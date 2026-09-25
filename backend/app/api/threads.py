@@ -48,14 +48,28 @@ import redis.asyncio as aioredis
 # buffer (degrade — skip that cursor) from a genuine outage (503). ResponseError is a
 # RedisError subclass, so the specific branch is handled BEFORE the broad except.
 from redis.exceptions import RedisError, ResponseError
-from app.models.message import RESERVED_RUN_INPUT_KEYS, MessageCreate, MessageResponse
+from app.models.message import (
+    RESERVED_RUN_INPUT_KEYS,
+    TRANSCRIPT_EVENT_KINDS,
+    MessageCreate,
+    MessageResponse,
+)
 from app.models.run import ActiveRunResponse
 from app.models.thread import (
+    ExpertScopePreview,
     ThreadCreate,
     ThreadResponse,
     ThreadSnapshotResponse,
     ThreadUpdate,
     ToolApprovalDecisionRequest,
+)
+# Phase 267 (D-267-11 / D-267-17) — the ONE statement of what a thread reads with an Expert, which
+# the preview route and the rename_thread event writer both read (never a second derivation).
+from app.services.expert_scope import (
+    build_expert_changed_event,
+    describe_expert_scope,
+    event_sentence,
+    scope_preview,
 )
 from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
@@ -497,6 +511,23 @@ async def list_active_runs(
     return runs_resp.data or []
 
 
+# Phase 267 (D-267-09 / PACK-23) — the ONE transcript allowlist for both read paths (/snapshot and
+# /messages). A role='system' row is returned ONLY when tool_calls[0].kind is in
+# TRANSCRIPT_EVENT_KINDS (models/message.py, one home). ⛔ It stays an ALLOWLIST: ask_user_prompt /
+# ask_user_response / context_truncated / iteration_cap_* rows exist in real data and would render as
+# assistant bubbles (and trip hasPendingAsk) if a denylist let them through.
+def _transcript_kind(row: dict) -> str | None:
+    calls = row.get("tool_calls")
+    if isinstance(calls, list) and calls and isinstance(calls[0], dict):
+        kind = calls[0].get("kind")
+        return kind if isinstance(kind, str) else None
+    return None
+
+
+def _visible_transcript_rows(rows: list[dict]) -> list[dict]:
+    return [r for r in rows if r.get("role") != "system" or _transcript_kind(r) in TRANSCRIPT_EVENT_KINDS]
+
+
 # Phase 075 D-075-01 / D-075-02 / D-075-03 / D-075-04: one-round-trip reconcile
 # primitive. Replaces the frontend's 3-call cold-cache chain (getActiveRuns +
 # loadMessages + per-run subscribeToRun?since=) with a single combined fetch.
@@ -534,21 +565,18 @@ async def get_snapshot(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
     # Step 2: messages SELECT + D-075-03 helper merge.
-    # BUG-260528-01: exclude role='system' rows (system_warning banners
-    # persisted since migration 048 / Plan 075.4-03). MessageResponse.role is
-    # Literal["user","assistant"], so serializing a system row raises
-    # ResponseValidationError → 500 and the thread never loads. These rows are
-    # an internal/forward-ref hook (Phase 082.5 error sink) with no frontend
-    # renderer yet; the live SSE event was already the user-visible signal.
+    # BUG-260528-01 (history): system rows were excluded in SQL because they 500'd a narrow role
+    # Literal and have no renderer. Phase 267 (D-267-09): the exclusion is now an ALLOWLIST applied
+    # by _visible_transcript_rows — only TRANSCRIPT_EVENT_KINDS system rows ride through; every other
+    # system kind (ask_user_*, context_truncated, iteration_cap_*, system_warning) stays out.
     msgs_resp = await aexec(
         supabase.table("messages")
         .select("*")
         .eq("thread_id", str(thread_id))
         .eq("user_id", current_user["id"])
-        .neq("role", "system")
         .order("created_at")
     )
-    messages = msgs_resp.data or []
+    messages = _visible_transcript_rows(msgs_resp.data or [])
     messages = await _enrich_messages_with_runs(
         messages,
         thread_id=str(thread_id),
@@ -672,6 +700,13 @@ async def get_snapshot(
 #      five suites stayed green under it, test_267_binding_gate.py does not).
 # ⛔ No refusal for a missing required connection (D-267-07 — the UI gate is the only gate), and
 # clearing an Expert never comes through here.
+async def _caller_roles(request: Request, current_user: dict) -> list[str]:
+    """The caller's org role via resolve_caller_role — never a key read off current_user."""
+    from app.dependencies import resolve_caller_role  # noqa: PLC0415
+    _role, _groups = await resolve_caller_role(request, current_user)
+    return [_role] if _role else []
+
+
 async def assert_expert_bindable(
     request: Request, current_user: dict, expert_id: UUID
 ) -> tuple[dict, str]:
@@ -689,14 +724,12 @@ async def assert_expert_bindable(
 
     # PACK-10 / SC#5: the caller must hold access to the bundle (not ungranted/private).
     from app.services.expert_service import get_expert_service  # noqa: PLC0415
-    from app.dependencies import resolve_caller_role  # noqa: PLC0415
-    _role, _groups = await resolve_caller_role(request, current_user)
     bundle = await get_expert_service(
         pool=pool,
         bundle_id=expert_id,
         caller_org_id=UUID(str(active_org_id)),
         caller_user_id=UUID(str(current_user["id"])),
-        caller_roles=[_role] if _role else [],
+        caller_roles=await _caller_roles(request, current_user),
     )
     if not bundle:
         raise HTTPException(
@@ -738,6 +771,52 @@ async def create_thread(
     return new_thread
 
 
+# Phase 267 (D-267-17 / D-267-18 / D-267-19 / PACK-25) — the restricted-cost preview.
+# ⛔ DECLARED ABOVE GET /{thread_id}: Starlette matches in order, and "/{thread_id}" would capture
+# "/expert-scope-preview" and answer it as a thread id.
+# Order: thread ownership (user JWT) → 404 before ANY other read (T-267-13); then the shared binding
+# gate; then the one statement. Names/counts come from the user-JWT client under RLS (T-267-14).
+@router.get("/expert-scope-preview", response_model=ExpertScopePreview)
+async def get_expert_scope_preview(
+    request: Request,
+    expert_id: UUID,
+    thread_id: UUID | None = None,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    thread_folder_id = None
+    if thread_id is not None:
+        t_resp = await aexec(
+            supabase.table("threads")
+            .select("id, folder_id")
+            .eq("id", str(thread_id))
+            .eq("user_id", current_user["id"])
+            .maybe_single()
+        )
+        t_row = t_resp.data if t_resp is not None else None
+        if not t_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+        thread_folder_id = t_row.get("folder_id")
+
+    _bundle, org_id = await assert_expert_bindable(request, current_user, expert_id)
+    try:
+        statement = await describe_expert_scope(
+            supabase=supabase,
+            pool=await get_pg_pool(),
+            user_id=current_user["id"],
+            org_id=org_id,
+            caller_roles=await _caller_roles(request, current_user),
+            expert_id=str(expert_id),
+            thread_folder_id=thread_folder_id,
+        )
+    except LookupError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Expert bundle not found or access denied",
+        )
+    return scope_preview(statement)
+
+
 @router.get("/{thread_id}", response_model=ThreadResponse)
 async def get_thread(
     thread_id: str,
@@ -756,6 +835,86 @@ async def get_thread(
     return result.data
 
 
+async def _thread_has_messages(supabase: Client, thread_id: str, user_id: str) -> bool:
+    """D-267-12: an event is written only once the thread holds ≥ 1 user/assistant message."""
+    resp = await aexec(
+        supabase.table("messages")
+        .select("id", count="exact")
+        .eq("thread_id", thread_id)
+        .eq("user_id", user_id)
+        .in_("role", ["user", "assistant"])
+        .limit(1)
+    )
+    count = getattr(resp, "count", None) if resp is not None else None
+    if isinstance(count, int):
+        return count > 0
+    return bool(getattr(resp, "data", None)) if resp is not None else False
+
+
+async def _expert_changed_event(
+    request: Request,
+    current_user: dict,
+    supabase: Client,
+    *,
+    before_expert: str | None,
+    after_expert: str | None,
+    folder_id: str | None,
+    org_id: str | None,
+):
+    """Both sides stated through the ONE statement helper, then the pure event builder."""
+    common = dict(
+        supabase=supabase,
+        pool=await get_pg_pool(),
+        user_id=current_user["id"],
+        org_id=org_id,
+        caller_roles=await _caller_roles(request, current_user),
+        thread_folder_id=folder_id,
+    )
+    try:
+        before = await describe_expert_scope(expert_id=before_expert, allow_unresolved=True, **common)
+    except LookupError:
+        # The previous Expert no longer exists at all, so there is nothing true to name. The change
+        # itself proceeds (clearing is never gated); the record is skipped and logged, not invented.
+        logger.warning("expert change on a thread: the previous Expert could not be named; no event")
+        return None
+    try:
+        after = await describe_expert_scope(expert_id=after_expert, **common)
+    except LookupError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Expert bundle not found or access denied",
+        )
+    return build_expert_changed_event(before, after, at=datetime.now(timezone.utc))
+
+
+async def _write_expert_change(conn, *, thread_id, user_id, org_id, update_data: dict, event) -> None:
+    """The UPDATE and the event row, on ONE user-JWT (RLS-as-caller) connection inside its txn.
+
+    D-267-34: ``org_id`` is the THREAD's own org, set explicitly — the messages autofill trigger
+    takes ``org_members … LIMIT 1``, which is the wrong org for a two-org user. ``tool_calls`` is a
+    plain list: the pool's jsonb codec encodes it (a pre-dumped string would be double-encoded).
+    """
+    after = update_data.get("active_expert_id")
+    params: list = [UUID(str(thread_id)), UUID(str(user_id)), UUID(str(after)) if after else None]
+    sets = ["active_expert_id = $3::uuid"]
+    if "title" in update_data:
+        params.append(update_data["title"])
+        sets.append(f"title = ${len(params)}")
+    await conn.execute(
+        f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid",
+        *params,
+    )
+    await conn.execute(
+        "INSERT INTO public.messages (thread_id, user_id, org_id, role, content, tool_calls) "
+        "VALUES ($1::uuid, $2::uuid, $3::uuid, 'system', $4, $5::jsonb)",
+        UUID(str(thread_id)),
+        UUID(str(user_id)),
+        UUID(str(org_id)),
+        event_sentence(event),
+        [event.model_dump(mode="json")],
+    )
+
+
 @router.patch("/{thread_id}", response_model=ThreadResponse)
 async def rename_thread(
     thread_id: str,
@@ -768,15 +927,73 @@ async def rename_thread(
     if body.title is not None:
         update_data["title"] = body.title.strip() or "New Chat"
 
+    bound_org_id: str | None = None
     if body.clear_active_expert or ("active_expert_id" in body.model_fields_set and body.active_expert_id is None):
         update_data["active_expert_id"] = None
     elif body.active_expert_id is not None:
         # Phase 267 (D-267-31): the shared, fail-closed gate. No validated org now REFUSES with a
         # reason — before 267 this arm skipped every check when no org validated.
-        await assert_expert_bindable(request, current_user, body.active_expert_id)
+        _bundle, bound_org_id = await assert_expert_bindable(request, current_user, body.active_expert_id)
         update_data["active_expert_id"] = str(body.active_expert_id)
 
-    if update_data:
+    # Phase 267 (D-267-09 / D-267-12 / D-267-34 / PACK-23) — the transcript event. Only when
+    # active_expert_id ACTUALLY changes (so the thread is read BEFORE the update) on a thread with
+    # ≥ 1 user/assistant message. Both statements are computed FIRST, outside any transaction; then
+    # the UPDATE and the event INSERT commit together or not at all. Every other PATCH (title-only,
+    # unchanged Expert, empty thread) stays on the existing supabase update below, byte-identical.
+    event = None
+    thread_org_id = None
+    if "active_expert_id" in update_data:
+        before_resp = await aexec(
+            supabase.table("threads")
+            .select("active_expert_id, folder_id, org_id")
+            .eq("id", thread_id)
+            .eq("user_id", current_user["id"])
+            .maybe_single()
+        )
+        before_row = before_resp.data if before_resp is not None else None
+        if not before_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+        before_expert = before_row.get("active_expert_id")
+        after_expert = update_data["active_expert_id"]
+        if str(before_expert or "") != str(after_expert or "") and await _thread_has_messages(
+            supabase, thread_id, current_user["id"]
+        ):
+            event = await _expert_changed_event(
+                request,
+                current_user,
+                supabase,
+                before_expert=before_expert,
+                after_expert=after_expert,
+                folder_id=before_row.get("folder_id"),
+                org_id=(
+                    bound_org_id
+                    or await resolve_active_org_or_none(request, current_user)
+                    or before_row.get("org_id")
+                ),
+            )
+            thread_org_id = before_row.get("org_id")
+
+    if event is not None:
+        try:
+            async with get_user_pg_connection(request, current_user) as conn:
+                await _write_expert_change(
+                    conn,
+                    thread_id=thread_id,
+                    user_id=current_user["id"],
+                    org_id=thread_org_id,
+                    update_data=update_data,
+                    event=event,
+                )
+        except Exception:
+            # T-267-20: the literal only; the cause goes to the log. The exception left the
+            # transaction, so asyncpg rolled back the UPDATE with the INSERT.
+            logger.error("expert change on thread %s was not written", thread_id, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="The Expert was not changed.",
+            )
+    elif update_data:
         # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
         await aexec(
             supabase.table("threads")
@@ -882,19 +1099,16 @@ async def get_messages(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
     # 1. Fetch messages.
-    # BUG-260528-01: exclude role='system' rows (system_warning banners,
-    # migration 048 / Plan 075.4-03) — MessageResponse.role only allows
-    # 'user'/'assistant', so a system row 500s this endpoint via
-    # ResponseValidationError. Mirror of the filter in get_snapshot.
+    # BUG-260528-01 → Phase 267 (D-267-09): system rows are filtered by the ONE allowlist helper,
+    # the mirror of get_snapshot — only TRANSCRIPT_EVENT_KINDS system rows are returned.
     msgs_resp = await aexec(
         supabase.table("messages")
         .select("*")
         .eq("thread_id", thread_id)
         .eq("user_id", current_user["id"])
-        .neq("role", "system")
         .order("created_at")
     )
-    messages = msgs_resp.data or []
+    messages = _visible_transcript_rows(msgs_resp.data or [])
 
     # 2. Phase 075 D-075-03: shared helper does the runs-FK merge so both
     # /messages and /snapshot route through one source of truth.
