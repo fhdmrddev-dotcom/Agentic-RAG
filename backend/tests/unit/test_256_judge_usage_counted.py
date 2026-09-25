@@ -758,6 +758,13 @@ _EXPECTED_FORCED_EMIT_SITES: dict[str, str] = {
     "services/skill_body_authoring.py": "NO-RUN",
     "services/skill_proposer_service.py": "NO-RUN",
     "services/skill_tuner_service.py": "NO-RUN",
+    # Phase 267 (PACK-24 / D-267-14). Found the same way 263's site was: this gate went red at
+    # 267-02's full-suite run, not from the plan. NO-RUN is the honest disposition — the handoff
+    # summary is a service called from `POST /threads/{id}/handoff`, before any `runs` or
+    # `workflow_runs` row exists (it creates a THREAD, not a run), exactly like `thread_title`.
+    # Its tokens are therefore attributed to nothing today; that gap is routed to Phase 268
+    # (METER-08), and this entry is where the METER-07 blind-spot view will find it.
+    "services/thread_handoff.py": "NO-RUN",
     "services/workflow_authoring.py": "NO-RUN",
 }
 

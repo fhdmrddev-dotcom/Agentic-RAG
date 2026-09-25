@@ -58,6 +58,7 @@ from app.models.run import ActiveRunResponse
 from app.models.thread import (
     ExpertScopePreview,
     ThreadCreate,
+    ThreadHandoffRequest,
     ThreadResponse,
     ThreadSnapshotResponse,
     ThreadUpdate,
@@ -70,6 +71,13 @@ from app.services.expert_scope import (
     describe_expert_scope,
     event_sentence,
     scope_preview,
+)
+# Phase 267 (D-267-14 / PACK-24) — the handoff summary is a SERVICE (never a tool); see its docstring.
+from app.services.thread_handoff import (
+    HandoffSummaryFailed,
+    handoff_title,
+    summarise_thread_for_handoff,
+    write_handoff,
 )
 from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
@@ -1011,6 +1019,120 @@ async def rename_thread(
     if not result or not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
     return result.data
+
+
+async def _expert_display_name(expert_id: str | None, org_id: str | None) -> str | None:
+    """The source thread's active Expert, by name, for the handoff event's `Here … stays` line."""
+    if not expert_id:
+        return None
+    try:
+        from app.services.expert_service import get_expert_service  # noqa: PLC0415
+        bundle = await get_expert_service(
+            pool=await get_pg_pool(),
+            bundle_id=UUID(str(expert_id)),
+            caller_org_id=UUID(str(org_id)) if org_id else None,
+        )
+    except Exception:  # noqa: BLE001 — a name for a pointer line; its absence is stated as null
+        logger.warning("handoff: the source thread's Expert could not be named", exc_info=True)
+        return None
+    return (bundle or {}).get("name") or None
+
+
+# Phase 267 (D-267-14 / D-267-15 / D-267-16 / D-267-33 / D-267-34 / PACK-24) — "New chat with <Expert>".
+# ONE request (also the double-submit fix): ownership (404 before anything else, T-267-13) → the
+# shared binding gate → the source's user/assistant rows (409 when there are none, before any LLM
+# call) → the send path's own model chain → the summary (502 on failure, NOTHING written) → ONE
+# user-JWT transaction writing the new thread, its handoff marker row and the source's event (500 and
+# a full rollback on failure). Install/connection gates stay UI-only here too (D-267-07, OQ-6).
+# Error bodies are literals only (T-267-20).
+@router.post("/{thread_id}/handoff", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
+async def handoff_thread(
+    thread_id: str,
+    body: ThreadHandoffRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    src_resp = await aexec(
+        supabase.table("threads")
+        .select("id, title, folder_id, org_id, active_expert_id")
+        .eq("id", thread_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    source = src_resp.data if src_resp is not None else None
+    if not source:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+
+    bundle, _org_id = await assert_expert_bindable(request, current_user, body.expert_id)
+
+    rows_resp = await aexec(
+        supabase.table("messages")
+        .select("role, content, created_at")
+        .eq("thread_id", thread_id)
+        .eq("user_id", current_user["id"])
+        .in_("role", ["user", "assistant"])
+        .order("created_at")
+    )
+    rows = (rows_resp.data if rows_resp is not None else None) or []
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This chat has no messages to hand off.",
+        )
+
+    # The send path's chain (send_message), so disabled-model fallback + provider inference match.
+    user_settings = await run_in_threadpool(load_user_settings, current_user["id"])
+    user_settings = await _run_model_resolution.apply_user_model_default(request, current_user, user_settings)
+    if body.provider and body.provider != user_settings.active_provider:
+        user_settings = override_provider(user_settings, body.provider)
+    model, provider, _notice, body, user_settings = await resolve_run_model(body=body, user_settings=user_settings)
+
+    expert = {"id": str(body.expert_id), "name": str(bundle.get("name") or "")}
+    source_title = source.get("title") or "New Chat"
+    try:
+        summary = await summarise_thread_for_handoff(
+            rows=rows,
+            source_title=source_title,
+            expert_name=expert["name"],
+            model=model,
+            provider=provider,
+            user_settings=user_settings,
+        )
+    except HandoffSummaryFailed:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="This chat could not be summarised.",
+        )
+
+    folder_name = None
+    if source.get("folder_id"):
+        f_resp = await aexec(
+            supabase.table("folders").select("name").eq("id", str(source["folder_id"])).maybe_single()
+        )
+        folder_name = ((f_resp.data if f_resp is not None else None) or {}).get("name")
+    stays_expert_name = await _expert_display_name(source.get("active_expert_id"), source.get("org_id"))
+
+    try:
+        async with get_user_pg_connection(request, current_user) as conn:
+            new_thread = await write_handoff(
+                conn,
+                source_thread=source,
+                user_id=current_user["id"],
+                expert=expert,
+                summary=summary,
+                title=handoff_title(expert["name"], source_title),
+                folder_name=folder_name,
+                stays_expert_name=stays_expert_name,
+                at=datetime.now(timezone.utc),
+            )
+    except Exception:
+        logger.error("handoff from thread %s was not written", thread_id, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The new chat could not be created.",
+        )
+    return new_thread
 
 
 @router.delete("/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
