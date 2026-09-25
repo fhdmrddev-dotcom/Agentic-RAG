@@ -365,3 +365,15 @@ async def test_x_a_zero_chunk_copy_owned_by_someone_else_is_named_not_touched():
     enq.assert_not_awaited()
     assert supa.writes() == []
     assert db.set_expert_install_status.await_args.kwargs["error"] == svc.REDRIVE_NOT_OWNER
+
+
+async def test_xi_the_installer_mints_with_folder_scoped_versioning():
+    # WR-03: without it, minting the install copy retires the admin's own same-named file in any
+    # other folder of the org, silently removing it from retrieval.
+    db = _db(claim=_claim(FOLDER), docs=[])
+    supa, mint, enq = FakeSupabase(folder_present=True), _mint(), AsyncMock()
+    await _run(db, supa, mint, enq, _corpus([(F1, RAW1)]))
+
+    mint.assert_awaited_once()
+    assert mint.await_args.kwargs["version_scope"] == "folder"
+

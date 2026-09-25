@@ -323,3 +323,82 @@ def test_link_requery_never_adopts_another_orgs_row():
         _mint(db, ORG_B, on_conflict="link")
     assert exc.value.status_code == 409
     assert db.link_site().has_org(ORG_B)
+
+
+# ---------------------------------------------------------------------------------------------
+# WR-03 (266 review) — the installer versions WITHIN its folder, never across the org
+# ---------------------------------------------------------------------------------------------
+# Versioning is keyed on (user_id, filename[, org_id]) and ignores the folder. So installing an
+# Expert retired the installing admin's OWN same-named document anywhere in the org, and retrieval
+# requires is_latest — the person's file silently left search. version_scope="folder" (the
+# installer only) adds the folder to the version lookup and the retirement; /upload is unchanged.
+
+INSTALL_FOLDER = "f0f0f0f0-0000-0000-0000-000000000001"
+OTHER_FOLDER = "f0f0f0f0-0000-0000-0000-000000000002"
+
+
+class _FolderFakeDB(_FakeDB):
+    """Adds the folder-ownership probe step 1 makes; every folder belongs to USER."""
+
+    def table(self, name):
+        if name == "folders":
+            return _FolderTable()
+        return super().table(name)
+
+
+class _FolderTable:
+    def select(self, *_a, **_k):
+        return self
+
+    def eq(self, _col, value):
+        self._id = value
+        return self
+
+    def maybe_single(self):
+        return self
+
+    def execute(self):
+        return _Result({"id": self._id, "user_id": USER})
+
+
+def _mint_into(db: _FakeDB, folder_id: str, **kw):
+    return mint_document_row(
+        raw=RAW,
+        filename=FILENAME,
+        mime_type=MIME,
+        user_id=USER,
+        supabase=db,  # type: ignore[arg-type]
+        folder_id=folder_id,
+        org_id=ORG_A,
+        on_conflict="link",
+        **kw,
+    )
+
+
+def test_folder_scope_never_retires_a_same_named_document_in_another_folder():
+    db = _FolderFakeDB(rows=[_row(id="mine", folder_id=OTHER_FOLDER, content_hash="h-mine")])
+    res = _mint_into(db, INSTALL_FOLDER, version_scope="folder")
+
+    assert res.version_number == 1
+    assert next(r for r in db.rows if r["id"] == "mine")["is_latest"] is True, (
+        "the admin's own file in another folder was un-latested by the install"
+    )
+    assert ("eq", ("folder_id", INSTALL_FOLDER)) in db.version_site().filters()
+
+
+def test_folder_scope_still_versions_within_the_install_folder():
+    db = _FolderFakeDB(rows=[_row(id="old", folder_id=INSTALL_FOLDER, content_hash="h-old")])
+    res = _mint_into(db, INSTALL_FOLDER, version_scope="folder")
+
+    assert res.version_number == 2
+    assert ("eq", ("folder_id", INSTALL_FOLDER)) in db.retire_site().filters()
+    assert next(r for r in db.rows if r["id"] == "old")["is_latest"] is False
+
+
+def test_default_scope_is_unchanged_and_carries_no_folder_predicate():
+    db = _FolderFakeDB(rows=[_row(id="mine", folder_id=OTHER_FOLDER, content_hash="h-mine")])
+    res = _mint_into(db, INSTALL_FOLDER)
+
+    assert res.version_number == 2
+    assert not any(f[1][0] == "folder_id" for f in db.version_site().filters())
+    assert not any(f[1][0] == "folder_id" for f in db.retire_site().filters())
