@@ -647,6 +647,8 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
       activeExpert={activeExpert}
       onActiveExpertChange={(exp) => void applyExpertChange(exp)}
       threadFolderName={dialogFolderName}
+      // 267-REVIEW WR-07: the folder id too, so a brand-new chat's preview states its real cost.
+      threadFolderId={dialogFolderId}
       hasMessages={messages.some((m) => m.role === "user" || m.role === "assistant")}
       onExpertHandoff={thread && threadNav ? handleExpertHandoff : undefined}
       onOpenConnections={onOpenConnections}

@@ -89,6 +89,8 @@ interface Props {
   // ── Phase 267 plan 04 (PACK-24 / PACK-25) — forwarded to the invite dialog, all optional ──────
   /** The thread's folder name, for the dialog's context line. */
   threadFolderName?: string | null
+  /** 267-REVIEW WR-07: that folder's id — forwarded so a brand-new chat's preview can use it. */
+  threadFolderId?: string | null
   /** True when the thread has ≥ 1 message — only then can a question be handed to a new chat. */
   hasMessages?: boolean
   /** "New chat with <Expert>" — absent means the dialog offers no such control. */
@@ -169,6 +171,7 @@ export function MessageInput({
   onActiveExpertChange,
   onBrowseExperts,
   threadFolderName,
+  threadFolderId,
   hasMessages,
   onExpertHandoff,
 }: Props) {
@@ -980,6 +983,7 @@ export function MessageInput({
         currentExpertName={activeExpert?.name ?? null}
         threadId={threadId ?? null}
         threadFolderName={threadFolderName ?? null}
+        threadFolderId={threadFolderId ?? null}
         hasMessages={hasMessages ?? false}
         onHandoff={onExpertHandoff}
         onOpenConnections={onOpenConnections}

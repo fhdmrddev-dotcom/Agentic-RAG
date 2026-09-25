@@ -259,10 +259,14 @@ export interface ExpertScopePreview {
 export async function getExpertScopePreview(
   expertId: string,
   threadId?: string | null,
+  /** 267-REVIEW WR-07: a brand-new chat's picked folder — sent ONLY when there is no thread yet
+   *  (a thread's own folder always wins server-side). */
+  folderId?: string | null,
 ): Promise<ExpertScopePreview> {
   const headers = await getAuthHeaders()
   const params = new URLSearchParams({ expert_id: expertId })
   if (threadId) params.set("thread_id", threadId)
+  else if (folderId) params.set("folder_id", folderId)
   const res = await fetch(`${API_BASE}/threads/expert-scope-preview?${params.toString()}`, { headers })
   if (!res.ok) {
     // The refusal-preserving shape `postMessage` uses: a tier refusal names the plan, any other

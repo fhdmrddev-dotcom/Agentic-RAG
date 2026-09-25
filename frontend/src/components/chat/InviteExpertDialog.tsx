@@ -61,6 +61,9 @@ interface InviteExpertDialogProps {
   threadId?: string | null
   /** The thread's folder name, for the context line. */
   threadFolderName?: string | null
+  /** 267-REVIEW WR-07: the folder a brand-new chat (no `threadId` yet) was scoped to, so its
+   *  preview states what the thread about to be created will exclude. Ignored with a thread. */
+  threadFolderId?: string | null
   /** True when the thread has ≥ 1 message — only then is there anything to hand off (R8). */
   hasMessages?: boolean
   /** "New chat with …" — resolves once the new thread is open; rejects with the reason. */
@@ -357,6 +360,7 @@ export function InviteExpertDialog({
   currentExpertName,
   threadId,
   threadFolderName,
+  threadFolderId,
   hasMessages = false,
   onHandoff,
   onOpenConnections,
@@ -376,7 +380,12 @@ export function InviteExpertDialog({
   const loadPreview = useCallback(
     (expertId: string, generation: number) => {
       setPreviews((p) => ({ ...p, [expertId]: { status: "loading" } }))
-      getExpertScopePreview(expertId, threadId ?? null)
+      // 267-REVIEW WR-07: no thread yet → the picked folder is what the new thread will carry.
+      const request =
+        !threadId && threadFolderId
+          ? getExpertScopePreview(expertId, null, threadFolderId)
+          : getExpertScopePreview(expertId, threadId ?? null)
+      request
         .then((preview) => {
           if (generationRef.current === generation) {
             setPreviews((p) => ({ ...p, [expertId]: { status: "ready", preview } }))
@@ -388,7 +397,7 @@ export function InviteExpertDialog({
           }
         })
     },
-    [threadId],
+    [threadId, threadFolderId],
   )
 
   useEffect(() => {

@@ -792,10 +792,21 @@ async def get_expert_scope_preview(
     request: Request,
     expert_id: UUID,
     thread_id: UUID | None = None,
+    folder_id: UUID | None = None,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
     thread_folder_id = None
+    if thread_id is None and folder_id is not None:
+        # 267-REVIEW WR-07: a brand-new chat has no thread yet but may already have its folder
+        # picked, and the thread handleSend creates will carry it. Read ONLY without a thread (a
+        # thread's own folder always wins), and only for a folder the caller can see — 404 before
+        # the gate or any statement otherwise, the same order the thread arm keeps.
+        from app.utils.folder_utils import fetch_visible_folders  # noqa: PLC0415
+        visible = await fetch_visible_folders(supabase, str(current_user["id"]))
+        if str(folder_id) not in {str(f.get("id")) for f in visible}:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+        thread_folder_id = str(folder_id)
     if thread_id is not None:
         t_resp = await aexec(
             supabase.table("threads")
