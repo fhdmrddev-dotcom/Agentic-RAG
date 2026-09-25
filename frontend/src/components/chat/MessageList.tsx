@@ -61,6 +61,16 @@ function formatFloatingElapsed(createdAt: string | undefined): string | null {
   return `${m}m ${s}s`
 }
 
+/**
+ * Phase 267 plan 04 (D-267-09): the index of the last CONVERSATION row. A transcript event is a
+ * `role: "system"` row appended after an answer; it must never be read as "the last message",
+ * or the answer before it loses its suggestions, its Continue card and its streaming flag.
+ */
+function lastTurnIndex(list: Message[]): number {
+  for (let i = list.length - 1; i >= 0; i--) if (list[i].role !== "system") return i
+  return -1
+}
+
 export function MessageList({ messages, isStreaming, isLoading = false, onSendMessage, showSuggestions, onResume, threadId }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const prevCountRef = useRef(0)
@@ -194,8 +204,8 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
   // identity lives in the header strip; this chip is the "↓ Jump to live" home,
   // carrying step + a calm motion verb so it is honest from the bottom too.
   const streamingMessage =
-    isStreaming && messages.length > 0 && messages[messages.length - 1].role === "assistant"
-      ? messages[messages.length - 1]
+    isStreaming && lastTurnIndex(messages) >= 0 && messages[lastTurnIndex(messages)].role === "assistant"
+      ? messages[lastTurnIndex(messages)]
       : undefined
   const chipStepCount = streamingMessage ? unifiedStepCount(streamingMessage) : 0
   const chipElapsed = formatFloatingElapsed(streamingMessage?.created_at) ?? ""
@@ -233,7 +243,7 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
         ) : (
           renderMessages.map((msg, idx) => {
             const isLastAssistant =
-              msg.role === "assistant" && idx === renderMessages.length - 1
+              msg.role === "assistant" && idx === lastTurnIndex(renderMessages)
             return (
               <MessageItem
                 key={msg.role === "assistant" && msg.runId ? `run-${msg.runId}` : msg.id}

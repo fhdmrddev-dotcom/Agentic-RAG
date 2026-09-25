@@ -198,6 +198,69 @@ export async function setThreadActiveExpert(threadId: string, expertId: string |
   return res.json() as Promise<Thread>
 }
 
+// ── Phase 267 plan 04 (PACK-23 / PACK-24 · D-267-09 / D-267-11 / D-267-15) — transcript payloads ──
+//
+// The wire shapes `backend/app/models/message.py` stores as `messages.tool_calls[0]`, declared HERE
+// beside the thread API that returns them. ⛔ Rendered ONLY by `components/chat/expertEventCopy.ts`
+// (one vocabulary home); the executable copies are `backend/tests/fixtures/phase267/*.json`, which
+// the frontend suites parse rather than retype. Every name is snapshotted at write time.
+
+/** A folder on a scope line. `name: null` = a folder the caller cannot see. */
+export interface TranscriptFolderRef {
+  id: string | null
+  name: string | null
+  /** Only the thread's own folder carries a count. */
+  doc_count: number | null
+}
+
+export interface TranscriptScopeLine {
+  folders: TranscriptFolderRef[]
+  thread_folder: TranscriptFolderRef | null
+  /** True = no folder filter at all. */
+  all_documents: boolean
+  /** Connection display names. */
+  connections: string[]
+}
+
+export interface TranscriptExpertRef {
+  id: string
+  name: string
+  scope_mode: "biased" | "restricted"
+}
+
+/** A swap, join (`before` null) or removal (`after` null), written on a thread with messages. */
+export interface ExpertChangedEvent {
+  kind: "expert_changed"
+  at: string
+  before: TranscriptExpertRef | null
+  after: TranscriptExpertRef | null
+  now: TranscriptScopeLine
+  dropped: TranscriptScopeLine
+  /** Restricted Expert on a folder-scoped thread only: the documents it will not read (≤ 5 names). */
+  excluded: { count: number; names: string[] } | null
+}
+
+/** The SOURCE thread's pointer to the thread a question was handed to. */
+export interface ExpertHandoffEvent {
+  kind: "expert_handoff"
+  at: string
+  target_thread_id: string
+  target_title: string
+  expert_name: string
+  stays_expert_name: string | null
+  folder_name: string | null
+}
+
+/** `tool_calls[0]` of the new thread's first (USER) message — never a transcript-only kind. */
+export interface HandoffMarker {
+  kind: "handoff"
+  source_thread_id: string
+  source_title: string
+  expert_name: string
+  summary: string[]
+  folder_name: string | null
+}
+
 // ── Phase 063: Run-backed streaming API ──────────────────────────────────────
 //
 // The legacy POST-and-stream-on-the-same-request orchestrator was physically
