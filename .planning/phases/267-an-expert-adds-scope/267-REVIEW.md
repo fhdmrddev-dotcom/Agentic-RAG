@@ -43,7 +43,11 @@ findings:
   warning: 9
   info: 8
   total: 19
-status: issues_found
+status: fixed
+fix_outcomes:
+  fixed: 13
+  refuted: 0
+  deferred: 6
 ---
 
 # Phase 267: Code Review Report
@@ -293,6 +297,42 @@ Each case asserts a deletion that did not happen. The docblock's own rule ("a th
 **Fix:** Keep an in-flight ref and drop or serialize changes while one is pending, as the handoff path does.
 
 ---
+
+## Fix outcomes
+
+Applied 2026-09-26 on `develop`, base `58de046f3`, main working tree. Each finding was driven RED before it was fixed: a `test(267-review): RED — …` commit that fails on base for the reason the finding states, then a `fix(267-review): …` commit. **No finding was refuted.** All 2 Critical and 9 Warning findings are fixed. Two Info findings met the "≤ 5 lines and obviously safe" bar and are fixed. The other six Info findings are deferred, each with its reason below.
+
+`status: fixed` means every Critical and Warning is closed. The six deferred items are Info.
+
+| Finding | Outcome | RED → fix | What changed |
+|---|---|---|---|
+| **CR-01** stale `active_expert_id` in the thread list | **fixed** | `e9dc1c6ed` → `00b61552c` | `useThreads.patchThread` (list + selection). ChatArea's one change home passes the PATCH's returned `Thread` to a new optional `onThreadUpdated`, and ChatLayout wires it. RED drove the real `useThreads` + real ChatArea through swap A→B on T, open U, back to T; a source check pins ChatLayout's wiring. |
+| **CR-02** disabled Expert bindable | **fixed** | `774ca3766` → `0e55d3465` | `assert_expert_bindable` refuses `is_enabled = false` with its existing 404 sentence, which covers PATCH, POST /threads and the handoff. `resolve_expert_bundle` returns `None`, so the run clears the id and refuses (fail-closed). There is one case per door plus the resolver. |
+| **WR-01** refused create loses the message | **fixed** | `975e400b6` → `8c3f4a16a` | ChatArea catches the refused create, shows the server's sentence in the existing `role="alert"` line, and resolves `false`. MessageInput puts the text back and keeps the draft when a send resolves `false`. There are no attachments to lose: `useComposerAttachments` refuses them without a thread. |
+| **WR-02** refusal banner follows to other threads | **fixed** | `5bdf5beaa` → `8197ddda9` | One line in the per-thread reset effect. |
+| **WR-03** handoff gated in active org, written into source org | **fixed** | `aa234d182` → `0c24b42d9`, `448d877cf` | **Chose refuse over re-gate.** Handoff answers 409 "Switch to this chat's organization to hand it off." and PATCH answers 409 "Switch to this chat's organization to invite an Expert." when the thread's org ≠ the gate's org. Gating against the source org would need a second membership check; refusing keeps one gate, one org, and D-267-34's thread-org stamping unchanged (`threads.org_id` is NOT NULL, so the comparison is strict). Three suites' fixtures pinned the mismatch (the handoff fixture deliberately set `SOURCE_ORG ≠` the gate's org; the 261 scenario row had no `org_id`). They now carry the thread's own org, and the active org stays different, so D-267-34 is still discriminated. |
+| **WR-04** change during a stream lands above the old answer | **fixed** | `97db13f8a` → `0e1954323` | **Chose refuse, not re-time the event.** PATCH answers 409 "Wait for this answer to finish before changing the Expert." when the value changes and a primary run is `streaming` (the snapshot's own predicate, sub-agents excluded). ChatArea's one change home refuses the same state before any PATCH, showing the reason in the existing alert line; the chip does not move. ChatArea case (6) had pinned the defect as a success and was replaced. |
+| **WR-05** scoped key admits revoked/errored connections | **fixed** | `97e6bad8f` → `ca559d4de` | The admission line (still one line, compiled by `test_chat_connector_scoping.py`) requires `status == 'active'` on the scoped-key arm; switched-on ids are unchanged. No name containing "expert" was added to `agent_loop.py`. |
+| **WR-06** D-267-35 not stated on unscoped threads | **fixed** | `16038a31e` → `654dc74db` | **Stating only; retrieval unchanged.** The new pure selector `narrowingLedgerColumns(preview)` gives `Will use` (the Expert's folders + Chat attachments) and `Won't use` (All your documents). It returns `null` unless the preview is biased, has no thread folder, and has folders. The invite dialog previews a biased row only on a chat with no folder and renders that statement without ever blocking the invite. `ExpertSpotlightCard` gains an opt-in `unscopedChat` prop that reads the same preview, and ChatArea sets it on the empty-thread and welcome mounts (the catalog Start Chat door, where D-267-12 writes no event). |
+| **WR-07** new chat's folder ignored by the preview | **fixed** | `de7ae168a` → `3e6a5cc32` | `GET /threads/expert-scope-preview` takes an optional `folder_id`. It is read only without a `thread_id` (the thread's own folder wins), and only for a folder in `fetch_visible_folders`; any other folder gets a 404 "Folder not found" before the gate or any statement. The client sends it only without a thread, and ChatArea forwards the folder id through MessageInput to the dialog. |
+| **WR-08** Chat attachments folded into "and k more" | **fixed** | `5e1293c64` → `01b22550a` | `LedgerItem.pinned`: pinned items are never counted into the overflow and render after the truncated list. UI-SPEC §5.3's order (folders, then Chat attachments) is kept. |
+| **WR-09** "· deleted" claimed without evidence | **fixed** | `3acd60ed6` → `2acc8d505` | An unfound target renders its plain title and no control. The `· deleted` copy and `deletedLabel` are removed, not left looking live. ExpertEventCard case (9) had pinned the defect and was replaced. |
+| **IN-02** Active pill re-PATCHes | **fixed** | `87107946f` → `7b9e64892` | The pill is a `<span>` (same classes and test id), not a button wired to `onInvite`. |
+| **IN-06** `thread_folder.name` typed `string` | **fixed** | `d20785a92` → `40a524d1c` | Now `string \| null`. A `?raw` fence reads both the server model and the client type, since a type mismatch has no runtime symptom. |
+| **IN-01** transcript-kind predicate spelled twice | **deferred** | none | This is a refactor across `threads.py` and `agent_loop.py` (G-5 hot files), more than 5 lines. Re-open trigger: the next change to the transcript discriminator shape. |
+| **IN-03** `?? "Folder"` placeholder | **deferred** | none | The one-line swap to `UNNAMEABLE_FOLDER` would render "This chat · /a knowledge folder you cannot see" (the context line adds the `/`), which is a copy decision, not an obviously safe fix. It needs a UI-SPEC ruling on the unnameable context line. |
+| **IN-04** second catalog start dropped silently | **deferred** | none | Passing `startBusy` to every card changes every card's busy rendering; that is more than a line and not obviously safe. Re-open with the catalog surfaces' next phase. |
+| **IN-05** member skills listed after the trim notice | **deferred** | none | This is a prompt-assembly change in `agent_loop.py` (an owed seam, D-267-23), more than 5 lines. |
+| **IN-07** handoff user→user turns unverified per provider | **deferred** | none | This needs the live SC#10 per-provider board (operator-driven UAT), not a code fix. It is owed as a handoff-thread row on that board. |
+| **IN-08** overlapping Expert changes revert wrongly | **deferred** | none | An in-flight ref plus serialization is more than 5 lines. WR-04's streaming refusal narrows the window but does not close it. |
+
+**Gates (after all fixes, `develop` at `c7c452fd2`):**
+- Backend unit baseline: `[GATE PASSED] Backend unit baseline satisfied (failed: 71 <= 71, errors: 0).` (71 failed, 5839 passed, 1 skipped, 2 xfailed, 2 xpassed). All 8 backend test files this work touched pass (130/130). The 71 are inherited: for example, `test_chat_tool_approval.py::test_tool_approval_ask_emits_event_and_pauses` fails identically with the committed `agent_loop.py`, and the `threads.py` source-grep rot (`_persist_assistant_message`, `event_consumer`, `iteration_start`) predates the phase.
+- Vitest count gate (`GSD_VITEST_MAX_WORKERS=2`, repo root): `count gate OK — 336/336 pinned files present, no per-file decrease, 0 failing.` (total 8969, pinned total 8221). There are no new suite files; five pins were raised to the printed counts (`c7c452fd2`), and two of them had lagged their files by 1 and 2 before this work.
+- Frontend typecheck `npx tsc -p tsconfig.app.json --noEmit`: **70 errors, the same set as base** (set diff empty).
+- Fences: the `agent_loop.py` AST fence (no `expert` name, no `if expert:`) and `expert_service.py`'s no-LLM-import fence both stay green (`test_259_closed_core_inventory`, `test_264_*`, `test_267_tool_floor_union`, `test_267_handoff`).
+
+_Fixes applied: 2026-09-26 · Fixer: Claude (gsd-code-fixer)_
 
 _Reviewed: 2026-09-26_
 _Reviewer: Claude (gsd-code-reviewer)_
