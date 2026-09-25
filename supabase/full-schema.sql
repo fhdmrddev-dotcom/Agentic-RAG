@@ -4107,7 +4107,7 @@ CREATE UNIQUE INDEX documents_completed_hash_unique_idx ON public.documents USIN
 -- Name: documents_dedup_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX documents_dedup_idx ON public.documents USING btree (user_id, content_hash, COALESCE(folder_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE (status <> 'failed'::text);
+CREATE UNIQUE INDEX documents_dedup_idx ON public.documents USING btree (org_id, user_id, content_hash, COALESCE(folder_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE (status <> 'failed'::text);
 
 
 --
