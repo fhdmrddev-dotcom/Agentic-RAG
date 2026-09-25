@@ -234,7 +234,12 @@ describe("(B) one PATCH home", () => {
     expect(h.loadMessages).not.toHaveBeenCalled()
   })
 
-  it("(6) while THIS thread is streaming, a successful change does not refetch", async () => {
+  // 267-REVIEW WR-04 — this case used to read "(6) while THIS thread is streaming, a successful
+  // change does not refetch": it pinned the defect. A change written while a run streams lands its
+  // event row ABOVE the answer the previous Expert is still producing (the assistant row is written
+  // at run end), so the event's `Now` line described an answer it did not produce. The change is now
+  // refused in the ONE home with a visible reason (and the server answers 409 for the same state).
+  it("(6) while THIS thread is streaming, removing the Expert is refused with a visible reason and no PATCH", async () => {
     const user = userEvent.setup()
     render(
       shell(<ChatArea thread={{ ...THREAD, active_expert_id: FA.id } as Thread} onCreateThread={vi.fn()} folders={[]} />),
@@ -245,9 +250,31 @@ describe("(B) one PATCH home", () => {
     })
     const chip = screen.getByTestId("active-expert-chip")
     await user.click(within(chip).getByRole("button", { name: /dismiss financial analyzer/i }))
-    await waitFor(() => expect(h.setThreadActiveExpert).toHaveBeenCalledTimes(1))
-    await new Promise((r) => setTimeout(r, 20))
+    const alert = await screen.findByTestId("expert-change-error")
+    expect(alert).toHaveAttribute("role", "alert")
+    expect(alert.textContent).toBe("Wait for this answer to finish before changing the Expert.")
+    expect(alert).toBeVisible()
+    expect(h.setThreadActiveExpert).not.toHaveBeenCalled()
+    expect(screen.getByTestId("active-expert-chip").textContent).toContain("Financial Analyzer")
     expect(h.loadMessages).not.toHaveBeenCalled()
+  })
+
+  it("(6b) while THIS thread is streaming, Replace is refused the same way", async () => {
+    h.messages = TALK
+    const user = userEvent.setup()
+    render(
+      shell(<ChatArea thread={{ ...THREAD, active_expert_id: FA.id } as Thread} onCreateThread={vi.fn()} folders={[]} />),
+    )
+    await screen.findByTestId("active-expert-chip")
+    act(() => {
+      useStreamsStore.setState({ streamingThreads: new Set([THREAD.id]) })
+    })
+    await openInvite(user)
+    await user.click(await screen.findByTestId("expert-replace-btn-contract-reviewer"))
+    const alert = await screen.findByTestId("expert-change-error")
+    expect(alert.textContent).toBe("Wait for this answer to finish before changing the Expert.")
+    expect(h.setThreadActiveExpert).not.toHaveBeenCalled()
+    expect(screen.getByTestId("active-expert-chip").textContent).toContain("Financial Analyzer")
   })
 })
 

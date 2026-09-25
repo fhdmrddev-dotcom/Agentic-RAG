@@ -196,8 +196,10 @@ async def test_the_expert_changed_fixture_is_the_real_builders_output():
 class ThreadsDb:
     """Answers the supabase-py reads/writes rename_thread routes through ``aexec``."""
 
-    def __init__(self, *, before_expert, folder_id=ACME_FOLDER, messages=3, after_expert=None):
+    def __init__(self, *, before_expert, folder_id=ACME_FOLDER, messages=3, after_expert=None, streaming=()):
         self.before = {"active_expert_id": before_expert, "folder_id": folder_id, "org_id": THREAD_ORG}
+        # 267-REVIEW WR-04: the thread's primary runs still streaming (none by default).
+        self.streaming = [{"run_id": r} for r in streaming]
         self.final = {
             "id": THREAD_ID, "user_id": USER_ID, "title": "Chat", "folder_id": folder_id,
             "active_expert_id": after_expert, "org_id": THREAD_ORG,
@@ -216,6 +218,8 @@ class ThreadsDb:
         if q.table_name == "threads":
             cols = q.call("select")[0][1][0]
             return SimpleNamespace(data=dict(self.final) if cols == "*" else dict(self.before))
+        if q.table_name == "runs":
+            return SimpleNamespace(data=list(self.streaming))
         if q.table_name == "messages":
             n = self.messages
             return SimpleNamespace(data=[{"id": str(uuid4())}] if n else [], count=n)
@@ -387,6 +391,40 @@ async def test_a_failed_event_insert_rolls_the_update_back_and_says_so():
     assert txn.entered == 1
     assert txn.committed is False  # the exception left the transaction: asyncpg rolls back
     assert db.updates() == []
+
+
+# ── 267-REVIEW WR-04: no Expert change while this thread has a run streaming ─────────────────────
+#
+# The event row is inserted at once (created_at = now()), but the streaming assistant row is written
+# when the run finalizes — so after the run-end reconcile the transcript read: question, "A → B · Now:
+# B's folders", then the answer A's scope produced. The event's Now line sat above an answer it does
+# not describe. The change is refused while a primary run streams ("From your next message" holds).
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "before,after",
+    [(FA_ID, HR_ID), (None, HR_ID), (FA_ID, None)],
+    ids=["swap", "join", "removal"],
+)
+async def test_WR04_an_expert_change_while_a_run_streams_is_refused_and_writes_nothing(before, after):
+    db = ThreadsDb(before_expert=before, after_expert=after, streaming=[str(uuid4())])
+    txn = FakeTxn(FakeConn())
+    body = ThreadUpdate(active_expert_id=UUID(after)) if after else ThreadUpdate(clear_active_expert=True)
+    with pytest.raises(HTTPException) as exc:
+        await _patch_thread(body, db, txn)
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "Wait for this answer to finish before changing the Expert."
+    assert txn.entered == 0
+    assert db.updates() == []
+
+
+@pytest.mark.asyncio
+async def test_WR04_with_no_run_streaming_the_swap_is_unchanged():
+    db = ThreadsDb(before_expert=FA_ID, after_expert=HR_ID, streaming=[])
+    txn = FakeTxn(FakeConn())
+    await _patch_thread(ThreadUpdate(active_expert_id=UUID(HR_ID)), db, txn)
+    assert txn.entered == 1 and txn.committed is True
 
 
 # ── the transcript allowlist on the two read paths ─────────────────────────────────────────────
