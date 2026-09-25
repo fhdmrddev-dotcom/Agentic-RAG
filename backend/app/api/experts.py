@@ -21,6 +21,7 @@ from supabase import Client
 
 from app.dependencies import (
     _has_org_permission,
+    feature_visible,
     get_active_org_id,
     get_current_user,
     get_pg_pool,
@@ -54,6 +55,7 @@ from app.services.skill_body_authoring import (
 from app.services.expert_service import (
     ResolvedExpertBundle,
     add_expert_grant_service,
+    connection_states,
     create_expert_service,
     delete_expert_service,
     filter_visible_skill_names,
@@ -455,7 +457,11 @@ async def list_experts(
             enabled_only=enabled_only,
         )
         # Phase 266 (D-266-03): the manage gate above already answered, so can_install is True.
-        return await overlay_install_state(pool, managed, org_id=org_id, can_install=True)
+        managed = await overlay_install_state(pool, managed, org_id=org_id, can_install=True)
+        # Phase 267 (D-267-05): every row tells the truth about its required connections.
+        return await _overlay_connection_state_for_caller(
+            request, current_user, active_org, pool, managed, org_id
+        )
 
     rows = await list_experts_service(
         pool=pool,
@@ -466,7 +472,8 @@ async def list_experts(
         # R265-262-07 / PACK-11: only the management arm may list disabled Experts.
         enabled_only=True,
     )
-    return await _overlay_install_state_for_caller(request, current_user, active_org, pool, rows, org_id)
+    rows = await _overlay_install_state_for_caller(request, current_user, active_org, pool, rows, org_id)
+    return await _overlay_connection_state_for_caller(request, current_user, active_org, pool, rows, org_id)
 
 
 async def _overlay_install_state_for_caller(
@@ -487,6 +494,54 @@ async def _overlay_install_state_for_caller(
     if any(r.get("is_system") for r in rows):
         can_install = await _has_org_permission(request, current_user, active_org, "experts:manage")
     return await overlay_install_state(pool, rows, org_id=org_id, can_install=can_install)
+
+
+async def _overlay_connection_state_for_caller(
+    request: Request,
+    current_user: dict[str, Any],
+    active_org: str,
+    pool: asyncpg.Pool,
+    rows: list[dict[str, Any]],
+    org_id: UUID,
+) -> list[dict[str, Any]]:
+    """Phase 267 (D-267-05 / D-267-06 / PACK-22): every Expert row says which of its required
+    connections the ACTIVE org has connected, and whether THIS caller can connect them.
+
+    Two NEW keys on every row (a copy — the input row is never changed):
+
+    - ``connection_state``: ``[{slug, name, connected}]`` in ``required_connections`` order, ``[]``
+      when nothing is required. Computed by ``expert_service.connection_states`` — the SAME rule
+      the run's resolver strips by, so the UI and the run cannot disagree. ⛔ Never re-spelled here.
+    - ``can_connect``: ``org:manage`` AND the ``live_connectors`` feature visible — exactly the gate
+      ``POST /connections`` applies (``require_org_manage`` + ``require_visible("live_connectors")``),
+      so a member is never offered a button that 403s. ⛔ Never the Expert-authoring permission
+      (UI-SPEC R-1): managing Experts is not managing connections.
+
+    ⛔ ``required_connections`` is NOT replaced: it is the string list the studio round-trips into
+    ``PATCH /experts/{id}`` for org-authored Experts (T-267-06). Cost: ONE connection read for the
+    whole list, and the permission is asked ONLY when some row has a missing connection — so a list
+    that needs nothing costs nothing.
+    """
+    union = sorted({s for r in rows for s in (r.get("required_connections") or [])})
+    by_slug = {st.slug: st for st in await connection_states(pool, org_id, union)}
+    missing = any(
+        not by_slug[s].connected for r in rows for s in (r.get("required_connections") or [])
+    )
+    can_connect = False
+    if missing:
+        can_connect = await _has_org_permission(
+            request, current_user, active_org, "org:manage"
+        ) and await feature_visible(request, current_user, "live_connectors")
+
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        row = dict(r)
+        row["connection_state"] = [
+            by_slug[s].model_dump() for s in (r.get("required_connections") or [])
+        ]
+        row["can_connect"] = bool(can_connect)
+        out.append(row)
+    return out
 
 
 @router.get("/installs", status_code=status.HTTP_200_OK, response_model=list[ExpertInstallSummary])
@@ -535,10 +590,13 @@ async def get_expert(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Expert bundle not found",
         )
-    (overlaid,) = await _overlay_install_state_for_caller(
+    overlaid = await _overlay_install_state_for_caller(
         request, current_user, active_org, pool, [bundle], org_id
     )
-    return overlaid
+    (overlaid_row,) = await _overlay_connection_state_for_caller(
+        request, current_user, active_org, pool, overlaid, org_id
+    )
+    return overlaid_row
 
 
 @router.post("/{bundle_id}/install", status_code=status.HTTP_202_ACCEPTED, response_model=ExpertInstallResult)

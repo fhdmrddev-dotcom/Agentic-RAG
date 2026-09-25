@@ -242,7 +242,9 @@ def test_a_list_with_no_first_party_row_asks_no_permission_question(app_):
          patch("app.api.experts.overlay_install_state", ov):
         resp = TestClient(app_).get("/experts")
     assert resp.status_code == 200
-    assert resp.json() == authored
+    # Phase 267 (D-267-05): every row now also carries the connection overlay. This row
+    # requires nothing, so the overlay costs nothing either — and it still asks no permission.
+    assert resp.json() == [dict(authored[0], connection_state=[], can_connect=False)]
     mperm.assert_not_awaited()
 
 

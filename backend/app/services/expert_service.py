@@ -34,6 +34,62 @@ class ResolvedExpertBundle(BaseModel):
     stripped_details: list[str] = Field(default_factory=list)
 
 
+class ConnectionState(BaseModel):
+    """Phase 267 (D-267-05) — one required connection, as the caller's org sees it."""
+
+    slug: str
+    name: str
+    connected: bool
+
+
+async def connection_states(
+    pool: asyncpg.Pool,
+    org_id: UUID | None,
+    required: list[str],
+) -> list[ConnectionState]:
+    """Phase 267 (D-267-05 / D-267-07) — THE ONE "is it connected" rule.
+
+    A required slug is connected ⇔ some ``connector_connections`` row of ``org_id`` has
+    ``is_enabled`` AND ``status = 'active'`` and its ``service_id`` OR ``capability`` equals the
+    slug. ``name`` is the display name of a connected matching row, else of ANY matching row (a
+    revoked "Google Workspace" can still be named), else the slug itself.
+
+    Read by ``resolve_expert_bundle`` (the run strips what is not connected — fail-closed, silent
+    to the run) AND by the Expert list/get overlay in ``api/experts.py`` (the UI names it). ⛔ Never
+    re-spell this rule anywhere else; call this.
+
+    One ``SELECT`` per call, the org bound as ``$1`` (T-267-04). ``org_id`` None or nothing
+    required → ZERO queries. One entry per required slug, in order (duplicates kept).
+    """
+    if not required:
+        return []
+    if org_id is None:
+        return [ConnectionState(slug=s, name=s, connected=False) for s in required]
+
+    rows = await pool.fetch(
+        """
+            SELECT service_id, capability, name, is_enabled, status
+            FROM public.connector_connections
+            WHERE org_id = $1
+            ORDER BY created_at;
+        """,
+        org_id,
+    )
+    states: list[ConnectionState] = []
+    for slug in required:
+        matching = [r for r in rows if r.get("service_id") == slug or r.get("capability") == slug]
+        live = [r for r in matching if r.get("is_enabled") and r.get("status") == "active"]
+        named = live[0] if live else (matching[0] if matching else None)
+        states.append(
+            ConnectionState(
+                slug=slug,
+                name=(named.get("name") if named is not None and named.get("name") else slug),
+                connected=bool(live),
+            )
+        )
+    return states
+
+
 async def create_expert_service(
     pool: asyncpg.Pool,
     org_id: UUID,
@@ -528,34 +584,22 @@ async def resolve_expert_bundle(
     raw_connections = bundle.get("required_connections") or []
     effective_connections: list[str] = []
 
-    if raw_connections:
-        conn_query = """
-            SELECT DISTINCT service_id, capability
-            FROM public.connector_connections
-            WHERE org_id = $1
-              AND is_enabled = true
-              AND status = 'active';
-        """
-        conn_rows = await pool.fetch(conn_query, caller_org_id)
-        active_conn_keys: set[str] = set()
-        for r in conn_rows:
-            if r.get("service_id"):
-                active_conn_keys.add(r["service_id"])
-            if r.get("capability"):
-                active_conn_keys.add(r["capability"])
-
-        for c in raw_connections:
-            if c in active_conn_keys:
-                effective_connections.append(c)
-            else:
-                stripped_count += 1
-                detail = f"connection:{c}"
-                stripped_details.append(detail)
-                logger.warning(
-                    "EXPERT_MEMBER_CROSS_ORG_STRIPPED: connection '%s' unconfigured or foreign to org '%s'",
-                    c,
-                    caller_org_id,
-                )
+    # Phase 267 (D-267-05 / D-267-07): the rule lives in connection_states, which the Expert
+    # overlay also reads. Behaviour here is unchanged — what is not connected is stripped,
+    # fail-closed and silent to the run (the UI gate is the only gate).
+    for state in await connection_states(pool, caller_org_id, list(raw_connections)):
+        c = state.slug
+        if state.connected:
+            effective_connections.append(c)
+        else:
+            stripped_count += 1
+            detail = f"connection:{c}"
+            stripped_details.append(detail)
+            logger.warning(
+                "EXPERT_MEMBER_CROSS_ORG_STRIPPED: connection '%s' unconfigured or foreign to org '%s'",
+                c,
+                caller_org_id,
+            )
 
     return ResolvedExpertBundle(
         bundle_id=bundle["id"],

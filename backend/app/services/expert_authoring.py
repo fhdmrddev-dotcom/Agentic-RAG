@@ -70,7 +70,7 @@ class ExpertDraftOutput(BaseModel):
     example_output: str = Field(..., min_length=120, max_length=4000, description="Realistic, concrete sample excerpt of the expert's deliverable")
     description: str = Field(..., min_length=400, max_length=8000, description="COMPREHENSIVE operating blueprint: mandate, methodologies, rubrics, quality standards, procedures (2-3 rich paragraphs)")
     scope_mode: ScopeMode = Field(default="biased", description="Knowledge composition mode (defaults to biased per D-v4.3-01)")
-    tool_floor_enabled: bool = Field(default=True, description="Whether deliverable tools are kept as additive floor")
+    tool_floor_enabled: bool = Field(default=True, description="Kept for compatibility; not read since Phase 267 (D-267-02). An Expert never removes tools.")
     prompt_suggestions: list[DraftPromptSuggestion] = Field(..., min_length=3, max_length=3, description="Exactly 3 starter Action Tiles")
     member_skills: list[str] = Field(..., description="Skill names selected from the provided available skills (may be empty when none match)")
     knowledge_folder_ids: list[UUID] = Field(..., description="Folder UUIDs selected from the provided available folders (may be empty)")
@@ -137,7 +137,7 @@ When drafting an Expert from the user's high-level goal, you must synthesize and
    - 'title': Crisp, action-oriented button label (e.g. 'Synthesize Literature Gap', 'Audit Research Methodology', 'Structure Thesis Outline').
    - 'prompt': A detailed, multi-sentence starter prompt template (2-3 sentences) instructing the expert on how to execute that action with maximum academic/professional rigor.
 9. 'scope_mode': MUST be 'biased' (Union Scope) as the universal platform default. Never use 'restricted' unless the user prompt specifically commands strict isolation.
-10. 'tool_floor_enabled': Set to true so deliverable tools (code execution, file writing, template rendering) are active.
+10. 'tool_floor_enabled': Always true. It is a compatibility field with no effect on the Expert.
 11. 'member_skills': Select all matching skill names from the provided available skills. ONLY names that appear verbatim in that list — never invent one.
 12. 'knowledge_folder_ids': Select relevant folder UUIDs from the provided available knowledge folders that align with this domain.
 13. 'required_connections': Select relevant connection slugs from the provided available connections.
