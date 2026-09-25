@@ -30,7 +30,13 @@ const h = vi.hoisted(() => ({
   setThreadActiveExpert: vi.fn(),
   handoffThread: vi.fn(),
   listThreads: vi.fn(),
+  getExpertScopePreview: vi.fn(),
 }))
+
+vi.mock("@/lib/api/experts", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/api/experts")>()
+  return { ...actual, getExpertScopePreview: h.getExpertScopePreview }
+})
 
 vi.mock("@/hooks/useMessages", () => ({
   useMessages: () => ({
@@ -150,6 +156,16 @@ beforeEach(() => {
   h.loadMessages.mockResolvedValue(undefined)
   h.sendMessage.mockResolvedValue(undefined)
   h.listExperts.mockResolvedValue([FA, CR])
+  // A preview that narrows nothing (a thread folder is set), unless a case says otherwise.
+  h.getExpertScopePreview.mockResolvedValue({
+    expert_id: "e-x",
+    expert_name: "Expert",
+    mode: "biased",
+    expert_folders: [],
+    thread_folder: { id: "tf", name: "Folder", doc_count: 0 },
+    excluded_count: 0,
+    excluded_names: [],
+  })
   h.getExpert.mockImplementation(async (id: string) => (id === FA.id ? FA : CR))
   h.setThreadActiveExpert.mockImplementation(async (tid: string, eid: string | null) => ({
     ...THREAD,
@@ -469,5 +485,35 @@ describe("(D) CR-01 — the list holds the server's Expert after a change", () =
     const layout = (await import("../../layout/ChatLayout.tsx?raw")).default as string
     expect(layout.length).toBeGreaterThan(1000)
     expect(layout).toMatch(/onThreadUpdated=\{patchThread\}/)
+  })
+})
+
+// 267-REVIEW WR-06 (D-267-35) — the catalog Start Chat door: an empty thread with no folder, bound
+// to a biased Expert. No event is written there (D-267-12); the spotlight must state the narrowing.
+describe("(E) WR-06 — the empty unscoped thread's spotlight states D-267-35", () => {
+  it("(11) the spotlight shows Won't use · All your documents at rest", async () => {
+    h.getExpertScopePreview.mockResolvedValue({
+    expert_id: "e-cr",
+    expert_name: "Contract Reviewer",
+    mode: "biased",
+    expert_folders: [{ id: "f1", name: "Contracts" }],
+    thread_folder: null,
+    excluded_count: 0,
+    excluded_names: [],
+  })
+    render(
+      shell(
+        <ChatArea
+          thread={{ ...THREAD, id: "thread-S", active_expert_id: CR.id, folder_id: null } as Thread}
+          onCreateThread={vi.fn()}
+          folders={[]}
+        />,
+      ),
+    )
+    await screen.findByTestId("expert-spotlight-card")
+    const wont = await screen.findByTestId("scope-ledger-col-no")
+    expect(wont.textContent).toContain("All your documents")
+    expect(wont).toBeVisible()
+    expect(h.getExpertScopePreview).toHaveBeenCalledWith(CR.id, null)
   })
 })

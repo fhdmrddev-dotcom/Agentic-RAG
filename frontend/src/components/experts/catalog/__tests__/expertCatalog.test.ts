@@ -629,3 +629,40 @@ describe("expertCatalog · an absent connection is named for a person (267-05 F-
     expect(unknown?.missing[0].name).toBe("mcp.example.com")
   })
 })
+
+// 267-REVIEW WR-06 (D-267-35) — a BIASED Expert on a chat with NO folder narrows retrieval to its own
+// folders. The decision keeps that behaviour on condition it is STATED; on the threads it names (a
+// catalog Start Chat, an invite on an empty unscoped chat) no statement existed anywhere. One pure
+// selector turns the preview payload into the statement both doors render.
+describe("267-REVIEW WR-06 — narrowingLedgerColumns", () => {
+  const base = {
+    expert_id: "e-fa",
+    expert_name: "Financial Analyzer",
+    mode: "biased",
+    expert_folders: [{ id: "f1", name: "Financial Reports" }],
+    thread_folder: null,
+    excluded_count: 0,
+    excluded_names: [],
+  } as const
+
+  it("biased, no thread folder, with folders → Will use its folders (+ attachments); Won't use All your documents", async () => {
+    const { narrowingLedgerColumns } = await import("../expertCatalog")
+    const cols = narrowingLedgerColumns({ ...base, expert_folders: [...base.expert_folders], excluded_names: [] })
+    expect(cols).not.toBeNull()
+    const [will, wont] = cols!
+    expect(will.tone).toBe("yes")
+    expect(will.heading).toBe("Will use")
+    expect(new Set(will.items.map((i) => i.label))).toEqual(new Set(["Financial Reports", "Chat attachments"]))
+    expect(wont.tone).toBe("no")
+    expect(wont.heading).toBe("Won't use")
+    expect(wont.items.map((i) => i.label)).toEqual(["All your documents"])
+  })
+
+  it("null when nothing narrows: restricted, a thread folder, or an Expert with no folders", async () => {
+    const { narrowingLedgerColumns } = await import("../expertCatalog")
+    const p = { ...base, expert_folders: [...base.expert_folders], excluded_names: [] }
+    expect(narrowingLedgerColumns({ ...p, mode: "restricted" })).toBeNull()
+    expect(narrowingLedgerColumns({ ...p, thread_folder: { id: "t", name: "HR", doc_count: 2 } })).toBeNull()
+    expect(narrowingLedgerColumns({ ...p, expert_folders: [] })).toBeNull()
+  })
+})

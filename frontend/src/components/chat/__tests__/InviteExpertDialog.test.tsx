@@ -215,7 +215,9 @@ describe("R4 / R5 / R6 — the restricted-cost preview", () => {
   it("(8) fetched once per restricted row, with the thread; pending shows 'Checking…' and NO invite", async () => {
     let resolve!: (v: unknown) => void
     mockGetExpertScopePreview.mockReturnValue(new Promise((r) => (resolve = r)))
-    await open({ threadId: "t-9" })
+    // 267-REVIEW WR-06: on a chat WITH a folder a biased row never narrows, so it is not previewed.
+    // (On a chat with no folder it is — the D-267-35 statement; see the WR-06 describe below.)
+    await open({ threadId: "t-9", threadFolderName: "Client ACME" })
     expect(mockGetExpertScopePreview).toHaveBeenCalledTimes(1)
     expect(mockGetExpertScopePreview).toHaveBeenCalledWith(HR.id, "t-9")
     const r = row("hr-advisor")
@@ -394,5 +396,34 @@ describe("R9 / R10 — the handoff in flight, and its refusal", () => {
     expect(alert.textContent).toBe(
       "Couldn't start a new chat with Contract Reviewer. The server could not be reached. Nothing was created.",
     )
+  })
+})
+
+// 267-REVIEW WR-06 (D-267-35) — a biased Expert on a chat with NO folder reads only its own folders.
+// That narrowing is kept on condition it is STATED; the dialog stated nothing for biased rows.
+describe("WR-06 — the biased narrowing is stated before the invite", () => {
+  const narrowing = {
+    expert_id: "e-fa",
+    expert_name: "Financial Analyzer",
+    mode: "biased",
+    expert_folders: [{ id: "f1", name: "Financial Reports" }],
+    thread_folder: null,
+    excluded_count: 0,
+    excluded_names: [],
+  }
+
+  it("(W6) a biased row on a chat with no folder shows Will use / Won't use · All your documents at rest", async () => {
+    mockGetExpertScopePreview.mockImplementation((id: string) =>
+      Promise.resolve(id === FA.id ? narrowing : preview),
+    )
+    await open({ threadFolderName: null })
+    expect(mockGetExpertScopePreview).toHaveBeenCalledWith(FA.id, "t-1")
+    const r = row("financial-analyzer")
+    const wont = await within(r).findByTestId("scope-ledger-col-no")
+    expect(wont.textContent).toContain("Won't use")
+    atRest(within(wont).getByText("All your documents"))
+    atRest(within(r).getByText("Financial Reports"))
+    // the statement never blocks the invite
+    atRest(within(r).getByTestId("invite-expert-btn-financial-analyzer"))
   })
 })
