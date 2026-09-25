@@ -174,7 +174,7 @@ const BASELINE = {
   // never lowered: the four hardcoded demo-Expert sites this suite pinned were RETIRED, and
   // the rewrite lands four cases MORE than the floor it replaced — the honest-empty tile, the
   // icon read from the column, the iconless fallback, and the count/first-skill arms.
-  "ExpertSpotlightCard.test.tsx": 9,
+  "ExpertSpotlightCard.test.tsx": 12, // 267-REVIEW WR-06 +2; gate printed 12, so the pin lagged by 1
   // ── Phase 267 plan 04 (PACK-22..25 · D-267-09 / D-267-12 / D-267-21 / D-267-24) — ADOPTED, both
   //    knobs, same commit. ⛔ `src/components/chat` has NO bare-directory TARGETS entry, so each
   //    suite is NAMED below and pinned here; unnamed, all six would run in no gate. The figures
@@ -186,8 +186,8 @@ const BASELINE = {
   "ExpertEventCard.test.tsx": 10,
   "HandoffCard.test.tsx": 3,
   "MessageItem.transcriptEvent.test.tsx": 8,
-  "InviteExpertDialog.test.tsx": 20,
-  "ChatArea.expertThread.test.tsx": 8,
+  "InviteExpertDialog.test.tsx": 22, // 267-REVIEW WR-06 +1, IN-02 +1
+  "ChatArea.expertThread.test.tsx": 16, // 267-REVIEW CR-01 +3, WR-01 +1, WR-02 +1, WR-04 +1, WR-06 +1, WR-07 +1
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/experts` has NO bare-directory TARGETS
   // entry — its two existing suites are both named FILE-LEVEL just below — so a suite
@@ -222,7 +222,7 @@ const BASELINE = {
   // ⬆ RAISED 27 → 44 at 267-03 (the gate's own printed count): CONNECTION_COPY's pinned
   //   literals, connectionGate's arms (exactly one of action/ask), gate order install →
   //   connection, the ledger columns, and the backend's OWN overlay row read via `?raw`.
-  "expertCatalog.test.ts": 44,
+  "expertCatalog.test.ts": 49, // 267-REVIEW WR-06 +2, IN-06 +1; gate printed 49, so the pin lagged by 2
   // ⬆ RAISED 8 → 13 at 266-04 (the file carried 9 at base — the 262-UAT 3.6 case sat above the
   //   pin): the card's control swap with no dead button, install → re-read → fresh modal state,
   //   the fetch poll that STOPS once nothing is installing (driven RED against a leaked
@@ -255,7 +255,7 @@ const BASELINE = {
   // files in TARGETS. ⛔ `ChatLayout.startChat.test.tsx` is the ONLY fence on ChatLayout's real
   // start wiring: with it unpinned, the two 265-review plants (refreshThreads no-op,
   // discardThread removed) would again leave every gated suite green.
-  "ScopeLedger.test.tsx": 8,
+  "ScopeLedger.test.tsx": 9, // 267-REVIEW WR-08 +1
   "ExpertCard.connection.test.tsx": 6,
   "ChatLayout.startChat.test.tsx": 2,
   // ── Phase 266 plan 04 (D-266-13) — the Library folder names its Expert ─────────────
