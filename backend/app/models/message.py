@@ -27,6 +27,25 @@ from pydantic import BaseModel
 RESERVED_RUN_INPUT_KEYS: frozenset[str] = frozenset({"kickoff_prompt", "folder_id"})
 
 
+# Phase 267 (D-267-09 / D-267-10 / PACK-23) — the TRANSCRIPT-ONLY system-row kinds.
+#
+# A `messages` row with role='system' and `tool_calls[0].kind` in this set is an event written
+# for PEOPLE (an Expert was swapped / removed, or a question was handed to a new chat). It is
+# shown in the transcript and NEVER sent to a model: providers treat persisted system rows
+# differently (Anthropic drops them, Google merges them into system_instruction, OpenAI
+# Responses keeps them inline), and the next turn's system prompt already carries the change.
+#
+# ONE frozenset, ONE home. Its importers:
+#   * app.services.agent_loop._reconstruct_history — skips these rows (never reach a model);
+#   * app.api.threads snapshot + messages readers (267-02) — let ONLY these system kinds through;
+#   * frontend/src/components/chat/expertEventCopy.ts (267-04) — the mirror, cross-pinned by ?raw.
+# ⛔ It stays an ALLOWLIST: other system kinds (ask_user_prompt, ask_user_response,
+# context_truncated, iteration_cap_*) exist in real data and must keep their current handling.
+# ⛔ "handoff" is deliberately NOT in it — the handoff summary is a USER row the model must see.
+# The name carries no "expert" because agent_loop.py imports it (its AST fence).
+TRANSCRIPT_EVENT_KINDS: frozenset[str] = frozenset({"expert_changed", "expert_handoff"})
+
+
 class MessageCreate(BaseModel):
     content: str
     model: str | None = None
@@ -80,7 +99,10 @@ class MessageResponse(BaseModel):
     id: UUID
     thread_id: UUID
     user_id: UUID
-    role: Literal["user", "assistant"]
+    # Phase 267 (D-267-09): "system" is admitted so an allowlisted transcript event
+    # (TRANSCRIPT_EVENT_KINDS above) can ride the snapshot. A narrow Literal would 500 the whole
+    # response on one such row — the BUG-260528-01 class.
+    role: Literal["user", "assistant", "system"]
     content: str
     created_at: datetime
     updated_at: datetime

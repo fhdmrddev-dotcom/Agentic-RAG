@@ -477,43 +477,17 @@ async def _resolve_thread_scoping(
             except Exception:
                 logger.warning("Failed to fetch visible folders for thread %s scoping", thread_id, exc_info=True)
 
-        folder_map = {str(f["id"]): f for f in all_folders}
-
-        def _get_subtree(root_id: str) -> list[str]:
-            res = [root_id]
-            for f in all_folders:
-                if str(f.get("parent_id") or "") == root_id:
-                    res.extend(_get_subtree(str(f["id"])))
-            return res
-
-        def _get_path(fid: str) -> str:
-            parts = []
-            curr: str | None = fid
-            while curr:
-                f = folder_map.get(curr)
-                if not f:
-                    break
-                parts.append(f.get("name", ""))
-                curr = str(f["parent_id"]) if f.get("parent_id") else None
-            return ("/" + "/".join(reversed(parts))) if parts else ""
-
-        scoped_folder_path: str | None = None
-
-        if scope_mode == "restricted":
-            # Strict isolation (S5 / D-v4.3-01): exclusive to expert folders
-            effective_folder_ids = tuple(sorted(set(expert_folder_ids)))
-            if expert_folder_ids:
-                scoped_folder_path = _get_path(expert_folder_ids[0]) or None
-        else:
-            # Union Scope (default, S4 / D-v4.3-01): thread folder + expert folders
-            if thread_folder_id:
-                thread_subfolder_ids = _get_subtree(str(thread_folder_id))
-                effective_folder_ids = tuple(sorted(set(thread_subfolder_ids).union(expert_folder_ids)))
-                scoped_folder_path = _get_path(str(thread_folder_id)) or None
-            else:
-                effective_folder_ids = tuple(sorted(set(expert_folder_ids)))
-                if expert_folder_ids:
-                    scoped_folder_path = _get_path(expert_folder_ids[0]) or None
+        # Phase 267 (D-267-17): the composition MOVED, byte-for-byte, into the one pure home the
+        # run and the user-facing statement both read — so the two cannot disagree.
+        from app.services.expert_scope import compose_expert_scope  # noqa: PLC0415
+        _scope = compose_expert_scope(
+            scope_mode=scope_mode,
+            thread_folder_id=str(thread_folder_id) if thread_folder_id else None,
+            expert_folder_ids=expert_folder_ids,
+            visible_folders=all_folders,
+        )
+        effective_folder_ids = _scope.effective_folder_ids
+        scoped_folder_path = _scope.scoped_folder_path
 
         # Phase 260 F-3: derive core tools strictly from tool_dispatcher.EXPERT_CORE_TOOLS
         # Phase 261 D-v4.3-02 / S6: preserve deliverable tools when tool_floor_enabled is True

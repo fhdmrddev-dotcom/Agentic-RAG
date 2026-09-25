@@ -85,6 +85,7 @@ from app.services.provider_gateway import classify_provider_error, message_for_k
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import insert_assistant_message
+from app.models.message import TRANSCRIPT_EVENT_KINDS
 from app.utils.folder_utils import fetch_visible_folders
 from app.services.context_window import (
     trim_messages_to_fit,
@@ -1003,6 +1004,17 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
     """
     messages: list[dict] = []
     for msg in history_rows:
+        # Phase 267 (D-267-10) — transcript-only: rendered to people, never sent to a model.
+        # One kind check against the one-home allowlist; every other system kind is untouched.
+        _first_call = msg.get("tool_calls")
+        if (
+            msg.get("role") == "system"
+            and isinstance(_first_call, list)
+            and _first_call
+            and isinstance(_first_call[0], dict)
+            and _first_call[0].get("kind") in TRANSCRIPT_EVENT_KINDS
+        ):
+            continue
         tool_calls_data = msg.get("tool_calls")
         if (
             msg["role"] == "assistant"
