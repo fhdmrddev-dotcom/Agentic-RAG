@@ -57,7 +57,9 @@ export const EVENT_COPY = {
   handoffHeader: (expert: string): string => `${expert} · new chat`,
   stays: (expert: string): string => `${expert} stays`,
   open: (title: string): string => `${title} →`,
-  deleted: (title: string): string => `${title} · deleted`,
+  // 267-REVIEW WR-09: the `{title} · deleted` label is RETIRED. The pointer only ever knew that the
+  // in-memory thread list did not hold the target (still loading, made in another tab, a failed
+  // load) — never that the thread was deleted. An unfound target now reads as its plain title.
   handedOffFrom: (title: string): string => `Handed off from “${title}”`,
   /** D-267-33: the handoff thread inherits the source's folder, and the event says so. */
   sameFolder: (name: string): string => `Same folder: /${name}`,
@@ -182,7 +184,6 @@ export interface HandoffEventModel {
   targetThreadId: string
   title: string
   openLabel: string
-  deletedLabel: string
   /** D-267-33: `Same folder: /{name}` when the new thread inherited a folder. */
   folderLine: string | null
 }
@@ -196,7 +197,6 @@ export function handoffEventModel(event: ExpertHandoffEvent): HandoffEventModel 
     targetThreadId: event.target_thread_id,
     title: event.target_title,
     openLabel: EVENT_COPY.open(event.target_title),
-    deletedLabel: EVENT_COPY.deleted(event.target_title),
     folderLine: event.folder_name ? EVENT_COPY.sameFolder(event.folder_name) : null,
   }
 }

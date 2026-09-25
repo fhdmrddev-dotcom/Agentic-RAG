@@ -10,8 +10,9 @@
  * never behind a hover. ⛔ Server strings are React text children only (T-267-40).
  *
  * ⛔ THE OPEN CONTROL EXISTS ONLY WHEN IT CAN DO SOMETHING (T-267-46): inside a navigation context
- * that resolves the target it is a real `<button>`; a target the list no longer has is the words
- * with a deleted suffix and no control; outside any context, the title as text.
+ * that resolves the target it is a real `<button>`; a target the loaded list does not hold, or no
+ * context at all, is the title as text and no control. (267-REVIEW WR-09: it used to add a
+ * "· deleted" suffix — a claim the in-memory list cannot support.)
  */
 import { useState, type ReactNode } from "react"
 import { ArrowUpRight, Plug, Sparkles } from "lucide-react"
@@ -162,9 +163,9 @@ function HandoffPointer({ event }: { event: ExpertHandoffEvent }) {
         {m.openLabel}
       </button>
     )
-  } else if (nav) {
-    open = <span className="text-muted-foreground">{m.deletedLabel}</span>
   } else {
+    // 267-REVIEW WR-09: not in the loaded list (or no navigation context) is NOT evidence of a
+    // deletion — the title as words, and no control, since a link to nothing does nothing.
     open = <span className="text-foreground">{m.title}</span>
   }
   return (

@@ -159,12 +159,12 @@ describe("eventCardModel — the backend builder's real output, rendered to word
 })
 
 describe("handoffEventModel — the source thread's pointer (D-267-16 / D-267-33)", () => {
-  it("(14) header, Here, Open label, deleted label and the inherited-folder statement", () => {
+  it("(14) header, Here, Open label and the inherited-folder statement (the deleted label is retired, WR-09)", () => {
     const m = handoffEventModel(handoffEvent)
     expect(m.header).toBe("Contract Reviewer · new chat")
     expect(m.here).toBe("Financial Analyzer stays")
     expect(m.openLabel).toBe("Contract Reviewer · Q3 board prep →")
-    expect(m.deletedLabel).toBe("Contract Reviewer · Q3 board prep · deleted")
+    expect(m).not.toHaveProperty("deletedLabel")
     expect(m.targetThreadId).toBe(handoffEvent.target_thread_id)
     expect(m.folderLine).toBe("Same folder: /Client ACME")
   })
