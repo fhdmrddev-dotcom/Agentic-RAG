@@ -1,0 +1,11 @@
+== SC#2 connection state — 2026-09-25T19:29:34.112929+00:00
+GET /experts as u1 (org-admin of org A) headers={'X-Org-Id': 'e8c567c2-6f75-4c8b-94cf-92768831c035'} -> 200
+  {"id": "00000000-0000-0000-0000-000000000259", "name": "Financial Analyzer", "required_connections": [], "connection_state": [], "can_connect": false, "install": {"state": "ready", "folder_id": "0a0e2126-07d3-4a8c-9c09-fbbf525ba54d", "cause": null, "cause_source": null, "can_install": true, "updated_at": "2026-09-25T19:27:51.372647Z"}}
+  {"id": "9bcbffda-c074-4108-b748-ba7cf15a40e9", "name": "Contract Reviewer", "required_connections": [], "connection_state": [], "can_connect": false}
+  {"id": "49e272b9-62fa-4f90-86dc-bf56737a32bf", "name": "Drive Briefing Assistant", "required_connections": ["google"], "connection_state": [{"slug": "google", "name": "google", "connected": false}], "can_connect": false}
+  {"id": "f1a6638e-5557-40d2-b7ef-5e25f6a99caa", "name": "HR Advisor", "required_connections": [], "connection_state": [], "can_connect": false}
+GET /experts as u2 (member of org A) headers={'X-Org-Id': 'e8c567c2-6f75-4c8b-94cf-92768831c035'} -> 200
+  {"id": "00000000-0000-0000-0000-000000000259", "name": "Financial Analyzer", "required_connections": [], "connection_state": [], "can_connect": false, "install": {"state": "ready", "folder_id": "0a0e2126-07d3-4a8c-9c09-fbbf525ba54d", "cause": null, "cause_source": null, "can_install": false, "updated_at": "2026-09-25T19:27:51.372647Z"}}
+  {"id": "9bcbffda-c074-4108-b748-ba7cf15a40e9", "name": "Contract Reviewer", "required_connections": [], "connection_state": [], "can_connect": false}
+  {"id": "49e272b9-62fa-4f90-86dc-bf56737a32bf", "name": "Drive Briefing Assistant", "required_connections": ["google"], "connection_state": [{"slug": "google", "name": "google", "connected": false}], "can_connect": false}
+  {"id": "f1a6638e-5557-40d2-b7ef-5e25f6a99caa", "name": "HR Advisor", "required_connections": [], "connection_state": [], "can_connect": false}
