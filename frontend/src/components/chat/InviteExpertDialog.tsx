@@ -220,16 +220,14 @@ function ExpertRowActions({
       <>
         {previewStatement().node}
         <div className="mt-3 flex justify-end">
-          <button
-            type="button"
+          {/* 267-REVIEW IN-02: a status, not a control — it re-PATCHed the bound Expert on click. */}
+          <span
             data-testid={`invite-expert-btn-${expert.slug}`}
-            onClick={guard(onInvite)}
-            {...inert}
-            className={cn(BTN, "bg-violet-500/20 text-violet-200 border border-violet-500/40 cursor-default", INERT)}
+            className={cn(BTN, "bg-violet-500/20 text-violet-200 border border-violet-500/40 cursor-default")}
           >
             <Check className="h-3.5 w-3.5 text-violet-400" />
             Active
-          </button>
+          </span>
         </div>
       </>
     )
