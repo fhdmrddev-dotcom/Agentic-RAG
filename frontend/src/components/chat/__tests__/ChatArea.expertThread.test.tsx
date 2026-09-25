@@ -258,6 +258,27 @@ describe("(B) one PATCH home", () => {
     expect(h.loadMessages).not.toHaveBeenCalled()
   })
 
+  // 267-REVIEW WR-02 — the refusal belongs to the thread it was made on. It used to be cleared only
+  // by the next Expert change, so a role="alert" sentence about thread A stayed above B's composer.
+  it("(5b) a refusal on thread A is gone once thread B is open", async () => {
+    h.messages = TALK
+    h.setThreadActiveExpert.mockRejectedValue(
+      new ApiError("Choose an organization before inviting an Expert.", 403),
+    )
+    const user = userEvent.setup()
+    const { rerender } = render(
+      shell(<ChatArea thread={{ ...THREAD, active_expert_id: FA.id } as Thread} onCreateThread={vi.fn()} folders={[]} />),
+    )
+    await screen.findByTestId("active-expert-chip")
+    await openInvite(user)
+    await user.click(await screen.findByTestId("expert-replace-btn-contract-reviewer"))
+    await screen.findByTestId("expert-change-error")
+    rerender(
+      shell(<ChatArea thread={{ ...THREAD, id: "thread-B", title: "Other" } as Thread} onCreateThread={vi.fn()} folders={[]} />),
+    )
+    await waitFor(() => expect(screen.queryByTestId("expert-change-error")).toBeNull())
+  })
+
   // 267-REVIEW WR-04 — this case used to read "(6) while THIS thread is streaming, a successful
   // change does not refetch": it pinned the defect. A change written while a run streams lands its
   // event row ABOVE the answer the previous Expert is still producing (the assistant row is written
