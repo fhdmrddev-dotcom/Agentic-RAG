@@ -254,7 +254,10 @@ class FakeTxn:
         return False
 
 
-def _writer_patches(db: ThreadsDb, txn: FakeTxn, *, gate_org=ORG_ID, active_org=ORG_ID):
+# 267-REVIEW WR-03: a BIND is refused unless the gate's org is the thread's own org, so the gate
+# fixture answers THREAD_ORG. The caller's active org stays ORG_ID (different), so the ungated
+# removal path still proves D-267-34 (the event row carries the THREAD's org, never the active one).
+def _writer_patches(db: ThreadsDb, txn: FakeTxn, *, gate_org=THREAD_ORG, active_org=ORG_ID):
     from app.api import threads as threads_mod
     from tests.unit.test_267_scope_preview import scope_patches
 
@@ -307,7 +310,7 @@ async def test_a_swap_on_a_thread_with_messages_writes_one_event_with_the_update
     ins_args = txn.conn.executed[1][1]
     thread_id, user_id, org_id, content, tool_calls = ins_args
     assert (str(thread_id), str(user_id)) == (THREAD_ID, USER_ID)
-    # D-267-34: the THREAD's org, explicitly — the caller's active org (ORG_ID) differs.
+    # D-267-34: the THREAD's org, explicitly (WR-03: a bind now requires the gate's org to equal it).
     assert str(org_id) == THREAD_ORG
     assert isinstance(tool_calls, list) and len(tool_calls) == 1
     assert tool_calls[0]["kind"] == "expert_changed"

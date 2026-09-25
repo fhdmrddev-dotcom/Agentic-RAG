@@ -30,7 +30,7 @@ APP_DIR = pathlib.Path(__file__).resolve().parents[2] / "app"
 
 SOURCE_ID = "50000000-0000-4000-8000-00000000000a"
 NEW_ID = "60000000-0000-4000-8000-00000000000b"
-SOURCE_ORG = "5a0c1d2e-0000-4000-8000-0000000000bb"  # differs from the caller's active org (ORG_ID)
+SOURCE_ORG = "5a0c1d2e-0000-4000-8000-0000000000bb"  # the source thread's org; the gate fixture returns it (WR-03)
 AT = datetime(2026, 9, 25, 14, 45, tzinfo=timezone.utc)
 ITEMS = [
     "ACME Q3 invoices: $412K (+9% on Q2)",
@@ -210,7 +210,10 @@ async def _handoff(sb, *, emit=None, txn=None, gate=None, body=None, overrides=N
 
     emit = emit or AsyncMock(return_value=_emit_ok())
     txn = txn or Txn(HConn())
-    gate = gate or AsyncMock(return_value=({"id": CR_ID, "name": "Contract Reviewer"}, ORG_ID))
+    # 267-REVIEW WR-03: the gate's validated org must BE the source thread's org, or the route
+    # refuses (409). The fixture used to hand back ORG_ID (≠ SOURCE_ORG) and every success case
+    # passed through the tier-bypass it pinned; the refusal has its own case below.
+    gate = gate or AsyncMock(return_value=({"id": CR_ID, "name": "Contract Reviewer"}, SOURCE_ORG))
     body = body or ThreadHandoffRequest(expert_id=UUID(CR_ID))
     o = {
         "load_user_settings": MagicMock(return_value=SETTINGS),

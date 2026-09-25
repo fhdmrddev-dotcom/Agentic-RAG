@@ -965,6 +965,13 @@ async def rename_thread(
         before_row = before_resp.data if before_resp is not None else None
         if not before_row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+        # 267-REVIEW WR-03: the org the gate validated must be the thread's own org (the same rule
+        # the handoff door enforces), or an Expert gated in one org is bound into another's thread.
+        if bound_org_id is not None and str(before_row.get("org_id") or "") != bound_org_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Switch to this chat's organization to invite an Expert.",
+            )
         before_expert = before_row.get("active_expert_id")
         after_expert = update_data["active_expert_id"]
         if str(before_expert or "") != str(after_expert or "") and await _thread_has_messages(
@@ -1068,6 +1075,15 @@ async def handoff_thread(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
     bundle, _org_id = await assert_expert_bindable(request, current_user, body.expert_id)
+    # 267-REVIEW WR-03: the gate validated entitlement and access in the ACTIVE org, and the new
+    # thread is written into the SOURCE thread's org (D-267-34). They must be one org, or an Expert
+    # gated in B is bound inside an A thread (a tier bypass when A lacks `experts`). Refusing is the
+    # smaller correct change: gating against the source org would need a second membership check.
+    if str(source.get("org_id") or "") != _org_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Switch to this chat's organization to hand it off.",
+        )
 
     rows_resp = await aexec(
         supabase.table("messages")
