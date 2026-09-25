@@ -193,3 +193,40 @@ def test_corpora_root_is_under_backend_app():
     app_dir = Path(expert_corpus.__file__).resolve().parents[1]
     assert expert_corpus.CORPORA_ROOT == (app_dir / "experts" / "corpora").resolve()
 
+
+
+# ── WR-07 (266 review): corpora are TEXT until binary corpora are designed ────────────────────
+# normalise_bytes rewrites every CRLF and .gitattributes forces eol=lf, so a PDF/DOCX/XLSX sample
+# would be byte-mangled twice and fail extraction as a generic "Install failed". The loader
+# refuses a non-text mime_type by name instead.
+
+
+def _one_file_corpus(tmp_path, monkeypatch, *, filename: str, mime_type: str) -> None:
+    slug_dir = tmp_path / "sample"
+    slug_dir.mkdir()
+    (slug_dir / filename).write_bytes(b"%PDF-1.7\r\n\x00\x01binary")
+    (slug_dir / "manifest.json").write_text(
+        json.dumps({"folder_name": "X", "files": [{"filename": filename, "mime_type": mime_type}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(expert_corpus, "CORPORA_ROOT", tmp_path.resolve())
+
+
+@pytest.mark.parametrize(
+    "filename,mime_type",
+    [
+        ("report.pdf", "application/pdf"),
+        ("report.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        ("chart.png", "image/png"),
+    ],
+)
+def test_load_corpus_refuses_a_non_text_mime_type(tmp_path, monkeypatch, filename, mime_type):
+    _one_file_corpus(tmp_path, monkeypatch, filename=filename, mime_type=mime_type)
+    with pytest.raises(CorpusRefused, match="text"):
+        load_corpus("sample")
+
+
+@pytest.mark.parametrize("mime_type", ["text/markdown", "text/plain", "application/json"])
+def test_load_corpus_accepts_text_mime_types(tmp_path, monkeypatch, mime_type):
+    _one_file_corpus(tmp_path, monkeypatch, filename="notes.md", mime_type=mime_type)
+    assert load_corpus("sample").files[0].mime_type == mime_type
