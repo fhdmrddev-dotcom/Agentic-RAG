@@ -86,12 +86,12 @@ def test_refusal_is_a_value_error_so_existing_fail_closed_handling_applies():
 
 @pytest.mark.asyncio
 async def test_biased_expert_with_no_folders_is_unchanged():
-    folders, *_ = await _scope(_bundle(scope_mode="biased", is_system=False, folders=[]), AsyncMock())
-    assert folders == ()
+    scoping = await _scope(_bundle(scope_mode="biased", is_system=False, folders=[]), AsyncMock())
+    assert scoping.effective_folder_ids == ()
 
 
 @pytest.mark.asyncio
 async def test_restricted_expert_with_a_folder_is_unchanged():
     fid = uuid4()
-    folders, *_ = await _scope(_bundle(scope_mode="restricted", is_system=True, folders=[fid]), AsyncMock())
-    assert folders == (str(fid),)
+    scoping = await _scope(_bundle(scope_mode="restricted", is_system=True, folders=[fid]), AsyncMock())
+    assert scoping.effective_folder_ids == (str(fid),)

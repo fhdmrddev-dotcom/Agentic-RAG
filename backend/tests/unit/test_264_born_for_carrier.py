@@ -343,7 +343,8 @@ def test_build_phase_tool_context_yields_a_none_born_for_tool_context():
 
 @pytest.mark.asyncio
 async def test_resolve_thread_scoping_no_expert_yields_a_none_fifth_element():
-    """D-264-03a: the no-consultant arm returns five values, the fifth `None`.
+    """D-264-03a: the no-consultant arm returns five values, all `None` (Phase 267: a
+    ``ThreadScoping`` whose ``born_for_bundle_id`` — and every other field — is None).
 
     Driven against the real `_resolve_thread_scoping` with the thread-row fake
     `test_260_expert_chat_scoping.py::test_resolve_thread_scoping_no_expert` builds —
@@ -364,6 +365,7 @@ async def test_resolve_thread_scoping_no_expert_yields_a_none_fifth_element():
     )
     assert len(result) == 5, f"expected a 5-tuple, got {len(result)}"
     assert result == (None, None, None, None, None)
+    assert result.born_for_bundle_id is None
 
 
 @pytest.mark.asyncio

@@ -49,6 +49,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import NamedTuple
 from uuid import UUID
 import uuid as _uuid_mod
 
@@ -375,6 +376,25 @@ async def _finalize_producer_run(
         )
 
 
+class ThreadScoping(NamedTuple):
+    """Phase 267 (PACK-21 / D-267-01 / D-267-29 / D-267-32) — what a thread's active Expert hands
+    the loop, as DATA. Every field is ``None`` on a thread with no Expert, which keeps a plain run
+    byte-identical to base on every axis.
+
+    ⛔ There is no tool list here. An Expert only ever ADDS: the thread keeps its normal tool set,
+    the Expert's resolver-approved connections are admitted ALONGSIDE the composer's switched-on
+    ones (``scoped_connection_keys``), and its member skills are appended to the normal catalog
+    (``skill_catalog_additions``) — never a replacement. Both names are neutral on purpose:
+    ``agent_loop.py`` reads them and is AST-fenced against the word "expert".
+    """
+
+    effective_folder_ids: tuple[str, ...] | None
+    skill_catalog_additions: tuple[dict, ...] | None
+    scoped_folder_path: str | None
+    born_for_bundle_id: UUID | None
+    scoped_connection_keys: tuple[str, ...] | None
+
+
 class ExpertScopeUnavailable(ValueError):
     """Phase 266 CR-01: a RESTRICTED Expert resolved to zero folders. The run is refused, because an
     empty scope reaches retrieval as "no folder filter" and would search every org the user is in."""
@@ -385,21 +405,20 @@ async def _resolve_thread_scoping(
     thread_id: str,
     current_user: dict,
     pool,
-) -> tuple[
-    tuple[str, ...] | None,
-    tuple[str, ...] | None,
-    tuple[dict, ...] | None,
-    str | None,
-    UUID | None,
-]:
-    """Phase 260 (PACK-02 / D-260-05) & Phase 261 (PACK-02 / D-v4.3-01 / D-v4.3-02 / BUG-260920-01) —
+) -> ThreadScoping:
+    """Phase 260 (PACK-02 / D-260-05) & Phase 261 (PACK-02 / D-v4.3-01 / BUG-260920-01) —
     Resolve thread-active consultant scoping prior to the loop.
 
-    Data-injected into RunContext: effective_folder_ids, effective_tools, skill_catalog_override,
-    scoped_folder_path, born_for_bundle_id.
-    Returns (None, None, None, None, None) when no expert is invited (preserving Deep Mode byte-identical).
+    Data-injected into RunContext (Phase 267 shape, ``ThreadScoping``): effective_folder_ids,
+    skill_catalog_additions, scoped_folder_path, born_for_bundle_id, scoped_connection_keys.
+    Returns ``ThreadScoping(None, None, None, None, None)`` when no expert is invited (preserving
+    Deep Mode byte-identical).
 
-    Phase 264 (PACK-17 / D-264-03 / D-264-03a) — the FIFTH element is the ACCESS-CHECKED bundle id
+    Phase 267 (D-267-01 / D-267-02): no tool list is computed any more and the tool-floor flag
+    is not read — an Expert never removes a tool. The old tool-list slot is gone, and the
+    replacing eval catalog override is no longer set here (D-267-32: skills ADD).
+
+    Phase 264 (PACK-17 / D-264-03 / D-264-03a) — ``born_for_bundle_id`` is the ACCESS-CHECKED bundle id
     (``ResolvedExpertBundle.bundle_id``), never the raw ``active_expert_id`` read off the thread row:
     ``resolve_expert_bundle`` returning non-``None`` is what makes the value honest (T-264-01). It
     rides ``RunContext`` → ``ToolContext`` → sub-agent ``sub_ctx`` as an additive default-``None``
@@ -417,7 +436,7 @@ async def _resolve_thread_scoping(
         active_expert_id = t_resp.data.get("active_expert_id") if (t_resp and t_resp.data) else None
         thread_folder_id = t_resp.data.get("folder_id") if (t_resp and t_resp.data) else None
         if not active_expert_id:
-            return None, None, None, None, None
+            return ThreadScoping(None, None, None, None, None)
 
         from app.services.expert_service import resolve_expert_bundle  # noqa: PLC0415
         caller_user_id = UUID(str(current_user["id"]))
@@ -489,31 +508,43 @@ async def _resolve_thread_scoping(
         effective_folder_ids = _scope.effective_folder_ids
         scoped_folder_path = _scope.scoped_folder_path
 
-        # Phase 260 F-3: derive core tools strictly from tool_dispatcher.EXPERT_CORE_TOOLS
-        # Phase 261 D-v4.3-02 / S6: preserve deliverable tools when tool_floor_enabled is True
-        from app.services.tool_dispatcher import EXPERT_CORE_TOOLS, EXPERT_DELIVERABLE_TOOLS  # noqa: PLC0415
-        base_tools = set(EXPERT_CORE_TOOLS)
-        if getattr(resolved, "tool_floor_enabled", True):
-            base_tools = base_tools.union(EXPERT_DELIVERABLE_TOOLS)
-        effective_tools = tuple(sorted(base_tools) + list(resolved.effective_connections))
+        # Phase 267 (D-267-01 / D-267-02): NO tool list. The Expert thread keeps the plain
+        # thread's tools; the tool-floor flag is kept on the row for compatibility and read by
+        # nothing here. (Before 267 this computed a 10-tool core ∪ deliverables and the loop
+        # filtered every schema down to it — 15 of 28 chat tools and every connector tool lost.)
 
-        skill_catalog_override = None
-        if resolved.effective_skills:
-            skill_catalog_override = tuple(
+        # Phase 267 (D-267-32): the Expert's member skills ADD to the normal catalog — never the
+        # Expert's alone. Same dict shape the retired override used. Already filtered by
+        # filter_visible_skill_names inside resolve_expert_bundle (T-267-07).
+        skill_catalog_additions = (
+            tuple(
                 {"name": s, "description": f"Expert member skill: {s}"}
                 for s in resolved.effective_skills
             )
+            if resolved.effective_skills
+            else None
+        )
 
-        # Phase 264 (PACK-17 / D-264-03a / T-264-01) — the fifth element is
+        # Phase 267 (D-267-29, operator-approved grant widening): the Expert's own connections,
+        # ALREADY approved by the resolver (active + enabled in the caller's org, via
+        # connection_states). The loop admits a connection by these keys alongside the
+        # composer's switched-on ids; per-tool grant posture still applies unchanged.
+        scoped_connection_keys = (
+            tuple(resolved.effective_connections) if resolved.effective_connections else None
+        )
+
+        # Phase 264 (PACK-17 / D-264-03a / T-264-01) — born_for_bundle_id is
         # `resolved.bundle_id`, the value `resolve_expert_bundle` already
         # access-checked, NOT the raw `active_expert_id` read off the thread row
         # above. `resolved` being non-None is the whole honesty of the id.
-        return (
+        # (Positional on purpose: the 264 fence counts `born_for_bundle_id=` keywords
+        # and pins exactly the two RunContext builds.)
+        return ThreadScoping(
             effective_folder_ids,
-            effective_tools,
-            skill_catalog_override,
+            skill_catalog_additions,
             scoped_folder_path,
             resolved.bundle_id,
+            scoped_connection_keys,
         )
     except Exception as exc:
         logger.error(
@@ -677,7 +708,7 @@ async def run_producer(
                 # run_agent_loop + the Deep `_result_sink` flow stay byte-identical (D-14).
             else:                                          # Deep — byte-identical
                 _wf_pool = await get_pg_pool()
-                _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path, _born_for = await _resolve_thread_scoping(
+                _scoping = await _resolve_thread_scoping(
                     supabase=supabase,
                     thread_id=thread_id,
                     current_user=current_user,
@@ -693,15 +724,18 @@ async def run_producer(
                     supabase=supabase,
                     resolved_model=resolved_model,
                     resolved_provider=resolved_provider,
-                    effective_folder_ids=_eff_folders,
-                    effective_tools=_eff_tools,
-                    skill_catalog_override=_skill_cat_override,
-                    scoped_folder_path=_eff_folder_path,
+                    effective_folder_ids=_scoping.effective_folder_ids,
+                    scoped_folder_path=_scoping.scoped_folder_path,
+                    # Phase 267 (D-267-29 / D-267-32) — the Expert ADDS: its approved
+                    # connections and member skills, as neutrally named data. Paired with
+                    # the continuation build below. None on a plain run => byte-identical.
+                    scoped_connection_keys=_scoping.scoped_connection_keys,
+                    skill_catalog_additions=_scoping.skill_catalog_additions,
                     # Phase 264 (PACK-17 / D-264-03 / 8.6) — the Deep build. Paired
                     # with the continuation build below; a field set at one and not
                     # the other is a defect every existing test would miss. None on
                     # every run without a consultant => literal no-op.
-                    born_for_bundle_id=_born_for,
+                    born_for_bundle_id=_scoping.born_for_bundle_id,
                 )
                 _agent_loop_result = await run_agent_loop(
                     ctx,
@@ -850,7 +884,7 @@ async def spawn_continuation_run(
             # .agent_mode/.content; a continuation carries no new user content.
             body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)
             _wf_pool = await get_pg_pool()
-            _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path, _born_for = await _resolve_thread_scoping(
+            _scoping = await _resolve_thread_scoping(
                 supabase=supabase,
                 thread_id=thread_id,
                 current_user=current_user,
@@ -868,14 +902,16 @@ async def spawn_continuation_run(
                 resolved_provider=resolved_provider,
                 resume_dropped_tool_calls=True,
                 dropped_tool_calls=tuple(dropped_tool_calls),
-                effective_folder_ids=_eff_folders,
-                effective_tools=_eff_tools,
-                skill_catalog_override=_skill_cat_override,
-                scoped_folder_path=_eff_folder_path,
+                effective_folder_ids=_scoping.effective_folder_ids,
+                scoped_folder_path=_scoping.scoped_folder_path,
+                # Phase 267 (D-267-29 / D-267-32) — same additive Expert data as the
+                # Deep build above; a resumed run is the same run and adds the same.
+                scoped_connection_keys=_scoping.scoped_connection_keys,
+                skill_catalog_additions=_scoping.skill_catalog_additions,
                 # Phase 264 (PACK-17 / D-264-03 / 8.6) — the CONTINUATION build, the
                 # site a one-site fix misses: no test exercises this path's scoping.
                 # A resumed run is the same run and carries the same scope.
-                born_for_bundle_id=_born_for,
+                born_for_bundle_id=_scoping.born_for_bundle_id,
             )
             try:
                 await run_agent_loop(

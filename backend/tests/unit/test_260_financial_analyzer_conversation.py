@@ -242,8 +242,18 @@ async def test_turn3_honest_out_of_scope_refusal(expert_tool_ctx):
 
 @pytest.mark.asyncio
 async def test_multi_turn_financial_analyzer_conversation_integrity():
-    """PACK-05 / PACK-02: Multi-turn conversation preserves history while enforcing scoping."""
-    # Verify that RunContext carries effective_folder_ids and effective_tools across turns
+    """PACK-05 / PACK-02: Multi-turn conversation preserves history while enforcing scoping.
+
+    Phase 267 RE-DRIVE: this pinned a TOOL WHITELIST on the context (`effective_tools` holding
+    search_documents + load_skill and excluding run_command / execute_bash). The whitelist is
+    gone (D-267-01): the folder scope is what an Expert enforces, and it is still carried every
+    turn. The "no shell tool" half is kept against the tool set a chat run is actually offered.
+    """
+    from types import SimpleNamespace
+
+    from app.services.openai_service import get_tools
+
+    # Verify that RunContext carries the folder scope (and the additive Expert data) across turns
     ctx = RunContext(
         run_id=UUID("00000000-0000-0000-0000-000000000266"),
         thread_id="test-thread-260",
@@ -255,16 +265,18 @@ async def test_multi_turn_financial_analyzer_conversation_integrity():
         resolved_model="gpt-4o",
         resolved_provider="openai",
         effective_folder_ids=(FINANCIAL_FOLDER_ID,),
-        effective_tools=("search_documents", "load_skill"),
+        skill_catalog_additions=({"name": "financial_ratio_calculator", "description": "d"},),
     )
 
     # Scoping data is preserved for all turns on the thread
     assert ctx.effective_folder_ids == (FINANCIAL_FOLDER_ID,)
-    assert "search_documents" in ctx.effective_tools
-    assert "load_skill" in ctx.effective_tools
-    # Out-of-scope tools (e.g. bash, terminal, mutate) are excluded
-    assert "run_command" not in ctx.effective_tools
-    assert "execute_bash" not in ctx.effective_tools
+    assert ctx.skill_catalog_additions[0]["name"] == "financial_ratio_calculator"
+    assert not hasattr(ctx, "effective_tools")
+    # The tools a chat run is offered include retrieval + skills and NO shell tool
+    offered = {t["function"]["name"] for t in get_tools(SimpleNamespace(web_search_enabled=True, sandbox_enabled=True, self_improve_enabled=True))}
+    assert {"search_documents", "load_skill"} <= offered
+    assert "run_command" not in offered
+    assert "execute_bash" not in offered
 
 
 @pytest.mark.asyncio
@@ -340,10 +352,17 @@ async def test_resolve_thread_scoping_exception_fails_closed():
 
 
 @pytest.mark.asyncio
-async def test_resolve_thread_scoping_derives_expert_core_tools():
-    """Phase 260 F-3: Successful resolution derives tools strictly from tool_dispatcher.EXPERT_CORE_TOOLS."""
+async def test_resolve_thread_scoping_adds_the_experts_connection_and_computes_no_tool_list():
+    """Phase 267 RE-DRIVE of "Phase 260 F-3: successful resolution derives tools strictly from
+    tool_dispatcher.EXPERT_CORE_TOOLS".
+
+    Old meaning: the Financial Analyzer's tools ⊇ EXPERT_CORE_TOOLS and its connection is in the
+    tool list. New meaning (stronger, PACK-21): no tool list is derived at all, so the thread keeps
+    EVERY tool a plain thread has (the union fence in test_267_tool_floor_union.py drives the real
+    loop), and the Expert's connection is carried as an ADDITIVE key. The phantom-tool guard is
+    kept: nothing named fetch_document_chunk reaches the run.
+    """
     from app.services.run_producer import _resolve_thread_scoping
-    from app.services.tool_dispatcher import EXPERT_CORE_TOOLS
     from app.services.expert_service import ResolvedExpertBundle
 
     mock_supabase = MagicMock()
@@ -373,19 +392,19 @@ async def test_resolve_thread_scoping_derives_expert_core_tools():
 
     with patch("app.utils.db.aexec", side_effect=mock_aexec), \
          patch("app.services.expert_service.resolve_expert_bundle", new_callable=AsyncMock, return_value=resolved):
-        # Phase 264 (PACK-17 / D-264-03a) — five-wide since the born-for carrier landed.
-        folders, tools, skills, _scoped_path, born_for = await _resolve_thread_scoping(
+        # Phase 267 — a ThreadScoping NamedTuple, read by attribute.
+        scoping = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id="test-thread-ok",
             current_user={"id": "00000000-0000-0000-0000-000000000001", "org_id": "430bffc6-7275-499b-b307-d932b4750051"},
             pool=MagicMock(),
         )
 
-        assert born_for == UUID("00000000-0000-0000-0000-000000000260")
-        assert folders == (FINANCIAL_FOLDER_ID,)
-        assert set(EXPERT_CORE_TOOLS).issubset(set(tools))
-        assert "slack_notify" in tools
-        # Phantom tool is gone
-        assert "fetch_document_chunk" not in tools
-        assert skills == ({"name": "financial_ratio_calculator", "description": "Expert member skill: financial_ratio_calculator"},)
+        assert scoping.born_for_bundle_id == UUID("00000000-0000-0000-0000-000000000260")
+        assert scoping.effective_folder_ids == (FINANCIAL_FOLDER_ID,)
+        assert not hasattr(scoping, "effective_tools"), "a tool list is being derived again"
+        assert scoping.scoped_connection_keys == ("slack_notify",)
+        # Phantom tool is gone — from every field the run receives
+        assert "fetch_document_chunk" not in repr(tuple(scoping))
+        assert scoping.skill_catalog_additions == ({"name": "financial_ratio_calculator", "description": "Expert member skill: financial_ratio_calculator"},)
 

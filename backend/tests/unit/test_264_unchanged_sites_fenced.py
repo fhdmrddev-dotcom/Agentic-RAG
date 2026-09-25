@@ -92,12 +92,12 @@ def _org_supabase(rows: list[dict], *, blobs: dict[str, bytes] | None = None) ->
 async def test_save_skill_sibling_filter_is_the_BASE_predicate_even_with_a_bundle_on_the_ctx():
     """D-264-04's DO-NOT-WIDEN row, driven rather than read off a comment.
 
-    Three measured reasons, all of which the source comment beside the call also states:
-    `save_skill` is in NEITHER Expert tool set so it is **not advertised** to an Expert run
-    (⚠ not "unreachable" — `dispatch_tool`'s only backstop is `phase_whitelist`, `None` on a
-    chat run); the read feeds a non-blocking description-lint corpus with no user-visible
-    capability; and it is a WRITE handler's helper, while PACK-17's axis is *read the body you
-    were promised*.
+    The measured reasons, which the source comment beside the call also states: the read feeds
+    a non-blocking description-lint corpus with no user-visible capability; and it is a WRITE
+    handler's helper, while PACK-17's axis is *read the body you were promised*. (A third reason
+    — "`save_skill` is in NEITHER Expert tool set so it is not advertised to an Expert run" — was
+    made FALSE by Phase 267, which deleted both sets and the Expert tool filter; `save_skill` is
+    advertised to Expert threads now. The decision never depended on it.)
     """
     sb = _org_supabase([_skill_row(name="an-existing-sibling")])
     ctx = _make_ctx(sb, caller=_AUTHOR, bundle=_BUNDLE)
