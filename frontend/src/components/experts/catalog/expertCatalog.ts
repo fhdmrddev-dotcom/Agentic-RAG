@@ -409,6 +409,8 @@ export const PREVIEW_COPY = {
   emptyBody: "An org admin can add one from the Experts catalog.",
   listLoading: "Loading Experts…",
   listError: (reason: string): string => `Couldn't load Experts. ${reason}`,
+  /** 267-REVIEW WR-04: an Expert change is refused while this chat's answer streams (server: 409). */
+  waitForAnswer: "Wait for this answer to finish before changing the Expert.",
 } as const
 
 /** Why an invite row cannot invite, in gate order — or `null` when nothing blocks it. */

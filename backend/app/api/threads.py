@@ -862,6 +862,21 @@ async def _thread_has_messages(supabase: Client, thread_id: str, user_id: str) -
     return bool(getattr(resp, "data", None)) if resp is not None else False
 
 
+async def _thread_has_active_run(supabase: Client, thread_id: str, user_id: str) -> bool:
+    """267-REVIEW WR-04: a primary run of this thread is still streaming — the same predicate as the
+    snapshot's active_runs select (status='streaming', never a sub-agent's run)."""
+    resp = await aexec(
+        supabase.table("runs")
+        .select("run_id")
+        .eq("thread_id", str(thread_id))
+        .eq("user_id", user_id)
+        .eq("status", "streaming")
+        .is_("parent_run_id", "null")
+        .limit(1)
+    )
+    return bool(getattr(resp, "data", None)) if resp is not None else False
+
+
 async def _expert_changed_event(
     request: Request,
     current_user: dict,
@@ -974,6 +989,16 @@ async def rename_thread(
             )
         before_expert = before_row.get("active_expert_id")
         after_expert = update_data["active_expert_id"]
+        if str(before_expert or "") != str(after_expert or "") and await _thread_has_active_run(
+            supabase, thread_id, current_user["id"]
+        ):
+            # 267-REVIEW WR-04: the event row is written now, the streaming answer at run end, so a
+            # change mid-run would sit ABOVE the answer the previous Expert produced. Refused until
+            # the run finishes ("From your next message" stays true).
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Wait for this answer to finish before changing the Expert.",
+            )
         if str(before_expert or "") != str(after_expert or "") and await _thread_has_messages(
             supabase, thread_id, current_user["id"]
         ):

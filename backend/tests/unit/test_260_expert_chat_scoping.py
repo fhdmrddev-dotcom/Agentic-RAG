@@ -248,6 +248,7 @@ async def test_patch_thread_updates_and_clears_active_expert():
         # and the plain update below runs, exactly as before.
         mock_aexec.side_effect = [
             MagicMock(data={"active_expert_id": None, "folder_id": None, "org_id": current_user["org_id"]}), # before-read
+            MagicMock(data=[]), # 267-REVIEW WR-04: no primary run streaming on this thread
             MagicMock(data=[], count=0), # user/assistant message count
             MagicMock(data=[]), # update
             MagicMock(data={"id": thread_id, "user_id": user_id, "title": "Chat", "active_expert_id": str(expert_id), "created_at": "2026-09-20T00:00:00Z", "updated_at": "2026-09-20T00:00:00Z"}), # select
@@ -268,6 +269,7 @@ async def test_patch_thread_updates_and_clears_active_expert():
          patch("app.api.threads.resolve_active_org_or_none", new_callable=AsyncMock, return_value=None):
         mock_aexec.side_effect = [
             MagicMock(data={"active_expert_id": str(expert_id), "folder_id": None, "org_id": current_user["org_id"]}), # before-read (Phase 267)
+            MagicMock(data=[]), # 267-REVIEW WR-04: no primary run streaming on this thread
             MagicMock(data=[], count=0), # user/assistant message count (Phase 267) — empty thread: no event
             MagicMock(data=[]), # update
             MagicMock(data={"id": thread_id, "user_id": user_id, "title": "Chat", "active_expert_id": None, "created_at": "2026-09-20T00:00:00Z", "updated_at": "2026-09-20T00:00:00Z"}), # select

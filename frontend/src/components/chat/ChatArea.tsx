@@ -20,6 +20,7 @@ import {
   ApiError,
 } from "@/lib/api"
 import { handoffThread } from "@/lib/api/threads"
+import { PREVIEW_COPY } from "@/components/experts/catalog/expertCatalog"
 import { useComposerModel } from "@/hooks/useComposerModel"
 import { useThreadNavigation } from "./threadNavigation"
 import { ExpertSpotlightCard } from "./ExpertSpotlightCard"
@@ -502,10 +503,17 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const applyExpertChange = useCallback(
     async (next: ExpertBundle | null) => {
       const previous = activeExpert
+      const tid = thread?.id
+      // 267-REVIEW WR-04: while THIS thread streams, a change would be recorded ABOVE the answer
+      // the current Expert is still producing. Refused here with a visible reason (the server
+      // answers 409 for the same state), and nothing on the chip moves.
+      if (tid && useStreamsStore.getState().streamingThreads.has(tid)) {
+        setExpertChangeError(PREVIEW_COPY.waitForAnswer)
+        return
+      }
       setExpertChangeError(null)
       setActiveExpert(next)
       setExpertInvited(next !== null)
-      const tid = thread?.id
       if (!tid) return
       try {
         await setThreadActiveExpert(tid, next?.id ?? null)
