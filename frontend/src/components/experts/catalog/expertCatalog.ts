@@ -441,7 +441,9 @@ export function previewLedgerColumns(preview: ExpertScopePreview): LedgerColumn[
       ? { label: f.name }
       : { label: "", unnameable: true },
   )
-  will.push({ label: LEDGER_COPY.chatAttachments })
+  // 267-REVIEW WR-08: pinned, so an Expert with five or more folders never folds D-267-19's promise
+  // into "and k more" — it stays last, and always visible.
+  will.push({ label: LEDGER_COPY.chatAttachments, pinned: true })
   const columns: LedgerColumn[] = [{ tone: "yes", heading: LEDGER_COPY.willUse, items: will }]
   const count = preview.excluded_count ?? 0
   if (count > 0) {

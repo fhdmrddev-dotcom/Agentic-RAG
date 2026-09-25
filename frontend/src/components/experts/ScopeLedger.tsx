@@ -26,6 +26,9 @@ export interface LedgerItem {
   label: string
   /** A folder the caller cannot resolve — rendered as the shipped phrase, never a blank. */
   unnameable?: boolean
+  /** 267-REVIEW WR-08: a promise the column must always show (D-267-19's `Chat attachments`). It
+   *  is never counted into `and {k} more`, and renders after the truncated list. */
+  pinned?: boolean
 }
 
 export interface LedgerColumn {
@@ -41,8 +44,11 @@ export const LEDGER_VISIBLE = 5
 
 function Column({ column }: { column: LedgerColumn }) {
   const headingId = useId()
-  const shown = column.items.slice(0, LEDGER_VISIBLE)
-  const overflow = Math.max(0, column.items.length - LEDGER_VISIBLE) + (column.more ?? 0)
+  // 267-REVIEW WR-08: pinned items sit outside the truncation, so they are never an "and k more".
+  const regular = column.items.filter((i) => !i.pinned)
+  const pinned = column.items.filter((i) => i.pinned)
+  const shown = regular.slice(0, LEDGER_VISIBLE)
+  const overflow = Math.max(0, regular.length - LEDGER_VISIBLE) + (column.more ?? 0)
   return (
     <div
       data-testid={`scope-ledger-col-${column.tone}`}
@@ -82,6 +88,13 @@ function Column({ column }: { column: LedgerColumn }) {
             {LEDGER_COPY.more(overflow)}
           </li>
         )}
+        {pinned.map((item, i) => (
+          <li key={`pinned-${item.label}-${i}`} className="flex min-w-0 items-center gap-1 text-xs leading-relaxed">
+            <span title={item.label} className="truncate text-foreground">
+              {item.label}
+            </span>
+          </li>
+        ))}
       </ul>
     </div>
   )
