@@ -133,9 +133,11 @@ describe("Composer Expert Consultant Integration (Phase 260)", () => {
       expect(chipsContainer.textContent).toContain("Restricted")
     })
 
-    // Verify backend persistence call
-    expect(api.setThreadActiveExpert).toHaveBeenCalledWith("test-thread", mockExpert.id)
+    // Phase 267 plan 04 (D-267-12): the composer REPORTS the choice; ChatArea is the one PATCH
+    // home (ChatArea.expertThread.test.tsx case 3). The shipped meaning — the choice reaches the
+    // thread — is now carried by the report, and the composer itself writes nothing.
     expect(onActiveExpertChange).toHaveBeenCalledWith(mockExpert)
+    expect(api.setThreadActiveExpert).not.toHaveBeenCalled()
   })
 
   // ── Phase 262 plan 05 (PACK-11) — the SECOND door into the catalog ───────────────────────
@@ -258,9 +260,9 @@ describe("Composer Expert Consultant Integration (Phase 260)", () => {
       expect(screen.queryByTestId("active-expert-chip")).toBeNull()
     })
 
-    // Verify backend clear was called with null
-    expect(api.setThreadActiveExpert).toHaveBeenCalledWith("test-thread", null)
+    // Phase 267 plan 04: the clear is REPORTED to ChatArea, which PATCHes null (its case 4).
     expect(onActiveExpertChange).toHaveBeenCalledWith(null)
+    expect(api.setThreadActiveExpert).not.toHaveBeenCalled()
 
     // Composer returns to neutral
     const composerBox = container.querySelector(".rounded-2xl.ghost-border")
@@ -345,15 +347,16 @@ describe("Composer invite gate on install state (266-04)", () => {
     const ready = firstParty("ready")
     const { user, onActiveExpertChange } = await openInvite(ready)
     await user.click(screen.getByTestId("invite-expert-btn-financial-analyzer"))
-    await waitFor(() => expect(api.setThreadActiveExpert).toHaveBeenCalledTimes(1))
-    expect(api.setThreadActiveExpert).toHaveBeenCalledWith("test-thread", ready.id)
+    // Phase 267 plan 04: reported once to the one PATCH home (ChatArea), never written here.
+    await waitFor(() => expect(onActiveExpertChange).toHaveBeenCalledTimes(1))
     expect(onActiveExpertChange).toHaveBeenCalledWith(ready)
+    expect(api.setThreadActiveExpert).not.toHaveBeenCalled()
   })
 
   it("an org-authored Expert (no install key) invites exactly as before", async () => {
     const orgAuthored: ExpertBundle = { ...mockExpert, is_system: false, slug: "org-analyst", id: "org-1" }
-    const { user } = await openInvite(orgAuthored)
+    const { user, onActiveExpertChange } = await openInvite(orgAuthored)
     await user.click(screen.getByTestId("invite-expert-btn-org-analyst"))
-    await waitFor(() => expect(api.setThreadActiveExpert).toHaveBeenCalledWith("test-thread", "org-1"))
+    await waitFor(() => expect(onActiveExpertChange).toHaveBeenCalledWith(orgAuthored))
   })
 })
