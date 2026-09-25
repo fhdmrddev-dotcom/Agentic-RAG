@@ -161,6 +161,9 @@ def _conn(cid, service_id, name, *, capability=None, enabled=True, tools=("searc
         capability=capability,
         name=name,
         is_enabled=enabled,
+        # 267-REVIEW WR-05: ConnectorConnectionResponse always carries `status`; a key admits only
+        # an 'active' connection, so the fake carries the field the real row has.
+        status="active",
         tool_grants={},
         default_approval_posture="ask",
         discovered_tools=[{"name": t, "description": f"{t} on {name}"} for t in tools],

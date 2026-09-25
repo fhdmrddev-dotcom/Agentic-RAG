@@ -287,7 +287,8 @@ class RunContext:
     # discipline above). A tuple of service_id / capability keys the producer has ALREADY
     # approved (active + enabled in the caller's org). The connector block admits a connection
     # whose id the composer switched on OR whose service_id / capability is in this set; it is
-    # re-checked `is_enabled` at admission and per-tool grant posture (deny/ask) applies
+    # re-checked `is_enabled` (and, for a key, `status == 'active'` — 267-REVIEW WR-05) at
+    # admission, and per-tool grant posture (deny/ask) applies
     # unchanged. Absent keys and no switched-on ids still mean NO connector tools.
     scoped_connection_keys: tuple[str, ...] | None = None
     # Phase 267 (PACK-21 / D-267-32) — ADDITIVE default-off catalog rows. OFF by default (None)
@@ -1713,11 +1714,14 @@ async def run_agent_loop(
             # service_id / capability is a key. `is_enabled` is re-checked for both, and the
             # per-tool grant posture below is unchanged. A run with no scoped keys and no
             # switched-on ids still gets NONE: absent and empty still mean none.
+            # 267-REVIEW WR-05: a KEY admits only a connection whose `status` is 'active' — the
+            # resolver approved the key because SOME connection of that service is live, which
+            # says nothing about a revoked or errored sibling (its tools would fail at call time).
             allowed_ids = {str(cid) for cid in (getattr(body, "active_connector_ids", None) or [])}
             # (Each statement stays on ONE line: test_chat_connector_scoping.py compiles these
             # exact lines out of this file and drives them, so the test runs the real predicate.)
             scoped_keys = {str(k) for k in (ctx.scoped_connection_keys or ())}
-            active_conns = [c for c in conns if (str(c.id) in allowed_ids or c.service_id in scoped_keys or c.capability in scoped_keys) and c.is_enabled]
+            active_conns = [c for c in conns if (str(c.id) in allowed_ids or ((c.service_id in scoped_keys or c.capability in scoped_keys) and c.status == "active")) and c.is_enabled]
             if not allowed_ids and not scoped_keys:
                 logger.debug(
                     "chat run %s named no connector connections — offering built-in tools "
