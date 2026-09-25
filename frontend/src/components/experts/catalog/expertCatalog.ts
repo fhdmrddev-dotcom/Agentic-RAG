@@ -21,6 +21,7 @@
 
 import type { ExpertBundle, Folder } from "@/types"
 import type { ExpertInstallSummary } from "@/lib/api/experts"
+import type { LedgerColumn } from "@/components/experts/ScopeLedger"
 import {
   classifyIngestionError,
   UNKNOWN_FAILURE_SENTENCE,
@@ -136,13 +137,136 @@ export const INSTALL_COPY = {
   provenance: (expertName: string) => `from ${expertName}`,
 } as const
 
+// ── Phase 267 plan 03 (PACK-22 · D-267-05 / D-267-06 / D-267-27) — THE CONNECTION GATE ───────
+//
+// ⭐ Same discipline as INSTALL_COPY above: the card, the detail modal and the invite dialog all
+// ask `connectionGate` / `installView` / `inviteGate`, none of them reads the overlay itself, and
+// none of them spells a literal below. `expertCatalog.test.ts` pins every string.
+//
+// ⛔ The UI never decides readiness: `connection_state[].connected` and `can_connect` are server
+// facts (267-01's ONE "is it connected" rule, and `org:manage` ∧ `live_connectors` — the exact
+// permission `POST /connections` enforces). ⛔ `brings` and `missing` are two lists from ONE
+// payload, never two computed strings that could disagree (D-267-27).
+
+/** "A", "A and B", "A, B and C". */
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ""
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
+}
+
+/** The PACK-22 / SC#2 literal, visible at rest on the card, the modal and the invite row. */
+const gateLine = (names: string[]): string => `Requires ${joinNames(names)} — not connected`
+const memberAsk = (names: string[]): string => `Ask an org admin to connect ${joinNames(names)}.`
+
+export const CONNECTION_COPY = {
+  gateLine,
+  memberAsk,
+  modalMemberLine: (names: string[]): string => `${gateLine(names)}. ${memberAsk(names)}`,
+  cardMemberPill: (names: string[]): string =>
+    names.length === 1
+      ? `An org admin must connect ${names[0]}`
+      : `An org admin must connect ${names.length} services`,
+  connectOne: (name: string): string => `Connect ${name} →`,
+  connectMany: "Open Connections →",
+  modalMissingPill: (name: string): string => `${name} · not connected`,
+} as const
+
+/** Ledger headings live beside the selector that builds the ledger's payload (UI-SPEC §7). */
+export const LEDGER_COPY = {
+  brings: "Brings",
+  missing: "Missing",
+  more: (k: number): string => `and ${k} more`,
+} as const
+
+export interface ConnectionGate {
+  missing: { slug: string; name: string }[]
+  /** The CONNECTED names, in payload order — the same payload `missing` came from. */
+  brings: string[]
+  line: string
+  /** Non-null only when the server says the caller may connect (`can_connect`). */
+  action: { label: string } | null
+  /** Non-null only when `action` is null — exactly one of the two is set. */
+  ask: string | null
+}
+
+/** A name a person can read: the server's name, or the slug — never a blank. */
+function connectionName(c: { slug: string; name: string }): string {
+  return c.name?.trim() ? c.name : c.slug
+}
+
 /**
- * What an Expert's primary control is, given its org's install. ⛔ No arm is a disabled button:
- * a state that cannot act renders a `status` LINE with the reason instead (D-262-02).
+ * `null` when nothing is missing (or the server said nothing); otherwise the whole statement.
+ * ⛔ No arm is a disabled button: a member gets the `ask` sentence and no control (D-267-06).
+ */
+export function connectionGate(expert: ExpertBundle): ConnectionGate | null {
+  const state = expert.connection_state ?? []
+  const missing = state
+    .filter((c) => !c.connected)
+    .map((c) => ({ slug: c.slug, name: connectionName(c) }))
+  if (missing.length === 0) return null
+  const names = missing.map((m) => m.name)
+  const brings = state.filter((c) => c.connected).map(connectionName)
+  const line = CONNECTION_COPY.gateLine(names)
+  if (expert.can_connect === true) {
+    const label =
+      names.length === 1 ? CONNECTION_COPY.connectOne(names[0]) : CONNECTION_COPY.connectMany
+    return { missing, brings, line, action: { label }, ask: null }
+  }
+  return { missing, brings, line, action: null, ask: CONNECTION_COPY.memberAsk(names) }
+}
+
+/**
+ * Every required connection as a pill: the server's name and whether it is missing. Without an
+ * overlay (an older server) the stored slugs are listed and nothing is claimed about them.
+ */
+export function connectionPills(expert: ExpertBundle): { label: string; missing: boolean }[] {
+  const state = expert.connection_state
+  if (!state) {
+    return (expert.required_connections ?? []).map((slug) => ({ label: slug, missing: false }))
+  }
+  return state.map((c) =>
+    c.connected
+      ? { label: connectionName(c), missing: false }
+      : { label: CONNECTION_COPY.modalMissingPill(connectionName(c)), missing: true },
+  )
+}
+
+/**
+ * The Brings / Missing ledger (D-267-27), built from the SAME overlay payload as the gate.
+ * `card` counts folders (the card's "names are the modal's job" rule); `dialog` omits them.
+ * An empty column is omitted, so a ledger that brings nothing is the Missing column alone.
+ */
+export function connectionLedgerColumns(
+  expert: ExpertBundle,
+  surface: "card" | "dialog",
+): LedgerColumn[] {
+  const state = expert.connection_state ?? []
+  const brings: LedgerColumn["items"] = []
+  const folderCount = expert.knowledge_folder_ids?.length ?? 0
+  if (surface === "card" && folderCount > 0) {
+    brings.push({ label: `${folderCount} folder${folderCount === 1 ? "" : "s"}` })
+  }
+  for (const s of expert.member_skills ?? []) brings.push({ label: s })
+  for (const c of state) if (c.connected) brings.push({ label: connectionName(c) })
+  const missing = state.filter((c) => !c.connected).map((c) => ({ label: connectionName(c) }))
+  const columns: LedgerColumn[] = []
+  if (brings.length) columns.push({ tone: "yes", heading: LEDGER_COPY.brings, items: brings })
+  if (missing.length) columns.push({ tone: "no", heading: LEDGER_COPY.missing, items: missing })
+  return columns
+}
+
+/**
+ * What an Expert's primary control is, given its org's install AND its required connections.
+ * ⛔ No arm is a disabled button: a state that cannot act renders a `status` LINE with the reason
+ * instead (D-262-02). The same rule covers connections: the `connect` arm carries either an
+ * action (a caller who may connect) or the member's ask — never a Start control that would lead to
+ * a run silently lacking a connection (D-267-06).
  *
- *   • `legacy` — no `install` key (org-authored) or `install: null` (first-party, no corpus):
- *                behave exactly as before 266.
- *   • `chat`   — installed and ready: the existing Start Chat control.
+ *   • `legacy`  — no `install` key (org-authored) or `install: null` (first-party, no corpus):
+ *                 behave exactly as before 266.
+ *   • `chat`    — installed and ready: the existing Start Chat control.
+ *   • `connect` — install ready/legacy, but a required connection is missing. Gate order is
+ *                 install → connection: an install that is not ready always wins.
  */
 export type InstallView =
   | { kind: "legacy" }
@@ -150,6 +274,7 @@ export type InstallView =
   | { kind: "install"; action: string }
   | { kind: "retry"; action: string; headline: string; cause: string }
   | { kind: "status"; line: string; cause?: string }
+  | { kind: "connect"; gate: ConnectionGate }
 
 /** A failure cause, as ONE sentence a person can read. Never "null", never a driver dict. */
 function installCause(install: NonNullable<ExpertBundle["install"]>): string {
@@ -162,6 +287,17 @@ function installCause(install: NonNullable<ExpertBundle["install"]>): string {
 }
 
 export function installView(expert: ExpertBundle): InstallView {
+  const view = installOnlyView(expert)
+  // Gate order install → connection: only an Expert that could otherwise start a chat is asked
+  // about its connections, so a surface never shows two gate reasons at once.
+  if (view.kind === "legacy" || view.kind === "chat") {
+    const gate = connectionGate(expert)
+    if (gate) return { kind: "connect", gate }
+  }
+  return view
+}
+
+function installOnlyView(expert: ExpertBundle): InstallView {
   const install = expert.install
   if (!install) return { kind: "legacy" }
   switch (install.state) {
@@ -214,10 +350,13 @@ export function provenanceByFolder(installs: ExpertInstallSummary[]): Record<str
  * The composer's invite gate (D-266-01): `null` means invite as before; a string is the reason
  * the Expert cannot join a chat yet. ⛔ A first-party Expert whose knowledge is not installed
  * never starts a run against an empty scope.
+ *
+ * Phase 267 (D-267-06): gate order install → connection. With the install ready (or no install at
+ * all) a missing required connection returns its gate line — the first blocking fact wins.
  */
 export function inviteGate(expert: ExpertBundle): string | null {
   const install = expert.install
-  if (!install || install.state === "ready") return null
+  if (!install || install.state === "ready") return connectionGate(expert)?.line ?? null
   if (install.state === "installing") return INSTALL_COPY.inviteInstalling
   if (install.state === "failed") return INSTALL_COPY.inviteFailed
   return INSTALL_COPY.inviteNotInstalled

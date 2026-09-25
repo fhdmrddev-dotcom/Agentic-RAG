@@ -83,6 +83,17 @@ export interface ExpertInstallState {
   updated_at: string | null
 }
 
+/** Phase 267 (PACK-22 · D-267-05): one required connection's state in the active org, as the
+ *  server derives it from the ONE "is it connected" rule (`connection_states`, 267-01). Wire type,
+ *  declared beside `ExpertInstallState` and imported by `@/types` with `import type`.
+ *  ⛔ Server facts, the UI never decides readiness: `connected` (and the row's `can_connect`) are
+ *  read by `connectionGate` (expertCatalog.ts) and by nothing else. */
+export interface ExpertConnectionState {
+  slug: string
+  name: string
+  connected: boolean
+}
+
 /** `POST /experts/{id}/install` → 202. */
 export interface ExpertInstallResult {
   expert_bundle_id: string
