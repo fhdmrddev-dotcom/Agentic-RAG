@@ -136,24 +136,32 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
   const handleInstall = async (expert: ExpertBundle) => {
     setInstallingId(expert.id)
     setInstallError(null)
+    let result: Awaited<ReturnType<typeof installExpert>>
     try {
-      const result = await installExpert(expert.id)
-      // The 202 already carries this org's install state — apply it at once, so the poll starts
-      // even if the re-read below fails.
-      setExperts((prev) =>
-        prev.map((e) => (e.id === expert.id ? { ...e, install: result.install } : e)),
-      )
-      setInspected((prev) =>
-        prev && prev.id === expert.id ? { ...prev, install: result.install } : prev,
-      )
-      const rows = await listExperts()
-      setExperts(rows)
-      setInspected((prev) => freshInspected(prev, rows))
+      result = await installExpert(expert.id)
     } catch (err) {
       setInstallError({
         id: expert.id,
         message: err instanceof Error ? err.message : "The install could not be started.",
       })
+      setInstallingId(null)
+      return
+    }
+    // The 202 already carries this org's install state — apply it at once, so the poll starts
+    // even if the re-read below fails.
+    setExperts((prev) =>
+      prev.map((e) => (e.id === expert.id ? { ...e, install: result.install } : e)),
+    )
+    setInspected((prev) =>
+      prev && prev.id === expert.id ? { ...prev, install: result.install } : prev,
+    )
+    try {
+      const rows = await listExperts()
+      setExperts(rows)
+      setInspected((prev) => freshInspected(prev, rows))
+    } catch {
+      // IN-02: the install STARTED — a failed re-read is not an install failure. The poll
+      // (running from the applied 202 state) reconciles by fetch.
     } finally {
       setInstallingId(null)
     }
