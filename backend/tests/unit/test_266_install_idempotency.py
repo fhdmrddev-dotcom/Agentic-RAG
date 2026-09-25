@@ -317,3 +317,51 @@ async def test_iv_b_a_real_asyncpg_row_with_uuid_ids_is_handed_on_with_a_string_
     assert isinstance(handed, str), f"re-drive handed a {type(handed).__name__} id to the ingest path"
     assert handed == str(failed["id"])
     json.dumps({"document_id": handed})  # the payload shape that failed live
+
+
+# ── WR-02 (266 review): a completed copy with NO searchable text ─────────────────────────────
+# derive_install_state reports it as `failed` / NO_SEARCHABLE_TEXT and the UI offers Retry, so the
+# Retry must reach it. Before this fix step 6's "present — never overwritten" arm skipped every
+# non-failed row, and the Retry button re-claimed, walked, and changed nothing.
+
+
+def _zero_chunk(raw: bytes, *, owner: UUID = CALLER) -> dict:
+    doc = _doc(F1, status="completed", owner=owner, chunks=0)
+    doc["content_hash"] = hashlib.sha256(raw).hexdigest()
+    return doc
+
+
+async def test_viii_an_unedited_zero_chunk_copy_owned_by_the_caller_is_re_driven():
+    empty = _zero_chunk(RAW1)
+    db = _db(claim=_claim(FOLDER), docs=[empty])
+    supa, mint, enq = FakeSupabase(folder_present=True), _mint(), AsyncMock()
+    await _run(db, supa, mint, enq, _corpus([(F1, RAW1)]))
+
+    mint.assert_not_awaited()
+    enq.assert_awaited_once()
+    assert enq.await_args.kwargs["doc"]["id"] == empty["id"]
+    updates = [ops for t, ops in supa.executed if t == "documents" and any(o[0] == "update" for o in ops)]
+    assert len(updates) == 1 and ("eq", ("user_id", str(CALLER)), {}) in updates[0]
+
+
+async def test_ix_an_edited_zero_chunk_document_is_still_left_untouched():
+    # D-266-14 holds: a person's bytes are never overwritten, even when they index to nothing.
+    empty = _zero_chunk(b"# a person's own replacement\n")
+    db = _db(claim=_claim(FOLDER), docs=[empty])
+    supa, mint, enq = FakeSupabase(folder_present=True), _mint(), AsyncMock()
+    await _run(db, supa, mint, enq, _corpus([(F1, RAW1)]))
+
+    mint.assert_not_awaited()
+    enq.assert_not_awaited()
+    assert supa.writes() == []
+
+
+async def test_x_a_zero_chunk_copy_owned_by_someone_else_is_named_not_touched():
+    empty = _zero_chunk(RAW1, owner=OTHER_ADMIN)
+    db = _db(claim=_claim(FOLDER), docs=[empty])
+    supa, mint, enq = FakeSupabase(folder_present=True), _mint(), AsyncMock()
+    await _run(db, supa, mint, enq, _corpus([(F1, RAW1)]))
+
+    enq.assert_not_awaited()
+    assert supa.writes() == []
+    assert db.set_expert_install_status.await_args.kwargs["error"] == svc.REDRIVE_NOT_OWNER

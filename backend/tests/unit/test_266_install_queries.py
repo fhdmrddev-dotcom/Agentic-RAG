@@ -171,7 +171,8 @@ async def test_list_install_corpus_documents_is_org_folder_latest_and_filename_s
     assert "is_latest = true" in sql
     assert "filename = ANY($3::text[])" in sql
     for col in ("id", "folder_id", "filename", "status", "chunk_count", "error_message",
-                "user_id", "file_path", "mime_type"):
+                "user_id", "file_path", "mime_type", "content_hash"):
+        # content_hash — WR-02: a zero-chunk copy is re-driven only when it is still the corpus's bytes.
         assert col in sql, col
     assert binds == (org_id, [folder_id], ["a.md"])
     _no_interpolation(sql, org_id, folder_id)
