@@ -54,6 +54,16 @@
  * Retry install (a manager), or a status LINE with the reason (installing, or a non-manager). ⛔ It
  * is never a dead button: a state that cannot act says why instead. ⛔ A failure cause is
  * never rendered raw — `installView` classifies it through the Library's own vocabulary.
+ *
+ * ⚠ PHASE 267 (PACK-22 · D-267-06 / D-267-08) — `installView`'s `connect` arm. Each Required
+ * Connections pill states its connection's state (a missing one reads `<Service> · not …` in rose,
+ * from `connectionPills`), and the footer's primary control becomes Connect (a caller the server
+ * says may connect, with a Connections door wired) beside the requirement line, or one member
+ * sentence that names the requirement AND who can fix it. Start Scoped Chat is not rendered in that
+ * state, in any form. This modal reads no overlay field itself.
+ *
+ * ⚠ SEED-309 R265-262-04 (D-267-24): a start that returns a promise keeps the modal open until it
+ * settles, so the in-flight state (`startBusy`, owned by the page) is visible where it was pressed.
  */
 
 import { useEffect, useState } from "react"
@@ -64,6 +74,7 @@ import {
   Download,
   EyeOff,
   FolderClosed,
+  Loader2,
   Plug,
   RotateCcw,
   Sparkles,
@@ -79,7 +90,14 @@ import {
 } from "@/components/ui/dialog"
 import type { ExpertBundle, Folder } from "@/types"
 import { cn } from "@/lib/utils"
-import { INSTALL_COPY, installView, resolveFolderNames } from "./expertCatalog"
+import {
+  CONNECTION_COPY,
+  INSTALL_COPY,
+  START_COPY,
+  connectionPills,
+  installView,
+  resolveFolderNames,
+} from "./expertCatalog"
 
 /**
  * ⛔ THE WORDING IS THE DELIVERABLE, so it lives in one place and its suite pins the literal.
@@ -112,18 +130,39 @@ function HonestLine({ children }: { children: React.ReactNode }) {
 }
 
 /** The footer's status line — the `HonestLine` voice, in the place a control would sit. */
-function FooterLine({ children }: { children: React.ReactNode }) {
-  return <p className="max-w-md text-right text-xs italic text-muted-foreground/90">{children}</p>
+function FooterLine({ children, testId }: { children: React.ReactNode; testId?: string }) {
+  return (
+    <p data-testid={testId} className="max-w-md text-right text-xs italic text-muted-foreground/90">
+      {children}
+    </p>
+  )
 }
 
-function NamePill({ icon, label, dim }: { icon: React.ReactNode; label: string; dim?: boolean }) {
+/** The shipped primary button class — Connect copies it so the footer reads as one control set. */
+const PRIMARY_BUTTON =
+  "inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+
+function NamePill({
+  icon,
+  label,
+  dim,
+  missing,
+}: {
+  icon: React.ReactNode
+  label: string
+  dim?: boolean
+  /** Phase 267: a required connection that is missing — rose, and its label says so. */
+  missing?: boolean
+}) {
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium",
-        dim
-          ? "border-border/60 bg-muted/20 italic text-muted-foreground"
-          : "border-violet-500/25 bg-violet-500/10 text-violet-200",
+        missing
+          ? "border-rose-500/25 bg-rose-500/10 text-rose-300"
+          : dim
+            ? "border-border/60 bg-muted/20 italic text-muted-foreground"
+            : "border-violet-500/25 bg-violet-500/10 text-violet-200",
       )}
     >
       {icon}
@@ -138,7 +177,14 @@ export interface ExpertDetailModalProps {
   folders: Folder[]
   open: boolean
   onOpenChange: (open: boolean) => void
-  onStartChat: (expert: ExpertBundle) => void
+  /** Phase 267: may return a promise — the modal then stays open (showing the in-flight state
+   *  the page passes as `startBusy`) until it settles, and closes after. */
+  onStartChat: (expert: ExpertBundle) => void | Promise<void>
+  /** Phase 267: the Connections page door. The modal closes BEFORE calling it. Absent, a caller
+   *  who may connect reads the member sentence — a Connect button with no door would do nothing. */
+  onOpenConnections?: () => void
+  /** Phase 267 (R265-262-04): a start for this Expert is in flight. */
+  startBusy?: boolean
   /** Phase 266: install this Expert's corpus into the active org. Optional so every existing
    *  mount compiles; without it an installable Expert shows the needs-an-admin line instead. */
   onInstall?: (expert: ExpertBundle) => void
@@ -154,6 +200,8 @@ export function ExpertDetailModal({
   open,
   onOpenChange,
   onStartChat,
+  onOpenConnections,
+  startBusy = false,
   onInstall,
   installBusy = false,
   installError = null,
@@ -171,7 +219,7 @@ export function ExpertDetailModal({
   const isRestricted = expert.scope_mode === "restricted"
   const resolvedFolders = resolveFolderNames(expert.knowledge_folder_ids ?? [], folders)
   const skills = expert.member_skills ?? []
-  const connections = expert.required_connections ?? []
+  const connections = connectionPills(expert)
   const prompts = expert.prompt_suggestions ?? []
   const whenToUse = expert.when_to_use?.trim() ?? ""
   const sample = expert.example_output?.trim() ?? ""
@@ -304,8 +352,13 @@ export function ExpertDetailModal({
                     <HonestLine>{HONEST.noConnections}</HonestLine>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
-                      {connections.map((c) => (
-                        <NamePill key={`conn-${c}`} icon={<Plug className="h-3 w-3" />} label={c} />
+                      {connections.map((c, i) => (
+                        <NamePill
+                          key={`conn-${c.label}-${i}`}
+                          missing={c.missing}
+                          icon={<Plug className="h-3 w-3" />}
+                          label={c.label}
+                        />
                       ))}
                     </div>
                   )}
@@ -400,15 +453,54 @@ export function ExpertDetailModal({
           {view.kind === "legacy" || view.kind === "chat" ? (
             <button
               type="button"
+              disabled={startBusy}
+              aria-busy={startBusy || undefined}
               onClick={() => {
-                onStartChat(expert)
-                onOpenChange(false)
+                if (startBusy) return
+                const started = onStartChat(expert) as unknown as PromiseLike<void> | undefined
+                // A start that returns a promise keeps the modal open until it settles, so the
+                // in-flight state is seen where it was pressed; the page's error line takes over
+                // once it closes. A plain callback closes at once, exactly as shipped.
+                if (started && typeof started.then === "function") {
+                  started.then(
+                    () => onOpenChange(false),
+                    () => onOpenChange(false),
+                  )
+                } else {
+                  onOpenChange(false)
+                }
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+              className={cn(PRIMARY_BUTTON, "disabled:cursor-wait disabled:opacity-80")}
             >
-              <Sparkles className="h-3.5 w-3.5" />
-              Start Scoped Chat with Expert
+              {startBusy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              {startBusy ? START_COPY.busy : "Start Scoped Chat with Expert"}
             </button>
+          ) : view.kind === "connect" ? (
+            view.gate.action && onOpenConnections ? (
+              <>
+                <FooterLine testId="connection-gate-line">{view.gate.line}</FooterLine>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Close first, then navigate (UI-SPEC §6.1).
+                    onOpenChange(false)
+                    onOpenConnections()
+                  }}
+                  className={PRIMARY_BUTTON}
+                >
+                  <Plug className="h-3.5 w-3.5" />
+                  {view.gate.action.label}
+                </button>
+              </>
+            ) : (
+              <FooterLine testId="connection-gate-line">
+                {CONNECTION_COPY.modalMemberLine(view.gate.missing.map((m) => m.name))}
+              </FooterLine>
+            )
           ) : view.kind === "install" || view.kind === "retry" ? (
             installBusy ? (
               <FooterLine>{INSTALL_COPY.starting}</FooterLine>

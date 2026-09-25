@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { ExpertCatalogPage } from "../ExpertCatalogPage"
 import * as api from "@/lib/api"
 import type { ExpertBundle } from "@/types"
-import { within, act } from "@testing-library/react"
+import { within, act, fireEvent } from "@testing-library/react"
 import { afterEach } from "vitest"
 import * as expertsApi from "@/lib/api/experts"
 import { INSTALL_COPY } from "../expertCatalog"
@@ -201,6 +201,148 @@ describe("ExpertCatalogPage — a failed start is VISIBLE (262-UAT 3.6)", () => 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t start a chat with Contract Reviewer/i)
     // The grid is still there — the error does not replace the catalog.
     expect(screen.getByText("Contract Reviewer")).toBeInTheDocument()
+  })
+})
+
+// ── Phase 267-03 (SEED-309 R265-262-04 · D-267-24) — Start Chat is in-flight guarded ─────────
+//
+// ⛔ DRIVEN RED ON BASE FIRST: the 265 review measured `{ calls: 2, disabled: false }` for a double
+// click on a page whose start was pending. Every start creates its own thread, so a second click
+// is a second thread. `fireEvent` (not userEvent) so both clicks land before the promise settles.
+
+function deferred() {
+  let resolve!: () => void
+  let reject!: (e: unknown) => void
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
+describe("ExpertCatalogPage — Start Chat in flight (267-03)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("(14) CARD: a double click starts ONE chat; 'Starting…' is disabled and aria-busy until it settles", async () => {
+    vi.mocked(api.listExperts).mockResolvedValue([A])
+    const d = deferred()
+    const onStartChat = vi.fn(() => d.promise)
+    render(<ExpertCatalogPage folders={[]} onStartChat={onStartChat} />)
+    const btn = await screen.findByRole("button", { name: /start chat/i })
+
+    fireEvent.click(btn)
+    fireEvent.click(screen.getAllByRole("button").find((b) => /start/i.test(b.textContent ?? ""))!)
+
+    expect(onStartChat).toHaveBeenCalledTimes(1)
+    const busy = screen.getByRole("button", { name: /starting/i }) as HTMLButtonElement
+    expect(busy.textContent).toContain("Starting…")
+    expect(busy.disabled).toBe(true)
+    expect(busy.getAttribute("aria-busy")).toBe("true")
+
+    await act(async () => {
+      d.resolve()
+      await d.promise
+    })
+    const again = await screen.findByRole("button", { name: /start chat/i })
+    expect((again as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it("(15) CARD: a rejected start re-enables the button and the shipped error path shows its message", async () => {
+    vi.mocked(api.listExperts).mockResolvedValue([A])
+    const d = deferred()
+    const onStartChat = vi.fn(() => d.promise)
+    render(<ExpertCatalogPage folders={[]} onStartChat={onStartChat} />)
+    fireEvent.click(await screen.findByRole("button", { name: /start chat/i }))
+    expect(screen.getByRole("button", { name: /starting/i })).toBeTruthy()
+
+    await act(async () => {
+      d.reject(new TypeError("Failed to fetch"))
+      await d.promise.catch(() => {})
+    })
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /couldn.t start a chat with Contract Reviewer/i,
+    )
+    expect(
+      (screen.getByRole("button", { name: /start chat/i }) as HTMLButtonElement).disabled,
+    ).toBe(false)
+  })
+
+  it("(16) MODAL: a double click on Start Scoped Chat starts ONE chat, shows 'Starting…', then closes", async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.listExperts).mockResolvedValue([A])
+    const d = deferred()
+    const onStartChat = vi.fn(() => d.promise)
+    const { container } = render(<ExpertCatalogPage folders={[]} onStartChat={onStartChat} />)
+    await screen.findByText("Contract Reviewer")
+    await user.click(within(cardOf(container, "contract-reviewer")).getByRole("button", { name: "Details" }))
+    const dialog = await screen.findByRole("dialog")
+    const start = within(dialog).getByRole("button", { name: /start scoped chat with expert/i })
+
+    fireEvent.click(start)
+    fireEvent.click(within(screen.getByRole("dialog")).getAllByRole("button").find((b) => /start/i.test(b.textContent ?? ""))!)
+
+    expect(onStartChat).toHaveBeenCalledTimes(1)
+    const busy = within(screen.getByRole("dialog")).getByRole("button", { name: /starting/i })
+    expect((busy as HTMLButtonElement).disabled).toBe(true)
+    expect(busy.getAttribute("aria-busy")).toBe("true")
+
+    await act(async () => {
+      d.resolve()
+      await d.promise
+    })
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+  })
+})
+
+// ── Phase 267-03 (PACK-22 · D-267-08) — the Connections door ─────────────────────────────────
+
+describe("ExpertCatalogPage — a missing connection opens Connections (267-03)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const coach = bundle({
+    name: "Sales Pipeline Coach",
+    slug: "sales-pipeline-coach",
+    required_connections: ["hubspot"],
+    connection_state: [{ slug: "hubspot", name: "HubSpot", connected: false }],
+    can_connect: true,
+  })
+
+  it("(17) the card's Connect calls onOpenConnections once and never starts a chat", async () => {
+    vi.mocked(api.listExperts).mockResolvedValue([coach])
+    const onStartChat = vi.fn()
+    const onOpenConnections = vi.fn()
+    render(
+      <ExpertCatalogPage
+        folders={[]}
+        onStartChat={onStartChat}
+        onOpenConnections={onOpenConnections}
+      />,
+    )
+    const connect = await screen.findByRole("button", { name: /connect hubspot →/i })
+    expect(screen.getByText("Requires HubSpot — not connected")).toBeVisible()
+    expect(screen.queryByRole("button", { name: /start chat/i })).toBeNull()
+    fireEvent.click(connect)
+    expect(onOpenConnections).toHaveBeenCalledTimes(1)
+    expect(onStartChat).not.toHaveBeenCalled()
+  })
+
+  it("(18) the modal's Connect closes the modal, then opens Connections", async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.listExperts).mockResolvedValue([coach])
+    const onOpenConnections = vi.fn()
+    const { container } = render(
+      <ExpertCatalogPage folders={[]} onStartChat={vi.fn()} onOpenConnections={onOpenConnections} />,
+    )
+    await screen.findByText("Sales Pipeline Coach")
+    await user.click(within(cardOf(container, "sales-pipeline-coach")).getByRole("button", { name: "Details" }))
+    const dialog = await screen.findByRole("dialog")
+    await user.click(within(dialog).getByRole("button", { name: /connect hubspot →/i }))
+    expect(onOpenConnections).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
   })
 })
 

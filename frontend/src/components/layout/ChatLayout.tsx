@@ -1030,6 +1030,9 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             // person clicks that thread again. `startScopedChat`'s docblock owns that rule.
             <ExpertCatalogPage
               folders={folders}
+              // 267 (D-267-08): a missing required connection's Connect control uses the SAME
+              // shipped door the composer uses above — no per-service deep link.
+              onOpenConnections={() => onNavigate("connections")}
               onStartChat={async (expert) => {
                 // ⛔ THE CATCH IS NOT DECORATION, AND IT IS NOT A SWALLOW EITHER. `startScopedChat`
                 // REJECTS when the PATCH is refused, precisely so a failed start never dresses

@@ -190,7 +190,10 @@ const BASELINE = {
   // ⬆ 14 → 23 at 263-REVIEW.md WR-03/04/05/08: the slug readOnly + its reason + the
   // payload omission, both grant-revocation fail-open arms, the unread-library THIRD
   // banner state and its positive control, and born_skills on both payloads.
-  "ExpertAuthoringStudio.test.tsx": 23,
+  // ⬆ 23 → 29 at 267-03 (the gate's own printed count): the dead tool-floor toggle absent, the
+  //   picker saving SERVICE IDS (not names), one chip per service id, a saved id shown selected,
+  //   an unmatched id kept, and tool_floor_enabled sent unchanged.
+  "ExpertAuthoringStudio.test.tsx": 29,
   // ── Phase 262 plan 03 (PACK-11) — the Expert catalog ───────────────────────────────
   // ⚠ ADOPTED, not raised — both figures taken from the gate's OWN printed `— N new`
   // column on the run that first named them in TARGETS, never from a local vitest tail.
@@ -203,12 +206,18 @@ const BASELINE = {
   // ⬆ RAISED 10 → 27 at 266-04: installView's seven state→control arms (a driver-dict cause
   //   CLASSIFIED, never rendered raw; a null cause the honest fallback), inviteGate's refusals,
   //   provenanceByFolder, and the install client (no body; 409 → the server's sentence; 403 → []).
-  "expertCatalog.test.ts": 27,
+  // ⬆ RAISED 27 → 44 at 267-03 (the gate's own printed count): CONNECTION_COPY's pinned
+  //   literals, connectionGate's arms (exactly one of action/ask), gate order install →
+  //   connection, the ledger columns, and the backend's OWN overlay row read via `?raw`.
+  "expertCatalog.test.ts": 44,
   // ⬆ RAISED 8 → 13 at 266-04 (the file carried 9 at base — the 262-UAT 3.6 case sat above the
   //   pin): the card's control swap with no dead button, install → re-read → fresh modal state,
   //   the fetch poll that STOPS once nothing is installing (driven RED against a leaked
   //   interval: 2 calls expected, 5 received), and a 409's sentence in the modal.
-  "ExpertCatalogPage.test.tsx": 13,
+  // ⬆ RAISED 13 → 19 at 267-03 (the gate's own printed count): Start Chat in flight from the
+  //   card AND the modal (driven RED on base: 2 calls expected 1), a rejection re-enables, and
+  //   the Connections door from both surfaces.
+  "ExpertCatalogPage.test.tsx": 19,
   // ── Phase 262 plan 04 (PACK-12) — the detail view ──────────────────────────────────
   // ⚠ ADOPTED, not raised — `8` is the gate's OWN printed `— N new` figure on the run that
   // first named this file in TARGETS, never a local vitest tail.
@@ -218,13 +227,24 @@ const BASELINE = {
   // ⬆ RAISED 8 → 15 at 266-04: the primary control swapped by install state — ready / Install /
   //   installing / needs-an-admin / Install failed — retry with a CLASSIFIED cause / Starting /
   //   the server's refusal — each asserting zero disabled buttons and no literal "undefined".
-  "ExpertDetailModal.test.tsx": 15,
+  // ⬆ RAISED 15 → 20 at 267-03 (the gate's own printed count): Required Connections pills state
+  //   each connection, the admin Connect / member sentence footers with NO Start control, and
+  //   the in-flight Starting… state.
+  "ExpertDetailModal.test.tsx": 20,
   // ── Phase 262 plan 04 (PACK-13) — the ordered handoff ──────────────────────────────
   // ⚠ ADOPTED, not raised — `6` is the gate's OWN printed `— N new` figure.
   // ⛔ TWO of these six are the ORDER itself, and one is an identity comparison. Five seams
   // called in the wrong order still call every seam, so an every-mock-was-called suite would
   // guard nothing; dropping a case here would let a silently un-scoping thread row ship green.
   "startScopedChat.test.ts": 6,
+  // ── Phase 267 plan 03 (PACK-22 · D-267-24 / D-267-27) — ADOPTED, both knobs, same commit ──
+  // ⚠ Each figure is the gate's OWN printed `— N new` count on the run that first named these
+  // files in TARGETS. ⛔ `ChatLayout.startChat.test.tsx` is the ONLY fence on ChatLayout's real
+  // start wiring: with it unpinned, the two 265-review plants (refreshThreads no-op,
+  // discardThread removed) would again leave every gated suite green.
+  "ScopeLedger.test.tsx": 8,
+  "ExpertCard.connection.test.tsx": 6,
+  "ChatLayout.startChat.test.tsx": 2,
   // ── Phase 266 plan 04 (D-266-13) — the Library folder names its Expert ─────────────
   // ⚠ ADOPTED at 266-04: this suite sat in NEITHER knob before (measured by grep). 14 cases at
   // base + 4 new: "Shared with org · from <Expert>" through NavRow's existing sharedLabel, the
@@ -4479,6 +4499,14 @@ const TARGETS = [
   // Pure module, no mount. Named here and pinned below in the same commit, for the same
   // directory reason: nothing under this path is reached by a bare-directory entry.
   "src/components/experts/catalog/__tests__/startScopedChat.test.ts",
+  // ── Phase 267 plan 03 (PACK-22 · D-267-24 / D-267-27) — the connection gate + SEED-309 ──
+  // Same directory trap (neither `src/components/experts` nor `src/components/layout` is a
+  // bare-directory entry), so all three are NAMED here and pinned in BASELINE, same commit:
+  // the Brings/Missing ledger leaf, the card's missing-connection states, and the fence on
+  // ChatLayout's REAL Start Chat wiring (driven RED by both 265-review plants).
+  "src/components/experts/__tests__/ScopeLedger.test.tsx",
+  "src/components/experts/catalog/__tests__/ExpertCard.connection.test.tsx",
+  "src/components/layout/__tests__/ChatLayout.startChat.test.tsx",
   // ── Phase 266 plan 04 (D-266-13) — the Library folder's provenance label ──────────
   // `src/__tests__/components` has no bare-directory entry, so this suite RAN IN NO GATE until
   // named here. Both knobs, same commit: the BASELINE pin is beside the experts pins above.

@@ -48,7 +48,7 @@
  * unreachable from here.
  */
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { AlertCircle, Search, Sparkles } from "lucide-react"
 import { listExperts } from "@/lib/api"
 import { installExpert } from "@/lib/api/experts"
@@ -80,6 +80,12 @@ export interface ExpertCatalogPageProps {
    * hook for the host, never the gate that decides.
    */
   onInspect?: (expert: ExpertBundle) => void
+  /**
+   * Phase 267 (D-267-08): the host's Connections page door, for an Expert whose required
+   * connection is missing. Passed straight through to the card and the modal; without it no
+   * Connect control renders (a button with no door would do nothing).
+   */
+  onOpenConnections?: () => void
 }
 
 export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
@@ -121,12 +127,23 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
   // 262-UAT 3.6: a failed start used to close the modal and say nothing. The handoff now
   // rejects to here, and the catalog says so beside the control that was pressed.
   const [startError, setStartError] = useState<string | null>(null)
+  // 267 (SEED-309 R265-262-04): ONE start in flight at a time. Every start creates its own thread,
+  // so a second click while the first is pending would be a second thread. The ref is the guard
+  // (it is current before React re-renders); the state is what the card and modal draw.
+  const [startingId, setStartingId] = useState<string | null>(null)
+  const startingRef = useRef(false)
   const handleStartChat = async (expert: ExpertBundle) => {
+    if (startingRef.current) return
+    startingRef.current = true
+    setStartingId(expert.id)
     setStartError(null)
     try {
       await props.onStartChat(expert)
     } catch {
       setStartError(`Couldn't start a chat with ${expert.name}. Check your connection and try again.`)
+    } finally {
+      startingRef.current = false
+      setStartingId(null)
     }
   }
 
@@ -310,6 +327,8 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
               onStartChat={handleStartChat}
               onInstall={handleInstall}
               installBusy={installingId === expert.id}
+              onOpenConnections={props.onOpenConnections}
+              startBusy={startingId === expert.id}
             />
           ))}
         </div>
@@ -326,6 +345,8 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
           if (!open) setInspected(null)
         }}
         onStartChat={handleStartChat}
+        onOpenConnections={props.onOpenConnections}
+        startBusy={inspected !== null && startingId === inspected.id}
         onInstall={handleInstall}
         installBusy={inspected !== null && installingId === inspected.id}
         installError={

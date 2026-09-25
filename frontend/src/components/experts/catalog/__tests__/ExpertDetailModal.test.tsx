@@ -22,7 +22,7 @@
  * and all four presentation columns are optional on `ExpertBundle`.
  */
 
-import { render, screen, cleanup } from "@testing-library/react"
+import { render, screen, cleanup, fireEvent, act } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { ExpertDetailModal, HONEST, UNNAMEABLE_FOLDER } from "../ExpertDetailModal"
@@ -69,7 +69,11 @@ const FULL = bundle({
   example_output: SAMPLE_OUTPUT,
   knowledge_folder_ids: ["known-id", "invisible-id"],
   member_skills: ["ratio_calculator"],
-  required_connections: ["Edgar MCP"],
+  // 267-03 (D-267-30): `required_connections` stores SERVICE IDS; the name a person reads comes
+  // from the server's `connection_state` overlay. (This fixture carried the NAME before 267.)
+  required_connections: ["edgar"],
+  connection_state: [{ slug: "edgar", name: "Edgar MCP", connected: true }],
+  can_connect: false,
   prompt_suggestions: [
     { title: "Reconcile Q3", prompt: "Compare the Q3 10-Q against the Q3 earnings call transcript." },
     { title: "Margin bridge", prompt: "Build a gross-margin bridge from Q2 to Q3 and name each driver." },
@@ -327,5 +331,122 @@ describe("ExpertDetailModal — install states (266-04)", () => {
     mountInstall(withInstall("not_installed"), { installError: sentence })
     expect(rendered()).toContain(sentence)
     noDeadControls()
+  })
+})
+
+// ── Phase 267-03 (PACK-22 · D-267-06 / D-267-08 · UI-SPEC §5.5) — required connections ────────
+//
+// ⛔ Every asserted word is VISIBLE AT REST (toBeVisible + no hiding utility on any ancestor).
+
+const HIDING = new Set(["hidden", "sr-only", "invisible", "opacity-0"])
+function assertVisibleAtRest(el: HTMLElement) {
+  expect(el).toBeVisible()
+  for (let n: HTMLElement | null = el; n; n = n.parentElement) {
+    const hiding = (n.getAttribute("class") ?? "").split(/\s+/).filter((t) => HIDING.has(t))
+    expect(hiding, `<${n.tagName.toLowerCase()} class="${n.getAttribute("class")}">`).toEqual([])
+  }
+}
+
+function needsHubSpot(can_connect: boolean): ExpertBundle {
+  return bundle({
+    name: "Sales Pipeline Coach",
+    slug: "sales-pipeline-coach",
+    required_connections: ["notion", "hubspot"],
+    connection_state: [
+      { slug: "notion", name: "Notion", connected: true },
+      { slug: "hubspot", name: "HubSpot", connected: false },
+    ],
+    can_connect,
+  })
+}
+
+function mountConn(
+  expert: ExpertBundle,
+  extra: { startBusy?: boolean; door?: boolean; onStartChat?: (e: ExpertBundle) => unknown } = {},
+) {
+  const onStartChat = vi.fn(extra.onStartChat ?? (() => undefined))
+  const onOpenChange = vi.fn()
+  const onOpenConnections = vi.fn()
+  render(
+    <ExpertDetailModal
+      expert={expert}
+      folders={VISIBLE_FOLDERS}
+      open
+      onOpenChange={onOpenChange}
+      onStartChat={onStartChat as (e: ExpertBundle) => void}
+      onOpenConnections={extra.door === false ? undefined : onOpenConnections}
+      startBusy={extra.startBusy}
+    />,
+  )
+  return { onStartChat, onOpenChange, onOpenConnections }
+}
+
+describe("ExpertDetailModal — required connections (267-03)", () => {
+  it("(16) the section names each connection's state: 'Notion' as shipped, 'HubSpot · not connected' in rose", () => {
+    mountConn(needsHubSpot(true))
+    const ok = screen.getByText("Notion")
+    assertVisibleAtRest(ok)
+    const missing = screen.getByText("HubSpot · not connected")
+    assertVisibleAtRest(missing)
+    expect(missing.className).toContain("rose")
+    expect(ok.className).not.toContain("rose")
+  })
+
+  it("(17) admin: the requires line + 'Connect HubSpot →' in the footer, and NO Start Scoped Chat", async () => {
+    const user = userEvent.setup()
+    const { onOpenConnections, onOpenChange, onStartChat } = mountConn(needsHubSpot(true))
+    const line = screen.getByTestId("connection-gate-line")
+    expect(line.textContent).toBe("Requires HubSpot — not connected")
+    assertVisibleAtRest(line)
+    expect(screen.queryByRole("button", { name: /start scoped chat/i })).toBeNull()
+    const connect = screen.getByRole("button", { name: /connect hubspot →/i })
+    assertVisibleAtRest(connect)
+    await user.click(connect)
+    // The modal closes before navigating (UI-SPEC §6.1).
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(onOpenConnections).toHaveBeenCalledTimes(1)
+    expect(onOpenChange.mock.invocationCallOrder[0]).toBeLessThan(
+      onOpenConnections.mock.invocationCallOrder[0],
+    )
+    expect(onStartChat).not.toHaveBeenCalled()
+    noDeadControls()
+  })
+
+  it("(18) member: one footer sentence carries the requirement AND who can fix it; no button", () => {
+    mountConn(needsHubSpot(false))
+    const line = screen.getByTestId("connection-gate-line")
+    expect(line.textContent).toBe(
+      "Requires HubSpot — not connected. Ask an org admin to connect HubSpot.",
+    )
+    assertVisibleAtRest(line)
+    expect(screen.queryByRole("button", { name: /connect/i })).toBeNull()
+    expect(screen.queryByRole("button", { name: /start scoped chat/i })).toBeNull()
+    noDeadControls()
+  })
+
+  it("(19) Start Scoped Chat in flight: 'Starting…', disabled, aria-busy — a click is a no-op", () => {
+    const { onStartChat } = mountConn(FULL, { startBusy: true })
+    const btn = screen.getByRole("button", { name: /starting/i }) as HTMLButtonElement
+    expect(btn.textContent).toContain("Starting…")
+    expect(btn.disabled).toBe(true)
+    expect(btn.getAttribute("aria-busy")).toBe("true")
+    fireEvent.click(btn)
+    expect(onStartChat).not.toHaveBeenCalled()
+  })
+
+  it("(20) a start that returns a promise keeps the modal open until it settles, then closes it", async () => {
+    let resolve!: () => void
+    const pending = new Promise<void>((r) => {
+      resolve = r
+    })
+    const { onStartChat, onOpenChange } = mountConn(FULL, { onStartChat: () => pending })
+    fireEvent.click(screen.getByRole("button", { name: /start scoped chat with expert/i }))
+    expect(onStartChat).toHaveBeenCalledTimes(1)
+    expect(onOpenChange).not.toHaveBeenCalled()
+    await act(async () => {
+      resolve()
+      await pending
+    })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 })
