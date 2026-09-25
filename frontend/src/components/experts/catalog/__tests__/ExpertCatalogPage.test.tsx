@@ -337,4 +337,31 @@ describe("ExpertCatalogPage — install (266-04)", () => {
     await waitFor(() => expect(within(screen.getByRole("dialog")).getByText(sentence)).toBeInTheDocument())
     expect(screen.queryAllByRole("button").filter((b) => (b as HTMLButtonElement).disabled)).toHaveLength(0)
   })
+
+  it("(13) IN-02 — an install that STARTED is never reported as failed because the re-read after it failed", async () => {
+    const user = userEvent.setup()
+    const readError = "Failed to list experts"
+    vi.mocked(api.listExperts)
+      .mockResolvedValueOnce([fa("not_installed")])
+      .mockRejectedValueOnce(new Error(readError))
+      .mockResolvedValue([fa("installing")])
+    vi.mocked(expertsApi.installExpert).mockResolvedValue({
+      expert_bundle_id: "financial-analyzer",
+      corpus_version: "sha256:abc",
+      install: fa("installing").install!,
+    })
+    const { container } = renderCatalog()
+    await screen.findByText("Financial Analyzer")
+
+    await user.click(within(cardOf(container, "financial-analyzer")).getByRole("button", { name: "Details" }))
+    const dialog = await screen.findByRole("dialog")
+    await user.click(within(dialog).getByRole("button", { name: INSTALL_COPY.installAction }))
+
+    await waitFor(() => expect(api.listExperts).toHaveBeenCalledTimes(2))
+    // The 202's own state stands; the failed re-read is left to the poll to reconcile.
+    await waitFor(() =>
+      expect(within(screen.getByRole("dialog")).getByText(INSTALL_COPY.installing)).toBeInTheDocument(),
+    )
+    expect(screen.queryByText(readError)).toBeNull()
+  })
 })
