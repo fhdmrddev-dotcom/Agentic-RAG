@@ -427,3 +427,20 @@ describe("WR-06 — the biased narrowing is stated before the invite", () => {
     atRest(within(r).getByTestId("invite-expert-btn-financial-analyzer"))
   })
 })
+
+// 267-REVIEW IN-02 — the R1 "Active" pill carried `onClick={onInvite}`, so clicking it re-PATCHed the
+// Expert that is already bound (and refetched the transcript). It is a status, not a control.
+describe("IN-02 — the Active pill does nothing", () => {
+  it("(I2) clicking Active selects nothing and closes nothing, and the pill is not a button", async () => {
+    const { onSelectExpert, onOpenChange, user } = await open({
+      currentExpertId: FA.id,
+      currentExpertName: "Financial Analyzer",
+      threadFolderName: "Client ACME",
+    })
+    const pill = within(row("financial-analyzer")).getByText("Active")
+    await user.click(pill)
+    expect(onSelectExpert).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalledWith(false)
+    expect(within(row("financial-analyzer")).queryByRole("button", { name: /active/i })).toBeNull()
+  })
+})
