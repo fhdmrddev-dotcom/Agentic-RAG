@@ -249,8 +249,8 @@ The superseded row above is kept, not overwritten.
 | WR-08 | **FIXED** — caption test asserts no hiding utility on the caption or any ancestor; driven RED by planting `sr-only` on NavRow's wrapper, restored | `8aa3821fc` |
 | IN-02 | **FIXED** — only `installExpert`'s rejection sets the error; a failed re-read is left to the poll | RED `487662c32` · GREEN `a733484ec` · catalog case (13) |
 | IN-03 / IN-04 | **FIXED** — `SYSTEM_USER_ID` deleted; pre-195 index comment marked superseded beside the original | `79e756e88` |
-| WR-04 | **FIX NEXT** (own quick task, needs migration 196 pasted by the operator) — root-folder imports/watches 409 for a two-org user | — |
-| WR-03 | **FIX NEXT** (own quick task) — folder-scoped versioning for the installer only | — |
+| WR-04 | ~~FIX NEXT~~ **FIXED** — migration 196 widens `documents_dedup_idx` to `(org_id, user_id, content_hash, COALESCE(folder_id, …))`; added to `266-PROD-PARITY.md` step B. ⚠ Applied locally only after the operator's SQL-editor paste | RED `6be140fb9` · GREEN `45e045d92` |
+| WR-03 | ~~FIX NEXT~~ **FIXED (install direction)** — `mint_document_row(version_scope="folder")`, passed only by the installer; `/upload` unchanged. The reverse direction (the admin's own later `/upload` retires the install copy) → **SEED-318** | GREEN `12587efaa` · mint (3 cases) + idempotency (xi) |
 | WR-01 + WR-06 | **DEFERRED → SEED-315** (WR-06 was already SEED-315; WR-01 folded in). Fix before the first customer install | `SEED-315` |
 | WR-05 + IN-05 (+ SECURITY W-1) | **DEFERRED → SEED-316** — an ownership decision (D-266-12), not a bug fix | `SEED-316` |
 | IN-01 | **DEFERRED → SEED-317** — `LibraryPage` has no active-org handle to key on | `SEED-317` |
@@ -258,3 +258,6 @@ The superseded row above is kept, not overwritten.
 Gates after the fixes: backend `71 failed / 5665 passed / 0 errors` (at the 71 ceiling; the 39 unit
 suites importing any changed module: **448 passed, 0 failed**) · vitest count gate
 `total 8828 · failed 0 · pinned 8075 · 327/327`.
+
+Gates after WR-03/WR-04: backend `71 failed / 5673 passed / 0 errors` (at the ceiling; the 40 unit suites
+importing any changed module + the 196 shape test: **456 passed, 0 failed**). No frontend change.
