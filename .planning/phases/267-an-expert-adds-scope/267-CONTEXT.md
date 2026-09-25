@@ -189,6 +189,33 @@ and SEED-303 S8 clone-on-customise.
   3. "New chat with Contract Reviewer". The new thread opens with a handoff card naming the first thread's facts, and
      the original thread keeps its Expert.
 
+### Research rulings (operator, 2026-09-25, after 267-RESEARCH.md)
+- **D-267-29 (OQ-1): the Expert's own connections reach its runs through a SERVER UNION.** This corrects D-267-01
+  sentence 2 and D-267-03, which the research refuted. A plain thread only advertises the connections the user switched
+  on in the composer (`agent_loop.py:1640-1662`: an empty list means none).
+  - `_resolve_thread_scoping` carries the resolver's **already approved** `effective_connections` (active and enabled in
+    the caller's org) as a **neutrally named** `RunContext` field, for example `scoped_connection_keys`. The name must not
+    contain "expert", because of the AST fence on `agent_loop.py`.
+  - The connector block admits a connection when its id was switched on OR its `service_id` / `capability` is in that
+    set.
+  - Per-tool grant posture (deny/ask) still applies unchanged.
+  - The ledger's `Brings` column and the event card's `Now` line are the visible statement, because the "Using:" chip row
+    will not show these connections.
+  - This widens a grant surface (SEED-146), with explicit operator approval.
+- **D-267-30 (OQ-2): the authoring studio's connection picker stores `service_id`, not `name`.** This is a new defect
+  (`ExpertAuthoringStudio.tsx:1114-1121`). A production read on 2026-09-25 (Supabase MCP, read-only) found **0**
+  `expert_bundles` rows with any `required_connections`, so there is no legacy-name compatibility and no backfill.
+- **D-267-31 (OQ-3): one shared, fail-closed Expert-binding gate.** PATCH /threads, POST /threads (D-267-21) and
+  POST /threads/{id}/handoff all call one helper, which checks entitlement and access. **No validated active org means
+  refuse, with a reason.** It replaces PATCH's fail-open skip, and `test_260_expert_chat_scoping.py:196-238`, which pins
+  that skip, is rewritten.
+- **D-267-32 (OQ-4): skills ADD, folded into 267.** The skill catalog of an Expert thread = the normal catalog ∪ the
+  Expert's member skills, and never the Expert's alone. It uses the same seam as the tool floor
+  (`run_producer.py:526-531` / `agent_loop.py:1445-1459`), is data handed to the loop, and has neutral names.
+- **D-267-33 (OQ-5): the handoff thread inherits the source thread's `folder_id`.** The handoff event states it.
+- **D-267-34: every `messages` row this phase writes (event, handoff) sets `org_id` explicitly from `threads.org_id`.**
+  The autofill trigger picks `org_members … LIMIT 1`, which is wrong for a two-org user.
+
 ### Claude's Discretion
 - The exact route shapes and response models (preview, handoff, overlay field names).
 - The model and prompt used for the handoff summary (`thread_title.py` precedent), and its length cap.
