@@ -215,6 +215,8 @@ describe("FolderNode", () => {
 
   // ── Phase 266-04 (D-266-13) — an installed Expert's folder names where it came from ─────────
   // The provenance rides NavRow's EXISTING `sharedLabel` tooltip; NavRow itself is not edited.
+  // ⚠ SUPERSEDED by 266-05 (UI-3): NavRow WAS edited — it gained the optional `caption` prop the
+  // at-rest note renders through. The line above is kept, not overwritten (266 review WR-08).
 
   async function revealSharedLabel(): Promise<string[]> {
     const pill = screen.getByText("G")
@@ -275,6 +277,13 @@ describe("FolderNode", () => {
     const caption = screen.getByTestId("navrow-caption")
     expect(caption).toHaveTextContent("from Financial Analyzer")
     expect(caption).toBeVisible()
+    // WR-08: jsdom loads no Tailwind, so toBeVisible() cannot see a utility class that hides the
+    // note. Assert no unprefixed hiding utility on the caption or any ancestor up to the root.
+    const HIDING = new Set(["hidden", "sr-only", "invisible", "opacity-0"])
+    for (let el: HTMLElement | null = caption; el; el = el.parentElement) {
+      const hiding = (el.getAttribute("class") ?? "").split(/\s+/).filter((t) => HIDING.has(t))
+      expect(hiding, `<${el.tagName.toLowerCase()} class="${el.getAttribute("class")}">`).toEqual([])
+    }
   })
 
   it("266 UAT: a folder with no provenance entry renders no caption line", () => {
