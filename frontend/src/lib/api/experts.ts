@@ -250,7 +250,7 @@ export interface ExpertScopePreview {
   mode: "biased" | "restricted"
   /** Server-named; `name: null` = a folder the caller cannot see. */
   expert_folders: { id: string; name: string | null }[]
-  thread_folder: { id: string; name: string; doc_count: number } | null
+  thread_folder: { id: string; name: string | null; doc_count: number } | null
   excluded_count: number
   /** At most five names; `excluded_count` may be larger. */
   excluded_names: string[]
