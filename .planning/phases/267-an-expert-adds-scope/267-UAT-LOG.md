@@ -231,7 +231,7 @@ From `1b10cf0b-…` after re-inviting Financial Analyzer:
   `active_expert_id …0259` (Financial Analyzer) and gained one `expert_handoff` row `3b584157-…`, org A:
   `Asked Contract Reviewer in a new chat: “Contract Reviewer · Q3 board prep”.`
 
-## Findings (recorded for the operator — none fixed in this plan)
+## Findings (as recorded at the Task 3 checkpoint; resolutions follow the list)
 
 - **F-1 — `can_connect` depends on a cold per-worker settings cache (PACK-22 / D-267-06).** `feature_visible`
   (`backend/app/dependencies.py`, factored out in 267) reads `feature_audience("live_connectors")` through the
@@ -257,6 +257,72 @@ From `1b10cf0b-…` after re-inviting Financial Analyzer:
   drops that folder (its first answer: "there is no master services agreement in this folder"). The 267-02
   fixture models it as biased. The G-4 #2 script ("Won't use · 4" on HR Advisor) is unaffected; a person
   inviting Financial Analyzer into a folder chat will see a Won't-use line for it too.
+
+### Resolutions (after the Task 3 checkpoint, 2026-09-26)
+
+| Finding | Resolution | Where |
+|---|---|---|
+| F-1 cold-cache `can_connect` | **FIXED.** `feature_visible` now awaits `ensure_settings_fresh()` before reading the audience. This also covers every `require_visible` gate, `POST /connections` included, on a cold worker. RED first: `test_feature_visible_refreshes_settings_before_reading_the_audience` (`backend/tests/unit/test_267_connection_overlay.py`). The 22 visibility-gate files: **328 passed, 1 failed**. The one failure, `test_182_validate::test_interactive_phase_verdict_is_incomplete_and_per_node`, is INHERITED (in the base set; fails with the fix stashed) | RED `13856a7e9`, fix `cdb173609` (`backend/app/dependencies.py`) |
+| F-2 slug as name | **FIXED.** `connectionName` in `expertCatalog.ts` falls back to `getCuratedServiceEntry(slug).name` when the server echoes the slug; a real server name is never overridden. RED tests F-2a / F-2b in `expertCatalog.test.ts`. Experts suites 151 passed; `tsc -p tsconfig.app.json` still 70 | RED `13856a7e9`, fix `cdb173609` |
+| F-3 send-path org for a two-org user | **KNOWN SEED, not a 267 regression.** This is SEED-314 ("chat rows stamped with the oldest org, not the active one"). This UAT's measurement is recorded against it (`evidence/05b`) | SEED-314 |
+| F-4 handoff 502 on `deepseek-v4-flash` | **OWED / observed.** Did not reproduce in-process or on the retry. The cause is only in the backend log (the rung is not persisted). A per-provider refusal rate is unmeasured | — |
+| F-5 Financial Analyzer restricted | **BY DESIGN.** Migration 187 seeds `financial-analyzer` with `scope_mode='restricted'` ("Answers strictly from uploaded documents or refuses"). Only the 267-02 fixture `expert_changed.json` assumed biased | — |
+
+## Task 4 — G-4 lived-experience rows (Chrome)
+
+**Who drove it:** driven in Chrome by the orchestrator, in an isolated browser context as
+`uat267-u1-7ef2ae@example.test`, org A `e8c567c2-6f75-4c8b-94cf-92768831c035`. **Operator confirmation
+OWED.** The operator asked for autonomous execution, so there is no verbatim operator reply to quote, and
+none is invented here. The verdicts below are the orchestrator's, with the screenshots under `evidence/`.
+
+### G4-1 — invite Financial Analyzer, search the web and write a file — **PASS**
+New chat; Financial Analyzer (restricted) invited BEFORE the first message; prompt: search the web and save
+`rate-note.md`. The run took 2 steps: `web_search` + `workspace_write`. DB: thread
+`15857387-e4a3-43b4-9919-9c19fd5dba9e` was created with `active_expert_id …0259` in org A (the D-267-21 fix, live:
+the invite on a brand-new chat reached the thread row); the assistant `tool_calls` are
+`[web_search, workspace_write]`; `workspace_files` holds `/rate-note.md`.
+Screenshots: `g4-00-invite-dialog-new-chat.png` (the dialog on a new chat: Drive Briefing Assistant reads
+"MISSING Google Workspace / Requires Google Workspace — not connected / Connect Google Workspace →"; the
+restricted Experts show WILL USE) and `g4-01-web-search-and-file.png`.
+
+### G4-2 — swap to HR Advisor in a Client ACME chat, reload, ask — **PASS**
+Thread "Client ACME review" `2d9ad453-1813-4a83-a7bf-40b1caa652bc`. Before any click, the dialog's HR Advisor
+row reads WILL USE "HR Policies, Chat attachments" and **WON'T USE · 4** with `ACME_invoices_Q3.md`,
+`ACME_MSA_2026.md`, `ACME_SOW_03.md`, `Board_deck_Q3.md`, and offers "Replace Financial Analyzer" and
+"New chat with HR Advisor →". Replace → exactly ONE event card: "Financial Analyzer → HR Advisor 02:14 NOW
+HR Policies DROPPED Financial Reports & Filings, ACME_invoices_Q3.md · … · Chat attachments stay readable.";
+the chip reads HR Advisor. After a page reload the card is present **exactly once** and the chip still reads HR
+Advisor. This discharges 267-04's owed "event row appears exactly once after refetch/reconcile". Asked
+"payment terms in the ACME MSA?": a 4-step run answered that it found nothing in /HR Policies (only
+HR_Leave_Policy.md) and cited no ACME file.
+Screenshots: `g4-02a-dialog-wont-use-4.png`, `g4-02b-event-card-after-replace.png`,
+`g4-02c-after-reload.png`, `g4-02d-no-acme-citation.png`.
+
+### G4-3 — "New chat with Contract Reviewer →" — **PASS**
+The row showed "Summarising this chat…" and the dialog stayed open after Escape (the in-flight lock). The new
+thread "Contract Reviewer · Client ACME review" opens with a "Handed off from 'Client ACME review'" card
+naming the first thread's facts ($124.5M +18.2%, $31.7M, EBITDA $38.4M, the open MSA question); folder Client
+ACME is inherited; the chip reads Contract Reviewer. The original thread keeps HR Advisor and shows the
+pointer "Contract Reviewer · new chat 02:16 HERE HR Advisor stays OPEN Contract Reviewer · Client ACME
+review → Same folder: /Client ACME"; Open lands on the new thread.
+Screenshots: `g4-03a-handoff-card-new-thread.png`, `g4-03b-original-pointer.png`.
+
+### UI-catalog — requires state at rest — **PASS (admin); member view SKIPPED in Chrome**
+On the Experts page, the Drive Briefing Assistant card reads "MISSING Google Workspace / Requires Google
+Workspace — not connected / Details / Connect Google Workspace →", with no Start control on the card;
+Connect lands on the Connections page. Screenshot `g4-04a-catalog-requires.png`. The member view was **not
+driven in Chrome (skipped)**; the member's API reading (`can_connect: false`, no action) is SC#2's evidence.
+
+### UI-doubleclick — Start Chat opens one thread — **PASS**
+Two clicks plus a dblclick on the Contract Reviewer card's "Start Chat" created exactly ONE thread,
+`ce0e2c5a-4960-43fb-aef6-29960b451908` at 22:17:26 (SQL count of U1's threads over the last 3 minutes; the
+only other row is the 22:16:35 handoff thread).
+
+### Observation O-1 (copy, not fixed — routed to SEED-303)
+The swap card's DROPPED line lists the 4 ACME files, although they were not in use under the previous
+Financial Analyzer either (both sides are restricted). The payload's `excluded` set is computed against the
+thread folder, not against the previous side's effective scope, so "Dropped" over-states the change for a
+restricted → restricted swap.
 
 ## Handover to Task 4 (Chrome, G-4) — fixtures
 
