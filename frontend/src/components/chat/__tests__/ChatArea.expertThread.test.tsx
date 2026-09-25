@@ -18,7 +18,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import type { ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 import type { ExpertBundle, Message, Thread } from "@/types"
 
 const h = vi.hoisted(() => ({
@@ -29,6 +29,7 @@ const h = vi.hoisted(() => ({
   getExpert: vi.fn(),
   setThreadActiveExpert: vi.fn(),
   handoffThread: vi.fn(),
+  listThreads: vi.fn(),
 }))
 
 vi.mock("@/hooks/useMessages", () => ({
@@ -65,6 +66,7 @@ vi.mock("@/lib/api", async (importActual) => {
     listExperts: h.listExperts,
     getExpert: h.getExpert,
     setThreadActiveExpert: h.setThreadActiveExpert,
+    listThreads: h.listThreads,
   }
 })
 
@@ -86,6 +88,7 @@ import { StreamsProvider } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ApiError } from "@/lib/api"
+import { useThreads } from "@/hooks/useThreads"
 
 function expert(over: Partial<ExpertBundle>): ExpertBundle {
   return {
@@ -386,5 +389,85 @@ describe("(C) New chat with … — one request, refresh BEFORE open, refusal na
     )
     expect(nav.refreshThreads).not.toHaveBeenCalled()
     expect(nav.openThread).not.toHaveBeenCalled()
+  })
+})
+
+// 267-REVIEW CR-01 — the thread list must hold the SERVER's answer after an Expert change. The
+// change PATCHed the thread and threw the returned row away, and `useThreads` had no updater for
+// `active_expert_id`; so swap A→B on T, open U, come back to T, and `selectThread` handed ChatArea
+// the stale list object: the hydration effect loaded A, the chip said A, the server (and the next
+// run) had B, and the persisted "A → B" event card directly above contradicted the chip.
+//
+// The harness is the pair ChatLayout wires: the REAL `useThreads` hook and the REAL ChatArea, with
+// only the network stubbed. Case (10) pins that ChatLayout passes the same updater.
+describe("(D) CR-01 — the list holds the server's Expert after a change", () => {
+  const T: Thread = { ...THREAD, id: "thread-T", active_expert_id: FA.id } as Thread
+  const U: Thread = { ...THREAD, id: "thread-U", title: "Other", active_expert_id: null } as Thread
+
+  function Parent() {
+    const api = useThreads()
+    const { loadThreads } = api
+    useEffect(() => {
+      void loadThreads()
+    }, [loadThreads])
+    return (
+      <>
+        {api.threads.map((t) => (
+          <button key={t.id} type="button" data-testid={`pick-${t.id}`} onClick={() => api.selectThread(t)}>
+            {t.title}
+          </button>
+        ))}
+        <ChatArea
+          thread={api.selectedThread}
+          onCreateThread={api.newThread}
+          onThreadUpdated={api.patchThread}
+          folders={[]}
+        />
+      </>
+    )
+  }
+
+  it("(9) swap A→B on T, open U, come back to T: the chip says B", async () => {
+    h.messages = TALK
+    h.listThreads.mockResolvedValue([T, U])
+    const user = userEvent.setup()
+    render(shell(<Parent />))
+    await user.click(await screen.findByTestId("pick-thread-T"))
+    await waitFor(() =>
+      expect(screen.getByTestId("active-expert-chip").textContent).toContain("Financial Analyzer"),
+    )
+    await openInvite(user)
+    await user.click(await screen.findByTestId("expert-replace-btn-contract-reviewer"))
+    await waitFor(() => expect(h.setThreadActiveExpert).toHaveBeenCalledWith(T.id, CR.id))
+    await waitFor(() =>
+      expect(screen.getByTestId("active-expert-chip").textContent).toContain("Contract Reviewer"),
+    )
+
+    await user.click(screen.getByTestId("pick-thread-U"))
+    await waitFor(() => expect(screen.queryByTestId("active-expert-chip")).toBeNull())
+    await user.click(screen.getByTestId("pick-thread-T"))
+    await waitFor(() => expect(h.getExpert).toHaveBeenLastCalledWith(CR.id))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.getByTestId("active-expert-chip").textContent).toContain("Contract Reviewer")
+  })
+
+  it("(9b) removing the Expert, then leaving and coming back, does not bring it back", async () => {
+    h.listThreads.mockResolvedValue([T, U])
+    const user = userEvent.setup()
+    render(shell(<Parent />))
+    await user.click(await screen.findByTestId("pick-thread-T"))
+    const chip = await screen.findByTestId("active-expert-chip")
+    await user.click(within(chip).getByRole("button", { name: /dismiss financial analyzer/i }))
+    await waitFor(() => expect(h.setThreadActiveExpert).toHaveBeenCalledWith(T.id, null))
+    await user.click(screen.getByTestId("pick-thread-U"))
+    await user.click(screen.getByTestId("pick-thread-T"))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.queryByTestId("active-expert-chip")).toBeNull()
+  })
+
+  it("(10) ChatLayout hands ChatArea the list's own updater", async () => {
+    const layout = (await import("../../layout/ChatLayout.tsx?raw")).default as string
+    expect(layout.length).toBeGreaterThan(1000)
+    expect(layout).toMatch(/onThreadUpdated=\{patchThread\}/)
   })
 })
