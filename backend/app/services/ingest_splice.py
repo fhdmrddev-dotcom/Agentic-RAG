@@ -132,6 +132,7 @@ def mint_document_row(
     on_conflict: Literal["raise", "link"] = "raise",
     source_connection_id: str | None = None,
     ingest_visibility: str | None = None,
+    version_scope: Literal["user", "folder"] = "user",
 ) -> MintResult:
     """Synchronously validates, dedupes, versions, and mints a single document row.
 
@@ -242,12 +243,25 @@ def mint_document_row(
     )
     if org_id:
         versions_query = versions_query.eq("org_id", org_id)
+    # WR-03 (266 review): the Expert installer versions WITHIN its folder. Keyed on the filename
+    # alone, minting the install copy retired the installing admin's own same-named document in
+    # any other folder — and retrieval requires is_latest. The default ("user") is /upload's
+    # behaviour, byte-unchanged.
+    folder_scoped = version_scope == "folder"
+    if folder_scoped:
+        versions_query = (
+            versions_query.eq("folder_id", folder_id) if folder_id else versions_query.is_("folder_id", "null")
+        )
     existing_versions = versions_query.order("version_number", desc=True).limit(1).execute()
     if existing_versions.data:
         next_version = existing_versions.data[0]["version_number"] + 1
         retire_query = supabase.table("documents").update({"is_latest": False}).eq("user_id", user_id).eq("filename", filename)
         if org_id:
             retire_query = retire_query.eq("org_id", org_id)
+        if folder_scoped:
+            retire_query = (
+                retire_query.eq("folder_id", folder_id) if folder_id else retire_query.is_("folder_id", "null")
+            )
         retire_query.execute()
     else:
         next_version = 1
@@ -345,6 +359,7 @@ async def async_mint_document_row(
     on_conflict: Literal["raise", "link"] = "raise",
     source_connection_id: str | None = None,
     ingest_visibility: str | None = None,
+    version_scope: Literal["user", "folder"] = "user",
 ) -> MintResult:
     """Asynchronous wrapper for mint_document_row using run_in_threadpool."""
     return await run_in_threadpool(
@@ -360,6 +375,7 @@ async def async_mint_document_row(
             on_conflict=on_conflict,
             source_connection_id=source_connection_id,
             ingest_visibility=ingest_visibility,
+            version_scope=version_scope,
         )
     )
 

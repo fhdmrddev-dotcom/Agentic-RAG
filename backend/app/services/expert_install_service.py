@@ -609,6 +609,7 @@ async def install_expert(
                 folder_id=folder_id,
                 org_id=str(org_id),
                 on_conflict="link",
+                version_scope="folder",  # WR-03: never retire a person's same-named file elsewhere
             )
             doc = dict(mint.document)
             if not mint.is_duplicate:
