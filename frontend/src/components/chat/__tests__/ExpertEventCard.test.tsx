@@ -6,8 +6,9 @@
  * anchor. ⛔ AT REST: `toBeVisible()` plus no hiding class on any ancestor — a `title` never counts.
  *
  * ⛔ THE OPEN CONTROL IS A REAL BUTTON ONLY WHEN IT CAN DO SOMETHING. Inside a navigation context
- * that resolves the target → a button that opens it. A target the list no longer has → the words
- * "· deleted" and no control. No context at all → the title as text and no control.
+ * that resolves the target → a button that opens it. A target the loaded list does not hold → the
+ * title as plain text and no control (267-REVIEW WR-09: never "· deleted" — absence from an in-memory
+ * list is not evidence of a deletion). No context at all → the title as text and no control.
  */
 import { describe, expect, it, vi } from "vitest"
 import { render, screen, within } from "@testing-library/react"
@@ -127,7 +128,11 @@ describe("ExpertEventCard — expert_handoff (the source thread's pointer)", () 
     expect(openThread).toHaveBeenCalledWith(target)
   })
 
-  it("(9) a thread no longer in the list reads '· deleted' and has no control", () => {
+  // 267-REVIEW WR-09 — this case used to read "(9) a thread no longer in the list reads '· deleted'":
+  // it pinned the defect. `findThread` reads only the in-memory list, which also misses a thread while
+  // the list is still loading, after a handoff made in another tab, or when the first load failed —
+  // each of which the card reported as a deletion that never happened.
+  it("(9) a thread the loaded list does not hold reads its plain title — never '· deleted' — and has no control", () => {
     render(
       <ThreadNavigationProvider
         value={{ findThread: () => null, openThread: vi.fn(), refreshThreads: async () => {} }}
@@ -135,7 +140,8 @@ describe("ExpertEventCard — expert_handoff (the source thread's pointer)", () 
         <ExpertEventCard event={handoff} />
       </ThreadNavigationProvider>,
     )
-    expectVisibleAtRest(screen.getByText("Contract Reviewer · Q3 board prep · deleted"))
+    expectVisibleAtRest(screen.getByText("Contract Reviewer · Q3 board prep"))
+    expect(screen.queryByText(/deleted/)).toBeNull()
     expect(screen.queryByRole("button")).toBeNull()
   })
 
