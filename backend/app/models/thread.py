@@ -21,6 +21,45 @@ class ThreadUpdate(BaseModel):
     clear_active_expert: bool = False
 
 
+class ThreadHandoffRequest(BaseModel):
+    """Phase 267 (D-267-14 / PACK-24) — POST /threads/{id}/handoff. ``model`` / ``provider`` are the
+    composer's current pick (as ``MessageCreate``), resolved through the send path's own chain."""
+
+    expert_id: UUID
+    model: str | None = None
+    provider: str | None = None
+
+
+class ScopePreviewFolder(BaseModel):
+    id: UUID
+    # None = a folder the caller cannot see.
+    name: str | None = None
+
+
+class ScopePreviewThreadFolder(BaseModel):
+    id: UUID
+    name: str | None = None
+    doc_count: int
+
+
+class ExpertScopePreview(BaseModel):
+    """Phase 267 (D-267-17 / D-267-18 / D-267-19 / PACK-25) — GET /threads/expert-scope-preview.
+
+    Built by ``app.services.expert_scope.scope_preview`` from the SAME statement the transcript
+    event reads, so the invite dialog and the event cannot disagree. ``excluded_count`` and
+    ``excluded_names`` (≤ 5) come from ONE documents query — the heading and the list are never two
+    computations. ``expert_folders == []`` on a restricted Expert is the UI's gate line (266 CR-01).
+    """
+
+    expert_id: UUID
+    expert_name: str
+    mode: Literal["biased", "restricted"]
+    expert_folders: list[ScopePreviewFolder]
+    thread_folder: ScopePreviewThreadFolder | None = None
+    excluded_count: int = 0
+    excluded_names: list[str] = []
+
+
 class ThreadResponse(BaseModel):
     id: UUID
     user_id: UUID

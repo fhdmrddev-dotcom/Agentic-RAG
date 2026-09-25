@@ -1,0 +1,12 @@
+{
+  "kind": "handoff",
+  "source_thread_id": "50000000-0000-4000-8000-00000000000a",
+  "source_title": "Q3 board prep",
+  "expert_name": "Contract Reviewer",
+  "summary": [
+    "ACME Q3 invoices: $412K (+9% on Q2)",
+    "Two invoices overdue > 30 days",
+    "Open: does the MSA late-payment clause apply?"
+  ],
+  "folder_name": "Client ACME"
+}

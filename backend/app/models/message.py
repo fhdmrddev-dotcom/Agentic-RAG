@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # Phase 214 D-214-04 (STEP-02) — the RUN-SCAFFOLDING keys a launcher may not supply.
@@ -154,3 +154,83 @@ class MessageResponse(BaseModel):
     is_rated: bool | None = None
     # Phase 223 (BUG-260902-03 / D-223-06): armed connector IDs active when user message was sent
     active_connector_ids: list[UUID] | None = None
+
+
+# ── Phase 267 (D-267-11 / D-267-15 / D-267-16 / PACK-23 / PACK-24) — transcript payloads ──────────
+#
+# ONE structured payload per kind, stored as ``messages.tool_calls[0]`` and rendered by ONE
+# vocabulary module on the frontend (``components/chat/expertEventCopy.ts``, 267-04). The words a
+# user sees are derived from these fields; nothing here is a pre-rendered string except the
+# ``content`` column sentence the writer stores beside it (content is NOT NULL).
+#
+# ``now`` / ``dropped`` are GENERIC scope lines — folders, the thread's folder, "all documents",
+# connections — never Expert-specific keys, so Phase 268 (CHAT-08, the folder-scope event) adds a
+# KIND, not a second renderer. Every name is SNAPSHOTTED at write time: renaming or deleting an
+# Expert or folder later does not rewrite history. Built only by ``app.services.expert_scope`` /
+# ``app.services.thread_handoff``; ``backend/tests/fixtures/phase267/*.json`` are the executable
+# copies 267-04 renders from.
+
+
+class TranscriptExpertRef(BaseModel):
+    id: UUID
+    name: str
+    scope_mode: Literal["biased", "restricted"]
+
+
+class TranscriptFolderRef(BaseModel):
+    # ``name`` None = a folder the caller cannot see (rendered "a knowledge folder you cannot see").
+    id: UUID | None = None
+    name: str | None = None
+    # Only the thread's own folder carries a count (its latest, not-disconnected KB documents).
+    doc_count: int | None = None
+
+
+class TranscriptScopeLine(BaseModel):
+    folders: list[TranscriptFolderRef] = Field(default_factory=list)
+    thread_folder: TranscriptFolderRef | None = None
+    # True = no folder filter at all ("All your documents").
+    all_documents: bool = False
+    # Connection NAMES (display names, snapshotted).
+    connections: list[str] = Field(default_factory=list)
+
+
+class TranscriptExclusion(BaseModel):
+    count: int
+    names: list[str] = Field(default_factory=list, max_length=5)
+
+
+class ExpertChangedEvent(BaseModel):
+    """A swap, join or removal (``before`` / ``after`` None = no Expert on that side)."""
+
+    kind: Literal["expert_changed"] = "expert_changed"
+    at: datetime
+    before: TranscriptExpertRef | None = None
+    after: TranscriptExpertRef | None = None
+    now: TranscriptScopeLine
+    dropped: TranscriptScopeLine
+    # Restricted Expert on a folder-scoped thread only: the thread's documents it will not read.
+    excluded: TranscriptExclusion | None = None
+
+
+class ExpertHandoffEvent(BaseModel):
+    """Written on the SOURCE thread when a question is handed to a second Expert in a new chat."""
+
+    kind: Literal["expert_handoff"] = "expert_handoff"
+    at: datetime
+    target_thread_id: UUID
+    target_title: str
+    expert_name: str
+    stays_expert_name: str | None = None
+    folder_name: str | None = None
+
+
+class HandoffMarker(BaseModel):
+    """``tool_calls[0]`` of the new thread's FIRST message — a ``role='user'`` row the model sees as
+    plain user content. ⛔ Deliberately NOT in ``TRANSCRIPT_EVENT_KINDS``."""
+
+    kind: Literal["handoff"] = "handoff"
+    source_thread_id: UUID
+    source_title: str
+    expert_name: str
+    summary: list[str]
+    folder_name: str | None = None

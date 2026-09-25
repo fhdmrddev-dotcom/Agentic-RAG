@@ -1,0 +1,23 @@
+{
+  "expert_id": "e2000000-0000-4000-8000-0000000000b2",
+  "expert_name": "HR Advisor",
+  "mode": "restricted",
+  "expert_folders": [
+    {
+      "id": "f2000000-0000-4000-8000-000000000002",
+      "name": "HR Policies"
+    }
+  ],
+  "thread_folder": {
+    "id": "f3000000-0000-4000-8000-000000000003",
+    "name": "Client ACME",
+    "doc_count": 4
+  },
+  "excluded_count": 4,
+  "excluded_names": [
+    "ACME_MSA_2026.pdf",
+    "ACME_SOW_03.docx",
+    "ACME_invoices_Q3.xlsx",
+    "Board_deck_Q3.pptx"
+  ]
+}
