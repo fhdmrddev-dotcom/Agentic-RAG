@@ -573,7 +573,16 @@ async def install_expert(
         not_owner_cause: str | None = None
         for f in corpus.files:
             row = by_name.get(f.filename)
-            if row is not None and row.get("status") != "failed":
+            # WR-02: a completed copy with no searchable text is what derive_install_state reports
+            # as NO_SEARCHABLE_TEXT, so Retry must reach it — but only while it is still the
+            # corpus's own bytes. An edited document stays untouched whatever it indexes to.
+            unedited_empty = (
+                row is not None
+                and row.get("status") == "completed"
+                and not (row.get("chunk_count") or 0) > 0
+                and row.get("content_hash") == f.sha256
+            )
+            if row is not None and row.get("status") != "failed" and not unedited_empty:
                 continue  # ⛔ present (possibly edited) — never overwritten (D-266-14)
             if row is not None:
                 if str(row.get("user_id")) == str(user_id):

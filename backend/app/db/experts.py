@@ -738,7 +738,7 @@ async def list_install_corpus_documents(
     """
     query = """
         SELECT id, folder_id, filename, status, chunk_count, error_message,
-               user_id, file_path, mime_type
+               user_id, file_path, mime_type, content_hash
         FROM public.documents
         WHERE org_id = $1
           AND folder_id = ANY($2::uuid[])
