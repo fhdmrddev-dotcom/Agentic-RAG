@@ -189,6 +189,12 @@ def mint_document_row(
     # ⚠ A CHECK THAT IS NARROWER THAN ITS CONSTRAINT DOES NOT PREVENT THE ERROR, IT ONLY DELAYS
     #   IT. The two predicates below are now the index's predicate, verbatim.
     #
+    #   ⚠ SUPERSEDED BY MIGRATION 195 (266 review IN-04) — the index quoted above is now
+    #   (org_id, user_id, content_hash). /upload passes no org_id, so its check is BROADER than
+    #   the constraint: a completed copy in ANOTHER org is reported as a duplicate of this upload,
+    #   and the second org receives nothing. Accepted under D-266-18 (see SEED-313). The two
+    #   paragraphs above are kept as written, not overwritten.
+    #
     # ⚠ DELIBERATE BEHAVIOUR CHANGE: the same bytes uploaded to a second folder are now reported
     #   as a duplicate instead of appearing to succeed and then failing. The database already
     #   forbade the second copy — this only moves the refusal to where a person can act on it.

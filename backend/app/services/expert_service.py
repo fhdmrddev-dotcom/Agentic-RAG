@@ -12,9 +12,9 @@ from app.models.expert import ExpertBundle, ExpertBundleCreate, ExpertBundleUpda
 from app.utils.skill_visibility import skill_row_visible
 
 logger = logging.getLogger(__name__)
-# No reader in app/ after Phase 266 deleted the is_system_folder bypass (D-266-10); kept so the
-# retirement comment in resolve_expert_bundle stays greppable against the constant it named.
-SYSTEM_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+# SYSTEM_USER_ID (00000000-0000-0000-0000-000000000001) was deleted by the 266 review (IN-03): it
+# had no reader after D-266-10 retired the is_system_folder bypass, and a live constant invites
+# the bypass back. The retirement comment in resolve_expert_bundle still quotes the rule it fed.
 
 
 class ResolvedExpertBundle(BaseModel):
