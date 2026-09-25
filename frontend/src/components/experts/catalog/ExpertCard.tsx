@@ -31,14 +31,46 @@
  * pill with the full reason as its title (installing, or a non-manager). Still ONE variant, still
  * at most two controls, and never a dead one. An install state is a fact about THIS org's
  * copy of the knowledge, not a tier badge; the decision is `installView`'s, not this card's.
+ *
+ * ⚠ PHASE 267 (PACK-22 · D-267-06 / D-267-08): `installView`'s `connect` arm — the install is ready
+ * (or absent) but a required connection is missing. The scope envelope is REPLACED by the Brings /
+ * Missing ledger, the requirement is a visible line at rest, and the second control is Connect
+ * (a caller the server says may connect, AND a Connections door wired) or the member's pill. Start
+ * Chat is not rendered: a chat started now would run silently without that connection. This card
+ * reads no overlay field itself — `installView` / `connectionLedgerColumns` do.
+ *
+ * ⚠ SEED-309 R265-262-04 (D-267-24): while a start is in flight (`startBusy`, owned by the page)
+ * the Start Chat button reads Starting…, is disabled and `aria-busy` — the ONLY disabled state on
+ * this card, and it is transient: it re-enables when the start settles.
  */
 
 import type { ReactNode } from "react"
-import { ArrowUpRight, Download, FolderClosed, Plug, RotateCcw, Sparkles, Wrench } from "lucide-react"
+import {
+  ArrowUpRight,
+  Download,
+  FolderClosed,
+  Loader2,
+  Plug,
+  RotateCcw,
+  Sparkles,
+  Wrench,
+} from "lucide-react"
 import { ExpertIcon } from "@/components/experts/expertIcon"
+import { ScopeLedger } from "@/components/experts/ScopeLedger"
 import type { ExpertBundle } from "@/types"
 import { cn } from "@/lib/utils"
-import { INSTALL_COPY, installCardLine, installView } from "./expertCatalog"
+import {
+  CONNECTION_COPY,
+  INSTALL_COPY,
+  START_COPY,
+  connectionLedgerColumns,
+  installCardLine,
+  installView,
+} from "./expertCatalog"
+
+/** The shipped primary button class — the Connect control copies it so the footer reads as one set. */
+const PRIMARY_BUTTON =
+  "inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
 
 export interface ExpertCardProps {
   expert: ExpertBundle
@@ -51,6 +83,11 @@ export interface ExpertCardProps {
   onInstall?: (expert: ExpertBundle) => void
   /** An install request for THIS Expert is in flight. */
   installBusy?: boolean
+  /** Phase 267: the Connections page door. Absent, a caller who may connect sees the member's
+   *  words instead — a Connect button with no door would do nothing. */
+  onOpenConnections?: () => void
+  /** Phase 267 (R265-262-04): a start for THIS Expert is in flight. */
+  startBusy?: boolean
 }
 
 /** Phase 266 — the footer's status pill, in the ScopePill idiom, with the full reason as title. */
@@ -81,8 +118,12 @@ export function ExpertCard({
   onStartChat,
   onInstall,
   installBusy = false,
+  onOpenConnections,
+  startBusy = false,
 }: ExpertCardProps) {
   const view = installView(expert)
+  const gate = view.kind === "connect" ? view.gate : null
+  const missingNames = gate ? gate.missing.map((m) => m.name) : []
   const isRestricted = expert.scope_mode === "restricted"
   const folderCount = expert.knowledge_folder_ids?.length ?? 0
   const skills = expert.member_skills ?? []
@@ -127,7 +168,20 @@ export function ExpertCard({
           </div>
         </div>
 
-        {/* ── 3 · scope envelope. Folders are a COUNT here; the NAMES are the modal's job. ── */}
+        {/* ── 3 · scope envelope. Folders are a COUNT here; the NAMES are the modal's job.
+              267: a missing connection REPLACES it with the Brings / Missing ledger + the
+              requirement line — one statement, from one payload, visible at rest. ── */}
+        {gate ? (
+          <div>
+            <ScopeLedger columns={connectionLedgerColumns(expert, "card")} />
+            <p
+              data-testid="connection-gate-line"
+              className="mt-2 text-xs leading-relaxed text-rose-300"
+            >
+              {gate.line}
+            </p>
+          </div>
+        ) : (
         <div className="flex flex-wrap gap-1.5">
           {folderCount > 0 && (
             <ScopePill
@@ -150,6 +204,7 @@ export function ExpertCard({
             />
           ))}
         </div>
+        )}
 
         {/* ── 4 · the Expert's own prompt tiles, or nothing ── */}
         {tiles.length > 0 && (
@@ -179,12 +234,39 @@ export function ExpertCard({
         {view.kind === "legacy" || view.kind === "chat" ? (
           <button
             type="button"
-            onClick={() => onStartChat(expert)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            disabled={startBusy}
+            aria-busy={startBusy || undefined}
+            onClick={() => {
+              if (!startBusy) onStartChat(expert)
+            }}
+            className={cn(PRIMARY_BUTTON, "disabled:cursor-wait disabled:opacity-80")}
           >
-            <Sparkles className="h-3.5 w-3.5" />
-            Start Chat
+            {startBusy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            {startBusy ? START_COPY.busy : "Start Chat"}
           </button>
+        ) : view.kind === "connect" ? (
+          gate?.action && onOpenConnections ? (
+            <button
+              type="button"
+              data-testid="connection-gate-connect"
+              onClick={() => onOpenConnections()}
+              className={PRIMARY_BUTTON}
+            >
+              <Plug className="h-3.5 w-3.5" />
+              {gate.action.label}
+            </button>
+          ) : (
+            // ⚠ The pill's title is hover-only; the requirement line above carries the reason at
+            // rest, so the title is never the only copy (UI-SPEC §5.4).
+            <StatusPill
+              label={CONNECTION_COPY.cardMemberPill(missingNames)}
+              reason={CONNECTION_COPY.memberAsk(missingNames)}
+            />
+          )
         ) : view.kind === "install" || view.kind === "retry" ? (
           installBusy ? (
             <StatusPill label={INSTALL_COPY.starting} reason={INSTALL_COPY.starting} />

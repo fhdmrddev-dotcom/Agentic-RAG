@@ -171,6 +171,11 @@ export const CONNECTION_COPY = {
   modalMissingPill: (name: string): string => `${name} · not connected`,
 } as const
 
+/** A catalog start in flight (SEED-309 R265-262-04): the card's and the modal's button label. */
+export const START_COPY = {
+  busy: "Starting…",
+} as const
+
 /** Ledger headings live beside the selector that builds the ledger's payload (UI-SPEC §7). */
 export const LEDGER_COPY = {
   brings: "Brings",
