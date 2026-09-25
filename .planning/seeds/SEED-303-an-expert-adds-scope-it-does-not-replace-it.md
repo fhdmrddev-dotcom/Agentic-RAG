@@ -11,7 +11,7 @@ trigger_paths: ["backend/app/models/expert.py", "backend/app/services/expert_ser
 trigger_surfaces: [backend, frontend, chat]
 migration_note:
 relates_to: [BUG-260920-01, BUG-260921-01, D-v4.3-01, D-v4.3-02, BUS-291, SEED-291, SEED-294, "259", "260", "261", "262", "263"]
-folded_into: "263 (S9 only, BUILT at 263-04 with UAT owed - the other arms remain open)"
+folded_into: "263 (S9 only, BUILT at 263-04 with UAT owed) · 267 (S2, S3, S5, S6 tool floor, S7 — D-267-01..20, discuss 2026-09-25)"
 renumbered_from: null
 renumbered_because: null
 ---
