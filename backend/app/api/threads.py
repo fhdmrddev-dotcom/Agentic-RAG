@@ -659,9 +659,57 @@ async def get_snapshot(
     return res
 
 
+# Phase 267 (D-267-31 / D-267-21 / D-267-24 R265-audit-fixes-03) — THE ONE Expert-binding gate.
+#
+# Three doors bind an Expert to a thread: PATCH /threads/{id}, POST /threads and
+# POST /threads/{id}/handoff. All three call this, so they cannot disagree about who may bind what.
+#   1. A VALIDATED active org is required. There is no silent skip any more: before 267 PATCH
+#      skipped every check when no org validated (fail-OPEN) and POST /threads checked nothing.
+#   2. Entitlement ("experts") before access — a refused tier never reads the bundle.
+#   3. Access via get_expert_service with the org role from resolve_caller_role. ⛔ Never a role
+#      key read off the current_user dict: get_current_user returns {id, email}, so that read is
+#      always empty and every role grant silently fails to match (the R265-audit-fixes-03 plant;
+#      five suites stayed green under it, test_267_binding_gate.py does not).
+# ⛔ No refusal for a missing required connection (D-267-07 — the UI gate is the only gate), and
+# clearing an Expert never comes through here.
+async def assert_expert_bindable(
+    request: Request, current_user: dict, expert_id: UUID
+) -> tuple[dict, str]:
+    active_org_id = await resolve_active_org_or_none(request, current_user)
+    if not active_org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Choose an organization before inviting an Expert.",
+        )
+    pool = await get_pg_pool()
+    from app.services import entitlement_service as _entitlements  # noqa: PLC0415
+    ent = await _entitlements.check_entitlement(pool, active_org_id, "experts")
+    if not ent.allowed:
+        raise _entitlements.EntitlementDeniedException(ent)
+
+    # PACK-10 / SC#5: the caller must hold access to the bundle (not ungranted/private).
+    from app.services.expert_service import get_expert_service  # noqa: PLC0415
+    from app.dependencies import resolve_caller_role  # noqa: PLC0415
+    _role, _groups = await resolve_caller_role(request, current_user)
+    bundle = await get_expert_service(
+        pool=pool,
+        bundle_id=expert_id,
+        caller_org_id=UUID(str(active_org_id)),
+        caller_user_id=UUID(str(current_user["id"])),
+        caller_roles=[_role] if _role else [],
+    )
+    if not bundle:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Expert bundle not found or access denied",
+        )
+    return bundle, str(active_org_id)
+
+
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
 async def create_thread(
     background_tasks: BackgroundTasks,
+    request: Request,
     body: ThreadCreate = ThreadCreate(),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
@@ -670,7 +718,12 @@ async def create_thread(
     if body.folder_id:
         insert_data["folder_id"] = str(body.folder_id)
     if body.active_expert_id:
+        # Phase 267 (D-267-21): this door bound ANY Expert id unchecked. It now runs the shared
+        # gate before the insert, and the thread is stamped with the gate's validated org so the
+        # thread, the gate and the run agree on one org. Without an Expert: byte-identical.
+        _bundle, _org_id = await assert_expert_bindable(request, current_user, body.active_expert_id)
         insert_data["active_expert_id"] = str(body.active_expert_id)
+        insert_data["org_id"] = _org_id
     # BL-01 fix: wrap sync .execute() with aexec so the event loop is not blocked
     # (D-v2.5-01 / Phase 058 D-058-09 — cross-tab unblocking invariant).
     response = await aexec(supabase.table("threads").insert(insert_data))
@@ -718,36 +771,9 @@ async def rename_thread(
     if body.clear_active_expert or ("active_expert_id" in body.model_fields_set and body.active_expert_id is None):
         update_data["active_expert_id"] = None
     elif body.active_expert_id is not None:
-        active_org_id = await resolve_active_org_or_none(request, current_user)
-        if active_org_id:
-            pool = await get_pg_pool()
-            from app.services.entitlement_service import check_entitlement, EntitlementDeniedException  # noqa: PLC0415
-            ent = await check_entitlement(pool, active_org_id, "experts")
-            if not ent.allowed:
-                raise EntitlementDeniedException(ent)
-
-            # PACK-10 / SC#5: Verify caller has access to the expert bundle (not ungranted/private)
-            from uuid import UUID  # noqa: PLC0415
-            from app.services.expert_service import get_expert_service  # noqa: PLC0415
-            c_uid = UUID(str(current_user["id"])) if isinstance(current_user, dict) else getattr(current_user, "id")
-            c_org_id = UUID(str(active_org_id))
-            # PACK-10 (v4.3 verification): the org role is resolved, never read off current_user
-            # (get_current_user returns {id, email} only).
-            from app.dependencies import resolve_caller_role  # noqa: PLC0415
-            _role, _groups = await resolve_caller_role(request, current_user)
-            caller_roles = [_role] if _role else []
-            bundle = await get_expert_service(
-                pool=pool,
-                bundle_id=body.active_expert_id,
-                caller_org_id=c_org_id,
-                caller_user_id=c_uid,
-                caller_roles=caller_roles,
-            )
-            if not bundle:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Expert bundle not found or access denied",
-                )
+        # Phase 267 (D-267-31): the shared, fail-closed gate. No validated org now REFUSES with a
+        # reason — before 267 this arm skipped every check when no org validated.
+        await assert_expert_bindable(request, current_user, body.active_expert_id)
         update_data["active_expert_id"] = str(body.active_expert_id)
 
     if update_data:

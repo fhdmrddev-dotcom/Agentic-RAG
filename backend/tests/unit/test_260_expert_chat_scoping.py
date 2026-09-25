@@ -221,9 +221,28 @@ async def test_patch_thread_updates_and_clears_active_expert():
 
     mock_request = MagicMock()
 
-    # 1. Update with active_expert_id
+    # 1a. Phase 267 (D-267-31) — CONSCIOUSLY RETIRED EXPECTATION. This case used to assert that a
+    # PATCH with NO validated active org SUCCEEDED (the fail-open skip: no entitlement check, no
+    # access check). The shared binding gate now REFUSES it with a reason, and writes nothing.
+    from fastapi import HTTPException
     with patch("app.api.threads.aexec", new_callable=AsyncMock) as mock_aexec, \
          patch("app.api.threads.resolve_active_org_or_none", new_callable=AsyncMock, return_value=None):
+        with pytest.raises(HTTPException) as exc_info:
+            await rename_thread(
+                thread_id=thread_id,
+                body=ThreadUpdate(active_expert_id=expert_id),
+                request=mock_request,
+                current_user=current_user,
+                supabase=mock_supabase,
+            )
+        assert exc_info.value.status_code == 403
+        assert exc_info.value.detail == "Choose an organization before inviting an Expert."
+        mock_aexec.assert_not_awaited()
+
+    # 1b. Update with active_expert_id, through the gate with a validated org.
+    with patch("app.api.threads.aexec", new_callable=AsyncMock) as mock_aexec, \
+         patch("app.api.threads.assert_expert_bindable", new_callable=AsyncMock,
+               return_value=({"id": str(expert_id)}, current_user["org_id"])) as gate:
         mock_aexec.side_effect = [
             MagicMock(data=[]), # update
             MagicMock(data={"id": thread_id, "user_id": user_id, "title": "Chat", "active_expert_id": str(expert_id), "created_at": "2026-09-20T00:00:00Z", "updated_at": "2026-09-20T00:00:00Z"}), # select
@@ -237,6 +256,7 @@ async def test_patch_thread_updates_and_clears_active_expert():
             supabase=mock_supabase,
         )
         assert resp["active_expert_id"] == str(expert_id)
+        gate.assert_awaited_once()
 
     # 2. Clear with clear_active_expert=True
     with patch("app.api.threads.aexec", new_callable=AsyncMock) as mock_aexec, \
