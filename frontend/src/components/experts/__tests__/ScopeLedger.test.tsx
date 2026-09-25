@@ -104,3 +104,31 @@ describe("ScopeLedger", () => {
     expect(screen.getByTestId("scope-ledger-col-no").textContent).toContain("Missing")
   })
 })
+
+// 267-REVIEW WR-08 — D-267-19's promise ("Chat attachments" stay readable) was appended AFTER the
+// Expert's folders and the ledger shows five items, so an Expert with five or more folders folded
+// the promise into "and 1 more": invisible at rest, the 266 UI-3 failure. The real selector feeds
+// the real ledger here.
+describe("WR-08 — Chat attachments is never folded into 'and k more'", () => {
+  it("six Expert folders: five named, the overflow line for the sixth, and Chat attachments visible", async () => {
+    const { previewLedgerColumns } = await import("../catalog/expertCatalog")
+    const folders = ["A", "B", "C", "D", "E", "F"].map((n, i) => ({ id: `f${i}`, name: `Folder ${n}` }))
+    render(
+      <ScopeLedger
+        columns={previewLedgerColumns({
+          expert_id: "e",
+          expert_name: "Wide",
+          mode: "restricted",
+          expert_folders: folders,
+          thread_folder: null,
+          excluded_count: 0,
+          excluded_names: [],
+        })}
+      />,
+    )
+    const yes = screen.getByTestId("scope-ledger-col-yes")
+    expect(within(yes).getByText("Chat attachments")).toBeVisible()
+    expect(within(yes).getByText("and 1 more")).toBeVisible()
+    for (const n of ["A", "B", "C", "D", "E"]) expect(within(yes).getByText(`Folder ${n}`)).toBeVisible()
+  })
+})
