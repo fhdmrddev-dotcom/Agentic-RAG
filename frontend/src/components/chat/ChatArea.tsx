@@ -447,7 +447,17 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     if (!activeThread) {
       // Phase 267 plan 04 (D-267-21): the Expert invited on this brand-new chat travels WITH the
       // create, so the thread exists scoped before the first run starts.
-      activeThread = await onCreateThread(scopeFolderId, activeExpert?.id ?? null)
+      try {
+        activeThread = await onCreateThread(scopeFolderId, activeExpert?.id ?? null)
+      } catch (err) {
+        // 267-REVIEW WR-01: POST /threads runs the binding gate, so an ordinary gate outcome (no
+        // org, tier, revoked access) refuses the create. State the server's sentence and resolve
+        // `false` — "not sent" — so the composer puts the typed message back. Nothing is sent.
+        setExpertChangeError(
+          err instanceof Error && err.message.trim() ? err.message : "The chat could not be created.",
+        )
+        return false
+      }
       justCreatedThreadRef.current = activeThread.id
       // D-067.2-01: synchronously align activeThreadIdRef BEFORE sendMessage
       // begins. sendMessage sets streamingThreadIdRef.current = threadId at

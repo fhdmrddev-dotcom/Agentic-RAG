@@ -53,7 +53,9 @@ interface Provider {
 }
 
 interface Props {
-  onSend: (content: string, activeConnectorIds?: string[]) => void
+  /** 267-REVIEW WR-01: may return a promise; resolving `false` means NOT sent (e.g. a refused
+   *  create), and the composer puts the text back and keeps the draft. */
+  onSend: (content: string, activeConnectorIds?: string[]) => void | Promise<unknown>
   disabled: boolean
   threadId?: string | null
   messages?: Message[]
@@ -386,7 +388,17 @@ export function MessageInput({
     // everything off" became "use everything": the backend's absent-arm offered every
     // enabled connection. Both ends now agree that absent and empty mean the same thing —
     // none — and the wire says which one the person chose.
-    onSend(trimmed, activeConnectorIds)
+    const sent = onSend(trimmed, activeConnectorIds)
+    // 267-REVIEW WR-01: a send the parent reports as NOT sent gets its text back (unless the person
+    // has typed something new meanwhile) and its draft kept, so a refusal never eats the message.
+    if (sent instanceof Promise) {
+      const refusedKey = draftKey
+      void sent.then((result) => {
+        if (result !== false) return
+        composerDraftsByThread.set(refusedKey, trimmed)
+        setValue((current) => (current.trim() ? current : trimmed))
+      })
+    }
     setValue("")
     // Phase 244 (244-05 T2): the pending chips have become SENT chips — the transcript renders
     // them from the thread's persisted workspace files now, so the composer lets them go.
