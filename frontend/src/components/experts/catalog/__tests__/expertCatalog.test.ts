@@ -666,3 +666,15 @@ describe("267-REVIEW WR-06 — narrowingLedgerColumns", () => {
     expect(narrowingLedgerColumns({ ...p, expert_folders: [] })).toBeNull()
   })
 })
+
+// 267-REVIEW IN-06 — the server's `ScopePreviewThreadFolder.name` is `str | None` (a folder the caller
+// cannot name), but the TS wire type claimed `string`. A type mismatch has no runtime symptom, so this
+// fence reads both sources.
+describe("IN-06 — the preview's thread_folder.name admits null on both sides", () => {
+  it("server `name: str | None` ⇔ client `name: string | null`", async () => {
+    const py = (await import("../../../../../../backend/app/models/thread.py?raw")).default as string
+    expect(py).toMatch(/class ScopePreviewThreadFolder\(BaseModel\):[\s\S]*?name: str \| None/)
+    const ts = (await import("../../../../lib/api/experts.ts?raw")).default as string
+    expect(ts).toMatch(/thread_folder: \{ id: string; name: string \| null; doc_count: number \} \| null/)
+  })
+})
