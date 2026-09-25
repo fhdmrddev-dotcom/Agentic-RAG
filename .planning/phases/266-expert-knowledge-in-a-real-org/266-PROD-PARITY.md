@@ -60,6 +60,13 @@ Run each against production and record the output beside it before doing anythin
   orphaned seed knowledge (folder `…0260`, document `…0261`, chunks `…0262/…0263`) by fixed id, and nothing else.
 - Precedent: migrations 182-193 went to prod through the MCP on per-batch approval (2026-09-23), and 194 was
   pasted by the operator (OV-265-01).
+- ⚠ **ADDED AT THE 266 REVIEW TRIAGE (2026-09-25): apply migration 196 right after 195, same rules.**
+  `supabase/migrations/196_documents_dedup_idx_org_scoped.sql` widens `documents_dedup_idx` to
+  `(org_id, user_id, content_hash, COALESCE(folder_id, …))` (review WR-04). Without it, a two-org user's
+  root-folder import or watch 409s every cycle against the new backend. Strictly looser key, idempotent,
+  `BEGIN/COMMIT`, no `CONCURRENTLY`. Verify after:
+  `SELECT indexdef FROM pg_indexes WHERE indexname = 'documents_dedup_idx';` must start its column list
+  with `org_id`.
 
 ## C. Verify (the 266-01 Task 3 SQL set, now against prod)
 

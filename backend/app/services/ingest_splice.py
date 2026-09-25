@@ -208,6 +208,8 @@ def mint_document_row(
     #   This matches migration 195's widened
     #     documents_completed_hash_unique_idx ON documents (org_id, user_id, content_hash)
     #   so the check is again exactly the constraint's predicate (BUG-260905-02's rule above).
+    #   ⚠ CORRECTED (266 review WR-04): that held for the completed-hash index only. The second
+    #   index, documents_dedup_idx, stayed per-user until migration 196 widened it to match.
     #   /upload passes no org_id and issues byte-unchanged queries. import_service and
     #   watch_service DO pass org_id and become org-scoped, which is the correct meaning of
     #   "already here" for a document that belongs to an org.
@@ -299,6 +301,8 @@ def mint_document_row(
             if on_conflict == "link":
                 # G-2: Attachment collision or concurrent ingest race.
                 # documents_dedup_idx is UNIQUE WHERE status <> 'failed'.
+                # Since migration 196 (266 review WR-04) its key is (org_id, user_id, content_hash,
+                # COALESCE(folder_id, …)), so this org-scoped re-query matches the row that fired.
                 link_query = (
                     supabase.table("documents")
                     .select("*")
