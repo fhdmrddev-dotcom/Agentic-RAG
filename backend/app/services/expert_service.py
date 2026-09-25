@@ -477,6 +477,12 @@ async def resolve_expert_bundle(
     bundle = await experts_db.get_expert_bundle_by_id(pool, bundle_id, caller_org_id)
     if not bundle:
         return None
+    # 267-REVIEW CR-02: a DISABLED Expert resolves to nothing, so a thread already bound to it stops
+    # running it (run_producer clears the id and refuses the run, fail-closed) — the same answer the
+    # binding gate gives every door.
+    if not bundle.get("is_enabled", True):
+        logger.warning("EXPERT_DISABLED: expert '%s' is disabled; not resolved", bundle_id)
+        return None
 
     # PACK-10 / SC#5: Verify caller holds grant access for granted/private bundles
     has_grant = await experts_db.check_expert_grant_access(

@@ -739,7 +739,10 @@ async def assert_expert_bindable(
         caller_user_id=UUID(str(current_user["id"])),
         caller_roles=await _caller_roles(request, current_user),
     )
-    if not bundle:
+    # 267-REVIEW CR-02: an admin's "disable" is the kill switch for a broken or leaking Expert, so a
+    # disabled bundle is refused here, at all three doors, with the same sentence as no access. A
+    # row without the key (pre-column fixtures) reads as enabled, the column's own default.
+    if not bundle or not bundle.get("is_enabled", True):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Expert bundle not found or access denied",
