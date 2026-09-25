@@ -595,7 +595,9 @@ async def test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert():
 
             # Granted user attempting to invite/set expert -> succeeds
             mock_table_select = MagicMock()
-            mock_table_select.data = {"id": "test-thread-id", "active_expert_id": str(bundle_id)}
+            # 267-REVIEW WR-03: `threads.org_id` is NOT NULL, and a bind is refused unless it is the
+            # gate's org — so the row carries the org it lives in, as every real row does.
+            mock_table_select.data = {"id": "test-thread-id", "active_expert_id": str(bundle_id), "org_id": str(org_id)}
             with patch("app.api.threads.aexec", AsyncMock(return_value=mock_table_select)):
                 res = await rename_thread(
                     thread_id="test-thread-id",
