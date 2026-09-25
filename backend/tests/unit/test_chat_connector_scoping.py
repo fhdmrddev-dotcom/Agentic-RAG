@@ -87,11 +87,12 @@ def test_the_selection_is_reached_and_not_dead_code():
 # ══════════════════════════════════════════════════════════════════════════════════════
 # The behaviour, driven against the real predicate
 # ══════════════════════════════════════════════════════════════════════════════════════
-def _conn(cid: str, *, enabled: bool = True, tools: bool = True):
+def _conn(cid: str, *, enabled: bool = True, tools: bool = True, status: str = "active"):
+    # `status` mirrors ConnectorConnectionResponse, which always carries it (default "active").
     return SimpleNamespace(
         id=cid, is_enabled=enabled,
         discovered_tools=[{"name": "t"}] if tools else [],
-        capability=None, name=cid, service_id=cid,
+        capability=None, name=cid, service_id=cid, status=status,
     )
 
 
@@ -185,3 +186,14 @@ def test_no_keys_still_means_absent_and_empty_select_nothing():
 def test_keys_and_named_ids_union():
     conns = [_conn("a"), _conn("hubspot"), _conn("c")]
     assert [c.id for c in _select(["a"], conns, scoped_keys=("hubspot",))] == ["a", "hubspot"]
+
+
+# 267-REVIEW WR-05 — the resolver approves a KEY when ANY connection of that service is enabled AND
+# active; the loop then admitted EVERY enabled connection matching the key, including a revoked or
+# errored one, whose tools were advertised to the model and failed at call time (a revoked OAuth
+# connection offered again as if it were live). A key admits only ACTIVE connections.
+def test_WR05_a_scoped_key_does_not_admit_a_revoked_or_errored_connection():
+    conns = [_conn("hubspot"), _conn("hubspot-old", status="revoked"), _conn("hubspot-bad", status="error")]
+    for c in conns:
+        c.service_id = "hubspot"
+    assert [c.id for c in _select(None, conns, scoped_keys=("hubspot",))] == ["hubspot"]
