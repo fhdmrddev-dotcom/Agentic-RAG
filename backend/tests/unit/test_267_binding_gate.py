@@ -295,3 +295,130 @@ async def test_post_without_an_expert_is_byte_identical_to_base():
     payload = sb.table.return_value.insert.call_args.args[0]
     assert payload == {"user_id": USER_ID, "title": "New Chat", "folder_id": str(folder_id)}
     assert "org_id" not in payload
+
+
+# ── 267-REVIEW CR-02: a DISABLED Expert is refused by the one gate, at every door, and at run time ──
+#
+# The admin "disable" toggle (``expert_bundles.is_enabled = false``) is the administrative kill for a
+# broken or leaking Expert. Before this fix the gate read visibility and grants only, so anyone holding
+# the id could bind a disabled Expert through PATCH, POST /threads or the handoff, and runs kept using
+# it. The refusal text is the gate's existing 404 sentence — a disabled Expert is "not found" to a
+# binder, exactly as the list already hides it from non-managers.
+
+DISABLED = {"id": str(EXPERT_ID), "name": "HR Advisor", "is_enabled": False}
+
+
+@pytest.mark.asyncio
+async def test_CR02_the_gate_refuses_a_disabled_expert_with_the_unchanged_404():
+    from app.api.threads import assert_expert_bindable
+
+    p_org, p_pool, p_ent, p_svc, p_role, _, _, _ = _gate_patches(bundle=DISABLED)
+    with p_org, p_pool, p_ent, p_svc, p_role:
+        with pytest.raises(HTTPException) as exc:
+            await assert_expert_bindable(MagicMock(), {"id": USER_ID}, EXPERT_ID)
+    assert exc.value.status_code == 404
+    assert exc.value.detail == ACCESS_DETAIL
+
+
+@pytest.mark.asyncio
+async def test_CR02_an_enabled_expert_and_a_legacy_row_without_the_key_still_bind():
+    from app.api.threads import assert_expert_bindable
+
+    for bundle in ({"id": str(EXPERT_ID), "is_enabled": True}, {"id": str(EXPERT_ID)}):
+        p_org, p_pool, p_ent, p_svc, p_role, _, _, _ = _gate_patches(bundle=bundle)
+        with p_org, p_pool, p_ent, p_svc, p_role:
+            got, _org = await assert_expert_bindable(MagicMock(), {"id": USER_ID}, EXPERT_ID)
+        assert got == bundle
+
+
+@pytest.mark.asyncio
+async def test_CR02_door_PATCH_refuses_a_disabled_expert_and_writes_nothing():
+    from app.api import threads as threads_mod
+
+    aexec = AsyncMock(side_effect=AssertionError("a refused PATCH must write nothing"))
+    p_org, p_pool, p_ent, p_svc, p_role, _, _, _ = _gate_patches(bundle=DISABLED)
+    with p_org, p_pool, p_ent, p_svc, p_role, patch.object(threads_mod, "aexec", aexec):
+        with pytest.raises(HTTPException) as exc:
+            await threads_mod.rename_thread(
+                thread_id=str(uuid4()),
+                body=ThreadUpdate(active_expert_id=EXPERT_ID),
+                request=MagicMock(),
+                current_user={"id": USER_ID},
+                supabase=MagicMock(),
+            )
+    assert exc.value.status_code == 404
+    aexec.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_CR02_door_POST_refuses_a_disabled_expert_and_inserts_nothing():
+    from app.api import threads as threads_mod
+
+    aexec = AsyncMock()
+    sb = _insert_supabase()
+    p_org, p_pool, p_ent, p_svc, p_role, _, _, _ = _gate_patches(bundle=DISABLED)
+    with p_org, p_pool, p_ent, p_svc, p_role, patch.object(threads_mod, "aexec", aexec):
+        with pytest.raises(HTTPException) as exc:
+            await threads_mod.create_thread(
+                background_tasks=MagicMock(),
+                request=MagicMock(),
+                body=ThreadCreate(title="New Chat", active_expert_id=EXPERT_ID),
+                current_user={"id": USER_ID},
+                supabase=sb,
+            )
+    assert exc.value.status_code == 404
+    aexec.assert_not_awaited()
+    sb.table.return_value.insert.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_CR02_door_handoff_refuses_a_disabled_expert_before_any_read_of_the_transcript():
+    from app.api import threads as threads_mod
+    from app.models.thread import ThreadHandoffRequest
+
+    source = {"id": str(uuid4()), "title": "Q3", "folder_id": None, "org_id": ORG_ID, "active_expert_id": None}
+    reads: list[int] = []
+
+    async def aexec(_q):
+        reads.append(1)
+        if len(reads) == 1:
+            return MagicMock(data=source)
+        raise AssertionError("a refused handoff must read no transcript and write nothing")
+
+    txn = MagicMock(side_effect=AssertionError("a refused handoff opens no transaction"))
+    p_org, p_pool, p_ent, p_svc, p_role, _, _, _ = _gate_patches(bundle=DISABLED)
+    with p_org, p_pool, p_ent, p_svc, p_role, \
+         patch.object(threads_mod, "aexec", aexec), \
+         patch.object(threads_mod, "get_user_pg_connection", txn):
+        with pytest.raises(HTTPException) as exc:
+            await threads_mod.handoff_thread(
+                thread_id=source["id"],
+                body=ThreadHandoffRequest(expert_id=EXPERT_ID),
+                request=MagicMock(),
+                current_user={"id": USER_ID},
+                supabase=MagicMock(),
+            )
+    assert exc.value.status_code == 404
+    assert len(reads) == 1
+
+
+@pytest.mark.asyncio
+async def test_CR02_the_run_resolver_fails_closed_on_a_disabled_expert():
+    """``resolve_expert_bundle`` returning ``None`` is what makes ``_resolve_thread_scoping`` clear the
+    stale id and refuse the run — so an ALREADY-bound thread stops running a disabled Expert too."""
+    from app.services import expert_service
+
+    bundle = {
+        "id": EXPERT_ID, "name": "HR Advisor", "slug": "hr-advisor", "is_enabled": False, "is_system": False,
+        "scope_mode": "biased", "member_skills": [], "knowledge_folder_ids": [], "required_connections": [],
+    }
+    grant = AsyncMock(return_value=True)
+    with patch.object(expert_service.experts_db, "get_expert_bundle_by_id", AsyncMock(return_value=bundle)), \
+         patch.object(expert_service.experts_db, "check_expert_grant_access", grant):
+        got = await expert_service.resolve_expert_bundle(
+            pool=MagicMock(),
+            bundle_id=EXPERT_ID,
+            caller_org_id=UUID(ORG_ID),
+            caller_user_id=UUID(USER_ID),
+        )
+    assert got is None
