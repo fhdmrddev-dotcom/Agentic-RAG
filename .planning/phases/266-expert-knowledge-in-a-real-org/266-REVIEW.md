@@ -236,3 +236,25 @@ _Depth: standard_
 |---|---|---|
 | CR-01 | **FIXED** — confirmed by code trace first (`run_producer.py` restricted branch → `()`; `retrieval_service.py:121,153` sends `None` = no folder filter; Financial Analyzer is `scope_mode='restricted'` locally). Operator chose "refuse the run" (OV-266-02, overrides D-266-11). | RED `73cb9726a` (3 × DID NOT RAISE) · GREEN `2c4102070` · 608 passed across Expert/run_producer/scoping suites |
 | WR-01..WR-08, IN-01..IN-05 | **OPEN — triage pending with the operator** after phase verification. | — |
+
+### Triage (operator, 2026-09-25, after `266-SECURITY.md` closed 35/35)
+
+Every finding was re-checked against the code before routing; all 8 warnings reproduce as written.
+The superseded row above is kept, not overwritten.
+
+| Finding | Routing | Evidence |
+|---|---|---|
+| WR-02 | **FIXED** — an unedited (`content_hash` == corpus sha), zero-chunk, caller-owned copy is re-driven by Retry; edited docs stay untouched | RED `582928777` · GREEN `cddf1f56b` · idempotency (viii)/(ix)/(x) |
+| WR-07 | **FIXED** — `load_corpus` refuses non-text mime types; `.gitattributes` eol=lf scoped to `*.md`/`*.json` | RED `7c1470dda` · GREEN `299d93e94` |
+| WR-08 | **FIXED** — caption test asserts no hiding utility on the caption or any ancestor; driven RED by planting `sr-only` on NavRow's wrapper, restored | `8aa3821fc` |
+| IN-02 | **FIXED** — only `installExpert`'s rejection sets the error; a failed re-read is left to the poll | RED `487662c32` · GREEN `a733484ec` · catalog case (13) |
+| IN-03 / IN-04 | **FIXED** — `SYSTEM_USER_ID` deleted; pre-195 index comment marked superseded beside the original | `79e756e88` |
+| WR-04 | **FIX NEXT** (own quick task, needs migration 196 pasted by the operator) — root-folder imports/watches 409 for a two-org user | — |
+| WR-03 | **FIX NEXT** (own quick task) — folder-scoped versioning for the installer only | — |
+| WR-01 + WR-06 | **DEFERRED → SEED-315** (WR-06 was already SEED-315; WR-01 folded in). Fix before the first customer install | `SEED-315` |
+| WR-05 + IN-05 (+ SECURITY W-1) | **DEFERRED → SEED-316** — an ownership decision (D-266-12), not a bug fix | `SEED-316` |
+| IN-01 | **DEFERRED → SEED-317** — `LibraryPage` has no active-org handle to key on | `SEED-317` |
+
+Gates after the fixes: backend `71 failed / 5665 passed / 0 errors` (at the 71 ceiling; the 39 unit
+suites importing any changed module: **448 passed, 0 failed**) · vitest count gate
+`total 8828 · failed 0 · pinned 8075 · 327/327`.

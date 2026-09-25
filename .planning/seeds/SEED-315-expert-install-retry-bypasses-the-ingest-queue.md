@@ -10,7 +10,7 @@ trigger_when: Any phase touching backend/app/services/sources/import_service.py 
 trigger_paths: ["backend/app/services/sources/import_service.py", "backend/app/services/expert_install_service.py"]
 trigger_surfaces: []
 migration_note:
-relates_to: ["266", "266-03 SUMMARY 'Notes for 266-05'", "BUG-260905-04"]
+relates_to: ["266", "266-03 SUMMARY 'Notes for 266-05'", "BUG-260905-04", "266-REVIEW WR-01", "266-REVIEW WR-06"]
 folded_into: null
 renumbered_from: null
 renumbered_because: null
@@ -50,3 +50,24 @@ work on ingest retries or the Ingestion tab's job accounting.
 Small. Pass `upsert: "true"` in the storage `file_options` for a re-drive (or delete the object first),
 so the job is enqueued; pin it with a test that a re-drive creates a job row. Phase 266 did not edit
 `import_service.py`, by plan.
+
+## Folded in at the 266 review triage (2026-09-25): WR-06 and WR-01
+
+**WR-06 is this seed** — the code review found the same storage-PUT fallback independently. Fix
+options it named: delete the old object or upload with `upsert=True` before `_enqueue_or_splice`, or
+add a re-enqueue helper that inserts the ingestion job without re-uploading (the bytes are already in
+storage).
+
+**WR-01 rides with it, because the two compound.** `derive_install_state` bounds staleness only while
+the install row reads `installing`. Once it reads `installed`, any corpus document not yet
+`completed`/`failed` keeps the Expert on "Installing…" with no time limit. The UI then has no control
+(`installing` maps to a status line), `inviteGate` blocks invite, and the catalog polls every 4 s while
+open. A document stranded by a dead worker, a lost BackgroundTask, or a Retry on this non-durable path
+never leaves that state. Fix named by the review: select `updated_at` in
+`list_install_corpus_documents`; derive `failed` / `STALE_INSTALL` for an in-flight corpus document
+older than N minutes, and let the retry path re-drive a stale `pending`/`processing` document as it
+does a `failed` one.
+
+⛔ Fix both before the first real customer install: today a Retry is exactly the path most likely to
+strand a document, and a stranded document is exactly the state with no way out.
+
