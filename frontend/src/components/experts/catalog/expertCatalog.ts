@@ -20,7 +20,7 @@
  */
 
 import type { ExpertBundle, Folder } from "@/types"
-import type { ExpertInstallSummary } from "@/lib/api/experts"
+import type { ExpertInstallSummary, ExpertScopePreview } from "@/lib/api/experts"
 import type { LedgerColumn } from "@/components/experts/ScopeLedger"
 import {
   classifyIngestionError,
@@ -181,6 +181,12 @@ export const LEDGER_COPY = {
   brings: "Brings",
   missing: "Missing",
   more: (k: number): string => `and ${k} more`,
+  // Phase 267 plan 04 (PACK-25 / D-267-18 / D-267-19): the restricted-cost ledger's headings.
+  willUse: "Will use",
+  /** ⛔ `n` is the server's `excluded_count`, never a list length (the list is capped at five). */
+  wontUse: (n: number): string => `Won't use · ${n}`,
+  /** Always readable, whatever the scope (D-267-19) — listed last in the Will use column. */
+  chatAttachments: "Chat attachments",
 } as const
 
 export interface ConnectionGate {
@@ -365,4 +371,78 @@ export function inviteGate(expert: ExpertBundle): string | null {
   if (install.state === "installing") return INSTALL_COPY.inviteInstalling
   if (install.state === "failed") return INSTALL_COPY.inviteFailed
   return INSTALL_COPY.inviteNotInstalled
+}
+
+// ── Phase 267 plan 04 (PACK-22 / PACK-24 / PACK-25 · D-267-06 / D-267-13 / D-267-16 / D-267-18) ──
+//    THE INVITE DIALOG'S WORDS AND ITS ROW GATE
+//
+// ⭐ Same discipline as the two blocks above: `InviteExpertDialog` spells none of these, and decides
+// no gate itself — it asks `inviteBlock` (install → connection, first blocking fact wins) and
+// `previewLedgerColumns` (one preview response → both columns).
+
+export const PREVIEW_COPY = {
+  contextPrefix: "This chat · ",
+  contextFolder: (name: string): string => `/${name}`,
+  contextAll: "All your documents",
+  checking: (expert: string): string => `Checking what ${expert} will read…`,
+  checkFailed: (expert: string): string => `Couldn't check which documents ${expert} will skip.`,
+  tryAgain: "Try again",
+  noFolders: (expert: string): string =>
+    `${expert} has no knowledge folders yet, so it cannot answer from documents.`,
+  activeHere: (active: string): string => `${active} is active here.`,
+  replace: (active: string): string => `Replace ${active}`,
+  newChatWith: (expert: string): string => `New chat with ${expert} →`,
+  summarising: "Summarising this chat…",
+  /** ⛔ Always ends "Nothing was created." — the D-267-16 guarantee made visible. */
+  refusal: (expert: string, reason: string): string =>
+    `Couldn't start a new chat with ${expert}. ${reason} Nothing was created.`,
+  summaryFailedReason: "This chat could not be summarised.",
+  networkReason: "The server could not be reached.",
+  emptyHeading: "No Experts available yet",
+  emptyBody: "An org admin can add one from the Experts catalog.",
+  listLoading: "Loading Experts…",
+  listError: (reason: string): string => `Couldn't load Experts. ${reason}`,
+} as const
+
+/** Why an invite row cannot invite, in gate order — or `null` when nothing blocks it. */
+export type InviteBlock =
+  | { kind: "install"; line: string }
+  | { kind: "connection"; gate: ConnectionGate }
+
+export function inviteBlock(expert: ExpertBundle): InviteBlock | null {
+  const install = expert.install
+  if (install && install.state !== "ready") {
+    const line = inviteGate(expert)
+    if (line) return { kind: "install", line }
+  }
+  const gate = connectionGate(expert)
+  return gate ? { kind: "connection", gate } : null
+}
+
+/**
+ * `Will use` = the Expert's folders (server-named) then `Chat attachments`; `Won't use · N` only
+ * when the server excluded something. ⛔ ONE response feeds both columns, and the heading's N is
+ * `excluded_count` — the names list is capped, so its length is never the count.
+ */
+export function previewLedgerColumns(preview: ExpertScopePreview): LedgerColumn[] {
+  const will: LedgerColumn["items"] = (preview.expert_folders ?? []).map((f) =>
+    typeof f.name === "string" && f.name.trim()
+      ? { label: f.name }
+      : { label: "", unnameable: true },
+  )
+  will.push({ label: LEDGER_COPY.chatAttachments })
+  const columns: LedgerColumn[] = [{ tone: "yes", heading: LEDGER_COPY.willUse, items: will }]
+  const count = preview.excluded_count ?? 0
+  if (count > 0) {
+    // The ledger shows five and counts the rest itself; `more` carries what the server counted
+    // but did not name.
+    const names = preview.excluded_names ?? []
+    columns.push({
+      tone: "no",
+      heading: LEDGER_COPY.wontUse(count),
+      items: names.map((label) => ({ label })),
+      more: Math.max(0, count - names.length),
+    })
+  }
+  return columns
 }

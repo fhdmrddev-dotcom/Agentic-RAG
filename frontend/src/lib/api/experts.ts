@@ -3,7 +3,7 @@
  */
 
 import type { ExpertBundle } from "../../types"
-import { API_BASE, getAuthHeaders } from "./_core"
+import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders } from "./_core"
 
 export interface ExpertBundleCreate {
   name: string
@@ -235,6 +235,46 @@ export async function getExpert(bundleId: string): Promise<ExpertBundle> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/experts/${bundleId}`, { headers })
   return handleResponse<ExpertBundle>(res, "Failed to get expert")
+}
+
+// ── Phase 267 plan 04 (PACK-25 · D-267-17..19) — the restricted-cost preview ────────────────────
+//
+// What a restricted Expert WILL and WILL NOT read on this thread, asked BEFORE the invite. The
+// route lives under `/threads` (it is a statement about a thread's scope) but its shape is an
+// Expert's, so it is declared here beside the other Expert reads. ⛔ One response feeds both
+// ledger columns: the `Won't use · N` heading is `excluded_count`, never a list length.
+
+export interface ExpertScopePreview {
+  expert_id: string
+  expert_name: string
+  mode: "biased" | "restricted"
+  /** Server-named; `name: null` = a folder the caller cannot see. */
+  expert_folders: { id: string; name: string | null }[]
+  thread_folder: { id: string; name: string; doc_count: number } | null
+  excluded_count: number
+  /** At most five names; `excluded_count` may be larger. */
+  excluded_names: string[]
+}
+
+export async function getExpertScopePreview(
+  expertId: string,
+  threadId?: string | null,
+): Promise<ExpertScopePreview> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams({ expert_id: expertId })
+  if (threadId) params.set("thread_id", threadId)
+  const res = await fetch(`${API_BASE}/threads/expert-scope-preview?${params.toString()}`, { headers })
+  if (!res.ok) {
+    // The refusal-preserving shape `postMessage` uses: a tier refusal names the plan, any other
+    // string detail is the server's own sentence, and only then the generic fallback.
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    throw new ApiError(
+      entitlementRefusalMessage(body) ??
+        (typeof body?.detail === "string" ? body.detail : "Failed to check the Expert's scope"),
+      res.status,
+    )
+  }
+  return res.json() as Promise<ExpertScopePreview>
 }
 
 /** Phase 266 (D-266-01 / D-266-02): install a first-party Expert's corpus into the ACTIVE org.
