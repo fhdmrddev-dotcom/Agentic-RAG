@@ -26,6 +26,7 @@ import {
   classifyIngestionError,
   UNKNOWN_FAILURE_SENTENCE,
 } from "@/components/library/ingestionErrorVocabulary"
+import { getCuratedServiceEntry } from "@/components/settings/servicesCatalog"
 
 /**
  * A knowledge folder id, resolved or honestly not. ⛔ There is no third shape and no `name?:` —
@@ -200,9 +201,15 @@ export interface ConnectionGate {
   ask: string | null
 }
 
-/** A name a person can read: the server's name, or the slug — never a blank. */
+/**
+ * A name a person can read: the server's name; when the server could only echo the slug (the org
+ * has no row for it at all — 267-05 F-2), the curated service catalog's name; else the slug —
+ * never a blank.
+ */
 function connectionName(c: { slug: string; name: string }): string {
-  return c.name?.trim() ? c.name : c.slug
+  const name = c.name?.trim()
+  if (name && name !== c.slug) return name
+  return getCuratedServiceEntry(c.slug)?.name ?? c.slug
 }
 
 /**

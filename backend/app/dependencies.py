@@ -629,7 +629,15 @@ async def feature_visible(request: Request, current_user: dict, feature: str) ->
     """
     if await is_operator(current_user["id"]):
         return True  # operator -> no-op
-    from app.models.user_settings import feature_audience, resolve_feature_access
+    from app.models.user_settings import (
+        ensure_settings_fresh,
+        feature_audience,
+        resolve_feature_access,
+    )
+    # 267-05 F-1 (T-184-UAT-02 shape): bound the SYNC reader's staleness before reading the
+    # audience, exactly as the canvas gate and /features do. Without it a cold worker read the
+    # fail-closed "off" default and an org-admin got can_connect false (and a 403 here).
+    await ensure_settings_fresh()
     audience = feature_audience(feature)
     if audience == "everyone":
         return True  # Everyone-audience feature -> no-op (carve-out byte-identical)
