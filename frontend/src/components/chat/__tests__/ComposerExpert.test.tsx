@@ -6,6 +6,26 @@ import * as api from "@/lib/api"
 import type { ExpertBundle } from "@/types"
 import { INSTALL_COPY } from "@/components/experts/catalog/expertCatalog"
 
+// Phase 267 plan 04 (PACK-25 / D-267-18): a RESTRICTED row now states its cost before it can be
+// invited — the dialog fetches `GET /threads/expert-scope-preview` per restricted row and offers no
+// invite control until it answers. `mockExpert` below is restricted, so the preview is answered
+// here (one folder, nothing excluded) and every case keeps its shipped, user-visible meaning.
+vi.mock("@/lib/api/experts", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/api/experts")>()
+  return {
+    ...actual,
+    getExpertScopePreview: vi.fn(async (expertId: string) => ({
+      expert_id: expertId,
+      expert_name: "Financial Analyzer",
+      mode: "restricted",
+      expert_folders: [{ id: "00000000-0000-0000-0000-000000000260", name: "SEC Filings" }],
+      thread_folder: null,
+      excluded_count: 0,
+      excluded_names: [],
+    })),
+  }
+})
+
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<any>("@/lib/api")
   return {
