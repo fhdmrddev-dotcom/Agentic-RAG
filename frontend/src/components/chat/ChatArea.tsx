@@ -246,6 +246,8 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   useEffect(() => {
     setAgentMode("default")
     setScopeFolderId(null)
+    // 267-REVIEW WR-02: a refusal is about the thread it was made on, never the next one.
+    setExpertChangeError(null)
   }, [thread?.id])
 
   // Phase 260 (PACK-02 / PACK-03): sync active expert consultant with thread
