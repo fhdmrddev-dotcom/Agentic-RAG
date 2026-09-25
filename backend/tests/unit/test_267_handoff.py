@@ -453,3 +453,25 @@ async def test_the_route_writes_exactly_the_fixture_shapes():
     event, marker = _fixture_models()
     assert set(txn.conn.calls[1][1][4][0]) == set(marker.model_dump(mode="json"))
     assert set(txn.conn.calls[2][1][4][0]) == set(event.model_dump(mode="json"))
+
+
+# ── 267-REVIEW WR-03: the gate's org and the org the new thread is written into must be ONE org ──
+#
+# ``list_threads`` returns a two-org user's threads from every org, so the source thread can live in
+# org A while the active org (X-Org-Id, which the gate checks entitlement and access in) is B. The
+# writer stamps the SOURCE org (D-267-34), so without this refusal an Expert gated in B was bound
+# inside an A thread — including when A does not hold the ``experts`` entitlement at all.
+
+
+@pytest.mark.asyncio
+async def test_WR03_a_source_thread_in_another_org_is_refused_before_any_model_call_or_write():
+    emit = AsyncMock()
+    txn = Txn(HConn())
+    gate = AsyncMock(return_value=({"id": CR_ID, "name": "Contract Reviewer"}, ORG_ID))
+    assert ORG_ID != SOURCE_ORG
+    with pytest.raises(HTTPException) as exc:
+        await _handoff(_sb(), emit=emit, txn=txn, gate=gate)
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "Switch to this chat's organization to hand it off."
+    emit.assert_not_awaited()
+    assert txn.entered == 0

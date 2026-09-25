@@ -422,3 +422,32 @@ async def test_CR02_the_run_resolver_fails_closed_on_a_disabled_expert():
             caller_user_id=UUID(USER_ID),
         )
     assert got is None
+
+
+# ── 267-REVIEW WR-03 (PATCH door): the thread's own org must be the org the gate validated ─────────
+
+
+@pytest.mark.asyncio
+async def test_WR03_patch_refuses_binding_into_a_thread_of_another_org_and_writes_nothing():
+    from app.api import threads as threads_mod
+
+    other_org = str(uuid4())
+    # The thread already holds this Expert, so the plain update path runs (no event machinery).
+    row = {**_thread_row(EXPERT_ID), "org_id": other_org}
+    helper = AsyncMock(return_value=({"id": str(EXPERT_ID)}, ORG_ID))
+    sb = MagicMock()
+    txn = MagicMock(side_effect=AssertionError("a refused PATCH opens no transaction"))
+    with patch.object(threads_mod, "assert_expert_bindable", helper), \
+         patch.object(threads_mod, "get_user_pg_connection", txn), \
+         patch.object(threads_mod, "aexec", AsyncMock(return_value=MagicMock(data=row))):
+        with pytest.raises(HTTPException) as exc:
+            await threads_mod.rename_thread(
+                thread_id=row["id"],
+                body=ThreadUpdate(active_expert_id=EXPERT_ID),
+                request=MagicMock(),
+                current_user={"id": USER_ID},
+                supabase=sb,
+            )
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "Switch to this chat's organization to invite an Expert."
+    sb.table.return_value.update.assert_not_called()
