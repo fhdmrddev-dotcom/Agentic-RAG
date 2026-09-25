@@ -334,3 +334,30 @@ def test_the_drafter_prompt_no_longer_promises_a_tool_floor():
 
     src = pathlib.Path(expert_authoring.__file__).read_text(encoding="utf-8")
     assert "so deliverable tools" not in src
+
+
+# ── 267-05 F-1: the visibility answer refreshes the settings cache first ─────────────────────
+# Live drive (evidence/03b): on a cold worker an org-admin read ``can_connect: false`` until an
+# unrelated ``GET /features`` warmed the cache, because ``feature_visible`` read the audience
+# through the SYNC settings reader with no staleness bound. Every other gated read awaits
+# ``ensure_settings_fresh()`` first (canvas gate, ``require_canvas``, ``/features``); this one
+# did not, and ``require_visible`` — POST /connections included — shares its body.
+
+@pytest.mark.asyncio
+async def test_feature_visible_refreshes_settings_before_reading_the_audience():
+    from app import dependencies as deps
+
+    order: list[str] = []
+
+    async def _fresh():
+        order.append("fresh")
+
+    def _audience(feature):
+        order.append("audience")
+        return "everyone"
+
+    with patch.object(deps, "is_operator", AsyncMock(return_value=False)), \
+         patch("app.models.user_settings.ensure_settings_fresh", _fresh), \
+         patch("app.models.user_settings.feature_audience", _audience):
+        assert await deps.feature_visible(None, {"id": str(USER)}, "live_connectors") is True
+    assert order == ["fresh", "audience"], order

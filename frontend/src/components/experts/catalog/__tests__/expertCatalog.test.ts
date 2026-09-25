@@ -610,3 +610,22 @@ describe("lib/api/experts · install client (266-04)", () => {
     await expect(listExpertInstalls()).resolves.toEqual([])
   })
 })
+
+describe("expertCatalog · an absent connection is named for a person (267-05 F-2)", () => {
+  // Live drive 267-05 (evidence/03c): with NO connector_connections row at all, the server can only
+  // echo the slug (`name: "google"`), so the card read "Requires google — not connected". The
+  // curated service catalog names it; an uncurated slug still falls back to itself, never a blank.
+  it("(F-2a) a slug-only name is replaced by the curated catalog name", () => {
+    const g = connectionGate(withConnections([conn("google", "google", false)], true))
+    expect(g?.missing).toEqual([{ slug: "google", name: "Google Workspace" }])
+    expect(g?.line).toContain("Google Workspace")
+    expect(g?.line).not.toMatch(/Requires google\b/)
+  })
+
+  it("(F-2b) a real server name is never overridden, and an uncurated slug stays itself", () => {
+    const named = connectionGate(withConnections([conn("google", "Acme Google", false)], true))
+    expect(named?.missing[0].name).toBe("Acme Google")
+    const unknown = connectionGate(withConnections([conn("mcp.example.com", "mcp.example.com", false)], true))
+    expect(unknown?.missing[0].name).toBe("mcp.example.com")
+  })
+})
