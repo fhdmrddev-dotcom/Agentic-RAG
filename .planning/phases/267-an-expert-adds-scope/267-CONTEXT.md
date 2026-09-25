@@ -1,7 +1,7 @@
 # Phase 267: An Expert Adds Scope - Context
 
 **Gathered:** 2026-09-25
-**Status:** Ready for planning (after the G-2 sketch pick)
+**Status:** Ready for planning (G-2 picked: Variant B)
 **Mode:** Autonomous smart-discuss. The operator accepted every recommended answer, chose "Sketch, I pick" for G-2,
 chose "honour by construction" for G-5, and chose to fold 4 of SEED-309's 7 items.
 
@@ -103,6 +103,8 @@ and SEED-303 S8 clone-on-customise.
 ### Ask a second Expert (PACK-24)
 - **D-267-13: The entry point is the existing invite dialog.** When an Expert is already active, each other row
   offers **Swap here** and **Ask in a new chat**. There is no new top-level composer control (sketch 260 rule).
+  - ⚠ **Wording superseded by D-267-27** (sketch pick): the buttons read "Replace <active>" / "New chat with
+    <Expert> →". The behaviour is unchanged.
 - **D-267-14: One server endpoint, `POST /threads/{id}/handoff {expert_id}`.** It writes an LLM summary of the
   source thread through a **service**, following the `services/thread_title.py` precedent. This is not a tool,
   so the red line holds. It then creates the new thread and sets its Expert **in one request**.
@@ -169,6 +171,23 @@ and SEED-303 S8 clone-on-customise.
 - **D-267-25: G-8.** Target 4-5 wave-sized plans. The five requirements are not five plans.
 - **D-267-26: G-4 lived-experience scenarios** are set with the operator at the sketch pick, before planning, and
   driven in Chrome at verification.
+
+### G-2 winner and G-4 scenarios (operator, 2026-09-25, at the sketch pick)
+- **D-267-27: G-2 winner = sketch 267 Variant B, "Will / won't ledger"**
+  (`.planning/sketches/267-an-expert-adds-scope/`). It is the acceptance bar for every new state:
+  - `Brings` / `Missing` for connections.
+  - `Will use` / `Won't use · N` (files named, attachments listed as *Will use*) for a restricted invite.
+  - A timestamped event card with `Now` / `Dropped` lines for a swap or removal.
+  - "Replace <active>" / "New chat with <Expert> →" in the dialog.
+  - `Here` / `Open →` in the original thread after a handoff.
+
+  ⛔ Both lists render from ONE structured payload, never two computed strings.
+- **D-267-28: G-4 lived-experience scenarios, driven in Chrome at verification:**
+  1. Invite Financial Analyzer into a thread and ask it to search the web and write a file. Both work.
+  2. Swap to HR Advisor (restricted) in a folder-scoped chat, then reload. The event card and "Won't use · 4" are still
+     there, and the next answer cites no excluded document.
+  3. "New chat with Contract Reviewer". The new thread opens with a handoff card naming the first thread's facts, and
+     the original thread keeps its Expert.
 
 ### Claude's Discretion
 - The exact route shapes and response models (preview, handoff, overlay field names).
