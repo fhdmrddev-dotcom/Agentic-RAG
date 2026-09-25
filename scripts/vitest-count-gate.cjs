@@ -175,6 +175,19 @@ const BASELINE = {
   // the rewrite lands four cases MORE than the floor it replaced — the honest-empty tile, the
   // icon read from the column, the iconless fallback, and the count/first-skill arms.
   "ExpertSpotlightCard.test.tsx": 9,
+  // ── Phase 267 plan 04 (PACK-22..25 · D-267-09 / D-267-12 / D-267-21 / D-267-24) — ADOPTED, both
+  //    knobs, same commit. ⛔ `src/components/chat` has NO bare-directory TARGETS entry, so each
+  //    suite is NAMED below and pinned here; unnamed, all six would run in no gate. The figures
+  //    are the per-file counts the gate itself prints on the adoption run (267-04-SUMMARY.md).
+  //    ⛔ `MessageItem.transcriptEvent.test.tsx` carries the G-5 hook fence on MessageItem.tsx and
+  //    the T-267-41 case (an unknown system row renders NOTHING — on base it rendered as an
+  //    assistant bubble); `ChatArea.expertThread.test.tsx` carries D-267-21, driven RED on base.
+  "expertEventCopy.test.ts": 19,
+  "ExpertEventCard.test.tsx": 10,
+  "HandoffCard.test.tsx": 3,
+  "MessageItem.transcriptEvent.test.tsx": 8,
+  "InviteExpertDialog.test.tsx": 20,
+  "ChatArea.expertThread.test.tsx": 8,
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/experts` has NO bare-directory TARGETS
   // entry — its two existing suites are both named FILE-LEVEL just below — so a suite
@@ -3555,7 +3568,10 @@ const BASELINE = {
   "DocumentStatusBadge.a11y.test.tsx": 19,
   // ── Phase 222 (222-05 / D-222-09) — Door half OAuth & probe-auth discovery ──
   "connectors.mcp_auth.test.ts": 8,
-  "entitlementRefusal.test.ts": 4, // v4.3 audit (TIER-03)
+  // ⬆ 4 → 13 at 267-04 (the gate's own printed count; the file already held 6 at base): chat
+  //   send names the plan with status 403 — R265-audit-fixes-06, driven RED by the 265 review's
+  //   own plant — and the Expert PATCH, create-with-Expert and handoff keep the server's sentence.
+  "entitlementRefusal.test.ts": 13, // v4.3 audit (TIER-03)
   "noFrontendTokenPricing.fence.test.ts": 3, // v4.3 audit (257 SC#3)
   "connectionFormCopy.mcp.test.ts": 6,
   "McpAuthDoor.test.tsx": 9,
@@ -4473,6 +4489,15 @@ const TARGETS = [
   // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
   "src/components/chat/__tests__/ComposerExpert.test.tsx",
   "src/components/chat/__tests__/ExpertSpotlightCard.test.tsx",
+  // ── Phase 267 plan 04 — the transcript event, the handoff, the invite matrix, the one PATCH
+  //    home. Named FILE-LEVEL (no bare `src/components/chat` entry exists); pinned in BASELINE
+  //    beside ExpertSpotlightCard, same commit.
+  "src/components/chat/__tests__/expertEventCopy.test.ts",
+  "src/components/chat/__tests__/ExpertEventCard.test.tsx",
+  "src/components/chat/__tests__/HandoffCard.test.tsx",
+  "src/components/chat/__tests__/MessageItem.transcriptEvent.test.tsx",
+  "src/components/chat/__tests__/InviteExpertDialog.test.tsx",
+  "src/components/chat/__tests__/ChatArea.expertThread.test.tsx",
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,
   // matching how its two siblings below are already reached. Both knobs, same commit.

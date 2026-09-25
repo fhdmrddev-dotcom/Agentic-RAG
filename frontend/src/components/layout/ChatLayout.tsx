@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { NavPanel } from "./NavPanel"
 // Phase 235 plan 09 (SURF-03 / D-235-03 / D-235-05) — the app-shell attention registry.
 //
@@ -10,6 +10,7 @@ import * as attentionRegistry from "./attentionConditions"
 import { ChatHistoryColumn } from "./ChatHistoryColumn"
 import { ThreadCommandPalette } from "./ThreadCommandPalette"
 import { ChatArea } from "@/components/chat/ChatArea"
+import { ThreadNavigationProvider, type ThreadNavigation } from "@/components/chat/threadNavigation"
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
 import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
 import { LibraryPage } from "@/pages/LibraryPage"
@@ -150,6 +151,22 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   } = useThreads()
 
   const { folders } = useFolders()
+
+  // Phase 267 plan 04 (PACK-24 · D-267-16 / T-267-46) — the no-router thread door, provided ONCE
+  // to the chat surface so the transcript's handoff pointer can open a thread without a prop
+  // travelling through MessageList / MessageItem. `findThread` resolves only from THIS list; a
+  // thread it does not hold is rendered as words, never as a control.
+  const threadNavigation = useMemo<ThreadNavigation>(
+    () => ({
+      findThread: (id) => threads.find((t) => t.id === id) ?? null,
+      openThread: (thread) => {
+        selectThread(thread)
+        onNavigate("chat")
+      },
+      refreshThreads: loadThreads,
+    }),
+    [threads, selectThread, onNavigate, loadThreads],
+  )
   const { theme, toggleTheme } = useTheme()
 
   // Phase 166 Plan 05 (ADMIN-01 / D-166-08): the org context (render-only). canManage
@@ -819,6 +836,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
           }}
         >
           <main className="min-w-0 min-h-0 overflow-hidden">
+            <ThreadNavigationProvider value={threadNavigation}>
             <ChatArea
               thread={selectedThread}
               onCreateThread={newThread}
@@ -844,6 +862,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               // Phase 156 REFINEMENT: the ▷ reopen handle shows only while collapsed.
               onReopenHistory={historyCollapsed ? () => setHistoryCollapsedPersisted(false) : undefined}
             />
+            </ThreadNavigationProvider>
           </main>
           <WorkspacePanel
             selectedThread={selectedThread}

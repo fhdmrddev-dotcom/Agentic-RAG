@@ -27,7 +27,7 @@ import { ActiveConnectorChips } from "./ActiveConnectorChips"
 import { ActiveExpertChip } from "./ActiveExpertChip"
 import { InviteExpertDialog } from "./InviteExpertDialog"
 import { ConnectedFilePickerModal } from "./ConnectedFilePickerModal"
-import { listConnectorConnections, setThreadActiveExpert, type ConnectorConnection } from "@/lib/api"
+import { listConnectorConnections, type ConnectorConnection } from "@/lib/api"
 import type { Message, ExpertBundle } from "@/types"
 // ── Phase 244 (244-05 T2 / SHELL-04) — the composer's LOCAL attach door ──────────────────
 // Sketch 236's winner is A — Scope on the chip (operator, 2026-09-11): the `+` menu stays PLAIN
@@ -84,6 +84,13 @@ interface Props {
   /** Phase 260 (PACK-02): Active expert consultant bound to the thread. */
   activeExpert?: ExpertBundle | null
   onActiveExpertChange?: (expert: ExpertBundle | null) => void
+  // ── Phase 267 plan 04 (PACK-24 / PACK-25) — forwarded to the invite dialog, all optional ──────
+  /** The thread's folder name, for the dialog's context line. */
+  threadFolderName?: string | null
+  /** True when the thread has ≥ 1 message — only then can a question be handed to a new chat. */
+  hasMessages?: boolean
+  /** "New chat with <Expert>" — absent means the dialog offers no such control. */
+  onExpertHandoff?: (expert: ExpertBundle) => Promise<void>
   /**
    * Phase 262 plan 05 (PACK-11): take the person to the Expert catalog — the
    * `onOpenConnections` precedent two entries up, copied line for line.
@@ -159,6 +166,9 @@ export function MessageInput({
   activeExpert: propActiveExpert,
   onActiveExpertChange,
   onBrowseExperts,
+  threadFolderName,
+  hasMessages,
+  onExpertHandoff,
 }: Props) {
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -168,33 +178,19 @@ export function MessageInput({
   const activeExpert = propActiveExpert !== undefined ? propActiveExpert : internalActiveExpert
   const [inviteExpertOpen, setInviteExpertOpen] = useState(false)
 
-  const handleSelectExpert = async (expert: ExpertBundle) => {
+  // Phase 267 plan 04 (D-267-12): the composer REPORTS the choice and writes nothing. The PATCH,
+  // its refusal (the chip reverts, the server's sentence is shown) and the transcript refetch all
+  // live in ONE home, `ChatArea`. Two writers used to exist here and one of them swallowed every
+  // refusal into the console.
+  const handleSelectExpert = (expert: ExpertBundle) => {
     setInternalActiveExpert(expert)
     setInviteExpertOpen(false)
-    if (onActiveExpertChange) {
-      onActiveExpertChange(expert)
-    }
-    if (threadId) {
-      try {
-        await setThreadActiveExpert(threadId, expert.id)
-      } catch (err) {
-        console.error("Failed to set thread active expert:", err)
-      }
-    }
+    onActiveExpertChange?.(expert)
   }
 
-  const handleDismissExpert = async () => {
+  const handleDismissExpert = () => {
     setInternalActiveExpert(null)
-    if (onActiveExpertChange) {
-      onActiveExpertChange(null)
-    }
-    if (threadId) {
-      try {
-        await setThreadActiveExpert(threadId, null)
-      } catch (err) {
-        console.error("Failed to clear thread active expert:", err)
-      }
-    }
+    onActiveExpertChange?.(null)
   }
 
   // Phase 216 (CHAT-05 / CHAT-06): active connectors per thread
@@ -969,6 +965,12 @@ export function MessageInput({
         onOpenChange={setInviteExpertOpen}
         onSelectExpert={handleSelectExpert}
         currentExpertId={activeExpert?.id}
+        currentExpertName={activeExpert?.name ?? null}
+        threadId={threadId ?? null}
+        threadFolderName={threadFolderName ?? null}
+        hasMessages={hasMessages ?? false}
+        onHandoff={onExpertHandoff}
+        onOpenConnections={onOpenConnections}
       />
     </div>
   )

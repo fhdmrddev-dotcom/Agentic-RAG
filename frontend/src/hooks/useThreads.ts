@@ -11,7 +11,8 @@ interface UseThreads {
    *  selection on an org switch). Widening to `Thread | null` is backward-compatible:
    *  every existing caller still passes a `Thread`. */
   selectThread: (thread: Thread | null) => void
-  newThread: (folderId?: string | null) => Promise<Thread>
+  /** Phase 267 (D-267-21): `activeExpertId` creates the thread WITH its Expert, in one request. */
+  newThread: (folderId?: string | null, activeExpertId?: string | null) => Promise<Thread>
   deleteThread: (id: string) => Promise<void>
   renameThread: (id: string, title: string) => Promise<void>
   updateThreadTitle: (id: string, title: string) => void
@@ -36,8 +37,8 @@ export function useThreads(): UseThreads {
     setSelectedThread(thread)
   }, [])
 
-  const newThread = useCallback(async (folderId?: string | null) => {
-    const thread = await createThread("New Chat", folderId)
+  const newThread = useCallback(async (folderId?: string | null, activeExpertId?: string | null) => {
+    const thread = await createThread("New Chat", folderId, activeExpertId)
     setThreads((prev) => [thread, ...prev])
     setSelectedThread(thread)
     return thread

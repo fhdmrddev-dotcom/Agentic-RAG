@@ -19,14 +19,18 @@ import {
   setThreadActiveExpert,
   ApiError,
 } from "@/lib/api"
+import { handoffThread } from "@/lib/api/threads"
 import { useComposerModel } from "@/hooks/useComposerModel"
+import { useThreadNavigation } from "./threadNavigation"
 import { ExpertSpotlightCard } from "./ExpertSpotlightCard"
 import type { Folder, Thread, ExpertBundle } from "@/types"
 import { Folder as FolderIcon, Menu, Sparkles, PanelLeftOpen } from "lucide-react"
 
 interface Props {
   thread: Thread | null
-  onCreateThread: (folderId?: string | null) => Promise<Thread>
+  /** Phase 267 (D-267-21): the second argument creates the thread WITH its Expert, so an Expert
+   *  invited on a brand-new chat scopes the first run instead of being cleared by hydration. */
+  onCreateThread: (folderId?: string | null, activeExpertId?: string | null) => Promise<Thread>
   onTitleUpdate?: (threadId: string, title: string) => void
   folders: Folder[]
   prefillMessage?: string | null
@@ -113,6 +117,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // Phase 260 (PACK-02 / PACK-03): active expert consultant state
   const [activeExpert, setActiveExpert] = useState<ExpertBundle | null>(null)
   const [expertInvited, setExpertInvited] = useState(false)
+  // Phase 267 plan 04 (D-267-12): the server's sentence when an Expert change is refused. One line
+  // above the composer, cleared by the next change.
+  const [expertChangeError, setExpertChangeError] = useState<string | null>(null)
+  // Phase 267 plan 04 (D-267-16): the no-router door ChatLayout provides — `null` outside it, and
+  // then no "New chat with …" control is offered at all.
+  const threadNav = useThreadNavigation()
   const justCreatedThreadRef = useRef<string | null>(null)
 
   // Plan 075.4-01 D-075.4-A1: thread-scoped reads. The composer disable
@@ -434,7 +444,9 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     setExpertInvited(false)
     let activeThread = thread
     if (!activeThread) {
-      activeThread = await onCreateThread(scopeFolderId)
+      // Phase 267 plan 04 (D-267-21): the Expert invited on this brand-new chat travels WITH the
+      // create, so the thread exists scoped before the first run starts.
+      activeThread = await onCreateThread(scopeFolderId, activeExpert?.id ?? null)
       justCreatedThreadRef.current = activeThread.id
       // D-067.2-01: synchronously align activeThreadIdRef BEFORE sendMessage
       // begins. sendMessage sets streamingThreadIdRef.current = threadId at
@@ -465,7 +477,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       undefined,
       activeConnectorIds,
     )
-  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread, streamActions])
+  }, [thread, scopeFolderId, activeExpert, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread, streamActions])
 
   // Phase 260 (PACK-03 / D-260-07): 1-click execution for action tiles
   const handlePromptSelect = useCallback(
@@ -476,17 +488,70 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     [handleSend],
   )
 
-  const handleDismissExpert = useCallback(async () => {
-    setActiveExpert(null)
-    setExpertInvited(false)
-    if (thread?.id) {
+  /**
+   * Phase 267 plan 04 (PACK-23 · D-267-12) — THE ONE HOME of every Expert change on a thread.
+   *
+   * Add, swap and remove all land here: the composer and the spotlight only REPORT a choice. With a
+   * thread, the PATCH is sent once; a refusal reverts the chip to the Expert that is still bound
+   * and states the server's own sentence. A success refetches the transcript so the persisted
+   * event row (written in the same transaction as the change) appears without a reload — except
+   * while THIS thread is streaming, where a refetch would race the live bucket and the run-end
+   * reconcile brings the row in (RESEARCH pitfall 11). Without a thread there is nothing to write:
+   * the choice rides the create call (D-267-21).
+   */
+  const applyExpertChange = useCallback(
+    async (next: ExpertBundle | null) => {
+      const previous = activeExpert
+      setExpertChangeError(null)
+      setActiveExpert(next)
+      setExpertInvited(next !== null)
+      const tid = thread?.id
+      if (!tid) return
       try {
-        await setThreadActiveExpert(thread.id, null)
+        await setThreadActiveExpert(tid, next?.id ?? null)
       } catch (err) {
-        console.error("Failed to clear thread active expert:", err)
+        setActiveExpert(previous)
+        setExpertInvited(false)
+        setExpertChangeError(
+          err instanceof Error && err.message.trim() ? err.message : "The Expert could not be changed.",
+        )
+        return
       }
-    }
-  }, [thread?.id])
+      if (!useStreamsStore.getState().streamingThreads.has(tid)) {
+        loadMessages(tid).catch(console.error)
+      }
+    },
+    [activeExpert, thread?.id, loadMessages],
+  )
+
+  const handleDismissExpert = useCallback(() => {
+    void applyExpertChange(null)
+  }, [applyExpertChange])
+
+  /**
+   * Phase 267 plan 04 (PACK-24 · D-267-14 / D-267-16) — "New chat with <Expert>": ONE request, then
+   * the list is refreshed BEFORE the new thread is opened (the `startScopedChat` order — a selected
+   * row the list does not hold yet would disagree with the server). A refusal propagates to the
+   * dialog, which states it; nothing navigates. ⛔ Once the server has created the thread, a failed
+   * list refresh must NOT surface as a refusal ("nothing was created" would be false) — the new
+   * thread is still opened.
+   */
+  const handleExpertHandoff = useCallback(
+    async (expert: ExpertBundle) => {
+      if (!thread?.id || !threadNav) return
+      const created = await handoffThread(thread.id, expert.id, {
+        model: selectedModel || undefined,
+        provider: selectedProvider || undefined,
+      })
+      try {
+        await threadNav.refreshThreads()
+      } catch (err) {
+        console.error("Thread list refresh after handoff failed:", err)
+      }
+      threadNav.openThread(created)
+    },
+    [thread?.id, threadNav, selectedModel, selectedProvider],
+  )
 
   // Plan 075.4-04 D-075.4-SC#6 — onSendMessage is the stable identity passed
   // to MessageList → MessageItem (SuggestionPills onSelect). Wraps handleSend
@@ -536,13 +601,28 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // value of useStreamingForThread(thread?.id ?? null) (declared at the top
   // of this component), so Thread A streaming will NOT disable Thread B's
   // composer.
+  // Phase 267 plan 04: what the invite dialog states about this chat before an invite.
+  const dialogFolderId = thread ? thread.folder_id : scopeFolderId
+  const dialogFolderName = dialogFolderId
+    ? (folders.find((f) => f.id === dialogFolderId)?.name ?? "Folder")
+    : null
   const inputBar = (
+    <>
+    {expertChangeError && (
+      <div
+        data-testid="expert-change-error"
+        role="alert"
+        className="mx-4 mb-2 p-3 text-xs rounded-lg bg-destructive/10 border border-destructive/30 text-destructive"
+      >
+        {expertChangeError}
+      </div>
+    )}
     <MessageInput
       activeExpert={activeExpert}
-      onActiveExpertChange={(exp) => {
-        setActiveExpert(exp)
-        if (exp) setExpertInvited(true)
-      }}
+      onActiveExpertChange={(exp) => void applyExpertChange(exp)}
+      threadFolderName={dialogFolderName}
+      hasMessages={messages.some((m) => m.role === "user" || m.role === "assistant")}
+      onExpertHandoff={thread && threadNav ? handleExpertHandoff : undefined}
       onOpenConnections={onOpenConnections}
       onBrowseExperts={onBrowseExperts}
       onSend={handleSend}
@@ -593,6 +673,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       }}
       workflowLocked={workflowLocked}
     />
+    </>
   )
 
   // Phase 156 REFINEMENT: the ▷ "Show chat history" handle (sketch #reopenA). Desktop-

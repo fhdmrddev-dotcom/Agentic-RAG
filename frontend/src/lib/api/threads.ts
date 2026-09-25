@@ -20,16 +20,38 @@ export async function listThreads(): Promise<Thread[]> {
   return res.json() as Promise<Thread[]>
 }
 
-export async function createThread(title = "New Chat", folderId?: string | null): Promise<Thread> {
+/** Phase 267 plan 04 (D-267-24 / 099-08 idiom): the refusal-preserving throw every thread write
+ *  shares with `postMessage` — a tier refusal names the plan, a string `detail` is the server's own
+ *  sentence, and only then the caller's fallback. The status rides on `ApiError`. */
+async function throwThreadRefusal(res: Response, fallback: string): Promise<never> {
+  const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+  throw new ApiError(
+    entitlementRefusalMessage(body) ?? (typeof body?.detail === "string" ? body.detail : fallback),
+    res.status,
+  )
+}
+
+/**
+ * Phase 267 plan 04 (D-267-21): `activeExpertId` creates the thread WITH its Expert in one request,
+ * so an Expert invited on a brand-new chat scopes the FIRST run. Before this the invite was lost:
+ * the thread was created bare and the hydration effect then cleared the chip. The server gates the
+ * id exactly as it gates the PATCH (267-02 `assert_expert_bindable`). Absent → the pre-267 body.
+ */
+export async function createThread(
+  title = "New Chat",
+  folderId?: string | null,
+  activeExpertId?: string | null,
+): Promise<Thread> {
   const headers = await getAuthHeaders()
   const body: Record<string, string> = { title }
   if (folderId) body.folder_id = folderId
+  if (activeExpertId) body.active_expert_id = activeExpertId
   const res = await fetch(`${API_BASE}/threads`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error("Failed to create thread")
+  if (!res.ok) return throwThreadRefusal(res, "Failed to create thread")
   return res.json() as Promise<Thread>
 }
 
@@ -194,7 +216,35 @@ export async function setThreadActiveExpert(threadId: string, expertId: string |
     headers,
     body: JSON.stringify({ active_expert_id: expertId }),
   })
-  if (!res.ok) throw new Error("Failed to update thread active expert")
+  // Phase 267 plan 04 (D-267-12): the caller reverts the chip and shows THIS sentence, so the
+  // server's refusal ("Choose an organization before inviting an Expert.", a tier refusal, …)
+  // must survive the throw — the generic string it used to throw told the person nothing.
+  if (!res.ok) return throwThreadRefusal(res, "Failed to update thread active expert")
+  return res.json() as Promise<Thread>
+}
+
+/**
+ * Phase 267 plan 04 (PACK-24 · D-267-14 / D-267-16): "New chat with <Expert>" — ONE request. The
+ * server summarises this thread, then creates the new thread, its handoff message and this thread's
+ * pointer atomically, or nothing (267-02). ⛔ One request is half of the double-click guard; the
+ * dialog's in-flight lock is the other. Refusals (409 / 502 / 403 / 404) keep the server's sentence.
+ */
+export async function handoffThread(
+  threadId: string,
+  expertId: string,
+  opts: { model?: string; provider?: string } = {},
+): Promise<Thread> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/handoff`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      expert_id: expertId,
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.provider ? { provider: opts.provider } : {}),
+    }),
+  })
+  if (!res.ok) return throwThreadRefusal(res, "The server did not start the new chat.")
   return res.json() as Promise<Thread>
 }
 
