@@ -186,8 +186,11 @@ const BASELINE = {
   "ExpertEventCard.test.tsx": 10,
   "HandoffCard.test.tsx": 3,
   "MessageItem.transcriptEvent.test.tsx": 8,
-  "InviteExpertDialog.test.tsx": 22, // 267-REVIEW WR-06 +1, IN-02 +1
-  "ChatArea.expertThread.test.tsx": 16, // 267-REVIEW CR-01 +3, WR-01 +1, WR-02 +1, WR-04 +1, WR-06 +1, WR-07 +1
+  "InviteExpertDialog.test.tsx": 23, // 267-REVIEW WR-06 +1, IN-02 +1; 267-UI-REVIEW #3 +1
+  "ChatArea.expertThread.test.tsx": 18, // 267-REVIEW CR-01 +3, WR-01 +1, WR-02 +1, WR-04 +1, WR-06 +1, WR-07 +1; 267-UI-REVIEW #2 +2
+  // 267-UI-REVIEW #1 (BLOCKER) — the light-theme contrast fence over the six phase files. Both
+  // knobs, same commit; the figure is the gate's own printed count on the adoption run.
+  "expertThemeContrast.test.tsx": 6,
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/experts` has NO bare-directory TARGETS
   // entry — its two existing suites are both named FILE-LEVEL just below — so a suite
@@ -4498,6 +4501,7 @@ const TARGETS = [
   "src/components/chat/__tests__/MessageItem.transcriptEvent.test.tsx",
   "src/components/chat/__tests__/InviteExpertDialog.test.tsx",
   "src/components/chat/__tests__/ChatArea.expertThread.test.tsx",
+  "src/components/chat/__tests__/expertThemeContrast.test.tsx", // 267-UI-REVIEW #1, pinned in BASELINE
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,
   // matching how its two siblings below are already reached. Both knobs, same commit.
