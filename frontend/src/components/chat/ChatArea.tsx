@@ -120,7 +120,6 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   // Phase 260 (PACK-02 / PACK-03): active expert consultant state
   const [activeExpert, setActiveExpert] = useState<ExpertBundle | null>(null)
-  const [expertInvited, setExpertInvited] = useState(false)
   // Phase 267 plan 04 (D-267-12): the server's sentence when an Expert change is refused. One line
   // above the composer, cleared by the next change.
   const [expertChangeError, setExpertChangeError] = useState<string | null>(null)
@@ -447,7 +446,6 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
   // pill onSelect). onResume mirrors the same useCallback-stabilization
   // pattern for the Resume button on failed/timed_out assistant messages.
   const handleSend = useCallback(async (content: string, activeConnectorIds?: string[]) => {
-    setExpertInvited(false)
     let activeThread = thread
     if (!activeThread) {
       // Phase 267 plan 04 (D-267-21): the Expert invited on this brand-new chat travels WITH the
@@ -498,7 +496,6 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
   // Phase 260 (PACK-03 / D-260-07): 1-click execution for action tiles
   const handlePromptSelect = useCallback(
     (prompt: string) => {
-      setExpertInvited(false)
       void handleSend(prompt)
     },
     [handleSend],
@@ -528,7 +525,6 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
       }
       setExpertChangeError(null)
       setActiveExpert(next)
-      setExpertInvited(next !== null)
       if (!tid) return
       try {
         // 267-REVIEW CR-01: the answer is the thread as the server now holds it. It goes back to
@@ -537,7 +533,6 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
         onThreadUpdated?.(updated)
       } catch (err) {
         setActiveExpert(previous)
-        setExpertInvited(false)
         setExpertChangeError(
           err instanceof Error && err.message.trim() ? err.message : "The Expert could not be changed.",
         )
@@ -974,15 +969,11 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
             onResume={onResume}
             threadId={thread?.id ?? null}
           />
-          {activeExpert && expertInvited && (
-            <div className="px-4 pb-2">
-              <ExpertSpotlightCard
-                expert={activeExpert}
-                onSelectPrompt={handlePromptSelect}
-                onDismiss={handleDismissExpert}
-              />
-            </div>
-          )}
+          {/* 267-UI-REVIEW #2 (UI-SPEC §9-D6): the transient spotlight that used to mount here is
+              GONE. This branch renders only when the thread already has messages, and a change on
+              it writes a persisted expert_changed event that applyExpertChange refetches — that
+              event card IS the announcement, and the spotlight announced the same change a second
+              time, louder. Empty threads keep their spotlight (the branch above, D-267-12). */}
         </>
       )}
       {pendingApproval && (

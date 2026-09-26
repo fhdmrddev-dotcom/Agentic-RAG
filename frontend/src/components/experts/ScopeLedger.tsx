@@ -55,8 +55,8 @@ function Column({ column }: { column: LedgerColumn }) {
       className={cn(
         "min-w-0 rounded-lg border px-3 py-2",
         column.tone === "yes"
-          ? "border-emerald-500/25 bg-emerald-500/[0.08]"
-          : "border-rose-500/25 bg-rose-500/10",
+          ? "border-emerald-600/40 bg-emerald-500/[0.08] dark:border-emerald-500/25"
+          : "border-rose-600/40 bg-rose-500/10 dark:border-rose-500/25",
       )}
     >
       <p

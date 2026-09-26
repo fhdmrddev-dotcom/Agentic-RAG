@@ -159,10 +159,10 @@ function NamePill({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium",
         missing
-          ? "border-rose-500/25 bg-rose-500/10 text-rose-300"
+          ? "border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-300"
           : dim
             ? "border-border/60 bg-muted/20 italic text-muted-foreground"
-            : "border-violet-500/25 bg-violet-500/10 text-violet-200",
+            : "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-200",
       )}
     >
       {icon}
@@ -241,7 +241,7 @@ export function ExpertDetailModal({
         {/* ── header: gem · name · scope badge · meta line ── */}
         <DialogHeader className="shrink-0 space-y-2 border-b border-border/60 p-6 pb-5">
           <div className="flex items-start gap-3.5 pr-8">
-            <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 text-violet-200 ring-1 ring-violet-500/30">
+            <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 text-violet-700 dark:text-violet-200 ring-1 ring-violet-500/30">
               <ExpertIcon icon={expert.icon} className="h-6 w-6" />
             </div>
             <div className="min-w-0 flex-1 text-left">
@@ -253,8 +253,8 @@ export function ExpertDetailModal({
                   className={cn(
                     "rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
                     isRestricted
-                      ? "border-rose-500/20 bg-rose-500/10 text-rose-300"
-                      : "border-amber-500/20 bg-amber-500/10 text-amber-300",
+                      ? "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                      : "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
                   )}
                 >
                   {/* The card face's own two words, so the two catalog surfaces cannot disagree

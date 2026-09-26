@@ -67,7 +67,7 @@ function Shell({
         <span
           className={cn(
             "font-semibold leading-relaxed",
-            tone === "violet" ? "text-violet-200" : "text-foreground",
+            tone === "violet" ? "text-violet-700 dark:text-violet-200" : "text-foreground",
           )}
         >
           {header}
@@ -93,7 +93,7 @@ function ScopeValue({ line, tone }: { line: ScopeLineModel; tone: "yes" | "no" }
   if (line.empty) {
     return <span className="text-muted-foreground">{line.items[0]}</span>
   }
-  const color = tone === "yes" ? "text-emerald-300" : "text-rose-300"
+  const color = tone === "yes" ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"
   const parts: ReactNode[] = []
   line.items.forEach((label, i) => {
     parts.push(
@@ -125,7 +125,7 @@ function ScopeValue({ line, tone }: { line: ScopeLineModel; tone: "yes" | "no" }
 function ChangedCard({ event }: { event: ExpertChangedEvent }) {
   const m = eventCardModel(event)
   const icon =
-    m.tone === "violet" ? <Sparkles className="h-3 w-3 flex-none text-violet-300" aria-hidden="true" /> : null
+    m.tone === "violet" ? <Sparkles className="h-3 w-3 flex-none text-violet-700 dark:text-violet-300" aria-hidden="true" /> : null
   return (
     <Shell at={m.at} tone={m.tone} header={m.header} icon={icon}>
       <div data-testid="expert-event-now" className="contents">
@@ -173,7 +173,7 @@ function HandoffPointer({ event }: { event: ExpertHandoffEvent }) {
       at={m.at}
       tone="violet"
       header={m.header}
-      icon={<ArrowUpRight className="h-3 w-3 flex-none text-violet-300" aria-hidden="true" />}
+      icon={<ArrowUpRight className="h-3 w-3 flex-none text-violet-700 dark:text-violet-300" aria-hidden="true" />}
     >
       {m.here && (
         <>

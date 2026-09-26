@@ -223,9 +223,9 @@ function ExpertRowActions({
           {/* 267-REVIEW IN-02: a status, not a control — it re-PATCHed the bound Expert on click. */}
           <span
             data-testid={`invite-expert-btn-${expert.slug}`}
-            className={cn(BTN, "bg-violet-500/20 text-violet-200 border border-violet-500/40 cursor-default")}
+            className={cn(BTN, "bg-violet-500/20 text-violet-700 dark:text-violet-200 border border-violet-500/40 cursor-default")}
           >
-            <Check className="h-3.5 w-3.5 text-violet-400" />
+            <Check className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
             Active
           </span>
         </div>
@@ -250,7 +250,7 @@ function ExpertRowActions({
       <>
         <ScopeLedger columns={connectionLedgerColumns(expert, "dialog")} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <p data-testid="connection-gate-line" className="text-xs leading-relaxed text-rose-300">
+          <p data-testid="connection-gate-line" className="text-xs leading-relaxed text-rose-700 dark:text-rose-300">
             {gate.line}
           </p>
           {gate.action && onConnect ? (
@@ -481,7 +481,7 @@ export function InviteExpertDialog({
       >
         <DialogHeader className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-300">
+            <div className="w-8 h-8 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-700 dark:text-violet-300">
               <Sparkles className="h-4 w-4" />
             </div>
             <DialogTitle className="text-base font-semibold text-foreground">
@@ -502,10 +502,16 @@ export function InviteExpertDialog({
           )}
         </DialogHeader>
 
-        <div className="mt-4 space-y-3 max-h-[380px] overflow-y-auto pr-1">
+        {/* 267-UI-REVIEW #3: 380px was sized for the pre-ledger rows; a row with its ledger is
+            ~360px, so the dialog showed one Expert and the R7 decision sat below the fold.
+            Viewport-relative: 702px of list on a 900px screen, and the dialog still fits. */}
+        <div
+          data-testid="invite-expert-list"
+          className="mt-4 space-y-3 max-h-[min(78vh,720px)] overflow-y-auto pr-1"
+        >
           {loading && (
             <div className="py-12 flex flex-col items-center justify-center text-muted-foreground gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-violet-600 dark:text-violet-400" />
               <span className="text-xs">{PREVIEW_COPY.listLoading}</span>
             </div>
           )}
@@ -546,7 +552,7 @@ export function InviteExpertDialog({
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/20 border border-violet-500/30 flex items-center justify-center text-lg shrink-0">
-                      <ExpertIcon icon={expert.icon} className="h-4 w-4 text-violet-200" />
+                      <ExpertIcon icon={expert.icon} className="h-4 w-4 text-violet-700 dark:text-violet-200" />
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -558,8 +564,8 @@ export function InviteExpertDialog({
                           className={cn(
                             "text-[10px] font-medium px-1.5 py-0.5 rounded-full uppercase tracking-wider",
                             isRestricted
-                              ? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
-                              : "bg-amber-500/10 text-amber-300 border border-amber-500/20",
+                              ? "bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20"
+                              : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20",
                           )}
                         >
                           {isRestricted ? "Restricted" : "Biased"}
@@ -574,19 +580,19 @@ export function InviteExpertDialog({
                         <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-muted-foreground/80">
                           {expert.knowledge_folder_ids?.length > 0 && (
                             <span className="flex items-center gap-1">
-                              <Folder className="h-3 w-3 text-violet-400" />
+                              <Folder className="h-3 w-3 text-violet-600 dark:text-violet-400" />
                               {expert.knowledge_folder_ids.length} folder{expert.knowledge_folder_ids.length > 1 ? "s" : ""}
                             </span>
                           )}
                           {expert.member_skills?.length > 0 && (
                             <span className="flex items-center gap-1">
-                              <Wrench className="h-3 w-3 text-violet-400" />
+                              <Wrench className="h-3 w-3 text-violet-600 dark:text-violet-400" />
                               {expert.member_skills.length} skill{expert.member_skills.length > 1 ? "s" : ""}
                             </span>
                           )}
                           {expert.required_connections?.length > 0 && (
                             <span className="flex items-center gap-1">
-                              <Shield className="h-3 w-3 text-violet-400" />
+                              <Shield className="h-3 w-3 text-violet-600 dark:text-violet-400" />
                               {expert.required_connections.length} conn
                             </span>
                           )}

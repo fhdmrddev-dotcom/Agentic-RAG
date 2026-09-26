@@ -140,7 +140,7 @@ export function ExpertCard({
       <div className="space-y-3">
         {/* ── 1 · identity gem, name, meta line, scope-mode badge ── */}
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/20 text-violet-200 ring-1 ring-violet-500/30">
+          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/20 text-violet-700 dark:text-violet-200 ring-1 ring-violet-500/30">
             <ExpertIcon icon={expert.icon} className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -152,8 +152,8 @@ export function ExpertCard({
                 className={cn(
                   "rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
                   isRestricted
-                    ? "border-rose-500/20 bg-rose-500/10 text-rose-300"
-                    : "border-amber-500/20 bg-amber-500/10 text-amber-300",
+                    ? "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                    : "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
                 )}
               >
                 {isRestricted ? "Restricted" : "Biased"}
@@ -176,7 +176,7 @@ export function ExpertCard({
             <ScopeLedger columns={connectionLedgerColumns(expert, "card")} />
             <p
               data-testid="connection-gate-line"
-              className="mt-2 text-xs leading-relaxed text-rose-300"
+              className="mt-2 text-xs leading-relaxed text-rose-700 dark:text-rose-300"
             >
               {gate.line}
             </p>
@@ -185,21 +185,21 @@ export function ExpertCard({
         <div className="flex flex-wrap gap-1.5">
           {folderCount > 0 && (
             <ScopePill
-              icon={<FolderClosed className="h-2.5 w-2.5 text-violet-400" />}
+              icon={<FolderClosed className="h-2.5 w-2.5 text-violet-600 dark:text-violet-400" />}
               label={`${folderCount} folder${folderCount === 1 ? "" : "s"}`}
             />
           )}
           {skills.map((s) => (
             <ScopePill
               key={`skill-${s}`}
-              icon={<Wrench className="h-2.5 w-2.5 text-violet-400" />}
+              icon={<Wrench className="h-2.5 w-2.5 text-violet-600 dark:text-violet-400" />}
               label={s}
             />
           ))}
           {connections.map((c) => (
             <ScopePill
               key={`conn-${c}`}
-              icon={<Plug className="h-2.5 w-2.5 text-violet-400" />}
+              icon={<Plug className="h-2.5 w-2.5 text-violet-600 dark:text-violet-400" />}
               label={c}
             />
           ))}
