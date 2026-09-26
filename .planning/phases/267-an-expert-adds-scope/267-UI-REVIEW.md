@@ -286,3 +286,64 @@ audit: 0 third-party blocks checked, no flags.
 - `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` (pill, header, footer)
 - `frontend/src/components/experts/catalog/expertCatalog.ts` (copy constants and ledger selectors)
 - `frontend/src/index.css` (the `:root` and `.dark` tokens)
+
+---
+
+## Fix outcomes (orchestrator-requested)
+
+Top 3 only, fixed 2026-09-26. Commits: RED `abbb1618d`, GREEN `09bdb3e9e`, gate adoption `5c260e6da`. Each RED case was
+driven failing on the unfixed tree before the fix landed (7 failed, control G14 passed).
+
+**#1 BLOCKER, light-theme contrast. FIXED.** It follows the repo's existing pairing pattern (`text-amber-700 dark:text-amber-300`
+in `SourceToolsCard.tsx`, `text-emerald-600 dark:text-emerald-400` in `McpAuthDoor.tsx`). No new tokens were added
+to `index.css`. The dark classes are unchanged, so Deep Midnight renders exactly as before.
+- **Text:** `text-{violet,emerald,rose,amber}-{200,300}` → `text-<hue>-700 dark:text-<hue>-{200,300}`.
+- **Icons:** `text-violet-400` → `text-violet-600 dark:text-violet-400`.
+- **Ledger borders:** `border-<hue>-500/25` → `border-<hue>-600/40 dark:border-<hue>-500/25`, so the columns
+  no longer vanish on white.
+- **Sites:** `ExpertEventCard.tsx` (the header, the Now/Dropped values, both glyphs), `InviteExpertDialog.tsx` (the
+  Active pill, the gate line, the dialog gem, and the row icons), `ExpertCard.tsx` (the gate line and meta icons),
+  `ExpertDetailModal.tsx` (the missing pill and the in-scope pill), and `ScopeLedger.tsx` (the borders).
+- **Inherited sites, fixed in the same pass:** the Restricted/Biased badges and the Expert gems, in
+  `InviteExpertDialog`, `ExpertCard` and `ExpertDetailModal`.
+- **Unchanged:** `HandoffCard.tsx` already used tokens (`text-primary`, `text-foreground`). The composer `USING:` chip
+  and `ExpertSpotlightCard`'s dark-only surfaces are **still open**. They are outside the six files, and 267 did not
+  add them.
+- **Fence:** `frontend/src/components/chat/__tests__/expertThemeContrast.test.tsx` has 6 cases.
+  - It checks the rendered class pairs on the event card and the ledger.
+  - It runs a source fence over the six files: no bare 50–400 hue step may appear anywhere, and every
+    `dark:text-<hue>-N` needs a 600–900 companion on the same line. A non-vacuity floor requires ≥ 8 pairs.
+
+**#2 WARNING, double announcement. FIXED.**
+- **Change:** the mid-thread `ExpertSpotlightCard` mount in `ChatArea.tsx` is removed.
+- **Why removal, not a guard:** that branch renders only when the thread has messages. A change made there always
+  writes the persisted `expert_changed` event, which `applyExpertChange` refetches. A `messages.length === 0` guard
+  inside that branch could never be true, so it would have been dead code.
+- **What remains:** the empty-thread spotlight (D-267-12) is untouched.
+- **Knock-on:** `expertInvited` had no reader left, so its `useState` and its four setters are removed. This takes the
+  file's `useState` count down by 1.
+- **Tests:** `ChatArea.expertThread.test.tsx` (G13) checks that a swap on a thread with messages mounts no spotlight
+  (RED on base). (G14) is the control: an invite on an empty thread still shows it.
+
+**#3 WARNING, list height. FIXED.**
+- **Change:** `max-h-[380px]` → `max-h-[min(78vh,720px)]` on the list, which now has `data-testid="invite-expert-list"`.
+- **Why 78vh:** on a 900px viewport the list gets 702px, and with the dialog chrome (~124px) the dialog is ~826px, so it
+  still fits.
+- **What you see:** 702px shows the first ledger row whole and most of the second. Previously it showed one row plus
+  a sliver.
+- **Limitation, stated honestly:** two *full* ~360–400px ledger rows plus the dialog chrome cannot fit in 900px at any
+  cap. The review's alternative (full ledger only on the active and evaluated rows) is **not** taken.
+- **Test:** `InviteExpertDialog.test.tsx` (U3) asserts the class.
+
+**Gates:**
+- `npx tsc -p tsconfig.app.json --noEmit`: **70 errors** (unchanged, none in touched files).
+- Targeted suites: 15 files / 236 tests passed.
+- `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`:
+  ```
+  total 8978  ·  failed 0  ·  pinned total 8230
+  count gate OK — 337/337 pinned files present, no per-file decrease, 0 failing.
+  ```
+- Pins: `expertThemeContrast.test.tsx` was adopted into both knobs at 6. InviteExpertDialog went 22→23, and
+  ChatArea.expertThread 16→18.
+- The five unrelated `— N new` suites (`PromptVariableChips`, `RunHero`, `automationFacts`, `nodeEffectBanner`,
+  `toolReadOnlyMap`) are not this fix's, and are left unpinned.
