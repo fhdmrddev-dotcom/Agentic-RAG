@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
-status: executed_verification_next
+status: verified_human_needed
 last_updated: 2026-09-26T00:00:00.000Z
-last_activity: 2026-09-26 -- Phase 267 executed (5/5 plans); verification next
+last_activity: 2026-09-26 -- Phase 267 verified (human_needed); code review 2 CR + 9 WR fixed
 progress:
   total_phases: 12
   completed_phases: 1
@@ -43,7 +43,19 @@ can be taught new behaviours (skills) that persist and can be shared.
 Milestone: v4.4 Experts That Actually Work
 Phase: 267 (An Expert Adds Scope, PACK-21..25)
 Plan: 5 plans / 4 waves, checker PASSED (01 → 02 ∥ 03 → 04 → 05)
-Status: **Phase 267 executed — verification next** (5/5 plans, 2026-09-26). Live UAT: `267-UAT-LOG.md` (SC#1-SC#5 PASS, SC#10 board 8/8 PASS, 4 axes PASS, G-4 ×3 PASS driven by the orchestrator in Chrome, operator confirmation OWED)
+Status: **Phase 267 VERIFIED: `human_needed`** (2026-09-26). 8/8 truths are verified, nothing failed. Live UAT is in `267-UAT-LOG.md`:
+- SC#1-SC#5 PASS
+- SC#10 board 8/8 PASS
+- G-4 ×3 PASS, driven in Chrome by the orchestrator
+- after the code-review fixes, CR-01 and WR-03 were re-driven live and PASS
+
+Code review (`267-REVIEW.md`): 2 critical + 9 warnings, all FIXED test-first. 6 info items deferred with reasons.
+
+OWED, run these first:
+1. The independent review by an agent that did NOT build 267 (AGENTS.md §6.3).
+2. Operator sign-off on the G-4 Chrome rows (screenshots: `evidence/g4-*.png`).
+3. F-4: the handoff 502 did not reproduce.
+4. Ledger triples: re-derive them for the files the review fixes touched after the 267-05 register commit (ExpertSpotlightCard.tsx, useThreads.ts, ChatArea.tsx, InviteExpertDialog.tsx, api/threads.py, expert_service.py, agent_loop.py, among others).
 G-2 honoured: sketch 267 Variant B "Will / won't ledger", picked by the operator (D-267-27). G-4 scenarios locked (D-267-28)
 Operator rulings at research: D-267-29..35. The rulings are: a server union of the Expert's connections; the picker stores `service_id`; a fail-closed binding gate; skills add; the handoff inherits the folder; `org_id` is set explicitly; the biased narrowing on a no-folder thread is kept and stated
 Baselines at `92b5476be`:
@@ -52,7 +64,7 @@ Baselines at `92b5476be`:
 - vitest gate: 8828 total · 3 failed (inherited) · 8075 pinned
 Still owed from 266: UI-2 and UI-4 (not-installed, non-manager) live checks; `independent_review`; the prod parity checklist `266-PROD-PARITY.md`
 Resume file: .planning/phases/267-an-expert-adds-scope/267-05-SUMMARY.md
-Last activity: 2026-09-26 -- Phase 267 executed; registers updated; verification next
+Last activity: 2026-09-26 -- Phase 267 verified human_needed; review fixes applied; live re-checks CR-01/WR-03 PASS
 
 ---
 
