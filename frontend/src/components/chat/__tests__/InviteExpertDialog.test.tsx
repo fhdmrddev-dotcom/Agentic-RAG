@@ -444,3 +444,20 @@ describe("IN-02 — the Active pill does nothing", () => {
     expect(within(row("financial-analyzer")).queryByRole("button", { name: /active/i })).toBeNull()
   })
 })
+
+// 267-UI-REVIEW top fix #3 — the list viewport was the pre-ledger `max-h-[380px]`; a restricted row
+// with its Will use / Won't use ledger is ~360px, so the dialog showed ONE Expert and the R7
+// Replace / New chat decision sat below the fold. The cap is now viewport-relative.
+describe("UI-REVIEW #3 — the list viewport is sized for ledger rows", () => {
+  it("(U3) the scrolling list is capped relative to the viewport, never at the pre-ledger 380px", async () => {
+    await open({ currentExpertId: FA.id, currentExpertName: "Financial Analyzer", hasMessages: true })
+    const list = screen.getByTestId("invite-expert-list")
+    const cls = list.className.split(/\s+/)
+    expect(cls).toContain("overflow-y-auto")
+    expect(cls).not.toContain("max-h-[380px]")
+    expect(cls).toContain("max-h-[min(78vh,720px)]")
+    // Both rows are inside the one scrolling list.
+    expect(within(list).getByTestId("expert-card-financial-analyzer")).toBeTruthy()
+    expect(within(list).getByTestId("expert-card-contract-reviewer")).toBeTruthy()
+  })
+})

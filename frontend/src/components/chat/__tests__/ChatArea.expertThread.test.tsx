@@ -535,3 +535,35 @@ describe("(F) WR-07 — a brand-new chat's picked folder reaches the restricted 
     expect(h.getExpertScopePreview).toHaveBeenCalledWith(HR.id, null, "f-acme")
   })
 })
+
+// 267-UI-REVIEW top fix #2 (UI-SPEC §9-D6) — after a mid-thread swap the transcript announced the
+// change TWICE: the persisted ExpertEventCard (the PACK-23 record) and, below it, the larger
+// transient spotlight. The event card owns every change on a thread that already has messages; the
+// spotlight stays for EMPTY threads (D-267-12, case E11 above), where no event is written.
+describe("(G) UI-REVIEW #2 — one announcement per mid-thread change", () => {
+  it("(13) a successful swap on a thread with messages mounts NO transient spotlight", async () => {
+    h.messages = TALK
+    const user = userEvent.setup()
+    render(
+      shell(<ChatArea thread={{ ...THREAD, active_expert_id: FA.id } as Thread} onCreateThread={vi.fn()} folders={[]} />),
+    )
+    await screen.findByTestId("active-expert-chip")
+    await openInvite(user)
+    await user.click(await screen.findByTestId("expert-replace-btn-contract-reviewer"))
+    await waitFor(() => expect(h.setThreadActiveExpert).toHaveBeenCalledWith(THREAD.id, CR.id))
+    await waitFor(() => expect(h.loadMessages).toHaveBeenCalledWith(THREAD.id))
+    await waitFor(() =>
+      expect(screen.getByTestId("active-expert-chip").textContent).toContain("Contract Reviewer"),
+    )
+    expect(screen.queryByTestId("expert-spotlight-card")).toBeNull()
+  })
+
+  it("(14) control: an invite on an EMPTY thread still shows the spotlight (D-267-12)", async () => {
+    const user = userEvent.setup()
+    render(shell(<ChatArea thread={THREAD} onCreateThread={vi.fn()} folders={[]} />))
+    await openInvite(user)
+    await user.click(await screen.findByTestId("invite-expert-btn-contract-reviewer"))
+    await waitFor(() => expect(h.setThreadActiveExpert).toHaveBeenCalledWith(THREAD.id, CR.id))
+    expect(await screen.findByTestId("expert-spotlight-card")).toBeVisible()
+  })
+})
