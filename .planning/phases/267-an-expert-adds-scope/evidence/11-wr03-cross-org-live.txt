@@ -1,0 +1,10 @@
+X-Org-Id=C (entitled, != thread org A) handoff -> 404 {"detail":"Expert bundle not found or access denied"}
+X-Org-Id=C (entitled, != thread org A) PATCH -> 404 {"detail":"Expert bundle not found or access denied"}
+thread after: [{'org_id': UUID('e8c567c2-6f75-4c8b-94cf-92768831c035'), 'active_expert_id': UUID('f1a6638e-5557-40d2-b7ef-5e25f6a99caa')}]
+threads count before/after: 3 3
+org C tier restored: [{'subscription_tier': None}]
+FA, X-Org-Id=C != thread org A: handoff -> 409 {"detail":"Switch to this chat's organization to hand it off."}
+FA, X-Org-Id=C != thread org A: PATCH -> 409 {"detail":"Switch to this chat's organization to invite an Expert."}
+thread after: [{'org_id': UUID('e8c567c2-6f75-4c8b-94cf-92768831c035'), 'active_expert_id': UUID('f1a6638e-5557-40d2-b7ef-5e25f6a99caa')}]
+threads count before/after: 3 3
+org C tier restored: [{'subscription_tier': None}]

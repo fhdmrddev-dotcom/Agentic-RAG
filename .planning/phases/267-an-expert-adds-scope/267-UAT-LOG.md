@@ -337,3 +337,12 @@ restricted → restricted swap.
 | HR Advisor | `f1a6638e-5557-40d2-b7ef-5e25f6a99caa` (restricted → HR Policies) |
 | Contract Reviewer | `9bcbffda-c074-4108-b748-ba7cf15a40e9` |
 | Requires-Google Expert | **Drive Briefing Assistant** `49e272b9-62fa-4f90-86dc-bf56737a32bf` (revoked "Google Workspace" row `8e76de62-…`) |
+
+## Post-review live re-checks (orchestrator, 2026-09-26, after the 267-REVIEW fixes)
+
+| Row | Verdict | Evidence |
+|---|---|---|
+| CR-01-live: chip after swap + thread switch | PASS | Replace HR Advisor → Contract Reviewer in "Client ACME review"; opened "Q3 board prep" (chip read Financial Analyzer); returned → chip still read **Contract Reviewer**, one "HR Advisor → Contract Reviewer" card. `evidence/g4-05-cr01-chip-after-thread-switch.png` |
+| WR-03-live: cross-org handoff/PATCH refused | PASS | U2 (member of A, personal org C). Org C temporarily set `enterprise` in the LOCAL DB for this check and restored to NULL in a `finally` (quoted). With `X-Org-Id=C` on org-A thread `330b3a4c…`: Financial Analyzer handoff → **409** "Switch to this chat's organization to hand it off."; PATCH → **409** "…to invite an Expert."; thread unchanged; thread count 3 → 3. With an org-A-only Expert the same calls → 404 (not visible from C), also no write. `evidence/11-wr03-cross-org-live.txt` |
+| WR-06-live | NOT DRIVEN | No biased Expert with its own folders exists in org A (Contract Reviewer and Drive Briefing Assistant have none, so nothing narrows and correctly no statement is shown). Verified by tests only. |
+| CR-02, WR-04, WR-05, WR-07, WR-08, WR-09, WR-01, WR-02 | TEST-ONLY | Fixed after the live drive; none of SC#1-5 depends on them (per 267-VERIFICATION.md). |
