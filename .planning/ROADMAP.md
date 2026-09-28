@@ -187,7 +187,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 268-03-PLAN.md — PATCH folder_id/clear_folder + authorized folder + scope_changed event in one txn; ScopeEffect route; search.query audit run_id; composer ScopeChip + ScopePicker (Save & say) + scope card; one PATCH home in ChatArea
+- [x] 268-03-PLAN.md — PATCH folder_id/clear_folder + authorized folder + scope_changed event in one txn; ScopeEffect route; search.query audit run_id; composer ScopeChip + ScopePicker (Save & say) + scope card; one PATCH home in ChatArea
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
