@@ -154,6 +154,19 @@ Not in scope: metering the handoff-summary LLM call (D-268-08, disclosed instead
     empty (Pitfall 11).
   - `backend/app/db/runs.py` gets its missing hot-file ledger row in the same commit as its first edit.
 
+### Live-proof ruling (operator, 2026-09-29, after 268-04 Task 3)
+- **D-268-26 (SEED-319, PARTLY REVERSES D-268-12's "never reaches the model"):** 268-04's live board found 6 of 8
+  providers answering the post-change follow-up from pre-change search results in history, and citing the dropped
+  folder. Retrieval itself was correct (a forced fresh search read only the new scope on 8/8). **Fix in 268:**
+  `agent_loop._reconstruct_history` gives the model **one short provider-neutral note** at each `scope_changed`
+  point, e.g. *"Search scope changed from {from} to {to}. Earlier search results from {from} are out of scope;
+  search again before citing."* Rules:
+  - The note is attached to the **next user message's content** in history. It is never a mid-history
+    `system`-role message, which Anthropic and Gemini reject.
+  - The transcript card and the stored row are unchanged, and **`expert_changed` stays invisible to the model**.
+  - The note contains no Expert name; `agent_loop.py`'s AST fence forbids "expert" identifiers there.
+  - RED-first. The 8-row SC#10 board is then re-driven under the same pass bar.
+
 ### Claude's Discretion
 - Exact component names (`ScopeChip`, `ScopeEventCard`), copy strings (ported from the sketch and fenced), and the
   exact SQL shape of the recursive roll-up. It must reuse `cost_usd_sql()`.
