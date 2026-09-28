@@ -1,0 +1,236 @@
+{
+ "provider": "google",
+ "model": "gemini-3.5-flash",
+ "create": {
+  "status": 201,
+  "id": "acbe21b7-7183-4083-ac89-0f77a93e63b4",
+  "org_id": null
+ },
+ "t1": {
+  "sent_at": "2026-09-28 19:39:38.326073+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "dd934f66-ed9c-4b42-958c-b8bfa3fb4088",
+   "run_id": "a55e5d91-7228-474a-88fc-b61288056307",
+   "model": "gemini-3.5-flash",
+   "provider": "google"
+  },
+  "run": {
+   "run_id": "a55e5d91-7228-474a-88fc-b61288056307",
+   "status": "completed",
+   "model": "gemini-3.5-flash",
+   "provider": "google",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 106724,
+   "output_tokens": 808,
+   "started_at": "2026-09-28 19:39:41.058567+00:00",
+   "completed_at": "2026-09-28 19:40:32.857319+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "4194f801-7de9-425b-82fa-256527302a25",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:40:03.764247+00:00",
+    "run_id": "a55e5d91-7228-474a-88fc-b61288056307",
+    "thread_id": "acbe21b7-7183-4083-ac89-0f77a93e63b4",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 2
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "a55e5d91-7228-474a-88fc-b61288056307",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   },
+   {
+    "run_id": "a55e5d91-7228-474a-88fc-b61288056307",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "1417fc12-a581-4068-adcc-ddbc1e3a848a",
+    "folder_id": "1a2d0273-b14d-487f-86ee-4d146e89d082"
+   }
+  ],
+  "tools": [
+   "query_documents",
+   "query_documents",
+   "query_documents",
+   "write_todos",
+   "search_documents",
+   "write_todos",
+   "workspace_write",
+   "write_todos"
+  ]
+ },
+ "patch": {
+  "status": 200,
+  "at": "2026-09-28 19:40:35.876194+00:00",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "event": [
+  {
+   "id": "f74a5c77-ae5d-4a0f-a372-16114fbc0a0d",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+   "created_at": "2026-09-28 19:40:41.092987+00:00"
+  }
+ ],
+ "thread_org": {
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "t2": {
+  "sent_at": "2026-09-28 19:41:10.965492+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "2a00a987-f7d0-467b-9f19-484a65c92e6f",
+   "run_id": "37fc4680-7314-42b4-9dcf-76e9cd79822d",
+   "model": "gemini-3.5-flash",
+   "provider": "google"
+  },
+  "run": {
+   "run_id": "37fc4680-7314-42b4-9dcf-76e9cd79822d",
+   "status": "completed",
+   "model": "gemini-3.5-flash",
+   "provider": "google",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 28288,
+   "output_tokens": 193,
+   "started_at": "2026-09-28 19:41:15.517594+00:00",
+   "completed_at": "2026-09-28 19:41:33.152801+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": [
+   "workspace_write"
+  ]
+ },
+ "t2_first_attempt": {
+  "sent_at": "2026-09-28 19:40:41.159634+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "a63c3db9-f150-4d15-85d4-066af6d3c84c",
+   "run_id": "f62fbc51-87ad-4d45-a38d-5b7ffe58a14e",
+   "model": "gemini-3.5-flash",
+   "provider": "google"
+  },
+  "run": {
+   "run_id": "f62fbc51-87ad-4d45-a38d-5b7ffe58a14e",
+   "status": "completed",
+   "model": "gemini-3.5-flash",
+   "provider": "google",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 41088,
+   "output_tokens": 273,
+   "started_at": "2026-09-28 19:40:43.492459+00:00",
+   "completed_at": "2026-09-28 19:41:07.867078+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": [
+   "query_documents",
+   "workspace_read"
+  ]
+ },
+ "retry": true,
+ "v1": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 2,
+  "folders": [
+   "1a2d0273-b14d-487f-86ee-4d146e89d082",
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "v2": {
+  "searched": false,
+  "scope_ok": false,
+  "docs_ok": true,
+  "n_docs": 0,
+  "folders": []
+ },
+ "t3_variant": {
+  "sent_at": "2026-09-28 19:41:33.835531+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "cfb63848-8bf7-48d6-bbf7-a1ffd64c2e49",
+   "run_id": "531c8244-f557-409a-97c9-74b67e0708dd",
+   "model": "gemini-3.5-flash",
+   "provider": "google"
+  },
+  "run": {
+   "run_id": "531c8244-f557-409a-97c9-74b67e0708dd",
+   "status": "completed",
+   "model": "gemini-3.5-flash",
+   "provider": "google",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 29858,
+   "output_tokens": 128,
+   "started_at": "2026-09-28 19:41:36.148565+00:00",
+   "completed_at": "2026-09-28 19:41:51.569710+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "ececc50a-afd8-4486-9a2c-423cc4b37b69",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:41:41.109937+00:00",
+    "run_id": "531c8244-f557-409a-97c9-74b67e0708dd",
+    "thread_id": "acbe21b7-7183-4083-ac89-0f77a93e63b4",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 1
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "531c8244-f557-409a-97c9-74b67e0708dd",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   }
+  ],
+  "tools": [
+   "search_documents"
+  ]
+ },
+ "v3": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 1,
+  "folders": [
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ }
+}

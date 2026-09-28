@@ -1,0 +1,156 @@
+{
+ "openai": [
+  [
+   "t2_first_attempt",
+   "ef5dcc62",
+   "new-only",
+   "Saved the one-line payment terms note to `terms.md`.  Source: **ACME_Q3_SOW_Contract.md** \u2014 Payment terms."
+  ],
+  [
+   "t2",
+   "52b0e276",
+   "new-only",
+   "Saved the one-line note to `terms.md`.  Source: **ACME_Q3_SOW_Contract.md** \u2014 Payment terms."
+  ],
+  [
+   "t3_variant",
+   "c6a9abf7",
+   "new-only",
+   "The new search found:  - **NET 15 days** from the invoice date \u2014 **ACME_Q3_SOW_Contract.md**.[1] - **2% early-payment discount** if payment is made within **5 d"
+  ]
+ ],
+ "anthropic": [
+  [
+   "t2_first_attempt",
+   "2a1c50a0",
+   "CITES-OLD",
+   "I already completed this \u2014 I searched your documents and found two ACME contracts with payment terms:  - **ACME_MSA_2026.md** \u2014 NET 60 days from invoice date - "
+  ],
+  [
+   "t2",
+   "e29cb3e9",
+   "CITES-OLD",
+   "It looks like this request has already been completed twice \u2014 here's a recap so you have it in one place:  **Search results:** - **ACME_MSA_2026.md** \u2014 Payment "
+  ],
+  [
+   "t3_variant",
+   "9634761f",
+   "CITES-OLD",
+   "This new search (scoped to the current folder, `/Client ACME/Q3 Contracts`) returned only one match:  - **ACME_Q3_SOW_Contract.md** \u2014 Payment terms: NET 15 days"
+  ]
+ ],
+ "google": [
+  [
+   "t2_first_attempt",
+   "f62fbc51",
+   "CITES-OLD",
+   "I have verified that the file `terms.md` is successfully saved in your workspace with the correct information.   ### Payment Terms Found: * **ACME Master Servic"
+  ],
+  [
+   "t2",
+   "37fc4680",
+   "CITES-OLD",
+   "I have successfully saved the one-line note to `terms.md` with the following content:  ```text ACME_MSA_2026.md: NET 60 days; ACME_Q3_SOW_Contract.md: NET 15 da"
+  ],
+  [
+   "t3_variant",
+   "531c8244",
+   "CITES-OLD",
+   "Based on the new search within your updated folder scope, only one contract was returned:  ### **ACME_Q3_SOW_Contract.md** [1] * **Payment Terms**: **NET 15 day"
+  ]
+ ],
+ "deepseek": [
+  [
+   "t2_first_attempt",
+   "6bfcf1a0",
+   "CITES-OLD",
+   "Saved the one-line note to `terms.md`:  > Payment terms: **ACME_MSA_2026.md** (NET 60 days); **ACME_Q3_SOW_Contract.md** (NET 15 days, USD 184,000).  Source: **"
+  ],
+  [
+   "t2",
+   "9a0e6c5f",
+   "CITES-OLD",
+   "Done \u2014 saved the one-line note to `terms.md`:  > Payment terms: **ACME_MSA_2026.md** (NET 60 days); **ACME_Q3_SOW_Contract.md** (NET 15 days, USD 184,000)."
+  ],
+  [
+   "t3_variant",
+   "2b405f42",
+   "CITES-OLD",
+   "The fresh search (under the new folder scope) returned **one** document:  **ACME_Q3_SOW_Contract.md** \u2014 NET 15 days from invoice date, 2% early-payment discount"
+  ]
+ ],
+ "zhipu": [
+  [
+   "t2_first_attempt",
+   "49bf4984",
+   "CITES-OLD",
+   "`terms.md` is already saved and current. Here's what it contains:  - **ACME_MSA_2026.md** \u2014 NET 60 days from invoice date (1.0%/month late interest; applies unl"
+  ],
+  [
+   "t2",
+   "c8b29742",
+   "CITES-OLD",
+   "`terms.md` already exists with the correct content from the search earlier in this conversation. No changes needed:  - **ACME_MSA_2026.md** \u2014 NET 60 days from i"
+  ],
+  [
+   "t3_variant",
+   "a1bed585",
+   "CITES-OLD",
+   "Fresh search complete. With the updated folder scope (`/Client ACME/Q3 Contracts`), only **one** document is now in scope \u2014 the MSA that previously appeared is "
+  ]
+ ],
+ "minimax": [
+  [
+   "t2_first_attempt",
+   "1e6fc54e",
+   "CITES-OLD",
+   "  The file `/terms.md` was already saved in our previous turn and still contains the note. Here's the current content:  ``` Payment terms: NET 60 days from invo"
+  ],
+  [
+   "t2",
+   "733b6f9d",
+   "CITES-OLD",
+   "  The file `/terms.md` already exists with the note saved from earlier in this conversation. Current contents:  > Payment terms: NET 60 days from invoice date ("
+  ],
+  [
+   "t3_variant",
+   "b0399874",
+   "CITES-OLD",
+   "  Done \u2014 fresh search. With your current folder scope, only **one** ACME contract is visible:  | Figure | Document | |---|---| | **NET 15 days** from invoice da"
+  ]
+ ],
+ "moonshot": [
+  [
+   "t2",
+   "bdac861f",
+   "new-only",
+   "Done. I found the payment terms in **ACME_Q3_SOW_Contract.md** and saved the following one-line note to `/terms.md`:  > ACME_Q3_SOW_Contract.md \u2014 NET 15 days fr"
+  ],
+  [
+   "t3_variant",
+   "77299a55",
+   "new-only",
+   "Here are the payment terms found in the current folder scope:  - **ACME_Q3_SOW_Contract.md** \u2014 NET 15 days from invoice date, with a 2% early-payment discount i"
+  ]
+ ],
+ "openrouter": [
+  [
+   "t2_first_attempt",
+   "199640da",
+   "CITES-OLD",
+   "I already completed this. The file `terms.md` exists in your workspace with the one-line note:  > **ACME_MSA_2026.md:** NET 60 days (1.0% monthly interest on la"
+  ],
+  [
+   "t2",
+   "10ed8c6a",
+   "CITES-OLD",
+   "The task is already done. Your `terms.md` file is saved in the workspace and contains:  > **ACME_MSA_2026.md:** NET 60 days (1.0% monthly interest on late payme"
+  ],
+  [
+   "t3_variant",
+   "cc8017f1",
+   "CITES-OLD",
+   "Here are the results from the fresh search:  - **ACME_Q3_SOW_Contract.md** \u2014 NET 15 days from invoice date, with a 2% early-payment discount if paid within 5 da"
+  ]
+ ]
+}

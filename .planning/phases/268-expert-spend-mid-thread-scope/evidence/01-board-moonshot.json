@@ -1,0 +1,225 @@
+{
+ "provider": "moonshot",
+ "model": "kimi-k2.6",
+ "create": {
+  "status": 201,
+  "id": "fbe5fea8-1550-4b0a-b29f-5d7906912012",
+  "org_id": null
+ },
+ "t1": {
+  "sent_at": "2026-09-28 19:42:55.309212+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "5d1dd5b5-5f7c-42fc-95e8-44b21ca76a15",
+   "run_id": "8c677a82-89f8-4a71-bd3c-12ab70c2b280",
+   "model": "kimi-k2.6",
+   "provider": "moonshot"
+  },
+  "run": {
+   "run_id": "8c677a82-89f8-4a71-bd3c-12ab70c2b280",
+   "status": "completed",
+   "model": "kimi-k2.6",
+   "provider": "moonshot",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 42897,
+   "output_tokens": 981,
+   "started_at": "2026-09-28 19:42:57.643786+00:00",
+   "completed_at": "2026-09-28 19:43:57.659039+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "b7ca8abf-30f9-48f8-a11b-af3261acd06c",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:43:06.365901+00:00",
+    "run_id": "8c677a82-89f8-4a71-bd3c-12ab70c2b280",
+    "thread_id": "fbe5fea8-1550-4b0a-b29f-5d7906912012",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 2
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "8c677a82-89f8-4a71-bd3c-12ab70c2b280",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   },
+   {
+    "run_id": "8c677a82-89f8-4a71-bd3c-12ab70c2b280",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "1417fc12-a581-4068-adcc-ddbc1e3a848a",
+    "folder_id": "1a2d0273-b14d-487f-86ee-4d146e89d082"
+   }
+  ],
+  "tools": [
+   "ls",
+   "search_documents",
+   "grep",
+   "ls",
+   "workspace_write"
+  ]
+ },
+ "patch": {
+  "status": 200,
+  "at": "2026-09-28 19:43:58.672380+00:00",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "event": [
+  {
+   "id": "edee3eda-b5a9-45ce-bd7e-46af921e2fbb",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+   "created_at": "2026-09-28 19:44:01.029080+00:00"
+  }
+ ],
+ "thread_org": {
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "t2": {
+  "sent_at": "2026-09-28 19:44:01.142786+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "7a2f342f-c2a2-4fb0-bdb6-0da60da31a01",
+   "run_id": "bdac861f-1258-4b9c-b51b-861445535aad",
+   "model": "kimi-k2.6",
+   "provider": "moonshot"
+  },
+  "run": {
+   "run_id": "bdac861f-1258-4b9c-b51b-861445535aad",
+   "status": "completed",
+   "model": "kimi-k2.6",
+   "provider": "moonshot",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 33652,
+   "output_tokens": 327,
+   "started_at": "2026-09-28 19:44:07.936784+00:00",
+   "completed_at": "2026-09-28 19:44:55.513946+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "8b3bd22d-6c49-429d-b558-960086bcf792",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:44:17.047982+00:00",
+    "run_id": "bdac861f-1258-4b9c-b51b-861445535aad",
+    "thread_id": "fbe5fea8-1550-4b0a-b29f-5d7906912012",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 1
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "bdac861f-1258-4b9c-b51b-861445535aad",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   }
+  ],
+  "tools": [
+   "search_documents",
+   "workspace_write"
+  ]
+ },
+ "v1": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 2,
+  "folders": [
+   "1a2d0273-b14d-487f-86ee-4d146e89d082",
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "v2": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 1,
+  "folders": [
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "t3_variant": {
+  "sent_at": "2026-09-28 19:44:56.658665+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "bf52333b-49e5-476e-9c2a-49ff21eac24e",
+   "run_id": "77299a55-0242-4cd7-a856-05025265f91b",
+   "model": "kimi-k2.6",
+   "provider": "moonshot"
+  },
+  "run": {
+   "run_id": "77299a55-0242-4cd7-a856-05025265f91b",
+   "status": "completed",
+   "model": "kimi-k2.6",
+   "provider": "moonshot",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 23402,
+   "output_tokens": 276,
+   "started_at": "2026-09-28 19:44:58.957250+00:00",
+   "completed_at": "2026-09-28 19:45:53.777258+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "78d1e6b5-70fa-4d18-a189-42830b243016",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:45:03.991117+00:00",
+    "run_id": "77299a55-0242-4cd7-a856-05025265f91b",
+    "thread_id": "fbe5fea8-1550-4b0a-b29f-5d7906912012",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 1
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "77299a55-0242-4cd7-a856-05025265f91b",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   }
+  ],
+  "tools": [
+   "search_documents"
+  ]
+ },
+ "v3": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 1,
+  "folders": [
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ }
+}

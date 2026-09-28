@@ -1,0 +1,233 @@
+{
+ "provider": "zhipu",
+ "model": "glm-5.2",
+ "create": {
+  "status": 201,
+  "id": "be9afa39-12cf-4f49-872d-7dd1a436d3fb",
+  "org_id": null
+ },
+ "t1": {
+  "sent_at": "2026-09-28 19:40:05.732811+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "8ee63628-eba7-44e3-913b-0ad7ae6711ce",
+   "run_id": "f9c4d9c7-ea5b-41e5-9475-51a785ece964",
+   "model": "glm-5.2",
+   "provider": "zhipu"
+  },
+  "run": {
+   "run_id": "f9c4d9c7-ea5b-41e5-9475-51a785ece964",
+   "status": "completed",
+   "model": "glm-5.2",
+   "provider": "zhipu",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 47107,
+   "output_tokens": 1721,
+   "started_at": "2026-09-28 19:40:08.024832+00:00",
+   "completed_at": "2026-09-28 19:40:59.580029+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "1d1b8655-5493-430b-83f4-f22e7a483e84",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:40:15.853269+00:00",
+    "run_id": "f9c4d9c7-ea5b-41e5-9475-51a785ece964",
+    "thread_id": "be9afa39-12cf-4f49-872d-7dd1a436d3fb",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 2
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "f9c4d9c7-ea5b-41e5-9475-51a785ece964",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   },
+   {
+    "run_id": "f9c4d9c7-ea5b-41e5-9475-51a785ece964",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "1417fc12-a581-4068-adcc-ddbc1e3a848a",
+    "folder_id": "1a2d0273-b14d-487f-86ee-4d146e89d082"
+   }
+  ],
+  "tools": [
+   "write_todos",
+   "search_documents",
+   "ls",
+   "write_todos",
+   "workspace_write",
+   "write_todos"
+  ]
+ },
+ "patch": {
+  "status": 200,
+  "at": "2026-09-28 19:40:59.799547+00:00",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "event": [
+  {
+   "id": "c26b70d0-9db1-41c9-a290-fe2e52d00b28",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+   "created_at": "2026-09-28 19:41:02.367118+00:00"
+  }
+ ],
+ "thread_org": {
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "t2": {
+  "sent_at": "2026-09-28 19:41:50.401107+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "08b67d0d-2218-4d1f-9394-f08e88ece1f2",
+   "run_id": "c8b29742-0b06-4c08-83ba-541106ad9c72",
+   "model": "glm-5.2",
+   "provider": "zhipu"
+  },
+  "run": {
+   "run_id": "c8b29742-0b06-4c08-83ba-541106ad9c72",
+   "status": "completed",
+   "model": "glm-5.2",
+   "provider": "zhipu",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 24012,
+   "output_tokens": 363,
+   "started_at": "2026-09-28 19:41:52.740318+00:00",
+   "completed_at": "2026-09-28 19:42:19.607348+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": [
+   "workspace_read"
+  ]
+ },
+ "t2_first_attempt": {
+  "sent_at": "2026-09-28 19:41:02.435990+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "b388a538-ddad-4c1d-a92d-db9e7e36f965",
+   "run_id": "49bf4984-ef52-494d-a80d-fddd877b5b66",
+   "model": "glm-5.2",
+   "provider": "zhipu"
+  },
+  "run": {
+   "run_id": "49bf4984-ef52-494d-a80d-fddd877b5b66",
+   "status": "completed",
+   "model": "glm-5.2",
+   "provider": "zhipu",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 23647,
+   "output_tokens": 577,
+   "started_at": "2026-09-28 19:41:04.732564+00:00",
+   "completed_at": "2026-09-28 19:41:47.727935+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": [
+   "workspace_read"
+  ]
+ },
+ "retry": true,
+ "v1": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 2,
+  "folders": [
+   "1a2d0273-b14d-487f-86ee-4d146e89d082",
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "v2": {
+  "searched": false,
+  "scope_ok": false,
+  "docs_ok": true,
+  "n_docs": 0,
+  "folders": []
+ },
+ "t3_variant": {
+  "sent_at": "2026-09-28 19:42:20.169315+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "6aa1e77b-4a64-4cce-8e61-168bc049ba31",
+   "run_id": "a1bed585-b755-4185-8721-4d36cbb0d761",
+   "model": "glm-5.2",
+   "provider": "zhipu"
+  },
+  "run": {
+   "run_id": "a1bed585-b755-4185-8721-4d36cbb0d761",
+   "status": "completed",
+   "model": "glm-5.2",
+   "provider": "zhipu",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 25003,
+   "output_tokens": 371,
+   "started_at": "2026-09-28 19:42:22.532696+00:00",
+   "completed_at": "2026-09-28 19:42:51.200227+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "885c4dd3-e3b6-4658-bb0f-f2bc7837f373",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:42:30.365222+00:00",
+    "run_id": "a1bed585-b755-4185-8721-4d36cbb0d761",
+    "thread_id": "be9afa39-12cf-4f49-872d-7dd1a436d3fb",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 1
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "a1bed585-b755-4185-8721-4d36cbb0d761",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   }
+  ],
+  "tools": [
+   "search_documents"
+  ]
+ },
+ "v3": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 1,
+  "folders": [
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ }
+}
