@@ -1,5 +1,7 @@
 import React from "react"
 import { AlertTriangle, ShieldCheck, BookOpen, Layers, Gauge } from "lucide-react"
+import { AttributionDisclosures } from "./AttributionDisclosures"
+import { EXPERT_SPEND_COPY } from "./expertSpendCopy"
 
 interface BlindSpotsCardProps {
   unratedRunsCount: number
@@ -15,6 +17,12 @@ interface BlindSpotsCardProps {
   incompleteCoverageCount: number
   /** A rate EXISTS - the same meaning as the ledger's is_rated. priced = rated - unmeasured. */
   ratedRunsCount: number
+  /**
+   * Phase 268 (D-268-25): sub-agent rows with NO rate under a root that HAS one. The root counts
+   * as rated (CR-06's counters keep their root meaning), so without this the unrated disclosure
+   * would under-state what the total leaves out. Optional: absent reads as 0.
+   */
+  unpricedSubagents?: number
   onFilterUnrated: () => void
   onFilterIncompleteCoverage: () => void
   onOpenRateRegistry: () => void
@@ -51,6 +59,7 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
   unmeasuredRunsCount,
   incompleteCoverageCount,
   ratedRunsCount,
+  unpricedSubagents = 0,
   onFilterUnrated,
   onFilterIncompleteCoverage,
   onOpenRateRegistry,
@@ -146,8 +155,8 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
         </div>
       </div>
 
-      {/* Disclosures Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 pt-4">
+      {/* Disclosures Grid — Phase 268: six tiles, three to a row (UI-SPEC §5.8). */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pt-4">
         {/* 1. Unrated Models */}
         <div className="rounded-lg bg-card/60 p-3 border border-border/50 flex flex-col justify-between gap-3">
           <div>
@@ -161,6 +170,11 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
             <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
               Models without a registered rate in <code className="text-foreground">model_rates</code> are excluded from org dollar totals rather than falsely priced at $0.00.
             </p>
+            {unpricedSubagents > 0 && (
+              <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed" data-testid="unpriced-subagents-note">
+                {EXPERT_SPEND_COPY.unpricedSubagents(unpricedSubagents)}
+              </p>
+            )}
           </div>
           {unratedRunsCount > 0 ? (
             <button
@@ -262,6 +276,9 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
             Open Rate Registry (Migration 183) →
           </button>
         </div>
+
+        {/* 5 + 6. Attribution (Phase 268) — a fenced, light-safe leaf. */}
+        <AttributionDisclosures />
       </div>
     </div>
   )
