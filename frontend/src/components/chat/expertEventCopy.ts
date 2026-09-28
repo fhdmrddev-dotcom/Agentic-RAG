@@ -26,6 +26,9 @@ import type {
   ExpertChangedEvent,
   ExpertHandoffEvent,
   HandoffMarker,
+  ScopeChangedEvent,
+  ScopeFolderRef,
+  ScopeTranscriptLine,
   TranscriptScopeLine,
 } from "@/lib/api/threads"
 import { UNNAMEABLE_FOLDER } from "@/components/experts/catalog/ExpertDetailModal"
@@ -35,9 +38,10 @@ import { LEDGER_COPY } from "@/components/experts/catalog/expertCatalog"
 export const TRANSCRIPT_EVENT_KINDS: ReadonlySet<string> = new Set([
   "expert_changed",
   "expert_handoff",
+  "scope_changed",
 ])
 
-export type TranscriptEvent = ExpertChangedEvent | ExpertHandoffEvent
+export type TranscriptEvent = ExpertChangedEvent | ExpertHandoffEvent | ScopeChangedEvent
 
 /** How many excluded file names the event sub-line lists before `and {k} more`. */
 const EXCLUDED_VISIBLE = 5
@@ -116,18 +120,21 @@ function folderLabel(name: string | null): string {
   return typeof name === "string" && name.trim() ? name : UNNAMEABLE_FOLDER
 }
 
-function scopeLine(line: TranscriptScopeLine): ScopeLineModel {
+function scopeLine(
+  line: TranscriptScopeLine | ScopeTranscriptLine,
+  allLabel: string = EVENT_COPY.allDocuments,
+): ScopeLineModel {
   const items: string[] = []
   for (const f of line.folders ?? []) items.push(folderLabel(f.name))
   if (line.thread_folder) {
     const tf = line.thread_folder
-    items.push(
-      typeof tf.name === "string" && tf.name.trim()
-        ? EVENT_COPY.threadFolder(tf.name, tf.doc_count)
-        : UNNAMEABLE_FOLDER,
-    )
+    // 268: a scope ref carries its full path — `/{path} ({n})`; a 267 ref has none and renders
+    // `/{name} ({n})` exactly as before.
+    const path = "path" in tf && typeof tf.path === "string" && tf.path.trim() ? tf.path : null
+    const name = path ?? (typeof tf.name === "string" && tf.name.trim() ? tf.name : null)
+    items.push(name ? EVENT_COPY.threadFolder(name, tf.doc_count) : UNNAMEABLE_FOLDER)
   }
-  if (line.all_documents) items.push(EVENT_COPY.allDocuments)
+  if (line.all_documents) items.push(allLabel)
   const connections = [...(line.connections ?? [])]
   if (items.length === 0 && connections.length === 0) {
     return { items: [EVENT_COPY.nothing], connections: [], empty: true }
@@ -170,6 +177,71 @@ export function eventCardModel(event: ExpertChangedEvent): EventCardModel {
     now: scopeLine(event.now),
     dropped: scopeLine(event.dropped),
     excludedSubline: excludedSubline(event.excluded),
+  }
+}
+
+// ── Phase 268 (CHAT-08 · D-268-12 / UI-SPEC §5.5, §7.3) — the scope_changed card ────────────
+//
+// The same Shell, a third kind (the FORWARD SHAPE this module reserved). ⛔ The card reads `held`
+// from the SERVER's snapshot; it never inspects the Expert's mode to decide what was searched.
+
+export const SCOPE_EVENT_COPY = {
+  header: (from: string, to: string): string => `Scope ${from} → ${to}`,
+  keys: { now: "Now", dropped: "Dropped", saved: "Saved", searching: "Searching" },
+  allOtherDocuments: "All other documents",
+  heldSearching: (folders: string, expert: string): string => `${folders} only · ${expert} is Restricted`,
+  footerIdle: "From your next message.",
+  footerStreaming: (from: string): string => `From your next message. The answer in progress keeps ${from}.`,
+  footerHeld: (expert: string): string => `Takes effect when ${expert} leaves.`,
+  ariaLabel: (time: string): string => `Scope change at ${time}`,
+} as const
+
+/** A scope folder as the chip, picker and card name it: `/{path}`, `/{name}`, or the unnameable
+ *  phrase; `null` = no folder at all ("All your documents"). */
+export function scopeFolderLabel(ref: ScopeFolderRef | null | undefined): string {
+  if (!ref) return EVENT_COPY.allDocuments
+  const path = typeof ref.path === "string" && ref.path.trim() ? ref.path : null
+  const name = path ?? (typeof ref.name === "string" && ref.name.trim() ? ref.name : null)
+  return name ? `/${name}` : UNNAMEABLE_FOLDER
+}
+
+export interface ScopeEventModel {
+  kind: "scope_changed"
+  header: string
+  tone: "scope" | "held"
+  at: string
+  held: boolean
+  now: ScopeLineModel
+  dropped: ScopeLineModel
+  /** Held only: the folder that is saved but not searched. */
+  saved: string | null
+  /** Held only: `{folders} only · {Expert} is Restricted` (Chat attachments omitted — the picker shows it). */
+  searching: string | null
+  footer: string
+}
+
+export function scopeEventModel(event: ScopeChangedEvent): ScopeEventModel {
+  const from = scopeFolderLabel(event.from_folder)
+  const held = event.held === true && event.expert != null
+  const expert = event.expert?.name ?? ""
+  let footer: string
+  if (held) footer = SCOPE_EVENT_COPY.footerHeld(expert)
+  else if (event.during_run) footer = SCOPE_EVENT_COPY.footerStreaming(from)
+  else footer = SCOPE_EVENT_COPY.footerIdle
+  const folders = (event.now?.folders ?? []).map((f) => folderLabel(f.name))
+  return {
+    kind: "scope_changed",
+    header: SCOPE_EVENT_COPY.header(from, scopeFolderLabel(event.to_folder)),
+    tone: held ? "held" : "scope",
+    at: event.at,
+    held,
+    now: scopeLine(event.now),
+    dropped: scopeLine(event.dropped, SCOPE_EVENT_COPY.allOtherDocuments),
+    saved: held ? scopeFolderLabel(event.saved) : null,
+    searching: held
+      ? SCOPE_EVENT_COPY.heldSearching(folders.length ? folders.join(" · ") : EVENT_COPY.nothing, expert)
+      : null,
+    footer,
   }
 }
 

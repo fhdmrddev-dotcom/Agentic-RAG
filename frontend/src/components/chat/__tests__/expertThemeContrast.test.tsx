@@ -40,12 +40,28 @@ import pillsSrc from "../../admin/spend/ExpertFilterPills.tsx?raw"
 import spendCardSrc from "../../admin/spend/ExpertSpendCard.tsx?raw"
 // @ts-ignore — Vite `?raw` import.
 import disclosuresSrc from "../../admin/spend/AttributionDisclosures.tsx?raw"
-import type { ExpertChangedEvent } from "@/lib/api/threads"
+// @ts-ignore — Vite `?raw` import. Phase 268-03: the scope chip, its picker, and the Expert chip
+// that sits beside it (UI-SPEC §4.3 / §9-R2 — G4-3 reads both chips at once).
+import scopeChipSrc from "../ScopeChip.tsx?raw"
+// @ts-ignore — Vite `?raw` import.
+import scopePickerSrc from "../ScopePicker.tsx?raw"
+// @ts-ignore — Vite `?raw` import.
+import expertChipSrc from "../ActiveExpertChip.tsx?raw"
+// @ts-ignore — Vite `?raw` import.
+import scopeChangedRaw from "../../../../../backend/tests/fixtures/phase268/scope_changed.json?raw"
+// @ts-ignore — Vite `?raw` import.
+import scopeHeldRaw from "../../../../../backend/tests/fixtures/phase268/scope_changed_held.json?raw"
+import type { ExpertChangedEvent, ScopeChangedEvent, ScopeEffect } from "@/lib/api/threads"
+import type { ExpertBundle, Folder } from "@/types"
 import { ExpertEventCard } from "../ExpertEventCard"
 import { ScopeLedger } from "../../experts/ScopeLedger"
 import { ExpertSpendCard, LedgerExpertCell } from "../../admin/spend/ExpertSpendCard"
+import { ScopeChip } from "../ScopeChip"
+import { ActiveExpertChip } from "../ActiveExpertChip"
 
 const changed = JSON.parse(expertChangedRaw as string) as ExpertChangedEvent
+const scopeChanged = JSON.parse(scopeChangedRaw as string) as ScopeChangedEvent
+const scopeHeld = JSON.parse(scopeHeldRaw as string) as ScopeChangedEvent
 
 /** The class list must carry the light-safe step AND the original dark step. */
 function expectBothThemes(el: Element, light: string, dark: string) {
@@ -143,6 +159,66 @@ describe("(A) rendered — the review's named elements carry a light-safe step b
     )
     expectBothThemes(screen.getByTestId("ledger-expert-cell"), "text-violet-700", "dark:text-violet-200")
   })
+
+  // ── Phase 268-03 (UI-SPEC §4.3): the scope chip (normal + held), the scope card (normal + held)
+  //    and the Expert chip beside it — every one legible on the light `:root` theme too. ─────────
+  const folders = [{ id: "f-acme", name: "Client ACME", parent_id: null }] as unknown as Folder[]
+  const L = { folders: [], thread_folder: null, all_documents: false, connections: [] }
+  const atRest: ScopeEffect = {
+    held: false,
+    expert: null,
+    next: { ...L, thread_folder: { id: "f-acme", name: "Client ACME", doc_count: 4, path: "Client ACME" } },
+    stops: L,
+    saved: null,
+  }
+  const heldEffect: ScopeEffect = {
+    held: true,
+    expert: { id: "e-hr", name: "HR Advisor", scope_mode: "restricted" },
+    next: { ...L, folders: [{ id: "f-hr", name: "HR Policies", doc_count: null }] },
+    stops: L,
+    saved: { id: "f-acme", name: "Client ACME", doc_count: 4, path: "Client ACME" },
+  }
+  const chipProps = { threadId: "t-1", folderId: "f-acme", folders, streaming: false, onApply: async () => {} }
+
+  it("(10) the scope chip (normal) is indigo-700 on light, indigo-200 on dark", () => {
+    render(<ScopeChip {...chipProps} effect={atRest} />)
+    expectBothThemes(screen.getByTestId("scope-chip"), "text-indigo-700", "dark:text-indigo-200")
+  })
+
+  it("(11) the held chip's `· not searched` is amber-700 on light, amber-300 on dark", () => {
+    render(<ScopeChip {...chipProps} effect={heldEffect} />)
+    expectBothThemes(
+      within(screen.getByTestId("scope-chip")).getByText("· not searched"),
+      "text-amber-700",
+      "dark:text-amber-300",
+    )
+  })
+
+  it("(12) the scope card header is indigo-700 / indigo-200; the held card header amber-700 / amber-300", () => {
+    const { unmount } = render(<ExpertEventCard event={scopeChanged} />)
+    expectBothThemes(
+      within(screen.getByTestId("scope-event-card")).getByText("Scope /Client ACME → /Client ACME/Contracts"),
+      "text-indigo-700",
+      "dark:text-indigo-200",
+    )
+    unmount()
+    render(<ExpertEventCard event={scopeHeld} />)
+    expectBothThemes(
+      within(screen.getByTestId("scope-event-card")).getByText("Scope /Client ACME → /Client ACME/Contracts"),
+      "text-amber-700",
+      "dark:text-amber-300",
+    )
+  })
+
+  it("(13) the Expert chip beside it is violet-700 on light, violet-200 on dark (§9-R2)", () => {
+    render(
+      <ActiveExpertChip
+        expert={{ id: "e-hr", name: "HR Advisor", scope_mode: "restricted" } as unknown as ExpertBundle}
+        onDismiss={() => {}}
+      />,
+    )
+    expectBothThemes(screen.getByTestId("active-expert-chip"), "text-violet-700", "dark:text-violet-200")
+  })
 })
 
 const FILES: Record<string, string> = {
@@ -156,14 +232,20 @@ const FILES: Record<string, string> = {
   "ExpertFilterPills.tsx": pillsSrc as string,
   "ExpertSpendCard.tsx": spendCardSrc as string,
   "AttributionDisclosures.tsx": disclosuresSrc as string,
+  // Phase 268-03: the scope chip + picker, and the Expert chip beside them (§9-R2).
+  "ScopeChip.tsx": scopeChipSrc as string,
+  "ScopePicker.tsx": scopePickerSrc as string,
+  "ActiveExpertChip.tsx": expertChipSrc as string,
 }
 
 // Phase 268-02: indigo joins — it is the scope / filter accent, and light `--primary` indigo
 // measured 4.47:1 on white, below 4.5:1 (UI-SPEC §4.2).
 const HUES = "violet|emerald|rose|amber|indigo"
-/** Measured at 268-02 GREEN: 28 pairs in 267's six files + 10 in 268-02's three leaves. A drop
- * below it means a leaf left FILES or lost its pairs. */
-const PAIR_FLOOR = 38
+/** Measured at 268-02 GREEN: 28 pairs in 267's six files + 10 in 268-02's three leaves (38).
+ * Raised at 268-03 GREEN to the measured 52: the scope card's tones in ExpertEventCard.tsx, the
+ * scope chip (2), its picker (2) and the paired ActiveExpertChip (6). A drop below it means a leaf
+ * left FILES or lost its pairs. */
+const PAIR_FLOOR = 52
 /** A text step on one of the four semantic hues, with its optional variant prefix captured. */
 const TOKEN = new RegExp(`(^|[\\s"'\`(])((?:[a-z-]+:)*)text-(${HUES})-(\\d{2,3})(?![\\d])`, "g")
 

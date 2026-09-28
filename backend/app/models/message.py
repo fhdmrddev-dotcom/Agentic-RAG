@@ -43,7 +43,9 @@ RESERVED_RUN_INPUT_KEYS: frozenset[str] = frozenset({"kickoff_prompt", "folder_i
 # context_truncated, iteration_cap_*) exist in real data and must keep their current handling.
 # ⛔ "handoff" is deliberately NOT in it — the handoff summary is a USER row the model must see.
 # The name carries no "expert" because agent_loop.py imports it (its AST fence).
-TRANSCRIPT_EVENT_KINDS: frozenset[str] = frozenset({"expert_changed", "expert_handoff"})
+# Phase 268 (D-268-12): "scope_changed" — a live thread's folder scope changed (CHAT-08). Same
+# allowlist, same skip, same one renderer; a KIND, never a second mechanism.
+TRANSCRIPT_EVENT_KINDS: frozenset[str] = frozenset({"expert_changed", "expert_handoff", "scope_changed"})
 
 
 class MessageCreate(BaseModel):
@@ -222,6 +224,46 @@ class ExpertHandoffEvent(BaseModel):
     expert_name: str
     stays_expert_name: str | None = None
     folder_name: str | None = None
+
+
+# ── Phase 268 (D-268-12 / D-268-12c / D-268-25 / CHAT-08) — the folder-scope payloads ────────────
+#
+# ⛔ PITFALL 11: ``path`` lives on SUBCLASSES only. A defaulted ``path`` on ``TranscriptFolderRef``
+# would add ``"path": null`` to every 267 dump and break the byte-equality fixture test (a new red at
+# zero headroom, and a frontend fixture drift). Pydantic v2 serializes a field by its DECLARED type,
+# so every field below that must carry a path DECLARES the subclass — a ``ScopeFolderRef`` assigned
+# to a ``TranscriptFolderRef``-typed field would silently lose it.
+
+
+class ScopeFolderRef(TranscriptFolderRef):
+    # The folder's full path WITHOUT the leading slash ("Client ACME/Q3 Contracts"), snapshotted at
+    # write time. None = a folder the caller cannot see (it renders as the unnameable phrase).
+    path: str | None = None
+
+
+class ScopeTranscriptLine(TranscriptScopeLine):
+    thread_folder: ScopeFolderRef | None = None
+
+
+class ScopeChangedEvent(BaseModel):
+    """A live thread's folder scope changed (PATCH /threads/{id} ``folder_id`` / ``clear_folder``).
+
+    ``from_folder`` / ``to_folder`` None = "All your documents". ``held`` = an active Restricted
+    Expert does not search the thread folder, so the change is SAVED and ``saved`` names it — decided
+    on the server (D-268-12c), never re-derived by a client. ``during_run`` = an answer was streaming
+    when the change was written, so the card says that answer keeps the old scope (Pitfall 4).
+    """
+
+    kind: Literal["scope_changed"] = "scope_changed"
+    at: datetime
+    from_folder: ScopeFolderRef | None = None
+    to_folder: ScopeFolderRef | None = None
+    expert: TranscriptExpertRef | None = None
+    held: bool = False
+    now: ScopeTranscriptLine
+    dropped: ScopeTranscriptLine
+    saved: ScopeFolderRef | None = None
+    during_run: bool = False
 
 
 class HandoffMarker(BaseModel):

@@ -841,6 +841,11 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
                     "query_text": args["query"],
                     "document_ids": [],
                     "retrieval_status": "provider_error",
+                    # Phase 268 (D-268-13): the run join keys — see the success write below.
+                    "run_id": str(ctx.run_id),
+                    "thread_id": str(ctx.thread_id),
+                    "parent_run_id": str(ctx.parent_run_id) if ctx.parent_run_id else None,
+                    "folder_ids": [str(f) for f in (ctx.folder_subtree_ids or [])],
                 },
                 supabase=ctx.supabase,
             ))
@@ -950,6 +955,14 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
             "query_text": args["query"],
             "document_ids": _audit_doc_ids,
             "similarities": _sims,
+            # Phase 268 (D-268-13, additive): SC#3's "retrieved-chunk records" do not exist, so
+            # every search row carries the keys that join it to its run — the ROOT run too, for a
+            # sub-agent — and the scope actually handed to retrieval, evidence independent of the
+            # result set. Readers only .get() known keys (api/audit.py, knowledge_health.py).
+            "run_id": str(ctx.run_id),
+            "thread_id": str(ctx.thread_id),
+            "parent_run_id": str(ctx.parent_run_id) if ctx.parent_run_id else None,
+            "folder_ids": [str(f) for f in (ctx.folder_subtree_ids or [])],
         },
         supabase=ctx.supabase,
     ))

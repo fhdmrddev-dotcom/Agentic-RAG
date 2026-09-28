@@ -56,12 +56,15 @@ from uuid import UUID
 
 from app.models.message import (
     ExpertChangedEvent,
+    ScopeChangedEvent,
+    ScopeFolderRef,
+    ScopeTranscriptLine,
     TranscriptExclusion,
     TranscriptExpertRef,
     TranscriptFolderRef,
     TranscriptScopeLine,
 )
-from app.models.thread import ExpertScopePreview, ScopePreviewFolder, ScopePreviewThreadFolder
+from app.models.thread import ExpertScopePreview, ScopeEffect, ScopePreviewFolder, ScopePreviewThreadFolder
 from app.services.expert_service import connection_states, get_expert_service, resolve_expert_bundle
 from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders
@@ -343,12 +346,13 @@ async def describe_expert_scope(
     )
 
 
-def build_expert_changed_event(before: ScopeStatement, after: ScopeStatement, *, at: datetime) -> ExpertChangedEvent:
-    """Pure: ``now`` = what the next turn reads; ``dropped`` = what the previous turn read and the
-    next will not. Every name comes from the two statements (snapshotted at write time)."""
+def _dropped_line(before: ScopeStatement, after: ScopeStatement) -> TranscriptScopeLine:
+    """Pure: what ``before`` read and ``after`` will not. The ONE ``dropped`` computation — 267's
+    Expert event and 268's scope event (``stops``) both call it, so the two can never disagree about
+    what a change stops searching. Extracted verbatim; 267's fixture byte-equality is the guard."""
     now = after.used()
     prev = before.used()
-    dropped = TranscriptScopeLine(
+    return TranscriptScopeLine(
         folders=[f for f in prev.folders if not after.covers(f.id)],
         thread_folder=(
             prev.thread_folder
@@ -358,6 +362,13 @@ def build_expert_changed_event(before: ScopeStatement, after: ScopeStatement, *,
         all_documents=prev.all_documents and not now.all_documents,
         connections=[c for c in prev.connections if c not in now.connections],
     )
+
+
+def build_expert_changed_event(before: ScopeStatement, after: ScopeStatement, *, at: datetime) -> ExpertChangedEvent:
+    """Pure: ``now`` = what the next turn reads; ``dropped`` = what the previous turn read and the
+    next will not. Every name comes from the two statements (snapshotted at write time)."""
+    now = after.used()
+    dropped = _dropped_line(before, after)
     excluded = None
     if after.expert is not None and after.expert.scope_mode == "restricted" and after.excluded_count > 0:
         excluded = TranscriptExclusion(count=after.excluded_count, names=list(after.excluded_names))
@@ -371,14 +382,15 @@ def build_expert_changed_event(before: ScopeStatement, after: ScopeStatement, *,
     )
 
 
-def _line_items(line: TranscriptScopeLine) -> list[str]:
+def _line_items(line: TranscriptScopeLine, *, all_label: str = _ALL_DOCUMENTS) -> list[str]:
     items = [f.name or _UNNAMEABLE_FOLDER for f in line.folders]
     if line.thread_folder is not None:
         tf = line.thread_folder
-        label = f"/{tf.name or _UNNAMEABLE_FOLDER}"
+        # 268: a scope ref carries its full ``path``; a 267 ref has no such attribute (unchanged).
+        label = f"/{getattr(tf, 'path', None) or tf.name or _UNNAMEABLE_FOLDER}"
         items.append(f"{label} ({tf.doc_count})" if tf.doc_count is not None else label)
     if line.all_documents:
-        items.append(_ALL_DOCUMENTS)
+        items.append(all_label)
     items.extend(line.connections)
     return items
 
@@ -398,6 +410,184 @@ def event_sentence(event: ExpertChangedEvent) -> str:
     now = ", ".join(_line_items(event.now)) or _NOTHING
     dropped = ", ".join(_line_items(event.dropped)) or _NOTHING
     return f"{header}. Now: {now}. Dropped: {dropped}."
+
+
+# ── Phase 268 (D-268-12 / D-268-12c / D-268-25 / CHAT-08): a live thread's folder scope changes ──
+#
+# ONE payload for three renderings — the composer chip, the picker ledger and the transcript card —
+# built from two ``describe_expert_scope`` statements (the same statement the Expert event, the
+# invite preview and the run read). ``held`` is decided HERE, never by a client (D-267-11).
+
+# "Dropped: All other documents" — moving from no folder to a folder (UI-SPEC §7.3).
+_ALL_OTHER_DOCUMENTS = "All other documents"
+
+
+def folder_path(folder_id: object, visible_folders: list[dict]) -> str | None:
+    """A folder's full path without the leading slash (``"Client ACME/Q3 Contracts"``); None when
+    the caller cannot see it. A REUSE of ``compose_expert_scope``'s own path walk — never a second
+    tree derivation."""
+    if not folder_id:
+        return None
+    path = compose_expert_scope(
+        scope_mode="biased",
+        thread_folder_id=str(folder_id),
+        expert_folder_ids=[],
+        visible_folders=visible_folders,
+    ).scoped_folder_path
+    return (path.lstrip("/") or None) if path else None
+
+
+def _scope_ref(ref: TranscriptFolderRef | None, path: str | None) -> ScopeFolderRef | None:
+    if ref is None:
+        return None
+    return ScopeFolderRef(id=ref.id, name=ref.name, doc_count=ref.doc_count, path=path)
+
+
+def _scope_line(line: TranscriptScopeLine, refs: dict[str, ScopeFolderRef]) -> ScopeTranscriptLine:
+    """A generic line re-typed so its thread folder carries its snapshotted path (Pitfall 11)."""
+    tf = line.thread_folder
+    thread_folder = None
+    if tf is not None:
+        thread_folder = refs.get(str(tf.id)) or _scope_ref(tf, None)
+    return ScopeTranscriptLine(
+        folders=list(line.folders),
+        thread_folder=thread_folder,
+        all_documents=line.all_documents,
+        connections=list(line.connections),
+    )
+
+
+def build_scope_effect(
+    before: ScopeStatement,
+    after: ScopeStatement,
+    *,
+    from_ref: ScopeFolderRef | None,
+    to_ref: ScopeFolderRef | None,
+) -> ScopeEffect:
+    """Pure: what the NEXT message searches if the thread's folder goes ``before`` → ``after``.
+
+    ``held`` = a Restricted Expert is active, so the thread folder is saved but not searched (Save &
+    say). ``next`` = ``after.used()``; ``stops`` = the shared ``_dropped_line`` (empty when widening);
+    ``saved`` = the draft folder, only when held.
+    """
+    refs = {str(r.id): r for r in (from_ref, to_ref) if r is not None and r.id is not None}
+    held = after.expert is not None and after.expert.scope_mode == "restricted"
+    return ScopeEffect(
+        held=held,
+        expert=after.expert,
+        next=_scope_line(after.used(), refs),
+        stops=_scope_line(_dropped_line(before, after), refs),
+        saved=to_ref if held else None,
+    )
+
+
+def build_scope_changed_event(
+    before: ScopeStatement,
+    after: ScopeStatement,
+    *,
+    at: datetime,
+    during_run: bool,
+    from_ref: ScopeFolderRef | None,
+    to_ref: ScopeFolderRef | None,
+) -> ScopeChangedEvent:
+    """Pure: the ``scope_changed`` transcript payload — the ScopeEffect SNAPSHOTTED at write time,
+    plus where it came from, where it went and whether an answer was streaming (Pitfall 4)."""
+    effect = build_scope_effect(before, after, from_ref=from_ref, to_ref=to_ref)
+    return ScopeChangedEvent(
+        at=at,
+        from_folder=from_ref,
+        to_folder=to_ref,
+        expert=effect.expert,
+        held=effect.held,
+        now=effect.next,
+        dropped=effect.stops,
+        saved=effect.saved,
+        during_run=during_run,
+    )
+
+
+def _folder_label(ref: ScopeFolderRef | None) -> str:
+    if ref is None:
+        return _ALL_DOCUMENTS
+    if ref.path or ref.name:
+        return f"/{ref.path or ref.name}"
+    return _UNNAMEABLE_FOLDER
+
+
+def scope_event_sentence(event: ScopeChangedEvent) -> str:
+    """The plain-text ``messages.content`` of a scope event row (NOT NULL). Rendered from the payload."""
+    from_label = _folder_label(event.from_folder)
+    header = f"Scope {from_label} → {_folder_label(event.to_folder)}"
+    if event.held and event.expert is not None:
+        folders = " · ".join(f.name or _UNNAMEABLE_FOLDER for f in event.now.folders) or _NOTHING
+        name = event.expert.name
+        return (
+            f"{header}. Saved: {_folder_label(event.saved)}. "
+            f"Searching: {folders} only · {name} is Restricted. Takes effect when {name} leaves."
+        )
+    now = ", ".join(_line_items(event.now)) or _NOTHING
+    dropped = ", ".join(_line_items(event.dropped, all_label=_ALL_OTHER_DOCUMENTS)) or _NOTHING
+    sentence = f"{header}. Now: {now}. Dropped: {dropped}."
+    if event.during_run:
+        sentence += f" The answer in progress keeps {from_label}."
+    return sentence
+
+
+async def describe_scope_change(
+    *,
+    supabase,
+    pool,
+    user_id: str,
+    org_id: str | None,
+    caller_roles: list[str] | None,
+    expert_id: str | None,
+    from_folder_id: str | None,
+    to_folder_id: str | None,
+) -> tuple[ScopeStatement, ScopeStatement, ScopeFolderRef | None, ScopeFolderRef | None]:
+    """The ONE async part of a scope change: ``(before, after, from_ref, to_ref)``.
+
+    Two ``describe_expert_scope`` statements with the thread's active Expert (one when ``from ==
+    to``: the at-rest effect), then one ``fetch_visible_folders`` for the two paths.
+
+    Both sides are stated with ``allow_unresolved=True``: the Expert is the SAME on both sides of a
+    folder change, so an Expert whose access has gone is named and stated as reading nothing rather
+    than blocking the change (the run refuses it anyway, fail-closed). An Expert that no longer
+    exists at all (``LookupError``) cannot be named truthfully, so the thread is stated alone and a
+    warning is logged — a folder change is never blocked by it.
+    """
+    from_id = str(from_folder_id) if from_folder_id else None
+    to_id = str(to_folder_id) if to_folder_id else None
+    common = dict(supabase=supabase, pool=pool, user_id=user_id, org_id=org_id, caller_roles=caller_roles)
+
+    async def _pair(expert: str | None) -> tuple[ScopeStatement, ScopeStatement]:
+        before = await describe_expert_scope(
+            expert_id=expert, thread_folder_id=from_id, allow_unresolved=True, **common
+        )
+        if to_id == from_id:
+            return before, before
+        after = await describe_expert_scope(
+            expert_id=expert, thread_folder_id=to_id, allow_unresolved=True, **common
+        )
+        return before, after
+
+    try:
+        before, after = await _pair(expert_id)
+    except LookupError:
+        logger.warning("scope change: the thread's Expert could not be named; stating the thread alone")
+        before, after = await _pair(None)
+
+    visible: list[dict] = []
+    if from_id or to_id:
+        try:
+            visible = await fetch_visible_folders(supabase, str(user_id))
+        except Exception:  # noqa: BLE001 — a path is presentation; the name still stands
+            logger.warning("describe_scope_change: visible folders unavailable", exc_info=True)
+    return (
+        before,
+        after,
+        _scope_ref(before.thread_folder, folder_path(from_id, visible)),
+        _scope_ref(after.thread_folder, folder_path(to_id, visible)),
+    )
 
 
 def scope_preview(statement: ScopeStatement) -> ExpertScopePreview:

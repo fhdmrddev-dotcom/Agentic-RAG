@@ -57,6 +57,7 @@ from app.models.message import (
 from app.models.run import ActiveRunResponse
 from app.models.thread import (
     ExpertScopePreview,
+    ScopeEffect,
     ThreadCreate,
     ThreadHandoffRequest,
     ThreadResponse,
@@ -68,8 +69,12 @@ from app.models.thread import (
 # the preview route and the rename_thread event writer both read (never a second derivation).
 from app.services.expert_scope import (
     build_expert_changed_event,
+    build_scope_changed_event,
+    build_scope_effect,
     describe_expert_scope,
+    describe_scope_change,
     event_sentence,
+    scope_event_sentence,
     scope_preview,
 )
 # Phase 267 (D-267-14 / PACK-24) — the handoff summary is a SERVICE (never a tool); see its docstring.
@@ -959,6 +964,168 @@ async def _write_expert_change(conn, *, thread_id, user_id, org_id, update_data:
     )
 
 
+# ── Phase 268 (D-268-12 / D-268-12a / D-268-12b / D-268-25 / CHAT-08) — a live thread's folder ──
+#
+# The 267 Expert arm's shape, one arm over: read the thread → authorize → unchanged is a no-op →
+# empty thread = plain UPDATE, no event → else the UPDATE and ONE ``scope_changed`` row in ONE
+# user-JWT transaction with the THREAD's org. ⛔ NO 409 while streaming or cap_paused: research Q1
+# proved the loop reads ``threads.folder_id`` once per run, so a change applies from the next turn
+# (D-268-12a / D-268-23); ``during_run`` is snapshotted so the card says the answer keeps its scope.
+
+
+async def _read_thread_scope(supabase: Client, thread_id: object, user_id: str) -> dict:
+    """The caller's own thread (``folder_id, active_expert_id, org_id``) — 404 before anything else."""
+    resp = await aexec(
+        supabase.table("threads")
+        .select("folder_id, active_expert_id, org_id")
+        .eq("id", str(thread_id))
+        .eq("user_id", user_id)
+        .maybe_single()
+    )
+    row = resp.data if resp is not None else None
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+    return row
+
+
+async def _authorize_thread_folder(supabase: Client, user_id: str, folder_id: str, thread_org_id) -> None:
+    """Pitfall 12 / T-268-20: the folder must be visible to the caller WITHIN THE THREAD'S ORG, and
+    the folder row's own org must BE the thread's — owned folders pass the visibility rule in any
+    org, so the second check is what stops a thread being scoped to another org's folder.
+    ⛔ Never ``create_thread``'s unchecked path. An org-less thread fails closed (owned folders only,
+    and only an org-less one)."""
+    from app.utils.folder_utils import fetch_visible_folders  # noqa: PLC0415 — the one SEED-124 home
+
+    org = str(thread_org_id) if thread_org_id else None
+    visible = await fetch_visible_folders(supabase, str(user_id), restrict_org_ids={org} if org else set())
+    row = next((f for f in visible if str(f.get("id")) == str(folder_id)), None)
+    if row is None or str(row.get("org_id") or "") != (org or ""):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+
+
+async def _write_scope_change(conn, *, thread_id, user_id, org_id, folder_id, event, title=None) -> None:
+    """The UPDATE and the event row on ONE user-JWT connection inside its txn (``_write_expert_change``'s
+    shape). ``org_id`` is the THREAD's (D-267-34); ``tool_calls`` a plain list (the jsonb codec)."""
+    params: list = [UUID(str(thread_id)), UUID(str(user_id)), UUID(str(folder_id)) if folder_id else None]
+    sets = ["folder_id = $3::uuid"]
+    if title is not None:
+        params.append(title)
+        sets.append(f"title = ${len(params)}")
+    await conn.execute(
+        f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid",
+        *params,
+    )
+    await conn.execute(
+        "INSERT INTO public.messages (thread_id, user_id, org_id, role, content, tool_calls) "
+        "VALUES ($1::uuid, $2::uuid, $3::uuid, 'system', $4, $5::jsonb)",
+        UUID(str(thread_id)),
+        UUID(str(user_id)),
+        UUID(str(org_id)),
+        scope_event_sentence(event),
+        [event.model_dump(mode="json")],
+    )
+
+
+async def _describe_thread_scope_change(request: Request, current_user: dict, supabase: Client, **kw):
+    """Pitfall 9 / T-268-25: stated with the producer's own inputs — the ACTIVE org (the run's
+    ``current_user["org_id"]``) and the caller's role — so the preview and the run cannot disagree."""
+    return await describe_scope_change(
+        supabase=supabase,
+        pool=await get_pg_pool(),
+        user_id=current_user["id"],
+        org_id=await resolve_active_org_or_none(request, current_user),
+        caller_roles=await _caller_roles(request, current_user),
+        **kw,
+    )
+
+
+async def _apply_folder_change(thread_id: str, body: ThreadUpdate, request: Request, current_user: dict,
+                               supabase: Client, update_data: dict) -> dict:
+    user_id = current_user["id"]
+    new_folder = None if body.clear_folder or body.folder_id is None else str(body.folder_id)
+    row = await _read_thread_scope(supabase, thread_id, user_id)
+    if new_folder is not None:
+        await _authorize_thread_folder(supabase, user_id, new_folder, row.get("org_id"))
+
+    old_folder = row.get("folder_id")
+    event = None
+    if str(old_folder or "") != str(new_folder or ""):
+        update_data["folder_id"] = new_folder
+        if await _thread_has_messages(supabase, thread_id, user_id):
+            during_run = await _thread_has_active_run(supabase, thread_id, user_id)
+            before, after, from_ref, to_ref = await _describe_thread_scope_change(
+                request,
+                current_user,
+                supabase,
+                expert_id=row.get("active_expert_id"),
+                from_folder_id=old_folder,
+                to_folder_id=new_folder,
+            )
+            event = build_scope_changed_event(
+                before, after, at=datetime.now(timezone.utc), during_run=during_run,
+                from_ref=from_ref, to_ref=to_ref,
+            )
+
+    if event is not None:
+        try:
+            async with get_user_pg_connection(request, current_user) as conn:
+                await _write_scope_change(
+                    conn,
+                    thread_id=thread_id,
+                    user_id=user_id,
+                    org_id=row.get("org_id"),
+                    folder_id=new_folder,
+                    event=event,
+                    title=update_data.get("title"),
+                )
+        except Exception:
+            # T-268-23: the literal only; the exception left the txn, so the UPDATE rolled back too.
+            logger.error("folder change on thread %s was not written", thread_id, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="The folder was not changed.",
+            )
+    elif update_data:
+        await aexec(supabase.table("threads").update(update_data).eq("id", thread_id).eq("user_id", user_id))
+
+    result = await aexec(
+        supabase.table("threads").select("*").eq("id", thread_id).eq("user_id", user_id).maybe_single()
+    )
+    if not result or not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+    return result.data
+
+
+# D-268-12c / R1 — the at-rest effect (no params) and a draft's effect (``folder_id`` / ``clear``).
+# Order: ownership 404 before any other read (T-268-21); the draft is authorized exactly as the PATCH.
+@router.get("/{thread_id}/scope-effect", response_model=ScopeEffect)
+async def get_scope_effect(
+    thread_id: UUID,
+    request: Request,
+    folder_id: UUID | None = None,
+    clear: bool = False,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    row = await _read_thread_scope(supabase, thread_id, current_user["id"])
+    current = row.get("folder_id")
+    draft = current
+    if clear:
+        draft = None
+    elif folder_id is not None:
+        await _authorize_thread_folder(supabase, current_user["id"], str(folder_id), row.get("org_id"))
+        draft = str(folder_id)
+    before, after, from_ref, to_ref = await _describe_thread_scope_change(
+        request,
+        current_user,
+        supabase,
+        expert_id=row.get("active_expert_id"),
+        from_folder_id=current,
+        to_folder_id=draft,
+    )
+    return build_scope_effect(before, after, from_ref=from_ref, to_ref=to_ref)
+
+
 @router.patch("/{thread_id}", response_model=ThreadResponse)
 async def rename_thread(
     thread_id: str,
@@ -970,6 +1137,17 @@ async def rename_thread(
     update_data: dict[str, Any] = {}
     if body.title is not None:
         update_data["title"] = body.title.strip() or "New Chat"
+
+    # Phase 268 (D-268-12 / CHAT-08): the folder arm. One PATCH writes one event, so a body that
+    # touches both the Expert pair and the folder pair is refused before any read.
+    _folder_touched = body.clear_folder or "folder_id" in body.model_fields_set
+    if _folder_touched and (body.clear_active_expert or "active_expert_id" in body.model_fields_set):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Change the Expert or the folder, not both.",
+        )
+    if _folder_touched:
+        return await _apply_folder_change(thread_id, body, request, current_user, supabase, update_data)
 
     bound_org_id: str | None = None
     if body.clear_active_expert or ("active_expert_id" in body.model_fields_set and body.active_expert_id is None):

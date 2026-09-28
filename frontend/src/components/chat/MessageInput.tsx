@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowUp, ChevronDown, Compass, Cpu, GraduationCap, HardDrive, Layers, Paperclip, Plus } from "lucide-react"
@@ -106,6 +106,14 @@ interface Props {
    * affordance, which is what D-262-02 refuses a whole requirement over.
    */
   onBrowseExperts?: () => void
+  /**
+   * Phase 268 (CHAT-08 · D-268-12d): the thread's scope chip, mounted in the chip row right after
+   * the Expert chip. ChatArea passes it only when a thread exists. Optional, for the same reason as
+   * every prop above: suites mount this component from their own prop objects.
+   */
+  scopeSlot?: ReactNode
+  /** Phase 268 (UI-SPEC §5.4): the pending note under the chip row while an answer streams. */
+  scopeNote?: ReactNode
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -174,6 +182,8 @@ export function MessageInput({
   threadFolderId,
   hasMessages,
   onExpertHandoff,
+  scopeSlot,
+  scopeNote,
 }: Props) {
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -449,7 +459,9 @@ export function MessageInput({
   // Phase 244 (244-05 T2 / D-244-26) — the ROW exists when EITHER an attachment or a connector
   // does, and not at all when neither does (S-2: no reserved empty space, the shipped behaviour).
   const armedConnectors = connections.filter((c) => activeConnectorIds.includes(c.id))
-  const showChipsRow = pendingAttachments.length > 0 || armedConnectors.length > 0 || activeExpert != null
+  // Phase 268 (D-268-12d): an existing thread always shows its scope chip, so the row widens by it.
+  const showChipsRow =
+    pendingAttachments.length > 0 || armedConnectors.length > 0 || activeExpert != null || scopeSlot != null
 
   return (
     <div className="px-4 pb-3 bg-transparent">
@@ -512,7 +524,7 @@ export function MessageInput({
                 data-testid="active-connector-chips"
                 className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 mb-1 bg-muted/40 rounded-lg border border-border/40"
               >
-                {(armedConnectors.length > 0 || activeExpert != null) && (
+                {(armedConnectors.length > 0 || activeExpert != null || scopeSlot != null) && (
                   <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mr-1">
                     Using:
                   </span>
@@ -523,6 +535,7 @@ export function MessageInput({
                     onDismiss={handleDismissExpert}
                   />
                 )}
+                {scopeSlot}
                 {pendingAttachments.map((f) => (
                   <ChatAttachmentChip
                     key={f.path}
@@ -539,6 +552,7 @@ export function MessageInput({
               </div>
             </div>
           )}
+          {scopeNote}
 
           {/* Text area */}
           <div className="px-4 pt-1 pb-1">

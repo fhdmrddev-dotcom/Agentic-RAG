@@ -5,7 +5,12 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.models.message import MessageResponse
+from app.models.message import (
+    MessageResponse,
+    ScopeFolderRef,
+    ScopeTranscriptLine,
+    TranscriptExpertRef,
+)
 from app.models.run import ActiveRunResponse
 
 
@@ -19,6 +24,28 @@ class ThreadUpdate(BaseModel):
     title: str | None = None
     active_expert_id: UUID | None = None
     clear_active_expert: bool = False
+    # Phase 268 (D-268-12 / CHAT-08): change a live thread's folder scope — the same shape as the
+    # Expert pair above (an explicit ``folder_id: null`` clears too). A body touching both pairs is
+    # a 422: one PATCH writes one transcript event.
+    folder_id: UUID | None = None
+    clear_folder: bool = False
+
+
+class ScopeEffect(BaseModel):
+    """Phase 268 (D-268-12c / R1) — GET /threads/{id}/scope-effect: what the NEXT message searches.
+
+    The ONE payload the composer chip (``held``), the picker ledger (``next`` / ``stops`` or
+    ``saved``) and — snapshotted — the ``scope_changed`` card render from. Built by
+    ``expert_scope.build_scope_effect`` from ``describe_expert_scope`` statements resolved with the
+    producer's own inputs (active org + caller role, Pitfall 9). ``stops`` is empty when the new scope
+    contains the old; ``saved`` is set only when ``held``.
+    """
+
+    held: bool
+    expert: TranscriptExpertRef | None = None
+    next: ScopeTranscriptLine
+    stops: ScopeTranscriptLine
+    saved: ScopeFolderRef | None = None
 
 
 class ThreadHandoffRequest(BaseModel):
