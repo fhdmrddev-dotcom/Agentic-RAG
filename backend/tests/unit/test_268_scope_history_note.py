@@ -163,6 +163,41 @@ def test_the_note_helper_is_the_one_home_of_the_words():
     )
 
 
+
+# ── 268-REVIEW WR-04 — a folder the caller cannot name is NOT "all your documents" ─────────────────────────
+
+
+def _unnamed(fid: str) -> dict:
+    """A ScopeFolderRef for a folder the caller cannot see: an id, no name, no path (models/message.py)."""
+    return {"id": fid, "name": None, "doc_count": None, "path": None}
+
+
+def _between(src, dst) -> dict:
+    p = copy.deepcopy(_payload("scope_changed.json"))
+    p["held"] = False
+    p["from_folder"], p["to_folder"] = src, dst
+    return p
+
+
+def test_WR04_an_unnameable_from_folder_is_not_called_all_your_documents():
+    q3 = {"id": "b", "name": "Q3 Contracts", "doc_count": 2, "path": "Client ACME/Q3 Contracts"}
+    out = _reconstruct_history([_event(_between(_unnamed("hidden-1"), q3)), _user("q")])
+    head = out[0]["content"].split("]\n\n")[0]
+    assert "Search scope changed" in head
+    assert "all your documents" not in head, "a specific folder was searched, not everything"
+
+
+def test_WR04_two_different_unnameable_folders_still_say_the_scope_changed():
+    out = _reconstruct_history([_event(_between(_unnamed("hidden-1"), _unnamed("hidden-2"))), _user("q")])
+    assert "Search scope changed" in out[0]["content"], "a real change was dropped because both labels matched"
+
+
+def test_WR04_the_same_unnameable_folder_round_trip_says_nothing():
+    q3 = {"id": "b", "name": "Q3 Contracts", "doc_count": 2, "path": "Client ACME/Q3 Contracts"}
+    rows = [_event(_between(_unnamed("hidden-1"), q3)), _event(_between(q3, _unnamed("hidden-1"))), _user("q")]
+    assert _reconstruct_history(rows) == [{"role": "user", "content": "q"}]
+
+
 # ── 268-REVIEW WR-03 — DEFERRED (needs operator decision), pinned as a STRICT xfail ──────────────────────────
 #
 # D-268-23 lets a scope change made while a run is cap_paused apply to the Continue, and the Continue does
