@@ -257,13 +257,31 @@ async def test_changing_both_the_expert_and_the_folder_is_a_422(body):
 
 
 def test_the_folder_arm_region_raises_no_409():
-    """D-268-12a / D-268-23: neither streaming nor cap_paused refuses a scope change."""
+    """D-268-12a / D-268-23: neither streaming nor cap_paused refuses a scope change.
+
+    268-REVIEW WR-02 (deliberate update): ONE 409 now exists, and it is not a streaming refusal —
+    it is the lost-race arm, reachable only from ``except ScopeChangeConflict`` (the conditional
+    UPDATE matched 0 rows). Every other 409 in the region still fails this fence."""
+    import ast
     import inspect
+    import textwrap
 
     from app.api import threads as threads_mod
 
-    src = inspect.getsource(threads_mod._apply_folder_change)
-    assert "HTTP_409" not in src
+    tree = ast.parse(textwrap.dedent(inspect.getsource(threads_mod._apply_folder_change)))
+    conflict_handlers = [
+        h for h in ast.walk(tree)
+        if isinstance(h, ast.ExceptHandler) and ast.unparse(h.type or ast.Name("")) == "ScopeChangeConflict"
+    ]
+    allowed = {id(n) for h in conflict_handlers for n in ast.walk(h)}
+    stray = [
+        ast.unparse(n) for n in ast.walk(tree)
+        if isinstance(n, ast.Attribute) and n.attr == "HTTP_409_CONFLICT" and id(n) not in allowed
+    ]
+    assert stray == [], f"a 409 outside the lost-race arm: {stray}"
+    assert len(conflict_handlers) == 1
+    # And the probe D-268-12a proved unnecessary still only SNAPSHOTS `during_run`, never refuses.
+    assert "_thread_has_active_run" in inspect.getsource(threads_mod._apply_folder_change)
 
 
 # ── GET /threads/{id}/scope-effect ────────────────────────────────────────────────────────────────

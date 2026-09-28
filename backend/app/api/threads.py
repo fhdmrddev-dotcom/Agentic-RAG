@@ -1003,18 +1003,35 @@ async def _authorize_thread_folder(supabase: Client, user_id: str, folder_id: st
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
 
 
-async def _write_scope_change(conn, *, thread_id, user_id, org_id, folder_id, event, title=None) -> None:
+class ScopeChangeConflict(Exception):
+    """268-REVIEW WR-02: the thread's folder moved after this PATCH read it."""
+
+
+async def _write_scope_change(conn, *, thread_id, user_id, org_id, folder_id, event, expected_folder_id,
+                              title=None) -> None:
     """The UPDATE and the event row on ONE user-JWT connection inside its txn (``_write_expert_change``'s
-    shape). ``org_id`` is the THREAD's (D-267-34); ``tool_calls`` a plain list (the jsonb codec)."""
-    params: list = [UUID(str(thread_id)), UUID(str(user_id)), UUID(str(folder_id)) if folder_id else None]
+    shape). ``org_id`` is the THREAD's (D-267-34); ``tool_calls`` a plain list (the jsonb codec).
+
+    268-REVIEW WR-02: the UPDATE is conditional on ``expected_folder_id`` — the folder the event's
+    "from" was built from. If another PATCH moved it in between, 0 rows update and
+    ``ScopeChangeConflict`` is raised BEFORE the event INSERT, so the caller's txn writes nothing."""
+    params: list = [
+        UUID(str(thread_id)),
+        UUID(str(user_id)),
+        UUID(str(folder_id)) if folder_id else None,
+        UUID(str(expected_folder_id)) if expected_folder_id else None,
+    ]
     sets = ["folder_id = $3::uuid"]
     if title is not None:
         params.append(title)
         sets.append(f"title = ${len(params)}")
-    await conn.execute(
-        f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid",
+    updated = await conn.execute(
+        f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid "
+        "AND folder_id IS NOT DISTINCT FROM $4::uuid",
         *params,
     )
+    if str(updated).split()[-1:] == ["0"]:
+        raise ScopeChangeConflict()
     await conn.execute(
         "INSERT INTO public.messages (thread_id, user_id, org_id, role, content, tool_calls) "
         "VALUES ($1::uuid, $2::uuid, $3::uuid, 'system', $4, $5::jsonb)",
@@ -1076,8 +1093,15 @@ async def _apply_folder_change(thread_id: str, body: ThreadUpdate, request: Requ
                     org_id=row.get("org_id"),
                     folder_id=new_folder,
                     event=event,
+                    expected_folder_id=old_folder,
                     title=update_data.get("title"),
                 )
+        except ScopeChangeConflict:
+            # 268-REVIEW WR-02: the txn rolled back — no UPDATE, no event with a false "from".
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The folder changed while you were choosing. Try again.",
+            )
         except Exception:
             # T-268-23: the literal only; the exception left the txn, so the UPDATE rolled back too.
             logger.error("folder change on thread %s was not written", thread_id, exc_info=True)
