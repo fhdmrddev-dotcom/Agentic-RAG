@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
-status: verified_human_needed
-last_updated: 2026-09-26T00:00:00.000Z
-last_activity: 2026-09-26 -- Phase 267 verified (human_needed); code review 2 CR + 9 WR fixed
+status: executing
+last_updated: "2026-09-28T14:26:45.908Z"
+last_activity: 2026-09-28 -- Phase 268 planning complete
 progress:
   total_phases: 12
-  completed_phases: 1
-  total_plans: 10
-  completed_plans: 10
-  percent: 8
-stopped_at: Phase 267 executed — verification next
+  completed_phases: 3
+  total_plans: 19
+  completed_plans: 15
+  percent: 25
 ---
 
 # Project State
@@ -43,7 +42,8 @@ can be taught new behaviours (skills) that persist and can be shared.
 Milestone: v4.4 Experts That Actually Work
 Phase: 267 (An Expert Adds Scope, PACK-21..25)
 Plan: 5 plans / 4 waves, checker PASSED (01 → 02 ∥ 03 → 04 → 05)
-Status: **Phase 267 VERIFIED: `human_needed`** (2026-09-26). 8/8 truths are verified, nothing failed. Live UAT is in `267-UAT-LOG.md`:
+Status: Ready to execute
+
 - SC#1-SC#5 PASS
 - SC#10 board 8/8 PASS
 - G-4 ×3 PASS, driven in Chrome by the orchestrator
@@ -52,19 +52,23 @@ Status: **Phase 267 VERIFIED: `human_needed`** (2026-09-26). 8/8 truths are veri
 Code review (`267-REVIEW.md`): 2 critical + 9 warnings, all FIXED test-first. 6 info items deferred with reasons.
 
 OWED, run these first:
+
 1. The independent review by an agent that did NOT build 267 (AGENTS.md §6.3).
 2. Operator sign-off on the G-4 Chrome rows (screenshots: `evidence/g4-*.png`).
 3. F-4: the handoff 502 did not reproduce.
 4. Ledger triples: re-derive them for the files the review fixes touched after the 267-05 register commit (ExpertSpotlightCard.tsx, useThreads.ts, ChatArea.tsx, InviteExpertDialog.tsx, api/threads.py, expert_service.py, agent_loop.py, among others).
+
 G-2 honoured: sketch 267 Variant B "Will / won't ledger", picked by the operator (D-267-27). G-4 scenarios locked (D-267-28)
 Operator rulings at research: D-267-29..35. The rulings are: a server union of the Expert's connections; the picker stores `service_id`; a fail-closed binding gate; skills add; the handoff inherits the folder; `org_id` is set explicitly; the biased narrowing on a no-folder thread is kept and stated
 Baselines at `92b5476be`:
+
 - backend unit: 71 failed / 5673 passed (ceiling, zero headroom)
 - `tsc -p tsconfig.app.json`: 70 errors
 - vitest gate: 8828 total · 3 failed (inherited) · 8075 pinned
+
 Still owed from 266: UI-2 and UI-4 (not-installed, non-manager) live checks; `independent_review`; the prod parity checklist `266-PROD-PARITY.md`
-Resume file: .planning/phases/267-an-expert-adds-scope/267-05-SUMMARY.md
-Last activity: 2026-09-26 -- Phase 267 verified human_needed; review fixes applied; live re-checks CR-01/WR-03 PASS
+Resume file: .planning/phases/268-expert-spend-mid-thread-scope/268-UI-SPEC.md
+Last activity: 2026-09-28 -- Phase 268 planning complete
 
 ---
 
@@ -95,6 +99,7 @@ Last activity: 2026-09-26 -- Phase 267 verified human_needed; review fixes appli
 | UAT findings | **F-1** (`can_connect` read a cold settings cache) FIXED `13856a7e9`/`cdb173609`. **F-2** (an absent connection named by its slug) FIXED in the same commits. **F-3** = **SEED-314** (a two-org user's chat rows are stamped with the trigger org), measured again live, not a 267 regression. **F-4** (handoff 502 on `deepseek-v4-flash`, first SC#4 attempt; did not reproduce) OWED/observed. **F-5** (Financial Analyzer restricted) is BY DESIGN (mig 187). **O-1** (Dropped over-states a restricted → restricted swap) routed to SEED-303 | `267-UAT-LOG.md` § Resolutions |
 
 **Owed from 267, and which to run first:**
+
 1. **The independent review**, by an agent that did not build 267 (AGENTS.md). Run this first.
 2. **Operator confirmation of the G-4 rows.** They were driven in Chrome by the orchestrator under an autonomous run, so there is no operator reply on record.
 3. The member-view catalog check in Chrome (skipped; the API member case is SC#2).

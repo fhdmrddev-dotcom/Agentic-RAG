@@ -761,16 +761,16 @@ COMMENT ON COLUMN public.runs.expert_attributed IS 'Phase 268: true for rows wri
 | A3 | `continue_run`'s user-JWT `runs` UPDATE matches 0 rows under RLS (no UPDATE policy) | Q9, Pitfall 8 | if wrong, Deep continuations DO read `streaming`, and Pitfall 8's second half disappears |
 | A4 | The local DB was down, so no live row counts (shell roots, sub-agents under shells, org mismatches) were taken | Q4 | the double-count magnitude is unknown. Wave 0 of plan 1 should measure it (SQL in Validation §Wave 0) |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **The thread-org ≠ active-org send (two-org user, old thread).**
+1. **The thread-org ≠ active-org send (two-org user, old thread).** → RESOLVED by D-268-22 (active org).
    - What we know: threads are not org-filtered in the list (`threads.py:255-272`). `send_message` never compares `thread.org_id` with the active org. Retrieval and the Expert already use the active org. 267's event rows use the thread's org.
    - Unclear: should the run and messages follow the active org (D-268-07 literally) or the thread's org?
    - Recommendation: follow D-268-07 (active org) for the run **and** every message the turn writes (keeps the Continue lookup coherent, Pitfall 3), and record the split transcript as a known edge. Or, if the operator prefers, refuse with 267 WR-03's sentence *"Switch to this chat's organization"*. Ask at plan-check.
-2. **Expert or scope changes while `cap_paused`.** Recommendation: allow the scope change (the Continue is "your next message" in effect, footer "From your next message."). For the Expert, either extend 267's 409 to `cap_paused` or accept "a run counts toward the Expert active when it started" and say so. Decide; do not leave it implicit.
-3. **Unpriced sub-agents under a rated root.** Recommendation: expose `unpriced_subagents` and fold it into the existing "unrated" disclosure copy rather than inventing a new KPI.
-4. **The "continued" ledger tag** has no data source (all shells look alike). Recommendation: drop it from 268 (UI-SPEC wrote "when the API marks it"), or add a kind column in 197 if the operator wants it.
-5. **The box-shell marker:** the literal predicate plus a fence (a), or a column (b)? Recommendation: (a).
+2. **Expert or scope changes while `cap_paused`.** → RESOLVED by D-268-23 (allow both, say so). Recommendation: allow the scope change (the Continue is "your next message" in effect, footer "From your next message."). For the Expert, either extend 267's 409 to `cap_paused` or accept "a run counts toward the Expert active when it started" and say so. Decide; do not leave it implicit.
+3. **Unpriced sub-agents under a rated root.** → RESOLVED by D-268-25. Recommendation: expose `unpriced_subagents` and fold it into the existing "unrated" disclosure copy rather than inventing a new KPI.
+4. **The "continued" ledger tag** → RESOLVED by D-268-24 (dropped). has no data source (all shells look alike). Recommendation: drop it from 268 (UI-SPEC wrote "when the API marks it"), or add a kind column in 197 if the operator wants it.
+5. **The box-shell marker:** → RESOLVED by D-268-21 (option a). the literal predicate plus a fence (a), or a column (b)? Recommendation: (a).
 
 ## Environment Availability
 

@@ -161,6 +161,7 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 267-05-PLAN.md — real-RLS org fence, live SC#1-5 + 8-row SC#10 board + G-4 ×3 in Chrome, registers (ledger, CLAUDE.md, STATE, ROADMAP, SEED-309, SEED-303)
+
 **Flags**: ⛔ **Red line — the Extension Contract:** PACK-21 is a **union**, not a new tool; the 29-tool inventory is unchanged. ⛔ **SC#10 cross-provider scoreboard FIRES** (tool set + agent loop): full native roster + OpenRouter, derived from `MODEL_CAPABILITIES`, rows blocked never omitted. **G-2 FIRES** — `/gsd:sketch` before plan (card "requires" state, invite cost statement, swap event, second-Expert handoff); operator-approved mockup is the bar. **G-4** — three "I'd recognize failure here" scenarios at scope time. **G-5 audit at discuss (all FIRING):** `backend/app/services/tool_dispatcher.py`, `backend/app/services/agent_loop.py`, `backend/app/services/run_producer.py`, `frontend/src/components/chat/ChatArea.tsx`, `MessageInput.tsx`, `MessageItem.tsx`, `ExpertSpotlightCard.tsx`, `InviteExpertDialog.tsx`, `frontend/src/types/index.ts` — ⛔ `tool_dispatcher.py` and `agent_loop.py` both carry OWED seams; propose the refactor as the first option. Scoping stays **data handed to the loop**, never a branch inside it. **UI hint**: yes
 
 #### Phase 268: Expert Spend & Mid-Thread Scope
@@ -179,10 +180,19 @@ Plans:
 **Plans**: 4 plans (3 waves: 01 ∥ 02 → 03 → 04)
 
 Plans:
+**Wave 1**
+
 - [ ] 268-01-PLAN.md — migration 197 (runs.expert_id / expert_attributed, no FK, no backfill); Expert + active org stamped at the one insert with a SQL parent copy; resolve-once send path; 4 agent_loop org stamps; Continue accumulates tokens; real-PG two-org fence
 - [ ] 268-02-PLAN.md — one per_root CTE (per-row pricing, sub-agent roll-up, placeholder-root rule), bound `expert` filter on /summary + /runs, expert_breakdown + window totals; cockpit Expert pills, Spend by Expert + recon footer, ledger Expert column, Blind Spots tiles
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 268-03-PLAN.md — PATCH folder_id/clear_folder + authorized folder + scope_changed event in one txn; ScopeEffect route; search.query audit run_id; composer ScopeChip + ScopePicker (Save & say) + scope card; one PATCH home in ChatArea
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 268-04-PLAN.md — live proof: real-PG spend reconciliation, SC#1-4, 8-row SC#10 board, G-4 ×3 in Chrome, 268-PROD-PARITY.md, seeds + ledger + STATE registers
+
 **Flags**: **Migration** likely (an Expert id on the usage/run rows — `194+`, after 266's). ⛔ Cost stays in its **one** token→USD home (257); attribution is a column, not a second formula. **G-2 FIRES** (scope-change control + transcript event; spend grouping). **G-4** scenarios at scope time. **SC#10** for CHAT-08 (retrieval per turn, streaming UI state). **G-5 audit at discuss:** `backend/app/services/run_producer.py`, `backend/app/db/workflows.py` / every usage finalize site (`api/runs.py`, `harness_engine.py`, `forced_emit.py`, `task_service.py`), `backend/app/api/threads.py`, `backend/app/services/retrieval_service.py` (extraction OWED — SEED-224), `ChatArea.tsx`, the `/admin/spend` surface. Seed `SEED-286`. **UI hint**: yes
 
 #### Phase 269: Starter Expert Library
