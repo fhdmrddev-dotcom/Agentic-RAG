@@ -17,15 +17,19 @@ import {
   getThreadWorkflow,
   getExpert,
   setThreadActiveExpert,
+  setThreadFolder,
+  getScopeEffect,
   ApiError,
 } from "@/lib/api"
-import { handoffThread } from "@/lib/api/threads"
+import { handoffThread, type ScopeEffect } from "@/lib/api/threads"
 import { PREVIEW_COPY } from "@/components/experts/catalog/expertCatalog"
 import { useComposerModel } from "@/hooks/useComposerModel"
 import { useThreadNavigation } from "./threadNavigation"
 import { ExpertSpotlightCard } from "./ExpertSpotlightCard"
+import { ScopeChip } from "./ScopeChip"
+import { SCOPE_COPY, chipLabel } from "./scopeCopy"
 import type { Folder, Thread, ExpertBundle } from "@/types"
-import { Folder as FolderIcon, Menu, Sparkles, PanelLeftOpen } from "lucide-react"
+import { Clock, Menu, Sparkles, PanelLeftOpen } from "lucide-react"
 
 interface Props {
   thread: Thread | null
@@ -123,6 +127,13 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
   // Phase 267 plan 04 (D-267-12): the server's sentence when an Expert change is refused. One line
   // above the composer, cleared by the next change.
   const [expertChangeError, setExpertChangeError] = useState<string | null>(null)
+  // Phase 268 (CHAT-08 · D-268-12c): the thread's at-rest ScopeEffect — the ONE payload the chip's
+  // `held` reads. `null` = not loaded (the chip then claims nothing, S5).
+  const [scopeEffect, setScopeEffect] = useState<ScopeEffect | null>(null)
+  // Phase 268 (UI-SPEC §5.4): the receipt of a scope change made while THIS thread streams — the
+  // transcript does not refetch mid-stream, so without it the change has no receipt at rest.
+  const [scopePendingNote, setScopePendingNote] = useState<string | null>(null)
+  const scopeReqRef = useRef(0)
   // Phase 267 plan 04 (D-267-16): the no-router door ChatLayout provides — `null` outside it, and
   // then no "New chat with …" control is offered at all.
   const threadNav = useThreadNavigation()
@@ -250,7 +261,39 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
     setScopeFolderId(null)
     // 267-REVIEW WR-02: a refusal is about the thread it was made on, never the next one.
     setExpertChangeError(null)
+    // Phase 268: a scope payload and its pending note are about the thread they were read on.
+    setScopeEffect(null)
+    setScopePendingNote(null)
   }, [thread?.id])
+
+  /**
+   * Phase 268 (D-268-12c) — read the thread's at-rest ScopeEffect. Latest wins: a slow answer for a
+   * previous thread or state is dropped. A failed read leaves the chip claiming nothing (S5). The
+   * call is made inside the promise chain so a synchronous throw is a rejection, never a crash.
+   */
+  const refreshScopeEffect = useCallback((tid: string): Promise<ScopeEffect | null> => {
+    const req = ++scopeReqRef.current
+    return new Promise<ScopeEffect>((resolve) => resolve(getScopeEffect(tid)))
+      .then((effect) => {
+        if (req === scopeReqRef.current) setScopeEffect(effect)
+        return effect
+      })
+      .catch((err) => {
+        console.error("Failed to read the thread's scope:", err)
+        if (req === scopeReqRef.current) setScopeEffect(null)
+        return null
+      })
+  }, [])
+
+  // Re-read on load and whenever the server's thread changes its folder or its Expert.
+  useEffect(() => {
+    if (thread?.id) void refreshScopeEffect(thread.id)
+  }, [thread?.id, thread?.folder_id, thread?.active_expert_id, refreshScopeEffect])
+
+  // UI-SPEC §5.4: the pending note clears when that run ends (the run-end reconcile brings the card).
+  useEffect(() => {
+    if (!isStreaming) setScopePendingNote(null)
+  }, [isStreaming])
 
   // Phase 260 (PACK-02 / PACK-03): sync active expert consultant with thread
   useEffect(() => {
@@ -538,11 +581,58 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
         )
         return
       }
+      // Phase 268 (§6.2): the Expert changes what the thread's folder does — a Restricted Expert
+      // leaving returns the chip to S1 with the saved folder. No second scope card is written.
+      void refreshScopeEffect(tid)
       if (!useStreamsStore.getState().streamingThreads.has(tid)) {
         loadMessages(tid).catch(console.error)
       }
     },
-    [activeExpert, thread?.id, loadMessages, onThreadUpdated],
+    [activeExpert, thread?.id, loadMessages, onThreadUpdated, refreshScopeEffect],
+  )
+
+  /**
+   * Phase 268 (CHAT-08 · D-268-12 / D-268-12a / D-268-12d / D-268-23) — THE ONE HOME of a scope
+   * change on a thread, beside the Expert one.
+   *
+   * ⛔ NO STREAMING REFUSAL, unlike the Expert arm above: research proved the loop reads the thread's
+   * folder once per run, so a change applies from the NEXT message and the answer in progress keeps
+   * its scope (a `cap_paused` run's Continue picks the new scope up, D-268-23). The server records
+   * `during_run` so the card says so.
+   *
+   * A refusal REJECTS with the reason sentence — the picker states it, and the chip never moved.
+   * Success → the server's thread to the list owner, the ScopeEffect re-read, then the transcript
+   * refetch (the persisted card) — except while THIS thread streams, where a refetch would race the
+   * live bucket (267 pitfall 11); the pending note is the receipt until that run ends.
+   */
+  const applyScopeChange = useCallback(
+    async (next: string | null) => {
+      const tid = thread?.id
+      if (!tid) return
+      const before = chipLabel(thread?.folder_id ?? null, folders).full
+      let updated: Thread
+      try {
+        updated = await setThreadFolder(tid, next)
+      } catch (err) {
+        throw new Error(
+          err instanceof ApiError && err.message.trim() ? err.message : SCOPE_COPY.networkReason,
+        )
+      }
+      onThreadUpdated?.(updated)
+      const effect = refreshScopeEffect(tid)
+      if (useStreamsStore.getState().streamingThreads.has(tid)) {
+        const after = chipLabel(next, folders).full
+        const held = await effect
+        setScopePendingNote(
+          held?.held && held.expert
+            ? SCOPE_COPY.pendingHeld(after, held.expert.name)
+            : SCOPE_COPY.pending(before, after),
+        )
+      } else {
+        loadMessages(tid).catch(console.error)
+      }
+    },
+    [thread?.id, thread?.folder_id, folders, onThreadUpdated, refreshScopeEffect, loadMessages],
   )
 
   const handleDismissExpert = useCallback(() => {
@@ -648,6 +738,33 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
       onExpertHandoff={thread && threadNav ? handleExpertHandoff : undefined}
       onOpenConnections={onOpenConnections}
       onBrowseExperts={onBrowseExperts}
+      // Phase 268 (D-268-12d): the scope chip — only on an existing thread; a new chat keeps the
+      // shipped `<select>` below. Its words come from the server's ScopeEffect.
+      scopeSlot={
+        thread ? (
+          <ScopeChip
+            threadId={thread.id}
+            folderId={thread.folder_id ?? null}
+            folders={folders}
+            effect={scopeEffect}
+            streaming={isStreaming}
+            onApply={applyScopeChange}
+          />
+        ) : undefined
+      }
+      scopeNote={
+        thread && scopePendingNote ? (
+          <div
+            data-testid="scope-pending-note"
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-1 px-4 pt-1 text-[11px] leading-snug text-amber-700 dark:text-amber-300"
+          >
+            <Clock className="h-3 w-3 flex-none" aria-hidden="true" />
+            {scopePendingNote}
+          </div>
+        ) : undefined
+      }
       onSend={handleSend}
       /* Phase 194.1 Plan 04 (RUN-01 / D-05/D-22) — THE STOP-DISPATCHER PROP IS GONE
          from this element. The composer's Stop is `StopControl` (written WITHOUT its
@@ -823,8 +940,6 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
     )
   }
 
-  const scopedFolder = thread.folder_id ? folders.find((f) => f.id === thread.folder_id) : null
-
   return (
     // Phase 244-01 (SHELL-01 / BUG-260828-08): link 4 of the four-link `min-h-0` chain
     // (ChatLayout's grid track and <main> are 2 and 3; MessageList's ScrollArea is 5).
@@ -846,12 +961,9 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
           {attentionDot}
         </button>
         <h2 className="font-headline font-semibold text-sm truncate text-foreground">{thread.title}</h2>
-        {thread.folder_id && (
-          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium shrink-0">
-            <FolderIcon className="h-3 w-3" />
-            {scopedFolder?.name ?? "Folder"}
-          </span>
-        )}
+        {/* Phase 268 (UI-SPEC §9-D6): the header folder pill is REMOVED — the composer's scope chip
+            is the one home of scope. The pill could not express `held`, so under a Restricted
+            Expert it named a folder that is not searched, beside a chip that says it is not. */}
         {/* Phase 087-08 (operator directive 2026-05-29): the chat-header
             "Toggle workspace" button was REMOVED. The workspace panel now has a
             single nav-style in-panel toggle (collapse-to-rail); the always-present

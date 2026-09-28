@@ -108,6 +108,7 @@ beforeEach(() => {
 describe("the picker's frame", () => {
   it("(1) title, idle sub-line, the tree nested by parent and the `current` marker on the saved folder", async () => {
     const user = userEvent.setup()
+    mount()
     const picker = await open(user)
     expect(within(picker).getByText("Search in")).toBeVisible()
     expect(within(picker).getByText("Applies from your next message. Earlier answers keep their sources.")).toBeVisible()

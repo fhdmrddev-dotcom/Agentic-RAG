@@ -14,10 +14,11 @@
  * The folder PATH built here from the caller's `folders` list (`parent_id` chain) is presentation
  * only — the chip's label — never a scope decision.
  */
-import type { ScopeEffect } from "@/lib/api/threads"
+import type { ScopeEffect, ScopeTranscriptLine } from "@/lib/api/threads"
+import type { LedgerColumn, LedgerItem } from "@/components/experts/ScopeLedger"
 import { UNNAMEABLE_FOLDER } from "@/components/experts/catalog/ExpertDetailModal"
 import { LEDGER_COPY } from "@/components/experts/catalog/expertCatalog"
-import { EVENT_COPY } from "./expertEventCopy"
+import { EVENT_COPY, SCOPE_EVENT_COPY, scopeFolderLabel } from "./expertEventCopy"
 
 /** The chip label truncates to `…/{last segment}` past this many characters (UI-SPEC §5.2). */
 export const CHIP_LABEL_MAX = 32
@@ -111,6 +112,56 @@ export function chipLabel(folderId: string | null | undefined, folders: FolderLi
   if (full.length <= CHIP_LABEL_MAX) return { label: full, full, unnamed: false }
   const last = path.split("/").pop() ?? path
   return { label: `…/${last}`, full, unnamed: false }
+}
+
+/** One scope line as ledger items: the Expert's folders (tagged `Expert` when an Expert is active),
+ *  the thread folder as `/{path} ({n})`, the no-filter literal, then connections. */
+function ledgerItems(line: ScopeTranscriptLine, opts: { expertTag: boolean; allLabel: string }): LedgerItem[] {
+  const items: LedgerItem[] = []
+  for (const f of line.folders ?? []) {
+    const named = typeof f.name === "string" && f.name.trim()
+    items.push({
+      label: named ? (f.name as string) : UNNAMEABLE_FOLDER,
+      unnameable: !named,
+      tag: opts.expertTag ? SCOPE_COPY.expertTag : undefined,
+    })
+  }
+  const tf = line.thread_folder
+  if (tf) {
+    const label = scopeFolderLabel(tf)
+    if (label === UNNAMEABLE_FOLDER) items.push({ label, unnameable: true })
+    else items.push({ label: tf.doc_count === null || tf.doc_count === undefined ? label : `${label} (${tf.doc_count})` })
+  }
+  if (line.all_documents) items.push({ label: opts.allLabel })
+  for (const c of line.connections ?? []) items.push({ label: c })
+  return items
+}
+
+/**
+ * The picker ledger's columns, from the SERVER payload (UI-SPEC §5.3): held → `Saved` / `Searching`;
+ * otherwise `Next message searches` / `Stops searching` (or the muted `Nothing changes`).
+ * `Chat attachments` is pinned last in the searching column — it is never folded into `and k more`.
+ */
+export function ledgerColumnsFor(effect: ScopeEffect, draftLabel: string): LedgerColumn[] {
+  const next: LedgerItem[] = [
+    ...ledgerItems(effect.next, { expertTag: effect.expert != null, allLabel: SCOPE_COPY.allDocuments }),
+    { label: SCOPE_COPY.chatAttachments, pinned: true },
+  ]
+  if (effect.held) {
+    return [
+      { tone: "held", heading: SCOPE_COPY.ledger.saved, items: [{ label: effect.saved ? scopeFolderLabel(effect.saved) : draftLabel }] },
+      { tone: "yes", heading: SCOPE_COPY.ledger.searching, items: next },
+    ]
+  }
+  const stops = ledgerItems(effect.stops, { expertTag: false, allLabel: SCOPE_EVENT_COPY.allOtherDocuments })
+  return [
+    { tone: "yes", heading: SCOPE_COPY.ledger.next, items: next },
+    {
+      tone: "no",
+      heading: SCOPE_COPY.ledger.stops,
+      items: stops.length ? stops : [{ label: SCOPE_COPY.nothingChanges, muted: true }],
+    },
+  ]
 }
 
 export interface ScopeExplain {

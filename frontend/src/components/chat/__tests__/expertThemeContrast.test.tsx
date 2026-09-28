@@ -241,9 +241,11 @@ const FILES: Record<string, string> = {
 // Phase 268-02: indigo joins — it is the scope / filter accent, and light `--primary` indigo
 // measured 4.47:1 on white, below 4.5:1 (UI-SPEC §4.2).
 const HUES = "violet|emerald|rose|amber|indigo"
-/** Measured at 268-02 GREEN: 28 pairs in 267's six files + 10 in 268-02's three leaves. A drop
- * below it means a leaf left FILES or lost its pairs. */
-const PAIR_FLOOR = 38
+/** Measured at 268-02 GREEN: 28 pairs in 267's six files + 10 in 268-02's three leaves (38).
+ * Raised at 268-03 GREEN to the measured 52: the scope card's tones in ExpertEventCard.tsx, the
+ * scope chip (2), its picker (2) and the paired ActiveExpertChip (6). A drop below it means a leaf
+ * left FILES or lost its pairs. */
+const PAIR_FLOOR = 52
 /** A text step on one of the four semantic hues, with its optional variant prefix captured. */
 const TOKEN = new RegExp(`(^|[\\s"'\`(])((?:[a-z-]+:)*)text-(${HUES})-(\\d{2,3})(?![\\d])`, "g")
 

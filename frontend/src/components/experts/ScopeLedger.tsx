@@ -29,10 +29,21 @@ export interface LedgerItem {
   /** 267-REVIEW WR-08: a promise the column must always show (D-267-19's `Chat attachments`). It
    *  is never counted into `and {k} more`, and renders after the truncated list. */
   pinned?: boolean
+  /** 268-03: a small bordered tag after the label (the scope picker's `Expert` on an Expert folder). */
+  tag?: string
+  /** 268-03: a statement, not an item ("Nothing changes") — rendered muted. */
+  muted?: boolean
 }
 
+/** 268-03 (UI-SPEC §4.1): `held` = saved but not in effect (the scope picker's `Saved` column). */
+const TONE_CLASS = {
+  yes: "border-emerald-600/40 bg-emerald-500/[0.08] dark:border-emerald-500/25",
+  no: "border-rose-600/40 bg-rose-500/10 dark:border-rose-500/25",
+  held: "border-amber-600/40 bg-amber-500/10 dark:border-amber-500/30",
+} as const
+
 export interface LedgerColumn {
-  tone: "yes" | "no"
+  tone: "yes" | "no" | "held"
   heading: string
   items: LedgerItem[]
   /** Items beyond `items` that the payload counted but did not list. */
@@ -52,12 +63,7 @@ function Column({ column }: { column: LedgerColumn }) {
   return (
     <div
       data-testid={`scope-ledger-col-${column.tone}`}
-      className={cn(
-        "min-w-0 rounded-lg border px-3 py-2",
-        column.tone === "yes"
-          ? "border-emerald-600/40 bg-emerald-500/[0.08] dark:border-emerald-500/25"
-          : "border-rose-600/40 bg-rose-500/10 dark:border-rose-500/25",
-      )}
+      className={cn("min-w-0 rounded-lg border px-3 py-2", TONE_CLASS[column.tone])}
     >
       <p
         id={headingId}
@@ -75,11 +81,16 @@ function Column({ column }: { column: LedgerColumn }) {
                 title={text}
                 className={cn(
                   "truncate",
-                  item.unnameable ? "italic text-muted-foreground" : "text-foreground",
+                  item.unnameable ? "italic text-muted-foreground" : item.muted ? "text-muted-foreground" : "text-foreground",
                 )}
               >
                 {text}
               </span>
+              {item.tag && (
+                <span className="flex-none rounded border border-border px-1 text-[11px] font-semibold uppercase leading-snug tracking-wider text-muted-foreground">
+                  {item.tag}
+                </span>
+              )}
             </li>
           )
         })}

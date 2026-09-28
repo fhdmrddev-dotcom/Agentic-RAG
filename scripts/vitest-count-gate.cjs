@@ -186,13 +186,16 @@ const BASELINE = {
   "ExpertEventCard.test.tsx": 14, // 268-03 +4: the scope card (normal / during_run / held / empty Dropped)
   // ── Phase 268 plan 03 (CHAT-08) — the scope vocabulary + wire. Both knobs, same commit. ──
   "scopeCopy.test.ts": 13,
+  "ScopeChip.test.tsx": 7,
+  "ScopePicker.test.tsx": 15,
+  "ChatArea.scopeChange.test.tsx": 9,
   "HandoffCard.test.tsx": 3,
   "MessageItem.transcriptEvent.test.tsx": 8,
   "InviteExpertDialog.test.tsx": 23, // 267-REVIEW WR-06 +1, IN-02 +1; 267-UI-REVIEW #3 +1
   "ChatArea.expertThread.test.tsx": 18, // 267-REVIEW CR-01 +3, WR-01 +1, WR-02 +1, WR-04 +1, WR-06 +1, WR-07 +1; 267-UI-REVIEW #2 +2
   // 267-UI-REVIEW #1 (BLOCKER) — the light-theme contrast fence over the six phase files. Both
   // knobs, same commit; the figure is the gate's own printed count on the adoption run.
-  "expertThemeContrast.test.tsx": 9, // 268-02 +3: layer-A recon OK/FAILED + ledger Expert pill; FILES += 3 leaves, HUES += indigo
+  "expertThemeContrast.test.tsx": 13, // 268-02 +3: layer-A recon OK/FAILED + ledger Expert pill; FILES += 3 leaves, HUES += indigo; 268-03 +4: scope chip normal/held, scope card normal+held, Expert chip; FILES += 3, PAIR_FLOOR 38→52
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/experts` has NO bare-directory TARGETS
   // entry — its two existing suites are both named FILE-LEVEL just below — so a suite
@@ -260,7 +263,7 @@ const BASELINE = {
   // files in TARGETS. ⛔ `ChatLayout.startChat.test.tsx` is the ONLY fence on ChatLayout's real
   // start wiring: with it unpinned, the two 265-review plants (refreshThreads no-op,
   // discardThread removed) would again leave every gated suite green.
-  "ScopeLedger.test.tsx": 9, // 267-REVIEW WR-08 +1
+  "ScopeLedger.test.tsx": 11, // 267-REVIEW WR-08 +1; 268-03 +2: held tone + Expert tag, muted literal
   "ExpertCard.connection.test.tsx": 6,
   "ChatLayout.startChat.test.tsx": 2,
   // ── Phase 266 plan 04 (D-266-13) — the Library folder names its Expert ─────────────
@@ -4515,6 +4518,9 @@ const TARGETS = [
   // ── Phase 268 plan 03 (CHAT-08) — the scope chip / picker / vocabulary. Named FILE-LEVEL, pinned
   //    in BASELINE, same commit.
   "src/components/chat/__tests__/scopeCopy.test.ts",
+  "src/components/chat/__tests__/ScopeChip.test.tsx",
+  "src/components/chat/__tests__/ScopePicker.test.tsx",
+  "src/components/chat/__tests__/ChatArea.scopeChange.test.tsx",
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,
   // matching how its two siblings below are already reached. Both knobs, same commit.
