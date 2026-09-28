@@ -17,13 +17,22 @@ import userEvent from "@testing-library/user-event"
 import expertChangedRaw from "../../../../../backend/tests/fixtures/phase267/expert_changed.json?raw"
 // @ts-ignore — Vite `?raw` import.
 import expertHandoffRaw from "../../../../../backend/tests/fixtures/phase267/expert_handoff.json?raw"
-import type { ExpertChangedEvent, ExpertHandoffEvent } from "@/lib/api/threads"
+// @ts-ignore — Vite `?raw` import (268-03: the scope_changed builder's real output).
+import scopeChangedRaw from "../../../../../backend/tests/fixtures/phase268/scope_changed.json?raw"
+// @ts-ignore — Vite `?raw` import.
+import scopeHeldRaw from "../../../../../backend/tests/fixtures/phase268/scope_changed_held.json?raw"
+// @ts-ignore — Vite `?raw` import.
+import scopeDuringRunRaw from "../../../../../backend/tests/fixtures/phase268/scope_changed_during_run.json?raw"
+import type { ExpertChangedEvent, ExpertHandoffEvent, ScopeChangedEvent } from "@/lib/api/threads"
 import type { Thread } from "@/types"
 import { ExpertEventCard } from "../ExpertEventCard"
 import { ThreadNavigationProvider } from "../threadNavigation"
 
 const changed = JSON.parse(expertChangedRaw as string) as ExpertChangedEvent
 const handoff = JSON.parse(expertHandoffRaw as string) as ExpertHandoffEvent
+const scopeChanged = JSON.parse(scopeChangedRaw as string) as ScopeChangedEvent
+const scopeHeld = JSON.parse(scopeHeldRaw as string) as ScopeChangedEvent
+const scopeDuringRun = JSON.parse(scopeDuringRunRaw as string) as ScopeChangedEvent
 
 const HIDING = ["sr-only", "hidden", "invisible", "opacity-0"]
 
@@ -149,5 +158,60 @@ describe("ExpertEventCard — expert_handoff (the source thread's pointer)", () 
     render(<ExpertEventCard event={handoff} />)
     expectVisibleAtRest(screen.getByText("Contract Reviewer · Q3 board prep"))
     expect(screen.queryByRole("button")).toBeNull()
+  })
+})
+
+describe("ExpertEventCard — scope_changed (268-03, the same Shell, a third kind)", () => {
+  it("(11) normal: a note named 'Scope change at …', the header, Now / Dropped and the idle footer", () => {
+    render(<ExpertEventCard event={scopeChanged} />)
+    const card = screen.getByTestId("scope-event-card")
+    expect(screen.queryByTestId("expert-event-card")).toBeNull()
+    expect(card).toHaveAttribute("role", "note")
+    expect(card.getAttribute("aria-label")).toMatch(/^Scope change at \S/)
+    expect(card.className).toContain("border-indigo-600/40")
+    expectVisibleAtRest(within(card).getByText("Scope /Client ACME → /Client ACME/Contracts"))
+    const now = screen.getByTestId("scope-event-now")
+    expectVisibleAtRest(within(now).getByText("Now"))
+    expectVisibleAtRest(within(now).getByText("/Client ACME/Contracts (2)"))
+    const dropped = screen.getByTestId("scope-event-dropped")
+    expectVisibleAtRest(within(dropped).getByText("Dropped"))
+    expectVisibleAtRest(within(dropped).getByText("/Client ACME (4)"))
+    const when = screen.getByTestId("scope-event-when")
+    expectVisibleAtRest(when)
+    expect(when.textContent).toBe("From your next message.")
+    // the row's content sentence is never rendered
+    expect(screen.queryByText(/Now: /)).toBeNull()
+  })
+
+  it("(12) written while an answer streamed: the footer names what the answer keeps", () => {
+    render(<ExpertEventCard event={scopeDuringRun} />)
+    expect(screen.getByTestId("scope-event-when").textContent).toBe(
+      "From your next message. The answer in progress keeps /Client ACME.",
+    )
+    expectVisibleAtRest(within(screen.getByTestId("scope-event-now")).getByText("Financial Reports & Filings"))
+    expectVisibleAtRest(within(screen.getByTestId("scope-event-now")).getByText("Slack"))
+  })
+
+  it("(13) held (Restricted): an amber card with Saved / Searching and the leave footer — no Now / Dropped", () => {
+    render(<ExpertEventCard event={scopeHeld} />)
+    const card = screen.getByTestId("scope-event-card")
+    expect(card.className).toContain("border-amber-600/40")
+    const saved = screen.getByTestId("scope-event-saved")
+    expectVisibleAtRest(within(saved).getByText("Saved"))
+    expectVisibleAtRest(within(saved).getByText("/Client ACME/Contracts"))
+    const searching = screen.getByTestId("scope-event-searching")
+    expectVisibleAtRest(within(searching).getByText("Searching"))
+    expectVisibleAtRest(within(searching).getByText("HR Policies only · HR Advisor is Restricted"))
+    expect(screen.getByTestId("scope-event-when").textContent).toBe("Takes effect when HR Advisor leaves.")
+    expect(screen.queryByTestId("scope-event-now")).toBeNull()
+    expect(screen.queryByTestId("scope-event-dropped")).toBeNull()
+  })
+
+  it("(14) an empty Dropped (widening) says 'Nothing' muted", () => {
+    const empty = { folders: [], thread_folder: null, all_documents: false, connections: [] }
+    render(<ExpertEventCard event={{ ...scopeChanged, dropped: empty }} />)
+    const nothing = within(screen.getByTestId("scope-event-dropped")).getByText("Nothing")
+    expectVisibleAtRest(nothing)
+    expect(nothing.className).toContain("text-muted-foreground")
   })
 })

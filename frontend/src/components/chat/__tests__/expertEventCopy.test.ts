@@ -18,22 +18,38 @@ import expertChangedRaw from "../../../../../backend/tests/fixtures/phase267/exp
 import expertHandoffRaw from "../../../../../backend/tests/fixtures/phase267/expert_handoff.json?raw"
 // @ts-ignore — Vite `?raw` import.
 import handoffMarkerRaw from "../../../../../backend/tests/fixtures/phase267/handoff_marker.json?raw"
+// @ts-ignore — Vite `?raw` import (268-03: the scope_changed builder's real output).
+import scopeChangedRaw from "../../../../../backend/tests/fixtures/phase268/scope_changed.json?raw"
+// @ts-ignore — Vite `?raw` import.
+import scopeHeldRaw from "../../../../../backend/tests/fixtures/phase268/scope_changed_held.json?raw"
+// @ts-ignore — Vite `?raw` import.
+import scopeDuringRunRaw from "../../../../../backend/tests/fixtures/phase268/scope_changed_during_run.json?raw"
 import type { Message } from "@/types"
-import type { ExpertChangedEvent, ExpertHandoffEvent, HandoffMarker } from "@/lib/api/threads"
+import type {
+  ExpertChangedEvent,
+  ExpertHandoffEvent,
+  HandoffMarker,
+  ScopeChangedEvent,
+} from "@/lib/api/threads"
 import {
   EVENT_COPY,
+  SCOPE_EVENT_COPY,
   TRANSCRIPT_EVENT_KINDS,
   eventCardModel,
   eventTimeLabel,
   handoffCardModel,
   handoffEventModel,
   handoffMarkerOf,
+  scopeEventModel,
   transcriptEventOf,
 } from "../expertEventCopy"
 
 const changed = JSON.parse(expertChangedRaw as string) as ExpertChangedEvent
 const handoffEvent = JSON.parse(expertHandoffRaw as string) as ExpertHandoffEvent
 const marker = JSON.parse(handoffMarkerRaw as string) as HandoffMarker
+const scopeChanged = JSON.parse(scopeChangedRaw as string) as ScopeChangedEvent
+const scopeHeld = JSON.parse(scopeHeldRaw as string) as ScopeChangedEvent
+const scopeDuringRun = JSON.parse(scopeDuringRunRaw as string) as ScopeChangedEvent
 
 function row(role: Message["role"], payload: unknown): Message {
   return {
@@ -195,6 +211,73 @@ describe("handoffCardModel — the new thread's first message (D-267-15)", () =>
     const m = handoffCardModel({ ...marker, summary: "One line." as unknown as string[] })
     expect(m.bullets).toBeNull()
     expect(m.paragraph).toBe("One line.")
+  })
+})
+
+describe("scopeEventModel — 268's scope_changed kind, from the backend builder's real output", () => {
+  it("(20) the kind is allowlisted and yields its payload", () => {
+    expect(TRANSCRIPT_EVENT_KINDS.has("scope_changed")).toBe(true)
+    expect(transcriptEventOf(row("system", scopeChanged))).toEqual(scopeChanged)
+  })
+
+  it("(21) normal: header with both paths, Now / Dropped with the path fallback, idle footer", () => {
+    const m = scopeEventModel(scopeChanged)
+    expect(m.header).toBe("Scope /Client ACME → /Client ACME/Contracts")
+    expect(m.tone).toBe("scope")
+    expect(m.held).toBe(false)
+    expect(m.now.items).toEqual(["/Client ACME/Contracts (2)"])
+    expect(m.dropped.items).toEqual(["/Client ACME (4)"])
+    expect(m.footer).toBe("From your next message.")
+    expect(m.saved).toBeNull()
+    expect(m.searching).toBeNull()
+  })
+
+  it("(22) written while an answer streamed: the footer says the answer keeps the old scope", () => {
+    const m = scopeEventModel(scopeDuringRun)
+    expect(m.footer).toBe("From your next message. The answer in progress keeps /Client ACME.")
+    // Biased: the Expert's folder and its connection ride Now; the thread folder carries its path.
+    expect(m.now.items).toEqual(["Financial Reports & Filings", "/Client ACME/Contracts (2)"])
+    expect(m.now.connections).toEqual(["Slack"])
+  })
+
+  it("(23) held (Restricted, Save & say): Saved / Searching and the leave footer", () => {
+    const m = scopeEventModel(scopeHeld)
+    expect(m.tone).toBe("held")
+    expect(m.held).toBe(true)
+    expect(m.saved).toBe("/Client ACME/Contracts")
+    expect(m.searching).toBe("HR Policies only · HR Advisor is Restricted")
+    expect(m.footer).toBe("Takes effect when HR Advisor leaves.")
+  })
+
+  it("(24) no folder → a folder: Dropped reads 'All other documents'; widening reads 'Nothing'", () => {
+    const toFolder = scopeEventModel({
+      ...scopeChanged,
+      from_folder: null,
+      dropped: { ...emptyLine, all_documents: true },
+    })
+    expect(toFolder.header).toBe("Scope All your documents → /Client ACME/Contracts")
+    expect(toFolder.dropped.items).toEqual(["All other documents"])
+    const widen = scopeEventModel({ ...scopeChanged, dropped: emptyLine })
+    expect(widen.dropped.items).toEqual([EVENT_COPY.nothing])
+    expect(widen.dropped.empty).toBe(true)
+  })
+
+  it("(25) a thread folder WITHOUT a path renders 267's /{name} ({n}) — 267 rows unchanged", () => {
+    const noPath = scopeEventModel({
+      ...scopeChanged,
+      now: { ...emptyLine, thread_folder: { id: "f", name: "Contracts", doc_count: 2, path: null } },
+    })
+    expect(noPath.now.items).toEqual(["/Contracts (2)"])
+    // the 267 swap still renders byte-identically
+    expect(eventCardModel(changed).dropped.items).toEqual(["Financial Reports & Filings", "/Client ACME (4)"])
+  })
+
+  it("(26) SCOPE_EVENT_COPY — the §7.3 strings, exact", () => {
+    expect(SCOPE_EVENT_COPY.header("/A", "/B")).toBe("Scope /A → /B")
+    expect(SCOPE_EVENT_COPY.keys).toEqual({ now: "Now", dropped: "Dropped", saved: "Saved", searching: "Searching" })
+    expect(SCOPE_EVENT_COPY.allOtherDocuments).toBe("All other documents")
+    expect(SCOPE_EVENT_COPY.footerIdle).toBe("From your next message.")
+    expect(SCOPE_EVENT_COPY.ariaLabel("14:35")).toBe("Scope change at 14:35")
   })
 })
 
