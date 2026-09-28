@@ -1405,7 +1405,14 @@ async def continue_run(
         await spawn_continuation_run(
             run_id=run_id,
             thread_id=thread_id,
-            current_user=current_user,
+            # 268-REVIEW CR-01: get_current_user carries no org_id, so without this the
+            # continuation's writes (assistant message, warnings, a RE-PAUSE carrier) fall to
+            # the mig-106 trigger's LIMIT-1 guess — and the next Continue, reading AND org_id =
+            # <the run's org>, re-drives the previous pause's calls. The run's own org is the
+            # value the carrier lookup above already uses.
+            current_user=(
+                {**current_user, "org_id": str(_cont_org_id)} if _cont_org_id else current_user
+            ),
             redis=redis,
             # Phase 163 (D-05/D-09): the Deep continuation producer is service-role.
             supabase=service_supabase,
