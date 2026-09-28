@@ -182,8 +182,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 268-01-PLAN.md — migration 197 (runs.expert_id / expert_attributed, no FK, no backfill); Expert + active org stamped at the one insert with a SQL parent copy; resolve-once send path; 4 agent_loop org stamps; Continue accumulates tokens; real-PG two-org fence
-- [ ] 268-02-PLAN.md — one per_root CTE (per-row pricing, sub-agent roll-up, placeholder-root rule), bound `expert` filter on /summary + /runs, expert_breakdown + window totals; cockpit Expert pills, Spend by Expert + recon footer, ledger Expert column, Blind Spots tiles
+- [x] 268-01-PLAN.md — migration 197 (runs.expert_id / expert_attributed, no FK, no backfill); Expert + active org stamped at the one insert with a SQL parent copy; resolve-once send path; 4 agent_loop org stamps; Continue accumulates tokens; real-PG two-org fence
+- [x] 268-02-PLAN.md — one per_root CTE (per-row pricing, sub-agent roll-up, placeholder-root rule), bound `expert` filter on /summary + /runs, expert_breakdown + window totals; cockpit Expert pills, Spend by Expert + recon footer, ledger Expert column, Blind Spots tiles
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
