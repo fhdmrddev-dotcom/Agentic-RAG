@@ -822,7 +822,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 56 / 28 / 3573 | ⚠ STALE (`54/27/3557`). **268-01**: 4 org stamps + 1 kwarg, 0 new branches. ⛔ prompt-assembly seam OWED |
+| `backend/app/services/agent_loop.py` | 57 / 28 / 3580 | ⚠ STALE (`56/28/3573`). **268**: 4 org stamps + ONE scope-note fold in history (D-268-26); 1 kind check, 1 prepend. ⛔ prompt-assembly seam OWED |
 | `backend/app/services/tool_dispatcher.py` | 93 / 40 / 5234 | ⚠ STALE (`92/39/5221`). **268-03**: +4 audit keys in the 2 existing `search.query` dicts. ⛔ registry/handler split OWED |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |

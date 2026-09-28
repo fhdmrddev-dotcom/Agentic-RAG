@@ -86,6 +86,7 @@ from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import insert_assistant_message
 from app.models.message import TRANSCRIPT_EVENT_KINDS
+from app.services.scope_note import SCOPE_CHANGED_KIND, ScopeNoteFold
 from app.utils.folder_utils import fetch_visible_folders
 from app.services.context_window import (
     trim_messages_to_fit,
@@ -1026,6 +1027,9 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
     is already ``jsonb``.
     """
     messages: list[dict] = []
+    # Phase 268 (D-268-26 / SEED-319): a scope change is TOLD to the model — one note, prepended to the
+    # NEXT user message (never a mid-history system row). The words and the fold live in scope_note.py.
+    _scope_fold = ScopeNoteFold()
     for msg in history_rows:
         # Phase 267 (D-267-10) — transcript-only: rendered to people, never sent to a model.
         # One kind check against the one-home allowlist; every other system kind is untouched.
@@ -1037,6 +1041,8 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
             and isinstance(_first_call[0], dict)
             and _first_call[0].get("kind") in TRANSCRIPT_EVENT_KINDS
         ):
+            if _first_call[0].get("kind") == SCOPE_CHANGED_KIND:
+                _scope_fold.add(_first_call[0])
             continue
         tool_calls_data = msg.get("tool_calls")
         if (
@@ -1109,9 +1115,10 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
                 })
         else:
             # User messages, plain assistant messages, or messages with null/empty tool_calls
+            _note = _scope_fold.take() if msg["role"] == "user" else None
             messages.append({
                 "role": msg["role"],
-                "content": msg.get("content") or "",
+                "content": (f"{_note}\n\n" if _note else "") + (msg.get("content") or ""),
                 **({"reasoning_content": msg["reasoning_content"]} if msg["role"] == "assistant" and msg.get("reasoning_content") else {}),
             })
     return messages
