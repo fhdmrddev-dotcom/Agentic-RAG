@@ -51,7 +51,41 @@ const mockSummary: SpendSummaryData = {
       isRated: true,
     },
   ],
+  // Phase 268: the window's Spend by Expert lines. They sum to the window total (148.62 over
+  // 100 runs), so the recon footer reads ✓ on this fixture. Neither line is $0, so the page-
+  // wide "never $0.0000" invariants below keep meaning what they meant.
+  expertBreakdown: [
+    {
+      key: "11111111-1111-4111-8111-111111111111",
+      expertId: "11111111-1111-4111-8111-111111111111",
+      name: "HR Advisor",
+      deleted: false,
+      scopeMode: "restricted",
+      runCount: 60,
+      inputTokens: 30000000,
+      outputTokens: 5000000,
+      spendUsd: 100.0,
+      unratedCount: 0,
+    },
+    {
+      key: "none",
+      expertId: null,
+      name: null,
+      deleted: false,
+      scopeMode: null,
+      runCount: 40,
+      inputTokens: 11500000,
+      outputTokens: 1700000,
+      spendUsd: 48.62,
+      unratedCount: 8,
+    },
+  ],
+  windowTotalUsd: 148.62,
+  windowRunCount: 100,
+  unpricedSubagents: 0,
 }
+
+const HR_ID = "11111111-1111-4111-8111-111111111111"
 
 const mockRuns: SpendRunItem[] = [
   {
@@ -66,6 +100,11 @@ const mockRuns: SpendRunItem[] = [
     costUsd: 0.0075,
     isRated: true,
     tokenCoverage: ["agent", "single", "batch", "emit"],
+    expertId: HR_ID,
+    expertName: "HR Advisor",
+    expertDeleted: false,
+    expertAttributed: true,
+    subagentCount: 2,
   },
   {
     id: "run-unrated-002",
@@ -79,6 +118,11 @@ const mockRuns: SpendRunItem[] = [
     costUsd: null,
     isRated: false,
     tokenCoverage: ["agent", "single"],
+    expertId: null,
+    expertName: null,
+    expertDeleted: false,
+    expertAttributed: false,
+    subagentCount: 0,
   },
 ]
 
@@ -112,7 +156,7 @@ describe("AdminSpendPage (METER-07)", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Spend & Metering")).toBeInTheDocument()
-      expect(screen.getByText("$148.6200")).toBeInTheDocument()
+      expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$148.6200")
     })
 
     // Check footnote with strict anti-falsehood disclaimer
@@ -163,7 +207,7 @@ describe("AdminSpendPage (METER-07)", () => {
     render(<AdminSpendPage />)
 
     await waitFor(() => {
-      expect(screen.getByText("$148.6200")).toBeInTheDocument()
+      expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$148.6200")
     })
     expect(screen.getByRole("heading", { name: /What This View Cannot See/i })).toBeInTheDocument()
     expect(screen.getByText("View 8 Unrated Runs →")).toBeInTheDocument()
@@ -186,7 +230,7 @@ describe("AdminSpendPage (METER-07)", () => {
     render(<AdminSpendPage />)
 
     await waitFor(() => {
-      expect(screen.getByText("$148.6200")).toBeInTheDocument()
+      expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$148.6200")
       expect(screen.getByText("Active Rate Registry (1)")).toBeInTheDocument()
     })
 
@@ -203,7 +247,7 @@ describe("AdminSpendPage (METER-07)", () => {
     render(<AdminSpendPage />)
 
     await waitFor(() => {
-      expect(screen.getByText("$148.6200")).toBeInTheDocument()
+      expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$148.6200")
       expect(screen.getByRole("button", { name: /Reprice Model/i })).toBeInTheDocument()
     })
 
@@ -279,7 +323,7 @@ describe("AdminSpendPage (METER-07)", () => {
   it("names the coverage filter's scope, because /summary has no status parameter", async () => {
     const user = userEvent.setup()
     render(<AdminSpendPage />)
-    await waitFor(() => expect(screen.getByText("$148.6200")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$148.6200"))
 
     expect(screen.queryByTestId("coverage-scope-note")).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: /Has Unrated/i }))
@@ -291,7 +335,7 @@ describe("AdminSpendPage (METER-07)", () => {
   it("gives its root a constrained height so the page can actually scroll", async () => {
     const { container } = render(<AdminSpendPage />)
     await waitFor(() => {
-      expect(screen.getByText("$148.6200")).toBeInTheDocument()
+      expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$148.6200")
     })
 
     const root = container.firstElementChild as HTMLElement
@@ -341,7 +385,7 @@ describe("AdminSpendPage (METER-07)", () => {
 
     // Initial mount: fast
     render(<AdminSpendPage />)
-    await waitFor(() => expect(screen.getByText("$148.6200")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$148.6200"))
 
     // First: trigger a refresh with slow response (fireEvent avoids awaiting pending promise)
     vi.mocked(spendApi.getSpendSummary).mockReturnValueOnce(slowPromise as any)
@@ -391,6 +435,11 @@ describe("AdminSpendPage (METER-07)", () => {
       costUsd: null,
       isRated: true,
       tokenCoverage: null,
+      expertId: null,
+      expertName: null,
+      expertDeleted: false,
+      expertAttributed: true,
+      subagentCount: 0,
     }
     vi.mocked(spendApi.getSpendRuns).mockResolvedValueOnce({
       runs: [unmeasuredRatedRun],
@@ -583,5 +632,210 @@ describe("AdminSpendPage — BUG-260923-02: every ledger row is reachable", () =
     expect(vi.mocked(spendApi.getSpendRuns)).toHaveBeenLastCalledWith(
       expect.objectContaining({ offset: 0 }),
     )
+  })
+})
+
+// ── Phase 268 (METER-08, D-268-08) — one Expert filter, and EVERY card follows it ─────────
+// The 257 "two dialects" defect was a filter that reached the ledger and not the charts. The
+// Expert filter must reach getSpendSummary AND getSpendRuns from loadAll, AND the paging door,
+// AND the refresh door — and the four summary/ledger regions must visibly move together.
+describe("AdminSpendPage — Phase 268: spend by Expert", () => {
+  const filteredSummary: SpendSummaryData = {
+    ...mockSummary,
+    totalSpendUsd: 0.42,
+    ratedRunsCount: 3,
+    unratedRunsCount: 0,
+    unmeasuredRunsCount: 0,
+    dailySpend: [{ date: "2026-09-21", dayLabel: "09/21", spendUsd: 0.42, unratedCount: 0 }],
+    modelBreakdown: [
+      {
+        modelId: "gpt-5-mini",
+        spendUsd: 0.42,
+        percentage: 100,
+        color: "hsl(142 71% 45%)",
+        runCount: 3,
+        ratedCount: 3,
+        unratedCount: 0,
+        isRated: true,
+      },
+    ],
+  }
+  const filteredRuns: SpendRunItem[] = [
+    { ...mockRuns[0], id: "run-hr-9999-xxxxxxxx", subagentCount: 1 },
+  ]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(spendApi.getSpendSummary).mockImplementation(async (p) =>
+      p?.expert === HR_ID ? filteredSummary : mockSummary,
+    )
+    vi.mocked(spendApi.getSpendRuns).mockImplementation(async (p) =>
+      p?.expert === HR_ID
+        ? { runs: filteredRuns, totalCount: 1 }
+        : { runs: mockRuns, totalCount: mockRuns.length },
+    )
+    vi.mocked(spendApi.getModelRates).mockResolvedValue(mockRates)
+  })
+
+  it("KPIs, the 14-day chart, the donut and the ledger all move together (D-268-08)", async () => {
+    render(<AdminSpendPage />)
+    await waitFor(() => expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$148.6200"))
+    expect(screen.getByText("09/18")).toBeInTheDocument()
+    expect(screen.getByText("claude-3-5-sonnet")).toBeInTheDocument()
+    expect(screen.getByText("run-rate…")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId(`spend-expert-pill-${HR_ID}`))
+
+    await waitFor(() => expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$0.4200"))
+    // both calls carry the ONE filter
+    expect(vi.mocked(spendApi.getSpendSummary).mock.calls.at(-1)?.[0]?.expert).toBe(HR_ID)
+    expect(vi.mocked(spendApi.getSpendRuns).mock.calls.at(-1)?.[0]?.expert).toBe(HR_ID)
+    // KPI 1 names the filter
+    expect(screen.getByText("Spend · HR Advisor")).toBeVisible()
+    expect(screen.queryByText("Total Org Spend (Attributable)")).not.toBeInTheDocument()
+    // the chart moved
+    expect(screen.getByText("09/21")).toBeInTheDocument()
+    expect(screen.queryByText("09/18")).not.toBeInTheDocument()
+    // the donut moved
+    expect(screen.getByText("gpt-5-mini")).toBeInTheDocument()
+    expect(screen.queryByText("claude-3-5-sonnet")).not.toBeInTheDocument()
+    // the ledger moved
+    expect(screen.getByText("run-hr-9…")).toBeInTheDocument()
+    expect(screen.queryByText("run-rate…")).not.toBeInTheDocument()
+    // the chart and donut headers say which Expert they show
+    expect(screen.getAllByText("· HR Advisor").length).toBe(2)
+  })
+
+  it("paging the ledger while filtered keeps the filter", async () => {
+    vi.mocked(spendApi.getSpendRuns).mockImplementation(async (p) => ({
+      runs: Array.from({ length: 50 }, (_, i) => ({ ...filteredRuns[0], id: `run-${(p?.offset ?? 0) + i}-xxxxxxxx` })),
+      totalCount: 120,
+    }))
+    render(<AdminSpendPage />)
+    await screen.findByText("Showing 1–50 of 120")
+    fireEvent.click(screen.getByTestId(`spend-expert-pill-${HR_ID}`))
+    await waitFor(() => expect(vi.mocked(spendApi.getSpendRuns).mock.calls.at(-1)?.[0]?.expert).toBe(HR_ID))
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }))
+    await screen.findByText("Showing 51–100 of 120")
+    expect(vi.mocked(spendApi.getSpendRuns)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 50, expert: HR_ID }),
+    )
+  })
+
+  it("Refresh keeps the filter", async () => {
+    render(<AdminSpendPage />)
+    await screen.findByTestId(`spend-expert-pill-${HR_ID}`)
+    fireEvent.click(screen.getByTestId(`spend-expert-pill-${HR_ID}`))
+    await waitFor(() => expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$0.4200"))
+    const before = vi.mocked(spendApi.getSpendSummary).mock.calls.length
+    fireEvent.click(screen.getByRole("button", { name: /Refresh/i }))
+    await waitFor(() => expect(vi.mocked(spendApi.getSpendSummary).mock.calls.length).toBe(before + 1))
+    expect(vi.mocked(spendApi.getSpendSummary).mock.calls.at(-1)?.[0]?.expert).toBe(HR_ID)
+    expect(vi.mocked(spendApi.getSpendRuns).mock.calls.at(-1)?.[0]?.expert).toBe(HR_ID)
+  })
+
+  it("the statement line names the filter, and clear resets it to all", async () => {
+    render(<AdminSpendPage />)
+    const statement = await screen.findByTestId("spend-filter-statement")
+    expect(statement).toHaveTextContent(/^Showing all runs · Last 30D$/)
+    expect(statement).toBeVisible()
+
+    fireEvent.click(screen.getByTestId(`spend-expert-pill-${HR_ID}`))
+    await waitFor(() =>
+      expect(screen.getByTestId("spend-filter-statement")).toHaveTextContent(
+        /^Showing HR Advisor · Last 30D · the cards, charts and ledger follow this filter · clear$/,
+      ),
+    )
+    fireEvent.click(within(screen.getByTestId("spend-filter-statement")).getByRole("button", { name: "clear" }))
+    await waitFor(() =>
+      expect(screen.getByTestId("spend-filter-statement")).toHaveTextContent(/^Showing all runs · Last 30D$/),
+    )
+    expect(vi.mocked(spendApi.getSpendSummary).mock.calls.at(-1)?.[0]?.expert).toBeUndefined()
+    expect(vi.mocked(spendApi.getSpendRuns).mock.calls.at(-1)?.[0]?.expert).toBeUndefined()
+  })
+
+  it("the Spend by Expert table does not follow the filter and reconciles with the window", async () => {
+    render(<AdminSpendPage />)
+    await screen.findByTestId(`spend-expert-pill-${HR_ID}`)
+    fireEvent.click(screen.getByTestId(`spend-expert-pill-${HR_ID}`))
+    await waitFor(() => expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$0.4200"))
+    const table = screen.getByTestId("expert-spend-table")
+    expect(within(screen.getByTestId("expert-spend-row-none")).getByText("No Expert")).toBeVisible()
+    expect(within(screen.getByTestId("expert-spend-row-total")).getByText("$148.6200")).toBeVisible()
+    expect(within(table).getByText("$100.0000")).toBeVisible()
+    expect(screen.getByTestId("expert-spend-recon")).toHaveTextContent(
+      "✓ 2 lines = $148.6200 = org total · 100 runs, 0 unattributed",
+    )
+    expect(screen.getByText("every Expert · Last 30D · not filtered")).toBeVisible()
+    expect(
+      screen.getByText(/^A run counts toward the Expert active when it started\./),
+    ).toBeVisible()
+  })
+
+  it("the ledger shows an Expert column second, and the sub-agent roll-up tag", async () => {
+    render(<AdminSpendPage />)
+    await screen.findByText("run-rate…")
+    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent)
+    const ledgerStart = headers.indexOf("Run Identity")
+    expect(headers[ledgerStart + 1]).toBe("Expert")
+    const cells = screen.getAllByTestId("ledger-expert-cell")
+    expect(cells[0]).toHaveTextContent("HR Advisor")
+    expect(cells[1]).toHaveTextContent("Not recorded")
+    expect(screen.getByText("incl. 2 sub-agents")).toBeVisible()
+    // D-268-24: the "continued" tag is not built — it has no data source.
+    expect(screen.queryByText(/^continued$/)).not.toBeInTheDocument()
+  })
+
+  it("a filtered, empty ledger says whose line reads $0.0000, and the header names the filter", async () => {
+    vi.mocked(spendApi.getSpendRuns).mockImplementation(async (p) =>
+      p?.expert === HR_ID ? { runs: [], totalCount: 0 } : { runs: mockRuns, totalCount: 2 },
+    )
+    render(<AdminSpendPage />)
+    await screen.findByTestId(`spend-expert-pill-${HR_ID}`)
+    fireEvent.click(screen.getByTestId(`spend-expert-pill-${HR_ID}`))
+    await waitFor(() =>
+      expect(screen.getByTestId("ledger-empty-state")).toHaveTextContent(
+        "No runs for HR Advisor in Last 30D. Its line in Spend by Expert reads $0.0000.",
+      ),
+    )
+    expect(screen.getByText("filtered to HR Advisor")).toBeVisible()
+  })
+
+  it("Blind Spots carries the two attribution tiles, three to a row", async () => {
+    render(<AdminSpendPage />)
+    const sub = await screen.findByTestId("blind-spot-subagent")
+    expect(within(sub).getByText("Sub-agent tokens now counted")).toBeVisible()
+    expect(within(screen.getByTestId("blind-spot-handoff")).getByText("Handoff summaries not metered")).toBeVisible()
+    const grid = sub.parentElement!
+    expect(grid.className).toMatch(/\bxl:grid-cols-3\b/)
+    expect(grid.className).not.toMatch(/\bxl:grid-cols-4\b/)
+  })
+
+  it("folds unpriced sub-agents into the unrated disclosure (D-268-25)", async () => {
+    vi.mocked(spendApi.getSpendSummary).mockResolvedValue({ ...mockSummary, unpricedSubagents: 3 })
+    render(<AdminSpendPage />)
+    expect(
+      await screen.findByText(
+        "3 sub-agent runs inside rated runs have no rate either, so their tokens are not in the total.",
+      ),
+    ).toBeVisible()
+  })
+
+  it("a failed load keeps All plus the selected pill, and the card says it is unavailable", async () => {
+    render(<AdminSpendPage />)
+    await screen.findByTestId(`spend-expert-pill-${HR_ID}`)
+    fireEvent.click(screen.getByTestId(`spend-expert-pill-${HR_ID}`))
+    await waitFor(() => expect(screen.getByTestId("spend-total-value")).toHaveTextContent("$0.4200"))
+
+    vi.mocked(spendApi.getSpendSummary).mockRejectedValue(new Error("network down"))
+    fireEvent.click(screen.getByRole("button", { name: /Refresh/i }))
+    expect(
+      await screen.findByText("Spend by Expert unavailable — spend data did not load."),
+    ).toBeVisible()
+    const pills = within(screen.getByTestId("spend-expert-filter"))
+      .getAllByRole("button")
+      .map((b) => b.textContent)
+    expect(pills).toEqual(["All", "HR Advisor"])
+    expect(screen.queryByTestId("expert-spend-table")).not.toBeInTheDocument()
   })
 })

@@ -34,9 +34,16 @@ import ledgerSrc from "../../experts/ScopeLedger.tsx?raw"
 import cardSrc from "../../experts/catalog/ExpertCard.tsx?raw"
 // @ts-ignore — Vite `?raw` import.
 import modalSrc from "../../experts/catalog/ExpertDetailModal.tsx?raw"
+// @ts-ignore — Vite `?raw` import. Phase 268-02: the three new /admin/spend leaves (UI-SPEC §4.3).
+import pillsSrc from "../../admin/spend/ExpertFilterPills.tsx?raw"
+// @ts-ignore — Vite `?raw` import.
+import spendCardSrc from "../../admin/spend/ExpertSpendCard.tsx?raw"
+// @ts-ignore — Vite `?raw` import.
+import disclosuresSrc from "../../admin/spend/AttributionDisclosures.tsx?raw"
 import type { ExpertChangedEvent } from "@/lib/api/threads"
 import { ExpertEventCard } from "../ExpertEventCard"
 import { ScopeLedger } from "../../experts/ScopeLedger"
+import { ExpertSpendCard, LedgerExpertCell } from "../../admin/spend/ExpertSpendCard"
 
 const changed = JSON.parse(expertChangedRaw as string) as ExpertChangedEvent
 
@@ -80,6 +87,62 @@ describe("(A) rendered — the review's named elements carry a light-safe step b
     expectBothThemes(screen.getByTestId("scope-ledger-col-yes"), "border-emerald-600/40", "dark:border-emerald-500/25")
     expectBothThemes(screen.getByTestId("scope-ledger-col-no"), "border-rose-600/40", "dark:border-rose-500/25")
   })
+
+  // ── Phase 268-02 (UI-SPEC §4.3): the /admin/spend leaves, rendered on both themes. ──────
+  const spendLine = (key: string, spendUsd: number, runCount: number) => ({
+    key,
+    expertId: key === "none" ? null : key,
+    name: key === "none" ? null : "HR Advisor",
+    deleted: false,
+    scopeMode: null,
+    runCount,
+    inputTokens: 10,
+    outputTokens: 5,
+    spendUsd,
+    unratedCount: 0,
+  })
+  const spendLines = [spendLine("11111111-1111-4111-8111-111111111111", 1, 2), spendLine("none", 0.5, 1)]
+
+  it("(7) the recon footer's OK state is emerald-700 on light, emerald-300 on dark", () => {
+    render(
+      <ExpertSpendCard
+        state="ready"
+        lines={spendLines}
+        windowTotalUsd={1.5}
+        windowRunCount={3}
+        windowLabel="Last 30D"
+        selected={null}
+        selectedLabel={null}
+        onSelect={() => {}}
+      />,
+    )
+    expectBothThemes(screen.getByTestId("expert-spend-recon"), "text-emerald-700", "dark:text-emerald-300")
+  })
+
+  it("(8) the recon footer's FAILED state is rose-700 on light, rose-300 on dark", () => {
+    render(
+      <ExpertSpendCard
+        state="ready"
+        lines={spendLines}
+        windowTotalUsd={1.5001}
+        windowRunCount={3}
+        windowLabel="Last 30D"
+        selected={null}
+        selectedLabel={null}
+        onSelect={() => {}}
+      />,
+    )
+    expectBothThemes(screen.getByTestId("expert-spend-recon"), "text-rose-700", "dark:text-rose-300")
+  })
+
+  it("(9) the ledger's Expert pill is violet-700 on light, violet-200 on dark", () => {
+    render(
+      <LedgerExpertCell
+        run={{ expertId: "x", expertName: "HR Advisor", expertDeleted: false, expertAttributed: true }}
+      />,
+    )
+    expectBothThemes(screen.getByTestId("ledger-expert-cell"), "text-violet-700", "dark:text-violet-200")
+  })
 })
 
 const FILES: Record<string, string> = {
@@ -89,13 +152,21 @@ const FILES: Record<string, string> = {
   "ScopeLedger.tsx": ledgerSrc as string,
   "ExpertCard.tsx": cardSrc as string,
   "ExpertDetailModal.tsx": modalSrc as string,
+  // Phase 268-02. The copy module stays OUT: it is < 1000 chars of class-free strings.
+  "ExpertFilterPills.tsx": pillsSrc as string,
+  "ExpertSpendCard.tsx": spendCardSrc as string,
+  "AttributionDisclosures.tsx": disclosuresSrc as string,
 }
 
-const HUES = "violet|emerald|rose|amber"
+// Phase 268-02: indigo joins — it is the scope / filter accent, and light `--primary` indigo
+// measured 4.47:1 on white, below 4.5:1 (UI-SPEC §4.2).
+const HUES = "violet|emerald|rose|amber|indigo"
+/** Measured at 268-02 GREEN; a drop below it means a leaf left FILES or lost its pairs. */
+const PAIR_FLOOR = 999
 /** A text step on one of the four semantic hues, with its optional variant prefix captured. */
 const TOKEN = new RegExp(`(^|[\\s"'\`(])((?:[a-z-]+:)*)text-(${HUES})-(\\d{2,3})(?![\\d])`, "g")
 
-describe("(B) class fence — no dark-only text step on the phase's six files", () => {
+describe("(B) class fence — no dark-only text step on the phase files (267's six + 268-02's three)", () => {
   it("(4) every source is non-trivial (the fence cannot pass over an empty import)", () => {
     for (const [name, src] of Object.entries(FILES)) {
       expect(src.length, name).toBeGreaterThan(1000)
@@ -132,7 +203,8 @@ describe("(B) class fence — no dark-only text step on the phase's six files", 
       })
     }
     expect(orphans).toEqual([])
-    // Non-vacuity: the fence has pairs to check (the review named eight sites).
-    expect(pairs).toBeGreaterThanOrEqual(8)
+    // Non-vacuity: the fence has pairs to check (the review named eight sites; 268-02 raised
+    // the floor to the pair count measured with its three leaves in FILES).
+    expect(pairs).toBeGreaterThanOrEqual(PAIR_FLOOR)
   })
 })
