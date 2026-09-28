@@ -50,10 +50,13 @@ Status: **Phase 268 executed — G-4 operator pass owed (268-04 Task 4), then ve
   SC#4 biased / restricted / authz, MT-1, PT-1, LM-1 PASS. SC#10 fixed recipe: **1 PASS / 7 ⛔** — turn 2 answered
   from history without searching (**F-1 → SEED-319**, an operator design decision); the fresh-search variant
   retrieves only the new subtree on 8 / 8. SC#1-continued OWED-manual. Record: `268-UAT-LOG.md`.
+- **2026-09-29, D-268-26 (SEED-319 "tell the model") BUILT and re-driven:** fix `1ec11a842` (RED `29e64548d`); SC#10
+  run 2 = **6 PASS / 2 ⛔** (openai, google re-retrieve with grep on the NEW path: a pass-bar gap, answers correct);
+  dropped-folder citations **6/8 → 0/8**; G4-2 API follow-up PASS. Backend 71 = base set. SEED-319 answered.
 - Still owed from 267: its independent review and the operator's G-4 sign-off (see the 267 block below).
 
 Resume file: .planning/phases/268-expert-spend-mid-thread-scope/268-04-PLAN.md (Task 4, then Task 5 step 1)
-Last activity: 2026-09-28 -- 268-04 live UAT + closeout; G-4 checkpoint returned
+Last activity: 2026-09-29 -- D-268-26 scope note built + SC#10 re-driven; G-4 Chrome pass owed (orchestrator)
 
 ---
 
@@ -88,7 +91,7 @@ Last activity: 2026-09-28 -- 268-04 live UAT + closeout; G-4 checkpoint returned
 1. **The operator's G-4 Chrome pass** (268-04 Task 4: G4-1, G4-2, G4-3, both themes). Run this first.
 2. **The independent review** by an agent that did not build 268 (AGENTS.md).
 3. **SC#1-continued** live (a Deep run reaching the cap, then Continue).
-4. The operator's ruling on **SEED-319** (F-1).
+4. ~~The operator's ruling on **SEED-319** (F-1).~~ Ruled 2026-09-29 (D-268-26) and BUILT (`1ec11a842`); SC#10 re-drive 6/8.
 5. Production: `268-PROD-PARITY.md` — migration 197 BEFORE the backend deploy; every write on explicit per-action approval.
 
 **CLAUDE.md size:** 117,178 chars after 268's cells — under the 120,000 warn band; no split scheduled (headroom

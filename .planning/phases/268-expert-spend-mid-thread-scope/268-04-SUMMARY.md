@@ -26,6 +26,8 @@ tech-stack:
 key-files:
   created:
     - backend/tests/integration/test_268_spend_rollup_pg.py
+    - backend/app/services/scope_note.py
+    - backend/tests/unit/test_268_scope_history_note.py
     - .planning/phases/268-expert-spend-mid-thread-scope/268-UAT-LOG.md
     - .planning/phases/268-expert-spend-mid-thread-scope/268-PROD-PARITY.md
     - .planning/phases/268-expert-spend-mid-thread-scope/evidence/ (16 files)
@@ -33,6 +35,7 @@ key-files:
     - .planning/seeds/SEED-320-meter-non-run-llm-calls.md
     - .planning/seeds/SEED-321-admin-spend-light-theme.md
   modified:
+    - backend/app/services/agent_loop.py
     - .planning/phases/268-expert-spend-mid-thread-scope/268-VALIDATION.md
     - .planning/seeds/SEED-286-a-thread-s-folder-scope-cannot-be-changed-once-it-starts.md
     - .planning/seeds/SEED-314-chat-rows-stamped-with-the-oldest-org-not-the-active-one.md
@@ -45,7 +48,8 @@ key-files:
 key-decisions:
   - "268-04: drove in the operator-named org (fhdmrd's, 22f9c615) and authored the missing fixtures there through the API, rather than reusing 267's UAT org"
   - "268-04: the SC#10 fixed recipe was applied unchanged (7 rows blocked); a labelled variant turn measured retrieval scope separately (8/8)"
-  - "268-04: F-1 (follow-up answered from history cites the dropped folder) recorded and seeded (SEED-319) for an operator decision, not fixed"
+  - "268-04: F-1 (follow-up answered from history cites the dropped folder) recorded and seeded (SEED-319) for an operator decision"
+  - "268-04 continuation (D-268-26): the model is told - one note prepended to the NEXT user message; held changes add none; consecutive changes fold first-from to last-to; words in scope_note.py (not expert_scope.py, so agent_loop imports no expert_* module)"
   - "268-04: research Q9 refuted by data (two Deep runs at continues_used=3, sole writer runs.py:1107), so no Q9 seed"
 metrics:
   duration: "~2h45m"
@@ -152,6 +156,75 @@ figures, never summed).
 frontend/src/components/chat/MessageItem.tsx` → **empty** (G-5 not fired; SEED-224 extraction stays owed).
 
 `graphify update .` ran on the main tree (34,037 nodes); `graphify-out/` left uncommitted (the operator's).
+
+## Continuation (2026-09-29) — D-268-26: the SEED-319 fix and the board re-drive
+
+The operator ruled SEED-319 "tell the model" (D-268-26, `4a6df4b7d`). Task 4 (G-4 in Chrome) is NOT done here: the
+orchestrator drives it.
+
+**Design choices (each pinned by a test):**
+- The note goes on the **next user message's content**, never a mid-history `system` row (Anthropic and Gemini reject
+  those). The `scope_changed` row itself is still skipped. A change made during a run attaches after that run's answer,
+  whose results are the stale ones.
+- **Several changes before one user message fold into one note**, first `from` → last `to`. Every earlier result was
+  retrieved under the first `from`, so that is what the model needs; a change that returns to its start says nothing.
+  I chose folding over "latest wins" because "latest wins" would name an intermediate folder no result came from.
+- **A `held` change adds no note.** Under a Restricted Expert the saved folder is not searched, so the model's search
+  did not change. Known limit, recorded in SEED-319: when that Expert later leaves, the change takes effect through an
+  `expert_changed` event, which the model never sees (D-267-10).
+- **The words live in a new neutral module, `backend/app/services/scope_note.py`**, not `expert_scope.py`. The AST
+  fence would allow an `expert_scope` import, but it would bring an `expert_*` module and `expert_service` into the
+  loop's import graph. The helper reads the stored payload and never its `expert` key, so no Expert name can reach a
+  model. Folder paths are user-authored text (T-268-22), so they are stripped of brackets and line breaks and capped at
+  120 characters.
+
+**RED** (`29e64548d`, `test_268_scope_history_note.py`): `8 failed, 4 passed`. The four that pass at base are guards
+whose base behaviour is the contract: held adds nothing, `expert_changed` is invisible, a round trip says nothing, a
+trailing event emits nothing.
+```
+E       AssertionError: assert ('/Client ACME' in '')
+E       AssertionError: assert ('all your documents' in 'q')
+E       AssertionError: assert ('\n' not in 'q' and 0 == 0 and 0 == 1)
+```
+**GREEN** (`1ec11a842`): `12 passed`. Neighbouring suites stayed green: 267 transcript kinds, 267 expert_changed
+byte-equal fixtures, the 260/261/264 AST fences, 268 scope effect and patch, 259 closed core, 255 contract guard
+(`120 passed`), and every other `_reconstruct_history` suite (`101 passed`). `agent_loop.py`: +1 fold object, +1 kind
+check inside the existing skip, +1 prepend (a conditional expression), +1 import. Ledger and CLAUDE.md rows are in the
+same commit (`57 / 28 / 3580`; `scope_note.py` `1 / 1 / 83`, row added at creation).
+
+**Backend gate, run once at the end:**
+```
+Summary:        71 failed, 5962 passed, 1 skipped, 2 xfailed, 2 xpassed, 49 warnings in 288.07s (0:04:48)
+[GATE PASSED] Backend unit baseline satisfied (failed: 71 <= 71, errors: 0).
+```
+Failed SET vs `268-BASELINES.md`: **NEW = [] · GONE = []**. The `+12` passed are the new tests.
+
+**Live**: uvicorn `--reload` respawned its worker at 00:27:42, after the last edit (00:27:28), so no restart
+checkpoint was needed.
+
+**SC#10 re-drive** (`c11a4a757`; same roster, prompt, pass bar and retry rule; run 1 kept beside it):
+
+| Provider | Run 1 | Run 2 | Run 2 turn-2 evidence |
+|---|---|---|---|
+| openai `gpt-5.6-sol` | ⛔ | ⛔ | grep + read_document on the NEW path, no `search_documents`; answer cites the SOW only |
+| anthropic `claude-sonnet-5` | ⛔ | **PASS** | `6a0cb31d` search `[Q3]` |
+| google `gemini-3.5-flash` | ⛔ | ⛔ | ls/grep/read_document then tree on the NEW path; answer cites the SOW only |
+| deepseek `deepseek-v4-pro` | ⛔ | **PASS** | `5c0c3f2c` search `[Q3]` |
+| zhipu `glm-5.2` | ⛔ | **PASS** | `39387904` search `[Q3]` |
+| minimax `MiniMax-M3` | ⛔ | **PASS** | `d44013a3` search `[Q3]` |
+| moonshot `kimi-k2.6` | PASS | **PASS** | `3692a329` search `[Q3]` |
+| openrouter `deepseek/deepseek-v4-pro` | ⛔ | **PASS** | `2c241762` search `[Q3]` |
+| **Answer cites a dropped-folder doc as a source** | **6 / 8** | **0 / 8** | anthropic, zhipu and minimax name the MSA only to say it is out of scope |
+
+No PASS row needed a retry. **Still failing: openai and google stay ⛔ under the fixed bar.** They re-retrieve with the
+explorer tools on the new path, and those tools write no `search.query` audit row, so bar (c) cannot score them. The
+pass bar was not changed. One sample per provider.
+
+**G4-2 API-level follow-up: PASS.** It ran on a mirror thread; the Chrome fixture thread was left untouched. The real
+`_reconstruct_history` output carries the note on the second user message, with 0 system rows. Turn 2 searched
+`[Q3]` only, and the answer flagged the MSA as outside the scope.
+
+SEED-319 → `answered` (folded into 268, D-268-26).
 
 ## Deviations from Plan
 
