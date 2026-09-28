@@ -15,9 +15,39 @@ from app.models.message import MessageResponse, TRANSCRIPT_EVENT_KINDS
 from app.services.agent_loop import _reconstruct_history
 
 
-def test_the_allowlist_is_exactly_the_two_transcript_kinds():
-    assert TRANSCRIPT_EVENT_KINDS == frozenset({"expert_changed", "expert_handoff"})
+def test_the_allowlist_is_exactly_the_three_transcript_kinds():
+    # Phase 268 (D-268-12): `scope_changed` (a thread's folder scope changed) joins the two 267
+    # kinds. Same allowlist, same skip, same renderer — a KIND, not a second mechanism.
+    assert TRANSCRIPT_EVENT_KINDS == frozenset({"expert_changed", "expert_handoff", "scope_changed"})
     assert isinstance(TRANSCRIPT_EVENT_KINDS, frozenset)
+
+
+def test_a_scope_changed_row_never_reaches_the_model():
+    """T-268-22: a folder name in the event is user-authored text; it must never be model context."""
+    rows = [
+        {"role": "user", "content": "Summarise the contracts", "tool_calls": None},
+        _sys("scope_changed", "Scope /Client ACME → /Client ACME/Contracts. Now: /Client ACME/Contracts (2)."),
+        {"role": "assistant", "content": "Two contracts.", "tool_calls": None},
+    ]
+    assert _reconstruct_history(rows) == [
+        {"role": "user", "content": "Summarise the contracts"},
+        {"role": "assistant", "content": "Two contracts."},
+    ]
+
+
+def test_a_scope_changed_row_is_visible_in_the_transcript():
+    from app.api.threads import _visible_transcript_rows
+
+    rows = [
+        {"role": "user", "content": "q", "tool_calls": None},
+        _sys("scope_changed"),
+        _sys("context_truncated"),
+    ]
+    kept = _visible_transcript_rows(rows)
+    assert [(r["role"], (r["tool_calls"] or [{}])[0].get("kind")) for r in kept] == [
+        ("user", None),
+        ("system", "scope_changed"),
+    ]
 
 
 def test_handoff_is_deliberately_not_a_transcript_kind():
