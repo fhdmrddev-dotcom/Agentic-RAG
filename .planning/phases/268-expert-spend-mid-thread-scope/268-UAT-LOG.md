@@ -318,7 +318,30 @@ before and after); system rows 1 → 1 (no event).
 
 ---
 
-## G-4 — lived-experience scenarios (Chrome, both themes) — AWAITING THE OPERATOR (Task 4 checkpoint)
+## G-4 — lived-experience scenarios (Chrome, both themes) — **PASS ×3, operator "approved" 2026-09-29**
+
+> The original checkpoint text is kept below. Per D-268-26's ruling ("Claude drives, you confirm"), the
+> ORCHESTRATOR drove G4-1/2/3 in Chrome (chrome-devtools MCP) after the SEED-319 fix, in LIGHT and then DARK
+> (ProfileMenu toggle), signed in as the operator in org `22f9c615-…`. The operator reviewed the reported
+> observations and replied verbatim: **"approved"**.
+
+| Row | Verdict | Observed (light + dark) | Evidence |
+|---|---|---|---|
+| G4-1 | **PASS** | Spend by Expert: HR Advisor $0.0319 (5), UAT-265 Billing SOP Advisor $0.0280 (3), Financial Analyzer $0.0229 (3), *No Expert* $3.4553 (60, 6 unrated), *Not recorded (before 268)* $4.4829 (201, 53 unrated). Footer `✓ 5 lines = $8.0210 = org total · 272 runs, 0 unattributed`. Clicking HR Advisor moved KPI $8.0210→$0.0319, the statement line, the 14-day chart (`· HR Advisor`), the donut (1 model $0.0319) and the ledger together, while the table stayed `not filtered`. The Financial Analyzer filter gives 3 ledger rows, one tagged `incl. 1 sub-agent`, and the ledger's Expert column pills are correct | `evidence/g4-1-light-spend-fa.png`, `g4-1-dark-spend-fa.png` |
+| G4-2 | **PASS** | The picker showed `Next message searches / Stops searching` before Apply, and Apply stayed disabled until a new folder was chosen. Card `Scope /Client ACME → /Client ACME/Q3 Contracts`, Now `(1)` / Dropped `(2)` / `From your next message.` A reload (no URL router, so the thread was reopened from the list) kept the card, the chip `/Client ACME/Q3 Contracts`, and the list's folder label. **The follow-up re-searched (Run · 2 steps), cited only `ACME_Q3_SOW_Contract.md` (1 source), and said the MSA "is outside this new scope"**. This is the D-268-26 fix, live | `g4-2-light-after-apply.png`, `g4-2-light-followup.png`, `g4-2-dark-card.png` |
+| G4-3 | **PASS** | At rest the chip already read `not searched while HR Advisor is active`. The picker said `Saved / Searching: HR Policies · EXPERT · Chat attachments` plus "No effect while HR Advisor is active…". The amber card reads `Saved /Client ACME/Q3 Contracts` / `Searching: HR Policies only · HR Advisor is Restricted` / `Takes effect when HR Advisor leaves.` A legible `HR Advisor · RESTRICTED` chip sits beside a dashed `· NOT SEARCHED` chip. The answer named `HR_Leave_Policy.md` | `g4-3-light-picker.png`, `g4-3-light-card.png`, `g4-3-light-followup.png`, `g4-3-dark-card.png` |
+
+**Observations (not blocking, recorded, not fixed here):**
+- **O-1:** the picker's `Next message searches` item is truncated (`/Client ACME/Q3 Contr…`), so the full path is not
+  readable at rest (266 UI-3 class). This is a small CSS follow-up.
+- **O-2:** every chat run reads `Partial` in the ledger's Coverage column, while the Blind Spots KPI counts 10 partial
+  runs. This is **inherited, not 268**: `get_spend_runs`' `is_coverage_complete` logic is byte-identical at base
+  `220c82dde` (chat runs carry no `workflow_runs.token_coverage`, so the value is None and the column reads Partial).
+- **O-3:** the G4-3 follow-up made **no search call**. It answered from an earlier in-scope HR turn in the same thread,
+  which already stated "25 days of annual leave". This is correct under Restricted: no note by D-268-26, since the
+  effective scope did not change.
+
+### Original checkpoint text (kept)
 
 This session has no Chrome DevTools MCP tools, so per the plan the operator drives and Claude records. Fixtures are
 ready in the dev org (`evidence/07-g4-fixtures.json`):
