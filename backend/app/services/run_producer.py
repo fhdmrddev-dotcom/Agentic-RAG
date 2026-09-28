@@ -570,8 +570,16 @@ async def run_producer(
     active_workflow_run_id,
     kickoff_definition,
     kickoff_definition_id,
+    scoping: ThreadScoping | None = None,
+    scoping_error: BaseException | None = None,
 ) -> None:
     """Producer task — XADDs every SSE event to run:{run_id} Redis Stream.
+
+    Phase 268 (D-268-19): ``send_message`` resolves the thread's Expert scoping ONCE, stamps the
+    ``runs`` row with it, and hands the SAME ``ThreadScoping`` here as ``scoping``. The Deep branch
+    uses it and resolves only when it is ``None`` (every older call shape). A resolution failure
+    arrives as ``scoping_error`` and is re-raised INSIDE the existing try, so the run fails with the
+    identical ``runs.error`` text it wrote before 268.
 
     Phase 162.5 Plan 03 (G-5 extraction): the inline ``agent_runner`` closure body
     lifted VERBATIM out of ``send_message``. The captured closure vars are now
@@ -707,8 +715,12 @@ async def run_producer(
                 # a no-op when absent → no double-persist. The Deep `else` branch +
                 # run_agent_loop + the Deep `_result_sink` flow stay byte-identical (D-14).
             else:                                          # Deep — byte-identical
+                # Phase 268 (D-268-19): a resolution error from send_message is re-raised HERE,
+                # inside this try, so the except below classifies it exactly as before 268.
+                if scoping_error is not None:
+                    raise scoping_error
                 _wf_pool = await get_pg_pool()
-                _scoping = await _resolve_thread_scoping(
+                _scoping = scoping if scoping is not None else await _resolve_thread_scoping(
                     supabase=supabase,
                     thread_id=thread_id,
                     current_user=current_user,
@@ -838,6 +850,23 @@ async def run_producer(
 # plain finalize_run keep-active, no terminal sentinel) so the next Continue can
 # resume, instead of finalizing terminal.
 # ───────────────────────────────────────────────────────────────────────
+def _accumulate_segment_tokens(
+    prior_in: int | None,
+    prior_out: int | None,
+    seg_in: int | None,
+    seg_out: int | None,
+) -> tuple[int | None, int | None]:
+    """Phase 268 (D-268-20) — a continued run's totals are the SUM of its segments.
+
+    D-256-06 semantics, the ``harness/phase_types._record_run_usage`` idiom: when nothing was
+    ever measured (all four None) the totals stay ``(None, None)`` — "never measured" is not
+    "zero". Otherwise a missing half counts as 0.
+    """
+    if prior_in is None and prior_out is None and seg_in is None and seg_out is None:
+        return None, None
+    return (prior_in or 0) + (seg_in or 0), (prior_out or 0) + (seg_out or 0)
+
+
 async def spawn_continuation_run(
     *,
     run_id: _uuid_mod.UUID,
@@ -870,6 +899,28 @@ async def spawn_continuation_run(
         _terminal_status = "completed"
         _terminal_error: str | None = None
         _result_sink: dict = {}
+        # Phase 268 (D-268-20 / SEED-297 trigger (d)) — the paused segment's totals, read BEFORE
+        # the loop so a finalize from ANY exit path below adds them. finalize_run's SQL is an
+        # unconditional SET and is deliberately NOT edited (SEED-297 trigger (a)); the sum is made
+        # here instead. A failed read is logged and leaves the base behaviour (continuation-only
+        # totals) — it never fails the continuation.
+        _prior_in: int | None = None
+        _prior_out: int | None = None
+        try:
+            _prior_row = await (await get_pg_pool()).fetchrow(
+                "SELECT input_tokens, output_tokens FROM runs WHERE run_id = $1",
+                run_id,
+            )
+            if _prior_row is not None:
+                _prior_in = _prior_row["input_tokens"]
+                _prior_out = _prior_row["output_tokens"]
+        except Exception:  # noqa: BLE001 — best-effort; the continuation must still run
+            logger.warning(
+                "continuation %s: prior token read failed; this segment's totals will replace "
+                "the paused segment's",
+                run_id,
+                exc_info=True,
+            )
         # Hoisted for the shared finalizer's best-effort missing-usage warning — a
         # continuation that fails before load_user_settings leaves these None (the
         # warning then logs provider=None model=None; no functional change — the old
@@ -933,6 +984,17 @@ async def spawn_continuation_run(
             _cap = _result_sink.get("cap_disposition")
             if _cap == "cap_paused":
                 _terminal_status = "cap_paused"
+
+            # Phase 268 (D-268-20): the SAME row carries every segment, so its totals are the SUM.
+            (
+                _result_sink["input_tokens_total"],
+                _result_sink["output_tokens_total"],
+            ) = _accumulate_segment_tokens(
+                _prior_in,
+                _prior_out,
+                _result_sink.get("input_tokens_total"),
+                _result_sink.get("output_tokens_total"),
+            )
 
             # D-A3 unification: reuse the ONE shared finalizer. active_workflow_run_id
             # is None (a Deep-only continuation → the step-7 harness F2 gate skips
