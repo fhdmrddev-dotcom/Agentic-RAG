@@ -281,6 +281,102 @@ describe("applyScopeChange — the one scope PATCH home", () => {
   })
 })
 
+describe("268-REVIEW WR-01 — an answer about one thread never lands on the next", () => {
+  const THREAD_B = { ...THREAD, id: "thread-B", title: "Other chat", folder_id: null } as Thread
+
+  function deferred<T>() {
+    let resolve!: (v: T) => void
+    const promise = new Promise<T>((r) => { resolve = r })
+    return { promise, resolve }
+  }
+
+  it("(10) switching threads while the PATCH is in flight: A's post-PATCH read never drives B's chip", async () => {
+    const patch = deferred<Thread>()
+    h.setThreadFolder.mockImplementation(() => patch.promise)
+    // A reads HELD (so a leak is visible as `· not searched`); B reads a plain at-rest effect.
+    h.getScopeEffect.mockImplementation(async (tid: string, d?: { folderId: string | null }) =>
+      d ? TO_Q3 : tid === "thread-A" ? HELD : AT_REST,
+    )
+    const user = userEvent.setup()
+    const { rerender } = render(shell(<ChatArea thread={THREAD} onCreateThread={vi.fn()} folders={FOLDERS} />))
+    await applyQ3(user)
+    await waitFor(() => expect(h.setThreadFolder).toHaveBeenCalledWith("thread-A", "f-q3"))
+    rerender(shell(<ChatArea thread={THREAD_B} onCreateThread={vi.fn()} folders={FOLDERS} />))
+    await waitFor(() => expect(h.getScopeEffect).toHaveBeenCalledWith("thread-B"))
+    await act(async () => {
+      patch.resolve({ ...THREAD, folder_id: "f-q3" })
+      await patch.promise
+    })
+    // Let every read that the resolution could trigger settle.
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+    const chip = screen.getByTestId("scope-chip")
+    expect(within(chip).queryByText("· not searched")).toBeNull()
+  })
+
+  it("(11) a streaming thread's pending note never lands on the thread switched to", async () => {
+    const read = deferred<ScopeEffect>()
+    let patched = false
+    let postPatchReads = 0
+    h.setThreadFolder.mockImplementation(async (tid: string, fid: string | null) => {
+      patched = true
+      return { ...THREAD, id: tid, folder_id: fid }
+    })
+    h.getScopeEffect.mockImplementation(async (tid: string, d?: { folderId: string | null }) => {
+      if (d) return TO_Q3
+      if (tid === "thread-A" && patched) {
+        postPatchReads += 1
+        return read.promise
+      }
+      return AT_REST
+    })
+    const user = userEvent.setup()
+    const { rerender } = render(shell(<ChatArea thread={THREAD} onCreateThread={vi.fn()} folders={FOLDERS} />))
+    await screen.findByTestId("scope-chip")
+    act(() => useStreamsStore.setState({ streamingThreads: new Set([THREAD.id]) }))
+    await applyQ3(user)
+    await waitFor(() => expect(postPatchReads).toBe(1))
+    rerender(shell(<ChatArea thread={THREAD_B} onCreateThread={vi.fn()} folders={FOLDERS} />))
+    await waitFor(() => expect(h.getScopeEffect).toHaveBeenCalledWith("thread-B"))
+    await act(async () => {
+      read.resolve(TO_Q3)
+      await read.promise
+    })
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+    expect(screen.queryByTestId("scope-pending-note")).toBeNull()
+  })
+
+  it("(12) the note is not set when the run ended before the post-PATCH read resolved", async () => {
+    const read = deferred<ScopeEffect>()
+    let patched = false
+    let postPatchReads = 0
+    h.setThreadFolder.mockImplementation(async (tid: string, fid: string | null) => {
+      patched = true
+      return { ...THREAD, id: tid, folder_id: fid }
+    })
+    h.getScopeEffect.mockImplementation(async (_tid: string, d?: { folderId: string | null }) => {
+      if (d) return TO_Q3
+      if (patched) {
+        postPatchReads += 1
+        return read.promise
+      }
+      return AT_REST
+    })
+    const user = userEvent.setup()
+    render(shell(<ChatArea thread={THREAD} onCreateThread={vi.fn()} folders={FOLDERS} />))
+    await screen.findByTestId("scope-chip")
+    act(() => useStreamsStore.setState({ streamingThreads: new Set([THREAD.id]) }))
+    await applyQ3(user)
+    await waitFor(() => expect(postPatchReads).toBe(1))
+    act(() => useStreamsStore.setState({ streamingThreads: new Set<string>() }))
+    await act(async () => {
+      read.resolve(TO_Q3)
+      await read.promise
+    })
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+    expect(screen.queryByTestId("scope-pending-note")).toBeNull()
+  })
+})
+
 describe("an Expert change re-reads the scope (§6.2)", () => {
   it("(9) the Restricted Expert leaves → the at-rest effect is read again, and no scope PATCH is sent", async () => {
     h.getScopeEffect.mockResolvedValue(HELD)
