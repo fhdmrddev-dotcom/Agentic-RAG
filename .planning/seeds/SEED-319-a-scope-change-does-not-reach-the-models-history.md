@@ -3,15 +3,24 @@ seed_id: SEED-319
 title: After a mid-thread scope change, a follow-up is answered from HISTORY — 6 of 8 providers cite the dropped folder's document, one with a false location
 created: 2026-09-28
 surface: Agentic-RAG
-status: planted
+status: answered
 partial: false
-status_note:
+status_note: |
+  ── 2026-09-29 · Phase 268 (268-04), ANSWERED by D-268-26 (operator ruling "tell the model"). Fix `1ec11a842`
+  (RED `29e64548d`): `_reconstruct_history` prepends ONE provider-neutral note to the NEXT user message after a
+  non-held `scope_changed` row; words in `backend/app/services/scope_note.py`. Re-driven live, same roster / pass
+  bar / retry rule: 6 of 8 PASS on the first attempt (run 1: 1 of 8); the answer cited a dropped-folder document as
+  a source on 0 of 8 (run 1: 6 of 8). The 2 remaining ⛔ (openai, google) re-retrieved with grep / read_document on
+  the NEW path and cited only the new folder — a pass-bar gap (those tools leave no `search.query` audit row), not
+  this defect. One sample per provider. ⚠ Known limit, by the held rule: a change saved under a Restricted Expert
+  gives no note, and the Expert leaving later is an `expert_changed` event, invisible to the model by D-267-10 — so
+  the saved folder taking effect on that departure is not announced.
 trigger_when: Any phase touching the agent loop's history reconstruction or its folder-scope system-prompt note, the scope_changed transcript event, or thread-level retrieval scope; also the next phase that promises "the next answer cites only the new folder" anywhere in its acceptance bar.
 trigger_paths: ["backend/app/services/agent_loop.py", "backend/app/models/message.py", "backend/app/services/expert_scope.py", "backend/app/api/threads.py", "frontend/src/components/chat/ScopePicker.tsx", "frontend/src/components/chat/scopeCopy.ts"]
 trigger_surfaces: [chat, retrieval]
 migration_note:
 relates_to: ["268", "SEED-286", "D-268-12", "D-267-10", ".planning/phases/268-expert-spend-mid-thread-scope/268-UAT-LOG.md (F-1)", "backend/app/services/agent_loop.py:1463-1471"]
-folded_into: null
+folded_into: "268 (D-268-26, fix 1ec11a842)"
 renumbered_from: null
 renumbered_because: null
 ---

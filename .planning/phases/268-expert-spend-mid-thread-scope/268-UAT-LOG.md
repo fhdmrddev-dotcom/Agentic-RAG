@@ -123,6 +123,64 @@ WHERE a.action_type = 'search.query' AND a.metadata->>'run_id' = '<run>';
 ```
 Every `search.query` audit row quoted carries `org_id 22f9c615-…`.
 
+### SC#10 RE-DRIVE after D-268-26 (2026-09-29) — **6 PASS · 2 ⛔** (run 1 above is kept, not overwritten)
+
+**The fix.** Operator ruling D-268-26 ("tell the model"): `agent_loop._reconstruct_history` prepends ONE provider-
+neutral note to the NEXT user message after a `scope_changed` row (`backend/app/services/scope_note.py`, commit
+`1ec11a842`; RED `29e64548d`). The live backend served it: uvicorn `--reload` respawned its worker at 00:27:42, after
+the last edit (00:27:28). **Proof the note reaches the provider history** (`evidence/09-g4-2-api-followup.json`): the
+real `_reconstruct_history` over the new thread's DB rows yields, as the second user message,
+*"[Search scope changed from /Client ACME to /Client ACME/Q3 Contracts. Earlier search results in this conversation may
+come from outside the new scope; run a new search before citing documents.]
+
+Search my documents for the ACME payment
+terms and name the document."* — 0 system-role entries in the history.
+
+Method identical to run 1: new threads (`268 SC#10 re-drive <provider>`), Client ACME → turn 1 → PATCH Q3 Contracts →
+turn 2, same prompt, same `model` + `provider`, `X-Org-Id` dev org, one retry at most. Evidence
+`evidence/08-board-redrive-<provider>.json`. Every row: PATCH `200`, **exactly one** `scope_changed` row with
+`org_id` = thread org = `22f9c615-…`; every runs row `completed`, org `22f9c615-…`, `expert_attributed true`, model /
+provider = the row's.
+
+| # | Provider | thread | event | turn-1 run · audit | turn-2 run (→ retry) · tools | turn-2 audit `folder_ids` · docs | answer cites a DROPPED-folder doc as a source? | Run 1 | **Run 2** |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | openai `gpt-5.6-sol` | `c45c4e69-…` | `e08eaea3-…` | `159be407-…` · grep/read_document (no search) | `10d76c84-…` → `cb9b688e-…` · grep + read_document on `/Client ACME/Q3 Contracts` | none (no `search_documents`) — grep matched only `95b41fa9` (Q3) | **no** (SOW only) | ⛔ | ⛔ reason below |
+| 2 | anthropic `claude-sonnet-5` | `9f111ac6-…` | `51040e50-…` | `f379f944-…` · `[Client ACME, Q3]` | `6a0cb31d-…` · **search_documents** + workspace_write | `[Q3]` · `95b41fa9` (Q3) | **no** — names the MSA only to say it "lives outside the current scope, so I removed it" | ⛔ | **PASS** |
+| 3 | google `gemini-3.5-flash` | `f86e6038-…` | `8a41a9c5-…` | `811e3d4d-…` · `[Client ACME, Q3]` | `f7888024-…` → `386cbc48-…` · ls/grep/read_document, then tree/workspace_read, on the new path | none (no `search_documents`) | **no** (SOW only) | ⛔ | ⛔ reason below |
+| 4 | deepseek `deepseek-v4-pro` | `58eb7c0b-…` | `875290be-…` | `1855d931-…` · `[Client ACME, Q3]` | `5c0c3f2c-…` · **search_documents** + workspace_write | `[Q3]` · `95b41fa9` | **no** | ⛔ | **PASS** |
+| 5 | zhipu `glm-5.2` | `be03bea9-…` | `82146d76-…` | `f52ff9ba-…` · `[Client ACME, Q3]` | `39387904-…` · ls + **search_documents** + workspace_write | `[Q3]` · `95b41fa9` | **no** — flags the MSA as outside the folder | ⛔ | **PASS** |
+| 6 | minimax `MiniMax-M3` | `965723e9-…` | `35f6cec4-…` | `09b31b17-…` · `[Client ACME, Q3]` | `d44013a3-…` · **search_documents** + workspace_write | `[Q3]` · `95b41fa9` | **no** — "outside the Q3 Contracts folder scope, so it isn't cited" | ⛔ | **PASS** |
+| 7 | moonshot `kimi-k2.6` | `c7426757-…` | `bc29b0b6-…` | `8ba92092-…` · `[Client ACME, Q3]` | `3692a329-…` · **search_documents** + workspace_write | `[Q3]` · `95b41fa9` | **no** | PASS | **PASS** |
+| 8 | openrouter `deepseek/deepseek-v4-pro` | `6f6326b3-…` | `138e07ce-…` | `5e193607-…` · `[Client ACME, Q3]` | `2c241762-…` · ls + **search_documents** + workspace_write | `[Q3]` · `95b41fa9` | **no** | ⛔ | **PASS** |
+
+Pass bar (d) (turn 1 read the OLD subtree) holds on 7 / 8 (openai's turn 1 used grep/read_document, unmeasured).
+**No retry was needed on any PASS row.**
+
+**The 2 ⛔, verbatim reason:** *"turn 2 re-retrieved with `grep` / `read_document` / `tree` scoped to
+`/Client ACME/Q3 Contracts` on both attempts and never called `search_documents`, so no `search.query` audit row
+exists to satisfy pass bar (c)."* Issue id: **SEED-319** (residual). Recorded, not smoothed: in both rows every tool
+call was on the new path, no tool result contained the MSA (`1417fc12` absent from every result), and the answer cited
+only `ACME_Q3_SOW_Contract.md` — the **defect SEED-319 names (citing the dropped folder) did not reproduce on any of the
+8 providers**. What remains is a pass-bar gap: the explorer tools (`grep`, `read_document`) leave no `search.query`
+audit row, so the fixed bar cannot score them. One sample per provider; one green sample proves nothing about a flaky
+provider.
+
+**MT-1 (run 2):** 6 PASS rows each persisted `search_documents` + `workspace_write` in turn 2 → PASS.
+
+### G4-2 API-level follow-up (2026-09-29, after the fix) — **PASS**
+
+A NEW thread `268 G4-2 API follow-up (re-drive)` mirroring G4-2 (the Chrome fixture thread `dc4e87e4-…` was left
+untouched for the operator's drive), `deepseek-v4-flash` / `deepseek`, X-Org-Id dev org
+(`evidence/09-g4-2-api-followup.json`):
+- Turn 1 → `search_documents`, audit `folder_ids = [Client ACME, Q3]`, docs from both folders; the answer cites the MSA
+  (NET 60) and the SOW — correct for that scope.
+- `PATCH {"folder_id": Q3}` → `200`; one event row `142f4105-…`, org `22f9c615-…`.
+- Turn 2, **same prompt** → `search_documents` (+ `query_documents`), audit `folder_ids = [Q3]`, the one retrieved doc
+  in Q3. Answer, verbatim excerpt: *"Re-searched within the new scope (**/Client ACME/Q3 Contracts**). Only one document
+  matches here: **ACME_Q3_SOW_Contract.md** … I should also flag: the MSA (NET 60 terms) I mentioned in my previous
+  answer sits **outside** this folder scope … so it doesn't count here."* The same model in run 1's SC#4-biased / LM-1
+  attempts answered from history.
+
 ### MT-1 — multi-tool — **PASS**
 Row 7 (moonshot) turn 2 `bdac861f-…` persisted `search_documents` AND `workspace_write` in one run and passes (b)+(c).
 Turn 1 of rows 2-8 also called both (`search_documents` + `workspace_write`).

@@ -87,6 +87,13 @@ chosen id is still present with the same seed values: `gpt-5.6-sol` (force_stric
 `native_tools = true`** — the 267 carry-over is CONFIRMED still true, so row 8 exercises OpenRouter's NATIVE tool
 path on this box, not the non-native one. No override row exists for the other four ids (seed values apply).
 
+**Two drives, recorded beside the table, neither over it (verdicts in `268-UAT-LOG.md`):**
+- **Run 1 (2026-09-28, before D-268-26):** 1 PASS (moonshot) · 7 ⛔ — turn 2 answered from history.
+- **Run 2 (2026-09-29, after D-268-26 fix `1ec11a842`):** same roster, prompt, pass bar and retry rule —
+  **6 PASS on the first attempt** (anthropic, deepseek, zhipu, minimax, moonshot, openrouter) · **2 ⛔** (openai,
+  google: re-retrieved with `grep` / `read_document` / `tree` on the new path, never `search_documents`, so no
+  `search.query` audit row exists for pass bar (c)). The pass bar was NOT changed to admit them.
+
 **Pass bar per row:** (a) exactly one `scope_changed` system row for the PATCH, its `org_id` = the
 thread's `org_id`; (b) both `runs` rows carry the row's `model` and `provider`; (c) turn 2's `search.query`
 audit row carries `run_id` = turn 2's run and `folder_ids` = the new subtree, and every retrieved document's

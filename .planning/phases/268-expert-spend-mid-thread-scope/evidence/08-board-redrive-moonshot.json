@@ -1,0 +1,168 @@
+{
+ "provider": "moonshot",
+ "model": "kimi-k2.6",
+ "create": {
+  "status": 201,
+  "id": "c7426757-8854-4bad-bedc-fc5d013d08e7",
+  "org_id": null
+ },
+ "t1": {
+  "sent_at": "2026-09-28 20:34:16.068926+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "f3d8ed74-0f33-4f3a-a3b6-78ad29475cd6",
+   "run_id": "8ba92092-2584-45dc-801d-a3c783110cd2",
+   "model": "kimi-k2.6",
+   "provider": "moonshot"
+  },
+  "run": {
+   "run_id": "8ba92092-2584-45dc-801d-a3c783110cd2",
+   "status": "completed",
+   "model": "kimi-k2.6",
+   "provider": "moonshot",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 30581,
+   "output_tokens": 389,
+   "started_at": "2026-09-28 20:34:18.375935+00:00",
+   "completed_at": "2026-09-28 20:34:51.783951+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "eb41a353-625d-49cf-93cb-af6916cb6ee3",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 20:34:23.799990+00:00",
+    "run_id": "8ba92092-2584-45dc-801d-a3c783110cd2",
+    "thread_id": "c7426757-8854-4bad-bedc-fc5d013d08e7",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 2
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "8ba92092-2584-45dc-801d-a3c783110cd2",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   },
+   {
+    "run_id": "8ba92092-2584-45dc-801d-a3c783110cd2",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "1417fc12-a581-4068-adcc-ddbc1e3a848a",
+    "folder_id": "1a2d0273-b14d-487f-86ee-4d146e89d082"
+   }
+  ],
+  "tools": [
+   "search_documents",
+   "workspace_write"
+  ]
+ },
+ "patch": {
+  "status": 200,
+  "at": "2026-09-28 20:34:54.892068+00:00",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "event": [
+  {
+   "id": "bc29b0b6-bd76-447f-85a9-626766f3f529",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+   "created_at": "2026-09-28 20:34:57.639764+00:00"
+  }
+ ],
+ "thread_org": {
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "t2": {
+  "sent_at": "2026-09-28 20:34:57.716282+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "2d1802d3-7901-427c-babb-ecf7da09e914",
+   "run_id": "3692a329-78c6-454b-9214-f95085f65ecd",
+   "model": "kimi-k2.6",
+   "provider": "moonshot"
+  },
+  "run": {
+   "run_id": "3692a329-78c6-454b-9214-f95085f65ecd",
+   "status": "completed",
+   "model": "kimi-k2.6",
+   "provider": "moonshot",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 32810,
+   "output_tokens": 417,
+   "started_at": "2026-09-28 20:35:00.054032+00:00",
+   "completed_at": "2026-09-28 20:35:49.709405+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "299e11f8-74f8-454f-9117-c3ec481168ed",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 20:35:09.633140+00:00",
+    "run_id": "3692a329-78c6-454b-9214-f95085f65ecd",
+    "thread_id": "c7426757-8854-4bad-bedc-fc5d013d08e7",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 1
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "3692a329-78c6-454b-9214-f95085f65ecd",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   }
+  ],
+  "tools": [
+   "search_documents",
+   "workspace_write"
+  ]
+ },
+ "v1": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 2,
+  "folders": [
+   "1a2d0273-b14d-487f-86ee-4d146e89d082",
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "v2": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 1,
+  "folders": [
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "answers": {
+  "t2": {
+   "cites_old": false,
+   "text": "Saved to `terms.md`:\n\n**ACME_Q3_SOW_Contract.md** \u2014 USD 184,000 (NET 15, 2% early-pay discount within 5 days)"
+  }
+ }
+}
