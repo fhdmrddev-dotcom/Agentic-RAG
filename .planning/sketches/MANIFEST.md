@@ -2929,3 +2929,13 @@ swap/remove transcript event, and the second-Expert handoff.
 
 ⛔ **The build obligation B creates:** both lists render from ONE structured payload (`267-CONTEXT.md` D-267-11 /
 D-267-17 / D-267-27). Two independently computed strings could disagree.
+
+## 268 · Expert spend & mid-thread scope
+
+G-2 sketch for Phase 268 (METER-08, CHAT-08), at `.planning/sketches/268-expert-spend-and-mid-thread-scope/index.html`.
+Driven in Chrome: every toggle works, there are no console errors, and there is no horizontal scroll at 390px. It
+reuses 267-B's event-card shape.
+
+- **Chat A (composer chip)** vs **Chat B (header pill)**, plus the Restricted handling: *Save & say* vs *Lock*.
+- **Spend A (Expert filter that every card follows)** vs **Spend B (Group by Model / Expert)**.
+- Winner ★ (operator, 2026-09-28): **Chat A · composer chip**, **Restricted: Save & say**, **Spend A · filter every card follows**.

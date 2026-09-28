@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>268 · Expert spend & mid-thread scope</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:hsl(216 45% 4%);--elev:hsl(220 40% 5%);--card:hsl(220 30% 7%);--pop:hsl(220 30% 8%);
+  --muted:hsl(220 30% 11%);--accent:hsl(220 25% 14%);
+  --text:hsl(226 60% 97%);--text-m:hsl(220 16% 65%);--text-d:hsl(220 16% 52%);
+  --border:hsl(220 20% 16%);--primary:hsl(239 100% 82%);--primary-s:hsl(239 84% 67%);
+  --violet:hsl(258 90% 66%);--v-bg:hsl(258 90% 66% / .12);--v-bd:hsl(258 90% 66% / .35);--v-tx:hsl(258 95% 85%);
+  --amber:hsl(38 92% 60%);--a-bg:hsl(38 92% 60% / .10);--a-bd:hsl(38 92% 60% / .30);--a-tx:hsl(38 92% 72%);
+  --rose:hsl(350 89% 72%);--r-bg:hsl(350 89% 60% / .10);--r-bd:hsl(350 89% 60% / .25);
+  --green:hsl(142 71% 55%);--g-bg:hsl(142 71% 45% / .08);--g-bd:hsl(142 71% 45% / .25);
+  --cyan:hsl(187 85% 60%);--indigo:hsl(239 84% 67%);--i-bg:hsl(239 84% 67% / .18);--i-bd:hsl(239 84% 67% / .4);--i-tx:hsl(239 100% 85%);
+  --sans:'Inter',system-ui,sans-serif;--head:'Manrope','Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--sans)}
+header.top{position:sticky;top:0;z-index:20;background:hsl(216 45% 4% / .92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+header.top h1{font:700 15px var(--head);margin:0}
+.grp{display:flex;gap:4px;align-items:center;font-size:11px;color:var(--text-d);flex-wrap:wrap}
+.tab{background:var(--muted);border:1px solid var(--border);color:var(--text-m);padding:5px 11px;border-radius:8px;cursor:pointer;font:500 12px var(--sans);transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab[aria-selected=true],.tab[aria-pressed=true]{background:var(--v-bg);border-color:var(--v-bd);color:var(--v-tx)}
+.sep{width:1px;height:22px;background:var(--border)}
+main{max-width:1180px;margin:0 auto;padding:24px}
+.surface{display:none}.surface.on{display:block}
+.variant{display:none}.variant.on{display:block}
+.vhead{margin:0 0 16px}.vhead h2{font:700 18px var(--head);margin:0 0 4px}.vhead p{margin:0;color:var(--text-m);font-size:13px;max-width:820px}
+.frame{background:var(--elev);border:1px solid var(--border);border-radius:14px;padding:16px}
+.frame > .label{font:500 11px var(--mono);color:var(--text-d);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.frame > .label b{color:var(--v-tx);font-weight:500}
+.btn{font:500 12px var(--sans);padding:6px 12px;border-radius:8px;border:1px solid transparent;cursor:pointer;display:inline-flex;gap:6px;align-items:center;transition:all .15s}
+.btn.p{background:var(--primary);color:hsl(216 45% 8%)}.btn.p:hover{filter:brightness(1.08)}
+.btn.g{background:transparent;border-color:var(--border);color:var(--text)}.btn.g:hover{background:var(--muted)}
+.mono{font-family:var(--mono)}
+.link{color:var(--primary);cursor:pointer;font-weight:500}
+.note{margin-top:20px;color:var(--text-m);font-size:12px;border-top:1px solid var(--border);padding-top:12px;line-height:1.6}
+.note b{color:var(--text)}
+
+/* ─── chat surface ─── */
+.chat{display:grid;grid-template-columns:1fr;background:var(--bg);border:1px solid var(--border);border-radius:14px;overflow:hidden;max-width:860px;margin:0 auto}
+.chead{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--elev);flex-wrap:wrap;position:relative}
+.chead .t{font:600 13px var(--sans)}
+.scopepill{display:inline-flex;gap:6px;align-items:center;font:500 12px var(--mono);border:1px solid var(--border);border-radius:999px;padding:3px 10px;color:var(--text-m);cursor:pointer;background:var(--card);transition:all .15s}
+.scopepill:hover{border-color:var(--i-bd);color:var(--text)}
+.scopepill .k{font-family:var(--sans);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-d)}
+.scopepill.inert{border-style:dashed}
+.scopepill.inert .val{text-decoration:line-through;text-decoration-color:var(--rose)}
+.transcript{padding:18px 16px;display:flex;flex-direction:column;gap:12px;min-height:360px}
+.msg{max-width:84%;font-size:13px}
+.msg.u{align-self:flex-end;background:var(--accent);padding:8px 12px;border-radius:12px 12px 4px 12px}
+.msg.a{align-self:flex-start}
+.msg.a .by{font:500 11px var(--sans);color:var(--text-d);margin-bottom:2px}
+.msg.a .src{font:400 11px var(--mono);color:var(--text-d);margin-top:4px}
+.streaming::after{content:'▍';color:var(--primary);animation:blink 1s steps(2) infinite;margin-left:2px}
+@keyframes blink{50%{opacity:0}}
+.evcard{align-self:stretch;border:1px solid var(--i-bd);background:hsl(239 84% 67% / .06);border-radius:10px;padding:10px 12px;font-size:12px;animation:in .25s ease}
+@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.evcard .hd{display:flex;gap:8px;align-items:center;color:var(--i-tx);font-weight:600;flex-wrap:wrap}
+.evcard .hd time{margin-left:auto;color:var(--text-d);font:400 11px var(--mono)}
+.evcard .lines{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin-top:6px}
+.evcard .k{color:var(--text-d);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:1px}
+.evcard .add{color:var(--green)}.evcard .drop{color:var(--rose)}.evcard .same{color:var(--text-m)}
+.evcard .when{margin-top:6px;color:var(--text-m);font-size:11px}
+.evcard.warn{border-color:var(--a-bd);background:var(--a-bg)}.evcard.warn .hd{color:var(--a-tx)}
+.composer{border-top:1px solid var(--border);padding:12px 16px;background:var(--elev);position:relative}
+.chiprow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.chip{border:1px solid var(--border);background:var(--card);color:var(--text-m);font-size:12px;border-radius:6px;padding:4px 10px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;transition:all .15s}
+.chip:hover{border-color:var(--i-bd);color:var(--text)}
+.chip.expert{background:hsl(258 90% 66%/.15);border-color:var(--v-bd);color:var(--v-tx);cursor:default}
+.chip.scope{border-color:var(--i-bd);color:var(--i-tx);background:var(--i-bg)}
+.chip.scope.inert{border-style:dashed;background:transparent;color:var(--text-m)}
+.chip small{font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.8}
+.inputbox{display:flex;gap:8px;align-items:center;border:1px solid var(--border);border-radius:12px;background:var(--card);padding:10px 12px;color:var(--text-d);font-size:13px}
+.inputbox .send{margin-left:auto}
+.pending{margin-top:8px;font-size:11px;color:var(--a-tx);display:none}
+.pending.on{display:block}
+/* popover */
+.pop{position:absolute;z-index:10;width:380px;max-width:calc(100vw - 48px);background:var(--pop);border:1px solid var(--border);border-radius:12px;box-shadow:0 18px 50px #000a;padding:12px;display:none}
+.pop.on{display:block;animation:in .15s ease}
+.pop h4{margin:0 0 2px;font:600 13px var(--sans)}
+.pop .sub{color:var(--text-m);font-size:11px;margin-bottom:8px}
+.tree{display:flex;flex-direction:column;gap:2px;max-height:220px;overflow:auto}
+.node{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text);transition:all .15s}
+.node:hover{background:var(--muted)}
+.node.sel{background:var(--i-bg);color:var(--i-tx)}
+.node .n{margin-left:auto;font:400 11px var(--mono);color:var(--text-d)}
+.node.d1{padding-left:24px}.node.d2{padding-left:40px}
+.ledger{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.ledger > div{border-radius:8px;padding:8px 10px;font-size:12px}
+.ledger .yes{background:var(--g-bg);border:1px solid var(--g-bd)}
+.ledger .no{background:var(--r-bg);border:1px solid var(--r-bd)}
+.ledger h5{margin:0 0 4px;font:600 10px var(--sans);text-transform:uppercase;letter-spacing:.06em;color:var(--text-m)}
+.ledger ul{margin:0;padding-left:16px}.ledger li{font-size:12px}
+.explain{margin-top:10px;font-size:12px;border-left:2px solid var(--amber);background:var(--a-bg);padding:7px 10px;border-radius:0 8px 8px 0;color:var(--text)}
+.explain.info{border-left-color:var(--indigo);background:var(--i-bg)}
+.pop .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap}
+.pop .btn[disabled]{opacity:.45;cursor:not-allowed}
+.statebar{display:flex;gap:16px;flex-wrap:wrap;margin:0 auto 14px;max-width:860px;padding:10px 12px;border:1px dashed var(--border);border-radius:10px;font-size:11px;color:var(--text-d)}
+
+/* ─── spend surface ─── */
+.sp{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:20px}
+.sp h3{font:700 18px var(--head);margin:0;display:flex;gap:8px;align-items:center}
+.sp .cockpit{font:500 11px var(--mono);padding:2px 8px;border-radius:999px;background:var(--i-bg);color:var(--i-tx);border:1px solid var(--i-bd)}
+.sp .desc{color:var(--text-m);font-size:12px;margin:4px 0 14px}
+.ribbon{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:10px 12px;border-radius:10px;background:hsl(220 30% 7% / .6);border:1px solid hsl(220 20% 16% / .5);font:400 12px var(--mono)}
+.ribbon .lab{color:var(--text-m)}
+.fp{padding:4px 10px;border-radius:6px;color:var(--text-m);cursor:pointer;border:1px solid transparent;transition:all .15s;background:none;font:inherit}
+.fp:hover{color:var(--text);background:var(--card)}
+.fp.on{background:var(--i-bg);border-color:var(--i-bd);color:var(--i-tx);font-weight:600}
+.fp.none{font-style:italic}
+.scopeline{margin-top:8px;font-size:11px;color:var(--text-m);font-family:var(--mono)}
+.scopeline b{color:var(--i-tx);font-weight:500}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:14px}
+.kpi{border:1px solid var(--border);background:var(--card);border-radius:12px;padding:14px}
+.kpi .k{font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--text-m)}
+.kpi .v{font:700 22px var(--mono);margin-top:4px}
+.kpi .f{margin-top:8px;padding-top:6px;border-top:1px solid hsl(220 20% 16% / .5);font:400 11px var(--mono);color:var(--text-m)}
+.card{border:1px solid var(--border);background:var(--card);border-radius:12px;padding:16px;margin-top:14px}
+.card h4{margin:0 0 10px;font:600 13px var(--sans);display:flex;gap:8px;align-items:center}
+.card h4 .r{margin-left:auto;font:400 11px var(--mono);color:var(--text-m)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--text-d);padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid hsl(220 20% 16% / .5);font-family:var(--mono)}
+td.name{font-family:var(--sans)}
+tr.clickable{cursor:pointer;transition:background .15s}tr.clickable:hover{background:var(--muted)}
+tr.sel td{background:var(--i-bg)}
+tr.noexp td.name{font-style:italic;color:var(--text-m)}
+tr.total td{border-top:1px solid var(--border);border-bottom:none;font-weight:600}
+.num{text-align:right}
+.bar{height:6px;border-radius:999px;background:var(--bg);overflow:hidden;min-width:80px}
+.bar i{display:block;height:100%;background:var(--indigo)}
+tr.noexp .bar i{background:var(--text-d)}
+.warnchip{font-size:10px;color:var(--a-tx);border:1px solid var(--a-bd);background:var(--a-bg);border-radius:999px;padding:1px 6px;margin-left:6px;font-family:var(--sans)}
+.recon{margin-top:10px;font:400 11px var(--mono);color:var(--green);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.recon.bad{color:var(--rose)}
+.rule{margin-top:6px;font-size:11px;color:var(--text-m)}
+.charts{display:grid;grid-template-columns:7fr 5fr;gap:14px}
+@media (max-width:760px){.charts{grid-template-columns:1fr}}
+.days{display:flex;align-items:flex-end;gap:5px;height:130px;padding-top:6px}
+.days div{flex:1;background:var(--indigo);border-radius:3px 3px 0 0;opacity:.85;transition:height .25s}
+.donut{width:150px;height:150px;border-radius:50%;margin:6px auto;position:relative}
+.donut::after{content:'';position:absolute;inset:28px;border-radius:50%;background:var(--card)}
+.legend{font:400 11px var(--mono);color:var(--text-m);display:grid;gap:3px;margin-top:6px}
+.legend span i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{background:transparent;border:0;color:var(--text-m);font:500 11px var(--mono);padding:4px 10px;cursor:pointer}
+.seg button.on{background:var(--i-bg);color:var(--i-tx)}
+.pexp{display:inline-flex;align-items:center;gap:4px;font:400 11px var(--sans);color:var(--v-tx);background:var(--v-bg);border:1px solid var(--v-bd);border-radius:999px;padding:1px 7px}
+.pexp.none{color:var(--text-d);background:transparent;border-style:dashed;border-color:var(--border)}
+.tag{font:400 10px var(--sans);color:var(--text-d);border:1px solid var(--border);border-radius:4px;padding:0 4px;margin-left:4px}
+.scrollx{overflow-x:auto}
+@media (max-width:600px){main{padding:14px}.transcript{padding:12px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>268 · Expert spend & mid-thread scope</h1>
+  <div class="grp" role="tablist" aria-label="Surface">Surface
+    <button class="tab" data-surface="chat" aria-selected="true">Chat · change scope</button>
+    <button class="tab" data-surface="spend" aria-selected="false">/admin/spend · by Expert</button>
+  </div>
+  <div class="sep"></div>
+  <div class="grp" role="tablist" aria-label="Variant">Variant
+    <button class="tab" data-v="a" aria-selected="true">A ★</button>
+    <button class="tab" data-v="b" aria-selected="false">B</button>
+  </div>
+</header>
+
+<main>
+<!-- ══════════════════════════ CHAT SURFACE ══════════════════════════ -->
+<section class="surface on" id="s-chat">
+  <div class="vhead" id="chat-vhead"></div>
+
+  <div class="statebar">
+    <div class="grp">Expert on this thread
+      <button class="tab" data-exp="none" aria-pressed="false">None</button>
+      <button class="tab" data-exp="biased" aria-pressed="true">Financial Analyzer · Biased</button>
+      <button class="tab" data-exp="restricted" aria-pressed="false">HR Advisor · Restricted</button>
+    </div>
+    <div class="grp">Run
+      <button class="tab" data-run="idle" aria-pressed="true">Idle</button>
+      <button class="tab" data-run="stream" aria-pressed="false">Answer streaming</button>
+    </div>
+    <div class="grp">Under Restricted
+      <button class="tab" data-rmode="save" aria-pressed="true">Save & say</button>
+      <button class="tab" data-rmode="lock" aria-pressed="false">Lock</button>
+    </div>
+    <div class="grp"><button class="btn g" id="reload" style="padding:3px 10px;font-size:11px">↻ Simulate reload</button></div>
+  </div>
+
+  <div class="chat" id="chat">
+    <div class="chead" id="chead">
+      <span class="t">💬 Q3 board prep</span>
+      <span class="scopepill" id="hdrPill" data-open="pop"><span class="k">Scope</span><span class="val" id="hdrVal">/Client ACME</span> ▾</span>
+      <span id="hdrNote" style="font-size:11px;color:var(--text-d)"></span>
+    </div>
+    <div class="transcript" id="transcript"></div>
+    <div class="composer" id="composer">
+      <div class="chiprow" id="chiprow"></div>
+      <div class="inputbox">Ask a follow-up… <button class="btn p send" id="send">Send ↵</button></div>
+      <div class="pending" id="pending"></div>
+    </div>
+    <div class="pop" id="pop">
+      <h4>Search in</h4>
+      <div class="sub" id="popSub">Applies from your next message. Earlier answers keep their sources.</div>
+      <div class="tree" id="tree"></div>
+      <div id="popExplain"></div>
+      <div class="acts"><button class="btn g" id="popCancel">Cancel</button><button class="btn p" id="popApply">Apply</button></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>Shared by both variants (not what you are choosing):</b> the change is a transcript card that survives reload and is never sent to the model. It applies from the <b>next</b> message. An answer that is streaming keeps the old scope, and the card says so. The Expert rule comes from <span class="mono">compose_expert_scope</span> and is not re-derived here. <b>Restricted</b> ignores the thread folder, so the change is saved but has <b>no effect</b> while that Expert is active. <b>Biased</b> searches the thread folder <b>plus</b> the Expert's folders.<br>
+    <b>What you are choosing:</b> <b>A</b> puts scope in the composer beside the Expert chip, next to where you type. <b>B</b> puts it in the thread header, a thread property you can see from the top. Also choose <b>Under Restricted</b>: <i>Save & say</i> (you can change it, and the card says it waits for the Expert to leave) or <i>Lock</i> (the picker refuses and says why).
+  </div>
+</section>
+
+<!-- ══════════════════════════ SPEND SURFACE ══════════════════════════ -->
+<section class="surface" id="s-spend">
+  <div class="vhead" id="spend-vhead"></div>
+  <div class="sp">
+    <h3>$ Spend & Metering <span class="cockpit">Cockpit</span></h3>
+    <div class="desc">Attributable dollar expenditure per run and organization · what this view cannot see</div>
+    <div class="ribbon" id="ribbon">
+      <span class="lab">⏱ Time:</span><button class="fp">Today</button><button class="fp">7D</button><button class="fp on">Last 30D</button><button class="fp">All Time</button>
+      <span class="lab" id="expFilterLab">✦ Expert:</span><span id="expFilter"></span>
+      <span id="groupSeg" style="display:none"><span class="lab">Group by:</span> <span class="seg"><button data-g="model">Model</button><button data-g="expert" class="on">Expert</button></span></span>
+    </div>
+    <div class="scopeline" id="scopeline"></div>
+    <div class="kpis" id="kpis"></div>
+    <div id="spendBody"></div>
+  </div>
+  <div class="note">
+    <b>Shared by both variants:</b> a run is attributed to the Expert that was <b>active when the run started</b>, and that is stored on the run. It is not read from the thread's current Expert, so a later swap does not rewrite history. Sub-agent runs and paused-then-continued runs count toward their <b>parent run's</b> Expert. <b>No Expert</b> is always a row, even when it is $0. The per-Expert lines always add up to the org total, and the footer checks that sum. Unpriced runs keep their amber flag inside each Expert line. The dollar figure comes from the one token-to-USD calculation built in 257; there is no second formula.<br>
+    <b>What you are choosing:</b> <b>A</b> adds an Expert <b>filter</b> that every card follows (KPIs, charts, ledger), plus a "Spend by Expert" table. <b>B</b> adds a <b>Group by Model / Expert</b> switch on the breakdown chart and table, and leaves the KPIs org-wide.
+  </div>
+</section>
+</main>
+
+<script>
+/* ───────── shared state ───────── */
+const S={surface:'chat',v:'a',exp:'biased',run:'idle',rmode:'save',scope:'/Client ACME',scopeId:'acme',pending:null,events:[]};
+const FOLDERS=[
+  {id:'all',name:'All documents',path:null,n:212,d:0},
+  {id:'acme',name:'Client ACME',path:'/Client ACME',n:4,d:0},
+  {id:'acmeq3',name:'Q3 Contracts',path:'/Client ACME/Q3 Contracts',n:2,d:1},
+  {id:'fin',name:'Finance',path:'/Finance',n:38,d:0},
+  {id:'fin25',name:'FY2025 Filings',path:'/Finance/FY2025 Filings',n:11,d:1},
+  {id:'hr',name:'HR Policies',path:'/HR Policies',n:17,d:0},
+];
+const EXP={
+  biased:{name:'Financial Analyzer',mode:'Biased',folders:['Financial Reports & Filings']},
+  restricted:{name:'HR Advisor',mode:'Restricted',folders:['HR Policies']},
+};
+const $=s=>document.querySelector(s);
+const fmt=p=>p||'All documents';
+const now=()=>{const d=new Date(2026,8,28,14,32+S.events.length*3);return d.toTimeString().slice(0,5)};
+
+/* ───────── top toggles ───────── */
+function bindGroup(attr,key,after){
+  document.querySelectorAll(`[data-${attr}]`).forEach(b=>b.addEventListener('click',()=>{
+    S[key]=b.dataset[attr];
+    const aria=b.hasAttribute('aria-selected')?'aria-selected':'aria-pressed';
+    document.querySelectorAll(`[data-${attr}]`).forEach(x=>x.setAttribute(aria,x===b));
+    after&&after();
+  }));
+}
+bindGroup('surface','surface',()=>{document.querySelectorAll('.surface').forEach(s=>s.classList.toggle('on',s.id==='s-'+S.surface));render()});
+bindGroup('v','v',render);
+bindGroup('exp','exp',()=>{closePop();renderChat()});
+bindGroup('run','run',renderChat);
+bindGroup('rmode','rmode',()=>{closePop();renderChat()});
+
+/* ───────── chat ───────── */
+const VH={
+  a:['A · Scope chip in the composer','The scope sits beside the Expert chip, right above where you type, which is where the effect lands (your next message). The chip reads what the next message will search.'],
+  b:['B · Scope pill in the thread header','The scope is a property of the thread, shown at the top next to its title. The composer stays as it is today. The header answers "what has this thread been reading?" from anywhere in a long transcript.'],
+};
+function effective(){
+  // what the NEXT message searches — mirrors compose_expert_scope, never re-derived in the real build
+  if(S.exp==='restricted') return {will:[EXP.restricted.folders[0],'Chat attachments'],wont:S.scope?[S.scope+' ('+folderN()+')']:['All other documents'],inert:true};
+  if(S.exp==='biased') return {will:[fmt(S.scope)+(S.scope?' ('+folderN()+')':''),EXP.biased.folders[0],'Chat attachments'],wont:[],inert:false};
+  return {will:[fmt(S.scope)+(S.scope?' ('+folderN()+')':''),'Chat attachments'],wont:[],inert:false};
+}
+function folderN(){return (FOLDERS.find(f=>f.id===S.scopeId)||{}).n}
+function renderChat(){
+  const [h,p]=VH[S.v];$('#chat-vhead').innerHTML=`<h2>${h}</h2><p>${p}</p>`;
+  const e=effective();
+  // header pill (B only)
+  $('#hdrPill').style.display=S.v==='b'?'':'none';
+  $('#hdrPill').classList.toggle('inert',e.inert);
+  $('#hdrVal').textContent=fmt(S.scope);
+  $('#hdrNote').textContent=S.v==='b'&&e.inert?`not searched while ${EXP.restricted.name} is active`:'';
+  // chip row
+  let chips='';
+  if(S.exp!=='none'){const x=EXP[S.exp];chips+=`<span class="chip expert">✦ ${x.name} <small>· ${x.mode}</small></span>`}
+  if(S.v==='a'){
+    chips+=`<span class="chip scope ${e.inert?'inert':''}" data-open="pop">📁 ${fmt(S.scope)} ▾${e.inert?' <small style="color:var(--a-tx)">· not searched</small>':''}</span>`;
+  }
+  chips+=`<span class="chip">🔌 Google Drive</span>`;
+  $('#chiprow').innerHTML=chips;
+  // transcript
+  let t=`<div class="msg u">What did ACME spend with us in Q3?</div>
+  <div class="msg a"><div class="by">${S.exp==='restricted'?'HR Advisor':S.exp==='biased'?'Financial Analyzer':'Assistant'}</div>ACME's Q3 invoices total <b>$412K</b>, up 9% on Q2 [1].<div class="src">[1] ACME_invoice_log.xlsx · /Client ACME</div></div>`;
+  S.events.forEach(ev=>t+=ev.html);
+  if(S.run==='stream') t+=`<div class="msg u">Which invoices are overdue?</div><div class="msg a"><div class="by">Answering · searching ${S.events.length?S.events[S.events.length-1].from:fmt(S.scope)}</div><span class="streaming">Two invoices are past 30 days: INV-2231 ($18.4K) and</span></div>`;
+  $('#transcript').innerHTML=t;
+  $('#pending').className='pending'+(S.run==='stream'&&S.events.length?' on':'');
+  $('#pending').textContent=`⏳ The answer in progress keeps searching ${S.events.length?S.events[S.events.length-1].from:''}. ${fmt(S.scope)} applies from your next message.`;
+  bindOpen();
+}
+function bindOpen(){document.querySelectorAll('[data-open=pop]').forEach(el=>el.onclick=ev=>{ev.stopPropagation();openPop(el)})}
+let draft=null;
+function openPop(anchor){
+  draft=S.scopeId;
+  const pop=$('#pop'),chat=$('#chat').getBoundingClientRect(),a=anchor.getBoundingClientRect();
+  pop.style.left=Math.max(8,Math.min(a.left-chat.left,chat.width-388))+'px';
+  if(S.v==='a'){pop.style.top='auto';pop.style.bottom=(chat.bottom-a.top+8)+'px'}else{pop.style.bottom='auto';pop.style.top=(a.bottom-chat.top+8)+'px'}
+  renderPop();pop.classList.add('on');
+}
+function closePop(){$('#pop').classList.remove('on')}
+function renderPop(){
+  const locked=S.exp==='restricted'&&S.rmode==='lock';
+  $('#tree').innerHTML=FOLDERS.map(f=>`<div class="node d${f.d} ${f.id===draft?'sel':''}" data-f="${f.id}" style="${locked?'opacity:.45;cursor:not-allowed':''}">📁 ${f.name}<span class="n">${f.n} docs</span></div>`).join('');
+  document.querySelectorAll('#tree .node').forEach(n=>n.onclick=()=>{if(locked)return;draft=n.dataset.f;renderPop()});
+  const f=FOLDERS.find(x=>x.id===draft);
+  let ex='';
+  if(S.exp==='restricted'){
+    ex=locked
+      ?`<div class="explain"><b>HR Advisor is Restricted</b>. It reads HR Policies only, so this thread's folder is not searched. Remove HR Advisor to change what this thread searches.</div>`
+      :`<div class="explain"><b>No effect while HR Advisor is active.</b> Restricted reads HR Policies only. <span class="mono">${fmt(f.path)}</span> is saved and is searched once HR Advisor leaves.</div>`;
+  }else if(S.exp==='biased'){
+    ex=`<div class="ledger"><div class="yes"><h5>Next message searches</h5><ul><li>${fmt(f.path)}${f.path?' ('+f.n+')':''}</li><li>Financial Reports & Filings <span class="tag">Expert</span></li><li>Chat attachments</li></ul></div><div class="no"><h5>Stops searching</h5><ul>${S.scopeId===draft?'<li style="color:var(--text-m)">nothing changes</li>':`<li>${fmt(S.scope)}${S.scope?' ('+folderN()+')':''}</li>`}</ul></div></div><div class="explain info">Financial Analyzer is Biased, so it adds its own folder to whatever you pick here.</div>`;
+  }else{
+    ex=`<div class="ledger"><div class="yes"><h5>Next message searches</h5><ul><li>${fmt(f.path)}${f.path?' ('+f.n+')':''}</li><li>Chat attachments</li></ul></div><div class="no"><h5>Stops searching</h5><ul>${S.scopeId===draft?'<li style="color:var(--text-m)">nothing changes</li>':`<li>${fmt(S.scope)}${S.scope?' ('+folderN()+')':''}</li>`}</ul></div></div>`;
+  }
+  $('#popExplain').innerHTML=ex;
+  $('#popApply').disabled=locked||draft===S.scopeId;
+  $('#popApply').textContent=locked?'Locked':'Apply';
+  $('#popSub').textContent=S.run==='stream'?'The answer in progress keeps its scope. This applies from your next message.':'Applies from your next message. Earlier answers keep their sources.';
+}
+$('#popCancel').onclick=closePop;
+$('#popApply').onclick=()=>{
+  const f=FOLDERS.find(x=>x.id===draft);const from=fmt(S.scope);
+  S.scope=f.path;S.scopeId=f.id;
+  const inert=S.exp==='restricted';
+  const stream=S.run==='stream';
+  const lines=inert
+    ?`<span class="k">Saved</span><span class="same">${fmt(f.path)}</span><span class="k">Searching</span><span class="same">HR Policies only · HR Advisor is Restricted</span>`
+    :`<span class="k">Now</span><span class="add">${fmt(f.path)}${f.path?' ('+f.n+')':''}${S.exp==='biased'?' + Financial Reports & Filings':''}</span><span class="k">Dropped</span><span class="drop">${from}</span>`;
+  const when=inert?'Takes effect when HR Advisor leaves.':(stream?'From your next message. The answer in progress keeps '+from+'.':'From your next message.');
+  S.events.push({from,html:`<div class="evcard ${inert?'warn':''}"><div class="hd">📁 Scope ${from} → ${fmt(f.path)} <time>${now()}</time></div><div class="lines">${lines}</div><div class="when">${when}</div></div>`});
+  closePop();renderChat();
+};
+$('#send').onclick=()=>{
+  if(!S.events.length){renderChat();return}
+  const e=effective();
+  S.run='idle';document.querySelectorAll('[data-run]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.run==='idle'));
+  const src=S.exp==='restricted'?'Contractor_Policy.pdf · /HR Policies':(S.scopeId==='acmeq3'?'ACME_MSA_2026.pdf · /Client ACME/Q3 Contracts':S.scopeId==='fin25'?'10-K_FY2025.pdf · /Finance/FY2025 Filings':'ACME_SOW_03.docx · '+fmt(S.scope));
+  S.events.push({from:fmt(S.scope),html:`<div class="msg u">Does the MSA have a late-payment clause?</div><div class="msg a"><div class="by">${S.exp==='restricted'?'HR Advisor':S.exp==='biased'?'Financial Analyzer':'Assistant'}</div>${S.exp==='restricted'?'HR Policies do not cover client contracts. Remove HR Advisor to search the client folder.':'Yes — §7.2 charges 1.5% per month after 30 days [1].'}<div class="src">[1] ${src}</div></div>`});
+  renderChat();
+};
+$('#reload').onclick=()=>{$('#transcript').style.opacity=.2;setTimeout(()=>{$('#transcript').style.opacity=1;renderChat()},350)};
+document.addEventListener('click',e=>{if(!$('#pop').contains(e.target))closePop()});
+
+/* ───────── spend ───────── */
+const ROWS=[
+  {k:'fa',name:'Financial Analyzer',mode:'Biased',runs:41,sub:6,paused:2,tokIn:1812000,tokOut:402000,usd:3.4172,unrated:0},
+  {k:'cr',name:'Contract Reviewer',mode:'Biased',runs:9,sub:0,paused:1,tokIn:640000,tokOut:118000,usd:1.2044,unrated:1},
+  {k:'hr',name:'HR Advisor',mode:'Restricted',runs:12,sub:0,paused:0,tokIn:402000,tokOut:88000,usd:0.8820,unrated:0},
+  {k:'none',name:'No Expert',mode:null,runs:58,sub:4,paused:0,tokIn:2210000,tokOut:512000,usd:2.9310,unrated:3},
+];
+const MODELS=[{name:'claude-sonnet-5',usd:4.1021,runs:52},{name:'gpt-5.1',usd:2.8840,runs:44},{name:'gemini-3-pro',usd:1.2201,runs:19},{name:'deepseek-v4',usd:0.2284,runs:5}];
+const COL=['hsl(239 84% 67%)','hsl(258 90% 66%)','hsl(187 85% 60%)','hsl(220 16% 45%)'];
+const SP={exp:'all',group:'expert'};
+const tot=a=>a.reduce((s,r)=>s+r.usd,0);
+const TOTAL=tot(ROWS);
+const k=n=>n>1e6?(n/1e6).toFixed(2)+'M':(n/1e3).toFixed(1)+'k';
+function renderSpend(){
+  const A=S.v==='a';
+  $('#spend-vhead').innerHTML=A?`<h2>A · Expert filter that every card follows</h2><p>An Expert filter sits beside Time. Picking one narrows the KPIs, charts and ledger together, and a line under the ribbon states what is filtered. This avoids the 257 case where one filter moved the ledger but not the charts. A "Spend by Expert" table with every Expert and "No Expert" is always shown.</p>`
+    :`<h2>B · Group by Model / Expert</h2><p>KPIs stay org-wide. A Group-by switch turns the breakdown chart and table from per-model into per-Expert. The ledger gains an Expert column. There is no filter state to explain, but you cannot see one Expert's daily trend.</p>`;
+  $('#expFilterLab').style.display=A?'':'none';
+  $('#expFilter').innerHTML=A?[{k:'all',name:'All'},...ROWS].map(r=>`<button class="fp ${r.k==='none'?'none':''} ${SP.exp===r.k?'on':''}" data-e="${r.k}">${r.name}</button>`).join(''):'';
+  document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{SP.exp=b.dataset.e;renderSpend()});
+  $('#groupSeg').style.display=A?'none':'';
+  document.querySelectorAll('[data-g]').forEach(b=>{b.classList.toggle('on',b.dataset.g===SP.group);b.onclick=()=>{SP.group=b.dataset.g;renderSpend()}});
+  const sel=A&&SP.exp!=='all'?ROWS.filter(r=>r.k===SP.exp):ROWS;
+  const usd=tot(sel),runs=sel.reduce((s,r)=>s+r.runs,0),ti=sel.reduce((s,r)=>s+r.tokIn,0),to=sel.reduce((s,r)=>s+r.tokOut,0),un=sel.reduce((s,r)=>s+r.unrated,0);
+  $('#scopeline').innerHTML=A&&SP.exp!=='all'?`Showing <b>${sel[0].name}</b> · Last 30D · all cards and the ledger below follow this filter · <span class="link" data-e2="all">clear</span>`:'Showing <b>all runs</b> · Last 30D';
+  document.querySelectorAll('[data-e2]').forEach(b=>b.onclick=()=>{SP.exp='all';renderSpend()});
+  $('#kpis').innerHTML=`
+    <div class="kpi"><div class="k">${A&&SP.exp!=='all'?'Spend · '+sel[0].name:'Total org spend (attributable)'}</div><div class="v" style="color:var(--green)">$${usd.toFixed(4)}${un?'<span style="color:var(--amber);font-size:14px">*</span>':''}</div><div class="f">${un?`<span style="color:var(--a-tx)">* ${runs-un} priced · ${un} unrated excluded</span>`:'✓ 100% of runs priced'}</div></div>
+    <div class="kpi"><div class="k">Tokens counted</div><div class="v">${k(ti+to)}</div><div class="f"><span style="color:var(--cyan)">In ${Math.round(ti/(ti+to)*100)}%</span> · <span style="color:var(--violet)">Out ${Math.round(to/(ti+to)*100)}%</span></div></div>
+    <div class="kpi"><div class="k">Runs</div><div class="v">${runs}</div><div class="f">incl. ${sel.reduce((s,r)=>s+r.sub,0)} sub-agent · ${sel.reduce((s,r)=>s+r.paused,0)} paused→continued</div></div>`;
+  // body
+  let b='';
+  const daily=[3,5,4,7,6,9,5,8,6,7,10,6,8,9].map(x=>x*(A&&SP.exp!=='all'?usd/TOTAL:1));
+  const breakdown=(!A&&SP.group==='model')?MODELS.map((m,i)=>({name:m.name,usd:m.usd,c:COL[i]})):ROWS.map((r,i)=>({name:r.name,usd:r.usd,c:COL[i],none:r.k==='none'}));
+  let acc=0;const grad=breakdown.map(x=>{const a=acc/TOTAL*360;acc+=x.usd;return `${x.c} ${a}deg ${acc/TOTAL*360}deg`}).join(',');
+  b+=`<div class="charts"><div class="card"><h4>📅 14-day spend${A&&SP.exp!=='all'?' · '+sel[0].name:''}<span class="r">daily attributable</span></h4><div class="days">${daily.map(x=>`<div style="height:${x*9}%"></div>`).join('')}</div></div>
+  <div class="card"><h4>◔ ${(!A&&SP.group==='model')?'Model':'Expert'} spend share<span class="r">${A&&SP.exp!=='all'?'org-wide · selection highlighted':'org-wide'}</span></h4><div class="donut" style="background:conic-gradient(${grad})"></div><div class="legend">${breakdown.map(x=>`<span style="${A&&SP.exp!=='all'&&!sel.some(s=>s.name===x.name)?'opacity:.4':''}"><i style="background:${x.c}"></i>${x.none?'<em>'+x.name+'</em>':x.name} · $${x.usd.toFixed(4)}</span>`).join('')}</div></div></div>`;
+  if(A||SP.group==='expert'){
+    b+=`<div class="card"><h4>✦ Spend by Expert<span class="r">sum of each Expert's runs</span></h4><div class="scrollx"><table><thead><tr><th>Expert</th><th class="num">Runs</th><th class="num">Tokens</th><th class="num">USD</th><th>Share</th></tr></thead><tbody>
+    ${ROWS.map(r=>`<tr class="clickable ${r.k==='none'?'noexp':''} ${A&&SP.exp===r.k?'sel':''}" data-e="${A?r.k:''}"><td class="name">${r.k==='none'?'No Expert':r.name}${r.mode?` <span class="tag">${r.mode}</span>`:''}${r.unrated?`<span class="warnchip">${r.unrated} unrated</span>`:''}</td><td class="num">${r.runs}</td><td class="num">${k(r.tokIn+r.tokOut)}</td><td class="num">$${r.usd.toFixed(4)}</td><td><div class="bar"><i style="width:${r.usd/TOTAL*100}%"></i></div></td></tr>`).join('')}
+    <tr class="total"><td class="name">Org total</td><td class="num">${ROWS.reduce((s,r)=>s+r.runs,0)}</td><td class="num">${k(ROWS.reduce((s,r)=>s+r.tokIn+r.tokOut,0))}</td><td class="num">$${TOTAL.toFixed(4)}</td><td></td></tr></tbody></table></div>
+    <div class="recon">✓ 4 Expert lines = $${TOTAL.toFixed(4)} = org total · 0 runs unattributed</div>
+    <div class="rule">A run counts toward the Expert active <b>when it started</b>. Sub-agent and continued runs count toward their parent run's Expert.</div></div>`;
+  }
+  // ledger
+  const L=[
+    {t:'14:40',thr:'Q3 board prep',e:'hr',m:'claude-sonnet-5',tok:'38.2k',usd:'$0.0914',note:''},
+    {t:'14:31',thr:'Q3 board prep',e:'fa',m:'claude-sonnet-5',tok:'51.0k',usd:'$0.1221',note:'↳ 2 sub-agents'},
+    {t:'13:05',thr:'Onboarding FAQ',e:'none',m:'gpt-5.1',tok:'12.4k',usd:'$0.0188',note:''},
+    {t:'11:52',thr:'MSA redlines',e:'cr',m:'deepseek-v4',tok:'22.9k',usd:'—',note:'unrated'},
+    {t:'09:14',thr:'Q2 variance',e:'fa',m:'gemini-3-pro',tok:'44.7k',usd:'$0.0802',note:'paused → continued'},
+  ].filter(r=>!(A&&SP.exp!=='all')||r.e===SP.exp);
+  const nm=e=>{const r=ROWS.find(x=>x.k===e);return e==='none'?'<span class="pexp none">No Expert</span>':`<span class="pexp">✦ ${r.name}</span>`};
+  b+=`<div class="card"><h4>▤ Run ledger<span class="r">${A&&SP.exp!=='all'?'filtered to '+sel[0].name:'all runs'}</span></h4><div class="scrollx"><table><thead><tr><th>Started</th><th>Thread</th><th>Expert</th><th>Model</th><th class="num">Tokens</th><th class="num">USD</th></tr></thead><tbody>
+  ${L.length?L.map(r=>`<tr><td>${r.t}</td><td class="name">${r.thr}${r.note?` <span class="tag">${r.note}</span>`:''}</td><td class="name">${nm(r.e)}</td><td>${r.m}</td><td class="num">${r.tok}</td><td class="num" style="${r.usd==='—'?'color:var(--a-tx)':''}">${r.usd}</td></tr>`).join(''):`<tr><td colspan="6" class="name" style="color:var(--text-m)">No runs for this Expert in the last 30 days. Its line above reads $0.0000.</td></tr>`}
+  </tbody></table></div><div class="rule">Two rows from "Q3 board prep" carry different Experts. A swap mid-thread splits the thread's cost at the run where the swap happened.</div></div>`;
+  $('#spendBody').innerHTML=b;
+  if(A) document.querySelectorAll('tr[data-e]').forEach(tr=>{if(tr.dataset.e)tr.onclick=()=>{SP.exp=SP.exp===tr.dataset.e?'all':tr.dataset.e;renderSpend()}});
+}
+
+function render(){S.surface==='chat'?renderChat():renderSpend()}
+render();
+</script>
+</body>
+</html>
