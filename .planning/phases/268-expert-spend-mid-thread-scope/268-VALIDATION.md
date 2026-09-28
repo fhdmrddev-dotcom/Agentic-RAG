@@ -75,6 +75,18 @@ WHERE a.action_type = 'search.query' AND a.metadata->>'run_id' = '<run>';
 | 7 | moonshot | `kimi-k2.6` | **coerce** (weakest emission) | | | | | |
 | 8 | openrouter | `deepseek/deepseek-v4-pro` | force (DB override: see above) | | | | | |
 
+**Re-derived at drive time (268-04 Task 3 step 1, 2026-09-28, repo HEAD `6fd38f39a`) — recorded BESIDE the
+table, the table above is unchanged.** The same command printed the same eight provider groups
+`['anthropic', 'deepseek', 'google', 'minimax', 'moonshot', 'openai', 'openrouter', 'zhipu']`, and every
+chosen id is still present with the same seed values: `gpt-5.6-sol` (force_strict, native, `responses`),
+`claude-sonnet-5` / `gemini-3.5-flash` / `deepseek-v4-pro` / `glm-5.2` / `MiniMax-M3` (force, native),
+`kimi-k2.6` (coerce, native), `deepseek/deepseek-v4-pro` (force, **seed native_tools False**). **No roster drift.**
+`model_capabilities_overrides` for the eight ids, re-queried: four rows exist —
+`deepseek-v4-pro`/deepseek, `gemini-3.5-flash`/google, `kimi-k2.6`/moonshot with every capability column NULL
+(no override: enabled, not deprecated, not removed); and **`deepseek/deepseek-v4-pro`/openrouter with
+`native_tools = true`** — the 267 carry-over is CONFIRMED still true, so row 8 exercises OpenRouter's NATIVE tool
+path on this box, not the non-native one. No override row exists for the other four ids (seed values apply).
+
 **Pass bar per row:** (a) exactly one `scope_changed` system row for the PATCH, its `org_id` = the
 thread's `org_id`; (b) both `runs` rows carry the row's `model` and `provider`; (c) turn 2's `search.query`
 audit row carries `run_id` = turn 2's run and `folder_ids` = the new subtree, and every retrieved document's
