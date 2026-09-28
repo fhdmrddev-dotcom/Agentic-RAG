@@ -190,7 +190,7 @@ const BASELINE = {
   "ChatArea.expertThread.test.tsx": 18, // 267-REVIEW CR-01 +3, WR-01 +1, WR-02 +1, WR-04 +1, WR-06 +1, WR-07 +1; 267-UI-REVIEW #2 +2
   // 267-UI-REVIEW #1 (BLOCKER) — the light-theme contrast fence over the six phase files. Both
   // knobs, same commit; the figure is the gate's own printed count on the adoption run.
-  "expertThemeContrast.test.tsx": 6,
+  "expertThemeContrast.test.tsx": 9, // 268-02 +3: layer-A recon OK/FAILED + ledger Expert pill; FILES += 3 leaves, HUES += indigo
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/experts` has NO bare-directory TARGETS
   // entry — its two existing suites are both named FILE-LEVEL just below — so a suite
@@ -4030,7 +4030,15 @@ const BASELINE = {
   // 17 -> 18 in 257 WR-12: fence em-dash loading state so pre-fix fallback $0.0000 cannot return.
   // 18 -> 22 in 257 CR-05/CR-07: four cases pinning that a FAILED LOAD answers nothing
   // rather than zero. Driven RED against the shipped zero-fallback (Received: "0.0k").
-  "AdminSpendPage.test.tsx": 26, // +4 BUG-260923-02 ledger paging
+  "AdminSpendPage.test.tsx": 36, // +4 BUG-260923-02 ledger paging; 268-02 +10 (Expert filter: four regions move together, paging/refresh keep it)
+  // ── Phase 268 plan 02 (METER-08) — the /admin/spend Expert leaves. BOTH KNOBS, SAME COMMIT:
+  // `src/components/admin/` has NO directory entry (the trap this block's neighbours name four
+  // times), so each suite is a FILE-LEVEL TARGETS entry at the bottom of this file too.
+  // Figures are the suites' own measured counts on the adoption run.
+  "ExpertFilterPills.test.tsx": 7,
+  "ExpertSpendCard.test.tsx": 19,
+  "AttributionDisclosures.test.tsx": 2,
+  "expertSpendCopy.test.ts": 9,
   // Added in 257 CR-06 follow-up. Exhaustive arithmetic: three independently-rounded
   // gauge segments summed to 101 on 34 of the combinations swept, and gemini found it
   // reviewing the CR-06 fix. Driven RED against the pre-fix arithmetic, 40 offenders named.
@@ -5785,6 +5793,11 @@ const TARGETS = [
   // it and not named here runs nowhere and its pin can never fail. Phase 257 hit this
   // trap three times: AdminSpendPage, RunCostBadge, and now apportion100.
   "src/components/admin/spend/apportion100.test.ts",
+  // Phase 268 plan 02 — named for the same reason (no `src/components/admin` directory entry).
+  "src/components/admin/spend/__tests__/ExpertFilterPills.test.tsx",
+  "src/components/admin/spend/__tests__/ExpertSpendCard.test.tsx",
+  "src/components/admin/spend/__tests__/AttributionDisclosures.test.tsx",
+  "src/components/admin/spend/__tests__/expertSpendCopy.test.ts",
   "src/components/admin/__tests__/ModelRegistryTab.test.tsx",
   "src/components/admin/__tests__/addProviderRoster.lockstep.test.ts",
   "src/components/admin/__tests__/hideControlLegibility.test.tsx",
