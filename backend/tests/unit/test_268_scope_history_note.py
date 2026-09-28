@@ -21,6 +21,8 @@ import copy
 import json
 from pathlib import Path
 
+import pytest
+
 from app.services.agent_loop import _reconstruct_history
 
 FIX = Path(__file__).resolve().parents[1] / "fixtures" / "phase268"
@@ -158,4 +160,40 @@ def test_the_note_helper_is_the_one_home_of_the_words():
     assert text == (
         "[Search scope changed from /Client ACME to /Client ACME/Q3 Contracts. Earlier search results in this "
         "conversation may come from outside the new scope; run a new search before citing documents.]"
+    )
+
+
+# ── 268-REVIEW WR-03 — DEFERRED (needs operator decision), pinned as a STRICT xfail ──────────────────────────
+#
+# D-268-23 lets a scope change made while a run is cap_paused apply to the Continue, and the Continue does
+# re-resolve scope. But a Continue writes no user row, so a scope_changed event after the paused segment is
+# still pending when the loop ends, and D-268-26 only hands the note to the NEXT user message. The resumed
+# model therefore gets no note while its history holds the paused segment's old-scope results (SEED-319 on
+# the one path D-268-23 names). The test above, `test_an_event_with_no_following_user_message_emits_nothing`,
+# pins the current rule deliberately (268-04).
+#
+# Fixing it means choosing where the note goes when no next user message exists: prepend it to the LAST
+# prior user message (the review's suggestion), or add a synthetic trailing user turn. Both satisfy the
+# locked "user-role, never a mid-history system row" rule; neither is what D-268-26 says. That placement is
+# the operator's call, so this is recorded rather than decided. `strict=True`: when a fix lands, this XPASSes,
+# the suite fails, and both this pin and the one above must be revisited together.
+
+
+@pytest.mark.xfail(strict=True, reason="268-REVIEW WR-03 deferred — needs operator decision on note placement")
+def test_WR03_a_scope_change_made_while_paused_reaches_the_continue():
+    paused_segment = {
+        "role": "assistant",
+        "content": "Searching the contracts…",
+        "tool_calls": [{"tool_call_id": "call_1", "name": "search_documents",
+                        "args": {"query": "payment terms"}, "result": "MSA: NET 60 (Client ACME)"}],
+    }
+    carrier = {"role": "system", "content": "⏸ Reached the iteration limit…",
+               "tool_calls": [{"kind": "iteration_cap_paused", "tool_call_id": "call_2",
+                               "name": "search_documents", "arguments": "{}"}]}
+    rows = [_user("payment terms?"), paused_segment, carrier,
+            _event(_moved("Client ACME", "Client ACME/Q3 Contracts"))]
+    out = _reconstruct_history(rows)
+    carrying = [m for m in out if "Search scope changed" in (m.get("content") or "")]
+    assert len(carrying) == 1 and carrying[0]["role"] == "user", (
+        "the resumed model is never told the scope changed while its history holds the old-scope results"
     )
