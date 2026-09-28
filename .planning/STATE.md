@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
 status: executing
-last_updated: "2026-09-28T14:26:45.908Z"
-last_activity: 2026-09-28 -- Phase 268 planning complete
+last_updated: "2026-09-28T14:28:00.379Z"
+last_activity: 2026-09-28 -- Phase 268 execution started
 progress:
   total_phases: 12
   completed_phases: 3
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 267 — an expert adds scope
+**Current focus:** Phase 268 — Expert Spend & Mid-Thread Scope
 **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`).
 
 ---
@@ -40,9 +40,9 @@ can be taught new behaviours (skills) that persist and can be shared.
 ## Current Position
 
 Milestone: v4.4 Experts That Actually Work
-Phase: 267 (An Expert Adds Scope, PACK-21..25)
-Plan: 5 plans / 4 waves, checker PASSED (01 → 02 ∥ 03 → 04 → 05)
-Status: Ready to execute
+Phase: 268 (Expert Spend & Mid-Thread Scope) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 268
 
 - SC#1-SC#5 PASS
 - SC#10 board 8/8 PASS
@@ -68,7 +68,7 @@ Baselines at `92b5476be`:
 
 Still owed from 266: UI-2 and UI-4 (not-installed, non-manager) live checks; `independent_review`; the prod parity checklist `266-PROD-PARITY.md`
 Resume file: .planning/phases/268-expert-spend-mid-thread-scope/268-UI-SPEC.md
-Last activity: 2026-09-28 -- Phase 268 planning complete
+Last activity: 2026-09-28 -- Phase 268 execution started
 
 ---
 
