@@ -23,7 +23,7 @@ relates_to:
   - "backend/app/services/run_reconciler.py:236"
   - "backend/app/main.py:434"
   - "256"
-folded_into: null
+folded_into: "268 (trigger (d) only — D-268-20 adds the paused segment tokens at Continue; the boot-reconciler NULL defect itself stays OPEN)"
 renumbered_from: null
 renumbered_because: null
 ---

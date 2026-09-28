@@ -117,6 +117,43 @@ Not in scope: metering the handoff-summary LLM call (D-268-08, disclosed instead
   migration is added to the production deploy checklist with `get_advisors(security)`. `runs` keeps its RLS, and the
   new columns need no new policy. This is verified, not assumed.
 
+### Research-driven decisions (268-RESEARCH.md; operator, 2026-09-28)
+- **D-268-19 (D-268-05 mechanism):** `send_message` calls `_resolve_thread_scoping` **once, before the run INSERT**,
+  and passes the same object to the producer. The row's `expert_id` and the run's scope therefore come from one
+  object. A resolution error is carried and re-raised in the producer, so the run fails exactly as it does today.
+  `insert_run` copies the parent's `expert_id` / `expert_attributed` / `org_id` in SQL for sub-agent rows. The
+  workflow, eval, scheduled and publish INSERT sites carry `(expert_id NULL, expert_attributed true)`. A call-site
+  disposition fence enumerates **every** `insert_run(` call (the 256 `forced_emit` pattern), so a missed site fails
+  a test instead of shipping silently.
+- **D-268-20 (Deep Continue token erasure, FIX IN 268):** `spawn_continuation_run` reads the row's prior
+  `input_tokens`/`output_tokens` and **adds** them before `_finalize_producer_run`. NULL+NULL stays NULL; otherwise
+  None counts as 0 (D-256-06). `finalize_run`'s SQL is **not** edited. This is proven RED-first with a two-segment
+  test. **SEED-297 trigger (d) is FOLDED here.**
+- **D-268-21 (placeholder-row double count):** spend prices **every** row at its own model's rate and groups by
+  root. For a harness **placeholder root** (`model='unknown'`, the three sites `runs.py:1172`,
+  `harness_engine.py:2795`, `publish_service.py:1623`), only the root's own tokens count, because they already sum
+  its sub-agents. The literal predicate is pinned by a fence over those three sites. `breakdown`, `window_total_usd`
+  and `window_run_count` come from ONE `per_root` CTE.
+- **D-268-22 (org mismatch):** a two-org user sending in a thread from a different org stamps the **active org** on
+  the run **and on every message the turn writes**: user, assistant, system-warning and the cap-paused carrier
+  (`agent_loop.py:390`, four stamps, no new branch). The Continue lookup therefore stays coherent. The split
+  transcript is recorded as a known edge case.
+- **D-268-23 (changes while `cap_paused`):** **allowed, and stated.** A scope change applies to the Continue ("your
+  next message"). An Expert change leaves the paused run counting toward the Expert **active when it started**, and
+  the spend rule line says so. No new 409.
+- **D-268-24:** the "paused → continued" ledger tag is **dropped**. The ledger shows `incl. N sub-agents` only, and
+  no kind column is added.
+- **D-268-25 (smaller research rulings):**
+  - Unpriced sub-agents under a rated root are exposed as `unpriced_subagents` and folded into the existing
+    "unrated" disclosure.
+  - The folder PATCH authorizes the new `folder_id` as **visible within the thread's org** before writing (Pitfall
+    12).
+  - `ScopeEffect` resolves with the producer's exact inputs: active org + caller roles (Pitfall 9).
+  - `during_run` is part of the event snapshot, so the card's footer is correct (Pitfall 4).
+  - 267's `TranscriptFolderRef` wire dump stays byte-identical: new fields go on a subclass or are omitted when
+    empty (Pitfall 11).
+  - `backend/app/db/runs.py` gets its missing hot-file ledger row in the same commit as its first edit.
+
 ### Claude's Discretion
 - Exact component names (`ScopeChip`, `ScopeEventCard`), copy strings (ported from the sketch and fenced), and the
   exact SQL shape of the recursive roll-up. It must reuse `cost_usd_sql()`.
