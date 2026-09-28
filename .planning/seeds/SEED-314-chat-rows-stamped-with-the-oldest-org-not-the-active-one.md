@@ -3,7 +3,7 @@ seed_id: SEED-314
 title: A two-org user's chat in org B writes its thread, messages and run under org A — retrieval honours X-Org-Id, the row stamps do not
 created: 2026-09-24
 surface: Agentic-RAG
-status: planted
+status: folded
 partial: false
 status_note:
 trigger_when: Any phase touching chat thread/run creation, run metering or usage attribution, the autofill_org_id_by_owner trigger, or multi-org membership.
@@ -11,7 +11,7 @@ trigger_paths: ["backend/app/api/threads.py", "backend/app/db/runs.py", "backend
 trigger_surfaces: []
 migration_note:
 relates_to: ["266", "SEED-313", "266-05 SC#4-flip", "migration 106"]
-folded_into: null
+folded_into: "268 (D-268-07 — explicit active org at the run/thread/message inserts, discuss 2026-09-28)"
 renumbered_from: null
 renumbered_because: null
 ---

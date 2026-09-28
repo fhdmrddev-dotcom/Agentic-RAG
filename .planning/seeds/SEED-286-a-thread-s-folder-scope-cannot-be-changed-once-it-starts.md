@@ -3,7 +3,7 @@ seed_id: SEED-286
 title: A chat thread's KB folder scope can only be set on the empty state — once the thread starts, there is no control to change it
 created: 2026-09-16
 surface: Agentic-RAG
-status: planted
+status: folded
 partial: false
 status_note: |
   ── 2026-09-22 · Phase 262 (plan 05), LEFT PLANTED. Fired on `ChatArea.tsx` + `MessageInput.tsx`,
@@ -25,7 +25,7 @@ relates_to:
   - "BUS-040 (2026-08-31) — where this was found and recorded as 'found and did not fix'"
   - "SEED-112 — the WORKFLOW-run KB folder-scope surface. ⛔ A DIFFERENT surface; it does not hold this finding"
   - "SEED-247 — thread-scoped attachments vs library documents. Adjacent, not the same question"
-folded_into: null
+folded_into: "268 (CHAT-08, D-268-12..12d, discuss 2026-09-28)"
 renumbered_from: null
 renumbered_because: null
 ---
