@@ -1,0 +1,42 @@
+{
+  "kind": "scope_changed",
+  "at": "2026-09-28T14:35:00Z",
+  "from_folder": {
+    "id": "f3000000-0000-4000-8000-000000000003",
+    "name": "Client ACME",
+    "doc_count": 4,
+    "path": "Client ACME"
+  },
+  "to_folder": {
+    "id": "f4000000-0000-4000-8000-000000000004",
+    "name": "Contracts",
+    "doc_count": 2,
+    "path": "Client ACME/Contracts"
+  },
+  "expert": null,
+  "held": false,
+  "now": {
+    "folders": [],
+    "thread_folder": {
+      "id": "f4000000-0000-4000-8000-000000000004",
+      "name": "Contracts",
+      "doc_count": 2,
+      "path": "Client ACME/Contracts"
+    },
+    "all_documents": false,
+    "connections": []
+  },
+  "dropped": {
+    "folders": [],
+    "thread_folder": {
+      "id": "f3000000-0000-4000-8000-000000000003",
+      "name": "Client ACME",
+      "doc_count": 4,
+      "path": "Client ACME"
+    },
+    "all_documents": false,
+    "connections": []
+  },
+  "saved": null,
+  "during_run": false
+}

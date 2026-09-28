@@ -35,6 +35,7 @@ import { LEDGER_COPY } from "@/components/experts/catalog/expertCatalog"
 export const TRANSCRIPT_EVENT_KINDS: ReadonlySet<string> = new Set([
   "expert_changed",
   "expert_handoff",
+  "scope_changed",
 ])
 
 export type TranscriptEvent = ExpertChangedEvent | ExpertHandoffEvent
