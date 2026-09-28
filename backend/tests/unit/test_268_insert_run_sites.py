@@ -172,3 +172,35 @@ def test_a_planted_aliased_call_fails_the_fence():
     )
     measured = set(_measured_sites({rel: planted}))
     assert measured - set(_EXPECTED_INSERT_RUN_SITES) == {"services/run_producer.py:1"}
+
+
+
+# ── 268-REVIEW WR-06 — an ORG-LESS ROOT insert must be justified ─────────────────────────────────────────
+#
+# D-268-07 fixed the send path's org only. A root row with no ``org_id`` falls to the mig-106 trigger's
+# ``org_members … LIMIT 1`` guess, and ``insert_run``'s parent copy then moves EVERY sub-agent under it
+# into the same org — so a two-org user's harness spend shows in the other org's cockpit. Every root site
+# (no ``parent_run_id=``) must pass ``org_id=`` or be named here with the reason it does not.
+_ORG_LESS_ROOT_JUSTIFIED: dict[str, str] = {
+    "api/evals.py:1": "ORG-TRIGGER (named gap, not WR-06's three shells): eval thread + run both take the trigger's org",
+    "api/evals.py:2": "ORG-TRIGGER (named gap, not WR-06's three shells): eval thread + run both take the trigger's org",
+    "api/evals.py:3": "ORG-TRIGGER (named gap, not WR-06's three shells): eval thread + run both take the trigger's org",
+}
+
+
+def test_an_org_less_root_insert_must_be_justified():
+    sites = _measured_sites()
+    org_less_roots = {
+        key for key, call in sites.items()
+        if "parent_run_id" not in _kwargs(call)
+        or any(k.arg == "parent_run_id" and isinstance(k.value, ast.Constant) and k.value.value is None
+               for k in call.keywords)
+        if "org_id" not in _kwargs(call)
+    }
+    unjustified = sorted(org_less_roots - set(_ORG_LESS_ROOT_JUSTIFIED))
+    assert unjustified == [], (
+        f"root `insert_run(` sites with no org_id and no justification: {unjustified} — the row and every "
+        "sub-agent under it take the trigger's LIMIT-1 org (268-REVIEW WR-06)"
+    )
+    stale = sorted(set(_ORG_LESS_ROOT_JUSTIFIED) - org_less_roots)
+    assert stale == [], f"a justified site now passes org_id — drop its entry: {stale}"
