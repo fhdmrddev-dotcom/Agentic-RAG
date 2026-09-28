@@ -157,7 +157,9 @@ describe("the wire — setThreadFolder / getScopeEffect (re-exported from @/lib/
   const reply = (status: number, body: unknown) =>
     vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }))
+      .mockImplementation(async () =>
+        new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }),
+      )
 
   it("(10) setThreadFolder(id) sends PATCH {folder_id}; null sends {clear_folder: true}", async () => {
     const f = reply(200, { id: "t-1" })

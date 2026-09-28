@@ -224,6 +224,44 @@ export async function setThreadActiveExpert(threadId: string, expertId: string |
 }
 
 /**
+ * Phase 268 (CHAT-08 · D-268-12 / D-268-12d): change a live thread's folder scope — `null` clears it
+ * ("All your documents"). The server authorizes the folder within the thread's org, and on a thread
+ * with messages writes ONE `scope_changed` transcript row in the same transaction. The caller keeps
+ * the chip where it was on a refusal and shows THIS sentence (the server's `detail`).
+ */
+export async function setThreadFolder(threadId: string, folderId: string | null): Promise<Thread> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(folderId ? { folder_id: folderId } : { clear_folder: true }),
+  })
+  if (!res.ok) return throwThreadRefusal(res, "The folder was not changed.")
+  return res.json() as Promise<Thread>
+}
+
+/**
+ * Phase 268 (D-268-12c / UI-SPEC R1): what the thread's NEXT message searches — at rest (no draft),
+ * or for a draft folder (`{ folderId }`; `null` = clear). The ONE payload the chip, the picker ledger
+ * and (snapshotted) the transcript card render from; `held` is decided by the server.
+ */
+export async function getScopeEffect(
+  threadId: string,
+  draft?: { folderId: string | null },
+): Promise<ScopeEffect> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams()
+  if (draft) {
+    if (draft.folderId) params.set("folder_id", draft.folderId)
+    else params.set("clear", "true")
+  }
+  const qs = params.toString()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/scope-effect${qs ? `?${qs}` : ""}`, { headers })
+  if (!res.ok) return throwThreadRefusal(res, "Couldn't check what your next message will search.")
+  return res.json() as Promise<ScopeEffect>
+}
+
+/**
  * Phase 267 plan 04 (PACK-24 · D-267-14 / D-267-16): "New chat with <Expert>" — ONE request. The
  * server summarises this thread, then creates the new thread, its handoff message and this thread's
  * pointer atomically, or nothing (267-02). ⛔ One request is half of the double-click guard; the
@@ -299,6 +337,44 @@ export interface ExpertHandoffEvent {
   expert_name: string
   stays_expert_name: string | null
   folder_name: string | null
+}
+
+// ── Phase 268 (D-268-12 / D-268-12c / CHAT-08) — the folder-scope payloads ────────────────────
+// Mirrors of `backend/app/models/message.py` / `thread.py`. ⛔ `path` exists on the SCOPE refs
+// only (Pitfall 11): 267's `TranscriptFolderRef` dumps stay byte-identical.
+
+/** A thread folder on a scope line, with its full path (no leading slash) snapshotted at write time. */
+export interface ScopeFolderRef extends TranscriptFolderRef {
+  path: string | null
+}
+
+export interface ScopeTranscriptLine extends Omit<TranscriptScopeLine, "thread_folder"> {
+  thread_folder: ScopeFolderRef | null
+}
+
+/** GET /threads/{id}/scope-effect — what the next message searches. `held` = a Restricted Expert
+ *  does not search the thread folder, so the folder is SAVED (`saved`), not searched. */
+export interface ScopeEffect {
+  held: boolean
+  expert: TranscriptExpertRef | null
+  next: ScopeTranscriptLine
+  stops: ScopeTranscriptLine
+  saved: ScopeFolderRef | null
+}
+
+/** A live thread's folder scope changed (`from_folder` / `to_folder` null = All your documents). */
+export interface ScopeChangedEvent {
+  kind: "scope_changed"
+  at: string
+  from_folder: ScopeFolderRef | null
+  to_folder: ScopeFolderRef | null
+  expert: TranscriptExpertRef | null
+  held: boolean
+  now: ScopeTranscriptLine
+  dropped: ScopeTranscriptLine
+  saved: ScopeFolderRef | null
+  /** An answer was streaming when the change was written — it keeps the old scope. */
+  during_run: boolean
 }
 
 /** `tool_calls[0]` of the new thread's first (USER) message — never a transcript-only kind. */

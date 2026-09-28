@@ -15,15 +15,18 @@
  * "· deleted" suffix — a claim the in-memory list cannot support.)
  */
 import { useState, type ReactNode } from "react"
-import { ArrowUpRight, Plug, Sparkles } from "lucide-react"
+import { ArrowUpRight, Folder, Plug, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { ExpertChangedEvent, ExpertHandoffEvent } from "@/lib/api/threads"
+import type { ExpertChangedEvent, ExpertHandoffEvent, ScopeChangedEvent } from "@/lib/api/threads"
 import {
   EVENT_COPY,
+  SCOPE_EVENT_COPY,
   eventCardModel,
   eventTimeLabel,
   handoffEventModel,
+  scopeEventModel,
   type ScopeLineModel,
+  type TranscriptEvent,
 } from "./expertEventCopy"
 import { useThreadNavigation } from "./threadNavigation"
 
@@ -35,39 +38,66 @@ function isLiveAppend(iso: string): boolean {
   return Number.isFinite(t) && Math.abs(Date.now() - t) < LIVE_APPEND_MS
 }
 
+/** Phase 268 (UI-SPEC §5.5): one lookup, four tones — both themes paired (the 267-ui light rule). */
+const TONES = {
+  violet: { box: "border-violet-500/35 bg-violet-500/[0.06]", header: "text-violet-700 dark:text-violet-200" },
+  neutral: { box: "border-border bg-card", header: "text-foreground" },
+  scope: {
+    box: "border-indigo-600/40 dark:border-indigo-500/40 bg-indigo-500/[0.06]",
+    header: "text-indigo-700 dark:text-indigo-200",
+  },
+  held: {
+    box: "border-amber-600/40 dark:border-amber-500/30 bg-amber-500/10",
+    header: "text-amber-700 dark:text-amber-300",
+  },
+} as const
+
 function Shell({
   at,
   tone,
   header,
   icon,
   children,
+  testId = "expert-event-card",
+  ariaLabel = EVENT_COPY.ariaLabel,
+  footer,
+  truncateHeader = false,
 }: {
   at: string
-  tone: "violet" | "neutral"
+  tone: keyof typeof TONES
   header: string
   icon: ReactNode
   children: ReactNode
+  /** 268: the scope kind carries its own id, so no 267 suite changes its population. */
+  testId?: string
+  ariaLabel?: (time: string) => string
+  /** 268: a line BELOW the grid (the grid's children are keys and values). */
+  footer?: ReactNode
+  /** 268: a folder-path header can be long — it truncates, with its full text in `title`. */
+  truncateHeader?: boolean
 }) {
   // Decided once at mount: a reload renders history, so it never animates (UI-SPEC §5.6 Motion).
   const [live] = useState(() => isLiveAppend(at))
   const time = eventTimeLabel(at)
   return (
     <div
-      data-testid="expert-event-card"
+      data-testid={testId}
       role="note"
-      aria-label={EVENT_COPY.ariaLabel(time)}
+      aria-label={ariaLabel(time)}
       className={cn(
         "w-full rounded-[10px] border px-3 py-3 text-xs",
-        tone === "violet" ? "border-violet-500/35 bg-violet-500/[0.06]" : "border-border bg-card",
+        TONES[tone].box,
         live && "animate-in fade-in duration-200 motion-reduce:animate-none",
       )}
     >
       <div className="flex items-center gap-1">
         {icon}
         <span
+          title={truncateHeader ? header : undefined}
           className={cn(
             "font-semibold leading-relaxed",
-            tone === "violet" ? "text-violet-700 dark:text-violet-200" : "text-foreground",
+            truncateHeader && "min-w-0 truncate",
+            TONES[tone].header,
           )}
         >
           {header}
@@ -77,6 +107,7 @@ function Shell({
         </time>
       </div>
       <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">{children}</div>
+      {footer}
     </div>
   )
 }
@@ -192,7 +223,56 @@ function HandoffPointer({ event }: { event: ExpertHandoffEvent }) {
   )
 }
 
-export function ExpertEventCard({ event }: { event: ExpertChangedEvent | ExpertHandoffEvent }) {
+/** Phase 268 (CHAT-08 · UI-SPEC §5.5): a live thread's folder scope changed. ⛔ Reads `held` from the
+ *  server's snapshot — never the Expert's mode. Held values are neither gained nor lost yet, so they
+ *  are `text-foreground`, not emerald / rose. */
+function ScopeChangedCard({ event }: { event: ScopeChangedEvent }) {
+  const m = scopeEventModel(event)
+  const glyph = m.held ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-300"
+  return (
+    <Shell
+      at={m.at}
+      tone={m.tone}
+      header={m.header}
+      icon={<Folder className={cn("h-3 w-3 flex-none", glyph)} aria-hidden="true" />}
+      testId="scope-event-card"
+      ariaLabel={SCOPE_EVENT_COPY.ariaLabel}
+      truncateHeader
+      footer={
+        <p data-testid="scope-event-when" className="mt-2 text-[11px] leading-snug text-muted-foreground">
+          {m.footer}
+        </p>
+      }
+    >
+      {m.held ? (
+        <>
+          <div data-testid="scope-event-saved" className="contents">
+            <Key>{SCOPE_EVENT_COPY.keys.saved}</Key>
+            <span className="min-w-0 text-foreground">{m.saved}</span>
+          </div>
+          <div data-testid="scope-event-searching" className="contents">
+            <Key>{SCOPE_EVENT_COPY.keys.searching}</Key>
+            <span className="min-w-0 text-foreground">{m.searching}</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div data-testid="scope-event-now" className="contents">
+            <Key>{SCOPE_EVENT_COPY.keys.now}</Key>
+            <ScopeValue line={m.now} tone="yes" />
+          </div>
+          <div data-testid="scope-event-dropped" className="contents">
+            <Key>{SCOPE_EVENT_COPY.keys.dropped}</Key>
+            <ScopeValue line={m.dropped} tone="no" />
+          </div>
+        </>
+      )}
+    </Shell>
+  )
+}
+
+export function ExpertEventCard({ event }: { event: TranscriptEvent }) {
   if (event.kind === "expert_handoff") return <HandoffPointer event={event} />
+  if (event.kind === "scope_changed") return <ScopeChangedCard event={event} />
   return <ChangedCard event={event} />
 }

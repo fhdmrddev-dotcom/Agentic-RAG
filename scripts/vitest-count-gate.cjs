@@ -182,8 +182,10 @@ const BASELINE = {
   //    ⛔ `MessageItem.transcriptEvent.test.tsx` carries the G-5 hook fence on MessageItem.tsx and
   //    the T-267-41 case (an unknown system row renders NOTHING — on base it rendered as an
   //    assistant bubble); `ChatArea.expertThread.test.tsx` carries D-267-21, driven RED on base.
-  "expertEventCopy.test.ts": 19,
-  "ExpertEventCard.test.tsx": 10,
+  "expertEventCopy.test.ts": 26, // 268-03 +7: scope_changed model from the three backend fixtures
+  "ExpertEventCard.test.tsx": 14, // 268-03 +4: the scope card (normal / during_run / held / empty Dropped)
+  // ── Phase 268 plan 03 (CHAT-08) — the scope vocabulary + wire. Both knobs, same commit. ──
+  "scopeCopy.test.ts": 13,
   "HandoffCard.test.tsx": 3,
   "MessageItem.transcriptEvent.test.tsx": 8,
   "InviteExpertDialog.test.tsx": 23, // 267-REVIEW WR-06 +1, IN-02 +1; 267-UI-REVIEW #3 +1
@@ -4510,6 +4512,9 @@ const TARGETS = [
   "src/components/chat/__tests__/InviteExpertDialog.test.tsx",
   "src/components/chat/__tests__/ChatArea.expertThread.test.tsx",
   "src/components/chat/__tests__/expertThemeContrast.test.tsx", // 267-UI-REVIEW #1, pinned in BASELINE
+  // ── Phase 268 plan 03 (CHAT-08) — the scope chip / picker / vocabulary. Named FILE-LEVEL, pinned
+  //    in BASELINE, same commit.
+  "src/components/chat/__tests__/scopeCopy.test.ts",
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,
   // matching how its two siblings below are already reached. Both knobs, same commit.
