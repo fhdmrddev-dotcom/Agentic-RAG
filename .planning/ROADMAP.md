@@ -191,7 +191,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 268-04-PLAN.md — live proof: real-PG spend reconciliation, SC#1-4, 8-row SC#10 board, G-4 ×3 in Chrome, 268-PROD-PARITY.md, seeds + ledger + STATE registers
+- [ ] 268-04-PLAN.md — live proof: real-PG spend reconciliation, SC#1-4, 8-row SC#10 board, G-4 ×3 in Chrome, 268-PROD-PARITY.md, seeds + ledger + STATE registers — ⏸ Tasks 1, 3, 5 done; Task 4 (G-4 ×3 in Chrome) awaits the operator
 
 **Flags**: **Migration** likely (an Expert id on the usage/run rows — `194+`, after 266's). ⛔ Cost stays in its **one** token→USD home (257); attribution is a column, not a second formula. **G-2 FIRES** (scope-change control + transcript event; spend grouping). **G-4** scenarios at scope time. **SC#10** for CHAT-08 (retrieval per turn, streaming UI state). **G-5 audit at discuss:** `backend/app/services/run_producer.py`, `backend/app/db/workflows.py` / every usage finalize site (`api/runs.py`, `harness_engine.py`, `forced_emit.py`, `task_service.py`), `backend/app/api/threads.py`, `backend/app/services/retrieval_service.py` (extraction OWED — SEED-224), `ChatArea.tsx`, the `/admin/spend` surface. Seed `SEED-286`. **UI hint**: yes
 
@@ -218,7 +218,7 @@ Plans:
 | 265. Owed v4.3 Verification | 5/5 | Complete (overrides OV-265-01..04; BUS-304 rulings open, non-blocking) | 2026-09-24 |
 | 266. Expert Knowledge in a Real Org | 0/? | Not started | - |
 | 267. An Expert Adds Scope | 5/5 | Executed — verification next (independent review + operator G-4 confirmation owed) | - |
-| 268. Expert Spend & Mid-Thread Scope | 0/4 | Planned | - |
+| 268. Expert Spend & Mid-Thread Scope | 3/4 | In progress — 268-04 at its G-4 checkpoint (live UAT + closeout done) | - |
 | 269. Starter Expert Library | 0/? | Not started | - |
 
 **Guardrails firing (v4.4):**

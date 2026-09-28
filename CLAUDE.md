@@ -703,7 +703,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 77 / 35 / 1027 | ⚠ STALE (`75/34/1004`). **267-04**: ONE early return after the last hook; hooks unchanged |
-| `backend/app/api/threads.py` | 255 / 87 / 2156 | ⚠ STALE (`245/82/1679`). **267-02**: 1 bind gate, 1 allowlist, 2 routes, 1 event writer. ⛔ send path untouched |
+| `backend/app/api/threads.py` | 261 / 88 / 2434 | ⚠ STALE (`255/87/2156`). **268**: send resolves scoping ONCE + org stamps; +1 folder arm, 1 scope writer, 1 route. ⛔ 0 new send-path branches |
 | `frontend/src/providers/StreamsProvider.tsx` | 104 / 38 / 4948 | ⚠ row STALE an 8th time (`102/37/4880`). NOT modified by 253 — re-derived under CR-08. ⛔ `onTurnBoundary` FLUSHES before moving, or a turn's tail leaks into the next body |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
@@ -721,7 +721,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/pages/WorkflowBuilderPage.tsx` | 56 / 21 / 2977 | honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214 |
 | `backend/app/api/workflows.py` | 43 / 23 / 2261 | ⚠ **extraction still OWED** · honoured by construction (258-03: 2 Depends, no branch) |
 | `backend/app/api/workflow_runs.py` | 11 / 8 / 1089 | honoured by construction (200 / 200.1 / **214**) |
-| `backend/app/models/thread.py` | 20 / 13 / 510 | honoured by construction (**267-02**: +4 additive models) |
+| `backend/app/models/thread.py` | 21 / 14 / 537 | honoured by construction (**268-03**: `folder_id`/`clear_folder` on `ThreadUpdate` + `ScopeEffect`, additive; both pairs in one body = 422) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
 | `frontend/src/components/layout/ChatLayout.tsx` | 58 / 29 / 1124 | ⚠ STALE (`54/28/1082`). **267-04**: ONE memoised provider + wrapper; hooks 9/5/29 → 9/5/30 |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase (the `settingsSearchPayload.ts` precedent); D-244-20 claimed a row existed and the gate refuted it |
@@ -734,9 +734,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 16 / 10 / 646 | honoured by construction (194 / 194.1) |
-| `backend/app/services/run_lifecycle.py` | 8 / 4 / 748 | ⚠ row STALE at `6/3/459` — re-derived 256-02; +289 L unrecorded. NOT modified by 256 and ⛔ NOT the shape to copy (C-5): its `input_tokens=None` is a DEFAULT PARAM, not a site |
+| `backend/app/services/run_lifecycle.py` | 9 / 5 / 756 | ⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id` + `expert_id`, nothing else. ⛔ NOT the shape to copy (C-5) |
 | `backend/app/db/runs.py` | 9 / 8 / 266 | ⚠ absent its ENTIRE LIFE — row added 268. **268-01**: `insert_run` stamps org + Expert; sub-agent copy in SQL. ⛔ `finalize_run` untouched (SEED-297) |
-| `backend/app/services/run_producer.py` | 16 / 8 / 967 | ⚠ STALE (`14/7/957`). **267-01**: scope branch MOVED to `compose_expert_scope`; no tool list |
+| `frontend/src/pages/admin/AdminSpendPage.tsx` | 9 / 3 / 974 | ⚠ NOW FIRES (crossed in 268). **268-02**: Expert pills, statement line, Spend by Expert, ledger column. ⛔ next phase proposes extraction FIRST |
+| `backend/app/services/run_producer.py` | 17 / 9 / 1029 | ⚠ STALE (`16/8/967`). **268-01**: takes the send path's `scoping` (resolve once); Continue SUMS segment tokens |
 | `backend/app/services/task_service.py` | 20 / 11 / 970 | ⚠ the row was ACCURATE at 264 research (`19/10/958`) and **264-01 made it stale inside the same phase**. honoured by construction: ONE `sub_ctx` kwarg, read from `parent_ctx`, never re-derived |
 | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box SUBTRACTS real spend |
@@ -744,17 +745,17 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness_engine.py` | 58 / 21 / 3290 | ⚠ row was STALE at `54/20/3135`. honoured by construction (**256-05**): ONE nested `_flush_run_usage` + ONE unconditional loop call; `_enforce_budget` if/try/loop **2/0/0 → 2/0/0**. ⛔ `try`/`finally` REJECTED |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE (`4/1/313`) and it does NOT fire yet — 2 phases, not 1. NOT modified by 253. ⛔ the ONE renderer of the model's process prose, now from TWO sources |
 | `frontend/src/components/chat/RunCard.tsx` | 29 / 14 / 723 | ⭐ G-5 DISCHARGED (243-02). ⚠ row STALE at `28/14/710`. **BUG-260912-01**: its state-2 guard asked `!reasoningContent` ALONE and shipped a VISIBLE mid-stream double once the fold gained a 2nd input |
-| `frontend/src/components/chat/MessageInput.tsx` | 38 / 19 / 977 | ⚠ STALE (`36/18/975`). **267-04**: lost its 2 PATCH calls; +3 optional props. ⛔ 0 new top-level controls |
+| `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE (`38/19/977`). **268-03**: +2 optional ReactNode slots; hooks unchanged. ⛔ 0 new top-level controls |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26) |
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE (`23/10/366`). **267-04**: the turn index skips system rows; no prop added |
-| `frontend/src/components/chat/ChatArea.tsx` | 79 / 40 / 970 | ⚠ STALE (`78/39/889`). **267-04**: +1 state, +2 callbacks (one PATCH home, the handoff). ⛔ no Expert branch in send |
+| `frontend/src/components/chat/ChatArea.tsx` | 87 / 41 / 1106 | ⚠ STALE (`79/40/970`). **268-03**: ONE scope PATCH home + 1 read; header pill removed; useState 5→7. ⛔ no scope branch in send |
 | `frontend/src/stores/streamsStore.ts` | 22 / 14 / 572 | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253. **244-15**: ONE action type + ONE bare no-op stub; ⛔ `void`, never `Promise<void>` |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string; a literal copied elsewhere makes its pin vacuous |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 15 / 8 / 836 | ⚠ row was STALE at `14/7/765`; G-5 FIRES at 8 phases. honoured by construction (**244-15**): ONE optional prop, ONE composed callback in the STACK, `useState` 9→9 — no new state on a 3-home shell |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 10 / 6 / 363 | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption`, never re-derives its three readings |
-| `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
+| `frontend/src/lib/api.ts` | 205 / 122 / 516 | ✅ **SPLIT TAKEN (207)** — barrel; **268-03** re-exports 2 names + 4 types |
 | `frontend/src/types/index.ts` | 93 / 72 / 1443 | ⚠ STALE (`91/71/1436`). **267-03**: TWO optional fields via `import type`. Seam OWED |
 | `backend/app/main.py` | 83 / 60 / 951 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**, Phase 259) |
 | `backend/app/config.py` | 88 / 51 / 1695 | ⚠ STALE a 14th time (`87/50/1593`). **262**: `api_surface` + `API_SURFACES` + `provider_hint`. ⛔ `MODEL_CAPABILITIES` seam STILL OWED — 12 of 15 fields are now DB-settable, the dict is not |
@@ -762,7 +763,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 85 / 33 / 2437 | ✅ **DISCHARGED (229)** |
-| `scripts/vitest-count-gate.cjs` | 254 / 57 / 6168 | ⚠ STALE (`244/55/6078`). **267-03/04** adopt the phase's suites into BOTH knobs |
+| `scripts/vitest-count-gate.cjs` | 259 / 58 / 6196 | ⚠ STALE (`254/57/6168`). **268-02/03** adopt the phase's new suites into BOTH knobs |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 at 256-03's head |
 | `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ **NOW FIRES at 3 phases, and its detail row still read `no (2 phases)` — present and WRONG, which stops an audit harder than absent.** Promoted here by 256-04; **256-03** closed its `None` finalize |
 | `frontend/src/components/panel/PhaseCard.tsx` | 17 / 11 / 788 | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253. honoured by construction (200 / **214**) |
@@ -803,13 +804,13 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/base.py` | 9 / 5 / 336 | ⚠ **absent while FIRING at 5 phases — row added 239-03.** honoured by construction (239): protocol resolution stayed DATA (two dicts), never a branch |
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`) — a row present and WRONG stops the audit. **SEED-258: the body cap is DERIVED; no envelope knob exists to disagree** |
-| `backend/app/models/message.py` | 20 / 12 / 236 | ⚠ STALE (`17/10/134`). **267**: `TRANSCRIPT_EVENT_KINDS` allowlist + 7 payload models |
+| `backend/app/models/message.py` | 21 / 13 / 278 | ⚠ STALE (`20/12/236`). **268-03**: `scope_changed` joins the allowlist; scope payload models additive, `path` on a SUBCLASS only |
 | `backend/app/models/user_settings.py` | 55 / 34 / 1723 | ⚠ STALE a 6th close running. honoured by construction (**249-03**): ONE `except` split into two arms + one typed exception. ⛔ the unreachable-DB arm is byte-identical |
 | `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
 | `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `frontend/src/lib/api/threads.ts` | 15 / 9 / 1859 | ⚠ STALE (`10/5/1734`). **267-04**: `handoffThread` + an Expert-carrying `createThread` |
+| `frontend/src/lib/api/threads.ts` | 16 / 10 / 1935 | ⚠ STALE (`15/9/1859`). **268-03**: `setThreadFolder` + `getScopeEffect` + 4 wire types, additive |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
@@ -821,8 +822,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 54 / 27 / 3557 | ⚠ STALE (`52/26/3501`). **267-01**: tool filter REMOVED; neutral keys only ADD. ⛔ prompt-assembly seam OWED |
-| `backend/app/services/tool_dispatcher.py` | 92 / 39 / 5221 | ⚠ STALE (`89/38/5169`). **267-01**: tool-floor code DELETED. ⛔ registry/handler split OWED |
+| `backend/app/services/agent_loop.py` | 56 / 28 / 3573 | ⚠ STALE (`54/27/3557`). **268-01**: 4 org stamps + 1 kwarg, 0 new branches. ⛔ prompt-assembly seam OWED |
+| `backend/app/services/tool_dispatcher.py` | 93 / 40 / 5234 | ⚠ STALE (`92/39/5221`). **268-03**: +4 audit keys in the 2 existing `search.query` dicts. ⛔ registry/handler split OWED |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |
@@ -863,7 +864,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/experts.py` | 14 / 6 / 822 | ⚠ STALE (`13/5/764`). **267-01**: ONE overlay adds `connection_state`/`can_connect`. Extraction OWED |
 | `backend/app/dependencies.py` | 24 / 12 / 1147 | ⚠ absent here at 12 phases — row added 267-05. `feature_visible` (267-01); F-1 fix `cdb173609` |
 | `backend/app/utils/skill_visibility.py` | 3 / 2 / 209 | ⚠ the row added at 264 PLANNING read `1/1/83` and was stale by that phase's own close. **264-02/04**: optional `expert_bundle_id` on both encodings; ⛔ the default arm is pinned byte-identical by `==` |
-| `frontend/src/components/chat/ActiveExpertChip.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — active consultant chip in composer (PACK-02) |
+| `frontend/src/components/chat/ActiveExpertChip.tsx` | 2 / 2 / 53 | ⚠ row read `0/0/0`. **268-03**: paired with the scope chip (legible `· Restricted` beside a held scope) |
 | `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 2 / 2 / 205 | ⚠ row was STALE at `0 / 0 / 0`. **262-02**: FOUR demo-Expert hardcodes retired as rewrites. ⛔ no fallback here may inspect `slug` or `name` — that match IS the retired artefact |
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 4 / 4 / 614 | ⚠ STALE (`3/3/231`). **267-04**: R1-R10 + Will/Won't ledger; seam `ExpertRowActions` TAKEN |
 | `frontend/src/components/skills/SkillFormDialog.tsx` | 13 / 9 / 657 | ⚠ row STALE at `12/8/635` ONE PLAN after 263 planning wrote it. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep entry; ⛔ callers pass a STABLE reference or the reset wipes typing |

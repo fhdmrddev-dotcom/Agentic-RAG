@@ -10713,14 +10713,14 @@ cells rot within days.
 | [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 11 / 7 / 619 (was `9 / 6 / 575`) | ⛔ **FIRES — 7 phases** | ⚠ row STALE (`9/6/575`). honoured by construction (**267-01**): `connection_states` is THE one 'is it connected' rule; the resolver strips by it. ⛔ pure data — no LLM import, no `while` |
 | [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 14 / 6 / 822 (was `13 / 5 / 764`) | ⛔ **FIRES — 6 phases** | ⚠ row STALE (`13/5/764`). honoured by construction (**267-01**): ONE overlay adds `connection_state` + `can_connect` to every row. ⛔ org ONLY from the active-org dep; extraction OWED |
 | [`backend/app/utils/skill_visibility.py`](docs/HOT-FILE-LEDGER.md#backendapputilsskill_visibilitypy) | 3 / 2 / 209 | no (2 phases) | ⚠ the row added at 264 PLANNING read `1/1/83` and was stale by that phase's own close. **264-02/04**: optional `expert_bundle_id` on both encodings; ⛔ the default arm is pinned byte-identical by `==` |
-| [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
+| [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 2 / 2 / 53 (was `0 / 0 / 0`) | no (2 phases) | ⚠ row read `0/0/0`. **268-03**: paired with the scope chip (legible `· Restricted` beside a held scope). Not firing yet |
 | [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 2 / 2 / 205 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 0`. **262-02**: FOUR demo-Expert hardcodes retired as rewrites. ⛔ no fallback here may inspect `slug` or `name` — that match IS the retired artefact |
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 4 / 4 / 614 (was `3 / 3 / 231`) | ⚠ **FIRES — 4 phases** | ⚠ row STALE (`3/3/231`). **267-04**: R1-R10 rows + the Will/Won't ledger; the per-row action area is ONE `ExpertRowActions` (the named seam, TAKEN). ⛔ the body stays a list |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 77 / 35 / 1027 (was `75 / 34 / 1000`) | **FIRES** | ⚠ row STALE (`75/34/1000`). honoured by construction (**267-04**): ONE early return after the last hook — event → card, marker → card, other system row → null. Hooks 3/0/7 unchanged |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 255 / 87 / 2156 (was `245 / 82 / 1617`) | **FIRES** | ⚠ row STALE (`245/82/1617`). honoured by construction (**267-02**): ONE bind gate (3 doors), ONE transcript allowlist (2 reads), 2 routes, 1 guarded event writer. ⛔ send path untouched |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 261 / 88 / 2434 (was `255 / 87 / 2156`) | **FIRES** | ⚠ STALE (`255/87/2156`). **268-01/03**: send resolves scoping ONCE + org stamps; +1 folder arm, 1 scope writer, 1 route. ⛔ 0 new send-path branches |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 104 / 38 / 4948 | **FIRES** | ⚠ row STALE an 8th time (`101/37/4815`; CLAUDE.md read `102/37/4880`). NOT modified by 253 — re-derived under CR-08. honoured by construction (**244-14**) |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
@@ -10737,7 +10737,7 @@ cells rot within days.
 | [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 56 / 21 / 2977 | **FIRES** | honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214.1**) — 214.1 added one import + one gated node, zero `useState` |
 | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 43 / 23 / 2261 | **FIRES** | honoured by construction (192.2 / **258-03**: two route dependencies, no new branch/handler; ⚠ extraction still OWED) |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
-| [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 20 / 13 / 510 (was `16 / 10 / 438`) | ⚠ **FIRES** | ⚠ row STALE (`16/10/438`). honoured by construction (**267-02**): 4 additive models (`ThreadHandoffRequest`, `ExpertScopePreview` + 2 folder refs); no existing model changed |
+| [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 21 / 14 / 537 (was `20 / 13 / 510`) | ⚠ **FIRES** | ⚠ STALE (`20/13/510`). **268-03**: `folder_id`/`clear_folder` on `ThreadUpdate` + `ScopeEffect`, additive only. ⛔ a body touching both pairs is a 422 |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
 | [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 58 / 29 / 1124 (was `52 / 27 / 1014`) | ⚠ **FIRES** | ⚠ row STALE (`52/27/1014`). honoured by construction (**267-03/04**): ONE prop, ONE memoised navigation provider + wrapper. Hooks 9/5/29 → 9/5/30. ⛔ the trailing fallback stays POSITIONAL |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
@@ -10754,21 +10754,21 @@ cells rot within days.
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | honoured by construction (193.2 / 197 / **214.1**) — `setDeclaredInputs` is the sixth `meta` writer, the shape the five before it take |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 16 / 10 / 646 | **FIRES** | honoured by construction (194 / 194.1) |
-| [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 8 / 4 / 748 | **FIRES** | ⚠ row STALE at `6/3/459` — re-derived 256-02; +289 L unrecorded. NOT modified by 256 and ⛔ NOT the shape to copy (RESEARCH C-5): its `input_tokens=None` is a DEFAULT PARAM, not a site |
+| [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 9 / 5 / 756 (was `8 / 4 / 748`) | **FIRES** | ⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id`/`expert_id` (+8 lines). ⛔ NOT the shape to copy (C-5) |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 39 / 18 / 1736 | **FIRES** | ⚠ row STALE a 3rd time (`35/16/1430`, then `38/17/1695`). **256-03 closed METER-05 here** — the two `input_tokens=None` finalize sites now carry real totals |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 58 / 21 / 3290 | **FIRES** | ⚠ row was STALE at `54 / 20 / 3135`. honoured by construction (194 / 214 / **256-05**) — 214-06 resolved the pause's service at ONE call site; 256-05 added ONE nested helper + ONE loop call |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 6 / 2 / 320 | no (2 phases) | ⚠ row STALE (`4/1/283`; CLAUDE.md read `4/1/313`). NOT modified by 253 — re-derived under CR-08. Still ONE reasoning renderer; no duration derived from length |
-| [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 38 / 19 / 977 (was `35 / 17 / 942`) | **FIRES** | ⚠ row STALE (`35/17/942`). honoured by construction (**267-04**): LOST its two PATCH calls; forwards 3 optional props. Hooks 7/5/23 → 7/5/23. ⛔ 0 new top-level controls |
+| [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 41 / 20 / 1007 (was `38 / 19 / 977`) | **FIRES** | ⚠ STALE (`38/19/977`). **268-03**: +2 optional ReactNode slots; hooks 8/6/4 → 8/6/4. ⛔ 0 new top-level controls |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 24 / 11 / 376 (was `21 / 9 / 307`) | **FIRES** | ⚠ row STALE (`21/9/307`). honoured by construction (**267-04**): the turn index skips system rows via ONE module-level helper; no prop added |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
-| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 79 / 40 / 970 (was `77 / 38 / 882`) | **FIRES** | ⚠ row STALE (`77/38/882`). honoured by construction (**267-04**): +1 state (the refusal line), +2 callbacks (one PATCH home, the handoff). ⛔ no Expert branch in the send path |
+| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 87 / 41 / 1106 (was `79 / 40 / 970`) | **FIRES** | ⚠ STALE (`79/40/970`). **268-03**: ONE scope PATCH home + 1 read; header folder pill REMOVED. useState 5→7, useEffect 4→6. ⛔ no scope branch in send |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 15 / 8 / 836 | **FIRES** | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
-| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 187 / 110 / 422 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — this path is the re-export BARREL. ⚠ **its 12 domain MODULES had no rows of their own until 214** |
+| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 205 / 122 / 516 (was `187 / 110 / 422`) | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — the re-export BARREL. **268-03**: +2 function names + 4 wire types re-exported, nothing else |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 93 / 72 / 1443 (was `91 / 71 / 1436`) | ⚠ **FIRES** | ⚠ STALE a 5th time (`91/71/1436`). honoured by construction (**267-03**): TWO optional fields (`connection_state`, `can_connect`) via `import type`. Seam still OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 83 / 60 / 951 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**, Phase 259 router mount) |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 87 / 50 / 1593 | ⚠ **FIRES** | ⚠ STALE a 13th time (`83/48/1506`). honoured by construction (**249-01**): ONE derived frozenset + a Literal widened to the value the code already returned. ⛔ MODEL_CAPABILITIES seam OWED |
@@ -10776,7 +10776,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 254 / 57 / 6168 (was `244 / 55 / 6078`) | ⚠ **FIRES** | ⚠ STALE an 11th time (`244/55/6078`). **267-03/04** adopt the phase's new suites into BOTH knobs; `components/experts` and `components/layout` now have directory entries |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 259 / 58 / 6196 (was `254 / 57 / 6168`) | ⚠ **FIRES** | ⚠ STALE (`254/57/6168`). **268-02/03** adopt the phase's 8 new suites into BOTH knobs |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
@@ -10866,7 +10866,7 @@ cells rot within days.
 | [`frontend/src/components/settings/AvailabilityLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsavailabilitylinetsx) | 0 / 0 / 74 | no (new) | young (221-02) — a `ready` application renders `null`, never an empty element |
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 28 / 11 / 1858 | ⚠ **FIRES** | ⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**239-06**) |
-| [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 20 / 12 / 236 (was `17 / 10 / 124`) | ⚠ **FIRES** | ⚠ row STALE (`17/10/124`). honoured by construction (**267-01/02**): `TRANSCRIPT_EVENT_KINDS` + 7 additive payload models. ⛔ an ALLOWLIST — `handoff` is deliberately not in it |
+| [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 21 / 13 / 278 (was `20 / 12 / 236`) | ⚠ **FIRES** | ⚠ STALE (`20/12/236`). **268-03**: `scope_changed` joins the allowlist; `ScopeFolderRef`/`ScopeChangedEvent` additive, `path` on the SUBCLASS only (267 dumps byte-equal) |
 | [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 55 / 34 / 1723 | ⚠ **FIRES** | ⚠ STALE for the SIXTH close running (`50/32/1561`). honoured by construction (**249-03**): ONE `except` split into two arms + one typed exception. ⛔ the unreachable-DB arm is byte-identical |
 | [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 7 / 2 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
 | [`backend/app/services/setup_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessetup_servicepy) | 4 / 2 / 514 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. Same deliberate non-catch as `api/setup.py`; its bool cannot express *the database refused the value* |
@@ -10895,7 +10895,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/stepActionWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepactionwordsts) | 2 / 1 / 91 | no (1 phase) | young (214) — the action half of a step's identity |
 | [`frontend/src/components/workflows/stepIdentityVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentityvocabularyts) | 1 / 1 / 206 | no (1 phase) | young (214-11) — ⚠ its six PAUSE sentences are consumed by NOTHING (`SEED-219`) |
 | [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 2 / 2 / 803 | no (2 phases) | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
-| [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 15 / 9 / 1859 (was `7 / 3 / 1683`) | ⚠ **FIRES** | ⚠ row STALE (`7/3/1683`). honoured by construction (**267-04**): `createThread` takes an Expert id, `handoffThread`, ONE refusal reader, 6 transcript wire types |
+| [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 16 / 10 / 1935 (was `15 / 9 / 1859`) | ⚠ **FIRES** | ⚠ STALE (`15/9/1859`). **268-03**: `setThreadFolder` + `getScopeEffect` + 4 wire types, additive |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 6 / 4 / 748 | ⚠ **FIRES** | ⛔ row was STALE at `4/2/715` reading `no (2 phases)` — re-derived 263 planning. Holds `FullAppSettings`, not only skills. D-263-03 reuses its `POST /skills` caller, adds no endpoint. |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
@@ -10912,13 +10912,13 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 54 / 27 / 3557 (was `52 / 26 / 3501`) | ⚠ **FIRES** | ⚠ row STALE (`52/26/3501`). honoured by construction (**267-01**): the tool filter REMOVED; neutral `scoped_connection_keys` + `skill_catalog_additions` only ADD. ⛔ prompt-assembly seam OWED |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 56 / 28 / 3573 (was `54 / 27 / 3557`) | ⚠ **FIRES** | ⚠ STALE (`54/27/3557`). **268-01**: 4 org stamps + 1 kwarg, 0 new branches; AST fence (no `expert` name) green. ⛔ prompt-assembly seam OWED |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
-| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 16 / 8 / 967 (was `12 / 6 / 943`) | ⚠ **FIRES** | ⚠ row STALE (`12/6/943`). honoured by construction (**267-01**): the scope branch MOVED to `compose_expert_scope`; returns `ThreadScoping` with no tool list. ⛔ no Expert → all None |
+| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 17 / 9 / 1029 (was `16 / 8 / 967`) | ⚠ **FIRES** | ⚠ STALE (`16/8/967`). **268-01**: takes the send path's `scoping`/`scoping_error` (resolve once); Continue SUMS segment tokens (D-268-20) |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
 | [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
-| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 92 / 39 / 5221 (was `89 / 38 / 5169`) | ⚠ **FIRES** | ⚠ row STALE (`89/38/5169`). honoured by construction (**267-01**): tool-floor constants + schema filter DELETED. ⛔ registry/handler split OWED; chat dispatch whitelist deferred (SEED-303) |
+| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 93 / 40 / 5234 (was `92 / 39 / 5221`) | ⚠ **FIRES** | ⚠ STALE (`92/39/5221`). **268-03**: 4 additive audit keys in the 2 existing `search.query` dicts. ⛔ registry/handler split OWED |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
 | [`frontend/src/components/ingestion/DocumentUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentuploadtsx) | 10 / 1 / 144 | no (1 phase) | young (056) — ⚠ absent for its entire life. ⛔ It reports NO byte progress (`onUploadProgress` absent), so any upload percentage is unknowable |
@@ -11010,16 +11010,16 @@ cells rot within days.
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 10 / 6 / 705 | ⚠ **FIRES** | ⚠ **FIRES at 5 phases, absent from BOTH registers its ENTIRE LIFE — row added 256-04, in its FIRST edit's commit (O-6).** honoured by construction. ⛔ accumulators init `None` never `0`, above the loop |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 2 / 1 / 103 | no (new) | young (created 257-01). The single home of token-to-USD conversion (METER-02 / D-257-13). CostResult with Decimal arithmetic and None on unrated. |
-| [`backend/app/db/rates.py`](docs/HOT-FILE-LEDGER.md#backendappdbratespy) | 2 / 1 / 507 | no (new) | young (created 257-02). High-volume rate queries, org spend summaries, and append-only reprice_model mutation (METER-01 / METER-07 / D-257-15). |
-| [`backend/app/api/admin_spend.py`](docs/HOT-FILE-LEDGER.md#backendappapiadmin_spendpy) | 1 / 1 / 202 | no (new) | young (created 257-02). Dedicated sub-router for /admin/spend endpoints, keeping api/admin.py minimal to respect G-5 hot-file limits. |
-| [`frontend/src/types/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesspendts) | 1 / 1 / 70 | no (new) | young (created 257-03). Shared TypeScript models for spend points, model breakdown, summary, and attributable runs. |
-| [`frontend/src/pages/admin/AdminSpendPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesadminadminspendpagetsx) | 2 / 1 / 567 | no (new) | young (created 257-03). The Spend & Metering Cockpit UI matching approved G-2 sketch 257. |
+| [`backend/app/db/rates.py`](docs/HOT-FILE-LEDGER.md#backendappdbratespy) | 9 / 2 / 898 (was `2 / 1 / 507`) | no (2 phases) | **268-02**: ONE `per_root` CTE feeds every spend query; root-only predicate appears ONCE. ⛔ never register a rate for model `unknown` (shell USD would double-count) |
+| [`backend/app/api/admin_spend.py`](docs/HOT-FILE-LEDGER.md#backendappapiadmin_spendpy) | 4 / 2 / 247 (was `1 / 1 / 202`) | no (2 phases) | honoured by construction (**268-02**): ONE validated `expert` Query on both routes (422 before the rates layer); 4 additive summary keys, every 257 key unchanged |
+| [`frontend/src/types/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesspendts) | 3 / 2 / 115 (was `1 / 1 / 70`) | no (2 phases) | **268-02**: `ExpertSpendLine` + additive summary/run fields. Not firing |
+| [`frontend/src/pages/admin/AdminSpendPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesadminadminspendpagetsx) | 9 / 3 / 974 (was `2 / 1 / 567`) | ⚠ **NOW FIRES — 3 phases** | ⚠ NOW FIRES (3 phases, crossed in 268). **268-02**: pills, statement line, Spend by Expert, ledger Expert column. ⛔ next phase proposes extraction FIRST |
 | [`frontend/src/components/admin/spend/DailySpendChart.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspenddailyspendcharttsx) | 1 / 1 / 147 | no (new) | young (created 257-03). Interactive 14-day SVG bar chart with overlaid amber unrated volume segments. |
 | [`frontend/src/components/admin/spend/SpendDonutChart.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendspenddonutcharttsx) | 1 / 1 / 148 | no (new) | young (created 257-03). Segmented SVG donut chart showing model spend distribution. |
-| [`frontend/src/components/admin/spend/BlindSpotsCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendblindspotscardtsx) | 2 / 1 / 162 | no (new) | young (created 257-03). Honesty summary card with dual-color coverage gauge and quick action filters. |
+| [`frontend/src/components/admin/spend/BlindSpotsCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendblindspotscardtsx) | 5 / 2 / 285 (was `2 / 1 / 162`) | no (2 phases) | **268-02**: grid `xl:grid-cols-3` + the 2 attribution tiles + the unpriced-sub-agent sentence. ⚠ dark-only classes (§9-D9) — light theme seeded |
 | [`frontend/src/components/admin/spend/RepriceModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendrepricemodaltsx) | 1 / 1 / 212 | no (new) | young (created 257-03). Reprice dialog allowing append-only rate entry for models. |
 | [`frontend/src/components/workflow/RunCostBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowruncostbadgetsx) | 1 / 1 / 101 | no (new) | young (created 257-04). Reusable run cost pill. ⛔ THREE states, not two: rated / unrated model / rated-but-unmeasured — collapsing the last two makes it state a FALSE cause. |
-| [`frontend/src/lib/api/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapispendts) | 1 / 1 / 184 | no (new) | ⚠ row added by the 257 REVIEW, not the build — UNDECLARED, so the gate never asked. Created 257-03 as `src/api/spend.ts`, a SECOND api home; MOVED to the one `lib/api/` home. |
+| [`frontend/src/lib/api/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapispendts) | 3 / 2 / 226 (was `1 / 1 / 184`) | no (2 phases) | **268-02**: `expert` sent only when given; maps the 4 new summary keys. ⛔ the one spend client (the 257 review moved a second home here) |
 | [`frontend/src/components/skills/SkillFormDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskillformdialogtsx) | 13 / 9 / 657 | ⚠ **FIRES** | ⚠ row STALE at `12/8/635` one plan later. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep-array entry. ⛔ callers pass a STABLE reference or the reset wipes typing. |
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
 | [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 1 / 1 / 159 | no (created 262-01) | ⚠ the AT-PLANNING row read `0/0/0`; measured in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse |
@@ -11035,21 +11035,21 @@ cells rot within days.
 | [`frontend/src/components/ingestion/FolderNode.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldernodetsx) | 12 / 6 / 272 | ⚠ **FIRES** | planning triple `9/5/259`. **266-04** + **266-05 UI-3**: the note is ALSO NavRow's `caption`, because tooltip-only was invisible. ⛔ its "zero NavRow edits" claim is REFUTED |
 | [`frontend/src/components/ingestion/NavRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionnavrowtsx) | 6 / 4 / 269 | ⚠ **FIRES — 4 phases** | ⚠ absent its ENTIRE LIFE — row added 266-05. **UI-3**: ONE optional `caption` (omitted → row unchanged). ⛔ words that are the deliverable render at rest, never tooltip-only |
 | [`backend/app/dependencies.py`](docs/HOT-FILE-LEDGER.md#backendappdependenciespy) | 24 / 12 / 1147 (was `23 / 12 / 1139`) | ⚠ **FIRES — 12 phases** | **267-01**: `feature_visible` factored out of `require_visible`. **267-05 F-1** (`cdb173609`): it awaits `ensure_settings_fresh()` first — a cold worker read `off`. ⛔ 403 text unchanged |
-| [`backend/app/services/expert_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scopepy) | 2 / 1 / 420 (was `1 / 1 / 116`) | no (young) | young (created 267-01). ⛔ the ONE composition of an Expert's scope (pure) + the ONE statement the preview AND the event read (267-02) — never two derivations |
+| [`backend/app/services/expert_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scopepy) | 3 / 2 / 610 (was `2 / 1 / 420`) | no (2 phases) | **268-03**: `build_scope_effect`, `build_scope_changed_event`, `describe_scope_change` beside 267's statement; `_dropped_line` extracted, 267 fixtures byte-equal |
 | [`backend/app/services/thread_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesthread_handoffpy) | 1 / 1 / 250 (was `0 / 0 / 0`) | no (young) | young (created 267-02). ⛔ a failed summary REFUSES the handoff (502, nothing written — seen live, F-4); 3 rows in ONE txn with the SOURCE org; a service, not a tool |
-| [`frontend/src/components/experts/ScopeLedger.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsscopeledgertsx) | 1 / 1 / 102 (was `0 / 0 / 0`) | no (young) | young (created 267-03). ⛔ Will/Won't lists render from ONE server payload, visible at rest (sketch 267-B). Live G4-2: 'Won't use · 4' + four names before any click |
-| [`frontend/src/components/chat/ExpertEventCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcardtsx) | 1 / 1 / 197 (was `0 / 0 / 0`) | no (young) | young (created 267-04). The Now / Dropped card from `tool_calls[0]`, never `content`. Live G4-2: ONE card, still ONE after reload. ⛔ words from `expertEventCopy.ts` |
+| [`frontend/src/components/experts/ScopeLedger.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsscopeledgertsx) | 4 / 2 / 126 (was `1 / 1 / 102`) | no (2 phases) | **268-03**: `held` tone + optional `tag`/`muted` item fields, additive. ⛔ Will/Won't render from ONE server payload, visible at rest |
+| [`frontend/src/components/chat/ExpertEventCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcardtsx) | 4 / 2 / 278 (was `1 / 1 / 197`) | no (2 phases) | **268-03**: `ScopeChangedCard` via the tone lookup (normal / held / during-run). ⛔ words from `expertEventCopy.ts`, never `content` |
 | [`frontend/src/components/chat/HandoffCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschathandoffcardtsx) | 1 / 1 / 40 (was `0 / 0 / 0`) | no (young) | young (created 267-04). Renders the handoff user row as a card, never a user bubble. Live G4-3: the new thread opens on it, naming the source thread's facts |
-| [`frontend/src/components/chat/expertEventCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcopyts) | 1 / 1 / 241 (was `0 / 0 / 0`) | no (young) | young (created 267-04). ⛔ the ONE home of event/handoff wording; its kind list is cross-pinned to `TRANSCRIPT_EVENT_KINDS` by `?raw` |
+| [`frontend/src/components/chat/expertEventCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcopyts) | 4 / 2 / 313 (was `1 / 1 / 241`) | no (2 phases) | **268-03**: `SCOPE_EVENT_COPY` + `scopeEventModel` beside 267's words. ⛔ the kind list is cross-pinned to `TRANSCRIPT_EVENT_KINDS` by `?raw` |
 | [`frontend/src/components/chat/threadNavigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadnavigationtsx) | 1 / 1 / 45 (was `0 / 0 / 0`) | no (young) | young (created 267-04). The pointer's `Open →` door; no router exists, so it selects the thread. Live G4-3: Open lands on the new thread |
-| [`backend/app/db/runs.py`](docs/HOT-FILE-LEDGER.md#backendappdbrunspy) | 9 / 8 / 266 (was `8 / 7 / 226` at planning) | ⚠ **FIRES — 8 phases** | ⚠ absent its ENTIRE LIFE — row added at 268 PLANNING. **268-01**: `insert_run` gains org + Expert with a SQL parent copy. ⛔ `finalize_run` untouched (SEED-297) |
-| [`frontend/src/components/admin/spend/ExpertFilterPills.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertfilterpillstsx) | 0 / 0 / 0 | no (new) | young (created 268-02). Row added AT PLANNING. ⛔ ONE `expert` filter that every card follows (D-268-08); owns `filterPillClass` for all 3 ribbon groups |
-| [`frontend/src/components/admin/spend/ExpertSpendCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcardtsx) | 0 / 0 / 0 | no (new) | young (created 268-02). Row added AT PLANNING. Spend by Expert + recon footer + `LedgerExpertCell`. ⛔ the table never follows the filter; No Expert always shown |
-| [`frontend/src/components/admin/spend/AttributionDisclosures.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendattributiondisclosurestsx) | 0 / 0 / 0 | no (new) | young (created 268-02). Row added AT PLANNING. The two Blind Spots tiles (sub-agent tokens counted; handoff not metered). ⛔ no button |
-| [`frontend/src/components/admin/spend/expertSpendCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcopyts) | 0 / 0 / 0 | no (new) | young (created 268-02). Row added AT PLANNING. ⛔ the ONE home of spend-by-Expert wording; shared literals imported, never re-spelled |
-| [`frontend/src/components/chat/ScopeChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopechiptsx) | 0 / 0 / 0 | no (new) | young (created 268-03). Row added AT PLANNING. The composer scope chip. ⛔ reads `held` from the payload, never `scope_mode` (D-268-12c) |
-| [`frontend/src/components/chat/ScopePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopepickertsx) | 0 / 0 / 0 | no (new) | young (created 268-03). Row added AT PLANNING. DropdownMenu picker; Apply/Cancel are menu items (Radix traps Tab). ⛔ no `scope_mode` token |
-| [`frontend/src/components/chat/scopeCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopecopyts) | 0 / 0 / 0 | no (new) | young (created 268-03). Row added AT PLANNING. ⛔ the ONE home of chip/picker/pending-note wording; `explainFor` keeps the Expert rule out of the leaves |
+| [`backend/app/db/runs.py`](docs/HOT-FILE-LEDGER.md#backendappdbrunspy) | 9 / 8 / 266 | ⚠ **FIRES — 8 phases** | ⚠ absent its ENTIRE LIFE — row added at 268 PLANNING. **268-01**: `insert_run` gains org + Expert with a SQL parent copy. ⛔ `finalize_run` untouched (SEED-297) |
+| [`frontend/src/components/admin/spend/ExpertFilterPills.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertfilterpillstsx) | 1 / 1 / 179 (was `0 / 0 / 0`) | no (new) | young (created 268-02). ⛔ ONE `expert` filter that every card follows (D-268-08); owns `filterPillClass` for all 3 ribbon groups |
+| [`frontend/src/components/admin/spend/ExpertSpendCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcardtsx) | 1 / 1 / 316 (was `0 / 0 / 0`) | no (new) | young (created 268-02). Spend by Expert + recon footer + `LedgerExpertCell`. ⛔ the table never follows the filter; No Expert always shown |
+| [`frontend/src/components/admin/spend/AttributionDisclosures.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendattributiondisclosurestsx) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 268-02). The two Blind Spots tiles (sub-agent tokens counted; handoff not metered). ⛔ no button — no filter lands on either population |
+| [`frontend/src/components/admin/spend/expertSpendCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcopyts) | 1 / 1 / 74 (was `0 / 0 / 0`) | no (new) | young (created 268-02). ⛔ the ONE home of spend-by-Expert wording; shared literals imported, never re-spelled |
+| [`frontend/src/components/chat/ScopeChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopechiptsx) | 1 / 1 / 102 (was `0 / 0 / 0`) | no (new) | young (created 268-03). The composer scope chip. ⛔ reads `held` from the payload, never `scope_mode` (D-268-12c) |
+| [`frontend/src/components/chat/ScopePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopepickertsx) | 1 / 1 / 285 (was `0 / 0 / 0`) | no (new) | young (created 268-03). DropdownMenu picker; Apply/Cancel are menu items (Radix traps Tab). ⛔ no `scope_mode` token |
+| [`frontend/src/components/chat/scopeCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopecopyts) | 2 / 1 / 196 (was `0 / 0 / 0`) | no (new) | young (created 268-03). ⛔ the ONE home of chip/picker/pending-note wording; `explainFor` keeps the Expert rule out of the leaves |
 
 
 
@@ -17266,3 +17266,131 @@ The G-5 gate (`scripts/check-hot-file-ledger.cjs`) found **8 files with no row**
 ### `frontend/src/components/chat/scopeCopy.ts`
 
 **`0 / 0 / 0`** at 268 planning. young (created 268-03). Row added AT PLANNING. `SCOPE_COPY` + `explainFor(effect)`: the chip, picker and pending-note words; shared literals (`All your documents`, `Chat attachments`, the unnameable-folder phrase) imported from their existing homes.
+
+## Phase 268 CLOSE (`268-04`, 2026-09-28) — 31 touched files, triples re-derived after the last merge
+
+Re-derived at `268-04` (after waves 1-2 merged) with the CLAUDE.md recipe (6-digit quick-task buckets excluded) for every non-test source file in `git diff --name-only 220c82dde..HEAD -- backend/app frontend/src` (the phase base) plus `scripts/vitest-count-gate.cjs`. Each scan-list row keeps its previous triple beside the new one; the new leaves keep their planning `0 / 0 / 0` beside the measured figure. **G-5 was honoured by construction on every firing file, with NO override**: each change is additive kwargs/fields, one arm, one writer, one route, or a copy of a shape that already existed. **G-5 not fired on `retrieval_service.py`: file unmodified; SEED-224 extraction stays owed** (D-268-03 → D-268-14). **Crossed the threshold in 268** (the next phase that edits it proposes a refactor first): `frontend/src/pages/admin/AdminSpendPage.tsx` (`2 / 1 / 567` → `9 / 3 / 974`). **Owed seams named, not taken:** `tool_dispatcher.py` registry/handler split; `agent_loop.py` prompt-assembly extraction; `AdminSpendPage.tsx` ledger/KPI extraction.
+
+### `backend/app/api/admin_spend.py` — Phase 268
+
+**`4 / 2 / 247`** (was `1 / 1 / 202`). `expert` is one `Query` with the uuid|none|unrecorded pattern on `/summary` and `/runs`, lowercased and forwarded; a malformed value is a 422 before `db/rates.py` is awaited (T-268-10). Four keys were added to the summary (`expert_breakdown`, `window_total_usd`, `window_run_count`, `unpriced_subagents`); no 257 key changed. Live: `GET /admin/spend/summary` answered 200 for the dev org with the four keys (268-UAT-LOG SC#1).
+
+### `backend/app/api/threads.py` — Phase 268
+
+**`261 / 88 / 2434`** (was `255 / 87 / 2156`). 268-01: `send_message` resolves the thread's Expert scoping ONCE (`_resolve_thread_scoping`, inside `if _kickoff_definition is None:`) and hands the object (and its error) to the detached producer, so the run's Expert and its scope are one value; the thread and user message carry the validated active org. 268-03: `rename_thread` gained a folder arm dispatched BEFORE the Expert arm (whose statement order is untouched), `_write_scope_change` writes the UPDATE and the `scope_changed` row in one user-JWT transaction with the THREAD's org, and `GET /{thread_id}/scope-effect` states what the next message searches. No 409 while streaming (D-268-12a). Live: one event row per PATCH on 8/8 board threads, present in two snapshot reads; another org's folder refused. ⛔ The send path gained no branch.
+
+### `backend/app/db/rates.py` — Phase 268
+
+**`9 / 2 / 898`** (was `2 / 1 / 507`). The ONE `per_root` CTE (roots → members → priced → per_root) is included by totals, daily, model donut, Spend by Expert, window totals, ledger rows and the ledger COUNT, so two regions cannot disagree. Each member is priced at its own model/provider/date rate through `cost_usd_sql`; a placeholder shell root (`model='unknown' AND provider='unknown'`) counts only its own box tokens. **Proven on real Postgres by `test_268_spend_rollup_pg.py` (268-04)**: Σ lines = window total in integer ten-thousandths with every awkward row shape present; the plant (shell FILTER removed) read `shell line double-counted: 160 (want 100)`. Live SC#1-reconcile (268-04): all 5 API lines equal an independent Python sum in ten-thousandths; Σ lines = window 40.8678 over 1,238 runs.
+
+### `backend/app/db/runs.py` — Phase 268
+
+**`9 / 8 / 266`**. Re-derived at close: unchanged since 268-01 (`9 / 8 / 266`). Live (268-04): every run the drive wrote reads `expert_attributed = true`, the Expert active when it started, and the active org; the sub-agent of the G4-1 run copied its parent's `expert_id` and `org_id` in SQL.
+
+### `backend/app/models/message.py` — Phase 268
+
+**`21 / 13 / 278`** (was `20 / 12 / 236`). `TRANSCRIPT_EVENT_KINDS` gained `scope_changed` (one home; the frontend mirror is `?raw`-pinned). `ScopeFolderRef` / `ScopeTranscriptLine` / `ScopeChangedEvent` are additive; `path` lives on the subclass so 267's `model_dump` fixtures stay byte-identical (Pitfall 11).
+
+### `backend/app/models/thread.py` — Phase 268
+
+**`21 / 14 / 537`** (was `20 / 13 / 510`). `ThreadUpdate` gained the folder pair (the same shape as the Expert pair); a body touching both pairs is a 422 so one PATCH writes one event. `ScopeEffect` is the one payload the chip, the picker ledger and the snapshotted card render from; `held` is decided on the server.
+
+### `backend/app/services/agent_loop.py` — Phase 268
+
+**`56 / 28 / 3573`** (was `54 / 27 / 3557`). 268-01 added four org stamps (cap-paused carrier, assistant message, system warnings, the `persist_cap_paused` call) and one kwarg; the two conditionals are dict-merge expressions, no `if` block, and the 260/264 AST fence (no identifier containing `expert`) stays green. ⚠ **Observed live at 268-04 (F-1):** the folder-scope note appended to the system prompt names the CURRENT folder, so after a scope change a model that answers from history can attribute an old-folder document to the new folder. Recorded as SEED-319, not edited here. ⛔ The prompt-assembly extraction stays OWED.
+
+### `backend/app/services/expert_scope.py` — Phase 268
+
+**`3 / 2 / 610`** (was `2 / 1 / 420`). 268-03 appended `folder_path`, `build_scope_effect`, `build_scope_changed_event`, `scope_event_sentence` and `describe_scope_change` next to 267's `describe_expert_scope`, and extracted `_dropped_line` so both events word the Dropped line one way (267's fixtures stayed byte-equal). Live: the Biased Expert's next run retrieved only from `ScopeEffect.next` folders (SC#4-biased).
+
+### `backend/app/services/run_lifecycle.py` — Phase 268
+
+**`9 / 5 / 756`** (was `8 / 4 / 748`). `register_run_start` gained `org_id` / `expert_id` keyword arguments forwarded to `insert_run`; nothing else moved except the `finish_run` call line (521 → 529), which the 256 fence re-pinned beside its old value.
+
+### `backend/app/services/run_producer.py` — Phase 268
+
+**`17 / 9 / 1029`** (was `16 / 8 / 967`). 268-01: `run_producer(scoping=, scoping_error=)` consumes the object `send_message` resolved (the producer still resolves when not handed one); `_accumulate_segment_tokens` makes a Deep Continue finalize paused + continuation instead of erasing the paused segment (best-effort prior read, logged when it fails). ⚠ SC#1-continued could not be driven live at 268-04 (two explorer attempts finished under the 8-iteration cap); the unit RED (`(30, 10) == (130, 50)`) and the real-PG continued-root row are the evidence.
+
+### `backend/app/services/tool_dispatcher.py` — Phase 268
+
+**`93 / 40 / 5234`** (was `92 / 39 / 5221`). `run_id`, `thread_id`, `parent_run_id` and `folder_ids` added to the two existing `search.query` audit dicts — the join every CHAT-08 proof uses. Live: 8/8 board threads' audit rows carry `run_id` and the scope in force. No tool added (29 at `test_259_closed_core_inventory.py`).
+
+### `frontend/src/components/admin/spend/AttributionDisclosures.tsx` — Phase 268
+
+**`1 / 1 / 44`** (was `0 / 0 / 0`). Created by 268-02 (measured `1 / 1 / 44`, the planning `0 / 0 / 0` kept above). Two text-only tiles; no control.
+
+### `frontend/src/components/admin/spend/BlindSpotsCard.tsx` — Phase 268
+
+**`5 / 2 / 285`** (was `2 / 1 / 162`). 268-02 widened the grid, mounted `AttributionDisclosures` and added the unpriced-sub-agents sentence to the unrated tile. Its shipped classes are dark-only (UI-SPEC §9-D9); the light theme is planted as a seed at 268-04 rather than fixed here.
+
+### `frontend/src/components/admin/spend/ExpertFilterPills.tsx` — Phase 268
+
+**`1 / 1 / 179`** (was `0 / 0 / 0`). Created by 268-02 (measured `1 / 1 / 179`). One `expert` value reaches both `getSpendSummary` and `getSpendRuns`; overflow `More` above 6 Experts.
+
+### `frontend/src/components/admin/spend/ExpertSpendCard.tsx` — Phase 268
+
+**`1 / 1 / 316`** (was `0 / 0 / 0`). Created by 268-02 (measured `1 / 1 / 316`). The recon footer sums the lines client-side in integer ten-thousandths, an independent check of the server's window total.
+
+### `frontend/src/components/admin/spend/expertSpendCopy.ts` — Phase 268
+
+**`1 / 1 / 74`** (was `0 / 0 / 0`). Created by 268-02 (measured `1 / 1 / 74`).
+
+### `frontend/src/components/chat/ActiveExpertChip.tsx` — Phase 268
+
+**`2 / 2 / 53`** (was `0 / 0 / 0`). The row read `0 / 0 / 0` since 260; measured `2 / 2 / 53` at 268 close. 268-03 paired it with `ScopeChip` so a held scope sits beside a legible `{Expert} · Restricted`.
+
+### `frontend/src/components/chat/ChatArea.tsx` — Phase 268
+
+**`87 / 41 / 1106`** (was `79 / 40 / 970`). 268-03: `applyScopeChange` is the one scope PATCH home, beside the Expert one; the at-rest `ScopeEffect` read is made inside a promise chain so a suite whose `@/lib/api` mock lacks the export cannot crash at mount. Hook deltas stated, not hidden: `useState` 5 → 7, `useEffect` 4 → 6, `useCallback` 10 → 12, `useRef` 1 → 2. The header folder pill was removed. ⛔ The send path has no scope branch.
+
+### `frontend/src/components/chat/ExpertEventCard.tsx` — Phase 268
+
+**`4 / 2 / 278`** (was `1 / 1 / 197`). 268-03 added `ScopeChangedCard` through the existing tone lookup; the card reads `tool_calls[0]`, never `content`.
+
+### `frontend/src/components/chat/MessageInput.tsx` — Phase 268
+
+**`41 / 20 / 1007`** (was `38 / 19 / 977`). 268-03 added two optional `ReactNode` slots (the scope chip and the pending note); `useState` 8 → 8, `useEffect` 6 → 6, `useCallback` 4 → 4.
+
+### `frontend/src/components/chat/ScopeChip.tsx` — Phase 268
+
+**`1 / 1 / 102`** (was `0 / 0 / 0`). Created by 268-03 (measured `1 / 1 / 102`).
+
+### `frontend/src/components/chat/ScopePicker.tsx` — Phase 268
+
+**`1 / 1 / 285`** (was `0 / 0 / 0`). Created by 268-03 (measured `1 / 1 / 285`). Latest-wins draft reads; the first preview is the AT-REST read so a folder the caller can no longer see still states itself.
+
+### `frontend/src/components/chat/expertEventCopy.ts` — Phase 268
+
+**`4 / 2 / 313`** (was `1 / 1 / 241`). 268-03 added the scope card's words and model; the kind list stays cross-pinned to the backend allowlist.
+
+### `frontend/src/components/chat/scopeCopy.ts` — Phase 268
+
+**`2 / 1 / 196`** (was `0 / 0 / 0`). Created by 268-03 (measured `2 / 1 / 196`).
+
+### `frontend/src/components/experts/ScopeLedger.tsx` — Phase 268
+
+**`4 / 2 / 126`** (was `1 / 1 / 102`). 268-03 added the held tone and two optional item fields; the existing 267 cases are unchanged.
+
+### `frontend/src/lib/api.ts` — Phase 268
+
+**`205 / 122 / 516`** (was `187 / 110 / 422`). The barrel re-exports `setThreadFolder`, `getScopeEffect` and four wire types; the two pre-existing tsc errors moved 6 lines (`:254/255` → `:260/261`), same errors.
+
+### `frontend/src/lib/api/spend.ts` — Phase 268
+
+**`3 / 2 / 226`** (was `1 / 1 / 184`). 268-02 maps `expert_breakdown`, the window totals and the ledger attribution fields; `expert` is set only when given.
+
+### `frontend/src/lib/api/threads.ts` — Phase 268
+
+**`16 / 10 / 1935`** (was `15 / 9 / 1859`). 268-03 added the two scope calls and their wire types beside 267's handoff call.
+
+### `frontend/src/pages/admin/AdminSpendPage.tsx` — Phase 268
+
+**`9 / 3 / 974`** (was `2 / 1 / 567`). **Crossed the G-5 threshold in 268** (`2 / 1 / 567` → `9 / 3 / 974`, +407 lines). 268-02 added the Expert pills, the statement line, KPI 1 naming, the Spend by Expert card mount, the ledger Expert column and sub-agent tag. Its shipped classes are dark-only (§9-D9, seeded at 268-04). ⛔ The next phase that edits it proposes an extraction first — the ledger table and the KPI ribbon are the natural seams.
+
+### `frontend/src/types/spend.ts` — Phase 268
+
+**`3 / 2 / 115`** (was `1 / 1 / 70`). 268-02 added `ExpertSpendLine` and the new optional/required summary and run fields.
+
+### `scripts/vitest-count-gate.cjs` — Phase 268
+
+**`259 / 58 / 6196`** (was `254 / 57 / 6168`). 268-02 and 268-03 each pinned their new suites in TARGETS and BASELINE in the same commit as the suite.

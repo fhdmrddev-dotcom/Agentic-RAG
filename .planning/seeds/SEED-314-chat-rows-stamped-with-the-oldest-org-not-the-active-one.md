@@ -3,9 +3,18 @@ seed_id: SEED-314
 title: A two-org user's chat in org B writes its thread, messages and run under org A — retrieval honours X-Org-Id, the row stamps do not
 created: 2026-09-24
 surface: Agentic-RAG
-status: folded
+status: answered
 partial: false
-status_note:
+status_note: |
+  ── 2026-09-28 · Phase 268 CLOSE (268-04), ANSWERED for the SEND PATH by 268-01 (D-268-07 / D-268-22). The
+  run, the thread, the user / assistant / system / cap-carrier messages of a turn are stamped with the
+  validated ACTIVE org explicitly; a sub-agent copies its parent's org in SQL. Proven on real Postgres with a
+  two-org subject (`test_268_two_org_rows.py`, plant RED quoted in 268-01-SUMMARY) and live (268-UAT-LOG: every
+  runs / message / audit row of the drive carries the X-Org-Id sent). ⚠ RECORDED EDGE, accepted by D-268-22,
+  not a defect: a two-org user sending in an OLD thread that belongs to org A while org B is active writes the
+  new turn's run and messages in B (the split transcript), while 267's `expert_changed` / 268's
+  `scope_changed` event rows use the THREAD's org. The `autofill_org_id_by_owner` trigger itself is unchanged
+  (its LIMIT-1 pick still decides any insert that omits org_id).
 trigger_when: Any phase touching chat thread/run creation, run metering or usage attribution, the autofill_org_id_by_owner trigger, or multi-org membership.
 trigger_paths: ["backend/app/api/threads.py", "backend/app/db/runs.py", "backend/app/services/run_producer.py", "supabase/migrations/*autofill*"]
 trigger_surfaces: []

@@ -4,7 +4,7 @@ milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
 status: executing
 last_updated: "2026-09-28T14:28:00.379Z"
-last_activity: 2026-09-28 -- Phase 268 execution started
+last_activity: 2026-09-28 -- 268-04 live UAT + closeout; G-4 checkpoint returned
 progress:
   total_phases: 12
   completed_phases: 3
@@ -40,35 +40,20 @@ can be taught new behaviours (skills) that persist and can be shared.
 ## Current Position
 
 Milestone: v4.4 Experts That Actually Work
-Phase: 268 (Expert Spend & Mid-Thread Scope) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 268
+Phase: 268 (Expert Spend & Mid-Thread Scope)
+Plan: 4 of 4 — at its Task 4 G-4 checkpoint (operator Chrome pass)
+Status: **Phase 268 executed — G-4 operator pass owed (268-04 Task 4), then verification next.**
 
-- SC#1-SC#5 PASS
-- SC#10 board 8/8 PASS
-- G-4 ×3 PASS, driven in Chrome by the orchestrator
-- after the code-review fixes, CR-01 and WR-03 were re-driven live and PASS
+- 268-01..03 shipped; 268-04 Task 1 (real-PG spend reconciliation, `6fd38f39a`) and Task 3 (live UAT,
+  `da142f6dd`) done; Task 5's closeout (parity checklist, seeds, registers, gates) done ahead of the G-4 reply.
+- Live (dev org `22f9c615-…`): SC#1 reconcile / filter / sub-agent, SC#2, SC#3 event / reload / retrieval,
+  SC#4 biased / restricted / authz, MT-1, PT-1, LM-1 PASS. SC#10 fixed recipe: **1 PASS / 7 ⛔** — turn 2 answered
+  from history without searching (**F-1 → SEED-319**, an operator design decision); the fresh-search variant
+  retrieves only the new subtree on 8 / 8. SC#1-continued OWED-manual. Record: `268-UAT-LOG.md`.
+- Still owed from 267: its independent review and the operator's G-4 sign-off (see the 267 block below).
 
-Code review (`267-REVIEW.md`): 2 critical + 9 warnings, all FIXED test-first. 6 info items deferred with reasons.
-
-OWED, run these first:
-
-1. The independent review by an agent that did NOT build 267 (AGENTS.md §6.3).
-2. Operator sign-off on the G-4 Chrome rows (screenshots: `evidence/g4-*.png`).
-3. F-4: the handoff 502 did not reproduce.
-4. Ledger triples: re-derive them for the files the review fixes touched after the 267-05 register commit (ExpertSpotlightCard.tsx, useThreads.ts, ChatArea.tsx, InviteExpertDialog.tsx, api/threads.py, expert_service.py, agent_loop.py, among others).
-
-G-2 honoured: sketch 267 Variant B "Will / won't ledger", picked by the operator (D-267-27). G-4 scenarios locked (D-267-28)
-Operator rulings at research: D-267-29..35. The rulings are: a server union of the Expert's connections; the picker stores `service_id`; a fail-closed binding gate; skills add; the handoff inherits the folder; `org_id` is set explicitly; the biased narrowing on a no-folder thread is kept and stated
-Baselines at `92b5476be`:
-
-- backend unit: 71 failed / 5673 passed (ceiling, zero headroom)
-- `tsc -p tsconfig.app.json`: 70 errors
-- vitest gate: 8828 total · 3 failed (inherited) · 8075 pinned
-
-Still owed from 266: UI-2 and UI-4 (not-installed, non-manager) live checks; `independent_review`; the prod parity checklist `266-PROD-PARITY.md`
-Resume file: .planning/phases/268-expert-spend-mid-thread-scope/268-UI-SPEC.md
-Last activity: 2026-09-28 -- Phase 268 execution started
+Resume file: .planning/phases/268-expert-spend-mid-thread-scope/268-04-PLAN.md (Task 4, then Task 5 step 1)
+Last activity: 2026-09-28 -- 268-04 live UAT + closeout; G-4 checkpoint returned
 
 ---
 
@@ -84,6 +69,30 @@ Last activity: 2026-09-28 -- Phase 268 execution started
 | Two non-engineering commercial blockers (no legal entity; employment / IP position) | `SEED-294` |
 
 ---
+
+## Guardrail records — Phase 268 (2026-09-28)
+
+**No guardrail was overridden in 268.**
+
+| Rule / item | Record | Evidence |
+|---|---|---|
+| G-2 (sketch before plan) | **HONOURED, not an override (D-268-01).** Sketch 268 ran before discuss; the operator picked **Chat A · Save & say · Spend A**. It is the acceptance bar for the G-4 drive | `.planning/sketches/268-expert-spend-and-mid-thread-scope/` |
+| D-268-02 (dependency risk) | 268 reuses 267's transcript-event plumbing (`TRANSCRIPT_EVENT_KINDS`, the history skip, the event card) while **267 still owes its independent review and the operator's G-4 sign-off**. **Unchanged by 268:** the plumbing was extended additively (`scope_changed` joins the allowlist; 267's fixtures stay byte-equal), and 268-01 only added org stamps in `agent_loop.py`. The risk stands until 267's review lands | `268-03-SUMMARY.md` § D-268-02 |
+| G-5 (refactor between feature waves) | **Honoured by construction on every firing file, NO override.** Each change is additive kwargs/fields, one arm, one writer, one route, or a shape that already existed. **G-5 not fired: `retrieval_service.py` unmodified; SEED-224 extraction stays owed** (D-268-03 → D-268-14; `git diff 220c82dde -- backend/app/services/retrieval_service.py` empty). **Crossed the threshold in 268:** `frontend/src/pages/admin/AdminSpendPage.tsx` (`9 / 3 / 974`) — the next phase that edits it proposes an extraction first | `docs/HOT-FILE-LEDGER.md` § Phase 268 CLOSE |
+| G-8 (plan-count proportion) | **4 plans / 3 waves (D-268-15).** The sub-agent roll-up SQL was moved from plan 1 to plan 2 so it lives beside the breakdown in `db/rates.py` (one author for one CTE) | `268-0{1..4}-PLAN.md` |
+| D-268-09 | **Org spend totals rise because sub-agent tokens are now counted.** 257 priced root runs only; 268 prices every sub-agent at its own rate and rolls it into its root and that root's Expert. Disclosed on the Blind Spots card ("Sub-agent tokens now counted"); not a pricing change | `268-02-SUMMARY.md` |
+| UAT findings | **F-1** (a same-prompt follow-up after a scope change is answered from history; 6 / 8 providers cite the dropped folder, one under a false location) → **SEED-319**, routed to the operator, not fixed. **Q9** (Continue's user-JWT UPDATE matching 0 rows) **refuted by data**, no seed. Fixture substitution: Financial Analyzer is Restricted, so SC#4-biased used UAT-265 Billing SOP Advisor | `268-UAT-LOG.md` |
+
+**Owed from 268, and which to run first:**
+
+1. **The operator's G-4 Chrome pass** (268-04 Task 4: G4-1, G4-2, G4-3, both themes). Run this first.
+2. **The independent review** by an agent that did not build 268 (AGENTS.md).
+3. **SC#1-continued** live (a Deep run reaching the cap, then Continue).
+4. The operator's ruling on **SEED-319** (F-1).
+5. Production: `268-PROD-PARITY.md` — migration 197 BEFORE the backend deploy; every write on explicit per-action approval.
+
+**CLAUDE.md size:** 117,178 chars after 268's cells — under the 120,000 warn band; no split scheduled (headroom
+2,822 to the band).
 
 ## Guardrail records — Phase 267 (2026-09-26)
 
