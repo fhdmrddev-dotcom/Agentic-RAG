@@ -18,6 +18,8 @@ Rules, each pinned by ``tests/unit/test_268_scope_history_note.py``:
     says nothing.
   * Folder paths are user-authored text: brackets and line breaks are removed and each path is capped, so a
     folder name cannot close the note or start a new instruction line.
+  * A folder the caller cannot name (an id, no name/path) is a SPECIFIC folder, never "all your documents", and
+    two such folders are told apart by id, not by their shared label (268-REVIEW WR-04).
 """
 from __future__ import annotations
 
@@ -41,35 +43,61 @@ def _label(path: str | None) -> str:
     return "/" + clean
 
 
-def scope_history_note(from_path: str | None, to_path: str | None) -> str:
-    """The note's words. ``None`` means the thread had no folder (all documents)."""
+def _note(from_label: str, to_label: str) -> str:
     return (
-        f"[Search scope changed from {_label(from_path)} to {_label(to_path)}. Earlier search results in this "
+        f"[Search scope changed from {from_label} to {to_label}. Earlier search results in this "
         "conversation may come from outside the new scope; run a new search before citing documents.]"
     )
 
 
-def _path(ref: object) -> str | None:
-    if not isinstance(ref, dict):
-        return None
-    return ref.get("path") or ref.get("name") or None
+def scope_history_note(from_path: str | None, to_path: str | None) -> str:
+    """The note's words. ``None`` means the thread had no folder (all documents)."""
+    return _note(_label(from_path), _label(to_path))
+
+
+_UNNAMED = "a folder that cannot be named here"
+
+
+class _Side:
+    """One side of a change. ``None`` ref = no folder (all documents). A ref with an id and no name or
+    path is a folder the caller cannot see (``ScopeFolderRef``) — a SPECIFIC folder, never "all your
+    documents" (268-REVIEW WR-04)."""
+
+    __slots__ = ("path", "unnamed_id")
+
+    def __init__(self, ref: object) -> None:
+        self.path: str | None = None
+        self.unnamed_id: str | None = None
+        if isinstance(ref, dict):
+            self.path = ref.get("path") or ref.get("name") or None
+            if self.path is None:
+                self.unnamed_id = str(ref.get("id") or "")
+
+    def label(self) -> str:
+        return _UNNAMED if self.unnamed_id is not None else _label(self.path)
+
+    def same_as(self, other: "_Side") -> bool:
+        # Unnameable sides compare by id (two hidden folders share a label, not an identity).
+        if self.unnamed_id is not None or other.unnamed_id is not None:
+            return self.unnamed_id == other.unnamed_id
+        return _label(self.path) == _label(other.path)
 
 
 class ScopeNoteFold:
     """Collects scope changes between user messages; hands the note to the next user message."""
 
     def __init__(self) -> None:
-        self._from: str | None = None
-        self._to: str | None = None
+        self._from: _Side | None = None
+        self._to: _Side | None = None
         self._pending = False
 
     def add(self, payload: dict) -> None:
         if payload.get("held"):
             return
         if not self._pending:
-            self._from = _path(payload.get("from_folder"))
+            self._from = _Side(payload.get("from_folder"))
             self._pending = True
-        self._to = _path(payload.get("to_folder"))
+        self._to = _Side(payload.get("to_folder"))
 
     def take(self) -> str | None:
         """The note for the user message about to be emitted, or None; resets the fold."""
@@ -78,6 +106,6 @@ class ScopeNoteFold:
         src, dst = self._from, self._to
         self._pending = False
         self._from = self._to = None
-        if _label(src) == _label(dst):
+        if src is None or dst is None or src.same_as(dst):
             return None
-        return scope_history_note(src, dst)
+        return _note(src.label(), dst.label())
