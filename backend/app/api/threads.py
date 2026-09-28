@@ -768,6 +768,13 @@ async def create_thread(
         _bundle, _org_id = await assert_expert_bindable(request, current_user, body.active_expert_id)
         insert_data["active_expert_id"] = str(body.active_expert_id)
         insert_data["org_id"] = _org_id
+    else:
+        # Phase 268 (D-268-07 / SEED-314): without an Expert the thread still belongs to the
+        # VALIDATED active org, not to the mig-106 trigger's LIMIT-1 guess (which is the wrong org
+        # for a two-org user). No header / non-member header → None → no key → byte-identical.
+        _active_org = await resolve_active_org_or_none(request, current_user)
+        if _active_org:
+            insert_data["org_id"] = _active_org
     # BL-01 fix: wrap sync .execute() with aexec so the event loop is not blocked
     # (D-v2.5-01 / Phase 058 D-058-09 — cross-tab unblocking invariant).
     response = await aexec(supabase.table("threads").insert(insert_data))
@@ -1420,6 +1427,10 @@ async def send_message(
     # Distinction: None -> SQL NULL (absent / not supplied); [] -> '[]'::jsonb (explicitly cleared)
     if body.active_connector_ids is not None:
         _user_msg_row["active_connector_ids"] = [str(c) for c in body.active_connector_ids]
+    # Phase 268 (D-268-07 / D-268-22 / SEED-314): the turn's rows go to the validated active org,
+    # not the trigger's LIMIT-1 guess. Absent → no key → the dict is byte-identical to base.
+    if active_org_id:
+        _user_msg_row["org_id"] = active_org_id
 
     _user_msg_resp = await aexec(
         supabase.table("messages").insert(_user_msg_row)
@@ -1476,6 +1487,32 @@ async def send_message(
         body=body, user_settings=_user_settings
     )
 
+    # ── Phase 268 (METER-08 / D-268-05 / D-268-19, Option A) — RESOLVE THE EXPERT ONCE, HERE ──
+    # The run row is born below, and it must name the Expert this turn actually runs with. That
+    # Expert used to be resolved only later, inside the detached producer — so the row could be
+    # stamped only by a SECOND read, and a PATCH between the two reads would stamp one Expert and
+    # scope another. So the Deep turn resolves ONCE, before the INSERT, and the SAME object is
+    # handed to the producer (``scoping=``), which no longer resolves when given one.
+    #   · A harness kickoff never resolves an Expert (the harness builder has none) → No Expert.
+    #   · A resolution ERROR is kept, not raised: the row is inserted unstamped and the producer
+    #     re-raises it INSIDE its existing try, so runs.error and the SSE terminal are exactly what
+    #     they were before 268 (``failed: ExpertScopeUnavailable: …``).
+    #   · ``_resolve_thread_scoping`` still clears a stale ``active_expert_id`` (its side effect
+    #     moves with it) and runs on the SERVICE client, as it did inside the producer.
+    _scoping = None
+    _scoping_error: BaseException | None = None
+    if _kickoff_definition is None:
+        from app.services.run_producer import _resolve_thread_scoping  # noqa: PLC0415
+        try:
+            _scoping = await _resolve_thread_scoping(
+                supabase=service_supabase,
+                thread_id=thread_id,
+                current_user=current_user,
+                pool=await get_pg_pool(),
+            )
+        except Exception as _exc:  # noqa: BLE001 — carried to the producer, re-raised there
+            _scoping_error = _exc
+
     try:
         # Phase 145-03 (D-145-09) — the runs INSERT + both ZADD mirrors are now ONE
         # atomic co-write via the run_lifecycle owner (was: an insert_run here + a
@@ -1501,6 +1538,11 @@ async def send_message(
             model=_resolved_model,
             provider=_resolved_provider,
             spawned_by_worker=str(os.getpid()),
+            # Phase 268 (D-268-05 / D-268-07): the validated active org (None → the trigger
+            # decides, byte-identical for single-org callers) and the Expert resolved ONCE above
+            # (None on a harness kickoff, on a plain thread, and on a failed resolution).
+            org_id=active_org_id,
+            expert_id=getattr(_scoping, "born_for_bundle_id", None),
         )
     except Exception:
         # Spawn-failure cleanup (RESEARCH.md Q2): don't leave an orphan runs row +
@@ -1645,6 +1687,9 @@ async def send_message(
         active_workflow_run_id=_active_workflow_run_id,
         kickoff_definition=_kickoff_definition,
         kickoff_definition_id=_kickoff_definition_id,
+        # Phase 268 (D-268-19): the SAME object that stamped the row scopes the run.
+        scoping=_scoping,
+        scoping_error=_scoping_error,
     ))
     RUN_TASKS[run_id] = task
 

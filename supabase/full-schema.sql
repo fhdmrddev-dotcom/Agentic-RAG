@@ -2560,6 +2560,8 @@ CREATE TABLE public.runs (
     parent_run_id uuid,
     continues_used integer DEFAULT 0 NOT NULL,
     org_id uuid NOT NULL,
+    expert_id uuid,
+    expert_attributed boolean DEFAULT false NOT NULL,
     CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
 );
 
@@ -2583,6 +2585,20 @@ COMMENT ON COLUMN public.runs.continues_used IS 'D-06: Continue cap counter, max
 --
 
 COMMENT ON COLUMN public.runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
+-- Name: COLUMN runs.expert_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.runs.expert_id IS 'Phase 268 (METER-08 / D-268-04). The Expert this run ran with: the ACCESS-CHECKED bundle id resolved for the turn (ThreadScoping.born_for_bundle_id), stamped at the one INSERT (db.runs.insert_run) and never re-read at report time. A sub-agent row copies its parent''s value in SQL. Read it ONLY together with expert_attributed: NULL + attributed = No Expert; NULL + not attributed = Not recorded (before 268). NO FOREIGN KEY on purpose — ON DELETE SET NULL would turn a deleted Expert''s runs into No Expert; a missing join renders "Deleted Expert".';
+
+
+--
+-- Name: COLUMN runs.expert_attributed; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.runs.expert_attributed IS 'Phase 268 (METER-08 / D-268-04 / D-268-06). true for every row written from 268 on — set in SQL by db.runs.insert_run, copied from the parent for a sub-agent. false (the default) means Not recorded (before 268). NEVER BACKFILLED: the thread''s current Expert is no evidence of the Expert at the time, because Phase 267 made mid-thread swaps possible.';
 
 
 --

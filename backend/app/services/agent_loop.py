@@ -371,8 +371,14 @@ async def persist_cap_paused(
     tool_calls_buffer: dict,
     continues_used: int,
     emit: Callable[..., Awaitable[Any]],
+    org_id: str | None = None,
 ) -> str:
     """Persist the dropped tool calls + emit the NON-terminal cap_paused event.
+
+    Phase 268 (D-268-22 / Pitfall 3): ``org_id`` is the turn's validated active org. The Continue
+    endpoint looks the carrier up ``AND org_id = <the run's org>``; the run now carries the active
+    org explicitly, so a carrier left to the trigger's LIMIT-1 guess would be invisible to Continue
+    for a two-org user. Absent → no key → the insert dict is byte-identical.
 
     Called at the iteration cap (force_no_tools WITH a non-empty buffer) BEFORE
     the caller clears ``tool_calls_buffer`` — so the calls are durable first
@@ -396,6 +402,7 @@ async def persist_cap_paused(
                     f"tool(s) still queued. Continue to run them."
                 ),
                 "tool_calls": carrier,
+                **({"org_id": org_id} if org_id else {}),
             })
         )
     except Exception:
@@ -1967,6 +1974,8 @@ async def run_agent_loop(
                 confidence_avg_similarity=row.get("confidence_avg_similarity"),
                 confidence_disclaimer=row.get("confidence_disclaimer"),
                 reasoning_content=_strip_nul(full_reasoning_content) or None,
+                # Phase 268 (D-268-22): the turn's validated active org (None → the trigger).
+                org_id=current_user.get("org_id"),
             )
             _cached_id = str(_inserted_id) if _inserted_id else None
         except Exception as e:
@@ -2005,6 +2014,8 @@ async def run_agent_loop(
                         "role": "system",
                         "content": _strip_nul(w.get("message", "")),
                         "tool_calls": [{"kind": w.get("kind", "")}],
+                        # Phase 268 (D-268-22): the turn's active org, when validated.
+                        **({"org_id": current_user["org_id"]} if current_user.get("org_id") else {}),
                     })
                 )
             except Exception as e:
@@ -2750,6 +2761,7 @@ async def run_agent_loop(
                     tool_calls_buffer=tool_calls_buffer,
                     continues_used=_continues_used,
                     emit=_emit,
+                    org_id=current_user.get("org_id"),  # Phase 268 (D-268-22 / Pitfall 3)
                 )
                 tool_calls_buffer = {}   # persisted above — now skip the tool execution round
 
