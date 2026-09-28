@@ -1568,6 +1568,8 @@ The duplicate row's own cell is preserved verbatim rather than deleted (G-5 ⚠ 
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `22 / 9 / 1223` → `23 / 10 / 1567`.** The five new lint codes are minted through the same `LintError(` seam the file already owned. ⚠ `test_182`'s drift detector was structurally blind to expression-minted codes — `SEED-220`. Phase buckets gain `214`.
 
+**268-REVIEW (2026-09-29) — `29 / 13 / 1942`, first 268 touch. Honoured by construction.** WR-06: the golden-run producer shell was inserted with no `org_id`, so for a two-org owner it (and, via `insert_run`'s parent copy, every golden-run sub-agent) took the mig-106 trigger's `LIMIT 1` org and its spend showed in the other org's `/admin/spend`. It now carries `_golden_run_org_id` — the definition's org `_resolve_publish_supabase` already returns and scopes the client by. **One kwarg, no branch.** ⛔ The validation ctx still withholds `org_id` (the Phase 190 fence at step 4 is unchanged). Named, not fixed: the ephemeral validation thread and the golden `workflow_runs` row still take the trigger.
+
 ## `backend/app/services/workflow_authoring.py`
 
 **⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `14 / 8 / 881` → `15 commits / 9 phases / 989 L`** · quick-task buckets: **none** (this file has still never been touched by a dated task). Recorded beside every previous value below, never over them. **G-5 fires at 9 phases and was honoured BY CONSTRUCTION**, argued rather than asserted: the whole diff is **`+110 / -2`**, and the two deleted lines are the two halves of ONE existing prompt sentence that was extended. No new emit path, no new refusal branch, no new `{"ok": False}` return, no `WF_SCHEMA` change, no schema edit anywhere.
@@ -1732,7 +1734,7 @@ Deep arm passed the plain `get_current_user` dict (no `org_id`) into `spawn_cont
 writes — including a RE-PAUSE carrier — fell to the mig-106 trigger's `LIMIT 1` org, and a two-org user's second
 Continue re-drove the FIRST pause's calls (driven RED on real Postgres, `test_268_continue_org.py`). The fix is one
 expression at the existing call: the run's own `org_id` (the value the carrier lookup already reads) is merged into
-`current_user`. ⛔ **No new branch, no new route.** The continuation carries the RUN's org, never a header's.
+`current_user`. ⛔ **No new branch, no new route.** The continuation carries the RUN's org, never a header's. **WR-06 (same pass, `41 / 19 / 1750`):** the Harness Continue's producer shell (`_insert_run`) now carries the WORKFLOW RUN's `org_id` (added to the existing RLS `workflow_runs` select), so the shell and its re-driven sub-agents stop taking the trigger's guess. One select column + one kwarg.
 
 ---
 
@@ -1805,6 +1807,8 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `46 / 16 / 2567` → `54 / 20 / 3135`.** The approval composer takes the service it cannot know as a parameter; a failing connection lookup can no longer kill the pause. Phase buckets gain `214`.
+
+**268-REVIEW (2026-09-29) — `60 / 23 / 3297`, first 268 touch. Honoured by construction.** WR-06: `_build_resume_context` minted the resume producer shell with no `org_id`; for a two-org owner the shell and every re-driven sub-agent under it (parent copy) took the trigger's `LIMIT 1` org (driven RED on real Postgres, `test_268_shell_org.py`). The run's own org — which this builder already resolved to scope its service-role client — is now resolved ABOVE the INSERT and passed as `org_id`. **The org read MOVED, not added; one kwarg, no branch.**
 
 ## `frontend/src/components/chat/ThinkingBlock.tsx`
 
@@ -10756,14 +10760,14 @@ cells rot within days.
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 21 / 8 / 1414 | **FIRES** | honoured by construction (193.1 / 211 / **214**) — ⚠ **extraction still OWED**; 214 changed no capability set |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 52 / 26 / 2724 | **FIRES** | ⚠ row was STALE at `48 / 25 / 2585`. honoured by construction (193.2 / 194 / 192.2 / 200.1 / 214 / **256-05**) — 256-05 is **COMMENT-ONLY** |
-| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 28 / 12 / 1939 | **FIRES** | ⚠ row STALE a 4th time (`27 / 12 / 1830`, and `26/11/1810` before). honoured by construction (193.2 / 214 / **BUG-260828-09** / 256-03 / **256-05**) |
+| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 29 / 13 / 1942 | **FIRES** | ⚠ STALE (`28/12/1939`). **268-REVIEW WR-06**: the golden shell carries the definition's org — one kwarg. ⛔ ctx still withholds org |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 15 / 9 / 989 | **FIRES** | honoured by construction (193.2 / 197 / 214 / **214.1**) — ⚠ the extraction it may be owed is neither taken nor obstructed |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | honoured by construction (193.2 / 197 / **214.1**) — `setDeclaredInputs` is the sixth `meta` writer, the shape the five before it take |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 16 / 10 / 646 | **FIRES** | honoured by construction (194 / 194.1) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 9 / 5 / 756 (was `8 / 4 / 748`) | **FIRES** | ⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id`/`expert_id` (+8 lines). ⛔ NOT the shape to copy (C-5) |
-| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 40 / 19 / 1743 | **FIRES** | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01**: the Deep Continue passes the RUN's org into the continuation — one expression, 0 new branches |
-| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 58 / 21 / 3290 | **FIRES** | ⚠ row was STALE at `54 / 20 / 3135`. honoured by construction (194 / 214 / **256-05**) — 214-06 resolved the pause's service at ONE call site; 256-05 added ONE nested helper + ONE loop call |
+| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 41 / 19 / 1750 | **FIRES** | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches |
+| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 60 / 23 / 3297 | **FIRES** | ⚠ STALE (`58/21/3290`). **268-REVIEW WR-06**: the resume shell carries its run's org — the org read MOVED above the INSERT, one kwarg |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 6 / 2 / 320 | no (2 phases) | ⚠ row STALE (`4/1/283`; CLAUDE.md read `4/1/313`). NOT modified by 253 — re-derived under CR-08. Still ONE reasoning renderer; no duration derived from length |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 41 / 20 / 1007 (was `38 / 19 / 977`) | **FIRES** | ⚠ STALE (`38/19/977`). **268-03**: +2 optional ReactNode slots; hooks 8/6/4 → 8/6/4. ⛔ 0 new top-level controls |

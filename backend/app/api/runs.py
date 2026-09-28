@@ -1068,7 +1068,8 @@ async def continue_run(
             supabase.table("workflow_runs")
             # F8 (092-07): pull `inputs` too so the re-driven first phase can read
             # the original kickoff_prompt back (Continue resume path).
-            .select("id, continues_used, definition_id, inputs")
+            # 268-REVIEW WR-06: `org_id` too — the producer shell below is attributed to it.
+            .select("id, continues_used, definition_id, inputs, org_id")
             .eq("id", str(active_workflow_run_id))
             .maybe_single()
         )
@@ -1180,6 +1181,12 @@ async def continue_run(
             status="streaming",
             model="unknown", provider="unknown",  # NOT NULL; shell makes no LLM call
             parent_run_id=None,
+            # 268-REVIEW WR-06: the WORKFLOW RUN's org (RLS-read above), so the shell and every
+            # re-driven sub-agent under it (insert_run's parent copy) land there — never the
+            # mig-106 trigger's LIMIT-1 guess for a two-org owner. None falls to the trigger.
+            org_id=(
+                str((wf_row or {}).get("org_id")) if (wf_row or {}).get("org_id") else None
+            ),
         )
 
         # F8 (092-07): rehydrate the original kickoff_prompt from the persisted

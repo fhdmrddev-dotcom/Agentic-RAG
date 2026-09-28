@@ -729,7 +729,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 52 / 26 / 2724 | ⚠ row was STALE at `48/25/2585`. honoured by construction (**256-05**): **COMMENT-ONLY** — `persist_run_usage`'s body and `TOKEN_COVERAGE_LEGS` byte-unchanged; 3 stale pins corrected beside originals |
-| `backend/app/services/harness/publish_service.py` | 28 / 12 / 1939 | ⚠ row STALE a 4th time (`27/12/1830`). honoured by construction (**256-05**): ONE additive kw-only `usage_box=None`, 2 accumulators above an existing loop, 1 persist at an existing call site; no new stage word |
+| `backend/app/services/harness/publish_service.py` | 29 / 13 / 1942 | ⚠ STALE (`28/12/1939`). **268-REVIEW WR-06**: the golden shell carries the definition's org — one kwarg. ⛔ ctx still withholds org |
 | `backend/app/services/workflow_authoring.py` | 15 / 9 / 989 | honoured by construction (193.2 / 197 / 214 / **214.1**) |
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
@@ -741,8 +741,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/task_service.py` | 20 / 11 / 970 | ⚠ the row was ACCURATE at 264 research (`19/10/958`) and **264-01 made it stale inside the same phase**. honoured by construction: ONE `sub_ctx` kwarg, read from `parent_ctx`, never re-derived |
 | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box SUBTRACTS real spend |
-| `backend/app/api/runs.py` | 40 / 19 / 1743 | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01**: the Deep Continue passes the RUN's org into the continuation — one expression, 0 new branches |
-| `backend/app/services/harness_engine.py` | 58 / 21 / 3290 | ⚠ row was STALE at `54/20/3135`. honoured by construction (**256-05**): ONE nested `_flush_run_usage` + ONE unconditional loop call; `_enforce_budget` if/try/loop **2/0/0 → 2/0/0**. ⛔ `try`/`finally` REJECTED |
+| `backend/app/api/runs.py` | 41 / 19 / 1750 | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches |
+| `backend/app/services/harness_engine.py` | 60 / 23 / 3297 | ⚠ STALE (`58/21/3290`). **268-REVIEW WR-06**: the resume shell carries its run's org — the org read MOVED above the INSERT, one kwarg |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE (`4/1/313`) and it does NOT fire yet — 2 phases, not 1. NOT modified by 253. ⛔ the ONE renderer of the model's process prose, now from TWO sources |
 | `frontend/src/components/chat/RunCard.tsx` | 29 / 14 / 723 | ⭐ G-5 DISCHARGED (243-02). ⚠ row STALE at `28/14/710`. **BUG-260912-01**: its state-2 guard asked `!reasoningContent` ALONE and shipped a VISIBLE mid-stream double once the fold gained a 2nd input |
 | `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE (`38/19/977`). **268-03**: +2 optional ReactNode slots; hooks unchanged. ⛔ 0 new top-level controls |
