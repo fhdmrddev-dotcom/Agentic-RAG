@@ -1,7 +1,8 @@
 ---
 phase: 268
 slug: expert-spend-mid-thread-scope
-status: draft
+status: approved
+reviewed_at: 2026-09-28
 shadcn_initialized: true
 preset: "components.json — style default, baseColor slate, cssVariables, iconLibrary lucide (no preset string; theme = Aether Deep Midnight `.dark` + the light `:root` in src/index.css)"
 created: 2026-09-28
