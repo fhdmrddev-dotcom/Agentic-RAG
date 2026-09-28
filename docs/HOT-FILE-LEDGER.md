@@ -11042,6 +11042,14 @@ cells rot within days.
 | [`frontend/src/components/chat/HandoffCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschathandoffcardtsx) | 1 / 1 / 40 (was `0 / 0 / 0`) | no (young) | young (created 267-04). Renders the handoff user row as a card, never a user bubble. Live G4-3: the new thread opens on it, naming the source thread's facts |
 | [`frontend/src/components/chat/expertEventCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcopyts) | 1 / 1 / 241 (was `0 / 0 / 0`) | no (young) | young (created 267-04). ⛔ the ONE home of event/handoff wording; its kind list is cross-pinned to `TRANSCRIPT_EVENT_KINDS` by `?raw` |
 | [`frontend/src/components/chat/threadNavigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadnavigationtsx) | 1 / 1 / 45 (was `0 / 0 / 0`) | no (young) | young (created 267-04). The pointer's `Open →` door; no router exists, so it selects the thread. Live G4-3: Open lands on the new thread |
+| [`backend/app/db/runs.py`](docs/HOT-FILE-LEDGER.md#backendappdbrunspy) | 8 / 7 / 226 | ⚠ **FIRES — 7 phases** | ⚠ absent its ENTIRE LIFE — row added at 268 PLANNING. **268-01**: `insert_run` gains org + Expert with a SQL parent copy. ⛔ `finalize_run` untouched (SEED-297) |
+| [`frontend/src/components/admin/spend/ExpertFilterPills.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertfilterpillstsx) | 0 / 0 / 0 | no (new) | young (created 268-02). Row added AT PLANNING. ⛔ ONE `expert` filter that every card follows (D-268-08); owns `filterPillClass` for all 3 ribbon groups |
+| [`frontend/src/components/admin/spend/ExpertSpendCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcardtsx) | 0 / 0 / 0 | no (new) | young (created 268-02). Row added AT PLANNING. Spend by Expert + recon footer + `LedgerExpertCell`. ⛔ the table never follows the filter; No Expert always shown |
+| [`frontend/src/components/admin/spend/AttributionDisclosures.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendattributiondisclosurestsx) | 0 / 0 / 0 | no (new) | young (created 268-02). Row added AT PLANNING. The two Blind Spots tiles (sub-agent tokens counted; handoff not metered). ⛔ no button |
+| [`frontend/src/components/admin/spend/expertSpendCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcopyts) | 0 / 0 / 0 | no (new) | young (created 268-02). Row added AT PLANNING. ⛔ the ONE home of spend-by-Expert wording; shared literals imported, never re-spelled |
+| [`frontend/src/components/chat/ScopeChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopechiptsx) | 0 / 0 / 0 | no (new) | young (created 268-03). Row added AT PLANNING. The composer scope chip. ⛔ reads `held` from the payload, never `scope_mode` (D-268-12c) |
+| [`frontend/src/components/chat/ScopePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopepickertsx) | 0 / 0 / 0 | no (new) | young (created 268-03). Row added AT PLANNING. DropdownMenu picker; Apply/Cancel are menu items (Radix traps Tab). ⛔ no `scope_mode` token |
+| [`frontend/src/components/chat/scopeCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopecopyts) | 0 / 0 / 0 | no (new) | young (created 268-03). Row added AT PLANNING. ⛔ the ONE home of chip/picker/pending-note wording; `explainFor` keeps the Expert rule out of the leaves |
 
 
 
@@ -17220,3 +17228,39 @@ Re-derived at `cdb173609` with the CLAUDE.md recipe (6-digit quick-task buckets 
 ### `scripts/vitest-count-gate.cjs` — Phase 267
 
 **`254 / 57 / 6168`** (was `244 / 55 / 6078`). Adopted: the six chat suites (`ExpertEventCard`, `HandoffCard`, `expertEventCopy`, `InviteExpertDialog`, `MessageItem.transcriptEvent`, `ChatArea.expertThread`), `ScopeLedger`, `ExpertCard.connection` and `ChatLayout.startChat`.
+
+## Phase 268 rows — added AT PLANNING (2026-09-28)
+
+The G-5 gate (`scripts/check-hot-file-ledger.cjs`) found **8 files with no row** when the 268 plans were written. Seven are **new files** the phase creates, and their rows are added at planning (the `264`/`266`/`267` precedent). The eighth is an **existing file that fires**: `backend/app/db/runs.py`, at **8 commits / 7 phases / 226 lines** (phase buckets `073 076.1 079 085 092 120 163`), has had no row for its entire life. Per D-268-25 its narrative paragraph and CLAUDE.md G-5-FIRING row land in the SAME commit as its first edit (268-01 Task 1); the row exists from planning so the gate can see it. The executor of each creating plan re-measures its triple in the same commit that creates the file.
+
+### `backend/app/db/runs.py`
+
+**`8 / 7 / 226`** at 268 planning. ⚠ absent its ENTIRE LIFE at 7 phases — row added at 268 PLANNING. 268-01 adds `org_id` / `expert_id` to `insert_run` (one `INSERT … SELECT` whose `LEFT JOIN public.runs p` copies a sub-agent's org and Expert from its parent) and `org_id` to `insert_assistant_message`. ⛔ **Binding invariants:** `finalize_run`'s unconditional SET is NOT edited (SEED-297 trigger (a)); every value `$N`-bound (T-073-02); the parent copy lives in SQL so no call site can forget it, and `test_268_insert_run_sites.py` pins every `insert_run(` call site with a disposition.
+
+### `frontend/src/components/admin/spend/ExpertFilterPills.tsx`
+
+**`0 / 0 / 0`** at 268 planning. young (created 268-02). Row added AT PLANNING. The Expert pill group between Time and Coverage and the exported `filterPillClass(on)` all three ribbon groups use (light/dark pair, UI-SPEC §9-D8). ⛔ one `expert` value reaches BOTH `getSpendSummary` and `getSpendRuns` (D-268-08, the 257 "two dialects" lesson).
+
+### `frontend/src/components/admin/spend/ExpertSpendCard.tsx`
+
+**`0 / 0 / 0`** at 268 planning. young (created 268-02). Row added AT PLANNING. Spend by Expert table, reconciliation footer (integer ten-thousandths, exported helper), rule line, and `LedgerExpertCell`. ⛔ the table is the navigator and never follows the Expert filter; `No Expert` is always a row; `Not recorded (before 268)` is never merged into it (D-268-06).
+
+### `frontend/src/components/admin/spend/AttributionDisclosures.tsx`
+
+**`0 / 0 / 0`** at 268 planning. young (created 268-02). Row added AT PLANNING. The two Blind Spots tiles: "Sub-agent tokens now counted" (D-268-09) and "Handoff summaries not metered" (D-268-11). ⛔ no button — no filter lands on either population (the CR-06 rule).
+
+### `frontend/src/components/admin/spend/expertSpendCopy.ts`
+
+**`0 / 0 / 0`** at 268 planning. young (created 268-02). Row added AT PLANNING. `EXPERT_SPEND_COPY`, the one home of the spend-by-Expert words (UI-SPEC §7.4).
+
+### `frontend/src/components/chat/ScopeChip.tsx`
+
+**`0 / 0 / 0`** at 268 planning. young (created 268-03). Row added AT PLANNING. The composer scope chip (S1-S5), mounted after `ActiveExpertChip`. ⛔ it renders `held` from the server payload and never contains `scope_mode` (D-268-12c, a `?raw` fence).
+
+### `frontend/src/components/chat/ScopePicker.tsx`
+
+**`0 / 0 / 0`** at 268 planning. young (created 268-03). Row added AT PLANNING. The `DropdownMenu` picker: radio-item folder tree, the `ScopeLedger` statement per draft (latest-wins), explain box, Apply/Cancel as menu items. ⛔ Radix Menu traps Tab, so a plain `<button>` in its content is unreachable — `AttentionPopover`'s pattern is wrong here.
+
+### `frontend/src/components/chat/scopeCopy.ts`
+
+**`0 / 0 / 0`** at 268 planning. young (created 268-03). Row added AT PLANNING. `SCOPE_COPY` + `explainFor(effect)`: the chip, picker and pending-note words; shared literals (`All your documents`, `Chat attachments`, the unnameable-folder phrase) imported from their existing homes.
