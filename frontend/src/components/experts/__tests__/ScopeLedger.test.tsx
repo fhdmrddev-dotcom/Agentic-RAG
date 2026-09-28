@@ -132,3 +132,41 @@ describe("WR-08 — Chat attachments is never folded into 'and k more'", () => {
     for (const n of ["A", "B", "C", "D", "E"]) expect(within(yes).getByText(`Folder ${n}`)).toBeVisible()
   })
 })
+
+// Phase 268-03 (CHAT-08 · UI-SPEC §4.1 / §5.3) — the scope picker reuses this leaf: a `held` tone
+// (saved, not in effect — amber on both themes), an `Expert` tag on an Expert's folder, and a muted
+// literal ("Nothing changes") that is a statement, not an item.
+describe("268-03 — held tone, the Expert tag and a muted literal", () => {
+  it("(268-1) the held column is amber on both themes and every word is visible at rest", () => {
+    render(
+      <ScopeLedger
+        columns={[
+          { tone: "held", heading: "Saved", items: [{ label: "/Client ACME/Q3 Contracts" }] },
+          { tone: "yes", heading: "Searching", items: [{ label: "HR Policies", tag: "Expert" }] },
+        ]}
+      />,
+    )
+    const held = screen.getByTestId("scope-ledger-col-held")
+    expect((held.getAttribute("class") ?? "").split(/\s+/)).toEqual(
+      expect.arrayContaining(["border-amber-600/40", "dark:border-amber-500/30"]),
+    )
+    for (const w of ["Saved", "/Client ACME/Q3 Contracts"]) assertVisibleAtRest(within(held).getByText(w))
+    const yes = screen.getByTestId("scope-ledger-col-yes")
+    const tag = within(yes).getByText("Expert")
+    assertVisibleAtRest(tag)
+    expect(tag.closest("li")?.textContent).toContain("HR Policies")
+  })
+
+  it("(268-2) a muted item renders muted, never as a foreground item", () => {
+    render(
+      <ScopeLedger
+        columns={[{ tone: "no", heading: "Stops searching", items: [{ label: "Nothing changes", muted: true }] }]}
+      />,
+    )
+    const cell = within(screen.getByTestId("scope-ledger-col-no")).getByText("Nothing changes")
+    assertVisibleAtRest(cell)
+    const cls = cell.className.split(/\s+/)
+    expect(cls).toContain("text-muted-foreground")
+    expect(cls).not.toContain("text-foreground")
+  })
+})
