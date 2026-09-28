@@ -134,6 +134,9 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
   // transcript does not refetch mid-stream, so without it the change has no receipt at rest.
   const [scopePendingNote, setScopePendingNote] = useState<string | null>(null)
   const scopeReqRef = useRef(0)
+  // 268-REVIEW WR-01: the thread on screen NOW. Every scope write that follows an await checks it,
+  // so an answer about the thread the user just left never lands on the one they switched to.
+  const currentTidRef = useRef<string | null>(thread?.id ?? null)
   // Phase 267 plan 04 (D-267-16): the no-router door ChatLayout provides — `null` outside it, and
   // then no "New chat with …" control is offered at all.
   const threadNav = useThreadNavigation()
@@ -257,6 +260,7 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
   }, [thread])
 
   useEffect(() => {
+    currentTidRef.current = thread?.id ?? null
     setAgentMode("default")
     setScopeFolderId(null)
     // 267-REVIEW WR-02: a refusal is about the thread it was made on, never the next one.
@@ -272,15 +276,19 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
    * call is made inside the promise chain so a synchronous throw is a rejection, never a crash.
    */
   const refreshScopeEffect = useCallback((tid: string): Promise<ScopeEffect | null> => {
+    // 268-REVIEW WR-01: a read for a thread that is no longer on screen is not started — starting it
+    // would also bump the counter and drop the on-screen thread's own in-flight read.
+    if (currentTidRef.current !== tid) return Promise.resolve(null)
     const req = ++scopeReqRef.current
+    const current = () => req === scopeReqRef.current && currentTidRef.current === tid
     return new Promise<ScopeEffect>((resolve) => resolve(getScopeEffect(tid)))
       .then((effect) => {
-        if (req === scopeReqRef.current) setScopeEffect(effect)
+        if (current()) setScopeEffect(effect)
         return effect
       })
       .catch((err) => {
         console.error("Failed to read the thread's scope:", err)
-        if (req === scopeReqRef.current) setScopeEffect(null)
+        if (current()) setScopeEffect(null)
         return null
       })
   }, [])
@@ -618,11 +626,19 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
           err instanceof ApiError && err.message.trim() ? err.message : SCOPE_COPY.networkReason,
         )
       }
+      // The list owner always learns the server's thread; everything below is about the thread ON
+      // SCREEN, so it stops if the user has switched away during the PATCH (268-REVIEW WR-01).
       onThreadUpdated?.(updated)
+      if (currentTidRef.current !== tid) return
       const effect = refreshScopeEffect(tid)
       if (useStreamsStore.getState().streamingThreads.has(tid)) {
         const after = chipLabel(next, folders).full
         const held = await effect
+        // Only a receipt for a run still in progress on the thread still on screen: the run may have
+        // ended (its clear already ran) or the user may have switched during the read.
+        if (currentTidRef.current !== tid || !useStreamsStore.getState().streamingThreads.has(tid)) {
+          return
+        }
         setScopePendingNote(
           held?.held && held.expert
             ? SCOPE_COPY.pendingHeld(after, held.expert.name)
