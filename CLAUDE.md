@@ -4,16 +4,14 @@ Agentic RAG platform — AI agent that knows your knowledge base, runs code in a
 sandbox, and can be taught new skills that persist. Chat is the default
 interface; document ingestion is a manual file-upload flow.
 
-## More than one agent works this repo
+## Claude is the only agent on this repo (since 2026-09-29)
 
-Gemini (Antigravity) and Claude (terminal) both work here, from processes that cannot call each
-other. Coordination is a durable mailbox: **`.agent-bus/OPEN.md`**, driven by
-`scripts/agent-bus.sh` (`list` / `open` / `answer` / `close`). Protocol + roles: **`AGENTS.md`**.
-
-A SessionStart hook (`.claude/hooks/agent-bus-check.sh`) prints every open `to:claude` item at
-every session and subagent start — silent when empty, loud at 3+ days. ⚠ **Whoever REVIEWS a
-phase must not have shaped the build**; design direction across the bus makes the review
-self-assessment. Decisions go `--to operator`, never settled agent-to-agent.
+⛔ **Gemini is OUT and the agent bus is RETIRED** — operator decision, 2026-09-29. Claude does all
+build AND review work. Do not open bus items, do not hand work to Gemini, do not wait on it, and
+do not tell the operator anything is "waiting on Gemini". Every item was closed and archived to
+`.agent-bus/archive/CLOSED.md` (history only); the SessionStart bus hook is removed. `AGENTS.md` and
+`scripts/agent-bus.sh` are historical. Reviews run as a fresh-context subagent
+(`/gsd:code-review`), and a phase record says `independent_review: self` rather than `owed`.
 
 ## Stack
 - Frontend: React + Vite + Tailwind + shadcn/ui (Aether Intelligence design system, Deep Midnight theme)

@@ -37,6 +37,16 @@ can be taught new behaviours (skills) that persist and can be shared.
 
 ---
 
+## Solo running (operator, 2026-09-29)
+
+Gemini is OUT and the agent bus is RETIRED. Claude builds and reviews everything; no independent
+reviewer exists, so a phase closes `verification_mode: self-verified`, never `reviewed`.
+Phase 268's `BUS-305` review request was closed with the bus. ⚠ The `OV-SOLO-01-status` marker is
+deliberately NOT set: it is global, and `live` retro-flags 12 phases (238-253, 265) that Gemini
+genuinely reviewed.
+
+---
+
 ## Current Position
 
 Milestone: v4.4 Experts That Actually Work
