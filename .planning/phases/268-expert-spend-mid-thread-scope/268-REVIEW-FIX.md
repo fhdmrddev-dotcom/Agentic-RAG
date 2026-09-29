@@ -2,10 +2,12 @@
 phase: 268-expert-spend-mid-thread-scope
 fixed_at: 2026-09-28T21:45:27Z
 review_path: .planning/phases/268-expert-spend-mid-thread-scope/268-REVIEW.md
-iteration: 2
-findings_in_scope: 7
-fixed: 7
+iteration: 3
+findings_in_scope: 8
+fixed: 8
 skipped: 0
+seeded: 1
+accepted: 2
 status: all_fixed
 ---
 
@@ -13,18 +15,32 @@ status: all_fixed
 
 **Fixed at:** 2026-09-28T21:45:27Z (2026-09-29 local)
 **Source review:** .planning/phases/268-expert-spend-mid-thread-scope/268-REVIEW.md
-**Iteration:** 2 (iteration 1: 5 fixed, 2 deferred; iteration 2 fixed both after operator rulings D-268-27 / D-268-28)
+**Iteration:** 3, final and G-7-capped. Iteration 1: 5 fixed, 2 deferred. Iteration 2: fixed both after operator rulings D-268-27 / D-268-28. Iteration 3: re-review iteration 2 found 0 critical, 2 warning and 2 info; the operator ruled fast-fix WR-01, seed WR-02, accept IN-01/IN-02.
 **Scope:** critical_warning (CR-01, WR-01 to WR-06). The six Info findings were not attempted.
 
 **Summary:**
-- Findings in scope: 7
-- Fixed: 7 (CR-01, WR-01 to WR-06). Each was driven RED first, then fixed GREEN, in separate commits.
+- Findings in scope: 8. Seven from the first review, plus re-review iteration 2's WR-01. Re-review WR-02 was seeded and IN-01/IN-02 accepted, by operator ruling.
+- Fixed: 8 (CR-01, WR-01 to WR-06, and re-review WR-01). Each was driven RED first, then fixed GREEN, in separate commits.
+- Seeded: 1 (re-review WR-02 → SEED-322).
+- Accepted: 2 (re-review IN-01, IN-02).
 - Skipped: 0.
 - Not reproduced: 0.
 
 Every fix was made in an isolated worktree and fast-forwarded onto `develop`:
 - Iteration 1: `9c2be128d..41c1ea7a1`, 11 commits.
 - Iteration 2: `6347014a5..ff148c13f`, 4 commits. It was based on the operator's D-268-27/28 commit.
+- Iteration 3: `fcf90dee1..83c299583`, 4 commits. It was based on the committed re-review.
+
+## Gates — iteration 3 (measured at `83c299583`)
+
+- **Backend:** untouched in iteration 3, so no backend gate was run (per the ruling).
+- **Frontend:**
+  - Touched suites at `GSD_VITEST_MAX_WORKERS=2`: `src/components/chat` gives **54 files / 630 passed**. `src/lib/api` plus `src/lib/__tests__/apiBarrel.test.ts` give **10 files / 102 passed**.
+  - `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` gives `total 9102 · failed 0 · pinned total 8354`, **count gate OK — 346/346 pinned files present, no per-file decrease, 0 failing**. Pins raised to the measured counts: `scopeCopy.test.ts 13 → 15` and `ChatArea.scopeChange.test.tsx 9 → 15`. The second includes iteration 1's +3, which that pass left unraised.
+  - `npx tsc -p tsconfig.app.json --noEmit` reports **70 errors**, a set equal to base. No error is in a line this pass wrote. The two `lib/api.ts` errors, `FolderIndexRow` and `IndexSummary`, are pre-existing re-exports.
+- **Registers:**
+  - `node scripts/check-seeds-register.cjs` gives **seeds register gate OK — 329/329 parsed, 0 duplicate ids, 329/329 carry all 5 required keys**.
+  - `node scripts/check-hot-file-ledger.cjs 268` gives ledger gate OK. Every touched file already carries a 268 cell.
 
 ## Gates — iteration 2 (measured at `ff148c13f`)
 
@@ -181,9 +197,39 @@ Every fix was made in an isolated worktree and fast-forwarded onto `develop`:
 - The Unrated tile and the KPI footnote render `EXPERT_SPEND_COPY.partlyPricedHarness(n)`, which reads *"N harness runs partly priced — sub-agent costs included, orchestrator cost not"* (singular "1 harness run"). `expertThemeContrast` is untouched, because no new component file was added.
 - **Scope, per the ruling's literal words:** only **harness placeholder** roots are counted. An unrated **Deep** root whose sub-agents run on a rated model has the same shape, but no copy was ruled for it, so it is named here rather than folded in.
 
+### Re-review WR-01 (iteration 2): The new 409 refusal tells the user the chat "still searches" a folder that is no longer in effect
+
+**Files modified:** `frontend/src/components/chat/ChatArea.tsx`, `frontend/src/components/chat/ScopePicker.tsx`, `frontend/src/components/chat/scopeCopy.ts`, `frontend/src/lib/api/threads.ts`, `frontend/src/lib/api.ts`, plus `scripts/vitest-count-gate.cjs` (pins)
+**Commits:** RED `d25fecdc5` · GREEN `c00b36ed5` · pins `5a5fe7e8c`
+**Status:** fixed
+**Driven:** new jsdom cases in `ChatArea.scopeChange.test.tsx`. Each test uses a real list owner that feeds `onThreadUpdated` back into the thread prop. All were RED at base, which showed *"Couldn't change the folder. … This chat still searches /Client ACME."* with the chip stuck on the stale folder.
+- **(13)** The PATCH 409s and the server's folder is now Q3. The chip shows `/Client ACME/Q3 Contracts`, the refusal names it, the effect is re-read, and there is still exactly one PATCH.
+- **(14)** The held variant, under a Restricted Expert, says the folder is "saved for when HR Advisor leaves".
+- **(15)** When the re-read fails, the refusal claims no folder.
+- `scopeCopy.test.ts` pins the three sentences and a `getThread` wire case.
+
+**Applied fix:**
+- A new `getThread(id)` client call (`GET /threads/{id}`, the existing owner-scoped route), re-exported from the barrel.
+- On a 409, the one scope PATCH home (`applyScopeChange`):
+  - re-reads the thread;
+  - hands it to the list owner through the same `onThreadUpdated` path as a success;
+  - re-reads the effect, gated by iteration 1's `currentTidRef`;
+  - throws a `ScopeConflictError` whose message is the finished sentence.
+- The sentences, in `scopeCopy.ts`:
+  - "The folder changed while you were choosing — this chat now searches {current}. Pick again."
+  - The held variant: "… {current} is now saved for when {expert} leaves. Pick again."
+  - When the re-read fails: "The folder changed while you were choosing. Pick again."
+- `ScopePicker` shows a `ScopeConflictError` message as-is and never appends the "still searches" line. Every other refusal keeps its old wording. There is no new PATCH and no backend change.
+
 ## Skipped Issues
 
 None. Both iteration-1 deferrals were fixed in iteration 2 after the operator's rulings (D-268-27, D-268-28).
+
+## Seeded and accepted (iteration 3, operator ruling under G-7)
+
+- **Re-review WR-02 → SEED-322 (planted, commit `83c299583`).** An unrated **Deep** root whose sub-agents run on a rated model is still labelled "excluded", while its sub-agent USD is in the total. D-268-28's partly-priced disclosure covers harness shells only. `trigger_paths`: `backend/app/db/rates.py` and `frontend/src/components/admin/spend/**`. Both fix options are recorded in the seed.
+- **Re-review IN-01, accepted.** `_Side.same_as` compares a named side and an unnameable side of the same folder id as different. At most this emits one extra note for a net no-op round trip; it never drops a note.
+- **Re-review IN-02, accepted.** On a Continue whose carrier is not found under the run's org (for example, a carrier written before CR-01), `dropped_tool_calls` is empty and the synthetic note turn becomes the last message the model sees. A cap pause always writes dropped calls, so this needs a pre-CR-01 carrier.
 
 ## Notes for the orchestrator
 
@@ -194,4 +240,4 @@ None. Both iteration-1 deferrals were fixed in iteration 2 after the operator's 
 
 _Fixed: 2026-09-28T21:45:27Z_
 _Fixer: Claude (gsd-code-fixer)_
-_Iteration: 2_
+_Iteration: 3_
