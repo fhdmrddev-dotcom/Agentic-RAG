@@ -347,3 +347,11 @@ restricted → restricted swap.
 | WR-06-live | NOT DRIVEN | No biased Expert with its own folders exists in org A (Contract Reviewer and Drive Briefing Assistant have none, so nothing narrows and correctly no statement is shown). Verified by tests only. |
 | CR-02, WR-04, WR-05, WR-07, WR-08, WR-09, WR-01, WR-02 | TEST-ONLY | Fixed after the live drive; none of SC#1-5 depends on them (per 267-VERIFICATION.md). |
 | UI-light-theme (after 267-UI-REVIEW fixes `09bdb3e9e`) | PASS | Live, light theme (body `rgb(246,247,249)`, no `dark` class): event-card header `text-violet-700` = `rgb(109,40,217)` and Now value `text-emerald-700` = `rgb(4,120,87)` on the 6%-alpha violet wash over near-white, ≈ 6:1 and ≈ 5.5:1 (≥ 4.5:1). Before the fix the same elements were `violet-200` / `emerald-300` (≈ 1.3:1 / 1.5:1 per 267-UI-REVIEW). `evidence/g4-06-light-theme-after-ui-fix.png` |
+
+## Member-view catalog requires-state — driven in Chrome 2026-09-29 (closes 267-VERIFICATION owed item 3)
+
+Driven with Chrome DevTools MCP in an isolated context as a plain **member** (`uat269b-member-…`) after switching to the org where they hold role `member` (org `21274586-…`, enterprise tier). Fixture: a TEMPORARY org Expert "Drive Probe (needs Google)" (`required_connections: ["google"]`, created and deleted through the real `POST` / `DELETE /experts` doors; the org has no Google connection). API reading first: `GET /experts/{id}` as the member → 200, `connection_state: [{slug: google, connected: false}]`, `can_connect: false`.
+
+**Rendered card (screenshot `evidence/g4-07-catalog-requires-member-view.png`): PASS.** "MISSING · Google Workspace", "Requires Google Workspace — not connected", a **Details** button, and the sentence "An org admin must connect Google Workspace" — **no Start Chat and no Connect button**. This is the literal reading SC#2 required at rest, now seen in the browser, not only via the API. The same page shows all five starter Experts with Details and Start Chat for a member.
+
+**Fixture note (not a defect):** a member who signs up gets their own personal org (tier `unassigned`), and the UI defaults to it; the catalog there shows "Capability 'experts' requires 'enterprise' tier (current tier: 'unassigned')" — the D-269-P1 sentence — until the account menu switches to the enterprise org.
