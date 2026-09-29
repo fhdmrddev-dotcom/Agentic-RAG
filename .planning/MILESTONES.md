@@ -26,8 +26,7 @@ real user, never by a mocked test.
 
 ⭐ The closed core held: no commits to phase_types / emitters / programmatic during the milestone.
 ⚠ Verification mode is `self-verified` for 265-269 (Gemini out) — none can claim `reviewed`.
-⛔ Nothing deployed: migrations 194-198 and `464ec8354` are not on production
-(`266-PROD-PARITY.md`, `269-PROD-PARITY.md`). Starter library visible to enterprise-tier orgs only (D-269-P1, SEED-325).
+✅ Deployed to production 2026-09-29 (`82babd8d0`); migrations 195-198 applied via MCP in order (195/196/197, backend, then 198). Operator smoke test owed. Starter library visible to enterprise-tier orgs only (D-269-P1, SEED-325).
 Known deferred items at close: 42 (see STATE.md Deferred Items).
 
 ---

@@ -49,7 +49,7 @@ genuinely reviewed.
 
 ## Milestone close (2026-09-29)
 
-**v4.4 Experts That Actually Work COMPLETED by hand** (not `milestone.complete`): archives in `.planning/milestones/v4.4-*`, tag `v4.4`, 17/17 requirements, audit `tech_debt`. Full pre-close STATE: `milestones/v4.4-STATE-at-close.md`. ⛔ Nothing deployed — migs 194-198 + `464ec8354` owed to production.
+**v4.4 Experts That Actually Work COMPLETED by hand** (not `milestone.complete`): archives in `.planning/milestones/v4.4-*`, tag `v4.4`, 17/17 requirements, audit `tech_debt`. Full pre-close STATE: `milestones/v4.4-STATE-at-close.md`. ✅ LIVE 2026-09-29 — production `82babd8d0` (master `86d9559bb`, tag `v4.4` pushed); migrations 195/196/197 applied via MCP BEFORE the backend, 198 AFTER it; advisors: no ERROR findings. Owed: operator smoke test (install contract-reviewer in an enterprise org, sandbox code-run in a new chat, embedding key in Coolify env).
 
 ---
 

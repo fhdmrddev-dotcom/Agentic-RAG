@@ -26,9 +26,7 @@ migrations 194-198, 7 days. **17 / 17 requirements satisfied.** Integration 6/6.
 A client can install an Expert and get grounded answers from its own knowledge in their own org:
 per-org corpus provisioning (266), additive scope with stated costs (267), per-Expert spend and
 mid-thread folder scope (268), a five-Expert starter library (269) — each proven by a live drive.
-⚠ All five phases closed `self-verified`. ⛔ **Deploy checklist before the next production push:**
-migrations 194-198 via the SQL editor, the image must carry `464ec8354`, run `get_advisors(security)`
-(`266-PROD-PARITY.md`, `269-PROD-PARITY.md`).
+⚠ All five phases closed `self-verified`. ✅ **DEPLOYED 2026-09-29** — production `82babd8d0`; migrations 194-198 all in production; `get_advisors(security)` shows no ERROR findings. Operator smoke test owed.
 
 ---
 
