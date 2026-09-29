@@ -218,7 +218,7 @@ Plans:
 | 265. Owed v4.3 Verification | 5/5 | Complete (overrides OV-265-01..04; BUS-304 rulings open, non-blocking) | 2026-09-24 |
 | 266. Expert Knowledge in a Real Org | 0/? | Not started | - |
 | 267. An Expert Adds Scope | 5/5 | Executed — verification next (independent review + operator G-4 confirmation owed) | - |
-| 268. Expert Spend & Mid-Thread Scope | 3/4 | In progress — 268-04 at its G-4 checkpoint (live UAT + closeout done) | - |
+| 268. Expert Spend & Mid-Thread Scope | 4/4 | Executed + verified `human_needed` — independent review + SC#1-continued live owed | - |
 | 269. Starter Expert Library | 0/? | Not started | - |
 
 **Guardrails firing (v4.4):**

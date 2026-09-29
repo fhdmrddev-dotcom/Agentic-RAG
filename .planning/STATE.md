@@ -4,7 +4,7 @@ milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
 status: executing
 last_updated: "2026-09-28T14:28:00.379Z"
-last_activity: 2026-09-28 -- 268-04 live UAT + closeout; G-4 checkpoint returned
+last_activity: 2026-09-29 -- 268 executed + verified (human_needed); code review all_fixed
 progress:
   total_phases: 12
   completed_phases: 3
@@ -41,8 +41,8 @@ can be taught new behaviours (skills) that persist and can be shared.
 
 Milestone: v4.4 Experts That Actually Work
 Phase: 268 (Expert Spend & Mid-Thread Scope)
-Plan: 4 of 4 — at its Task 4 G-4 checkpoint (operator Chrome pass)
-Status: **Phase 268 executed — G-4 operator pass owed (268-04 Task 4), then verification next.**
+Plan: 4 of 4 — complete
+Status: **Phase 268 executed + verified — `human_needed` (4/4 SC live-verified). Owed: independent (non-builder) review + SC#1-continued live drive (`268-HUMAN-UAT.md`).**
 
 - 268-01..03 shipped; 268-04 Task 1 (real-PG spend reconciliation, `6fd38f39a`) and Task 3 (live UAT,
   `da142f6dd`) done; Task 5's closeout (parity checklist, seeds, registers, gates) done ahead of the G-4 reply.
@@ -55,8 +55,11 @@ Status: **Phase 268 executed — G-4 operator pass owed (268-04 Task 4), then ve
   dropped-folder citations **6/8 → 0/8**; G4-2 API follow-up PASS. Backend 71 = base set. SEED-319 answered.
 - Still owed from 267: its independent review and the operator's G-4 sign-off (see the 267 block below).
 
-Resume file: .planning/phases/268-expert-spend-mid-thread-scope/268-04-PLAN.md (Task 4, then Task 5 step 1)
-Last activity: 2026-09-29 -- D-268-26 scope note built + SC#10 re-driven; G-4 Chrome pass owed (orchestrator)
+- **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
+- **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
+
+Resume file: .planning/phases/268-expert-spend-mid-thread-scope/268-HUMAN-UAT.md
+Last activity: 2026-09-29 -- 268 verified human_needed; review all_fixed
 
 ---
 
@@ -88,8 +91,8 @@ Last activity: 2026-09-29 -- D-268-26 scope note built + SC#10 re-driven; G-4 Ch
 
 **Owed from 268, and which to run first:**
 
-1. **The operator's G-4 Chrome pass** (268-04 Task 4: G4-1, G4-2, G4-3, both themes). Run this first.
-2. **The independent review** by an agent that did not build 268 (AGENTS.md).
+1. ~~The operator's G-4 Chrome pass~~ **PASS ×3, both themes, operator "approved" 2026-09-29** (`268-UAT-LOG.md`).
+2. **The independent review** by an agent that did not build 268 (AGENTS.md). **Run this first.**
 3. **SC#1-continued** live (a Deep run reaching the cap, then Continue).
 4. ~~The operator's ruling on **SEED-319** (F-1).~~ Ruled 2026-09-29 (D-268-26) and BUILT (`1ec11a842`); SC#10 re-drive 6/8.
 5. Production: `268-PROD-PARITY.md` — migration 197 BEFORE the backend deploy; every write on explicit per-action approval.
