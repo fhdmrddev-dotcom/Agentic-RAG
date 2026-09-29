@@ -75,7 +75,7 @@ path is built, in any phase.
 - [x] **Phase 266: Expert Knowledge in a Real Org** — per-org copy + ingest of an Expert's corpus, idempotent and org-contained; Financial Analyzer answers from its report live (PACK-18..20) — completed 2026-09-25
 - [ ] **Phase 267: An Expert Adds Scope** — additive tool floor, required-connection honesty, swap/remove transcript event, "ask a second Expert", restricted-cost statement (PACK-21..25)
 - [x] **Phase 268: Expert Spend & Mid-Thread Scope** — per-Expert token/USD attribution in `/admin/spend`, change a thread's folder scope mid-thread (METER-08, CHAT-08)
-- [ ] **Phase 269: Starter Expert Library** — a starter set of first-party Experts installable through the 266 path, each with a recorded live conversation (PACK-26, PACK-27) — executed 2026-09-29 (5/5 plans; FOUR Experts shipped, security-compliance HELD per D-269-09); verification + `/gsd:code-review 269` next
+- [x] **Phase 269: Starter Expert Library** — a starter set of first-party Experts installable through the 266 path, each with a recorded live conversation (PACK-26, PACK-27) — ✅ complete 2026-09-29 (5/5 plans; FOUR Experts shipped, security-compliance HELD per D-269-09); code review (CR-01/WR-01..03 fixed) + verifier `passed`
 
 ### Phase Details
 
@@ -239,7 +239,7 @@ Plans:
 | 266. Expert Knowledge in a Real Org | ~~0/?~~ 5/5 | ~~Not started~~ Complete — `266-VERIFICATION.md` `status: passed` (⚠ this row read `0/? · Not started` until 2026-09-29 and was stale since 2026-09-25 — the known `phase.complete` roadmap gap, 269-RESEARCH M-5; original struck, not deleted) | 2026-09-25 |
 | 267. An Expert Adds Scope | 5/5 | Executed — verification next (independent review + operator G-4 confirmation owed) | - |
 | 268. Expert Spend & Mid-Thread Scope | 4/4 | ✅ Complete 2026-09-29 — reviewed (Gemini, 0 blocking), SC#1-continued PASS live (seeded pause), D-2 fixed; SEED-323/324 deferred; prod parity owed | 2026-09-29 |
-| 269. Starter Expert Library | 5/5 | Plans complete 2026-09-29 — FOUR starter Experts shipped via migration 198 (financial-analyzer, contract-reviewer, hr-policy-advisor, operations-analyst); security-compliance HELD (refusal FAIL, BUG-260929-01); SC#1 qualified to enterprise-tier orgs (D-269-P1, SEED-325); g4 screenshots owed; 267 human_needed inherited; independent_review: self — `/gsd:code-review 269` + verifier next; prod parity owed (`269-PROD-PARITY.md`) | - |
+| 269. Starter Expert Library | 5/5 | Plans complete 2026-09-29 — FOUR starter Experts shipped via migration 198 (financial-analyzer, contract-reviewer, hr-policy-advisor, operations-analyst); security-compliance HELD (refusal FAIL, BUG-260929-01); SC#1 qualified to enterprise-tier orgs (D-269-P1, SEED-325); ✅ **CLOSED 2026-09-29** — `269-VERIFICATION.md` `status: passed` (4/4, SC#1 qualified); code review fixes landed; 4 g4 screenshots captured (g4-00/03/04 + first-run 5-card not reproducible, text evidence kept); 267 `human_needed` inherited; `independent_review: self` (fresh-context, same model family); prod parity owed (`269-PROD-PARITY.md`), nothing deployed | 2026-09-29 |
 
 **Guardrails firing (v4.4):**
 
