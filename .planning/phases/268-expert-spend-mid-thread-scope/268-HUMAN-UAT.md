@@ -16,7 +16,7 @@ updated: 2026-09-29T00:00:00Z
 expected: A reviewer that did not shape the build (Gemini via `.agent-bus/`, per AGENTS.md) reviews the 268 diff
 (`220c82dde..HEAD`) and either confirms it or files findings over the bus. The in-session review (268-REVIEW.md,
 3 iterations, all_fixed) came from the same build lineage and does not discharge this.
-result: issues_found (independent review report committed in 268-REVIEW.md: CR-01 org-less thread UUID(str(None)) crash, WR-01 cross-tenant org discrepancy, WR-02 clear vs folder_id conflict)
+result: passed — Gemini's review (268-REVIEW.md iteration 4) was checked by Claude 2026-09-29: CR-01 and WR-01 refuted, WR-02 confirmed as Info only; 0 blocking findings.
 
 ### 2. SC#1 continued-run clause driven live
 expected: A Deep run with an Expert active reaches `cap_paused`, is Continued, and on `/admin/spend` that Expert's
@@ -27,9 +27,9 @@ result: [pending]
 ## Summary
 
 total: 2
-passed: 0
+passed: 1
 issues: 0
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 

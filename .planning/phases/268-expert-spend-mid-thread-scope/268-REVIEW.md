@@ -252,3 +252,19 @@ The previous in-session iteration fixes (detailed in `268-REVIEW-FIX.md`) were a
 _Reviewed by: Gemini (Independent Code Reviewer)_  
 _Phase: 268-expert-spend-mid-thread-scope_  
 _Report artifact: `.planning/phases/268-expert-spend-mid-thread-scope/268-REVIEW.md`_
+
+---
+
+## Claude check of Gemini's findings (2026-09-29)
+
+Each finding was checked against code and schema before being accepted.
+
+| Finding | Verdict | Evidence |
+|---|---|---|
+| CR-01 | **REFUTED — unreachable** | `threads.org_id` and `messages.org_id` are `NOT NULL` (mig 105:487/556; `full-schema.sql` both tables). `_read_thread_scope` selects `org_id`, so it is never `None`. The sibling `_write_expert_change` (:961) has the same line. No fix owed. |
+| WR-01 | **REFUTED — fix contradicts a recorded decision** | Using the active org is deliberate: Pitfall 9 / T-268-25, and 268-03-SUMMARY says "no thread-org fallback". The preview must use the same org as the next run. Switching to the thread's org would make the preview and the run disagree. |
+| WR-02 | **CONFIRMED, Info not Warning** | `clear` silently wins over `folder_id`. The PATCH (`_apply_folder_change`) behaves the same way, the only client (`getScopeEffect`) never sends both, and the ignored `folder_id` reads nothing, so there is no authorization bypass. Optional 422 for strictness. |
+| IN-01 | **CONFIRMED** | `pytest tests/unit -k test_268` → 133 passed (re-run by Claude). |
+
+**Net: 0 blocking findings.** Gemini's commit `04d23d1ca` replaced the iteration-3 report body in
+this file; that version is preserved at `04d23d1ca^:.planning/phases/268-expert-spend-mid-thread-scope/268-REVIEW.md`.
