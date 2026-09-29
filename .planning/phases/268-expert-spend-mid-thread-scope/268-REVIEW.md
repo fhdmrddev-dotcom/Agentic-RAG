@@ -1,126 +1,254 @@
 ---
 phase: 268-expert-spend-mid-thread-scope
-reviewed: 2026-09-29T00:00:00Z
+reviewed: 2026-09-29T15:00:00Z
 depth: standard
-iteration: 2
-scope: "fix commits 9c2be128d..6bdef87a8 (CR-01, WR-01..WR-06)"
-files_reviewed: 14
+iteration: 4
+scope: "independent review of phase 268 diff (220c82dde..HEAD)"
+reviewer: gemini
+files_reviewed: 35
 files_reviewed_list:
   - backend/app/api/admin_spend.py
   - backend/app/api/runs.py
   - backend/app/api/threads.py
   - backend/app/db/rates.py
+  - backend/app/db/runs.py
+  - backend/app/models/message.py
+  - backend/app/models/thread.py
   - backend/app/services/agent_loop.py
+  - backend/app/services/expert_scope.py
   - backend/app/services/harness/publish_service.py
   - backend/app/services/harness_engine.py
+  - backend/app/services/run_lifecycle.py
+  - backend/app/services/run_producer.py
   - backend/app/services/scope_note.py
+  - backend/app/services/tool_dispatcher.py
+  - frontend/src/components/admin/spend/AttributionDisclosures.tsx
   - frontend/src/components/admin/spend/BlindSpotsCard.tsx
+  - frontend/src/components/admin/spend/ExpertFilterPills.tsx
+  - frontend/src/components/admin/spend/ExpertSpendCard.tsx
   - frontend/src/components/admin/spend/expertSpendCopy.ts
+  - frontend/src/components/chat/ActiveExpertChip.tsx
   - frontend/src/components/chat/ChatArea.tsx
+  - frontend/src/components/chat/ExpertEventCard.tsx
+  - frontend/src/components/chat/MessageInput.tsx
+  - frontend/src/components/chat/ScopeChip.tsx
+  - frontend/src/components/chat/ScopePicker.tsx
+  - frontend/src/components/chat/expertEventCopy.ts
+  - frontend/src/components/chat/scopeCopy.ts
+  - frontend/src/components/experts/ScopeLedger.tsx
+  - frontend/src/lib/api.ts
   - frontend/src/lib/api/spend.ts
+  - frontend/src/lib/api/threads.ts
   - frontend/src/pages/admin/AdminSpendPage.tsx
   - frontend/src/types/spend.ts
+  - supabase/migrations/197_runs_expert_attribution.sql
 findings:
-  critical: 0
+  critical: 1
   warning: 2
-  info: 2
+  info: 1
   total: 4
 status: issues_found
 ---
 
-# Phase 268: Code Review Report (iteration 2, re-review of the fix commits)
+# Phase 268: Independent Code Review Report
 
-**Reviewed:** 2026-09-29
-**Depth:** standard. The scope is the hunks in `git diff 9c2be128d..HEAD`, with call sites traced where a fix depends on them. The tests those commits added or changed were read to check they can actually fail.
-**Files Reviewed:** 14 source files, plus the fix commits' tests
-**Status:** issues_found
-
-## Summary
-
-All seven iteration-1 findings were checked against the code itself, not against the fixer's report.
-
-| Finding | Verdict | Evidence |
-|---|---|---|
-| CR-01 | **Closed** | `runs.py:1420` passes `{**current_user, "org_id": row.org_id}`. The only other `run_agent_loop` entry points are the send producer and the eval runner, so no Deep re-entry path is left without the org. I drove `test_268_continue_org.py` against simulated pre-fix behaviour (a pytest plugin that removes `org_id` before `spawn_continuation_run`). It fails at `consumed[1] == ["call_2"]`, so the test can fail. |
-| WR-01 | **Closed** | `currentTidRef` is set in the reset effect, which is declared **before** the re-read effect, so it is current when the refresh runs. Every state write after an await is gated. A stale write that lands before the passive effects flush is cleared by the reset effect. |
-| WR-02 | **Closed, but it adds a new defect (WR-01 below)** | The conditional `UPDATE … IS NOT DISTINCT FROM $4` sits inside `get_user_pg_connection`'s transaction. `ScopeChangeConflict` is raised before the event INSERT and becomes a 409. Under READ COMMITTED, a concurrent loser re-checks the committed row and matches 0 rows. The race suite on real Postgres has a control case. |
-| WR-03 | **Closed** | `resuming` is the boolean `ctx.resume_dropped_tool_calls`, which is set `True` only at `run_producer.py:954`. The synthetic user turn is appended after the history and before the pre-dispatched `assistant(tool_calls)` → `tool` messages, so the tool_use/tool_result pairing stays valid for OpenAI, Anthropic and Gemini. The send path is unchanged. |
-| WR-04 | **Closed** | `None` still means "all your documents", because `_scope_ref(None)` stays `None`. An id-only ref gets the unnameable label and is compared by id. |
-| WR-05 | **Only partly closed (WR-02 below)** | The CTE count is correct. `BOOL_OR(is_box_shell)` is the root's own flag, `priced_subagents` matches `cost_usd`'s NULL rule, and there are no ambiguous column references in the three joined queries. The disclosure covers harness shells only. |
-| WR-06 | **Closed** | All three shell sites pass the workflow run's org. The resume org read only moved above the INSERT and its meaning did not change. The new root-site fence passes, and `evals.py` is named as a known gap. |
-
-Gates I ran myself:
-- Targeted backend unit tests: 110 passed.
-- The four new or extended real-Postgres suites: 15 passed on :54322.
-- The touched frontend suites: 8 files, 94 passed.
-
-No blockers. Two warnings:
-- The WR-02 fix adds a 409 whose refusal text names the losing folder as the one in effect.
-- The WR-05 disclosure leaves out the non-harness form of the same mispricing, which the fixer named.
-
-## Warnings
-
-### WR-01: The new 409 refusal tells the user the chat "still searches" a folder that is no longer in effect
-
-**File:** `backend/app/api/threads.py:1099-1104` (the new 409). The false sentence is built at `frontend/src/components/chat/ScopePicker.tsx:139,160` and `frontend/src/components/chat/scopeCopy.ts:52-53`. No refresh happens at `frontend/src/components/chat/ChatArea.tsx:620-627`.
-
-**Issue:** The 409 fires only when the thread's folder is no longer the one this client last saw. Another tab or request has already moved it from X to Y. On that refusal:
-- `applyScopeChange` re-throws without refreshing the thread.
-- `ScopePicker` shows `SCOPE_COPY.refusal(reason, savedLabel)`, where `savedLabel` comes from the stale `savedFolderId` (X).
-
-The picker therefore says: *"Couldn't change the folder. The folder changed while you were choosing. Try again. This chat still searches X."* That sentence is false in every case where this 409 is reachable, since the thread searches Y. The chip also keeps showing X until something else refetches the thread.
-
-The durable record stays correct: a retry is re-read on the server and writes "Y → Z". The user-facing statement is wrong, though, and this path did not exist before the WR-02 fix.
-
-**Fix:** On a scope-PATCH refusal, reconcile before stating the reason. Fetch the thread, hand it to the list owner and re-read the effect, so `savedFolderId` (and therefore `savedLabel`) is the winner's folder:
-```ts
-// ChatArea.applyScopeChange
-} catch (err) {
-  if (err instanceof ApiError && err.status === 409) {
-    const fresh = await getThread(tid).catch(() => null)
-    if (fresh) { onThreadUpdated?.(fresh); if (currentTidRef.current === tid) void refreshScopeEffect(tid) }
-  }
-  throw new Error(...)
-}
-```
-Alternatively, have the 409 detail carry the current folder and give the refusal copy a conflict-specific variant that names it. Add a case: 409 → the refusal names Y, not X.
-
-### WR-02: WR-05 is closed only for harness shells. An unrated Deep root with priced sub-agents is still labelled "excluded" while its sub-agent USD is in the total
-
-**File:** `backend/app/db/rates.py:545-550` (the `partly_priced_harness_runs` filter requires `pr.is_box_shell`). Copy at `frontend/src/components/admin/spend/BlindSpotsCard.tsx:173` ("excluded from org dollar totals").
-
-**Issue:** `per_root.cost_usd` sums every priced member, and `rates.py`'s own header says a sub-agent "may run on the provider's FAST default", which is a different, rated model. So a Deep root on a model with no registered rate, with sub-agents on a rated default, has this shape:
-- It counts in `unrated_runs_count`, which the Unrated tile and the KPI "* … unrated excluded" footnote both describe as excluded from the total.
-- Its sub-agents' USD **is** in `total_spend_usd`, `window_total_usd` and its Expert line.
-
-That is iteration-1 WR-05's defect, still present for this population. The fixer named this gap ("no copy was ruled for it"), so it is not hidden. But D-268-28's wording covers only harness placeholder roots, so the page still makes a false "excluded" claim for these runs. The same condition is reachable by any user who picks a newly added model before an operator registers its rate.
-
-**Fix:** This needs an operator ruling, because the copy is operator-ruled. Two options:
-- (a) Widen the count to `pr.input_cost_per_million IS NULL AND pr.priced_subagents > 0`, dropping the `is_box_shell` requirement, and give the copy a non-harness wording ("N unrated runs partly priced — sub-agent costs included").
-- (b) Keep the harness-only count and add a second counter for non-shell roots.
-
-Either way, add a real-Postgres fixture with an unrated non-shell root that has one priced sub-agent, and assert it is disclosed.
-
-## Info
-
-### IN-01: `_Side.same_as` treats a named side and an unnameable side as different even when they are the same folder id
-
-**File:** `backend/app/services/scope_note.py:98-103`
-
-**Issue:** The fold takes `from` from the first event and `to` from the last. Each event snapshots names against the visibility at the time it was written. So for A→B then B→A, where A became unnameable to the caller between the two writes, the fold compares `path="…/A"` against `unnamed_id=A`. It returns "different" and emits a note for what is really a net no-op. This is low impact, since it produces an extra note and never a missing one.
-
-**Fix:** When both sides carry an id, compare by id first and fall back to labels only when an id is missing. That requires `_Side` to keep `ref["id"]` for named refs as well.
-
-### IN-02: On a Continue with no loaded dropped calls, the synthetic note becomes the model's final prompt
-
-**File:** `backend/app/services/agent_loop.py:1129-1132` together with `:2121`
-
-**Issue:** The trailing note turn is appended whenever `resuming` is true. The pre-dispatch that normally follows it runs only `if ctx.resume_dropped_tool_calls and ctx.dropped_tool_calls`. A cap pause always has dropped calls when it is written (`force_no_tools and tool_calls_buffer`). But `load_cap_paused_tool_calls` returns `[]` when the carrier is not found under the run's org. That can happen for a carrier written before the CR-01 fix, which is in the trigger's org. In that case the message list ends on `user: "[Search scope changed …]"`, and the model answers the note instead of resuming. The note is also re-sent on every later Continue of the same run. That repeat is harmless, but it is not stated anywhere.
-
-**Fix:** Append the tail note only when there is something to resume into (`resuming and ctx.dropped_tool_calls`). Alternatively, place it before the last assistant row. In either case, add a case with `dropped_tool_calls=[]` to pin the behaviour.
+**Reviewed:** 2026-09-29  
+**Reviewer:** Gemini (Independent Code Reviewer, non-builder per AGENTS.md §3 & §6.3, discharging BUS-305 / 268-HUMAN-UAT §1)  
+**Depth:** standard  
+**Scope:** Full Phase 268 diff (`220c82dde..HEAD`), including backend routes, database migrations and rates logic, frontend chat scope components, admin spend views, and all associated unit and integration tests.  
+**Status:** issues_found  
 
 ---
 
-_Reviewed: 2026-09-29_
-_Reviewer: Claude (gsd-code-reviewer)_
-_Depth: standard (iteration 2, fix-commit scope)_
+## Executive Summary
+
+Phase 268 introduces two core features:
+1. **Expert Spend Attribution & Sub-Agent Rollup** (`METER-08`): Migration 197 stamps `expert_id` and `expert_attributed` at run insertion (`db.runs.insert_run`); sub-agents copy their parent run's attribution; the `per_root` CTE rolls up sub-agent token spend into their root runs and aggregates by Expert on `/admin/spend`.
+2. **Mid-Thread Scope Change** (`CHAT-08`): Live folder switching in chat via `PATCH /threads/{id}` (folder arm) and `GET /threads/{id}/scope-effect`; `ScopeChip` and `ScopePicker` in the composer; model history notification via synthetic scope notes (`scope_note.py`, `SEED-319`).
+
+While the prior 3 in-session iterations by Claude closed several important defects (such as Continue org stamping in CR-01, `currentTidRef` UI race handling, and 409 conflict handling on folder patch races), this independent review uncovered a **critical unhandled exception in the folder PATCH route** for org-less threads, as well as a cross-tenant scoping discrepancy.
+
+| Finding | Severity | File(s) | Summary |
+|---|---|---|---|
+| **CR-01** | **Critical** | `backend/app/api/threads.py:1040` | `_write_scope_change` crashes with HTTP 500 (`ValueError: badly formed hexadecimal UUID string`) when patching or clearing a folder on an org-less thread (`UUID(str(None))`). |
+| **WR-01** | **Warning** | `backend/app/api/threads.py:1053` | Cross-tenant inconsistency: `_describe_thread_scope_change` resolves active org from the incoming HTTP request instead of the thread's own org, causing Expert lookup failure and degraded scope text for multi-org users. |
+| **WR-02** | **Warning** | `backend/app/api/threads.py:1125-1133` | `get_scope_effect` allows conflicting `folder_id` and `clear=True` parameters simultaneously without 422 validation, silently ignoring `folder_id`. |
+| **IN-01** | **Info** | Multiple | Audit of prior fixes from iterations 1–3: confirmed CR-01 (Continue org), WR-01 (ChatArea tid ref), WR-02 (409 conflict), WR-03 (Continue scope turn), WR-04 (unnameable folders), WR-05 / D-268-28 (partly priced harness disclosure), WR-06 (harness shells), and SEED-322 are correctly preserved and tested. |
+
+---
+
+## Findings
+
+### CR-01: `_write_scope_change` crashes with HTTP 500 when modifying an org-less thread
+
+**File:** `backend/app/api/threads.py:1040` (and call site at line 1093)
+
+**Issue:**  
+In `_apply_folder_change`:
+```python
+row = await _read_thread_scope(supabase, thread_id, user_id)
+# ...
+await _write_scope_change(
+    conn,
+    thread_id=thread_id,
+    user_id=user_id,
+    org_id=row.get("org_id"),
+    folder_id=new_folder,
+    event=event,
+    expected_folder_id=old_folder,
+    title=update_data.get("title"),
+)
+```
+When a thread has `org_id is None` (e.g. personal threads, threads created without org header, or legacy threads; explicitly supported per `_authorize_thread_folder` docstring: *"An org-less thread fails closed (owned folders only, and only an org-less one)"*), `row.get("org_id")` evaluates to `None`.
+
+In `_write_scope_change` (lines 1036-1043):
+```python
+await conn.execute(
+    "INSERT INTO public.messages (thread_id, user_id, org_id, role, content, tool_calls) "
+    "VALUES ($1::uuid, $2::uuid, $3::uuid, 'system', $4, $5::jsonb)",
+    UUID(str(thread_id)),
+    UUID(str(user_id)),
+    UUID(str(org_id)),  # <--- CRASHES HERE WHEN org_id IS None
+    scope_event_sentence(event),
+    [event.model_dump(mode="json")],
+)
+```
+Notice lines 1021–1022 correctly guard nullable UUIDs:
+```python
+UUID(str(folder_id)) if folder_id else None,
+UUID(str(expected_folder_id)) if expected_folder_id else None,
+```
+However, line 1040 executes `UUID(str(None))` which becomes `UUID("None")`. In Python:
+```python
+>>> UUID(str(None))
+ValueError: badly formed hexadecimal UUID string
+```
+The unhandled `ValueError` escapes to `_apply_folder_change`'s `except Exception:` block:
+```python
+except Exception:
+    logger.error("folder change on thread %s was not written", thread_id, exc_info=True)
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="The folder was not changed.",
+    )
+```
+Consequently, every folder change or folder clear on an org-less thread fails with HTTP 500.
+
+**Fix:**  
+Guard `org_id` conditionally, exactly like `folder_id`:
+```python
+- UUID(str(org_id)),
++ UUID(str(org_id)) if org_id else None,
+```
+Add a unit test in `test_268_scope_patch.py` where `row["org_id"]` is `None` to assert that changing/clearing a folder succeeds with `messages.org_id = NULL`.
+
+---
+
+### WR-01: Cross-tenant discrepancy in `_describe_thread_scope_change`
+
+**File:** `backend/app/api/threads.py:1046-1056`
+
+**Issue:**  
+In `_describe_thread_scope_change`:
+```python
+async def _describe_thread_scope_change(request: Request, current_user: dict, supabase: Client, **kw):
+    """Pitfall 9 / T-268-25: stated with the producer's own inputs — the ACTIVE org (the run's
+    ``current_user["org_id"]``) and the caller's role — so the preview and the run cannot disagree."""
+    return await describe_scope_change(
+        supabase=supabase,
+        pool=await get_pg_pool(),
+        user_id=current_user["id"],
+        org_id=await resolve_active_org_or_none(request, current_user),
+        caller_roles=await _caller_roles(request, current_user),
+        **kw,
+    )
+```
+`_describe_thread_scope_change` derives `org_id` from the HTTP request header (`resolve_active_org_or_none`).
+
+Consider a multi-org user belonging to Org A and Org B:
+- The user has an existing chat thread created under Org A with an active Expert in Org A.
+- The user switches active org in their UI session to Org B (sending `X-Org-Id: Org B`), but views/edits this thread in Org A.
+- When `_apply_folder_change` runs, `_authorize_thread_folder` authorizes against `row.get("org_id")` (Org A), and `_write_scope_change` writes `org_id = Org A`.
+- However, `_describe_thread_scope_change` passes `org_id = Org B` to `describe_scope_change`.
+- Inside `describe_expert_scope`, looking up the thread's Expert with `org_id = Org B` fails (`LookupError`), logging:
+  `scope change: the thread's Expert could not be named; stating the thread alone`
+- As a result, the transcript card and event sentence describe the thread as having NO expert, falsely claiming the Expert's scope was dropped or unnameable, despite the thread having a valid Expert in Org A.
+
+**Fix:**  
+Pass the thread's `org_id` (`row.get("org_id")`) into `_describe_thread_scope_change` so that the scope change is described in the thread's own org context:
+```python
+async def _describe_thread_scope_change(
+    request: Request,
+    current_user: dict,
+    supabase: Client,
+    thread_org_id: str | None = None,
+    **kw,
+):
+    org_id = thread_org_id or await resolve_active_org_or_none(request, current_user)
+    ...
+```
+
+---
+
+### WR-02: `get_scope_effect` allows conflicting `folder_id` and `clear=True` parameters without 422 validation
+
+**File:** `backend/app/api/threads.py:1125-1133`
+
+**Issue:**  
+In `get_scope_effect`:
+```python
+@router.get("/{thread_id}/scope-effect", response_model=ScopeEffect)
+async def get_scope_effect(
+    thread_id: UUID,
+    request: Request,
+    folder_id: UUID | None = None,
+    clear: bool = False,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    row = await _read_thread_scope(supabase, thread_id, current_user["id"])
+    current = row.get("folder_id")
+    draft = current
+    if clear:
+        draft = None
+    elif folder_id is not None:
+        await _authorize_thread_folder(supabase, current_user["id"], str(folder_id), row.get("org_id"))
+        draft = str(folder_id)
+```
+If a client passes both `folder_id=<uuid>` AND `clear=true`, the endpoint silently executes `if clear:` and sets `draft = None`, skipping `_authorize_thread_folder` on `folder_id`.
+In `rename_thread` / `ThreadUpdate`, contradictory inputs or changing both Expert and folder simultaneously are strictly guarded with 422 Unprocessable Content. In `get_scope_effect`, sending contradictory arguments is silently coalesced.
+
+**Fix:**  
+Enforce standard input validation:
+```python
+if clear and folder_id is not None:
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="Specify folder_id or clear, not both.",
+    )
+```
+
+---
+
+### IN-01: Audit of Prior Iteration Fixes & Verification Gates
+
+The previous in-session iteration fixes (detailed in `268-REVIEW-FIX.md`) were audited against active code:
+- **CR-01 (Continue active org):** In `backend/app/api/runs.py:1420`, `spawn_continuation_run` correctly injects `{**current_user, "org_id": str(row["org_id"])}`.
+- **WR-01 (ChatArea stale thread race):** In `frontend/src/components/chat/ChatArea.tsx:648`, `currentTidRef` properly gates scope effect refreshes and pending note updates.
+- **WR-02 (Scope PATCH race 409):** In `backend/app/api/threads.py:1030`, `WHERE folder_id IS NOT DISTINCT FROM $4::uuid` cleanly detects concurrent folder changes and raises `ScopeChangeConflict` -> HTTP 409.
+- **WR-03 (Continue scope history note):** In `backend/app/services/agent_loop.py:1126-1133`, `resuming=True` appends a single trailing user-role note when scope changed during pause.
+- **WR-04 (Unnameable folders):** In `backend/app/services/scope_note.py:61-85`, `_Side` compares unnameable folders by ID rather than assuming "all your documents".
+- **WR-05 (Partly priced harness runs disclosure):** In `backend/app/db/rates.py:548-550`, `partly_priced_harness_runs` is aggregated and disclosed on `BlindSpotsCard.tsx` per D-268-28.
+- **WR-06 (Harness shell org stamping):** `runs.py`, `harness_engine.py`, and `publish_service.py` pass the workflow run's org.
+- **SEED-322:** Formally planted for unrated Deep roots with priced sub-agents.
+
+**Automated Gates:**
+- Seeds register: 329/329 valid.
+- Hot-file ledger: 30/30 watched files tracked.
+- Phase 268 Unit Tests (`test_268*.py`): 133/133 passed.
+
+---
+
+_Reviewed by: Gemini (Independent Code Reviewer)_  
+_Phase: 268-expert-spend-mid-thread-scope_  
+_Report artifact: `.planning/phases/268-expert-spend-mid-thread-scope/268-REVIEW.md`_
