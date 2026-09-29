@@ -68,6 +68,16 @@ _FIGURE_PATTERNS = (
 # ---------------------------------------------------------------------------------------------
 
 
+# The cited literals fixed BEFORE driving (269-03 Drive table). A new starter Expert must add its own
+# entry here, so an evidence file cannot pass while quoting different figures than the ones promised.
+STARTER_FIGURES: dict[str, set[str]] = {
+    "financial-analyzer": {"30.8%", "$29.1"},
+    "contract-reviewer": {"$2.35M", "75 days"},
+    "hr-policy-advisor": {"18 weeks", "23 days"},
+    "operations-analyst": {"94.7%", "38 days"},
+}
+
+
 def phase_dir() -> Path:
     matches = sorted(p for p in PLANNING.rglob(PHASE_DIR_NAME) if p.is_dir())
     assert len(matches) == 1, f"expected exactly one {PHASE_DIR_NAME} dir under .planning, got {matches}"
@@ -152,8 +162,20 @@ def evidence_problems(ev_dir: Path, slugs: set[str]) -> list[str]:
                 problems.append(f"{f.name}: newest attempt is not a PASS — {verdicts[0][:160]}")
             if kind in ("cited", "refusal") and "web_search_calls: 0" not in lines:
                 problems.append(f"{f.name}: no 'web_search_calls: 0' line")
-            if kind == "cited" and not any(ln.startswith("figure: ") for ln in lines):
-                problems.append(f"{f.name}: no 'figure: ' line")
+            if kind in ("cited", "refusal") and "out_of_folder_documents_retrieved_by_any_tool: 0" not in {ln.strip() for ln in lines}:
+                problems.append(f"{f.name}: no 'out_of_folder_documents_retrieved_by_any_tool: 0' line")
+            if kind == "refusal" and "sibling_literal_present: false" not in lines:
+                problems.append(f"{f.name}: no 'sibling_literal_present: false' line")
+            if kind == "cited":
+                figures = {ln[len("figure: ") :] for ln in lines if ln.startswith("figure: ")}
+                if not figures:
+                    problems.append(f"{f.name}: no 'figure: ' line")
+                elif slug not in STARTER_FIGURES:
+                    problems.append(f"{f.name}: slug {slug} has no Starter Contract figures in STARTER_FIGURES")
+                elif not STARTER_FIGURES[slug] <= figures:
+                    problems.append(
+                        f"{f.name}: figures {sorted(figures)} miss the Starter Contract {sorted(STARTER_FIGURES[slug] - figures)}"
+                    )
     return problems
 
 
@@ -249,3 +271,26 @@ def test_evidence_check_rejects_the_held_back_expert():
     """security-compliance is HELD (refusal FAIL). The check must say so if anyone seeds it."""
     problems = evidence_problems(evidence_dir(), {"security-compliance"})
     assert any("security-compliance-refusal.txt" in p and "not a PASS" in p for p in problems), problems
+
+
+def test_evidence_check_rejects_a_pass_verdict_over_a_measured_leak(ev_copy):
+    """WR-01: a helper that wrote VERDICT: PASS over an out-of-folder hit must not pass the gate."""
+    slug = sorted(insert_slugs(migration_198()))[0]
+    f = newest_evidence(ev_copy, slug, "refusal")
+    text = f.read_text(encoding="utf-8").replace(
+        "out_of_folder_documents_retrieved_by_any_tool: 0", "out_of_folder_documents_retrieved_by_any_tool: 1"
+    )
+    f.write_text(text, encoding="utf-8")
+    problems = evidence_problems(ev_copy, {slug})
+    assert any("out_of_folder_documents_retrieved_by_any_tool: 0" in p for p in problems), problems
+
+
+def test_evidence_check_rejects_a_present_sibling_literal_and_wrong_figures(ev_copy):
+    slug = sorted(insert_slugs(migration_198()))[0]
+    r = newest_evidence(ev_copy, slug, "refusal")
+    r.write_text(r.read_text(encoding="utf-8").replace("sibling_literal_present: false", "sibling_literal_present: true"), encoding="utf-8")
+    c = newest_evidence(ev_copy, slug, "cited")
+    c.write_text(re.sub(r"(?m)^figure: .*$", "figure: 0.0%", c.read_text(encoding="utf-8")), encoding="utf-8")
+    problems = evidence_problems(ev_copy, {slug})
+    assert any("sibling_literal_present: false" in p for p in problems), problems
+    assert any("miss the Starter Contract" in p for p in problems), problems
