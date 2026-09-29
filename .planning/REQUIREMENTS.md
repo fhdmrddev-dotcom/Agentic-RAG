@@ -54,8 +54,10 @@ read path is built.**
 
 ### Starter Expert library (SEED-244)
 
-- [ ] **PACK-26**: A new org opens the catalog to a starter library of first-party Experts (count and domains decided at the phase's discuss), each installable through the `PACK-18` path.
-- [ ] **PACK-27**: Every starter Expert has one recorded live conversation that answers from its own corpus in a real org — no Expert ships that has only been tested by mock.
+- [x] **PACK-26**: A new org opens the catalog to a starter library of first-party Experts (count and domains decided at the phase's discuss), each installable through the `PACK-18` path.
+  - ⚠ **Holds for an org on the enterprise tier** — operator ruling **D-269-P1** (2026-09-29): tiers stay operator-assigned; a raw signup org has `subscription_tier = NULL` and sees the tier refusal, never a blank page. The NULL-tier gap is **SEED-325**. Satisfied for **FOUR** Experts (financial-analyzer, contract-reviewer, hr-policy-advisor, operations-analyst — migration 198); **security-compliance is HELD** (D-269-09, refusal FAIL, `BUG-260929-01`) and is not claimed.
+- [x] **PACK-27**: Every starter Expert has one recorded live conversation that answers from its own corpus in a real org — no Expert ships that has only been tested by mock.
+  - Satisfied for the FOUR shipped Experts (`269-UAT-LOG.md`, `evidence/03-07`, gated by `test_269_starter_evidence_gate.py`). The fifth candidate, security-compliance, was held back by this requirement's own rule — its refusal turn FAILED — rather than shipped (D-269-09: ship fewer, never weaken).
 
 ### Spend
 
@@ -104,7 +106,7 @@ read path is built.**
 | PACK-25 | Phase 267 | Pending |
 | METER-08 | Phase 268 | Pending |
 | CHAT-08 | Phase 268 | Pending |
-| PACK-26 | Phase 269 | Pending |
-| PACK-27 | Phase 269 | Pending |
+| PACK-26 | Phase 269 | Complete (four Experts; enterprise-tier orgs per D-269-P1) |
+| PACK-27 | Phase 269 | Complete (four Experts; security-compliance HELD) |
 
 **Coverage:** 17/17 v1 requirements mapped · 0 orphans · 0 duplicates (roadmap 2026-09-23).

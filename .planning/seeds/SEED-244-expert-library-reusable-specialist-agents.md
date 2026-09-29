@@ -3,9 +3,9 @@ seed_id: SEED-244
 title: "An expert library — reusable specialist agents a person picks by name, evaluated against agency-agents (MIT, 230+ personas)"
 created: 2026-09-04
 planted_during: "v3.9 close intake — operator supplied https://github.com/msitarzewski/agency-agents"
-status: folded
+status: answered
 folded_into: "269"
-status_note: "Folded into Phase 269 (Starter Expert Library) at plan-phase 2026-09-29 — curated first-party starter Experts via the 266 install path. Persona import from agency-agents (reuse #3) REJECTED at 269 discuss (D-269-03). Flip to answered at 269 close (269-05)."
+status_note: "ANSWERED by Phase 269 (2026-09-29). The curated first-party starter library SHIPPED via migration 198: FOUR Experts — financial-analyzer (mig 187, copy fixed in 198 per D-269-P2), contract-reviewer, hr-policy-advisor, operations-analyst — each installable through the 266 path and each proven by a live cited + refusal conversation (269-UAT-LOG.md). A fifth, security-compliance, was HELD (D-269-09; refusal FAIL, BUG-260929-01). Persona import from agency-agents (reuse #3) REJECTED (D-269-03). Still DEFERRED, not answered: domain grouping / a featured layout once the catalog passes ~8 Experts, and packs / marketplace distribution (SEED-291..294). Earlier note: folded at 269 plan-phase 2026-09-29."
 surface: Agentic-RAG
 severity: medium
 category: agent-behaviour / skills / library / product-surface

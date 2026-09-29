@@ -75,7 +75,7 @@ path is built, in any phase.
 - [x] **Phase 266: Expert Knowledge in a Real Org** — per-org copy + ingest of an Expert's corpus, idempotent and org-contained; Financial Analyzer answers from its report live (PACK-18..20) — completed 2026-09-25
 - [ ] **Phase 267: An Expert Adds Scope** — additive tool floor, required-connection honesty, swap/remove transcript event, "ask a second Expert", restricted-cost statement (PACK-21..25)
 - [x] **Phase 268: Expert Spend & Mid-Thread Scope** — per-Expert token/USD attribution in `/admin/spend`, change a thread's folder scope mid-thread (METER-08, CHAT-08)
-- [ ] **Phase 269: Starter Expert Library** — a starter set of first-party Experts installable through the 266 path, each with a recorded live conversation (PACK-26, PACK-27)
+- [ ] **Phase 269: Starter Expert Library** — a starter set of first-party Experts installable through the 266 path, each with a recorded live conversation (PACK-26, PACK-27) — executed 2026-09-29 (5/5 plans; FOUR Experts shipped, security-compliance HELD per D-269-09); verification + `/gsd:code-review 269` next
 
 ### Phase Details
 
@@ -207,6 +207,7 @@ Plans:
   2. Each starter Expert installs into that org through the **same** 266 path — its corpus copied, ingested and embedded there — with no Expert-specific install code (PACK-26).
   3. Every starter Expert has **one recorded live conversation** in a real org that answers from its own corpus with a cited figure and refuses one out-of-scope question (PACK-27).
   4. No starter Expert ships whose only evidence is a mocked or fixture test — an Expert without its live transcript is held back, not shipped (PACK-27).
+     ⚠ **OUTCOME 2026-09-29 (269-04/05):** the library ships **FOUR** Experts, not the five decided at discuss (D-269-01) — `security-compliance` was HELD under this criterion's rule after its live refusal turn FAILED (`query_documents` returned a sibling-folder document; `evidence/06-security-compliance-refusal.txt`, `BUG-260929-01`). SC#1-SC#4 are claimed for the four only; the held one is not padded in.
 
 **How we'd know this failed**: an Expert needs a bespoke seed script or code branch to install; a starter Expert's live answer is generic model knowledge with no citation from its corpus; the catalog in a new org is empty until someone runs a migration by hand; the library count is chosen before the domains are validated against real corpora.
 **Plans**: 5 plans / 4 waves — 01 corpora ∥ 02 candidate SQL + fences (wave 1, worktrees) → 03 live proof in a fresh org (wave 2, main tree, operator paste) → 04 operator lock + promote proven rows into migration 198 (wave 3) → 05 greenfield runbook, prod parity, registers (wave 4)
@@ -214,20 +215,20 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 269-01-PLAN.md — four synthetic ACME corpora (Legal, HR, Compliance, Operations) + corpus contract test over the derived slug set (figures in exactly one corpus, sibling refusal literals)
-- [ ] 269-02-PLAN.md — 269-candidate-bundles.sql (4 org-portable rows + D-269-P2 Financial Analyzer copy fix) + shape fence + D-269-08 no-Expert-specific-code fence (RED-driven)
+- [x] 269-01-PLAN.md — four synthetic ACME corpora (Legal, HR, Compliance, Operations) + corpus contract test over the derived slug set (figures in exactly one corpus, sibling refusal literals)
+- [x] 269-02-PLAN.md — 269-candidate-bundles.sql (4 org-portable rows + D-269-P2 Financial Analyzer copy fix) + shape fence + D-269-08 no-Expert-specific-code fence (RED-driven)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 269-03-PLAN.md — operator stages candidates locally; fresh org, named D-269-P1 tier step, first-run catalog, 5 installs via the 266 path, cited + sibling-corpus refusal per Expert with org-joined evidence
+- [x] 269-03-PLAN.md — operator stages candidates locally; fresh org, named D-269-P1 tier step, first-run catalog, 5 installs via the 266 path, cited + sibling-corpus refusal per Expert with org-joined evidence
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 269-04-PLAN.md — operator G-2/G-4 acceptance + per-Expert LOCK/HOLD; promote proven rows verbatim into 198 with the SC#4 evidence gate; operator applies 198 + regenerates full-schema
+- [x] 269-04-PLAN.md — operator G-2/G-4 acceptance + per-Expert LOCK/HOLD; promote proven rows verbatim into 198 with the SC#4 evidence gate; operator applies 198 + regenerates full-schema
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 269-05-PLAN.md — OPERATOR.md Step-3 (186/187/189/198) with the silenced drift WARN preserved in a seed, 269-PROD-PARITY.md, F-4 seed, SEED-244 answered, gates
+- [x] 269-05-PLAN.md — OPERATOR.md Step-3 (186/187/189/198) with the silenced drift WARN preserved in a seed, 269-PROD-PARITY.md, F-4 seed, SEED-244 answered, gates
 **Flags**: ⚠ **Operator decision at discuss:** count and domains of the starter set, and the source/licence of each sample corpus. Seed data ships as numbered migrations (`194+`) and must be **org-portable** — the lesson of migration 193 (188 hardcoded a local org id). **G-2 FIRES** (catalog first-run / installed states). **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/components/experts/catalog/*` (young rows), `backend/app/db/experts.py` (FIRES), `backend/app/services/expert_service.py`. Seed `SEED-244`. **UI hint**: yes
 
 ### Progress
@@ -235,10 +236,10 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 265. Owed v4.3 Verification | 5/5 | Complete (overrides OV-265-01..04; BUS-304 rulings open, non-blocking) | 2026-09-24 |
-| 266. Expert Knowledge in a Real Org | 0/? | Not started | - |
+| 266. Expert Knowledge in a Real Org | ~~0/?~~ 5/5 | ~~Not started~~ Complete — `266-VERIFICATION.md` `status: passed` (⚠ this row read `0/? · Not started` until 2026-09-29 and was stale since 2026-09-25 — the known `phase.complete` roadmap gap, 269-RESEARCH M-5; original struck, not deleted) | 2026-09-25 |
 | 267. An Expert Adds Scope | 5/5 | Executed — verification next (independent review + operator G-4 confirmation owed) | - |
 | 268. Expert Spend & Mid-Thread Scope | 4/4 | ✅ Complete 2026-09-29 — reviewed (Gemini, 0 blocking), SC#1-continued PASS live (seeded pause), D-2 fixed; SEED-323/324 deferred; prod parity owed | 2026-09-29 |
-| 269. Starter Expert Library | 0/? | Not started | - |
+| 269. Starter Expert Library | 5/5 | Plans complete 2026-09-29 — FOUR starter Experts shipped via migration 198 (financial-analyzer, contract-reviewer, hr-policy-advisor, operations-analyst); security-compliance HELD (refusal FAIL, BUG-260929-01); SC#1 qualified to enterprise-tier orgs (D-269-P1, SEED-325); g4 screenshots owed; 267 human_needed inherited; independent_review: self — `/gsd:code-review 269` + verifier next; prod parity owed (`269-PROD-PARITY.md`) | - |
 
 **Guardrails firing (v4.4):**
 

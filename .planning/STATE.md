@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
 status: executing
-last_updated: "2026-09-29T14:12:18.962Z"
-last_activity: 2026-09-29 -- Phase 269 execution started
+last_updated: "2026-09-29T18:00:00.000Z"
+last_activity: 2026-09-29 -- Phase 269 executed (5/5 plans); verification + /gsd:code-review 269 next
 progress:
   total_phases: 12
   completed_phases: 4
   total_plans: 24
-  completed_plans: 19
+  completed_plans: 24
   percent: 33
 ---
 
@@ -50,9 +50,12 @@ genuinely reviewed.
 ## Current Position
 
 Milestone: v4.4 Experts That Actually Work
-Phase: 269 (starter-expert-library) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 269
+Phase: 269 (starter-expert-library) — EXECUTED (5 of 5 plans), verification next
+Plan: 5 of 5
+Status: Phase 269 executed — `/gsd:code-review 269` (independent_review: self) + verifier next
+
+- **2026-09-29, Phase 269 executed.** The starter library ships **FOUR** Experts via migration **198** (applied LOCALLY only): financial-analyzer (187 + the D-269-P2 copy fix), contract-reviewer, hr-policy-advisor, operations-analyst. **security-compliance HELD** (D-269-09) — its live refusal turn FAILED: `query_documents` returned a sibling-folder document → **BUG-260929-01** (open, folded into no phase). Greenfield runbook (`docs/OPERATOR.md` Step-3) now lists 186/187/189/198; the drift WARN that listing silenced is preserved in **SEED-326**; NULL-tier signup gap → **SEED-325**; SEED-244 answered. Production: `269-PROD-PARITY.md`, nothing applied.
+- **Operator rulings 2026-09-29:** **D-269-P1** — tiers stay operator-assigned; no `handle_new_user` / tier / capability change; SC#1 qualified to *"an org on the enterprise tier sees the starter library"* (F-4 → SEED-325). **D-269-P2** — the Financial Analyzer's `example_output` and third prompt suggestion advertised figures its own corpus contradicts (24.3% / $412M, a quarter-over-quarter comparison); replaced with corpus figures (30.8%, +380 bps, $29.1M, ~42%) and a year-over-year prompt, shipped in 198.
 
 - **2026-09-29 close:** Gemini's independent review checked by Claude — 0 blocking (CR-01/WR-01 refuted, WR-02 info). SC#1-continued PASS live on a seeded pause (line delta = run delta, +139,903 / +297). **D-2 FIXED** `a2274e435` (Continue's count was dropped by RLS). D-1 → **SEED-323**, D-3 → **SEED-324**. UI-review top 3 fixed `dda093f6f`.
 
@@ -73,8 +76,8 @@ Status: Executing Phase 269
 - **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
-Resume file: .planning/phases/269-starter-expert-library/269-CONTEXT.md
-Last activity: 2026-09-29 -- Phase 269 execution started
+Resume file: .planning/phases/269-starter-expert-library/269-05-SUMMARY.md
+Last activity: 2026-09-29 -- Phase 269 executed (5/5 plans)
 
 ---
 
@@ -90,6 +93,27 @@ Last activity: 2026-09-29 -- Phase 269 execution started
 | Two non-engineering commercial blockers (no legal entity; employment / IP position) | `SEED-294` |
 
 ---
+
+## Guardrail dispositions — Phase 269 (2026-09-29)
+
+**No guardrail was overridden in 269.**
+
+| Rule / item | Record | Evidence |
+|---|---|---|
+| G-2 (sketch before plan) | **Acceptance bar = the operator's reply at 269-04 Task 1, verbatim: `proceed`** — applied as acceptance of the orchestrator's presented recommendation *"G-2 accepted; LOCK financial-analyzer, contract-reviewer, hr-policy-advisor, operations-analyst; HOLD security-compliance"*. The live-rendered first-run catalog (API-level, `evidence/01`, `evidence/02`) is the bar; no component changed (D-269-06) | `269-UAT-LOG.md` § Operator lock |
+| G-4 (lived-experience UAT) | **Rows driven live through the real API** in a fresh enterprise-tier org: first-run catalog, member reason state, 5 installs via the 266 path, cited + sibling refusal per Expert (15 rows: 14 PASS, 1 FAIL → held). ⚠ **Screenshots `g4-00` … `g4-06` are OWED** — no Chrome tool in 269-03; never claimed as taken | `269-UAT-LOG.md`, `evidence/00-07` |
+| G-5 (refactor between feature waves) | **Not fired — `watched: 0`.** A data-only phase: corpora, a data migration, tests, docs; no source file with a ledger row modified. Stated so it is not read as a skipped audit | `check-hot-file-ledger.cjs` at 269-05 |
+| G-8 (plan-count proportion) | **5 plans / 4 waves.** Wave 1 split in two because 12 corpus files + their fences exceed one plan's budget; waves 2-4 are sequential by operator checkpoints (live drive → lock → close) | `269-0{1..5}-PLAN.md` |
+| SC#10 cross-provider | **Does not fire** — no streaming / agent-loop / provider-routing / UI-state change; PACK-27 asks for one live conversation per Expert (all on `deepseek-v4-flash` / `deepseek`, the configured default) | `269-UAT-LOG.md` § SC#10 |
+| 267 dependency | **267 is `human_needed`** (independent review + operator G-4 sign-off owed). 269 inherits 267's additive-scope behaviour (D-267-01) as an **INHERITED DEPENDENCY** and does **not** claim 267 verified | `267-VERIFICATION.md` |
+| independent_review | **`self`** — Gemini is out; run `/gsd:code-review 269` next (fresh-context subagent) | CLAUDE.md § Claude is the only agent |
+
+**Owed from 269, and which to run first:**
+
+1. `/gsd:code-review 269` + the verifier.
+2. G-4 screenshots `g4-00` … `g4-06` (operator or a Chrome-equipped session).
+3. **BUG-260929-01** — `query_documents` restricted-scope gap; affects every restricted Expert; security-compliance can ship only after a fix + a PASS refusal re-drive.
+4. Production: `269-PROD-PARITY.md` — backend with corpora LIVE **before** 198; every write on explicit per-action approval.
 
 ## Guardrail records — Phase 268 (2026-09-28)
 
