@@ -505,8 +505,15 @@ async def _resolve_thread_scoping(
             expert_folder_ids=expert_folder_ids,
             visible_folders=all_folders,
         )
-        effective_folder_ids = _scope.effective_folder_ids
-        scoped_folder_path = _scope.scoped_folder_path
+        # 267-REVIEW-INDEPENDENT CR-02: an EMPTY composition means "no Expert narrowing", exactly as on
+        # a plain thread. `()` is not `None`: the loop handed the tools `folder_subtree_ids = []`, the
+        # RPC ran unfiltered (`folder_ids if folder_ids else None`) and the dispatcher's folder wall
+        # then dropped EVERY hit and emitted `scope_violation` — while the statement said "All your
+        # documents". Only a BIASED Expert with no effective folders on a no-folder thread reaches
+        # this (restricted-empty is refused above; a thread folder always contributes its own id), so
+        # every non-empty composition is handed on verbatim.
+        effective_folder_ids = _scope.effective_folder_ids or None
+        scoped_folder_path = _scope.scoped_folder_path if effective_folder_ids else None
 
         # Phase 267 (D-267-01 / D-267-02): NO tool list. The Expert thread keeps the plain
         # thread's tools; the tool-floor flag is kept on the row for compatibility and read by

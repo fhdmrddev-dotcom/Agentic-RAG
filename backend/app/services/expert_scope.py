@@ -233,6 +233,9 @@ class ScopeStatement:
             )
         # biased: thread subtree ∪ Expert folders. With NO thread folder this narrows to the
         # Expert's folders (D-267-35) — and an empty composition reaches retrieval as no filter.
+        # ⚠ CORRECTED 2026-09-29 (267-REVIEW-INDEPENDENT CR-02): that clause was FALSE when written —
+        # `()` reached the tool_dispatcher folder wall as `[]` and every hit was dropped. It is true
+        # since `run_producer._resolve_thread_scoping` hands an empty composition on as `None`.
         return TranscriptScopeLine(
             folders=list(self.expert_folders),
             thread_folder=self.thread_folder,

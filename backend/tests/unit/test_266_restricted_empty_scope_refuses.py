@@ -10,6 +10,12 @@ reachable (every org right after deploy has no install).
 Operator decision (2026-09-25): refuse the run in `run_producer`, overriding D-266-11
 ("run_producer byte-unchanged") as a security fix. A BIASED Expert with no folders keeps searching
 everything — that is what biased (soft priority) means.
+
+⚠ CORRECTED 2026-09-29 (267-REVIEW-INDEPENDENT CR-02) — the last sentence above was FALSE when it was
+written, and it is kept rather than deleted. This analysis traced `retrieval_service` and missed the
+098/262 folder wall in `tool_dispatcher`: the biased-empty `()` reached the tools as `[]`, the RPC ran
+unfiltered, and the post-query clip dropped EVERY hit (and ls/tree/grep were walled to nothing). It is
+true since `run_producer` maps an empty biased composition to `None`.
 """
 from __future__ import annotations
 
@@ -86,8 +92,12 @@ def test_refusal_is_a_value_error_so_existing_fail_closed_handling_applies():
 
 @pytest.mark.asyncio
 async def test_biased_expert_with_no_folders_is_unchanged():
+    # ⚠ CORRECTED 2026-09-29 (267-REVIEW-INDEPENDENT CR-02): this read `== ()` and PINNED THE DEFECT —
+    # `()` reached the tool_dispatcher folder wall as `[]` and dropped every hit. An empty biased
+    # composition is now `None` ("no Expert narrowing", as on a plain thread); the search-level proof
+    # is `test_267_cr02_empty_biased_scope_searches.py`.
     scoping = await _scope(_bundle(scope_mode="biased", is_system=False, folders=[]), AsyncMock())
-    assert scoping.effective_folder_ids == ()
+    assert scoping.effective_folder_ids is None
 
 
 @pytest.mark.asyncio

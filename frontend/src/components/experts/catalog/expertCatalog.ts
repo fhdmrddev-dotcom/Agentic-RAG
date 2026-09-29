@@ -466,6 +466,11 @@ export function previewLedgerColumns(preview: ExpertScopePreview): LedgerColumn[
  * `Won't use` = `All your documents`. `null` when the preview shows no narrowing: a restricted
  * Expert (its own ledger), a chat with a folder (thread ∪ Expert), or an Expert with no folders
  * (an empty composition reaches retrieval as no filter). ⛔ Built from the ONE preview payload.
+ *
+ * ⚠ CORRECTED 2026-09-29 (267-REVIEW-INDEPENDENT CR-02): the parenthesis above was FALSE when written —
+ * the empty composition reached the backend's folder wall as `[]` and every search came back empty.
+ * It is true since `run_producer._resolve_thread_scoping` hands an empty biased composition on as
+ * "no Expert narrowing" (`None`). This function's behaviour is unchanged.
  */
 export function narrowingLedgerColumns(preview: ExpertScopePreview): LedgerColumn[] | null {
   if (preview.mode !== "biased" || preview.thread_folder) return null
