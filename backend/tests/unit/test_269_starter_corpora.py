@@ -12,6 +12,11 @@ pins what the live drive (269-03) depends on, BEFORE any drive happens:
    what ships (ship fewer, never weaken): it still trips on the next lost corpus, and
    test_269_starter_evidence_gate.py pins the exact set against migration 198. No REFUSAL_LITERALS
    entry used it as a sibling, so no refusal pair was re-pointed.
+   ⚠ CORRECTED (269 re-drive, after the BUG-260929-01 fix) — the paragraph above is kept, not
+   deleted, because it was true when written. The refusal FAIL was the query_documents OR-precedence
+   defect, not the corpus. Re-driven in a fresh org with the same leaking query shape, it PASSED
+   (evidence/11-security-compliance-*.txt), so the corpus is restored byte-identical to 269-01, its
+   entries are back in both maps and the floor is FIVE again.
 2. EVERY CORPUS LOADS through the unchanged Phase 266 loader (D-269-08) — text mime, LF only.
 3. UNIQUENESS ACROSS CORPORA (M-13 / T-269-04). folder_name, filename and sha256 are unique, so an
    install never 409s on duplicate bytes and two Experts never collide on one Library folder.
@@ -47,19 +52,23 @@ EXPECTED_FIGURES: dict[str, list[bytes]] = {
     "financial-analyzer": [b"$124.5", b"+18.2%", b"30.8%", b"$29.1"],
     "contract-reviewer": [b"$2.35M", b"75 days"],
     "hr-policy-advisor": [b"23 days", b"18 weeks", b"$1,850"],
+    "security-compliance": [b"36 hours", b"14 of 16"],
     "operations-analyst": [b"94.7%", b"38 days", b"41%"],
 }
-# security-compliance: HELD BACK in 269-04 (D-269-09) — corpus deleted, keys removed from both maps.
+# ~~security-compliance: HELD BACK in 269-04 (D-269-09) — corpus deleted, keys removed from both maps.~~
+# Restored by the 269 re-drive (evidence/11-security-compliance-*.txt, all PASS after BUG-260929-01).
 
-# The shipped corpus count (financial-analyzer + three LOCKed starters). Five were authored; one
-# was held back on live evidence. A floor, so a later LOCKed addition does not need an edit here.
-SHIPPED_CORPORA_FLOOR = 4
+# The shipped corpus count (financial-analyzer + four starters). Five were authored; one was held
+# back on live evidence in 269-04 (floor 4), then re-driven and promoted (floor back to 5). A floor,
+# so a later proven addition does not need an edit here.
+SHIPPED_CORPORA_FLOOR = 5
 
 # asking slug -> (sibling slug that answers the out-of-scope question, the answer literal)
 REFUSAL_LITERALS: dict[str, tuple[str, bytes]] = {
     "financial-analyzer": ("hr-policy-advisor", b"23 days"),
     "contract-reviewer": ("operations-analyst", b"94.7%"),
     "hr-policy-advisor": ("contract-reviewer", b"$2.35M"),
+    "security-compliance": ("financial-analyzer", b"$124.5"),
     "operations-analyst": ("hr-policy-advisor", b"18 weeks"),
 }
 

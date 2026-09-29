@@ -206,7 +206,7 @@ SQL editor, in order:
    | 11 | `192_revoke_anon_tier_capabilities.sql` | **apply straight after 186** — 186 grants `anon` read on `tier_capabilities` and 192 revokes it; without 192 unauthenticated callers can read the tier→capability map |
    | 12 | `187_expert_bundles.sql` | the Financial Analyzer system Expert row — **apply FIRST of the Expert trio** |
    | 13 | `189_expert_presentation_and_grants.sql` | presentation columns + `experts:manage` role permissions; UPDATEs 187's row — **apply SECOND** |
-   | 14 | `198_starter_expert_library.sql` | the starter Expert library (Contract Reviewer, HR Policy Advisor, Operations Analyst) + the Financial Analyzer copy fix; UPDATEs 187's row — **apply THIRD** |
+   | 14 | `198_starter_expert_library.sql` | the starter Expert library (Contract Reviewer, HR Policy Advisor, Security & Compliance, Operations Analyst) + the Financial Analyzer copy fix; UPDATEs 187's row — **apply THIRD** |
 
    **Order matters within the trio `087 → 088 → 089`** (088 and 089 both UPDATE the row
    087 creates) **and within the Expert trio `187 → 189 → 198`** (189 and 198 both UPDATE the
@@ -243,7 +243,9 @@ SQL editor, in order:
 
    ```sql
    SELECT slug FROM public.expert_bundles WHERE is_system ORDER BY slug;
-   -- expect exactly: contract-reviewer, financial-analyzer, hr-policy-advisor, operations-analyst
+   -- expect exactly: contract-reviewer, financial-analyzer, hr-policy-advisor, operations-analyst,
+   --                 security-compliance  (five; security-compliance was held, then promoted after
+   --                 the Phase 269 re-drive — a four-row result means an OLD copy of 198 was applied)
    ```
 
    If a slug is missing, re-apply `187 → 189 → 198` in order.

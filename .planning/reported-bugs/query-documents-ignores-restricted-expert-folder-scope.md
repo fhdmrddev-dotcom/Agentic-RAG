@@ -4,10 +4,10 @@ title: query_documents returns documents from a sibling Expert's folder inside a
 reported: 2026-09-29
 surface: Agentic-RAG
 severity: major
-status: fixed-pending-redrive
+status: closed
 affected_areas: [backend/tools, RAG/retrieval, experts/scope]
 folded_into: null
-verified_closed_by: null   # closes only when the held security-compliance refusal turn is re-driven live and PASSES
+verified_closed_by: "269 re-drive 2026-09-29 — evidence/11-security-compliance-refusal.txt (VERDICT: PASS, same leaking OR shape now returns No results) + evidence/redrive-counterfactual-or-scope.txt (pre-fix returns the sibling doc, current does not); 15/15 PASS across 08-12; 269-REDRIVE-SUMMARY.md"
 related_seeds: []
 re_open_trigger: "any phase whose files_modified names backend/app/services/tool_dispatcher.py, the query_documents service, or the Expert scope resolution (run_producer.py / expert_service.py); OR the operator asks to re-drive and ship the held security-compliance Expert — its refusal turn must be re-driven and PASS after the fix"
 reproduces_on:
@@ -98,3 +98,30 @@ The hypothesis that `folder_subtree_ids` was unset for Expert threads was **REFU
 **Live proof (local DB, uat269 admin, Security folder `16db0107-…`):** the exact leaking query with the OLD injection returned `acme_q3_2026_financial_report.md` (folder `cc435f1e`, the Financial Analyzer's); through the fixed `query_documents` it returns `No results.` The 13 failing tests in the related `-k "sql or query_documents or folder_scope"` selection are the SAME set with and without the change (existing baseline red).
 
 **Not done — deliberately:** security-compliance is still HELD and not shipped. Un-holding it needs its refusal turn re-driven live in a fresh enterprise-tier org with a PASS transcript (D-269-09), then re-promotion into a migration. The other four Experts' PASS verdicts were single samples that did not exercise the leaking query shape; they should be re-driven with an OR-shaped question before anyone claims strict isolation.
+
+## CLOSED — live re-drive after the fix (2026-09-29)
+
+Fix `464ec8354` was live (backend restarted after it). One fresh enterprise-tier org (`uat269b`, org
+`21274586-64aa-42a8-81fe-7dedac7740fd`), all five starter Experts installed through the 266 path, each driven
+with its 269-03 cited question and a NEW broad, OR-inviting refusal question fixed and committed BEFORE the
+first message (`269-REDRIVE-QUESTIONS.md`, `dfa95c079`). Every tool result of every turn was scanned for
+out-of-folder documents (id / filename / title).
+
+- **15/15 PASS** (evidence `08`-`12`). `out_of_folder_documents_retrieved_by_any_tool: 0` in all ten turns.
+- The security-compliance refusal model wrote **the same leaking shape**:
+  `WHERE d.filename ILIKE '%revenue%' OR d.filename ILIKE '%financial%' OR … OR d.metadata->>'title' ILIKE '%earnings%'`
+  → `No results.`
+- **Read-only counterfactual** (`evidence/redrive-counterfactual-or-scope.txt`): the same SQL through the
+  PRE-FIX `_inject_folder_scope` returns `acme_q3_2026_financial_report.md` (the Financial Analyzer's folder);
+  through the current one, `No results.` This is the one turn of the five that DISCRIMINATES the fix — the
+  other OR-shaped queries return nothing foreign under either version, so their PASSes would have passed
+  before the fix too, and are not claimed as proof of it.
+- security-compliance was promoted back into migration 198 on this evidence.
+
+**Residual, not a re-open:** `_inject_folder_scope` parenthesises from the FIRST `WHERE` keyword.
+Measured on the pure function (not live): a subquery inside the outer WHERE
+(`WHERE d.id IN (SELECT … WHERE …) OR …`) is wrapped correctly; a CTE whose own body carries the first
+`WHERE` (`WITH t AS (SELECT … WHERE a) SELECT … WHERE b OR c`) comes out as INVALID SQL (two SELECTs inside
+the CTE parentheses), so that query ERRORS — it fails closed, it does not leak, and the pre-fix version
+also broke on it (the outer query has no `d` alias). No re-drive turn wrote a CTE. RLS still bounds
+everything to the org.

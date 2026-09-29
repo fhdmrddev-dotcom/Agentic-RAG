@@ -1,8 +1,9 @@
 -- 198 — Phase 269 (PACK-26, PACK-27, D-269-07, D-269-09, D-269-P2)
 -- Data:  public.expert_bundles — the starter Expert library, proven live before it was seeded
 --
--- WHAT. Three new first-party starter Experts (Contract Reviewer …2691, HR Policy Advisor …2692,
--- Operations Analyst …2694) plus the Financial Analyzer (…0259, shipped by migration 187) copy fix.
+-- WHAT. Four new first-party starter Experts (Contract Reviewer …2691, HR Policy Advisor …2692,
+-- Security & Compliance …2693, Operations Analyst …2694) plus the Financial Analyzer (…0259, shipped
+-- by migration 187) copy fix — five starter Experts in the library.
 -- Every statement below is copied VERBATIM from the staging artifact
 -- .planning/phases/269-starter-expert-library/269-candidate-bundles.sql, which is the exact text
 -- that was applied locally and driven live in plan 269-03. Nothing here was edited after the drive.
@@ -14,16 +15,28 @@
 -- (the Phase 266 path, no Expert-specific code — D-269-08). A fresh org therefore sees each Expert as
 -- an Install card, never as pre-populated knowledge.
 --
--- D-269-09 — HELD BACK UNTIL PROVEN. A row is here only because its newest install, cited and refusal
--- transcripts all end VERDICT: PASS (gated by backend/tests/unit/test_269_starter_evidence_gate.py):
---   contract-reviewer   evidence/04-contract-reviewer-{install,cited,refusal}.txt
---   hr-policy-advisor   evidence/05-hr-policy-advisor-{install,cited,refusal}.txt
---   operations-analyst  evidence/07-operations-analyst-{install,cited,refusal}.txt
---   financial-analyzer  evidence/03-financial-analyzer-{install,cited,refusal}.txt  (UPDATE only)
--- HELD BACK and deliberately ABSENT: security-compliance (its refusal turn FAILed — query_documents
--- returned a sibling-folder document, evidence/06-security-compliance-refusal.txt). Its candidate row
--- is not promoted and its corpus directory is not shipped. The library ships four, not five
--- (operator lock recorded in 269-UAT-LOG.md, "Operator lock (269-04 Task 1)").
+-- D-269-09 — HELD BACK UNTIL PROVEN. A row is here only because its NEWEST install, cited and refusal
+-- transcripts all end VERDICT: PASS (gated by backend/tests/unit/test_269_starter_evidence_gate.py).
+-- The newest set is the 269 RE-DRIVE (one fresh enterprise-tier org, after the BUG-260929-01 fix
+-- 464ec8354, questions fixed in 269-REDRIVE-QUESTIONS.md before driving):
+--   financial-analyzer   evidence/08-financial-analyzer-{install,cited,refusal}.txt  (UPDATE only)
+--   contract-reviewer    evidence/09-contract-reviewer-{install,cited,refusal}.txt
+--   hr-policy-advisor    evidence/10-hr-policy-advisor-{install,cited,refusal}.txt
+--   security-compliance  evidence/11-security-compliance-{install,cited,refusal}.txt
+--   operations-analyst   evidence/12-operations-analyst-{install,cited,refusal}.txt
+-- The first drive (evidence/03..07) is kept. In it security-compliance's refusal FAILed
+-- (evidence/06-security-compliance-refusal.txt: query_documents returned a sibling-folder document)
+-- and it was HELD from the first version of this file. The cause was BUG-260929-01 (the folder scope
+-- was ANDed onto an unparenthesised OR predicate); after the fix its refusal turn was re-driven with
+-- the same leaking query shape and PASSED (evidence/11-security-compliance-refusal.txt, and the
+-- pre-fix/current counterfactual in evidence/redrive-counterfactual-or-scope.txt), so its candidate
+-- row …2693 is promoted here VERBATIM and its corpus directory ships again.
+--
+-- ⚠ THIS FILE WAS EDITED AFTER IT WAS FIRST APPLIED — deliberately, and only because nothing outside
+-- one developer's LOCAL database had applied it: it was never pushed, never deployed, and production
+-- still lacks it (269-PROD-PARITY.md step D is owed). The edit only ADDS one idempotent upsert, so the
+-- local database converges by re-applying this file. Once 198 reaches any shared environment this is
+-- no longer acceptable (the Phase 163 rule): a later change is a new numbered migration.
 --
 -- D-269-P2 — the Financial Analyzer's example_output and third prompt suggestion advertised figures
 -- (24.3% / $412M, a quarter-over-quarter comparison) its own corpus contradicts or cannot support.
@@ -158,6 +171,71 @@ INSERT INTO public.expert_bundles (
     'HR',
     'When you need a policy answer from the employee handbook or the learning and expense policy, with the section it came from.',
     'Paid parental leave: 18 weeks (Employee Handbook, Leave & Time Off)' || E'\n' || 'Annual paid time off, full-time: 23 days' || E'\n' || 'Every answer names the policy section it came from.'
+)
+ON CONFLICT (slug) WHERE is_system = true DO UPDATE
+SET name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    scope_mode = EXCLUDED.scope_mode,
+    prompt_suggestions = EXCLUDED.prompt_suggestions,
+    visibility = EXCLUDED.visibility,
+    is_enabled = EXCLUDED.is_enabled,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    when_to_use = EXCLUDED.when_to_use,
+    example_output = EXCLUDED.example_output,
+    updated_at = now();
+
+INSERT INTO public.expert_bundles (
+    id,
+    org_id,
+    created_by,
+    name,
+    slug,
+    description,
+    scope_mode,
+    member_skills,
+    required_connections,
+    knowledge_folder_ids,
+    prompt_suggestions,
+    visibility,
+    is_system,
+    is_enabled,
+    icon,
+    category,
+    when_to_use,
+    example_output
+) VALUES (
+    '00000000-0000-0000-0000-000000002693'::uuid,
+    NULL,
+    '00000000-0000-0000-0000-000000000001'::uuid,
+    'Security & Compliance Advisor',
+    'security-compliance',
+    'Answers questions about ACME Corporation''s sample incident response policy and quarterly control test results: notification obligations, recovery objectives, control outcomes and remediation owners. Answers from its installed ACME sample documents, citing the policy or test record, or says it cannot find the answer.',
+    'restricted',
+    '{}'::text[],
+    '{}'::text[],
+    '{}'::uuid[],
+    $json$[
+        {
+            "title": "Incident Notification",
+            "prompt": "How quickly must ACME notify affected customers after a confirmed security incident?"
+        },
+        {
+            "title": "Q3 Control Results",
+            "prompt": "How many controls passed ACME's Q3 2026 control testing, which ones failed, and who owns the remediation?"
+        },
+        {
+            "title": "Recovery Objectives",
+            "prompt": "What are the recovery time and recovery point objectives in ACME's incident response policy?"
+        }
+    ]$json$::jsonb,
+    'public',
+    true,
+    true,
+    'shield',
+    'Compliance',
+    'When you need an obligation from the incident response policy or an outcome from the quarterly control tests, with the record it came from.',
+    'Customer notification after a confirmed incident: within 36 hours (Incident Response Policy)' || E'\n' || 'Q3 control testing: 14 of 16 controls passed' || E'\n' || 'Failed controls are listed with their remediation owners and due dates.'
 )
 ON CONFLICT (slug) WHERE is_system = true DO UPDATE
 SET name = EXCLUDED.name,

@@ -218,11 +218,14 @@ def test_candidate_sql_matches_the_starter_seed_shape():
     assert_starter_seed_shape(candidate_sql(), set(STARTER_IDS.values()))
 
 
-# 269-04 operator lock (269-UAT-LOG.md, "Operator lock (269-04 Task 1)"): the three LOCKed new
+# 269-04 operator lock (269-UAT-LOG.md, "Operator lock (269-04 Task 1)"): ~~the three LOCKed new
 # Experts. security-compliance (…2693) was HELD BACK on a refusal FAIL (D-269-09) and must NOT be
-# in 198. REQUIRED, not "if present": 198 missing is a failure here, never a skip.
-LOCKED_INSERT_SLUGS = ("contract-reviewer", "hr-policy-advisor", "operations-analyst")
-HELD_BACK_SLUGS = ("security-compliance",)
+# in 198.~~ CORRECTED by the 269 re-drive (after the BUG-260929-01 fix): security-compliance's
+# install, cited and refusal turns all PASSED (evidence/11-security-compliance-*.txt), so it is
+# promoted and 198 seeds ALL FOUR candidate INSERTs. assert_starter_seed_shape pins the INSERT count
+# and every id, so this set is exact, not a floor. REQUIRED, not "if present": 198 missing is a
+# failure here, never a skip.
+LOCKED_INSERT_SLUGS = ("contract-reviewer", "hr-policy-advisor", "security-compliance", "operations-analyst")
 
 
 def migration_198() -> Path:
@@ -235,12 +238,15 @@ def test_migration_198_matches_the_starter_seed_shape():
     assert_starter_seed_shape(migration_198(), {STARTER_IDS[s] for s in LOCKED_INSERT_SLUGS})
 
 
-def test_migration_198_does_not_seed_a_held_back_expert():
+def test_migration_198_seeds_every_candidate_insert_once():
+    """Replaces the held-back fence: after the re-drive nothing is held, so 198's INSERT ids must be
+    exactly the candidate's (a dropped or duplicated promoted row fails here)."""
     text = migration_198().read_text(encoding="utf-8")
     code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("--"))
-    for slug in HELD_BACK_SLUGS:
-        assert f"'{slug}'" not in code, f"held-back Expert {slug} is seeded by 198"
-        assert STARTER_IDS[slug] not in text, f"held-back Expert id {STARTER_IDS[slug]} appears in 198"
+    assert set(LOCKED_INSERT_SLUGS) == set(STARTER_IDS), (LOCKED_INSERT_SLUGS, sorted(STARTER_IDS))
+    for slug in LOCKED_INSERT_SLUGS:
+        assert code.count(f"'{STARTER_IDS[slug]}'::uuid") == 1, f"{slug} id not seeded exactly once by 198"
+        assert code.count(f"'{slug}'") == 1, f"{slug} slug not seeded exactly once by 198"
 
 
 def test_migration_198_has_no_forbidden_statement_keyword_even_in_copy():

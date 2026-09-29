@@ -1,0 +1,13 @@
+{
+  "folder_name": "Security & Compliance Policies",
+  "files": [
+    {
+      "filename": "acme_incident_response_policy_2026.md",
+      "mime_type": "text/markdown"
+    },
+    {
+      "filename": "acme_control_test_results_q3_2026.md",
+      "mime_type": "text/markdown"
+    }
+  ]
+}

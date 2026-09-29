@@ -106,7 +106,7 @@ read path is built.**
 | PACK-25 | Phase 267 | Pending |
 | METER-08 | Phase 268 | Pending |
 | CHAT-08 | Phase 268 | Pending |
-| PACK-26 | Phase 269 | Complete (four Experts; enterprise-tier orgs per D-269-P1) |
-| PACK-27 | Phase 269 | Complete (four Experts; security-compliance HELD) |
+| PACK-26 | Phase 269 | Complete (~~four~~ **five** Experts after the 269 re-drive; enterprise-tier orgs per D-269-P1) |
+| PACK-27 | Phase 269 | Complete (~~four Experts; security-compliance HELD~~ **five** Experts, each with a live PASS — security-compliance re-driven after BUG-260929-01, evidence `11-*`) |
 
 **Coverage:** 17/17 v1 requirements mapped · 0 orphans · 0 duplicates (roadmap 2026-09-23).

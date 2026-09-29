@@ -7,11 +7,18 @@ approval**: state exactly what will run, wait for a clear yes, then run it. Appr
 approval for the next (CLAUDE.md, "Supabase MCP — reads are free, WRITES ARE APPROVAL-GATED"). A deploy
 needs an explicit operator **"deploy"**.
 
-**What ships:** FOUR system Experts — `financial-analyzer` (already in prod via 187), `contract-reviewer`,
+**What ships:** ~~FOUR system Experts — `financial-analyzer` (already in prod via 187), `contract-reviewer`,
 `hr-policy-advisor`, `operations-analyst` (new, via 198). ⚠ `security-compliance` was **HELD** (D-269-09,
 refusal FAIL — `query_documents` returned a sibling-folder document; `evidence/06-security-compliance-refusal.txt`,
 reported-bugs `query-documents-ignores-restricted-expert-folder-scope.md`). It has **no row in 198 and no
-corpus in the image**; do not add it by hand.
+corpus in the image**; do not add it by hand.~~
+⚠ **CORRECTED 2026-09-29 (269 re-drive) — FIVE system Experts.** The hold's cause was BUG-260929-01
+(fixed at `464ec8354`); re-driven in a fresh org after the fix, `security-compliance` passed install, cited
+and refusal (`evidence/11-security-compliance-*.txt`), so 198 now carries its row `…2693` and the image
+carries its corpus. Ships: `financial-analyzer` (187 + copy fix), `contract-reviewer`, `hr-policy-advisor`,
+`security-compliance`, `operations-analyst`. ⛔ **The backend image in C must contain `464ec8354`**
+(`sql_service._inject_folder_scope`): the live proof that admitted the fifth row was taken WITH the fix,
+and without it every restricted Expert's `query_documents` can read a sibling folder's documents.
 
 **Order is the whole point of this file:**
 
@@ -72,10 +79,11 @@ restated here. Number order, each on its own approval, all before C. Phase 269 a
 - The image must carry `backend/app/experts/corpora/<slug>/` for **every seeded slug**. After the container
   is up, in the backend container:
   ```bash
-  for s in financial-analyzer contract-reviewer hr-policy-advisor operations-analyst; do
+  for s in financial-analyzer contract-reviewer hr-policy-advisor security-compliance operations-analyst; do
     ls app/experts/corpora/$s/manifest.json || echo "MISSING $s"
   done
-  ls app/experts/corpora/   # expect exactly those four directories; no security-compliance
+  ls app/experts/corpora/   # expect exactly those five directories (was four + "no security-compliance" before the re-drive)
+  grep -c "BUG-260929-01" app/services/sql_service.py   # expect >= 1: the OR-precedence fix is in the image
   ```
   Every line must resolve; any `MISSING` stops the checklist here — do not proceed to D.
 - "The new backend is up" probe: an unauthenticated request to a route new since the running image returns
@@ -84,16 +92,17 @@ restated here. Number order, each on its own approval, all before C. Phase 269 a
 ## D. Apply migration 198 — per-action approval, and ONLY after C is verified
 
 - File: `supabase/migrations/198_starter_expert_library.sql`. Data only — no DDL, no grants, no org id.
-  Three `INSERT … ON CONFLICT (slug) WHERE is_system = true DO UPDATE` rows (`…2691` contract-reviewer,
-  `…2692` hr-policy-advisor, `…2694` operations-analyst) plus one `UPDATE` of the Financial Analyzer copy
+  ~~Three~~ **Four** `INSERT … ON CONFLICT (slug) WHERE is_system = true DO UPDATE` rows (`…2691` contract-reviewer,
+  `…2692` hr-policy-advisor, `…2693` security-compliance, `…2694` operations-analyst) plus one `UPDATE` of the Financial Analyzer copy
   (D-269-P2: `30.8%` / `$29.1M`). Idempotent; safe to re-run.
 - Route: Supabase MCP `apply_migration` on approval, or the operator pastes it into the cloud SQL editor.
   **Never `supabase db push` / `db reset`.**
 - Verify:
   ```sql
   SELECT slug, org_id, scope_mode, visibility, is_enabled FROM expert_bundles WHERE is_system ORDER BY slug;
-  -- expect exactly 4: contract-reviewer, financial-analyzer, hr-policy-advisor, operations-analyst;
-  -- org_id NULL, scope_mode 'restricted', is_enabled true (the three new rows carry visibility 'public')
+  -- expect exactly 5 (was 4 before the re-drive): contract-reviewer, financial-analyzer, hr-policy-advisor,
+  -- operations-analyst, security-compliance;
+  -- org_id NULL, scope_mode 'restricted', is_enabled true (the four new rows carry visibility 'public')
   SELECT example_output LIKE '%30.8%' AS fa_fixed FROM expert_bundles
    WHERE is_system AND slug='financial-analyzer';   -- expect true
   ```
@@ -125,16 +134,17 @@ decrypt or print it).
 
 ## H. Post-deploy probe (operator, in an enterprise-tier org)
 
-1. `GET /experts` with that org's `X-Org-Id` lists exactly the four starter slugs.
+1. `GET /experts` with that org's `X-Org-Id` lists exactly the ~~four~~ **five** starter slugs.
 2. Install ONE new Expert (e.g. `contract-reviewer`) through the Experts page: `installing` → `ready`.
 3. Read (free, MCP): the install's documents are `completed` with `chunk_count > 0`, every row's `org_id`
    equals that org, and no chunk exists outside it (the SC#1 SQL in `269-UAT-LOG.md` / `266-UAT-LOG.md`).
 
 ## Residuals shipped as-is (recorded, not fixed by 269)
 
-- **`query_documents` ignores a restricted Expert's folder scope** — the reason security-compliance is held;
+- ~~**`query_documents` ignores a restricted Expert's folder scope** — the reason security-compliance is held;
   it equally affects the four shipped Experts' tool surface (reported-bugs entry, open). Same-org metadata
-  only; no cross-tenant read was observed.
+  only; no cross-tenant read was observed.~~ **CORRECTED:** BUG-260929-01 is fixed in code (`464ec8354`) and
+  closed on live re-drive evidence (`269-REDRIVE-SUMMARY.md`) — but production has the fix only once C ships it.
 - **SEED-325** (NULL-tier signup) and **SEED-326** (greenfield runbook seed rows beyond the Expert catalog).
 - G-4 screenshots `g4-*` are owed; 267 remains `human_needed` (inherited dependency).
 

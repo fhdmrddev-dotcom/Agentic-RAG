@@ -218,3 +218,33 @@ Re-capturing them needs a NEW fresh enterprise-tier org (another signup + tier w
 **Observations from driving it (not defects fixed here):**
 - The Financial Analyzer detail description still reads "Answers strictly from uploaded documents or refuses." — the pre-existing 187 copy that 198 does not touch (same overclaim as review WR-02).
 - Its action prompt "Compare Year-over-Year Results" compares Q3 2026 with Q3 2025 — the corpus is Q3 2026 only, so that one-click prompt cannot be answered from it. Recorded for the operator; not in 269's scope to change without a new ruling.
+
+## Re-drive after the BUG-260929-01 fix — 2026-09-29 (operator: "proceed")
+
+⚠ **Corrects "the library ships four" above — it ships FIVE.** The operator lock's HOLD is kept above as
+it was given; this section records what superseded it.
+
+Fix `464ec8354` live (backend restarted 20:05, after it). Questions and verdict rules fixed and committed
+BEFORE the first message (`269-REDRIVE-QUESTIONS.md`, `dfa95c079`). Fresh signup `uat269b-admin-0a2e5c` →
+org `21274586-64aa-42a8-81fe-7dedac7740fd`; NULL tier → `403` with the tier sentence; the named **F-4
+operator tier assignment (D-269-P1)** `UPDATE … SET subscription_tier='enterprise'` → five slugs
+(`evidence/redrive-00-users-org-tier.txt`). Same model/provider/embedding model as 269-03.
+
+| slug | install | cited | refusal (broad OR-inviting question) | OR-shaped `query_documents` in refusal |
+|---|---|---|---|---|
+| financial-analyzer | PASS `08` | PASS `08` | PASS `08` ¹ | 1 (non-discriminating) |
+| contract-reviewer | PASS `09` | PASS `09` | PASS `09` | 1 + 1 folder-name OR (non-discriminating) |
+| hr-policy-advisor | PASS `10` | PASS `10` | PASS `10` | 0 (a no-WHERE `SELECT` over all documents; returned only its own 2) |
+| security-compliance | PASS `11` | PASS `11` | PASS `11` | 1 — **the leaking shape; DISCRIMINATING** |
+| operations-analyst | PASS `12` | PASS `12` | PASS `12` | 1 (self-scoped by the model; non-discriminating) |
+
+Every cited/refusal file: `web_search_calls: 0`, `out_of_folder_documents_retrieved_by_any_tool: 0` (every
+tool result scanned for id / filename / title). "Discriminating" is measured, not asserted:
+`evidence/redrive-counterfactual-or-scope.txt` runs each model-written query through the pre-fix and current
+scope injection — only security-compliance's returns a sibling document pre-fix.
+
+¹ The helper crashed on a cp1252 console print AFTER the run completed and BEFORE writing the file; the turn
+was evaluated from its persisted rows by the same checks and NOT re-driven (stated in the file).
+
+Decision by evidence: security-compliance promoted into 198 (verbatim candidate row `…2693`), corpus
+restored byte-identical to 269-01. Full record: `269-REDRIVE-SUMMARY.md`.

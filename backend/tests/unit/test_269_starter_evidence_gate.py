@@ -25,6 +25,10 @@ What is pinned:
 
 Driven RED in 269-04 twice: before 198 existed, and by moving one PASS refusal file of a seeded slug
 aside (restored md5-identical) — see 269-04's record.
+
+269 re-drive (after the BUG-260929-01 fix): every Expert was re-driven in a fresh org as NN 08..12,
+security-compliance included, and all 15 files PASS. It is seeded again by 198, and its older 06
+refusal FAIL stays in the evidence dir — the newest-NN rule is what lets the re-drive supersede it.
 """
 
 from __future__ import annotations
@@ -74,6 +78,7 @@ STARTER_FIGURES: dict[str, set[str]] = {
     "financial-analyzer": {"30.8%", "$29.1"},
     "contract-reviewer": {"$2.35M", "75 days"},
     "hr-policy-advisor": {"18 weeks", "23 days"},
+    "security-compliance": {"36 hours", "14 of 16"},
     "operations-analyst": {"94.7%", "38 days"},
 }
 
@@ -253,7 +258,12 @@ def test_evidence_check_accepts_the_real_locked_set(ev_copy):
 
 def test_evidence_check_rejects_a_missing_file(ev_copy):
     slug = sorted(insert_slugs(migration_198()))[0]
-    newest_evidence(ev_copy, slug, "refusal").unlink()
+    # Every attempt, not just the newest: since the re-drive each slug has TWO generations (03-07 and
+    # 08-12), and unlinking only the newest leaves an older PASS behind — that plants nothing missing.
+    attempts = list(ev_copy.glob(f"*-{slug}-refusal.txt"))
+    assert len(attempts) >= 2, attempts
+    for f in attempts:
+        f.unlink()
     problems = evidence_problems(ev_copy, {slug})
     assert any(f"-{slug}-refusal.txt" in p for p in problems), problems
 
@@ -267,10 +277,21 @@ def test_evidence_check_rejects_a_newest_fail_even_over_an_older_pass(ev_copy):
     assert any("99-" in p and "not a PASS" in p for p in problems), problems
 
 
-def test_evidence_check_rejects_the_held_back_expert():
-    """security-compliance is HELD (refusal FAIL). The check must say so if anyone seeds it."""
-    problems = evidence_problems(evidence_dir(), {"security-compliance"})
-    assert any("security-compliance-refusal.txt" in p and "not a PASS" in p for p in problems), problems
+def test_a_newer_pass_supersedes_the_older_real_fail_and_only_the_newest_is_read(ev_copy):
+    """The real history, not a plant: security-compliance's first refusal (06) is a FAIL and its
+    re-drive refusal (11) is a PASS. ~~269-04 asserted the check rejects it (it was HELD).~~ After the
+    BUG-260929-01 re-drive the NEWEST attempt wins, so it passes; and the rule is proven to be
+    newest-wins, not any-PASS-wins, by removing the newer PASS — the older FAIL is then read again."""
+    slug = "security-compliance"
+    old_fail = ev_copy / f"06-{slug}-refusal.txt"
+    assert old_fail.exists() and "VERDICT: FAIL" in old_fail.read_text(encoding="utf-8"), "the recorded 06 FAIL is gone"
+    newest = newest_evidence(ev_copy, slug, "refusal")
+    assert int(_NN.match(newest.name).group(1)) > 6, newest.name
+    assert "VERDICT: PASS" in newest.read_text(encoding="utf-8").splitlines(), newest.name
+    assert evidence_problems(ev_copy, {slug}) == []
+    newest.unlink()
+    problems = evidence_problems(ev_copy, {slug})
+    assert any(f"06-{slug}-refusal.txt" in p and "not a PASS" in p for p in problems), problems
 
 
 def test_evidence_check_rejects_a_pass_verdict_over_a_measured_leak(ev_copy):
