@@ -148,6 +148,9 @@ async def get_spend_summary(
         # D-268-25: sub-agents with no rate under a rated root — folded into the unrated
         # disclosure rather than under-pricing that root in silence.
         "unpriced_subagents": summary.unpriced_subagents,
+        # D-268-28 (268-REVIEW WR-05): unrated harness shells whose priced sub-agents ARE in the
+        # total — disclosed on the Unrated tile and the KPI footnote, never repriced.
+        "partly_priced_harness_runs": summary.partly_priced_harness_runs,
     }
 
 

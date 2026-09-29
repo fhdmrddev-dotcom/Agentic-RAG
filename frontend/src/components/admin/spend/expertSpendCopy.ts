@@ -61,6 +61,11 @@ export const EXPERT_SPEND_COPY = {
     n === 1
       ? "1 sub-agent run inside rated runs has no rate either, so its tokens are not in the total."
       : `${n} sub-agent runs inside rated runs have no rate either, so their tokens are not in the total.`,
+  /** D-268-28 (268-REVIEW WR-05): an unrated harness shell whose priced sub-agents ARE in the total. */
+  partlyPricedHarness: (n: number): string =>
+    n === 1
+      ? "1 harness run partly priced — sub-agent costs included, orchestrator cost not"
+      : `${n} harness runs partly priced — sub-agent costs included, orchestrator cost not`,
   subagentTile: {
     title: "Sub-agent tokens now counted",
     body: "A sub-agent's tokens now count toward the run that started it, and toward that run's Expert. Before Phase 268 they were left out, so totals that include sub-agent work read higher than they used to.",

@@ -83,6 +83,7 @@ const mockSummary: SpendSummaryData = {
   windowTotalUsd: 148.62,
   windowRunCount: 100,
   unpricedSubagents: 0,
+  partlyPricedHarnessRuns: 0,
 }
 
 const HR_ID = "11111111-1111-4111-8111-111111111111"

@@ -526,6 +526,13 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
             ) : (
               <span>—</span>
             )}
+            {/* D-268-28 (268-REVIEW WR-05): an unrated harness shell is NOT wholly excluded — its
+                priced sub-agents are in the figure above (D-268-21). Said here, beside the "*". */}
+            {!loadError && summary && (summary.partlyPricedHarnessRuns || 0) > 0 && (
+              <span className="block mt-1 text-amber-400/90" data-testid="kpi-partly-priced">
+                {EXPERT_SPEND_COPY.partlyPricedHarness(summary.partlyPricedHarnessRuns)}
+              </span>
+            )}
           </div>
         </div>
 
@@ -705,6 +712,7 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
         incompleteCoverageCount={summary?.incompleteCoverageCount || 0}
         ratedRunsCount={summary?.ratedRunsCount || 0}
         unpricedSubagents={summary?.unpricedSubagents || 0}
+        partlyPricedHarnessRuns={summary?.partlyPricedHarnessRuns || 0}
         onFilterUnrated={() => setCoverageFilter("unrated")}
         onFilterIncompleteCoverage={() => setCoverageFilter("incomplete_coverage")}
         onOpenRateRegistry={() => setActiveTab("rates")}

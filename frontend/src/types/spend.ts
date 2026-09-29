@@ -55,6 +55,11 @@ export interface SpendSummaryData {
   windowRunCount: number;
   /** D-268-25: sub-agents with no rate under a rated root, folded into the unrated disclosure. */
   unpricedSubagents: number;
+  /**
+   * D-268-28: unrated harness shell roots whose PRICED sub-agents are in the total (D-268-21), so the
+   * page says "partly priced" instead of "excluded". Computed by the server's per_root CTE.
+   */
+  partlyPricedHarnessRuns: number;
 }
 
 /** One Spend by Expert line. `key` is an Expert uuid, `none` or `unrecorded`. */

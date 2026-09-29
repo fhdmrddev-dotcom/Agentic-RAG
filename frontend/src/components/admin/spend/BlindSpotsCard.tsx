@@ -23,6 +23,8 @@ interface BlindSpotsCardProps {
    * would under-state what the total leaves out. Optional: absent reads as 0.
    */
   unpricedSubagents?: number
+  /** D-268-28: unrated harness shells whose priced sub-agents ARE in the total. Absent reads as 0. */
+  partlyPricedHarnessRuns?: number
   onFilterUnrated: () => void
   onFilterIncompleteCoverage: () => void
   onOpenRateRegistry: () => void
@@ -60,6 +62,7 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
   incompleteCoverageCount,
   ratedRunsCount,
   unpricedSubagents = 0,
+  partlyPricedHarnessRuns = 0,
   onFilterUnrated,
   onFilterIncompleteCoverage,
   onOpenRateRegistry,
@@ -173,6 +176,11 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
             {unpricedSubagents > 0 && (
               <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed" data-testid="unpriced-subagents-note">
                 {EXPERT_SPEND_COPY.unpricedSubagents(unpricedSubagents)}
+              </p>
+            )}
+            {partlyPricedHarnessRuns > 0 && (
+              <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed" data-testid="partly-priced-note">
+                {EXPERT_SPEND_COPY.partlyPricedHarness(partlyPricedHarnessRuns)}
               </p>
             )}
           </div>

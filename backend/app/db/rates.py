@@ -69,6 +69,10 @@ class SpendSummary:
     # "rated" (the CR-06 counters keep their root meaning) while part of its work is unpriced.
     # Named here so the unrated disclosure can say so instead of under-pricing in silence.
     unpriced_subagents: int = 0
+    # D-268-28 (268-REVIEW WR-05): ROOTS that are harness placeholder shells with no rate of their own
+    # but at least one PRICED sub-agent. D-268-21 puts that sub-agent USD in the totals while the root
+    # counts as unrated, so the page must say "partly priced" rather than "excluded".
+    partly_priced_harness_runs: int = 0
 
 
 # ═════════════════════════════════════════════════════════════════════════════════════
@@ -186,7 +190,12 @@ def _per_root_cte(window_sql: str, expert_param: str) -> str:
                 MAX(output_cost_per_million) FILTER (WHERE is_root) AS output_cost_per_million,
                 COUNT(*) FILTER (
                     WHERE NOT is_root AND input_cost_per_million IS NULL
-                ) AS unpriced_subagents
+                ) AS unpriced_subagents,
+                -- D-268-28: a shell root has no rate of its own, yet its PRICED sub-agents' USD is
+                -- in cost_usd above (D-268-21). These two let the totals name such a root as
+                -- "partly priced" instead of letting the Unrated tile call it excluded.
+                BOOL_OR(is_box_shell) AS is_box_shell,
+                COUNT(*) FILTER (WHERE NOT is_root AND cost_usd IS NOT NULL) AS priced_subagents
             FROM priced
             GROUP BY root_run_id
         )
@@ -533,7 +542,12 @@ async def get_org_spend_summary(
             COALESCE(SUM(pr.output_tokens), 0) AS total_output_tokens,
             COALESCE(
                 SUM(pr.unpriced_subagents) FILTER (WHERE pr.input_cost_per_million IS NOT NULL), 0
-            ) AS unpriced_subagents
+            ) AS unpriced_subagents,
+            -- D-268-28: an unrated harness shell whose sub-agents priced — counted in
+            -- unrated_runs_count AND contributing sub-agent USD to total_spend_usd. Disclosed, not repriced.
+            COUNT(*) FILTER (
+                WHERE pr.is_box_shell AND pr.input_cost_per_million IS NULL AND pr.priced_subagents > 0
+            ) AS partly_priced_harness_runs
         FROM per_root pr;
     """
     totals_row = await pool.fetchrow(summary_query, org_id, expert, start_time, end_time)
@@ -545,6 +559,8 @@ async def get_org_spend_summary(
     total_in = int(totals_row["total_input_tokens"] or 0)
     total_out = int(totals_row["total_output_tokens"] or 0)
     unpriced_subs = int(totals_row["unpriced_subagents"] or 0)
+    # D-268-28. `.get`: an asyncpg Record and every older mock row both answer it.
+    partly_priced = int(totals_row.get("partly_priced_harness_runs") or 0)
 
     # 2. Incomplete coverage query on workflow_runs (utilizing partial index).
     # 268: `workflow_runs` has no Expert column, so the filter follows the THREAD — a workflow
@@ -704,6 +720,7 @@ async def get_org_spend_summary(
         window_total_usd=window_total,
         window_run_count=window_runs,
         unpriced_subagents=unpriced_subs,
+        partly_priced_harness_runs=partly_priced,
     )
 
 

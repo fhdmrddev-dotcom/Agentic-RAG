@@ -113,6 +113,7 @@ export async function getSpendSummary(params?: {
     windowTotalUsd: usdOrNull(data.window_total_usd),
     windowRunCount: data.window_run_count || 0,
     unpricedSubagents: data.unpriced_subagents || 0,
+    partlyPricedHarnessRuns: data.partly_priced_harness_runs || 0,
   }
 }
 
