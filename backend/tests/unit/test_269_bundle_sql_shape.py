@@ -218,6 +218,39 @@ def test_candidate_sql_matches_the_starter_seed_shape():
     assert_starter_seed_shape(candidate_sql(), set(STARTER_IDS.values()))
 
 
+# 269-04 operator lock (269-UAT-LOG.md, "Operator lock (269-04 Task 1)"): the three LOCKed new
+# Experts. security-compliance (…2693) was HELD BACK on a refusal FAIL (D-269-09) and must NOT be
+# in 198. REQUIRED, not "if present": 198 missing is a failure here, never a skip.
+LOCKED_INSERT_SLUGS = ("contract-reviewer", "hr-policy-advisor", "operations-analyst")
+HELD_BACK_SLUGS = ("security-compliance",)
+
+
+def migration_198() -> Path:
+    matches = sorted(MIGRATIONS.glob("198_*.sql"))
+    assert len(matches) == 1, f"expected exactly one supabase/migrations/198_*.sql, got {matches}"
+    return matches[0]
+
+
+def test_migration_198_matches_the_starter_seed_shape():
+    assert_starter_seed_shape(migration_198(), {STARTER_IDS[s] for s in LOCKED_INSERT_SLUGS})
+
+
+def test_migration_198_does_not_seed_a_held_back_expert():
+    text = migration_198().read_text(encoding="utf-8")
+    code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("--"))
+    for slug in HELD_BACK_SLUGS:
+        assert f"'{slug}'" not in code, f"held-back Expert {slug} is seeded by 198"
+        assert STARTER_IDS[slug] not in text, f"held-back Expert id {STARTER_IDS[slug]} appears in 198"
+
+
+def test_migration_198_has_no_forbidden_statement_keyword_even_in_copy():
+    code = "\n".join(
+        line for line in migration_198().read_text(encoding="utf-8").splitlines() if not line.lstrip().startswith("--")
+    )
+    assert not re.search(r"GRANT|CREATE |ALTER |DROP |DELETE |TRUNCATE", code, flags=re.I)
+    assert not re.search(r"24\.3%|412M|quarter-over-quarter", code)
+
+
 def test_candidate_sql_is_a_staging_artifact_outside_migrations():
     path = candidate_sql()
     assert MIGRATIONS not in path.parents, path

@@ -4,8 +4,14 @@ Every starter Expert ships a corpus as DATA under ``backend/app/experts/corpora/
 pins what the live drive (269-03) depends on, BEFORE any drive happens:
 
 1. THE SET IS DERIVED, NEVER A CONSTANT. ``SLUGS`` is read from ``CORPORA_ROOT.iterdir()``. A
-   collapse guard refuses to pass over fewer than five corpora, and a bijection check refuses a
-   figure map for a corpus that does not exist (or a corpus with no figure map).
+   collapse guard refuses to pass over fewer than the shipped count of corpora, and a bijection check
+   refuses a figure map for a corpus that does not exist (or a corpus with no figure map).
+   ⚠ 269-04: the shipped count is FOUR, not five. ``security-compliance`` was HELD BACK under
+   D-269-09 (its live refusal turn FAILed — evidence/06-security-compliance-refusal.txt), so its
+   corpus directory was deleted and its entries left both maps. The floor moved 5 -> 4 to match
+   what ships (ship fewer, never weaken): it still trips on the next lost corpus, and
+   test_269_starter_evidence_gate.py pins the exact set against migration 198. No REFUSAL_LITERALS
+   entry used it as a sibling, so no refusal pair was re-pointed.
 2. EVERY CORPUS LOADS through the unchanged Phase 266 loader (D-269-08) — text mime, LF only.
 3. UNIQUENESS ACROSS CORPORA (M-13 / T-269-04). folder_name, filename and sha256 are unique, so an
    install never 409s on duplicate bytes and two Experts never collide on one Library folder.
@@ -41,16 +47,19 @@ EXPECTED_FIGURES: dict[str, list[bytes]] = {
     "financial-analyzer": [b"$124.5", b"+18.2%", b"30.8%", b"$29.1"],
     "contract-reviewer": [b"$2.35M", b"75 days"],
     "hr-policy-advisor": [b"23 days", b"18 weeks", b"$1,850"],
-    "security-compliance": [b"36 hours", b"14 of 16"],
     "operations-analyst": [b"94.7%", b"38 days", b"41%"],
 }
+# security-compliance: HELD BACK in 269-04 (D-269-09) — corpus deleted, keys removed from both maps.
+
+# The shipped corpus count (financial-analyzer + three LOCKed starters). Five were authored; one
+# was held back on live evidence. A floor, so a later LOCKed addition does not need an edit here.
+SHIPPED_CORPORA_FLOOR = 4
 
 # asking slug -> (sibling slug that answers the out-of-scope question, the answer literal)
 REFUSAL_LITERALS: dict[str, tuple[str, bytes]] = {
     "financial-analyzer": ("hr-policy-advisor", b"23 days"),
     "contract-reviewer": ("operations-analyst", b"94.7%"),
     "hr-policy-advisor": ("contract-reviewer", b"$2.35M"),
-    "security-compliance": ("financial-analyzer", b"$124.5"),
     "operations-analyst": ("hr-policy-advisor", b"18 weeks"),
 }
 
@@ -77,7 +86,9 @@ def _raw_by_slug() -> dict[str, bytes]:
 
 
 def test_derived_slug_set_has_not_collapsed():
-    assert len(SLUGS) >= 5, f"derived corpus set collapsed to {SLUGS} — a fence over nothing is vacuous"
+    assert len(SLUGS) >= SHIPPED_CORPORA_FLOOR, (
+        f"derived corpus set collapsed to {SLUGS} — a fence over nothing is vacuous"
+    )
 
 
 def test_figure_map_is_a_bijection_with_the_corpus_directories():
