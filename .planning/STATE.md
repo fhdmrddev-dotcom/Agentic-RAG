@@ -4,13 +4,13 @@ milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
 status: executing
 last_updated: "2026-09-28T14:28:00.379Z"
-last_activity: 2026-09-29 -- 268 executed + verified (human_needed); code review all_fixed
+last_activity: 2026-09-29 -- 268 CLOSED (passed); D-2 fixed; SEED-323/324 planted
 progress:
   total_phases: 12
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 19
-  completed_plans: 15
-  percent: 25
+  completed_plans: 16
+  percent: 33
 ---
 
 # Project State
@@ -52,7 +52,9 @@ genuinely reviewed.
 Milestone: v4.4 Experts That Actually Work
 Phase: 268 (Expert Spend & Mid-Thread Scope)
 Plan: 4 of 4 — complete
-Status: **Phase 268 executed + verified — `human_needed` (4/4 SC live-verified). Owed: independent (non-builder) review + SC#1-continued live drive (`268-HUMAN-UAT.md`).**
+Status: **Phase 268 CLOSED 2026-09-29 — `passed`.** Next: Phase 269 (Starter Expert Library) → `/gsd:discuss-phase 269`.
+
+- **2026-09-29 close:** Gemini's independent review checked by Claude — 0 blocking (CR-01/WR-01 refuted, WR-02 info). SC#1-continued PASS live on a seeded pause (line delta = run delta, +139,903 / +297). **D-2 FIXED** `a2274e435` (Continue's count was dropped by RLS). D-1 → **SEED-323**, D-3 → **SEED-324**. UI-review top 3 fixed `dda093f6f`.
 
 - 268-01..03 shipped; 268-04 Task 1 (real-PG spend reconciliation, `6fd38f39a`) and Task 3 (live UAT,
   `da142f6dd`) done; Task 5's closeout (parity checklist, seeds, registers, gates) done ahead of the G-4 reply.
@@ -68,8 +70,8 @@ Status: **Phase 268 executed + verified — `human_needed` (4/4 SC live-verified
 - **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
-Resume file: .planning/phases/268-expert-spend-mid-thread-scope/268-HUMAN-UAT.md
-Last activity: 2026-09-29 -- 268 verified human_needed; review all_fixed
+Resume file: none — start Phase 269
+Last activity: 2026-09-29 -- 268 closed (passed)
 
 ---
 
@@ -97,15 +99,15 @@ Last activity: 2026-09-29 -- 268 verified human_needed; review all_fixed
 | G-5 (refactor between feature waves) | **Honoured by construction on every firing file, NO override.** Each change is additive kwargs/fields, one arm, one writer, one route, or a shape that already existed. **G-5 not fired: `retrieval_service.py` unmodified; SEED-224 extraction stays owed** (D-268-03 → D-268-14; `git diff 220c82dde -- backend/app/services/retrieval_service.py` empty). **Crossed the threshold in 268:** `frontend/src/pages/admin/AdminSpendPage.tsx` (`9 / 3 / 974`) — the next phase that edits it proposes an extraction first | `docs/HOT-FILE-LEDGER.md` § Phase 268 CLOSE |
 | G-8 (plan-count proportion) | **4 plans / 3 waves (D-268-15).** The sub-agent roll-up SQL was moved from plan 1 to plan 2 so it lives beside the breakdown in `db/rates.py` (one author for one CTE) | `268-0{1..4}-PLAN.md` |
 | D-268-09 | **Org spend totals rise because sub-agent tokens are now counted.** 257 priced root runs only; 268 prices every sub-agent at its own rate and rolls it into its root and that root's Expert. Disclosed on the Blind Spots card ("Sub-agent tokens now counted"); not a pricing change | `268-02-SUMMARY.md` |
-| UAT findings | **F-1** (a same-prompt follow-up after a scope change is answered from history; 6 / 8 providers cite the dropped folder, one under a false location) → **SEED-319**, routed to the operator, not fixed. **Q9** (Continue's user-JWT UPDATE matching 0 rows) **refuted by data**, no seed. Fixture substitution: Financial Analyzer is Restricted, so SC#4-biased used UAT-265 Billing SOP Advisor | `268-UAT-LOG.md` |
+| UAT findings | **F-1** (a same-prompt follow-up after a scope change is answered from history; 6 / 8 providers cite the dropped folder, one under a false location) → **SEED-319**, routed to the operator, not fixed. ~~**Q9** (Continue's user-JWT UPDATE matching 0 rows) **refuted by data**, no seed.~~ ⚠ **CORRECTED 2026-09-29 — Q9 was TRUE**: measured live, the API said `continues_used 1` and the row read `0` (`runs` is SELECT-only under RLS). Fixed as **D-2** `a2274e435`. Fixture substitution: Financial Analyzer is Restricted, so SC#4-biased used UAT-265 Billing SOP Advisor | `268-UAT-LOG.md` |
 
 **Owed from 268, and which to run first:**
 
 1. ~~The operator's G-4 Chrome pass~~ **PASS ×3, both themes, operator "approved" 2026-09-29** (`268-UAT-LOG.md`).
-2. **The independent review** by an agent that did not build 268 (AGENTS.md). **Run this first.**
-3. **SC#1-continued** live (a Deep run reaching the cap, then Continue).
+2. ~~**The independent review**~~ **Done 2026-09-29** — Gemini, checked by Claude, 0 blocking (`268-REVIEW.md`).
+3. ~~**SC#1-continued** live~~ **PASS 2026-09-29** on a seeded pause, after the D-2 fix (`268-UAT-LOG.md`).
 4. ~~The operator's ruling on **SEED-319** (F-1).~~ Ruled 2026-09-29 (D-268-26) and BUILT (`1ec11a842`); SC#10 re-drive 6/8.
-5. Production: `268-PROD-PARITY.md` — migration 197 BEFORE the backend deploy; every write on explicit per-action approval.
+5. **Still owed —** Production: `268-PROD-PARITY.md` — migration 197 BEFORE the backend deploy; every write on explicit per-action approval.
 
 **CLAUDE.md size:** 117,178 chars after 268's cells — under the 120,000 warn band; no split scheduled (headroom
 2,822 to the band).

@@ -1,9 +1,9 @@
 ---
 phase: 268-expert-spend-mid-thread-scope
 verified: 2026-09-29T00:00:00Z
-verification_mode: self-verified   # ⛔ NEVER "reviewed" — the independent AGENTS.md review by an agent that did not build 268 is OWED (STATE.md itself records this)
-status: human_needed
-score: 4/4 roadmap success criteria live-verified (with 2 named residual gaps, both self-disclosed by the phase); 2 items OWED (human_needed)
+verification_mode: reviewed   # independent review by Gemini (non-builder) at 04d23d1ca, each finding checked by Claude (0 blocking); the D-2 fix after it (a2274e435, runs.py) is self-verified
+status: passed
+score: 4/4 roadmap success criteria live-verified; both human_verification items discharged 2026-09-29 (see Closure)
 overrides_applied: 0
 human_verification:
   - test: "Independent code review of Phase 268 by an agent that did NOT build it (AGENTS.md two-agent separation / 'whoever reviews must not have shaped the build')."
@@ -23,7 +23,7 @@ after it starts — both visible where the person looks, and both true in the da
 **Requirements:** METER-08, CHAT-08
 **Verified:** 2026-09-29
 **Verification mode:** self-verified (⛔ not "reviewed" — see `human_verification` above)
-**Status:** human_needed
+**Status:** passed (closed 2026-09-29 — see Closure)
 **Re-verification:** No — initial verification
 
 ## Summary
@@ -156,3 +156,13 @@ reflect that G-4 is done, alongside whatever this verification report resolves.
 
 _Verified: 2026-09-29_
 _Verifier: Claude (gsd-verifier)_
+
+## Closure (2026-09-29)
+
+| Owed item | Result | Evidence |
+|---|---|---|
+| Independent review | **Done.** Gemini (did not build 268) reviewed `220c82dde..HEAD` → 1 Critical, 2 Warnings. Claude checked each: CR-01 refuted (org_id is NOT NULL since mig 105), WR-01 refuted (contradicts Pitfall 9 / T-268-25), WR-02 confirmed as Info. **0 blocking.** | `268-REVIEW.md` iteration 4 + "Claude check" section |
+| SC#1-continued live | **PASS (seeded pause).** No provider reached `cap_paused` live in 3 attempts, so the pause was set by hand. A real Continue then added +139,903 / +297 tokens to the run and exactly the same to the HR Advisor line (8 runs unchanged; independent SUM agrees). | `268-UAT-LOG.md` § SC#1-continued PASS |
+| Found on the way | **D-2 FIXED**: Continue's `continues_used` write was dropped by RLS (runs is SELECT-only). RED→GREEN real-PG test `test_268_continue_counts.py`; unit gate 71 = the 256 baseline set. **D-1 → SEED-323, D-3 → SEED-324** (both rare, both deferred). | `a2274e435` |
+
+Production parity is unchanged and still owed: `268-PROD-PARITY.md` (migration 197 before the backend deploy).
