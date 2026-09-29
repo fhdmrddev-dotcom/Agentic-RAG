@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
-status: executing
-last_updated: "2026-09-28T14:28:00.379Z"
-last_activity: 2026-09-29 -- 268 CLOSED (passed); D-2 fixed; SEED-323/324 planted
+status: "**Phase 268 CLOSED 2026-09-29 — `passed`.** Next: Phase 269 (Starter Expert Library) → `/gsd:discuss-phase 269`."
+last_updated: "2026-09-29T13:22:12.160Z"
+last_activity: 2026-09-29 -- 268 closed (passed)
 progress:
   total_phases: 12
   completed_phases: 4
   total_plans: 19
-  completed_plans: 16
+  completed_plans: 19
   percent: 33
 ---
 
@@ -58,19 +58,22 @@ Status: **Phase 268 CLOSED 2026-09-29 — `passed`.** Next: Phase 269 (Starter E
 
 - 268-01..03 shipped; 268-04 Task 1 (real-PG spend reconciliation, `6fd38f39a`) and Task 3 (live UAT,
   `da142f6dd`) done; Task 5's closeout (parity checklist, seeds, registers, gates) done ahead of the G-4 reply.
+
 - Live (dev org `22f9c615-…`): SC#1 reconcile / filter / sub-agent, SC#2, SC#3 event / reload / retrieval,
   SC#4 biased / restricted / authz, MT-1, PT-1, LM-1 PASS. SC#10 fixed recipe: **1 PASS / 7 ⛔** — turn 2 answered
   from history without searching (**F-1 → SEED-319**, an operator design decision); the fresh-search variant
   retrieves only the new subtree on 8 / 8. SC#1-continued OWED-manual. Record: `268-UAT-LOG.md`.
+
 - **2026-09-29, D-268-26 (SEED-319 "tell the model") BUILT and re-driven:** fix `1ec11a842` (RED `29e64548d`); SC#10
   run 2 = **6 PASS / 2 ⛔** (openai, google re-retrieve with grep on the NEW path: a pass-bar gap, answers correct);
   dropped-folder citations **6/8 → 0/8**; G4-2 API follow-up PASS. Backend 71 = base set. SEED-319 answered.
+
 - Still owed from 267: its independent review and the operator's G-4 sign-off (see the 267 block below).
 
 - **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
-Resume file: none — start Phase 269
+Resume file: .planning/phases/269-starter-expert-library/269-CONTEXT.md
 Last activity: 2026-09-29 -- 268 closed (passed)
 
 ---
