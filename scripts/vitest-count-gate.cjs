@@ -185,10 +185,10 @@ const BASELINE = {
   "expertEventCopy.test.ts": 26, // 268-03 +7: scope_changed model from the three backend fixtures
   "ExpertEventCard.test.tsx": 14, // 268-03 +4: the scope card (normal / during_run / held / empty Dropped)
   // ── Phase 268 plan 03 (CHAT-08) — the scope vocabulary + wire. Both knobs, same commit. ──
-  "scopeCopy.test.ts": 13,
+  "scopeCopy.test.ts": 15, // +2 268-REVIEW iter-2 WR-01 (conflict copy + getThread wire)
   "ScopeChip.test.tsx": 7,
   "ScopePicker.test.tsx": 15,
-  "ChatArea.scopeChange.test.tsx": 9,
+  "ChatArea.scopeChange.test.tsx": 15, // +3 268-REVIEW WR-01 (thread-switch gating) · +3 iter-2 WR-01 (409 reconcile)
   "HandoffCard.test.tsx": 3,
   "MessageItem.transcriptEvent.test.tsx": 8,
   "InviteExpertDialog.test.tsx": 23, // 267-REVIEW WR-06 +1, IN-02 +1; 267-UI-REVIEW #3 +1
