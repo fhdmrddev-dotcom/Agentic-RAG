@@ -4,10 +4,10 @@ title: query_documents returns documents from a sibling Expert's folder inside a
 reported: 2026-09-29
 surface: Agentic-RAG
 severity: major
-status: open
+status: fixed-pending-redrive
 affected_areas: [backend/tools, RAG/retrieval, experts/scope]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: null   # closes only when the held security-compliance refusal turn is re-driven live and PASSES
 related_seeds: []
 re_open_trigger: "any phase whose files_modified names backend/app/services/tool_dispatcher.py, the query_documents service, or the Expert scope resolution (run_producer.py / expert_service.py); OR the operator asks to re-drive and ship the held security-compliance Expert — its refusal turn must be re-driven and PASS after the fix"
 reproduces_on:
@@ -88,3 +88,13 @@ None safe for users. Operator-side: do not ship a restricted Expert whose refusa
 - `.planning/phases/269-starter-expert-library/evidence/06-security-compliance-{install,cited,refusal}.txt`
 - `supabase/migrations/198_starter_expert_library.sql` header (HELD BACK note)
 - `backend/app/services/tool_dispatcher.py:978-983`
+
+## ROOT CAUSE + FIX (2026-09-29, fast fix under G-3 — corrects the hypothesis above, original kept)
+
+The hypothesis that `folder_subtree_ids` was unset for Expert threads was **REFUTED**: `query_documents` did apply the scope. The defect was in `sql_service._inject_folder_scope`: it appended `AND d.folder_id IN (...)` to the model's WHERE **without parentheses**. SQL binds AND tighter than OR, so `WHERE a OR b OR c AND folder` scoped only `c`; the leaking turn's query was `filename ILIKE .. OR filename ILIKE .. OR title ILIKE ..`. It affects every folder-scoped chat, not only Experts (RLS still confined it to the org — no cross-tenant read).
+
+**Fix:** the whole existing predicate is parenthesised before the folder condition is ANDed on. `backend/tests/unit/test_sql_scope_or_precedence.py` (6 tests; 4 RED before the fix, 6 green after).
+
+**Live proof (local DB, uat269 admin, Security folder `16db0107-…`):** the exact leaking query with the OLD injection returned `acme_q3_2026_financial_report.md` (folder `cc435f1e`, the Financial Analyzer's); through the fixed `query_documents` it returns `No results.` The 13 failing tests in the related `-k "sql or query_documents or folder_scope"` selection are the SAME set with and without the change (existing baseline red).
+
+**Not done — deliberately:** security-compliance is still HELD and not shipped. Un-holding it needs its refusal turn re-driven live in a fresh enterprise-tier org with a PASS transcript (D-269-09), then re-promotion into a migration. The other four Experts' PASS verdicts were single samples that did not exercise the leaking query shape; they should be re-driven with an OR-shaped question before anyone claims strict isolation.
