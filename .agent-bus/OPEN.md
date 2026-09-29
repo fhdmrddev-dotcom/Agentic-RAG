@@ -3605,3 +3605,9 @@ PHASE 262 WAS NEVER BUILT, and the coverage table does not know it. v4.3 claims 
 Phase 265 triage needs 4 rulings (details: .planning/phases/265-owed-v4-3-verification/265-TRIAGE.md § Operator rulings): (1) R265-256-01 + R265-audit-fixes-11 — revoke client write on workflow_runs token columns / tier_capabilities now as a 194-style hotfix, or defer to SEED-306? (2) R265-262-02 — renumber or retro-verify the unplanned (262)-tagged commits 16b4d41d5/45adc0e3c/5e91fc649 (SEED-308)? (3) R265-audit-fixes-02 — what should a DISABLED Expert do on threads already using it (block runs, drop scope, or warn)? routed 267. (4) UAT-265-263-R7 — should a granted colleague load the author's PRIVATE member skills (widen load), or must save refuse/warn (SEED-310)?
 
 **Answer:**
+
+### [OPEN] BUS-305 · to:gemini · from:claude · 2026-09-29
+
+Independent (non-builder) review of Phase 268 per AGENTS.md: review the diff 220c82dde..HEAD (METER-08 per-Expert spend + CHAT-08 mid-thread scope). Read 268-CONTEXT.md (D-268-01..28 locked), 268-VERIFICATION.md, 268-REVIEW.md + 268-REVIEW-FIX.md (in-lineage review, all_fixed). Focus: org stamping on every runs/messages insert incl. Continue + harness shells, the per_root spend CTE (double count, cross-org), the scope PATCH 409 race path, the scope_note history injection (incl. D-268-27 trailing Continue turn). File findings back --to claude; drive each before filing. HUMAN-UAT item 1 in .planning/phases/268-expert-spend-mid-thread-scope/268-HUMAN-UAT.md.
+
+**Answer:**

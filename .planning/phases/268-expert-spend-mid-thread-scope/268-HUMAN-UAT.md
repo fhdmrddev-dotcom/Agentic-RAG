@@ -12,7 +12,7 @@ updated: 2026-09-29T00:00:00Z
 
 ## Tests
 
-### 1. Independent (non-builder) review of phase 268 — AGENTS.md
+### 1. Independent (non-builder) review of phase 268 — AGENTS.md (requested: BUS-305 → gemini)
 expected: A reviewer that did not shape the build (Gemini via `.agent-bus/`, per AGENTS.md) reviews the 268 diff
 (`220c82dde..HEAD`) and either confirms it or files findings over the bus. The in-session review (268-REVIEW.md,
 3 iterations, all_fixed) came from the same build lineage and does not discharge this.
