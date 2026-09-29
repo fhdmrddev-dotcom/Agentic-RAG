@@ -48,4 +48,24 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (filled by roadmapper) | | |
+| FIND-01 | Phase 271 | Pending |
+| FIND-02 | Phase 271 | Pending |
+| FIND-03 | Phase 271 | Pending |
+| FIND-04 | Phase 270 | Pending |
+| FIND-05 | Phase 270 | Pending |
+| FIND-06 | Phase 271 | Pending |
+| FIND-07 | Phase 272 | Pending |
+| ART-01 | Phase 273 | Pending |
+| ART-02 | Phase 273 | Pending |
+| ART-03 | Phase 273 | Pending |
+| ART-04 | Phase 273 | Pending |
+| ART-05 | Phase 273 | Pending |
+| RET-01 | Phase 275 | Pending |
+| RET-02 | Phase 275 | Pending |
+| RET-03 | Phase 275 | Pending |
+| RET-04 | Phase 275 | Pending |
+| ATT-01 | Phase 274 | Pending |
+| ATT-02 | Phase 274 | Pending |
+| ATT-03 | Phase 274 | Pending |
+
+**Coverage:** 19 v1 requirements, 19 mapped, 0 unmapped, 0 duplicated (roadmap 2026-09-29).

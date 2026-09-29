@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: Find It, Show It
 status: planning
-last_updated: "2026-09-29T19:00:00.000Z"
-last_activity: 2026-09-29 -- Milestone v4.5 started
+last_updated: "2026-09-29T20:00:00.000Z"
+last_activity: 2026-09-29 -- v4.5 roadmap created (phases 270-275)
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -32,8 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Milestone v4.5 Find It, Show It — defining requirements (phases resume at 270, migrations at 199)
-**265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`).
+**Current focus:** Milestone v4.5 Find It, Show It. Roadmap created 2026-09-29: phases **270-275**, migrations from **199**. Next: Phase 270.
 
 ---
 
@@ -55,10 +54,23 @@ genuinely reviewed.
 
 ## Current Position (v4.5)
 
-Phase: Not started (defining requirements)
+Phase: 270 (The Document as an Object) — not started, ready to discuss
 Plan: -
-Status: Defining requirements
-Last activity: 2026-09-29 - Milestone v4.5 Find It, Show It started (hand-edited; `state.milestone-switch` NOT called, backup taken)
+Status: Roadmap created; ready to plan
+Last activity: 2026-09-29 - v4.5 roadmap created (hand-edited; no `state.*` / `milestone.*` SDK verb called)
+
+### v4.5 roadmap (2026-09-29): 19 / 19 requirements mapped
+
+| Phase | Name | Requirements | Gate flags |
+|---|---|---|---|
+| 270 | The Document as an Object | FIND-04, FIND-05 | migration 199 · security (signed URL) · G-2 · G-4 |
+| 271 | Find the Document | FIND-01, FIND-02, FIND-03, FIND-06 | G-2 sketch · G-4 · SEED-211 fence |
+| 272 | Close Means Wrong | FIND-07 | ⛔ G-5: `retrieval_service.py` extraction FIRST · SC#10 · SEED-273 recall |
+| 273 | Agent-Authored Artifacts | ART-01..05 | G-2 sketch · G-4 · SC#10 · closed-core tool-count decision |
+| 274 | Thread-Scoped Attachments | ATT-01..03 | measure first (244 D-244-01/03/04) · G-2 · G-4 |
+| 275 | Retention & Legal Hold | RET-01..04 | ⛔ fail-closed + dry-run first · migrations · RLS · G-2 · G-4 |
+
+Order: 270 → 271 → 272 → 273 → 274 → 275 (273 can move earlier if `tool_dispatcher.py` / `agent_loop.py` are free). Full detail: `ROADMAP.md` § v4.5. Next: `/gsd:discuss-phase 270` (sweep reported-bugs and `node scripts/check-seeds-register.cjs --phase 270` there).
 
 **The v4.4 block below is the v4.4 close history, kept verbatim.**
 
