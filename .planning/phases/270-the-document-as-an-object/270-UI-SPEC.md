@@ -1,7 +1,7 @@
 ---
 phase: 270
 slug: the-document-as-an-object
-status: draft
+status: approved
 shadcn_initialized: true
 preset: "components.json — style default, baseColor slate, cssVariables true, iconLibrary lucide (Aether Intelligence / Deep Midnight tokens in src/index.css)"
 created: 2026-09-30
