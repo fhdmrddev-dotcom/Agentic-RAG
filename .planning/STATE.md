@@ -72,7 +72,7 @@ Status: Phase 269 closed — verification `passed`; nothing deployed; ~~next: op
   run 2 = **6 PASS / 2 ⛔** (openai, google re-retrieve with grep on the NEW path: a pass-bar gap, answers correct);
   dropped-folder citations **6/8 → 0/8**; G4-2 API follow-up PASS. Backend 71 = base set. SEED-319 answered.
 
-- Still owed from 267: its independent review and the operator's G-4 sign-off (see the 267 block below).
+- ~~Still owed from 267: its independent review and the operator's G-4 sign-off (see the 267 block below).~~ **CLOSED 2026-09-29:** both landed — the independent review (`267-REVIEW-INDEPENDENT.md`; CR-02/CR-03 fixed and live-driven, CR-01 → SEED-327, the rest → SEED-328) and the operator's G-4 reply ("all pass", verbatim in `267-UAT-LOG.md`); `267-VERIFICATION.md` is `passed`.
 
 - **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
@@ -106,7 +106,7 @@ Last activity: 2026-09-29 -- Phase 269 closed
 | G-5 (refactor between feature waves) | **Not fired — `watched: 0`.** A data-only phase: corpora, a data migration, tests, docs; no source file with a ledger row modified. Stated so it is not read as a skipped audit | `check-hot-file-ledger.cjs` at 269-05 |
 | G-8 (plan-count proportion) | **5 plans / 4 waves.** Wave 1 split in two because 12 corpus files + their fences exceed one plan's budget; waves 2-4 are sequential by operator checkpoints (live drive → lock → close) | `269-0{1..5}-PLAN.md` |
 | SC#10 cross-provider | **Does not fire** — no streaming / agent-loop / provider-routing / UI-state change; PACK-27 asks for one live conversation per Expert (all on `deepseek-v4-flash` / `deepseek`, the configured default) | `269-UAT-LOG.md` § SC#10 |
-| 267 dependency | **267 is `human_needed`** (independent review + operator G-4 sign-off owed). 269 inherits 267's additive-scope behaviour (D-267-01) as an **INHERITED DEPENDENCY** and does **not** claim 267 verified | `267-VERIFICATION.md` |
+| 267 dependency | ~~**267 is `human_needed`** (independent review + operator G-4 sign-off owed).~~ **CORRECTED 2026-09-29: 267 is now `passed`** (see `267-VERIFICATION.md`). 269 inherits 267's additive-scope behaviour (D-267-01) as an **INHERITED DEPENDENCY** and does **not** claim 267 verified | `267-VERIFICATION.md` |
 | independent_review | **`self`** — Gemini is out; run `/gsd:code-review 269` next (fresh-context subagent) | CLAUDE.md § Claude is the only agent |
 
 **Owed from 269, and which to run first:**
