@@ -21,8 +21,6 @@ import copy
 import json
 from pathlib import Path
 
-import pytest
-
 from app.services.agent_loop import _reconstruct_history
 
 FIX = Path(__file__).resolve().parents[1] / "fixtures" / "phase268"
@@ -135,6 +133,8 @@ def test_a_change_during_a_run_attaches_after_that_answer():
 
 
 def test_an_event_with_no_following_user_message_emits_nothing():
+    """268-04's pin, narrowed by D-268-27 to the NON-Continue path (the default): on an ordinary send the
+    just-inserted user message follows the event and carries the note, so a trailing event adds nothing."""
     assert _reconstruct_history([_user("q"), _event(_moved("A", "B"))]) == [{"role": "user", "content": "q"}]
 
 
@@ -198,37 +198,65 @@ def test_WR04_the_same_unnameable_folder_round_trip_says_nothing():
     assert _reconstruct_history(rows) == [{"role": "user", "content": "q"}]
 
 
-# ── 268-REVIEW WR-03 — DEFERRED (needs operator decision), pinned as a STRICT xfail ──────────────────────────
+# ── 268-REVIEW WR-03 → D-268-27 — a scope change made while paused reaches the Continue ───────────────────
 #
-# D-268-23 lets a scope change made while a run is cap_paused apply to the Continue, and the Continue does
-# re-resolve scope. But a Continue writes no user row, so a scope_changed event after the paused segment is
-# still pending when the loop ends, and D-268-26 only hands the note to the NEXT user message. The resumed
-# model therefore gets no note while its history holds the paused segment's old-scope results (SEED-319 on
-# the one path D-268-23 names). The test above, `test_an_event_with_no_following_user_message_emits_nothing`,
-# pins the current rule deliberately (268-04).
-#
-# Fixing it means choosing where the note goes when no next user message exists: prepend it to the LAST
-# prior user message (the review's suggestion), or add a synthetic trailing user turn. Both satisfy the
-# locked "user-role, never a mid-history system row" rule; neither is what D-268-26 says. That placement is
-# the operator's call, so this is recorded rather than decided. `strict=True`: when a fix lands, this XPASSes,
-# the suite fails, and both this pin and the one above must be revisited together.
+# A Continue writes no user row, so a scope_changed event after the paused segment was still pending when the
+# loop ended and the resumed model was never told (SEED-319 on the path D-268-23 names). D-268-27 (operator):
+# on a Continue, ONE synthetic USER-role note turn is appended at the end, in scope_note.py's one-home words.
+# Never a system-role message; an earlier user message is never rewritten. (This was a strict xfail, 1037bfcf8.)
+
+_PAUSED_SEGMENT = {
+    "role": "assistant",
+    "content": "Searching the contracts…",
+    "tool_calls": [{"tool_call_id": "call_1", "name": "search_documents",
+                    "args": {"query": "payment terms"}, "result": "MSA: NET 60 (Client ACME)"}],
+}
+_CARRIER = {"role": "system", "content": "⏸ Reached the iteration limit…",
+            "tool_calls": [{"kind": "iteration_cap_paused", "tool_call_id": "call_2",
+                            "name": "search_documents", "arguments": "{}"}]}
 
 
-@pytest.mark.xfail(strict=True, reason="268-REVIEW WR-03 deferred — needs operator decision on note placement")
 def test_WR03_a_scope_change_made_while_paused_reaches_the_continue():
-    paused_segment = {
-        "role": "assistant",
-        "content": "Searching the contracts…",
-        "tool_calls": [{"tool_call_id": "call_1", "name": "search_documents",
-                        "args": {"query": "payment terms"}, "result": "MSA: NET 60 (Client ACME)"}],
-    }
-    carrier = {"role": "system", "content": "⏸ Reached the iteration limit…",
-               "tool_calls": [{"kind": "iteration_cap_paused", "tool_call_id": "call_2",
-                               "name": "search_documents", "arguments": "{}"}]}
-    rows = [_user("payment terms?"), paused_segment, carrier,
+    from app.services.scope_note import scope_history_note
+
+    rows = [_user("payment terms?"), _PAUSED_SEGMENT, _CARRIER,
             _event(_moved("Client ACME", "Client ACME/Q3 Contracts"))]
-    out = _reconstruct_history(rows)
+    out = _reconstruct_history(rows, resuming=True)
     carrying = [m for m in out if "Search scope changed" in (m.get("content") or "")]
-    assert len(carrying) == 1 and carrying[0]["role"] == "user", (
-        "the resumed model is never told the scope changed while its history holds the old-scope results"
-    )
+    assert len(carrying) == 1, "the resumed model must be told the scope changed — exactly once"
+    assert out[-1] is carrying[0], "the note is ONE synthetic turn at the END"
+    assert out[-1] == {"role": "user", "content": scope_history_note("Client ACME", "Client ACME/Q3 Contracts")}
+    assert out[0] == {"role": "user", "content": "payment terms?"}, "an earlier user message is never rewritten"
+
+
+def test_WR03_a_continue_whose_event_is_followed_by_a_user_message_adds_no_extra_turn():
+    rows = [_event(_moved("A", "B")), _user("q")]
+    out = _reconstruct_history(rows, resuming=True)
+    assert [m["role"] for m in out] == ["user"] and "Search scope changed" in out[0]["content"]
+
+
+def test_WR03_a_continue_with_nothing_pending_adds_nothing():
+    rows = [_user("q"), _PAUSED_SEGMENT]
+    assert _reconstruct_history(rows, resuming=True) == _reconstruct_history(rows)
+
+
+def test_WR03_a_held_trailing_change_on_a_continue_adds_nothing():
+    held = _moved("A", "B")
+    held["held"] = True
+    rows = [_user("q"), _event(held)]
+    assert _reconstruct_history(rows, resuming=True) == [{"role": "user", "content": "q"}]
+
+
+def test_WR03_the_loop_passes_the_continue_flag_at_its_one_call_site():
+    """The flag is the run's own `resume_dropped_tool_calls` (set only by the Continue path)."""
+    import ast
+    import inspect
+
+    from app.services import agent_loop
+
+    tree = ast.parse(inspect.getsource(agent_loop))
+    calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Name) and n.func.id == "_reconstruct_history"]
+    assert len(calls) == 1
+    kw = {k.arg: ast.unparse(k.value) for k in calls[0].keywords}
+    assert kw.get("resuming") == "ctx.resume_dropped_tool_calls", kw
