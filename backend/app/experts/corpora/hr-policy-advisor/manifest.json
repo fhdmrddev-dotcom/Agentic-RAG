@@ -1,0 +1,13 @@
+{
+  "folder_name": "HR Policies & Handbook",
+  "files": [
+    {
+      "filename": "acme_employee_handbook_2026.md",
+      "mime_type": "text/markdown"
+    },
+    {
+      "filename": "acme_learning_and_expense_policy_2026.md",
+      "mime_type": "text/markdown"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "folder_name": "Operations & Supply Chain",
+  "files": [
+    {
+      "filename": "acme_supplier_scorecard_q3_2026.md",
+      "mime_type": "text/markdown"
+    },
+    {
+      "filename": "acme_fulfilment_and_inventory_q3_2026.md",
+      "mime_type": "text/markdown"
+    }
+  ]
+}
