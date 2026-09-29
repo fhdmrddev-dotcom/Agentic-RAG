@@ -10,23 +10,29 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: v4.4 Experts That Actually Work
+## Current Milestone: none — v4.4 shipped, next via `/gsd:new-milestone`
 
-**Goal:** A client can install an Expert and get grounded answers from its own knowledge, in their own org — verified live, not by mocked tests.
-
-**Target features:**
-- **Owed v4.3 verification first** — live UAT for 257 / 258 / 261 / 263 and independent review of 255 / 256 / 262 / 264 plus the audit fix commits `c28853142`..`cdf3a308a`.
-- **PACK-05 closed (`SEED-304`)** — an Expert's sample corpus is **copied into the installing org and embedded there** (per-org provisioning; operator decision 2026-09-23 — no cross-tenant read path). Plus the blocking drafter bug: a ~4.8k-char blueprint into 1000-char fields.
-  - ✅ **Validated in Phase 266: Expert Knowledge in a Real Org (2026-09-25)** — PACK-18/19/20. Install copies the Financial Analyzer corpus into the installing org through the one ingest path; re-install adds only what is missing; a real-RLS two-org fence and live drives cite `$124.5 million` / `+18.2%` from the org's own copy. Migration **195** applied locally (prod = checklist only, 195 BEFORE backend deploy). CR-01 fixed: a restricted Expert with no folders now refuses the run (OV-266-02). ⚠ Before prod: new orgs get `subscription_tier` NULL and cannot install (F-4, operator decision owed).
-- **An Expert adds scope, it does not replace it (`SEED-303` open arms)** — two Experts in one chat (S3), the additive tool floor (S6), per-Expert spend attribution. S8 clone-and-customise stays deferred.
-- **A starter Expert library (`SEED-244`)** — a new org does not open an empty product.
-- **A thread's scope can change after it starts (`SEED-286`).**
-
-**Key context:** Phase numbering resumes at **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`). Tenancy decision for SEED-304 = **per-org copy** (operator, at intake). ⛔ Carried, not in scope: `SEED-013` Open Platform (next after this), `SEED-294` commercial blockers (non-engineering).
+Phase numbering resumes at **270**, migrations at **199**. ⛔ Carried: `SEED-013` Open Platform,
+`SEED-294` commercial blockers (non-engineering), `SEED-325` NULL-tier signup gap, `SEED-327`
+(`forced_emit` system prompt dropped by OpenAI-compat/Responses adapters), `SEED-328` deferred review items.
 
 ---
 
-## Last Shipped: v4.3 What You Can Actually Sell (2026-09-23)
+## Last Shipped: v4.4 Experts That Actually Work (2026-09-29)
+
+**Started:** 2026-09-23 · **Shipped:** 2026-09-29, git tag `v4.4` · 5 phases (265-269), 24 plans,
+migrations 194-198, 7 days. **17 / 17 requirements satisfied.** Integration 6/6. Audit `tech_debt`.
+
+A client can install an Expert and get grounded answers from its own knowledge in their own org:
+per-org corpus provisioning (266), additive scope with stated costs (267), per-Expert spend and
+mid-thread folder scope (268), a five-Expert starter library (269) — each proven by a live drive.
+⚠ All five phases closed `self-verified`. ⛔ **Deploy checklist before the next production push:**
+migrations 194-198 via the SQL editor, the image must carry `464ec8354`, run `get_advisors(security)`
+(`266-PROD-PARITY.md`, `269-PROD-PARITY.md`).
+
+---
+
+## Previously Shipped: v4.3 What You Can Actually Sell (2026-09-23)
 
 **Started:** 2026-09-18 · **Shipped:** 2026-09-23, git tag `v4.3` · 10 phases (255-260 scoped,
 **261-264 added in-milestone**), 39 plans, migrations 182-192, 6 days.
@@ -1117,6 +1123,14 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 - ✓ `BUS-171`'s operator queue is a decision list — REG-03, v4.2 (251)
 - ⛔ `DEBT-06` — **8 of 14 rows unmet** (239, 241, 242, 244, 245, 251, 252, 253). Accepted as documented debt at close by operator decision; `done` needs Gemini, `refused` needs an operator ruling (`REG-03`). **A refusal is not a pass.**
 
+### Validated (v4.4 — Experts That Actually Work)
+
+- ✓ Owed v4.3 UAT driven live and independently reviewed — VERIFY-01..05, v4.4 (265)
+- ✓ Expert corpus copied, ingested and embedded per org; idempotent and org-contained; Financial Analyzer answers from its own copy — PACK-18..20, v4.4 (266)
+- ✓ An Expert adds scope: additive tool floor, connection honesty, swap/remove event, ask-a-second-Expert, restricted-cost statement — PACK-21..25, v4.4 (267)
+- ✓ Spend attributable per Expert; mid-thread folder-scope change — METER-08, CHAT-08, v4.4 (268)
+- ✓ Five-Expert starter library, each with a live grounded conversation — PACK-26/27, v4.4 (269; enterprise-tier orgs only, D-269-P1)
+
 ### Validated (v4.3 — What You Can Actually Sell)
 
 - ✓ The extension contract is binding law, guarded, with three worked examples — EXT-01..03, v4.3 (255)
@@ -1402,3 +1416,5 @@ This document evolves at phase transitions and milestone boundaries.
 </details>
 
 *Last updated: 2026-09-23 — **milestone v4.4 Experts That Actually Work STARTED** via /gsd:new-milestone. Phase numbering continues at **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`). SEED-304 tenancy decided: per-org copy.*
+
+*Last updated: 2026-09-29 — **milestone v4.4 Experts That Actually Work COMPLETED** (git tag `v4.4`; 5 phases, 24 plans, 17/17 requirements; nothing deployed — migrations 194-198 + `464ec8354` owed to production). STATE.md and the archives were done by hand, not via `milestone.complete`.*
