@@ -353,3 +353,27 @@ ready in the dev org (`evidence/07-g4-fixtures.json`):
 | G4-3 | `G4-3 — HR Advisor, change scope here` `6c1eb62f-9eb7-456d-8bde-d9cc6c13d9ea` (HR Advisor active, one exchange) | the held payload and event wording above |
 
 Rows G4-1 / G4-2 / G4-3 are recorded here verbatim from the operator's reply at Task 5.
+
+### SC#1-continued — live drive 2026-09-29 (Claude, solo) — **BLOCKED by 3 Continue defects**
+
+**Reaching `cap_paused` live — 3 attempts, 0 pauses.** HR Advisor thread, 25-step dependent task, explorer mode:
+`deepseek-v4-flash` (run `91c12936`), `deepseek/deepseek-v4-pro` via OpenRouter (`d260c6ea`), and the same with
+`openrouter_tool_strategy = xml` for one run (`aece3c50`, restored to `quality` afterwards). All `completed` after
+7 tool calls: on the final step (`tool_choice = none`) the models either obeyed or wrote the call as DSML text,
+which is not buffered. **The local DB has never held a `cap_paused` Deep run** — the pause is near-unreachable live.
+
+**Seeded pause (operator-approved):** run `91c12936` (real tokens 18,929 / 3,426) was set `cap_paused` by hand, plus
+one carrier row in the exact `build_cap_paused_carrier_tool_calls` shape (`grep`, JSON-string arguments). Then
+`POST /runs/91c12936…/continue` was driven for real, twice. Afterwards the run row, the 4 added messages and both
+app settings were restored and verified; the first segment's tokens are unchanged.
+
+| # | Finding | Evidence |
+|---|---|---|
+| D-1 | **Continue on DeepSeek fails 400** — the replayed assistant tool-call turn omits `reasoning_content`, which DeepSeek thinking mode requires. The app's global default model is `deepseek-v4-flash`, so a Continue on the default config fails. | run `error`: `The reasoning_content in the thinking mode must be passed back to the API` (request ids `dc34f511…`, `382a949e…`); the transcript shows *"Model parameter error"* |
+| D-2 | **`continues_used` is never written.** `continue_run` updates `runs` through the user-JWT client (`runs.py:1108`), and `runs` has only the SELECT policy `runs_select_own` (since mig 035), so the UPDATE matches 0 rows silently. The endpoint answered `continues_used: 1` both times; the row read `0` both times. The 3-Continue limit therefore never counts up for chat runs. | `pg_policy` on `runs` = `runs_select_own` only; API vs DB readings above |
+| D-3 | **Continue does not check the run is `cap_paused`.** The second call went to a `failed` run and still answered `ok` and re-ran it. | second `POST …/continue` → `200 ok` on `status = failed` |
+| ✓ | A failed continuation keeps the first segment's tokens (18,929 / 3,426 unchanged; the HR Advisor line unchanged at 8 runs). | spend before = after |
+
+⚠ One attempt to run the Continue on `claude-sonnet-5` (global default switched for one run, then restored) still
+called DeepSeek; the cause (settings cache vs. model resolution) was **not** established. **SC#1's continued-run
+clause stays proven by tests only**; a live drive needs D-1 and D-2 fixed first.
