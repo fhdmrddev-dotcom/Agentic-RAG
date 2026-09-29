@@ -70,7 +70,7 @@ UPSERT_SET_COLUMNS = [
 CEILINGS = {"name": 120, "slug": 120, "category": 64, "when_to_use": 500, "example_output": 4000, "description": 8000}
 TEXT_COLUMNS = ["name", "slug", "description", "category", "when_to_use", "example_output", "prompt_suggestions"]
 
-_FIGURE = re.compile(r"(?<![A-Za-z0-9-])[~+]?\$?\d[\d,]*(?:\.\d+)?(?:%|M\b)?")
+_FIGURE = re.compile(r"(?<![\w-])[~+]?\$?\d[\d,]*(?:\.\d+)?(?:%|M\b)?")
 _UUID_ANY = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
