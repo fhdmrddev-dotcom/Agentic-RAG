@@ -3,7 +3,7 @@ import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
 import { ChatToolApprovalCard, type ApprovalDecision } from "./ChatToolApprovalCard"
 import { useMessages } from "@/hooks/useMessages"
-import { useStreamsStore } from "@/stores/streamsStore"
+import { useStreamsStore, recordExpertReading, type ExpertReading } from "@/stores/streamsStore"
 import {
   useStreamingForThread,
   useLoadingForThread,
@@ -138,6 +138,11 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
   // 268-REVIEW WR-01: the thread on screen NOW. Every scope write that follows an await checks it,
   // so an answer about the thread the user just left never lands on the one they switched to.
   const currentTidRef = useRef<string | null>(thread?.id ?? null)
+  // 267-REVIEW-INDEPENDENT CR-03(c): the server Expert reading this thread has already been reconciled
+  // against (set on every thread switch), and the thread as it is NOW (read by that reconcile only).
+  const seenExpertReadingRef = useRef<ExpertReading | undefined>(undefined)
+  const threadRef = useRef(thread)
+  threadRef.current = thread
   // Phase 267 plan 04 (D-267-16): the no-router door ChatLayout provides — `null` outside it, and
   // then no "New chat with …" control is offered at all.
   const threadNav = useThreadNavigation()
@@ -262,6 +267,10 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
 
   useEffect(() => {
     currentTidRef.current = thread?.id ?? null
+    // CR-03(c): a reading already stored for this thread is not NEW — its own reconcile brings one.
+    seenExpertReadingRef.current = thread?.id
+      ? useStreamsStore.getState().expertReadingsByThread.get(thread.id)
+      : undefined
     setAgentMode("default")
     setScopeFolderId(null)
     // 267-REVIEW WR-02: a refusal is about the thread it was made on, never the next one.
@@ -323,6 +332,26 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
       cancelled = true
     }
   }, [thread?.id, thread?.active_expert_id])
+
+  // 267-REVIEW-INDEPENDENT CR-03(c) — reconcile the chip from the SERVER's Expert. The chip hydrates
+  // from the thread-list object, so when the server removed the Expert (disabled, grant revoked — the
+  // send's scoping resolve clears it) nothing told the client and the chip kept claiming it. Every
+  // snapshot read now records `active_expert_id` (null included); a NEW reading that disagrees with
+  // this thread is written back to the list owner, so the hydration effect above clears (or re-loads)
+  // the chip. A reading already in the store when this thread came on screen is not new: the thread's
+  // own reconcile brings a fresh one. PATCH answers are recorded too (`applyExpertChange`), so a
+  // snapshot already in flight before a change can never put the old Expert back.
+  const serverExpertReading = useStreamsStore((s) =>
+    thread?.id ? s.expertReadingsByThread.get(thread.id) : undefined,
+  )
+  useEffect(() => {
+    if (!serverExpertReading || serverExpertReading === seenExpertReadingRef.current) return
+    seenExpertReadingRef.current = serverExpertReading
+    const current = threadRef.current
+    if (!current || (current.active_expert_id ?? null) === serverExpertReading.expertId) return
+    if (serverExpertReading.expertId === null) setActiveExpert(null)
+    onThreadUpdated?.({ ...current, active_expert_id: serverExpertReading.expertId })
+  }, [serverExpertReading, onThreadUpdated])
 
   // Phase 092 (SC#5 / D-v2.5-03): mount-time reconcile of the workflow lock +
   // Continue state from GET /threads/{id}/workflow — the SOURCE OF TRUTH, never
@@ -581,8 +610,11 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
       try {
         // 267-REVIEW CR-01: the answer is the thread as the server now holds it. It goes back to
         // the list owner, or returning to this thread would hydrate the Expert it no longer has.
+        const requestedAt = Date.now()
         const updated = await setThreadActiveExpert(tid, next?.id ?? null)
         onThreadUpdated?.(updated)
+        // CR-03(c): the PATCH answer is a server reading too — newer than any snapshot in flight.
+        recordExpertReading(tid, updated.active_expert_id ?? null, requestedAt)
       } catch (err) {
         setActiveExpert(previous)
         setExpertChangeError(

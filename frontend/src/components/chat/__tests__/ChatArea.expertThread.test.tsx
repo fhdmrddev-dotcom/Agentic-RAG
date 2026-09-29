@@ -31,6 +31,7 @@ const h = vi.hoisted(() => ({
   handoffThread: vi.fn(),
   listThreads: vi.fn(),
   getExpertScopePreview: vi.fn(),
+  getSnapshot: vi.fn(),
 }))
 
 vi.mock("@/lib/api/experts", async (importActual) => {
@@ -73,6 +74,7 @@ vi.mock("@/lib/api", async (importActual) => {
     getExpert: h.getExpert,
     setThreadActiveExpert: h.setThreadActiveExpert,
     listThreads: h.listThreads,
+    getSnapshot: h.getSnapshot,
   }
 })
 
@@ -176,7 +178,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
-  useStreamsStore.setState({ streamingThreads: new Set<string>() })
+  useStreamsStore.setState({ streamingThreads: new Set<string>(), expertReadingsByThread: new Map() })
 })
 
 describe("(A) D-267-21 — an invite on a brand-new chat reaches the created thread", () => {
@@ -565,5 +567,118 @@ describe("(G) UI-REVIEW #2 — one announcement per mid-thread change", () => {
     await user.click(await screen.findByTestId("invite-expert-btn-contract-reviewer"))
     await waitFor(() => expect(h.setThreadActiveExpert).toHaveBeenCalledWith(THREAD.id, CR.id))
     expect(await screen.findByTestId("expert-spotlight-card")).toBeVisible()
+  })
+})
+
+// 267-REVIEW-INDEPENDENT CR-03(c) — the SERVER removed the thread's Expert (it was disabled, or the
+// grant was revoked; the next send's scoping resolve cleared it and refused the run). The chip
+// hydrated from the list's thread object and nothing reconciled it, so it kept saying the Expert over
+// a thread that now runs unscoped. The snapshot always carries `active_expert_id` (null included), and
+// every snapshot read — driven here through the REAL StreamsProvider reconcile — reconciles the chip.
+describe("(H) CR-03(c) — a server-side clear removes the chip", () => {
+  const T: Thread = { ...THREAD, id: "thread-T", active_expert_id: FA.id } as Thread
+  const U: Thread = { ...THREAD, id: "thread-U", title: "Other", active_expert_id: null } as Thread
+
+  function Parent() {
+    const api = useThreads()
+    const { loadThreads } = api
+    useEffect(() => {
+      void loadThreads()
+    }, [loadThreads])
+    return (
+      <>
+        {api.threads.map((t) => (
+          <button key={t.id} type="button" data-testid={`pick-${t.id}`} onClick={() => api.selectThread(t)}>
+            {t.title}
+          </button>
+        ))}
+        <ChatArea thread={api.selectedThread} onCreateThread={api.newThread} onThreadUpdated={api.patchThread} folders={[]} />
+      </>
+    )
+  }
+
+  const snapshot = (activeExpertId: string | null | undefined) => ({
+    messages: [],
+    active_runs: [],
+    since_cursors: {},
+    ...(activeExpertId === undefined ? {} : { active_expert_id: activeExpertId }),
+  })
+
+  async function reconcile(tid: string) {
+    await act(async () => {
+      await useStreamsStore.getState().actions.reconcile(tid)
+    })
+  }
+
+  it("(15) a reconcile that reads null removes the chip, and coming back does not bring it back", async () => {
+    h.listThreads.mockResolvedValue([T, U])
+    h.getSnapshot.mockResolvedValue(snapshot(null))
+    const user = userEvent.setup()
+    render(shell(<Parent />))
+    await user.click(await screen.findByTestId("pick-thread-T"))
+    await waitFor(() =>
+      expect(screen.getByTestId("active-expert-chip").textContent).toContain("Financial Analyzer"),
+    )
+    await reconcile(T.id)
+    await waitFor(() => expect(screen.queryByTestId("active-expert-chip")).toBeNull())
+    await user.click(screen.getByTestId("pick-thread-U"))
+    await user.click(screen.getByTestId("pick-thread-T"))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.queryByTestId("active-expert-chip")).toBeNull()
+  })
+
+  it("(16) without a list owner, a null reading still clears the chip", async () => {
+    h.getSnapshot.mockResolvedValue(snapshot(null))
+    render(shell(<ChatArea thread={T} onCreateThread={vi.fn()} folders={[]} />))
+    await screen.findByTestId("active-expert-chip")
+    await reconcile(T.id)
+    await waitFor(() => expect(screen.queryByTestId("active-expert-chip")).toBeNull())
+  })
+
+  it("(17) control: a reconcile that reads the SAME Expert changes nothing", async () => {
+    h.getSnapshot.mockResolvedValue(snapshot(FA.id))
+    render(shell(<ChatArea thread={T} onCreateThread={vi.fn()} folders={[]} />))
+    await screen.findByTestId("active-expert-chip")
+    await reconcile(T.id)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.getByTestId("active-expert-chip").textContent).toContain("Financial Analyzer")
+  })
+
+  it("(18) a snapshot already in flight before a swap never puts the old Expert back", async () => {
+    h.messages = TALK
+    h.listThreads.mockResolvedValue([T, U])
+    let resolveSnap: (v: unknown) => void = () => {}
+    h.getSnapshot.mockImplementation(() => new Promise((r) => (resolveSnap = r)))
+    const user = userEvent.setup()
+    render(shell(<Parent />))
+    await user.click(await screen.findByTestId("pick-thread-T"))
+    await screen.findByTestId("active-expert-chip")
+    let inflight: Promise<void> = Promise.resolve()
+    act(() => {
+      inflight = useStreamsStore.getState().actions.reconcile(T.id)
+    })
+    await new Promise((r) => setTimeout(r, 5))
+    await openInvite(user)
+    await user.click(await screen.findByTestId("expert-replace-btn-contract-reviewer"))
+    await waitFor(() => expect(h.setThreadActiveExpert).toHaveBeenCalledWith(T.id, CR.id))
+    await waitFor(() =>
+      expect(screen.getByTestId("active-expert-chip").textContent).toContain("Contract Reviewer"),
+    )
+    await act(async () => {
+      resolveSnap(snapshot(FA.id)) // read BEFORE the swap — stale
+      await inflight
+    })
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.getByTestId("active-expert-chip").textContent).toContain("Contract Reviewer")
+  })
+
+  it("(19) a response without the field records nothing (older server / partial mock)", async () => {
+    h.getSnapshot.mockResolvedValue(snapshot(undefined))
+    render(shell(<ChatArea thread={T} onCreateThread={vi.fn()} folders={[]} />))
+    await screen.findByTestId("active-expert-chip")
+    await reconcile(T.id)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.getByTestId("active-expert-chip").textContent).toContain("Financial Analyzer")
+    expect(useStreamsStore.getState().expertReadingsByThread.has(T.id)).toBe(false)
   })
 })

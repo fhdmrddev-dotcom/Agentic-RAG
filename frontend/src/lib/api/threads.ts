@@ -450,6 +450,9 @@ export interface ThreadSnapshot {
   messages: Message[]
   active_runs: ActiveRun[]
   since_cursors: Record<string, string>
+  /** 267-REVIEW-INDEPENDENT CR-03(c): the thread's Expert as the server holds it NOW — `null` = none
+   *  (a server-side clear). `undefined` only when the response did not carry the field at all. */
+  active_expert_id?: string | null
 }
 
 /** Phase 063 / Phase 066: callback shape for subscribeToRun. Mirrors the legacy POST-stream
@@ -1317,11 +1320,14 @@ export async function getSnapshot(
     messages: MessageResponseDTO[]
     active_runs: ActiveRun[]
     since_cursors: Record<string, string>
+    active_expert_id?: string | null
   }
   return {
     messages: data.messages.map(_mapMessageResponse),
     active_runs: data.active_runs,
     since_cursors: data.since_cursors,
+    // 267-REVIEW-INDEPENDENT CR-03(c): the reconcile needs the null too — it is what clears the chip.
+    active_expert_id: data.active_expert_id,
   }
 }
 

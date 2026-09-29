@@ -400,6 +400,62 @@ class ExpertScopeUnavailable(ValueError):
     empty scope reaches retrieval as "no folder filter" and would search every org the user is in."""
 
 
+async def _state_expert_removed(
+    supabase,
+    pool,
+    *,
+    thread_id: str,
+    user_id: str,
+    thread_org_id,
+    caller_roles: list[str],
+    expert_id: str,
+    thread_folder_id: str | None,
+) -> None:
+    """267-REVIEW-INDEPENDENT CR-03(a) / PACK-23 — the transcript STATES a removal the server made.
+
+    ``_resolve_thread_scoping`` clears an Expert the caller can no longer resolve (disabled, grant
+    revoked, deleted). Before this, nothing said so: the chip kept the Expert and the next turn ran
+    unscoped under its label. The row is the one ``PATCH /threads/{id}`` writes for a removal —
+    ``before`` stated with ``allow_unresolved`` (named by ``get_expert_service``), ``after`` = no
+    Expert — through the same statement helper, event builder and row writer, in the THREAD's org.
+
+    ⛔ Never raises: the clear is the fail-closed security action and the run is refused either way;
+    a statement that cannot be made is logged, never allowed to mask that refusal. An Expert that no
+    longer exists at all cannot be named truthfully, so — exactly as on the PATCH door — no row.
+    """
+    if not thread_org_id:
+        logger.warning("expert cleared on thread %s: the thread has no org; no event", thread_id)
+        return
+    try:
+        from app.services.expert_scope import (  # noqa: PLC0415
+            build_expert_changed_event,
+            describe_expert_scope,
+            insert_expert_changed_row,
+        )
+
+        common = dict(
+            supabase=supabase,
+            pool=pool,
+            user_id=user_id,
+            org_id=str(thread_org_id),
+            caller_roles=caller_roles,
+            thread_folder_id=thread_folder_id,
+        )
+        try:
+            before = await describe_expert_scope(expert_id=expert_id, allow_unresolved=True, **common)
+        except LookupError:
+            logger.warning("expert cleared on thread %s: the Expert could not be named; no event", thread_id)
+            return
+        after = await describe_expert_scope(expert_id=None, **common)
+        event = build_expert_changed_event(before, after, at=datetime.now(timezone.utc))
+        async with pool.acquire() as conn:
+            await insert_expert_changed_row(
+                conn, thread_id=thread_id, user_id=user_id, org_id=thread_org_id, event=event
+            )
+    except Exception:  # noqa: BLE001 — see the docstring: never masks the refusal
+        logger.warning("expert cleared on thread %s: the event row was not written", thread_id, exc_info=True)
+
+
 async def _resolve_thread_scoping(
     supabase,
     thread_id: str,
@@ -429,12 +485,13 @@ async def _resolve_thread_scoping(
         from app.utils.db import aexec  # noqa: PLC0415
         t_resp = await aexec(
             supabase.table("threads")
-            .select("active_expert_id, folder_id")
+            .select("active_expert_id, folder_id, org_id")
             .eq("id", str(thread_id))
             .maybe_single()
         )
         active_expert_id = t_resp.data.get("active_expert_id") if (t_resp and t_resp.data) else None
         thread_folder_id = t_resp.data.get("folder_id") if (t_resp and t_resp.data) else None
+        thread_org_id = t_resp.data.get("org_id") if (t_resp and t_resp.data) else None
         if not active_expert_id:
             return ThreadScoping(None, None, None, None, None)
 
@@ -464,14 +521,31 @@ async def _resolve_thread_scoping(
         )
         if not resolved:
             # Phase 260 F-1 (Fail-Closed): Drop stale/inaccessible active_expert_id to keep DB/UI honest
+            # 267-REVIEW-INDEPENDENT CR-03(a): conditional on the Expert READ above, so a PATCH that
+            # bound a new Expert in between is never clobbered and a concurrent send clears (and
+            # states) it once; the rows it cleared say whether THIS send made the change.
+            _cleared = False
             try:
-                await aexec(
+                _clear = await aexec(
                     supabase.table("threads")
                     .update({"active_expert_id": None})
                     .eq("id", str(thread_id))
+                    .eq("active_expert_id", str(active_expert_id))
                 )
+                _cleared = bool(getattr(_clear, "data", None))
             except Exception:
                 logger.warning("Failed to reset stale active_expert_id on thread %s", thread_id, exc_info=True)
+            if _cleared:
+                await _state_expert_removed(
+                    supabase,
+                    pool,
+                    thread_id=thread_id,
+                    user_id=str(current_user["id"]),
+                    thread_org_id=thread_org_id,
+                    caller_roles=caller_roles if str(thread_org_id or "") == str(caller_org_id or "") else [],
+                    expert_id=str(active_expert_id),
+                    thread_folder_id=str(thread_folder_id) if thread_folder_id else None,
+                )
             raise ValueError(
                 f"Active expert '{active_expert_id}' could not be resolved or is inaccessible; refusing run (fail-closed)"
             )

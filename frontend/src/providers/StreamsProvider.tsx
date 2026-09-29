@@ -71,7 +71,7 @@ import {
   getMessages,
   postMessage,
   subscribeToRun,
-  getSnapshot,
+  getSnapshot as fetchThreadSnapshot,
   cancelRun,
   getThreadTodos,
   getThreadWorkspaceFiles,
@@ -94,6 +94,7 @@ import { usePanelReconcile } from "@/hooks/usePanelReconcile"
 import { useOrgOptional } from "@/providers/OrgProvider"
 import {
   useStreamsStore,
+  recordExpertReading,
   type SurfaceId,
   type StreamsState,
   type WorkflowLock,
@@ -122,6 +123,23 @@ import { dedupMessagesByRunId } from "@/lib/dedupMessages"
 // with the FRESH producer_run_id from the /continue 200 body; the provider
 // re-subscribes that thread's producer stream (additive, per-thread keyed).
 import { subscribeProducerResubscribe } from "@/providers/producerResubscribeSignal"
+
+/**
+ * 267-REVIEW-INDEPENDENT CR-03(c) — EVERY snapshot read in this file (the reconcile, the transient
+ * terminal probe, the watchdog probe) goes through this one wrapper, so the server's
+ * `active_expert_id` — `null` included — reaches the store on every read. That is what lets ChatArea
+ * clear the Expert chip after the SERVER removed the Expert (a disabled Expert, a revoked grant).
+ * ⛔ Pure pass-through otherwise: same argument, same result, same rejection. A response without the
+ * field records nothing.
+ */
+async function getSnapshot(threadId: string): Promise<ThreadSnapshot> {
+  const requestedAt = Date.now()
+  const snapshot = await fetchThreadSnapshot(threadId)
+  if (snapshot && snapshot.active_expert_id !== undefined) {
+    recordExpertReading(threadId, snapshot.active_expert_id ?? null, requestedAt)
+  }
+  return snapshot
+}
 
 // RESEARCH §Finding #1: module-level constant gives every empty-bucket subscriber
 // the SAME reference, so React/useSyncExternalStore skips re-render when the

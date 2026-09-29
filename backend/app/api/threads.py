@@ -73,7 +73,7 @@ from app.services.expert_scope import (
     build_scope_effect,
     describe_expert_scope,
     describe_scope_change,
-    event_sentence,
+    insert_expert_changed_row,
     scope_event_sentence,
     scope_preview,
 )
@@ -634,8 +634,10 @@ async def get_snapshot(
             "active_runs": [],
             "since_cursors": {},
         }
-        if row and row.get("active_expert_id") is not None:
-            res["active_expert_id"] = row["active_expert_id"]
+        # 267-REVIEW-INDEPENDENT CR-03(c): ALWAYS stated, null included — a server-side clear is
+        # what the client reconciles the Expert chip from. (The response_model already filled a null
+        # on the wire; the handler no longer relies on that.)
+        res["active_expert_id"] = row.get("active_expert_id")
         return res
 
     # Step 4: per-active-run since_cursors via xinfo_stream (D-075-01).
@@ -695,8 +697,8 @@ async def get_snapshot(
         "active_runs": active_runs,
         "since_cursors": since_cursors,
     }
-    if row and row.get("active_expert_id") is not None:
-        res["active_expert_id"] = row["active_expert_id"]
+    # 267-REVIEW-INDEPENDENT CR-03(c): always stated, null included (see the arm above).
+    res["active_expert_id"] = row.get("active_expert_id")
     return res
 
 
@@ -953,15 +955,8 @@ async def _write_expert_change(conn, *, thread_id, user_id, org_id, update_data:
         f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid",
         *params,
     )
-    await conn.execute(
-        "INSERT INTO public.messages (thread_id, user_id, org_id, role, content, tool_calls) "
-        "VALUES ($1::uuid, $2::uuid, $3::uuid, 'system', $4, $5::jsonb)",
-        UUID(str(thread_id)),
-        UUID(str(user_id)),
-        UUID(str(org_id)),
-        event_sentence(event),
-        [event.model_dump(mode="json")],
-    )
+    # 267-REVIEW-INDEPENDENT CR-03: the row is written by the ONE writer the send-time clear also uses.
+    await insert_expert_changed_row(conn, thread_id=thread_id, user_id=user_id, org_id=org_id, event=event)
 
 
 # ── Phase 268 (D-268-12 / D-268-12a / D-268-12b / D-268-25 / CHAT-08) — a live thread's folder ──

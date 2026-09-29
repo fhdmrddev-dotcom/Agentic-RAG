@@ -585,6 +585,14 @@ async def get_expert(
         caller_user_id=user_id,
         caller_roles=caller_roles,
     )
+    # 267-REVIEW-INDEPENDENT CR-03(d): a DISABLED Expert is hidden from non-managers here exactly as
+    # the list hides it (R265-262-07 — only the management arm may list disabled Experts); otherwise a
+    # thread bound to it kept hydrating the chip. The permission is asked ONLY for a disabled bundle,
+    # so an ordinary read costs nothing extra. Same 404 sentence as a bundle that does not exist.
+    if bundle and not bundle.get("is_enabled", True) and not await _has_org_permission(
+        request, current_user, active_org, "experts:manage"
+    ):
+        bundle = None
     if not bundle:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -385,6 +385,26 @@ def build_expert_changed_event(before: ScopeStatement, after: ScopeStatement, *,
     )
 
 
+async def insert_expert_changed_row(conn, *, thread_id, user_id, org_id, event: ExpertChangedEvent) -> None:
+    """THE one writer of an ``expert_changed`` transcript row (267-REVIEW-INDEPENDENT CR-03).
+
+    Two callers, one row shape: ``PATCH /threads/{id}`` (inside its user-JWT transaction, beside the
+    UPDATE) and ``run_producer._resolve_thread_scoping`` when it clears an Expert the caller can no
+    longer resolve. ``org_id`` is the THREAD's own org, set explicitly (D-267-34 — the messages autofill
+    trigger takes ``org_members … LIMIT 1``). ``tool_calls`` is a plain list: the pool's jsonb codec
+    encodes it (a pre-dumped string would be double-encoded).
+    """
+    await conn.execute(
+        "INSERT INTO public.messages (thread_id, user_id, org_id, role, content, tool_calls) "
+        "VALUES ($1::uuid, $2::uuid, $3::uuid, 'system', $4, $5::jsonb)",
+        UUID(str(thread_id)),
+        UUID(str(user_id)),
+        UUID(str(org_id)),
+        event_sentence(event),
+        [event.model_dump(mode="json")],
+    )
+
+
 def _line_items(line: TranscriptScopeLine, *, all_label: str = _ALL_DOCUMENTS) -> list[str]:
     items = [f.name or _UNNAMEABLE_FOLDER for f in line.folders]
     if line.thread_folder is not None:
