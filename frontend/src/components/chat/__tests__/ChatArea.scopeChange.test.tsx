@@ -16,7 +16,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import type { ExpertBundle, Folder, Message, Thread } from "@/types"
 import type { ScopeEffect } from "@/lib/api/threads"
 
@@ -28,6 +28,7 @@ const h = vi.hoisted(() => ({
   setThreadActiveExpert: vi.fn(),
   setThreadFolder: vi.fn(),
   getScopeEffect: vi.fn(),
+  getThread: vi.fn(),
 }))
 
 vi.mock("@/hooks/useMessages", () => ({
@@ -61,6 +62,7 @@ vi.mock("@/lib/api", async (importActual) => {
     setThreadActiveExpert: h.setThreadActiveExpert,
     setThreadFolder: h.setThreadFolder,
     getScopeEffect: h.getScopeEffect,
+    getThread: h.getThread,
   }
 })
 
@@ -374,6 +376,69 @@ describe("268-REVIEW WR-01 — an answer about one thread never lands on the nex
     })
     await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
     expect(screen.queryByTestId("scope-pending-note")).toBeNull()
+  })
+})
+
+describe("268-REVIEW iter-2 WR-01 — a lost race states what the chat searches NOW", () => {
+  // The server answers 409 only when the folder moved after this client read it (another tab won).
+  // The chip and the refusal must follow the WINNER's folder, never repeat the stale one.
+  const CONFLICT = () => new ApiError("The folder changed while you were choosing. Try again.", 409)
+
+  function Owner({ initial }: { initial: Thread }) {
+    const [t, setT] = useState<Thread>(initial)
+    return <ChatArea thread={t} onCreateThread={vi.fn()} onThreadUpdated={setT} folders={FOLDERS} />
+  }
+
+  async function applyAll(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByTestId("scope-chip"))
+    const picker = await screen.findByTestId("scope-picker")
+    await user.click(within(picker).getByTestId("scope-picker-node-all"))
+    await waitFor(() => expect(screen.getByTestId("scope-picker-apply")).not.toHaveAttribute("data-disabled"))
+    await user.click(screen.getByTestId("scope-picker-apply"))
+  }
+
+  it("(13) 409: the thread is re-read, the chip shows the winner's folder, and the refusal names it", async () => {
+    h.setThreadFolder.mockRejectedValue(CONFLICT())
+    h.getThread.mockResolvedValue({ ...THREAD, folder_id: "f-q3" })
+    const user = userEvent.setup()
+    render(shell(<Owner initial={THREAD} />))
+    await applyAll(user)
+    const refusal = await screen.findByTestId("scope-refusal")
+    expect(refusal.textContent).toBe(
+      "The folder changed while you were choosing — this chat now searches /Client ACME/Q3 Contracts. Pick again.",
+    )
+    expect(refusal.textContent).not.toMatch(/still searches \/Client ACME\./)
+    expect(h.getThread).toHaveBeenCalledWith("thread-A")
+    await waitFor(() =>
+      expect(within(screen.getByTestId("scope-chip")).getByText("/Client ACME/Q3 Contracts")).toBeInTheDocument(),
+    )
+    await waitFor(() => expect(h.getScopeEffect.mock.calls.filter((c) => c.length === 1).length).toBeGreaterThan(1))
+    expect(h.setThreadFolder).toHaveBeenCalledTimes(1)
+  })
+
+  it("(14) 409 under a Restricted Expert: the winner's folder is SAVED, not searched, and says so", async () => {
+    h.setThreadFolder.mockRejectedValue(CONFLICT())
+    h.getThread.mockResolvedValue({ ...THREAD, folder_id: "f-q3", active_expert_id: "e-hr" })
+    h.getScopeEffect.mockImplementation(async (_t: string, d?: { folderId: string | null }) =>
+      d ? TO_Q3 : { ...HELD, saved: q3 },
+    )
+    const user = userEvent.setup()
+    render(shell(<Owner initial={{ ...THREAD, active_expert_id: "e-hr" } as Thread} />))
+    await applyAll(user)
+    const refusal = await screen.findByTestId("scope-refusal")
+    expect(refusal.textContent).toBe(
+      "The folder changed while you were choosing — /Client ACME/Q3 Contracts is now saved for when HR Advisor leaves. Pick again.",
+    )
+  })
+
+  it("(15) 409 and the re-read fails: the refusal claims no folder at all", async () => {
+    h.setThreadFolder.mockRejectedValue(CONFLICT())
+    h.getThread.mockRejectedValue(new TypeError("Failed to fetch"))
+    const user = userEvent.setup()
+    render(shell(<Owner initial={THREAD} />))
+    await applyAll(user)
+    const refusal = await screen.findByTestId("scope-refusal")
+    expect(refusal.textContent).toBe("The folder changed while you were choosing. Pick again.")
   })
 })
 

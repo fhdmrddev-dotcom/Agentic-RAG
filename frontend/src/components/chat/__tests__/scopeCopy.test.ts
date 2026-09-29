@@ -25,7 +25,7 @@ vi.mock("@/lib/supabase", () => ({
 import { UNNAMEABLE_FOLDER } from "@/components/experts/catalog/ExpertDetailModal"
 import { LEDGER_COPY } from "@/components/experts/catalog/expertCatalog"
 import type { ScopeEffect } from "@/lib/api/threads"
-import { getScopeEffect, setThreadFolder } from "@/lib/api"
+import { getScopeEffect, getThread, setThreadFolder } from "@/lib/api"
 import { EVENT_COPY } from "../expertEventCopy"
 import { SCOPE_COPY, chipLabel, explainFor, folderPathOf, joinFolders } from "../scopeCopy"
 
@@ -80,6 +80,20 @@ describe("SCOPE_COPY — every §7.2 string, exact", () => {
     expect(SCOPE_COPY.pendingHeld("/Client ACME/Q3", "HR Advisor")).toBe(
       "The answer in progress keeps its scope. /Client ACME/Q3 is saved for when HR Advisor leaves.",
     )
+  })
+
+  it("(2b) 268-REVIEW iter-2 WR-01: a lost-race refusal names what the chat searches NOW", () => {
+    expect(SCOPE_COPY.conflict("/Client ACME/Q3 Contracts")).toBe(
+      "The folder changed while you were choosing — this chat now searches /Client ACME/Q3 Contracts. Pick again.",
+    )
+    expect(SCOPE_COPY.conflictHeld("/Client ACME/Q3 Contracts", "HR Advisor")).toBe(
+      "The folder changed while you were choosing — /Client ACME/Q3 Contracts is now saved for when HR Advisor leaves. Pick again.",
+    )
+    expect(SCOPE_COPY.conflictUnknown).toBe("The folder changed while you were choosing. Pick again.")
+    // Never the stale claim: none of the three says "still searches".
+    for (const s of [SCOPE_COPY.conflict("/X"), SCOPE_COPY.conflictHeld("/X", "E"), SCOPE_COPY.conflictUnknown]) {
+      expect(s).not.toMatch(/still searches/)
+    }
   })
 
   it("(3) shared literals are imported, never re-spelled", () => {
@@ -184,6 +198,14 @@ describe("the wire — setThreadFolder / getScopeEffect (re-exported from @/lib/
     expect(String(f.mock.calls[1][0])).toMatch(/\/threads\/t-1\/scope-effect\?folder_id=f-9$/)
     await getScopeEffect("t-1", { folderId: null })
     expect(String(f.mock.calls[2][0])).toMatch(/\/threads\/t-1\/scope-effect\?clear=true$/)
+  })
+
+  it("(12b) getThread(id) GETs the one thread (268-REVIEW iter-2 WR-01's reconcile read)", async () => {
+    const f = reply(200, { id: "t-1", folder_id: "f-9" })
+    const t = await getThread("t-1")
+    expect(String(f.mock.calls[0][0])).toMatch(/\/threads\/t-1$/)
+    expect((f.mock.calls[0][1] as RequestInit | undefined)?.method ?? "GET").toBe("GET")
+    expect(t.folder_id).toBe("f-9")
   })
 
   it("(13) a preview refusal keeps the server's detail", async () => {
