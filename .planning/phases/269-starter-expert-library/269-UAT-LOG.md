@@ -196,3 +196,25 @@ Operator instruction: "you do it" (answering the offer to apply 198 and run step
 2. Held row removed locally: `DELETE FROM public.expert_bundles WHERE id = '00000000-0000-0000-0000-000000002693' AND is_system` -> `DELETE 1`. The test org's copied security-compliance documents and folder `16db0107-...` stay in place.
 3. `bash scripts/regenerate-full-schema.sh` (live-DB dump, no reset): completed, 8836 lines; `git diff --stat supabase/full-schema.sql` empty = zero diff, as expected (schema-only dump, 198 changes data only, M-8).
 4. Read-back: `expert_bundles WHERE is_system` returns exactly contract-reviewer, financial-analyzer, hr-policy-advisor, operations-analyst — all restricted, org_id NULL (portable), is_enabled true. Financial Analyzer `example_output LIKE '%30.8%'` = true.
+
+## G-4 screenshots — captured 2026-09-29 (operator: "screenshots")
+
+Driven with Chrome DevTools MCP in an ISOLATED browser context, signed in as the uat269 admin (org `9042e46f-...`, enterprise tier). Local frontend http://localhost:5173/app. Credentials stay in the session scratchpad only.
+
+| File | What it shows | Verified by reading the page |
+|---|---|---|
+| `g4-01-catalog-admin-4-installed.png` | Expert Catalog, "Showing 4 of 4", category pills All/Finance/HR/Legal/Operations, each card RESTRICTED · System Template · 1 folder with Details + Start Chat | snapshot text |
+| `g4-02-detail-financial-analyzer.png` | Detail modal with sample deliverable expanded: "EBITDA Margin: 30.8% (+380 bps YoY)", "Operating Cash Flow: $29.1M" | script read of the dialog: 30.8 and 29.1 present; 24.3 and 412 ABSENT (D-269-P2 confirmed in the UI) |
+| `g4-05-cited-answer-contract-reviewer.png` | Cited answer: $2.35M liability cap and 75 days termination notice, with numbered citations to `acme_msa_kestrel_freight_2026.md` | snapshot text |
+| `g4-06-refusal-contract-reviewer.png` | Refusal: "I couldn't find any on-time delivery rate for Q3 2026 in your documents"; names only its own two documents; offers to search elsewhere; does not state 94.7% | image read |
+
+**NOT capturable in this org — stated, not faked.** These describe first-run states that no longer exist here because the five installs already happened:
+- `g4-00` NULL-tier refusal: the org is now enterprise; the 403 body is recorded verbatim in `evidence/01-catalog-first-run.txt`.
+- `g4-01` (original "5 Install cards"): superseded by `g4-01-catalog-admin-4-installed.png` (4 installed, since security-compliance is held).
+- `g4-03` member's not-installed reason: every shown Expert is installed, so a member sees Start Chat; the reason text is recorded in `evidence/02-member-reason.txt`.
+- `g4-04` installing → ready: transient; the state sequence is recorded in each `*-install.txt`.
+Re-capturing them needs a NEW fresh enterprise-tier org (another signup + tier write); not done.
+
+**Observations from driving it (not defects fixed here):**
+- The Financial Analyzer detail description still reads "Answers strictly from uploaded documents or refuses." — the pre-existing 187 copy that 198 does not touch (same overclaim as review WR-02).
+- Its action prompt "Compare Year-over-Year Results" compares Q3 2026 with Q3 2025 — the corpus is Q3 2026 only, so that one-click prompt cannot be answered from it. Recorded for the operator; not in 269's scope to change without a new ruling.
