@@ -355,3 +355,9 @@ Driven with Chrome DevTools MCP in an isolated context as a plain **member** (`u
 **Rendered card (screenshot `evidence/g4-07-catalog-requires-member-view.png`): PASS.** "MISSING · Google Workspace", "Requires Google Workspace — not connected", a **Details** button, and the sentence "An org admin must connect Google Workspace" — **no Start Chat and no Connect button**. This is the literal reading SC#2 required at rest, now seen in the browser, not only via the API. The same page shows all five starter Experts with Details and Start Chat for a member.
 
 **Fixture note (not a defect):** a member who signs up gets their own personal org (tier `unassigned`), and the UI defaults to it; the catalog there shows "Capability 'experts' requires 'enterprise' tier (current tier: 'unassigned')" — the D-269-P1 sentence — until the account menu switches to the enterprise org.
+
+## Operator confirmation of the G-4 rows — 2026-09-29 (closes 267-VERIFICATION owed item 2)
+
+The operator was asked to review scenarios G4-1, G4-2 and G4-3 against the screenshots under `evidence/` (`g4-00` … `g4-03b`, `g4-04a`) and reply per scenario. **The operator's reply, verbatim: `all pass`.**
+
+Read plainly: the operator's literal words were "all pass" in answer to a message that listed the three scenarios; it is recorded as a pass on G4-1, G4-2 and G4-3. It is NOT read as a verdict on anything not named in that message — O-1 (over-stated "DROPPED" copy, SEED-303) and the deferred review items (SEED-327, SEED-328) were disclosed to the operator in the same exchange and are not waived by it. The operator did not name the screenshots they opened; whether each was viewed is not recorded here.
