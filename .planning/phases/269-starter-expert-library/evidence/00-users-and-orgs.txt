@@ -1,0 +1,28 @@
+== 269-03 users and orgs — 2026-09-29T14:38:53.384938+00:00
+PHASE_BASE: 0300bf94260447704d5f82bde0c5d839443d9699
+HEAD: b081cefd5f6ab0586db5cb9092e01293a63a0f5c
+DB: local 127.0.0.1:54322/postgres (NOT production; Supabase MCP not used)
+embedding_model: text-embedding-3-small (embedding_provider=openai, dims=1536, source=app_settings.global)
+app_settings.global web_search: {"web_search_enabled": true, "tavily_key_in_app_settings": false}
+signup admin: POST http://127.0.0.1:54321/auth/v1/signup email=uat269-admin-406a18@example.test -> HTTP 200 user_id=b93a9c96-2de1-4e13-958c-10e5d6775fd0 session=yes
+signup member: POST http://127.0.0.1:54321/auth/v1/signup email=uat269-member-406a18@example.test -> HTTP 200 user_id=046ac4e2-02ee-40db-93dd-1d53bbf006ea session=yes
+SQL: SELECT m.user_id, u.email, m.org_id, m.role, o.name, o.subscription_tier FROM org_members m JOIN auth.users u ON u.id=m.user_id JOIN organizations o ON o.id=m.org_id WHERE m.user_id = ANY($1) ORDER BY u.email
+{"user_id": "b93a9c96-2de1-4e13-958c-10e5d6775fd0", "email": "uat269-admin-406a18@example.test", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "role": "org-admin", "name": "uat269-admin-406a18@example.test's Organization", "subscription_tier": null}
+{"user_id": "046ac4e2-02ee-40db-93dd-1d53bbf006ea", "email": "uat269-member-406a18@example.test", "org_id": "0074ea41-1e34-4c7b-b7be-6cb7127c6e44", "role": "org-admin", "name": "uat269-member-406a18@example.test's Organization", "subscription_tier": null}
+TEST ORG = admin's personal org 9042e46f-745d-40d6-83eb-c6984d582ce1; subscription_tier right after signup = None
+   (D-269-P1: a NULL tier on a fresh signup is the RECORDED gap, not a defect to fix here — no handle_new_user / tier / capability change is made)
+
+-- add member to the test org (LOCAL SQL insert, 266 precedent):
+SQL: INSERT INTO org_members (org_id, user_id, role) VALUES ('9042e46f-745d-40d6-83eb-c6984d582ce1', '046ac4e2-02ee-40db-93dd-1d53bbf006ea', 'member')
+re-read:
+{"user_id": "b93a9c96-2de1-4e13-958c-10e5d6775fd0", "email": "uat269-admin-406a18@example.test", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "role": "org-admin", "name": "uat269-admin-406a18@example.test's Organization", "subscription_tier": null}
+{"user_id": "046ac4e2-02ee-40db-93dd-1d53bbf006ea", "email": "uat269-member-406a18@example.test", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "role": "member", "name": "uat269-admin-406a18@example.test's Organization", "subscription_tier": null}
+{"user_id": "046ac4e2-02ee-40db-93dd-1d53bbf006ea", "email": "uat269-member-406a18@example.test", "org_id": "0074ea41-1e34-4c7b-b7be-6cb7127c6e44", "role": "org-admin", "name": "uat269-member-406a18@example.test's Organization", "subscription_tier": null}
+
+== F-4 operator tier assignment (D-269-P1) — 2026-09-29T14:38:59.116153+00:00
+   Named, evidenced LOCAL data step. Tiers stay operator-assigned (D-269-P1). No code, no migration, no handle_new_user change.
+subscription_tier before: None
+SQL: UPDATE organizations SET subscription_tier = 'enterprise' WHERE id = '9042e46f-745d-40d6-83eb-c6984d582ce1'
+-> UPDATE 1
+subscription_tier after: 'enterprise'
+subscription_tier: null -> enterprise (org 9042e46f-745d-40d6-83eb-c6984d582ce1)
