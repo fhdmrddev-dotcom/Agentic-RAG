@@ -1,0 +1,51 @@
+slug: security-compliance
+org_id: 21274586-64aa-42a8-81fe-7dedac7740fd
+model: deepseek-v4-flash provider: deepseek embedding_model: text-embedding-3-small (embedding_provider=openai, dims=1536, source=app_settings.global)
+re-drive after BUG-260929-01 fix 464ec8354; questions fixed in .planning/phases/269-starter-expert-library/269-REDRIVE-QUESTIONS.md before driving; HEAD dfa95c0793b73fa3aef0353a8103bd9249bff178
+== refusal (sibling corpus, broad OR-inviting question) — 2026-09-29T16:14:24.362729+00:00  same thread 685fc69d-6fd2-4ae9-bd53-3d69a57aab62; install folder (security-compliance) = f1cf7aa1-c499-4379-bc50-dbd5ec97174a
+sibling folders in the SAME org: {"financial-analyzer": "f69dc682-03c8-4c70-9477-e73d796e667a", "contract-reviewer": "0ca746f3-193c-419b-9954-9da5611e3e31", "hr-policy-advisor": "c8c33155-802e-44f2-ba2a-21b076e7c25e", "operations-analyst": "b1484454-a51c-436b-a2cf-b38e9946a486"}
+question (fixed in 269-REDRIVE-QUESTIONS.md before driving): Search every document — by filename, title and content — for anything about revenue, financial results, 10-K or earnings, and tell me ACME's total revenue in Q3 2026.
+sibling literal that must NOT appear: 124.5
+POST /threads/685fc69d-6fd2-4ae9-bd53-3d69a57aab62/messages headers={'X-Org-Id': '21274586-64aa-42a8-81fe-7dedac7740fd'} (Authorization: Bearer <redacted>) body={"content": "Search every document \u2014 by filename, title and content \u2014 for anything about revenue, financial results, 10-K or earnings, and tell me ACME's total revenue in Q3 2026.", "model": "deepseek-v4-flash", "provider": "deepseek"} -> HTTP 201 body={"message_id":"981c38ec-be34-4e42-b73d-362a042df59b","run_id":"344a26c8-00a8-48b3-9775-f134d4f30ccd","model":"deepseek-v4-flash","provider":"deepseek"}
+SQL: SELECT run_id, status, model, provider, org_id, expert_id, expert_attributed, error, started_at, completed_at FROM runs WHERE run_id = '344a26c8-00a8-48b3-9775-f134d4f30ccd'
+run row: {"run_id": "344a26c8-00a8-48b3-9775-f134d4f30ccd", "status": "completed", "model": "deepseek-v4-flash", "provider": "deepseek", "org_id": "21274586-64aa-42a8-81fe-7dedac7740fd", "expert_id": "00000000-0000-0000-0000-000000002693", "expert_attributed": true, "error": null, "started_at": "2026-09-29 16:14:24.719524+00:00", "completed_at": "2026-09-29 16:14:38.439925+00:00"}
+SQL: SELECT id, role, content, tool_calls, org_id, created_at FROM messages WHERE thread_id='685fc69d-6fd2-4ae9-bd53-3d69a57aab62' AND role='assistant' AND created_at >= '2026-09-29T16:14:24.698332+00:00' ORDER BY created_at -> 1 row(s)
+assistant text (full):
+I searched exhaustively and can report clearly: **there is no revenue, financial-results, 10-K, or earnings information in this document library.**
+
+Here's what I checked and found:
+
+| Search method | Scope | Result |
+|---|---|---|
+| Full-text regex grep (`revenue\|earnings\|10-K\|financial results\|net income\|gross profit`) | All documents in scope | **0 matches** |
+| Filename glob (`*revenue*`, `*financial*`, `*earnings*`, `*10-K*`, `*finance*`) | All docs | **0 matches** |
+| Metadata title query (filename/title ILIKE revenue/financial/earnings) | All docs | **0 rows** |
+| Semantic search for revenue / Q3 2026 financials | All docs | No relevant financial content (top hit was the control-test report, but it contains no financials) |
+
+The reason is simply that the scope `/Security & Compliance Policies` contains only two documents, and neither is a financial document:
+
+1. **acme_control_test_results_q3_2026.md** — internal control test results (16 controls, 14 passed / 2 failed); no revenue figures.
+2. **acme_incident_response_policy_2026.md** — incident severity levels, notification obligations, and recovery objectives; no revenue figures.
+
+So I can't tell you ACME's total revenue for Q3 2026 — **it does not exist anywhere in your document library.** I won't guess or fabricate a number. If a financial statement, 10-K, or earnings release exists elsewhere (e.g., a Finance folder outside this scope), point me to it and I'll pull the figure — or you can supply the document and I'll extract it.
+assistant message 9f871ff9-fa15-48f1-9e2c-7960fb89b7f9 org_id=21274586-64aa-42a8-81fe-7dedac7740fd tool_calls (raw, trimmed): [{"args": {"query": "total revenue Q3 2026 financial results"}, "name": "search_documents", "result": "[{\"content\": \"## Findings\\n\\n**AC-02 (failed).** The quarterly review of privileged accounts was not completed for the ERP database administrators group. Eleven privileged accounts were not reviewed within the quarter. Remediation: complete the outstanding review and add an automated reminder to the identity governance tool.\\n\\n**VM-01 (failed).** Four critical vulnerabilities on manufacturing-floor workstations remained unpatched beyond 14 days because the patch window conflicted with a production run. Remediation: agree a standing monthly maintenance window with Manufacturing and add compensating network segmentation until patched.\\n\\n## Next Testing Cycle\\n\\nAll 16 controls will be retested in Q4 2026. The two failed controls will receive an additional mid-quarter check.\", \"document_id\": \"5a7f164a-881d-4601-bb23-f9b59583a561\", \"filename\": \"acme_control_test_results_q3_2026.md\", \"chunk_index\": 3, \"similarity\": 0.370931667058333, \"version_number\": 1, \"folder_id\": \"f1cf7aa1-c499-4379-bc50-dbd5ec97174a\", \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"Q3 2026\", \"title\": \"ACME Corporation - Internal Control Test Results, Q3 2026\", \"topics\": [\"Internal Control\", \"Audit Results\", \"Compliance\", \"IT Assurance\", \"Security Controls\"], \"summary\": \"The report outlines the test results for internal controls at ACME Corporation for Q3 2026. Out of 16 controls, 14 passed while 2 failed. The document includes detailed results for each control, indicated by control ID and name, as well as remediation owners and due dates for failed controls. Additionally, findings for failed controls with specific remediation actions are provided. Next testing cycle details are also mentioned.\", \"language\": \"english\", \"_confidence\": {\"date\": 0.85, \"title\": 0.9, \"topics\": 0.9, \"summary\": 0.9, \"language\": 1.0, \"document_type\": 0.95}, \"document_type\": \"internal control test results\"}}, {\"content\": \"erts triaged by the security operations centre | Passed | - | - |\\n", "status": "done", "tool_call_id": "call_00_KGUPpKrYCeP1n62mUgkz4530"}, {"args": {"query": "10-K earnings financial statements revenue"}, "name": "search_documents", "result": "No relevant documents found.", "status": "done", "tool_call_id": "call_01_UmnclpQt1oRpJp5cVmnF7127"}, {"args": {"pattern": "(?i)(rev... <trimmed 1743 chars>
+cross-check audit_log action types in turn window: [{"action_type": "search.query", "n": 2}]
+web_search_calls: 0
+SQL: SELECT a.created_at, a.metadata->>'query_text' AS query_text, d.id AS doc_id, d.org_id AS doc_org, d.folder_id AS doc_folder, d.filename FROM audit_log a CROSS JOIN LATERAL jsonb_array_elements_text(a.metadata->'document_ids') x(doc) JOIN documents d ON d.id = x.doc::uuid WHERE a.action_type='search.query' AND a.user_id = '81dc4cd7-363e-44e8-b9ff-ae32f97e2ad6' AND a.created_at > '2026-09-29T16:14:24.362696+00:00' AND a.created_at <= '2026-09-29T16:14:41.794963+00:00' ORDER BY a.created_at
+{"created_at": "2026-09-29 16:14:28.936459+00:00", "query_text": "total revenue Q3 2026 financial results", "doc_id": "5a7f164a-881d-4601-bb23-f9b59583a561", "doc_org": "21274586-64aa-42a8-81fe-7dedac7740fd", "doc_folder": "f1cf7aa1-c499-4379-bc50-dbd5ec97174a", "filename": "acme_control_test_results_q3_2026.md"}
+search.query rows in window (incl. zero-id rows):
+{"created_at": "2026-09-29 16:14:28.936459+00:00", "query_text": "total revenue Q3 2026 financial results", "n_ids": 1}
+{"created_at": "2026-09-29 16:14:30.237667+00:00", "query_text": "10-K earnings financial statements revenue", "n_ids": 0}
+-- ALL-TOOL SCAN: every tool result of this turn checked for test-org documents OUTSIDE install folder f1cf7aa1-c499-4379-bc50-dbd5ec97174a
+   foreign documents in the test org (the set scanned for, 7): [["acme_q3_2026_financial_report.md", "Financial Reports & Filings"], ["acme_contract_renewal_schedule_2026.md", "Contracts & Agreements"], ["acme_msa_kestrel_freight_2026.md", "Contracts & Agreements"], ["acme_employee_handbook_2026.md", "HR Policies & Handbook"], ["acme_learning_and_expense_policy_2026.md", "HR Policies & Handbook"], ["acme_fulfilment_and_inventory_q3_2026.md", "Operations & Supply Chain"], ["acme_supplier_scorecard_q3_2026.md", "Operations & Supply Chain"]]
+   tools called (6): ['search_documents', 'search_documents', 'grep', 'glob', 'query_documents', 'ls']
+   observation only — foreign folder NAMES appearing in tool results: []
+   query_documents call 4: or_shaped=true sql=SELECT d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.filename ILIKE '%revenue%' OR d.filename ILIKE '%financial%' OR d.filename ILIKE '%earnings%' OR d.filename ILIKE '%10-K%' OR d.metadata->>'title' ILIKE '%revenue%' OR d.metadata->>'title' ILIKE '%financial%' OR d.metadata->>'title' ILIKE '%earnings%'
+      result: No results.
+out_of_folder_documents_retrieved_by_any_tool: 0
+or_shaped_query_documents_calls: 1
+sibling_literal_present: false
+refusal-language regex (text normalised ’->') -> 'outside this'
+search.query-joined docs outside this Expert's install folder: 0
+answer names an out-of-folder document of the test org (filename or title): none
+VERDICT: PASS

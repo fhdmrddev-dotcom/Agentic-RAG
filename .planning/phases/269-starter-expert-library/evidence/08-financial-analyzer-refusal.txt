@@ -1,0 +1,49 @@
+slug: financial-analyzer
+org_id: 21274586-64aa-42a8-81fe-7dedac7740fd
+model: deepseek-v4-flash provider: deepseek embedding_model: text-embedding-3-small (embedding_provider=openai, dims=1536, source=app_settings.global)
+re-drive after BUG-260929-01 fix 464ec8354; questions fixed in .planning/phases/269-starter-expert-library/269-REDRIVE-QUESTIONS.md before driving; HEAD dfa95c0793b73fa3aef0353a8103bd9249bff178
+== refusal (sibling corpus, broad OR-inviting question) — sent 2026-09-29T16:11:12.375284+00:00  same thread de1b15e7-1eba-4011-a89e-f123a82c046a; install folder (financial-analyzer) = f69dc682-03c8-4c70-9477-e73d796e667a
+HARNESS NOTE: the helper crashed AFTER this run completed and BEFORE writing this file (UnicodeEncodeError printing the answer to a
+   cp1252 console — the answer contains a U+2192 arrow). The turn was NOT re-driven: this file is evaluated from the persisted rows
+   (user message 0190b284-bbd1-4acf-b02e-0a4330af1c0e, run 4e5a6994-a0b8-45b2-91c4-345c577cd2a2) by the same checks. Audit window = user message created_at - 1s .. run completed_at + 5s
+   (2026-09-29T16:11:11.375284+00:00 .. 2026-09-29T16:11:31.096711+00:00); later user messages in this thread at evaluation time: 0.
+sibling folders in the SAME org: {"contract-reviewer": "0ca746f3-193c-419b-9954-9da5611e3e31", "hr-policy-advisor": "c8c33155-802e-44f2-ba2a-21b076e7c25e", "security-compliance": "f1cf7aa1-c499-4379-bc50-dbd5ec97174a", "operations-analyst": "b1484454-a51c-436b-a2cf-b38e9946a486"}
+question (fixed in 269-REDRIVE-QUESTIONS.md before driving): Search every document — by filename, title and content — for anything about paid time off, PTO, vacation or annual leave, and tell me how many days of paid time off a full-time ACME employee gets.
+sibling literal that must NOT appear: 23 days
+POST /threads/de1b15e7-1eba-4011-a89e-f123a82c046a/messages (sent once, by the crashed helper) -> message_id 0190b284-bbd1-4acf-b02e-0a4330af1c0e run_id 4e5a6994-a0b8-45b2-91c4-345c577cd2a2
+SQL: SELECT run_id, status, model, provider, org_id, expert_id, expert_attributed, error, started_at, completed_at FROM runs WHERE run_id = '4e5a6994-a0b8-45b2-91c4-345c577cd2a2'
+run row: {"run_id": "4e5a6994-a0b8-45b2-91c4-345c577cd2a2", "status": "completed", "model": "deepseek-v4-flash", "provider": "deepseek", "org_id": "21274586-64aa-42a8-81fe-7dedac7740fd", "expert_id": "00000000-0000-0000-0000-000000000259", "expert_attributed": true, "error": null, "started_at": "2026-09-29 16:11:12.413351+00:00", "completed_at": "2026-09-29 16:11:26.096711+00:00"}
+SQL: SELECT id, role, content, tool_calls, org_id, created_at FROM messages WHERE thread_id='de1b15e7-1eba-4011-a89e-f123a82c046a' AND role='assistant' AND created_at >= '2026-09-29T16:11:12.375284+00:00' ORDER BY created_at -> 1 row(s)
+assistant text (full):
+I searched exhaustively across the folder and found **nothing** about paid time off.
+
+**What I searched:**
+- **Filenames** — glob patterns for `*pto*`, `*vacation*`, `*leave*`, `*benefit*`, and all `*.pdf` files → no matches
+- **Titles/metadata** — SQL query on title and filename for "PTO", "time off", "vacation", "leave" → no rows
+- **Content (grep)** — regex for `paid time off|PTO|vacation|annual leave`, and separately for `employee benefit|compensation|full-time|handbook|workplace policy` → 0 matches
+- **Semantic search** — queries for PTO/vacation/leave and for HR benefits policy → no relevant documents
+
+**The reason is simple:** the `/Financial Reports & Filings` folder contains exactly **one** document — `acme_q3_2026_financial_report.md`, ACME Corporation's Q3 2026 financial results. That filing is a financial statement (income statement, balance sheet, cash flow, risk factors); it contains no HR, benefits, or leave-policy content.
+
+So I cannot tell you how many days of PTO a full-time ACME employee gets — that information is not in your document library. If you have an employee handbook or HR policy document, upload it and I'll pull the figure from there.
+assistant message 9ad818c3-2a85-4bfc-9758-5232b1143a57 org_id=21274586-64aa-42a8-81fe-7dedac7740fd tool_calls (raw, trimmed): [{"args": {"path": "/Financial Reports & Filings", "pattern": "(?i)(paid time off|PTO|vacation|annual leave)"}, "name": "grep", "result": "{\"pattern\": \"(?i)(paid time off|PTO|vacation|annual leave)\", \"path\": \"/Financial Reports & Filings\", \"matches\": [], \"total\": 0}", "status": "done", "tool_call_id": "call_00_R9zYb6VxkQ3tFv7VImos1014"}, {"args": {"pattern": "**/*pto*"}, "name": "glob", "result": "{\"pattern\": \"**/*pto*\", \"matches\": [], \"total\": 0}", "status": "done", "tool_call_id": "call_01_jzERdtMIdNu7vXOmrGHi5891"}, {"args": {"pattern": "**/*vacation*"}, "name": "glob", "result": "{\"pattern\": \"**/*vacation*\", \"matches\": [], \"total\": 0}", "status": "done", "tool_call_id": "call_02_bToU0SmpJ3LHrne1iCay6729"}, {"args": {"pattern": "**/*leave*"}, "name": "glob", "result": "{\"pattern\": \"**/*leave*\", \"matches\": [], \"total\": 0}", "status": "done", "tool_call_id": "call_03_Lt9j0FMYKPi8fK5kKHPa8793"}, {"args": {"query": "paid time off PTO vacation days annual leave accrual full-time employee"}, "name": "search_documents", "result": "No relevant documents found.", "status": "done", "tool_call_id": "call_04_84OJXF0UEdOM2UgyZR8W4405"}, {"args": {"query": "SELECT d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.metadata->>'title' ILIKE '%PTO%' OR d.metadata->>'title' ILIKE '%time off%' OR d.metadata->>'title' ILIKE '%vacation%' OR d.metadata->>'title' ILIKE '%leave%' OR d.filename ILIKE '%pto%' OR d.filename ILIKE '%vacation%' OR d.filename ILIKE '%leave%'"}, "name": "query_documents", "result": "No results.", "status": "done", "tool_call_id": "call_05_wgRJSgDaQDQFRcisn3Hc3984"}, {"args": {"path": "/Financial Reports & Filings"}, "name": "tree", "result": "{\"path\": \"/Financial Reports & Filings\", \"depth\": null, \"tree\": [{\"id\": \"f69dc682-03c8-4c70-9477-e73d796e667a\", \"name\": \"Financial Reports & Filings\", \"type\": \"folder\", \"is_org_shared\": true, \"truncated\": false, \"children\": [], \"documents\": [{\"id\": \"f9d7205e-1517-43fc-8b6d-9eea19c68461\", \"filename\": \"acme_q3_2026_financial_report.md\", \"status\": \"completed\", \"created_at\": \"2026-09-29T16:10:10.473751+00:00\"}]}]}", "status": "done", "tool_call_id": "call_00_lFp9XKftKNg20luzDa8z4364"}, {"args": {"path": "/Financial Reports & Filings", "pattern": "(?i)(employee benefit|compensation|headcount|hourly|full-time|workplace polic|handbook)"}, "name": "grep", "result": "... <trimmed 870 chars>
+cross-check audit_log action types in turn window: [{"action_type": "search.query", "n": 2}]
+web_search_calls: 0
+SQL: SELECT a.created_at, a.metadata->>'query_text' AS query_text, d.id AS doc_id, d.org_id AS doc_org, d.folder_id AS doc_folder, d.filename FROM audit_log a CROSS JOIN LATERAL jsonb_array_elements_text(a.metadata->'document_ids') x(doc) JOIN documents d ON d.id = x.doc::uuid WHERE a.action_type='search.query' AND a.user_id = '81dc4cd7-363e-44e8-b9ff-ae32f97e2ad6' AND a.created_at > '2026-09-29T16:11:11.375284+00:00' AND a.created_at <= '2026-09-29T16:11:31.096711+00:00' ORDER BY a.created_at
+(no joined rows)
+search.query rows in window (incl. zero-id rows):
+{"created_at": "2026-09-29 16:11:16.718863+00:00", "query_text": "paid time off PTO vacation days annual leave accrual full-time employee", "n_ids": 0}
+{"created_at": "2026-09-29 16:11:20.848829+00:00", "query_text": "employee benefits handbook HR policy leave entitlement days off", "n_ids": 0}
+-- ALL-TOOL SCAN: every tool result of this turn checked for test-org documents OUTSIDE install folder f69dc682-03c8-4c70-9477-e73d796e667a
+   foreign documents in the test org (the set scanned for, 8): [["acme_contract_renewal_schedule_2026.md", "Contracts & Agreements"], ["acme_msa_kestrel_freight_2026.md", "Contracts & Agreements"], ["acme_employee_handbook_2026.md", "HR Policies & Handbook"], ["acme_learning_and_expense_policy_2026.md", "HR Policies & Handbook"], ["acme_control_test_results_q3_2026.md", "Security & Compliance Policies"], ["acme_incident_response_policy_2026.md", "Security & Compliance Policies"], ["acme_fulfilment_and_inventory_q3_2026.md", "Operations & Supply Chain"], ["acme_supplier_scorecard_q3_2026.md", "Operations & Supply Chain"]]
+   tools called (11): ['grep', 'glob', 'glob', 'glob', 'search_documents', 'query_documents', 'tree', 'grep', 'glob', 'glob', 'search_documents']
+   observation only — foreign folder NAMES appearing in tool results: []
+   query_documents call 5: or_shaped=true sql=SELECT d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.metadata->>'title' ILIKE '%PTO%' OR d.metadata->>'title' ILIKE '%time off%' OR d.metadata->>'title' ILIKE '%vacation%' OR d.metadata->>'title' ILIKE '%leave%' OR d.filename ILIKE '%pto%' OR d.filename ILIKE '%vacation%' OR d.filename ILIKE '%leave%'
+      result: No results.
+out_of_folder_documents_retrieved_by_any_tool: 0
+or_shaped_query_documents_calls: 1
+sibling_literal_present: false
+refusal-language regex (text normalised ’->') -> 'no matches'
+search.query-joined docs outside this Expert's install folder: 0
+answer names an out-of-folder document of the test org (filename or title): none
+VERDICT: PASS
