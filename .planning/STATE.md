@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
-status: "**Phase 268 CLOSED 2026-09-29 — `passed`.** Next: Phase 269 (Starter Expert Library) → `/gsd:discuss-phase 269`."
-last_updated: "2026-09-29T13:22:12.160Z"
-last_activity: 2026-09-29 -- 268 closed (passed)
+status: executing
+last_updated: "2026-09-29T13:55:29.628Z"
+last_activity: 2026-09-29 -- Phase 269 planning complete
 progress:
   total_phases: 12
   completed_phases: 4
-  total_plans: 19
+  total_plans: 24
   completed_plans: 19
   percent: 33
 ---
@@ -52,7 +52,7 @@ genuinely reviewed.
 Milestone: v4.4 Experts That Actually Work
 Phase: 268 (Expert Spend & Mid-Thread Scope)
 Plan: 4 of 4 — complete
-Status: **Phase 268 CLOSED 2026-09-29 — `passed`.** Next: Phase 269 (Starter Expert Library) → `/gsd:discuss-phase 269`.
+Status: Ready to execute
 
 - **2026-09-29 close:** Gemini's independent review checked by Claude — 0 blocking (CR-01/WR-01 refuted, WR-02 info). SC#1-continued PASS live on a seeded pause (line delta = run delta, +139,903 / +297). **D-2 FIXED** `a2274e435` (Continue's count was dropped by RLS). D-1 → **SEED-323**, D-3 → **SEED-324**. UI-review top 3 fixed `dda093f6f`.
 
@@ -74,7 +74,7 @@ Status: **Phase 268 CLOSED 2026-09-29 — `passed`.** Next: Phase 269 (Starter E
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
 Resume file: .planning/phases/269-starter-expert-library/269-CONTEXT.md
-Last activity: 2026-09-29 -- 268 closed (passed)
+Last activity: 2026-09-29 -- Phase 269 planning complete
 
 ---
 
