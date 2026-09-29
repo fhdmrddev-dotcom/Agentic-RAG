@@ -343,3 +343,22 @@ async def test_the_unfiltered_ledger_count_equals_the_window_run_count(pg_pool, 
     assert r1["subagent_count"] == 1 and r1["expert_id"] == str(s["e1"])
     r7 = by_id[str(s["runs"]["R7"]["id"])]
     assert r7["expert_attributed"] is False
+
+
+# ── 268-REVIEW WR-05 → D-268-28 — the placeholder shell is DISCLOSED as partly priced ─────────────────────
+# D-268-21's pricing stands: R8 (an unrated `unknown` shell) still adds S8's USD to the totals. What was false
+# was the page's claim that an unrated run is excluded from the total. The count comes from the SAME per_root CTE.
+
+
+@pytest.mark.asyncio
+async def test_WR05_the_placeholder_shell_is_counted_as_a_partly_priced_harness_run(pg_pool, spend_org):
+    s = spend_org
+    whole = await get_org_spend_summary(pg_pool, s["org"])
+    # Exactly R8: an unrated NON-shell root, or a rated root with an unpriced sub-agent (R6), is not one.
+    assert whole.partly_priced_harness_runs == 1
+    e3 = await get_org_spend_summary(pg_pool, s["org"], expert=str(s["e3"]))
+    assert (e3.unrated_runs_count, e3.partly_priced_harness_runs) == (1, 1)
+    # The disclosure changes no money: the shell's line is still its sub-agent's price (D-268-21).
+    assert _t(e3.total_spend_usd) == _t(_price(s["runs"]["S8"])) > 0
+    e1 = await get_org_spend_summary(pg_pool, s["org"], expert=str(s["e1"]))
+    assert e1.partly_priced_harness_runs == 0

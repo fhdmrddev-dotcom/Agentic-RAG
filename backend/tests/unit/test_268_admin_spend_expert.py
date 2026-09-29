@@ -155,3 +155,14 @@ def test_window_total_is_null_when_the_window_was_never_measured(client, operato
     with ps[0], ps[1], ps[2], ps[3]:
         res = client.get("/admin/spend/summary")
     assert res.json()["window_total_usd"] is None
+
+
+def test_WR05_the_summary_payload_carries_partly_priced_harness_runs(client, operator):
+    """D-268-28: the disclosure's N travels on the wire beside the 268 fields."""
+    base = _summary()
+    base.partly_priced_harness_runs = 2
+    _, ps = _patches(summary_mock=AsyncMock(return_value=base))
+    with ps[0], ps[1], ps[2], ps[3]:
+        res = client.get("/admin/spend/summary")
+    assert res.status_code == 200
+    assert res.json()["partly_priced_harness_runs"] == 2

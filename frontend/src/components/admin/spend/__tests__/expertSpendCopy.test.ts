@@ -71,6 +71,15 @@ describe("EXPERT_SPEND_COPY", () => {
     expect(C.handoffTile.footer).toBe("Not metered yet")
   })
 
+  it("discloses a partly priced harness run in the operator's words (D-268-28)", () => {
+    expect(C.partlyPricedHarness(1)).toBe(
+      "1 harness run partly priced — sub-agent costs included, orchestrator cost not",
+    )
+    expect(C.partlyPricedHarness(3)).toBe(
+      "3 harness runs partly priced — sub-agent costs included, orchestrator cost not",
+    )
+  })
+
   it("names unpriced sub-agents inside the unrated disclosure (D-268-25)", () => {
     expect(C.unpricedSubagents(1)).toBe(
       "1 sub-agent run inside rated runs has no rate either, so its tokens are not in the total.",

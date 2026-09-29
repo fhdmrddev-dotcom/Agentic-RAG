@@ -3581,6 +3581,7 @@ const BASELINE = {
   //   own plant — and the Expert PATCH, create-with-Expert and handoff keep the server's sentence.
   "entitlementRefusal.test.ts": 13, // v4.3 audit (TIER-03)
   "noFrontendTokenPricing.fence.test.ts": 3, // v4.3 audit (257 SC#3)
+  "spendSummaryMapper.test.ts": 2, // 268-REVIEW WR-05 (D-268-28): partly_priced_harness_runs on the wire
   "connectionFormCopy.mcp.test.ts": 6,
   "McpAuthDoor.test.tsx": 9,
   "McpAuthDoor.byo.test.tsx": 3,
@@ -4035,7 +4036,7 @@ const BASELINE = {
   // 17 -> 18 in 257 WR-12: fence em-dash loading state so pre-fix fallback $0.0000 cannot return.
   // 18 -> 22 in 257 CR-05/CR-07: four cases pinning that a FAILED LOAD answers nothing
   // rather than zero. Driven RED against the shipped zero-fallback (Received: "0.0k").
-  "AdminSpendPage.test.tsx": 36, // +4 BUG-260923-02 ledger paging; 268-02 +10 (Expert filter: four regions move together, paging/refresh keep it)
+  "AdminSpendPage.test.tsx": 38, // +4 BUG-260923-02 ledger paging; 268-02 +10 (Expert filter: four regions move together, paging/refresh keep it); +2 268-REVIEW WR-05
   // ── Phase 268 plan 02 (METER-08) — the /admin/spend Expert leaves. BOTH KNOBS, SAME COMMIT:
   // `src/components/admin/` has NO directory entry (the trap this block's neighbours name four
   // times), so each suite is a FILE-LEVEL TARGETS entry at the bottom of this file too.
@@ -4043,7 +4044,7 @@ const BASELINE = {
   "ExpertFilterPills.test.tsx": 7,
   "ExpertSpendCard.test.tsx": 19,
   "AttributionDisclosures.test.tsx": 2,
-  "expertSpendCopy.test.ts": 9,
+  "expertSpendCopy.test.ts": 10, // +1 268-REVIEW WR-05 (D-268-28 partly-priced words)
   // Added in 257 CR-06 follow-up. Exhaustive arithmetic: three independently-rounded
   // gauge segments summed to 101 on 34 of the combinations swept, and gemini found it
   // reviewing the CR-06 fix. Driven RED against the pre-fix arithmetic, 40 offenders named.
@@ -5430,6 +5431,7 @@ const TARGETS = [
   // ── v4.3 milestone audit (TIER-03) — a tier refusal names the plan; both knobs, same commit
   "src/lib/api/__tests__/entitlementRefusal.test.ts",
   "src/lib/api/__tests__/noFrontendTokenPricing.fence.test.ts", // v4.3 audit (257 SC#3)
+  "src/lib/api/__tests__/spendSummaryMapper.test.ts", // 268-REVIEW WR-05 (D-268-28)
   "src/components/settings/__tests__/connectionFormCopy.mcp.test.ts",
   "src/components/settings/McpAuthDoor.test.tsx",
   "src/components/settings/McpAuthDoor.byo.test.tsx",

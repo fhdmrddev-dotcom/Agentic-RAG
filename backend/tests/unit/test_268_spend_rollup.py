@@ -445,3 +445,19 @@ async def test_ledger_count_carries_the_same_root_and_expert_predicates():
         assert "INTERVAL '7 days'" in sql
         assert "pr.input_cost_per_million IS NOT NULL" in sql
     assert "ORDER BY ro.started_at DESC" in rows_sql
+
+
+@pytest.mark.asyncio
+async def test_WR05_partly_priced_harness_runs_reach_the_dataclass_and_default_to_zero():
+    """D-268-28: read from the totals row (the ONE per_root CTE); an older mock row without it reads 0."""
+    pool = _pool()
+    _prime_summary(pool, [_line("none", runs=2)], totals=_totals_row(partly_priced_harness_runs=3))
+    assert (await get_org_spend_summary(pool, uuid4())).partly_priced_harness_runs == 3
+    pool = _pool()
+    _prime_summary(pool, [_line("none", runs=2)], totals=_totals_row())
+    assert (await get_org_spend_summary(pool, uuid4())).partly_priced_harness_runs == 0
+
+
+def test_WR05_the_count_is_built_from_the_one_per_root_cte():
+    assert "partly_priced_harness_runs" in _RATES_SRC
+    assert "priced_subagents" in _RATES_SRC, "per_root must count the PRICED sub-agents of each root"

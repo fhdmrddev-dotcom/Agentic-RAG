@@ -839,3 +839,31 @@ describe("AdminSpendPage — Phase 268: spend by Expert", () => {
     expect(screen.queryByTestId("expert-spend-table")).not.toBeInTheDocument()
   })
 })
+
+describe("AdminSpendPage — 268-REVIEW WR-05 / D-268-28: a partly priced harness run is disclosed", () => {
+  // D-268-21 prices an unrated harness shell's sub-agents into the total, while the Unrated tile
+  // said unrated runs are "excluded from org dollar totals". The count comes from the server's
+  // per_root CTE; the page only says it.
+  const PARTLY = "2 harness runs partly priced — sub-agent costs included, orchestrator cost not"
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(spendApi.getSpendRuns).mockResolvedValue({ runs: [], totalCount: 100 })
+    vi.mocked(spendApi.getModelRates).mockResolvedValue([])
+  })
+
+  it("says it in the Unrated tile and in the KPI footnote", async () => {
+    vi.mocked(spendApi.getSpendSummary).mockResolvedValue({ ...mockSummary, partlyPricedHarnessRuns: 2 })
+    render(<AdminSpendPage onBack={() => {}} />)
+    expect((await screen.findByTestId("partly-priced-note")).textContent).toBe(PARTLY)
+    expect(screen.getByTestId("kpi-partly-priced").textContent).toBe(PARTLY)
+  })
+
+  it("says nothing when there is none", async () => {
+    vi.mocked(spendApi.getSpendSummary).mockResolvedValue({ ...mockSummary, partlyPricedHarnessRuns: 0 })
+    render(<AdminSpendPage onBack={() => {}} />)
+    await screen.findByText(/80 priced/)
+    expect(screen.queryByTestId("partly-priced-note")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("kpi-partly-priced")).not.toBeInTheDocument()
+  })
+})
