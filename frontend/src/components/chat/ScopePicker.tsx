@@ -29,7 +29,7 @@ import { getScopeEffect } from "@/lib/api"
 import type { ScopeEffect } from "@/lib/api/threads"
 import type { Folder } from "@/types"
 import { cn } from "@/lib/utils"
-import { SCOPE_COPY, chipLabel, explainFor, ledgerColumnsFor } from "./scopeCopy"
+import { SCOPE_COPY, ScopeConflictError, chipLabel, explainFor, ledgerColumnsFor } from "./scopeCopy"
 
 /** The radio value of the tree root ("All your documents" — clears the folder). */
 const ROOT = "__all__"
@@ -156,6 +156,11 @@ export function ScopePicker({
       await onApply(draftId)
     } catch (err) {
       onApplyingChange(false)
+      // 268-REVIEW iter-2 WR-01: a lost race arrives as a finished sentence about what is in effect NOW.
+      if (err instanceof ScopeConflictError) {
+        setRefusal(err.message)
+        return
+      }
       const reason = err instanceof Error && err.message.trim() ? err.message : SCOPE_COPY.networkReason
       setRefusal(SCOPE_COPY.refusal(reason, savedLabel))
       return

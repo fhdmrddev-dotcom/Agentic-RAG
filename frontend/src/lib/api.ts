@@ -45,6 +45,7 @@ export {
   setThreadActiveExpert,
   setThreadFolder,
   getScopeEffect,
+  getThread,
   postMessage,
   subscribeToRun,
   getActiveRuns,

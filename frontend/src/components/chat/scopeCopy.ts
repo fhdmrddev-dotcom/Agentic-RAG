@@ -52,6 +52,13 @@ export const SCOPE_COPY = {
   refusal: (reason: string, saved: string): string =>
     `Couldn't change the folder. ${reason} This chat still searches ${saved}.`,
   networkReason: "The server could not be reached.",
+  // 268-REVIEW iter-2 WR-01: a 409 means another tab moved the folder first. State what is in effect
+  // NOW (from the re-read thread), never the folder this client last saw.
+  conflict: (current: string): string =>
+    `The folder changed while you were choosing — this chat now searches ${current}. Pick again.`,
+  conflictHeld: (current: string, expert: string): string =>
+    `The folder changed while you were choosing — ${current} is now saved for when ${expert} leaves. Pick again.`,
+  conflictUnknown: "The folder changed while you were choosing. Pick again.",
   pending: (old: string, next: string): string =>
     `The answer in progress keeps searching ${old}. ${next} applies from your next message.`,
   pendingHeld: (next: string, expert: string): string =>
@@ -62,6 +69,13 @@ export const SCOPE_COPY = {
   heldRest: (folders: string, draft: string, expert: string): string =>
     ` Restricted reads ${folders} only. ${draft} is saved and is searched once ${expert} leaves.`,
 } as const
+
+/**
+ * 268-REVIEW iter-2 WR-01: the scope PATCH lost a race (409). Its `message` is the FINISHED refusal
+ * sentence, built from the re-read thread by the ONE scope PATCH home (ChatArea) — the picker shows it
+ * as-is and never appends the stale "still searches" line.
+ */
+export class ScopeConflictError extends Error {}
 
 /** `A` · `A and B` · `A, B and C` (the 267 gate-line rule). */
 export function joinFolders(names: string[]): string {

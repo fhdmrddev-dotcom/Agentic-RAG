@@ -19,6 +19,7 @@ import {
   setThreadActiveExpert,
   setThreadFolder,
   getScopeEffect,
+  getThread,
   ApiError,
 } from "@/lib/api"
 import { handoffThread, type ScopeEffect } from "@/lib/api/threads"
@@ -27,7 +28,7 @@ import { useComposerModel } from "@/hooks/useComposerModel"
 import { useThreadNavigation } from "./threadNavigation"
 import { ExpertSpotlightCard } from "./ExpertSpotlightCard"
 import { ScopeChip } from "./ScopeChip"
-import { SCOPE_COPY, chipLabel } from "./scopeCopy"
+import { SCOPE_COPY, ScopeConflictError, chipLabel } from "./scopeCopy"
 import type { Folder, Thread, ExpertBundle } from "@/types"
 import { Clock, Menu, Sparkles, PanelLeftOpen } from "lucide-react"
 
@@ -622,6 +623,21 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
       try {
         updated = await setThreadFolder(tid, next)
       } catch (err) {
+        // 268-REVIEW iter-2 WR-01: a 409 means another tab moved the folder after this client read it.
+        // Re-read the thread (the list owner learns it through the same path as a success), re-read
+        // the effect, and state what is in effect NOW — never the stale folder. Still ONE PATCH.
+        if (err instanceof ApiError && err.status === 409) {
+          const fresh = await getThread(tid).catch(() => null)
+          if (!fresh) throw new ScopeConflictError(SCOPE_COPY.conflictUnknown)
+          onThreadUpdated?.(fresh)
+          const current = chipLabel(fresh.folder_id ?? null, folders).full
+          const effect = currentTidRef.current === tid ? await refreshScopeEffect(tid) : null
+          throw new ScopeConflictError(
+            effect?.held && effect.expert
+              ? SCOPE_COPY.conflictHeld(current, effect.expert.name)
+              : SCOPE_COPY.conflict(current),
+          )
+        }
         throw new Error(
           err instanceof ApiError && err.message.trim() ? err.message : SCOPE_COPY.networkReason,
         )

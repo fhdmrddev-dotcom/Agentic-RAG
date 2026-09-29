@@ -241,6 +241,17 @@ export async function setThreadFolder(threadId: string, folderId: string | null)
 }
 
 /**
+ * 268-REVIEW iter-2 WR-01: the ONE thread as the server holds it now (`GET /threads/{id}`, owner-scoped).
+ * Read after a scope PATCH loses a race (409), so the chip and the refusal follow the winner's folder.
+ */
+export async function getThread(threadId: string): Promise<Thread> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}`, { headers })
+  if (!res.ok) return throwThreadRefusal(res, "Thread not found")
+  return res.json() as Promise<Thread>
+}
+
+/**
  * Phase 268 (D-268-12c / UI-SPEC R1): what the thread's NEXT message searches — at rest (no draft),
  * or for a draft folder (`{ folderId }`; `null` = clear). The ONE payload the chip, the picker ledger
  * and (snapshotted) the transcript card render from; `held` is decided by the server.
