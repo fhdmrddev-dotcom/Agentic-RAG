@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: Find It, Show It
 status: planning
-last_updated: "2026-09-29T20:00:00.000Z"
-last_activity: 2026-09-29 -- v4.5 roadmap created (phases 270-275)
+last_updated: "2026-09-29T20:16:51.715Z"
+last_activity: 2026-09-29 - v4.5 roadmap created (hand-edited; no `state.*` / `milestone.*` SDK verb called)
 progress:
-  total_phases: 6
+  total_phases: 13
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -74,7 +74,6 @@ Order: 270 → 271 → 272 → 273 → 274 → 275 (273 can move earlier if `too
 
 **The v4.4 block below is the v4.4 close history, kept verbatim.**
 
-
 Milestone: v4.4 Experts That Actually Work
 Phase: 269 (starter-expert-library) — CLOSED (5 of 5 plans; verification passed)
 Plan: 5 of 5
@@ -103,7 +102,7 @@ Status: Phase 269 closed — verification `passed`; nothing deployed; ~~next: op
 - **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
-Resume file: .planning/phases/269-starter-expert-library/269-05-SUMMARY.md
+Resume file: .planning/phases/270-the-document-as-an-object/270-CONTEXT.md
 Last activity: 2026-09-29 -- Phase 269 closed
 
 ---
