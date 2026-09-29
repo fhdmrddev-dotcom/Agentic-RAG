@@ -83,7 +83,7 @@ interface ExpertSpendCardProps {
 function ModeTag({ mode }: { mode: string | null }) {
   if (!mode || !C.modeTag[mode]) return null
   return (
-    <span className="ml-1.5 text-[11px] px-1.5 py-px rounded border border-border/60 text-muted-foreground font-normal not-italic">
+    <span className="ml-2 text-[11px] px-2 py-px rounded border border-border/60 text-muted-foreground font-normal not-italic">
       {C.modeTag[mode]}
     </span>
   )
@@ -161,7 +161,7 @@ export const ExpertSpendCard: React.FC<ExpertSpendCardProps> = ({
               <thead>
                 <tr className="border-b border-border/40 font-mono text-[11px] text-muted-foreground">
                   {C.headers.map((h, i) => (
-                    <th key={h} className={`py-2 px-3 font-medium ${i >= 1 && i <= 3 ? "text-right" : ""}`}>
+                    <th key={h} className={`py-2 px-3 font-semibold ${i >= 1 && i <= 3 ? "text-right" : ""}`}>
                       {h}
                     </th>
                   ))}
@@ -194,7 +194,7 @@ export const ExpertSpendCard: React.FC<ExpertSpendCardProps> = ({
                             </button>
                             {!line.deleted && <ModeTag mode={line.scopeMode} />}
                             {line.unratedCount > 0 && (
-                              <span className="ml-1.5 text-amber-700 dark:text-amber-300 border border-amber-600/40 dark:border-amber-500/30 bg-amber-500/10 rounded-full px-2 text-[11px]">
+                              <span className="ml-2 text-amber-700 dark:text-amber-300 border border-amber-600/40 dark:border-amber-500/30 bg-amber-500/10 rounded-full px-2 text-[11px]">
                                 {C.unratedChip(line.unratedCount)}
                               </span>
                             )}
@@ -308,7 +308,7 @@ export const LedgerExpertCell: React.FC<{ run: LedgerAttribution }> = ({ run }) 
 export const SubagentTag: React.FC<{ count: number }> = ({ count }) => {
   if (count <= 0) return null
   return (
-    <span className="text-[11px] px-1.5 rounded border border-border/40 text-muted-foreground inline-flex items-center gap-1">
+    <span className="text-[11px] px-2 rounded border border-border/40 text-muted-foreground inline-flex items-center gap-1">
       <CornerDownRight className="h-3 w-3" aria-hidden="true" />
       {C.subagentTag(count)}
     </span>

@@ -25,7 +25,7 @@ export const AttributionDisclosures: React.FC = () => (
           <GitMerge className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
           <span>{C.subagentTile.title}</span>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">{C.subagentTile.body}</p>
+        <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">{C.subagentTile.body}</p>
       </div>
       <span className="text-[11px] text-muted-foreground">{C.subagentTile.footer}</span>
     </div>
@@ -36,7 +36,7 @@ export const AttributionDisclosures: React.FC = () => (
           <MessageSquareDashed className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
           <span>{C.handoffTile.title}</span>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">{C.handoffTile.body}</p>
+        <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">{C.handoffTile.body}</p>
       </div>
       <span className="text-[11px] text-amber-700 dark:text-amber-300">{C.handoffTile.footer}</span>
     </div>

@@ -75,12 +75,12 @@ function Column({ column }: { column: LedgerColumn }) {
         {shown.map((item, i) => {
           const text = item.unnameable ? UNNAMEABLE_FOLDER : item.label
           return (
-            <li key={`${text}-${i}`} className="flex min-w-0 items-center gap-1 text-xs leading-relaxed">
+            <li key={`${text}-${i}`} className="flex min-w-0 items-start gap-1 text-xs leading-relaxed">
               {item.unnameable && <EyeOff className="h-3 w-3 flex-none text-muted-foreground" />}
               <span
                 title={text}
                 className={cn(
-                  "truncate",
+                  "min-w-0 break-words",
                   item.unnameable ? "italic text-muted-foreground" : item.muted ? "text-muted-foreground" : "text-foreground",
                 )}
               >

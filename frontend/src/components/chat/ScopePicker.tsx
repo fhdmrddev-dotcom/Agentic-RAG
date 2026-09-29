@@ -68,7 +68,7 @@ function flattenTree(folders: Folder[]): TreeNode[] {
 const NODE =
   "min-h-[44px] sm:min-h-0 gap-1 rounded-md py-2 pr-2 text-xs leading-relaxed [&>span:first-child]:hidden"
 const SELECTED = "bg-indigo-500/10 dark:bg-indigo-500/[0.18] text-indigo-700 dark:text-indigo-200"
-const ACTION = "min-h-[44px] sm:min-h-0 justify-center rounded-md px-3 py-1.5 text-xs font-semibold"
+const ACTION = "min-h-[44px] sm:min-h-0 justify-center rounded-md px-3 py-2 text-xs font-semibold"
 
 export interface ScopePickerProps {
   threadId: string
