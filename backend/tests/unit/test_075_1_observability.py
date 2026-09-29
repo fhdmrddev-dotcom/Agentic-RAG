@@ -94,6 +94,10 @@ async def test_snapshot_short_circuits_on_empty_active_runs() -> None:
         "messages": [],
         "active_runs": [],
         "since_cursors": {},
+        # 267-REVIEW-INDEPENDENT CR-03(c): the snapshot ALWAYS states the thread's Expert, null
+        # included, so the client can reconcile its chip after a server-side clear. (The response
+        # model already sent null on the wire; the handler dict now says so itself.)
+        "active_expert_id": None,
     }
     # xinfo_stream MUST NOT have been called
     assert redis.xinfo_stream.call_count == 0
