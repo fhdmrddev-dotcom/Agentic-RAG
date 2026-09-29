@@ -22,15 +22,15 @@ result: passed — Gemini's review (268-REVIEW.md iteration 4) was checked by Cl
 expected: A Deep run with an Expert active reaches `cap_paused`, is Continued, and on `/admin/spend` that Expert's
 line counts BOTH segments' tokens (D-268-20). Today this is proven only by `test_268_continuation_tokens.py`
 (RED→GREEN) and the real-Postgres fixture; two live attempts finished under the cap.
-result: blocked — 2026-09-29 live drive: no provider reached cap_paused in 3 attempts; a hand-seeded pause + real Continue hit 3 Continue defects (D-1 DeepSeek 400 on reasoning_content, D-2 continues_used never written, D-3 no cap_paused check). See 268-UAT-LOG.md.
+result: passed (seeded pause) — 2026-09-29 after the D-2 fix: a real Continue added +139,903 / +297 to the run and exactly the same to the HR Advisor line (8 runs unchanged; independent SUM agrees). D-1 and D-3 remain open. See 268-UAT-LOG.md.
 
 ## Summary
 
 total: 2
-passed: 1
+passed: 2
 issues: 0
 pending: 0
 skipped: 0
-blocked: 1
+blocked: 0
 
 ## Gaps

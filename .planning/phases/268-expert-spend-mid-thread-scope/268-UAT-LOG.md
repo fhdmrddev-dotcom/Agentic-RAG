@@ -377,3 +377,19 @@ app settings were restored and verified; the first segment's tokens are unchange
 ⚠ One attempt to run the Continue on `claude-sonnet-5` (global default switched for one run, then restored) still
 called DeepSeek; the cause (settings cache vs. model resolution) was **not** established. **SC#1's continued-run
 clause stays proven by tests only**; a live drive needs D-1 and D-2 fixed first.
+
+### SC#1-continued — **PASS (seeded pause)**, 2026-09-29, after D-2 fix `a2274e435`
+
+Run `91c12936` (HR Advisor, real first segment 18,929 / 3,426) set `cap_paused` by hand, **no carrier row**;
+`POST /runs/…/continue` driven for real on the restarted backend: API `continues_used 1` in 3.0 s and the row read
+`1` / `streaming` (D-2 fixed live — it read `0` before). The continuation **completed** on `deepseek-v4-flash`.
+
+| | input | output | runs |
+|---|---|---|---|
+| run delta (segment 2) | +139,903 | +297 | — |
+| HR Advisor line delta on `/admin/spend` | +139,903 | +297 | 0 (8 → 8) |
+| independent `SUM(runs)` for the Expert | 293,561 | 7,649 | 8 = line |
+
+Both segments are counted on one run and one line. ⚠ D-1 did **not** fire here: it needs dropped tool calls to be
+replayed (a carrier row), and this Continue had none — so D-1 stays OPEN for the real-pause case. D-3 stays OPEN.
+The run keeps its real segment-2 tokens (real spend); only `continues_used` was reset by the restore.
