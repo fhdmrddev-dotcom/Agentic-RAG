@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
 status: executing
-last_updated: "2026-09-29T13:55:29.628Z"
-last_activity: 2026-09-29 -- Phase 269 planning complete
+last_updated: "2026-09-29T14:12:18.962Z"
+last_activity: 2026-09-29 -- Phase 269 execution started
 progress:
   total_phases: 12
   completed_phases: 4
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 268 — Expert Spend & Mid-Thread Scope
+**Current focus:** Phase 269 — starter-expert-library
 **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`).
 
 ---
@@ -50,9 +50,9 @@ genuinely reviewed.
 ## Current Position
 
 Milestone: v4.4 Experts That Actually Work
-Phase: 268 (Expert Spend & Mid-Thread Scope)
-Plan: 4 of 4 — complete
-Status: Ready to execute
+Phase: 269 (starter-expert-library) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 269
 
 - **2026-09-29 close:** Gemini's independent review checked by Claude — 0 blocking (CR-01/WR-01 refuted, WR-02 info). SC#1-continued PASS live on a seeded pause (line delta = run delta, +139,903 / +297). **D-2 FIXED** `a2274e435` (Continue's count was dropped by RLS). D-1 → **SEED-323**, D-3 → **SEED-324**. UI-review top 3 fixed `dda093f6f`.
 
@@ -74,7 +74,7 @@ Status: Ready to execute
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
 Resume file: .planning/phases/269-starter-expert-library/269-CONTEXT.md
-Last activity: 2026-09-29 -- Phase 269 planning complete
+Last activity: 2026-09-29 -- Phase 269 execution started
 
 ---
 
