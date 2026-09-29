@@ -203,12 +203,31 @@ Plans:
 **Success Criteria** (what must be TRUE):
 
   1. A newly created org opens the Expert catalog and sees the starter library (count and domains as decided at discuss), each Expert with a working detail view (PACK-26).
+     ⚠ **QUALIFIED 2026-09-29 at plan-phase — operator ruling D-269-P1** (the original is kept above, not overwritten): tiers stay OPERATOR-ASSIGNED, so SC#1 holds for **an org on the enterprise tier**. A raw signup org has `subscription_tier = NULL` and sees the tier-refusal sentence, never a blank page (F-4, `266-PROD-PARITY.md` §F); no `handle_new_user` / tier / capability change is made. The NULL-tier gap is planted as a seed at close (269-05).
   2. Each starter Expert installs into that org through the **same** 266 path — its corpus copied, ingested and embedded there — with no Expert-specific install code (PACK-26).
   3. Every starter Expert has **one recorded live conversation** in a real org that answers from its own corpus with a cited figure and refuses one out-of-scope question (PACK-27).
   4. No starter Expert ships whose only evidence is a mocked or fixture test — an Expert without its live transcript is held back, not shipped (PACK-27).
 
 **How we'd know this failed**: an Expert needs a bespoke seed script or code branch to install; a starter Expert's live answer is generic model knowledge with no citation from its corpus; the catalog in a new org is empty until someone runs a migration by hand; the library count is chosen before the domains are validated against real corpora.
-**Plans**: TBD
+**Plans**: 5 plans / 4 waves — 01 corpora ∥ 02 candidate SQL + fences (wave 1, worktrees) → 03 live proof in a fresh org (wave 2, main tree, operator paste) → 04 operator lock + promote proven rows into migration 198 (wave 3) → 05 greenfield runbook, prod parity, registers (wave 4)
+
+Plans:
+**Wave 1**
+
+- [ ] 269-01-PLAN.md — four synthetic ACME corpora (Legal, HR, Compliance, Operations) + corpus contract test over the derived slug set (figures in exactly one corpus, sibling refusal literals)
+- [ ] 269-02-PLAN.md — 269-candidate-bundles.sql (4 org-portable rows + D-269-P2 Financial Analyzer copy fix) + shape fence + D-269-08 no-Expert-specific-code fence (RED-driven)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 269-03-PLAN.md — operator stages candidates locally; fresh org, named D-269-P1 tier step, first-run catalog, 5 installs via the 266 path, cited + sibling-corpus refusal per Expert with org-joined evidence
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 269-04-PLAN.md — operator G-2/G-4 acceptance + per-Expert LOCK/HOLD; promote proven rows verbatim into 198 with the SC#4 evidence gate; operator applies 198 + regenerates full-schema
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 269-05-PLAN.md — OPERATOR.md Step-3 (186/187/189/198) with the silenced drift WARN preserved in a seed, 269-PROD-PARITY.md, F-4 seed, SEED-244 answered, gates
 **Flags**: ⚠ **Operator decision at discuss:** count and domains of the starter set, and the source/licence of each sample corpus. Seed data ships as numbered migrations (`194+`) and must be **org-portable** — the lesson of migration 193 (188 hardcoded a local org id). **G-2 FIRES** (catalog first-run / installed states). **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/components/experts/catalog/*` (young rows), `backend/app/db/experts.py` (FIRES), `backend/app/services/expert_service.py`. Seed `SEED-244`. **UI hint**: yes
 
 ### Progress
