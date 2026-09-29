@@ -10,11 +10,20 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: none — v4.4 shipped, next via `/gsd:new-milestone`
+## Current Milestone: v4.5 Find It, Show It
 
-Phase numbering resumes at **270**, migrations at **199**. ⛔ Carried: `SEED-013` Open Platform,
-`SEED-294` commercial blockers (non-engineering), `SEED-325` NULL-tier signup gap, `SEED-327`
-(`forced_emit` system prompt dropped by OpenAI-compat/Responses adapters), `SEED-328` deferred review items.
+**Goal:** Find documents by what they ARE (type, owner, date, structure), get the file back out, and let the
+agent answer with interactive artifacts instead of dead images and prose.
+
+**Target features (operator intake 2026-09-29; hardening/testing milestone and plugins/ecosystem work POSTPONED by operator):**
+- **Find the DOCUMENT** (`SEED-243`, `SEED-153`, `SEED-224`) - document-first metadata search beside (never inside) RAG search; rename + re-home the Classification page; download the original file + rich file facts; structure (folder path, relationships, version lineage) as searchable fields.
+- **A2UI artifact rail** (`SEED-193`, later `SEED-194`) - the agent emits a validated spec from a CLOSED component registry (never free markup); chart-as-spec first, then table / metric / comparison.
+- **Retention & archival** (`SEED-250`) - the one absent DMS capability: policy, legal hold, disposition audit.
+- **Thread-scoped attachments** (`SEED-247`) - chat attachments belong to the thread, not the Library.
+
+Phase numbering resumes at **270**, migrations at **199**. Research skipped (seeds hold the analysis).
+Solo running: Claude builds and reviews; phases close `verification_mode: self-verified`.
+Carried: `SEED-013`, `SEED-294` (non-engineering), `SEED-325`, `SEED-327`, `SEED-328`.
 
 ---
 

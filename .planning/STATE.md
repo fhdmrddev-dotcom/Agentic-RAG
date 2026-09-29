@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.4
-milestone_name: Experts That Actually Work — ✅ SHIPPED
-status: milestone_complete
+milestone: v4.5
+milestone_name: Find It, Show It
+status: planning
 last_updated: "2026-09-29T19:00:00.000Z"
-last_activity: 2026-09-29 -- v4.4 milestone COMPLETED (tag v4.4)
+last_activity: 2026-09-29 -- Milestone v4.5 started
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 24
-  completed_plans: 24
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Planning next milestone (`/gsd:new-milestone`; phases resume at 270, migrations at 199)
+**Current focus:** Milestone v4.5 Find It, Show It — defining requirements (phases resume at 270, migrations at 199)
 **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`).
 
 ---
@@ -53,7 +53,15 @@ genuinely reviewed.
 
 ---
 
-## Current Position
+## Current Position (v4.5)
+
+Phase: Not started (defining requirements)
+Plan: -
+Status: Defining requirements
+Last activity: 2026-09-29 - Milestone v4.5 Find It, Show It started (hand-edited; `state.milestone-switch` NOT called, backup taken)
+
+**The v4.4 block below is the v4.4 close history, kept verbatim.**
+
 
 Milestone: v4.4 Experts That Actually Work
 Phase: 269 (starter-expert-library) — CLOSED (5 of 5 plans; verification passed)
