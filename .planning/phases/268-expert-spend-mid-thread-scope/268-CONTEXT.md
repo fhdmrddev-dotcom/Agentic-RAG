@@ -167,6 +167,16 @@ Not in scope: metering the handoff-summary LLM call (D-268-08, disclosed instead
   - The note contains no Expert name; `agent_loop.py`'s AST fence forbids "expert" identifiers there.
   - RED-first. The 8-row SC#10 board is then re-driven under the same pass bar.
 
+### Code-review rulings (operator, 2026-09-29, 268-REVIEW WR-03 / WR-05)
+- **D-268-27 (WR-03, extends D-268-26):** when a Deep **Continue** runs and the history ends in a `scope_changed`
+  event with no user message after it (a change made while `cap_paused`), `_reconstruct_history` appends **one
+  synthetic user-role note turn** at the end, with the same one-home wording from `scope_note.py`. This replaces
+  268-04's "a trailing event emits nothing" pin, but only for the Continue path. It is never a system-role message,
+  and it never rewrites an earlier user message.
+- **D-268-28 (WR-05, keeps D-268-21's pricing):** the Unrated tile and KPI footnote state the truth for harness
+  placeholder roots: *"N harness runs partly priced — sub-agent costs included, orchestrator cost not"*. The count
+  comes from the same `per_root` CTE, and no pricing changes.
+
 ### Claude's Discretion
 - Exact component names (`ScopeChip`, `ScopeEventCard`), copy strings (ported from the sketch and fenced), and the
   exact SQL shape of the recursive roll-up. It must reuse `cost_usd_sql()`.
