@@ -26,6 +26,12 @@
 
 import { render, screen, fireEvent } from "@testing-library/react"
 import { describe, it, expect, vi } from "vitest"
+const { mockPreview } = vi.hoisted(() => ({ mockPreview: vi.fn() }))
+vi.mock("@/lib/api/experts", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/api/experts")>()
+  return { ...actual, getExpertScopePreview: mockPreview }
+})
+
 import { ExpertSpotlightCard } from "../ExpertSpotlightCard"
 import type { ExpertBundle } from "@/types"
 
@@ -238,5 +244,38 @@ describe("ExpertSpotlightCard (Phase 260 / PACK-03 / D-260-06 — retired at 262
     fireEvent.click(dismissBtn)
 
     expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+})
+
+// 267-REVIEW WR-06 (D-267-35) — a catalog Start Chat opens an EMPTY thread with NO folder, so no
+// transcript event is written (D-267-12) and the spotlight is the announcement. A biased Expert there
+// reads only its own folders, and the card now says so, from the same preview payload the dialog uses.
+describe("WR-06 — the spotlight states the biased narrowing on an unscoped chat", () => {
+  const biased: ExpertBundle = { ...mockFinancialExpert, scope_mode: "biased", is_system: false }
+
+  it("unscopedChat: Will use its folders, Won't use All your documents — visible at rest", async () => {
+    mockPreview.mockResolvedValue({
+    expert_id: "e-fa",
+    expert_name: "Financial Analyzer",
+    mode: "biased",
+    expert_folders: [{ id: "f1", name: "Financial Reports" }],
+    thread_folder: null,
+    excluded_count: 0,
+    excluded_names: [],
+  })
+    render(<ExpertSpotlightCard expert={biased} onSelectPrompt={vi.fn()} unscopedChat />)
+    const wont = await screen.findByTestId("scope-ledger-col-no")
+    expect(wont.textContent).toContain("Won't use")
+    expect(wont.textContent).toContain("All your documents")
+    expect(wont).toBeVisible()
+    expect(screen.getByText("Financial Reports")).toBeVisible()
+    expect(mockPreview).toHaveBeenCalledWith(biased.id, null)
+  })
+
+  it("without unscopedChat (every shipped mount) nothing is fetched and nothing is added", () => {
+    mockPreview.mockClear()
+    render(<ExpertSpotlightCard expert={biased} onSelectPrompt={vi.fn()} />)
+    expect(mockPreview).not.toHaveBeenCalled()
+    expect(screen.queryByTestId("scope-ledger")).toBeNull()
   })
 })

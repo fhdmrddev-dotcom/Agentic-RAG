@@ -60,7 +60,8 @@ export const SUPABASE_CLIENT_REHYDRATED = "supabase:client-rehydrated"
  */
 export async function hydrateSupabaseFromRuntime(apiBase: string): Promise<void> {
   try {
-    const r = await fetch(`${apiBase}/public-config`)
+    // 265 WR-01: App.tsx awaits this before getSetupStatus — a hung backend must fall through.
+    const r = await fetch(`${apiBase}/public-config`, { signal: AbortSignal.timeout(10_000) })
     if (!r.ok) return
     const cfg = (await r.json()) as {
       supabase_url?: string

@@ -5,7 +5,7 @@ All queries parameterised with $1..$N asyncpg binds.
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
@@ -58,6 +58,164 @@ class SpendSummary:
     total_output_tokens: int
     daily_spend: list[dict[str, Any]]
     model_breakdown: list[dict[str, Any]]
+    # ── Phase 268 (METER-08). DEFAULTED, so every 257 constructor still builds. ─────────
+    # ⛔ These three are computed with the Expert filter OFF (D-268-10): the Spend by Expert
+    # table is the navigator and the recon footer compares its lines against the WINDOW, so
+    # both must describe every run in the window whatever the operator has selected.
+    expert_breakdown: list[dict[str, Any]] = field(default_factory=list)
+    window_total_usd: Decimal | None = None
+    window_run_count: int = 0
+    # D-268-25: sub-agent rows with no rate under a ROOT that has one. Such a root reads as
+    # "rated" (the CR-06 counters keep their root meaning) while part of its work is unpriced.
+    # Named here so the unrated disclosure can say so instead of under-pricing in silence.
+    unpriced_subagents: int = 0
+    # D-268-28 (268-REVIEW WR-05): ROOTS that are harness placeholder shells with no rate of their own
+    # but at least one PRICED sub-agent. D-268-21 puts that sub-agent USD in the totals while the root
+    # counts as unrated, so the page must say "partly priced" rather than "excluded".
+    partly_priced_harness_runs: int = 0
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════
+#  THE ONE per_root CTE — Phase 268 (D-268-09, D-268-10, D-268-21)
+# ═════════════════════════════════════════════════════════════════════════════════════
+#
+# 257 priced ROOT runs only (a root-only predicate on every query), so a sub-agent's spend
+# was in no total on /admin/spend. 268 prices EVERY row at ITS OWN model/provider/date rate
+# and rolls it up into the root that started it, so it counts toward that root's Expert.
+# ⚠ ORG TOTALS THEREFORE RISE by exactly the sub-agent spend 257 left out. That is disclosed
+# on the Blind Spots card ("Sub-agent tokens now counted"), never slipped in silently.
+#
+# Four CTEs, one text, included by EVERY spend query (totals, daily, model donut, Expert
+# breakdown, window totals, ledger rows and the ledger COUNT). Two regions of this page
+# computed from two queries is the 257 "two dialects" defect; one CTE makes them agree by
+# construction rather than by care.
+#
+#   roots     the org's ROOT runs in the window, narrowed by the Expert filter. ⛔ The ONLY
+#             place the root-only predicate may appear — a second copy would silently
+#             reinstate 257's exclusion (pinned by test_268_spend_rollup.py).
+#   members   the root itself + its DIRECT sub-agents. Depth is 1: `_handle_task` refuses
+#             inside a sub-agent (tool_dispatcher.py, D-085-12), so no recursive CTE.
+#             ⛔ NO predicate on m.org_id: a pre-268 sub-agent row may carry the trigger's
+#             org rather than its parent's (Pitfall 7). Members are reached only THROUGH a
+#             root of this org, which is the whole org boundary (T-268-12).
+#   priced    each member priced at ITS OWN model/provider/started_at through
+#             `cost_usd_sql("m", "rate")` — the one 257 token->USD home. A sub-agent may run
+#             on the provider's FAST default, so re-pricing at the root's model would be wrong.
+#             The rate's org is the ROOT's org, for the same Pitfall-7 reason.
+#   per_root  one row per root. ⛔ THE PLACEHOLDER-ROOT RULE (D-268-21): a harness shell root
+#             (model='unknown' AND provider='unknown', written by exactly three sites — pinned
+#             by a set fence) persists `run_usage_box`, which ALREADY sums every sub-agent, so
+#             its sub-agents' TOKENS are not added again. Its USD still sums the priced
+#             sub-agent rows, because the shell itself has no rate.
+#             ⚠ If an operator ever registers a rate for model `unknown`, shell USD would
+#             double-count. Never register one.
+#
+# The Expert filter is ONE clause whose placeholder number is passed in — never the value.
+# `expert_id::text = $N`, not `$N::uuid`: Postgres does not promise OR short-circuit, so a
+# `'none'::uuid` cast on an arm that was never meant to run could raise.
+
+_MEMBER_COST_USD_SQL = cost_usd_sql("m", "rate")
+
+
+def _expert_filter_sql(param: str) -> str:
+    """The bound Expert predicate on `roots`. `param` is a placeholder like "$2" — static text
+    chosen by this module, never caller input (T-268-10)."""
+    p = param + "::text"
+    return (
+        "AND (" + p + " IS NULL"
+        " OR (" + p + " = 'unrecorded' AND NOT r.expert_attributed)"
+        " OR (" + p + " = 'none' AND r.expert_attributed AND r.expert_id IS NULL)"
+        " OR (" + p + " NOT IN ('none', 'unrecorded')"
+        " AND r.expert_attributed AND r.expert_id::text = " + p + "))"
+    )
+
+
+def _per_root_cte(window_sql: str, expert_param: str) -> str:
+    """Build the ONE CTE. `window_sql` is static text from this module (the summary's bound
+    start/end, or the ledger's fixed time_range clause), never caller input."""
+    return (
+        """
+        WITH roots AS (
+            SELECT
+                r.run_id, r.org_id, r.thread_id, r.user_id, r.status, r.model, r.provider,
+                r.started_at, r.completed_at, r.expert_id, r.expert_attributed,
+                (r.model = 'unknown' AND r.provider = 'unknown') AS is_box_shell
+            FROM public.runs r
+            WHERE r.org_id = $1
+              AND r.parent_run_id IS NULL
+              """ + window_sql + """
+              """ + _expert_filter_sql(expert_param) + """
+        ),
+        members AS (
+            SELECT
+                ro.run_id AS root_run_id,
+                ro.org_id AS root_org_id,
+                ro.is_box_shell,
+                (m.run_id = ro.run_id) AS is_root,
+                m.model, m.provider, m.started_at, m.input_tokens, m.output_tokens
+            FROM roots ro
+            JOIN public.runs m ON m.run_id = ro.run_id OR m.parent_run_id = ro.run_id
+        ),
+        priced AS (
+            SELECT
+                m.*,
+                rate.input_cost_per_million,
+                rate.output_cost_per_million,
+                """ + _MEMBER_COST_USD_SQL + """ AS cost_usd
+            FROM members m
+            LEFT JOIN LATERAL (
+                SELECT mr.input_cost_per_million, mr.output_cost_per_million
+                FROM public.model_rates mr
+                WHERE mr.model_id = m.model
+                  AND (mr.org_id = m.root_org_id OR mr.org_id IS NULL)
+                  AND (mr.provider = m.provider OR mr.provider IS NULL)
+                  AND mr.effective_from <= m.started_at
+                ORDER BY
+                  (mr.org_id IS NOT NULL) DESC,
+                  (mr.provider IS NOT NULL AND mr.provider = m.provider) DESC,
+                  mr.effective_from DESC
+                LIMIT 1
+            ) rate ON true
+        ),
+        per_root AS (
+            SELECT
+                root_run_id,
+                SUM(cost_usd) AS cost_usd,
+                SUM(input_tokens) FILTER (WHERE is_root OR NOT is_box_shell) AS input_tokens,
+                SUM(output_tokens) FILTER (WHERE is_root OR NOT is_box_shell) AS output_tokens,
+                COUNT(*) FILTER (WHERE NOT is_root) AS subagent_count,
+                -- The ROOT's own rate: CR-06's rated/unrated/unmeasured keep their ROOT meaning,
+                -- and the ledger's `is_rated` reads the same column.
+                MAX(input_cost_per_million) FILTER (WHERE is_root) AS input_cost_per_million,
+                MAX(output_cost_per_million) FILTER (WHERE is_root) AS output_cost_per_million,
+                COUNT(*) FILTER (
+                    WHERE NOT is_root AND input_cost_per_million IS NULL
+                ) AS unpriced_subagents,
+                -- D-268-28: a shell root has no rate of its own, yet its PRICED sub-agents' USD is
+                -- in cost_usd above (D-268-21). These two let the totals name such a root as
+                -- "partly priced" instead of letting the Unrated tile call it excluded.
+                BOOL_OR(is_box_shell) AS is_box_shell,
+                COUNT(*) FILTER (WHERE NOT is_root AND cost_usd IS NOT NULL) AS priced_subagents
+            FROM priced
+            GROUP BY root_run_id
+        )
+        """
+    )
+
+
+# The summary's window: bound start/end ($3/$4); the Expert filter is $2.
+_SUMMARY_WINDOW_SQL = (
+    "AND ($3::timestamptz IS NULL OR r.started_at >= $3) "
+    "AND ($4::timestamptz IS NULL OR r.started_at <= $4)"
+)
+_SUMMARY_CTE = _per_root_cte(_SUMMARY_WINDOW_SQL, "$2")
+
+# The ledger's windows are a FIXED set of static clauses keyed by the validated chip.
+_LEDGER_WINDOW_SQL = {
+    "today": "AND r.started_at >= CURRENT_DATE",
+    "7d": "AND r.started_at >= (NOW() - INTERVAL '7 days')",
+    "30d": "AND r.started_at >= (NOW() - INTERVAL '30 days')",
+}
 
 
 async def get_rate_for_model(
@@ -343,65 +501,56 @@ async def get_org_spend_summary(
     org_id: UUID,
     start_time: datetime | None = None,
     end_time: datetime | None = None,
+    expert: str | None = None,
 ) -> SpendSummary:
     """Calculate aggregated spend for an organization within a time window.
 
     Strict blind-spot honesty:
     - total_spend_usd sums only runs that actually PRICED (a rate AND recorded tokens).
-    - unrated_runs_count counts runs with NO registered rate.
-    - unmeasured_runs_count counts runs that HAVE a rate but recorded no tokens. These are
+    - unrated_runs_count counts ROOT runs with NO registered rate.
+    - unmeasured_runs_count counts ROOT runs that HAVE a rate but recorded no tokens. These are
       excluded from the sum too, but for a different reason, and saying so is the whole point
-      of this page (CR-06). rated + unrated = every run; unmeasured is a subset of rated.
+      of this page (CR-06). rated + unrated = every root run; unmeasured is a subset of rated.
     - incomplete_coverage_count queries workflow_runs using the partial index.
     - daily_spend provides a 14-day time series.
     - model_breakdown provides per-model spend, volume, and rate status.
+
+    Phase 268 (METER-08):
+    - Every figure reads the ONE `per_root` CTE, so sub-agent spend is counted once, at its own
+      price, under its root (D-268-09 / D-268-21).
+    - `expert` ('<uuid>' | 'none' | 'unrecorded' | None) narrows totals, daily, model and the
+      coverage count. It is only ever bound as $N (T-268-10); the route validates its shape.
+    - `expert_breakdown`, `window_total_usd` and `window_run_count` are computed with the filter
+      OFF (bound NULL): the Spend by Expert table is the navigator (D-268-10).
+
+    Call order (mock-pool tests depend on it): fetchrow(totals) · fetchrow(coverage) ·
+    fetch(daily) · fetch(model) · fetch(breakdown) · fetchrow(window).
     """
-    # 1. Runs spend totals query
-    summary_query = """
-        WITH rated_runs AS (
-            SELECT
-                r.run_id,
-                r.model,
-                r.input_tokens,
-                r.output_tokens,
-                r.started_at,
-                rate.input_cost_per_million,
-                rate.output_cost_per_million,
-                """ + _COST_USD_SQL + """ AS cost_usd
-            FROM public.runs r
-            LEFT JOIN LATERAL (
-                SELECT mr.input_cost_per_million, mr.output_cost_per_million
-                FROM public.model_rates mr
-                WHERE mr.model_id = r.model
-                  AND (mr.org_id = r.org_id OR mr.org_id IS NULL)
-                  AND (mr.provider = r.provider OR mr.provider IS NULL)
-                  AND mr.effective_from <= r.started_at
-                ORDER BY
-                  (mr.org_id IS NOT NULL) DESC,
-                  (mr.provider IS NOT NULL AND mr.provider = r.provider) DESC,
-                  mr.effective_from DESC
-                LIMIT 1
-            ) rate ON true
-            WHERE r.org_id = $1
-              AND r.parent_run_id IS NULL
-              AND ($2::timestamptz IS NULL OR r.started_at >= $2)
-              AND ($3::timestamptz IS NULL OR r.started_at <= $3)
-        )
+    # 1. Totals (filtered) — CR-06's counters keep their ROOT meaning.
+    summary_query = _SUMMARY_CTE + """
         SELECT
-            COALESCE(SUM(cost_usd), 0.0000) AS total_spend_usd,
+            COALESCE(SUM(pr.cost_usd), 0.0000) AS total_spend_usd,
             -- ⛔ RATED means A RATE EXISTS, never "a cost came out". CR-06. The ledger derives
             -- its `is_rated` from `input_cost_per_million IS NOT NULL`; these must agree or the
             -- KPI cards and the rows beneath them describe different populations.
-            COUNT(*) FILTER (WHERE input_cost_per_million IS NOT NULL) AS rated_runs_count,
-            COUNT(*) FILTER (WHERE input_cost_per_million IS NULL) AS unrated_runs_count,
+            COUNT(*) FILTER (WHERE pr.input_cost_per_million IS NOT NULL) AS rated_runs_count,
+            COUNT(*) FILTER (WHERE pr.input_cost_per_million IS NULL) AS unrated_runs_count,
             COUNT(*) FILTER (
-                WHERE input_cost_per_million IS NOT NULL AND cost_usd IS NULL
+                WHERE pr.input_cost_per_million IS NOT NULL AND pr.cost_usd IS NULL
             ) AS unmeasured_runs_count,
-            COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
-            COALESCE(SUM(output_tokens), 0) AS total_output_tokens
-        FROM rated_runs;
+            COALESCE(SUM(pr.input_tokens), 0) AS total_input_tokens,
+            COALESCE(SUM(pr.output_tokens), 0) AS total_output_tokens,
+            COALESCE(
+                SUM(pr.unpriced_subagents) FILTER (WHERE pr.input_cost_per_million IS NOT NULL), 0
+            ) AS unpriced_subagents,
+            -- D-268-28: an unrated harness shell whose sub-agents priced — counted in
+            -- unrated_runs_count AND contributing sub-agent USD to total_spend_usd. Disclosed, not repriced.
+            COUNT(*) FILTER (
+                WHERE pr.is_box_shell AND pr.input_cost_per_million IS NULL AND pr.priced_subagents > 0
+            ) AS partly_priced_harness_runs
+        FROM per_root pr;
     """
-    totals_row = await pool.fetchrow(summary_query, org_id, start_time, end_time)
+    totals_row = await pool.fetchrow(summary_query, org_id, expert, start_time, end_time)
 
     total_spend = Decimal(str(totals_row["total_spend_usd"] or "0.0000"))
     rated_count = int(totals_row["rated_runs_count"] or 0)
@@ -409,62 +558,53 @@ async def get_org_spend_summary(
     unmeasured_count = int(totals_row["unmeasured_runs_count"] or 0)
     total_in = int(totals_row["total_input_tokens"] or 0)
     total_out = int(totals_row["total_output_tokens"] or 0)
+    unpriced_subs = int(totals_row["unpriced_subagents"] or 0)
+    # D-268-28. `.get`: an asyncpg Record and every older mock row both answer it.
+    partly_priced = int(totals_row.get("partly_priced_harness_runs") or 0)
 
-    # 2. Incomplete coverage query on workflow_runs (utilizing partial index)
+    # 2. Incomplete coverage query on workflow_runs (utilizing partial index).
+    # 268: `workflow_runs` has no Expert column, so the filter follows the THREAD — a workflow
+    # run counts toward a selection when a root run in its thread does (the same thread
+    # correlation the ledger's coverage LATERAL already uses). Unfiltered ($4 NULL) the
+    # EXISTS arm never runs and the figure is 257's exactly.
     coverage_query = """
         SELECT COUNT(*) AS incomplete_count
-        FROM public.workflow_runs
-        WHERE org_id = $1
+        FROM public.workflow_runs wr
+        WHERE wr.org_id = $1
           AND (
-              token_coverage IS NULL
-              OR NOT (token_coverage @> ARRAY['agent','single','batch','emit']::text[])
+              wr.token_coverage IS NULL
+              OR NOT (wr.token_coverage @> ARRAY['agent','single','batch','emit']::text[])
           )
-          AND ($2::timestamptz IS NULL OR created_at >= $2)
-          AND ($3::timestamptz IS NULL OR created_at <= $3);
+          AND ($2::timestamptz IS NULL OR wr.created_at >= $2)
+          AND ($3::timestamptz IS NULL OR wr.created_at <= $3)
+          AND ($4::text IS NULL OR EXISTS (
+              SELECT 1 FROM public.runs r
+              WHERE r.org_id = $1
+                AND r.thread_id = wr.thread_id
+                """ + _expert_filter_sql("$4") + """
+          ));
     """
-    cov_row = await pool.fetchrow(coverage_query, org_id, start_time, end_time)
+    cov_row = await pool.fetchrow(coverage_query, org_id, start_time, end_time, expert)
     incomplete_cov = int(cov_row["incomplete_count"] or 0) if cov_row else 0
 
-    # 3. Daily spend aggregation (last 14 days or filtered window)
-    daily_query = """
-        WITH day_series AS (
-            SELECT
-                DATE_TRUNC('day', r.started_at) AS day,
-                rate.input_cost_per_million,
-                """ + _COST_USD_SQL + """ AS cost_usd
-            FROM public.runs r
-            LEFT JOIN LATERAL (
-                SELECT mr.input_cost_per_million, mr.output_cost_per_million
-                FROM public.model_rates mr
-                WHERE mr.model_id = r.model
-                  AND (mr.org_id = r.org_id OR mr.org_id IS NULL)
-                  AND (mr.provider = r.provider OR mr.provider IS NULL)
-                  AND mr.effective_from <= r.started_at
-                ORDER BY
-                  (mr.org_id IS NOT NULL) DESC,
-                  (mr.provider IS NOT NULL AND mr.provider = r.provider) DESC,
-                  mr.effective_from DESC
-                LIMIT 1
-            ) rate ON true
-            WHERE r.org_id = $1
-              AND r.parent_run_id IS NULL
-              AND ($2::timestamptz IS NULL OR r.started_at >= $2)
-              AND ($3::timestamptz IS NULL OR r.started_at <= $3)
-        )
+    # 3. Daily spend (filtered). Bucketed by the ROOT's started_at: a sub-agent's spend lands
+    # on the day its run started, with the run it belongs to.
+    daily_query = _SUMMARY_CTE + """
         SELECT
-            TO_CHAR(day, 'YYYY-MM-DD') AS date_str,
-            COALESCE(SUM(cost_usd), 0.0000) AS spend_usd,
+            TO_CHAR(DATE_TRUNC('day', ro.started_at), 'YYYY-MM-DD') AS date_str,
+            COALESCE(SUM(pr.cost_usd), 0.0000) AS spend_usd,
             -- Same meaning as the summary and the ledger (CR-06): a rate EXISTS.
-            COUNT(*) FILTER (WHERE input_cost_per_million IS NOT NULL) AS rated_count,
-            COUNT(*) FILTER (WHERE input_cost_per_million IS NULL) AS unrated_count,
+            COUNT(*) FILTER (WHERE pr.input_cost_per_million IS NOT NULL) AS rated_count,
+            COUNT(*) FILTER (WHERE pr.input_cost_per_million IS NULL) AS unrated_count,
             COUNT(*) FILTER (
-                WHERE input_cost_per_million IS NOT NULL AND cost_usd IS NULL
+                WHERE pr.input_cost_per_million IS NOT NULL AND pr.cost_usd IS NULL
             ) AS unmeasured_count
-        FROM day_series
-        GROUP BY day
-        ORDER BY day ASC;
+        FROM roots ro
+        JOIN per_root pr ON pr.root_run_id = ro.run_id
+        GROUP BY DATE_TRUNC('day', ro.started_at)
+        ORDER BY DATE_TRUNC('day', ro.started_at) ASC;
     """
-    daily_rows = await pool.fetch(daily_query, org_id, start_time, end_time)
+    daily_rows = await pool.fetch(daily_query, org_id, expert, start_time, end_time)
     daily_spend = [
         {
             "date": r["date_str"],
@@ -476,55 +616,30 @@ async def get_org_spend_summary(
         for r in daily_rows
     ]
 
-    # 4. Model breakdown aggregation
-    model_query = """
-        WITH model_runs AS (
-            SELECT
-                r.model,
-                r.provider,
-                r.input_tokens,
-                r.output_tokens,
-                rate.input_cost_per_million,
-                """ + _COST_USD_SQL + """ AS cost_usd
-            FROM public.runs r
-            LEFT JOIN LATERAL (
-                SELECT mr.input_cost_per_million, mr.output_cost_per_million
-                FROM public.model_rates mr
-                WHERE mr.model_id = r.model
-                  AND (mr.org_id = r.org_id OR mr.org_id IS NULL)
-                  AND (mr.provider = r.provider OR mr.provider IS NULL)
-                  AND mr.effective_from <= r.started_at
-                ORDER BY
-                  (mr.org_id IS NOT NULL) DESC,
-                  (mr.provider IS NOT NULL AND mr.provider = r.provider) DESC,
-                  mr.effective_from DESC
-                LIMIT 1
-            ) rate ON true
-            WHERE r.org_id = $1
-              AND r.parent_run_id IS NULL
-              AND ($2::timestamptz IS NULL OR r.started_at >= $2)
-              AND ($3::timestamptz IS NULL OR r.started_at <= $3)
-        )
+    # 4. Model donut (filtered). Grouped by MEMBER model, so a sub-agent's spend lands on the
+    # model that incurred it. Tokens honour the placeholder-root rule, so the donut's tokens
+    # sum to the KPI's.
+    model_query = _SUMMARY_CTE + """
         SELECT
-            model,
-            COALESCE(provider, 'unknown') AS provider,
-            COALESCE(SUM(cost_usd), 0.0000) AS spend_usd,
-            COALESCE(SUM(input_tokens), 0) AS input_tokens,
-            COALESCE(SUM(output_tokens), 0) AS output_tokens,
+            m.model,
+            COALESCE(m.provider, 'unknown') AS provider,
+            COALESCE(SUM(m.cost_usd), 0.0000) AS spend_usd,
+            COALESCE(SUM(m.input_tokens) FILTER (WHERE m.is_root OR NOT m.is_box_shell), 0) AS input_tokens,
+            COALESCE(SUM(m.output_tokens) FILTER (WHERE m.is_root OR NOT m.is_box_shell), 0) AS output_tokens,
             COUNT(*) AS run_count,
             -- Same meaning as the summary and the ledger (CR-06): a rate EXISTS.
-            COUNT(*) FILTER (WHERE input_cost_per_million IS NOT NULL) AS rated_count,
-            COUNT(*) FILTER (WHERE input_cost_per_million IS NULL) AS unrated_count,
+            COUNT(*) FILTER (WHERE m.input_cost_per_million IS NOT NULL) AS rated_count,
+            COUNT(*) FILTER (WHERE m.input_cost_per_million IS NULL) AS unrated_count,
             COUNT(*) FILTER (
-                WHERE input_cost_per_million IS NOT NULL AND cost_usd IS NULL
+                WHERE m.input_cost_per_million IS NOT NULL AND m.cost_usd IS NULL
             ) AS unmeasured_count,
-            COUNT(*) FILTER (WHERE cost_usd IS NOT NULL) AS priced_count,
-            BOOL_AND(input_cost_per_million IS NOT NULL) AS is_fully_rated
-        FROM model_runs
-        GROUP BY model, provider
+            COUNT(*) FILTER (WHERE m.cost_usd IS NOT NULL) AS priced_count,
+            BOOL_AND(m.input_cost_per_million IS NOT NULL) AS is_fully_rated
+        FROM priced m
+        GROUP BY m.model, m.provider
         ORDER BY spend_usd DESC, run_count DESC;
     """
-    model_rows = await pool.fetch(model_query, org_id, start_time, end_time)
+    model_rows = await pool.fetch(model_query, org_id, expert, start_time, end_time)
     model_breakdown = [
         {
             "model_name": r["model"],
@@ -545,6 +660,52 @@ async def get_org_spend_summary(
         for r in model_rows
     ]
 
+    # 5. Spend by Expert (UNFILTERED — the navigator). One line per attribution key:
+    #    '<uuid>'      the Expert active when the root run started (D-268-05)
+    #    'none'        attributed, no Expert (D-268-04)
+    #    'unrecorded'  written before 268; never backfilled, never merged into 'none' (D-268-06)
+    # ⛔ The name join is ORG-CONSTRAINED (T-268-11): an id from another org can never pull that
+    # org's Expert name into this cockpit. No join -> "Deleted Expert {id8}" (no FK, D-268-04).
+    breakdown_query = _SUMMARY_CTE + """
+        SELECT
+            CASE
+                WHEN NOT ro.expert_attributed THEN 'unrecorded'
+                WHEN ro.expert_id IS NULL THEN 'none'
+                ELSE ro.expert_id::text
+            END AS line_key,
+            ro.expert_id,
+            eb.name AS expert_name,
+            eb.scope_mode,
+            (eb.id IS NOT NULL) AS name_found,
+            COUNT(*) AS run_count,
+            COALESCE(SUM(pr.input_tokens), 0) AS input_tokens,
+            COALESCE(SUM(pr.output_tokens), 0) AS output_tokens,
+            SUM(pr.cost_usd) AS spend_usd,
+            COUNT(*) FILTER (WHERE pr.input_cost_per_million IS NULL) AS unrated_count
+        FROM roots ro
+        JOIN per_root pr ON pr.root_run_id = ro.run_id
+        LEFT JOIN public.expert_bundles eb ON eb.id = ro.expert_id
+            AND (eb.is_system OR eb.org_id = ro.org_id)
+        GROUP BY 1, ro.expert_id, eb.id, eb.name, eb.scope_mode;
+    """
+    breakdown_rows = await pool.fetch(breakdown_query, org_id, None, start_time, end_time)
+    expert_breakdown = _shape_expert_breakdown(breakdown_rows)
+
+    # 6. Window totals (UNFILTERED), from the SAME CTE the lines came from. The recon footer
+    # compares the lines against THIS, so it is an independent check only because the client
+    # sums the lines itself — the server never restates "lines == total".
+    window_query = _SUMMARY_CTE + """
+        SELECT
+            COALESCE(SUM(pr.cost_usd), 0.0000) AS window_total_usd,
+            COUNT(*) AS window_run_count
+        FROM per_root pr;
+    """
+    window_row = await pool.fetchrow(window_query, org_id, None, start_time, end_time)
+    window_total = (
+        Decimal(str(window_row["window_total_usd"] or "0.0000")) if window_row else None
+    )
+    window_runs = int(window_row["window_run_count"] or 0) if window_row else 0
+
     return SpendSummary(
         total_spend_usd=total_spend,
         rated_runs_count=rated_count,
@@ -555,7 +716,71 @@ async def get_org_spend_summary(
         total_output_tokens=total_out,
         daily_spend=daily_spend,
         model_breakdown=model_breakdown,
+        expert_breakdown=expert_breakdown,
+        window_total_usd=window_total,
+        window_run_count=window_runs,
+        unpriced_subagents=unpriced_subs,
+        partly_priced_harness_runs=partly_priced,
     )
+
+
+def _shape_expert_breakdown(rows: Any) -> list[dict[str, Any]]:
+    """Order and complete the Spend by Expert lines.
+
+    Experts (deleted included) by USD descending, then `none` — ALWAYS, even at 0 · 0 · $0 —
+    then `unrecorded` only when it has runs (D-268-10). A line whose runs are all unpriced
+    reports `spend_usd: None`, never a confident "0.0000" (257 CR-06). The synthesized `none`
+    line has no runs at all, so its zero is measured, not assumed.
+    """
+    experts: list[dict[str, Any]] = []
+    none_line: dict[str, Any] | None = None
+    unrecorded_line: dict[str, Any] | None = None
+    for r in rows:
+        key = r["line_key"]
+        spend = r["spend_usd"]
+        line = dict(
+            key=key,
+            expert_id=str(r["expert_id"]) if r["expert_id"] is not None else None,
+            name=r["expert_name"],
+            deleted=bool(key not in ("none", "unrecorded") and not r["name_found"]),
+            scope_mode=r["scope_mode"],
+            run_count=int(r["run_count"] or 0),
+            input_tokens=int(r["input_tokens"] or 0),
+            output_tokens=int(r["output_tokens"] or 0),
+            spend_usd=str(spend) if spend is not None else None,
+            unrated_count=int(r["unrated_count"] or 0),
+        )
+        if key == "none":
+            none_line = line
+        elif key == "unrecorded":
+            unrecorded_line = line
+        else:
+            experts.append(line)
+
+    experts.sort(
+        key=lambda ln: (
+            -Decimal(ln["spend_usd"] or "0"),
+            -ln["run_count"],
+            ln["key"],
+        )
+    )
+    if none_line is None:
+        none_line = dict(
+            key="none",
+            expert_id=None,
+            name=None,
+            deleted=False,
+            scope_mode=None,
+            run_count=0,
+            input_tokens=0,
+            output_tokens=0,
+            spend_usd="0.0000",
+            unrated_count=0,
+        )
+    lines = experts + [none_line]
+    if unrecorded_line is not None and unrecorded_line["run_count"] > 0:
+        lines.append(unrecorded_line)
+    return lines
 
 
 async def get_spend_runs(
@@ -565,35 +790,26 @@ async def get_spend_runs(
     offset: int = 0,
     filter_status: str | None = None,
     time_range: str | None = None,
+    expert: str | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    """Retrieve paginated runs with effective rates, computed cost, and coverage markers.
+    """Retrieve paginated ROOT runs with their rolled-up cost, coverage and attribution.
 
     filter_status: 'rated' | 'unrated' | 'incomplete_coverage' | None
     time_range: 'today' | '7d' | '30d' | 'all' | None
-    """
-    time_clause = ""
-    if time_range == "today":
-        time_clause = "AND r.started_at >= CURRENT_DATE"
-    elif time_range == "7d":
-        time_clause = "AND r.started_at >= (NOW() - INTERVAL '7 days')"
-    elif time_range == "30d":
-        time_clause = "AND r.started_at >= (NOW() - INTERVAL '30 days')"
+    expert: '<uuid>' | 'none' | 'unrecorded' | None — bound as $2, never interpolated.
 
-    base_query = f"""
-        FROM public.runs r
-        LEFT JOIN LATERAL (
-            SELECT mr.input_cost_per_million, mr.output_cost_per_million
-            FROM public.model_rates mr
-            WHERE mr.model_id = r.model
-              AND (mr.org_id = r.org_id OR mr.org_id IS NULL)
-              AND (mr.provider = r.provider OR mr.provider IS NULL)
-              AND mr.effective_from <= r.started_at
-            ORDER BY
-              (mr.org_id IS NOT NULL) DESC,
-              (mr.provider IS NOT NULL AND mr.provider = r.provider) DESC,
-              mr.effective_from DESC
-            LIMIT 1
-        ) rate ON true
+    Phase 268: each row is a ROOT with its `per_root` totals, so a root whose tokens include
+    its sub-agents' says so (`subagent_count`) — the row's tokens now exceed that run's own
+    persisted tokens, and the count is what explains why (D-268-09).
+    """
+    window_sql = _LEDGER_WINDOW_SQL.get(time_range or "", "")
+    cte = _per_root_cte(window_sql, "$2")
+
+    base_query = """
+        FROM roots ro
+        JOIN per_root pr ON pr.root_run_id = ro.run_id
+        LEFT JOIN public.expert_bundles eb ON eb.id = ro.expert_id
+            AND (eb.is_system OR eb.org_id = ro.org_id)
         -- ⛔ LATERAL … LIMIT 1, NOT a plain LEFT JOIN. Phase 257 review (Claude, reviewer).
         -- A plain `LEFT JOIN public.workflow_runs wr ON wr.thread_id = r.thread_id`
         -- MULTIPLIES a run row by the number of workflow_runs sharing its thread, because
@@ -608,55 +824,57 @@ async def get_spend_runs(
         LEFT JOIN LATERAL (
             SELECT wr2.token_coverage
             FROM public.workflow_runs wr2
-            WHERE wr2.thread_id = r.thread_id
+            WHERE wr2.thread_id = ro.thread_id
             ORDER BY wr2.created_at DESC
             LIMIT 1
         ) wr ON true
-        WHERE r.org_id = $1
-          AND r.parent_run_id IS NULL
-          {time_clause}
+        WHERE true
     """
 
     status_filter_clause = ""
     if filter_status == "rated":
-        status_filter_clause = "AND rate.input_cost_per_million IS NOT NULL"
+        status_filter_clause = "AND pr.input_cost_per_million IS NOT NULL"
     elif filter_status == "unrated":
-        status_filter_clause = "AND rate.input_cost_per_million IS NULL"
+        status_filter_clause = "AND pr.input_cost_per_million IS NULL"
     elif filter_status == "incomplete_coverage":
         status_filter_clause = (
             "AND (wr.token_coverage IS NULL OR NOT (wr.token_coverage @> ARRAY['agent','single','batch','emit']::text[]))"
         )
 
-    count_query = f"""
+    # ⛔ The COUNT carries the SAME CTE, the same joins and the same predicates as the rows —
+    # the 257 LATERAL lesson. A count that disagrees with its rows makes the pager lie.
+    count_query = cte + """
         SELECT COUNT(*) AS total
-        {base_query}
-        {status_filter_clause}
-    """
-    count_row = await pool.fetchrow(count_query, org_id)
+    """ + base_query + status_filter_clause
+    count_row = await pool.fetchrow(count_query, org_id, expert)
     total_count = int(count_row["total"] or 0) if count_row else 0
 
-    select_query = f"""
+    select_query = cte + """
         SELECT
-            r.run_id,
-            r.thread_id,
-            r.user_id,
-            r.status,
-            r.model,
-            r.provider,
-            r.started_at,
-            r.completed_at,
-            r.input_tokens,
-            r.output_tokens,
-            rate.input_cost_per_million,
-            rate.output_cost_per_million,
+            ro.run_id,
+            ro.thread_id,
+            ro.user_id,
+            ro.status,
+            ro.model,
+            ro.provider,
+            ro.started_at,
+            ro.completed_at,
+            pr.input_tokens,
+            pr.output_tokens,
+            pr.input_cost_per_million,
+            pr.output_cost_per_million,
             wr.token_coverage,
-            """ + _COST_USD_SQL + f""" AS cost_usd
-        {base_query}
-        {status_filter_clause}
-        ORDER BY r.started_at DESC
-        LIMIT $2 OFFSET $3
+            pr.cost_usd,
+            pr.subagent_count,
+            ro.expert_id,
+            ro.expert_attributed,
+            eb.name AS expert_name,
+            (eb.id IS NOT NULL) AS expert_found
+    """ + base_query + status_filter_clause + """
+        ORDER BY ro.started_at DESC
+        LIMIT $3 OFFSET $4
     """
-    rows = await pool.fetch(select_query, org_id, limit, offset)
+    rows = await pool.fetch(select_query, org_id, expert, limit, offset)
 
     items = []
     for r in rows:
@@ -668,6 +886,7 @@ async def get_spend_runs(
             if coverage_list is not None
             else False
         )
+        attributed_id = r["expert_id"]
 
         items.append({
             "run_id": str(r["run_id"]),
@@ -683,6 +902,14 @@ async def get_spend_runs(
             "is_rated": is_rated,
             "token_coverage": coverage_list,
             "is_coverage_complete": is_complete,
+            # Phase 268 attribution (D-268-04/06): None + attributed = No Expert; not
+            # attributed = Not recorded (before 268); an id whose org-constrained join found
+            # nothing = Deleted Expert.
+            "expert_id": str(attributed_id) if attributed_id is not None else None,
+            "expert_name": r["expert_name"],
+            "expert_deleted": bool(attributed_id is not None and not r["expert_found"]),
+            "expert_attributed": bool(r["expert_attributed"]),
+            "subagent_count": int(r["subagent_count"] or 0),
         })
 
     return items, total_count

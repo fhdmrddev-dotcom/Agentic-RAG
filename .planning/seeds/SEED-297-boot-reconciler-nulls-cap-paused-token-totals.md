@@ -5,7 +5,14 @@ created: 2026-09-18
 surface: Agentic-RAG
 status: planted
 partial: false
-status_note:
+status_note: |
+  ── 2026-09-28 · Phase 268 CLOSE (268-04). Trigger (d) ANSWERED by D-268-20 — a Deep Continue now finalizes
+  the SUM of the paused and the continuation segments (`run_producer._accumulate_segment_tokens`, RED at base
+  `(30, 10) == (130, 50)`), so a cap_paused run's tokens are load-bearing for money and no longer erased by the
+  Continue itself. ⚠ THE DEFECT THIS SEED NAMES IS STILL OPEN: the boot reconciler's `finalize_run`
+  unconditional SET still NULLs a cap_paused run's persisted totals — 268 deliberately did not edit
+  `finalize_run` (trigger (a)). Status stays planted. Live SC#1-continued was OWED-manual (the cap was not
+  reached in two explorer attempts).
 trigger_when: >
   Any phase that (a) edits db/runs.py finalize_run's UPDATE statement, (b) edits
   run_reconciler.py's candidate status set or its finalize call, (c) changes
@@ -23,7 +30,7 @@ relates_to:
   - "backend/app/services/run_reconciler.py:236"
   - "backend/app/main.py:434"
   - "256"
-folded_into: null
+folded_into: "268 (trigger (d) only — D-268-20 adds the paused segment tokens at Continue; the boot-reconciler NULL defect itself stays OPEN)"
 renumbered_from: null
 renumbered_because: null
 ---

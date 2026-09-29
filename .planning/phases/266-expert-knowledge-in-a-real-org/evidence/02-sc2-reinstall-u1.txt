@@ -1,0 +1,11 @@
+== SC#2 re-install — 2026-09-24T19:53:37.294889+00:00
+SC#1 ingest route (job rows for U1's corpus doc): SELECT j.id, j.status, j.document_id, j.org_id, j.created_at FROM ingestion_jobs j WHERE j.document_id = '731bfa9a-74bb-4f6f-9d15-891f94fabb48'
+{"id": "0bcf94ea-2e82-4a04-bb15-7bb3a7604f59", "status": "completed", "document_id": "731bfa9a-74bb-4f6f-9d15-891f94fabb48", "org_id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "created_at": "2026-09-24 19:53:10.696291+00:00"}
+SQL: SELECT id, user_id, org_id, folder_id, is_latest, content_hash IS NOT NULL AS hashed FROM documents WHERE id='731bfa9a-74bb-4f6f-9d15-891f94fabb48'
+{"id": "731bfa9a-74bb-4f6f-9d15-891f94fabb48", "user_id": "7b43cd2c-21e7-4a66-8a36-2fa3793551b0", "org_id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "folder_id": "1e441bd0-e82e-4eb0-b5de-b69f9d0f983c", "is_latest": true, "hashed": true}
+SQL: SELECT (SELECT count(*) FROM documents WHERE org_id='0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf') AS documents, (SELECT count(*) FROM document_chunks WHERE org_id='0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf') AS chunks, (SELECT count(*) FROM folders WHERE org_id='0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf') AS folders, (SELECT count(*) FROM expert_installs WHERE org_id='0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf') AS installs, (SELECT max(updated_at) FROM documents WHERE org_id='0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf') AS docs_max_updated_at
+BEFORE: {"documents": 1, "chunks": 3, "folders": 1, "installs": 1, "docs_max_updated_at": "2026-09-24 19:53:10.168732+00:00"}
+POST /experts/00000000-0000-0000-0000-000000000259/install headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} -> HTTP 202 body={"expert_bundle_id":"00000000-0000-0000-0000-000000000259","corpus_version":"9bbb510c6038217f57deb84ea9265559a3e4180fe40a00fcb73619ece4c8e757","install":{"state":"ready","folder_id":"1e441bd0-e82e-4eb0-b5de-b69f9d0f983c","cause":null,"cause_source":null,"can_install":true,"updated_at":"2026-09-24T19:53:43.012334Z"}}
+GET /experts/00000000-0000-0000-0000-000000000259 (15 s later) -> 200 install={'state': 'ready', 'folder_id': '1e441bd0-e82e-4eb0-b5de-b69f9d0f983c', 'cause': None, 'cause_source': None, 'can_install': True, 'updated_at': '2026-09-24T19:53:43.012334Z'}
+AFTER:  {"documents": 1, "chunks": 3, "folders": 1, "installs": 1, "docs_max_updated_at": "2026-09-24 19:53:10.168732+00:00"}
+identical: True

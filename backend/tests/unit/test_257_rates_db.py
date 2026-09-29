@@ -286,8 +286,14 @@ async def test_get_org_spend_summary_honesty():
             "unmeasured_runs_count": 12,
             "total_input_tokens": 1500000,
             "total_output_tokens": 400000,
+            # D-268-25: the totals query now also names unpriced sub-agents under rated roots.
+            "unpriced_subagents": 0,
         },
         {"incomplete_count": 5},
+        # D-268-09 / D-268-21: 268 appends ONE fetchrow (the unfiltered window totals from the
+        # same per_root CTE) after 257's two. Appended, never inserted, so every 257 assertion
+        # below reads exactly the rows it always read.
+        {"window_total_usd": Decimal("48.2050"), "window_run_count": 100},
     ]
     pool.fetch.side_effect = [
         # Daily spend
@@ -326,7 +332,10 @@ async def test_get_org_spend_summary_honesty():
                 "priced_count": 0,
                 "is_fully_rated": False,
             }
-        ]
+        ],
+        # D-268-10: 268 appends ONE fetch - the unfiltered Spend by Expert lines. Empty here,
+        # which still yields the always-present `No Expert` line.
+        [],
     ]
 
     summary = await get_org_spend_summary(pool, org_id)
@@ -376,6 +385,12 @@ async def test_get_spend_runs_returns_coverage_and_cost():
             "output_cost_per_million": Decimal("10.000000"),
             "token_coverage": ["agent", "single", "batch", "emit"],
             "cost_usd": Decimal("0.0075"),
+            # D-268-09: the ledger now selects each root's attribution and sub-agent count.
+            "subagent_count": 0,
+            "expert_id": None,
+            "expert_attributed": True,
+            "expert_name": None,
+            "expert_found": False,
         }
     ]
 

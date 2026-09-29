@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # Phase 214 D-214-04 (STEP-02) — the RUN-SCAFFOLDING keys a launcher may not supply.
@@ -25,6 +25,27 @@ from pydantic import BaseModel
 # ONE frozenset, imported by BOTH merge sites (api/threads.py and services/workflow_kickoff.py)
 # — this plan's whole complaint is a fact living in two places, so it does not add a third.
 RESERVED_RUN_INPUT_KEYS: frozenset[str] = frozenset({"kickoff_prompt", "folder_id"})
+
+
+# Phase 267 (D-267-09 / D-267-10 / PACK-23) — the TRANSCRIPT-ONLY system-row kinds.
+#
+# A `messages` row with role='system' and `tool_calls[0].kind` in this set is an event written
+# for PEOPLE (an Expert was swapped / removed, or a question was handed to a new chat). It is
+# shown in the transcript and NEVER sent to a model: providers treat persisted system rows
+# differently (Anthropic drops them, Google merges them into system_instruction, OpenAI
+# Responses keeps them inline), and the next turn's system prompt already carries the change.
+#
+# ONE frozenset, ONE home. Its importers:
+#   * app.services.agent_loop._reconstruct_history — skips these rows (never reach a model);
+#   * app.api.threads snapshot + messages readers (267-02) — let ONLY these system kinds through;
+#   * frontend/src/components/chat/expertEventCopy.ts (267-04) — the mirror, cross-pinned by ?raw.
+# ⛔ It stays an ALLOWLIST: other system kinds (ask_user_prompt, ask_user_response,
+# context_truncated, iteration_cap_*) exist in real data and must keep their current handling.
+# ⛔ "handoff" is deliberately NOT in it — the handoff summary is a USER row the model must see.
+# The name carries no "expert" because agent_loop.py imports it (its AST fence).
+# Phase 268 (D-268-12): "scope_changed" — a live thread's folder scope changed (CHAT-08). Same
+# allowlist, same skip, same one renderer; a KIND, never a second mechanism.
+TRANSCRIPT_EVENT_KINDS: frozenset[str] = frozenset({"expert_changed", "expert_handoff", "scope_changed"})
 
 
 class MessageCreate(BaseModel):
@@ -80,7 +101,10 @@ class MessageResponse(BaseModel):
     id: UUID
     thread_id: UUID
     user_id: UUID
-    role: Literal["user", "assistant"]
+    # Phase 267 (D-267-09): "system" is admitted so an allowlisted transcript event
+    # (TRANSCRIPT_EVENT_KINDS above) can ride the snapshot. A narrow Literal would 500 the whole
+    # response on one such row — the BUG-260528-01 class.
+    role: Literal["user", "assistant", "system"]
     content: str
     created_at: datetime
     updated_at: datetime
@@ -132,3 +156,123 @@ class MessageResponse(BaseModel):
     is_rated: bool | None = None
     # Phase 223 (BUG-260902-03 / D-223-06): armed connector IDs active when user message was sent
     active_connector_ids: list[UUID] | None = None
+
+
+# ── Phase 267 (D-267-11 / D-267-15 / D-267-16 / PACK-23 / PACK-24) — transcript payloads ──────────
+#
+# ONE structured payload per kind, stored as ``messages.tool_calls[0]`` and rendered by ONE
+# vocabulary module on the frontend (``components/chat/expertEventCopy.ts``, 267-04). The words a
+# user sees are derived from these fields; nothing here is a pre-rendered string except the
+# ``content`` column sentence the writer stores beside it (content is NOT NULL).
+#
+# ``now`` / ``dropped`` are GENERIC scope lines — folders, the thread's folder, "all documents",
+# connections — never Expert-specific keys, so Phase 268 (CHAT-08, the folder-scope event) adds a
+# KIND, not a second renderer. Every name is SNAPSHOTTED at write time: renaming or deleting an
+# Expert or folder later does not rewrite history. Built only by ``app.services.expert_scope`` /
+# ``app.services.thread_handoff``; ``backend/tests/fixtures/phase267/*.json`` are the executable
+# copies 267-04 renders from.
+
+
+class TranscriptExpertRef(BaseModel):
+    id: UUID
+    name: str
+    scope_mode: Literal["biased", "restricted"]
+
+
+class TranscriptFolderRef(BaseModel):
+    # ``name`` None = a folder the caller cannot see (rendered "a knowledge folder you cannot see").
+    id: UUID | None = None
+    name: str | None = None
+    # Only the thread's own folder carries a count (its latest, not-disconnected KB documents).
+    doc_count: int | None = None
+
+
+class TranscriptScopeLine(BaseModel):
+    folders: list[TranscriptFolderRef] = Field(default_factory=list)
+    thread_folder: TranscriptFolderRef | None = None
+    # True = no folder filter at all ("All your documents").
+    all_documents: bool = False
+    # Connection NAMES (display names, snapshotted).
+    connections: list[str] = Field(default_factory=list)
+
+
+class TranscriptExclusion(BaseModel):
+    count: int
+    names: list[str] = Field(default_factory=list, max_length=5)
+
+
+class ExpertChangedEvent(BaseModel):
+    """A swap, join or removal (``before`` / ``after`` None = no Expert on that side)."""
+
+    kind: Literal["expert_changed"] = "expert_changed"
+    at: datetime
+    before: TranscriptExpertRef | None = None
+    after: TranscriptExpertRef | None = None
+    now: TranscriptScopeLine
+    dropped: TranscriptScopeLine
+    # Restricted Expert on a folder-scoped thread only: the thread's documents it will not read.
+    excluded: TranscriptExclusion | None = None
+
+
+class ExpertHandoffEvent(BaseModel):
+    """Written on the SOURCE thread when a question is handed to a second Expert in a new chat."""
+
+    kind: Literal["expert_handoff"] = "expert_handoff"
+    at: datetime
+    target_thread_id: UUID
+    target_title: str
+    expert_name: str
+    stays_expert_name: str | None = None
+    folder_name: str | None = None
+
+
+# ── Phase 268 (D-268-12 / D-268-12c / D-268-25 / CHAT-08) — the folder-scope payloads ────────────
+#
+# ⛔ PITFALL 11: ``path`` lives on SUBCLASSES only. A defaulted ``path`` on ``TranscriptFolderRef``
+# would add ``"path": null`` to every 267 dump and break the byte-equality fixture test (a new red at
+# zero headroom, and a frontend fixture drift). Pydantic v2 serializes a field by its DECLARED type,
+# so every field below that must carry a path DECLARES the subclass — a ``ScopeFolderRef`` assigned
+# to a ``TranscriptFolderRef``-typed field would silently lose it.
+
+
+class ScopeFolderRef(TranscriptFolderRef):
+    # The folder's full path WITHOUT the leading slash ("Client ACME/Q3 Contracts"), snapshotted at
+    # write time. None = a folder the caller cannot see (it renders as the unnameable phrase).
+    path: str | None = None
+
+
+class ScopeTranscriptLine(TranscriptScopeLine):
+    thread_folder: ScopeFolderRef | None = None
+
+
+class ScopeChangedEvent(BaseModel):
+    """A live thread's folder scope changed (PATCH /threads/{id} ``folder_id`` / ``clear_folder``).
+
+    ``from_folder`` / ``to_folder`` None = "All your documents". ``held`` = an active Restricted
+    Expert does not search the thread folder, so the change is SAVED and ``saved`` names it — decided
+    on the server (D-268-12c), never re-derived by a client. ``during_run`` = an answer was streaming
+    when the change was written, so the card says that answer keeps the old scope (Pitfall 4).
+    """
+
+    kind: Literal["scope_changed"] = "scope_changed"
+    at: datetime
+    from_folder: ScopeFolderRef | None = None
+    to_folder: ScopeFolderRef | None = None
+    expert: TranscriptExpertRef | None = None
+    held: bool = False
+    now: ScopeTranscriptLine
+    dropped: ScopeTranscriptLine
+    saved: ScopeFolderRef | None = None
+    during_run: bool = False
+
+
+class HandoffMarker(BaseModel):
+    """``tool_calls[0]`` of the new thread's FIRST message — a ``role='user'`` row the model sees as
+    plain user content. ⛔ Deliberately NOT in ``TRANSCRIPT_EVENT_KINDS``."""
+
+    kind: Literal["handoff"] = "handoff"
+    source_thread_id: UUID
+    source_title: str
+    expert_name: str
+    summary: list[str]
+    folder_name: str | None = None

@@ -5,7 +5,12 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.models.message import MessageResponse
+from app.models.message import (
+    MessageResponse,
+    ScopeFolderRef,
+    ScopeTranscriptLine,
+    TranscriptExpertRef,
+)
 from app.models.run import ActiveRunResponse
 
 
@@ -19,6 +24,67 @@ class ThreadUpdate(BaseModel):
     title: str | None = None
     active_expert_id: UUID | None = None
     clear_active_expert: bool = False
+    # Phase 268 (D-268-12 / CHAT-08): change a live thread's folder scope — the same shape as the
+    # Expert pair above (an explicit ``folder_id: null`` clears too). A body touching both pairs is
+    # a 422: one PATCH writes one transcript event.
+    folder_id: UUID | None = None
+    clear_folder: bool = False
+
+
+class ScopeEffect(BaseModel):
+    """Phase 268 (D-268-12c / R1) — GET /threads/{id}/scope-effect: what the NEXT message searches.
+
+    The ONE payload the composer chip (``held``), the picker ledger (``next`` / ``stops`` or
+    ``saved``) and — snapshotted — the ``scope_changed`` card render from. Built by
+    ``expert_scope.build_scope_effect`` from ``describe_expert_scope`` statements resolved with the
+    producer's own inputs (active org + caller role, Pitfall 9). ``stops`` is empty when the new scope
+    contains the old; ``saved`` is set only when ``held``.
+    """
+
+    held: bool
+    expert: TranscriptExpertRef | None = None
+    next: ScopeTranscriptLine
+    stops: ScopeTranscriptLine
+    saved: ScopeFolderRef | None = None
+
+
+class ThreadHandoffRequest(BaseModel):
+    """Phase 267 (D-267-14 / PACK-24) — POST /threads/{id}/handoff. ``model`` / ``provider`` are the
+    composer's current pick (as ``MessageCreate``), resolved through the send path's own chain."""
+
+    expert_id: UUID
+    model: str | None = None
+    provider: str | None = None
+
+
+class ScopePreviewFolder(BaseModel):
+    id: UUID
+    # None = a folder the caller cannot see.
+    name: str | None = None
+
+
+class ScopePreviewThreadFolder(BaseModel):
+    id: UUID
+    name: str | None = None
+    doc_count: int
+
+
+class ExpertScopePreview(BaseModel):
+    """Phase 267 (D-267-17 / D-267-18 / D-267-19 / PACK-25) — GET /threads/expert-scope-preview.
+
+    Built by ``app.services.expert_scope.scope_preview`` from the SAME statement the transcript
+    event reads, so the invite dialog and the event cannot disagree. ``excluded_count`` and
+    ``excluded_names`` (≤ 5) come from ONE documents query — the heading and the list are never two
+    computations. ``expert_folders == []`` on a restricted Expert is the UI's gate line (266 CR-01).
+    """
+
+    expert_id: UUID
+    expert_name: str
+    mode: Literal["biased", "restricted"]
+    expert_folders: list[ScopePreviewFolder]
+    thread_folder: ScopePreviewThreadFolder | None = None
+    excluded_count: int = 0
+    excluded_names: list[str] = []
 
 
 class ThreadResponse(BaseModel):

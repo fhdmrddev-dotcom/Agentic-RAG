@@ -1,0 +1,662 @@
+{
+ "sc3_reload": {
+  "thread": "1e845e4e-7fbc-4402-a85d-b72d5291c08f",
+  "event_rows": [
+   {
+    "id": "ee5c378c-a1e8-4cac-8893-375900fad7d1",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "role": "system",
+    "kind": "scope_changed",
+    "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+    "payload": {
+     "at": "2026-09-28T19:36:13.721155Z",
+     "now": {
+      "folders": [],
+      "connections": [],
+      "all_documents": false,
+      "thread_folder": {
+       "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+       "name": "Q3 Contracts",
+       "path": "Client ACME/Q3 Contracts",
+       "doc_count": 1
+      }
+     },
+     "held": false,
+     "kind": "scope_changed",
+     "saved": null,
+     "expert": null,
+     "dropped": {
+      "folders": [],
+      "connections": [],
+      "all_documents": false,
+      "thread_folder": {
+       "id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+       "name": "Client ACME",
+       "path": "Client ACME",
+       "doc_count": 2
+      }
+     },
+     "to_folder": {
+      "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+      "name": "Q3 Contracts",
+      "path": "Client ACME/Q3 Contracts",
+      "doc_count": 1
+     },
+     "during_run": false,
+     "from_folder": {
+      "id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+      "name": "Client ACME",
+      "path": "Client ACME",
+      "doc_count": 2
+     }
+    }
+   }
+  ],
+  "snapshots": [
+   {
+    "status": 200,
+    "n_messages": 9,
+    "scope_changed_ids": [
+     "ee5c378c-a1e8-4cac-8893-375900fad7d1"
+    ]
+   },
+   {
+    "status": 200,
+    "n_messages": 9,
+    "scope_changed_ids": [
+     "ee5c378c-a1e8-4cac-8893-375900fad7d1"
+    ]
+   }
+  ]
+ },
+ "sc3_history": {
+  "db_rows": 9,
+  "db_scope_rows": 1,
+  "history_entries": 19,
+  "roles": [
+   "assistant",
+   "tool",
+   "user"
+  ],
+  "contains_scope_text": false
+ },
+ "sc3_empty": {
+  "thread": "58ef37d7-132c-417a-ad81-30f984b517b4",
+  "patch_status": 200,
+  "folder_after": [
+   {
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f"
+   }
+  ],
+  "system_rows": [
+   {
+    "n": 0
+   }
+  ]
+ },
+ "sc4b_create": {
+  "status": 201,
+  "id": "a57a1e42-7314-4068-9b2e-87b583e37ab5",
+  "active_expert_id": "253ba288-7483-4af7-9979-e88f8c54cc98"
+ },
+ "sc4b_t1": {
+  "status": 201,
+  "run": {
+   "run_id": "e4202681-e5d5-43f2-8369-6613f122e279",
+   "status": "completed",
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": "253ba288-7483-4af7-9979-e88f8c54cc98",
+   "expert_attributed": true,
+   "input_tokens": 28065,
+   "output_tokens": 1350,
+   "started_at": "2026-09-28 19:49:31.597218+00:00",
+   "completed_at": "2026-09-28 19:49:48.205007+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit": [
+   {
+    "run_id": "e4202681-e5d5-43f2-8369-6613f122e279",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "docs": [
+     "ac8e1abd-082d-4ea7-9cb1-991752b746ef",
+     "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+     "1417fc12-a581-4068-adcc-ddbc1e3a848a"
+    ]
+   },
+   {
+    "run_id": "e4202681-e5d5-43f2-8369-6613f122e279",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "docs": [
+     "ac8e1abd-082d-4ea7-9cb1-991752b746ef"
+    ]
+   },
+   {
+    "run_id": "e4202681-e5d5-43f2-8369-6613f122e279",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "docs": [
+     "ac8e1abd-082d-4ea7-9cb1-991752b746ef"
+    ]
+   }
+  ],
+  "join": [
+   {
+    "run_id": "e4202681-e5d5-43f2-8369-6613f122e279",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "ac8e1abd-082d-4ea7-9cb1-991752b746ef",
+    "folder_id": "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe"
+   },
+   {
+    "run_id": "e4202681-e5d5-43f2-8369-6613f122e279",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   },
+   {
+    "run_id": "e4202681-e5d5-43f2-8369-6613f122e279",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "1417fc12-a581-4068-adcc-ddbc1e3a848a",
+    "folder_id": "1a2d0273-b14d-487f-86ee-4d146e89d082"
+   },
+   {
+    "run_id": "e4202681-e5d5-43f2-8369-6613f122e279",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "ac8e1abd-082d-4ea7-9cb1-991752b746ef",
+    "folder_id": "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe"
+   },
+   {
+    "run_id": "e4202681-e5d5-43f2-8369-6613f122e279",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "ac8e1abd-082d-4ea7-9cb1-991752b746ef",
+    "folder_id": "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe"
+   }
+  ]
+ },
+ "sc4b_preview": {
+  "status": 200,
+  "effect": {
+   "held": false,
+   "expert": {
+    "id": "253ba288-7483-4af7-9979-e88f8c54cc98",
+    "name": "UAT-265 Billing SOP Advisor",
+    "scope_mode": "biased"
+   },
+   "next": {
+    "folders": [
+     {
+      "id": "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+      "name": "SOPs",
+      "doc_count": null
+     }
+    ],
+    "thread_folder": {
+     "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+     "name": "Q3 Contracts",
+     "doc_count": 1,
+     "path": "Client ACME/Q3 Contracts"
+    },
+    "all_documents": false,
+    "connections": []
+   },
+   "stops": {
+    "folders": [],
+    "thread_folder": {
+     "id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "name": "Client ACME",
+     "doc_count": 2,
+     "path": "Client ACME"
+    },
+    "all_documents": false,
+    "connections": []
+   },
+   "saved": null
+  }
+ },
+ "sc4b_patch": {
+  "status": 200
+ },
+ "sc4b_event": [
+  {
+   "id": "c3633f80-89eb-4fc2-9d7b-09d135230a3b",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: SOPs, /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+   "payload": {
+    "at": "2026-09-28T19:49:54.615189Z",
+    "now": {
+     "folders": [
+      {
+       "id": "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+       "name": "SOPs",
+       "doc_count": null
+      }
+     ],
+     "connections": [],
+     "all_documents": false,
+     "thread_folder": {
+      "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+      "name": "Q3 Contracts",
+      "path": "Client ACME/Q3 Contracts",
+      "doc_count": 1
+     }
+    },
+    "held": false,
+    "kind": "scope_changed",
+    "saved": null,
+    "expert": {
+     "id": "253ba288-7483-4af7-9979-e88f8c54cc98",
+     "name": "UAT-265 Billing SOP Advisor",
+     "scope_mode": "biased"
+    },
+    "dropped": {
+     "folders": [],
+     "connections": [],
+     "all_documents": false,
+     "thread_folder": {
+      "id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+      "name": "Client ACME",
+      "path": "Client ACME",
+      "doc_count": 2
+     }
+    },
+    "to_folder": {
+     "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+     "name": "Q3 Contracts",
+     "path": "Client ACME/Q3 Contracts",
+     "doc_count": 1
+    },
+    "during_run": false,
+    "from_folder": {
+     "id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "name": "Client ACME",
+     "path": "Client ACME",
+     "doc_count": 2
+    }
+   }
+  }
+ ],
+ "sc4b_at_rest": {
+  "status": 200,
+  "effect": {
+   "held": false,
+   "expert": {
+    "id": "253ba288-7483-4af7-9979-e88f8c54cc98",
+    "name": "UAT-265 Billing SOP Advisor",
+    "scope_mode": "biased"
+   },
+   "next": {
+    "folders": [
+     {
+      "id": "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+      "name": "SOPs",
+      "doc_count": null
+     }
+    ],
+    "thread_folder": {
+     "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+     "name": "Q3 Contracts",
+     "doc_count": 1,
+     "path": "Client ACME/Q3 Contracts"
+    },
+    "all_documents": false,
+    "connections": []
+   },
+   "stops": {
+    "folders": [],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+   },
+   "saved": null
+  }
+ },
+ "sc4b_t2": {
+  "status": 201,
+  "run": {
+   "run_id": "7e14859a-544c-4bd0-8a97-af31b381f24c",
+   "status": "completed",
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": "253ba288-7483-4af7-9979-e88f8c54cc98",
+   "expert_attributed": true,
+   "input_tokens": 13346,
+   "output_tokens": 1759,
+   "started_at": "2026-09-28 19:49:59.253810+00:00",
+   "completed_at": "2026-09-28 19:50:11.101933+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit": [],
+  "join": []
+ },
+ "sc4r_create": {
+  "status": 201,
+  "id": "aa6b30ae-2d82-486c-a6e3-e7ae86e9c67f"
+ },
+ "sc4r_t1": {
+  "status": 201,
+  "run": {
+   "run_id": "eecf9430-db01-4bd4-adb2-9b7d18a35b1a",
+   "status": "completed",
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": "587c3f87-a001-4db2-a37f-27bafa25ae87",
+   "expert_attributed": true,
+   "input_tokens": 21554,
+   "output_tokens": 495,
+   "started_at": "2026-09-28 19:50:16.093575+00:00",
+   "completed_at": "2026-09-28 19:50:25.894733+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit": [
+   {
+    "run_id": "eecf9430-db01-4bd4-adb2-9b7d18a35b1a",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "scope": [
+     "4ff33372-772d-45b4-9c0d-9d676d314c4d"
+    ],
+    "docs": [
+     "5ee944a5-42ae-4a64-990f-a519c283518a"
+    ]
+   }
+  ],
+  "join": [
+   {
+    "run_id": "eecf9430-db01-4bd4-adb2-9b7d18a35b1a",
+    "scope": [
+     "4ff33372-772d-45b4-9c0d-9d676d314c4d"
+    ],
+    "id": "5ee944a5-42ae-4a64-990f-a519c283518a",
+    "folder_id": "4ff33372-772d-45b4-9c0d-9d676d314c4d"
+   }
+  ]
+ },
+ "sc4r_preview": {
+  "status": 200,
+  "effect": {
+   "held": true,
+   "expert": {
+    "id": "587c3f87-a001-4db2-a37f-27bafa25ae87",
+    "name": "HR Advisor",
+    "scope_mode": "restricted"
+   },
+   "next": {
+    "folders": [
+     {
+      "id": "4ff33372-772d-45b4-9c0d-9d676d314c4d",
+      "name": "HR Policies",
+      "doc_count": null
+     }
+    ],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+   },
+   "stops": {
+    "folders": [],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+   },
+   "saved": {
+    "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+    "name": "Q3 Contracts",
+    "doc_count": 1,
+    "path": "Client ACME/Q3 Contracts"
+   }
+  }
+ },
+ "sc4r_patch": {
+  "status": 200
+ },
+ "sc4r_event": [
+  {
+   "id": "b91c7cc9-9b9a-4144-8b20-c6931809f62c",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Saved: /Client ACME/Q3 Contracts. Searching: HR Policies only \u00b7 HR Advisor is Restricted. Takes effect when HR Advisor leaves.",
+   "payload": {
+    "at": "2026-09-28T19:50:33.059147Z",
+    "now": {
+     "folders": [
+      {
+       "id": "4ff33372-772d-45b4-9c0d-9d676d314c4d",
+       "name": "HR Policies",
+       "doc_count": null
+      }
+     ],
+     "connections": [],
+     "all_documents": false,
+     "thread_folder": null
+    },
+    "held": true,
+    "kind": "scope_changed",
+    "saved": {
+     "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+     "name": "Q3 Contracts",
+     "path": "Client ACME/Q3 Contracts",
+     "doc_count": 1
+    },
+    "expert": {
+     "id": "587c3f87-a001-4db2-a37f-27bafa25ae87",
+     "name": "HR Advisor",
+     "scope_mode": "restricted"
+    },
+    "dropped": {
+     "folders": [],
+     "connections": [],
+     "all_documents": false,
+     "thread_folder": null
+    },
+    "to_folder": {
+     "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+     "name": "Q3 Contracts",
+     "path": "Client ACME/Q3 Contracts",
+     "doc_count": 1
+    },
+    "during_run": false,
+    "from_folder": {
+     "id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "name": "Client ACME",
+     "path": "Client ACME",
+     "doc_count": 2
+    }
+   }
+  }
+ ],
+ "sc4r_at_rest": {
+  "status": 200,
+  "effect": {
+   "held": true,
+   "expert": {
+    "id": "587c3f87-a001-4db2-a37f-27bafa25ae87",
+    "name": "HR Advisor",
+    "scope_mode": "restricted"
+   },
+   "next": {
+    "folders": [
+     {
+      "id": "4ff33372-772d-45b4-9c0d-9d676d314c4d",
+      "name": "HR Policies",
+      "doc_count": null
+     }
+    ],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+   },
+   "stops": {
+    "folders": [],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+   },
+   "saved": {
+    "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+    "name": "Q3 Contracts",
+    "doc_count": 1,
+    "path": "Client ACME/Q3 Contracts"
+   }
+  }
+ },
+ "sc4r_t2": {
+  "status": 201,
+  "run": {
+   "run_id": "8a1b0e9b-d711-43bd-9e02-0dd665ade5fd",
+   "status": "completed",
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": "587c3f87-a001-4db2-a37f-27bafa25ae87",
+   "expert_attributed": true,
+   "input_tokens": 23060,
+   "output_tokens": 487,
+   "started_at": "2026-09-28 19:50:37.659992+00:00",
+   "completed_at": "2026-09-28 19:50:46.541977+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit": [
+   {
+    "run_id": "8a1b0e9b-d711-43bd-9e02-0dd665ade5fd",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "scope": [
+     "4ff33372-772d-45b4-9c0d-9d676d314c4d"
+    ],
+    "docs": [
+     "5ee944a5-42ae-4a64-990f-a519c283518a"
+    ]
+   }
+  ],
+  "join": [
+   {
+    "run_id": "8a1b0e9b-d711-43bd-9e02-0dd665ade5fd",
+    "scope": [
+     "4ff33372-772d-45b4-9c0d-9d676d314c4d"
+    ],
+    "id": "5ee944a5-42ae-4a64-990f-a519c283518a",
+    "folder_id": "4ff33372-772d-45b4-9c0d-9d676d314c4d"
+   }
+  ]
+ },
+ "sc4_authz": {
+  "status": 404,
+  "body": {
+   "detail": "Folder not found"
+  },
+  "folder_before": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+  "folder_after": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+  "foreign_folder_org": [
+   {
+    "org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035"
+   }
+  ],
+  "system_rows_before": 1,
+  "system_rows_after": 1
+ },
+ "sc4b_t3_variant": {
+  "run": {
+   "run_id": "249652fb-9ec6-445e-bb0f-15aac594c16d",
+   "status": "completed",
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": "253ba288-7483-4af7-9979-e88f8c54cc98",
+   "expert_attributed": true,
+   "input_tokens": 35603,
+   "output_tokens": 1036,
+   "started_at": "2026-09-28 19:51:06.621283+00:00",
+   "completed_at": "2026-09-28 19:51:25.936568+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit": [
+   {
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "scope": [
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ]
+   },
+   {
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "scope": [
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ]
+   }
+  ],
+  "join": [
+   {
+    "run_id": "249652fb-9ec6-445e-bb0f-15aac594c16d",
+    "scope": [
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "ac8e1abd-082d-4ea7-9cb1-991752b746ef",
+    "folder_id": "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe"
+   },
+   {
+    "run_id": "249652fb-9ec6-445e-bb0f-15aac594c16d",
+    "scope": [
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   },
+   {
+    "run_id": "249652fb-9ec6-445e-bb0f-15aac594c16d",
+    "scope": [
+     "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "ac8e1abd-082d-4ea7-9cb1-991752b746ef",
+    "folder_id": "1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe"
+   }
+  ]
+ }
+}

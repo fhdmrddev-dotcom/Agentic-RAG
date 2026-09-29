@@ -12,7 +12,9 @@ from app.models.expert import ExpertBundle, ExpertBundleCreate, ExpertBundleUpda
 from app.utils.skill_visibility import skill_row_visible
 
 logger = logging.getLogger(__name__)
-SYSTEM_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+# SYSTEM_USER_ID (00000000-0000-0000-0000-000000000001) was deleted by the 266 review (IN-03): it
+# had no reader after D-266-10 retired the is_system_folder bypass, and a live constant invites
+# the bypass back. The retirement comment in resolve_expert_bundle still quotes the rule it fed.
 
 
 class ResolvedExpertBundle(BaseModel):
@@ -30,6 +32,62 @@ class ResolvedExpertBundle(BaseModel):
     prompt_suggestions: list[dict[str, Any]] = Field(default_factory=list)
     stripped_members_count: int = 0
     stripped_details: list[str] = Field(default_factory=list)
+
+
+class ConnectionState(BaseModel):
+    """Phase 267 (D-267-05) — one required connection, as the caller's org sees it."""
+
+    slug: str
+    name: str
+    connected: bool
+
+
+async def connection_states(
+    pool: asyncpg.Pool,
+    org_id: UUID | None,
+    required: list[str],
+) -> list[ConnectionState]:
+    """Phase 267 (D-267-05 / D-267-07) — THE ONE "is it connected" rule.
+
+    A required slug is connected ⇔ some ``connector_connections`` row of ``org_id`` has
+    ``is_enabled`` AND ``status = 'active'`` and its ``service_id`` OR ``capability`` equals the
+    slug. ``name`` is the display name of a connected matching row, else of ANY matching row (a
+    revoked "Google Workspace" can still be named), else the slug itself.
+
+    Read by ``resolve_expert_bundle`` (the run strips what is not connected — fail-closed, silent
+    to the run) AND by the Expert list/get overlay in ``api/experts.py`` (the UI names it). ⛔ Never
+    re-spell this rule anywhere else; call this.
+
+    One ``SELECT`` per call, the org bound as ``$1`` (T-267-04). ``org_id`` None or nothing
+    required → ZERO queries. One entry per required slug, in order (duplicates kept).
+    """
+    if not required:
+        return []
+    if org_id is None:
+        return [ConnectionState(slug=s, name=s, connected=False) for s in required]
+
+    rows = await pool.fetch(
+        """
+            SELECT service_id, capability, name, is_enabled, status
+            FROM public.connector_connections
+            WHERE org_id = $1
+            ORDER BY created_at;
+        """,
+        org_id,
+    )
+    states: list[ConnectionState] = []
+    for slug in required:
+        matching = [r for r in rows if r.get("service_id") == slug or r.get("capability") == slug]
+        live = [r for r in matching if r.get("is_enabled") and r.get("status") == "active"]
+        named = live[0] if live else (matching[0] if matching else None)
+        states.append(
+            ConnectionState(
+                slug=slug,
+                name=(named.get("name") if named is not None and named.get("name") else slug),
+                connected=bool(live),
+            )
+        )
+    return states
 
 
 async def create_expert_service(
@@ -409,12 +467,21 @@ async def resolve_expert_bundle(
       Independently evaluate each referenced member (skills, folders, connections):
       - skills: must be is_system = true OR (org_id == caller_org_id AND is_enabled = true AND (user_id == caller_user_id OR is_org_shared = true OR born_for_expert_bundle_id == bundle_id))
         The third disjunct is Phase 263 (D-263-06) and is evaluated by ``filter_visible_skill_names``.
-      - folders: must belong to caller_org_id (org_id == caller_org_id)
+      - folders: must belong to caller_org_id (org_id == caller_org_id). For an is_system
+        (first-party) bundle the folder ids come ONLY from the caller org's expert_installs
+        row (D-266-09) — no install, no folders; the bundle's global knowledge_folder_ids is
+        ignored. Org-authored bundles read knowledge_folder_ids exactly as before.
       - connections: must be active and enabled in caller_org_id
       Foreign members are stripped and logged with an audit warning (EXPERT_MEMBER_CROSS_ORG_STRIPPED).
     """
     bundle = await experts_db.get_expert_bundle_by_id(pool, bundle_id, caller_org_id)
     if not bundle:
+        return None
+    # 267-REVIEW CR-02: a DISABLED Expert resolves to nothing, so a thread already bound to it stops
+    # running it (run_producer clears the id and refuses the run, fail-closed) — the same answer the
+    # binding gate gives every door.
+    if not bundle.get("is_enabled", True):
+        logger.warning("EXPERT_DISABLED: expert '%s' is disabled; not resolved", bundle_id)
         return None
 
     # PACK-10 / SC#5: Verify caller holds grant access for granted/private bundles
@@ -464,7 +531,19 @@ async def resolve_expert_bundle(
                 )
 
     # 2. Evaluate knowledge_folder_ids independently
-    raw_folder_ids = bundle.get("knowledge_folder_ids") or []
+    if bundle.get("is_system"):
+        # D-266-09: a first-party Expert's knowledge is the CALLER ORG's installed copy, never
+        # a global folder id. No install (or no caller org) means no folders; the bundle's own
+        # knowledge_folder_ids is ignored for a system bundle. The install-sourced id still runs
+        # through the strict caller-org loop below, so a row pointing elsewhere is stripped.
+        install = (
+            await experts_db.get_expert_install(pool, org_id=caller_org_id, bundle_id=bundle["id"])
+            if caller_org_id is not None
+            else None
+        )
+        raw_folder_ids = [install["folder_id"]] if install and install.get("folder_id") else []
+    else:
+        raw_folder_ids = bundle.get("knowledge_folder_ids") or []
     effective_folder_ids: list[UUID] = []
 
     if raw_folder_ids:
@@ -481,9 +560,16 @@ async def resolve_expert_bundle(
             f_org_id = r.get("org_id")
             f_user_id = r.get("user_id")
             f_shared = bool(r.get("is_org_shared"))
-            is_system_folder = bool(f_user_id == SYSTEM_USER_ID and f_shared)
+            # ⛔ RETIRED DELIBERATELY BY PHASE 266 (D-266-10 / SEED-304; rule SEED-177 / D-206-07).
+            # The retired line, quoted verbatim rather than silently deleted:
+            #   is_system_folder = bool(f_user_id == SYSTEM_USER_ID and f_shared)
+            # It admitted a SYSTEM_USER_ID-owned shared folder in ANY org — scope this resolver
+            # approved and match_document_chunks (gated on current_user_org_ids()) could never
+            # read, so the Expert's scope was a promise retrieval broke. A folder is now admitted
+            # only when it lives in the caller's own org. Fence:
+            # tests/unit/test_266_system_folder_bypass_fence.py (driven RED against the old rule).
             is_tenant_folder = bool(f_org_id == caller_org_id and (f_user_id == caller_user_id or f_shared))
-            if is_system_folder or is_tenant_folder:
+            if is_tenant_folder:
                 valid_folders.add(f_id)
 
         for f_id in raw_folder_ids:
@@ -504,34 +590,22 @@ async def resolve_expert_bundle(
     raw_connections = bundle.get("required_connections") or []
     effective_connections: list[str] = []
 
-    if raw_connections:
-        conn_query = """
-            SELECT DISTINCT service_id, capability
-            FROM public.connector_connections
-            WHERE org_id = $1
-              AND is_enabled = true
-              AND status = 'active';
-        """
-        conn_rows = await pool.fetch(conn_query, caller_org_id)
-        active_conn_keys: set[str] = set()
-        for r in conn_rows:
-            if r.get("service_id"):
-                active_conn_keys.add(r["service_id"])
-            if r.get("capability"):
-                active_conn_keys.add(r["capability"])
-
-        for c in raw_connections:
-            if c in active_conn_keys:
-                effective_connections.append(c)
-            else:
-                stripped_count += 1
-                detail = f"connection:{c}"
-                stripped_details.append(detail)
-                logger.warning(
-                    "EXPERT_MEMBER_CROSS_ORG_STRIPPED: connection '%s' unconfigured or foreign to org '%s'",
-                    c,
-                    caller_org_id,
-                )
+    # Phase 267 (D-267-05 / D-267-07): the rule lives in connection_states, which the Expert
+    # overlay also reads. Behaviour here is unchanged — what is not connected is stripped,
+    # fail-closed and silent to the run (the UI gate is the only gate).
+    for state in await connection_states(pool, caller_org_id, list(raw_connections)):
+        c = state.slug
+        if state.connected:
+            effective_connections.append(c)
+        else:
+            stripped_count += 1
+            detail = f"connection:{c}"
+            stripped_details.append(detail)
+            logger.warning(
+                "EXPERT_MEMBER_CROSS_ORG_STRIPPED: connection '%s' unconfigured or foreign to org '%s'",
+                c,
+                caller_org_id,
+            )
 
     return ResolvedExpertBundle(
         bundle_id=bundle["id"],

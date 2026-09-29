@@ -1,0 +1,47 @@
+{
+  "kind": "scope_changed",
+  "at": "2026-09-28T14:35:00Z",
+  "from_folder": {
+    "id": "f3000000-0000-4000-8000-000000000003",
+    "name": "Client ACME",
+    "doc_count": 4,
+    "path": "Client ACME"
+  },
+  "to_folder": {
+    "id": "f4000000-0000-4000-8000-000000000004",
+    "name": "Contracts",
+    "doc_count": 2,
+    "path": "Client ACME/Contracts"
+  },
+  "expert": {
+    "id": "e2000000-0000-4000-8000-0000000000b2",
+    "name": "HR Advisor",
+    "scope_mode": "restricted"
+  },
+  "held": true,
+  "now": {
+    "folders": [
+      {
+        "id": "f2000000-0000-4000-8000-000000000002",
+        "name": "HR Policies",
+        "doc_count": null
+      }
+    ],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+  },
+  "dropped": {
+    "folders": [],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+  },
+  "saved": {
+    "id": "f4000000-0000-4000-8000-000000000004",
+    "name": "Contracts",
+    "doc_count": 2,
+    "path": "Client ACME/Contracts"
+  },
+  "during_run": false
+}

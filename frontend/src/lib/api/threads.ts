@@ -20,16 +20,38 @@ export async function listThreads(): Promise<Thread[]> {
   return res.json() as Promise<Thread[]>
 }
 
-export async function createThread(title = "New Chat", folderId?: string | null): Promise<Thread> {
+/** Phase 267 plan 04 (D-267-24 / 099-08 idiom): the refusal-preserving throw every thread write
+ *  shares with `postMessage` — a tier refusal names the plan, a string `detail` is the server's own
+ *  sentence, and only then the caller's fallback. The status rides on `ApiError`. */
+async function throwThreadRefusal(res: Response, fallback: string): Promise<never> {
+  const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+  throw new ApiError(
+    entitlementRefusalMessage(body) ?? (typeof body?.detail === "string" ? body.detail : fallback),
+    res.status,
+  )
+}
+
+/**
+ * Phase 267 plan 04 (D-267-21): `activeExpertId` creates the thread WITH its Expert in one request,
+ * so an Expert invited on a brand-new chat scopes the FIRST run. Before this the invite was lost:
+ * the thread was created bare and the hydration effect then cleared the chip. The server gates the
+ * id exactly as it gates the PATCH (267-02 `assert_expert_bindable`). Absent → the pre-267 body.
+ */
+export async function createThread(
+  title = "New Chat",
+  folderId?: string | null,
+  activeExpertId?: string | null,
+): Promise<Thread> {
   const headers = await getAuthHeaders()
   const body: Record<string, string> = { title }
   if (folderId) body.folder_id = folderId
+  if (activeExpertId) body.active_expert_id = activeExpertId
   const res = await fetch(`${API_BASE}/threads`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error("Failed to create thread")
+  if (!res.ok) return throwThreadRefusal(res, "Failed to create thread")
   return res.json() as Promise<Thread>
 }
 
@@ -194,8 +216,186 @@ export async function setThreadActiveExpert(threadId: string, expertId: string |
     headers,
     body: JSON.stringify({ active_expert_id: expertId }),
   })
-  if (!res.ok) throw new Error("Failed to update thread active expert")
+  // Phase 267 plan 04 (D-267-12): the caller reverts the chip and shows THIS sentence, so the
+  // server's refusal ("Choose an organization before inviting an Expert.", a tier refusal, …)
+  // must survive the throw — the generic string it used to throw told the person nothing.
+  if (!res.ok) return throwThreadRefusal(res, "Failed to update thread active expert")
   return res.json() as Promise<Thread>
+}
+
+/**
+ * Phase 268 (CHAT-08 · D-268-12 / D-268-12d): change a live thread's folder scope — `null` clears it
+ * ("All your documents"). The server authorizes the folder within the thread's org, and on a thread
+ * with messages writes ONE `scope_changed` transcript row in the same transaction. The caller keeps
+ * the chip where it was on a refusal and shows THIS sentence (the server's `detail`).
+ */
+export async function setThreadFolder(threadId: string, folderId: string | null): Promise<Thread> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(folderId ? { folder_id: folderId } : { clear_folder: true }),
+  })
+  if (!res.ok) return throwThreadRefusal(res, "The folder was not changed.")
+  return res.json() as Promise<Thread>
+}
+
+/**
+ * 268-REVIEW iter-2 WR-01: the ONE thread as the server holds it now (`GET /threads/{id}`, owner-scoped).
+ * Read after a scope PATCH loses a race (409), so the chip and the refusal follow the winner's folder.
+ */
+export async function getThread(threadId: string): Promise<Thread> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}`, { headers })
+  if (!res.ok) return throwThreadRefusal(res, "Thread not found")
+  return res.json() as Promise<Thread>
+}
+
+/**
+ * Phase 268 (D-268-12c / UI-SPEC R1): what the thread's NEXT message searches — at rest (no draft),
+ * or for a draft folder (`{ folderId }`; `null` = clear). The ONE payload the chip, the picker ledger
+ * and (snapshotted) the transcript card render from; `held` is decided by the server.
+ */
+export async function getScopeEffect(
+  threadId: string,
+  draft?: { folderId: string | null },
+): Promise<ScopeEffect> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams()
+  if (draft) {
+    if (draft.folderId) params.set("folder_id", draft.folderId)
+    else params.set("clear", "true")
+  }
+  const qs = params.toString()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/scope-effect${qs ? `?${qs}` : ""}`, { headers })
+  if (!res.ok) return throwThreadRefusal(res, "Couldn't check what your next message will search.")
+  return res.json() as Promise<ScopeEffect>
+}
+
+/**
+ * Phase 267 plan 04 (PACK-24 · D-267-14 / D-267-16): "New chat with <Expert>" — ONE request. The
+ * server summarises this thread, then creates the new thread, its handoff message and this thread's
+ * pointer atomically, or nothing (267-02). ⛔ One request is half of the double-click guard; the
+ * dialog's in-flight lock is the other. Refusals (409 / 502 / 403 / 404) keep the server's sentence.
+ */
+export async function handoffThread(
+  threadId: string,
+  expertId: string,
+  opts: { model?: string; provider?: string } = {},
+): Promise<Thread> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/handoff`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      expert_id: expertId,
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.provider ? { provider: opts.provider } : {}),
+    }),
+  })
+  if (!res.ok) return throwThreadRefusal(res, "The server did not start the new chat.")
+  return res.json() as Promise<Thread>
+}
+
+// ── Phase 267 plan 04 (PACK-23 / PACK-24 · D-267-09 / D-267-11 / D-267-15) — transcript payloads ──
+//
+// The wire shapes `backend/app/models/message.py` stores as `messages.tool_calls[0]`, declared HERE
+// beside the thread API that returns them. ⛔ Rendered ONLY by `components/chat/expertEventCopy.ts`
+// (one vocabulary home); the executable copies are `backend/tests/fixtures/phase267/*.json`, which
+// the frontend suites parse rather than retype. Every name is snapshotted at write time.
+
+/** A folder on a scope line. `name: null` = a folder the caller cannot see. */
+export interface TranscriptFolderRef {
+  id: string | null
+  name: string | null
+  /** Only the thread's own folder carries a count. */
+  doc_count: number | null
+}
+
+export interface TranscriptScopeLine {
+  folders: TranscriptFolderRef[]
+  thread_folder: TranscriptFolderRef | null
+  /** True = no folder filter at all. */
+  all_documents: boolean
+  /** Connection display names. */
+  connections: string[]
+}
+
+export interface TranscriptExpertRef {
+  id: string
+  name: string
+  scope_mode: "biased" | "restricted"
+}
+
+/** A swap, join (`before` null) or removal (`after` null), written on a thread with messages. */
+export interface ExpertChangedEvent {
+  kind: "expert_changed"
+  at: string
+  before: TranscriptExpertRef | null
+  after: TranscriptExpertRef | null
+  now: TranscriptScopeLine
+  dropped: TranscriptScopeLine
+  /** Restricted Expert on a folder-scoped thread only: the documents it will not read (≤ 5 names). */
+  excluded: { count: number; names: string[] } | null
+}
+
+/** The SOURCE thread's pointer to the thread a question was handed to. */
+export interface ExpertHandoffEvent {
+  kind: "expert_handoff"
+  at: string
+  target_thread_id: string
+  target_title: string
+  expert_name: string
+  stays_expert_name: string | null
+  folder_name: string | null
+}
+
+// ── Phase 268 (D-268-12 / D-268-12c / CHAT-08) — the folder-scope payloads ────────────────────
+// Mirrors of `backend/app/models/message.py` / `thread.py`. ⛔ `path` exists on the SCOPE refs
+// only (Pitfall 11): 267's `TranscriptFolderRef` dumps stay byte-identical.
+
+/** A thread folder on a scope line, with its full path (no leading slash) snapshotted at write time. */
+export interface ScopeFolderRef extends TranscriptFolderRef {
+  path: string | null
+}
+
+export interface ScopeTranscriptLine extends Omit<TranscriptScopeLine, "thread_folder"> {
+  thread_folder: ScopeFolderRef | null
+}
+
+/** GET /threads/{id}/scope-effect — what the next message searches. `held` = a Restricted Expert
+ *  does not search the thread folder, so the folder is SAVED (`saved`), not searched. */
+export interface ScopeEffect {
+  held: boolean
+  expert: TranscriptExpertRef | null
+  next: ScopeTranscriptLine
+  stops: ScopeTranscriptLine
+  saved: ScopeFolderRef | null
+}
+
+/** A live thread's folder scope changed (`from_folder` / `to_folder` null = All your documents). */
+export interface ScopeChangedEvent {
+  kind: "scope_changed"
+  at: string
+  from_folder: ScopeFolderRef | null
+  to_folder: ScopeFolderRef | null
+  expert: TranscriptExpertRef | null
+  held: boolean
+  now: ScopeTranscriptLine
+  dropped: ScopeTranscriptLine
+  saved: ScopeFolderRef | null
+  /** An answer was streaming when the change was written — it keeps the old scope. */
+  during_run: boolean
+}
+
+/** `tool_calls[0]` of the new thread's first (USER) message — never a transcript-only kind. */
+export interface HandoffMarker {
+  kind: "handoff"
+  source_thread_id: string
+  source_title: string
+  expert_name: string
+  summary: string[]
+  folder_name: string | null
 }
 
 // ── Phase 063: Run-backed streaming API ──────────────────────────────────────
@@ -250,6 +450,9 @@ export interface ThreadSnapshot {
   messages: Message[]
   active_runs: ActiveRun[]
   since_cursors: Record<string, string>
+  /** 267-REVIEW-INDEPENDENT CR-03(c): the thread's Expert as the server holds it NOW — `null` = none
+   *  (a server-side clear). `undefined` only when the response did not carry the field at all. */
+  active_expert_id?: string | null
 }
 
 /** Phase 063 / Phase 066: callback shape for subscribeToRun. Mirrors the legacy POST-stream
@@ -1117,11 +1320,14 @@ export async function getSnapshot(
     messages: MessageResponseDTO[]
     active_runs: ActiveRun[]
     since_cursors: Record<string, string>
+    active_expert_id?: string | null
   }
   return {
     messages: data.messages.map(_mapMessageResponse),
     active_runs: data.active_runs,
     since_cursors: data.since_cursors,
+    // 267-REVIEW-INDEPENDENT CR-03(c): the reconcile needs the null too — it is what clears the chip.
+    active_expert_id: data.active_expert_id,
   }
 }
 

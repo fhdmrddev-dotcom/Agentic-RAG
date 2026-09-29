@@ -1,0 +1,5 @@
+# Phase 266 Pitfall 5: Expert corpora are hashed into corpus_version, so they must be LF in every checkout.
+# WR-07: only the TEXT files — a binary sample must never have its bytes rewritten (the loader refuses one anyway).
+backend/app/experts/corpora/** -text
+backend/app/experts/corpora/**/*.md text eol=lf
+backend/app/experts/corpora/**/*.json text eol=lf

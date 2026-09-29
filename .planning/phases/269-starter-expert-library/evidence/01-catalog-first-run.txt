@@ -1,0 +1,30 @@
+== 01 catalog first run — 2026-09-29T14:38:58.758236+00:00  test org 9042e46f-745d-40d6-83eb-c6984d582ce1
+--- PART A: before the tier step (subscription_tier NULL)
+SQL: SELECT subscription_tier FROM organizations WHERE id='9042e46f-745d-40d6-83eb-c6984d582ce1' -> None
+GET /experts headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (Authorization: Bearer <redacted>) -> HTTP 403 body={"detail":{"detail":"Capability 'experts' requires 'enterprise' tier (current tier: 'unassigned')","error":"entitlement_required","capability":"experts","required_tier":"enterprise","current_tier":null,"upgrade_hint":"Upgrade to Enterprise to use experts."}}
+
+--- PART B: after the F-4 tier step (subscription_tier = 'enterprise', see 00-users-and-orgs.txt)
+GET /experts headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (admin) -> HTTP 200
+{"id": "00000000-0000-0000-0000-000000002691", "slug": "contract-reviewer", "name": "Contract Reviewer", "is_system": true, "icon": "scale", "category": "Legal", "install.state": "not_installed", "can_install": true}
+{"id": "00000000-0000-0000-0000-000000000259", "slug": "financial-analyzer", "name": "Financial Analyzer", "is_system": true, "icon": "chart", "category": "Finance", "install.state": "not_installed", "can_install": true}
+{"id": "00000000-0000-0000-0000-000000002692", "slug": "hr-policy-advisor", "name": "HR Policy Advisor", "is_system": true, "icon": "book", "category": "HR", "install.state": "not_installed", "can_install": true}
+{"id": "00000000-0000-0000-0000-000000002694", "slug": "operations-analyst", "name": "Operations Analyst", "is_system": true, "icon": "truck", "category": "Operations", "install.state": "not_installed", "can_install": true}
+{"id": "00000000-0000-0000-0000-000000002693", "slug": "security-compliance", "name": "Security & Compliance Advisor", "is_system": true, "icon": "shield", "category": "Compliance", "install.state": "not_installed", "can_install": true}
+distinct slugs (5): ['contract-reviewer', 'financial-analyzer', 'hr-policy-advisor', 'operations-analyst', 'security-compliance']
+
+--- detail view data (GET /experts/{id}, admin)
+GET /experts/00000000-0000-0000-0000-000000000259 -> HTTP 200
+  {"slug": "financial-analyzer", "name": "Financial Analyzer", "icon": "chart", "category": "Finance", "scope_mode": "restricted", "when_to_use": "When evaluating 10-K filings, earnings releases, and balance sheets.", "example_output": "EBITDA Margin: 30.8% (+380 bps YoY)\nOperating Cash Flow: $29.1M\nKey Risks: supply-chain concentration in three Tier-1 Southeast Asia suppliers, and foreign-currency volatility (~42% of revenue international)."}
+  install={"state": "not_installed", "folder_id": null, "cause": null, "cause_source": null, "can_install": true, "updated_at": null}
+GET /experts/00000000-0000-0000-0000-000000002691 -> HTTP 200
+  {"slug": "contract-reviewer", "name": "Contract Reviewer", "icon": "scale", "category": "Legal", "scope_mode": "restricted", "when_to_use": "When you need a commercial term from a contract (a liability cap, a termination right, a notice window or a renewal date) with the clause it came from.", "example_output": "Liability cap: $2.35M aggregate (Kestrel Freight MSA, Key Commercial Terms)\nTermination for convenience: 75 days written notice\nEvery figure is quoted with the agreement and clause it came from."}
+  install={"state": "not_installed", "folder_id": null, "cause": null, "cause_source": null, "can_install": true, "updated_at": null}
+GET /experts/00000000-0000-0000-0000-000000002692 -> HTTP 200
+  {"slug": "hr-policy-advisor", "name": "HR Policy Advisor", "icon": "book", "category": "HR", "scope_mode": "restricted", "when_to_use": "When you need a policy answer from the employee handbook or the learning and expense policy, with the section it came from.", "example_output": "Paid parental leave: 18 weeks (Employee Handbook, Leave & Time Off)\nAnnual paid time off, full-time: 23 days\nEvery answer names the policy section it came from."}
+  install={"state": "not_installed", "folder_id": null, "cause": null, "cause_source": null, "can_install": true, "updated_at": null}
+GET /experts/00000000-0000-0000-0000-000000002693 -> HTTP 200
+  {"slug": "security-compliance", "name": "Security & Compliance Advisor", "icon": "shield", "category": "Compliance", "scope_mode": "restricted", "when_to_use": "When you need an obligation from the incident response policy or an outcome from the quarterly control tests, with the record it came from.", "example_output": "Customer notification after a confirmed incident: within 36 hours (Incident Response Policy)\nQ3 control testing: 14 of 16 controls passed\nFailed controls are listed with their remediation owners and due dates."}
+  install={"state": "not_installed", "folder_id": null, "cause": null, "cause_source": null, "can_install": true, "updated_at": null}
+GET /experts/00000000-0000-0000-0000-000000002694 -> HTTP 200
+  {"slug": "operations-analyst", "name": "Operations Analyst", "icon": "truck", "category": "Operations", "scope_mode": "restricted", "when_to_use": "When you need a delivery, supplier or inventory figure from the quarterly operations reports, with the table it came from.", "example_output": "On-time delivery rate: 94.7% (Fulfilment KPIs)\nAverage Tier-1 supplier lead time: 38 days (Supplier Scorecard)\nEvery figure is quoted with the report table it came from."}
+  install={"state": "not_installed", "folder_id": null, "cause": null, "cause_source": null, "can_install": true, "updated_at": null}

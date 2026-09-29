@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowUp, ChevronDown, Compass, Cpu, GraduationCap, HardDrive, Layers, Paperclip, Plus } from "lucide-react"
@@ -27,7 +27,7 @@ import { ActiveConnectorChips } from "./ActiveConnectorChips"
 import { ActiveExpertChip } from "./ActiveExpertChip"
 import { InviteExpertDialog } from "./InviteExpertDialog"
 import { ConnectedFilePickerModal } from "./ConnectedFilePickerModal"
-import { listConnectorConnections, setThreadActiveExpert, type ConnectorConnection } from "@/lib/api"
+import { listConnectorConnections, type ConnectorConnection } from "@/lib/api"
 import type { Message, ExpertBundle } from "@/types"
 // ── Phase 244 (244-05 T2 / SHELL-04) — the composer's LOCAL attach door ──────────────────
 // Sketch 236's winner is A — Scope on the chip (operator, 2026-09-11): the `+` menu stays PLAIN
@@ -53,7 +53,9 @@ interface Provider {
 }
 
 interface Props {
-  onSend: (content: string, activeConnectorIds?: string[]) => void
+  /** 267-REVIEW WR-01: may return a promise; resolving `false` means NOT sent (e.g. a refused
+   *  create), and the composer puts the text back and keeps the draft. */
+  onSend: (content: string, activeConnectorIds?: string[]) => void | Promise<unknown>
   disabled: boolean
   threadId?: string | null
   messages?: Message[]
@@ -84,6 +86,15 @@ interface Props {
   /** Phase 260 (PACK-02): Active expert consultant bound to the thread. */
   activeExpert?: ExpertBundle | null
   onActiveExpertChange?: (expert: ExpertBundle | null) => void
+  // ── Phase 267 plan 04 (PACK-24 / PACK-25) — forwarded to the invite dialog, all optional ──────
+  /** The thread's folder name, for the dialog's context line. */
+  threadFolderName?: string | null
+  /** 267-REVIEW WR-07: that folder's id — forwarded so a brand-new chat's preview can use it. */
+  threadFolderId?: string | null
+  /** True when the thread has ≥ 1 message — only then can a question be handed to a new chat. */
+  hasMessages?: boolean
+  /** "New chat with <Expert>" — absent means the dialog offers no such control. */
+  onExpertHandoff?: (expert: ExpertBundle) => Promise<void>
   /**
    * Phase 262 plan 05 (PACK-11): take the person to the Expert catalog — the
    * `onOpenConnections` precedent two entries up, copied line for line.
@@ -95,6 +106,14 @@ interface Props {
    * affordance, which is what D-262-02 refuses a whole requirement over.
    */
   onBrowseExperts?: () => void
+  /**
+   * Phase 268 (CHAT-08 · D-268-12d): the thread's scope chip, mounted in the chip row right after
+   * the Expert chip. ChatArea passes it only when a thread exists. Optional, for the same reason as
+   * every prop above: suites mount this component from their own prop objects.
+   */
+  scopeSlot?: ReactNode
+  /** Phase 268 (UI-SPEC §5.4): the pending note under the chip row while an answer streams. */
+  scopeNote?: ReactNode
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -159,6 +178,12 @@ export function MessageInput({
   activeExpert: propActiveExpert,
   onActiveExpertChange,
   onBrowseExperts,
+  threadFolderName,
+  threadFolderId,
+  hasMessages,
+  onExpertHandoff,
+  scopeSlot,
+  scopeNote,
 }: Props) {
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -168,33 +193,19 @@ export function MessageInput({
   const activeExpert = propActiveExpert !== undefined ? propActiveExpert : internalActiveExpert
   const [inviteExpertOpen, setInviteExpertOpen] = useState(false)
 
-  const handleSelectExpert = async (expert: ExpertBundle) => {
+  // Phase 267 plan 04 (D-267-12): the composer REPORTS the choice and writes nothing. The PATCH,
+  // its refusal (the chip reverts, the server's sentence is shown) and the transcript refetch all
+  // live in ONE home, `ChatArea`. Two writers used to exist here and one of them swallowed every
+  // refusal into the console.
+  const handleSelectExpert = (expert: ExpertBundle) => {
     setInternalActiveExpert(expert)
     setInviteExpertOpen(false)
-    if (onActiveExpertChange) {
-      onActiveExpertChange(expert)
-    }
-    if (threadId) {
-      try {
-        await setThreadActiveExpert(threadId, expert.id)
-      } catch (err) {
-        console.error("Failed to set thread active expert:", err)
-      }
-    }
+    onActiveExpertChange?.(expert)
   }
 
-  const handleDismissExpert = async () => {
+  const handleDismissExpert = () => {
     setInternalActiveExpert(null)
-    if (onActiveExpertChange) {
-      onActiveExpertChange(null)
-    }
-    if (threadId) {
-      try {
-        await setThreadActiveExpert(threadId, null)
-      } catch (err) {
-        console.error("Failed to clear thread active expert:", err)
-      }
-    }
+    onActiveExpertChange?.(null)
   }
 
   // Phase 216 (CHAT-05 / CHAT-06): active connectors per thread
@@ -390,7 +401,17 @@ export function MessageInput({
     // everything off" became "use everything": the backend's absent-arm offered every
     // enabled connection. Both ends now agree that absent and empty mean the same thing —
     // none — and the wire says which one the person chose.
-    onSend(trimmed, activeConnectorIds)
+    const sent = onSend(trimmed, activeConnectorIds)
+    // 267-REVIEW WR-01: a send the parent reports as NOT sent gets its text back (unless the person
+    // has typed something new meanwhile) and its draft kept, so a refusal never eats the message.
+    if (sent instanceof Promise) {
+      const refusedKey = draftKey
+      void sent.then((result) => {
+        if (result !== false) return
+        composerDraftsByThread.set(refusedKey, trimmed)
+        setValue((current) => (current.trim() ? current : trimmed))
+      })
+    }
     setValue("")
     // Phase 244 (244-05 T2): the pending chips have become SENT chips — the transcript renders
     // them from the thread's persisted workspace files now, so the composer lets them go.
@@ -438,7 +459,9 @@ export function MessageInput({
   // Phase 244 (244-05 T2 / D-244-26) — the ROW exists when EITHER an attachment or a connector
   // does, and not at all when neither does (S-2: no reserved empty space, the shipped behaviour).
   const armedConnectors = connections.filter((c) => activeConnectorIds.includes(c.id))
-  const showChipsRow = pendingAttachments.length > 0 || armedConnectors.length > 0 || activeExpert != null
+  // Phase 268 (D-268-12d): an existing thread always shows its scope chip, so the row widens by it.
+  const showChipsRow =
+    pendingAttachments.length > 0 || armedConnectors.length > 0 || activeExpert != null || scopeSlot != null
 
   return (
     <div className="px-4 pb-3 bg-transparent">
@@ -501,7 +524,7 @@ export function MessageInput({
                 data-testid="active-connector-chips"
                 className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 mb-1 bg-muted/40 rounded-lg border border-border/40"
               >
-                {(armedConnectors.length > 0 || activeExpert != null) && (
+                {(armedConnectors.length > 0 || activeExpert != null || scopeSlot != null) && (
                   <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mr-1">
                     Using:
                   </span>
@@ -512,6 +535,7 @@ export function MessageInput({
                     onDismiss={handleDismissExpert}
                   />
                 )}
+                {scopeSlot}
                 {pendingAttachments.map((f) => (
                   <ChatAttachmentChip
                     key={f.path}
@@ -528,6 +552,7 @@ export function MessageInput({
               </div>
             </div>
           )}
+          {scopeNote}
 
           {/* Text area */}
           <div className="px-4 pt-1 pb-1">
@@ -969,6 +994,13 @@ export function MessageInput({
         onOpenChange={setInviteExpertOpen}
         onSelectExpert={handleSelectExpert}
         currentExpertId={activeExpert?.id}
+        currentExpertName={activeExpert?.name ?? null}
+        threadId={threadId ?? null}
+        threadFolderName={threadFolderName ?? null}
+        threadFolderId={threadFolderId ?? null}
+        hasMessages={hasMessages ?? false}
+        onHandoff={onExpertHandoff}
+        onOpenConnections={onOpenConnections}
       />
     </div>
   )

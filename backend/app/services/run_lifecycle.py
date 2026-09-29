@@ -267,8 +267,14 @@ async def register_run_start(
     spawned_by_worker=None,
     parent_run_id=None,
     status: str = "streaming",
+    org_id=None,
+    expert_id=None,
 ) -> None:
     """Atomic START co-write — insert the ``runs`` row THEN ZADD both mirrors.
+
+    Phase 268 (D-268-05 / D-268-07): ``org_id`` / ``expert_id`` are forwarded to ``insert_run``
+    unchanged — the validated active org and the access-checked Expert ``send_message`` resolved
+    ONCE for this turn. ``None`` defaults keep every other caller byte-identical.
 
     Routes the status write through the shared ``db.runs.insert_run`` (parity with the
     live producer), then adds ``run_id`` to ``runs:active`` and ``runs_by_thread:{tid}``
@@ -292,6 +298,8 @@ async def register_run_start(
         provider=provider,
         spawned_by_worker=spawned_by_worker,
         parent_run_id=parent_run_id,
+        org_id=org_id,
+        expert_id=expert_id,
     )
     _score = time.time()
     # CR-01 (Phase 145 review): the two mirror ZADDs are BEST-EFFORT. The Postgres

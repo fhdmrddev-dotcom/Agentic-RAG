@@ -27,6 +27,26 @@
 - ✅ **v4.1 Ship It & Feel It** — Phases **242-246** (shipped 2026-09-13, git tag `v4.1`). 5 phases, **25 plans**, migrations **177-180**, 3 days. **18/19 requirements delivered · 1 ⛔ unmet BY MEASUREMENT.** A deliberate **CONSOLIDATION** milestone — no new capability axis; every requirement closed something already in a register. The ship claims closed against the **database and the branch** rather than the deploy record; the chat surface stopped getting in the way (follow-scroll driven with a **real wheel** — 0 px drift, closing `BUG-260823-01` after two fixes that had passed on synthetic events; all five `SHELL` criteria driven in a browser); and v4.0's verification debt got **written verdicts** plus a greppable marker so a self-verification can no longer read as a review. ⭐ **Its best work is the requirement it did NOT deliver:** 246 proved by `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff through the index — every index walk returns **ONE row**, every good recall figure is a **~1.1 s sequential scan** — so the 200 default was **refused and reverted to 40**, with `RECALL-01` left open on `SEED-273`. ⭐ 246 is also the **first peer-reviewed phase since `OV-SOLO-01` was re-armed**. ⚠ Migrations **179/180 are not in cloud** and `production` is **287 commits behind**, so v4.1's own output is undeployed ([`audit`](milestones/v4.1-MILESTONE-AUDIT.md)).
 - ✅ **v4.2 The Connected Knowledge You Can Actually Run** — Phases **247-254** (shipped 2026-09-18, git tag `v4.2`). 8 phases (247-251 scoped; **252 / 253 / 254 inserted by audit**), **31 plans**, migration **181**, 6 days. **25/26 requirements satisfied · 1 ⛔ unsatisfied (`DEBT-06`).** Integration **19/19** · flows **3/3**. **26 requirements in 6 categories**, 25 mapped to the five scoped phases and `DEBT-06` held as a **milestone-wide standing gate** that ends the milestone **unmet, by measurement**. ⚠ **The bullet above is CORRECTED, not rewritten: its closing claim — *"migrations 179/180 are not in cloud and `production` is 287 commits behind, so v4.1's own output is undeployed"* — was true when written and is now FALSE.** Measured at this scoping: `production` moved `e65610ac2 → eebc4c42f` (**292 commits**), `production..develop` is **0**, migrations **179 and 180 are applied and verified in cloud** (177/178 measured **already present** — `scripts/pending-cloud-migrations.sh` diffs git refs, not the live database, and over-reported by two), and `get_advisors(security)` returns **zero ERROR findings**. **v4.1 IS deployed.** v4.2 is therefore the SECOND consecutive **consolidation** milestone — no new capability axis, every requirement closes something already in a register, and each was **DRIVEN against the tree on 2026-09-13 rather than read from a `status:` field**, a method that caught three wrong register entries (two stale toward *"still broken"*, one toward *"fine"*). Watch-loop honesty (247) · the credential boundary (248) · the model you actually run (249) · run-honesty residue (250) · register integrity (251) — then **three phases the audit added**: the four blockers five green verifications could not see (252) · the bootstrap artifact that shipped every function wide open (253) · the independent review of 249-253 (254). **v4.2 opened on deployed code for the first time in three milestones, and closed on it.**
 - ✅ **v4.3 What You Can Actually Sell** — Phases **255-264** (shipped 2026-09-23, git tag `v4.3`). 10 phases (255-260 scoped; 261-264 added in-milestone), **39 plans**, migrations **182-192**, 6 days. **31/32 requirements delivered · PACK-05 carried to SEED-304 by decision.** Extension contract, token metering + USD, enforceable tiers, Experts as data.
+- ✅ **v4.4 Experts That Actually Work** — Phases **265-269** (shipped 2026-09-29, git tag `v4.4`). 5 phases, **24 plans**, migrations **194-198**, 7 days. **17/17 requirements satisfied** (audit `tech_debt`, no blockers). A client installs an Expert and gets grounded answers from its own knowledge in their own org — proven by live drives as a real user, never by a mocked test. ⚠ **Nothing deployed:** migrations 194-198 and `464ec8354` are not on production.
+
+---
+
+## v4.4 Experts That Actually Work — SHIPPED 2026-09-29
+
+**5 phases** (265-269), **24 plans**, migrations **194-198**, 7 days, git tag `v4.4`.
+**17 ✅ satisfied of 17 requirements.** Integration **6/6** seams wired. Status `tech_debt` — no blockers.
+Full detail: [`milestones/v4.4-ROADMAP.md`](milestones/v4.4-ROADMAP.md) ·
+requirements: [`milestones/v4.4-REQUIREMENTS.md`](milestones/v4.4-REQUIREMENTS.md) ·
+audit: [`milestones/v4.4-MILESTONE-AUDIT.md`](milestones/v4.4-MILESTONE-AUDIT.md) ·
+state at close: [`milestones/v4.4-STATE-at-close.md`](milestones/v4.4-STATE-at-close.md)
+
+Owed v4.3 verification driven live (265) · per-org Expert install that copies and embeds the corpus in
+the installing org (266; closes `PACK-05`) · an Expert only ADDS scope and states every cost (267) ·
+per-Expert spend + mid-thread folder-scope change (268) · a five-Expert starter library, each with a
+live grounded conversation (269). ⭐ **The closed core held** (no commits to phase_types / emitters /
+programmatic). ⚠ **Verification mode is `self-verified` for 265-269** (Gemini out). ⛔ **Deploy checklist:**
+migrations 194-198 + `464ec8354` (`266-PROD-PARITY.md`, `269-PROD-PARITY.md`); starter library visible to
+enterprise-tier orgs only (D-269-P1, SEED-325). Open follow-ups: SEED-319/322-328.
 
 ---
 
@@ -40,7 +60,7 @@ Full detail: [`milestones/v4.3-ROADMAP.md`](milestones/v4.3-ROADMAP.md) ·
 requirements: [`milestones/v4.3-REQUIREMENTS.md`](milestones/v4.3-REQUIREMENTS.md) ·
 audit: [`milestones/v4.3-MILESTONE-AUDIT.md`](milestones/v4.3-MILESTONE-AUDIT.md) ·
 state at close: [`milestones/v4.3-STATE-at-close.md`](milestones/v4.3-STATE-at-close.md) ·
-phases: `.planning/phases/25{5..9}-*`, `.planning/phases/26{0..4}-*`
+phases: [`milestones/v4.3-phases/`](milestones/v4.3-phases/) (archived 2026-09-23)
 
 The milestone that turned a product that works into one that can be **packaged, priced and
 shipped**: a written extension contract with a guard, every token persisted and priced in dollars,
@@ -63,7 +83,7 @@ requirements: [`milestones/v4.2-REQUIREMENTS.md`](milestones/v4.2-REQUIREMENTS.m
 audit: [`milestones/v4.2-MILESTONE-AUDIT.md`](milestones/v4.2-MILESTONE-AUDIT.md)
 (the superseded 2026-09-16 reading is preserved beside it at
 [`v4.2-MILESTONE-AUDIT-260916.md`](milestones/v4.2-MILESTONE-AUDIT-260916.md)) ·
-phases: `.planning/phases/25{1,2,3,4}-*`, `.planning/phases/24{7,8,9}-*`
+phases: [`milestones/v4.2-phases/`](milestones/v4.2-phases/) (archived 2026-09-23)
 
 The **second consecutive consolidation** milestone, and the one that turned v4.0's capability and
 v4.1's deployment into a surface you can **live on**. Every requirement closed something already in a
@@ -109,15 +129,18 @@ regexes printed `mirrored: 0/0 … OK`, exit 0.
   answering `BUS-249`/`BUS-256`/`BUS-257`, `refused` needs an operator ruling (`REG-03`). Three
   refusal drafts are written and pending. ⛔ **A refusal is not a pass:** the accepted risk is that a
   builder read its own work, six closes running.
+
 - **Four one-line register repairs** (`F-1`..`F-4`): `254`'s own verification frontmatter is
   **unparseable YAML** — *the exact defect `254` reported against `244`, the same week, caught by no
   gate* · two duplicate-id clusters in `.planning/reported-bugs/`, a register **no gate sweeps** ·
   `BUG-260915-01` fixed in code but never flipped to `closed` · `253-VERIFICATION.md` still reading
   `gaps_found` over a gap that is closed.
+
 - **Undriven, not passing:** migration **181 is not in cloud** — `CRED-04` discharges at the next
   promotion, and its code half and SQL half must reach cloud in **one operation** · `MODEL-04`
   end-to-end needs a live self-hosted endpoint · 248's G-4 scenario **S2** (live BYO-OAuth) · the
   `schema-acl-parity` CI job.
+
 - **Two live criticals triaged and unfixed** (`251-REVIEW.md` CR-01/CR-02): the seeds gate's own
   self-test has **no RED arm** for its missing-key check, and the `status:` enum's
   change-all-three rule has **zero executable enforcement**.
@@ -135,7 +158,7 @@ plan inflation inside one, which is the failure mode the governor was written ag
 Full detail: [`milestones/v4.1-ROADMAP.md`](milestones/v4.1-ROADMAP.md) ·
 requirements: [`milestones/v4.1-REQUIREMENTS.md`](milestones/v4.1-REQUIREMENTS.md) ·
 audit: [`milestones/v4.1-MILESTONE-AUDIT.md`](milestones/v4.1-MILESTONE-AUDIT.md) ·
-phases: `.planning/phases/24{2,3,4,5,6}-*`
+phases: [`milestones/v4.1-phases/`](milestones/v4.1-phases/)
 
 A deliberate **consolidation** milestone — no new capability axis; every requirement closed something
 already sitting in a register. **The ship claims stopped being claims**: all four `SHIP` items closed

@@ -1,0 +1,183 @@
+{
+ "provider": "openrouter",
+ "model": "deepseek/deepseek-v4-pro",
+ "create": {
+  "status": 201,
+  "id": "6f6326b3-c2bf-4599-9f61-9584eb7f96ca",
+  "org_id": null
+ },
+ "t1": {
+  "sent_at": "2026-09-28 20:34:27.921993+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "1e5fcf84-5f15-4ad9-9520-ebd078b3d1e9",
+   "run_id": "5e193607-374b-4701-b8e6-34a08ac1cc80",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter"
+  },
+  "run": {
+   "run_id": "5e193607-374b-4701-b8e6-34a08ac1cc80",
+   "status": "completed",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 45293,
+   "output_tokens": 618,
+   "started_at": "2026-09-28 20:34:32.503344+00:00",
+   "completed_at": "2026-09-28 20:35:07.048810+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "06ac7494-ff63-4870-90b2-5b1f1431e330",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 20:34:42.499917+00:00",
+    "run_id": "5e193607-374b-4701-b8e6-34a08ac1cc80",
+    "thread_id": "6f6326b3-c2bf-4599-9f61-9584eb7f96ca",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 0
+   },
+   {
+    "id": "d3a7193b-552b-47c3-b762-3f33bd6efb11",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 20:34:48.734687+00:00",
+    "run_id": "5e193607-374b-4701-b8e6-34a08ac1cc80",
+    "thread_id": "6f6326b3-c2bf-4599-9f61-9584eb7f96ca",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 2
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "5e193607-374b-4701-b8e6-34a08ac1cc80",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   },
+   {
+    "run_id": "5e193607-374b-4701-b8e6-34a08ac1cc80",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "1417fc12-a581-4068-adcc-ddbc1e3a848a",
+    "folder_id": "1a2d0273-b14d-487f-86ee-4d146e89d082"
+   }
+  ],
+  "tools": [
+   "search_documents",
+   "glob",
+   "search_documents",
+   "workspace_write"
+  ]
+ },
+ "patch": {
+  "status": 200,
+  "at": "2026-09-28 20:35:09.033766+00:00",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "event": [
+  {
+   "id": "138e07ce-de80-47bd-9a75-69300a8d3e3d",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+   "created_at": "2026-09-28 20:35:12.371517+00:00"
+  }
+ ],
+ "thread_org": {
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "t2": {
+  "sent_at": "2026-09-28 20:35:12.439053+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "3cdfd4ca-2cd0-4993-9c4b-61324b46123d",
+   "run_id": "2c241762-f2aa-46c0-aa66-789012eb1e99",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter"
+  },
+  "run": {
+   "run_id": "2c241762-f2aa-46c0-aa66-789012eb1e99",
+   "status": "completed",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 37226,
+   "output_tokens": 376,
+   "started_at": "2026-09-28 20:35:14.762128+00:00",
+   "completed_at": "2026-09-28 20:35:36.328510+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "0ccf1777-1d85-4fab-94d8-1e55e8e9a530",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 20:35:22.068008+00:00",
+    "run_id": "2c241762-f2aa-46c0-aa66-789012eb1e99",
+    "thread_id": "6f6326b3-c2bf-4599-9f61-9584eb7f96ca",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 1
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "2c241762-f2aa-46c0-aa66-789012eb1e99",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   }
+  ],
+  "tools": [
+   "ls",
+   "search_documents",
+   "workspace_write"
+  ]
+ },
+ "v1": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 2,
+  "folders": [
+   "1a2d0273-b14d-487f-86ee-4d146e89d082",
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "v2": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 1,
+  "folders": [
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "answers": {
+  "t2": {
+   "cites_old": false,
+   "text": "Done. Within the `/Client ACME/Q3 Contracts` folder, there's one document \u2014 **ACME_Q3_SOW_Contract.md** \u2014 and its payment terms are **NET 15 days from invoice date, with a 2% early-payment discount if paid within 5 days** [1]. That one-liner is now saved to `terms.md`."
+  }
+ }
+}

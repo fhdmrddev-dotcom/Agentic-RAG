@@ -81,12 +81,32 @@ async def _resolve_operator_org_id(
     )
 
 
+# ── Phase 268 (D-268-08 / T-268-10): ONE Expert filter, ONE validation, BOTH routes. ──────
+# `<uuid>` | `none` | `unrecorded` | absent. Anything else is a 422 BEFORE the rates layer is
+# called — and even a valid value is only ever bound as $N there, never interpolated.
+_EXPERT_FILTER_PATTERN = (
+    r"^(none|unrecorded|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+)
+_EXPERT_FILTER_DESCRIPTION = (
+    "Narrow to one attribution line: an Expert id, 'none' (No Expert) or 'unrecorded' "
+    "(runs from before Phase 268). Absent = every run."
+)
+
+
+def _normalize_expert(value: Optional[str]) -> Optional[str]:
+    # `expert_id::text` renders lowercase, so an uppercase uuid would silently match nothing.
+    return value.lower() if value is not None else None
+
+
 @router.get("/summary")
 async def get_spend_summary(
     request: Request,
     org_id: Optional[UUID] = Query(None, description="Organization ID (defaults to active org)"),
     start_time: Optional[datetime] = Query(None, description="Start timestamp filter"),
     end_time: Optional[datetime] = Query(None, description="End timestamp filter"),
+    expert: Optional[str] = Query(
+        None, pattern=_EXPERT_FILTER_PATTERN, description=_EXPERT_FILTER_DESCRIPTION
+    ),
 ):
     """Retrieve aggregated spend, volume, and blind spots for the operator spend dashboard.
 
@@ -100,6 +120,7 @@ async def get_spend_summary(
         org_id=target_org_id,
         start_time=start_time,
         end_time=end_time,
+        expert=_normalize_expert(expert),
     )
 
     return {
@@ -117,6 +138,19 @@ async def get_spend_summary(
         "model_breakdown": summary.model_breakdown,
         "has_unrated_runs": summary.unrated_runs_count > 0,
         "has_incomplete_coverage": summary.incomplete_coverage_count > 0,
+        # Phase 268 (METER-08). UNFILTERED whatever `expert` is (D-268-10): the Spend by Expert
+        # table is the navigator, and the recon footer compares its lines against the window.
+        "expert_breakdown": summary.expert_breakdown,
+        "window_total_usd": (
+            str(summary.window_total_usd) if summary.window_total_usd is not None else None
+        ),
+        "window_run_count": summary.window_run_count,
+        # D-268-25: sub-agents with no rate under a rated root — folded into the unrated
+        # disclosure rather than under-pricing that root in silence.
+        "unpriced_subagents": summary.unpriced_subagents,
+        # D-268-28 (268-REVIEW WR-05): unrated harness shells whose priced sub-agents ARE in the
+        # total — disclosed on the Unrated tile and the KPI footnote, never repriced.
+        "partly_priced_harness_runs": summary.partly_priced_harness_runs,
     }
 
 
@@ -128,6 +162,9 @@ async def get_spend_runs_list(
     offset: int = Query(0, ge=0),
     filter_status: Optional[str] = Query(None, description="'rated', 'unrated', 'incomplete_coverage'"),
     time_range: Optional[str] = Query(None, description="'today', '7d', '30d', 'all'"),
+    expert: Optional[str] = Query(
+        None, pattern=_EXPERT_FILTER_PATTERN, description=_EXPERT_FILTER_DESCRIPTION
+    ),
 ):
     """Retrieve paginated attributable runs with computed dollar cost and token coverage."""
     pool = await deps.get_pg_pool()
@@ -140,6 +177,7 @@ async def get_spend_runs_list(
         offset=offset,
         filter_status=filter_status,
         time_range=time_range,
+        expert=_normalize_expert(expert),
     )
 
     return {

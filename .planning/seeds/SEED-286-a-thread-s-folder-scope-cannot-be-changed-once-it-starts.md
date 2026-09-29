@@ -3,9 +3,18 @@ seed_id: SEED-286
 title: A chat thread's KB folder scope can only be set on the empty state — once the thread starts, there is no control to change it
 created: 2026-09-16
 surface: Agentic-RAG
-status: planted
+status: answered
 partial: false
 status_note: |
+  ── 2026-09-28 · Phase 268 CLOSE (268-04), ANSWERED by 268-03 (CHAT-08, D-268-12..12d). A live thread's
+  folder scope now changes from the composer's scope chip; the picker states the server's `ScopeEffect`
+  before Apply; ONE `PATCH /threads/{id} {folder_id}` authorizes the folder within the thread's org and
+  writes one `scope_changed` transcript row (never sent to a model). Live (268-UAT-LOG): one event row per
+  PATCH on 8/8 board threads, present in two snapshot reads; the next SEARCHING run retrieves only the new
+  subtree on 8/8 providers; another org's folder → 404. ⚠ NOT a clean close on the lived experience: a
+  same-prompt follow-up after the change is answered FROM HISTORY by 6/8 providers, citing the dropped
+  folder's document (F-1) — routed to SEED-319, not reopened here. G-4 Chrome sign-off owed at the 268-04
+  checkpoint.
   ── 2026-09-22 · Phase 262 (plan 05), LEFT PLANTED. Fired on `ChatArea.tsx` + `MessageInput.tsx`,
   both of which 262-05 edits — but the edit is ONE optional pass-through callback opening the Expert
   catalog, and it changes nothing about scope. ⛔ ADJACENT AND DELIBERATELY NOT FOLDED: an Expert
@@ -25,7 +34,7 @@ relates_to:
   - "BUS-040 (2026-08-31) — where this was found and recorded as 'found and did not fix'"
   - "SEED-112 — the WORKFLOW-run KB folder-scope surface. ⛔ A DIFFERENT surface; it does not hold this finding"
   - "SEED-247 — thread-scoped attachments vs library documents. Adjacent, not the same question"
-folded_into: null
+folded_into: "268 (CHAT-08, D-268-12..12d, discuss 2026-09-28)"
 renumbered_from: null
 renumbered_because: null
 ---

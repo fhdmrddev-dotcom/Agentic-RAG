@@ -92,8 +92,14 @@ if not os.environ.get("LANGSMITH_ENDPOINT") and os.environ.get("LANGCHAIN_ENDPOI
 # Allow override for the (likely) day when upstream renames or repackages.
 mcp_cmd_name = os.environ.get("LANGSMITH_MCP_CMD", "langsmith-mcp-server")
 
+# Phase 265: prefer an ISOLATED venv. Installing langsmith-mcp-server into backend/venv would
+# move the backend's own pins (measured dry-run: uvicorn 0.32.1 -> 0.53.0, langsmith 0.2.3 ->
+# 0.14.0, and it drags in langchain-core). Create it with:
+#   python -m venv .tools/langsmith-mcp-venv
+#   .tools/langsmith-mcp-venv/Scripts/pip install langsmith-mcp-server
+isolated_exe = ROOT / ".tools" / "langsmith-mcp-venv" / "Scripts" / f"{mcp_cmd_name}.exe"
 scripts_dir = ROOT / "backend" / "venv" / "Scripts"  # Windows venv layout
-mcp_exe = scripts_dir / f"{mcp_cmd_name}.exe"
+mcp_exe = isolated_exe if isolated_exe.is_file() else scripts_dir / f"{mcp_cmd_name}.exe"
 if not mcp_exe.is_file():
     # POSIX fallback (linux/macOS venvs don't have .exe; CI / cross-platform safe)
     posix_exe = ROOT / "backend" / "venv" / "bin" / mcp_cmd_name

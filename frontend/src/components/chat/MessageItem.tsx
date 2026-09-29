@@ -28,6 +28,11 @@ import {
   attachmentDisplayName,
 } from "./ChatAttachmentChip"
 import { COPY } from "./composerCopy"
+// Phase 267 plan 04 (PACK-23 / PACK-24): the transcript event + handoff cards, reached by ONE
+// early return below. The kind predicates live in the vocabulary module, never here.
+import { ExpertEventCard } from "./ExpertEventCard"
+import { HandoffCard } from "./HandoffCard"
+import { transcriptEventOf, handoffMarkerOf } from "./expertEventCopy"
 // Phase 092-07 (Facet C): after a Harness Continue the backend mints a FRESH
 // producer runs row + returns its id; re-subscribe its live stream (per-thread
 // keyed, additive — mirrors panelOpenSignal).
@@ -318,6 +323,24 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
     (isUser ? prevUserAt : prevPrevUserAt) || null,
     threadAttachments,
   )
+
+  // ── Phase 267 plan 04 (PACK-23 / PACK-24 · D-267-09 / D-267-15 / D-267-23) — THE ONE EARLY
+  // RETURN, placed after the last hook so the Rules of Hooks hold on every path.
+  // ⛔ An allowlisted system row is a transcript EVENT; a user row carrying the handoff marker is
+  // the new thread's handoff card; ANY OTHER system row renders nothing — never an assistant
+  // bubble (T-267-41). The kind decisions live in `expertEventCopy.ts`, not here.
+  const transcriptEvent = transcriptEventOf(message)
+  const handoffMarker = handoffMarkerOf(message)
+  if (transcriptEvent || handoffMarker || message.role === "system") {
+    if (transcriptEvent) {
+      return (
+        <div className="py-2">
+          <ExpertEventCard event={transcriptEvent} />
+        </div>
+      )
+    }
+    return handoffMarker ? <HandoffCard marker={handoffMarker} /> : null
+  }
 
   if (isUser) {
     // ⚠ THE OUTER ROW IS BYTE-UNCHANGED, AND THAT IS DELIBERATE. The first draft replaced

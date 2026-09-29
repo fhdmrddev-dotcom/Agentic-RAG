@@ -1,0 +1,57 @@
+slug: security-compliance
+org_id: 9042e46f-745d-40d6-83eb-c6984d582ce1
+model: deepseek-v4-flash provider: deepseek embedding_model: text-embedding-3-small (embedding_provider=openai, dims=1536, source=app_settings.global)
+figure: 36 hours
+figure: 14 of 16
+== cited — 2026-09-29T14:43:19.174898+00:00  install folder (security-compliance) = 16db0107-a395-4381-8507-a9b65691afbb
+question (fixed in the Drive table before driving): Within how many hours must ACME notify affected customers after a confirmed security incident, and how many controls passed the Q3 2026 control test?
+POST /threads headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (Authorization: Bearer <redacted>) body={"title": "269-03 security-compliance"} -> HTTP 201 body={"id":"bbe87936-d9b8-40ca-a5fa-41d1a9396be7","user_id":"b93a9c96-2de1-4e13-958c-10e5d6775fd0","title":"269-03 security-compliance","folder_id":null,"active_expert_id":null,"created_at":"2026-09-29T14:43:19.509991Z","updated_at":"2026-09-29T14:43:19.509991Z"}
+PATCH /threads/bbe87936-d9b8-40ca-a5fa-41d1a9396be7 headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (Authorization: Bearer <redacted>) body={"active_expert_id": "00000000-0000-0000-0000-000000002693"} -> HTTP 200 body={"id":"bbe87936-d9b8-40ca-a5fa-41d1a9396be7","user_id":"b93a9c96-2de1-4e13-958c-10e5d6775fd0","title":"269-03 security-compliance","folder_id":null,"active_expert_id":"00000000-0000-0000-0000-000000002693","created_at":"2026-09-29T14:43:19.509991Z","updated_at":"2026-09-29T14:43:19.572251Z"}
+thread row: {"id": "bbe87936-d9b8-40ca-a5fa-41d1a9396be7", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "active_expert_id": "00000000-0000-0000-0000-000000002693"}
+POST /threads/bbe87936-d9b8-40ca-a5fa-41d1a9396be7/messages headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (Authorization: Bearer <redacted>) body={"content": "Within how many hours must ACME notify affected customers after a confirmed security incident, and how many controls passed the Q3 2026 control test?", "model": "deepseek-v4-flash", "provider": "deepseek"} -> HTTP 201 body={"message_id":"b82f6f93-6c79-402a-b929-a1a608ab08a9","run_id":"ad0cdb41-78d0-4ebb-b83c-b3018b483917","model":"deepseek-v4-flash","provider":"deepseek"}
+SQL: SELECT run_id, status, model, provider, org_id, expert_id, expert_attributed, error, started_at, completed_at FROM runs WHERE run_id = 'ad0cdb41-78d0-4ebb-b83c-b3018b483917'
+run row: {"run_id": "ad0cdb41-78d0-4ebb-b83c-b3018b483917", "status": "completed", "model": "deepseek-v4-flash", "provider": "deepseek", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "expert_id": "00000000-0000-0000-0000-000000002693", "expert_attributed": true, "error": null, "started_at": "2026-09-29 14:43:19.652221+00:00", "completed_at": "2026-09-29 14:43:28.862337+00:00"}
+SQL: SELECT id, role, content, tool_calls, org_id, created_at FROM messages WHERE thread_id='bbe87936-d9b8-40ca-a5fa-41d1a9396be7' AND role='assistant' AND created_at >= '2026-09-29T14:43:19.627745+00:00' ORDER BY created_at -> 1 row(s)
+assistant text (full):
+Here are the answers to both questions:
+
+**1. Customer notification deadline — 36 hours**
+
+Per the Notification Obligations table, ACME must "[n]otify affected customers after a confirmed incident" **within 36 hours** [1]. Note the clock starts when the incident is *confirmed by the incident commander*, not from first detection — and if a law or contract sets a shorter deadline, the shorter one applies [4].
+
+**2. Controls that passed Q3 2026 — 14 of 16**
+
+The Q3 2026 control test (conducted by Internal Audit, Testing period 2026-07-01 to 2026-09-30) covered 16 controls, of which **14 passed** and 2 failed [6]. The two failures were:
+- **AC-02** — Quarterly access review of privileged accounts (remediation owner: Director of IT Operations, due 2026-11-14) [6]
+- **VM-01** — Critical vulnerabilities patched within 14 days (remediation owner: Head of Infrastructure Security, due 2026-10-31) [8]
+
+All 16 controls will be retested in Q4 2026, with an extra mid-quarter check for the two failed controls [7].
+
+**Sources:**
+- **acme_incident_response_policy_2026.md** — Notification Obligations
+- **acme_control_test_results_q3_2026.md** — Summary and Per-Control Results
+assistant message 5ac6df57-38ee-45df-bc56-d6fa7fc99fc1 org_id=9042e46f-745d-40d6-83eb-c6984d582ce1 tool_calls (raw, trimmed): [{"args": {"query": "ACME notify affected customers hours after confirmed security incident"}, "name": "search_documents", "result": "[{\"content\": \"1 hour, 24x7 |\\n| SEV-3 Medium | Contained malware, policy violation, or a single affected workstation | 1 business day |\\n| SEV-4 Low | Suspicious activity with no confirmed impact | 3 business days |\\n\\n## Notification Obligations\\n\\n| Obligation | Deadline |\\n| :--- | :--- |\\n| Escalate a SEV-1 or SEV-2 to the Chief Information Security Officer | within 30 minutes of classification |\\n| Notify the executive leadership team of a SEV-1 | within 2 hours of classification |\\n| Notify affected customers after a confirmed incident | within 36 hours |\\n| Notify the lead data protection authority where personal data is affected | within 72 hours of awareness |\\n| Publish an internal post-incident review | within 10 business days of closure |\\n\\nThe customer notification deadline runs from the moment the incident is confirmed by the incident commander, not from first detection. Where a law or contract sets a shorter deadline, the shorter deadline applies.\", \"document_id\": \"0bf8a8e0-1e22-4333-b89f-306997b8a465\", \"filename\": \"acme_incident_response_policy_2026.md\", \"chunk_index\": 1, \"similarity\": 0.6515865741552539, \"version_number\": 1, \"folder_id\": \"16db0107-a395-4381-8507-a9b65691afbb\", \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026\", \"title\": \"ACME Corporation - Security Incident Response Policy 2026\", \"author\": \"ACME Corporation\", \"topics\": [\"Security Incident Response\", \"Information Security\", \"Corporate Policy\", \"Incident Management\", \"Data Protection\"], \"summary\": \"This policy outlines ACME Corporation's approach to handling information security incidents, focusing on detection, classification, containment, and recovery. It includes severity levels, notification obligations, recovery objectives, and roles in incident response. The policy applies to all employees and partners with access to ACME systems and emphasizes timely communication, evidence retention, and regular testing of recovery plans.\", \"language\": \"", "status": "done", "tool_call_id": "call_00_dAoLjJruB3idRFVnOPpX4775"}, {"args": {"query": "Q3 2026 control test how many controls passed"}, "name": "search_documents", "result": "[{\"content\": \"> SAMPLE DATA: ACME Corporation is a fictional company and these test results are invented. Fo... <trimmed 2048 chars>
+tool names in tool_calls (key read: first of name/tool/tool_name/function.name per entry): ['search_documents', 'search_documents']
+cross-check audit_log action types in turn window: [{"action_type": "search.query", "n": 2}]
+web_search_calls: 0
+SQL: SELECT a.created_at, a.metadata->>'query_text' AS query_text, d.id AS doc_id, d.org_id AS doc_org, d.folder_id AS doc_folder, d.filename FROM audit_log a CROSS JOIN LATERAL jsonb_array_elements_text(a.metadata->'document_ids') x(doc) JOIN documents d ON d.id = x.doc::uuid WHERE a.action_type='search.query' AND a.user_id = 'b93a9c96-2de1-4e13-958c-10e5d6775fd0' AND a.created_at > '2026-09-29T14:43:19.582426+00:00' AND a.created_at <= '2026-09-29T14:43:33.718795+00:00' ORDER BY a.created_at
+{"created_at": "2026-09-29 14:43:22.732636+00:00", "query_text": "ACME notify affected customers hours after confirmed security incident", "doc_id": "0bf8a8e0-1e22-4333-b89f-306997b8a465", "doc_org": "9042e46f-745d-40d6-83eb-c6984d582ce1", "doc_folder": "16db0107-a395-4381-8507-a9b65691afbb", "filename": "acme_incident_response_policy_2026.md"}
+{"created_at": "2026-09-29 14:43:22.732636+00:00", "query_text": "ACME notify affected customers hours after confirmed security incident", "doc_id": "4e4825d9-d18e-43a4-8479-70f2f486ce05", "doc_org": "9042e46f-745d-40d6-83eb-c6984d582ce1", "doc_folder": "16db0107-a395-4381-8507-a9b65691afbb", "filename": "acme_control_test_results_q3_2026.md"}
+{"created_at": "2026-09-29 14:43:23.726136+00:00", "query_text": "Q3 2026 control test how many controls passed", "doc_id": "4e4825d9-d18e-43a4-8479-70f2f486ce05", "doc_org": "9042e46f-745d-40d6-83eb-c6984d582ce1", "doc_folder": "16db0107-a395-4381-8507-a9b65691afbb", "filename": "acme_control_test_results_q3_2026.md"}
+search.query rows in window (incl. zero-id rows):
+{"created_at": "2026-09-29 14:43:22.732636+00:00", "query_text": "ACME notify affected customers hours after confirmed security incident", "n_ids": 2}
+{"created_at": "2026-09-29 14:43:23.726136+00:00", "query_text": "Q3 2026 control test how many controls passed", "n_ids": 1}
+re.search(r'36\s*hours') -> '36 hours'
+re.search(r'14\s*of\s*16') -> '14 of 16'
+distinct joined doc orgs = ['9042e46f-745d-40d6-83eb-c6984d582ce1']; distinct joined folders = ['16db0107-a395-4381-8507-a9b65691afbb'] (install folder 16db0107-a395-4381-8507-a9b65691afbb)
+SQL: SELECT c.document_id, c.org_id, d.folder_id, c.chunk_index, c.content FROM document_chunks c JOIN documents d ON d.id=c.document_id WHERE d.folder_id = '16db0107-a395-4381-8507-a9b65691afbb' AND d.org_id = '9042e46f-745d-40d6-83eb-c6984d582ce1' AND strpos(c.content, '36 hours') > 0 ORDER BY c.chunk_index
+document_id=0bf8a8e0-1e22-4333-b89f-306997b8a465 org_id=9042e46f-745d-40d6-83eb-c6984d582ce1 folder_id=16db0107-a395-4381-8507-a9b65691afbb chunk_index=1 matching lines:
+    | Notify affected customers after a confirmed incident | within 36 hours |
+SQL: SELECT c.document_id, c.org_id, d.folder_id, c.chunk_index, c.content FROM document_chunks c JOIN documents d ON d.id=c.document_id WHERE d.folder_id = '16db0107-a395-4381-8507-a9b65691afbb' AND d.org_id = '9042e46f-745d-40d6-83eb-c6984d582ce1' AND strpos(c.content, '14 of 16') > 0 ORDER BY c.chunk_index
+document_id=4e4825d9-d18e-43a4-8479-70f2f486ce05 org_id=9042e46f-745d-40d6-83eb-c6984d582ce1 folder_id=16db0107-a395-4381-8507-a9b65691afbb chunk_index=0 matching lines:
+    | Controls passed | 14 of 16 |
+-- SUPPLEMENTARY SCAN 2026-09-29T14:46:07.666956+00:00: every tool result of assistant message 5ac6df57-38ee-45df-bc56-d6fa7fc99fc1 (not only search.query) checked for documents of the test org
+   OUTSIDE this Expert's install folder 16db0107-a395-4381-8507-a9b65691afbb (match on document id or filename; read-only, the turn was NOT re-driven)
+   tools called: ['search_documents', 'search_documents']
+   out_of_folder_documents_retrieved_by_any_tool: 0
+VERDICT: PASS

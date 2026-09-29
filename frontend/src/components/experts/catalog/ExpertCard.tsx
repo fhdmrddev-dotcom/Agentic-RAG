@@ -25,13 +25,52 @@
  * in plan 05; this card's declared props carry no prompt-bearing callback. A tile wired to
  * anything other than running its own prompt would be a control that lies about itself, so the
  * tiles carry no button affordance and the two footer controls own every interaction.
+ *
+ * ⚠ PHASE 266 (D-266-01 / D-266-03): the SECOND control is chosen by the org's install state —
+ * Start Chat (ready, or no install at all), Install / Retry install (a manager), or a short status
+ * pill with the full reason as its title (installing, or a non-manager). Still ONE variant, still
+ * at most two controls, and never a dead one. An install state is a fact about THIS org's
+ * copy of the knowledge, not a tier badge; the decision is `installView`'s, not this card's.
+ *
+ * ⚠ PHASE 267 (PACK-22 · D-267-06 / D-267-08): `installView`'s `connect` arm — the install is ready
+ * (or absent) but a required connection is missing. The scope envelope is REPLACED by the Brings /
+ * Missing ledger, the requirement is a visible line at rest, and the second control is Connect
+ * (a caller the server says may connect, AND a Connections door wired) or the member's pill. Start
+ * Chat is not rendered: a chat started now would run silently without that connection. This card
+ * reads no overlay field itself — `installView` / `connectionLedgerColumns` do.
+ *
+ * ⚠ SEED-309 R265-262-04 (D-267-24): while a start is in flight (`startBusy`, owned by the page)
+ * the Start Chat button reads Starting…, is disabled and `aria-busy` — the ONLY disabled state on
+ * this card, and it is transient: it re-enables when the start settles.
  */
 
 import type { ReactNode } from "react"
-import { ArrowUpRight, FolderClosed, Plug, Sparkles, Wrench } from "lucide-react"
+import {
+  ArrowUpRight,
+  Download,
+  FolderClosed,
+  Loader2,
+  Plug,
+  RotateCcw,
+  Sparkles,
+  Wrench,
+} from "lucide-react"
 import { ExpertIcon } from "@/components/experts/expertIcon"
+import { ScopeLedger } from "@/components/experts/ScopeLedger"
 import type { ExpertBundle } from "@/types"
 import { cn } from "@/lib/utils"
+import {
+  CONNECTION_COPY,
+  INSTALL_COPY,
+  START_COPY,
+  connectionLedgerColumns,
+  installCardLine,
+  installView,
+} from "./expertCatalog"
+
+/** The shipped primary button class — the Connect control copies it so the footer reads as one set. */
+const PRIMARY_BUTTON =
+  "inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
 
 export interface ExpertCardProps {
   expert: ExpertBundle
@@ -39,6 +78,28 @@ export interface ExpertCardProps {
   onInspect: (expert: ExpertBundle) => void
   /** Starts a scoped conversation with this Expert (plan 05). */
   onStartChat: (expert: ExpertBundle) => void
+  /** Phase 266: install this Expert's corpus into the active org. Optional — absent, an
+   *  installable Expert shows the needs-an-admin pill instead of a control. */
+  onInstall?: (expert: ExpertBundle) => void
+  /** An install request for THIS Expert is in flight. */
+  installBusy?: boolean
+  /** Phase 267: the Connections page door. Absent, a caller who may connect sees the member's
+   *  words instead — a Connect button with no door would do nothing. */
+  onOpenConnections?: () => void
+  /** Phase 267 (R265-262-04): a start for THIS Expert is in flight. */
+  startBusy?: boolean
+}
+
+/** Phase 266 — the footer's status pill, in the ScopePill idiom, with the full reason as title. */
+function StatusPill({ label, reason }: { label: string; reason: string }) {
+  return (
+    <span
+      title={reason}
+      className="inline-flex items-center rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground"
+    >
+      {label}
+    </span>
+  )
 }
 
 /** Element 3 — one muted pill, used for every envelope entry so no resource type outranks another. */
@@ -51,7 +112,18 @@ function ScopePill({ icon, label }: { icon: ReactNode; label: string }) {
   )
 }
 
-export function ExpertCard({ expert, onInspect, onStartChat }: ExpertCardProps) {
+export function ExpertCard({
+  expert,
+  onInspect,
+  onStartChat,
+  onInstall,
+  installBusy = false,
+  onOpenConnections,
+  startBusy = false,
+}: ExpertCardProps) {
+  const view = installView(expert)
+  const gate = view.kind === "connect" ? view.gate : null
+  const missingNames = gate ? gate.missing.map((m) => m.name) : []
   const isRestricted = expert.scope_mode === "restricted"
   const folderCount = expert.knowledge_folder_ids?.length ?? 0
   const skills = expert.member_skills ?? []
@@ -68,7 +140,7 @@ export function ExpertCard({ expert, onInspect, onStartChat }: ExpertCardProps) 
       <div className="space-y-3">
         {/* ── 1 · identity gem, name, meta line, scope-mode badge ── */}
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/20 text-violet-200 ring-1 ring-violet-500/30">
+          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/20 text-violet-700 dark:text-violet-200 ring-1 ring-violet-500/30">
             <ExpertIcon icon={expert.icon} className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -80,8 +152,8 @@ export function ExpertCard({ expert, onInspect, onStartChat }: ExpertCardProps) 
                 className={cn(
                   "rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
                   isRestricted
-                    ? "border-rose-500/20 bg-rose-500/10 text-rose-300"
-                    : "border-amber-500/20 bg-amber-500/10 text-amber-300",
+                    ? "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                    : "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
                 )}
               >
                 {isRestricted ? "Restricted" : "Biased"}
@@ -96,29 +168,43 @@ export function ExpertCard({ expert, onInspect, onStartChat }: ExpertCardProps) 
           </div>
         </div>
 
-        {/* ── 3 · scope envelope. Folders are a COUNT here; the NAMES are the modal's job. ── */}
+        {/* ── 3 · scope envelope. Folders are a COUNT here; the NAMES are the modal's job.
+              267: a missing connection REPLACES it with the Brings / Missing ledger + the
+              requirement line — one statement, from one payload, visible at rest. ── */}
+        {gate ? (
+          <div>
+            <ScopeLedger columns={connectionLedgerColumns(expert, "card")} />
+            <p
+              data-testid="connection-gate-line"
+              className="mt-2 text-xs leading-relaxed text-rose-700 dark:text-rose-300"
+            >
+              {gate.line}
+            </p>
+          </div>
+        ) : (
         <div className="flex flex-wrap gap-1.5">
           {folderCount > 0 && (
             <ScopePill
-              icon={<FolderClosed className="h-2.5 w-2.5 text-violet-400" />}
+              icon={<FolderClosed className="h-2.5 w-2.5 text-violet-600 dark:text-violet-400" />}
               label={`${folderCount} folder${folderCount === 1 ? "" : "s"}`}
             />
           )}
           {skills.map((s) => (
             <ScopePill
               key={`skill-${s}`}
-              icon={<Wrench className="h-2.5 w-2.5 text-violet-400" />}
+              icon={<Wrench className="h-2.5 w-2.5 text-violet-600 dark:text-violet-400" />}
               label={s}
             />
           ))}
           {connections.map((c) => (
             <ScopePill
               key={`conn-${c}`}
-              icon={<Plug className="h-2.5 w-2.5 text-violet-400" />}
+              icon={<Plug className="h-2.5 w-2.5 text-violet-600 dark:text-violet-400" />}
               label={c}
             />
           ))}
         </div>
+        )}
 
         {/* ── 4 · the Expert's own prompt tiles, or nothing ── */}
         {tiles.length > 0 && (
@@ -145,14 +231,64 @@ export function ExpertCard({ expert, onInspect, onStartChat }: ExpertCardProps) 
         >
           Details
         </button>
-        <button
-          type="button"
-          onClick={() => onStartChat(expert)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          Start Chat
-        </button>
+        {view.kind === "legacy" || view.kind === "chat" ? (
+          <button
+            type="button"
+            disabled={startBusy}
+            aria-busy={startBusy || undefined}
+            onClick={() => {
+              if (!startBusy) onStartChat(expert)
+            }}
+            className={cn(PRIMARY_BUTTON, "disabled:cursor-wait disabled:opacity-80")}
+          >
+            {startBusy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            {startBusy ? START_COPY.busy : "Start Chat"}
+          </button>
+        ) : view.kind === "connect" ? (
+          gate?.action && onOpenConnections ? (
+            <button
+              type="button"
+              data-testid="connection-gate-connect"
+              onClick={() => onOpenConnections()}
+              className={PRIMARY_BUTTON}
+            >
+              <Plug className="h-3.5 w-3.5" />
+              {gate.action.label}
+            </button>
+          ) : (
+            // ⚠ The pill's title is hover-only; the requirement line above carries the reason at
+            // rest, so the title is never the only copy (UI-SPEC §5.4).
+            <StatusPill
+              label={CONNECTION_COPY.cardMemberPill(missingNames)}
+              reason={CONNECTION_COPY.memberAsk(missingNames)}
+            />
+          )
+        ) : view.kind === "install" || view.kind === "retry" ? (
+          installBusy ? (
+            <StatusPill label={INSTALL_COPY.starting} reason={INSTALL_COPY.starting} />
+          ) : onInstall ? (
+            <button
+              type="button"
+              onClick={() => onInstall(expert)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            >
+              {view.kind === "retry" ? (
+                <RotateCcw className="h-3.5 w-3.5" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              {view.action}
+            </button>
+          ) : (
+            <StatusPill label={INSTALL_COPY.cardNeedsAdmin} reason={INSTALL_COPY.needsAdmin} />
+          )
+        ) : (
+          <StatusPill label={installCardLine(expert) ?? view.line} reason={view.line} />
+        )}
       </div>
     </div>
   )

@@ -1,146 +1,40 @@
 {
   "version": "1.0",
-  "timestamp": "2026-09-14T19:30:00.000Z",
-  "phase": "247",
-  "phase_name": "Sources & Watches — the surface you now live on",
-  "phase_dir": ".planning/phases/247-sources-and-watches",
-  "plan": 4,
-  "task": 4,
-  "total_tasks": 4,
+  "timestamp": "2026-09-24",
+  "phase": "265",
+  "phase_name": "owed-v4-3-verification",
+  "phase_dir": ".planning/phases/265-owed-v4-3-verification",
+  "plan": 5,
+  "task": 2,
+  "total_tasks": 3,
   "status": "paused",
   "completed_tasks": [
-    {
-      "id": 1,
-      "name": "247-01 Drive & Graph path resolution, WR-04, WR-07 fence",
-      "status": "done",
-      "commit": "e5ded885a"
-    },
-    {
-      "id": 2,
-      "name": "247-02 missing_since lifecycle + is_enabled health verdict",
-      "status": "done",
-      "commit": "35bbe6c7c"
-    },
-    {
-      "id": 3,
-      "name": "247-03 WatchRowCard extraction, Variant A badges, F-1 cross-tenant fix",
-      "status": "done",
-      "commit": "ef6458c9c"
-    },
-    {
-      "id": 4,
-      "name": "247-04 disposition, ledger sync, verification",
-      "status": "done",
-      "commit": "50feee403"
-    },
-    {
-      "id": 5,
-      "name": "reviewer findings V-1..V-5",
-      "status": "done",
-      "commit": "1f37737ae"
-    },
-    {
-      "id": 6,
-      "name": "SEED-282 fence retired under D-247-01 (post-retraction)",
-      "status": "done",
-      "commit": "3d5f62dc6"
-    },
-    {
-      "id": 9,
-      "name": "Claude read + DROVE Gemini's 240 review-response-range audit — verdict STANDS, 3 citation defects raised on BUS-226",
-      "status": "done",
-      "commit": "pending"
-    }
+    {"id": "265-01", "name": "five fresh-context reviews (48 findings)", "status": "done", "commit": "89874debe"},
+    {"id": "265-02", "name": "257 rows / 258 refusals / D-09 / 256 pre-stop", "status": "done", "commit": "a935274cf"},
+    {"id": "265-03", "name": "256 rows 2-3, 261 rows 1-3 (all PASS)", "status": "done", "commit": "d24586ce2"},
+    {"id": "265-04", "name": "263 R-1..R-9 re-drive + approval (operator pass)", "status": "done", "commit": "2125523ad"},
+    {"id": "265-05-T1", "name": "triage 65 rows + checker + seeds 305-311 + BUS-304", "status": "done", "commit": "05090018c"},
+    {"id": "265-05-T2", "name": "12 G-3 fixes + fresh re-drive (all resolved) + backend gate 71<=71", "status": "done", "commit": "254a29a6b"},
+    {"id": "265-05-T3", "name": "partial-independence flags + STATE + completeness", "status": "done", "commit": "see git log docs(265-05)"}
   ],
   "remaining_tasks": [
-    {
-      "id": 7,
-      "name": "247 G-4 lived-experience UAT — 3 operator-defined browser scenarios",
-      "status": "not_started"
-    },
-    {
-      "id": 8,
-      "name": "Gemini: fix BUS-225 C-1 (WR-05 wording) and C-2 (finding counts)",
-      "status": "not_started"
-    },
-    {
-      "id": 10,
-      "name": "Phase 248 The Credential Boundary — Claude builds end-to-end per OV-248-01",
-      "status": "not_started"
-    }
+    {"id": "265-05-T2b", "name": "record vitest count gate verdict + write ## Re-drive method and ## Gates in 265-TRIAGE.md", "status": "not_started"},
+    {"id": "265-05-S", "name": "write 265-05-SUMMARY.md", "status": "not_started"},
+    {"id": "265-V", "name": "execute-phase verify_phase_goal (gsd-verifier) then phase.complete", "status": "not_started"}
   ],
   "blockers": [
-    {
-      "description": "247's G-4 browser UAT cannot be driven by Claude — needs the operator",
-      "type": "human_action",
-      "workaround": "none; the code close stands, the UAT is separate"
-    },
-    {
-      "description": "Phase 239 has no eligible independent reviewer — Gemini planned it, Claude executed it, so both shaped it under AGENTS.md 6.3",
-      "type": "external",
-      "workaround": "operator ruling required; options are accept-as-owed, review-with-conflict-declared, or ultra (ruled out on cost)"
-    },
-    {
-      "description": "Claude cannot trigger Gemini — separate process, no channel. The bus is a mailbox, not a doorbell",
-      "type": "external",
-      "workaround": "operator starts Gemini"
-    }
+    {"description": "BUS-304: four operator rulings (256-01 token-column hotfix vs seed; 262 unverified commits retro-verify vs renumber; disabled Expert on existing threads stop vs finish; 263-R7 grantees get author private skills no vs yes)", "type": "human_action", "workaround": "rows are deferred to seeds/phases; rulings do not block phase close"}
   ],
   "human_actions_pending": [
-    {
-      "action": "Drive 247's G-4 UAT — 3 'I'd recognize failure here' scenarios in a real browser",
-      "context": "the phase is entirely about what a person READS; jsdom+pytest cannot see legibility",
-      "blocking": true
-    },
-    {
-      "action": "BUS-208 — replace the revoked Zhipu/GLM and Moonshot keys in backend/.env AND Coolify",
-      "context": "both are dead; they are rows 5 and 7 of the mandatory cross-provider UAT roster",
-      "blocking": false
-    },
-    {
-      "action": "BUS-040 — reconnect Google while org 22f9c615 is active; enable Sheets+Docs APIs in project 877112366454",
-      "context": "SERVICE_DISABLED on two APIs",
-      "blocking": false
-    },
-    {
-      "action": "Rule on Phase 239's reviewer",
-      "context": "nobody untainted exists",
-      "blocking": false
-    },
-    {
-      "action": "Confirm whether Phase 248 starts now",
-      "context": "OV-248-01 makes it Claude end-to-end; it is the trust-boundary phase so it will close self-verified",
-      "blocking": false
-    }
+    {"action": "Answer BUS-304 (4 rulings)", "context": "Claude recommended: 1 hotfix, 2 retro-verify, 3 stop, 4 no-but-warn", "blocking": false},
+    {"action": "Restore read_only=true in .mcp.json Supabase URL and reconnect via /mcp", "context": "removed manually to apply mig 194; CLAUDE.md prefers read-only", "blocking": false}
   ],
   "decisions": [
-    {
-      "decision": "VERDICT.md counts as equivalent to VERIFICATION.md for the honesty gate",
-      "rationale": "Phase 245 produced only a VERDICT.md, so the phase that wrote the gate was invisible to it",
-      "phase": "tooling"
-    },
-    {
-      "decision": "DEBT-06 discharged as 3 reviews + 5 reasoned refusals, not 8 reviews",
-      "rationale": "operator ruling; refusals name the mechanical evidence standing in for a reviewer",
-      "phase": "v4.2"
-    },
-    {
-      "decision": "Claude must NOT implement findings from phases Claude reviewed",
-      "rationale": "the fixes would be review-response commits nobody independent has read — the exact gap measured in 240-REVIEW-RECONCILIATION.md",
-      "phase": "247"
-    },
-    {
-      "decision": "The standing-red contract is a SET of 16 test names, never a count",
-      "rationale": "the suite reads 16/17/18 across runners on a byte-identical tree; an integer contract cannot pass reliably",
-      "phase": "247"
-    },
-    {
-      "decision": "SEED-282's Drive-path fence retired under D-247-01 rather than made green",
-      "rationale": "WATCH-01 completed the behaviour the fence guarded; the replacement asserts the NEW invariant",
-      "phase": "247"
-    }
+    {"decision": "Migration 194 hotfix applied local + prod (operator 'fix it' / 'apply 194 to prod')", "rationale": "R265-audit-fixes-01 blocker: org-admin could self-upgrade tier", "phase": "265"},
+    {"decision": "LangSmith MCP runs from isolated .tools/langsmith-mcp-venv", "rationale": "installing into backend/venv would move uvicorn/langsmith pins and add langchain-core", "phase": "265"},
+    {"decision": "Plans run inline by the orchestrator; triage/fixes/re-drives delegated to subagents", "rationale": "Chrome/LangSmith MCP + subagent spawning not available to gsd-executor", "phase": "265"}
   ],
-  "uncommitted_files": [],
-  "next_action": "Phase 248 — The Credential Boundary. Claude end-to-end per the operator ruling; closes verification_mode: self-verified with independent_review: owed. 248-MEASUREMENTS.md is already written (production read-only facts; the 13 advisor findings split into THREE ACL groups, not one). Start with /gsd:discuss-phase 248.",
-  "context_notes": "Phase 247 is CLOSED ON CODE at 3d5f62dc6 after a close that was given, RETRACTED, and re-given on wider evidence. The retraction is the session's most important lesson: the first close was made over three red suites, all CAUSED by the phase, invisible because the review ran every file 247 TOUCHED and no file that DEPENDS on what it changed — one of them a FENCE. For 248 onward: run the touched suites AND their dependents, and establish base-vs-HEAD on anything red before assuming inheritance. Two tooling defects were fixed this session (agent-bus close() wrote false records; the honesty gate read 3 hardcoded paths while 20 verdict files existed) and two more were found in Claude's OWN monitor. The recurring theme across every register touched today: a claim is not evidence until it is driven."
+  "uncommitted_files": [".mcp.json (pre-existing, operator's)"],
+  "next_action": "Read vitest gate result (re-run: GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs from repo root), record it + Re-drive method + Gates in 265-TRIAGE.md, write 265-05-SUMMARY.md, then run verify_phase_goal and phase.complete per execute-phase.md.",
+  "context_notes": "Chrome MCP tab stays visibilityState=hidden so screenshots time out; evidence is rendered text + computed styles + in-page fetch capture + SQL. Test-user sign-in done by swapping a local GoTrue session into localStorage (operator session backed up and restored). Fixture passwords live only in the session scratchpad (lost on new session; reset via GoTrue admin API)."
 }

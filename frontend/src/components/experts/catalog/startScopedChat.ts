@@ -64,14 +64,14 @@ export async function startScopedChat(
   let scoped: Thread
   try {
     scoped = await deps.setExpert(created.id, expert.id)
+    // ⛔ BEFORE the selection, always. See the docblock: the list row is stale until this runs.
+    // Inside the try (R265-262-05): a failed refresh must not strand a thread a retry duplicates.
+    await deps.refreshThreads()
   } catch (err) {
     // ⛔ The ORIGINAL error is what the caller reports; a failed cleanup must not replace it.
     await deps.discardThread?.(created.id).catch(() => {})
     throw err
   }
-
-  // ⛔ BEFORE the selection, always. See the docblock: the list row is stale until this runs.
-  await deps.refreshThreads()
 
   deps.selectThread(scoped)
   deps.navigate()

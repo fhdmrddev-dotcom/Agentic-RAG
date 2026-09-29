@@ -35,6 +35,12 @@ interface FolderNodeProps {
    *  render on every row for parity with the mandated View count. Absent ids
    *  render gracefully as 0. */
   folderDocumentCounts?: Record<string, number>
+  /** Phase 266 (D-266-13): provenance notes keyed by folder id — e.g. "from Financial Analyzer"
+   *  for an installed Expert's folder. Appended to the EXISTING shared label, so it only ever
+   *  shows on an org-shared folder; NavRow is not changed.
+   *  ⚠ CORRECTED 2026-09-25 (266-05 UAT): NavRow WAS changed. Tooltip-only, the note was invisible
+   *  to the operator. So it is also passed as NavRow's optional `caption`, a grey line visible at rest. */
+  folderProvenance?: Record<string, string>
   onSelect: (id: string) => void
   onToggleExpand: (id: string) => void
   onStartRename: (id: string, currentName: string) => void
@@ -59,6 +65,7 @@ export function FolderNode({
   creatingInParentId,
   currentUserId,
   folderDocumentCounts,
+  folderProvenance,
   onSelect,
   onToggleExpand,
   onStartRename,
@@ -93,7 +100,12 @@ export function FolderNode({
         depth={depth}
         isSelected={isSelected}
         isShared={node.is_org_shared}
-        sharedLabel="Shared with org"
+        sharedLabel={
+          folderProvenance?.[node.id]
+            ? `Shared with org · ${folderProvenance[node.id]}`
+            : "Shared with org"
+        }
+        caption={node.is_org_shared ? folderProvenance?.[node.id] : undefined}
         onSelect={() => onSelect(node.id)}
         isEditing={isEditing}
         onCommitRename={(newName) => onCommitRename(node.id, newName)}
@@ -240,6 +252,7 @@ export function FolderNode({
             creatingInParentId={creatingInParentId}
             currentUserId={currentUserId}
             folderDocumentCounts={folderDocumentCounts}
+            folderProvenance={folderProvenance}
             onSelect={onSelect}
             onToggleExpand={onToggleExpand}
             onStartRename={onStartRename}

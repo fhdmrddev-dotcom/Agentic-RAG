@@ -100,13 +100,15 @@ def test_skill_body_authoring_is_not_registered_as_a_tool():
         )
 
 
-def test_expert_core_tools_is_strict_subset_of_tool_registry():
-    """PACK-02 / Phase 260 F-3: EXPERT_CORE_TOOLS is derived and fenced strictly against _TOOL_REGISTRY."""
-    from app.services.tool_dispatcher import EXPERT_CORE_TOOLS, _TOOL_REGISTRY
+def test_the_expert_tool_floor_constants_no_longer_exist():
+    """Phase 267 (D-267-01) — RE-DRIVEN from "EXPERT_CORE_TOOLS is derived and fenced strictly
+    against _TOOL_REGISTRY (len 10)". The constant existed to FILTER an Expert thread's tools; 267
+    deleted it and the filter, so the fence now pins its absence — a dead constant must not look
+    live, and a restored one would be a second encoding of the tool set that drifts.
+    """
+    from app.services import tool_dispatcher
 
-    assert len(EXPERT_CORE_TOOLS) == 10, f"Expected 10 core tools for experts, got {len(EXPERT_CORE_TOOLS)}"
-    assert EXPERT_CORE_TOOLS.issubset(_TOOL_REGISTRY.keys()), (
-        f"Inventory drift: EXPERT_CORE_TOOLS has unregistered members: "
-        f"{EXPERT_CORE_TOOLS - set(_TOOL_REGISTRY.keys())}"
-    )
+    assert not hasattr(tool_dispatcher, "EXPERT_CORE_TOOLS")
+    assert not hasattr(tool_dispatcher, "EXPERT_DELIVERABLE_TOOLS")
+    assert len(tool_dispatcher._TOOL_REGISTRY) == 29
 

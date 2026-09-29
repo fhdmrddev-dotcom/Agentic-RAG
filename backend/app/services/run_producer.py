@@ -49,6 +49,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import NamedTuple
 from uuid import UUID
 import uuid as _uuid_mod
 
@@ -375,26 +376,105 @@ async def _finalize_producer_run(
         )
 
 
+class ThreadScoping(NamedTuple):
+    """Phase 267 (PACK-21 / D-267-01 / D-267-29 / D-267-32) — what a thread's active Expert hands
+    the loop, as DATA. Every field is ``None`` on a thread with no Expert, which keeps a plain run
+    byte-identical to base on every axis.
+
+    ⛔ There is no tool list here. An Expert only ever ADDS: the thread keeps its normal tool set,
+    the Expert's resolver-approved connections are admitted ALONGSIDE the composer's switched-on
+    ones (``scoped_connection_keys``), and its member skills are appended to the normal catalog
+    (``skill_catalog_additions``) — never a replacement. Both names are neutral on purpose:
+    ``agent_loop.py`` reads them and is AST-fenced against the word "expert".
+    """
+
+    effective_folder_ids: tuple[str, ...] | None
+    skill_catalog_additions: tuple[dict, ...] | None
+    scoped_folder_path: str | None
+    born_for_bundle_id: UUID | None
+    scoped_connection_keys: tuple[str, ...] | None
+
+
+class ExpertScopeUnavailable(ValueError):
+    """Phase 266 CR-01: a RESTRICTED Expert resolved to zero folders. The run is refused, because an
+    empty scope reaches retrieval as "no folder filter" and would search every org the user is in."""
+
+
+async def _state_expert_removed(
+    supabase,
+    pool,
+    *,
+    thread_id: str,
+    user_id: str,
+    thread_org_id,
+    caller_roles: list[str],
+    expert_id: str,
+    thread_folder_id: str | None,
+) -> None:
+    """267-REVIEW-INDEPENDENT CR-03(a) / PACK-23 — the transcript STATES a removal the server made.
+
+    ``_resolve_thread_scoping`` clears an Expert the caller can no longer resolve (disabled, grant
+    revoked, deleted). Before this, nothing said so: the chip kept the Expert and the next turn ran
+    unscoped under its label. The row is the one ``PATCH /threads/{id}`` writes for a removal —
+    ``before`` stated with ``allow_unresolved`` (named by ``get_expert_service``), ``after`` = no
+    Expert — through the same statement helper, event builder and row writer, in the THREAD's org.
+
+    ⛔ Never raises: the clear is the fail-closed security action and the run is refused either way;
+    a statement that cannot be made is logged, never allowed to mask that refusal. An Expert that no
+    longer exists at all cannot be named truthfully, so — exactly as on the PATCH door — no row.
+    """
+    if not thread_org_id:
+        logger.warning("expert cleared on thread %s: the thread has no org; no event", thread_id)
+        return
+    try:
+        from app.services.expert_scope import (  # noqa: PLC0415
+            build_expert_changed_event,
+            describe_expert_scope,
+            insert_expert_changed_row,
+        )
+
+        common = dict(
+            supabase=supabase,
+            pool=pool,
+            user_id=user_id,
+            org_id=str(thread_org_id),
+            caller_roles=caller_roles,
+            thread_folder_id=thread_folder_id,
+        )
+        try:
+            before = await describe_expert_scope(expert_id=expert_id, allow_unresolved=True, **common)
+        except LookupError:
+            logger.warning("expert cleared on thread %s: the Expert could not be named; no event", thread_id)
+            return
+        after = await describe_expert_scope(expert_id=None, **common)
+        event = build_expert_changed_event(before, after, at=datetime.now(timezone.utc))
+        async with pool.acquire() as conn:
+            await insert_expert_changed_row(
+                conn, thread_id=thread_id, user_id=user_id, org_id=thread_org_id, event=event
+            )
+    except Exception:  # noqa: BLE001 — see the docstring: never masks the refusal
+        logger.warning("expert cleared on thread %s: the event row was not written", thread_id, exc_info=True)
+
+
 async def _resolve_thread_scoping(
     supabase,
     thread_id: str,
     current_user: dict,
     pool,
-) -> tuple[
-    tuple[str, ...] | None,
-    tuple[str, ...] | None,
-    tuple[dict, ...] | None,
-    str | None,
-    UUID | None,
-]:
-    """Phase 260 (PACK-02 / D-260-05) & Phase 261 (PACK-02 / D-v4.3-01 / D-v4.3-02 / BUG-260920-01) —
+) -> ThreadScoping:
+    """Phase 260 (PACK-02 / D-260-05) & Phase 261 (PACK-02 / D-v4.3-01 / BUG-260920-01) —
     Resolve thread-active consultant scoping prior to the loop.
 
-    Data-injected into RunContext: effective_folder_ids, effective_tools, skill_catalog_override,
-    scoped_folder_path, born_for_bundle_id.
-    Returns (None, None, None, None, None) when no expert is invited (preserving Deep Mode byte-identical).
+    Data-injected into RunContext (Phase 267 shape, ``ThreadScoping``): effective_folder_ids,
+    skill_catalog_additions, scoped_folder_path, born_for_bundle_id, scoped_connection_keys.
+    Returns ``ThreadScoping(None, None, None, None, None)`` when no expert is invited (preserving
+    Deep Mode byte-identical).
 
-    Phase 264 (PACK-17 / D-264-03 / D-264-03a) — the FIFTH element is the ACCESS-CHECKED bundle id
+    Phase 267 (D-267-01 / D-267-02): no tool list is computed any more and the tool-floor flag
+    is not read — an Expert never removes a tool. The old tool-list slot is gone, and the
+    replacing eval catalog override is no longer set here (D-267-32: skills ADD).
+
+    Phase 264 (PACK-17 / D-264-03 / D-264-03a) — ``born_for_bundle_id`` is the ACCESS-CHECKED bundle id
     (``ResolvedExpertBundle.bundle_id``), never the raw ``active_expert_id`` read off the thread row:
     ``resolve_expert_bundle`` returning non-``None`` is what makes the value honest (T-264-01). It
     rides ``RunContext`` → ``ToolContext`` → sub-agent ``sub_ctx`` as an additive default-``None``
@@ -405,14 +485,15 @@ async def _resolve_thread_scoping(
         from app.utils.db import aexec  # noqa: PLC0415
         t_resp = await aexec(
             supabase.table("threads")
-            .select("active_expert_id, folder_id")
+            .select("active_expert_id, folder_id, org_id")
             .eq("id", str(thread_id))
             .maybe_single()
         )
         active_expert_id = t_resp.data.get("active_expert_id") if (t_resp and t_resp.data) else None
         thread_folder_id = t_resp.data.get("folder_id") if (t_resp and t_resp.data) else None
+        thread_org_id = t_resp.data.get("org_id") if (t_resp and t_resp.data) else None
         if not active_expert_id:
-            return None, None, None, None, None
+            return ThreadScoping(None, None, None, None, None)
 
         from app.services.expert_service import resolve_expert_bundle  # noqa: PLC0415
         caller_user_id = UUID(str(current_user["id"]))
@@ -440,20 +521,46 @@ async def _resolve_thread_scoping(
         )
         if not resolved:
             # Phase 260 F-1 (Fail-Closed): Drop stale/inaccessible active_expert_id to keep DB/UI honest
+            # 267-REVIEW-INDEPENDENT CR-03(a): conditional on the Expert READ above, so a PATCH that
+            # bound a new Expert in between is never clobbered and a concurrent send clears (and
+            # states) it once; the rows it cleared say whether THIS send made the change.
+            _cleared = False
             try:
-                await aexec(
+                _clear = await aexec(
                     supabase.table("threads")
                     .update({"active_expert_id": None})
                     .eq("id", str(thread_id))
+                    .eq("active_expert_id", str(active_expert_id))
                 )
+                _cleared = bool(getattr(_clear, "data", None))
             except Exception:
                 logger.warning("Failed to reset stale active_expert_id on thread %s", thread_id, exc_info=True)
+            if _cleared:
+                await _state_expert_removed(
+                    supabase,
+                    pool,
+                    thread_id=thread_id,
+                    user_id=str(current_user["id"]),
+                    thread_org_id=thread_org_id,
+                    caller_roles=caller_roles if str(thread_org_id or "") == str(caller_org_id or "") else [],
+                    expert_id=str(active_expert_id),
+                    thread_folder_id=str(thread_folder_id) if thread_folder_id else None,
+                )
             raise ValueError(
                 f"Active expert '{active_expert_id}' could not be resolved or is inaccessible; refusing run (fail-closed)"
             )
 
         expert_folder_ids = [str(f) for f in resolved.effective_folder_ids]
         scope_mode = getattr(resolved, "scope_mode", "biased")
+
+        # Phase 266 CR-01: a restricted Expert with zero folders would hand retrieval an empty scope,
+        # which it treats as "no folder filter". Refuse instead; the thread keeps its Expert.
+        if scope_mode == "restricted" and not expert_folder_ids:
+            if getattr(resolved, "is_system", False):
+                reason = "has no knowledge installed in this organization yet. Install it from Experts first."
+            else:
+                reason = "has no knowledge folders this organization can read."
+            raise ExpertScopeUnavailable(f"{resolved.name} {reason}")
 
         all_folders: list[dict] = []
         if thread_folder_id or expert_folder_ids:
@@ -463,69 +570,62 @@ async def _resolve_thread_scoping(
             except Exception:
                 logger.warning("Failed to fetch visible folders for thread %s scoping", thread_id, exc_info=True)
 
-        folder_map = {str(f["id"]): f for f in all_folders}
+        # Phase 267 (D-267-17): the composition MOVED, byte-for-byte, into the one pure home the
+        # run and the user-facing statement both read — so the two cannot disagree.
+        from app.services.expert_scope import compose_expert_scope  # noqa: PLC0415
+        _scope = compose_expert_scope(
+            scope_mode=scope_mode,
+            thread_folder_id=str(thread_folder_id) if thread_folder_id else None,
+            expert_folder_ids=expert_folder_ids,
+            visible_folders=all_folders,
+        )
+        # 267-REVIEW-INDEPENDENT CR-02: an EMPTY composition means "no Expert narrowing", exactly as on
+        # a plain thread. `()` is not `None`: the loop handed the tools `folder_subtree_ids = []`, the
+        # RPC ran unfiltered (`folder_ids if folder_ids else None`) and the dispatcher's folder wall
+        # then dropped EVERY hit and emitted `scope_violation` — while the statement said "All your
+        # documents". Only a BIASED Expert with no effective folders on a no-folder thread reaches
+        # this (restricted-empty is refused above; a thread folder always contributes its own id), so
+        # every non-empty composition is handed on verbatim.
+        effective_folder_ids = _scope.effective_folder_ids or None
+        scoped_folder_path = _scope.scoped_folder_path if effective_folder_ids else None
 
-        def _get_subtree(root_id: str) -> list[str]:
-            res = [root_id]
-            for f in all_folders:
-                if str(f.get("parent_id") or "") == root_id:
-                    res.extend(_get_subtree(str(f["id"])))
-            return res
+        # Phase 267 (D-267-01 / D-267-02): NO tool list. The Expert thread keeps the plain
+        # thread's tools; the tool-floor flag is kept on the row for compatibility and read by
+        # nothing here. (Before 267 this computed a 10-tool core ∪ deliverables and the loop
+        # filtered every schema down to it — 15 of 28 chat tools and every connector tool lost.)
 
-        def _get_path(fid: str) -> str:
-            parts = []
-            curr: str | None = fid
-            while curr:
-                f = folder_map.get(curr)
-                if not f:
-                    break
-                parts.append(f.get("name", ""))
-                curr = str(f["parent_id"]) if f.get("parent_id") else None
-            return ("/" + "/".join(reversed(parts))) if parts else ""
-
-        scoped_folder_path: str | None = None
-
-        if scope_mode == "restricted":
-            # Strict isolation (S5 / D-v4.3-01): exclusive to expert folders
-            effective_folder_ids = tuple(sorted(set(expert_folder_ids)))
-            if expert_folder_ids:
-                scoped_folder_path = _get_path(expert_folder_ids[0]) or None
-        else:
-            # Union Scope (default, S4 / D-v4.3-01): thread folder + expert folders
-            if thread_folder_id:
-                thread_subfolder_ids = _get_subtree(str(thread_folder_id))
-                effective_folder_ids = tuple(sorted(set(thread_subfolder_ids).union(expert_folder_ids)))
-                scoped_folder_path = _get_path(str(thread_folder_id)) or None
-            else:
-                effective_folder_ids = tuple(sorted(set(expert_folder_ids)))
-                if expert_folder_ids:
-                    scoped_folder_path = _get_path(expert_folder_ids[0]) or None
-
-        # Phase 260 F-3: derive core tools strictly from tool_dispatcher.EXPERT_CORE_TOOLS
-        # Phase 261 D-v4.3-02 / S6: preserve deliverable tools when tool_floor_enabled is True
-        from app.services.tool_dispatcher import EXPERT_CORE_TOOLS, EXPERT_DELIVERABLE_TOOLS  # noqa: PLC0415
-        base_tools = set(EXPERT_CORE_TOOLS)
-        if getattr(resolved, "tool_floor_enabled", True):
-            base_tools = base_tools.union(EXPERT_DELIVERABLE_TOOLS)
-        effective_tools = tuple(sorted(base_tools) + list(resolved.effective_connections))
-
-        skill_catalog_override = None
-        if resolved.effective_skills:
-            skill_catalog_override = tuple(
+        # Phase 267 (D-267-32): the Expert's member skills ADD to the normal catalog — never the
+        # Expert's alone. Same dict shape the retired override used. Already filtered by
+        # filter_visible_skill_names inside resolve_expert_bundle (T-267-07).
+        skill_catalog_additions = (
+            tuple(
                 {"name": s, "description": f"Expert member skill: {s}"}
                 for s in resolved.effective_skills
             )
+            if resolved.effective_skills
+            else None
+        )
 
-        # Phase 264 (PACK-17 / D-264-03a / T-264-01) — the fifth element is
+        # Phase 267 (D-267-29, operator-approved grant widening): the Expert's own connections,
+        # ALREADY approved by the resolver (active + enabled in the caller's org, via
+        # connection_states). The loop admits a connection by these keys alongside the
+        # composer's switched-on ids; per-tool grant posture still applies unchanged.
+        scoped_connection_keys = (
+            tuple(resolved.effective_connections) if resolved.effective_connections else None
+        )
+
+        # Phase 264 (PACK-17 / D-264-03a / T-264-01) — born_for_bundle_id is
         # `resolved.bundle_id`, the value `resolve_expert_bundle` already
         # access-checked, NOT the raw `active_expert_id` read off the thread row
         # above. `resolved` being non-None is the whole honesty of the id.
-        return (
+        # (Positional on purpose: the 264 fence counts `born_for_bundle_id=` keywords
+        # and pins exactly the two RunContext builds.)
+        return ThreadScoping(
             effective_folder_ids,
-            effective_tools,
-            skill_catalog_override,
+            skill_catalog_additions,
             scoped_folder_path,
             resolved.bundle_id,
+            scoped_connection_keys,
         )
     except Exception as exc:
         logger.error(
@@ -551,8 +651,16 @@ async def run_producer(
     active_workflow_run_id,
     kickoff_definition,
     kickoff_definition_id,
+    scoping: ThreadScoping | None = None,
+    scoping_error: BaseException | None = None,
 ) -> None:
     """Producer task — XADDs every SSE event to run:{run_id} Redis Stream.
+
+    Phase 268 (D-268-19): ``send_message`` resolves the thread's Expert scoping ONCE, stamps the
+    ``runs`` row with it, and hands the SAME ``ThreadScoping`` here as ``scoping``. The Deep branch
+    uses it and resolves only when it is ``None`` (every older call shape). A resolution failure
+    arrives as ``scoping_error`` and is re-raised INSIDE the existing try, so the run fails with the
+    identical ``runs.error`` text it wrote before 268.
 
     Phase 162.5 Plan 03 (G-5 extraction): the inline ``agent_runner`` closure body
     lifted VERBATIM out of ``send_message``. The captured closure vars are now
@@ -688,8 +796,12 @@ async def run_producer(
                 # a no-op when absent → no double-persist. The Deep `else` branch +
                 # run_agent_loop + the Deep `_result_sink` flow stay byte-identical (D-14).
             else:                                          # Deep — byte-identical
+                # Phase 268 (D-268-19): a resolution error from send_message is re-raised HERE,
+                # inside this try, so the except below classifies it exactly as before 268.
+                if scoping_error is not None:
+                    raise scoping_error
                 _wf_pool = await get_pg_pool()
-                _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path, _born_for = await _resolve_thread_scoping(
+                _scoping = scoping if scoping is not None else await _resolve_thread_scoping(
                     supabase=supabase,
                     thread_id=thread_id,
                     current_user=current_user,
@@ -705,15 +817,18 @@ async def run_producer(
                     supabase=supabase,
                     resolved_model=resolved_model,
                     resolved_provider=resolved_provider,
-                    effective_folder_ids=_eff_folders,
-                    effective_tools=_eff_tools,
-                    skill_catalog_override=_skill_cat_override,
-                    scoped_folder_path=_eff_folder_path,
+                    effective_folder_ids=_scoping.effective_folder_ids,
+                    scoped_folder_path=_scoping.scoped_folder_path,
+                    # Phase 267 (D-267-29 / D-267-32) — the Expert ADDS: its approved
+                    # connections and member skills, as neutrally named data. Paired with
+                    # the continuation build below. None on a plain run => byte-identical.
+                    scoped_connection_keys=_scoping.scoped_connection_keys,
+                    skill_catalog_additions=_scoping.skill_catalog_additions,
                     # Phase 264 (PACK-17 / D-264-03 / 8.6) — the Deep build. Paired
                     # with the continuation build below; a field set at one and not
                     # the other is a defect every existing test would miss. None on
                     # every run without a consultant => literal no-op.
-                    born_for_bundle_id=_born_for,
+                    born_for_bundle_id=_scoping.born_for_bundle_id,
                 )
                 _agent_loop_result = await run_agent_loop(
                     ctx,
@@ -816,6 +931,23 @@ async def run_producer(
 # plain finalize_run keep-active, no terminal sentinel) so the next Continue can
 # resume, instead of finalizing terminal.
 # ───────────────────────────────────────────────────────────────────────
+def _accumulate_segment_tokens(
+    prior_in: int | None,
+    prior_out: int | None,
+    seg_in: int | None,
+    seg_out: int | None,
+) -> tuple[int | None, int | None]:
+    """Phase 268 (D-268-20) — a continued run's totals are the SUM of its segments.
+
+    D-256-06 semantics, the ``harness/phase_types._record_run_usage`` idiom: when nothing was
+    ever measured (all four None) the totals stay ``(None, None)`` — "never measured" is not
+    "zero". Otherwise a missing half counts as 0.
+    """
+    if prior_in is None and prior_out is None and seg_in is None and seg_out is None:
+        return None, None
+    return (prior_in or 0) + (seg_in or 0), (prior_out or 0) + (seg_out or 0)
+
+
 async def spawn_continuation_run(
     *,
     run_id: _uuid_mod.UUID,
@@ -848,6 +980,28 @@ async def spawn_continuation_run(
         _terminal_status = "completed"
         _terminal_error: str | None = None
         _result_sink: dict = {}
+        # Phase 268 (D-268-20 / SEED-297 trigger (d)) — the paused segment's totals, read BEFORE
+        # the loop so a finalize from ANY exit path below adds them. finalize_run's SQL is an
+        # unconditional SET and is deliberately NOT edited (SEED-297 trigger (a)); the sum is made
+        # here instead. A failed read is logged and leaves the base behaviour (continuation-only
+        # totals) — it never fails the continuation.
+        _prior_in: int | None = None
+        _prior_out: int | None = None
+        try:
+            _prior_row = await (await get_pg_pool()).fetchrow(
+                "SELECT input_tokens, output_tokens FROM runs WHERE run_id = $1",
+                run_id,
+            )
+            if _prior_row is not None:
+                _prior_in = _prior_row["input_tokens"]
+                _prior_out = _prior_row["output_tokens"]
+        except Exception:  # noqa: BLE001 — best-effort; the continuation must still run
+            logger.warning(
+                "continuation %s: prior token read failed; this segment's totals will replace "
+                "the paused segment's",
+                run_id,
+                exc_info=True,
+            )
         # Hoisted for the shared finalizer's best-effort missing-usage warning — a
         # continuation that fails before load_user_settings leaves these None (the
         # warning then logs provider=None model=None; no functional change — the old
@@ -862,7 +1016,7 @@ async def spawn_continuation_run(
             # .agent_mode/.content; a continuation carries no new user content.
             body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)
             _wf_pool = await get_pg_pool()
-            _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path, _born_for = await _resolve_thread_scoping(
+            _scoping = await _resolve_thread_scoping(
                 supabase=supabase,
                 thread_id=thread_id,
                 current_user=current_user,
@@ -880,14 +1034,16 @@ async def spawn_continuation_run(
                 resolved_provider=resolved_provider,
                 resume_dropped_tool_calls=True,
                 dropped_tool_calls=tuple(dropped_tool_calls),
-                effective_folder_ids=_eff_folders,
-                effective_tools=_eff_tools,
-                skill_catalog_override=_skill_cat_override,
-                scoped_folder_path=_eff_folder_path,
+                effective_folder_ids=_scoping.effective_folder_ids,
+                scoped_folder_path=_scoping.scoped_folder_path,
+                # Phase 267 (D-267-29 / D-267-32) — same additive Expert data as the
+                # Deep build above; a resumed run is the same run and adds the same.
+                scoped_connection_keys=_scoping.scoped_connection_keys,
+                skill_catalog_additions=_scoping.skill_catalog_additions,
                 # Phase 264 (PACK-17 / D-264-03 / 8.6) — the CONTINUATION build, the
                 # site a one-site fix misses: no test exercises this path's scoping.
                 # A resumed run is the same run and carries the same scope.
-                born_for_bundle_id=_born_for,
+                born_for_bundle_id=_scoping.born_for_bundle_id,
             )
             try:
                 await run_agent_loop(
@@ -909,6 +1065,17 @@ async def spawn_continuation_run(
             _cap = _result_sink.get("cap_disposition")
             if _cap == "cap_paused":
                 _terminal_status = "cap_paused"
+
+            # Phase 268 (D-268-20): the SAME row carries every segment, so its totals are the SUM.
+            (
+                _result_sink["input_tokens_total"],
+                _result_sink["output_tokens_total"],
+            ) = _accumulate_segment_tokens(
+                _prior_in,
+                _prior_out,
+                _result_sink.get("input_tokens_total"),
+                _result_sink.get("output_tokens_total"),
+            )
 
             # D-A3 unification: reuse the ONE shared finalizer. active_workflow_run_id
             # is None (a Deep-only continuation → the step-7 harness F2 gate skips

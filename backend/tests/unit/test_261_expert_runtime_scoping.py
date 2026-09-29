@@ -8,8 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.services.expert_service import ResolvedExpertBundle
-from app.services.run_producer import _resolve_thread_scoping
-from app.services.tool_dispatcher import EXPERT_CORE_TOOLS, EXPERT_DELIVERABLE_TOOLS
+from app.services.run_producer import ThreadScoping, _resolve_thread_scoping
 
 
 APP_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "app"
@@ -56,11 +55,15 @@ async def test_union_scope_composition_default_biased():
          patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_bundle)), \
          patch("app.utils.folder_utils.fetch_visible_folders", AsyncMock(return_value=all_folders)):
 
-        eff_folders, eff_tools, skill_cat, scoped_path, born_for = await _resolve_thread_scoping(
+        # Phase 267: a ThreadScoping NamedTuple, read by attribute (the field order changed).
+        scoping = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=thread_id,
             current_user={"id": user_id, "org_id": org_id},
             pool=MagicMock(),
+        )
+        eff_folders, scoped_path, born_for = (
+            scoping.effective_folder_ids, scoping.scoped_folder_path, scoping.born_for_bundle_id,
         )
 
         # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
@@ -114,11 +117,15 @@ async def test_strict_isolation_restricted_mode():
          patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_bundle)), \
          patch("app.utils.folder_utils.fetch_visible_folders", AsyncMock(return_value=all_folders)):
 
-        eff_folders, eff_tools, skill_cat, scoped_path, born_for = await _resolve_thread_scoping(
+        # Phase 267: a ThreadScoping NamedTuple, read by attribute (the field order changed).
+        scoping = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=thread_id,
             current_user={"id": user_id, "org_id": org_id},
             pool=MagicMock(),
+        )
+        eff_folders, scoped_path, born_for = (
+            scoping.effective_folder_ids, scoping.scoped_folder_path, scoping.born_for_bundle_id,
         )
 
         # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
@@ -135,8 +142,16 @@ async def test_strict_isolation_restricted_mode():
 
 
 @pytest.mark.asyncio
-async def test_additive_tool_floor_preserves_deliverable_tools():
-    """D-v4.3-02 / SEED-303 S6: Deliverable-producing tools are preserved as additive floor."""
+async def test_tool_floor_enabled_has_no_effect_and_no_tool_list_is_computed():
+    """Phase 267 (D-267-01 / D-267-02) — RE-DRIVEN from "D-v4.3-02 / SEED-303 S6: deliverable tools
+    are preserved as an additive floor (and REMOVED when tool_floor_enabled is False)".
+
+    The original intent was "an Expert must not lose the tools that produce deliverables". 267
+    delivers the stronger form: an Expert computes NO tool list at all, so it loses NOTHING — and
+    `tool_floor_enabled=False` can no longer remove anything either. Both flag values hand the
+    loop the same data, with no tool slot, and the Expert's approved connection is carried as
+    an ADDITIVE key (D-267-29) instead of being mixed into a tool whitelist.
+    """
     thread_id = str(uuid4())
     expert_id = uuid4()
     user_id = str(uuid4())
@@ -145,82 +160,40 @@ async def test_additive_tool_floor_preserves_deliverable_tools():
     mock_supabase = MagicMock()
     mock_t_resp = MagicMock(data={"active_expert_id": str(expert_id), "folder_id": None})
 
-    # 1. tool_floor_enabled = True (default)
-    resolved_with_floor = ResolvedExpertBundle(
-        bundle_id=expert_id,
-        name="RFP Responder",
-        slug="rfp-responder",
-        description="Produces RFP proposals",
-        scope_mode="biased",
-        is_system=False,
-        org_id=UUID(org_id),
-        tool_floor_enabled=True,
-        effective_skills=[],
-        effective_folder_ids=[],
-        effective_connections=["hubspot"],
-    )
-
-    with patch("app.utils.db.aexec", AsyncMock(return_value=mock_t_resp)), \
-         patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_with_floor)):
-
-        eff_folders, eff_tools, skill_cat, scoped_path, born_for = await _resolve_thread_scoping(
-            supabase=mock_supabase,
-            thread_id=thread_id,
-            current_user={"id": user_id, "org_id": org_id},
-            pool=MagicMock(),
+    results = {}
+    for floor in (True, False):
+        resolved = ResolvedExpertBundle(
+            bundle_id=expert_id,
+            name="RFP Responder",
+            slug="rfp-responder",
+            description="Produces RFP proposals",
+            scope_mode="biased",
+            is_system=False,
+            org_id=UUID(org_id),
+            tool_floor_enabled=floor,
+            effective_skills=[],
+            effective_folder_ids=[],
+            effective_connections=["hubspot"],
         )
+        with patch("app.utils.db.aexec", AsyncMock(return_value=mock_t_resp)), \
+             patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved)):
+            results[floor] = await _resolve_thread_scoping(
+                supabase=mock_supabase,
+                thread_id=thread_id,
+                current_user={"id": user_id, "org_id": org_id},
+                pool=MagicMock(),
+            )
 
-        # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
-        # ResolvedExpertBundle.bundle_id, never the thread row's raw active_expert_id.
-        assert born_for == expert_id
+    for scoping in results.values():
+        assert isinstance(scoping, ThreadScoping)
+        # Phase 264 (PACK-17 / T-264-01) - the ACCESS-CHECKED bundle id, never the raw thread value.
+        assert scoping.born_for_bundle_id == expert_id
+        assert not hasattr(scoping, "effective_tools"), "a tool list is being computed again"
+        # The Expert's connection ADDS (D-267-29), it is not a whitelist entry
+        assert scoping.scoped_connection_keys == ("hubspot",)
 
-        assert eff_tools is not None
-        tool_set = set(eff_tools)
-
-        # Core tools present
-        for t in EXPERT_CORE_TOOLS:
-            assert t in tool_set
-
-        # Deliverable tools preserved on the floor
-        for t in ["execute_code", "workspace_write", "render_template", "ask_user"]:
-            assert t in tool_set, f"Deliverable tool '{t}' missing from effective_tools"
-
-        # Connection present
-        assert "hubspot" in tool_set
-
-    # 2. tool_floor_enabled = False (explicit opt-out)
-    resolved_without_floor = ResolvedExpertBundle(
-        bundle_id=expert_id,
-        name="Read-Only Auditor",
-        slug="ro-auditor",
-        description="Auditor",
-        scope_mode="biased",
-        is_system=False,
-        org_id=UUID(org_id),
-        tool_floor_enabled=False,
-        effective_skills=[],
-        effective_folder_ids=[],
-        effective_connections=[],
-    )
-
-    with patch("app.utils.db.aexec", AsyncMock(return_value=mock_t_resp)), \
-         patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_without_floor)):
-
-        eff_folders, eff_tools, skill_cat, scoped_path, born_for = await _resolve_thread_scoping(
-            supabase=mock_supabase,
-            thread_id=thread_id,
-            current_user={"id": user_id, "org_id": org_id},
-            pool=MagicMock(),
-        )
-
-        # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
-        # ResolvedExpertBundle.bundle_id, never the thread row's raw active_expert_id.
-        assert born_for == expert_id
-
-        assert eff_tools is not None
-        tool_set = set(eff_tools)
-        for t in ["execute_code", "workspace_write", "render_template", "ask_user"]:
-            assert t not in tool_set, f"Deliverable tool '{t}' should not be present when tool_floor_enabled is False"
+    # The flag changes nothing the run receives.
+    assert results[True] == results[False]
 
 
 def test_agent_loop_contains_zero_expert_branches():

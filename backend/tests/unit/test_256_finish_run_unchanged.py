@@ -96,7 +96,13 @@ _EXPECTED_CALL_SITES = {
     "services/harness_engine.py:2390",
     "services/harness_engine.py:2431",
     "services/harness_engine.py:2713",
-    "services/run_lifecycle.py:521",
+    # ⚠ RE-DERIVED at Phase 268 Plan 01: +8 line shift in services/run_lifecycle.py —
+    #   register_run_start gained `org_id` / `expert_id` kwargs, their forward to insert_run and
+    #   a 4-line docstring note, all ABOVE this call. Check (a), the per-file COUNTS, stayed
+    #   identical (no caller appeared or vanished); the call itself is byte-unchanged.
+    #   Re-derived with `grep -n "await finish_run(" backend/app/services/run_lifecycle.py`.
+    #   run_lifecycle.py:521 → 529
+    "services/run_lifecycle.py:529",
 }
 
 _CALL_RE = re.compile(r"await\s+finish_run\s*\(")

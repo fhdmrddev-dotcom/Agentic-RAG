@@ -15,6 +15,9 @@ interface FolderTreeProps {
   /** Per-folder document counts keyed by folder id (Phase 114 D-114-13/8). Threaded
    *  to every FolderNode so counts render on every row, not just Root. */
   folderDocumentCounts?: Record<string, number>
+  /** Phase 266 (D-266-13): provenance notes keyed by folder id, threaded to every FolderNode
+   *  exactly as `folderDocumentCounts` is — pure prop-threading, nothing read here. */
+  folderProvenance?: Record<string, string>
   onSelectFolder: (id: string | null) => void
   onCreateFolder: (name: string, parentId: string | null, isOrgShared?: boolean) => Promise<Folder>
   onRenameFolder: (id: string, name: string) => Promise<void>
@@ -28,6 +31,7 @@ export function FolderTree({
   currentUserId,
   rootDocumentCount,
   folderDocumentCounts,
+  folderProvenance,
   onSelectFolder,
   onCreateFolder,
   onRenameFolder,
@@ -182,6 +186,7 @@ export function FolderTree({
             creatingInParentId={creatingInParentId}
             currentUserId={currentUserId}
             folderDocumentCounts={folderDocumentCounts}
+            folderProvenance={folderProvenance}
             onSelect={onSelectFolder}
             onToggleExpand={handleToggleExpand}
             onStartRename={handleStartRename}

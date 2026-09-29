@@ -1,0 +1,226 @@
+{
+ "provider": "minimax",
+ "model": "MiniMax-M3",
+ "create": {
+  "status": 201,
+  "id": "672402db-6122-4b1a-bf8c-7da7fc3ff602",
+  "org_id": null
+ },
+ "t1": {
+  "sent_at": "2026-09-28 19:41:56.752674+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "32c92e3d-14c2-478d-89e8-1cf0d264e5f1",
+   "run_id": "09c554f3-56ee-475c-814a-5ef4abd126fa",
+   "model": "MiniMax-M3",
+   "provider": "minimax"
+  },
+  "run": {
+   "run_id": "09c554f3-56ee-475c-814a-5ef4abd126fa",
+   "status": "completed",
+   "model": "MiniMax-M3",
+   "provider": "minimax",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 34768,
+   "output_tokens": 1165,
+   "started_at": "2026-09-28 19:42:01.442015+00:00",
+   "completed_at": "2026-09-28 19:42:45.206616+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "b10ea4d2-04f4-45e3-9655-e465df213d14",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:42:09.494752+00:00",
+    "run_id": "09c554f3-56ee-475c-814a-5ef4abd126fa",
+    "thread_id": "672402db-6122-4b1a-bf8c-7da7fc3ff602",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 2
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "09c554f3-56ee-475c-814a-5ef4abd126fa",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   },
+   {
+    "run_id": "09c554f3-56ee-475c-814a-5ef4abd126fa",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "1417fc12-a581-4068-adcc-ddbc1e3a848a",
+    "folder_id": "1a2d0273-b14d-487f-86ee-4d146e89d082"
+   }
+  ],
+  "tools": [
+   "search_documents",
+   "ls",
+   "workspace_write"
+  ]
+ },
+ "patch": {
+  "status": 200,
+  "at": "2026-09-28 19:42:47.128504+00:00",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "event": [
+  {
+   "id": "083cb392-1576-45cd-b8a4-4c61b4dbbe3c",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+   "created_at": "2026-09-28 19:42:49.451051+00:00"
+  }
+ ],
+ "thread_org": {
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "t2": {
+  "sent_at": "2026-09-28 19:43:13.201649+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "cd3d5c7a-ac60-4076-9f0f-d89ed1b89c33",
+   "run_id": "733b6f9d-fe99-4b87-b59a-f09189ba017c",
+   "model": "MiniMax-M3",
+   "provider": "minimax"
+  },
+  "run": {
+   "run_id": "733b6f9d-fe99-4b87-b59a-f09189ba017c",
+   "status": "completed",
+   "model": "MiniMax-M3",
+   "provider": "minimax",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 11962,
+   "output_tokens": 256,
+   "started_at": "2026-09-28 19:43:15.874576+00:00",
+   "completed_at": "2026-09-28 19:43:33.471245+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": []
+ },
+ "t2_first_attempt": {
+  "sent_at": "2026-09-28 19:42:49.516158+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "41b8a40a-43cb-4ab5-9017-e775ef63b3ed",
+   "run_id": "1e6fc54e-22fe-4e93-bd75-7044c3e61efb",
+   "model": "MiniMax-M3",
+   "provider": "minimax"
+  },
+  "run": {
+   "run_id": "1e6fc54e-22fe-4e93-bd75-7044c3e61efb",
+   "status": "completed",
+   "model": "MiniMax-M3",
+   "provider": "minimax",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 11607,
+   "output_tokens": 313,
+   "started_at": "2026-09-28 19:42:51.807819+00:00",
+   "completed_at": "2026-09-28 19:43:10.567012+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": []
+ },
+ "retry": true,
+ "v1": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 2,
+  "folders": [
+   "1a2d0273-b14d-487f-86ee-4d146e89d082",
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "v2": {
+  "searched": false,
+  "scope_ok": false,
+  "docs_ok": true,
+  "n_docs": 0,
+  "folders": []
+ },
+ "t3_variant": {
+  "sent_at": "2026-09-28 19:43:34.365113+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "bdd23623-0634-4e06-977b-0905f9d06ed4",
+   "run_id": "b0399874-bbd0-4e9c-a193-41f51449fb75",
+   "model": "MiniMax-M3",
+   "provider": "minimax"
+  },
+  "run": {
+   "run_id": "b0399874-bbd0-4e9c-a193-41f51449fb75",
+   "status": "completed",
+   "model": "MiniMax-M3",
+   "provider": "minimax",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 25222,
+   "output_tokens": 413,
+   "started_at": "2026-09-28 19:43:36.680430+00:00",
+   "completed_at": "2026-09-28 19:43:57.372735+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "e020847f-ca0a-462c-9b3f-ef159f4faef1",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:43:42.672334+00:00",
+    "run_id": "b0399874-bbd0-4e9c-a193-41f51449fb75",
+    "thread_id": "672402db-6122-4b1a-bf8c-7da7fc3ff602",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 1
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "b0399874-bbd0-4e9c-a193-41f51449fb75",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   }
+  ],
+  "tools": [
+   "search_documents"
+  ]
+ },
+ "v3": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 1,
+  "folders": [
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ }
+}

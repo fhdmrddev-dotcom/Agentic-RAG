@@ -1,0 +1,15 @@
+== F-1 re-drive THROUGH THE SERVER (pid 89432, started 2026-09-24T21:21:59Z, after fix a0c1b0ea6 at 20:03:56Z) — 2026-09-24T21:33:04.619031+00:00
+jobs BEFORE: {"id": "103c04c8-b385-4ef3-a179-8b627438cd54", "status": "completed", "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "created_at": "2026-09-24 19:54:14.489712+00:00"}
+doc BEFORE:  {"status": "completed", "chunk_count": 3, "error_message": null, "file_path": "3dce4e6b-e31b-4fe6-8b06-511781e08837/06f16045-f301-4ca4-826d-4e9c86a6cf1d/acme_q3_2026_financial_report.md", "updated_at": "2026-09-24 19:54:14.443357+00:00", "chunks": 3, "embedded": 3}
+PLANT (LOCAL SQL): UPDATE documents SET status='failed', error_message='266-05 planted failure (server re-drive)' WHERE id='06f16045-f301-4ca4-826d-4e9c86a6cf1d'
+GET /experts/00000000-0000-0000-0000-000000000259 after plant -> 200 install={'state': 'failed', 'folder_id': 'e6601dfc-7b54-4555-9e93-dc2ee94795bd', 'cause': '266-05 planted failure (server re-drive)', 'cause_source': 'document', 'can_install': True, 'updated_at': '2026-09-24T20:03:34.208564Z'}
+POST /experts/00000000-0000-0000-0000-000000000259/install (the Retry) headers={'X-Org-Id': '1fd7000d-adc2-477a-89d8-877d0e367376'} -> 202 {"expert_bundle_id":"00000000-0000-0000-0000-000000000259","corpus_version":"9bbb510c6038217f57deb84ea9265559a3e4180fe40a00fcb73619ece4c8e757","install":{"state":"installing","folder_id":"e6601dfc-7b54-4555-9e93-dc2ee94795bd","cause":null,"cause_source":null,"can_install":true,"updated_at":"2026-09-24T21:33:10.578549Z"}}
+final install = {'state': 'ready', 'folder_id': 'e6601dfc-7b54-4555-9e93-dc2ee94795bd', 'cause': None, 'cause_source': None, 'can_install': True, 'updated_at': '2026-09-24T21:33:10.578549Z'}
+jobs AFTER:  {"id": "103c04c8-b385-4ef3-a179-8b627438cd54", "status": "completed", "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "created_at": "2026-09-24 19:54:14.489712+00:00"}
+doc AFTER:   {"status": "completed", "chunk_count": 3, "error_message": null, "file_path": "3dce4e6b-e31b-4fe6-8b06-511781e08837/06f16045-f301-4ca4-826d-4e9c86a6cf1d/acme_q3_2026_financial_report.md", "updated_at": "2026-09-24 19:54:14.443357+00:00", "chunks": 3, "embedded": 3}
+
+SELECT c.id, c.chunk_index, c.org_id, c.created_at, (c.embedding IS NOT NULL) AS embedded FROM document_chunks c WHERE c.document_id='06f16045-f301-4ca4-826d-4e9c86a6cf1d' ORDER BY c.chunk_index;
+chunks AFTER (server re-drive):
+{"id": "ff582a28-3e3c-4c4d-916e-7e382038c4cb", "chunk_index": 0, "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "created_at": "2026-09-24 21:33:15.065272+00:00", "embedded": true}
+{"id": "84a8871c-485b-41e9-a73d-f29e9975fa6d", "chunk_index": 1, "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "created_at": "2026-09-24 21:33:15.065272+00:00", "embedded": true}
+{"id": "eafa948d-c702-435b-8e17-c941e209f3e9", "chunk_index": 2, "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "created_at": "2026-09-24 21:33:15.065272+00:00", "embedded": true}

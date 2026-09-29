@@ -54,7 +54,7 @@ class ExpertBundleBase(BaseModel):
     example_output: str = Field(default="", max_length=4000, description="Sample deliverable or output snippet")
     description: str = Field(default="", max_length=8000)
     scope_mode: ScopeMode = Field(default="restricted")
-    tool_floor_enabled: bool = Field(default=True, description="Whether deliverable tools are kept as additive floor")
+    tool_floor_enabled: bool = Field(default=True, description="Kept for compatibility; not read since Phase 267 (D-267-02). An Expert never removes tools.")
     member_skills: list[str] = Field(default_factory=list)
     required_connections: list[str] = Field(default_factory=list)
     knowledge_folder_ids: list[UUID] = Field(default_factory=list)
@@ -113,7 +113,7 @@ class ExpertBundleUpdate(BaseModel):
     example_output: str | None = Field(default=None, max_length=4000)
     description: str | None = Field(default=None, max_length=8000)
     scope_mode: ScopeMode | None = None
-    tool_floor_enabled: bool | None = None
+    tool_floor_enabled: bool | None = Field(default=None, description="Kept for compatibility; not read since Phase 267 (D-267-02). An Expert never removes tools.")
     member_skills: list[str] | None = None
     required_connections: list[str] | None = None
     knowledge_folder_ids: list[UUID] | None = None

@@ -3,15 +3,15 @@ seed_id: SEED-304
 title: PACK-05 — the Financial Analyzer's knowledge is unreachable from any real org
 created: 2026-09-23
 surface: Agentic-RAG
-status: planted
+status: answered
 partial: false
-status_note:
+status_note: ANSWERED by Phase 266 (2026-09-25) — every SC#3 and SC#4 row in .planning/phases/266-expert-knowledge-in-a-real-org/266-UAT-LOG.md is PASS (SC#3a, SC#3-control, SC#3b, SC#3c, SC#4-revenue, SC#4-refusal, SC#4-flip; org-joined search.query → documents.org_id evidence), plus the real-RLS fence backend/tests/integration/test_266_two_org_fence.py (6 passed; 3 failed against the base resolver). Earlier note, kept — Folded into Phase 266 at discuss (2026-09-23) — option 2, per-org provisioning via explicit Install + expert_installs (mig 195); see 266-CONTEXT.md D-266-01..17
 trigger_when: The next milestone's scoping (/gsd:new-milestone) — PACK-05 is an unmet v4.3 requirement carried forward by decision; also any phase touching expert knowledge scoping, folder sharing, or org provisioning.
 trigger_paths: ["supabase/migrations/188_expert_chat_scoping.sql", "backend/app/utils/folder_utils.py", "backend/app/services/run_producer.py", "backend/app/services/expert_service.py", "backend/tests/unit/test_260_financial_analyzer_conversation.py"]
 trigger_surfaces: []
 migration_note:
 relates_to: ["Phase 260", "PACK-05", ".planning/v4.3-MILESTONE-AUDIT.md", ".planning/phases/260-the-expert-you-can-actually-use/260-VERIFICATION.md"]
-folded_into: null
+folded_into: "266"
 renumbered_from: null
 renumbered_because: null
 ---

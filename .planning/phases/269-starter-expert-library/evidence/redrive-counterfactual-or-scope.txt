@@ -1,0 +1,61 @@
+== 269 re-drive — read-only counterfactual of every OR-shaped (and every) query_documents SQL the re-drive's models wrote
+   2026-09-29T16:16:15Z — test org 21274586-64aa-42a8-81fe-7dedac7740fd
+   Method: each SQL is taken verbatim from messages.tool_calls[*].args.query of the persisted re-drive turns and run through
+   sql_service.query_documents (the same user-context RPC path, as the uat269b admin, folder_ids=[that Expert's install folder]) twice:
+   once with _inject_folder_scope from 464ec8354^ (PRE-FIX) and once with the current one (CURRENT). SELECT only; nothing written.
+   Purpose: say which PASS turns actually DISCRIMINATE the fix (PRE-FIX would have leaked) and which would have passed anyway.
+
+== financial-analyzer refusal call 5
+   model SQL: SELECT d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.metadata->>'title' ILIKE '%PTO%' OR d.metadata->>'title' ILIKE '%time off%' OR d.metadata->>'title' ILIKE '%vacation%' OR d.metadata->>'title' ILIKE '%leave%' OR d.filename ILIKE '%pto%' OR d.filename ILIKE '%vacation%' OR d.filename ILIKE '%leave%'
+   PRE-FIX scoped SQL: SELECT d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.metadata->>'title' ILIKE '%PTO%' OR d.metadata->>'title' ILIKE '%time off%' OR d.metadata->>'title' ILIKE '%vacation%' OR d.metadata->>'title' ILIKE '%leave%' OR d.filename ILIKE '%pto%' OR d.filename ILIKE '%vacation%' OR d.filename ILIKE '%leave%' AND d.folder_id IN ('f69dc682-03c8-4c70-9477-e73d796e667a')
+   PRE-FIX result: No results.
+   CURRENT scoped SQL: SELECT d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE (d.metadata->>'title' ILIKE '%PTO%' OR d.metadata->>'title' ILIKE '%time off%' OR d.metadata->>'title' ILIKE '%vacation%' OR d.metadata->>'title' ILIKE '%leave%' OR d.filename ILIKE '%pto%' OR d.filename ILIKE '%vacation%' OR d.filename ILIKE '%leave%') AND d.folder_id IN ('f69dc682-03c8-4c70-9477-e73d796e667a')
+   CURRENT result: No results.
+== contract-reviewer refusal call 4
+   model SQL: SELECT d.filename, d.metadata->>'title' AS title, d.metadata->>'topics' AS topics, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.filename ILIKE '%otd%' OR d.filename ILIKE '%on-time%' OR d.filename ILIKE '%delivery%' OR d.filename ILIKE '%logistics%' OR d.filename ILIKE '%shipping%' OR d.filename ILIKE '%kpi%' OR d.metadata->>'title' ILIKE '%on-time%' OR d.metadata->>'title' ILIKE '%delivery%' OR d.metadata->>'title' ILIKE '%logistics%' OR d.metadata->>'title' ILIKE '%performance%' OR d.metadata->>'title' ILIKE '%KPI%'
+   PRE-FIX scoped SQL: SELECT d.filename, d.metadata->>'title' AS title, d.metadata->>'topics' AS topics, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.filename ILIKE '%otd%' OR d.filename ILIKE '%on-time%' OR d.filename ILIKE '%delivery%' OR d.filename ILIKE '%logistics%' OR d.filename ILIKE '%shipping%' OR d.filename ILIKE '%kpi%' OR d.metadata->>'title' ILIKE '%on-time%' OR d.metadata->>'title' ILIKE '%delivery%' OR d.metadata->>'title' ILIKE '%logistics%' OR d.metadata->>'title' ILIKE '%performance%' OR d.metadata->>'title' ILIKE '%KPI%' AND d.folder_id IN ('0ca746f3-193c-419b-9954-9da5611e3e31')
+   PRE-FIX result: No results.
+   CURRENT scoped SQL: SELECT d.filename, d.metadata->>'title' AS title, d.metadata->>'topics' AS topics, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE (d.filename ILIKE '%otd%' OR d.filename ILIKE '%on-time%' OR d.filename ILIKE '%delivery%' OR d.filename ILIKE '%logistics%' OR d.filename ILIKE '%shipping%' OR d.filename ILIKE '%kpi%' OR d.metadata->>'title' ILIKE '%on-time%' OR d.metadata->>'title' ILIKE '%delivery%' OR d.metadata->>'title' ILIKE '%logistics%' OR d.metadata->>'title' ILIKE '%performance%' OR d.metadata->>'title' ILIKE '%KPI%') AND d.folder_id IN ('0ca746f3-193c-419b-9954-9da5611e3e31')
+   CURRENT result: No results.
+== contract-reviewer refusal call 6
+   model SQL: SELECT d.filename, d.metadata->>'title' AS title, d.metadata->>'document_type' AS doc_type, d.metadata->>'summary' AS summary FROM documents d JOIN folders f ON d.folder_id = f.id WHERE f.name = 'Contracts & Agreements' OR f.name ILIKE '%Contract%'
+   PRE-FIX scoped SQL: SELECT d.filename, d.metadata->>'title' AS title, d.metadata->>'document_type' AS doc_type, d.metadata->>'summary' AS summary FROM documents d JOIN folders f ON d.folder_id = f.id WHERE f.name = 'Contracts & Agreements' OR f.name ILIKE '%Contract%' AND d.folder_id IN ('0ca746f3-193c-419b-9954-9da5611e3e31')
+   PRE-FIX result: title | summary | doc_type | filename
+--- | --- | --- | ---
+ACME Corporation - Contract Renewal and Termination Schedule 2026 | The document outlines ACME Corporation's contract renewal and termination schedule for 2026, along with the first half of 2027. It includes details on agreement types, renewal dates, and notice windows for each contract. Adjustments mechanisms are provided for pricing, and the ownership structure of agreements is detailed for those exceeding $1M in value. | corporate schedule | acme_contract_renewal_schedule_2026.md
+Master Services Agreement - ACME Corporation and Kestrel Freight Partners Ltd. | This document is a Master Services Agreement between ACME Corporation a
+   CURRENT scoped SQL: SELECT d.filename, d.metadata->>'title' AS title, d.metadata->>'document_type' AS doc_type, d.metadata->>'summary' AS summary FROM documents d JOIN folders f ON d.folder_id = f.id WHERE (f.name = 'Contracts & Agreements' OR f.name ILIKE '%Contract%') AND d.folder_id IN ('0ca746f3-193c-419b-9954-9da5611e3e31')
+   CURRENT result: title | summary | doc_type | filename
+--- | --- | --- | ---
+ACME Corporation - Contract Renewal and Termination Schedule 2026 | The document outlines ACME Corporation's contract renewal and termination schedule for 2026, along with the first half of 2027. It includes details on agreement types, renewal dates, and notice windows for each contract. Adjustments mechanisms are provided for pricing, and the ownership structure of agreements is detailed for those exceeding $1M in value. | corporate schedule | acme_contract_renewal_schedule_2026.md
+Master Services Agreement - ACME Corporation and Kestrel Freight Partners Ltd. | This document is a Master Services Agreement between ACME Corporation a
+== hr-policy-advisor refusal call 3
+   model SQL: SELECT d.id, d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id
+   PRE-FIX scoped SQL: SELECT d.id, d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.folder_id IN ('c8c33155-802e-44f2-ba2a-21b076e7c25e')
+   PRE-FIX result: id | title | folder | filename
+--- | --- | --- | ---
+498e0bc8-8a3f-4e5a-a43a-077f5f5d40c2 | ACME Corporation - Employee Handbook 2026 | HR Policies & Handbook | acme_employee_handbook_2026.md
+1e544e8f-7d11-4287-b9b5-cb4aa6bfca43 | ACME Corporation - Learning, Development and Expense Policy 2026 | HR Policies & Handbook | acme_learning_and_expense_policy_2026.md
+   CURRENT scoped SQL: SELECT d.id, d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.folder_id IN ('c8c33155-802e-44f2-ba2a-21b076e7c25e')
+   CURRENT result: id | title | folder | filename
+--- | --- | --- | ---
+498e0bc8-8a3f-4e5a-a43a-077f5f5d40c2 | ACME Corporation - Employee Handbook 2026 | HR Policies & Handbook | acme_employee_handbook_2026.md
+1e544e8f-7d11-4287-b9b5-cb4aa6bfca43 | ACME Corporation - Learning, Development and Expense Policy 2026 | HR Policies & Handbook | acme_learning_and_expense_policy_2026.md
+== security-compliance refusal call 4
+   model SQL: SELECT d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.filename ILIKE '%revenue%' OR d.filename ILIKE '%financial%' OR d.filename ILIKE '%earnings%' OR d.filename ILIKE '%10-K%' OR d.metadata->>'title' ILIKE '%revenue%' OR d.metadata->>'title' ILIKE '%financial%' OR d.metadata->>'title' ILIKE '%earnings%'
+   PRE-FIX scoped SQL: SELECT d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.filename ILIKE '%revenue%' OR d.filename ILIKE '%financial%' OR d.filename ILIKE '%earnings%' OR d.filename ILIKE '%10-K%' OR d.metadata->>'title' ILIKE '%revenue%' OR d.metadata->>'title' ILIKE '%financial%' OR d.metadata->>'title' ILIKE '%earnings%' AND d.folder_id IN ('f1cf7aa1-c499-4379-bc50-dbd5ec97174a')
+   PRE-FIX result: title | folder | filename
+--- | --- | ---
+ACME Corporation - Q3 2026 Financial Results and Form 10-K Report | Financial Reports & Filings | acme_q3_2026_financial_report.md
+   CURRENT scoped SQL: SELECT d.filename, d.metadata->>'title' AS title, f.name AS folder FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE (d.filename ILIKE '%revenue%' OR d.filename ILIKE '%financial%' OR d.filename ILIKE '%earnings%' OR d.filename ILIKE '%10-K%' OR d.metadata->>'title' ILIKE '%revenue%' OR d.metadata->>'title' ILIKE '%financial%' OR d.metadata->>'title' ILIKE '%earnings%') AND d.folder_id IN ('f1cf7aa1-c499-4379-bc50-dbd5ec97174a')
+   CURRENT result: No results.
+== operations-analyst refusal call 3
+   model SQL: SELECT d.filename, d.metadata->>'title' AS title, d.metadata->>'topics' AS topics FROM documents d JOIN folders f ON d.folder_id = f.id WHERE f.name ILIKE '%Operations%' AND (d.filename ILIKE '%leave%' OR d.filename ILIKE '%parental%' OR d.filename ILIKE '%maternity%' OR d.filename ILIKE '%paternity%' OR d.filename ILIKE '%family%' OR d.metadata->>'title' ILIKE '%leave%' OR d.metadata->>'title' ILIKE '%parental%' OR d.metadata->>'title' ILIKE '%maternity%' OR d.metadata->>'title' ILIKE '%paternity%' OR d.metadata->>'title' ILIKE '%family%')
+   PRE-FIX scoped SQL: SELECT d.filename, d.metadata->>'title' AS title, d.metadata->>'topics' AS topics FROM documents d JOIN folders f ON d.folder_id = f.id WHERE f.name ILIKE '%Operations%' AND (d.filename ILIKE '%leave%' OR d.filename ILIKE '%parental%' OR d.filename ILIKE '%maternity%' OR d.filename ILIKE '%paternity%' OR d.filename ILIKE '%family%' OR d.metadata->>'title' ILIKE '%leave%' OR d.metadata->>'title' ILIKE '%parental%' OR d.metadata->>'title' ILIKE '%maternity%' OR d.metadata->>'title' ILIKE '%paternity%' OR d.metadata->>'title' ILIKE '%family%') AND d.folder_id IN ('b1484454-a51c-436b-a2cf-b38e9946a486')
+   PRE-FIX result: No results.
+   CURRENT scoped SQL: SELECT d.filename, d.metadata->>'title' AS title, d.metadata->>'topics' AS topics FROM documents d JOIN folders f ON d.folder_id = f.id WHERE (f.name ILIKE '%Operations%' AND (d.filename ILIKE '%leave%' OR d.filename ILIKE '%parental%' OR d.filename ILIKE '%maternity%' OR d.filename ILIKE '%paternity%' OR d.filename ILIKE '%family%' OR d.metadata->>'title' ILIKE '%leave%' OR d.metadata->>'title' ILIKE '%parental%' OR d.metadata->>'title' ILIKE '%maternity%' OR d.metadata->>'title' ILIKE '%paternity%' OR d.metadata->>'title' ILIKE '%family%')) AND d.folder_id IN ('b1484454-a51c-436b-a2cf-b38e9946a486')
+   CURRENT result: No results.
+
+SUMMARY: 6 query_documents calls across 5 refusal turns (0 in cited turns); 4 OR-shaped WHERE (financial-analyzer c5, contract-reviewer c4, security-compliance c4, operations-analyst c3 [self-parenthesised + ANDed on its own folder name]) + contract-reviewer c6 (OR over folder NAMES that match only its own folder) + hr-policy-advisor c3 (no WHERE).
+DISCRIMINATING: security-compliance refusal call 4 ONLY — PRE-FIX returns acme_q3_2026_financial_report.md (folder 'Financial Reports & Filings', the Financial Analyzer's), CURRENT returns 'No results.'
+NON-DISCRIMINATING: every other call returns the same rows under both versions (no foreign document either way) — those PASSes would have passed before the fix too.

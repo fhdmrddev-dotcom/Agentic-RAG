@@ -350,7 +350,10 @@ async def test_insert_run_accepts_parent_run_id_kwarg():
     assert "$8" in sql
     # The parent_run_id value MUST be the 8th positional arg (after pool, run_id, thread_id,
     # user_id, status, model, provider, spawned_by_worker — i.e. positions 1..8 in the args)
-    assert args[-1] == parent_run_id
+    # ⚠ Phase 268 (D-268-19): this read `args[-1]`, which was the 8th bound value only while
+    # parent_run_id was the LAST one. insert_run now binds org_id ($9) and expert_id ($10) after
+    # it, so the 8th bound value is addressed by position — the property the comment above states.
+    assert args[8] == parent_run_id
 
 
 @pytest.mark.asyncio

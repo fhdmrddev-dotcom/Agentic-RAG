@@ -1,0 +1,20 @@
+slug: hr-policy-advisor
+org_id: 21274586-64aa-42a8-81fe-7dedac7740fd
+model: deepseek-v4-flash provider: deepseek embedding_model: text-embedding-3-small (embedding_provider=openai, dims=1536, source=app_settings.global)
+re-drive after BUG-260929-01 fix 464ec8354; questions fixed in .planning/phases/269-starter-expert-library/269-REDRIVE-QUESTIONS.md before driving; HEAD dfa95c0793b73fa3aef0353a8103bd9249bff178
+== install hr-policy-advisor (00000000-0000-0000-0000-000000002692) — 2026-09-29T16:10:28.326167+00:00  (mechanism: POST /experts/{id}/install only, D-269-08)
+POST /experts/00000000-0000-0000-0000-000000002692/install headers={'X-Org-Id': '21274586-64aa-42a8-81fe-7dedac7740fd'} (Authorization: Bearer <redacted>) -> HTTP 202 body={"expert_bundle_id":"00000000-0000-0000-0000-000000002692","corpus_version":"10b7edffacaa6174c4e0453e3e39398083fe9ef657c2cd8e378d10deafcca60b","install":{"state":"installing","folder_id":"c8c33155-802e-44f2-ba2a-21b076e7c25e","cause":null,"cause_source":null,"can_install":true,"updated_at":"2026-09-29T16:10:28.592684Z"}}
+polls (3), first and last:
+2026-09-29T16:10:30.665058+00:00 GET /experts/00000000-0000-0000-0000-000000002692 -> 200 install={"state": "installing", "folder_id": "c8c33155-802e-44f2-ba2a-21b076e7c25e", "cause": null, "cause_source": null, "can_install": true, "updated_at": "2026-09-29T16:10:28.592684Z"}
+2026-09-29T16:10:34.818260+00:00 GET /experts/00000000-0000-0000-0000-000000002692 -> 200 install={"state": "ready", "folder_id": "c8c33155-802e-44f2-ba2a-21b076e7c25e", "cause": null, "cause_source": null, "can_install": true, "updated_at": "2026-09-29T16:10:28.592684Z"}
+state sequence: installing -> ready
+final install.state = ready
+SQL: SELECT org_id, expert_bundle_id, installed_by, status, folder_id, corpus_version, error FROM expert_installs WHERE org_id='21274586-64aa-42a8-81fe-7dedac7740fd' AND expert_bundle_id='00000000-0000-0000-0000-000000002692'
+{"org_id": "21274586-64aa-42a8-81fe-7dedac7740fd", "expert_bundle_id": "00000000-0000-0000-0000-000000002692", "installed_by": "81dc4cd7-363e-44e8-b9ff-ae32f97e2ad6", "status": "installed", "folder_id": "c8c33155-802e-44f2-ba2a-21b076e7c25e", "corpus_version": "10b7edffacaa6174c4e0453e3e39398083fe9ef657c2cd8e378d10deafcca60b", "error": null}
+SQL: SELECT d.id AS doc_id, d.filename, d.org_id, d.folder_id, d.status, d.chunk_count, count(c.*) AS chunks, count(c.*) FILTER (WHERE c.embedding IS NOT NULL) AS embedded, count(c.*) FILTER (WHERE c.org_id = d.org_id) AS chunks_in_doc_org, f.org_id AS folder_org, f.name AS folder_name FROM documents d JOIN folders f ON f.id=d.folder_id LEFT JOIN document_chunks c ON c.document_id=d.id WHERE d.folder_id = 'c8c33155-802e-44f2-ba2a-21b076e7c25e' GROUP BY d.id, d.filename, d.org_id, d.folder_id, d.status, d.chunk_count, f.org_id, f.name ORDER BY d.filename
+{"doc_id": "498e0bc8-8a3f-4e5a-a43a-077f5f5d40c2", "filename": "acme_employee_handbook_2026.md", "org_id": "21274586-64aa-42a8-81fe-7dedac7740fd", "folder_id": "c8c33155-802e-44f2-ba2a-21b076e7c25e", "status": "completed", "chunk_count": 5, "chunks": 5, "embedded": 5, "chunks_in_doc_org": 5, "folder_org": "21274586-64aa-42a8-81fe-7dedac7740fd", "folder_name": "HR Policies & Handbook"}
+{"doc_id": "1e544e8f-7d11-4287-b9b5-cb4aa6bfca43", "filename": "acme_learning_and_expense_policy_2026.md", "org_id": "21274586-64aa-42a8-81fe-7dedac7740fd", "folder_id": "c8c33155-802e-44f2-ba2a-21b076e7c25e", "status": "completed", "chunk_count": 3, "chunks": 3, "embedded": 3, "chunks_in_doc_org": 3, "folder_org": "21274586-64aa-42a8-81fe-7dedac7740fd", "folder_name": "HR Policies & Handbook"}
+SQL: SELECT count(*) FROM document_chunks WHERE document_id = ANY(ARRAY['498e0bc8-8a3f-4e5a-a43a-077f5f5d40c2', '1e544e8f-7d11-4287-b9b5-cb4aa6bfca43']::uuid[]) AND embedding IS NOT NULL -> 8
+SQL: SELECT count(*) FILTER (WHERE org_id <> '21274586-64aa-42a8-81fe-7dedac7740fd') FROM document_chunks WHERE document_id = ANY(<ids>) -> 0
+checks: install 202=True; state ready=True; docs=2; embedded chunks=8; chunks outside test org=0
+VERDICT: PASS

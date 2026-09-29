@@ -1,0 +1,35 @@
+== 269 RE-DRIVE users, org and tier — 2026-09-29T16:10:01.774977+00:00
+HEAD: dfa95c0793b73fa3aef0353a8103bd9249bff178  (BUG-260929-01 fix 464ec8354; backend restarted 20:05 local, after the fix)
+DB: local 127.0.0.1:54322/postgres (NOT production; Supabase MCP not used)
+embedding_model: text-embedding-3-small (embedding_provider=openai, dims=1536, source=app_settings.global)
+app_settings.global web_search: {"web_search_enabled": true, "tavily_key_in_app_settings": false}
+signup admin: POST http://127.0.0.1:54321/auth/v1/signup email=uat269b-admin-0a2e5c@example.test -> HTTP 200 user_id=81dc4cd7-363e-44e8-b9ff-ae32f97e2ad6 session=yes
+signup member: POST http://127.0.0.1:54321/auth/v1/signup email=uat269b-member-0a2e5c@example.test -> HTTP 200 user_id=d1016557-8107-45b4-baa4-1037458facc1 session=yes
+SQL: SELECT m.user_id, u.email, m.org_id, m.role, o.name, o.subscription_tier FROM org_members m JOIN auth.users u ON u.id=m.user_id JOIN organizations o ON o.id=m.org_id WHERE m.user_id = ANY(ARRAY[<admin>,<member>]::uuid[]) ORDER BY u.email
+{"user_id": "81dc4cd7-363e-44e8-b9ff-ae32f97e2ad6", "email": "uat269b-admin-0a2e5c@example.test", "org_id": "21274586-64aa-42a8-81fe-7dedac7740fd", "role": "org-admin", "name": "uat269b-admin-0a2e5c@example.test's Organization", "subscription_tier": null}
+{"user_id": "d1016557-8107-45b4-baa4-1037458facc1", "email": "uat269b-member-0a2e5c@example.test", "org_id": "97eb28a0-52e2-42b8-baa9-c44ea27db185", "role": "org-admin", "name": "uat269b-member-0a2e5c@example.test's Organization", "subscription_tier": null}
+TEST ORG = admin's personal org 21274586-64aa-42a8-81fe-7dedac7740fd; subscription_tier right after signup = None
+SQL: INSERT INTO org_members (org_id, user_id, role) VALUES ('21274586-64aa-42a8-81fe-7dedac7740fd', 'd1016557-8107-45b4-baa4-1037458facc1', 'member')  (LOCAL, 266 precedent)
+{"user_id": "81dc4cd7-363e-44e8-b9ff-ae32f97e2ad6", "email": "uat269b-admin-0a2e5c@example.test", "org_id": "21274586-64aa-42a8-81fe-7dedac7740fd", "role": "org-admin", "name": "uat269b-admin-0a2e5c@example.test's Organization", "subscription_tier": null}
+{"user_id": "d1016557-8107-45b4-baa4-1037458facc1", "email": "uat269b-member-0a2e5c@example.test", "org_id": "21274586-64aa-42a8-81fe-7dedac7740fd", "role": "member", "name": "uat269b-admin-0a2e5c@example.test's Organization", "subscription_tier": null}
+{"user_id": "d1016557-8107-45b4-baa4-1037458facc1", "email": "uat269b-member-0a2e5c@example.test", "org_id": "97eb28a0-52e2-42b8-baa9-c44ea27db185", "role": "org-admin", "name": "uat269b-member-0a2e5c@example.test's Organization", "subscription_tier": null}
+
+--- catalog BEFORE the tier step
+GET /experts headers={'X-Org-Id': '21274586-64aa-42a8-81fe-7dedac7740fd'} (Authorization: Bearer <redacted>) -> HTTP 403 body={"detail":{"detail":"Capability 'experts' requires 'enterprise' tier (current tier: 'unassigned')","error":"entitlement_required","capability":"experts","required_tier":"enterprise","current_tier":null,"upgrade_hint":"Upgrade to Enterprise to use experts."}}
+
+== F-4 operator tier assignment (D-269-P1) — 2026-09-29T16:10:02.057298+00:00
+   Named, evidenced LOCAL data step. Tiers stay operator-assigned (D-269-P1). No code, no migration, no handle_new_user change.
+subscription_tier before: None
+SQL: UPDATE organizations SET subscription_tier = 'enterprise' WHERE id = '21274586-64aa-42a8-81fe-7dedac7740fd'
+-> UPDATE 1
+subscription_tier after: 'enterprise'
+subscription_tier: null -> enterprise (org 21274586-64aa-42a8-81fe-7dedac7740fd)
+
+--- catalog AFTER the tier step
+GET /experts (admin) -> HTTP 200
+{"id": "00000000-0000-0000-0000-000000002691", "slug": "contract-reviewer", "is_system": true, "install.state": "not_installed", "can_install": true}
+{"id": "00000000-0000-0000-0000-000000000259", "slug": "financial-analyzer", "is_system": true, "install.state": "not_installed", "can_install": true}
+{"id": "00000000-0000-0000-0000-000000002692", "slug": "hr-policy-advisor", "is_system": true, "install.state": "not_installed", "can_install": true}
+{"id": "00000000-0000-0000-0000-000000002694", "slug": "operations-analyst", "is_system": true, "install.state": "not_installed", "can_install": true}
+{"id": "00000000-0000-0000-0000-000000002693", "slug": "security-compliance", "is_system": true, "install.state": "not_installed", "can_install": true}
+distinct slugs (5): ['contract-reviewer', 'financial-analyzer', 'hr-policy-advisor', 'operations-analyst', 'security-compliance']

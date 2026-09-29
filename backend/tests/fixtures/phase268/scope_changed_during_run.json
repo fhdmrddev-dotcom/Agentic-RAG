@@ -1,0 +1,54 @@
+{
+  "kind": "scope_changed",
+  "at": "2026-09-28T14:35:00Z",
+  "from_folder": {
+    "id": "f3000000-0000-4000-8000-000000000003",
+    "name": "Client ACME",
+    "doc_count": 4,
+    "path": "Client ACME"
+  },
+  "to_folder": {
+    "id": "f4000000-0000-4000-8000-000000000004",
+    "name": "Contracts",
+    "doc_count": 2,
+    "path": "Client ACME/Contracts"
+  },
+  "expert": {
+    "id": "e1000000-0000-4000-8000-0000000000fa",
+    "name": "Financial Analyzer",
+    "scope_mode": "biased"
+  },
+  "held": false,
+  "now": {
+    "folders": [
+      {
+        "id": "f1000000-0000-4000-8000-000000000001",
+        "name": "Financial Reports & Filings",
+        "doc_count": null
+      }
+    ],
+    "thread_folder": {
+      "id": "f4000000-0000-4000-8000-000000000004",
+      "name": "Contracts",
+      "doc_count": 2,
+      "path": "Client ACME/Contracts"
+    },
+    "all_documents": false,
+    "connections": [
+      "Slack"
+    ]
+  },
+  "dropped": {
+    "folders": [],
+    "thread_folder": {
+      "id": "f3000000-0000-4000-8000-000000000003",
+      "name": "Client ACME",
+      "doc_count": 4,
+      "path": "Client ACME"
+    },
+    "all_documents": false,
+    "connections": []
+  },
+  "saved": null,
+  "during_run": true
+}

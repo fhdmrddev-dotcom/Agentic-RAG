@@ -6,7 +6,7 @@ Validates scenarios:
   - S2: Data-driven permission denial (HTTP 403 on missing experts:manage, role_permissions driven)
   - S4: Union scope retrieval composition (thread folder + expert folders unified)
   - S5: Strict isolation retrieval (restricted scope exclusively in expert folders)
-  - S6: Additive tool floor (deliverable tools retained and enabled)
+  - S6: Additive tool floor — Phase 267: an Expert computes no tool list, so nothing is removed
   - S8: Clone-on-customise (system templates remain immutable; tenant clone is independent)
 """
 
@@ -27,8 +27,8 @@ from app.services.expert_service import (
     get_expert_service,
     update_expert_service,
 )
+from app.services.agent_loop import RunContext
 from app.services.run_producer import _resolve_thread_scoping
-from app.services.tool_dispatcher import EXPERT_CORE_TOOLS, EXPERT_DELIVERABLE_TOOLS
 
 
 # ── Scenario S1: Authoring CRUD ──────────────────────────────────────────────
@@ -176,11 +176,15 @@ async def test_scenario_s4_union_scope_composition():
          patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_bundle)), \
          patch("app.utils.folder_utils.fetch_visible_folders", AsyncMock(return_value=all_folders)):
 
-        eff_folders, eff_tools, _, scoped_path, born_for = await _resolve_thread_scoping(
+        # Phase 267: a ThreadScoping NamedTuple, read by attribute (the field order changed).
+        scoping = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=thread_id,
             current_user={"id": user_id, "org_id": org_id},
             pool=MagicMock(),
+        )
+        eff_folders, scoped_path, born_for = (
+            scoping.effective_folder_ids, scoping.scoped_folder_path, scoping.born_for_bundle_id,
         )
 
         # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
@@ -233,11 +237,15 @@ async def test_scenario_s5_strict_isolation():
          patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_bundle)), \
          patch("app.utils.folder_utils.fetch_visible_folders", AsyncMock(return_value=all_folders)):
 
-        eff_folders, eff_tools, _, scoped_path, born_for = await _resolve_thread_scoping(
+        # Phase 267: a ThreadScoping NamedTuple, read by attribute (the field order changed).
+        scoping = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=thread_id,
             current_user={"id": user_id, "org_id": org_id},
             pool=MagicMock(),
+        )
+        eff_folders, scoped_path, born_for = (
+            scoping.effective_folder_ids, scoping.scoped_folder_path, scoping.born_for_bundle_id,
         )
 
         # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
@@ -255,7 +263,15 @@ async def test_scenario_s5_strict_isolation():
 
 @pytest.mark.asyncio
 async def test_scenario_s6_additive_tool_floor_deliverables():
-    """S6: Deliverable tools (execute_code, workspace_write, render_template, ask_user) are retained."""
+    """S6 — Phase 267 RE-DRIVE of "deliverable tools (execute_code, workspace_write, render_template,
+    ask_user) are retained in the Expert's tool whitelist".
+
+    The intent — an Expert never loses a deliverable tool — is kept and made stronger: there is
+    no whitelist any more, so the run receives NO tool slot to filter by and keeps every tool a
+    plain thread has (``test_267_tool_floor_union.py`` drives the real loop and proves
+    ``execute_code`` / ``workspace_write`` / ``ask_user`` reach an Expert thread). ``render_template``
+    was always a chat no-op here: it is harness-only and never in ``get_tools()``.
+    """
     thread_id = str(uuid4())
     expert_id = uuid4()
     user_id = str(uuid4())
@@ -281,24 +297,21 @@ async def test_scenario_s6_additive_tool_floor_deliverables():
     with patch("app.utils.db.aexec", AsyncMock(return_value=mock_t_resp)), \
          patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_bundle)):
 
-        _, eff_tools, _, _, born_for = await _resolve_thread_scoping(
+        scoping = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=thread_id,
             current_user={"id": user_id, "org_id": org_id},
             pool=MagicMock(),
         )
 
-        # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
-        # ResolvedExpertBundle.bundle_id, never the thread row's raw active_expert_id.
-        assert born_for == expert_id
+        # Phase 264 (PACK-17 / T-264-01) - the ACCESS-CHECKED ResolvedExpertBundle.bundle_id,
+        # never the thread row's raw active_expert_id.
+        assert scoping.born_for_bundle_id == expert_id
 
-        assert eff_tools is not None
-        # All deliverable tools are preserved
-        for deliv_tool in EXPERT_DELIVERABLE_TOOLS:
-            assert deliv_tool in eff_tools, f"Expected {deliv_tool} in expert effective tools"
-        # Core tools are preserved
-        for core_tool in EXPERT_CORE_TOOLS:
-            assert core_tool in eff_tools, f"Expected {core_tool} in expert effective tools"
+        # Nothing to filter by: no tool slot is handed to the loop, and the loop has no field
+        # that could carry one — so no deliverable tool can be stripped.
+        assert not hasattr(scoping, "effective_tools")
+        assert "effective_tools" not in RunContext.__dataclass_fields__
 
 
 # ── Scenario S8: Clone-On-Customise ─────────────────────────────────────────
@@ -582,7 +595,9 @@ async def test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert():
 
             # Granted user attempting to invite/set expert -> succeeds
             mock_table_select = MagicMock()
-            mock_table_select.data = {"id": "test-thread-id", "active_expert_id": str(bundle_id)}
+            # 267-REVIEW WR-03: `threads.org_id` is NOT NULL, and a bind is refused unless it is the
+            # gate's org — so the row carries the org it lives in, as every real row does.
+            mock_table_select.data = {"id": "test-thread-id", "active_expert_id": str(bundle_id), "org_id": str(org_id)}
             with patch("app.api.threads.aexec", AsyncMock(return_value=mock_table_select)):
                 res = await rename_thread(
                     thread_id="test-thread-id",

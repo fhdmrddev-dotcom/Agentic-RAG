@@ -1,0 +1,5 @@
+== SC#2 cold-cache probe — 2026-09-25T19:31:40.390279+00:00
+(1) GET /experts as u1 (org-admin), X-Org-Id e8c567c2-6f75-4c8b-94cf-92768831c035 -> (200, {'name': 'Drive Briefing Assistant', 'connection_state': [{'slug': 'google', 'name': 'google', 'connected': False}], 'can_connect': False})
+(2) GET /features as u1 -> 200 live_connectors=null  (this route awaits ensure_settings_fresh())
+(3) GET /experts as u1 again -> (200, {'name': 'Drive Briefing Assistant', 'connection_state': [{'slug': 'google', 'name': 'google', 'connected': False}], 'can_connect': True})
+(4) GET /experts as u2 (member) -> (200, {'name': 'Drive Briefing Assistant', 'connection_state': [{'slug': 'google', 'name': 'google', 'connected': False}], 'can_connect': False})

@@ -1,0 +1,42 @@
+slug: contract-reviewer
+org_id: 9042e46f-745d-40d6-83eb-c6984d582ce1
+model: deepseek-v4-flash provider: deepseek embedding_model: text-embedding-3-small (embedding_provider=openai, dims=1536, source=app_settings.global)
+== refusal (sibling corpus) — 2026-09-29T14:42:23.994616+00:00  same thread c7f5962b-93dd-4562-882e-4a6285853a12; install folder (contract-reviewer) = c33b2abd-2de5-4527-a58e-5935a7da2330
+sibling folders in the SAME org: {"financial-analyzer": "cc435f1e-b080-4066-bcb9-4bf3bb064898", "hr-policy-advisor": "d495a71d-e4fd-409b-88d7-35faf07b28d6", "security-compliance": "16db0107-a395-4381-8507-a9b65691afbb", "operations-analyst": "ac0768c8-275b-4970-b687-0ebbd7e075d4"}
+question (fixed in the Drive table before driving): What was ACME's on-time delivery rate in Q3 2026?
+sibling literal that must NOT appear: 94.7
+POST /threads/c7f5962b-93dd-4562-882e-4a6285853a12/messages headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (Authorization: Bearer <redacted>) body={"content": "What was ACME's on-time delivery rate in Q3 2026?", "model": "deepseek-v4-flash", "provider": "deepseek"} -> HTTP 201 body={"message_id":"f03449c5-ab02-44cd-9785-8ae572a6b475","run_id":"8b7168b3-d1a0-4748-ad15-442af34f7345","model":"deepseek-v4-flash","provider":"deepseek"}
+SQL: SELECT run_id, status, model, provider, org_id, expert_id, expert_attributed, error, started_at, completed_at FROM runs WHERE run_id = '8b7168b3-d1a0-4748-ad15-442af34f7345'
+run row: {"run_id": "8b7168b3-d1a0-4748-ad15-442af34f7345", "status": "completed", "model": "deepseek-v4-flash", "provider": "deepseek", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "expert_id": "00000000-0000-0000-0000-000000002691", "expert_attributed": true, "error": null, "started_at": "2026-09-29 14:42:24.377256+00:00", "completed_at": "2026-09-29 14:42:36.262436+00:00"}
+SQL: SELECT id, role, content, tool_calls, org_id, created_at FROM messages WHERE thread_id='c7f5962b-93dd-4562-882e-4a6285853a12' AND role='assistant' AND created_at >= '2026-09-29T14:42:24.333918+00:00' ORDER BY created_at -> 1 row(s)
+assistant text (full):
+I couldn't find any on-time delivery rate for Q3 2026 in your documents.
+
+A few specifics on what I checked:
+- A content search for "on-time delivery," "delivery rate," "Q3 2026," and "quarterly" across **/Contracts & Agreements** returned **zero matches**.
+- The folder contains only two documents: the **Master Services Agreement – ACME Corporation and Kestrel Freight Partners Ltd.** [1] and the **ACME Corporation – Contract Renewal and Termination Schedule 2026** [2].
+
+Neither is a performance or operations report — they contain contractual terms, not actual delivery-results data. The closest thing in the MSA is its *service-level targets* (what Kestrel is contractually required to hit), which are not the same as a measured on-time delivery rate:
+
+- Customs clearance within 2 business days — **97%** of entries per month [4]
+- Shipment status update within 4 hours of a milestone — **99%** of milestones per month [4]
+- Damage/loss claims acknowledged within 5 business days — **1%** credit if missed [4]
+
+If you're looking for ACME's *actual* Q3 2026 delivery performance, that data likely lives in an operations/KPI report that isn't in this folder. Want me to search elsewhere in your library, or would the contractual service-level targets above suffice?
+assistant message ec428957-1b42-4bc1-b2fe-a4745dbe95a3 org_id=9042e46f-745d-40d6-83eb-c6984d582ce1 tool_calls (raw, trimmed): [{"args": {"query": "ACME on-time delivery rate Q3 2026"}, "name": "search_documents", "result": "[{\"content\": \"lier - facilities | 2026-12-31 | Yes, 12 months | 45 days | $286K |\\n| OEM-2024-VRT-019 | Vertex Medical Imaging Inc. | Customer - OEM supply | 2026-10-01 | Yes, 36 months | 90 days | $9.25M revenue |\\n\\n## Notes on Notice Windows\\n\\n- A notice window is counted in calendar days back from the renewal date. Notice must be delivered in writing to the counterparty's legal notice address named in the agreement.\\n- The Northwind Analytics subscription renews automatically for a further 12 months unless ACME gives notice at least 60 days before 2026-11-15. The last compliant notice date is 2026-09-16.\\n- The Vertex Medical Imaging OEM agreement is ACME's largest single customer agreement by value. It renews automatically for 36 months unless either party gives notice at least 90 days before 2026-10-01.\\n- The Ridgeline headquarters lease does not auto-renew. ACME holds one option to extend for five years, exercisable by notice at least 180 days before expiry.\", \"document_id\": \"fdf3b7e3-e200-4aac-90aa-14f9e0970945\", \"filename\": \"acme_contract_renewal_schedule_2026.md\", \"chunk_index\": 2, \"similarity\": 0.4532573435590399, \"version_number\": 1, \"folder_id\": \"c33b2abd-2de5-4527-a58e-5935a7da2330\", \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"Unknown\", \"title\": \"ACME Corporation - Contract Renewal and Termination Schedule 2026\", \"author\": \"ACME Legal Operations\", \"topics\": [\"Contract Renewal\", \"Termination\", \"Legal Operations\", \"Commercial Agreements\"], \"summary\": \"This document is maintained by ACME Legal Operations and lists the active commercial agreements that renew or expire during the calendar year 2026 and the first half of 2027. It includes details of the renewal schedule, notes on notice windows, pricing adjustment clauses, and ownership. Renewal decisions for agreements with an annual value above $1M require approval from the Chief Financial Officer and the General Counsel.\", \"language\": \"english\", \"_confidence\": {\"d", "status": "done", "tool_call_id": "call_00_Q14nC9Aui25Rsv3Qla6I2521"}, {"args": {"path": "/Contracts & Agreements", "pattern": "on-time delivery"}, "name": "grep", "result": "{\"pattern\": \"on-time delivery\", \"path\": \"/Contracts & Agreements\", \"matches\": [], \"total\": 0}", "status": "done", "tool_call_id": "call_01_oO8k... <trimmed 1123 chars>
+tool names in tool_calls (key read: first of name/tool/tool_name/function.name per entry): ['search_documents', 'grep', 'grep', 'query_documents']
+cross-check audit_log action types in turn window: [{"action_type": "search.query", "n": 1}]
+web_search_calls: 0
+SQL: SELECT a.created_at, a.metadata->>'query_text' AS query_text, d.id AS doc_id, d.org_id AS doc_org, d.folder_id AS doc_folder, d.filename FROM audit_log a CROSS JOIN LATERAL jsonb_array_elements_text(a.metadata->'document_ids') x(doc) JOIN documents d ON d.id = x.doc::uuid WHERE a.action_type='search.query' AND a.user_id = 'b93a9c96-2de1-4e13-958c-10e5d6775fd0' AND a.created_at > '2026-09-29T14:42:23.994325+00:00' AND a.created_at <= '2026-09-29T14:42:38.465530+00:00' ORDER BY a.created_at
+{"created_at": "2026-09-29 14:42:27.714254+00:00", "query_text": "ACME on-time delivery rate Q3 2026", "doc_id": "dd5077cc-8641-48aa-9ffb-5a3fe55a929d", "doc_org": "9042e46f-745d-40d6-83eb-c6984d582ce1", "doc_folder": "c33b2abd-2de5-4527-a58e-5935a7da2330", "filename": "acme_msa_kestrel_freight_2026.md"}
+{"created_at": "2026-09-29 14:42:27.714254+00:00", "query_text": "ACME on-time delivery rate Q3 2026", "doc_id": "fdf3b7e3-e200-4aac-90aa-14f9e0970945", "doc_org": "9042e46f-745d-40d6-83eb-c6984d582ce1", "doc_folder": "c33b2abd-2de5-4527-a58e-5935a7da2330", "filename": "acme_contract_renewal_schedule_2026.md"}
+search.query rows in window (incl. zero-id rows):
+{"created_at": "2026-09-29 14:42:27.714254+00:00", "query_text": "ACME on-time delivery rate Q3 2026", "n_ids": 2}
+sibling_literal_present: false
+refusal-language regex -> "couldn't find"
+joined docs outside this Expert's install folder: 0
+-- SUPPLEMENTARY SCAN 2026-09-29T14:46:07.666956+00:00: every tool result of assistant message ec428957-1b42-4bc1-b2fe-a4745dbe95a3 (not only search.query) checked for documents of the test org
+   OUTSIDE this Expert's install folder c33b2abd-2de5-4527-a58e-5935a7da2330 (match on document id or filename; read-only, the turn was NOT re-driven)
+   tools called: ['search_documents', 'grep', 'grep', 'query_documents']
+   out_of_folder_documents_retrieved_by_any_tool: 0
+VERDICT: PASS

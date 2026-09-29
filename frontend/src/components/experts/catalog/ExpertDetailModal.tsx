@@ -46,10 +46,40 @@
  * at the footer's action would start a conversation WITHOUT the prompt the tile advertises — a
  * control that lies about itself, which is the dishonesty this phase exists to remove. Reasoning
  * and the re-open trigger are in `262-04-SUMMARY.md`.
+ *
+ * ⚠ PHASE 266 (D-266-01 / D-266-03) — THE PRIMARY CONTROL IS NOW SWAPPED BY INSTALL STATE, AND THE
+ * "TWO CONTROLS" RULE ABOVE STILL HOLDS. A first-party Expert's corpus reaches an org only when a
+ * manager installs it, so the footer's primary control is chosen by `installView`: Start Scoped
+ * Chat (ready, or an Expert with no install at all — the legacy path, byte-identical), Install /
+ * Retry install (a manager), or a status LINE with the reason (installing, or a non-manager). ⛔ It
+ * is never a dead button: a state that cannot act says why instead. ⛔ A failure cause is
+ * never rendered raw — `installView` classifies it through the Library's own vocabulary.
+ *
+ * ⚠ PHASE 267 (PACK-22 · D-267-06 / D-267-08) — `installView`'s `connect` arm. Each Required
+ * Connections pill states its connection's state (a missing one reads `<Service> · not …` in rose,
+ * from `connectionPills`), and the footer's primary control becomes Connect (a caller the server
+ * says may connect, with a Connections door wired) beside the requirement line, or one member
+ * sentence that names the requirement AND who can fix it. Start Scoped Chat is not rendered in that
+ * state, in any form. This modal reads no overlay field itself.
+ *
+ * ⚠ SEED-309 R265-262-04 (D-267-24): a start that returns a promise keeps the modal open until it
+ * settles, so the in-flight state (`startBusy`, owned by the page) is visible where it was pressed.
  */
 
 import { useEffect, useState } from "react"
-import { ChevronDown, ChevronRight, EyeOff, FolderClosed, Plug, Sparkles, Wrench } from "lucide-react"
+import {
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  EyeOff,
+  FolderClosed,
+  Loader2,
+  Plug,
+  RotateCcw,
+  Sparkles,
+  Wrench,
+} from "lucide-react"
 import { ExpertIcon } from "@/components/experts/expertIcon"
 import {
   Dialog,
@@ -60,7 +90,14 @@ import {
 } from "@/components/ui/dialog"
 import type { ExpertBundle, Folder } from "@/types"
 import { cn } from "@/lib/utils"
-import { resolveFolderNames } from "./expertCatalog"
+import {
+  CONNECTION_COPY,
+  INSTALL_COPY,
+  START_COPY,
+  connectionPills,
+  installView,
+  resolveFolderNames,
+} from "./expertCatalog"
 
 /**
  * ⛔ THE WORDING IS THE DELIVERABLE, so it lives in one place and its suite pins the literal.
@@ -92,14 +129,40 @@ function HonestLine({ children }: { children: React.ReactNode }) {
   return <p className="text-xs italic text-muted-foreground/80">{children}</p>
 }
 
-function NamePill({ icon, label, dim }: { icon: React.ReactNode; label: string; dim?: boolean }) {
+/** The footer's status line — the `HonestLine` voice, in the place a control would sit. */
+function FooterLine({ children, testId }: { children: React.ReactNode; testId?: string }) {
+  return (
+    <p data-testid={testId} className="max-w-md text-right text-xs italic text-muted-foreground/90">
+      {children}
+    </p>
+  )
+}
+
+/** The shipped primary button class — Connect copies it so the footer reads as one control set. */
+const PRIMARY_BUTTON =
+  "inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+
+function NamePill({
+  icon,
+  label,
+  dim,
+  missing,
+}: {
+  icon: React.ReactNode
+  label: string
+  dim?: boolean
+  /** Phase 267: a required connection that is missing — rose, and its label says so. */
+  missing?: boolean
+}) {
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium",
-        dim
-          ? "border-border/60 bg-muted/20 italic text-muted-foreground"
-          : "border-violet-500/25 bg-violet-500/10 text-violet-200",
+        missing
+          ? "border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+          : dim
+            ? "border-border/60 bg-muted/20 italic text-muted-foreground"
+            : "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-200",
       )}
     >
       {icon}
@@ -114,7 +177,21 @@ export interface ExpertDetailModalProps {
   folders: Folder[]
   open: boolean
   onOpenChange: (open: boolean) => void
-  onStartChat: (expert: ExpertBundle) => void
+  /** Phase 267: may return a promise — the modal then stays open (showing the in-flight state
+   *  the page passes as `startBusy`) until it settles, and closes after. */
+  onStartChat: (expert: ExpertBundle) => void | Promise<void>
+  /** Phase 267: the Connections page door. The modal closes BEFORE calling it. Absent, a caller
+   *  who may connect reads the member sentence — a Connect button with no door would do nothing. */
+  onOpenConnections?: () => void
+  /** Phase 267 (R265-262-04): a start for this Expert is in flight. */
+  startBusy?: boolean
+  /** Phase 266: install this Expert's corpus into the active org. Optional so every existing
+   *  mount compiles; without it an installable Expert shows the needs-an-admin line instead. */
+  onInstall?: (expert: ExpertBundle) => void
+  /** An install request is in flight — the install control becomes the Starting line. */
+  installBusy?: boolean
+  /** The server's refusal sentence from the last install attempt, if any. */
+  installError?: string | null
 }
 
 export function ExpertDetailModal({
@@ -123,6 +200,11 @@ export function ExpertDetailModal({
   open,
   onOpenChange,
   onStartChat,
+  onOpenConnections,
+  startBusy = false,
+  onInstall,
+  installBusy = false,
+  installError = null,
 }: ExpertDetailModalProps) {
   const [sampleShown, setSampleShown] = useState(false)
 
@@ -137,11 +219,21 @@ export function ExpertDetailModal({
   const isRestricted = expert.scope_mode === "restricted"
   const resolvedFolders = resolveFolderNames(expert.knowledge_folder_ids ?? [], folders)
   const skills = expert.member_skills ?? []
-  const connections = expert.required_connections ?? []
+  const connections = connectionPills(expert)
   const prompts = expert.prompt_suggestions ?? []
   const whenToUse = expert.when_to_use?.trim() ?? ""
   const sample = expert.example_output?.trim() ?? ""
   const description = expert.description?.trim() ?? ""
+  const view = installView(expert)
+  // A failed install names its cause above the footer, whichever control the footer draws. For a
+  // non-manager the footer's own status line already says "Install failed", so only the cause
+  // is added here — the same sentence is never printed twice.
+  const failure: { headline: string | null; cause: string } | null =
+    view.kind === "retry"
+      ? { headline: view.headline, cause: view.cause }
+      : view.kind === "status" && view.cause
+        ? { headline: null, cause: view.cause }
+        : null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -149,7 +241,7 @@ export function ExpertDetailModal({
         {/* ── header: gem · name · scope badge · meta line ── */}
         <DialogHeader className="shrink-0 space-y-2 border-b border-border/60 p-6 pb-5">
           <div className="flex items-start gap-3.5 pr-8">
-            <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 text-violet-200 ring-1 ring-violet-500/30">
+            <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 text-violet-700 dark:text-violet-200 ring-1 ring-violet-500/30">
               <ExpertIcon icon={expert.icon} className="h-6 w-6" />
             </div>
             <div className="min-w-0 flex-1 text-left">
@@ -161,8 +253,8 @@ export function ExpertDetailModal({
                   className={cn(
                     "rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
                     isRestricted
-                      ? "border-rose-500/20 bg-rose-500/10 text-rose-300"
-                      : "border-amber-500/20 bg-amber-500/10 text-amber-300",
+                      ? "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                      : "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
                   )}
                 >
                   {/* The card face's own two words, so the two catalog surfaces cannot disagree
@@ -260,8 +352,13 @@ export function ExpertDetailModal({
                     <HonestLine>{HONEST.noConnections}</HonestLine>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
-                      {connections.map((c) => (
-                        <NamePill key={`conn-${c}`} icon={<Plug className="h-3 w-3" />} label={c} />
+                      {connections.map((c, i) => (
+                        <NamePill
+                          key={`conn-${c.label}-${i}`}
+                          missing={c.missing}
+                          icon={<Plug className="h-3 w-3" />}
+                          label={c.label}
+                        />
                       ))}
                     </div>
                   )}
@@ -322,7 +419,29 @@ export function ExpertDetailModal({
           </section>
         </div>
 
-        {/* ── footer: exactly two controls ── */}
+        {/* ── 266: a failed install names its cause; a refused request says why ── */}
+        {(failure || installError) && (
+          <div className="shrink-0 space-y-1.5 border-t border-border/60 px-6 py-3">
+            {failure && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-none text-destructive" />
+                <div className="min-w-0 space-y-0.5">
+                  {failure.headline && (
+                    <p className="font-medium text-destructive">{failure.headline}</p>
+                  )}
+                  <p className="text-muted-foreground">{failure.cause}</p>
+                </div>
+              </div>
+            )}
+            {installError && (
+              <p role="alert" className="text-xs text-destructive">
+                {installError}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── footer: exactly two controls — the primary one swapped by install state ── */}
         <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border/60 p-4">
           <button
             type="button"
@@ -331,17 +450,79 @@ export function ExpertDetailModal({
           >
             Close
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              onStartChat(expert)
-              onOpenChange(false)
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            Start Scoped Chat with Expert
-          </button>
+          {view.kind === "legacy" || view.kind === "chat" ? (
+            <button
+              type="button"
+              disabled={startBusy}
+              aria-busy={startBusy || undefined}
+              onClick={() => {
+                if (startBusy) return
+                const started = onStartChat(expert) as unknown as PromiseLike<void> | undefined
+                // A start that returns a promise keeps the modal open until it settles, so the
+                // in-flight state is seen where it was pressed; the page's error line takes over
+                // once it closes. A plain callback closes at once, exactly as shipped.
+                if (started && typeof started.then === "function") {
+                  started.then(
+                    () => onOpenChange(false),
+                    () => onOpenChange(false),
+                  )
+                } else {
+                  onOpenChange(false)
+                }
+              }}
+              className={cn(PRIMARY_BUTTON, "disabled:cursor-wait disabled:opacity-80")}
+            >
+              {startBusy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              {startBusy ? START_COPY.busy : "Start Scoped Chat with Expert"}
+            </button>
+          ) : view.kind === "connect" ? (
+            view.gate.action && onOpenConnections ? (
+              <>
+                <FooterLine testId="connection-gate-line">{view.gate.line}</FooterLine>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Close first, then navigate (UI-SPEC §6.1).
+                    onOpenChange(false)
+                    onOpenConnections()
+                  }}
+                  className={PRIMARY_BUTTON}
+                >
+                  <Plug className="h-3.5 w-3.5" />
+                  {view.gate.action.label}
+                </button>
+              </>
+            ) : (
+              <FooterLine testId="connection-gate-line">
+                {CONNECTION_COPY.modalMemberLine(view.gate.missing.map((m) => m.name))}
+              </FooterLine>
+            )
+          ) : view.kind === "install" || view.kind === "retry" ? (
+            installBusy ? (
+              <FooterLine>{INSTALL_COPY.starting}</FooterLine>
+            ) : onInstall ? (
+              <button
+                type="button"
+                onClick={() => onInstall(expert)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+              >
+                {view.kind === "retry" ? (
+                  <RotateCcw className="h-3.5 w-3.5" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                {view.action}
+              </button>
+            ) : (
+              <FooterLine>{INSTALL_COPY.needsAdmin}</FooterLine>
+            )
+          ) : (
+            <FooterLine>{view.line}</FooterLine>
+          )}
         </div>
       </DialogContent>
     </Dialog>

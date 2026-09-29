@@ -27,9 +27,13 @@
  * below now reads the Expert's OWN row, and no fallback anywhere inspects `slug` or `name`.
  */
 
+import { useEffect, useState } from "react"
 import { X, ArrowRight, Folder, Wrench } from "lucide-react"
 import type { ExpertBundle } from "@/types"
 import { ExpertIcon } from "@/components/experts/expertIcon"
+import { ScopeLedger, type LedgerColumn } from "@/components/experts/ScopeLedger"
+import { narrowingLedgerColumns } from "@/components/experts/catalog/expertCatalog"
+import { getExpertScopePreview } from "@/lib/api/experts"
 import { cn } from "@/lib/utils"
 
 interface ExpertSpotlightCardProps {
@@ -37,6 +41,10 @@ interface ExpertSpotlightCardProps {
   onSelectPrompt: (prompt: string) => void
   onDismiss?: () => void
   className?: string
+  /** 267-REVIEW WR-06 (D-267-35): this chat has NO folder (and no transcript event will be written
+   *  while it is empty, D-267-12). A biased Expert here reads only its own folders, so the card
+   *  states that from the server's preview. Absent on every other mount: nothing is fetched. */
+  unscopedChat?: boolean
 }
 
 interface ActionTile {
@@ -85,8 +93,26 @@ export function ExpertSpotlightCard({
   onSelectPrompt,
   onDismiss,
   className,
+  unscopedChat = false,
 }: ExpertSpotlightCardProps) {
   const isRestricted = expert.scope_mode === "restricted"
+
+  // 267-REVIEW WR-06 (D-267-35): the narrowing statement, from the ONE preview payload the invite
+  // dialog also reads (`narrowingLedgerColumns`). A failed read states nothing rather than guess.
+  const [narrowing, setNarrowing] = useState<LedgerColumn[] | null>(null)
+  useEffect(() => {
+    setNarrowing(null)
+    if (!unscopedChat || isRestricted) return
+    let cancelled = false
+    getExpertScopePreview(expert.id, null)
+      .then((preview) => {
+        if (!cancelled) setNarrowing(narrowingLedgerColumns(preview))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [unscopedChat, isRestricted, expert.id])
   const tiles = getTilesForExpert(expert)
 
   // Domain badge names.
@@ -180,6 +206,8 @@ export function ExpertSpotlightCard({
           </button>
         )}
       </div>
+
+      {narrowing && <ScopeLedger columns={narrowing} />}
 
       {/* Action Tiles Grid (PACK-03) */}
       <div className="mt-4 pt-3 border-t border-white/[0.06]">

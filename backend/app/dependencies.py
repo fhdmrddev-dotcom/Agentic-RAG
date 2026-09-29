@@ -619,6 +619,35 @@ async def resolve_caller_role(
         return "member", set()
 
 
+async def feature_visible(request: Request, current_user: dict, feature: str) -> bool:
+    """Phase 267 (D-267-06) — the NON-RAISING body of ``require_visible(feature)``.
+
+    Factored out, never re-encoded, so a reader that needs the ANSWER rather than a 403 (the Expert
+    overlay's ``can_connect`` asks exactly what ``POST /connections`` asks) cannot drift from the
+    gate. Operator → visible; ``everyone`` audience → visible; ``role`` audience → the Glean
+    precedence-merge over the caller's resolved org role; anything else → NOT visible (fail-closed).
+    """
+    if await is_operator(current_user["id"]):
+        return True  # operator -> no-op
+    from app.models.user_settings import (
+        ensure_settings_fresh,
+        feature_audience,
+        resolve_feature_access,
+    )
+    # 267-05 F-1 (T-184-UAT-02 shape): bound the SYNC reader's staleness before reading the
+    # audience, exactly as the canvas gate and /features do. Without it a cold worker read the
+    # fail-closed "off" default and an org-admin got can_connect false (and a 403 here).
+    await ensure_settings_fresh()
+    audience = feature_audience(feature)
+    if audience == "everyone":
+        return True  # Everyone-audience feature -> no-op (carve-out byte-identical)
+    if audience == "role":
+        caller_role, caller_groups = await resolve_caller_role(request, current_user)
+        if resolve_feature_access(feature, caller_role, caller_groups):
+            return True  # greenlisted role/group -> pass
+    return False
+
+
 def require_visible(feature: str):
     """VIS-01 API-layer visibility gate (D-03 / D-167-06). A dependency FACTORY.
 
@@ -643,16 +672,9 @@ def require_visible(feature: str):
     (user_settings -> deps).
     """
     async def _dep(current_user: dict = Depends(get_current_user), request: Request = None):
-        if await is_operator(current_user["id"]):
-            return  # operator -> no-op
-        from app.models.user_settings import feature_audience, resolve_feature_access
-        audience = feature_audience(feature)
-        if audience == "everyone":
-            return  # Everyone-audience feature -> no-op (carve-out byte-identical)
-        if audience == "role":
-            caller_role, caller_groups = await resolve_caller_role(request, current_user)
-            if resolve_feature_access(feature, caller_role, caller_groups):
-                return  # greenlisted role/group -> pass
+        # Phase 267: the decision lives in feature_visible (one home); this keeps the 403.
+        if await feature_visible(request, current_user, feature):
+            return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This feature is available to administrators only.",

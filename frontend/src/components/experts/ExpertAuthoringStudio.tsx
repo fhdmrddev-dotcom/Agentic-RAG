@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   Cpu,
   Database,
-  FileCode,
   FileText,
   HelpCircle,
   Layers,
@@ -177,7 +176,11 @@ export function ExpertAuthoringStudio({
   // NOT conclude that every capability is phantom — that would lock Save with no recourse
   // over a transient network fault. The fence is advisory (D-263-09); the server is real.
   const [availableSkillsLoaded, setAvailableSkillsLoaded] = useState(false)
-  const [availableConnections, setAvailableConnections] = useState<Array<{ id: string; name: string }>>([])
+  // 267 (D-267-30): a connection option carries its SERVICE ID — that, never the name, is what
+  // `required_connections` stores and what the resolver matches (267-01 `connection_states`).
+  const [availableConnections, setAvailableConnections] = useState<
+    Array<{ id: string; service_id: string; name: string }>
+  >([])
 
   // Auto-slug on name change if not manually edited
   const [slugModified, setSlugModified] = useState(isEditing)
@@ -217,7 +220,12 @@ export function ExpertAuthoringStudio({
             setAvailableSkills(skills.map((s: any) => ({ name: s.name, description: s.description })))
             setAvailableSkillsLoaded(true)
           }
-          setAvailableConnections(connections.map((c: any) => ({ id: c.id, name: c.name })))
+          setAvailableConnections(
+            connections
+              // A row with no service id cannot be required: nothing could ever match it.
+              .filter((c: any) => typeof c.service_id === "string" && c.service_id.trim())
+              .map((c: any) => ({ id: c.id, service_id: c.service_id, name: c.name })),
+          )
         }
       } catch {
         // Degrade gracefully
@@ -543,6 +551,22 @@ export function ExpertAuthoringStudio({
   const previewFoldersCount = knowledgeFolderIds.length
   const previewSkillsCount = memberSkills.length
   const previewConnectionsCount = requiredConnections.length
+  // 267 (D-267-30): ONE chip per service id (two connections to the same service are one
+  // requirement), labelled by the first connection's name. A saved id that no loaded connection
+  // matches is still shown — as its raw id, selected — so an Expert saved elsewhere never loses
+  // a requirement silently when it is re-saved here.
+  const connectionChips: Array<{ serviceId: string; label: string }> = []
+  const seenServiceIds = new Set<string>()
+  for (const c of availableConnections) {
+    if (seenServiceIds.has(c.service_id)) continue
+    seenServiceIds.add(c.service_id)
+    connectionChips.push({ serviceId: c.service_id, label: c.name?.trim() || c.service_id })
+  }
+  for (const id of requiredConnections) {
+    if (seenServiceIds.has(id)) continue
+    seenServiceIds.add(id)
+    connectionChips.push({ serviceId: id, label: id })
+  }
 
   // ── PACK-16's client fence (D-263-09 — ADVISORY; the server is the real one) ──────
   // ⛔ BOTH entry points. The draft path is the obvious one; `handleAddCustomSkill`
@@ -824,11 +848,11 @@ export function ExpertAuthoringStudio({
               </div>
             </div>
 
-            {/* Knowledge Scope & Additive Tool Floor (D-v4.3-01 / D-v4.3-02) */}
+            {/* Knowledge Scope (D-v4.3-01) — the tool half of this card left with D-267-02 */}
             <div className="rounded-xl border border-border/80 bg-card p-5 space-y-4">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Layers className="h-4 w-4 text-primary" />
-                <span>Knowledge Scope & Deliverable Tool Floor</span>
+                <span>Knowledge Scope</span>
               </h3>
 
               {/* Knowledge Scope Mode Radio */}
@@ -887,25 +911,10 @@ export function ExpertAuthoringStudio({
                 </div>
               </div>
 
-              {/* Additive Tool Floor Checkbox (D-v4.3-02 / S6) */}
-              <div className="rounded-lg border border-border/60 bg-accent/20 p-3.5">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={toolFloorEnabled}
-                    onChange={(e) => setToolFloorEnabled(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-input text-primary focus:ring-primary"
-                  />
-                  <div>
-                    <span className="text-xs font-semibold text-foreground">
-                      Preserve Deliverable Tool Floor (Recommended)
-                    </span>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      Keeps deliverable-producing tools (<code className="text-primary font-mono text-[10px]">execute_code</code>, <code className="text-primary font-mono text-[10px]">workspace_write</code>, <code className="text-primary font-mono text-[10px]">render_template</code>, and <code className="text-primary font-mono text-[10px]">ask_user</code>) active so the Expert can write reports, calculate formulas, and produce artifacts.
-                    </p>
-                  </div>
-                </label>
-              </div>
+              {/* 267 (D-267-02): the tool-floor checkbox that sat here is REMOVED, not relabelled.
+                  An Expert now only ADDS to a thread's tools (D-267-01), so the switch no longer
+                  did anything — and a control that does nothing is the dishonesty this phase
+                  removes. `tool_floor_enabled` still travels on save, exactly as loaded. */}
             </div>
 
             {/* Resources (Folders, Skills, Connections) */}
@@ -1108,17 +1117,20 @@ export function ExpertAuthoringStudio({
                 <label className="block text-xs font-medium text-foreground mb-1">
                   External Connections ({requiredConnections.length} selected)
                 </label>
-                {availableConnections.length > 0 ? (
+                {connectionChips.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto rounded-md border border-input bg-background/50 p-2">
-                    {availableConnections.map((c) => {
-                      const isSelected = requiredConnections.includes(c.name)
+                    {connectionChips.map((c) => {
+                      const isSelected = requiredConnections.includes(c.serviceId)
                       return (
                         <button
-                          key={c.id}
+                          key={c.serviceId}
                           type="button"
+                          aria-pressed={isSelected}
                           onClick={() => {
                             setRequiredConnections((prev) =>
-                              isSelected ? prev.filter((name) => name !== c.name) : [...prev, c.name],
+                              isSelected
+                                ? prev.filter((id) => id !== c.serviceId)
+                                : [...prev, c.serviceId],
                             )
                           }}
                           className={cn(
@@ -1129,7 +1141,7 @@ export function ExpertAuthoringStudio({
                           )}
                         >
                           {isSelected && <Check className="h-3 w-3" />}
-                          <span>{c.name}</span>
+                          <span>{c.label}</span>
                         </button>
                       )
                     })}
@@ -1500,16 +1512,6 @@ export function ExpertAuthoringStudio({
                   ))}
                 </div>
               </div>
-
-              {/* Element 5: Deliverable Tool Floor indicator (SEED-303 S6) */}
-              {toolFloorEnabled && (
-                <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-2.5 text-[11px] text-muted-foreground flex items-center gap-2">
-                  <FileCode className="h-4 w-4 flex-none text-primary" />
-                  <span>
-                    <strong className="text-foreground">Additive Tool Floor:</strong> Delivers code execution, file writes, and template rendering.
-                  </span>
-                </div>
-              )}
 
               {/* Sample Deliverable Preview */}
               {exampleOutput.trim() && (

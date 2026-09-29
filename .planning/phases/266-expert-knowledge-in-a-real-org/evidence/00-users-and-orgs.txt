@@ -1,0 +1,8 @@
+signup u1: HTTP 200 user_id=7b43cd2c-21e7-4a66-8a36-2fa3793551b0 session=yes
+signup u2: HTTP 200 user_id=3dce4e6b-e31b-4fe6-8b06-511781e08837 session=yes
+org_members for U1,U2 (right after signup):
+{"user_id": "7b43cd2c-21e7-4a66-8a36-2fa3793551b0", "email": "uat266-u1-25ada3@example.test", "org_id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "role": "org-admin", "name": "uat266-u1-25ada3@example.test's Organization", "subscription_tier": null}
+{"user_id": "3dce4e6b-e31b-4fe6-8b06-511781e08837", "email": "uat266-u2-25ada3@example.test", "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "role": "org-admin", "name": "uat266-u2-25ada3@example.test's Organization", "subscription_tier": null}
+prior tiers: u1=None u2=None; after UPDATE (LOCAL DB):
+{"id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "subscription_tier": "enterprise"}
+{"id": "1fd7000d-adc2-477a-89d8-877d0e367376", "subscription_tier": "enterprise"}

@@ -51,17 +51,25 @@ def _inject_folder_scope(sql: str, folder_ids: list[str]) -> str:
     else:
         doc_ref = _detect_alias(sql, "documents")
         condition = f"{doc_ref}.folder_id IN ({ids_list})"
-    # ``AND`` onto an existing WHERE, else open a fresh ``WHERE``.
-    connector = "AND" if re.search(r"\bwhere\b", sql, re.IGNORECASE) else "WHERE"
     # Splice the condition BEFORE the first trailing clause (leftmost keyword boundary) so it
     # always lands inside the WHERE. A simple keyword regex is sufficient for the LLM-generated
     # single-SELECT shape (string-literal-aware parsing is out of scope — D-164-05 / 164-05).
-    tail = re.search(r"\b(?:order\s+by|group\s+by|having|limit|offset)\b", sql, re.IGNORECASE)
+    where = re.search(r"\bwhere\b", sql, re.IGNORECASE)
+    tail_re = r"\b(?:order\s+by|group\s+by|having|limit|offset)\b"
+    if where:
+        # BUG-260929-01: AND binds tighter than OR, so ``WHERE a OR b OR c AND folder`` scoped ONLY
+        # ``c`` — a restricted Expert's query_documents read a sibling folder. The WHOLE existing
+        # predicate is parenthesised so the folder filter covers every branch of it.
+        tail = re.search(tail_re, sql[where.end():], re.IGNORECASE)
+        end = where.end() + tail.start() if tail else len(sql)
+        predicate = sql[where.end():end].strip()
+        return f"{sql[:where.end()]} ({predicate}) AND {condition} {sql[end:]}".rstrip()
+    tail = re.search(tail_re, sql, re.IGNORECASE)
     if tail:
         pos = tail.start()
         head = sql[:pos].rstrip()
-        return f"{head} {connector} {condition} {sql[pos:]}"
-    return sql.rstrip() + f" {connector} {condition}"
+        return f"{head} WHERE {condition} {sql[pos:]}"
+    return sql.rstrip() + f" WHERE {condition}"
 
 
 async def query_documents(sql_query: str, user_id: str, supabase: Client, folder_ids: list[str] | None = None) -> str:

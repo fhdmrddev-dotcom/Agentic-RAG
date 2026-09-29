@@ -1506,10 +1506,12 @@ async def _drive_golden_run(
     # so the "no org-less fallback on the publish path" rule lives in a single place, shared
     # with the stage-2.6 grounding read). The ephemeral validation thread INSERT below still
     # relies on the mig-106 autofill for its own org_id.
-    # The org is IGNORED here (bound to a throwaway name) on purpose: the golden run is scoped
-    # by the CLIENT alone — every read it performs rides that already-org-scoped client, and
-    # the ephemeral validation thread INSERT relies on the mig-106 autofill. Only stage 2.6's
-    # grounding gate needs the org as a VALUE (WR-05).
+    # The org is NOT used to scope anything here: the golden run is scoped by the CLIENT alone —
+    # every read it performs rides that already-org-scoped client, and the ephemeral validation
+    # thread INSERT relies on the mig-106 autofill. Only stage 2.6's grounding gate needs the org
+    # as a VALUE (WR-05). 268-REVIEW WR-06: it is also the producer shell's ATTRIBUTION (below),
+    # so the golden run's spend is in the definition's org, not the trigger's LIMIT-1 guess. The
+    # validation ctx still withholds it (the Phase 190 fence at step 4 is unchanged).
     supabase, _golden_run_org_id = await _resolve_publish_supabase(
         supabase, definition_id=definition_id, pool=pool
     )
@@ -1629,6 +1631,7 @@ async def _drive_golden_run(
         model="unknown",
         provider="unknown",
         parent_run_id=None,
+        org_id=str(_golden_run_org_id) if _golden_run_org_id else None,
     )
 
     # ── 4. build the minimal validation ctx (mirrors _build_resume_context) ──────
