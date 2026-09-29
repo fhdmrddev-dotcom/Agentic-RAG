@@ -1103,10 +1103,15 @@ async def continue_run(
                 .eq("id", str(active_workflow_run_id))
             )
         else:
+            # 268 D-2: `runs` has only a SELECT policy (runs_select_own), so this write through
+            # the user-JWT client matched 0 rows in silence and the Continue cap never counted.
+            # Ownership was proven by the RLS read above; the service client writes, and the
+            # UPDATE keeps its own user_id scope because that client bypasses RLS.
             await aexec(
-                supabase.table("runs")
+                service_supabase.table("runs")
                 .update({"continues_used": _new_used, "status": "streaming"})
                 .eq("run_id", str(run_id))
+                .eq("user_id", current_user["id"])
             )
     except Exception:
         logger.exception("continue: continues_used increment failed for run %s", run_id)
