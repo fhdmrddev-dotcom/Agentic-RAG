@@ -116,7 +116,14 @@ data-thread branch/compare half of `SEED-193`, the hardening/testing milestone, 
   4. The detail panel shows created, modified, pages, size, type and uploader. "Created" in the source file and "added" to this system are **labelled as different facts**. A document ingested before this phase shows "not recorded" for a fact it lacks, never a `0` or a wrong date (FIND-05).
 
 **How we'd know this failed**: the URL is minted with the service role before any org check (the `BUG-260903-02` shape); the link still works an hour later; a 2019 contract reads "created 2026-09-…" because the upload date sits under the source-created label; old documents show `0 pages`; the panel shows v1 while the download returns the latest; the download works for the uploader and 403s for an org colleague who can see the document.
-**Plans**: TBD
+**Plans**: 5 plans in 3 waves
+
+Plans:
+- [ ] 270-01-PLAN.md — baselines + ledger rows, migration 199 (fact columns + TTL setting), `file_facts.py` + the one best-effort write in `splice_document` (wave 1)
+- [ ] 270-02-PLAN.md — `POST /documents/{id}/download-url` (RLS read first, service-role sign second, bounded TTL, no-store), facts + connection name on `DocumentResponse` (wave 1)
+- [ ] 270-03-PLAN.md — Wave-0 save-strategy spike, `documentDownload.ts`, `DocumentDownloadButton`, `DocumentFileFacts`, API fn + barrel (wave 1)
+- [ ] 270-04-PLAN.md — mounts: panel header Download + first `File` section, list-row and version-history Download (wave 2)
+- [ ] 270-05-PLAN.md — merged-tree gates, live SC#1-4 proofs + G-4 drive (checkpoint), ledger triples, audit-trail seed, prod parity (wave 3)
 **Flags**: **Migration `199`** for the file-fact columns (page count, plus source-created date and author read from PDF/DOCX properties; exact shape decided at discuss). Apply via the SQL editor, regenerate `full-schema.sql`, run `get_advisors(security)`. **Backfill is a discuss decision:** re-extract existing files from storage, or show "not recorded" honestly. The page count is one line at `extraction_service.py`'s page loop (SEED-243). **security_enforcement**: the org check runs through the user-JWT / RLS path before the URL is minted. The URL is a bearer token, so it must be short-lived. **G-2 fires** (download control + panel file facts). The UI is small and sits on shipped surfaces. A skip must be a recorded decision, and OV-266-01 shows what a skip cost: a note that was invisible because it lived only in a tooltip. **G-4** scenarios at scope time. **G-5 audit at discuss:** `backend/app/api/documents.py` (85/33, DISCHARGED at 229), `frontend/src/components/metadata/DocumentDetailPanel.tsx` (FIRES), `frontend/src/components/ingestion/DocumentList.tsx` (FIRES, seam taken), `frontend/src/types/index.ts` (seam OWED), and the extraction service (run `node scripts/check-hot-file-ledger.cjs`, which catches rows that are absent). **Deploy parity**: the migration goes to production before the backend, and the signed-URL lifetime is set as a setting, not hardcoded. Seeds: `SEED-243` (both operator halves).
 **UI hint**: yes
 
