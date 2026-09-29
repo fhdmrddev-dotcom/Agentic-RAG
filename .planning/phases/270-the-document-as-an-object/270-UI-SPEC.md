@@ -327,3 +327,7 @@ Drive all of these with Chrome MCP as a real signed-in user at phase verificatio
 - [ ] Dimension 6 Registry Safety: PASS
 
 **Approval:** pending
+
+## Operator Ratification (2026-09-30)
+
+**Q1 RATIFIED: option A.** Add a labelled per-version Download to each row of the version-history table that expands inside `DocumentRow.tsx`. The detail panel is NOT changed to open older versions; `LibraryPage` selection stays latest-only. This makes "Download vN (viewed, not latest)" reachable so SC#2 can be driven live.
