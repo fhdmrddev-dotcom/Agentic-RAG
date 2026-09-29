@@ -188,7 +188,7 @@ SQL editor, in order:
    **"Run without RLS"** — the file enables RLS itself). One shot: tables + RLS + the 4
    storage buckets + the `on_auth_user_created` trigger + realtime + pgvector.
 
-2. **Apply the 9 seed migrations** the schema-only dump skips, from `supabase/migrations/`,
+2. **Apply the 13 seed migrations** the schema-only dump skips, from `supabase/migrations/`,
    by exact filename:
 
    | Order | File | Carries |
@@ -202,9 +202,26 @@ SQL editor, in order:
    | 7 | `087_skill_creator_reborn.sql` | skill-creator seed row — **apply FIRST of the trio** |
    | 8 | `088_skill_creator_eval_step_sequencing.sql` | UPDATEs 087's row — **apply SECOND** |
    | 9 | `089_skill_creator_file_attach_honesty.sql` | UPDATEs 087's row — **apply THIRD** |
+   | 10 | `186_tier_capabilities.sql` | `tier_capabilities` rows — without them `experts` is enabled for **no** tier |
+   | 11 | `187_expert_bundles.sql` | the Financial Analyzer system Expert row — **apply FIRST of the Expert trio** |
+   | 12 | `189_expert_presentation_and_grants.sql` | presentation columns + `experts:manage` role permissions; UPDATEs 187's row — **apply SECOND** |
+   | 13 | `198_starter_expert_library.sql` | the starter Expert library (Contract Reviewer, HR Policy Advisor, Operations Analyst) + the Financial Analyzer copy fix; UPDATEs 187's row — **apply THIRD** |
 
-   **Order matters only within the trio `087 → 088 → 089`** (088 and 089 both UPDATE the row
-   087 creates). All nine are idempotent — safe to re-run.
+   **Order matters within the trio `087 → 088 → 089`** (088 and 089 both UPDATE the row
+   087 creates) **and within the Expert trio `187 → 189 → 198`** (189 and 198 both UPDATE the
+   Financial Analyzer row 187 creates). All thirteen are idempotent — safe to re-run.
+
+   ⚠ **What this list deliberately does NOT carry, for the Expert catalog** (Phase 269): the
+   retired hardcoded-org knowledge seed and the two later migrations that re-point and then delete
+   its rows are absent on purpose — a fresh box never had those rows, and their schema half is
+   already in `full-schema.sql`. **Expert KNOWLEDGE is not seeded at all**: the rows above only make
+   the Experts *listable*; each org installs an Expert's corpus through the Experts page, and the
+   corpus files ship inside the backend image. **A new org still sees a tier refusal, not the
+   catalog, until an operator assigns it the `enterprise` tier** — tiers are operator-assigned by
+   ruling D-269-P1 (SEED-325). Other seed-like migrations that are not listed here (role/permission
+   and settings rows among them) are tracked, by name, in SEED-326 — listing the Expert trio raised
+   the drift script's ceiling and silenced its warning for them, so that seed is where they now
+   live.
 
 3. **Insert the global settings row** (the exact A6 fix — without it, Settings shows a fake
    "Saved" but persists nothing, because `save_app_settings` does an `UPDATE ... WHERE
@@ -221,7 +238,14 @@ SQL editor, in order:
     WHERE id='00000000-0000-0000-0000-000000000010' AND is_system=true;   -- expect 1
    ```
 
-   If this returns 0, re-apply `087 → 088 → 089` in order.
+   If this returns 0, re-apply `087 → 088 → 089` in order. Then verify the Expert catalog rows:
+
+   ```sql
+   SELECT slug FROM public.expert_bundles WHERE is_system ORDER BY slug;
+   -- expect exactly: contract-reviewer, financial-analyzer, hr-policy-advisor, operations-analyst
+   ```
+
+   If a slug is missing, re-apply `187 → 189 → 198` in order.
 
 5. **(Optional — Cloud SAML SSO, Phase 168)** Skip unless org-admins will register SAML IdPs on
    **Cloud** Supabase. Seed the Management/PAT token (`sbp_…`, from Supabase Dashboard → Account →
@@ -261,9 +285,12 @@ SQL editor, in order:
    gone stale. `backend/tests/unit/test_214_flag_cold_default.py` is what fails when a governed
    feature is added or a default changes without this table following in the same commit.
 
-> Migrations currently run to **124** (⚠ this line read `102` until 2026-08-24 and had been
-> stale for twenty-two migrations — re-derive it with `ls supabase/migrations | tail -1` rather
-> than trusting it). The newest, migration **124** (Phase 204, SCHED-01), creates the
+> Migrations currently run to **198** (re-derived 2026-09-29 at Phase 269; ⚠ ~~this line read
+> **124** until then~~ and had been stale for seventy-four migrations — it read `102` until
+> 2026-08-24 before that. Re-derive it with `ls supabase/migrations | tail -1` rather than
+> trusting it). The newest, migration **198** (Phase 269), is the starter-Expert-library seed
+> and is row 13 of the table above. The paragraph that follows describes migration **124** and is
+> kept as the worked example of the filename trap: migration **124** (Phase 204, SCHED-01), creates the
 > `workflow_schedules` table with owner-scoped RLS — **schema, not a seed**, so like 102 it is
 > deliberately absent from the table above and needs no separate paste on a fresh box:
 > `full-schema.sql` already carries it. ⚠ Its FILENAME is deliberately not spelled here:
