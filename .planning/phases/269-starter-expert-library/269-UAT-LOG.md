@@ -135,3 +135,55 @@ never changed. One attempt per turn; the FAIL is recorded, not re-driven.
 **SCREENSHOTS OWED — operator captures at 269-04 Task 1.** This executor had no Chrome tool, so
 `g4-00` … `g4-06` were not captured. Credentials for the uat269 admin and member users are in the session
 scratchpad (`state.json`), handed over by the orchestrator — never in the repo.
+
+## Operator lock (269-04 Task 1)
+
+**Date:** 2026-09-29.
+
+**What the operator was shown.** The orchestrator presented the verdict table above (every evidence
+file's `VERDICT:` line, the one FAIL quoted with its reason) and this recommendation, quoted verbatim —
+it is the ORCHESTRATOR's text, not the operator's:
+
+> "G-2 accepted; LOCK financial-analyzer, contract-reviewer, hr-policy-advisor, operations-analyst; HOLD security-compliance"
+
+**The operator's reply, verbatim:**
+
+> `proceed`
+
+**How it is applied.** The operator's literal word was **"proceed"**. It is recorded here and applied as
+acceptance of the recommendation quoted above — the operator did not type the LOCK/HOLD list; they
+accepted it. Nothing beyond that recommendation is read into the reply.
+
+| slug | install | cited | refusal | decision |
+|---|---|---|---|---|
+| financial-analyzer | PASS (`03-…-install.txt`) | PASS (`03-…-cited.txt`) | PASS (`03-…-refusal.txt`) | **LOCK** (already shipped by mig 187; D-269-P2 copy UPDATE ships in 198) |
+| contract-reviewer | PASS (`04-…-install.txt`) | PASS (`04-…-cited.txt`) | PASS (`04-…-refusal.txt`) | **LOCK** |
+| hr-policy-advisor | PASS (`05-…-install.txt`) | PASS (`05-…-cited.txt`) | PASS (`05-…-refusal.txt`) | **LOCK** |
+| operations-analyst | PASS (`07-…-install.txt`) | PASS (`07-…-cited.txt`) | PASS (`07-…-refusal.txt`) | **LOCK** |
+| security-compliance | PASS (`06-…-install.txt`) | PASS (`06-…-cited.txt`) | **FAIL** (`06-…-refusal.txt`) | **HOLD** (D-269-09 default for a FAIL) |
+
+**G-2 answer.** The live-rendered first-run catalog (evidence `01-catalog-first-run.txt` /
+`02-member-reason.txt`, driven through the real API) is accepted as the G-2 acceptance bar; no component
+was changed (D-269-06). ⚠ **Screenshots `g4-00` … `g4-06` are still OWED** — 269-03 had no Chrome tool,
+and this acceptance was given on the API-level evidence and the verdict table, not on captured images.
+The owed screenshots are not claimed as taken.
+
+**HELD BACK — security-compliance — refusal FAIL: `query_documents` returned a sibling-folder document
+(`297c6ee8-…`, the Financial Analyzer's report) outside the restricted Expert's install folder, and the
+answer disclosed its filename/title — evidence `06-security-compliance-{install,cited,refusal}.txt`.**
+Per D-269-09 (ship fewer, never weaken): its candidate row (`…2693`) is NOT promoted to migration 198,
+its corpus directory `backend/app/experts/corpora/security-compliance/` is deleted from the tree, and its
+three evidence files are KEPT. Its local `expert_bundles` row is deleted in Task 3 by the operator. The
+library ships **four** starter Experts (financial-analyzer + three new), not five, and is not padded.
+⚠ The cause is the platform `query_documents` scope gap described in footnote ² above, which equally
+affects the four LOCKed Experts' tool surface (their turns simply did not exercise it) — the hold is the
+evidence rule, not a claim that the four are immune.
+
+**Pre-deletion dependency check (measured, not assumed).** Before deleting the held corpus, every LOCKed
+Expert's refusal evidence was read for its sibling literal: financial-analyzer → `23 days` (hr-policy-advisor),
+contract-reviewer → `94.7` (operations-analyst), hr-policy-advisor → `2.35` (contract-reviewer),
+operations-analyst → `18 weeks` (hr-policy-advisor). **None uses the security-compliance corpus.** The
+security-compliance folder `16db0107-…` was PRESENT as an extra sibling in the test org during those turns,
+and each of their supplementary scans reads `out_of_folder_documents_retrieved_by_any_tool: 0`, so no locked
+verdict depends on (or was contaminated by) the held corpus. The cited turns cite only each Expert's own
+figures (`30.8%`/`$29.1`, `$2.35M`/`75 days`, `18 weeks`/`23 days`, `94.7%`/`38 days`).
