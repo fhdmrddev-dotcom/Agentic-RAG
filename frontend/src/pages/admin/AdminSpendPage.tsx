@@ -20,6 +20,17 @@ import { SpendDonutChart } from "@/components/admin/spend/SpendDonutChart"
 import { BlindSpotsCard } from "@/components/admin/spend/BlindSpotsCard"
 import { RepriceModal } from "@/components/admin/spend/RepriceModal"
 import { PaginationControls } from "@/components/health/PaginationControls"
+import {
+  ExpertFilterPills,
+  expertLineLabel,
+  filterPillClass,
+} from "@/components/admin/spend/ExpertFilterPills"
+import {
+  ExpertSpendCard,
+  LedgerExpertCell,
+  SubagentTag,
+} from "@/components/admin/spend/ExpertSpendCard"
+import { EXPERT_SPEND_COPY, windowLabel } from "@/components/admin/spend/expertSpendCopy"
 
 interface AdminSpendPageProps {
   onBack?: () => void
@@ -85,6 +96,14 @@ export function timeRangeToStartTime(range: TimeRangeFilter, now: Date = new Dat
 export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
   const [timeRange, setTimeRange] = useState<TimeRangeFilter>("30d")
   const [coverageFilter, setCoverageFilter] = useState<CoverageFilter>("all")
+  // ── Phase 268 (D-268-08): ONE Expert filter — `<uuid>` | `none` | `unrecorded` | null (all).
+  // ⛔ It reaches getSpendSummary AND getSpendRuns from `loadAll`, AND the paging door, and it
+  // sits in BOTH dependency lists. A second call site that omits it is the 257 "two dialects"
+  // defect: the ledger answering about one population while the cards answer about another.
+  const [expertFilter, setExpertFilter] = useState<string | null>(null)
+  // The selected line's words, remembered at selection so a window with no runs for that
+  // Expert still names it (UI-SPEC §5.6). A ref, not state: it never drives a fetch.
+  const expertLabelAtSelect = React.useRef<string | null>(null)
   const [summary, setSummary] = useState<SpendSummaryData | null>(null)
   const [runs, setRuns] = useState<SpendRunItem[]>([])
   const [rates, setRates] = useState<ModelRateItem[]>([])
@@ -124,17 +143,19 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
   // parameter, so the coverage chips scope the LEDGER only — said out loud in the ledger
   // header rather than left for the operator to infer from two numbers that disagree.
   const loadAll = React.useCallback(async () => {
+    const expert = expertFilter ?? undefined
     return Promise.all([
-      getSpendSummary({ startTime: timeRangeToStartTime(timeRange) }),
+      getSpendSummary({ startTime: timeRangeToStartTime(timeRange), expert }),
       getSpendRuns({
         timeRange: timeRange === "all" ? undefined : timeRange,
         filterStatus: coverageFilter === "all" ? undefined : coverageFilter,
         limit: LEDGER_PAGE_SIZE,
         offset: ledgerOffsetRef.current,
+        expert,
       }),
       getModelRates(),
     ] as const)
-  }, [timeRange, coverageFilter])
+  }, [timeRange, coverageFilter, expertFilter])
 
   const applyAll = React.useCallback(
     ([sumData, runsData, ratesData]: Awaited<ReturnType<typeof loadAll>>) => {
@@ -211,6 +232,8 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
           filterStatus: coverageFilter === "all" ? undefined : coverageFilter,
           limit: LEDGER_PAGE_SIZE,
           offset,
+          // ⛔ The paging door carries the Expert filter too (D-268-08).
+          expert: expertFilter ?? undefined,
         })
         if (mine === ledgerReqId.current && filtersGen === reqId.current) {
           ledgerOffsetRef.current = offset
@@ -227,7 +250,7 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
         if (mine === ledgerReqId.current) setIsLedgerPaging(false)
       }
     },
-    [timeRange, coverageFilter],
+    [timeRange, coverageFilter, expertFilter],
   )
 
   // ⛔ A FAILED LOAD MUST NOT PRODUCE CONFIDENT NUMBERS ANYWHERE. Phase 257 CR-07.
@@ -269,6 +292,26 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
   // Excluded from the dollar total, for either reason. The asterisk and the footnote below
   // must fire when EITHER is non-zero — an unmeasured run is just as absent from the sum.
   const excludedFromTotal = (summary?.unratedRunsCount || 0) + (summary?.unmeasuredRunsCount || 0)
+
+  // ── Phase 268: the Expert filter's words. ─────────────────────────────────────────────
+  const windowWords = windowLabel(timeRange)
+  const expertLines = summary?.expertBreakdown ?? []
+  const selectedLine = expertFilter ? expertLines.find((l) => l.key === expertFilter) : undefined
+  const expertLabel: string | null =
+    expertFilter === null
+      ? null
+      : selectedLine
+        ? expertLineLabel(selectedLine)
+        : expertLabelAtSelect.current ??
+          expertLineLabel({ key: expertFilter, name: null, deleted: true })
+  const selectExpert = React.useCallback(
+    (key: string | null) => {
+      const line = key ? summary?.expertBreakdown.find((l) => l.key === key) : undefined
+      expertLabelAtSelect.current = line ? expertLineLabel(line) : key === null ? null : expertLabelAtSelect.current
+      setExpertFilter(key)
+    },
+    [summary],
+  )
 
   return (
     // ⛔ `h-full min-h-0` IS THE SCROLL, AND `flex-1` ALONE WAS NOT. Phase 257.1.
@@ -337,7 +380,8 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Filter Ribbon */}
+      {/* Filter Ribbon — Time · Expert · Coverage (Phase 268), and the line that states it. */}
+      <div>
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-card/60 border border-border/40 text-xs">
         {/* Time Range Pills */}
         <div className="flex items-center gap-1.5">
@@ -348,17 +392,23 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
             <button
               key={r}
               type="button"
+              aria-pressed={timeRange === r}
               onClick={() => setTimeRange(r)}
-              className={`px-2.5 py-1 rounded-md font-mono transition-colors ${
-                timeRange === r
-                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-card"
-              }`}
+              // Phase 268 §9-D8: the ONE light-safe pill style the three groups share.
+              className={filterPillClass(timeRange === r)}
             >
               {r === "today" ? "Today" : r === "7d" ? "7D" : r === "30d" ? "Last 30D" : "All Time"}
             </button>
           ))}
         </div>
+
+        {/* Expert Pills (Phase 268, D-268-08) */}
+        <ExpertFilterPills
+          lines={hasData ? expertLines : null}
+          selected={expertFilter}
+          selectedLabel={expertLabel}
+          onSelect={selectExpert}
+        />
 
         {/* Coverage Filter Pills */}
         <div className="flex items-center gap-1.5">
@@ -376,17 +426,35 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
             <button
               key={c.id}
               type="button"
+              aria-pressed={coverageFilter === c.id}
               onClick={() => setCoverageFilter(c.id)}
-              className={`px-2.5 py-1 rounded-md font-mono transition-colors ${
-                coverageFilter === c.id
-                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-card"
-              }`}
+              className={filterPillClass(coverageFilter === c.id)}
             >
               {c.label}
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Phase 268: say which filter the page is showing, and what follows it (§5.6, §9-D7). */}
+      <p className="mt-2 text-[11px] font-mono text-muted-foreground" data-testid="spend-filter-statement">
+        {expertFilter === null ? (
+          EXPERT_SPEND_COPY.statementAll(windowWords)
+        ) : (
+          <>
+            {EXPERT_SPEND_COPY.showing}{" "}
+            <span className="font-semibold text-foreground">{expertLabel}</span> · {windowWords} ·{" "}
+            {EXPERT_SPEND_COPY.followsFilter} ·{" "}
+            <button
+              type="button"
+              onClick={() => selectExpert(null)}
+              className="text-indigo-700 dark:text-indigo-300 hover:underline"
+            >
+              {EXPERT_SPEND_COPY.clear}
+            </button>
+          </>
+        )}
+      </p>
       </div>
 
       {/* Error banner (CR-04) */}
@@ -418,7 +486,10 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
         <div className="rounded-xl border border-border bg-card p-4 flex flex-col justify-between shadow-sm">
           <div>
             <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-              Total Org Spend (Attributable)
+              {/* Phase 268: while filtered, KPI 1 names whose spend it is (§5.6). */}
+              {expertLabel !== null
+                ? EXPERT_SPEND_COPY.kpiFiltered(expertLabel)
+                : "Total Org Spend (Attributable)"}
             </span>
             <div className="mt-1 flex items-baseline gap-1">
               {loadError ? (
@@ -426,7 +497,7 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
                   Unavailable
                 </span>
               ) : (
-                <span className="text-2xl font-bold font-mono text-emerald-400">
+                <span className="text-2xl font-bold font-mono text-emerald-400" data-testid="spend-total-value">
                   {summary ? `$${summary.totalSpendUsd.toFixed(4)}` : "—"}
                 </span>
               )}
@@ -454,6 +525,13 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
               </span>
             ) : (
               <span>—</span>
+            )}
+            {/* D-268-28 (268-REVIEW WR-05): an unrated harness shell is NOT wholly excluded — its
+                priced sub-agents are in the figure above (D-268-21). Said here, beside the "*". */}
+            {!loadError && summary && (summary.partlyPricedHarnessRuns || 0) > 0 && (
+              <span className="block mt-1 text-amber-400/90" data-testid="kpi-partly-priced">
+                {EXPERT_SPEND_COPY.partlyPricedHarness(summary.partlyPricedHarnessRuns)}
+              </span>
             )}
           </div>
         </div>
@@ -555,7 +633,10 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
               <Calendar className="h-4 w-4 text-indigo-400" />
               14-Day Spend & Unrated Volume
             </h2>
-            <span className="text-[10px] font-mono text-muted-foreground">Daily Attributable</span>
+            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
+              Daily Attributable
+              {expertLabel !== null && <span>{EXPERT_SPEND_COPY.chartSuffix(expertLabel)}</span>}
+            </span>
           </div>
           {hasData ? (
             <DailySpendChart data={summary!.dailySpend || []} height={190} />
@@ -576,7 +657,10 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
               <Layers className="h-4 w-4 text-purple-400" />
               Model Spend Share
             </h2>
-            <span className="text-[10px] font-mono text-muted-foreground">Volume & Rates</span>
+            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
+              Volume & Rates
+              {expertLabel !== null && <span>{EXPERT_SPEND_COPY.chartSuffix(expertLabel)}</span>}
+            </span>
           </div>
           {hasData ? (
             <SpendDonutChart
@@ -594,6 +678,19 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
           )}
         </div>
       </div>
+
+      {/* Spend by Expert (Phase 268, D-268-10). ⛔ It does NOT follow the Expert filter — it is
+          the navigator, computed server-side with the filter off; its header says so. */}
+      <ExpertSpendCard
+        state={loadError ? "failed" : summary === null ? "loading" : "ready"}
+        lines={expertLines}
+        windowTotalUsd={summary?.windowTotalUsd ?? null}
+        windowRunCount={summary?.windowRunCount ?? 0}
+        windowLabel={windowWords}
+        selected={expertFilter}
+        selectedLabel={expertLabel}
+        onSelect={selectExpert}
+      />
 
       {/* "What This View Cannot See" Honesty Summary Card */}
       {/* ⛔ NOT MOUNTED ON A FAILED LOAD. CR-07. Fed zeroes, this card renders a 100%-priced
@@ -614,6 +711,8 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
         unmeasuredRunsCount={summary?.unmeasuredRunsCount || 0}
         incompleteCoverageCount={summary?.incompleteCoverageCount || 0}
         ratedRunsCount={summary?.ratedRunsCount || 0}
+        unpricedSubagents={summary?.unpricedSubagents || 0}
+        partlyPricedHarnessRuns={summary?.partlyPricedHarnessRuns || 0}
         onFilterUnrated={() => setCoverageFilter("unrated")}
         onFilterIncompleteCoverage={() => setCoverageFilter("incomplete_coverage")}
         onOpenRateRegistry={() => setActiveTab("rates")}
@@ -664,6 +763,15 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
                 coverage filter applies to this ledger only
               </span>
             )}
+            {/* Phase 268: the ledger follows the Expert filter, and says so in visible text. */}
+            {activeTab === "ledger" && expertLabel !== null && (
+              <span
+                className="px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-600/40 dark:border-indigo-500/30"
+                data-testid="expert-scope-note"
+              >
+                {EXPERT_SPEND_COPY.ledgerHeaderChip(expertLabel)}
+              </span>
+            )}
           </div>
         </div>
 
@@ -674,6 +782,7 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
               <thead>
                 <tr className="border-b border-border/40 bg-muted/20 font-mono text-[11px] text-muted-foreground">
                   <th className="py-2.5 px-4 font-medium">Run Identity</th>
+                  <th className="py-2.5 px-4 font-medium">{EXPERT_SPEND_COPY.ledgerColumn}</th>
                   <th className="py-2.5 px-4 font-medium">Model & Provider</th>
                   <th className="py-2.5 px-4 font-medium">Timestamp</th>
                   <th className="py-2.5 px-4 font-medium">Tokens (In / Out)</th>
@@ -685,7 +794,7 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
                 {runs.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="py-8 text-center text-muted-foreground"
                       data-testid="ledger-empty-state"
                     >
@@ -693,7 +802,9 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
                           after a failed load it is a claim made from nothing. CR-07. */}
                       {loadError
                         ? "Runs unavailable — the ledger did not load."
-                        : "No runs matching current filters."}
+                        : expertLabel !== null
+                          ? EXPERT_SPEND_COPY.ledgerEmptyFiltered(expertLabel, windowWords)
+                          : "No runs matching current filters."}
                     </td>
                   </tr>
                 ) : (
@@ -719,7 +830,14 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-card text-muted-foreground border border-border/40">
                               {run.status}
                             </span>
+                            {/* D-268-09: this row's figures include its sub-agents'. */}
+                            <SubagentTag count={run.subagentCount} />
                           </div>
+                        </td>
+
+                        {/* Expert (Phase 268) */}
+                        <td className="py-2.5 px-4">
+                          <LedgerExpertCell run={run} />
                         </td>
 
                         {/* Model & Provider */}

@@ -1,0 +1,27 @@
+{
+ "thread": "78d40bab-8d16-40a5-b281-1eeeded86d51",
+ "send": {
+  "status": 201,
+  "body": {
+   "message_id": "234c96d8-bf62-44de-aa14-a7e8190f31f6",
+   "run_id": "bb51b5a5-2bcd-4905-bde9-d69619b34046",
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek"
+  }
+ },
+ "run": {
+  "run_id": "bb51b5a5-2bcd-4905-bde9-d69619b34046",
+  "status": "completed",
+  "model": "deepseek-v4-flash",
+  "provider": "deepseek",
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "expert_id": "00000000-0000-0000-0000-000000000259",
+  "expert_attributed": true,
+  "input_tokens": 17690,
+  "output_tokens": 603,
+  "started_at": "2026-09-28 19:42:16.793174+00:00",
+  "completed_at": "2026-09-28 19:42:43.914412+00:00",
+  "error": null,
+  "continues_used": 0
+ }
+}

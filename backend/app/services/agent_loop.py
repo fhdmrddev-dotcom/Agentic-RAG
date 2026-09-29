@@ -85,6 +85,8 @@ from app.services.provider_gateway import classify_provider_error, message_for_k
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import insert_assistant_message
+from app.models.message import TRANSCRIPT_EVENT_KINDS
+from app.services.scope_note import SCOPE_CHANGED_KIND, ScopeNoteFold
 from app.utils.folder_utils import fetch_visible_folders
 from app.services.context_window import (
     trim_messages_to_fit,
@@ -265,7 +267,8 @@ class RunContext:
     # Phase 260 (PACK-02 / D-260-05) — ADDITIVE scoping inputs resolved prior to the loop.
     # None = normal unrestricted chat (closed-core invariant).
     effective_folder_ids: tuple[str, ...] | None = None
-    effective_tools: tuple[str, ...] | None = None
+    # (Phase 267 / D-267-01: the tool-list field that lived here was DELETED with the schema
+    # filter that read it. A thread's scoping never removes a tool; the two fields below only ADD.)
     # Phase 261 (BUG-260920-01 / D-v4.3-01) — synchronized scoped folder path
     scoped_folder_path: str | None = None
     # Phase 264 (264-01 / PACK-17 / D-264-03) — ADDITIVE default-off born-for scope id,
@@ -280,6 +283,21 @@ class RunContext:
     # or set could not live here — same constraint skill_catalog_override's frozen
     # tuple already satisfies). NOTHING reads it in 264-01; the consumer is 264-03.
     born_for_bundle_id: UUID | None = None
+    # Phase 267 (PACK-21 / D-267-29) — ADDITIVE default-off connection keys. OFF by default
+    # (None) at EVERY existing call site → None => byte-identical to base (the 092/133 default-off
+    # discipline above). A tuple of service_id / capability keys the producer has ALREADY
+    # approved (active + enabled in the caller's org). The connector block admits a connection
+    # whose id the composer switched on OR whose service_id / capability is in this set; it is
+    # re-checked `is_enabled` (and, for a key, `status == 'active'` — 267-REVIEW WR-05) at
+    # admission, and per-tool grant posture (deny/ask) applies
+    # unchanged. Absent keys and no switched-on ids still mean NO connector tools.
+    scoped_connection_keys: tuple[str, ...] | None = None
+    # Phase 267 (PACK-21 / D-267-32) — ADDITIVE default-off catalog rows. OFF by default (None)
+    # at EVERY existing call site → None => byte-identical to base. Each dict carries `name` +
+    # `description`. They are UNIONED with the normal DB catalog (a DB row of the same name
+    # wins) and never trimmed by the relevance pre-filter. Unlike `skill_catalog_override` (the
+    # eval seam, which REPLACES the catalog and is left byte-identical), this only ever adds.
+    skill_catalog_additions: tuple[dict, ...] | None = None
 
 
 
@@ -354,8 +372,14 @@ async def persist_cap_paused(
     tool_calls_buffer: dict,
     continues_used: int,
     emit: Callable[..., Awaitable[Any]],
+    org_id: str | None = None,
 ) -> str:
     """Persist the dropped tool calls + emit the NON-terminal cap_paused event.
+
+    Phase 268 (D-268-22 / Pitfall 3): ``org_id`` is the turn's validated active org. The Continue
+    endpoint looks the carrier up ``AND org_id = <the run's org>``; the run now carries the active
+    org explicitly, so a carrier left to the trigger's LIMIT-1 guess would be invisible to Continue
+    for a two-org user. Absent → no key → the insert dict is byte-identical.
 
     Called at the iteration cap (force_no_tools WITH a non-empty buffer) BEFORE
     the caller clears ``tool_calls_buffer`` — so the calls are durable first
@@ -379,6 +403,7 @@ async def persist_cap_paused(
                     f"tool(s) still queued. Continue to run them."
                 ),
                 "tool_calls": carrier,
+                **({"org_id": org_id} if org_id else {}),
             })
         )
     except Exception:
@@ -981,7 +1006,9 @@ def _apply_origin_filter(history_q, agent_mode: str):
     return history_q.eq("origin", "harness")
 
 
-def _reconstruct_history(history_rows: list[dict], active_provider: str = "") -> list[dict]:
+def _reconstruct_history(
+    history_rows: list[dict], active_provider: str = "", *, resuming: bool = False
+) -> list[dict]:
     """
     Reconstruct an OpenAI-compatible multi-turn message list from stored DB rows.
 
@@ -1002,7 +1029,23 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
     is already ``jsonb``.
     """
     messages: list[dict] = []
+    # Phase 268 (D-268-26 / SEED-319): a scope change is TOLD to the model — one note, prepended to the
+    # NEXT user message (never a mid-history system row). The words and the fold live in scope_note.py.
+    _scope_fold = ScopeNoteFold()
     for msg in history_rows:
+        # Phase 267 (D-267-10) — transcript-only: rendered to people, never sent to a model.
+        # One kind check against the one-home allowlist; every other system kind is untouched.
+        _first_call = msg.get("tool_calls")
+        if (
+            msg.get("role") == "system"
+            and isinstance(_first_call, list)
+            and _first_call
+            and isinstance(_first_call[0], dict)
+            and _first_call[0].get("kind") in TRANSCRIPT_EVENT_KINDS
+        ):
+            if _first_call[0].get("kind") == SCOPE_CHANGED_KIND:
+                _scope_fold.add(_first_call[0])
+            continue
         tool_calls_data = msg.get("tool_calls")
         if (
             msg["role"] == "assistant"
@@ -1074,11 +1117,19 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
                 })
         else:
             # User messages, plain assistant messages, or messages with null/empty tool_calls
+            _note = _scope_fold.take() if msg["role"] == "user" else None
             messages.append({
                 "role": msg["role"],
-                "content": msg.get("content") or "",
+                "content": (f"{_note}\n\n" if _note else "") + (msg.get("content") or ""),
                 **({"reasoning_content": msg["reasoning_content"]} if msg["role"] == "assistant" and msg.get("reasoning_content") else {}),
             })
+    # Phase 268 (D-268-27): a Continue writes no user row, so a change made while the run was paused is still
+    # pending here. Only on a Continue (``resuming``), it becomes ONE synthetic USER-role turn at the end —
+    # never a system row, never a rewrite of an earlier user message. A send's own new user row took it above.
+    if resuming:
+        _tail_note = _scope_fold.take()
+        if _tail_note:
+            messages.append({"role": "user", "content": _tail_note})
     return messages
 
 
@@ -1458,7 +1509,24 @@ async def run_agent_loop(
         else:
             enabled_skills = list(skill_catalog_override)
 
-        if enabled_skills:
+        # Phase 267 (D-267-32) — the scoped catalog rows ADD to the DB catalog, only in the
+        # live-DB branch (the eval-tuple branch stays byte-identical). A DB row of the same name
+        # wins (its real description). These rows are pulled OUT of the relevance-trim set and
+        # appended after the trimmed block, so the Phase 140 pre-filter can never drop them —
+        # stronger than pinning, because `_cap_pins` can still drop a pin that overflows its cap.
+        # Rows with no DB match carry no id, so they never reach the embed / rank / kick paths.
+        # None / () => `_forced_catalog_rows` is empty and everything below is byte-identical.
+        _forced_catalog_rows: list[dict] = []
+        if skill_catalog_override is None and ctx.skill_catalog_additions:
+            _db_rows_by_name = {s["name"]: s for s in enabled_skills}
+            for _addition in ctx.skill_catalog_additions:
+                _row = _db_rows_by_name.get(_addition["name"], _addition)
+                if all(r["name"] != _row["name"] for r in _forced_catalog_rows):
+                    _forced_catalog_rows.append(_row)
+            _forced_names = {r["name"] for r in _forced_catalog_rows}
+            enabled_skills = [s for s in enabled_skills if s["name"] not in _forced_names]
+
+        if enabled_skills or _forced_catalog_rows:
             if skill_catalog_override is None:
                 # Phase 140 (TRIG-02) smart-dispatch relevance pre-filter — lives STRICTLY
                 # inside this override-None (live DB) branch so the eval-tuple path below
@@ -1543,6 +1611,12 @@ async def run_agent_loop(
                     pinned_recent_ids,
                     sim_by_id,
                 )
+                # Phase 267 (D-267-32) — the scoped rows, never trimmed, in the catalog's own
+                # line shape. An empty trim set leaves the bare header (which ends in a newline).
+                if _forced_catalog_rows:
+                    catalog_note = catalog_note + ("\n" if enabled_skills else "") + "\n".join(
+                        f"- **{s['name']}**: {s['description']}" for s in _forced_catalog_rows
+                    )
             else:
                 # Eval-tuple branch (D-06): byte-identical to today — no budget, no embed,
                 # no rank, no kick. The eval arms drive exactly these skills.
@@ -1656,9 +1730,22 @@ async def run_agent_loop(
             # ABSENT AND EMPTY BOTH MEAN NONE, and they mean it HERE, at the boundary,
             # rather than by agreement with a client we do not control. A caller that
             # wants connector tools names them.
+            #
+            # Phase 267 (D-267-29, operator-approved): a SECOND way to be named — the run's
+            # scoped connection keys, which the producer has already approved (active + enabled
+            # in the caller's org). A connection is admitted when its id was switched on OR its
+            # service_id / capability is a key. `is_enabled` is re-checked for both, and the
+            # per-tool grant posture below is unchanged. A run with no scoped keys and no
+            # switched-on ids still gets NONE: absent and empty still mean none.
+            # 267-REVIEW WR-05: a KEY admits only a connection whose `status` is 'active' — the
+            # resolver approved the key because SOME connection of that service is live, which
+            # says nothing about a revoked or errored sibling (its tools would fail at call time).
             allowed_ids = {str(cid) for cid in (getattr(body, "active_connector_ids", None) or [])}
-            active_conns = [c for c in conns if str(c.id) in allowed_ids and c.is_enabled]
-            if not allowed_ids:
+            # (Each statement stays on ONE line: test_chat_connector_scoping.py compiles these
+            # exact lines out of this file and drives them, so the test runs the real predicate.)
+            scoped_keys = {str(k) for k in (ctx.scoped_connection_keys or ())}
+            active_conns = [c for c in conns if (str(c.id) in allowed_ids or ((c.service_id in scoped_keys or c.capability in scoped_keys) and c.status == "active")) and c.is_enabled]
+            if not allowed_ids and not scoped_keys:
                 logger.debug(
                     "chat run %s named no connector connections — offering built-in tools "
                     "only (absent and empty both mean none)", run_id,
@@ -1693,14 +1780,10 @@ async def run_agent_loop(
         except Exception:
             logger.warning("Failed to wire connector tools into chat agent loop", exc_info=True)
 
-        # Phase 260 (PACK-02 / D-260-05) — explicit tool restriction from RunContext data
-        if ctx.effective_tools is not None:
-            allowed_tool_names = set(ctx.effective_tools)
-            current_tools = list(active_tools) if active_tools is not None else list(get_tools(user_settings))
-            active_tools = [
-                t for t in current_tools
-                if isinstance(t, dict) and t.get("function", {}).get("name") in allowed_tool_names
-            ]
+        # (Phase 267 / D-267-01 / D-267-03: the schema filter that stood here was DELETED. It
+        # compared bare connection slugs against namespaced tool names, so beyond stripping 15
+        # of 28 chat tools it dropped every connector tool on a scoped thread. Nothing narrows
+        # the tool set after this point.)
 
         # Phase 244 (SHELL-04 / D-244-02) — announce this thread's attached files.
         # The SIXTH conditional append, in the exact shape of `memory_note` above.
@@ -1747,6 +1830,8 @@ async def run_agent_loop(
         _reconstruct_history(
             history_resp.data,
             active_provider=(getattr(user_settings, "active_provider", "") or "").lower(),
+            # Phase 268 (D-268-27): True only on a Continue (POST /runs/{id}/continue).
+            resuming=ctx.resume_dropped_tool_calls,
         )
     )
 
@@ -1907,6 +1992,8 @@ async def run_agent_loop(
                 confidence_avg_similarity=row.get("confidence_avg_similarity"),
                 confidence_disclaimer=row.get("confidence_disclaimer"),
                 reasoning_content=_strip_nul(full_reasoning_content) or None,
+                # Phase 268 (D-268-22): the turn's validated active org (None → the trigger).
+                org_id=current_user.get("org_id"),
             )
             _cached_id = str(_inserted_id) if _inserted_id else None
         except Exception as e:
@@ -1945,6 +2032,8 @@ async def run_agent_loop(
                         "role": "system",
                         "content": _strip_nul(w.get("message", "")),
                         "tool_calls": [{"kind": w.get("kind", "")}],
+                        # Phase 268 (D-268-22): the turn's active org, when validated.
+                        **({"org_id": current_user["org_id"]} if current_user.get("org_id") else {}),
                     })
                 )
             except Exception as e:
@@ -2690,6 +2779,7 @@ async def run_agent_loop(
                     tool_calls_buffer=tool_calls_buffer,
                     continues_used=_continues_used,
                     emit=_emit,
+                    org_id=current_user.get("org_id"),  # Phase 268 (D-268-22 / Pitfall 3)
                 )
                 tool_calls_buffer = {}   # persisted above — now skip the tool execution round
 

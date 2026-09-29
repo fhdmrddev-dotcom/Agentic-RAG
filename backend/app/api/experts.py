@@ -5,9 +5,29 @@ from typing import Any
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
+from supabase import Client
 
-from app.dependencies import _has_org_permission, get_active_org_id, get_current_user, get_pg_pool, resolve_caller_role
+from app.dependencies import (
+    _has_org_permission,
+    feature_visible,
+    get_active_org_id,
+    get_current_user,
+    get_pg_pool,
+    get_user_supabase_client,
+    resolve_caller_role,
+)
 from app.models.expert import (
     ExpertBundleCreate,
     ExpertBundleUpdate,
@@ -17,6 +37,16 @@ from app.models.expert import (
 )
 from app.services.entitlement_service import require_capability
 from app.services.expert_authoring import ExpertDraftOutput, generate_expert_draft
+from app.services.expert_install_service import (
+    ExpertInstallConflict,
+    ExpertInstallFolderNotOwned,
+    ExpertInstallResult,
+    ExpertInstallSummary,
+    ExpertNotInstallable,
+    list_install_summaries,
+    overlay_install_state,
+)
+from app.services.expert_install_service import install_expert as install_expert_service
 from app.services.skill_body_authoring import (
     AuthoredSkillBody,
     SkillBodyAuthoringDisabled,
@@ -25,6 +55,7 @@ from app.services.skill_body_authoring import (
 from app.services.expert_service import (
     ResolvedExpertBundle,
     add_expert_grant_service,
+    connection_states,
     create_expert_service,
     delete_expert_service,
     filter_visible_skill_names,
@@ -419,21 +450,114 @@ async def list_experts(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to manage experts for this organization.",
             )
-        return await list_experts_service(
+        managed = await list_experts_service(
             pool=pool,
             caller_org_id=org_id,
             include_system=include_system,
             enabled_only=enabled_only,
         )
+        # Phase 266 (D-266-03): the manage gate above already answered, so can_install is True.
+        managed = await overlay_install_state(pool, managed, org_id=org_id, can_install=True)
+        # Phase 267 (D-267-05): every row tells the truth about its required connections.
+        return await _overlay_connection_state_for_caller(
+            request, current_user, active_org, pool, managed, org_id
+        )
 
-    return await list_experts_service(
+    rows = await list_experts_service(
         pool=pool,
         caller_org_id=org_id,
         caller_user_id=user_id,
         caller_roles=caller_roles,
         include_system=include_system,
-        enabled_only=enabled_only,
+        # R265-262-07 / PACK-11: only the management arm may list disabled Experts.
+        enabled_only=True,
     )
+    rows = await _overlay_install_state_for_caller(request, current_user, active_org, pool, rows, org_id)
+    return await _overlay_connection_state_for_caller(request, current_user, active_org, pool, rows, org_id)
+
+
+async def _overlay_install_state_for_caller(
+    request: Request,
+    current_user: dict[str, Any],
+    active_org: str,
+    pool: asyncpg.Pool,
+    rows: list[dict[str, Any]],
+    org_id: UUID,
+) -> list[dict[str, Any]]:
+    """Phase 266 (D-266-03/09): every first-party row carries the ACTIVE org's install state.
+
+    ``can_install`` is ``experts:manage`` in the active org — asked ONLY when a first-party row
+    is present, so a list of org-authored Experts costs no extra query (and the overlay itself
+    returns it untouched).
+    """
+    can_install = False
+    if any(r.get("is_system") for r in rows):
+        can_install = await _has_org_permission(request, current_user, active_org, "experts:manage")
+    return await overlay_install_state(pool, rows, org_id=org_id, can_install=can_install)
+
+
+async def _overlay_connection_state_for_caller(
+    request: Request,
+    current_user: dict[str, Any],
+    active_org: str,
+    pool: asyncpg.Pool,
+    rows: list[dict[str, Any]],
+    org_id: UUID,
+) -> list[dict[str, Any]]:
+    """Phase 267 (D-267-05 / D-267-06 / PACK-22): every Expert row says which of its required
+    connections the ACTIVE org has connected, and whether THIS caller can connect them.
+
+    Two NEW keys on every row (a copy — the input row is never changed):
+
+    - ``connection_state``: ``[{slug, name, connected}]`` in ``required_connections`` order, ``[]``
+      when nothing is required. Computed by ``expert_service.connection_states`` — the SAME rule
+      the run's resolver strips by, so the UI and the run cannot disagree. ⛔ Never re-spelled here.
+    - ``can_connect``: ``org:manage`` AND the ``live_connectors`` feature visible — exactly the gate
+      ``POST /connections`` applies (``require_org_manage`` + ``require_visible("live_connectors")``),
+      so a member is never offered a button that 403s. ⛔ Never the Expert-authoring permission
+      (UI-SPEC R-1): managing Experts is not managing connections.
+
+    ⛔ ``required_connections`` is NOT replaced: it is the string list the studio round-trips into
+    ``PATCH /experts/{id}`` for org-authored Experts (T-267-06). Cost: ONE connection read for the
+    whole list, and the permission is asked ONLY when some row has a missing connection — so a list
+    that needs nothing costs nothing.
+    """
+    union = sorted({s for r in rows for s in (r.get("required_connections") or [])})
+    by_slug = {st.slug: st for st in await connection_states(pool, org_id, union)}
+    missing = any(
+        not by_slug[s].connected for r in rows for s in (r.get("required_connections") or [])
+    )
+    can_connect = False
+    if missing:
+        can_connect = await _has_org_permission(
+            request, current_user, active_org, "org:manage"
+        ) and await feature_visible(request, current_user, "live_connectors")
+
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        row = dict(r)
+        row["connection_state"] = [
+            by_slug[s].model_dump() for s in (r.get("required_connections") or [])
+        ]
+        row["can_connect"] = bool(can_connect)
+        out.append(row)
+    return out
+
+
+@router.get("/installs", status_code=status.HTTP_200_OK, response_model=list[ExpertInstallSummary])
+async def list_expert_installs(
+    active_org: str = Depends(get_active_org_id),
+    current_user: dict[str, Any] = Depends(get_current_user),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> list[ExpertInstallSummary]:
+    """The active org's Expert installs whose folder still exists (PACK-18, Library provenance).
+
+    ⛔ DECLARED BEFORE ``GET /{bundle_id}`` on purpose: after it, FastAPI would match
+    ``installs`` as a UUID path parameter and answer 422. Members may read their own org's
+    installs — the org is bound in SQL from the validated active org, and the names and folder
+    ids are already visible to them (T-266-22).
+    """
+    return await list_install_summaries(pool, org_id=_to_uuid(active_org))
 
 
 @router.get("/{bundle_id}", status_code=status.HTTP_200_OK)
@@ -461,12 +585,98 @@ async def get_expert(
         caller_user_id=user_id,
         caller_roles=caller_roles,
     )
+    # 267-REVIEW-INDEPENDENT CR-03(d): a DISABLED Expert is hidden from non-managers here exactly as
+    # the list hides it (R265-262-07 — only the management arm may list disabled Experts); otherwise a
+    # thread bound to it kept hydrating the chip. The permission is asked ONLY for a disabled bundle,
+    # so an ordinary read costs nothing extra. Same 404 sentence as a bundle that does not exist.
+    if bundle and not bundle.get("is_enabled", True) and not await _has_org_permission(
+        request, current_user, active_org, "experts:manage"
+    ):
+        bundle = None
     if not bundle:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Expert bundle not found",
         )
-    return bundle
+    overlaid = await _overlay_install_state_for_caller(
+        request, current_user, active_org, pool, [bundle], org_id
+    )
+    (overlaid_row,) = await _overlay_connection_state_for_caller(
+        request, current_user, active_org, pool, overlaid, org_id
+    )
+    return overlaid_row
+
+
+@router.post("/{bundle_id}/install", status_code=status.HTTP_202_ACCEPTED, response_model=ExpertInstallResult)
+async def install_expert(
+    bundle_id: UUID,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    active_org: str = Depends(get_active_org_id),
+    # ⛔ POSITIONAL-OR-KEYWORD, NO bare `*` and NO body parameter. The 261 fence walks
+    # `args.defaults`; and with no body, an `org_id` a client sends has nowhere to land — the
+    # org comes ONLY from the validated active org above (T-266-14).
+    current_user: dict[str, Any] = Depends(require_expert_manage),
+    supabase: Client = Depends(get_user_supabase_client),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> ExpertInstallResult:
+    """Copy a first-party Expert's sample knowledge into the ACTIVE org (PACK-18/19, D-266-01).
+
+    Gated by the router's ``require_capability("experts")`` — the ONE tier home, no second check
+    here (D-266-04) — and ``require_expert_manage`` (D-266-02): it writes org-wide Library
+    content. The bundle is looked up grant-aware, so a bundle the caller cannot see is a 404
+    before any installability answer (T-266-18). 202: the documents are queued, and readiness is
+    derived from them on every later read.
+    """
+    org_id = _to_uuid(active_org)
+    user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
+    caller_roles = await _caller_roles(request, current_user)
+    bundle = await get_expert_service(
+        pool=pool,
+        bundle_id=bundle_id,
+        caller_org_id=org_id,
+        caller_user_id=user_id,
+        caller_roles=caller_roles,
+    )
+    if not bundle:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expert bundle not found")
+
+    try:
+        return await install_expert_service(
+            pool=pool,
+            supabase=supabase,
+            bundle=bundle,
+            org_id=org_id,
+            user_id=user_id,
+            # The manage gate passed, so this caller may install.
+            can_install=True,
+            background_tasks=background_tasks,
+        )
+    # ⛔ WR-09 ORDER IS THE CONTRACT: named refusals, then HTTPException re-raised untouched,
+    # then the catch-all — whose detail is a LITERAL, never f"…{exc}".
+    except ExpertNotInstallable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"detail": exc.sentence, "error": "expert_not_installable"},
+        ) from exc
+    except ExpertInstallConflict as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"detail": exc.sentence, "error": "install_conflict"},
+        ) from exc
+    except ExpertInstallFolderNotOwned as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"detail": exc.sentence, "error": "install_folder_not_owned"},
+        ) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to install expert %s for org %s: %s", bundle_id, org_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not install this Expert.",
+        ) from exc
 
 
 @router.get("/{bundle_id}/resolve", status_code=status.HTTP_200_OK, response_model=ResolvedExpertBundle)

@@ -3,6 +3,7 @@
 // a type-only import (verbatimModuleSyntax) — fully elided at compile, so the
 // api.ts ↔ types circular *type* reference creates no runtime import cycle.
 import type { TunerCandidate } from "@/lib/api"
+import type { ExpertConnectionState, ExpertInstallState } from "@/lib/api/experts"
 
 export interface Thread {
   id: string
@@ -32,6 +33,11 @@ export interface ExpertBundle {
   when_to_use?: string
   example_output?: string
   tool_floor_enabled?: boolean
+  install?: ExpertInstallState | null
+  /** Phase 267 overlay (server facts): each required connection's state, and whether the caller
+   *  may create a connection (org:manage ∧ live_connectors). */
+  connection_state?: ExpertConnectionState[]
+  can_connect?: boolean
 }
 
 
@@ -169,7 +175,10 @@ export interface Message {
   id: string
   thread_id: string
   user_id: string
-  role: "user" | "assistant"
+  /** Phase 267 (D-267-09): "system" rows reach the client ONLY for the transcript-event
+   *  allowlist (`expertEventCopy.ts` → `TRANSCRIPT_EVENT_KINDS`); MessageItem renders any other
+   *  system row as nothing. */
+  role: "user" | "assistant" | "system"
   content: string
   created_at: string
   updated_at: string

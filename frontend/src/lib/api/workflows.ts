@@ -375,7 +375,7 @@ export async function updateWorkflowDraft(
     throw new WorkflowDraftUnreadableError(rawBody)
   }
   if (res.status === 404) throw new WorkflowNotFoundError()
-  if (!res.ok) throw new Error(`Failed to update workflow draft (status ${res.status})`)
+  if (!res.ok) throw new Error(entitlementRefusalMessage(await res.json().catch(() => null)) ?? `Failed to update workflow draft (status ${res.status})`)
   return (await res.json()) as WorkflowDraftWriteResult
 }
 
@@ -960,7 +960,7 @@ export async function generateWorkflow(
     body: JSON.stringify(body),
     signal,
   })
-  if (!res.ok) throw new Error(`Failed to generate workflow (status ${res.status})`)
+  if (!res.ok) throw new Error(entitlementRefusalMessage(await res.json().catch(() => null)) ?? `Failed to generate workflow (status ${res.status})`)
   return (await res.json()) as GenerateResult
 }
 

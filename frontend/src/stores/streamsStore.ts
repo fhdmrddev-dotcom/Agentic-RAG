@@ -41,6 +41,16 @@ import { readSnapshotSyncOrEmpty, readTodosSyncOrEmpty, readTasksSyncOrEmpty } f
 export type SurfaceId = string
 
 /**
+ * 267-REVIEW-INDEPENDENT CR-03(c) — the server's `active_expert_id` for one thread, as the latest
+ * server answer read it (`null` = the server says there is NO Expert). `requestedAt` is when that
+ * read STARTED, so an answer already in flight before a newer one can never overwrite it.
+ */
+export interface ExpertReading {
+  expertId: string | null
+  requestedAt: number
+}
+
+/**
  * Phase 092 (MODE-01/02 — SC#3) — the per-thread workflow-lock record. Held in
  * `workflowLockByThread` keyed by the OWNING thread id. Presence of a key means
  * the thread is Harness-locked (a non-terminal workflow run owns its anchor);
@@ -300,6 +310,11 @@ export interface StreamsState {
   // ────────────────────────────────────────────────────────────────────────────
   /** Per-thread harness phase timeline (panel-only). Absent key = no phases. */
   phasesByThread: Map<string, Phase[]>
+  // 267-REVIEW-INDEPENDENT CR-03(c) — the server's Expert per thread, from every snapshot read
+  // (StreamsProvider) and every Expert PATCH answer (ChatArea), through `recordExpertReading` only.
+  // ChatArea reconciles the Expert chip from it, so a server-side clear removes the chip. Ephemeral.
+  /** Per-thread server reading of the thread's Expert. Absent key = the server has not said. */
+  expertReadingsByThread: Map<string, ExpertReading>
   actions: {
     setMessagesForBucket: (
       surface: SurfaceId,
@@ -522,6 +537,9 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   // tasksByThread which persists). Panel-only — chat selectors never read it.
   // Type: phasesByThread: Map<string, Phase[]>
   phasesByThread: new Map<string, Phase[]>(),
+  // 267-REVIEW-INDEPENDENT CR-03(c): ephemeral, never persisted.
+  // Type: expertReadingsByThread: Map<string, ExpertReading>
+  expertReadingsByThread: new Map<string, ExpertReading>(),
   actions: {
     setMessagesForBucket: () => {},
     clearThreadBucket: () => {},
@@ -570,3 +588,18 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     finalizeEarlierPhasesForThread: () => {},
   },
 })))
+
+/**
+ * 267-REVIEW-INDEPENDENT CR-03(c) — THE ONE writer of `expertReadingsByThread`. Latest READ wins: an
+ * answer whose request started before the stored one is dropped, so a snapshot already in flight when
+ * the user changed the Expert can never put the old Expert back.
+ */
+export function recordExpertReading(threadId: string, expertId: string | null, requestedAt: number): void {
+  useStreamsStore.setState((s) => {
+    const prev = s.expertReadingsByThread.get(threadId)
+    if (prev && prev.requestedAt > requestedAt) return {}
+    return {
+      expertReadingsByThread: new Map(s.expertReadingsByThread).set(threadId, { expertId, requestedAt }),
+    }
+  })
+}

@@ -6,7 +6,8 @@ import pytest
 
 from app.services.harness.phase_types import PHASE_TYPE_REGISTRY_ENTRIES
 from app.services.harness.emitters import EMITTER_REGISTRY
-from app.services.tool_dispatcher import _TOOL_REGISTRY, EXPERT_CORE_TOOLS
+from app.services import tool_dispatcher
+from app.services.tool_dispatcher import _TOOL_REGISTRY
 
 
 APP_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "app"
@@ -52,13 +53,24 @@ def test_tool_dispatcher_contains_zero_expert_tools_or_dispatchers():
                 pytest.fail(f"Expert-specific tool handler found in tool_dispatcher: {node.name}")
 
 
-def test_expert_core_tools_is_strict_subset_of_tool_registry():
-    """PACK-02 / Phase 260 F-3: EXPERT_CORE_TOOLS is derived and fenced strictly against _TOOL_REGISTRY."""
-    assert len(EXPERT_CORE_TOOLS) == 10, f"Expected 10 core tools for experts, got {len(EXPERT_CORE_TOOLS)}"
-    assert EXPERT_CORE_TOOLS.issubset(_TOOL_REGISTRY.keys()), (
-        f"Inventory drift: EXPERT_CORE_TOOLS has unregistered members: "
-        f"{EXPERT_CORE_TOOLS - set(_TOOL_REGISTRY.keys())}"
-    )
+def test_no_second_encoding_of_the_tool_set_survives():
+    """Phase 267 (D-267-01) — RE-DRIVEN. This test used to pin `len(EXPERT_CORE_TOOLS) == 10` and
+    its subset of `_TOOL_REGISTRY`: a fence against the second tool registry DRIFTING. Phase 267
+    deleted that second encoding outright (an Expert no longer filters tools), so the stronger
+    form of the same intent is that no such encoding exists to drift at all.
+    """
+    for name in ("EXPERT_CORE_TOOLS", "EXPERT_DELIVERABLE_TOOLS"):
+        assert not hasattr(tool_dispatcher, name), f"{name} is back in tool_dispatcher"
+    dispatcher_path = APP_DIR / "services" / "tool_dispatcher.py"
+    tree = ast.parse(dispatcher_path.read_text(encoding="utf-8"), filename=str(dispatcher_path))
+    module_names = {
+        t.id
+        for node in tree.body
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        for t in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(t, ast.Name)
+    }
+    assert not [n for n in module_names if "expert" in n.lower() and "tool" in n.lower()], module_names
 
 
 def test_expert_authoring_service_uses_forced_emit_and_has_no_execution_loop():

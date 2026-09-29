@@ -1,0 +1,19 @@
+slug: operations-analyst
+org_id: 9042e46f-745d-40d6-83eb-c6984d582ce1
+model: deepseek-v4-flash provider: deepseek embedding_model: text-embedding-3-small (embedding_provider=openai, dims=1536, source=app_settings.global)
+== install operations-analyst (00000000-0000-0000-0000-000000002694) — 2026-09-29T14:39:41.480316+00:00  (mechanism: POST /experts/{id}/install only, D-269-08)
+POST /experts/00000000-0000-0000-0000-000000002694/install headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (Authorization: Bearer <redacted>) -> HTTP 202 body={"expert_bundle_id":"00000000-0000-0000-0000-000000002694","corpus_version":"2b6cee078f1c6a58fb60f96a38a24c371ab72b0805309c4abbe7127dd505fa83","install":{"state":"installing","folder_id":"ac0768c8-275b-4970-b687-0ebbd7e075d4","cause":null,"cause_source":null,"can_install":true,"updated_at":"2026-09-29T14:39:41.671441Z"}}
+polls (4), first and last:
+2026-09-29T14:39:43.758928+00:00 GET /experts/00000000-0000-0000-0000-000000002694 -> 200 install={"state": "installing", "folder_id": "ac0768c8-275b-4970-b687-0ebbd7e075d4", "cause": null, "cause_source": null, "can_install": true, "updated_at": "2026-09-29T14:39:41.671441Z"}
+2026-09-29T14:39:49.999514+00:00 GET /experts/00000000-0000-0000-0000-000000002694 -> 200 install={"state": "ready", "folder_id": "ac0768c8-275b-4970-b687-0ebbd7e075d4", "cause": null, "cause_source": null, "can_install": true, "updated_at": "2026-09-29T14:39:41.671441Z"}
+state sequence: installing -> ready
+final install.state = ready
+SQL: SELECT org_id, expert_bundle_id, installed_by, status, folder_id, corpus_version, error FROM expert_installs WHERE org_id='9042e46f-745d-40d6-83eb-c6984d582ce1' AND expert_bundle_id='00000000-0000-0000-0000-000000002694'
+{"org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "expert_bundle_id": "00000000-0000-0000-0000-000000002694", "installed_by": "b93a9c96-2de1-4e13-958c-10e5d6775fd0", "status": "installed", "folder_id": "ac0768c8-275b-4970-b687-0ebbd7e075d4", "corpus_version": "2b6cee078f1c6a58fb60f96a38a24c371ab72b0805309c4abbe7127dd505fa83", "error": null}
+SQL: SELECT d.id AS doc_id, d.filename, d.org_id, d.folder_id, d.status, d.chunk_count, count(c.*) AS chunks, count(c.*) FILTER (WHERE c.embedding IS NOT NULL) AS embedded, count(c.*) FILTER (WHERE c.org_id = d.org_id) AS chunks_in_doc_org, f.org_id AS folder_org, f.name AS folder_name FROM documents d JOIN folders f ON f.id=d.folder_id LEFT JOIN document_chunks c ON c.document_id=d.id WHERE d.folder_id = 'ac0768c8-275b-4970-b687-0ebbd7e075d4' GROUP BY d.id, d.filename, d.org_id, d.folder_id, d.status, d.chunk_count, f.org_id, f.name ORDER BY d.filename
+{"doc_id": "e5caacfd-cd16-4bc6-bfdb-96f2b924c264", "filename": "acme_fulfilment_and_inventory_q3_2026.md", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "folder_id": "ac0768c8-275b-4970-b687-0ebbd7e075d4", "status": "completed", "chunk_count": 3, "chunks": 3, "embedded": 3, "chunks_in_doc_org": 3, "folder_org": "9042e46f-745d-40d6-83eb-c6984d582ce1", "folder_name": "Operations & Supply Chain"}
+{"doc_id": "6388883a-cfd7-4023-ac2b-d65348082bd3", "filename": "acme_supplier_scorecard_q3_2026.md", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "folder_id": "ac0768c8-275b-4970-b687-0ebbd7e075d4", "status": "completed", "chunk_count": 4, "chunks": 4, "embedded": 4, "chunks_in_doc_org": 4, "folder_org": "9042e46f-745d-40d6-83eb-c6984d582ce1", "folder_name": "Operations & Supply Chain"}
+SQL: SELECT count(*) FROM document_chunks WHERE document_id = ANY(ARRAY['e5caacfd-cd16-4bc6-bfdb-96f2b924c264', '6388883a-cfd7-4023-ac2b-d65348082bd3']::uuid[]) AND embedding IS NOT NULL -> 7
+SQL: SELECT count(*) FILTER (WHERE org_id <> '9042e46f-745d-40d6-83eb-c6984d582ce1') FROM document_chunks WHERE document_id = ANY(<ids>) -> 0
+checks: install 202=True; state ready=True; docs=2; embedded chunks=7; all rows org_id == 9042e46f-745d-40d6-83eb-c6984d582ce1: True
+VERDICT: PASS

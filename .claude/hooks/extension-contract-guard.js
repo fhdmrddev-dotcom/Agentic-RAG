@@ -58,8 +58,9 @@ process.stdin.on('end', () => {
     if (out) process.stdout.write(out);
     process.exit(0);
   } catch (err) {
-    if (err.stdout) process.stdout.write(err.stdout);
-    if (err.stderr) process.stderr.write(err.stderr);
-    process.exit(1);
+    // PostToolUse: exit 1 is not shown to the model — report via additionalContext + exit 0.
+    const additionalContext = `EXTENSION CONTRACT (docs/EXTENSION-CONTRACT.md) — violation in ${matched}:\n\n${`${err.stdout || ''}${err.stderr || ''}`.trim()}`;
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext, file_path: norm } }));
+    process.exit(0);
   }
 });

@@ -1,0 +1,42 @@
+== SC#3 live leg — 2026-09-24T19:55:57.580130+00:00  model=deepseek-v4-flash provider=deepseek
+SQL: SELECT m.user_id, u.email, m.org_id, m.role FROM org_members m JOIN auth.users u ON u.id=m.user_id WHERE m.user_id = ANY(ARRAY['7b43cd2c-21e7-4a66-8a36-2fa3793551b0','3dce4e6b-e31b-4fe6-8b06-511781e08837']::uuid[]) ORDER BY u.email
+{"user_id": "7b43cd2c-21e7-4a66-8a36-2fa3793551b0", "email": "uat266-u1-25ada3@example.test", "org_id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "role": "org-admin"}
+{"user_id": "3dce4e6b-e31b-4fe6-8b06-511781e08837", "email": "uat266-u2-25ada3@example.test", "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "role": "org-admin"}
+SC#3a  U1 GET /documents/06f16045-f301-4ca4-826d-4e9c86a6cf1d headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} -> 405 {"detail":"Method Not Allowed"}
+SC#3-control  U2 GET /documents/06f16045-f301-4ca4-826d-4e9c86a6cf1d headers={'X-Org-Id': '1fd7000d-adc2-477a-89d8-877d0e367376'} -> 405 id={"detail":"Method Not Allowed"} filename=
+(non-vacuity) U1 GET /documents/731bfa9a-74bb-4f6f-9d15-891f94fabb48 (own org copy) -> 405
+--- SC#3b (no Expert)
+POST /threads headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} body={'title': '266 SC#3b'} -> 201 id=08edf31a-a525-49ce-98d4-aa571e34359f
+POST /threads/08edf31a-a525-49ce-98d4-aa571e34359f/messages headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} body={"content": "What was ACME Corp's Q3 2026 revenue and its year-over-year growth?", "model": "deepseek-v4-flash", "provider": "deepseek"} -> 201 {"message_id":"9954032c-3639-4396-9a05-307951b5d3a0","run_id":"5f65042f-78e8-44f8-a123-184243a7c379","model":"deepseek-v4-flash","provider":"deepseek"}
+run row: {"run_id": "5f65042f-78e8-44f8-a123-184243a7c379", "status": "completed", "model": "deepseek-v4-flash", "provider": "deepseek", "org_id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "error": null, "started_at": "2026-09-24 19:56:17.054083+00:00", "completed_at": "2026-09-24 19:56:24.373084+00:00"}
+assistant text:
+ACME Corporation reported Q3 2026 total revenue of **$124.5 million**, up **+18.2%** year over year (from $105.3 million in Q3 2025) [1][2].
+
+**[acme_q3_2026_financial_report.md]** — Condensed Consolidated Statement of Operations (Quarter Ended September 30, 2026)
+SQL:
+SELECT a.created_at, a.metadata->>'query_text' AS query_text, d.id AS doc_id, d.org_id AS doc_org, d.filename FROM audit_log a CROSS JOIN LATERAL jsonb_array_elements_text(a.metadata->'document_ids') x(doc) JOIN documents d ON d.id = x.doc::uuid WHERE a.action_type='search.query' AND a.user_id = '7b43cd2c-21e7-4a66-8a36-2fa3793551b0' AND a.created_at > '2026-09-24T19:56:14.299379+00:00' ORDER BY a.created_at
+{"created_at": "2026-09-24 19:56:20.126097+00:00", "query_text": "ACME Corp Q3 2026 revenue year-over-year growth", "doc_id": "731bfa9a-74bb-4f6f-9d15-891f94fabb48", "doc_org": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "filename": "acme_q3_2026_financial_report.md"}
+search.query rows in window (incl. zero-id rows):
+{"created_at": "2026-09-24 19:56:20.126097+00:00", "query_text": "ACME Corp Q3 2026 revenue year-over-year growth", "n_ids": 1}
+distinct doc orgs = ['0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf']; B doc present = False
+--- SC#3c (Financial Analyzer active)
+POST /threads headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} body={'title': '266 SC#3c'} -> 201 id=6ee8750b-d0c7-49ab-839b-4ee86e0ad520
+PATCH /threads/6ee8750b-d0c7-49ab-839b-4ee86e0ad520 body={'active_expert_id': '00000000-0000-0000-0000-000000000259'} -> 200 active_expert_id=00000000-0000-0000-0000-000000000259
+POST /threads/6ee8750b-d0c7-49ab-839b-4ee86e0ad520/messages headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} body={"content": "What was ACME Corp's Q3 2026 revenue and its year-over-year growth?", "model": "deepseek-v4-flash", "provider": "deepseek"} -> 201 {"message_id":"0dea561a-5b7b-451d-900d-c1be4fc2b22f","run_id":"6e3628bb-ff7a-48f4-bd42-87aa5b0b0b02","model":"deepseek-v4-flash","provider":"deepseek"}
+run row: {"run_id": "6e3628bb-ff7a-48f4-bd42-87aa5b0b0b02", "status": "completed", "model": "deepseek-v4-flash", "provider": "deepseek", "org_id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "error": null, "started_at": "2026-09-24 19:56:39.030228+00:00", "completed_at": "2026-09-24 19:56:48.634787+00:00"}
+assistant text:
+ACME Corp reported **Q3 2026 total revenue of $124.5 million**, up **+18.2% year-over-year** from $105.3 million in Q3 2025 [2].
+
+A few related highlights from the same statement of operations [2]:
+- **Gross Profit:** $79.9M, +21.4% YoY (gross margin expanded to 64.2%)
+- **Operating Income (EBIT):** $31.7M, +40.9% YoY
+- **Net Income:** $24.8M, +40.9% YoY
+- **Operating Cash Flow:** $29.1M, +36.6% YoY
+
+Source: **acme_q3_2026_financial_report.md** — Condensed Consolidated Statement of Operations (Unaudited)
+SQL:
+SELECT a.created_at, a.metadata->>'query_text' AS query_text, d.id AS doc_id, d.org_id AS doc_org, d.filename FROM audit_log a CROSS JOIN LATERAL jsonb_array_elements_text(a.metadata->'document_ids') x(doc) JOIN documents d ON d.id = x.doc::uuid WHERE a.action_type='search.query' AND a.user_id = '7b43cd2c-21e7-4a66-8a36-2fa3793551b0' AND a.created_at > '2026-09-24T19:56:36.145729+00:00' ORDER BY a.created_at
+{"created_at": "2026-09-24 19:56:42.030827+00:00", "query_text": "ACME Corp Q3 2026 revenue year-over-year growth", "doc_id": "731bfa9a-74bb-4f6f-9d15-891f94fabb48", "doc_org": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "filename": "acme_q3_2026_financial_report.md"}
+search.query rows in window (incl. zero-id rows):
+{"created_at": "2026-09-24 19:56:42.030827+00:00", "query_text": "ACME Corp Q3 2026 revenue year-over-year growth", "n_ids": 1}
+distinct doc orgs = ['0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf']; B doc present = False

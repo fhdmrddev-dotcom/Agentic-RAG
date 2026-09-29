@@ -44,6 +44,8 @@ import {
   resolveAdHoc,
   updateView,
 } from "@/lib/api"
+import { listExpertInstalls } from "@/lib/api/experts"
+import { provenanceByFolder } from "@/components/experts/catalog/expertCatalog"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -406,6 +408,26 @@ export function LibraryPage({
     return counts
   }, [documents])
 
+  // Phase 266 (D-266-13): an installed Expert's folder names where it came from —
+  // "Shared with org · from Financial Analyzer" — through NavRow's existing shared label.
+  // ⚠ A standard-tier org is REFUSED this read (403, the capability gate on the whole
+  // `/experts` router); `listExpertInstalls` turns that into `[]`, and any other failure is a
+  // missing note, not an error — the tree renders exactly as before either way.
+  const [folderProvenance, setFolderProvenance] = useState<Record<string, string>>({})
+  useEffect(() => {
+    let mounted = true
+    listExpertInstalls()
+      .then((rows) => {
+        if (mounted) setFolderProvenance(provenanceByFolder(rows))
+      })
+      .catch(() => {
+        if (mounted) setFolderProvenance({})
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
   // ── Resolve an active filter into the list (the SAME surface for ad-hoc + saved,
   // D-114-1). A saved view resolves by id (`resolveView`); an UNSAVED ad-hoc filter
   // resolves via the stateless `resolveAdHoc` endpoint (114 CR-01) — NO transient
@@ -501,6 +523,7 @@ export function LibraryPage({
         currentUserId={user?.id ?? ""}
         rootDocumentCount={rootDocumentCount}
         folderDocumentCounts={folderDocumentCounts}
+        folderProvenance={folderProvenance}
         onSelectFolder={handleSelectFolder}
         onCreateFolder={createFolder}
         onRenameFolder={renameFolder}

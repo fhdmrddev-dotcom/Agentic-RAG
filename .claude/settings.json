@@ -49,14 +49,6 @@
             "command": "\"C:/Program Files/Git/bin/bash.exe\" \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gsd-session-state.sh"
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"C:/Program Files/Git/bin/bash.exe\" \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/agent-bus-check.sh"
-          }
-        ]
       }
     ],
     "PostToolUse": [

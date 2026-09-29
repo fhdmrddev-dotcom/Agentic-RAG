@@ -87,26 +87,35 @@ def test_the_selection_is_reached_and_not_dead_code():
 # ══════════════════════════════════════════════════════════════════════════════════════
 # The behaviour, driven against the real predicate
 # ══════════════════════════════════════════════════════════════════════════════════════
-def _conn(cid: str, *, enabled: bool = True, tools: bool = True):
+def _conn(cid: str, *, enabled: bool = True, tools: bool = True, status: str = "active"):
+    # `status` mirrors ConnectorConnectionResponse, which always carries it (default "active").
     return SimpleNamespace(
         id=cid, is_enabled=enabled,
         discovered_tools=[{"name": "t"}] if tools else [],
-        capability=None, name=cid, service_id=cid,
+        capability=None, name=cid, service_id=cid, status=status,
     )
 
 
-def _select(body_ids, conns):
+def _select(body_ids, conns, scoped_keys=None):
     """The shipped selection, evaluated exactly as `agent_loop` evaluates it.
 
     ⚠ COMPILED FROM THE FILE, NOT RETYPED. A copy of the logic in a test proves the copy
-    is correct and nothing else — this is the same two lines the loop runs, so an edit
+    is correct and nothing else — these are the same lines the loop runs, so an edit
     there is an edit here.
+
+    Phase 267 (D-267-29): a third deciding line, `scoped_keys = …`, reads the run's
+    `ctx.scoped_connection_keys` — the Expert's resolver-approved connection keys. `ctx` is
+    supplied with that one field; None (every non-Expert run) must behave exactly as before.
     """
     body = SimpleNamespace(active_connector_ids=body_ids)
+    ctx = SimpleNamespace(scoped_connection_keys=scoped_keys)
     src = _selection_source()
-    # Keep the two statements that decide; drop the logging tail.
-    lines = [ln for ln in src.splitlines() if ln.strip().startswith(("allowed_ids", "active_conns"))]
-    scope: dict = {"body": body, "conns": conns, "getattr": getattr, "str": str}
+    # Keep the three statements that decide; drop the logging tail.
+    lines = [
+        ln for ln in src.splitlines()
+        if ln.strip().startswith(("allowed_ids", "scoped_keys", "active_conns"))
+    ]
+    scope: dict = {"body": body, "ctx": ctx, "conns": conns, "getattr": getattr, "str": str, "set": set}
     exec(compile("\n".join(l.strip() for l in lines), "<selection>", "exec"), scope)
     return scope["active_conns"]
 
@@ -151,3 +160,40 @@ def test_uuid_objects_and_strings_both_match():
     cid = "11111111-1111-1111-1111-111111111111"
     conns = [_conn(cid)]
     assert [c.id for c in _select([UUID(cid)], conns)] == [cid]
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════
+# Phase 267 (D-267-29) — the Expert's approved keys are a SECOND way to be named
+# ══════════════════════════════════════════════════════════════════════════════════════
+def test_a_scoped_key_admits_its_connection_by_service_id_or_capability():
+    conns = [_conn("hubspot"), _conn("notion")]
+    conns[1].capability = "send_email"
+    assert [c.id for c in _select(None, conns, scoped_keys=("hubspot",))] == ["hubspot"]
+    assert [c.id for c in _select(None, conns, scoped_keys=("send_email",))] == ["notion"]
+
+
+def test_a_scoped_key_does_not_override_is_enabled():
+    assert _select(None, [_conn("hubspot", enabled=False)], scoped_keys=("hubspot",)) == []
+
+
+def test_no_keys_still_means_absent_and_empty_select_nothing():
+    """The 2026-08-31 rule survives the widening: no ids and no keys is NONE."""
+    conns = [_conn("a"), _conn("b")]
+    assert _select(None, conns, scoped_keys=None) == []
+    assert _select([], conns, scoped_keys=()) == []
+
+
+def test_keys_and_named_ids_union():
+    conns = [_conn("a"), _conn("hubspot"), _conn("c")]
+    assert [c.id for c in _select(["a"], conns, scoped_keys=("hubspot",))] == ["a", "hubspot"]
+
+
+# 267-REVIEW WR-05 — the resolver approves a KEY when ANY connection of that service is enabled AND
+# active; the loop then admitted EVERY enabled connection matching the key, including a revoked or
+# errored one, whose tools were advertised to the model and failed at call time (a revoked OAuth
+# connection offered again as if it were live). A key admits only ACTIVE connections.
+def test_WR05_a_scoped_key_does_not_admit_a_revoked_or_errored_connection():
+    conns = [_conn("hubspot"), _conn("hubspot-old", status="revoked"), _conn("hubspot-bad", status="error")]
+    for c in conns:
+        c.service_id = "hubspot"
+    assert [c.id for c in _select(None, conns, scoped_keys=("hubspot",))] == ["hubspot"]

@@ -1,5 +1,37 @@
 # Milestones
 
+## v4.4 Experts That Actually Work (Shipped: 2026-09-29)
+
+**Phases:** 5 (265-269) · **Plans:** 24 · **Commits:** 351 since `v4.3` · **Files:** 758
+(+69,996 / −5,270) · **Migrations:** 194-198 · **Timeline:** 2026-09-23 → 2026-09-29 (7 days)
+**Audit:** [`v4.4-MILESTONE-AUDIT.md`](milestones/v4.4-MILESTONE-AUDIT.md) — `tech_debt`, no blockers ·
+**17 / 17** satisfied · integration **6/6** · flows **4/4**.
+
+The milestone that made an Expert work for a real client in a real org — proven by live drives as a
+real user, never by a mocked test.
+
+**Key accomplishments:**
+
+- **Owed v4.3 verification driven live** (265). 257/258/261/263 UAT and an independent review of
+  255/256/262/264 plus the audit fix commits; `BUG-260921-02` closed on evidence.
+- **An Expert's knowledge exists inside the installing org** (266). Corpus copied and embedded per
+  org through the one ingest path, idempotent, real-RLS two-org fence; the Financial Analyzer cites
+  `$124.5 million` / `+18.2%` live. Closes v4.3's `PACK-05` / `SEED-304`.
+- **An Expert only ADDS scope** (267). Additive tool floor, required-connection honesty on card and
+  invite, swap/remove transcript event, "ask a second Expert" handoff, restricted-cost statement.
+- **Spend per Expert and mid-thread scope change** (268). Token/USD attributable per Expert in
+  `/admin/spend`; a thread's folder scope changes after it starts and applies next turn.
+- **A five-Expert starter library** (269). Migration 198; each Expert has a recorded live grounded
+  conversation; BUG-260929-01 (sibling-folder leak) found by the live drive and fixed at `464ec8354`.
+
+⭐ The closed core held: no commits to phase_types / emitters / programmatic during the milestone.
+⚠ Verification mode is `self-verified` for 265-269 (Gemini out) — none can claim `reviewed`.
+⛔ Nothing deployed: migrations 194-198 and `464ec8354` are not on production
+(`266-PROD-PARITY.md`, `269-PROD-PARITY.md`). Starter library visible to enterprise-tier orgs only (D-269-P1, SEED-325).
+Known deferred items at close: 42 (see STATE.md Deferred Items).
+
+---
+
 ## v4.3 What You Can Actually Sell (Shipped: 2026-09-23)
 
 **Phases:** 10 (255-264; 255-260 scoped, 261-264 added in-milestone) · **Plans:** 39 · **Commits:** 332

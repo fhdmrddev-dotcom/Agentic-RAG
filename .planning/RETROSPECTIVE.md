@@ -1028,6 +1028,39 @@ code review, **254** was the review phase.
 
 ---
 
+## Milestone: v4.4 — Experts That Actually Work
+
+**Shipped:** 2026-09-29
+**Phases:** 5 | **Plans:** 24
+**Timeline:** 2026-09-23 → 2026-09-29 (7 days) | **Commits:** 351 since v4.3
+
+### What Was Built
+- Live-driven closure of v4.3's owed verification (265); per-org Expert corpus provisioning (266)
+- Additive-scope Expert semantics with stated costs (267); per-Expert spend + mid-thread scope (268)
+- Five-Expert starter library, each with a live grounded conversation (269)
+
+### What Worked
+- The milestone rule "a success criterion is met by a live drive as a real user" found what tests could not: 18 defects in 267, a real cross-folder leak (BUG-260929-01) in 269, a silent user-JWT UPDATE no-op on `runs` in 268.
+- Holding security-compliance out of the library until its refusal turn passed, then promoting it after a 15/15 re-drive.
+
+### What Was Inefficient
+- REQUIREMENTS.md checkboxes, ROADMAP progress rows and STATE frontmatter went stale while phases closed (the known phase.complete roadmap gap); the audit had to flag them.
+- All five phases closed `self-verified` (Gemini out) — no independent reviewer for the milestone.
+
+### Patterns Established
+- Hand-close the milestone (archives, tag) rather than trusting `milestone.complete`.
+- Prod parity documented per phase (`*-PROD-PARITY.md`) so the deploy checklist is not reconstructed later.
+
+### Key Lessons
+- A read-only counterfactual (pre-fix vs current) shows which live turn actually discriminates a fix.
+- Enterprise-tier-only visibility (D-269-P1) is an operator ruling, not a bug; the NULL-tier signup gap is SEED-325.
+
+### Cost Observations
+- Model mix: not measured this milestone
+- Notable: solo Claude build + review; no bus.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |

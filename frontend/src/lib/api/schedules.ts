@@ -11,7 +11,7 @@
  */
 
 import type { ScheduleTriggerResult, WorkflowSchedule, WorkflowScheduleCreate, WorkflowScheduleUpdate } from "@/types/schedule"
-import { API_BASE, ApiError, getAuthHeaders } from "./_core"
+import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders } from "./_core"
 export async function listSchedules(signal?: AbortSignal): Promise<WorkflowSchedule[]> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/schedules`, { headers, signal })
@@ -112,6 +112,8 @@ export async function triggerSchedule(scheduleId: string): Promise<ScheduleTrigg
 async function readScheduleFailure(res: Response): Promise<string> {
   try {
     const body = await res.json()
+    const tierMsg = entitlementRefusalMessage(body) // UAT-265-258-c: a tier refusal names the plan
+    if (tierMsg) return tierMsg
     const detail = (body as { detail?: unknown }).detail
     if (typeof detail === "string") return detail
     // FastAPI's 422 detail is an ARRAY of per-field errors; the first one's `msg` is the

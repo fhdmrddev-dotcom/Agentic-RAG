@@ -1,0 +1,25 @@
+{
+  "can_connect": true,
+  "connection_state": [
+    {
+      "connected": false,
+      "name": "Google Workspace",
+      "slug": "google"
+    },
+    {
+      "connected": true,
+      "name": "Notion",
+      "slug": "notion"
+    }
+  ],
+  "id": "44444444-4444-4444-4444-444444444444",
+  "is_enabled": true,
+  "is_system": false,
+  "name": "RFP Responder",
+  "required_connections": [
+    "google",
+    "notion"
+  ],
+  "slug": "rfp-responder",
+  "visibility": "org"
+}

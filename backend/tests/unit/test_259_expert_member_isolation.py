@@ -63,9 +63,12 @@ async def test_resolve_legitimate_bundle_all_members_admitted():
             [
                 {"id": folder_a, "org_id": org_a, "user_id": user_a, "is_org_shared": False},
             ],
-            # conn_rows: slack active in org_a
+            # conn_rows: slack active in org_a. Phase 267 (D-267-05): the ONE connection rule
+            # (expert_service.connection_states) reads ALL the org's rows and judges
+            # is_enabled / status itself, so the fixture row now carries those columns.
             [
-                {"service_id": "slack", "capability": "post_message"},
+                {"service_id": "slack", "capability": "post_message", "name": "Slack",
+                 "is_enabled": True, "status": "active"},
             ],
         ]
     )
@@ -223,9 +226,11 @@ async def test_resolve_strips_unconfigured_connection(caplog):
 
     mock_pool.fetch = AsyncMock(
         side_effect=[
-            # Only slack is active in Org A
+            # Only slack is active in Org A. Phase 267 (D-267-05): connection_states reads ALL
+            # the org's rows and judges is_enabled / status itself — the row carries both.
             [
-                {"service_id": "slack", "capability": "post_message"},
+                {"service_id": "slack", "capability": "post_message", "name": "Slack",
+                 "is_enabled": True, "status": "active"},
             ],
         ]
     )

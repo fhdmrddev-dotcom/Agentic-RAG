@@ -1,0 +1,328 @@
+{
+ "summary_status": 200,
+ "summary_keys": {
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "window_total_usd": "40.8678",
+  "window_run_count": 1238,
+  "total_spend_usd": "40.8678",
+  "unpriced_subagents": 4
+ },
+ "expert_breakdown": [
+  {
+   "key": "253ba288-7483-4af7-9979-e88f8c54cc98",
+   "expert_id": "253ba288-7483-4af7-9979-e88f8c54cc98",
+   "name": "UAT-265 Billing SOP Advisor",
+   "deleted": false,
+   "scope_mode": "biased",
+   "run_count": 3,
+   "input_tokens": 77014,
+   "output_tokens": 4145,
+   "spend_usd": "0.0280",
+   "unrated_count": 0
+  },
+  {
+   "key": "00000000-0000-0000-0000-000000000259",
+   "expert_id": "00000000-0000-0000-0000-000000000259",
+   "name": "Financial Analyzer",
+   "deleted": false,
+   "scope_mode": "restricted",
+   "run_count": 3,
+   "input_tokens": 65190,
+   "output_tokens": 2782,
+   "spend_usd": "0.0229",
+   "unrated_count": 0
+  },
+  {
+   "key": "587c3f87-a001-4db2-a37f-27bafa25ae87",
+   "expert_id": "587c3f87-a001-4db2-a37f-27bafa25ae87",
+   "name": "HR Advisor",
+   "deleted": false,
+   "scope_mode": "restricted",
+   "run_count": 3,
+   "input_tokens": 67990,
+   "output_tokens": 1176,
+   "spend_usd": "0.0218",
+   "unrated_count": 0
+  },
+  {
+   "key": "none",
+   "expert_id": null,
+   "name": null,
+   "deleted": false,
+   "scope_mode": null,
+   "run_count": 38,
+   "input_tokens": 1058592,
+   "output_tokens": 18465,
+   "spend_usd": "1.7696",
+   "unrated_count": 4
+  },
+  {
+   "key": "unrecorded",
+   "expert_id": null,
+   "name": null,
+   "deleted": false,
+   "scope_mode": null,
+   "run_count": 1191,
+   "input_tokens": 52955306,
+   "output_tokens": 2171338,
+   "spend_usd": "39.0255",
+   "unrated_count": 322
+  }
+ ],
+ "reconcile": [
+  {
+   "key": "253ba288-7483-4af7-9979-e88f8c54cc98",
+   "name": "UAT-265 Billing SOP Advisor",
+   "deleted": false,
+   "api_usd_1e4": 280,
+   "sql_usd_1e4": 280,
+   "api_in": 77014,
+   "sql_in": 77014,
+   "api_out": 4145,
+   "sql_out": 4145,
+   "api_runs": 3,
+   "sql_runs": 3,
+   "equal": true
+  },
+  {
+   "key": "00000000-0000-0000-0000-000000000259",
+   "name": "Financial Analyzer",
+   "deleted": false,
+   "api_usd_1e4": 229,
+   "sql_usd_1e4": 229,
+   "api_in": 65190,
+   "sql_in": 65190,
+   "api_out": 2782,
+   "sql_out": 2782,
+   "api_runs": 3,
+   "sql_runs": 3,
+   "equal": true
+  },
+  {
+   "key": "587c3f87-a001-4db2-a37f-27bafa25ae87",
+   "name": "HR Advisor",
+   "deleted": false,
+   "api_usd_1e4": 218,
+   "sql_usd_1e4": 218,
+   "api_in": 67990,
+   "sql_in": 67990,
+   "api_out": 1176,
+   "sql_out": 1176,
+   "api_runs": 3,
+   "sql_runs": 3,
+   "equal": true
+  },
+  {
+   "key": "none",
+   "name": null,
+   "deleted": false,
+   "api_usd_1e4": 17696,
+   "sql_usd_1e4": 17696,
+   "api_in": 1058592,
+   "sql_in": 1058592,
+   "api_out": 18465,
+   "sql_out": 18465,
+   "api_runs": 38,
+   "sql_runs": 38,
+   "equal": true
+  },
+  {
+   "key": "unrecorded",
+   "name": null,
+   "deleted": false,
+   "api_usd_1e4": 390255,
+   "sql_usd_1e4": 390255,
+   "api_in": 52955306,
+   "sql_in": 52955306,
+   "api_out": 2171338,
+   "sql_out": 2171338,
+   "api_runs": 1191,
+   "sql_runs": 1191,
+   "equal": true
+  }
+ ],
+ "lines_sum_1e4": 408678,
+ "lines_runs": 1238,
+ "window_1e4": 408678,
+ "independent_total_1e4": 408678,
+ "independent_runs": 1238,
+ "filter": {
+  "00000000-0000-0000-0000-000000000259": {
+   "status": [
+    200,
+    200
+   ],
+   "line_1e4": 229,
+   "line_runs": 3,
+   "kpi1_1e4": 229,
+   "daily_1e4": 229,
+   "donut_1e4": 229,
+   "ledger_1e4": 229,
+   "ledger_count": 3,
+   "ledger_rows": 3
+  },
+  "587c3f87-a001-4db2-a37f-27bafa25ae87": {
+   "status": [
+    200,
+    200
+   ],
+   "line_1e4": 218,
+   "line_runs": 3,
+   "kpi1_1e4": 218,
+   "daily_1e4": 218,
+   "donut_1e4": 218,
+   "ledger_1e4": 218,
+   "ledger_count": 3,
+   "ledger_rows": 3
+  },
+  "none": {
+   "status": [
+    200,
+    200
+   ],
+   "line_1e4": 17696,
+   "line_runs": 38,
+   "kpi1_1e4": 17696,
+   "daily_1e4": 17696,
+   "donut_1e4": 17696,
+   "ledger_1e4": 17696,
+   "ledger_count": 38,
+   "ledger_rows": 38
+  },
+  "unrecorded": {
+   "status": [
+    200,
+    200
+   ],
+   "line_1e4": 390255,
+   "line_runs": 1191,
+   "kpi1_1e4": 390255,
+   "daily_1e4": 390255,
+   "donut_1e4": 390255,
+   "ledger_1e4": 390255,
+   "ledger_count": 1191,
+   "ledger_rows": 1191
+  }
+ },
+ "subagent_rows": [
+  {
+   "run_id": "15052e5f-634b-448b-8406-d5ccdfb15472",
+   "parent_run_id": null,
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": "00000000-0000-0000-0000-000000000259",
+   "expert_attributed": true,
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "input_tokens": 21701,
+   "output_tokens": 466
+  },
+  {
+   "run_id": "e5f751da-9677-4c8b-8b30-153b556c5f2f",
+   "parent_run_id": "15052e5f-634b-448b-8406-d5ccdfb15472",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": "00000000-0000-0000-0000-000000000259",
+   "expert_attributed": true,
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "input_tokens": 8437,
+   "output_tokens": 852
+  }
+ ],
+ "subagent_ledger_row": {
+  "run_id": "15052e5f-634b-448b-8406-d5ccdfb15472",
+  "thread_id": "a2691e74-421b-4d3c-bbfb-f922ee7357d1",
+  "status": "completed",
+  "model": "deepseek-v4-flash",
+  "provider": "deepseek",
+  "started_at": "2026-09-28T19:40:21.565795+00:00",
+  "completed_at": "2026-09-28T19:40:38.061046+00:00",
+  "input_tokens": 30138,
+  "output_tokens": 1318,
+  "cost_usd": "0.0107",
+  "is_rated": true,
+  "token_coverage": null,
+  "is_coverage_complete": false,
+  "expert_id": "00000000-0000-0000-0000-000000000259",
+  "expert_name": "Financial Analyzer",
+  "expert_deleted": false,
+  "expert_attributed": true,
+  "subagent_count": 1
+ },
+ "attribution_rows": [
+  {
+   "run_id": "15052e5f-634b-448b-8406-d5ccdfb15472",
+   "thread_id": "a2691e74-421b-4d3c-bbfb-f922ee7357d1",
+   "title": "268 SC#1 / G4-1 Expert swap",
+   "parent_run_id": null,
+   "expert_id": "00000000-0000-0000-0000-000000000259",
+   "expert_attributed": true,
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "input_tokens": 21701,
+   "output_tokens": 466,
+   "status": "completed"
+  },
+  {
+   "run_id": "e5f751da-9677-4c8b-8b30-153b556c5f2f",
+   "thread_id": "a2691e74-421b-4d3c-bbfb-f922ee7357d1",
+   "title": "268 SC#1 / G4-1 Expert swap",
+   "parent_run_id": "15052e5f-634b-448b-8406-d5ccdfb15472",
+   "expert_id": "00000000-0000-0000-0000-000000000259",
+   "expert_attributed": true,
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "input_tokens": 8437,
+   "output_tokens": 852,
+   "status": "completed"
+  },
+  {
+   "run_id": "109eac5e-7886-4c2f-9d52-1c7bd320a4e7",
+   "thread_id": "a2691e74-421b-4d3c-bbfb-f922ee7357d1",
+   "title": "268 SC#1 / G4-1 Expert swap",
+   "parent_run_id": null,
+   "expert_id": "587c3f87-a001-4db2-a37f-27bafa25ae87",
+   "expert_attributed": true,
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "input_tokens": 23376,
+   "output_tokens": 194,
+   "status": "completed"
+  },
+  {
+   "run_id": "d0785e80-c697-4d6b-bacd-29945999c991",
+   "thread_id": "e5b664d9-2ab8-43cf-987f-3eb0a0521d67",
+   "title": "268 SC#1 no Expert",
+   "parent_run_id": null,
+   "expert_id": null,
+   "expert_attributed": true,
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "model": "deepseek-v4-flash",
+   "provider": "deepseek",
+   "input_tokens": 21937,
+   "output_tokens": 132,
+   "status": "completed"
+  }
+ ],
+ "sc2_empty_window": {
+  "status": 200,
+  "expert_breakdown": [
+   {
+    "key": "none",
+    "expert_id": null,
+    "name": null,
+    "deleted": false,
+    "scope_mode": null,
+    "run_count": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "spend_usd": "0.0000",
+    "unrated_count": 0
+   }
+  ],
+  "window_total_usd": "0.0000",
+  "window_run_count": 0
+ }
+}

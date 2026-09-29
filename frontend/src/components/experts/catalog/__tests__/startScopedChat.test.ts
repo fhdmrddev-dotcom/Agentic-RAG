@@ -180,3 +180,24 @@ describe("startScopedChat — a refused patch cleans up the thread it created (2
     await expect(startScopedChat(d, EXPERT)).rejects.toBe(boom)
   })
 })
+
+// R265-262-05: a failed refresh after a successful PATCH must not strand a scoped thread that a
+// retry would then duplicate — it takes the same discard-then-rethrow path as a refused PATCH.
+describe("startScopedChat — a failed refresh cleans up too (R265-262-05)", () => {
+  it("(9) discards the created thread, re-throws the ORIGINAL error, never selects", async () => {
+    const boom = new Error("Failed to fetch threads")
+    const d = deps({
+      refreshThreads: vi.fn(async () => {
+        log.push("refreshThreads")
+        throw boom
+      }),
+      discardThread: vi.fn(async (id: string) => {
+        log.push(`discardThread:${id}`)
+      }),
+    })
+    await expect(startScopedChat(d, EXPERT)).rejects.toBe(boom)
+    expect(log).toEqual(["createThread", "setExpert", "refreshThreads", "discardThread:thread-1"])
+    expect(d.selectThread).not.toHaveBeenCalled()
+    expect(d.navigate).not.toHaveBeenCalled()
+  })
+})

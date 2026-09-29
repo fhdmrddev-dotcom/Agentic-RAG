@@ -1,0 +1,15 @@
+== F-3 probe: org_id of every row in U2's org-A threads — 2026-09-25T19:35:08.240131+00:00
+SQL: SELECT 'thread' AS kind, t.id::text AS id, t.org_id, NULL AS role, t.title AS note FROM threads t WHERE t.id = ANY(ARRAY['330b3a4c-dc46-4a03-bd2c-220d74d61326', '38f28c82-f017-4310-8075-4d9bc85968ff', '4e971c0c-1874-4d74-8c9a-4bb2d6102eee']::uuid[]) UNION ALL SELECT 'message', m.id::text, m.org_id, m.role, coalesce(m.tool_calls->0->>'kind', left(m.content, 40)) FROM messages m WHERE m.thread_id = ANY(ARRAY['330b3a4c-dc46-4a03-bd2c-220d74d61326', '38f28c82-f017-4310-8075-4d9bc85968ff', '4e971c0c-1874-4d74-8c9a-4bb2d6102eee']::uuid[]) UNION ALL SELECT 'run', r.run_id::text, r.org_id, r.status, r.model FROM runs r WHERE r.thread_id = ANY(ARRAY['330b3a4c-dc46-4a03-bd2c-220d74d61326', '38f28c82-f017-4310-8075-4d9bc85968ff', '4e971c0c-1874-4d74-8c9a-4bb2d6102eee']::uuid[]) ORDER BY 1
+{"kind": "message", "id": "37dc7e9d-ac62-4e5d-835f-4c488fde61f1", "org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035", "role": "user", "note": "handoff"}
+{"kind": "message", "id": "971847b8-6f6e-46b8-ab9d-1adc694db03e", "org_id": "e3c47417-aa1c-4d85-a9e4-6b894bf0d424", "role": "assistant", "note": "- **Total overspend items:** 21 of 31 li"}
+{"kind": "message", "id": "266e3955-043d-465b-a7f0-43dd1a910755", "org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035", "role": "system", "note": "expert_handoff"}
+{"kind": "message", "id": "73baa451-168a-400c-bc1d-8c7e2e066792", "org_id": "e3c47417-aa1c-4d85-a9e4-6b894bf0d424", "role": "user", "note": "Below are raw meeting notes. Summarise t"}
+{"kind": "message", "id": "186624fa-f2ee-4299-849c-5b48050622e9", "org_id": "e3c47417-aa1c-4d85-a9e4-6b894bf0d424", "role": "user", "note": "In one sentence: what is a central bank "}
+{"kind": "message", "id": "0762aa9c-b643-43f6-939c-af72bd5b9553", "org_id": "e3c47417-aa1c-4d85-a9e4-6b894bf0d424", "role": "assistant", "note": "A central bank deposit facility rate is "}
+{"kind": "message", "id": "9ae2a12b-6774-4263-8377-27a84d16f6e8", "org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035", "role": "system", "note": "expert_changed"}
+{"kind": "run", "id": "bfbc1682-c682-4039-ab27-c1fc19c14589", "org_id": "e3c47417-aa1c-4d85-a9e4-6b894bf0d424", "role": "completed", "note": "deepseek-v4-flash"}
+{"kind": "run", "id": "13e55d14-04c4-4fa3-8106-0c10171f6857", "org_id": "e3c47417-aa1c-4d85-a9e4-6b894bf0d424", "role": "completed", "note": "deepseek-v4-flash"}
+{"kind": "thread", "id": "330b3a4c-dc46-4a03-bd2c-220d74d61326", "org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035", "role": null, "note": "267 two-org swap"}
+{"kind": "thread", "id": "4e971c0c-1874-4d74-8c9a-4bb2d6102eee", "org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035", "role": null, "note": "267 LM-1 long message"}
+{"kind": "thread", "id": "38f28c82-f017-4310-8075-4d9bc85968ff", "org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035", "role": null, "note": "Contract Reviewer · 267 two-org swap"}
+org A (X-Org-Id sent) = e8c567c2-6f75-4c8b-94cf-92768831c035;  org C (U2's LIMIT-1 trigger pick) = e3c47417-aa1c-4d85-a9e4-6b894bf0d424

@@ -1,0 +1,18 @@
+slug: financial-analyzer
+org_id: 9042e46f-745d-40d6-83eb-c6984d582ce1
+model: deepseek-v4-flash provider: deepseek embedding_model: text-embedding-3-small (embedding_provider=openai, dims=1536, source=app_settings.global)
+== install financial-analyzer (00000000-0000-0000-0000-000000000259) — 2026-09-29T14:39:05.536196+00:00  (mechanism: POST /experts/{id}/install only, D-269-08)
+POST /experts/00000000-0000-0000-0000-000000000259/install headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (Authorization: Bearer <redacted>) -> HTTP 202 body={"expert_bundle_id":"00000000-0000-0000-0000-000000000259","corpus_version":"9bbb510c6038217f57deb84ea9265559a3e4180fe40a00fcb73619ece4c8e757","install":{"state":"installing","folder_id":"cc435f1e-b080-4066-bcb9-4bf3bb064898","cause":null,"cause_source":null,"can_install":true,"updated_at":"2026-09-29T14:39:07.168366Z"}}
+polls (5), first and last:
+2026-09-29T14:39:09.276298+00:00 GET /experts/00000000-0000-0000-0000-000000000259 -> 200 install={"state": "installing", "folder_id": "cc435f1e-b080-4066-bcb9-4bf3bb064898", "cause": null, "cause_source": null, "can_install": true, "updated_at": "2026-09-29T14:39:07.168366Z"}
+2026-09-29T14:39:17.586595+00:00 GET /experts/00000000-0000-0000-0000-000000000259 -> 200 install={"state": "ready", "folder_id": "cc435f1e-b080-4066-bcb9-4bf3bb064898", "cause": null, "cause_source": null, "can_install": true, "updated_at": "2026-09-29T14:39:07.168366Z"}
+state sequence: installing -> ready
+final install.state = ready
+SQL: SELECT org_id, expert_bundle_id, installed_by, status, folder_id, corpus_version, error FROM expert_installs WHERE org_id='9042e46f-745d-40d6-83eb-c6984d582ce1' AND expert_bundle_id='00000000-0000-0000-0000-000000000259'
+{"org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "expert_bundle_id": "00000000-0000-0000-0000-000000000259", "installed_by": "b93a9c96-2de1-4e13-958c-10e5d6775fd0", "status": "installed", "folder_id": "cc435f1e-b080-4066-bcb9-4bf3bb064898", "corpus_version": "9bbb510c6038217f57deb84ea9265559a3e4180fe40a00fcb73619ece4c8e757", "error": null}
+SQL: SELECT d.id AS doc_id, d.filename, d.org_id, d.folder_id, d.status, d.chunk_count, count(c.*) AS chunks, count(c.*) FILTER (WHERE c.embedding IS NOT NULL) AS embedded, count(c.*) FILTER (WHERE c.org_id = d.org_id) AS chunks_in_doc_org, f.org_id AS folder_org, f.name AS folder_name FROM documents d JOIN folders f ON f.id=d.folder_id LEFT JOIN document_chunks c ON c.document_id=d.id WHERE d.folder_id = 'cc435f1e-b080-4066-bcb9-4bf3bb064898' GROUP BY d.id, d.filename, d.org_id, d.folder_id, d.status, d.chunk_count, f.org_id, f.name ORDER BY d.filename
+{"doc_id": "297c6ee8-739f-4b64-b5d6-073957e9f0b1", "filename": "acme_q3_2026_financial_report.md", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "folder_id": "cc435f1e-b080-4066-bcb9-4bf3bb064898", "status": "completed", "chunk_count": 3, "chunks": 3, "embedded": 3, "chunks_in_doc_org": 3, "folder_org": "9042e46f-745d-40d6-83eb-c6984d582ce1", "folder_name": "Financial Reports & Filings"}
+SQL: SELECT count(*) FROM document_chunks WHERE document_id = ANY(ARRAY['297c6ee8-739f-4b64-b5d6-073957e9f0b1']::uuid[]) AND embedding IS NOT NULL -> 3
+SQL: SELECT count(*) FILTER (WHERE org_id <> '9042e46f-745d-40d6-83eb-c6984d582ce1') FROM document_chunks WHERE document_id = ANY(<ids>) -> 0
+checks: install 202=True; state ready=True; docs=1; embedded chunks=3; all rows org_id == 9042e46f-745d-40d6-83eb-c6984d582ce1: True
+VERDICT: PASS

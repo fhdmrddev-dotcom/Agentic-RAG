@@ -1,0 +1,225 @@
+{
+ "provider": "anthropic",
+ "model": "claude-sonnet-5",
+ "create": {
+  "status": 201,
+  "id": "8ada158a-b0cc-4b7e-ac46-c33d3ebf1540",
+  "org_id": null
+ },
+ "t1": {
+  "sent_at": "2026-09-28 19:38:17.014006+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "2fdb3031-2767-4931-8654-190ff3f5fd54",
+   "run_id": "7d74fe28-1dd0-4721-8314-eb6a9f02bf72",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic"
+  },
+  "run": {
+   "run_id": "7d74fe28-1dd0-4721-8314-eb6a9f02bf72",
+   "status": "completed",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 3018,
+   "output_tokens": 828,
+   "started_at": "2026-09-28 19:38:19.374701+00:00",
+   "completed_at": "2026-09-28 19:38:40.498433+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "85e4961f-c06e-4b44-9aca-75fb4f22f912",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:38:24.538775+00:00",
+    "run_id": "7d74fe28-1dd0-4721-8314-eb6a9f02bf72",
+    "thread_id": "8ada158a-b0cc-4b7e-ac46-c33d3ebf1540",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 2
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "7d74fe28-1dd0-4721-8314-eb6a9f02bf72",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   },
+   {
+    "run_id": "7d74fe28-1dd0-4721-8314-eb6a9f02bf72",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "1417fc12-a581-4068-adcc-ddbc1e3a848a",
+    "folder_id": "1a2d0273-b14d-487f-86ee-4d146e89d082"
+   }
+  ],
+  "tools": [
+   "search_documents",
+   "workspace_write"
+  ]
+ },
+ "patch": {
+  "status": 200,
+  "at": "2026-09-28 19:38:40.903118+00:00",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "event": [
+  {
+   "id": "d3b9388a-ea7b-4d02-9c5f-c7294c120018",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+   "created_at": "2026-09-28 19:38:43.307796+00:00"
+  }
+ ],
+ "thread_org": {
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "t2": {
+  "sent_at": "2026-09-28 19:38:55.909782+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "b504c70f-5ec3-4e5e-a406-efaa680c74ac",
+   "run_id": "e29cb3e9-95f4-42db-9624-5edc252d5827",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic"
+  },
+  "run": {
+   "run_id": "e29cb3e9-95f4-42db-9624-5edc252d5827",
+   "status": "completed",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 1809,
+   "output_tokens": 463,
+   "started_at": "2026-09-28 19:38:59.990599+00:00",
+   "completed_at": "2026-09-28 19:39:09.389522+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": []
+ },
+ "t2_first_attempt": {
+  "sent_at": "2026-09-28 19:38:43.373536+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "69bd382d-e30f-4145-bbbc-3a03e83fd03b",
+   "run_id": "2a1c50a0-b394-44ae-bb83-d53955cf62d9",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic"
+  },
+  "run": {
+   "run_id": "2a1c50a0-b394-44ae-bb83-d53955cf62d9",
+   "status": "completed",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 1526,
+   "output_tokens": 321,
+   "started_at": "2026-09-28 19:38:46.647095+00:00",
+   "completed_at": "2026-09-28 19:38:53.769576+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": []
+ },
+ "retry": true,
+ "v1": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 2,
+  "folders": [
+   "1a2d0273-b14d-487f-86ee-4d146e89d082",
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "v2": {
+  "searched": false,
+  "scope_ok": false,
+  "docs_ok": true,
+  "n_docs": 0,
+  "folders": []
+ },
+ "t3_variant": {
+  "sent_at": "2026-09-28 19:39:12.281884+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "946498ca-43f3-4bac-aaab-c17b13501148",
+   "run_id": "9634761f-1fea-4b72-989e-a78b756ef093",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic"
+  },
+  "run": {
+   "run_id": "9634761f-1fea-4b72-989e-a78b756ef093",
+   "status": "completed",
+   "model": "claude-sonnet-5",
+   "provider": "anthropic",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 5021,
+   "output_tokens": 384,
+   "started_at": "2026-09-28 19:39:15.912273+00:00",
+   "completed_at": "2026-09-28 19:39:31.523704+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "480e7bcc-6306-4aca-9a05-75b7b21a38d8",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:39:20.261737+00:00",
+    "run_id": "9634761f-1fea-4b72-989e-a78b756ef093",
+    "thread_id": "8ada158a-b0cc-4b7e-ac46-c33d3ebf1540",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 1
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "9634761f-1fea-4b72-989e-a78b756ef093",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   }
+  ],
+  "tools": [
+   "search_documents"
+  ]
+ },
+ "v3": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 1,
+  "folders": [
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ }
+}

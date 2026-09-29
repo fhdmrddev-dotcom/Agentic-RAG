@@ -43,6 +43,9 @@ export {
   deleteThread,
   renameThread,
   setThreadActiveExpert,
+  setThreadFolder,
+  getScopeEffect,
+  getThread,
   postMessage,
   subscribeToRun,
   getActiveRuns,
@@ -70,6 +73,10 @@ export type {
   WorkflowPhaseState,
   PublishedWorkflow,
   ContinueRunResult,
+  ScopeFolderRef,
+  ScopeTranscriptLine,
+  ScopeEffect,
+  ScopeChangedEvent,
 } from "./api/threads"
 
 // ── documents ─────────────────────────────────────────────────────────

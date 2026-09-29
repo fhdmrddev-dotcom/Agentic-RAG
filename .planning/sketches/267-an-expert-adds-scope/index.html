@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>267 · An Expert adds scope</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:hsl(216 45% 4%);--elev:hsl(220 40% 5%);--card:hsl(220 30% 7%);--pop:hsl(220 30% 8%);
+  --muted:hsl(220 30% 11%);--accent:hsl(220 25% 14%);
+  --text:hsl(226 60% 97%);--text-m:hsl(220 16% 65%);--text-d:hsl(220 16% 52%);
+  --border:hsl(220 20% 16%);--primary:hsl(239 100% 82%);--primary-s:hsl(239 84% 67%);
+  --violet:hsl(258 90% 66%);--v-bg:hsl(258 90% 66% / .12);--v-bd:hsl(258 90% 66% / .35);--v-tx:hsl(258 95% 85%);
+  --amber:hsl(38 92% 60%);--a-bg:hsl(38 92% 60% / .10);--a-bd:hsl(38 92% 60% / .30);
+  --rose:hsl(350 89% 72%);--r-bg:hsl(350 89% 60% / .10);--r-bd:hsl(350 89% 60% / .25);
+  --green:hsl(142 71% 55%);
+  --sans:'Inter',system-ui,sans-serif;--head:'Manrope','Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--sans)}
+header.top{position:sticky;top:0;z-index:5;background:hsl(216 45% 4% / .92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+header.top h1{font:700 15px var(--head);margin:0}
+header.top .sub{color:var(--text-m);font-size:12px}
+.tabs{display:flex;gap:6px;margin-left:auto}
+.tab{background:var(--muted);border:1px solid var(--border);color:var(--text-m);padding:6px 12px;border-radius:8px;cursor:pointer;font:500 12px var(--sans)}
+.tab[aria-selected=true]{background:var(--v-bg);border-color:var(--v-bd);color:var(--v-tx)}
+.role{display:flex;gap:4px;align-items:center;font-size:11px;color:var(--text-d)}
+main{max-width:1180px;margin:0 auto;padding:24px}
+.variant{display:none}.variant.on{display:block}
+.vhead{margin:0 0 18px}.vhead h2{font:700 18px var(--head);margin:0 0 4px}.vhead p{margin:0;color:var(--text-m);font-size:13px;max-width:780px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:20px}
+@media (max-width:600px){.grid{grid-template-columns:1fr}main{padding:16px}}
+.frame{background:var(--elev);border:1px solid var(--border);border-radius:14px;padding:16px}
+.frame > .label{font:500 11px var(--mono);color:var(--text-d);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;gap:8px;align-items:center}
+.frame > .label b{color:var(--v-tx);font-weight:500}
+/* ─ shipped: InviteExpertDialog ─ */
+.dialog{background:hsl(220 30% 7% / .95);border:1px solid hsl(220 20% 16% / .8);border-radius:16px;padding:20px;box-shadow:0 20px 60px #0008}
+.dh{display:flex;gap:8px;align-items:center}.gem{width:32px;height:32px;border-radius:8px;background:var(--v-bg);border:1px solid var(--v-bd);display:grid;place-items:center;color:var(--v-tx)}
+.dh h3{font:600 15px var(--sans);margin:0}
+.dd{color:var(--text-m);font-size:12px;margin:6px 0 14px}
+.row{padding:14px;border-radius:12px;border:1px solid hsl(220 20% 16% / .6);background:hsl(220 30% 11% / .3);margin-bottom:10px}
+.row.cur{background:var(--v-bg);border-color:var(--v-bd)}
+.rtop{display:flex;gap:12px;align-items:flex-start}
+.av{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,hsl(258 90% 66%/.2),hsl(239 84% 67%/.2));border:1px solid var(--v-bd);display:grid;place-items:center;font-size:15px;flex-shrink:0}
+.rn{display:flex;gap:8px;align-items:center}.rn b{font-size:14px}
+.pill{font:500 10px var(--sans);padding:2px 6px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em}
+.pill.r{background:var(--r-bg);color:var(--rose);border:1px solid var(--r-bd)}.pill.b{background:var(--a-bg);color:hsl(38 92% 72%);border:1px solid var(--a-bd)}
+.rdesc{color:var(--text-m);font-size:12px;margin:4px 0 0}
+.meta{display:flex;gap:10px;margin-top:8px;font-size:11px;color:hsl(220 16% 65% / .85);flex-wrap:wrap}
+.acts{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
+.btn{font:500 12px var(--sans);padding:6px 12px;border-radius:8px;border:1px solid transparent;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.btn.p{background:var(--primary);color:hsl(216 45% 8%)}
+.btn.g{background:transparent;border-color:var(--border);color:var(--text)}
+.btn.v{background:var(--v-bg);border-color:var(--v-bd);color:var(--v-tx)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+/* ─ new states ─ */
+.need{display:flex;gap:8px;align-items:center;font-size:12px;color:hsl(38 92% 72%);background:var(--a-bg);border:1px solid var(--a-bd);border-radius:8px;padding:6px 10px;margin-top:10px}
+.need .x{margin-left:auto}
+.link{color:var(--primary);text-decoration:none;font-weight:500;cursor:pointer;white-space:nowrap}
+.cost{font-size:12px;margin-top:10px;border-left:2px solid var(--rose);padding:6px 10px;background:var(--r-bg);border-radius:0 8px 8px 0}
+.cost .files{color:var(--text-m);font:400 11px var(--mono);margin-top:4px}
+.keep{color:var(--text-m);font-size:11px;margin-top:4px}
+.ledger{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.ledger > div{border-radius:8px;padding:8px 10px;font-size:12px}
+.ledger .yes{background:hsl(142 71% 45%/.08);border:1px solid hsl(142 71% 45%/.25)}
+.ledger .no{background:var(--r-bg);border:1px solid var(--r-bd)}
+.ledger h5{margin:0 0 4px;font:600 10px var(--sans);text-transform:uppercase;letter-spacing:.06em;color:var(--text-m)}
+.ledger ul{margin:0;padding-left:16px;color:var(--text)}
+.ledger li{font-size:12px}
+/* ─ transcript ─ */
+.thread{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.th-title{font:600 12px var(--sans);color:var(--text-m);display:flex;gap:6px;align-items:center}
+.msg{max-width:88%;font-size:13px}
+.msg.u{align-self:flex-end;background:var(--accent);padding:8px 12px;border-radius:12px 12px 4px 12px}
+.msg.a{align-self:flex-start;color:var(--text)}
+.msg.a .by{font:500 11px var(--sans);color:var(--text-d);margin-bottom:2px}
+.evt{align-self:center;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 8px;align-items:center;font-size:12px;color:var(--text-m);padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:var(--elev)}
+.evt .dot{width:6px;height:6px;border-radius:50%;background:var(--violet)}
+.evt b{color:var(--v-tx);font-weight:600}
+.evt .more{color:var(--primary);cursor:pointer;font-size:11px}
+.evt-detail{align-self:center;font-size:12px;color:var(--text-m);max-width:92%;text-align:center;margin-top:-6px}
+.evcard{align-self:stretch;border:1px solid var(--v-bd);background:hsl(258 90% 66% / .06);border-radius:10px;padding:10px 12px;font-size:12px}
+.evcard .hd{display:flex;gap:8px;align-items:center;color:var(--v-tx);font-weight:600}
+.evcard .hd time{margin-left:auto;color:var(--text-d);font:400 11px var(--mono)}
+.evcard .lines{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin-top:6px}
+.evcard .k{color:var(--text-d);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:1px}
+.evcard .add{color:var(--green)}.evcard .drop{color:var(--rose)}
+.handoff{align-self:stretch;border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:10px;background:var(--card);padding:12px}
+.handoff .hd{font:600 12px var(--sans);color:var(--primary);display:flex;gap:6px;align-items:center}
+.handoff .src{color:var(--text-m);font-size:11px;margin-top:2px}
+.handoff p{margin:8px 0 0;font-size:13px;color:var(--text)}
+.handoff ul{margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--text-m)}
+.chiprow{display:flex;gap:6px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:12px;background:var(--card);margin-top:4px}
+.chiprow .lbl{font-size:11px;color:var(--text-d)}
+.chip{background:hsl(258 90% 66%/.15);border:1px solid var(--v-bd);color:var(--v-tx);font-size:12px;border-radius:6px;padding:4px 10px;display:inline-flex;gap:6px;align-items:center}
+.chip small{font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.8}
+/* ─ catalog card ─ */
+.ccard{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+.ccard .top{display:flex;gap:12px}
+.ccard h4{margin:0;font:700 15px var(--head)}
+.ccard .cat{font-size:11px;color:var(--text-d)}
+.res{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.res span{font-size:11px;border:1px solid var(--border);border-radius:999px;padding:2px 8px;color:var(--text-m)}
+.res span.miss{border-color:var(--a-bd);color:hsl(38 92% 72%);background:var(--a-bg)}
+.res span.ok{border-color:hsl(142 71% 45%/.3);color:var(--green)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:600px){.two{grid-template-columns:1fr}}
+.note{margin-top:22px;color:var(--text-m);font-size:12px;border-top:1px solid var(--border);padding-top:12px}
+.note b{color:var(--text)}
+.mono{font-family:var(--mono)}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>267 · An Expert adds scope</h1>
+  <span class="sub">4 new states · real data · shipped dialog/chip/card styling</span>
+  <div class="role" role="group" aria-label="Viewing as">Viewing as
+    <button class="tab" data-role="admin" aria-pressed="true">Org admin</button>
+    <button class="tab" data-role="member" aria-pressed="false">Member</button>
+  </div>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-v="a">A · One line</button>
+    <button class="tab" role="tab" aria-selected="false" data-v="b">B · Will / won't ledger</button>
+  </div>
+</header>
+
+<main>
+<!-- ═════════════════════ VARIANT A ═════════════════════ -->
+<section class="variant on" id="v-a">
+  <div class="vhead"><h2>A · One line, at rest</h2>
+  <p>Every consequence is a single sentence visible without hover or click. The transcript event is a slim centred pill plus one line underneath.</p></div>
+
+  <div class="grid">
+    <!-- 1 · requires a connection -->
+    <div class="frame"><div class="label"><b>PACK-22</b> requires a connection · catalog card + invite row</div>
+      <div class="two">
+        <div class="ccard">
+          <div class="top"><div class="av">📈</div><div><h4>Sales Pipeline Coach</h4><div class="cat">Sales · Biased</div></div></div>
+          <div class="res"><span>Sales Playbooks</span><span class="miss">⚠ HubSpot — not connected</span></div>
+          <div class="need"><span>Requires HubSpot</span><span class="x admin-only"><a class="link">Connect →</a></span><span class="x member-only" hidden>Ask an org admin</span></div>
+        </div>
+        <div class="dialog" style="padding:14px">
+          <div class="row" style="margin:0">
+            <div class="rtop"><div class="av">📈</div><div style="flex:1"><div class="rn"><b>Sales Pipeline Coach</b><span class="pill b">Biased</span></div>
+            <div class="meta"><span>📁 1 folder</span><span>🔌 HubSpot</span></div></div></div>
+            <div class="acts"><span style="font-size:12px;color:hsl(38 92% 72%)">Requires HubSpot — not connected</span>
+              <a class="btn g admin-only">Connect HubSpot →</a><span class="member-only" hidden style="font-size:12px;color:var(--text-m)">Ask an org admin to connect it</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 · restricted cost -->
+    <div class="frame"><div class="label"><b>PACK-25</b> restricted cost · invite row, before confirming</div>
+      <div class="dialog">
+        <div class="dh"><div class="gem">✦</div><h3>Invite an Expert</h3></div>
+        <div class="dd">This chat · <span class="mono">/Client ACME</span> · 4 documents</div>
+        <div class="row">
+          <div class="rtop"><div class="av">🧑‍⚖️</div><div style="flex:1"><div class="rn"><b>HR Advisor</b><span class="pill r">Restricted</span></div>
+          <div class="meta"><span>📁 HR Policies</span><span>🛠 2 skills</span></div></div></div>
+          <div class="cost">Reads <b>HR Policies</b> only. <b>4 documents</b> in this chat's folder will not be used.
+            <div class="files">ACME_MSA_2026.pdf · ACME_SOW_03.docx · ACME_invoice_log.xlsx · Board_deck_draft.pptx</div>
+            <div class="keep">Files attached to this chat stay readable.</div></div>
+          <div class="acts"><button class="btn p">✦ Invite to Thread</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 · swap / remove event -->
+    <div class="frame"><div class="label"><b>PACK-23</b> swap + remove · transcript events, survive reload</div>
+      <div class="thread">
+        <div class="th-title">💬 Q3 board prep · /Client ACME</div>
+        <div class="msg u">What did ACME spend with us in Q3?</div>
+        <div class="msg a"><div class="by">Financial Analyzer</div>ACME's Q3 invoices total <b>$412K</b>, up 9% on Q2 [1].</div>
+        <div class="evt"><span class="dot"></span>Swapped <b>Financial Analyzer</b> → <b>HR Advisor</b></div>
+        <div class="evt-detail">From your next message: reads HR Policies only · /Client ACME (4) not used</div>
+        <div class="msg u">Can contractors on the ACME SOW get overtime?</div>
+        <div class="msg a"><div class="by">HR Advisor</div>Per the Contractor Policy §4, overtime needs written pre-approval [1].</div>
+        <div class="evt"><span class="dot" style="background:var(--text-d)"></span><b style="color:var(--text)">HR Advisor</b> left</div>
+        <div class="evt-detail">From your next message: all of /Client ACME · no Expert folders</div>
+      </div>
+    </div>
+
+    <!-- 4 · second expert handoff -->
+    <div class="frame"><div class="label"><b>PACK-24</b> ask a second Expert · dialog → new chat</div>
+      <div class="dialog" style="padding:14px;margin-bottom:12px">
+        <div class="row cur" style="margin-bottom:8px"><div class="rtop"><div class="av">📊</div><div style="flex:1"><div class="rn"><b>Financial Analyzer</b><span class="pill b">Biased</span></div></div></div>
+          <div class="acts" style="margin-top:6px"><span class="btn v">✓ Active</span></div></div>
+        <div class="row" style="margin:0"><div class="rtop"><div class="av">⚖️</div><div style="flex:1"><div class="rn"><b>Contract Reviewer</b><span class="pill b">Biased</span></div></div></div>
+          <div class="acts"><button class="btn g">Swap here</button><button class="btn p">Ask in a new chat →</button></div></div>
+      </div>
+      <div class="two">
+        <div class="thread">
+          <div class="th-title">💬 Q3 board prep <span style="color:var(--text-d)">(original)</span></div>
+          <div class="evt"><span class="dot"></span>Asked <b>Contract Reviewer</b> in a new chat <a class="link">Open →</a></div>
+          <div class="chiprow"><span class="lbl">Using:</span><span class="chip">✦ Financial Analyzer <small>· Biased</small></span></div>
+        </div>
+        <div class="thread">
+          <div class="th-title">💬 Contract Reviewer · ACME</div>
+          <div class="handoff"><div class="hd">↪ Handed off from “Q3 board prep”</div>
+            <p>ACME's Q3 invoices total $412K (+9% on Q2). Open question: whether the MSA's late-payment clause applies to the two overdue invoices.</p></div>
+          <div class="chiprow"><span class="lbl">Using:</span><span class="chip">✦ Contract Reviewer <small>· Biased</small></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════ VARIANT B ═════════════════════ -->
+<section class="variant" id="v-b">
+  <div class="vhead"><h2>B · Will use / won't use ledger</h2>
+  <p>Consequences are shown as two lists, <b>Will use</b> and <b>Won't use</b>, both open at rest. The transcript event is a small card with its own timestamp. It is denser, but you do not have to read a sentence to get it.</p></div>
+
+  <div class="grid">
+    <div class="frame"><div class="label"><b>PACK-22</b> requires a connection · catalog card + invite row</div>
+      <div class="two">
+        <div class="ccard">
+          <div class="top"><div class="av">📈</div><div><h4>Sales Pipeline Coach</h4><div class="cat">Sales · Biased</div></div></div>
+          <div class="ledger"><div class="yes"><h5>Brings</h5><ul><li>Sales Playbooks</li></ul></div><div class="no"><h5>Missing</h5><ul><li>HubSpot</li></ul></div></div>
+          <div class="acts" style="justify-content:flex-start"><a class="btn g admin-only">Connect HubSpot →</a><span class="member-only" hidden style="font-size:12px;color:var(--text-m)">An org admin must connect HubSpot</span></div>
+        </div>
+        <div class="dialog" style="padding:14px">
+          <div class="row" style="margin:0">
+            <div class="rtop"><div class="av">📈</div><div style="flex:1"><div class="rn"><b>Sales Pipeline Coach</b><span class="pill b">Biased</span></div></div></div>
+            <div class="ledger"><div class="yes"><h5>Brings</h5><ul><li>Sales Playbooks</li></ul></div><div class="no"><h5>Missing</h5><ul><li>HubSpot · not connected</li></ul></div></div>
+            <div class="acts"><button class="btn p" disabled>Invite to Thread</button><a class="btn g admin-only">Connect HubSpot →</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame"><div class="label"><b>PACK-25</b> restricted cost · invite row, before confirming</div>
+      <div class="dialog">
+        <div class="dh"><div class="gem">✦</div><h3>Invite an Expert</h3></div>
+        <div class="dd">This chat · <span class="mono">/Client ACME</span></div>
+        <div class="row">
+          <div class="rtop"><div class="av">🧑‍⚖️</div><div style="flex:1"><div class="rn"><b>HR Advisor</b><span class="pill r">Restricted</span></div></div></div>
+          <div class="ledger">
+            <div class="yes"><h5>Will use</h5><ul><li>HR Policies</li><li>Chat attachments</li></ul></div>
+            <div class="no"><h5>Won't use · 4</h5><ul><li>ACME_MSA_2026.pdf</li><li>ACME_SOW_03.docx</li><li>ACME_invoice_log.xlsx</li><li>Board_deck_draft.pptx</li></ul></div>
+          </div>
+          <div class="acts"><button class="btn p">✦ Invite to Thread</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame"><div class="label"><b>PACK-23</b> swap + remove · transcript events, survive reload</div>
+      <div class="thread">
+        <div class="th-title">💬 Q3 board prep · /Client ACME</div>
+        <div class="msg u">What did ACME spend with us in Q3?</div>
+        <div class="msg a"><div class="by">Financial Analyzer</div>ACME's Q3 invoices total <b>$412K</b>, up 9% on Q2 [1].</div>
+        <div class="evcard"><div class="hd">✦ Financial Analyzer → HR Advisor <time>14:32</time></div>
+          <div class="lines"><span class="k">Now</span><span class="add">HR Policies</span><span class="k">Dropped</span><span class="drop">Financial Reports & Filings · /Client ACME (4)</span></div></div>
+        <div class="msg u">Can contractors on the ACME SOW get overtime?</div>
+        <div class="msg a"><div class="by">HR Advisor</div>Per the Contractor Policy §4, overtime needs written pre-approval [1].</div>
+        <div class="evcard" style="border-color:var(--border);background:var(--elev)"><div class="hd" style="color:var(--text)">HR Advisor left <time>14:40</time></div>
+          <div class="lines"><span class="k">Now</span><span class="add">/Client ACME (4)</span><span class="k">Dropped</span><span class="drop">HR Policies</span></div></div>
+      </div>
+    </div>
+
+    <div class="frame"><div class="label"><b>PACK-24</b> ask a second Expert · dialog → new chat</div>
+      <div class="dialog" style="padding:14px;margin-bottom:12px">
+        <div class="row" style="margin:0"><div class="rtop"><div class="av">⚖️</div><div style="flex:1"><div class="rn"><b>Contract Reviewer</b><span class="pill b">Biased</span></div>
+          <div class="rdesc">Financial Analyzer is active here.</div></div></div>
+          <div class="acts"><button class="btn g">Replace Financial Analyzer</button><button class="btn p">New chat with Contract Reviewer →</button></div></div>
+      </div>
+      <div class="two">
+        <div class="thread">
+          <div class="th-title">💬 Q3 board prep <span style="color:var(--text-d)">(original)</span></div>
+          <div class="evcard"><div class="hd">↗ Contract Reviewer · new chat <time>14:45</time></div>
+            <div class="lines"><span class="k">Here</span><span>Financial Analyzer stays</span><span class="k">Open</span><a class="link">Contract Reviewer · ACME →</a></div></div>
+        </div>
+        <div class="thread">
+          <div class="th-title">💬 Contract Reviewer · ACME</div>
+          <div class="handoff"><div class="hd">↪ Handed off from “Q3 board prep”</div>
+            <ul><li>ACME Q3 invoices: $412K (+9% on Q2)</li><li>Two invoices overdue &gt; 30 days</li><li>Open: does the MSA late-payment clause apply?</li></ul></div>
+          <div class="chiprow"><span class="lbl">Using:</span><span class="chip">✦ Contract Reviewer <small>· Biased</small></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="note">
+  <b>Shared by both variants (not what you are choosing):</b> every consequence is visible at rest, with no hover and no disclosure (266 UI-3 lesson). Members never see a button that does nothing. The events are persisted rows that survive reload and are never sent to the model. The handoff is refused, with a reason, if the summary cannot be produced.<br>
+  <b>What you are choosing:</b> <b>A</b> puts each consequence in one sentence (less text, but you have to read it). <b>B</b> puts it in labelled Will / Won't lists (you can scan it, but it is taller). This also applies to the button wording in the second-Expert dialog: A reads “Swap here / Ask in a new chat”, B reads “Replace X / New chat with Y”.
+</div>
+</main>
+
+<script>
+document.querySelectorAll('[data-v]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-v]').forEach(x=>x.setAttribute('aria-selected',x===b));
+  document.querySelectorAll('.variant').forEach(s=>s.classList.toggle('on',s.id==='v-'+b.dataset.v));
+}));
+document.querySelectorAll('[data-role]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-role]').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  const member=b.dataset.role==='member';
+  document.querySelectorAll('.admin-only').forEach(e=>e.hidden=member);
+  document.querySelectorAll('.member-only').forEach(e=>e.hidden=!member);
+}));
+</script>
+</body>
+</html>

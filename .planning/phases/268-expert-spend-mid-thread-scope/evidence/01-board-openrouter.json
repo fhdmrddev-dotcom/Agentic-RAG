@@ -1,0 +1,225 @@
+{
+ "provider": "openrouter",
+ "model": "deepseek/deepseek-v4-pro",
+ "create": {
+  "status": 201,
+  "id": "d045728c-82c3-49e5-a060-9fe587872ecb",
+  "org_id": null
+ },
+ "t1": {
+  "sent_at": "2026-09-28 19:44:00.314129+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "2c3705a5-77c9-4a93-9a34-64f40c6235a6",
+   "run_id": "693656ec-7900-41c8-af00-b8de18b99962",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter"
+  },
+  "run": {
+   "run_id": "693656ec-7900-41c8-af00-b8de18b99962",
+   "status": "completed",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 33794,
+   "output_tokens": 505,
+   "started_at": "2026-09-28 19:44:02.620022+00:00",
+   "completed_at": "2026-09-28 19:44:40.696488+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "4caf7aa8-4b3d-4d01-b60f-9ab915e78acb",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:44:13.370994+00:00",
+    "run_id": "693656ec-7900-41c8-af00-b8de18b99962",
+    "thread_id": "d045728c-82c3-49e5-a060-9fe587872ecb",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 2
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "693656ec-7900-41c8-af00-b8de18b99962",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   },
+   {
+    "run_id": "693656ec-7900-41c8-af00-b8de18b99962",
+    "scope": [
+     "1a2d0273-b14d-487f-86ee-4d146e89d082",
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "1417fc12-a581-4068-adcc-ddbc1e3a848a",
+    "folder_id": "1a2d0273-b14d-487f-86ee-4d146e89d082"
+   }
+  ],
+  "tools": [
+   "search_documents",
+   "workspace_write"
+  ]
+ },
+ "patch": {
+  "status": 200,
+  "at": "2026-09-28 19:44:42.184264+00:00",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "event": [
+  {
+   "id": "faa7aea1-6f9c-45a0-8ffc-d7599192f5b2",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+   "created_at": "2026-09-28 19:44:44.550116+00:00"
+  }
+ ],
+ "thread_org": {
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "t2": {
+  "sent_at": "2026-09-28 19:45:02.184519+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "b3cb2b59-6c84-46df-9494-a9337aacd324",
+   "run_id": "10ed8c6a-ad35-4a1f-ac92-12c43246d56b",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter"
+  },
+  "run": {
+   "run_id": "10ed8c6a-ad35-4a1f-ac92-12c43246d56b",
+   "status": "completed",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 11620,
+   "output_tokens": 153,
+   "started_at": "2026-09-28 19:45:15.075062+00:00",
+   "completed_at": "2026-09-28 19:45:30.517170+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": []
+ },
+ "t2_first_attempt": {
+  "sent_at": "2026-09-28 19:44:44.610942+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "fba53b16-a724-4589-92ca-d4d253eeede7",
+   "run_id": "199640da-1f43-434a-8c0c-3fbfac0fc636",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter"
+  },
+  "run": {
+   "run_id": "199640da-1f43-434a-8c0c-3fbfac0fc636",
+   "status": "completed",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 11497,
+   "output_tokens": 179,
+   "started_at": "2026-09-28 19:44:46.894105+00:00",
+   "completed_at": "2026-09-28 19:45:01.579870+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": []
+ },
+ "retry": true,
+ "v1": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 2,
+  "folders": [
+   "1a2d0273-b14d-487f-86ee-4d146e89d082",
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ },
+ "v2": {
+  "searched": false,
+  "scope_ok": false,
+  "docs_ok": true,
+  "n_docs": 0,
+  "folders": []
+ },
+ "t3_variant": {
+  "sent_at": "2026-09-28 19:45:33.444627+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "f90c2fdd-e6fb-4e99-8e60-860891a624d6",
+   "run_id": "cc8017f1-2b93-46d8-b67a-ab84a2e2c355",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter"
+  },
+  "run": {
+   "run_id": "cc8017f1-2b93-46d8-b67a-ab84a2e2c355",
+   "status": "completed",
+   "model": "deepseek/deepseek-v4-pro",
+   "provider": "openrouter",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 24205,
+   "output_tokens": 279,
+   "started_at": "2026-09-28 19:45:35.741193+00:00",
+   "completed_at": "2026-09-28 19:46:02.400185+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "9af300ac-2e96-48fb-acce-19074b02671b",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:45:47.811154+00:00",
+    "run_id": "cc8017f1-2b93-46d8-b67a-ab84a2e2c355",
+    "thread_id": "d045728c-82c3-49e5-a060-9fe587872ecb",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 1
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "cc8017f1-2b93-46d8-b67a-ab84a2e2c355",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   }
+  ],
+  "tools": [
+   "search_documents"
+  ]
+ },
+ "v3": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 1,
+  "folders": [
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ }
+}

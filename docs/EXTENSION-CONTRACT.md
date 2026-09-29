@@ -114,6 +114,6 @@ To prevent recurring design debates, this contract formally records what the arc
 ## 6. Mechanical Enforcement
 
 This contract is not a suggestion; it is enforced by automated gates:
-- `scripts/check-extension-contract.cjs`: AST and pattern scanner auditing the six trigger paths (`phase_types.py`, `validator_kinds.py`, `emitters.py`, `programmatic.py`, `tool_dispatcher.py`, `agent_loop.py`).
+- `scripts/check-extension-contract.cjs`: line-based pattern scanner auditing the six trigger paths (`phase_types.py`, `validator_kinds.py`, `emitters.py`, `programmatic.py`, `tool_dispatcher.py`, `agent_loop.py`).
 - `backend/tests/unit/test_255_extension_contract_guard.py`: Unit test suite ensuring registries remain static and closed.
-- Pre-commit and GSD hooks preventing commits that introduce dynamic dispatch.
+- `.claude/hooks/extension-contract-guard.js` (PostToolUse): runs the scanner when an agent edits a trigger path and reports a violation back to that agent. It does not block commits; there is no pre-commit hook.

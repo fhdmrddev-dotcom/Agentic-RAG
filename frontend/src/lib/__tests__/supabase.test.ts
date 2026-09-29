@@ -88,7 +88,7 @@ describe("supabase client — runtime public-config overlay (SC#3 / D-07)", () =
     )
     await mod.hydrateSupabaseFromRuntime("http://api.test")
     // Fetched /public-config off the passed apiBase (NOT a hardcoded /api prefix).
-    expect(fetch).toHaveBeenCalledWith("http://api.test/public-config")
+    expect(fetch).toHaveBeenCalledWith("http://api.test/public-config", expect.anything())
     // Reassigned the client to the runtime creds.
     expect(mockCreateClient).toHaveBeenCalledTimes(1)
     expect(mockCreateClient).toHaveBeenCalledWith(REAL_URL, REAL_KEY)
@@ -118,5 +118,24 @@ describe("supabase client — runtime public-config overlay (SC#3 / D-07)", () =
     await expect(mod.hydrateSupabaseFromRuntime("http://api.test")).resolves.toBeUndefined()
     expect(mockCreateClient).not.toHaveBeenCalled()
     expect(mod.supabase).toBe(baked) // unchanged — the baked client survives
+  })
+
+  it("a hung backend cannot hold boot: the /public-config fetch carries an abort signal (265 WR-01)", async () => {
+    // App.tsx awaits this BEFORE getSetupStatus, so without a signal a hung backend spins the
+    // boot spinner forever regardless of getSetupStatus's own timeout.
+    const mod = await importFresh(REAL_URL, REAL_KEY)
+    let abort: (() => void) | undefined
+    const pending = vi.fn(
+      (_url: string, _init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          abort = () => reject(new Error("aborted"))
+        }),
+    )
+    vi.stubGlobal("fetch", pending)
+    const done = mod.hydrateSupabaseFromRuntime("http://api.test")
+    expect(pending.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
+    // Reject the way an elapsed timeout would: hydrate must resolve (fall through), never hang.
+    abort!()
+    await expect(done).resolves.toBeUndefined()
   })
 })

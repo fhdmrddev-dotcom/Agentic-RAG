@@ -473,8 +473,8 @@ REVOKE DELETE ON public.user_settings FROM authenticated;
 
 
 -- ============================================================
--- 5e. Table privileges: tier_capabilities, expert_bundles, expert_grants
---     (migrations 186, 187, 189 / Phases 258, 259, 261)
+-- 5e. Table privileges: tier_capabilities, expert_bundles, expert_grants, organizations,
+--     expert_installs (migrations 186, 187, 189, 192, 194, 195 / Phases 258, 259, 261, 265, 266)
 -- ============================================================
 -- migration 186:30-31
 GRANT SELECT ON TABLE public.tier_capabilities TO anon, authenticated, service_role;
@@ -488,6 +488,25 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_bundles TO authentic
 
 -- migration 189:45
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_grants TO authenticated, service_role;
+
+-- migration 194 — an org admin must not raise their own plan (R265-audit-fixes-01).
+-- Table-level INSERT/UPDATE revoked from the client roles; UPDATE granted back column by
+-- column. A column-only revoke would be a no-op against the table-level default grant.
+REVOKE INSERT, UPDATE ON TABLE public.organizations FROM anon;
+REVOKE INSERT, UPDATE ON TABLE public.organizations FROM authenticated;
+REVOKE INSERT, UPDATE ON TABLE public.organizations FROM PUBLIC;
+REVOKE UPDATE (id, name, slug, subscription_tier, add_ons, settings, created_at, updated_at)
+    ON public.organizations FROM anon;
+REVOKE UPDATE (id, name, slug, subscription_tier, add_ons, settings, created_at, updated_at)
+    ON public.organizations FROM authenticated;
+GRANT UPDATE (name, slug, settings, updated_at) ON public.organizations TO authenticated;
+
+-- migration 195 — expert_installs: members READ their org's installs; only the backend writes (D-266-08)
+REVOKE ALL ON TABLE public.expert_installs FROM PUBLIC;
+REVOKE ALL ON TABLE public.expert_installs FROM anon;
+REVOKE ALL ON TABLE public.expert_installs FROM authenticated;
+GRANT SELECT ON TABLE public.expert_installs TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_installs TO service_role;
 
 
 -- ============================================================

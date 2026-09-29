@@ -11,10 +11,14 @@ interface UseThreads {
    *  selection on an org switch). Widening to `Thread | null` is backward-compatible:
    *  every existing caller still passes a `Thread`. */
   selectThread: (thread: Thread | null) => void
-  newThread: (folderId?: string | null) => Promise<Thread>
+  /** Phase 267 (D-267-21): `activeExpertId` creates the thread WITH its Expert, in one request. */
+  newThread: (folderId?: string | null, activeExpertId?: string | null) => Promise<Thread>
   deleteThread: (id: string) => Promise<void>
   renameThread: (id: string, title: string) => Promise<void>
   updateThreadTitle: (id: string, title: string) => void
+  /** 267-REVIEW CR-01: write the SERVER's answer for a thread (e.g. after an Expert change) into the
+   *  list and the selection, so coming back to the thread never hydrates a stale `active_expert_id`. */
+  patchThread: (updated: Thread) => void
 }
 
 export function useThreads(): UseThreads {
@@ -36,8 +40,8 @@ export function useThreads(): UseThreads {
     setSelectedThread(thread)
   }, [])
 
-  const newThread = useCallback(async (folderId?: string | null) => {
-    const thread = await createThread("New Chat", folderId)
+  const newThread = useCallback(async (folderId?: string | null, activeExpertId?: string | null) => {
+    const thread = await createThread("New Chat", folderId, activeExpertId)
     setThreads((prev) => [thread, ...prev])
     setSelectedThread(thread)
     return thread
@@ -60,5 +64,10 @@ export function useThreads(): UseThreads {
     setSelectedThread((prev) => (prev?.id === id ? { ...prev, title } : prev))
   }, [])
 
-  return { threads, selectedThread, loading, loadThreads, selectThread, newThread, deleteThread, renameThread, updateThreadTitle }
+  const patchThread = useCallback((updated: Thread) => {
+    setThreads((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)))
+    setSelectedThread((prev) => (prev?.id === updated.id ? { ...prev, ...updated } : prev))
+  }, [])
+
+  return { threads, selectedThread, loading, loadThreads, selectThread, newThread, deleteThread, renameThread, updateThreadTitle, patchThread }
 }

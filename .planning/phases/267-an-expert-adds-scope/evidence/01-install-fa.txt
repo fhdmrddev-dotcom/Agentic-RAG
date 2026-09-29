@@ -1,0 +1,5 @@
+== s1 install Financial Analyzer into org A — 2026-09-25T19:27:47.872062+00:00
+POST /experts/00000000-0000-0000-0000-000000000259/install headers={'X-Org-Id': 'e8c567c2-6f75-4c8b-94cf-92768831c035'} -> 202 {"expert_bundle_id":"00000000-0000-0000-0000-000000000259","corpus_version":"9bbb510c6038217f57deb84ea9265559a3e4180fe40a00fcb73619ece4c8e757","install":{"state":"installing","folder_id":"0a0e2126-07d3-4a8c-9c09-fbbf525ba54d","cause":null,"cause_source":null,"can_install":true,"updated_at":"2026-09-25T19:27:51.372647Z"}}
+GET /experts/00000000-0000-0000-0000-000000000259 poll #3 -> 200 install={"state": "ready", "folder_id": "0a0e2126-07d3-4a8c-9c09-fbbf525ba54d", "cause": null, "cause_source": null, "can_install": true, "updated_at": "2026-09-25T19:27:51.372647Z"}
+SELECT org_id, status, folder_id, installed_by, error FROM expert_installs WHERE org_id='e8c567c2-6f75-4c8b-94cf-92768831c035';
+{"org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035", "status": "installed", "folder_id": "0a0e2126-07d3-4a8c-9c09-fbbf525ba54d", "installed_by": "f93af2b6-79dc-420f-95a6-105b3cfaf67b", "error": null}

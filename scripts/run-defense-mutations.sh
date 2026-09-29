@@ -6,7 +6,10 @@ set -euo pipefail
 # Uses pytest runtime monkeypatch fixture (--disable-defense=<name>)
 # Proves test suite fails loudly and names missing defense when any of the 8 named defenses is removed.
 
-REPORT_FILE=".planning/phases/236-the-corpus-under-attack/236-MUTATION-REPORT.md"
+# Phase 236 lives in the v4.0 archive once archived; write to wherever the phase dir actually is.
+REPORT_DIR=".planning/phases/236-the-corpus-under-attack"
+[ -d "$REPORT_DIR" ] || REPORT_DIR=".planning/milestones/v4.0-phases/236-the-corpus-under-attack"
+REPORT_FILE="$REPORT_DIR/236-MUTATION-REPORT.md"
 PYTEST_CMD="backend/venv/Scripts/pytest.exe"
 
 echo "=== Phase 236 SC#2: GA Gate Defense Mutation Audit ==="

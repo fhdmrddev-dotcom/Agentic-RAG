@@ -1,0 +1,202 @@
+{
+ "acme": {
+  "id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+  "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+  "name": "Client ACME",
+  "parent_id": null,
+  "is_org_shared": true,
+  "created_at": "2026-09-28T19:34:25.286358Z",
+  "updated_at": "2026-09-28T19:34:25.286358Z"
+ },
+ "q3": {
+  "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+  "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+  "name": "Q3 Contracts",
+  "parent_id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+  "is_org_shared": true,
+  "created_at": "2026-09-28T19:34:27.577004Z",
+  "updated_at": "2026-09-28T19:34:27.577004Z"
+ },
+ "hr": {
+  "id": "4ff33372-772d-45b4-9c0d-9d676d314c4d",
+  "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+  "name": "HR Policies",
+  "parent_id": null,
+  "is_org_shared": true,
+  "created_at": "2026-09-28T19:34:29.843089Z",
+  "updated_at": "2026-09-28T19:34:29.843089Z"
+ },
+ "log": [
+  {
+   "step": "folder Client ACME",
+   "status": 201,
+   "body": {
+    "id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+    "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+    "name": "Client ACME",
+    "parent_id": null,
+    "is_org_shared": true,
+    "created_at": "2026-09-28T19:34:25.286358Z",
+    "updated_at": "2026-09-28T19:34:25.286358Z"
+   }
+  },
+  {
+   "step": "folder Q3 Contracts",
+   "status": 201,
+   "body": {
+    "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+    "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+    "name": "Q3 Contracts",
+    "parent_id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+    "is_org_shared": true,
+    "created_at": "2026-09-28T19:34:27.577004Z",
+    "updated_at": "2026-09-28T19:34:27.577004Z"
+   }
+  },
+  {
+   "step": "folder HR Policies",
+   "status": 201,
+   "body": {
+    "id": "4ff33372-772d-45b4-9c0d-9d676d314c4d",
+    "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+    "name": "HR Policies",
+    "parent_id": null,
+    "is_org_shared": true,
+    "created_at": "2026-09-28T19:34:29.843089Z",
+    "updated_at": "2026-09-28T19:34:29.843089Z"
+   }
+  },
+  {
+   "step": "upload ACME_MSA_2026.md",
+   "status": 201,
+   "body": {
+    "id": "1417fc12-a581-4068-adcc-ddbc1e3a848a",
+    "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+    "folder_id": "1a2d0273-b14d-487f-86ee-4d146e89d082",
+    "filename": "ACME_MSA_2026.md",
+    "file_path": "d8a54002-6a29-4b88-b918-cff2aa4a06d5/1417fc12-a581-4068-adcc-ddbc1e3a848a/ACME_MSA_2026.md",
+    "file_size": 323,
+    "mime_type": "text/markdown",
+    "status": "pending",
+    "error_message": null,
+    "chunk_count": null,
+    "content_hash": "3904d5aa90d51a72e6abcaf684b38ba9be4f26f4e7728a988b2923f5e3fe7b55",
+    "version_number": 1,
+    "is_latest": true,
+    "metadata": null,
+    "created_at": "2026-09-28T19:34:32.128364Z",
+    "updated_at": "2026-09-28T19:34:32.128364Z",
+    "table_count": 0,
+    "image_count": 0,
+    "extractor": null,
+    "source_connection_id": null,
+    "ingestion_step": null,
+    "tables_stage_applies": false,
+    "images_stage_applies": false
+   }
+  },
+  {
+   "step": "upload ACME_Q3_SOW_Contract.md",
+   "status": 201,
+   "body": {
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75",
+    "filename": "ACME_Q3_SOW_Contract.md",
+    "file_path": "d8a54002-6a29-4b88-b918-cff2aa4a06d5/95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6/ACME_Q3_SOW_Contract.md",
+    "file_size": 333,
+    "mime_type": "text/markdown",
+    "status": "pending",
+    "error_message": null,
+    "chunk_count": null,
+    "content_hash": "df3d449e249ebe5a1b74d26db90ffb08b2e018ad4dcf2a527bb76e588eba9b40",
+    "version_number": 1,
+    "is_latest": true,
+    "metadata": null,
+    "created_at": "2026-09-28T19:34:34.888681Z",
+    "updated_at": "2026-09-28T19:34:34.888681Z",
+    "table_count": 0,
+    "image_count": 0,
+    "extractor": null,
+    "source_connection_id": null,
+    "ingestion_step": null,
+    "tables_stage_applies": false,
+    "images_stage_applies": false
+   }
+  },
+  {
+   "step": "upload HR_Leave_Policy.md",
+   "status": 201,
+   "body": {
+    "id": "5ee944a5-42ae-4a64-990f-a519c283518a",
+    "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+    "folder_id": "4ff33372-772d-45b4-9c0d-9d676d314c4d",
+    "filename": "HR_Leave_Policy.md",
+    "file_path": "d8a54002-6a29-4b88-b918-cff2aa4a06d5/5ee944a5-42ae-4a64-990f-a519c283518a/HR_Leave_Policy.md",
+    "file_size": 220,
+    "mime_type": "text/markdown",
+    "status": "pending",
+    "error_message": null,
+    "chunk_count": null,
+    "content_hash": "09187de1f3658c8bb91c286b401b2e4765052f7f89738c4e95da51af7f90c497",
+    "version_number": 1,
+    "is_latest": true,
+    "metadata": null,
+    "created_at": "2026-09-28T19:34:37.243091Z",
+    "updated_at": "2026-09-28T19:34:37.243091Z",
+    "table_count": 0,
+    "image_count": 0,
+    "extractor": null,
+    "source_connection_id": null,
+    "ingestion_step": null,
+    "tables_stage_applies": false,
+    "images_stage_applies": false
+   }
+  },
+  {
+   "step": "expert HR Advisor",
+   "status": 201,
+   "body": {
+    "id": "587c3f87-a001-4db2-a37f-27bafa25ae87",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_by": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+    "name": "HR Advisor",
+    "slug": "hr-advisor-268",
+    "description": "Answers HR policy questions from the HR Policies folder only.",
+    "scope_mode": "restricted",
+    "member_skills": [],
+    "required_connections": [],
+    "knowledge_folder_ids": [
+     "4ff33372-772d-45b4-9c0d-9d676d314c4d"
+    ],
+    "prompt_suggestions": [],
+    "visibility": "org",
+    "is_system": false,
+    "is_enabled": true,
+    "created_at": "2026-09-28T19:34:39.593141Z",
+    "updated_at": "2026-09-28T19:34:39.593141Z",
+    "icon": "users",
+    "category": "HR",
+    "when_to_use": "",
+    "example_output": "",
+    "tool_floor_enabled": true
+   }
+  },
+  {
+   "step": "install Financial Analyzer",
+   "status": 202,
+   "body": {
+    "expert_bundle_id": "00000000-0000-0000-0000-000000000259",
+    "corpus_version": "9bbb510c6038217f57deb84ea9265559a3e4180fe40a00fcb73619ece4c8e757",
+    "install": {
+     "state": "installing",
+     "folder_id": "07abbbbf-8f55-4fca-8ed3-6f27df7d0200",
+     "cause": null,
+     "cause_source": null,
+     "can_install": true,
+     "updated_at": "2026-09-28T19:34:41.945027Z"
+    }
+   }
+  }
+ ]
+}

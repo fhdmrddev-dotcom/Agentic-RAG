@@ -1068,7 +1068,8 @@ async def continue_run(
             supabase.table("workflow_runs")
             # F8 (092-07): pull `inputs` too so the re-driven first phase can read
             # the original kickoff_prompt back (Continue resume path).
-            .select("id, continues_used, definition_id, inputs")
+            # 268-REVIEW WR-06: `org_id` too — the producer shell below is attributed to it.
+            .select("id, continues_used, definition_id, inputs, org_id")
             .eq("id", str(active_workflow_run_id))
             .maybe_single()
         )
@@ -1102,10 +1103,15 @@ async def continue_run(
                 .eq("id", str(active_workflow_run_id))
             )
         else:
+            # 268 D-2: `runs` has only a SELECT policy (runs_select_own), so this write through
+            # the user-JWT client matched 0 rows in silence and the Continue cap never counted.
+            # Ownership was proven by the RLS read above; the service client writes, and the
+            # UPDATE keeps its own user_id scope because that client bypasses RLS.
             await aexec(
-                supabase.table("runs")
+                service_supabase.table("runs")
                 .update({"continues_used": _new_used, "status": "streaming"})
                 .eq("run_id", str(run_id))
+                .eq("user_id", current_user["id"])
             )
     except Exception:
         logger.exception("continue: continues_used increment failed for run %s", run_id)
@@ -1180,6 +1186,12 @@ async def continue_run(
             status="streaming",
             model="unknown", provider="unknown",  # NOT NULL; shell makes no LLM call
             parent_run_id=None,
+            # 268-REVIEW WR-06: the WORKFLOW RUN's org (RLS-read above), so the shell and every
+            # re-driven sub-agent under it (insert_run's parent copy) land there — never the
+            # mig-106 trigger's LIMIT-1 guess for a two-org owner. None falls to the trigger.
+            org_id=(
+                str((wf_row or {}).get("org_id")) if (wf_row or {}).get("org_id") else None
+            ),
         )
 
         # F8 (092-07): rehydrate the original kickoff_prompt from the persisted
@@ -1405,7 +1417,14 @@ async def continue_run(
         await spawn_continuation_run(
             run_id=run_id,
             thread_id=thread_id,
-            current_user=current_user,
+            # 268-REVIEW CR-01: get_current_user carries no org_id, so without this the
+            # continuation's writes (assistant message, warnings, a RE-PAUSE carrier) fall to
+            # the mig-106 trigger's LIMIT-1 guess — and the next Continue, reading AND org_id =
+            # <the run's org>, re-drives the previous pause's calls. The run's own org is the
+            # value the carrier lookup above already uses.
+            current_user=(
+                {**current_user, "org_id": str(_cont_org_id)} if _cont_org_id else current_user
+            ),
             redis=redis,
             # Phase 163 (D-05/D-09): the Deep continuation producer is service-role.
             supabase=service_supabase,

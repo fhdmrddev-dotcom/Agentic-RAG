@@ -1,0 +1,13 @@
+== s0 users/orgs — 2026-09-25T19:27:28.680866+00:00
+signup u1: POST /auth/v1/signup (public, anon key from GET /public-config) -> HTTP 200 user_id=f93af2b6-79dc-420f-95a6-105b3cfaf67b session=yes
+signup u2: POST /auth/v1/signup (public, anon key from GET /public-config) -> HTTP 200 user_id=1b6dd214-c5a4-48df-b23b-da4bd7a45b9f session=yes
+org_members right after signup:
+{"user_id": "f93af2b6-79dc-420f-95a6-105b3cfaf67b", "email": "uat267-u1-7ef2ae@example.test", "org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035", "role": "org-admin", "name": "uat267-u1-7ef2ae@example.test's Organization", "subscription_tier": null}
+{"user_id": "1b6dd214-c5a4-48df-b23b-da4bd7a45b9f", "email": "uat267-u2-7ef2ae@example.test", "org_id": "e3c47417-aa1c-4d85-a9e4-6b894bf0d424", "role": "org-admin", "name": "uat267-u2-7ef2ae@example.test's Organization", "subscription_tier": null}
+LOCAL DB: UPDATE organizations SET subscription_tier='enterprise' WHERE id='e8c567c2-6f75-4c8b-94cf-92768831c035'  (prior value: None)
+LOCAL DB: INSERT INTO org_members (org_id, user_id, role) VALUES ('e8c567c2-6f75-4c8b-94cf-92768831c035', '1b6dd214-c5a4-48df-b23b-da4bd7a45b9f', 'member')  -- U2 becomes the D-267-34 two-org shape
+org_members after setup:
+{"user_id": "f93af2b6-79dc-420f-95a6-105b3cfaf67b", "email": "uat267-u1-7ef2ae@example.test", "org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035", "role": "org-admin", "name": "uat267-u1-7ef2ae@example.test's Organization", "subscription_tier": "enterprise"}
+{"user_id": "1b6dd214-c5a4-48df-b23b-da4bd7a45b9f", "email": "uat267-u2-7ef2ae@example.test", "org_id": "e8c567c2-6f75-4c8b-94cf-92768831c035", "role": "member", "name": "uat267-u1-7ef2ae@example.test's Organization", "subscription_tier": "enterprise"}
+{"user_id": "1b6dd214-c5a4-48df-b23b-da4bd7a45b9f", "email": "uat267-u2-7ef2ae@example.test", "org_id": "e3c47417-aa1c-4d85-a9e4-6b894bf0d424", "role": "org-admin", "name": "uat267-u2-7ef2ae@example.test's Organization", "subscription_tier": null}
+U2's autofill-trigger pick (SELECT org_id FROM org_members WHERE user_id=U2 LIMIT 1) = e3c47417-aa1c-4d85-a9e4-6b894bf0d424  (org C = e3c47417-aa1c-4d85-a9e4-6b894bf0d424; drive org A = e8c567c2-6f75-4c8b-94cf-92768831c035)

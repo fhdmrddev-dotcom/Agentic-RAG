@@ -3,7 +3,20 @@
  */
 
 import { API_BASE, getAuthHeaders } from "@/lib/api/_core"
-import type { SpendSummaryData, SpendRunItem, ModelRateItem, ModelSpendShare } from "@/types/spend"
+import type {
+  SpendSummaryData,
+  SpendRunItem,
+  ModelRateItem,
+  ModelSpendShare,
+  ExpertSpendLine,
+} from "@/types/spend"
+
+/** A USD string from the API, or null when the server said "not priced". Never NaN. */
+function usdOrNull(v: unknown): number | null {
+  if (v === null || v === undefined) return null
+  const n = parseFloat(String(v))
+  return Number.isFinite(n) ? n : null
+}
 
 const MODEL_COLORS = [
   "hsl(239 84% 67%)", // indigo
@@ -18,12 +31,15 @@ export async function getSpendSummary(params?: {
   orgId?: string
   startTime?: string
   endTime?: string
+  /** Phase 268 (D-268-08): `<uuid>` | `none` | `unrecorded`; absent = every run. */
+  expert?: string
 }): Promise<SpendSummaryData> {
   const headers = await getAuthHeaders()
   const search = new URLSearchParams()
   if (params?.orgId) search.set("org_id", params.orgId)
   if (params?.startTime) search.set("start_time", params.startTime)
   if (params?.endTime) search.set("end_time", params.endTime)
+  if (params?.expert) search.set("expert", params.expert)
 
   const url = `${API_BASE}/admin/spend/summary${search.toString() ? `?${search.toString()}` : ""}`
   const res = await fetch(url, { headers })
@@ -80,6 +96,24 @@ export async function getSpendSummary(params?: {
     modelBreakdown,
     hasUnratedRuns: data.has_unrated_runs ?? (data.unrated_runs_count > 0),
     hasIncompleteCoverage: data.has_incomplete_coverage ?? (data.incomplete_coverage_count > 0),
+    expertBreakdown: (data.expert_breakdown || []).map(
+      (l: any): ExpertSpendLine => ({
+        key: String(l.key),
+        expertId: l.expert_id ?? null,
+        name: l.name ?? null,
+        deleted: Boolean(l.deleted),
+        scopeMode: l.scope_mode ?? null,
+        runCount: l.run_count || 0,
+        inputTokens: l.input_tokens || 0,
+        outputTokens: l.output_tokens || 0,
+        spendUsd: usdOrNull(l.spend_usd),
+        unratedCount: l.unrated_count || 0,
+      }),
+    ),
+    windowTotalUsd: usdOrNull(data.window_total_usd),
+    windowRunCount: data.window_run_count || 0,
+    unpricedSubagents: data.unpriced_subagents || 0,
+    partlyPricedHarnessRuns: data.partly_priced_harness_runs || 0,
   }
 }
 
@@ -89,6 +123,8 @@ export async function getSpendRuns(params?: {
   offset?: number
   filterStatus?: string
   timeRange?: string
+  /** Phase 268 (D-268-08): the SAME param as getSpendSummary's — one filter, both calls. */
+  expert?: string
 }): Promise<{ runs: SpendRunItem[]; totalCount: number }> {
   const headers = await getAuthHeaders()
   const search = new URLSearchParams()
@@ -97,6 +133,7 @@ export async function getSpendRuns(params?: {
   if (params?.offset) search.set("offset", String(params.offset))
   if (params?.filterStatus) search.set("filter_status", params.filterStatus)
   if (params?.timeRange) search.set("time_range", params.timeRange)
+  if (params?.expert) search.set("expert", params.expert)
 
   const url = `${API_BASE}/admin/spend/runs${search.toString() ? `?${search.toString()}` : ""}`
   const res = await fetch(url, { headers })
@@ -121,6 +158,11 @@ export async function getSpendRuns(params?: {
     isRated: r.is_rated,
     tokenCoverage: r.token_coverage,
     isCoverageComplete: r.is_coverage_complete,
+    expertId: r.expert_id ?? null,
+    expertName: r.expert_name ?? null,
+    expertDeleted: Boolean(r.expert_deleted),
+    expertAttributed: Boolean(r.expert_attributed),
+    subagentCount: r.subagent_count || 0,
   }))
 
   return {

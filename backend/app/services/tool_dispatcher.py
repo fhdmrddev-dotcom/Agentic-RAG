@@ -841,6 +841,11 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
                     "query_text": args["query"],
                     "document_ids": [],
                     "retrieval_status": "provider_error",
+                    # Phase 268 (D-268-13): the run join keys — see the success write below.
+                    "run_id": str(ctx.run_id),
+                    "thread_id": str(ctx.thread_id),
+                    "parent_run_id": str(ctx.parent_run_id) if ctx.parent_run_id else None,
+                    "folder_ids": [str(f) for f in (ctx.folder_subtree_ids or [])],
                 },
                 supabase=ctx.supabase,
             ))
@@ -950,6 +955,14 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
             "query_text": args["query"],
             "document_ids": _audit_doc_ids,
             "similarities": _sims,
+            # Phase 268 (D-268-13, additive): SC#3's "retrieved-chunk records" do not exist, so
+            # every search row carries the keys that join it to its run — the ROOT run too, for a
+            # sub-agent — and the scope actually handed to retrieval, evidence independent of the
+            # result set. Readers only .get() known keys (api/audit.py, knowledge_health.py).
+            "run_id": str(ctx.run_id),
+            "thread_id": str(ctx.thread_id),
+            "parent_run_id": str(ctx.parent_run_id) if ctx.parent_run_id else None,
+            "folder_ids": [str(f) for f in (ctx.folder_subtree_ids or [])],
         },
         supabase=ctx.supabase,
     ))
@@ -1430,8 +1443,9 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     # OR org_id ∈ caller_org_ids AND (owner OR is_org_shared)) — a disjoint-org caller no
     # longer resolves another org's is_org_shared skill on the BYPASSRLS service client.
     #
-    # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. THIS SITE IS THE DEFECT. `load_skill` is in
-    # `EXPERT_CORE_TOOLS`, and Phase 263 already admits a colleague's born-for skill at
+    # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. THIS SITE IS THE DEFECT. `load_skill` is
+    # advertised to every chat run, Expert or not (Phase 267 deleted the Expert tool filter,
+    # D-267-01), and Phase 263 already admits a colleague's born-for skill at
     # RESOLVE time — but that result is the CATALOG only (names + descriptions). The
     # instruction BODY is fetched here, through a predicate that had never heard of
     # `born_for_expert_bundle_id`, so for every org member but the author the prompt promised
@@ -1588,11 +1602,13 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
         # Phase 264 (PACK-17 / D-264-04) — ⛔ DELIBERATELY **NOT** WIDENED. This is the one
         # resolver call in this module that keeps the default `born_for=False`, and the
         # decision is written here rather than left as an omission. Three measured reasons:
-        #   1. `save_skill` is in NEITHER `EXPERT_CORE_TOOLS` nor `EXPERT_DELIVERABLE_TOOLS`
-        #      (:4585-4609), so it is **not advertised** to an Expert run. ⚠ "not advertised",
-        #      NOT "unreachable" — `effective_tools` is a SCHEMA filter, and `dispatch_tool`'s
-        #      only refusal backstop is `ctx.phase_whitelist`, which is `None` on a chat run,
-        #      so a hallucinated call could still dispatch here.
+        #   1. ⚠ CORRECTED BY PHASE 267 — the original reason #1 was "`save_skill` is in NEITHER
+        #      `EXPERT_CORE_TOOLS` nor `EXPERT_DELIVERABLE_TOOLS`, so it is **not advertised** to
+        #      an Expert run". That became FALSE when 267 deleted both constants and the Expert
+        #      tool filter (D-267-01): `save_skill` IS advertised to Expert threads now. The
+        #      decision NOT to widen still stands on reasons 2 and 3 alone, which never depended
+        #      on it. (Chat still has no dispatch-side whitelist — `ctx.phase_whitelist` is `None`
+        #      on a chat run; that backstop is owed to SEED-303, not built.)
         #   2. The read feeds a non-blocking description **lint** corpus and produces NO
         #      user-visible capability. Widening it would only let an Expert's borrowed skills
         #      influence another user's save-time warnings — a widening with no upside.
@@ -1730,7 +1746,7 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     #    visibility filter is org-gated per SEED-125 (CR-01). Resolve the caller's org
     #    set ONCE and reuse it for the normalized-name retry (no double round-trip). ──
     skill_name = args.get("skill_name", "")
-    # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. `read_skill_file` is in `EXPERT_CORE_TOOLS`,
+    # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. `read_skill_file` is advertised to every chat run,
     # and `load_skill` returns `files: [...]` (:1405) — so a body that loads while its bundled
     # files 404 is the SAME defect one layer down: the model is told the files exist and then
     # cannot read them. ⚠ This handler applies NO `is_enabled` filter of its own, which is why
@@ -2346,8 +2362,8 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         # before the injection loop (not per file) so a disjoint-org caller cannot pull
         # another org's is_org_shared skill files into the sandbox on the service client.
         #
-        # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. `execute_code` is in
-        # `EXPERT_DELIVERABLE_TOOLS`, unioned in whenever `tool_floor_enabled` (the default).
+        # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. `execute_code` is advertised to Expert runs
+        # like every other chat run (Phase 267 deleted the Expert tool filter, D-267-01).
         # Same class as `read_skill_file`, one layer further out, and the failure is QUIETER:
         # an unresolved skill here is a `logger.warning` plus a silently-skipped file below, so
         # the sandbox runs WITHOUT the helper and the model reasons on from a false premise.
@@ -4741,39 +4757,14 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "attach_skill_file": _handle_attach_skill_file,
 }
 
-# Phase 260 (PACK-02 / F-3) — Canonical core tools allowed for consultant experts
-# Derived strictly from _TOOL_REGISTRY keys to prevent second-registry drift.
-EXPERT_CORE_TOOLS: frozenset[str] = frozenset({
-    "search_documents",
-    "query_documents",
-    "read_document",
-    "analyze_document",
-    "ls",
-    "tree",
-    "grep",
-    "glob",
-    "load_skill",
-    "read_skill_file",
-})
-
-assert EXPERT_CORE_TOOLS.issubset(_TOOL_REGISTRY.keys()), (
-    f"EXPERT_CORE_TOOLS contains tools not registered in _TOOL_REGISTRY: "
-    f"{EXPERT_CORE_TOOLS - set(_TOOL_REGISTRY.keys())}"
-)
-
-# Phase 261 (PACK-02 / D-v4.3-02 / SEED-303 S6) — Additive tool floor preserving deliverable-producing tools
-EXPERT_DELIVERABLE_TOOLS: frozenset[str] = frozenset({
-    "execute_code",
-    "workspace_write",
-    "render_template",
-    "ask_user",
-})
-
-assert EXPERT_DELIVERABLE_TOOLS.issubset(_TOOL_REGISTRY.keys()), (
-    f"EXPERT_DELIVERABLE_TOOLS contains tools not registered in _TOOL_REGISTRY: "
-    f"{EXPERT_DELIVERABLE_TOOLS - set(_TOOL_REGISTRY.keys())}"
-)
-
+# Phase 267 (PACK-21 / D-267-01) — `EXPERT_CORE_TOOLS` and `EXPERT_DELIVERABLE_TOOLS` were DELETED
+# here, with their module-scope registry asserts. They were a second encoding of the tool set that
+# `run_producer` used to FILTER an Expert thread's advertised tools (15 of 28 chat tools stripped,
+# and every connector schema dropped by a bare-slug vs namespaced-name mismatch). An Expert now only
+# ever ADDS: it gets the plain thread's tools plus its own approved connections and skills. Deleted
+# rather than kept as documentation, so no dead constant can look live.
+# ⚠ OWED, NOT BUILT: chat has no dispatch-side whitelist — `dispatch_tool`'s only refusal backstop
+# is `ctx.phase_whitelist`, which is None on a chat run. Deferred to SEED-303 (267-CONTEXT).
 
 
 def _spawn_tool_refused_audit(ctx: ToolContext, tool_name: str, allowed: list[str]) -> None:

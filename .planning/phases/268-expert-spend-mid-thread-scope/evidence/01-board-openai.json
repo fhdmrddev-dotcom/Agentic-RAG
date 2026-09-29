@@ -1,0 +1,206 @@
+{
+ "provider": "openai",
+ "model": "gpt-5.6-sol",
+ "create": {
+  "status": 201,
+  "id": "aa56a842-c9c7-44e1-bf36-bfa176ae42ae",
+  "org_id": null
+ },
+ "t1": {
+  "sent_at": "2026-09-28 19:38:17.014006+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "b6497686-4c0f-4735-a8c2-39f462edbd6e",
+   "run_id": "5bde21e2-c77e-423b-95bc-222bed4a5872",
+   "model": "gpt-5.6-sol",
+   "provider": "openai"
+  },
+  "run": {
+   "run_id": "5bde21e2-c77e-423b-95bc-222bed4a5872",
+   "status": "completed",
+   "model": "gpt-5.6-sol",
+   "provider": "openai",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 63468,
+   "output_tokens": 603,
+   "started_at": "2026-09-28 19:38:19.374693+00:00",
+   "completed_at": "2026-09-28 19:38:50.261245+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": [
+   "write_todos",
+   "grep",
+   "read_document",
+   "read_document",
+   "workspace_write",
+   "write_todos"
+  ]
+ },
+ "patch": {
+  "status": 200,
+  "at": "2026-09-28 19:38:53.040116+00:00",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "event": [
+  {
+   "id": "e1637140-ac89-4706-a8cf-872f16587121",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "role": "system",
+   "kind": "scope_changed",
+   "content": "Scope /Client ACME \u2192 /Client ACME/Q3 Contracts. Now: /Client ACME/Q3 Contracts (1). Dropped: /Client ACME (2).",
+   "created_at": "2026-09-28 19:38:55.387728+00:00"
+  }
+ ],
+ "thread_org": {
+  "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+  "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+ },
+ "t2": {
+  "sent_at": "2026-09-28 19:39:22.166255+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "b883dfde-c50a-4459-9909-70cd17ae849a",
+   "run_id": "52b0e276-99f7-4a1c-8b81-a31f90ac0081",
+   "model": "gpt-5.6-sol",
+   "provider": "openai"
+  },
+  "run": {
+   "run_id": "52b0e276-99f7-4a1c-8b81-a31f90ac0081",
+   "status": "completed",
+   "model": "gpt-5.6-sol",
+   "provider": "openai",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 64837,
+   "output_tokens": 419,
+   "started_at": "2026-09-28 19:39:24.470235+00:00",
+   "completed_at": "2026-09-28 19:39:48.387916+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": [
+   "write_todos",
+   "grep",
+   "read_document",
+   "workspace_write",
+   "write_todos"
+  ]
+ },
+ "t2_first_attempt": {
+  "sent_at": "2026-09-28 19:38:55.449320+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "48055dff-c4a7-431e-81df-4b58c9927177",
+   "run_id": "ef5dcc62-4759-4c28-8bdb-4f7efd1aa370",
+   "model": "gpt-5.6-sol",
+   "provider": "openai"
+  },
+  "run": {
+   "run_id": "ef5dcc62-4759-4c28-8bdb-4f7efd1aa370",
+   "status": "completed",
+   "model": "gpt-5.6-sol",
+   "provider": "openai",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 60093,
+   "output_tokens": 450,
+   "started_at": "2026-09-28 19:38:57.755678+00:00",
+   "completed_at": "2026-09-28 19:39:21.651053+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [],
+  "audit_join": [],
+  "tools": [
+   "write_todos",
+   "grep",
+   "read_document",
+   "workspace_write",
+   "write_todos"
+  ]
+ },
+ "retry": true,
+ "v1": {
+  "searched": false,
+  "scope_ok": false,
+  "docs_ok": true,
+  "n_docs": 0,
+  "folders": []
+ },
+ "v2": {
+  "searched": false,
+  "scope_ok": false,
+  "docs_ok": true,
+  "n_docs": 0,
+  "folders": []
+ },
+ "t3_variant": {
+  "sent_at": "2026-09-28 19:39:48.891079+00:00",
+  "send_status": 201,
+  "send_body": {
+   "message_id": "e693aba9-72f1-4aba-b397-db2390c46275",
+   "run_id": "c6a9abf7-a251-4a77-ab6b-54c4b197d20e",
+   "model": "gpt-5.6-sol",
+   "provider": "openai"
+  },
+  "run": {
+   "run_id": "c6a9abf7-a251-4a77-ab6b-54c4b197d20e",
+   "status": "completed",
+   "model": "gpt-5.6-sol",
+   "provider": "openai",
+   "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+   "expert_id": null,
+   "expert_attributed": true,
+   "input_tokens": 23067,
+   "output_tokens": 227,
+   "started_at": "2026-09-28 19:39:51.194913+00:00",
+   "completed_at": "2026-09-28 19:40:02.729061+00:00",
+   "error": null,
+   "continues_used": 0
+  },
+  "audit_rows": [
+   {
+    "id": "f5c87339-118a-4f7e-83b0-2eb654121777",
+    "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+    "created_at": "2026-09-28 19:39:57.736832+00:00",
+    "run_id": "c6a9abf7-a251-4a77-ab6b-54c4b197d20e",
+    "thread_id": "aa56a842-c9c7-44e1-bf36-bfa176ae42ae",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "n_docs": 1
+   }
+  ],
+  "audit_join": [
+   {
+    "run_id": "c6a9abf7-a251-4a77-ab6b-54c4b197d20e",
+    "scope": [
+     "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+    ],
+    "id": "95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6",
+    "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+   }
+  ],
+  "tools": [
+   "search_documents"
+  ]
+ },
+ "v3": {
+  "searched": true,
+  "scope_ok": true,
+  "docs_ok": true,
+  "n_docs": 1,
+  "folders": [
+   "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"
+  ]
+ }
+}

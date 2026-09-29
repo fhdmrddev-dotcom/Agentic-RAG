@@ -2300,10 +2300,10 @@ async def run_workflow(
         #
         # ⚠ IT DOES NOT DOUBLE-BOOK, and the reason is the breaker's watermark rather
         # than a guard here: ``absorb_usage_box`` returns a DELTA derived from its own
-        # mutated counters, so on the completed path — where
-        # ``_enforce_budget("phase_completed")`` has already absorbed the box — this
-        # yields ``(0, 0)`` and ``persist_run_usage`` returns before the database. N
-        # phases still produce N writes.
+        # mutated counters. On the completed path THIS call runs first and does the
+        # write; the later ``_enforce_budget("phase_completed")`` flush then yields
+        # ``(0, 0)`` and ``persist_run_usage`` returns before the database. N phases
+        # still produce N writes.
         #
         # ⛔ A ``try:``/``finally:`` AROUND THE ``while`` LOOP WAS CONSIDERED AND
         # REJECTED, and the rejection is recorded here rather than left silent. A
@@ -2792,6 +2792,23 @@ async def _build_resume_context(run, redis, pool):
     _producer_id = uuid4()
     _thread_id = run["thread_id"]
     _user_id = run.get("user_id")
+    # The resumed run's OWN org (workflow_runs.org_id): carried on the run dict when
+    # find_resumable_runs selected it, else read here by run id. 268-REVIEW WR-06: it is
+    # resolved BEFORE the shell INSERT so the shell — and, through insert_run's parent copy,
+    # every re-driven sub-agent under it — lands in that org, not the mig-106 trigger's
+    # LIMIT-1 guess for a two-org owner. None still falls to the trigger (as before).
+    _org_id = run.get("org_id")
+    if _org_id is None:
+        try:
+            _org_id = await pool.fetchval(
+                "SELECT org_id FROM workflow_runs WHERE id = $1",
+                run["run_id"] if isinstance(run["run_id"], UUID) else UUID(str(run["run_id"])),
+            )
+        except Exception:  # noqa: BLE001 — org resolution is best-effort
+            logger.debug(
+                "resume: org_id read failed for run %s", run.get("run_id"), exc_info=True
+            )
+            _org_id = None
     await insert_run(
         pool,
         run_id=_producer_id,
@@ -2802,6 +2819,7 @@ async def _build_resume_context(run, redis, pool):
         # LLM call so the placeholder cannot misroute any provider's sub-agent.
         model="unknown", provider="unknown",
         parent_run_id=None,
+        org_id=str(_org_id) if _org_id else None,
     )
 
     # F5 (092-07): the startup sweep has NO request, so there is no request-scoped
@@ -2820,18 +2838,7 @@ async def _build_resume_context(run, redis, pool):
     # find_resumable_runs selected it, else read here by run id. The BYPASSRLS + owner-scope
     # posture is otherwise unchanged.
     from app.dependencies import get_service_role_supabase
-    _org_id = run.get("org_id")
-    if _org_id is None:
-        try:
-            _org_id = await pool.fetchval(
-                "SELECT org_id FROM workflow_runs WHERE id = $1",
-                run["run_id"] if isinstance(run["run_id"], UUID) else UUID(str(run["run_id"])),
-            )
-        except Exception:  # noqa: BLE001 — org resolution is best-effort
-            logger.debug(
-                "resume: org_id read failed for run %s", run.get("run_id"), exc_info=True
-            )
-            _org_id = None
+    # (the org itself is resolved above, before the shell INSERT — 268-REVIEW WR-06)
     _service_supabase = get_service_role_supabase(_org_id)
 
     # F8 (092-07) + 152 WFIN-02 (Pitfall 5): parse the durable workflow_runs.inputs jsonb

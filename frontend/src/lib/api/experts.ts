@@ -3,7 +3,7 @@
  */
 
 import type { ExpertBundle } from "../../types"
-import { API_BASE, getAuthHeaders } from "./_core"
+import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders } from "./_core"
 
 export interface ExpertBundleCreate {
   name: string
@@ -67,6 +67,46 @@ export interface ExpertGrant {
 export interface ExpertGrantCreate {
   grantee_type: "user" | "role"
   grantee_id: string
+}
+
+/** Phase 266 (PACK-18 / PACK-19): the active org's install of a first-party Expert, as the
+ *  server derives it. Wire type — declared HERE beside its siblings and imported by `@/types`
+ *  with `import type` (elided at compile, so no runtime cycle).
+ *  ⛔ The UI never decides readiness: `state` and `can_install` are server facts. `cause` is a
+ *  raw string and is NEVER rendered as-is — `installView` (expertCatalog.ts) classifies it. */
+export interface ExpertInstallState {
+  state: "not_installed" | "installing" | "ready" | "failed"
+  folder_id: string | null
+  cause: string | null
+  cause_source: "document" | "install" | null
+  can_install: boolean
+  updated_at: string | null
+}
+
+/** Phase 267 (PACK-22 · D-267-05): one required connection's state in the active org, as the
+ *  server derives it from the ONE "is it connected" rule (`connection_states`, 267-01). Wire type,
+ *  declared beside `ExpertInstallState` and imported by `@/types` with `import type`.
+ *  ⛔ Server facts, the UI never decides readiness: `connected` (and the row's `can_connect`) are
+ *  read by `connectionGate` (expertCatalog.ts) and by nothing else. */
+export interface ExpertConnectionState {
+  slug: string
+  name: string
+  connected: boolean
+}
+
+/** `POST /experts/{id}/install` → 202. */
+export interface ExpertInstallResult {
+  expert_bundle_id: string
+  corpus_version: string
+  install: ExpertInstallState
+}
+
+/** One row of `GET /experts/installs` — the active org's installs, for Library provenance. */
+export interface ExpertInstallSummary {
+  expert_bundle_id: string
+  expert_name: string
+  folder_id: string
+  state: ExpertInstallState["state"]
 }
 
 /** Phase 263 (PACK-14): one capability the drafter judged the Expert needs and the
@@ -195,6 +235,75 @@ export async function getExpert(bundleId: string): Promise<ExpertBundle> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/experts/${bundleId}`, { headers })
   return handleResponse<ExpertBundle>(res, "Failed to get expert")
+}
+
+// ── Phase 267 plan 04 (PACK-25 · D-267-17..19) — the restricted-cost preview ────────────────────
+//
+// What a restricted Expert WILL and WILL NOT read on this thread, asked BEFORE the invite. The
+// route lives under `/threads` (it is a statement about a thread's scope) but its shape is an
+// Expert's, so it is declared here beside the other Expert reads. ⛔ One response feeds both
+// ledger columns: the `Won't use · N` heading is `excluded_count`, never a list length.
+
+export interface ExpertScopePreview {
+  expert_id: string
+  expert_name: string
+  mode: "biased" | "restricted"
+  /** Server-named; `name: null` = a folder the caller cannot see. */
+  expert_folders: { id: string; name: string | null }[]
+  thread_folder: { id: string; name: string | null; doc_count: number } | null
+  excluded_count: number
+  /** At most five names; `excluded_count` may be larger. */
+  excluded_names: string[]
+}
+
+export async function getExpertScopePreview(
+  expertId: string,
+  threadId?: string | null,
+  /** 267-REVIEW WR-07: a brand-new chat's picked folder — sent ONLY when there is no thread yet
+   *  (a thread's own folder always wins server-side). */
+  folderId?: string | null,
+): Promise<ExpertScopePreview> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams({ expert_id: expertId })
+  if (threadId) params.set("thread_id", threadId)
+  else if (folderId) params.set("folder_id", folderId)
+  const res = await fetch(`${API_BASE}/threads/expert-scope-preview?${params.toString()}`, { headers })
+  if (!res.ok) {
+    // The refusal-preserving shape `postMessage` uses: a tier refusal names the plan, any other
+    // string detail is the server's own sentence, and only then the generic fallback.
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    throw new ApiError(
+      entitlementRefusalMessage(body) ??
+        (typeof body?.detail === "string" ? body.detail : "Failed to check the Expert's scope"),
+      res.status,
+    )
+  }
+  return res.json() as Promise<ExpertScopePreview>
+}
+
+/** Phase 266 (D-266-01 / D-266-02): install a first-party Expert's corpus into the ACTIVE org.
+ *  ⛔ No body at all (T-266-24) — the org travels only in the `X-Org-Id` header, which the
+ *  server re-validates against membership. A 409 (`expert_not_installable` / `install_conflict`
+ *  / `install_folder_not_owned`) and a 403 surface as an Error carrying the server's sentence
+ *  through `handleResponse`'s `detail.detail` arm. */
+export async function installExpert(bundleId: string): Promise<ExpertInstallResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/experts/${bundleId}/install`, {
+    method: "POST",
+    headers,
+  })
+  return handleResponse<ExpertInstallResult>(res, "Failed to install expert")
+}
+
+/** Phase 266 (D-266-13): the active org's installs, read for the Library's provenance label.
+ *  ⚠ A 403 is the TIER refusal (the whole `/experts` router is capability-gated), and for a
+ *  standard-tier org it is the expected answer, not an error — so it becomes `[]` BEFORE
+ *  `handleResponse`, the `draftSkillBody` call-site-arm precedent (RESEARCH Pitfall 10). */
+export async function listExpertInstalls(): Promise<ExpertInstallSummary[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/experts/installs`, { headers })
+  if (res.status === 403) return []
+  return handleResponse<ExpertInstallSummary[]>(res, "Failed to list expert installs")
 }
 
 export async function createExpert(payload: ExpertBundleCreate): Promise<ExpertBundle> {

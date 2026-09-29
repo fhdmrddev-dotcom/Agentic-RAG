@@ -44,6 +44,38 @@ export interface SpendSummaryData {
   modelBreakdown: ModelSpendShare[];
   hasUnratedRuns?: boolean;
   hasIncompleteCoverage?: boolean;
+  /**
+   * Phase 268 (METER-08). The Spend by Expert lines for the WINDOW — computed with the Expert
+   * filter OFF, whatever is selected (D-268-10: the table is the navigator). Always carries a
+   * `none` line; carries `unrecorded` only when it has runs.
+   */
+  expertBreakdown: ExpertSpendLine[];
+  /** The window's org total, unfiltered — what the recon footer compares the lines against. */
+  windowTotalUsd: number | null;
+  windowRunCount: number;
+  /** D-268-25: sub-agents with no rate under a rated root, folded into the unrated disclosure. */
+  unpricedSubagents: number;
+  /**
+   * D-268-28: unrated harness shell roots whose PRICED sub-agents are in the total (D-268-21), so the
+   * page says "partly priced" instead of "excluded". Computed by the server's per_root CTE.
+   */
+  partlyPricedHarnessRuns: number;
+}
+
+/** One Spend by Expert line. `key` is an Expert uuid, `none` or `unrecorded`. */
+export interface ExpertSpendLine {
+  key: string;
+  expertId: string | null;
+  name: string | null;
+  /** An Expert id whose org-constrained name join found nothing — "Deleted Expert {id8}". */
+  deleted: boolean;
+  scopeMode: string | null;
+  runCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** `null` when no run on the line was priced — never a confident $0.0000 (257 CR-06). */
+  spendUsd: number | null;
+  unratedCount: number;
 }
 
 export interface SpendRunItem {
@@ -63,6 +95,16 @@ export interface SpendRunItem {
   isRated: boolean;
   tokenCoverage: string[] | null;
   isCoverageComplete?: boolean;
+  /**
+   * Phase 268 attribution (D-268-04/06). `expertAttributed` false = Not recorded (before 268);
+   * attributed with no id = No Expert; an id with `expertDeleted` = Deleted Expert.
+   */
+  expertId: string | null;
+  expertName: string | null;
+  expertDeleted: boolean;
+  expertAttributed: boolean;
+  /** D-268-09: sub-agent rows rolled into this root's tokens and cost. */
+  subagentCount: number;
 }
 
 export interface ModelRateItem {

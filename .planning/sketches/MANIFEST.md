@@ -2914,3 +2914,28 @@ G-2 sketch for Phase 263 (PACK-14, PACK-15, PACK-16). Tested at `.planning/sketc
 - **Variant C (Capability Ledger)** — the preview card becomes an account: *Will have* vs *Blueprint claims · not real* (ghost chips, approve inline on the card). `Save Expert` is **never blocked**; it prints one sentence — *"…will be saved without 5 of the 7 capabilities its blueprint describes"* — and names each one.
 
 ⭐ **A WON, and the decision it settles is that Save IS blocked.** B and C were the opposite answers to `PACK-16` and both were defensible; the operator chose the one that holds Save shut behind a banner naming the count, inside the card the author is already looking at. ⛔ **The consequence for planning: `PACK-16` lands as a DISABLED save + an inline banner, not as a wizard step and not as a refusal sheet** — so no new studio step is authored and the shipped `Bound Knowledge & Capabilities` card grows a second group rather than the studio growing a third screen. ⚠ **B and C are opposite answers to PACK-16 and both are defensible** — B makes blocking unnecessary, C refuses to block and states the consequence. That is the real decision this sketch exists to settle. ⛔ **Nothing in any variant rewrites the blueprint prose** when a claimed capability is dropped, so an Expert can still *describe* a capability it knowingly lacks — a named gap, not an oversight.
+
+## 267 · An Expert adds scope — what it costs or changes, stated at rest
+
+G-2 sketch for Phase 267 (PACK-22..25), at `.planning/sketches/267-an-expert-adds-scope/index.html`. It was driven in
+Chrome: both toggles work and there is no horizontal scroll. It renders the four new states on the shipped
+`InviteExpertDialog` / `ActiveExpertChip` / catalog-card styling: requires-a-connection, the restricted cost, the
+swap/remove transcript event, and the second-Expert handoff.
+
+- **Variant A (One line):** each consequence is one sentence. The event is a slim pill plus one line.
+- **Variant B (Will / won't ledger)** ★ **WINNER, operator, 2026-09-25:** consequences are labelled `Brings`/`Missing`
+  and `Will use`/`Won't use · N` lists, with the files named and attachments listed under *Will use*. The event is a
+  timestamped card with `Now`/`Dropped` lines. The dialog buttons read "Replace <active>" / "New chat with <Expert> →".
+
+⛔ **The build obligation B creates:** both lists render from ONE structured payload (`267-CONTEXT.md` D-267-11 /
+D-267-17 / D-267-27). Two independently computed strings could disagree.
+
+## 268 · Expert spend & mid-thread scope
+
+G-2 sketch for Phase 268 (METER-08, CHAT-08), at `.planning/sketches/268-expert-spend-and-mid-thread-scope/index.html`.
+Driven in Chrome: every toggle works, there are no console errors, and there is no horizontal scroll at 390px. It
+reuses 267-B's event-card shape.
+
+- **Chat A (composer chip)** vs **Chat B (header pill)**, plus the Restricted handling: *Save & say* vs *Lock*.
+- **Spend A (Expert filter that every card follows)** vs **Spend B (Group by Model / Expert)**.
+- Winner ★ (operator, 2026-09-28): **Chat A · composer chip**, **Restricted: Save & say**, **Spend A · filter every card follows**.

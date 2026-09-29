@@ -66,6 +66,13 @@ def _keyword_count(module_relpath: str, keyword: str) -> int:
     )
 
 
+def _none_keyword_count(module_relpath: str, keyword: str) -> int:
+    """R265-264-01: count `keyword=None` literals — a present-but-None kwarg is an unwired site."""
+    tree = ast.parse((APP_DIR / module_relpath).read_text(encoding="utf-8"))
+    return sum(1 for n in ast.walk(tree) if isinstance(n, ast.keyword) and n.arg == keyword
+               and isinstance(n.value, ast.Constant) and n.value.value is None)
+
+
 def _field_default(cls, name):
     """Return the declared default of a dataclass field, or MISSING when it has none."""
     for f in fields(cls):
@@ -155,6 +162,7 @@ def test_run_producer_passes_the_field_at_both_run_context_builds():
         f"expected exactly 2 `{FIELD}=` keyword args in run_producer.py (the Deep build and "
         f"the continuation build), found {n}"
     )
+    assert _none_keyword_count("services/run_producer.py", FIELD) == 0, "a build site passes None"
 
 
 def test_agent_loop_passes_the_field_at_both_tool_context_builds():
@@ -169,6 +177,7 @@ def test_agent_loop_passes_the_field_at_both_tool_context_builds():
         f"expected exactly 2 `{FIELD}=` keyword args in agent_loop.py (the resume ToolContext "
         f"build and the primary per-iteration build), found {n}"
     )
+    assert _none_keyword_count("services/agent_loop.py", FIELD) == 0, "a build site passes None"
 
 
 def test_task_service_propagates_the_field_onto_sub_ctx():
@@ -334,7 +343,8 @@ def test_build_phase_tool_context_yields_a_none_born_for_tool_context():
 
 @pytest.mark.asyncio
 async def test_resolve_thread_scoping_no_expert_yields_a_none_fifth_element():
-    """D-264-03a: the no-consultant arm returns five values, the fifth `None`.
+    """D-264-03a: the no-consultant arm returns five values, all `None` (Phase 267: a
+    ``ThreadScoping`` whose ``born_for_bundle_id`` — and every other field — is None).
 
     Driven against the real `_resolve_thread_scoping` with the thread-row fake
     `test_260_expert_chat_scoping.py::test_resolve_thread_scoping_no_expert` builds —
@@ -355,6 +365,7 @@ async def test_resolve_thread_scoping_no_expert_yields_a_none_fifth_element():
     )
     assert len(result) == 5, f"expected a 5-tuple, got {len(result)}"
     assert result == (None, None, None, None, None)
+    assert result.born_for_bundle_id is None
 
 
 @pytest.mark.asyncio

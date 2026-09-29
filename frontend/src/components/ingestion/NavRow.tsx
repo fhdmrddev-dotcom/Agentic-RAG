@@ -49,6 +49,10 @@ export interface NavRowProps {
   /** Tooltip text for the "G" pill (D-165-07). Folders pass "Shared with org";
    *  platform-seeded views/rules pass built-in wording. Defaults to "Shared". */
   sharedLabel?: string
+  /** Optional small grey second line under the name, visible at rest (Phase 266 UAT: an
+   *  installed Expert's folder reads "from Financial Analyzer"). Omit it and the row renders
+   *  exactly as before. */
+  caption?: string
   /** Nesting depth (0 = top level). Drives the single soft indent guide + the
    *  ~3-level indent cap. */
   depth?: number
@@ -74,6 +78,7 @@ export function NavRow({
   isSelected = false,
   isShared = false,
   sharedLabel = "Shared",
+  caption,
   depth = 0,
   leading,
   actions,
@@ -199,6 +204,20 @@ export function NavRow({
             {hint && (
               <span className="block mt-0.5 text-[11px] text-destructive">{hint}</span>
             )}
+          </div>
+        ) : caption ? (
+          <div className="flex-1 min-w-0 flex flex-col">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-sm truncate min-w-0">{name}</span>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-[200px]">
+                <p className="break-words">{name}</p>
+              </TooltipContent>
+            </Tooltip>
+            <span data-testid="navrow-caption" className="text-[11px] leading-tight text-muted-foreground truncate">
+              {caption}
+            </span>
           </div>
         ) : (
           <Tooltip>

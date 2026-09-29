@@ -1,0 +1,59 @@
+slug: financial-analyzer
+org_id: 9042e46f-745d-40d6-83eb-c6984d582ce1
+model: deepseek-v4-flash provider: deepseek embedding_model: text-embedding-3-small (embedding_provider=openai, dims=1536, source=app_settings.global)
+figure: 30.8%
+figure: $29.1
+== cited — 2026-09-29T14:40:52.071924+00:00  install folder (financial-analyzer) = cc435f1e-b080-4066-bcb9-4bf3bb064898
+question (fixed in the Drive table before driving): What was ACME's EBITDA margin in Q3 2026, and what was operating cash flow?
+POST /threads headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (Authorization: Bearer <redacted>) body={"title": "269-03 financial-analyzer"} -> HTTP 201 body={"id":"c91eff76-14a7-4c9e-9417-5d43f54d10e0","user_id":"b93a9c96-2de1-4e13-958c-10e5d6775fd0","title":"269-03 financial-analyzer","folder_id":null,"active_expert_id":null,"created_at":"2026-09-29T14:40:52.430423Z","updated_at":"2026-09-29T14:40:52.430423Z"}
+PATCH /threads/c91eff76-14a7-4c9e-9417-5d43f54d10e0 headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (Authorization: Bearer <redacted>) body={"active_expert_id": "00000000-0000-0000-0000-000000000259"} -> HTTP 200 body={"id":"c91eff76-14a7-4c9e-9417-5d43f54d10e0","user_id":"b93a9c96-2de1-4e13-958c-10e5d6775fd0","title":"269-03 financial-analyzer","folder_id":null,"active_expert_id":"00000000-0000-0000-0000-000000000259","created_at":"2026-09-29T14:40:52.430423Z","updated_at":"2026-09-29T14:40:52.497155Z"}
+thread row: {"id": "c91eff76-14a7-4c9e-9417-5d43f54d10e0", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "active_expert_id": "00000000-0000-0000-0000-000000000259"}
+POST /threads/c91eff76-14a7-4c9e-9417-5d43f54d10e0/messages headers={'X-Org-Id': '9042e46f-745d-40d6-83eb-c6984d582ce1'} (Authorization: Bearer <redacted>) body={"content": "What was ACME's EBITDA margin in Q3 2026, and what was operating cash flow?", "model": "deepseek-v4-flash", "provider": "deepseek"} -> HTTP 201 body={"message_id":"918a2e7a-d4f6-4df6-91f6-9df2ce7c7b59","run_id":"5a7abcfd-20bd-475a-87be-d8bcf56addda","model":"deepseek-v4-flash","provider":"deepseek"}
+SQL: SELECT run_id, status, model, provider, org_id, expert_id, expert_attributed, error, started_at, completed_at FROM runs WHERE run_id = '5a7abcfd-20bd-475a-87be-d8bcf56addda'
+run row: {"run_id": "5a7abcfd-20bd-475a-87be-d8bcf56addda", "status": "completed", "model": "deepseek-v4-flash", "provider": "deepseek", "org_id": "9042e46f-745d-40d6-83eb-c6984d582ce1", "expert_id": "00000000-0000-0000-0000-000000000259", "expert_attributed": true, "error": null, "started_at": "2026-09-29 14:40:52.580659+00:00", "completed_at": "2026-09-29 14:41:04.370025+00:00"}
+SQL: SELECT id, role, content, tool_calls, org_id, created_at FROM messages WHERE thread_id='c91eff76-14a7-4c9e-9417-5d43f54d10e0' AND role='assistant' AND created_at >= '2026-09-29T14:40:52.550218+00:00' ORDER BY created_at -> 1 row(s)
+assistant text (full):
+Here are ACME's Q3 2026 figures, from **acme_q3_2026_financial_report.md** (Condensed Consolidated Statement of Operations):
+
+- **EBITDA margin: 30.8%** (EBITDA of $38.4M on total revenue of $124.5M) — up 380 bps from 27.0% in Q3 2025 [1]
+- **Operating cash flow: $29.1M** — up 36.6% year-over-year from $21.3M [1]
+
+For additional context, the same filing notes EBITDA grew 35.2% YoY to $38.4M, and free cash flow for the quarter was $22.4M after $6.7M of capital expenditures [2].
+assistant message b47812cd-2b7f-40b6-98e1-df667b223022 org_id=9042e46f-745d-40d6-83eb-c6984d582ce1 tool_calls (raw, trimmed): [{"args": {"query": "ACME EBITDA margin Q3 2026"}, "name": "search_documents", "result": "[{\"content\": \"# ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\\n\\n## Condensed Consolidated Statement of Operations (Unaudited)\\n*Quarter Ended September 30, 2026*\\n\\n| Financial Metric | Q3 2026 ($M) | Q3 2025 ($M) | YoY Change (%) |\\n| :--- | :--- | :--- | :--- |\\n| **Total Revenue** | **$124.5** | $105.3 | **+18.2%** |\\n| Cost of Goods Sold (COGS) | $44.6 | $39.5 | +12.9% |\\n| **Gross Profit** | **$79.9** | $65.8 | **+21.4%** |\\n| Gross Margin (%) | **64.2%** | 62.5% | +170 bps |\\n| Research & Development | $23.1 | $20.4 | +13.2% |\\n| Sales & Marketing | $16.3 | $14.8 | +10.1% |\\n| General & Administrative | $8.8 | $8.1 | +8.6% |\\n| **Operating Income (EBIT)** | **$31.7** | $22.5 | **+40.9%** |\\n| Depreciation & Amortization | $6.7 | $5.9 | +13.6% |\\n| **EBITDA** | **$38.4** | $28.4 | **+35.2%** |\\n| EBITDA Margin (%) | **30.8%** | 27.0% | +380 bps |\\n| Net Income | $24.8 | $17.6 | +40.9% |\\n| **Operating Cash Flow** | **$29.1** | $21.3 | **+36.6%** |\", \"document_id\": \"297c6ee8-739f-4b64-b5d6-073957e9f0b1\", \"filename\": \"acme_q3_2026_financial_report.md\", \"chunk_index\": 0, \"similarity\": 0.5467714211965068, \"version_number\": 1, \"folder_id\": \"cc435f1e-b080-4066-bcb9-4bf3bb064898\", \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"September 30, 2026\", \"title\": \"ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\", \"topics\": [\"Finance\", \"Operations\", \"Risk Factors\"], \"summary\": \"This document details ACME Corporation's financial performance for Q3 2026, including statements of operations, balance sheet analysis, and identified risk factors. The company saw a significant increase in total revenue and operating income compared to the previous year. Key risk factors include supply chain concentration, foreign currency volatility, and regulatory compliance challenges.\", \"language\": \"english\", \"_confidence\": {\"date\": 1.0, \"title\": 0.9, \"topics\": 0.8, \"summary\": 0.85, \"language\": 1.0, \"document_type\": 0.9}, ", "status": "done", "tool_call_id": "call_00_enG6eLE0uxeDC5jsSPTX1592"}, {"args": {"query": "ACME operating cash flow Q3 2026"}, "name": "search_documents", "result": "[{\"content\": \"# ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\\n\\n## Condensed Consolidated Statement of Operations (Unaudited)\\n*Q... <trimmed 2002 chars>
+tool names in tool_calls (key read: first of name/tool/tool_name/function.name per entry): ['search_documents', 'search_documents']
+cross-check audit_log action types in turn window: [{"action_type": "search.query", "n": 2}]
+web_search_calls: 0
+SQL: SELECT a.created_at, a.metadata->>'query_text' AS query_text, d.id AS doc_id, d.org_id AS doc_org, d.folder_id AS doc_folder, d.filename FROM audit_log a CROSS JOIN LATERAL jsonb_array_elements_text(a.metadata->'document_ids') x(doc) JOIN documents d ON d.id = x.doc::uuid WHERE a.action_type='search.query' AND a.user_id = 'b93a9c96-2de1-4e13-958c-10e5d6775fd0' AND a.created_at > '2026-09-29T14:40:52.508841+00:00' AND a.created_at <= '2026-09-29T14:41:06.652391+00:00' ORDER BY a.created_at
+{"created_at": "2026-09-29 14:40:55.767525+00:00", "query_text": "ACME EBITDA margin Q3 2026", "doc_id": "297c6ee8-739f-4b64-b5d6-073957e9f0b1", "doc_org": "9042e46f-745d-40d6-83eb-c6984d582ce1", "doc_folder": "cc435f1e-b080-4066-bcb9-4bf3bb064898", "filename": "acme_q3_2026_financial_report.md"}
+{"created_at": "2026-09-29 14:40:57.621926+00:00", "query_text": "ACME operating cash flow Q3 2026", "doc_id": "297c6ee8-739f-4b64-b5d6-073957e9f0b1", "doc_org": "9042e46f-745d-40d6-83eb-c6984d582ce1", "doc_folder": "cc435f1e-b080-4066-bcb9-4bf3bb064898", "filename": "acme_q3_2026_financial_report.md"}
+search.query rows in window (incl. zero-id rows):
+{"created_at": "2026-09-29 14:40:55.767525+00:00", "query_text": "ACME EBITDA margin Q3 2026", "n_ids": 1}
+{"created_at": "2026-09-29 14:40:57.621926+00:00", "query_text": "ACME operating cash flow Q3 2026", "n_ids": 1}
+re.search(r'30\.8\s*%') -> '30.8%'
+re.search(r'\$29\.1\b') -> NO MATCH
+distinct joined doc orgs = ['9042e46f-745d-40d6-83eb-c6984d582ce1']; distinct joined folders = ['cc435f1e-b080-4066-bcb9-4bf3bb064898'] (install folder cc435f1e-b080-4066-bcb9-4bf3bb064898)
+SQL: SELECT c.document_id, c.org_id, d.folder_id, c.chunk_index, c.content FROM document_chunks c JOIN documents d ON d.id=c.document_id WHERE d.folder_id = 'cc435f1e-b080-4066-bcb9-4bf3bb064898' AND d.org_id = '9042e46f-745d-40d6-83eb-c6984d582ce1' AND strpos(c.content, '30.8%') > 0 ORDER BY c.chunk_index
+document_id=297c6ee8-739f-4b64-b5d6-073957e9f0b1 org_id=9042e46f-745d-40d6-83eb-c6984d582ce1 folder_id=cc435f1e-b080-4066-bcb9-4bf3bb064898 chunk_index=0 matching lines:
+    | EBITDA Margin (%) | **30.8%** | 27.0% | +380 bps |
+document_id=297c6ee8-739f-4b64-b5d6-073957e9f0b1 org_id=9042e46f-745d-40d6-83eb-c6984d582ce1 folder_id=cc435f1e-b080-4066-bcb9-4bf3bb064898 chunk_index=1 matching lines:
+    | EBITDA Margin (%) | **30.8%** | 27.0% | +380 bps |
+SQL: SELECT c.document_id, c.org_id, d.folder_id, c.chunk_index, c.content FROM document_chunks c JOIN documents d ON d.id=c.document_id WHERE d.folder_id = 'cc435f1e-b080-4066-bcb9-4bf3bb064898' AND d.org_id = '9042e46f-745d-40d6-83eb-c6984d582ce1' AND strpos(c.content, '$29.1') > 0 ORDER BY c.chunk_index
+document_id=297c6ee8-739f-4b64-b5d6-073957e9f0b1 org_id=9042e46f-745d-40d6-83eb-c6984d582ce1 folder_id=cc435f1e-b080-4066-bcb9-4bf3bb064898 chunk_index=0 matching lines:
+    | **Operating Cash Flow** | **$29.1** | $21.3 | **+36.6%** |
+document_id=297c6ee8-739f-4b64-b5d6-073957e9f0b1 org_id=9042e46f-745d-40d6-83eb-c6984d582ce1 folder_id=cc435f1e-b080-4066-bcb9-4bf3bb064898 chunk_index=1 matching lines:
+    | **Operating Cash Flow** | **$29.1** | $21.3 | **+36.6%** |
+helper verdict as first computed (SUPERSEDED - checker defect in the drive helper, not in the answer): FAIL — literal $29.1 not in answer
+-- CORRECTION 2026-09-29T14:41:59.612569+00:00 (same turn, NOT re-driven, answer unchanged):
+   The helper's regex r'\$29\.1\b' cannot match "$29.1M": \b needs a word/non-word transition and '1'->'M' is word->word.
+   The Drive-table literal is `$29.1` (fixed before driving, unchanged). The persisted answer is re-read from the DB and re-checked
+   with r'\$29\.1(?!\d)' (the literal, not followed by another digit). Every other check above already passed and is unchanged.
+SQL: SELECT id, thread_id, org_id, created_at FROM messages WHERE id='b47812cd-2b7f-40b6-98e1-df667b223022' -> id=b47812cd-2b7f-40b6-98e1-df667b223022 thread_id=c91eff76-14a7-4c9e-9417-5d43f54d10e0 org_id=9042e46f-745d-40d6-83eb-c6984d582ce1 created_at=2026-09-29 14:40:59.641195+00:00
+re.search(r'30\.8\s*%') on the persisted content -> '30.8%'
+plain substring '30.8%' in content -> True
+re.search(r'\$29\.1(?!\d)') on the persisted content -> '$29.1'
+plain substring '$29.1' in content -> True
+-- SUPPLEMENTARY SCAN 2026-09-29T14:46:07.666956+00:00: every tool result of assistant message b47812cd-2b7f-40b6-98e1-df667b223022 (not only search.query) checked for documents of the test org
+   OUTSIDE this Expert's install folder cc435f1e-b080-4066-bcb9-4bf3bb064898 (match on document id or filename; read-only, the turn was NOT re-driven)
+   tools called: ['search_documents', 'search_documents']
+   out_of_folder_documents_retrieved_by_any_tool: 0
+VERDICT: PASS

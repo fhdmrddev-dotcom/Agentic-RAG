@@ -8,6 +8,7 @@ Generates .planning/phases/236-the-corpus-under-attack/236-ROSTER-REPORT.md on r
 """
 from __future__ import annotations
 
+import tempfile
 import datetime
 import json
 import os
@@ -19,9 +20,10 @@ from app.config import MODEL_CAPABILITIES, settings
 from app.services.connectors.chat_tools import wrap_untrusted_tool_result
 
 
-_ROSTER_REPORT_PATH = Path(
-    "c:/Vibe Apps/Agentic RAG/.planning/phases/236-the-corpus-under-attack/236-ROSTER-REPORT.md"
-)
+# Written to the temp dir, NOT into .planning/: a test run must never rewrite a tracked planning
+# file (it dirtied git on every run and resurrected the phase dir after archiving). The report
+# committed at .planning/milestones/v4.0-phases/236-the-corpus-under-attack/ is the historical record.
+_ROSTER_REPORT_PATH = Path(tempfile.gettempdir()) / "agentic-rag-reports" / "236-ROSTER-REPORT.md"
 
 # Store evaluated results across test execution for the roster report generator
 _ROSTER_EVALUATION_RECORDS: list[dict[str, Any]] = []
@@ -134,6 +136,7 @@ def roster_report_generator():
     _ROSTER_EVALUATION_RECORDS.clear()
     yield
     if _ROSTER_EVALUATION_RECORDS:
+        _ROSTER_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
         _render_roster_report(_ROSTER_EVALUATION_RECORDS, _ROSTER_REPORT_PATH)
 
 

@@ -407,10 +407,12 @@ def test_the_born_for_bundle_id_is_read_through_getattr_never_as_an_attribute():
 def test_the_save_skill_site_states_its_refusal_in_source():
     """D-264-04: the one site that must NOT widen says so where the call is, not in a plan.
 
-    `save_skill` is in NEITHER `EXPERT_CORE_TOOLS` nor `EXPERT_DELIVERABLE_TOOLS`, so it is
-    **not advertised** to an Expert run; its read feeds a non-blocking description **lint**
-    corpus and produces no user-visible capability; and it is a WRITE handler's helper while
-    PACK-17's axis is *read the body you were promised*.
+    Phase 267 CORRECTED the first of the three original reasons: `save_skill` used to be in
+    NEITHER Expert tool set and so was not advertised to an Expert run, but 267 deleted both
+    sets and the Expert tool filter (D-267-01), so it **IS advertised** now. The decision stands
+    on the remaining **reasons 2 and 3**: its read feeds a non-blocking description **lint**
+    corpus with no user-visible capability, and it is a WRITE handler's helper while PACK-17's
+    axis is *read the body you were promised*. The comment beside the call must say so.
     """
     lines = _DISPATCHER_SRC.read_text(encoding="utf-8").splitlines()
     call_idx = [
@@ -422,7 +424,7 @@ def test_the_save_skill_site_states_its_refusal_in_source():
 
     i = call_idx[0]
     window = "\n".join(lines[max(0, i - 12) : i + 4])
-    for token in ("EXPERT_CORE_TOOLS", "not advertised", "lint"):
+    for token in ("IS advertised", "reasons 2 and 3", "lint"):
         assert token in window, (
             f"the save_skill resolver call must carry {token!r} in the comment beside it — "
             "a DO-NOT-WIDEN decision that is not written down is an omission, not a decision"

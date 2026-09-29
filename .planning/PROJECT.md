@@ -10,7 +10,29 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Last Shipped: v4.3 What You Can Actually Sell (2026-09-23)
+## Current Milestone: none — v4.4 shipped, next via `/gsd:new-milestone`
+
+Phase numbering resumes at **270**, migrations at **199**. ⛔ Carried: `SEED-013` Open Platform,
+`SEED-294` commercial blockers (non-engineering), `SEED-325` NULL-tier signup gap, `SEED-327`
+(`forced_emit` system prompt dropped by OpenAI-compat/Responses adapters), `SEED-328` deferred review items.
+
+---
+
+## Last Shipped: v4.4 Experts That Actually Work (2026-09-29)
+
+**Started:** 2026-09-23 · **Shipped:** 2026-09-29, git tag `v4.4` · 5 phases (265-269), 24 plans,
+migrations 194-198, 7 days. **17 / 17 requirements satisfied.** Integration 6/6. Audit `tech_debt`.
+
+A client can install an Expert and get grounded answers from its own knowledge in their own org:
+per-org corpus provisioning (266), additive scope with stated costs (267), per-Expert spend and
+mid-thread folder scope (268), a five-Expert starter library (269) — each proven by a live drive.
+⚠ All five phases closed `self-verified`. ⛔ **Deploy checklist before the next production push:**
+migrations 194-198 via the SQL editor, the image must carry `464ec8354`, run `get_advisors(security)`
+(`266-PROD-PARITY.md`, `269-PROD-PARITY.md`).
+
+---
+
+## Previously Shipped: v4.3 What You Can Actually Sell (2026-09-23)
 
 **Started:** 2026-09-18 · **Shipped:** 2026-09-23, git tag `v4.3` · 10 phases (255-260 scoped,
 **261-264 added in-milestone**), 39 plans, migrations 182-192, 6 days.
@@ -1101,6 +1123,14 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 - ✓ `BUS-171`'s operator queue is a decision list — REG-03, v4.2 (251)
 - ⛔ `DEBT-06` — **8 of 14 rows unmet** (239, 241, 242, 244, 245, 251, 252, 253). Accepted as documented debt at close by operator decision; `done` needs Gemini, `refused` needs an operator ruling (`REG-03`). **A refusal is not a pass.**
 
+### Validated (v4.4 — Experts That Actually Work)
+
+- ✓ Owed v4.3 UAT driven live and independently reviewed — VERIFY-01..05, v4.4 (265)
+- ✓ Expert corpus copied, ingested and embedded per org; idempotent and org-contained; Financial Analyzer answers from its own copy — PACK-18..20, v4.4 (266)
+- ✓ An Expert adds scope: additive tool floor, connection honesty, swap/remove event, ask-a-second-Expert, restricted-cost statement — PACK-21..25, v4.4 (267)
+- ✓ Spend attributable per Expert; mid-thread folder-scope change — METER-08, CHAT-08, v4.4 (268)
+- ✓ Five-Expert starter library, each with a live grounded conversation — PACK-26/27, v4.4 (269; enterprise-tier orgs only, D-269-P1)
+
 ### Validated (v4.3 — What You Can Actually Sell)
 
 - ✓ The extension contract is binding law, guarded, with three worked examples — EXT-01..03, v4.3 (255)
@@ -1116,7 +1146,14 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 
 ### Active (current milestone)
 
+*v4.4 Experts That Actually Work **STARTED 2026-09-23** via `/gsd:new-milestone`. Phase numbering resumes at **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`). Scope set by the operator at intake: owed v4.3 UAT + independent review as the FIRST phase; `SEED-304` (PACK-05) via **per-org provisioning**; the Expert-drafter field-cap bug (already fixed at `7a04e944e` — live-verify and close); `SEED-303` open arms (S3 two Experts, S6 additive tool floor, per-Expert spend; S8 stays deferred); `SEED-244` starter Expert library; `SEED-286` mid-thread scope change. Requirements: `.planning/REQUIREMENTS.md`.*
+
+<details>
+<summary>Superseded Active note (v4.3-close, preserved)</summary>
+
 *v4.3 What You Can Actually Sell SHIPPED (2026-09-23; git tag `v4.3`). **No milestone active.** Next: `/gsd:new-milestone`, resuming phase numbering at **265**. ⚠ **Carried into scoping:** `SEED-304` (PACK-05 tenancy decision) · owed live UAT for 257/258/261/263 · independent review owed on 255/256/262/264 and on every audit fix commit · the production deploy checklist above · `SEED-013` Open Platform sequencing and `OV-248-01` (`BUS-263`) · the two non-engineering commercial blockers in `SEED-294`.*
+
+</details>
 
 <details>
 <summary>Superseded Active note (v4.3-era, preserved)</summary>
@@ -1377,3 +1414,7 @@ This document evolves at phase transitions and milestone boundaries.
 
 
 </details>
+
+*Last updated: 2026-09-23 — **milestone v4.4 Experts That Actually Work STARTED** via /gsd:new-milestone. Phase numbering continues at **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`). SEED-304 tenancy decided: per-org copy.*
+
+*Last updated: 2026-09-29 — **milestone v4.4 Experts That Actually Work COMPLETED** (git tag `v4.4`; 5 phases, 24 plans, 17/17 requirements; nothing deployed — migrations 194-198 + `464ec8354` owed to production). STATE.md and the archives were done by hand, not via `milestone.complete`.*
