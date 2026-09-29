@@ -187,3 +187,12 @@ security-compliance folder `16db0107-…` was PRESENT as an extra sibling in the
 and each of their supplementary scans reads `out_of_folder_documents_retrieved_by_any_tool: 0`, so no locked
 verdict depends on (or was contaminated by) the held corpus. The cited turns cite only each Expert's own
 figures (`30.8%`/`$29.1`, `$2.35M`/`75 days`, `18 weeks`/`23 days`, `94.7%`/`38 days`).
+
+## 198 applied (local) — 269-04 Task 3, 2026-09-29
+
+Operator instruction: "you do it" (answering the offer to apply 198 and run steps 1-4 against the local DB). Target confirmed local: 127.0.0.1:54322. No `supabase db push` / `db reset`, no `--reset`, production Supabase MCP not used.
+
+1. `supabase/migrations/198_starter_expert_library.sql` applied via asyncpg (idempotent upsert over the 269-03 candidate rows).
+2. Held row removed locally: `DELETE FROM public.expert_bundles WHERE id = '00000000-0000-0000-0000-000000002693' AND is_system` -> `DELETE 1`. The test org's copied security-compliance documents and folder `16db0107-...` stay in place.
+3. `bash scripts/regenerate-full-schema.sh` (live-DB dump, no reset): completed, 8836 lines; `git diff --stat supabase/full-schema.sql` empty = zero diff, as expected (schema-only dump, 198 changes data only, M-8).
+4. Read-back: `expert_bundles WHERE is_system` returns exactly contract-reviewer, financial-analyzer, hr-policy-advisor, operations-analyst — all restricted, org_id NULL (portable), is_enabled true. Financial Analyzer `example_output LIKE '%30.8%'` = true.
