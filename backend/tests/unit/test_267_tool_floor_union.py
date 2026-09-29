@@ -209,7 +209,7 @@ async def _drive(
     supabase.table.side_effect = _Query
     captured: dict = {}
 
-    def _capture(history_rows, active_provider=""):
+    def _capture(history_rows, active_provider="", **_kw):  # 268 D-268-27 added `resuming=`
         frame = sys._getframe(1)
         captured["tools"] = frame.f_locals.get("active_tools")
         captured["prompt"] = frame.f_locals.get("active_system_prompt")

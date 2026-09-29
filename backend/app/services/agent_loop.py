@@ -1006,7 +1006,9 @@ def _apply_origin_filter(history_q, agent_mode: str):
     return history_q.eq("origin", "harness")
 
 
-def _reconstruct_history(history_rows: list[dict], active_provider: str = "") -> list[dict]:
+def _reconstruct_history(
+    history_rows: list[dict], active_provider: str = "", *, resuming: bool = False
+) -> list[dict]:
     """
     Reconstruct an OpenAI-compatible multi-turn message list from stored DB rows.
 
@@ -1121,6 +1123,13 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
                 "content": (f"{_note}\n\n" if _note else "") + (msg.get("content") or ""),
                 **({"reasoning_content": msg["reasoning_content"]} if msg["role"] == "assistant" and msg.get("reasoning_content") else {}),
             })
+    # Phase 268 (D-268-27): a Continue writes no user row, so a change made while the run was paused is still
+    # pending here. Only on a Continue (``resuming``), it becomes ONE synthetic USER-role turn at the end —
+    # never a system row, never a rewrite of an earlier user message. A send's own new user row took it above.
+    if resuming:
+        _tail_note = _scope_fold.take()
+        if _tail_note:
+            messages.append({"role": "user", "content": _tail_note})
     return messages
 
 
@@ -1821,6 +1830,8 @@ async def run_agent_loop(
         _reconstruct_history(
             history_resp.data,
             active_provider=(getattr(user_settings, "active_provider", "") or "").lower(),
+            # Phase 268 (D-268-27): True only on a Continue (POST /runs/{id}/continue).
+            resuming=ctx.resume_dropped_tool_calls,
         )
     )
 
