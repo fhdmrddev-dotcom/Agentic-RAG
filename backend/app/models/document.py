@@ -75,6 +75,18 @@ class DocumentResponse(BaseModel):
     # honest way to read it. Clients must not consult this field on a completed row.
     ingestion_step: str | None = None
 
+    # Phase 270 (FIND-05 / D-01) — the document's file facts. NULL renders "not recorded";
+    # DEFAULTED because five routes build responses from a narrow select and a required
+    # field 500s them. A missing value is None — never 0, never an invented date.
+    page_count: int | None = None
+    source_created_at: datetime | None = None
+    source_modified_at: datetime | None = None
+    source_author: str | None = None
+
+    # Phase 270 (P-02) — NOT a column. Filled by `list_documents` from ONE batched
+    # `connector_connections` read; absence renders "a connected source".
+    source_connection_name: str | None = None
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def tables_stage_applies(self) -> bool:
@@ -105,6 +117,18 @@ class DocumentResponse(BaseModel):
             images_stage_applies as _applies,
         )
         return _applies(self.mime_type)
+
+
+class DocumentDownloadUrl(BaseModel):
+    """Phase 270 (FIND-04): a short-lived signed URL for a document's original file.
+
+    A bearer token; never log it, never persist it (D-04/D-05).
+    """
+
+    url: str
+    expires_in: int
+    version_number: int
+    filename: str
 
 
 # ── Phase 217 · document-content row models (the routes plan 02 adds) ─────────

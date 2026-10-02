@@ -794,6 +794,23 @@ async def list_documents(
             doc["table_count"] = tc.get(doc["id"], 0)
             doc["image_count"] = ic.get(doc["id"], 0)
 
+        # Phase 270 (P-02): the connection NAME for connector-placed documents — ONE batched
+        # user-JWT read. connector_connections is org-RLS'd and `name` is column-granted to
+        # `authenticated`. The name is decoration: a failure leaves it None, never a 500.
+        conn_ids = sorted({d["source_connection_id"] for d in merged if d.get("source_connection_id")})
+        conn_names: dict[str, str] = {}
+        if conn_ids:
+            try:
+                conn_res = await aexec(
+                    supabase.table("connector_connections").select("id, name").in_("id", conn_ids)
+                )
+                conn_names = {r["id"]: r.get("name") for r in (conn_res.data or [])}
+            except Exception:
+                log.debug("connection-name lookup failed; names stay None")
+        for doc in merged:
+            sid = doc.get("source_connection_id")
+            doc["source_connection_name"] = conn_names.get(sid) if sid else None
+
     return merged
 
 
