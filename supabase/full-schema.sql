@@ -729,6 +729,8 @@ CREATE TABLE public.app_settings (
     lmstudio_api_key text,
     custom_base_url text DEFAULT ''::text,
     custom_api_key text,
+    document_download_url_ttl_seconds integer DEFAULT 60 NOT NULL,
+    CONSTRAINT app_settings_download_ttl_bounds CHECK (((document_download_url_ttl_seconds >= 10) AND (document_download_url_ttl_seconds <= 900))),
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
     CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
@@ -820,6 +822,13 @@ COMMENT ON COLUMN public.app_settings.custom_base_url IS 'Generic OpenAI-compati
 --
 
 COMMENT ON COLUMN public.app_settings.custom_api_key IS 'Bearer token for custom_base_url. Encrypted at rest via SECRET_COLUMNS when SECRETS_ENCRYPTION_KEY is configured.';
+
+
+--
+-- Name: COLUMN app_settings.document_download_url_ttl_seconds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.document_download_url_ttl_seconds IS 'Lifetime in seconds of a minted document download link. Default 60; bounded 10-900 by app_settings_download_ttl_bounds.';
 
 
 --
@@ -1529,7 +1538,12 @@ CREATE TABLE public.documents (
     ingest_visibility text DEFAULT 'private'::text NOT NULL,
     source_state text,
     thread_key text,
+    page_count integer,
+    source_created_at timestamp with time zone,
+    source_modified_at timestamp with time zone,
+    source_author text,
     CONSTRAINT documents_ingest_visibility_check CHECK ((ingest_visibility = ANY (ARRAY['private'::text, 'org'::text, 'dept'::text]))),
+    CONSTRAINT documents_page_count_positive CHECK (((page_count IS NULL) OR (page_count > 0))),
     CONSTRAINT documents_source_state_check CHECK (((source_state IS NULL) OR (source_state = ANY (ARRAY['live'::text, 'missing_at_source'::text, 'unauthorized_at_source'::text, 'source_disconnected'::text])))),
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
@@ -1568,6 +1582,34 @@ COMMENT ON COLUMN public.documents.source_state IS 'Phase 234 (VIS-03 / VIS-04 /
 --
 
 COMMENT ON COLUMN public.documents.thread_key IS 'Phase 240 (D-3): the conversation a mail document belongs to, derived from its own RFC 5322 headers (References[0] -> In-Reply-To -> Message-ID), normalised and capped at 512 chars. NULL means "not mail" or "mail with no usable headers" — deliberately not distinguished by a sentinel. Never derived from Subject.';
+
+
+--
+-- Name: COLUMN documents.page_count; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.page_count IS 'Pages in the file, read from the PDF or DOCX at ingest. NULL = not recorded (non-paged format, unreadable file, or ingested before Phase 270). Never 0.';
+
+
+--
+-- Name: COLUMN documents.source_created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.source_created_at IS 'The date the FILE claims it was created (PDF CreationDate / DOCX core created), UTC. NULL = not recorded. Never the upload date, that is created_at.';
+
+
+--
+-- Name: COLUMN documents.source_modified_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.source_modified_at IS 'The date the FILE claims it was last modified (PDF ModDate / DOCX core modified), UTC. NULL = not recorded. Never the upload date.';
+
+
+--
+-- Name: COLUMN documents.source_author; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.source_author IS 'The author the FILE names (PDF Author / DOCX core author), trimmed and capped at 512 chars. NULL = not recorded.';
 
 
 --
