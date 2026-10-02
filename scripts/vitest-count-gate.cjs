@@ -4067,6 +4067,11 @@ const BASELINE = {
   "DocumentFileFacts.test.tsx": 9, // 270-03
   "DocumentDetailPanel.file270.test.tsx": 6, // 270-04
   "DocumentRow.download270.test.tsx": 4, // 270-04
+  // ── Phase 271-03 — adopted BEFORE the combobox extraction so a regression is visible (they
+  // were in neither knob; SEED-280). Measured at PHASE_BASE 20050816d: 8 / 11 / 6 passed. ──
+  "CreateLinkDialog.test.tsx": 8, // 271-03
+  "RelationshipsSection.test.tsx": 11, // 271-03
+  "RelationshipsSection.a11y.test.tsx": 6, // 271-03
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5929,6 +5934,11 @@ const TARGETS = [
   // Phase 270 plan 04 — FILE-LEVEL.
   "src/components/metadata/__tests__/DocumentDetailPanel.file270.test.tsx",
   "src/components/ingestion/__tests__/DocumentRow.download270.test.tsx",
+  // Phase 271-03 — adopted BEFORE the combobox extraction so a regression is visible (they
+  // were in neither knob; SEED-280). FILE-LEVEL, never the directory.
+  "src/components/relationships/CreateLinkDialog.test.tsx",
+  "src/components/relationships/RelationshipsSection.test.tsx",
+  "src/components/relationships/RelationshipsSection.a11y.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
