@@ -2944,4 +2944,4 @@ reuses 267-B's event-card shape.
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 271 | find-the-document | Find\|Ask mode switch, structure filters (folder/relationship/version), Filing rules home | pending operator pick | phase-271, document-search, filing-rules |
+| 271 | find-the-document | Find\|Ask mode switch, structure filters (folder/relationship/version), Filing rules home | ★ 1A · 2A · 3A · keep older-versions hint (operator, 2026-10-03) | phase-271, document-search, filing-rules |
