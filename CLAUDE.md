@@ -886,6 +886,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/ingestion/FolderTree.tsx` | 12 / 7 / 207 | ⚠ absent its ENTIRE LIFE — row added 266. **266-04**: ONE optional prop threaded. ⛔ no fetch here |
 | `frontend/src/components/ingestion/FolderNode.tsx` | 12 / 6 / 272 | ⚠ absent its ENTIRE LIFE — row added 266. The note is NavRow's `caption` now; tooltip-only was invisible (UI-3) |
 | `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05. ONE optional `caption`; ⛔ deliverable words never tooltip-only |
+| `backend/app/models/document.py` | 10 / 7 / 183 | ⚠ absent from BOTH registers its ENTIRE LIFE at 7 phases — row added 270-01. ⛔ additive OPTIONAL fields only: a required field 500s five narrow-select routes |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
