@@ -20,8 +20,10 @@ export class VersionMismatchError extends Error {
 /** The control's words — the single derivation (P-04 one vocabulary). */
 export function downloadLabel(doc: Pick<Document, "version_number" | "is_latest">): string {
   const v = doc.version_number
+  // 270-04: an OLDER row is named even when it is v1 — in a version history, a bare "Download" beside
+  // "Download v3 (latest)" would not say which file it fetches (Q1 option A, SC#2).
+  if (v != null && doc.is_latest === false) return `Download v${v} (viewed, not latest)`
   if (v == null || v <= 1) return "Download"
-  if (doc.is_latest === false) return `Download v${v} (viewed, not latest)`
   return `Download v${v} (latest)`
 }
 

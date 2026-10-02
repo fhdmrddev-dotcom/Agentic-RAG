@@ -20,6 +20,7 @@
  * (chevron, Filename, Type, Size, Chunks, Status, Actions), no `colSpan` on the main row —
  * `LibraryPage`'s `nth-child(n+3):nth-child(-n+5)` shed hides Type/Size/Chunks by position.
  * The version-history expand row is a SEPARATE `<tr>` and is the only `colSpan` user.
+ * Phase 270: Download lives INSIDE the seventh cell; still seven <td>.
  */
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -46,6 +47,7 @@ import { cn } from "@/lib/utils"
 import { formatBytes } from "@/lib/formatBytes"
 import { classifyIngestionError } from "@/components/library/ingestionErrorVocabulary"
 import { ChunkProportionBar } from "@/components/library/ChunkProportionBar"
+import { DocumentDownloadButton } from "@/components/metadata/DocumentDownloadButton"
 import type { Document, Folder } from "@/types"
 
 /** Phase 112 (D-01): the chevron toggles VERSION HISTORY ONLY. */
@@ -168,18 +170,22 @@ function VersionHistoryPanel({
                   {formatBytes(v.file_size)}
                 </td>
                 <td className="px-2 py-1.5 text-right">
-                  {v.is_latest ? (
-                    <span className="text-xs text-muted-foreground">Current</span>
-                  ) : v.user_id === currentUserId ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setRestoreTarget(v)}
-                      className="h-6 text-xs"
-                    >
-                      Restore
-                    </Button>
-                  ) : null}
+                  <div className="flex items-center justify-end gap-1">
+                    {/* Phase 270 (Q1 option A): one Download per version row, fetching THAT row's version. */}
+                    <DocumentDownloadButton doc={v} density="row" />
+                    {v.is_latest ? (
+                      <span className="text-xs text-muted-foreground">Current</span>
+                    ) : v.user_id === currentUserId ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRestoreTarget(v)}
+                        className="h-6 text-xs"
+                      >
+                        Restore
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -402,7 +408,8 @@ export function DocumentRow({
           )}
         </td>
         <td className="px-4 py-3 text-right">
-          <div className="flex items-center justify-end gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-1">
+            <DocumentDownloadButton doc={doc} density="row" />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

@@ -4065,6 +4065,8 @@ const BASELINE = {
   "documentDownload.test.ts": 8, // 270-03 (2026-10-02)
   "DocumentDownloadButton.test.tsx": 13, // 270-03
   "DocumentFileFacts.test.tsx": 9, // 270-03
+  "DocumentDetailPanel.file270.test.tsx": 6, // 270-04
+  "DocumentRow.download270.test.tsx": 4, // 270-04
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5924,6 +5926,9 @@ const TARGETS = [
   "src/lib/__tests__/documentDownload.test.ts",
   "src/components/metadata/__tests__/DocumentDownloadButton.test.tsx",
   "src/components/metadata/__tests__/DocumentFileFacts.test.tsx",
+  // Phase 270 plan 04 — FILE-LEVEL.
+  "src/components/metadata/__tests__/DocumentDetailPanel.file270.test.tsx",
+  "src/components/ingestion/__tests__/DocumentRow.download270.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
