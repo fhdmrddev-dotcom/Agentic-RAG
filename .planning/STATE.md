@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: Find It, Show It
-status: planning
-last_updated: "2026-09-29T20:16:51.715Z"
-last_activity: 2026-09-29 - v4.5 roadmap created (hand-edited; no `state.*` / `milestone.*` SDK verb called)
+status: executing
+last_updated: "2026-10-02T19:28:02.182Z"
+last_activity: 2026-10-02
 progress:
   total_phases: 13
   completed_phases: 0
-  total_plans: 0
+  total_plans: 5
   completed_plans: 0
   percent: 0
 ---
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Milestone v4.5 Find It, Show It. Roadmap created 2026-09-29: phases **270-275**, migrations from **199**. Next: Phase 270.
+**Current focus:** Phase 270 — the-document-as-an-object
 
 ---
 
@@ -56,8 +56,8 @@ genuinely reviewed.
 
 Phase: 270 (The Document as an Object) — not started, ready to discuss
 Plan: -
-Status: Roadmap created; ready to plan
-Last activity: 2026-09-29 - v4.5 roadmap created (hand-edited; no `state.*` / `milestone.*` SDK verb called)
+Status: Executing Phase 270
+Last activity: 2026-10-02
 
 ### v4.5 roadmap (2026-09-29): 19 / 19 requirements mapped
 
@@ -102,7 +102,7 @@ Status: Phase 269 closed — verification `passed`; nothing deployed; ~~next: op
 - **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
-Resume file: .planning/phases/270-the-document-as-an-object/270-CONTEXT.md
+Resume file: .planning/phases/270-the-document-as-an-object/270-UI-SPEC.md
 Last activity: 2026-09-29 -- Phase 269 closed
 
 ---
