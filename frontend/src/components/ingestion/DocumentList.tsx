@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { reingestDocument } from "@/lib/api"
 import { MoveToFolderDialog } from "@/components/health/MoveToFolderDialog"
-import { DocumentRow, hasVersions } from "./DocumentRow"
+import { DocumentRow, hasVersions, type DocumentColumns, type FindDateColumn } from "./DocumentRow"
 import type { Document, Folder } from "@/types"
 
 interface Props {
@@ -27,7 +27,14 @@ interface Props {
   /** Phase 217.1-05 — folders are held by `LibraryPage` (`useFolders`) and threaded
    *  down so the row's folder pill can resolve `doc.folder_id` to a name. No new fetch. */
   folders?: Folder[]
+  /** Phase 271-03 — `"find"` renders Find results: the Find column set, never re-filtered
+   *  by folder, and no empty-state copy (the Find body owns its zero state, S7). */
+  columns?: DocumentColumns
+  /** Phase 271-03 — the Find Date column (header + row field). Default: Added. */
+  findDateColumn?: FindDateColumn
 }
+
+const DEFAULT_FIND_DATE_COLUMN: FindDateColumn = { label: "Added", field: "created_at" }
 
 // Phase 112 Plan 04 (D-01): the inline `MetadataPanel` was RETIRED here — metadata
 // now lives in the one honest surface (DocumentDetailPanel, opened by a row click).
@@ -41,6 +48,11 @@ interface Props {
  * ⛔ THE SHED INVARIANT: exactly seven `<th>`s in the order chevron / Filename / Type /
  * Size / Chunks / Status / Actions, with the `<th className="px-4 py-3 …">` class strings
  * byte-identical to the pre-extraction version. `drive.cjs` A1/A2 read these.
+ *
+ * Phase 271-03 (FIND-01): `columns="find"` is the Find column set — chevron / Name /
+ * Document type / Added by / <Date> / Status / Actions. SEVEN cells in BOTH modes, because
+ * `LibraryPage`'s `SHED_COLUMNS_3_TO_5` sheds columns 3-5 POSITIONALLY (T-217-35) and is not
+ * edited. Browse renders byte-identically.
  */
 export function DocumentList({
   documents,
@@ -51,7 +63,10 @@ export function DocumentList({
   onSelect,
   selectedDocId,
   folders,
+  columns = "browse",
+  findDateColumn = DEFAULT_FIND_DATE_COLUMN,
 }: Props) {
+  const isFind = columns === "find"
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -85,8 +100,10 @@ export function DocumentList({
   // - folderId === undefined: no folder context — show all (backward compat)
   // - folderId === null: Root — show root-level documents (folder_id === null)
   // - folderId = string: show only documents in that folder
+  // - Find (271-03): NEVER re-filtered — results are cross-folder by design, and the server
+  //   already applied any Folder condition (incl. subfolders, which this filter cannot see).
   const filtered =
-    folderId === undefined
+    isFind || folderId === undefined
       ? documents
       : folderId === null
         ? documents.filter((d) => d.folder_id == null)  // == catches null AND undefined (pre-migration docs)
@@ -117,6 +134,10 @@ export function DocumentList({
     }
   }
 
+  // Find's zero state ("No documents match" + the older-versions hint) belongs to the Find
+  // body (UI-SPEC S7); browse's folder copy would mislabel a search with no results.
+  if (isFind && filtered.length === 0) return null
+
   if (filtered.length === 0) {
     return (
       <div>
@@ -141,6 +162,18 @@ export function DocumentList({
       <div className="overflow-x-auto rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm shadow-sm transition-all duration-200">
         <table className="w-full text-sm">
           <thead>
+            {isFind ? (
+              // Phase 271-03 — the Find header set: same seven positions, same classes.
+              <tr className="border-b border-border/50 bg-muted/40">
+                <th className="px-2 py-3 w-8" />
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Document type</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Added by</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{findDateColumn.label}</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
+              </tr>
+            ) : (
             <tr className="border-b border-border/50 bg-muted/40">
               <th className="px-2 py-3 w-8" />
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Filename</th>
@@ -150,6 +183,7 @@ export function DocumentList({
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
             </tr>
+            )}
           </thead>
           <tbody>
             {filtered.map((doc) => (
@@ -169,6 +203,8 @@ export function DocumentList({
                 onDeleteRequest={setDeleteTarget}
                 onRefresh={onRefresh}
                 currentUserId={currentUserId}
+                columns={columns}
+                findDateColumn={findDateColumn}
               />
             ))}
           </tbody>

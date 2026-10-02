@@ -10,9 +10,11 @@
 import type { Document } from "@/types"
 import { formatBytes } from "@/lib/formatBytes"
 import { extensionOf } from "@/lib/fileTypeMark"
+// Phase 271-03: `addedBy` moved to its one home so the Find list's Added-by column reads the same answer.
+import { NOT_RECORDED, addedBy } from "@/lib/documentAddedBy"
 
 function NotRecorded() {
-  return <span className="italic text-panel-muted-foreground">not recorded</span>
+  return <span className="italic text-panel-muted-foreground">{NOT_RECORDED}</span>
 }
 
 function formatFactDate(iso: string | null | undefined) {
@@ -27,19 +29,6 @@ function formatFactDate(iso: string | null | undefined) {
     minute: "2-digit",
   })
   return <time dateTime={iso}>{text}</time>
-}
-
-function addedBy(doc: Document, currentUserId?: string): string {
-  // A connected source owns its documents under the user who connected it, so the connection is
-  // tested FIRST: otherwise every connector-placed file reads "You" beside a banner saying a
-  // connected source placed it (270 UAT G4-4a).
-  if (doc.source_connection_id) {
-    return doc.source_connection_name
-      ? `${doc.source_connection_name} (connected source)`
-      : "a connected source"
-  }
-  if (currentUserId && doc.user_id === currentUserId) return "You"
-  return "name not available"
 }
 
 export function DocumentFileFacts({

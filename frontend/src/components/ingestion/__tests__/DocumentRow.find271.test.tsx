@@ -92,8 +92,14 @@ function mainRows(): HTMLTableRowElement[] {
   return Array.from(document.querySelectorAll("table:not([data-version-history]) > tbody > tr"))
 }
 
+const SHORT: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" }
+
 function shortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+  // A date-only value is a calendar date, not an instant: it must not shift a day in a
+  // timezone west of UTC, so the expectation builds it in LOCAL time (as the row must).
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso)
+  return d.toLocaleDateString(undefined, SHORT)
 }
 
 afterEach(() => {
