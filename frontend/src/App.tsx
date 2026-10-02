@@ -124,7 +124,9 @@ import { visibleNavItems } from "@/lib/nav-items"
 //      branchless member compiled and shipped green. `lib/activeViewReachability.ts`
 //      (Phase 262 plan 01) is that sentence's executable half, and it is what makes the
 //      claim provable for the member below rather than merely intended.
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "classification-rules" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run" | "admin-spend" | "experts"
+// Phase 271 (D-09): the rules-authoring home left this union, its ChatLayout branch and the rail in ONE
+// commit — it now opens inside the Library as "Filing rules", a Library-local sub-view, not a view.
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run" | "admin-spend" | "experts"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()

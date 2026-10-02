@@ -221,6 +221,11 @@ export function LibraryPage({
    * Absent ⇒ no tab carries a mark, which is what every caller other than `ChatLayout` gets.
    */
   attentionConditions?: readonly AttentionCondition[]
+  /**
+   * Phase 271 (D-02) — Ask leaves the Library through ChatLayout; the Library renders no answer.
+   * Consumed by the Documents tab in 271-04.
+   */
+  onAskInChat?: (question: string) => Promise<boolean> | void
 } = {}) {
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
