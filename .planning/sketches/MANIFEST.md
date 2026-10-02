@@ -2939,3 +2939,9 @@ reuses 267-B's event-card shape.
 - **Chat A (composer chip)** vs **Chat B (header pill)**, plus the Restricted handling: *Save & say* vs *Lock*.
 - **Spend A (Expert filter that every card follows)** vs **Spend B (Group by Model / Expert)**.
 - Winner ★ (operator, 2026-09-28): **Chat A · composer chip**, **Restricted: Save & say**, **Spend A · filter every card follows**.
+
+## Sketch 271 — Find the Document (Phase 271, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 271 | find-the-document | Find\|Ask mode switch, structure filters (folder/relationship/version), Filing rules home | pending operator pick | phase-271, document-search, filing-rules |
