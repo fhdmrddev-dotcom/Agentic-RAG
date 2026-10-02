@@ -647,6 +647,22 @@ export interface Document {
   updated_at: string
   table_count?: number
   image_count?: number
+  /** Phase 270 (D-01 / D-10) — facts read from the file at ingest; server-derived, not columns.
+   *  null renders "not recorded". Optional because Realtime `payload.new` and narrow-select
+   *  routes may omit them. */
+  page_count?: number | null
+  source_created_at?: string | null
+  source_modified_at?: string | null
+  source_author?: string | null
+  source_connection_name?: string | null
+}
+
+/** Phase 270 — response of `POST /documents/{id}/download-url`. `url` is a bearer token: use once, never store. */
+export interface DocumentDownloadUrl {
+  url: string
+  expires_in: number
+  version_number: number
+  filename: string
 }
 
 // ──────────────────────────────────────────────────────────────────────────────────────

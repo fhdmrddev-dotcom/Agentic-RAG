@@ -4061,6 +4061,10 @@ const BASELINE = {
   // ⬆ RAISED 18 → 20 at `262-05`: the Experts entry renders from the SHIPPED NAV_ITEMS and
   //   clicking it navigates. The leg `activeViewReachability` structurally cannot see.
   "NavPanel.test.tsx": 20,
+  // ── Phase 270 plan 03 (FIND-04/05) — the download label/mint, button and file facts. BOTH KNOBS, SAME COMMIT. ──
+  "documentDownload.test.ts": 8, // 270-03 (2026-10-02)
+  "DocumentDownloadButton.test.tsx": 13, // 270-03
+  "DocumentFileFacts.test.tsx": 9, // 270-03
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5916,6 +5920,10 @@ const TARGETS = [
   // pinned in BASELINE in that commit too: a suite in TARGETS and not in BASELINE RUNS and
   // guards nothing, which is the trap this array's own comment at :184 records firing.
   "src/lib/__tests__/activeViewReachability.test.ts",
+  // Phase 270 plan 03 (2026-10-02) — FILE-LEVEL, never the `src/components/metadata` directory.
+  "src/lib/__tests__/documentDownload.test.ts",
+  "src/components/metadata/__tests__/DocumentDownloadButton.test.tsx",
+  "src/components/metadata/__tests__/DocumentFileFacts.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
