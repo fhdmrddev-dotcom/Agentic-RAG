@@ -10712,6 +10712,25 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
+| [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 0 / 0 / 0 | no (new) | young (created 271-01). Row added AT PLANNING. ⛔ FastAPI-free Find core: no embedding import, no `.rpc(`; an unreachable folder or picked doc returns ZERO rows, never no narrowing |
+| [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 0 / 0 / 0 | no (new) | young (created 271-01). Row added AT PLANNING. ⛔ `extra="forbid"`; every verb, sort and version is a closed Literal; the 8 verbs are pinned equal to `_INVERSE_LABEL` keys + values |
+| [`backend/app/api/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_searchpy) | 0 / 0 / 0 | no (new) | young (created 271-01). Row added AT PLANNING. ⛔ user-JWT client only (RLS); a thin wrapper that remaps `ResolveError`; no DB write, no audit row |
+| [`frontend/src/pages/findState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesfindstatets) | 0 / 0 / 0 | no (new) | young (created 271-03). Row added AT PLANNING. ⛔ a STRICT LEAF: zero imports, no React, no I/O. Holds Find's conditions, name, version, sort, page and mode, never the result |
+| [`frontend/src/hooks/useDocumentFind.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentfindts) | 0 / 0 / 0 | no (new) | young (created 271-03). Row added AT PLANNING. ⛔ resting Find makes ZERO requests; an error KEEPS rows and chips, never the `resolveFilterIntoList` list swap |
+| [`frontend/src/lib/documentAddedBy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentaddedbyts) | 0 / 0 / 0 | no (new) | young (created 271-03). Row added AT PLANNING. ⛔ the ONE `addedBy` rule (connection first, never an email), moved out of DocumentFileFacts; both import it |
+| [`frontend/src/components/relationships/LinkTargetCombobox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipslinktargetcomboboxtsx) | 0 / 0 / 0 | no (new) | young (created 271-03 by EXTRACTION from CreateLinkDialog). Row added AT PLANNING. ⛔ one combobox, two mounts; APG roles move verbatim, never forked |
+| [`frontend/src/components/relationships/CreateLinkDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipscreatelinkdialogtsx) | 3 / 1 / 316 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 271 PLANNING. **271-03**: combobox body EXTRACTED to `LinkTargetCombobox`; chips, note, preview, footer stay. Suite adopted first |
+| [`frontend/src/components/relationships/relationshipLabels.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipsrelationshiplabelsts) | 1 / 1 / 43 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 271 PLANNING. **271-03**: + an 8-verb filter table DERIVED from the two maps by one stated transform, pinned; never retyped |
+| [`frontend/src/components/library/DocumentsPager.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarydocumentspagertsx) | 2 / 1 / 108 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 271 PLANNING. **271-04**: ONE optional `exact` prop skips the 1000-cap arm for a server-exact total; browse unchanged |
+| [`frontend/src/components/ingestion/FilterBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfilterbartsx) | 6 / 3 / 311 | ⚠ **FIRES** (3 phases) | ⚠ FIRES and absent its ENTIRE LIFE — row added AT 271 PLANNING. **271-04**: 4 optional props + a `FilterChip` export; the Views tab passes none and stays byte-identical |
+| [`frontend/src/components/ingestion/AutomationGroup.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionautomationgrouptsx) | 5 / 4 / 303 | ⚠ **FIRES** (4 phases) | ⚠ FIRES and absent its ENTIRE LIFE — row added AT 271 PLANNING. **271-02**: ONE string, the empty line becomes "No filing rules yet" (D-08). ⛔ no logic change |
+| [`frontend/src/components/library/find/StructurePopovers.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindstructurepopoverstsx) | 0 / 0 / 0 | no (new) | young (created 271-04). Row added AT PLANNING. ⛔ every option is backed by a server filter with a CONTENT test; one popover family (the ConditionPopover shell idiom) |
+| [`frontend/src/components/library/find/FindQuickAdd.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindquickaddtsx) | 0 / 0 / 0 | no (new) | young (created 271-04). Row added AT PLANNING. ⛔ the Version chip is ALWAYS visible (D-06); set chips use the shipped `FilterChip`, never an indigo wash |
+| [`frontend/src/components/library/find/FindModeSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmodeswitchtsx) | 0 / 0 / 0 | no (new) | young (created 271-02). Row added AT PLANNING. ⛔ `role="radiogroup"`, never `role="tab"`: a second tablist collides with the Library's `getByRole("tab")` cases |
+| [`frontend/src/components/library/find/FindMetaLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmetalinetsx) | 0 / 0 / 0 | no (new) | young (created 271-02). Row added AT PLANNING. ⛔ the ONLY count on screen in Find; the stated sort is the server's order and the client never re-sorts |
+| [`frontend/src/components/library/find/AskHandoffCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindaskhandoffcardtsx) | 0 / 0 / 0 | no (new) | young (created 271-02). Row added AT PLANNING. ⛔ no I/O and no list: renders a question and calls `onAskInChat`; nothing list- or passage-shaped renders in the Library (D-02) |
+| [`frontend/src/components/library/find/askInChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindaskinchatts) | 0 / 0 / 0 | no (new) | young (created 271-02). Row added AT PLANNING. ⛔ create the thread, THEN set the prefill, THEN navigate; a failed create navigates nowhere. Never sends |
+| [`frontend/src/components/library/find/DocumentsFindBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfinddocumentsfindbodytsx) | 0 / 0 / 0 | no (new) | young (created 271-04). Row added AT PLANNING. ⛔ owns the Find render so LibraryPage only wires props (its named seam); an error keeps the chips, never the folder list |
 | [`backend/app/models/document.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocumentpy) | 11 / 8 / 207 | ⚠ **FIRES — 8 phases** | ⚠ STALE (`10/7/183`). **270-02**: 4 optional file-fact fields + `source_connection_name` + the download-response model, additive. ⛔ optional fields only: a required one 500s five non-upload paths |
 | [`frontend/src/components/ingestion/DocumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentrowtsx) | 7 / 3 / 476 | ⚠ **FIRES** (3 phases) | ⚠ STALE (`5/2/469`); now FIRES at 3 phases. **270-04/05**: 2 Download mounts inside Actions, still seven `<td>`; nested table marked `data-version-history` (F-1, 270-05) |
 | [`backend/app/services/file_facts.py`](docs/HOT-FILE-LEDGER.md#backendappservicesfile_factspy) | 1 / 1 / 163 | no (1 phase) | young (created 270-01). ⛔ `read_file_facts` NEVER raises; a fact it cannot read is `None`, never `0` and never a substituted date. Re-measured `1/1/163` at 270 close |
@@ -17512,3 +17531,83 @@ Every triple below was re-derived AFTER the phase's last source edit (`96d59b622
 ### `backend/app/services/ingest_splice.py` — Phase 270
 
 **`19 / 7 / 930 (was `15 / 6 / 877`)`** at 270 close. One separate best-effort UPDATE writing the file facts after the splice (skipped when every fact is None, so a failed parse never overwrites). A missing migration degrades with a logged warning; ingest is not broken (tested).
+
+## Phase 271 rows — added AT PLANNING (2026-10-03)
+
+The G-5 gate (`node scripts/check-hot-file-ledger.cjs --files …`, run over every file the 271 plans name) found 19 files with no row: five EXISTING files (`FilterBar.tsx` and `AutomationGroup.tsx`, which FIRE; `DocumentsPager.tsx`; `CreateLinkDialog.tsx`; `relationshipLabels.ts`) and fourteen files this phase creates. The rows are added in the commit that first names each file (the plan commit). Creating plans do NOT edit this file (plans 01-04 run in parallel worktrees, so a shared ledger edit would conflict); 271-05 re-derives every phase-touched triple once, at close.
+
+### `backend/app/services/document_search_service.py`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-01). The FastAPI-free document-search core beside `document_view_resolver.resolve_filter`: it reuses the extracted `apply_fragments` / `validate_and_compile`, the two visibility legs (own ∪ global-folder, kept as two queries), `resolve_project_subtree` ∩ `fetch_visible_folders`, `_relative_window`, and the relationship service's `_resolve_readable_latest` / `_subject_version_ids` with the ROUTE'S user-JWT client passed explicitly. ⛔ **Binding invariants:** no embedding or retrieval import and no `.rpc(` (D-03, fenced by `test_271_no_embedding.py`); an unreachable folder or an unreadable picked document returns the zero-result shape, the OPPOSITE of D-113-5; the candidate read is count-exact and range-paged and fails loud past the reported count; the sort is applied server-side with nulls last in both directions; no module-level mutable cache (multi-worker).
+
+### `backend/app/models/document_search.py`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-01). The `POST /document-search` request model. ⛔ **Binding invariants:** `model_config = ConfigDict(extra="forbid")` on every model; verbs, sorts, versions, date `which`, date ops and added-by kinds are closed `Literal`s; every id is a `UUID`; `name` is capped at 200 chars and `limit` at 1..100. The eight relationship verbs are pinned equal to `document_relationship_service._INVERSE_LABEL` keys plus values by a test, so the vocabulary has one home.
+
+### `backend/app/api/document_search.py`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-01). Its own route module, deliberately NOT in the hot `api/documents.py` (the `library.py` precedent). ⛔ **Binding invariants:** `Depends(get_user_supabase_client)` only, so RLS is in force; the core raises `ResolveError` and the route remaps it to `HTTPException`; no DB write and no audit row.
+
+### `frontend/src/pages/findState.ts`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-03). The pure reducer leaf for Find, composed at the `LibraryPage` boundary beside `librarySelection` (a SECOND `useReducer`, never new actions in `librarySelection.ts`, whose suite pins six). ⛔ **Binding invariants:** zero import statements, no React, no fetch, no storage (a `?raw` fence pins it); the async result, total, `older_matches` and request id are NOT in it; `canSaveAsView` is false whenever a condition the `ViewFilter` cannot store is set.
+
+### `frontend/src/hooks/useDocumentFind.ts`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-03). Debounced, stale-guarded request sequencing for Find (FilterBar's `reqIdRef` + 300 ms shape). ⛔ **Binding invariants:** an inactive search issues ZERO requests (every LibraryPage mount suite depends on it); the catch sets `error` and KEEPS the previous rows and chips, never the `resolveFilterIntoList` swap to the unfiltered folder list; imports `searchDocuments` from `@/lib/api/documents`, never the barrel.
+
+### `frontend/src/lib/documentAddedBy.ts`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-03). The `addedBy(doc, currentUserId)` rule MOVED out of `DocumentFileFacts.tsx` (module-private there), so the detail panel and the Find column import one function. ⛔ **Binding invariants:** the connection is tested BEFORE "is it me" (270 F-2); never an email (270 P-02); unknown reads "name not available".
+
+### `frontend/src/components/relationships/LinkTargetCombobox.tsx`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-03 by extraction). The Phase 117 typeahead body (input `role="combobox"`, `aria-controls` only while the list is visible (WR-04), `aria-activedescendant`, `<ul role="listbox">`, `onMouseDown` preventDefault) moved out of `CreateLinkDialog`, so the dialog and the Find Relationship popover mount ONE component. ⛔ **Binding invariant:** a move, never a fork; `CreateLinkDialog.test.tsx` stays green unmodified in its assertions.
+
+### `frontend/src/components/relationships/CreateLinkDialog.tsx`
+
+**`3 / 1 / 316`** at 271 planning (bucket `117`). Absent from the scan list for its entire life. **271-03 (planned):** the combobox body is extracted to `LinkTargetCombobox.tsx`; the rel-type chips, the exclusion note, the preview and the footer stay. Its suite was in NEITHER vitest knob and is adopted into both BEFORE the extraction. ⛔ **Binding invariant:** create stays outgoing-only (D-117-1).
+
+### `frontend/src/components/relationships/relationshipLabels.ts`
+
+**`1 / 1 / 43`** at 271 planning (bucket `117`). Absent for its entire life. **271-03 (planned):** adds `RELATIONSHIP_FILTER_VERBS`, the closed 8-row table DERIVED from `OUTGOING_LABEL` / `INCOMING_LABEL` / `REL_TYPES` by one stated transform (participles `… by` and `Attached to` gain `Is ` with a lowercased first letter; finite verbs are unchanged). ⛔ **Binding invariants:** never retyped; keys equal the backend `_INVERSE_LABEL` keys plus values (pinned by a `?raw` read of the backend file).
+
+### `frontend/src/components/library/DocumentsPager.tsx`
+
+**`2 / 1 / 108`** at 271 planning (bucket `217.1`). Absent for its entire life. **271-04 (planned):** one optional `exact?: boolean`. Its `total >= ROW_CAP` arm reads "list may be larger", which is honest for the client-sliced browse list and FALSE for Find's server-exact count. ⛔ **Binding invariant:** with `exact` absent, browse renders byte-identically.
+
+### `frontend/src/components/ingestion/FilterBar.tsx`
+
+**`6 / 3 / 311`** at 271 planning (buckets `114 155 217.1`). FIRES G-5 and had NO row for its entire life. **271-04 (planned):** four optional props (`quickAdd`, `suppressCount`, `saveDisabledReason`, `excludeFieldKeys` passed through to ConditionPopover) and the set-chip markup exported as `FilterChip` so Find's structure chips reuse it. ⛔ **Binding invariants:** ONE builder (D-114-1); with no new prop passed, the Views tab's DOM is byte-identical; `suppressCount` also suppresses the count REQUEST, not only the span. The next phase that touches it proposes the extraction first.
+
+### `frontend/src/components/library/find/StructurePopovers.tsx`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-04). The Folder, Relationship, Version, Added by and Date editors in the shipped popover idiom (`w-72 rounded-lg border bg-popover p-3`, `role="dialog"`, Esc returns focus to the chip). ⛔ **Binding invariants:** every option maps to a server condition with a content-level test (no presence-only chip); the Relationship editor mounts `LinkTargetCombobox`; D-07 words: version lineage reads "Older versions (superseded)", the link reads "Supersedes".
+
+### `frontend/src/components/library/find/FindQuickAdd.tsx`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-04). The quick-add chip row passed to FilterBar's `quickAdd` slot in Find mode. ⛔ **Binding invariants:** the `Version: Latest` chip is always visible and takes no ✕ (D-06); set chips render through the shipped `FilterChip` (neutral, never an indigo wash); Document type and Date-in-the-document write into the shared `lib.filter`, the structure chips into `findState`.
+
+### `frontend/src/components/library/find/FindModeSwitch.tsx`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-02). The `Find documents | Ask` segmented control (D-01). ⛔ **Binding invariants:** `role="radiogroup"` + `role="radio"`/`aria-checked`, NEVER `role="tab"` (a second tablist would collide with the Library header's tab queries); the selected segment is the accent; arrows move and select.
+
+### `frontend/src/components/library/find/FindMetaLine.tsx`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-02). Count, `Sorted by` select, `Exact match on fields. No AI ranking.`, scope line, `Clear search`. ⛔ **Binding invariants:** it is the only count on screen in Find mode; the sort select re-requests from the server and the client never re-sorts (D-03); props-only, no fetch.
+
+### `frontend/src/components/library/find/AskHandoffCard.tsx`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-02). The Ask card (D-02). ⛔ **Binding invariants:** no I/O; it calls `onAskInChat(question)` and nothing else; it renders no list, chunk or passage; the button is disabled while the question is empty.
+
+### `frontend/src/components/library/find/DocumentsFindBody.tsx`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-04). The Find render (meta line, result list with the Find column set, pager with `exact`, loading / zero / error states, older-versions hint) so `LibraryPage` only wires props, the file's named seam. ⛔ **Binding invariants:** an error keeps the query, chips and previous rows (S7); the hint's `Show them` sets Version to Older versions and never widens on its own; it never renders in Ask mode.
+
+### `frontend/src/components/library/find/askInChat.ts`
+
+**`0 / 0 / 0`** at 271 planning. Young (created 271-02). The Ask handoff as a pure, dependency-injected helper (the `startScopedChat.ts` precedent), so its ORDER is testable without mounting ChatLayout. ⛔ **Binding invariants:** `await createThread()` first (the shipped `handleTryInChat` does not create a thread, and copying it opens chat in the OLD thread, G-4 #4), then `setPrefill(question)`, then `navigate()`; a rejected create logs and does NOT navigate; it never sends the message (the person presses Send).
+
+### `frontend/src/components/ingestion/AutomationGroup.tsx`
+
+**`5 / 4 / 303`** at 271 planning (buckets `118 155 165 237`). FIRES G-5 and had NO row for its entire life; the gate found it only because 271-02 renames its empty-state line. **271-02 (planned):** "No classification rules yet" becomes "No filing rules yet" (D-08), and its suite's matching assertion moves in the same commit. ⛔ **Binding invariant:** a copy change only; the group still renders on the Filing rules surface and the rules list, scope filter and actions are untouched. The next phase that touches it proposes the extraction first.

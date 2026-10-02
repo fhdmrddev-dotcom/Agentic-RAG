@@ -79,16 +79,22 @@ data-thread branch/compare half of `SEED-193`, the hardening/testing milestone, 
 | 275 | Retention & Legal Hold | An admin sets how long documents are kept and what happens after. A legal hold stops it, and disposition runs on schedule, writes an audit record, and never deletes what it cannot prove it should | RET-01..04 | 4 | ⛔ **deletes customer data on a timer, so fail-closed + dry-run first** · migration(s) · RLS + `get_advisors(security)` · **G-2 sketch** · **G-4** · G-5 (`scheduler_service.py`, `documents.py`, `retrieval_service.py`) · deploy parity · UI hint |
 
 **Dependency order:** 270 → 271 → 272 → 273 → 274 → 275.
+
 - **270 comes first.** It is cheap and security-bearing, and its file facts (pages, source-created
   date) become searchable dimensions in 271.
+
 - **271 comes before 272.** The agent's dimension filters use the same field vocabulary the person
   searches by.
+
 - **272 comes before 275.** RET-04's "archived drops out of default retrieval" rides the filter seam
   272 extracts, so it is a default predicate there rather than a second landing on `retrieval_service.py`.
+
 - **273 has no functional dependency on the FIND track.** It is sequenced after 272 only because both
   land on `tool_dispatcher.py` and `agent_loop.py`. It can run earlier if those hot files are free.
+
 - **274 comes after 271**, because the Library IA must be settled before chat's doors move into it,
   and `LibraryPage.tsx` must not be edited concurrently.
+
 - **275 comes last.** It needs 271 (archived documents stay *findable*), 272 (the retrieval seam) and
   274 (a promoted attachment becomes a document a policy can reach, and a thread attachment never is).
 
@@ -119,11 +125,13 @@ data-thread branch/compare half of `SEED-193`, the hardening/testing milestone, 
 **Plans**: 5 plans in 3 waves
 
 Plans:
+
 - [x] 270-01-PLAN.md — baselines + ledger rows, migration 199 (fact columns + TTL setting), `file_facts.py` + the one best-effort write in `splice_document` (wave 1)
 - [x] 270-02-PLAN.md — `POST /documents/{id}/download-url` (RLS read first, service-role sign second, bounded TTL, no-store), facts + connection name on `DocumentResponse` (wave 1)
 - [x] 270-03-PLAN.md — Wave-0 save-strategy spike, `documentDownload.ts`, `DocumentDownloadButton`, `DocumentFileFacts`, API fn + barrel (wave 1)
 - [x] 270-04-PLAN.md — mounts: panel header Download + first `File` section, list-row and version-history Download (wave 2)
 - [x] 270-05-PLAN.md — merged-tree gates, live SC#1-4 proofs + G-4 drive (checkpoint), ledger triples, audit-trail seed, prod parity (wave 3)
+
 **Flags**: **Migration `199`** for the file-fact columns (page count, plus source-created date and author read from PDF/DOCX properties; exact shape decided at discuss). Apply via the SQL editor, regenerate `full-schema.sql`, run `get_advisors(security)`. **Backfill is a discuss decision:** re-extract existing files from storage, or show "not recorded" honestly. The page count is one line at `extraction_service.py`'s page loop (SEED-243). **security_enforcement**: the org check runs through the user-JWT / RLS path before the URL is minted. The URL is a bearer token, so it must be short-lived. **G-2 fires** (download control + panel file facts). The UI is small and sits on shipped surfaces. A skip must be a recorded decision, and OV-266-01 shows what a skip cost: a note that was invisible because it lived only in a tooltip. **G-4** scenarios at scope time. **G-5 audit at discuss:** `backend/app/api/documents.py` (85/33, DISCHARGED at 229), `frontend/src/components/metadata/DocumentDetailPanel.tsx` (FIRES), `frontend/src/components/ingestion/DocumentList.tsx` (FIRES, seam taken), `frontend/src/types/index.ts` (seam OWED), and the extraction service (run `node scripts/check-hot-file-ledger.cjs`, which catches rows that are absent). **Deploy parity**: the migration goes to production before the backend, and the signed-URL lifetime is set as a setting, not hardcoded. Seeds: `SEED-243` (both operator halves).
 **UI hint**: yes
 
@@ -141,7 +149,23 @@ Plans:
   5. Document search returns only what the caller's org access allows: a two-org fence driven against the real RLS path shows zero cross-org rows (FIND-01).
 
 **How we'd know this failed**: "document search" is RAG with a filter bolted on, so it returns chunks or calls the embedder; the UI offers a filter the backend silently ignores (a green presence test with no content effect); the relationship filter matches outgoing links only; a version filter hides the latest row; the rename leaves a dead `ActiveView` member, a stale nav entry, or a route that `activeViewReachability.ts` rejects; a metadata value starts deciding who can see a document (the `SEED-211` fork, out of scope).
-**Plans**: TBD
+**Plans**: 5 plans in 3 waves
+
+Plans:
+**Wave 1**
+
+- [ ] 271-01-PLAN.md — baselines; extract apply_fragments/validate_and_compile; DocumentSearchRequest + document_search_service (structure filters, relationship both directions, version states, server sort/page/exact total, no embedding) + POST /document-search (wave 1)
+- [ ] 271-02-PLAN.md — retire the classification-rules view; Filing rules header link + Library sub-view; Ask handoff (askInChat, new thread, prefill, never send); FindModeSwitch / FindMetaLine / AskHandoffCard (wave 1)
+- [ ] 271-03-PLAN.md — findState leaf, wire types, searchDocuments, useDocumentFind; 8-verb table derived from relationshipLabels; LinkTargetCombobox extracted; Find column set (seven cells) + documentAddedBy (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 271-04-PLAN.md — quick-add builder on the one FilterBar + structure editors + always-visible Version chip; DocumentsFindBody states; LibraryPage wiring; older-version panel notice; wave-2 gates (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 271-05-PLAN.md — live content proofs + two-org fence on real RLS (GoTrue JWTs); merged-tree gates; G4-1..G4-6 browser drive (operator sign-off OWED); ledger triples, SEED-243, BUG-260923-01 note (wave 3)
+
 **Flags**: **G-2 FIRES**: `/gsd:sketch` before plan (the search mode beside RAG, the filter builder, the rules surface's new name and home). Reuse the Phase 114 no-DSL filter/view builder and the sketch-findings skill; do not invent a second builder. **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/pages/LibraryPage.tsx` (FIRES), `frontend/src/components/layout/ChatLayout.tsx` (FIRES; Classification mounts at `:943`), `frontend/src/App.tsx` (the `ActiveView` union, fenced by `activeViewReachability.ts`), `frontend/src/lib/nav-items.ts`, `backend/app/api/documents.py`, `backend/app/api/classification_rules.py`, `frontend/src/components/classification/RuleBuilderPanel.tsx`, the folder tree (`FolderTree.tsx` / `NavRow.tsx` / `ViewsGroup.tsx`), `frontend/src/types/index.ts`, and the `lib/api/*` modules (the barrel split was TAKEN at 207, so add to a module, never to the barrel). Reuse the shipped view-filter compiler and typed columns (`date_typed`, `document_type_norm`, migration 074) before adding any. Migration: probably none. If one is needed, use the next free number. Seeds: `SEED-243` §decide 1-3, `SEED-005` Tier A. `SEED-224`'s five-tab redesign is **not** this phase.
 **UI hint**: yes
 

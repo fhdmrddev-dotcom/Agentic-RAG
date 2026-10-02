@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: Find It, Show It
-status: planning
-last_updated: "2026-10-02T21:35:13.222Z"
+status: executing
+last_updated: "2026-10-02T23:03:50.470Z"
 last_activity: 2026-10-02
 progress:
   total_phases: 13
   completed_phases: 1
-  total_plans: 5
+  total_plans: 10
   completed_plans: 5
   percent: 8
 ---
@@ -56,7 +56,7 @@ genuinely reviewed.
 
 Phase: 271
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Last activity: 2026-10-02
 
 ### v4.5 roadmap (2026-09-29): 19 / 19 requirements mapped
@@ -102,7 +102,7 @@ Status: Phase 269 closed — verification `passed`; nothing deployed; ~~next: op
 - **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
-Resume file: .planning/phases/271-find-the-document/271-CONTEXT.md
+Resume file: .planning/phases/271-find-the-document/271-UI-SPEC.md
 Last activity: 2026-09-29 -- Phase 269 closed
 
 ---
