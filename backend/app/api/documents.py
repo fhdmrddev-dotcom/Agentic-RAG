@@ -13,6 +13,7 @@ from uuid import uuid4
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
+from storage3.exceptions import StorageApiError
 from supabase import Client
 
 from app.api.kb import read_path
@@ -20,6 +21,7 @@ from app.dependencies import get_current_user, get_supabase, get_user_supabase_c
 from app.models.document import (
     DocumentChunkRow,
     DocumentContentResponse,
+    DocumentDownloadUrl,
     DocumentImageRow,
     DocumentMetadata,
     DocumentMoveRequest,
@@ -27,7 +29,7 @@ from app.models.document import (
     DocumentTableRow,
 )
 from app.models.document import ConversationMessage, ConversationResponse  # Phase 240
-from app.models.user_settings import load_app_settings
+from app.models.user_settings import load_app_settings, load_app_settings_async
 from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata, read_enabled_field_defs
 from app.services.email_attachments import ingest_email_attachments
@@ -842,6 +844,82 @@ async def list_document_versions(
         .execute()
     )
     return result.data or []
+
+
+# ── Phase 270 · FIND-04 — the download mint ───────────────────────────────────────────
+# Mirrors migration 199's CHECK (10..900). The ROADMAP failure is "still works an hour later".
+DOWNLOAD_URL_TTL_DEFAULT_S = 60
+DOWNLOAD_URL_TTL_MIN_S = 10
+DOWNLOAD_URL_TTL_MAX_S = 900
+
+
+def _clamp_download_ttl(value) -> int:
+    """A non-int / None setting falls to the default; anything else clamps to 10..900."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return DOWNLOAD_URL_TTL_DEFAULT_S
+    return max(DOWNLOAD_URL_TTL_MIN_S, min(DOWNLOAD_URL_TTL_MAX_S, value))
+
+
+@router.post("/{document_id}/download-url", response_model=DocumentDownloadUrl)
+async def create_document_download_url(
+    document_id: str,
+    response: Response,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+    # D-04 carve-out — STORAGE SIGN ONLY, and only AFTER the RLS read below: the documents
+    # bucket's SELECT policy is owner-folder-only, so a user-JWT sign refuses every colleague.
+    service_supabase: Client = Depends(get_supabase),
+):
+    """Mint a short-lived signed URL for a document's original file.
+
+    Access is proven FIRST through the user-JWT / RLS path; only then does the service role
+    sign the `file_path` read from that authorized row. The route accepts no path, bucket or
+    version. An invisible document is a 404 (never 403) with zero storage calls.
+    """
+    # (a) the authorization decision — owner or shared-folder visibility through RLS
+    await _assert_document_visible(document_id, current_user["id"], supabase)
+    # (b) the narrow row the signer is allowed to act on
+    res = await aexec(
+        supabase.table("documents")
+        .select("id, file_path, filename, version_number")
+        .eq("id", document_id)
+        .maybe_single()
+    )
+    row = getattr(res, "data", None)
+    if not row:
+        raise HTTPException(status_code=404, detail="Document not found")
+    # (c) nothing stored → an honest refusal, never a URL to nowhere
+    if not row.get("file_path"):
+        raise HTTPException(
+            status_code=409,
+            detail={"reason_code": "not_stored", "message": "This document's file is not stored here."},
+        )
+    # (d) bounded lifetime
+    settings = await load_app_settings_async()
+    ttl = _clamp_download_ttl(getattr(settings, "document_download_url_ttl_seconds", None))
+    # (e) service-role sign of the authorized row's own path; `download` forces attachment
+    try:
+        signed = await run_in_threadpool(
+            service_supabase.storage.from_("documents").create_signed_url,
+            row["file_path"],
+            ttl,
+            {"download": row["filename"]},
+        )
+    except StorageApiError:
+        raise HTTPException(
+            status_code=410,
+            detail={"reason_code": "file_missing", "message": "The original file is missing from storage."},
+        )
+    link = (signed or {}).get("signedURL") or (signed or {}).get("signedUrl")
+    if not link:
+        raise HTTPException(status_code=500, detail="Failed to generate download URL")
+    response.headers["Cache-Control"] = "no-store"
+    return DocumentDownloadUrl(
+        url=link,
+        expires_in=ttl,
+        version_number=row.get("version_number") or 1,
+        filename=row["filename"],
+    )
 
 
 # ── Phase 217 · LIB-04 — the four buried facts, put on the wire ───────────────────────
