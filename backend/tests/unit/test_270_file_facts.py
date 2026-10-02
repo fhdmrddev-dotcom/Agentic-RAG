@@ -129,8 +129,11 @@ def test_author_is_truncated_stripped_and_blank_becomes_none():
     f = read_file_facts(_pdf(1, {"/Author": long_author}), PDF_MIME)
     assert f.source_author is not None and len(f.source_author) == 512
     assert read_file_facts(_pdf(1, {"/Author": "   "}), PDF_MIME).source_author is None
-    f2 = read_file_facts(_docx("Bea\x00X"), DOCX_MIME)
-    assert f2.source_author == "BeaX"
+    # A DOCX cannot carry a NUL (lxml refuses it), but a PDF string can; the cleaner is the one home.
+    from app.services.file_facts import _clean_author
+
+    assert _clean_author("Bea\x00X") == "BeaX"
+    assert read_file_facts(_docx("Bea"), DOCX_MIME).source_author == "Bea"
 
 
 def test_as_row_has_exactly_the_four_keys_with_iso_strings():

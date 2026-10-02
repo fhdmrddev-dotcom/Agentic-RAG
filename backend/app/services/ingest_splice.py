@@ -23,9 +23,13 @@ from supabase import Client
 if TYPE_CHECKING:
     from app.services.extraction_service import ExtractedDocument
 
+from app.services.file_facts import read_file_facts
 from app.services.transient_errors import is_transient
 
 log = logging.getLogger(__name__)
+
+#: Phase 270 (FIND-05 / T-270-01): wall-clock cap on parsing a PDF/DOCX for its file facts.
+_FILE_FACTS_TIMEOUT_S = 10
 
 
 async def _db(call):
@@ -500,6 +504,29 @@ async def splice_document(
         if job_id:
             raise RuntimeError(f"no bytes in storage for document {document_id}")
         return
+
+    # ── Phase 270 (FIND-05 / P-06 / P-08) — THE DOCUMENT'S OWN FILE FACTS ────────────────
+    # Pages, the dates the FILE says it was created / modified, the author it names. ONE
+    # separate best-effort UPDATE, deliberately NOT merged into any status write below: a
+    # database that has not yet had migration 199 applied (cloud before migration) must not
+    # take the status write down with it, and a facts failure NEVER fails an ingest. A caller
+    # that passes `raw=b""` on purpose (the backfill tool) skips this block and writes nothing.
+    if raw:
+        _facts = None
+        try:
+            _facts = await asyncio.wait_for(
+                run_in_threadpool(read_file_facts, raw, mime_type or ""),
+                timeout=_FILE_FACTS_TIMEOUT_S,
+            )
+        except Exception as facts_exc:  # noqa: BLE001 — includes asyncio.TimeoutError
+            log.warning("file facts read failed for %s: %s", document_id, facts_exc)
+        if _facts is not None and not _facts.is_empty():
+            try:
+                await _db(lambda: supabase.table("documents").update(
+                    _facts.as_row()
+                ).eq("id", document_id).execute())
+            except Exception:  # noqa: BLE001
+                log.warning("file facts write failed for %s", document_id)
 
     # Step 1: Storage upload (if raw & storage_path provided and not already uploaded)
     if storage_path and raw:
