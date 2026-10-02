@@ -10712,6 +10712,12 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
+| [`backend/app/models/document.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocumentpy) | 10 / 7 / 183 | ⚠ **FIRES — 7 phases** | ⚠ absent from BOTH registers its ENTIRE LIFE at 7 phases — row added 270-01. ⛔ additive OPTIONAL fields only: a required field 500s five narrow-select routes |
+| [`frontend/src/components/ingestion/DocumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentrowtsx) | 5 / 2 / 469 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 270-01 at its 2nd phase. ⛔ exactly seven `<td>`; the Download goes INSIDE the Actions cell, never an 8th column |
+| [`backend/app/services/file_facts.py`](docs/HOT-FILE-LEDGER.md#backendappservicesfile_factspy) | 0 / 0 / 0 | no (new) | young (created 270-01). Row added AT PLANNING. ⛔ `read_file_facts` NEVER raises; a fact it cannot read is `None`, never `0` and never a substituted date |
+| [`frontend/src/lib/documentDownload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentdownloadts) | 0 / 0 / 0 | no (new) | young (created 270-03). Row added AT PLANNING. ⛔ the ONLY place the download label is derived and the request made |
+| [`frontend/src/components/metadata/DocumentDownloadButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdownloadbuttontsx) | 0 / 0 / 0 | no (new) | young (created 270-03). Row added AT PLANNING. ⛔ no `href`, no stored URL: the link is minted on click |
+| [`frontend/src/components/metadata/DocumentFileFacts.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentfilefactstsx) | 0 / 0 / 0 | no (new) | young (created 270-03). Row added AT PLANNING. ⛔ eight rows always present; a source date NEVER falls back to the upload date |
 | [`backend/app/services/expert_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_authoringpy) | 7 / 3 / 393 (was `4 / 2 / 389`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/389`), now FIRES. honoured by construction (**267-01**): the draft prompt says `tool_floor_enabled` is always true and has no effect. ⛔ every emitted string CAPPED |
 | [`backend/app/services/skill_body_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesskill_body_authoringpy) | 2 / 1 / 373 | no (new) | young (created 263). Row added AT CREATION — an absent row is invisible to G-5 at any count. ⛔ The ONE home of the borrowed craft doctrine; doctrine inlined here makes it an ENGINE (D-263-13). |
 | [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 6 / 3 / 1550 (was `3 / 2 / 1475`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`3/2/1475`), now FIRES. honoured by construction (**267-03**): 2 removals + ONE re-keyed connection picker. ⛔ no new section; extraction OWED before a 4th phase |
@@ -17412,3 +17418,32 @@ Re-derived at `268-04` (after waves 1-2 merged) with the CLAUDE.md recipe (6-dig
 ### `backend/app/services/scope_note.py`
 
 **`1 / 1 / 83`**, created by 268-04 (D-268-26 / SEED-319), row added AT CREATION. The ONE home of the MODEL-facing scope-change note: `scope_history_note(from, to)` holds the words; `ScopeNoteFold` folds consecutive changes before one user message (first `from` → last `to`; a round trip says nothing) and drops `held` changes (under a Restricted Expert the effective search did not change). It reads the stored `scope_changed` payload and never its `expert` key, so no Expert name reaches a model through it. Folder paths are user-authored text: brackets and line breaks are stripped and each path is capped at 120 chars. ⛔ The UI's scope words stay in `scopeCopy.ts` / `expert_scope.scope_event_sentence`; this is a separate, model-facing register.
+
+
+## Phase 270 rows — added AT PLANNING (2026-09-30)
+
+The G-5 gate found 6 files with no row when the 270 plans were written: two EXISTING files (`document.py`, `DocumentRow.tsx`) and four files this phase creates. The executor of each creating plan re-measures its triple in the same commit that creates the file.
+
+### `backend/app/models/document.py`
+
+**`10 / 7 / 183`** at 270 planning (phase buckets `02 036 112 217 231 240 28`; the `Module 2/3/4` commits are not phases). FIRES G-5 and had NO row for its entire life. **270-02 (planned):** five optional response fields (`page_count`, `source_created_at`, `source_modified_at`, `source_author`, plus the download response model), additive. ⛔ **Binding invariant:** additive OPTIONAL fields only. A required field makes five narrow-select routes that build `DocumentResponse` from a partial row return HTTP 500.
+
+### `frontend/src/components/ingestion/DocumentRow.tsx`
+
+**`5 / 2 / 469`** at 270 planning (buckets `217.1 230`). Absent for its entire life; below the G-5 threshold (2 phases) but 270-04 is its third touch, so the row is added now. ⛔ **Binding invariants:** exactly SEVEN `<td>` (`LibraryPage` sheds columns 3-5 by `nth-child`, so a new column silently breaks it); the Download affordance goes INSIDE the Actions cell.
+
+### `backend/app/services/file_facts.py`
+
+**`0 / 0 / 0`** at 270 planning. Young (created 270-01). Pure parsing of a PDF or DOCX into `FileFacts` (page count, source created, source modified, author). ⛔ **Binding invariants:** `read_file_facts` never raises; every fact it cannot read is `None`, never `0` and never a substituted date (D-01 / D-09); naive PDF dates are treated as UTC; no network or database import.
+
+### `frontend/src/lib/documentDownload.ts`
+
+**`0 / 0 / 0`** at 270 planning. Young (created 270-03). ⛔ **Binding invariant:** the ONLY place the download label is derived and the mint request made; components import it, never re-derive.
+
+### `frontend/src/components/metadata/DocumentDownloadButton.tsx`
+
+**`0 / 0 / 0`** at 270 planning. Young (created 270-03). ⛔ **Binding invariant:** no `href` and no stored URL. The signed link is minted on click, so a link in the DOM is a link that has already expired or leaked.
+
+### `frontend/src/components/metadata/DocumentFileFacts.tsx`
+
+**`0 / 0 / 0`** at 270 planning. Young (created 270-03). ⛔ **Binding invariants:** eight rows always present; a source date NEVER falls back to the upload date; a missing fact reads "not recorded".

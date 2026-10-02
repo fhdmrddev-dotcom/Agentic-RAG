@@ -5,7 +5,7 @@ created: 2026-09-25
 surface: Agentic-RAG
 status: planted
 partial: false
-status_note:
+status_note: "Phase 270 (2026-09-30) touched the trigger path and left this open: the phase adds a download route and a file-facts write, and changes neither upload org-stamping nor versioning."
 trigger_when: Any phase touching document versioning (mint_document_row's version lookup / is_latest retirement), /upload, or Expert install readiness.
 trigger_paths: ["backend/app/services/ingest_splice.py", "backend/app/api/documents.py", "backend/app/services/expert_install_service.py"]
 trigger_surfaces: []
