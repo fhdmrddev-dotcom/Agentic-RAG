@@ -14,6 +14,7 @@ import type {
   Document,
   DocumentChunkRow,
   DocumentContentResponse,
+  DocumentDownloadUrl,
   DocumentImageRow,
   DocumentQueryRow,
   ConversationResponse,
@@ -132,6 +133,27 @@ export class DownloadError extends Error {
     this.status = status
     this.name = "DownloadError"
   }
+}
+
+/**
+ * Phase 270 — mint a short-lived signed download URL for a document's original file.
+ * The URL is a bearer token: the caller (`startDocumentDownload`) uses it once and never keeps it.
+ * 404/403 = invisible, 409 = not stored, 410 = file missing; all surface as DownloadError(status).
+ */
+export async function getDocumentDownloadUrl(documentId: string): Promise<DocumentDownloadUrl> {
+  const headers = await getAuthHeaders()
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/documents/${documentId}/download-url`, {
+      method: "POST",
+      headers,
+      cache: "no-store",
+    })
+  } catch {
+    throw new DownloadError("network", "Download failed.")
+  }
+  if (!res.ok) throw new DownloadError(res.status, "Download failed.")
+  return res.json() as Promise<DocumentDownloadUrl>
 }
 
 export async function downloadSandboxOutput(

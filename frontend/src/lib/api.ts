@@ -109,6 +109,8 @@ export {
   // Phase 240 (SRC-05 SC#3) — the conversation read. Same rule as the five above: a symbol
   // missing from this barrel typechecks perfectly and is invisible to every consumer.
   fetchDocumentConversation,
+  // Phase 270 (FIND-04) — the per-click download mint.
+  getDocumentDownloadUrl,
 } from "./api/documents"
 
 // ── skills ─────────────────────────────────────────────────────────
