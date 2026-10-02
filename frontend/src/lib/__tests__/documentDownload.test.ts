@@ -39,6 +39,10 @@ describe("downloadLabel", () => {
     expect(downloadLabel({ version_number: 2, is_latest: false })).toBe(
       "Download v2 (viewed, not latest)",
     )
+    // 270-04: an older v1 in a version history is named too (a bare "Download" would be ambiguous).
+    expect(downloadLabel({ version_number: 1, is_latest: false })).toBe(
+      "Download v1 (viewed, not latest)",
+    )
   })
 })
 

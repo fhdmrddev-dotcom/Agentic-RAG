@@ -674,6 +674,7 @@ export function LibraryPage({
           doc={selectedDoc}
           onClose={() => setSelectedDocId(null)}
           onReconcile={loadDocuments}
+          currentUserId={user?.id}
         />
       )}
     </div>
