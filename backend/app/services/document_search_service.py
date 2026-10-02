@@ -48,7 +48,12 @@ from datetime import date, datetime, timedelta
 
 from supabase import Client
 
-from app.models.document_search import DocumentSearchRequest
+from app.models.document_search import DocumentSearchRequest, FindRelationship
+from app.services.document_relationship_service import (
+    _INVERSE_LABEL,
+    _resolve_readable_latest,
+    _subject_version_ids,
+)
 from app.services.document_view_resolver import (
     ResolveError,
     _relative_window,
@@ -92,6 +97,9 @@ _SORT = {
 _TIMESTAMP_COLUMNS = {"created_at", "source_created_at", "source_modified_at"}
 
 _NOT_IN_A_FOLDER = object()  # sentinel: folder condition = "Not in a folder"
+
+# Incoming verb → its stored rel_type (the inverse of ``_INVERSE_LABEL``, never retyped).
+_REL_TYPE_OF_INCOMING = {inverse: stored for stored, inverse in _INVERSE_LABEL.items()}
 
 TRUNCATED_DETAIL = "Couldn't read every matching document. Narrow the search and try again."
 
@@ -302,6 +310,77 @@ def _lineage_facts(rows: list[dict], lineage: list[dict], caller: str, global_id
     return facts
 
 
+async def _relationship_allow_list(
+    caller: str, rel: FindRelationship, supabase: Client
+) -> tuple[set[str], set[str]] | None:
+    """``<result> <verb> <picked P>`` → ``(latest_ids, older_ids)``, or ``None`` if P is unreadable.
+
+    P-02 (RESEARCH Pattern 3), both directions (D-04 / D-05):
+      * an OUTGOING verb (a stored ``rel_type``: supersedes / amends / references /
+        attached_to) matches the edge SOURCES whose target is in P's lineage;
+      * an INCOMING verb (its inverse label) matches the edge TARGETS whose source is in
+        P's lineage — so "is superseded by A" is non-empty whenever A supersedes something
+        in P's lineage, never "outgoing links only".
+    P is matched BY LINEAGE (``_subject_version_ids``) so an edge recorded on P's old
+    version still counts (D-116-1a). For Latest / Has earlier each matched endpoint follows
+    to its lineage's latest row and P's own latest is excluded (a link inside one lineage is
+    not "X supersedes X"); for Older versions the endpoints are row-exact — the rows the
+    link was recorded on. ``older_ids`` is therefore what "Show them" lists.
+
+    ⛔ Both helpers are handed the route's user-JWT client explicitly: their ``None``
+    default is the SERVICE-ROLE client, which would switch RLS off. The edge read is
+    also ``user_id = caller`` (RLS on ``document_relationships`` is owner-only anyway).
+    An unreadable P returns ``None`` → the caller answers with the zero-result shape, so
+    the picker can never become an existence oracle.
+    """
+    p_row = await _resolve_readable_latest(str(rel.document_id), caller, supabase=supabase)
+    if p_row is None:
+        return None
+    versions = await _subject_version_ids(p_row, supabase=supabase)
+
+    if rel.verb in _INVERSE_LABEL:  # outgoing: result is the SOURCE
+        rel_type, match_col, result_col = rel.verb, "target_doc_id", "source_doc_id"
+    else:  # incoming: result is the TARGET
+        rel_type, match_col, result_col = _REL_TYPE_OF_INCOMING[rel.verb], "source_doc_id", "target_doc_id"
+
+    edges = await aexec(
+        supabase.table("document_relationships")
+        .select("source_doc_id,target_doc_id")
+        .eq("rel_type", rel_type)
+        .eq("user_id", caller)
+        .in_(match_col, versions)
+    )
+    endpoints = sorted({str(e[result_col]) for e in (edges.data or []) if e.get(result_col)})
+    if not endpoints:
+        return set(), set()
+
+    rows = (
+        await aexec(
+            supabase.table("documents").select("id,user_id,filename,is_latest").in_("id", endpoints)
+        )
+    ).data or []
+    latest_ids = {r["id"] for r in rows if r.get("is_latest")}
+    older_ids = {r["id"] for r in rows if not r.get("is_latest")}
+
+    # Follow each non-latest endpoint to its lineage's latest row — ONE batched read.
+    stale = [r for r in rows if not r.get("is_latest") and r.get("user_id") and r.get("filename")]
+    if stale:
+        wanted = {(r["user_id"], r["filename"]) for r in stale}
+        heads = (
+            await aexec(
+                supabase.table("documents")
+                .select("id,user_id,filename")
+                .in_("user_id", sorted({k[0] for k in wanted}))
+                .in_("filename", sorted({k[1] for k in wanted}))
+                .eq("is_latest", True)
+            )
+        ).data or []
+        latest_ids |= {h["id"] for h in heads if (h.get("user_id"), h.get("filename")) in wanted}
+
+    latest_ids.discard(p_row["id"])  # P's own lineage latest is never its own match
+    return latest_ids, older_ids
+
+
 def _sort_rows(rows: list[dict], sort: str) -> list[dict]:
     """Server order (D-03): nulls LAST in both directions, ties on ``id`` ascending."""
     col, desc = _SORT[sort]
@@ -429,14 +508,36 @@ async def search_documents(*, caller: str, req: DocumentSearchRequest, supabase:
 
     id_allow = None
     older_matches = 0
+    rel_older: set[str] = set()
+
+    # (c) relationship → an id allow-list, applied INSIDE both legs (it only narrows).
+    if req.relationship is not None:
+        allow = await _relationship_allow_list(caller, req.relationship, supabase)
+        if allow is None:
+            return _zero_result(req)  # unreadable P: the same shape as "no matches"
+        rel_latest, rel_older = allow
+        id_allow = rel_older if req.version == "older" else rel_latest
 
     global_ids = await get_globally_visible_folder_ids(supabase, caller)
 
+    def candidates_for(version: str, allow):
+        return _candidates(
+            caller=caller, req=req, version=version, fragments=fragments,
+            folder_ids=folder_ids, id_allow=allow, global_ids=global_ids, supabase=supabase,
+        )
+
+    # older_matches (P-02's hint): only for version=latest with a relationship set. It is
+    # the SAME pipeline with version="older" — so pressing "Show them" (the same request
+    # with version=older) returns exactly this many rows. Counted, never hydrated.
+    if req.version == "latest" and req.relationship is not None and rel_older:
+        older_matches = len(await candidates_for("older", rel_older))
+
+    if id_allow is not None and not id_allow:
+        # An empty allow-list: never send `.in_("id", [])`; answer with the zero shape.
+        return _zero_result(req, older_matches=older_matches)
+
     # (d) candidates over both legs (own only for `older`).
-    candidates = await _candidates(
-        caller=caller, req=req, version=req.version, fragments=fragments,
-        folder_ids=folder_ids, id_allow=id_allow, global_ids=global_ids, supabase=supabase,
-    )
+    candidates = await candidates_for(req.version, id_allow)
 
     # (e) has_earlier — ONE batched lineage read over the candidates.
     facts: dict = {}
