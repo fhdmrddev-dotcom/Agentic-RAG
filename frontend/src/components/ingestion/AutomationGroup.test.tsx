@@ -144,6 +144,6 @@ describe("AutomationGroup", () => {
 
   it("honest empty state when there are no rules", () => {
     renderGroup({ rules: [] })
-    expect(screen.getByText(/no classification rules yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/no filing rules yet/i)).toBeInTheDocument()
   })
 })
