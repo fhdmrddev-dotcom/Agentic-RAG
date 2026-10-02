@@ -115,7 +115,7 @@ describe("DocumentDetailPanel — Phase 270 placement", () => {
     ]) {
       expect(screen.getByText(label)).toBeTruthy()
     }
-    const detailsHead = screen.getByRole("button", { name: /details/i })
+    const detailsHead = screen.getByRole("button", { name: /^Details/ })
     expect(follows(fileHead, detailsHead)).toBe(true)
   })
 

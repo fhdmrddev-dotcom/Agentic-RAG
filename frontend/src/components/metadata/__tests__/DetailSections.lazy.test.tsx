@@ -203,7 +203,8 @@ describe("detail sections are lazy — zero requests before the accordion is cli
     expect(await screen.findByText("The spec")).toBeInTheDocument()
 
     const titles = sectionTitlesInDomOrder(container)
-    expect(titles.slice(0, 3)).toEqual(["Details", "Text", "Chunks"])
+    // Phase 270: "File" is now FIRST (UI-SPEC §3); the 217 order follows it unchanged.
+    expect(titles.slice(0, 4)).toEqual(["File", "Details", "Text", "Chunks"])
     expect(titles.slice(-2)).toEqual(["Relationships", "Classification"])
   })
 

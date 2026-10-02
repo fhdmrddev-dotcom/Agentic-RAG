@@ -385,6 +385,7 @@ describe("the panel's eight sections, in the D-217-25a order", () => {
     expect(await screen.findByText("The quarterly")).toBeInTheDocument()
 
     expect(sectionTitlesInDomOrder(container)).toEqual([
+      "File", // Phase 270 (UI-SPEC §3): first, open at rest
       "Details",
       "Text",
       "Chunks",
