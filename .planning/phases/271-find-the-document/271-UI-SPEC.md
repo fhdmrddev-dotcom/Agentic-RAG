@@ -39,7 +39,7 @@ Declared values. All are multiples of 4, and every one maps to a Tailwind class 
 
 | Token | Value | Tailwind | Usage in this phase |
 |-------|-------|----------|---------------------|
-| xs | 4px | `gap-1`, `p-0.5` | Icon to label gap inside chips and links, padding of the segmented-control track |
+| xs | 4px | `gap-1`, `p-1`, `py-1` | Icon to label gap inside chips and links, padding of the NEW Find/Ask segmented-control track (`p-1`), vertical padding of the Filing rules link (`py-1`) |
 | sm | 8px | `gap-2` | Mode switch to search input, chip to chip, Filing rules link to queue pill, meta-line items |
 | md | 16px | `space-y-4`, `gap-4` | Vertical rhythm of the Documents list column (search row → chip strip → meta line → list); this is the shipped `space-y-4` |
 | lg | 24px | `gap-6`, `p-6` | List column to detail-panel gap (shipped `gap-6`), Ask card inner padding |
@@ -48,7 +48,11 @@ Declared values. All are multiples of 4, and every one maps to a Tailwind class 
 | 3xl | 64px | — | Not used in this phase |
 
 Exceptions:
-- **12px** (`gap-3`, `p-3`) for the shipped FilterBar wrapper (`rounded-xl bg-card/30 ghost-border p-3`). It is inherited and not changed.
+- **12px, shipped idioms only** (reused, never authored fresh here):
+  - the FilterBar wrapper `rounded-xl bg-card/30 ghost-border p-3` (inherited, unchanged);
+  - the popover shell `p-3` (the shipped ConditionPopover idiom; every new popover in S6 reuses it so one popover family keeps one inner padding).
+- **Shipped 2px track padding:** the existing Library tab segmented control keeps its shipped `p-0.5`. It is not edited by this phase; the new mode switch uses `p-1`.
+- **Decorative size exemption:** the 6px (`h-1.5 w-1.5`) dot before "Exact match on fields. No AI ranking." is a decorative glyph (`aria-hidden`), not a spacing value.
 - **Touch targets:** below 768px, the mode-switch segments, the quick-add chips, the Filing rules link and the sort select are `min-h-[44px]`. At 768px and up they are 32px (`h-8`).
 - **Search input height 36px** (`h-9`), to match the ConditionPopover inputs it sits beside.
 
@@ -56,7 +60,7 @@ Exceptions:
 
 ## Typography
 
-New surfaces in this phase use exactly four sizes and two weights. Shipped elements this phase reuses keep their classes byte-for-byte (see the exceptions below).
+**Weights: every NEW element in this phase uses only 400 (regular) and 600 (semibold).** Weight 700 appears only on the shipped page-title class, and 500 only on the shipped FilterBar chip text and the shipped DocumentRow filename cell, all named below. New surfaces use exactly four sizes. Shipped elements this phase reuses keep their classes byte-for-byte.
 
 | Role | Size | Weight | Line height | Used for |
 |------|------|--------|-------------|----------|
@@ -68,6 +72,7 @@ New surfaces in this phase use exactly four sizes and two weights. Shipped eleme
 Exceptions (inherited, not authored here):
 - The page title (`text-2xl font-headline font-bold`) is the measured convention on every page (`LibraryHeaderBar.tsx:96-102`). "Filing rules" keeps that class so it matches its siblings.
 - FilterBar chip text stays `font-medium` (500) as shipped. The builder is shared with the Views tab, and restyling it here would fork it.
+- The result-row filename keeps the shipped `DocumentRow` filename cell class `font-medium` (500). The Find column set reuses that cell; it does not restyle it.
 
 ---
 
@@ -95,6 +100,8 @@ Accent is **never** used for: filter chips, set or unset (they keep FilterBar's 
 ---
 
 ## Screen Inventory and Layout Contract
+
+**Focal points.** Find: the search input first, then the result list (count line, then rows). Ask: the question input, then the **Open in chat** button. Filing rules: the rules list, with **New rule** as the single primary action in the header.
 
 ### S1. Library header row: the Filing rules link (FIND-06, D-08/D-09, sketch 3A)
 
@@ -152,9 +159,9 @@ Where [Document type is Contract ✕] [Added by You ✕] [Folder /Contracts + su
   4. When no Folder chip is set: "Searching every folder you can see."
   5. "Clear search" as a text action, right-aligned with `ml-auto`.
 - **Result rows** come through the shipped `DocumentList` with a Find column set. It stays **seven `<td>`, fixed order**: chevron · Name · Document type · Added by · *Date* · Status · Actions. Columns 3 to 5 are what `SHED_COLUMNS_3_TO_5` hides when the detail panel opens, and **that constant is not edited** (T-217-35). Browse mode keeps Filename · Type · Size · Chunks byte-identical.
-  - **Name cell:** the file name (`text-sm font-medium`), with a second line (`text-xs text-muted-foreground`) carrying the folder path ("/Contracts/2019", or "Not in a folder") and the version tag. The second line survives the shed, so folder and version stay visible beside the detail panel.
+  - **Name cell:** the file name (the shipped DocumentRow filename cell, `text-sm font-medium`, unchanged), with a second line (`text-xs text-muted-foreground`) carrying the folder path ("/Contracts/2019", or "Not in a folder") and the version tag. The second line survives the shed, so folder and version stay visible beside the detail panel.
   - **Date column:** the header names the fact the active sort uses ("Added", "Modified in the file", "Created in the file", "Date in the document"). When the sort is by name, it shows "Added". A missing value reads *not recorded* (italic, muted), never `0` and never a substituted date (the 270 D-09/D-10 rule).
-  - **Version tag** (`text-xs`, `rounded-md border px-1.5`). A latest row with a history reads "v2 · 2 versions", in neutral `border-border text-muted-foreground`. An older-version row reads "v1 · older version", in `border-warning/30 bg-warning/10 text-warning`. A single-version latest row shows no tag.
+  - **Version tag** (`text-xs`, `rounded-md border px-2`). A latest row with a history reads "v2 · 2 versions", in neutral `border-border text-muted-foreground`. An older-version row reads "v1 · older version", in `border-warning/30 bg-warning/10 text-warning`. A single-version latest row shows no tag.
 - **Row click** opens the Phase 270 detail panel for **that row**, including an older-version row. The panel must resolve from the Find result set, not only from the latest-rows `documents` array.
 - **Panel open:** the shipped 032-A behaviour applies. The sidebar rails, the chip strip collapses to the shipped summary chip ("3 filters"), and columns 3 to 5 shed. Every chip popover stays usable at the reduced width (`w-72` max, it may overflow the strip to the right but never off-screen).
 - **Pagination:** the shipped `DocumentsPager`, 25 rows by default. It only renders when the total is above 25. The total comes from the server count, never from the page length.
@@ -207,7 +214,7 @@ All popovers use the shipped idiom: `absolute top-full mt-2 z-20 w-72 rounded-lg
 
 **The Version chip is always visible, even at the default.** It reads `Version: Latest`, takes no ✕, and is styled as a neutral set chip. A filter that hides rows by default has to show that it does (D-06). Choosing an option replaces the value. Clear search resets it to Latest.
 
-**Older-versions hint** (README winner, D-06). It shows when Version = Latest **and** a Relationship condition is set **and** the server reports N > 0 matching older-version rows. It sits directly under the result list (or under the zero box), `role="status"`, styled `rounded-lg border border-dashed border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning`. Its copy is below. **Show them** sets Version to "Older versions (superseded)". It never widens the filter on its own.
+**Older-versions hint** (README winner, D-06). It shows when Version = Latest **and** a Relationship condition is set **and** the server reports N > 0 matching older-version rows. It sits directly under the result list (or under the zero box), `role="status"`, styled `rounded-lg border border-dashed border-warning/30 bg-warning/10 px-4 py-2 text-xs text-warning`. Its copy is below. **Show them** sets Version to "Older versions (superseded)". It never widens the filter on its own.
 
 ### S7. States (every surface)
 
