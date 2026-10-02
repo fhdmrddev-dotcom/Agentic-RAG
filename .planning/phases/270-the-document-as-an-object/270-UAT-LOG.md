@@ -7,7 +7,7 @@ Driven 2026-10-03 on the MAIN working tree against LOCAL services only (Supabase
 | Gate | Result |
 |---|---|
 | Backend unit baseline (`check-backend-unit-baseline.cjs`, in `backend/`) | `[GATE PASSED] Backend unit baseline satisfied (failed: 71 <= 71, errors: 0)`. Count only: the failed SET was not diffed against `270-BASELINES.md` by this run. The 270-02 and 270-01 executors each recorded 71 before and after. |
-| Vitest count gate (`GSD_VITEST_MAX_WORKERS=2`) | see "Vitest verdict" at the foot of this file |
+| Vitest count gate (`GSD_VITEST_MAX_WORKERS=2`) | RED, triaged: see "Vitest verdict" at the foot of this file |
 | `tsc -p tsconfig.app.json --noEmit` | 70 errors = the baseline count of 70 (`270-BASELINES.md` line 129). Count compared, SET not re-diffed here; 270-03 and 270-04 each reported "no new error" as a set diff against base. |
 | `check-hot-file-ledger.cjs 270` | `ledger gate OK — every watched file has a row` (356 rows, 37 subject files, 14 watched) |
 | `check-claude-md-size.cjs` | `claude-md size gate OK — every CLAUDE.md loads, all under 120000 chars.` |
@@ -59,4 +59,16 @@ Deleted: documents `5e6e5ec5…`, `fb40421d…`, `cb34697b…` (uat270-versions.
 
 ## Vitest verdict
 
-_pending: filled in below once the gate finishes._
+Two full runs on the merged tree, cap 2, no sibling agent:
+
+- Run 1 (before the F-1/F-2 fixes; files were being edited while it ran): `total 9149 · failed 1 · pinned total 8394` → `FAIL [failing-tests] 1 test(s) failed`. The one failure was `DocumentFileFacts.test.tsx` "names who added it…", i.e. a file mid-edit at that moment; the same file passes 15/15 after the edit finished.
+- Run 2 (final tree, after the fixes, commit `96d59b622`): `total 9149 · failed 5 · pinned total 8394` → `FAIL [failing-tests] 5 test(s) failed — the gate requires 0.` Filenames captured from the gate's own JSON BEFORE any re-run:
+  - `src/pages/WorkflowsPage.test.tsx` (3 cases) — one of SEED-171's five named flaky suites
+  - `src/pages/__tests__/SettingsPage.changedFields.test.tsx` (1 case)
+  - `src/components/library/__tests__/sketchComposition.test.tsx` (1 case) — also red once in 270-03's own run and green 46/46 at base and with its changes
+  - all five are `STACK_TRACE_ERROR` timeouts. `git diff --name-only 26308281a HEAD -- frontend` lists 16 files and NONE of these three is among them (provably unmodified by this phase). The failing SET moved between runs (1 file, then 3 files), which is the SEED-171 signature, so this is recorded as an observation, never as proof of innocence.
+- The deterministic evidence for this phase is therefore: the in-scope suites (`src/components/ingestion`, `src/components/metadata`, `src/lib/__tests__/documentDownload.test.ts`, `src/pages/LibraryPage*`) with the two edited files 15/15 and the two timeout-prone neighbours 21/21 at cap 1, plus the backend gate (71 ≤ 71), the tsc count (70 = baseline) and the live drive above. `count gate OK` was NOT reached, and a plan that needs it green cannot promise it (CLAUDE.md consequence for planning).
+
+## Operator sign-off (G-4)
+
+2026-10-03: the operator reviewed the three checks asked for at close (Download button naming the version; `File` first with eight rows; four italic `not recorded` rows on an old document) and replied **"1 2 3 are confirmed"**. Recorded as the G-4 sign-off.
