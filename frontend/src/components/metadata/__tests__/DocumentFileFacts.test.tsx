@@ -145,6 +145,18 @@ describe("DocumentFileFacts — Added to / Added by", () => {
     expect(ddFor(named.container, "Added by")).toHaveTextContent("Team Drive (connected source)")
     named.unmount()
 
+    // 270 UAT G4-4a: a connected source files documents under the user who connected it, so the
+    // SAME user viewing it must still read the connection, never "You".
+    const ownConnected = render(
+      <DocumentFileFacts
+        doc={makeDoc({ user_id: "u1", source_connection_id: "c1", source_connection_name: "Microsoft 365" })}
+        currentUserId="u1"
+      />,
+    )
+    expect(ddFor(ownConnected.container, "Added by")).toHaveTextContent("Microsoft 365 (connected source)")
+    expect(ddFor(ownConnected.container, "Added by").textContent).not.toMatch(/You/)
+    ownConnected.unmount()
+
     const unnamed = render(
       <DocumentFileFacts doc={makeDoc({ source_connection_id: "c1", source_connection_name: null })} currentUserId="other" />,
     )

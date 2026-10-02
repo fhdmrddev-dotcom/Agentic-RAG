@@ -6,6 +6,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, within, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { Document } from "@/types"
+import libraryPageSrc from "@/pages/LibraryPage.tsx?raw"
+import documentRowSrc from "../DocumentRow.tsx?raw"
 
 vi.mock("@/lib/supabase", () => ({
   supabase: {
@@ -152,5 +154,20 @@ describe("DocumentRow — Phase 270 Download", () => {
     await waitFor(() => expect(startDocumentDownload).toHaveBeenCalledTimes(1))
     expect(startDocumentDownload).toHaveBeenCalledWith(v2)
     expect((startDocumentDownload.mock.calls[0][0] as Document).id).toBe("d-2")
+  })
+})
+
+// 270 UAT F-1: LibraryPage's column shed is a CSS rule, so jsdom cannot evaluate it. A source fence pins
+// the two halves that must stay together: the shed excludes the nested history table, and that table
+// carries the marker. Dropping either half hides per-version Download (and Restore) while a panel is open.
+describe("version history survives the column shed", () => {
+  it("the shed selector excludes the nested version-history table", () => {
+    const shed = libraryPageSrc.match(/const SHED_COLUMNS_3_TO_5 =\s*"([^"]+)"/)?.[1] ?? ""
+    expect(shed).toContain(":not([data-version-history])")
+    expect(shed).not.toMatch(/\[&_table_t[hd]:nth-child/) // the old descendant form reached the nested table
+  })
+
+  it("the nested history table carries the marker the shed excludes", () => {
+    expect(documentRowSrc).toMatch(/aria-label="Version history"[^>]*data-version-history/)
   })
 })

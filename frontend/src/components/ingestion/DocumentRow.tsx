@@ -150,7 +150,7 @@ function VersionHistoryPanel({
   return (
     <>
       <div className="bg-muted/30 border-t p-3">
-        <table className="w-full text-sm" aria-label="Version history">
+        <table className="w-full text-sm" aria-label="Version history" data-version-history>
           <thead>
             <tr>
               <th className="text-left font-semibold px-2 py-1">Version</th>

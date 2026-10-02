@@ -105,7 +105,7 @@ const SIDEBAR_PIN_KEY = "documents.sidebar.pinnedExpanded"
 // was hoisted to a named constant at Phase 217-09 so the two surfaces that mount the list
 // (the Documents tab and the Views tab) share ONE copy of it rather than two.
 const SHED_COLUMNS_3_TO_5 =
-  "[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden [&_table_td:nth-child(n+3):nth-child(-n+5)]:hidden"
+  "[&_table:not([data-version-history])>thead>tr>th:nth-child(n+3):nth-child(-n+5)]:hidden [&_table:not([data-version-history])>tbody>tr>td:nth-child(n+3):nth-child(-n+5)]:hidden"
 
 // Phase 217.1-06 — the tab's display name, for the breadcrumb suffix. Five members only;
 // a sixth key is the same schema change as a sixth trigger (D-217-15).

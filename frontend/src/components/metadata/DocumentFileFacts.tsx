@@ -30,12 +30,15 @@ function formatFactDate(iso: string | null | undefined) {
 }
 
 function addedBy(doc: Document, currentUserId?: string): string {
-  if (currentUserId && doc.user_id === currentUserId) return "You"
+  // A connected source owns its documents under the user who connected it, so the connection is
+  // tested FIRST: otherwise every connector-placed file reads "You" beside a banner saying a
+  // connected source placed it (270 UAT G4-4a).
   if (doc.source_connection_id) {
     return doc.source_connection_name
       ? `${doc.source_connection_name} (connected source)`
       : "a connected source"
   }
+  if (currentUserId && doc.user_id === currentUserId) return "You"
   return "name not available"
 }
 
