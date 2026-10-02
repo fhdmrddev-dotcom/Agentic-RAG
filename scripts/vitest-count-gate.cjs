@@ -4072,6 +4072,14 @@ const BASELINE = {
   "CreateLinkDialog.test.tsx": 8, // 271-03
   "RelationshipsSection.test.tsx": 11, // 271-03
   "RelationshipsSection.a11y.test.tsx": 6, // 271-03
+  // ── Phase 271-03 — every suite this plan CREATED, at its measured passing count. BOTH KNOBS, SAME COMMIT. ──
+  "findState.test.ts": 49, // 271-03 (2026-10-03)
+  "documents.search271.test.ts": 3, // 271-03
+  "useDocumentFind.test.tsx": 11, // 271-03
+  "relationshipLabels.test.ts": 5, // 271-03
+  "LinkTargetCombobox.test.tsx": 9, // 271-03
+  "documentAddedBy.test.ts": 6, // 271-03
+  "DocumentRow.find271.test.tsx": 17, // 271-03
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5939,6 +5947,14 @@ const TARGETS = [
   "src/components/relationships/CreateLinkDialog.test.tsx",
   "src/components/relationships/RelationshipsSection.test.tsx",
   "src/components/relationships/RelationshipsSection.a11y.test.tsx",
+  // Phase 271-03 — every suite this plan created. FILE-LEVEL.
+  "src/pages/__tests__/findState.test.ts",
+  "src/lib/api/__tests__/documents.search271.test.ts",
+  "src/hooks/__tests__/useDocumentFind.test.tsx",
+  "src/components/relationships/relationshipLabels.test.ts",
+  "src/components/relationships/LinkTargetCombobox.test.tsx",
+  "src/lib/__tests__/documentAddedBy.test.ts",
+  "src/components/ingestion/__tests__/DocumentRow.find271.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
