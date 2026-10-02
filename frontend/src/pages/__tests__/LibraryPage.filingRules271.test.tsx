@@ -13,7 +13,7 @@
  * pays a cold transform inside its first case and times out under load.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, fireEvent, waitFor } from "@testing-library/react"
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { ClassificationRule, Document, Folder } from "@/types"
@@ -240,7 +240,8 @@ describe("LibraryPage — Filing rules is a Library sub-view (Phase 271, D-09)",
       for (const name of ["Documents", "Views", "Ingestion", "Indexing", "Health"]) {
         fireEvent.click(screen.getByRole("tab", { name }))
         expect(screen.getByRole("button", { name: "Filing rules" })).toBeInTheDocument()
-        expect(screen.getAllByRole("tab")).toHaveLength(5)
+        // The HEADER's tablist (a tab body such as Ingestion owns its own child tabs).
+        expect(within(screen.getByTestId("library-headerbar")).getAllByRole("tab")).toHaveLength(5)
       }
     },
     30_000,

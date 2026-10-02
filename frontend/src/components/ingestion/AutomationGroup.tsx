@@ -136,7 +136,7 @@ export function AutomationGroup({
 
       {rules.length === 0 ? (
         <div className="text-center py-6 px-2">
-          <p className="text-sm font-medium">No classification rules yet</p>
+          <p className="text-sm font-medium">No filing rules yet</p>
           <p className="text-xs text-muted-foreground mt-1">
             New rule suggests a folder for matching uploads.
           </p>
