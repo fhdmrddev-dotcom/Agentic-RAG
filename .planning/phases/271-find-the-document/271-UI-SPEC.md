@@ -1,7 +1,8 @@
 ---
 phase: 271
 slug: find-the-document
-status: draft
+status: approved
+reviewed_at: 2026-10-03
 shadcn_initialized: true
 preset: not applicable (components.json style "default", baseColor slate, cssVariables, iconLibrary lucide)
 created: 2026-10-03
@@ -245,7 +246,7 @@ All popovers use the shipped idiom: `absolute top-full mt-2 z-20 w-72 rounded-lg
 | Count | `{N} documents` · `1 document` · `0 documents` |
 | Empty state heading | `No documents match` |
 | Empty state body | `Nothing is shown from outside these filters. Remove a filter, or clear them all.` + action `Clear filters` |
-| Older-versions hint | `{N} more match in older (superseded) versions.` + action `Show them` (N=1 reads `1 more matches in older (superseded) versions.`) |
+| Older-versions hint | `{N} more matches in older (superseded) versions.` + action `Show them` (N=1 reads `1 more match in older (superseded) versions.`) |
 | Error state | `Couldn't run this search. Your filters are kept.` + action `Try again` |
 | Ask card title | `Ask is answered in chat` |
 | Ask card body | `Ask searches what your documents say and answers with cited passages. It does not list documents here.` |
