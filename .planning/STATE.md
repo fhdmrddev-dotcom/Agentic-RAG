@@ -189,6 +189,12 @@ Last activity: 2026-09-29 -- Phase 269 closed
 
 **CLAUDE.md size:** 116,523 chars after 267's cells were shortened. This is under the 120,000 warn band, so no split is scheduled.
 
+## Guardrail overrides — Phase 271 (2026-10-03)
+
+| Id | Rule | Override | Evidence |
+|---|---|---|---|
+| OV-271-01 | G-2 (sketch before discuss) | **Order only, not a skip.** Operator chose to discuss first; `/gsd:sketch` stays REQUIRED before `/gsd:plan-phase 271`. | `271-CONTEXT.md` status line |
+
 ## Guardrail overrides — Phase 266 (2026-09-25)
 
 | Id | Rule | Override | Evidence |
