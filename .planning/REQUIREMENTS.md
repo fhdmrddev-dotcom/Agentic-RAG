@@ -12,8 +12,8 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 - [ ] **FIND-01**: User can search for documents by type, owner, dates, custom fields, folder path, relationships and version state, and gets documents back rather than passages.
 - [ ] **FIND-02**: Document search is its own mode beside RAG search; the two never share a ranking.
 - [ ] **FIND-03**: Folder path, relationships and version lineage are filterable dimensions.
-- [ ] **FIND-04**: User can download the original file of any document they can access; the UI states latest vs viewed version; the URL is short-lived and minted only after an org authorization check.
-- [ ] **FIND-05**: Document detail shows rich file facts: created, modified, pages, size, type, uploader.
+- [x] **FIND-04**: User can download the original file of any document they can access; the UI states latest vs viewed version; the URL is short-lived and minted only after an org authorization check.
+- [x] **FIND-05**: Document detail shows rich file facts: created, modified, pages, size, type, uploader.
 - [ ] **FIND-06**: The Classification page is renamed for what people do there and mounted inside the Library.
 - [ ] **FIND-07**: The agent can pass date and dimension filters into retrieval, so "October revenue" cannot return March.
 
@@ -51,8 +51,8 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 | FIND-01 | Phase 271 | Pending |
 | FIND-02 | Phase 271 | Pending |
 | FIND-03 | Phase 271 | Pending |
-| FIND-04 | Phase 270 | Pending |
-| FIND-05 | Phase 270 | Pending |
+| FIND-04 | Phase 270 | Complete |
+| FIND-05 | Phase 270 | Complete |
 | FIND-06 | Phase 271 | Pending |
 | FIND-07 | Phase 272 | Pending |
 | ART-01 | Phase 273 | Pending |
