@@ -52,10 +52,15 @@ describe("NAV_ITEMS — the Expert catalog entry (Phase 262 / PACK-11)", () => {
     expect(Object.prototype.hasOwnProperty.call(entry ?? {}, "feature")).toBe(false)
   })
 
-  it("is the EIGHTH entry — the count is recorded because a register corrected with a wrong number is the rot repeating", () => {
-    // RESEARCH R-6 measured SEVEN before this phase. The operator shield and the Spend
-    // entry render OUTSIDE this array, so the rail shows ten affordances and the array
-    // holds eight; "three homes → four" is neither of those numbers.
-    expect(NAV_ITEMS.length).toBeGreaterThanOrEqual(8)
+  it("is the SEVENTH entry — Classification moved into the Library as Filing rules (Phase 271, D-09)", () => {
+    // RE-PINNED IN PLACE, never deleted (this case is BASELINE-counted). It read "the EIGHTH
+    // entry" and asserted `>= 8` at Phase 262, which measured SEVEN before the Experts home
+    // landed. Phase 271 (D-09) retired the `classification-rules` home: the rules surface now
+    // opens inside the Library as "Filing rules", behind a header link, so the array drops back
+    // to SEVEN. The operator shield and the Spend entry still render OUTSIDE this array, so the
+    // rail shows nine affordances and the array holds seven.
+    // ⛔ Exact, not `>=`: a lower bound could not see the retired entry come back.
+    expect(NAV_ITEMS.length).toBe(7)
+    expect(NAV_ITEMS.some((item) => (item.view as string) === "classification-rules")).toBe(false)
   })
 })
