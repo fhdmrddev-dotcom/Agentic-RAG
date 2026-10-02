@@ -10712,12 +10712,12 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/models/document.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocumentpy) | 10 / 7 / 183 | ⚠ **FIRES — 7 phases** | ⚠ absent from BOTH registers its ENTIRE LIFE at 7 phases — row added 270-01. ⛔ additive OPTIONAL fields only: a required field 500s five narrow-select routes |
-| [`frontend/src/components/ingestion/DocumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentrowtsx) | 5 / 2 / 469 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 270-01 at its 2nd phase. ⛔ exactly seven `<td>`; the Download goes INSIDE the Actions cell, never an 8th column |
-| [`backend/app/services/file_facts.py`](docs/HOT-FILE-LEDGER.md#backendappservicesfile_factspy) | 0 / 0 / 0 | no (new) | young (created 270-01). Row added AT PLANNING. ⛔ `read_file_facts` NEVER raises; a fact it cannot read is `None`, never `0` and never a substituted date |
-| [`frontend/src/lib/documentDownload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentdownloadts) | 0 / 0 / 0 | no (new) | young (created 270-03). Row added AT PLANNING. ⛔ the ONLY place the download label is derived and the request made |
-| [`frontend/src/components/metadata/DocumentDownloadButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdownloadbuttontsx) | 0 / 0 / 0 | no (new) | young (created 270-03). Row added AT PLANNING. ⛔ no `href`, no stored URL: the link is minted on click |
-| [`frontend/src/components/metadata/DocumentFileFacts.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentfilefactstsx) | 0 / 0 / 0 | no (new) | young (created 270-03). Row added AT PLANNING. ⛔ eight rows always present; a source date NEVER falls back to the upload date |
+| [`backend/app/models/document.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocumentpy) | 11 / 8 / 207 | ⚠ **FIRES — 8 phases** | ⚠ STALE (`10/7/183`). **270-02**: 4 optional file-fact fields + `source_connection_name` + the download-response model, additive. ⛔ optional fields only: a required one 500s five non-upload paths |
+| [`frontend/src/components/ingestion/DocumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentrowtsx) | 7 / 3 / 476 | ⚠ **FIRES** (3 phases) | ⚠ STALE (`5/2/469`); now FIRES at 3 phases. **270-04/05**: 2 Download mounts inside Actions, still seven `<td>`; nested table marked `data-version-history` (F-1, 270-05) |
+| [`backend/app/services/file_facts.py`](docs/HOT-FILE-LEDGER.md#backendappservicesfile_factspy) | 1 / 1 / 163 | no (1 phase) | young (created 270-01). ⛔ `read_file_facts` NEVER raises; a fact it cannot read is `None`, never `0` and never a substituted date. Re-measured `1/1/163` at 270 close |
+| [`frontend/src/lib/documentDownload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentdownloadts) | 2 / 1 / 63 | no (1 phase) | young (created 270-03). ⛔ the ONLY place the download label is derived and the request made. 270-04 names an older v1 row too (`Download v1 (viewed, not latest)`) |
+| [`frontend/src/components/metadata/DocumentDownloadButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdownloadbuttontsx) | 1 / 1 / 146 | no (1 phase) | young (created 270-03). ⛔ no `href`, no stored URL: the link is minted on click. The live drive found no signed URL in the DOM |
+| [`frontend/src/components/metadata/DocumentFileFacts.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentfilefactstsx) | 2 / 1 / 113 | no (1 phase) | young (created 270-03). ⛔ eight rows always present; a source date NEVER falls back to the upload date. 270-05 F-2: `Added by` tests the connection BEFORE "is it me" |
 | [`backend/app/services/expert_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_authoringpy) | 7 / 3 / 393 (was `4 / 2 / 389`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/389`), now FIRES. honoured by construction (**267-01**): the draft prompt says `tool_floor_enabled` is always true and has no effect. ⛔ every emitted string CAPPED |
 | [`backend/app/services/skill_body_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesskill_body_authoringpy) | 2 / 1 / 373 | no (new) | young (created 263). Row added AT CREATION — an absent row is invisible to G-5 at any count. ⛔ The ONE home of the borrowed craft doctrine; doctrine inlined here makes it an ENGINE (D-263-13). |
 | [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 6 / 3 / 1550 (was `3 / 2 / 1475`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`3/2/1475`), now FIRES. honoured by construction (**267-03**): 2 removals + ONE re-keyed connection picker. ⛔ no new section; extraction OWED before a 4th phase |
@@ -10785,15 +10785,15 @@ cells rot within days.
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
-| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 205 / 122 / 516 (was `187 / 110 / 422`) | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — the re-export BARREL. **268-03**: +2 function names + 4 wire types re-exported, nothing else |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 93 / 72 / 1443 (was `91 / 71 / 1436`) | ⚠ **FIRES** | ⚠ STALE a 5th time (`91/71/1436`). honoured by construction (**267-03**): TWO optional fields (`connection_state`, `can_connect`) via `import type`. Seam still OWED |
+| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 207 / 123 / 519 (was `205 / 122 / 516`) | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — barrel. **270-03**: re-exports `getDocumentDownloadUrl` + its type, nothing else |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 94 / 73 / 1459 (was `93 / 72 / 1443`) | ⚠ **FIRES** | ⚠ STALE (`93/72/1443`). **270-03**: 4 optional fact fields + `source_connection_name` on `Document` + the download-response type, additive. Seam OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 83 / 60 / 951 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**, Phase 259 router mount) |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 87 / 50 / 1593 | ⚠ **FIRES** | ⚠ STALE a 13th time (`83/48/1506`). honoured by construction (**249-01**): ONE derived frozenset + a Literal widened to the value the code already returned. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
-| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 259 / 58 / 6196 (was `254 / 57 / 6168`) | ⚠ **FIRES** | ⚠ STALE (`254/57/6168`). **268-02/03** adopt the phase's 8 new suites into BOTH knobs |
+| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 91 / 35 / 2518 (was `87 / 34 / 2414`) | ⚠ **FIRES** | ⚠ STALE (`87/34/2414`). **270-02**: +1 route (`POST /{id}/download-url`) outside the 217 region + 1 batched read. ⛔ RLS read BEFORE service sign; 404 not 403; no `ingestion_step` literal |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 263 / 59 / 6211 (was `259 / 58 / 6196`) | ⚠ **FIRES** | ⚠ STALE (`259/58/6196`). **270-03/04** adopt the phase's new suites into BOTH knobs. Gate verdict recorded in 270-UAT-LOG.md |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
@@ -10884,7 +10884,7 @@ cells rot within days.
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 28 / 11 / 1858 | ⚠ **FIRES** | ⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**239-06**) |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 21 / 13 / 278 (was `20 / 12 / 236`) | ⚠ **FIRES** | ⚠ STALE (`20/12/236`). **268-03**: `scope_changed` joins the allowlist; `ScopeFolderRef`/`ScopeChangedEvent` additive, `path` on the SUBCLASS only (267 dumps byte-equal) |
-| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 55 / 34 / 1723 | ⚠ **FIRES** | ⚠ STALE for the SIXTH close running (`50/32/1561`). honoured by construction (**249-03**): ONE `except` split into two arms + one typed exception. ⛔ the unreachable-DB arm is byte-identical |
+| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 57 / 35 / 1742 (was `55 / 34 / 1723`) | ⚠ **FIRES** | ⚠ STALE (`55/34/1723`). **270-02**: ONE field (`document_download_url_ttl_seconds`, default 60), clamped 10..900 in code. ⛔ the unreachable-DB arm is byte-identical |
 | [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 7 / 2 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
 | [`backend/app/services/setup_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessetup_servicepy) | 4 / 2 / 514 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. Same deliberate non-catch as `api/setup.py`; its bool cannot express *the database refused the value* |
 | [`backend/app/api/evals.py`](docs/HOT-FILE-LEDGER.md#backendappapievalspy) | 24 / 7 / 3237 | ⚠ **FIRES** | ⚠ **absent for its ENTIRE LIFE at 7 phases — row added 249-04, which left the file BYTE-UNCHANGED.** ⛔ `_tile_for_run`'s engine-shaped sentence must stay the LAST resort |
@@ -10918,14 +10918,14 @@ cells rot within days.
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
-| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 48 / 16 / 993 | ⚠ **FIRES** | ⚠ row STALE at `46/15/970`. **266-04**: ONE state + ONE effect (the install read), which refutes 244-06's "gained no effect". `.folder_id` count held at 5 |
+| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 50 / 17 / 994 (was `48 / 16 / 993`) | ⚠ **FIRES** | ⚠ STALE (`48/16/993`). **270-04/05**: `currentUserId` passed to the panel (1 line); **270-05 F-1**: `SHED_COLUMNS_3_TO_5` scoped to the list's own table, excludes `[data-version-history]` |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 19 / 11 / 456 | ⚠ **FIRES** | ⛔ **extraction still OWED** (`SEED-224`, since 231) — 241 is the SECOND landing, capped at 11 lines by a fence; a THIRD must propose the extraction FIRST |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
-| [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 12 / 7 / 596 | ⚠ **FIRES** | honoured by construction (**240**): ONE child section mounted, gated on metadata, no shell change. ⚠ CR-01's fence caught a missing reset before it shipped |
+| [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 14 / 9 / 614 (was `12 / 7 / 596`) | ⚠ **FIRES** | honoured by construction (**270-04**): 1 import pair + 2 mounts (header Download row, first open `File` section) + 1 optional prop; 0 new state, 0 new effect |
 | [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
-| [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 2 / 2 / 389 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 240.** ⭐ The Phase 207 `lib/api.ts` split created it with no row, exactly as its sibling `api/workflows.ts` records |
+| [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 5 / 5 / 450 | ⚠ **FIRES** (5 phases) | ⚠ STALE (`2/2/389`); now FIRES at 5 phases. **270-03**: ONE caller (`getDocumentDownloadUrl`) + its wire type, additive; re-exported by the `api.ts` barrel |
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
@@ -10971,7 +10971,7 @@ cells rot within days.
 | [`frontend/src/lib/api/sources.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisourcests) | 5 / 1 / 312 | no (1 phase) | ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL.** ⛔ 235-13: it held TWO hand-written copies of the cause union the `?raw` fence is blind to; both now import the type |
 | [`backend/app/models/source.py`](docs/HOT-FILE-LEDGER.md#backendappmodelssourcepy) | 5 / 1 / 196 | no (1 phase) | ⚠ absent — row added 235 (+117 L). `cause`/`status` are `Literal`s, so an unknown value is a ValidationError, never a string that renders |
 | [`backend/app/services/ingest_enrich.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_enrichpy) | 7 / 2 / 623 | no (2 phases) | ⚠ absent for its entire life — row added 235. ⚠ its `0 phases` is real: all three commits are DATED QUICK TASKS. `BUG-260906-01` closed here by `260906-5qd` |
-| [`backend/app/services/ingest_splice.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_splicepy) | 15 / 6 / 877 | ⚠ **FIRES** | ⚠ row STALE at `11/4/827`. honoured by construction (**266-02**): an `org_id` arm at 4 mint sites (build-then-branch); the `org_id=None` sequence is identical to base |
+| [`backend/app/services/ingest_splice.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_splicepy) | 19 / 7 / 930 (was `15 / 6 / 877`) | ⚠ **FIRES** | ⚠ STALE (`15/6/877`). **270-01**: ONE best-effort UPDATE after the splice writes the file facts; skipped when every fact is None. ⛔ a failed facts write logs and never fails ingest |
 | [`backend/app/services/email_attachments.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_attachmentspy) | 0 / 0 / 226 | no (new) | young (240) — the shared email-attachment child loop. ⛔ Closed the FOURTH two-paths disagreement: a watched mailbox ingested messages and zero attachments |
 | [`backend/app/services/email_extraction_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_extraction_servicepy) | 4 / 1 / 511 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 240.** Home of `parse_eml_bytes`, `strip_quoted_replies` and now `thread_key_for`. ⛔ Subject is never a thread input |
 | [`backend/app/services/sources/failure_cause.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesfailure_causepy) | 2 / 1 / 196 | no (1 phase) | young (235) — **THE ONE classifier of why a source stopped.** ⛔ 235-13: `connection_disabled` is WRITTEN by one seam and inferred by NOTHING — no matcher, no status row |
@@ -17447,3 +17447,68 @@ The G-5 gate found 6 files with no row when the 270 plans were written: two EXIS
 ### `frontend/src/components/metadata/DocumentFileFacts.tsx`
 
 **`0 / 0 / 0`** at 270 planning. Young (created 270-03). ⛔ **Binding invariants:** eight rows always present; a source date NEVER falls back to the upload date; a missing fact reads "not recorded".
+
+
+## Phase 270 — close re-derivation (2026-10-03, plan `270-05`)
+
+Every triple below was re-derived AFTER the phase's last source edit (`96d59b622`, the F-1/F-2 fix commit) with the CLAUDE.md recipe; six-digit quick-task buckets are subtracted. `LibraryPage.tsx` uses `git log --follow` (a plain log reads the rename). The six rows added at planning were refreshed in place, not duplicated. Live evidence for the invariants named here is in `.planning/phases/270-the-document-as-an-object/270-UAT-LOG.md`.
+
+### `backend/app/models/document.py` — Phase 270
+
+**`11 / 8 / 207`** at 270 close. Four optional fact fields and `source_connection_name` on `DocumentResponse` plus one new response model (`DocumentDownloadUrl`), all additive; no existing field retyped. The row was `10 / 7 / 183` at planning, so it was STALE by close.
+
+### `frontend/src/components/ingestion/DocumentRow.tsx` — Phase 270
+
+**`7 / 3 / 476`** at 270 close. Two mounts (row Download in the Actions cell, per-version Download in every version-history row); still exactly seven `<td>`. **Live drive (270-UAT-LOG F-1):** the page's column shed was a descendant selector and hid the nested history table's Size/Actions columns whenever the panel was open, so the new Download and the old Restore were unreachable; fixed in 270-05 by marking the nested table `data-version-history` (the shed excludes it). ⛔ a fence in `DocumentRow.download270.test.tsx` asserts the marker and the selector, because jsdom cannot evaluate the CSS.
+
+### `backend/app/services/file_facts.py` — Phase 270
+
+**`1 / 1 / 163`** at 270 close. Re-measured `1 / 1 / 163` (was `0 / 0 / 0` at planning). Unchanged since creation; the live drive read a 3-page 2019 PDF correctly (pages 3, created 2019-03-12, modified 2019-04-01, author) and left pre-270 rows NULL.
+
+### `frontend/src/lib/documentDownload.ts` — Phase 270
+
+**`2 / 1 / 63`** at 270 close. Re-measured `2 / 1 / 63`. 270-04 changed `downloadLabel` so an older version at v1 is named, not a bare "Download" (ambiguous beside `Download v3 (latest)`). Live: `Download v2 (viewed, not latest)` minted against v2's own id.
+
+### `frontend/src/components/metadata/DocumentDownloadButton.tsx` — Phase 270
+
+**`1 / 1 / 146`** at 270 close. Re-measured `1 / 1 / 146`. Unchanged since creation. No signed URL was found in the DOM on the live drive; the missing-file sentence rendered as text under the version row.
+
+### `frontend/src/components/metadata/DocumentFileFacts.tsx` — Phase 270
+
+**`2 / 1 / 113`** at 270 close. Re-measured `2 / 1 / 113`. **Live drive (270-UAT-LOG F-2):** a connector-placed document is owned by the user who connected the source, so testing "is it me" first read `You` under a banner saying a connected source placed it. 270-05 reordered `addedBy()` (connection first); the earlier test used `currentUserId="other"` for the connected cases, which is why it never saw this.
+
+### `frontend/src/lib/api/documents.ts` — Phase 270
+
+**`5 / 5 / 450`** at 270 close. One function (`getDocumentDownloadUrl`) and its wire type, additive, re-exported through the `api.ts` barrel. It now measures 5 phases, so it FIRES and carries a CLAUDE.md row from this close.
+
+### `frontend/src/lib/api.ts` — Phase 270
+
+**`207 / 123 / 519 (was `205 / 122 / 516`)`** at 270 close. Barrel only: one function name and one type re-exported (+3 lines). No logic.
+
+### `frontend/src/types/index.ts` — Phase 270
+
+**`94 / 73 / 1459 (was `93 / 72 / 1443`)`** at 270 close. Optional file-fact fields and `source_connection_name` on the `Document` type plus the download-response type; additive. The types-file seam stays OWED.
+
+### `backend/app/api/documents.py` — Phase 270
+
+**`91 / 35 / 2518 (was `87 / 34 / 2414`)`** at 270 close. +1 route and one batched read of connection names. ⛔ **Binding invariant:** visibility is proven through the user-JWT client BEFORE any service-role call, pinned by an AST order fence (a planted reorder drives it red). **Live:** a single-org member of another org gets 404 with no `url` key; a colleague of the org gets 200 for a shared-folder document; the URL is refused by Storage after TTL + 5 s; a row whose object is absent returns 410 `file_missing`. No audit row is written (SEED-329).
+
+### `scripts/vitest-count-gate.cjs` — Phase 270
+
+**`263 / 59 / 6211 (was `259 / 58 / 6196`)`** at 270 close. The phase's new suites (`documentDownload`, `DocumentDownloadButton`, `DocumentFileFacts`, `DocumentDetailPanel.file270`, `DocumentRow.download270`) adopted into BOTH knobs (TARGETS and BASELINE) in 270-03/04.
+
+### `backend/app/models/user_settings.py` — Phase 270
+
+**`57 / 35 / 1742 (was `55 / 34 / 1723`)`** at 270 close. One setting field (`document_download_url_ttl_seconds`, default 60) clamped 10..900 in the route; the settings read/write arms are unchanged.
+
+### `frontend/src/pages/LibraryPage.tsx` — Phase 270
+
+**`50 / 17 / 994 (was `48 / 16 / 993`)`** at 270 close. Two touches. 270-04: ONE line (the current user id passed to the panel). 270-05 F-1: `SHED_COLUMNS_3_TO_5` was a descendant selector that also hid the nested version-history table's Size and Actions columns when the panel opened; it now targets the list's own table by child combinators and excludes `[data-version-history]`. Re-driven live with the panel open: `Download v3/v2/v1` and `Restore` visible, the main list still sheds Type, Size and Chunks. Derived with `--follow` (a plain log reads 1 here, the rename).
+
+### `frontend/src/components/metadata/DocumentDetailPanel.tsx` — Phase 270
+
+**`14 / 9 / 614 (was `12 / 7 / 596`)`** at 270 close. One import pair, two mounts (a Download row keyed by `doc.id`, and the first open `File` section) and one optional prop (`currentUserId`); `useState`/`useEffect` counts unchanged. The order fences in `DetailSections.lazy/tables` now expect `File` before `Details`.
+
+### `backend/app/services/ingest_splice.py` — Phase 270
+
+**`19 / 7 / 930 (was `15 / 6 / 877`)`** at 270 close. One separate best-effort UPDATE writing the file facts after the splice (skipped when every fact is None, so a failed parse never overwrites). A missing migration degrades with a logged warning; ingest is not broken (tested).

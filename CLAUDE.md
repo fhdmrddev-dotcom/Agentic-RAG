@@ -753,15 +753,15 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 10 / 6 / 363 | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption`, never re-derives its three readings |
-| `frontend/src/lib/api.ts` | 205 / 122 / 516 | ✅ **SPLIT TAKEN (207)** — barrel; **268-03** re-exports 2 names + 4 types |
-| `frontend/src/types/index.ts` | 93 / 72 / 1443 | ⚠ STALE (`91/71/1436`). **267-03**: TWO optional fields via `import type`. Seam OWED |
+| `frontend/src/lib/api.ts` | 207 / 123 / 519 (was `205 / 122 / 516`) | ✅ **SPLIT TAKEN (207)** — barrel. **270-03**: re-exports `getDocumentDownloadUrl` + its type, nothing else |
+| `frontend/src/types/index.ts` | 94 / 73 / 1459 (was `93 / 72 / 1443`) | ⚠ STALE (`93/72/1443`). **270-03**: 4 optional fact fields + `source_connection_name` on `Document` + the download-response type, additive. Seam OWED |
 | `backend/app/main.py` | 83 / 60 / 951 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**, Phase 259) |
 | `backend/app/config.py` | 88 / 51 / 1695 | ⚠ STALE a 14th time (`87/50/1593`). **262**: `api_surface` + `API_SURFACES` + `provider_hint`. ⛔ `MODEL_CAPABILITIES` seam STILL OWED — 12 of 15 fields are now DB-settable, the dict is not |
 | `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `backend/app/api/documents.py` | 85 / 33 / 2437 | ✅ **DISCHARGED (229)** |
-| `scripts/vitest-count-gate.cjs` | 259 / 58 / 6196 | ⚠ STALE (`254/57/6168`). **268-02/03** adopt the phase's new suites into BOTH knobs |
+| `backend/app/api/documents.py` | 91 / 35 / 2518 (was `87 / 34 / 2414`) | ⚠ STALE (`87/34/2414`). **270-02**: +1 route (`POST /{id}/download-url`) outside the 217 region + 1 batched read. ⛔ RLS read BEFORE service sign; 404 not 403; no `ingestion_step` literal |
+| `scripts/vitest-count-gate.cjs` | 263 / 59 / 6211 (was `259 / 58 / 6196`) | ⚠ STALE (`259/58/6196`). **270-03/04** adopt the phase's new suites into BOTH knobs. Gate verdict recorded in 270-UAT-LOG.md |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 at 256-03's head |
 | `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ **NOW FIRES at 3 phases, and its detail row still read `no (2 phases)` — present and WRONG, which stops an audit harder than absent.** Promoted here by 256-04; **256-03** closed its `None` finalize |
 | `frontend/src/components/panel/PhaseCard.tsx` | 17 / 11 / 788 | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253. honoured by construction (200 / **214**) |
@@ -803,7 +803,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`) — a row present and WRONG stops the audit. **SEED-258: the body cap is DERIVED; no envelope knob exists to disagree** |
 | `backend/app/models/message.py` | 21 / 13 / 278 | ⚠ STALE (`20/12/236`). **268-03**: `scope_changed` joins the allowlist; scope payload models additive, `path` on a SUBCLASS only |
-| `backend/app/models/user_settings.py` | 55 / 34 / 1723 | ⚠ STALE a 6th close running. honoured by construction (**249-03**): ONE `except` split into two arms + one typed exception. ⛔ the unreachable-DB arm is byte-identical |
+| `backend/app/models/user_settings.py` | 57 / 35 / 1742 (was `55 / 34 / 1723`) | ⚠ STALE (`55/34/1723`). **270-02**: ONE field (`document_download_url_ttl_seconds`, default 60), clamped 10..900 in code. ⛔ the unreachable-DB arm is byte-identical |
 | `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
 | `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
@@ -813,10 +813,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 24 / 13 / 294 | ✅ **seam TAKEN (217.1-05)** |
-| `frontend/src/pages/LibraryPage.tsx` | 48 / 16 / 993 | ⚠ row STALE (`46/15/970`). **266-04**: ONE state + ONE effect (install read); 244-06's "no effect" refuted |
+| `frontend/src/pages/LibraryPage.tsx` | 50 / 17 / 994 (was `48 / 16 / 993`) | ⚠ STALE (`48/16/993`). **270-04/05**: `currentUserId` passed to the panel (1 line); **270-05 F-1**: `SHED_COLUMNS_3_TO_5` scoped to the list's own table, excludes `[data-version-history]` |
 | `backend/app/services/retrieval_service.py` | 19 / 11 / 456 | ⛔ **extraction still OWED (SEED-224, since 231).** 241 is the SECOND landing, 11 lines; a THIRD must propose the extraction FIRST |
 | `backend/app/services/recall_eval.py` | 4 / 3 / 1070 | ⚠ **FIRES (3 phases).** Offline eval harness; safe as-is (Blocker B / D-246-12), additive plan inspection & latency p50/p95 |
-| `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 9 / 6 / 496 | ⚠ **the row was STALE at `6 / 5 / 405`.** honoured by construction (21 |
+| `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 14 / 9 / 614 (was `12 / 7 / 596`) | honoured by construction (**270-04**): 1 import pair + 2 mounts (header Download row, first open `File` section) + 1 optional prop; 0 new state, 0 new effect |
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
@@ -882,11 +882,13 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 7 / 4 / 359 | ⚠ STALE (`5/3/330`). **267-03**: ONE in-flight guard; live dblclick → 1 thread |
 | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 4 / 3 / 530 | ⚠ now FIRES (`3/2/438`). **267-03**: Brings/Missing; Connect only if `can_connect` |
 | `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
-| `backend/app/services/ingest_splice.py` | 15 / 6 / 877 | ⚠ **FIRES**, no CLAUDE.md row until 266. **266-02**: an `org_id` arm at 4 mint sites; the None path is identical to base |
+| `backend/app/services/ingest_splice.py` | 19 / 7 / 930 (was `15 / 6 / 877`) | ⚠ STALE (`15/6/877`). **270-01**: ONE best-effort UPDATE after the splice writes the file facts; skipped when every fact is None. ⛔ a failed facts write logs and never fails ingest |
 | `frontend/src/components/ingestion/FolderTree.tsx` | 12 / 7 / 207 | ⚠ absent its ENTIRE LIFE — row added 266. **266-04**: ONE optional prop threaded. ⛔ no fetch here |
 | `frontend/src/components/ingestion/FolderNode.tsx` | 12 / 6 / 272 | ⚠ absent its ENTIRE LIFE — row added 266. The note is NavRow's `caption` now; tooltip-only was invisible (UI-3) |
 | `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05. ONE optional `caption`; ⛔ deliverable words never tooltip-only |
-| `backend/app/models/document.py` | 10 / 7 / 183 | ⚠ absent from BOTH registers its ENTIRE LIFE at 7 phases — row added 270-01. ⛔ additive OPTIONAL fields only: a required field 500s five narrow-select routes |
+| `backend/app/models/document.py` | 11 / 8 / 207 | ⚠ STALE (`10/7/183`). **270-02**: 4 optional file-fact fields + `source_connection_name` + the download-response model, additive. ⛔ optional fields only: a required one 500s five non-upload paths |
+| `frontend/src/components/ingestion/DocumentRow.tsx` | 7 / 3 / 476 | ⚠ STALE (`5/2/469`); now FIRES at 3 phases. **270-04/05**: 2 Download mounts inside Actions, still seven `<td>`; nested table marked `data-version-history` (F-1, 270-05) |
+| `frontend/src/lib/api/documents.ts` | 5 / 5 / 450 | ⚠ STALE (`2/2/389`); now FIRES at 5 phases. **270-03**: ONE caller (`getDocumentDownloadUrl`) + its wire type, additive; re-exported by the `api.ts` barrel |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
