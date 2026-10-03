@@ -102,7 +102,7 @@ data-thread branch/compare half of `SEED-193`, the hardening/testing milestone, 
 
 - [ ] **Phase 270: The Document as an Object**: download the original file (org-checked, short-lived URL, latest vs viewed version stated) and rich file facts on the detail panel (FIND-04, FIND-05)
 - [ ] **Phase 271: Find the Document**: document-first search mode beside RAG, structure (folder path, relationships, version lineage) as filters, Classification renamed and mounted in the Library (FIND-01, FIND-02, FIND-03, FIND-06)
-- [ ] **Phase 272: Close Means Wrong**: the agent passes date and dimension filters into retrieval, and an empty filter fails closed (FIND-07)
+- [x] **Phase 272: Close Means Wrong** (completed 2026-10-03 — self-verified, human_needed: prod parity owed): the agent passes date and dimension filters into retrieval, and an empty filter fails closed (FIND-07)
 - [ ] **Phase 273: Agent-Authored Artifacts**: a closed component registry (chart, table, metric), validated specs, rows attached for re-encoding, identical on reload, full provider roster (ART-01..05)
 - [ ] **Phase 274: Thread-Scoped Attachments**: chat attachments scoped to the thread, Library ingestion only from Documents, explicit promote-to-Library (ATT-01..03)
 - [ ] **Phase 275: Retention & Legal Hold**: policies per class or folder, legal hold, scheduled audited disposition with dry-run, archived documents out of default retrieval but findable (RET-01..04)
@@ -261,7 +261,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 270. The Document as an Object | 0/TBD | Not started | - |
 | 271. Find the Document | 0/TBD | Not started | - |
-| 272. Close Means Wrong | 5/5 | Executed — review + verification pending | - |
+| 272. Close Means Wrong | 5/5 | Complete (prod migrations 200+201 owed) | 2026-10-03 |
 | 273. Agent-Authored Artifacts | 0/TBD | Not started | - |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |

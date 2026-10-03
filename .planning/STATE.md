@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 272 — close-means-wrong
+**Current focus:** Phase 273 — agent-authored-artifacts (272 complete)
 
 ---
 
@@ -56,7 +56,7 @@ genuinely reviewed.
 
 Phase: 272
 Plan: Not started
-Status: Phase 272 EXECUTED (5/5 plans, 2026-10-03) — code review + verifier pending. G-4 G4-1..3 operator-'Approved'. SC#4 closed BY DECISION: met 6/8; Google gemini-3.5-flash UNMET (model behaviour, investigated); MiniMax-M3 UNSTABLE; SEED-334 (must-filter flag) fired. Migrations 200 + 201 LOCAL ONLY — prod OWED: read prod document_chunks count (CONCURRENTLY index if large) → 200 → 201 IMMEDIATELY (201 fixes a plan-cache regression 200 alone causes) → VERIFY → get_advisors(security), each write operator-approved. Seeds planted: 333 (folded card), 334, 335 (absence hint). Owed to 273: D-15/D-16 seams.
+Status: Phase 272 COMPLETE (2026-10-03) — verification human_needed, self-verified. FIND-07 done. Review: 2 CR + 8 WR all fixed; HUMAN-UAT 2/3 (live re-drive pass; rules accepted); G-1 (topics eq in the shared compiler) fixed. Final backend gate 71 = baseline, 6474 passed. OWED (operator): production — migration 200 STEP 1 (CREATE INDEX CONCURRENTLY) alone → STEP 2 → 201 immediately → both VERIFY → get_advisors(security), each write approved; then backend+frontend deploy (271 also undeployed). Seeds: 333, 334, 335, 336. Owed to 273: D-15/D-16 seams. Next: /gsd:discuss-phase 273.
 Prior: Phase 271 EXECUTED — verification human_needed (2026-10-03). Owed to operator: sign-off on G-4 rows G4-1..G4-6 (driven in Playwright, not Chrome MCP), review of P-01 (default sort added_desc) and P-03 (Older versions = own rows only), deploy (no migration; backend+frontend together; then read-only probe of /document-search + security advisors), CLAUDE.md split (119,524 chars, 476 under the 120k band). Deferred: SEED-331, SEED-332, F-1, F-4. Next: /gsd:discuss-phase 272.
 Last activity: 2026-10-03
 

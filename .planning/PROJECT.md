@@ -25,6 +25,8 @@ Phase numbering resumes at **270**, migrations at **199**. Research skipped (see
 Solo running: Claude builds and reviews; phases close `verification_mode: self-verified`.
 Carried: `SEED-013`, `SEED-294` (non-engineering), `SEED-325`, `SEED-327`, `SEED-328`.
 
+**Progress:** 270 ✓ · 271 executed (human_needed) · **272 Close Means Wrong ✓ 2026-10-03 — FIND-07 validated**: the agent's search carries structured date/dimension filters on both retrieval arms, an empty filter fails closed with a structural retry lock, and a small filtered set is searched exactly (recall 1.000, 500–15,000 chunks). SC#4 met on 6/8 providers by decision (Google unmet, MiniMax unstable → SEED-334). Migrations 200+201 local only — production owed.
+
 ---
 
 ## Last Shipped: v4.4 Experts That Actually Work (2026-09-29)
@@ -1425,3 +1427,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-09-23 — **milestone v4.4 Experts That Actually Work STARTED** via /gsd:new-milestone. Phase numbering continues at **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`). SEED-304 tenancy decided: per-org copy.*
 
 *Last updated: 2026-09-29 — **milestone v4.4 Experts That Actually Work COMPLETED** (git tag `v4.4`; 5 phases, 24 plans, 17/17 requirements; nothing deployed — migrations 194-198 + `464ec8354` owed to production). STATE.md and the archives were done by hand, not via `milestone.complete`.*
+
+*Last updated: 2026-10-03 — **Phase 272 Close Means Wrong COMPLETE** (FIND-07; 5 plans + review fixes; self-verified, human_needed: production migrations 200 STEP 1 → STEP 2 → 201 owed).*

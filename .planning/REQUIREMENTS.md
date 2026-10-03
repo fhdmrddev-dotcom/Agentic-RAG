@@ -15,7 +15,7 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 - [x] **FIND-04**: User can download the original file of any document they can access; the UI states latest vs viewed version; the URL is short-lived and minted only after an org authorization check.
 - [x] **FIND-05**: Document detail shows rich file facts: created, modified, pages, size, type, uploader.
 - [ ] **FIND-06**: The Classification page is renamed for what people do there and mounted inside the Library.
-- [ ] **FIND-07**: The agent can pass date and dimension filters into retrieval, so "October revenue" cannot return March.
+- [x] **FIND-07**: The agent can pass date and dimension filters into retrieval, so "October revenue" cannot return March.
 
 ### Agent-authored artifacts (ART) - SEED-193 (SEED-194 rides the same rail later)
 
@@ -54,7 +54,7 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 | FIND-04 | Phase 270 | Complete |
 | FIND-05 | Phase 270 | Complete |
 | FIND-06 | Phase 271 | Pending |
-| FIND-07 | Phase 272 | Pending |
+| FIND-07 | Phase 272 | Complete (SC#4 6/8 by decision) |
 | ART-01 | Phase 273 | Pending |
 | ART-02 | Phase 273 | Pending |
 | ART-03 | Phase 273 | Pending |
