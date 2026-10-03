@@ -273,3 +273,31 @@ describe("P-05 — the chevron is unchanged", () => {
     expect(screen.queryByRole("button", { name: /version history/i })).not.toBeInTheDocument()
   })
 })
+
+// 271-VERIFICATION F-2 — POST /documents/{id}/reingest is latest-gated (404 on an older row,
+// which the list only logged), and PATCH /documents/{id}/move moves ONE row out of its
+// lineage's folder. So an older row offers neither, and says why in words. Delete stays:
+// the version delete removes exactly that row and promotes nothing (documents.py:1855-1886).
+describe("F-2 — an older-version row offers only what works on it", () => {
+  it("an older row has no Re-ingest and no Move, says why in words, and keeps Download and Delete", () => {
+    renderList({
+      documents: [row({ id: "old", is_latest: false, version_number: 1, version_count: 2 })],
+      columns: "find",
+      findDateColumn: ADDED,
+    })
+    const actions = mainRows()[0].querySelectorAll("td")[6] as HTMLElement
+    expect(within(actions).queryByRole("button", { name: "Re-ingest document" })).toBeNull()
+    expect(within(actions).queryByRole("button", { name: "Move to folder" })).toBeNull()
+    expect(actions).toHaveTextContent("Older version: re-ingest and move work on the latest")
+    expect(within(actions).getByRole("button", { name: "Delete document" })).toBeInTheDocument()
+    expect(within(actions).getByRole("button", { name: /Download/ })).toBeInTheDocument()
+  })
+
+  it("a latest row keeps every action and carries no older-version line", () => {
+    renderList({ documents: [row()], columns: "find", findDateColumn: ADDED })
+    const actions = mainRows()[0].querySelectorAll("td")[6] as HTMLElement
+    expect(within(actions).getByRole("button", { name: "Re-ingest document" })).toBeInTheDocument()
+    expect(within(actions).getByRole("button", { name: "Move to folder" })).toBeInTheDocument()
+    expect(actions).not.toHaveTextContent("Older version")
+  })
+})

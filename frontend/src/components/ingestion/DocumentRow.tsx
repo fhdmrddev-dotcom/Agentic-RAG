@@ -498,6 +498,16 @@ export function DocumentRow({
         <td className="px-4 py-3 text-right">
           <div className="flex flex-wrap items-center justify-end gap-1">
             <DocumentDownloadButton doc={doc} density="row" />
+            {/* 271-VERIFICATION F-2: an OLDER version (only Find lists one) offers neither
+                Re-ingest (the route is latest-gated → 404, which only logged) nor Move (it
+                moves one row out of its lineage's folder). Said in words, never a tooltip.
+                Delete stays: the version delete removes exactly this row. */}
+            {doc.is_latest === false ? (
+              <span className="text-xs text-muted-foreground text-left">
+                Older version: re-ingest and move work on the latest
+              </span>
+            ) : (
+            <>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -531,6 +541,8 @@ export function DocumentRow({
               </TooltipTrigger>
               <TooltipContent>Move to folder</TooltipContent>
             </Tooltip>
+            </>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
