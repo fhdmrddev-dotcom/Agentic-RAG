@@ -189,6 +189,28 @@ describe("FindQuickAdd — each editor dispatches exactly one condition", () => 
     expect(document.activeElement).toBe(chip)
   })
 
+  // 271-05 (G-4 drive finding): the case above dispatches Escape ON the dialog, which a real
+  // keyboard cannot do unless focus is inside it. In Chromium, focus stayed on the chip after
+  // opening, so Esc did nothing and Tab moved to the NEXT chip. Escape here is sent from
+  // wherever focus actually is.
+  it.each([
+    ["＋ Document type", "Document type"],
+    ["＋ Added by", "Added by"],
+    ["＋ Date", "Date"],
+    ["＋ Folder", "Folder"],
+    ["＋ Relationship", "Relationship"],
+    ["Version: Latest", "Version"],
+  ])("opening %s moves focus INTO its editor, and Esc from there closes it", (chipName, dialogName) => {
+    renderQA()
+    const chip = screen.getByRole("button", { name: chipName })
+    fireEvent.click(chip)
+    const dialog = screen.getByRole("dialog", { name: dialogName })
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    fireEvent.keyDown(document.activeElement as Element, { key: "Escape" })
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(document.activeElement).toBe(chip)
+  })
+
   it("only one editor is open at a time", () => {
     renderQA()
     fireEvent.click(screen.getByRole("button", { name: "＋ Folder" }))
