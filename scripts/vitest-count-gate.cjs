@@ -4109,6 +4109,9 @@ const BASELINE = {
   // ── Phase 272-02 (D-08) — ADOPTED: in NEITHER knob before (272-RESEARCH, measured). Pinned
   // at the gate's own printed `— 27 new` (20 shipped banner cases + 7 searchFilterLine). ──
   "toolMeta.test.ts": 27, // 272-02 (2026-10-03)
+  // ── Phase 272-05 (F-3, operator ruling 2026-10-03) — NEW suite, BOTH KNOBS, SAME COMMIT. The
+  // search card named every non-passage result "0 results"; 9 cases, 6 RED on the shipped tree. ──
+  "SearchDocumentsBody.test.ts": 9, // 272-05 (2026-10-03)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6006,6 +6009,8 @@ const TARGETS = [
   // measured), so its D-14 banner pins and the new searchFilterLine pins were guarded by
   // nothing. FILE-LEVEL — there is no `src/lib/__tests__` directory entry.
   "src/lib/__tests__/toolMeta.test.ts",
+  // Phase 272-05 (F-3) — FILE-LEVEL: `src/components/chat` has NO bare-directory entry.
+  "src/components/chat/tool-bodies/SearchDocumentsBody.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
