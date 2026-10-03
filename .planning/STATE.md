@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 271 — find-the-document
+**Current focus:** Phase 272 — close-means-wrong
 
 ---
 
@@ -54,10 +54,11 @@ genuinely reviewed.
 
 ## Current Position (v4.5)
 
-Phase: 271
+Phase: 272
 Plan: Not started
-Status: Phase 271 EXECUTED — verification human_needed (2026-10-03). Owed to operator: sign-off on G-4 rows G4-1..G4-6 (driven in Playwright, not Chrome MCP), review of P-01 (default sort added_desc) and P-03 (Older versions = own rows only), deploy (no migration; backend+frontend together; then read-only probe of /document-search + security advisors), CLAUDE.md split (119,524 chars, 476 under the 120k band). Deferred: SEED-331, SEED-332, F-1, F-4. Next: /gsd:discuss-phase 272.
-Last activity: 2026-10-02
+Status: Phase 272 CONTEXT GATHERED (2026-10-03) — 20 decisions in `phases/272-close-means-wrong/272-CONTEXT.md`; SEED-153 (chat half, partial) + SEED-273 folded. G-2 skip RECORDED as a decision (D-08: one visible text line on the shipped search tool card, no new component; G-4 scenario drafted). Next: /gsd:plan-phase 272 (extraction of retrieval_service.py is plan 1).
+Prior: Phase 271 EXECUTED — verification human_needed (2026-10-03). Owed to operator: sign-off on G-4 rows G4-1..G4-6 (driven in Playwright, not Chrome MCP), review of P-01 (default sort added_desc) and P-03 (Older versions = own rows only), deploy (no migration; backend+frontend together; then read-only probe of /document-search + security advisors), CLAUDE.md split (119,524 chars, 476 under the 120k band). Deferred: SEED-331, SEED-332, F-1, F-4. Next: /gsd:discuss-phase 272.
+Last activity: 2026-10-03
 
 ### v4.5 roadmap (2026-09-29): 19 / 19 requirements mapped
 
