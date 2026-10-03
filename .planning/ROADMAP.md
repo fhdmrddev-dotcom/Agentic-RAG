@@ -231,7 +231,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 273-05-PLAN.md — `artifact` SSE branch + reload mapper, ONE StreamsProvider handler, ONE MessageItem mount, rail leak arms L-1..L-4 + refused node, toolNames/toolMeta, backend↔frontend parity fences (wave 3)
+- [x] 273-05-PLAN.md — `artifact` SSE branch + reload mapper, ONE StreamsProvider handler, ONE MessageItem mount, rail leak arms L-1..L-4 + refused node, toolNames/toolMeta, backend↔frontend parity fences (wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
