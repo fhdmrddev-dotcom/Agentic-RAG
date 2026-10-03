@@ -103,6 +103,9 @@ export const TOOL_PHRASES: Record<string, string> = {
   remember: "Remember something",
   save_skill: "Save a skill",
   search_documents: "Search documents",
+  // Phase 273-05 (UI-D-06): CHAT-ONLY — never in the harness offer (`CHAT_ONLY_TOOLS`,
+  // `openai_service.py`), named here because the chat rail is a person-facing step list.
+  show_artifact: "Show an artifact",
   task: "Hand off to a helper",
   tree: "See the folder tree",
   web_search: "Browse the web",

@@ -754,7 +754,10 @@ const BASELINE = {
   //     that was never at risk, and the mitigation would be ceremony.
   //   • COVERAGE as a SET DIFFERENCE against the 28 ids `get_tools(None)` offers — so a tool
   //     added server-side fails HERE rather than reaching a business user as a schema token.
-  "toolNames.test.ts": 10,
+  // RAISED 10 → 11 at 273-05 (RESEARCH OQ3, RESOLVED): the key-set case now reads offered (28)
+  // ∪ the chat-only set parsed from `openai_service.py`'s CHAT_ONLY_TOOLS via `?raw`, and one
+  // new case pins that parse as non-vacuous and disjoint from the offer.
+  "toolNames.test.ts": 11,
   // 193.1-09 (AUTH-03 / SC#3) — TWO NEW FILES, pinned in the SAME COMMIT that creates them,
   // because a `BASELINE` key naming a path that does not yet exist makes this gate ERROR
   // (exit 2) rather than fail.
@@ -4122,6 +4125,16 @@ const BASELINE = {
   "MetricArtifact.test.tsx": 6, // 273-02 — glyph + percent delta, zero comparison
   "ArtifactBlock.test.tsx": 8, // 273-02 — registry closed to 3, notices, boundary, busy frame
   "ChartArtifact.test.tsx": 15, // 273-02 — legend toggles, hide, slots, no animation, tooltip
+  // ── Phase 273-05 (D-16 · I-1 · I-2 · SC#2) — SIX NEW suites, BOTH KNOBS, SAME COMMIT. None of
+  // their directories has a bare TARGETS entry (`src/components/chat`, `src/lib/api`,
+  // `src/providers` — the last sits in NEITHER knob), so each is adopted by FILE path below.
+  // Pinned at the measured passing counts (56 cases, 0 failing). ──
+  "threads.artifact.test.ts": 6, // 273-05 (2026-10-03) — artifact SSE branch + reload mapper
+  "streamsProviderArtifact.test.tsx": 5, // 273-05 — the ONE handler: append + replace-by-id
+  "MessageItem.artifacts.test.tsx": 5, // 273-05 — the ONE mount: placement + live == reload DOM
+  "artifactParity.fence.test.ts": 7, // 273-05 — backend Literals/fixture vs frontend registry (I-1)
+  "ShowArtifactBody.test.tsx": 17, // 273-05 — rail essence + body, never the spec or model text
+  "ToolCallPanel.showArtifact.test.tsx": 16, // 273-05 — L-1..L-4, refused node, phrases
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6030,6 +6043,14 @@ const TARGETS = [
   "src/components/chat/artifacts/__tests__/MetricArtifact.test.tsx",
   "src/components/chat/artifacts/__tests__/ArtifactBlock.test.tsx",
   "src/components/chat/artifacts/__tests__/ChartArtifact.test.tsx",
+  // Phase 273-05 — six new suites. FILE-LEVEL: none of `src/components/chat`, `src/lib/api` or
+  // `src/providers` has a bare-directory entry (`src/providers` is in NEITHER knob).
+  "src/lib/api/__tests__/threads.artifact.test.ts",
+  "src/providers/__tests__/streamsProviderArtifact.test.tsx",
+  "src/components/chat/__tests__/MessageItem.artifacts.test.tsx",
+  "src/components/chat/__tests__/artifactParity.fence.test.ts",
+  "src/components/chat/tool-bodies/ShowArtifactBody.test.tsx",
+  "src/components/chat/__tests__/ToolCallPanel.showArtifact.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

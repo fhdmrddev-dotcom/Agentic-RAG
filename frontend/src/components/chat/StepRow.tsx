@@ -16,13 +16,16 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ToolCall } from "@/types"
-import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
+import { stepLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
 import { preparingDescription } from "@/lib/providerLogo"
 import { StatusPill, type ToolStatus } from "./StatusPill"
 import { ConnectionMarkGlyph } from "@/lib/connectionMark"
 import { summarizeToolCall } from "./tool-bodies"
+import { nodeStateOf } from "./toolStepDerivation"
 
-export type NodeState = "done" | "active" | "queued"
+// Phase 273-05 (UI-D-02, OV-273-04): `refused` — a done step whose result carries the
+// structured refusal marker (derived in `toolStepDerivation.nodeStateOf`). Amber, never red.
+export type NodeState = "done" | "active" | "queued" | "refused"
 
 export function toolIcon(name: string) {
   const cls = "w-3.5 h-3.5"
@@ -128,7 +131,7 @@ export function ToolEssenceLine({
       <span className="flex-1 min-w-0 text-xs truncate">
         {isPreparing ? (
           <span className="font-semibold text-foreground/50 italic">
-            Preparing {toolLabel(tc.name)}…
+            Preparing {stepLabel(tc.name)}…
             {(() => {
               const prepDesc = preparingDescription(tc)
               return prepDesc ? (
@@ -140,14 +143,14 @@ export function ToolEssenceLine({
           </span>
         ) : isRunning ? (
           <>
-            <span className="font-semibold text-primary">Running {toolLabel(tc.name)}</span>
+            <span className="font-semibold text-primary">Running {stepLabel(tc.name)}</span>
             {summary && <span className="ml-1.5 opacity-50">"{summary}"</span>}
           </>
         ) : (
           <>
-            <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
+            <span className="font-semibold text-foreground/80">{stepLabel(tc.name)}</span>
             <span className="mx-1 text-muted-foreground">→</span>
-            <span className="text-muted-foreground">{result}</span>
+            <span className={nodeStateOf(tc) === "refused" ? "text-amber-700 dark:text-warning" : "text-muted-foreground"}>{result}</span>
           </>
         )}
       </span>
@@ -228,6 +231,7 @@ export function StepRow({
             node === "active" &&
               "bg-card border-primary animate-pulseGlow shadow-[0_0_0_3px_hsl(var(--primary)/0.15)]",
             node === "queued" && "bg-card border-border",
+            node === "refused" && "bg-amber-600 border-amber-600 dark:bg-warning dark:border-warning",
           )}
         />
         {/* the step number */}
@@ -235,7 +239,7 @@ export function StepRow({
           data-testid="step-snum"
           className={cn(
             "mt-1 font-mono text-[10px] tabular-nums leading-none",
-            node === "active" ? "text-primary font-bold" : "text-success/80",
+            node === "active" ? "text-primary font-bold" : node === "refused" ? "text-amber-700 dark:text-warning" : "text-success/80",
             node === "queued" && "text-muted-foreground",
           )}
         >

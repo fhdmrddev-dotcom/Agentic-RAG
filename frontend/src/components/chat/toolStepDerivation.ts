@@ -53,8 +53,28 @@ export function buildToolStepNumberMap(deduplicatedToolCalls: ToolCall[]): Map<s
   return map
 }
 
+/**
+ * Phase 273-05 (UI-D-02, OV-273-04): a done call whose result is a JSON object carrying the
+ * structured refusal marker `status: "refused"` is a REFUSED step (amber node). Read from the
+ * marker, never from the tool name: in v1 only one tool emits it, and any tool that adopts the
+ * marker later gets the state for free. Strings only; never throws.
+ */
+function carriesRefusalMarker(result: string | undefined): boolean {
+  if (typeof result !== "string" || !result.includes("refused")) return false
+  try {
+    const parsed: unknown = JSON.parse(result)
+    return (
+      typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) &&
+      (parsed as { status?: unknown }).status === "refused"
+    )
+  } catch {
+    return false
+  }
+}
+
 export function nodeStateOf(tc: ToolCall): NodeState {
   if (tc.status === "running" || tc.status === "preparing") return "active"
+  if (tc.status === "done" && carriesRefusalMarker(tc.result)) return "refused"
   if (tc.status === "done" || tc.status === "interrupted") return "done"
   return "queued"
 }
