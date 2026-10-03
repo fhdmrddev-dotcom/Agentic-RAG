@@ -18,7 +18,14 @@ import { FolderBreadcrumb } from "@/components/ingestion/FolderBreadcrumb"
 import { FolderDetail } from "@/components/ingestion/FolderDetail"
 import { FolderTree } from "@/components/ingestion/FolderTree"
 import { FilterBar } from "@/components/ingestion/FilterBar"
+import { FIND_EXCLUDED_FIELD_KEYS } from "@/components/ingestion/ConditionPopover"
 import { ViewsGroup } from "@/components/ingestion/ViewsGroup"
+// Phase 271-04 — Find on the Documents tab. ⛔ The page WIRES these; it renders none of Find's
+// states itself (DocumentsFindBody owns them — the ledger's "each tab owns its body" seam).
+import { FindQuickAdd } from "@/components/library/find/FindQuickAdd"
+import { DocumentsFindResults, FindSearchRow } from "@/components/library/find/DocumentsFindBody"
+import { AskHandoffCard } from "@/components/library/find/AskHandoffCard"
+import { useDocumentFind } from "@/hooks/useDocumentFind"
 import { ViewsTab } from "@/components/library/ViewsTab"
 import { IngestionTab } from "@/components/library/IngestionTab"
 import { IndexingTab } from "@/components/library/IndexingTab"
@@ -72,6 +79,13 @@ import {
   type LibraryState,
   type LibraryTab,
 } from "./librarySelection"
+import {
+  canSaveAsView,
+  findReducer,
+  initialFindState,
+  isSearchActive,
+  toSearchRequest,
+} from "./findState"
 
 // Mirrors the local hook in WorkspacePanel/DocumentDetailPanel (768px = the app's
 // mobile breakpoint). On the Documents page it drives two things: hiding the fixed
@@ -208,6 +222,7 @@ export function LibraryPage({
   onNavigate,
   initialTab,
   attentionConditions,
+  onAskInChat,
 }: {
   onNavigate?: (view: ActiveView) => void
   initialTab?: LibraryTab
@@ -224,7 +239,7 @@ export function LibraryPage({
   attentionConditions?: readonly AttentionCondition[]
   /**
    * Phase 271 (D-02) — Ask leaves the Library through ChatLayout; the Library renders no answer.
-   * Consumed by the Documents tab in 271-04.
+   * Consumed by the Documents tab (271-04): the Ask card's Open in chat and Enter in Ask mode.
    */
   onAskInChat?: (question: string) => Promise<boolean> | void
 } = {}) {
@@ -302,6 +317,18 @@ export function LibraryPage({
   // EMPTY_FILTER). The equivalence is fenced by the leaf's own suite.
   const filter = lib.filter ?? EMPTY_FILTER
 
+  // ── Phase 271-04 — Find on the Documents tab ──────────────────────────────────────────
+  // ⛔ A SECOND REDUCER BESIDE THE SHIPPED ONE, NOT NEW `librarySelection` ACTIONS: that leaf's
+  // suite pins its action set, and Find's state is not a selection. The metadata conditions
+  // stay in `lib.filter` (one source of truth with the Views tab, D-114-1); `findState` holds
+  // only what a saved view cannot store. The mode is never persisted — it is Find on every load.
+  const [find, findDispatch] = useReducer(findReducer, initialFindState)
+  const searchActive = isSearchActive(find, filter.conditions.length)
+  // ZERO requests at rest, in Ask mode, and on every other tab: the hook is handed `null`.
+  const findResult = useDocumentFind({
+    request: tab === "documents" && find.mode === "find" ? toSearchRequest(find, filter) : null,
+  })
+
   // Phase 112 (D-01): the open document for the right-side push/split detail panel.
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
   const isMobile = useIsMobile()
@@ -347,9 +374,17 @@ export function LibraryPage({
 
   // Resolve the selected doc from the live documents array so it tracks edits +
   // re-fetches (loadDocuments reconcile). Falls back to closed if it disappears.
-  const selectedDoc = useMemo(
-    () => (selectedDocId === null ? null : documents.find((d) => d.id === selectedDocId) ?? null),
-    [selectedDocId, documents],
+  // Phase 271-04 (UI-SPEC S4): a Find row may be an OLDER version, which `documents` (latest
+  // rows only) never holds — so the Find answer is the second place a selection resolves from.
+  // The live `documents` row still wins for a latest document.
+  const selectedDoc = useMemo<Document | null>(
+    () =>
+      selectedDocId === null
+        ? null
+        : documents.find((d) => d.id === selectedDocId) ??
+          findResult.rows.find((d) => d.id === selectedDocId) ??
+          null,
+    [selectedDocId, documents, findResult.rows],
   )
 
   // Phase 153 (CITE-01 / SC#2 / T-153-02-01): consume the one-shot cross-view
@@ -474,6 +509,9 @@ export function LibraryPage({
   // resolve, that resolve. Nothing here re-derives the mutual exclusion by hand: the
   // reducer already encodes every clear and every reset these handlers used to perform.
   const handleSelectFolder = useCallback((id: string | null) => {
+    // Phase 271-04 (UI-SPEC: pre-seeded folder): choosing a folder in the sidebar ENDS a Find
+    // search and browses that folder — the shipped SELECT_FOLDER rule, applied to Find too.
+    findDispatch({ type: "CLEAR_SEARCH" })
     dispatch({ type: "SELECT_FOLDER", folderId: id })
     setFilteredDocs(null)
   }, [])
@@ -498,6 +536,46 @@ export function LibraryPage({
     dispatch({ type: "CHANGE_FILTER", filter: next })
     void resolveFilterIntoList(next)
   }, [resolveFilterIntoList])
+
+  // Phase 271-04 — the Documents tab's filter change. The metadata conditions still live in the
+  // shared reducer, but Find's own request (`useDocumentFind`) evaluates them, so this path
+  // ⛔ NEVER calls `resolveFilterIntoList`: that function's catch swaps the list for the
+  // UNFILTERED folder list (T-271-14). The Views tab keeps `handleFilterChange` as shipped.
+  const handleFindFilterChange = useCallback((next: ViewFilter) => {
+    dispatch({ type: "CHANGE_FILTER", filter: next })
+    setFilteredDocs(null)
+    setMatchCount(null)
+  }, [])
+
+  // Clear search: every Find condition, Version back to Latest, and the metadata filter.
+  const handleClearSearch = useCallback(() => {
+    findDispatch({ type: "CLEAR_SEARCH" })
+    dispatch({ type: "CHANGE_FILTER", filter: EMPTY_FILTER })
+    setFilteredDocs(null)
+    setMatchCount(null)
+  }, [])
+
+  // UI-SPEC (pre-seeded folder): when a search STARTS while a sidebar folder is selected, it is
+  // scoped to that folder with subfolders on — as a visible, removable chip, never a hidden
+  // scope. Edge-triggered, so removing the chip mid-search does not bring it back.
+  const wasSearchActive = useRef(false)
+  useEffect(() => {
+    const was = wasSearchActive.current
+    wasSearchActive.current = searchActive
+    if (
+      !was &&
+      searchActive &&
+      tab === "documents" &&
+      find.mode === "find" &&
+      selectedFolderId !== null &&
+      find.folder === null
+    ) {
+      findDispatch({
+        type: "SET_FOLDER",
+        folder: { folderId: selectedFolderId, includeSubfolders: true },
+      })
+    }
+  }, [searchActive, tab, find.mode, find.folder, selectedFolderId])
 
   const handleViewSaved = useCallback((view: SavedView) => {
     refreshViews()
@@ -583,16 +661,24 @@ export function LibraryPage({
   // Phase 114: the inline filter/view builder (D-114-1). Ad-hoc filtering and a
   // loaded saved view are the SAME surface. When the detail panel is open the bar
   // collapses to a summary chip to reclaim room (D-114-17).
-  const filterBarEl =
-    panelOpen && !filterChipExpanded ? (
+  // Phase 271-04: ONE builder for both tabs (D-114-1). The Views tab calls this with nothing and
+  // gets the shipped bar; the Documents tab passes Find's quick-add row and the Find-only props.
+  // The panel-open summary chip counts what is actually set (metadata + structure conditions).
+  const renderFilterBar = (findBar?: {
+    quickAdd: ReactNode
+    saveDisabledReason: string | undefined
+    conditionCount: number
+  }) => {
+    const count = findBar ? findBar.conditionCount : filter.conditions.length
+    return panelOpen && !filterChipExpanded ? (
       <button
         type="button"
         onClick={() => setFilterChipExpanded(true)}
         className="inline-flex items-center gap-2 self-start rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <SlidersHorizontal className="h-3.5 w-3.5" />
-        {filterActive
-          ? `${filter.conditions.length} ${filter.conditions.length === 1 ? "filter" : "filters"}`
+        {(findBar ? count > 0 : filterActive)
+          ? `${count} ${count === 1 ? "filter" : "filters"}`
           : "Filter"}
       </button>
     ) : (
@@ -609,16 +695,117 @@ export function LibraryPage({
             </button>
           </div>
         )}
-        <FilterBar
-          customFields={customFields}
-          value={filter}
-          onChange={handleFilterChange}
-          onViewSaved={handleViewSaved}
-          editingView={editingView}
-          matchCount={matchCount}
-        />
+        {findBar ? (
+          <FilterBar
+            customFields={customFields}
+            value={filter}
+            onChange={handleFindFilterChange}
+            onViewSaved={handleViewSaved}
+            editingView={editingView}
+            quickAdd={findBar.quickAdd}
+            suppressCount
+            saveDisabledReason={findBar.saveDisabledReason}
+            excludeFieldKeys={FIND_EXCLUDED_FIELD_KEYS}
+          />
+        ) : (
+          <FilterBar
+            customFields={customFields}
+            value={filter}
+            onChange={handleFilterChange}
+            onViewSaved={handleViewSaved}
+            editingView={editingView}
+            matchCount={matchCount}
+          />
+        )}
       </div>
     )
+  }
+  const filterBarEl = renderFilterBar()
+
+  // ── Phase 271-04 — the Documents tab's Find composition (the seam's `find` argument). ──
+  // `top` is the search row and, in Find mode, the shared bar with the quick-add chips; it is
+  // always at the top so the controls a person is using never move (UI-SPEC S3). `body` is
+  // what REPLACES the shipped lead + list: the Ask card in Ask mode (no list, no passage —
+  // D-02), the Find results while a search is active, else null (rest = shipped browse).
+  const findStructureCount =
+    (find.folder ? 1 : 0) +
+    (find.addedBy ? 1 : 0) +
+    find.dates.length +
+    (find.relationship ? 1 : 0) +
+    (find.version !== "latest" ? 1 : 0)
+  const askInChat = (question: string) => {
+    void onAskInChat?.(question)
+  }
+  const documentsFind = {
+    top: (
+      <div className="flex flex-col gap-3">
+        <FindSearchRow
+          mode={find.mode}
+          onModeChange={(mode) => findDispatch({ type: "SET_MODE", mode })}
+          name={find.name}
+          onNameChange={(name) => findDispatch({ type: "SET_NAME", name })}
+          askText={find.askText}
+          onAskTextChange={(text) => findDispatch({ type: "SET_ASK_TEXT", text })}
+          onAsk={askInChat}
+        />
+        {find.mode === "find" &&
+          renderFilterBar({
+            quickAdd: (
+              <FindQuickAdd
+                find={find}
+                dispatch={findDispatch}
+                filter={filter}
+                onFilterChange={handleFindFilterChange}
+                documents={documents}
+                folders={folders}
+              />
+            ),
+            saveDisabledReason: canSaveAsView(find)
+              ? undefined
+              : "This search can't be saved as a view yet.",
+            conditionCount: filter.conditions.length + findStructureCount,
+          })}
+      </div>
+    ),
+    body:
+      find.mode === "ask" ? (
+        <AskHandoffCard question={find.askText} onAskInChat={askInChat} />
+      ) : searchActive ? (
+        <DocumentsFindResults
+          rows={findResult.rows}
+          total={findResult.total}
+          olderMatches={findResult.olderMatches}
+          loading={findResult.loading}
+          error={findResult.error}
+          onRetry={findResult.retry}
+          sort={find.sort}
+          onSortChange={(sort) => findDispatch({ type: "SET_SORT", sort })}
+          hasFolderCondition={find.folder !== null}
+          hasRelationship={find.relationship !== null}
+          version={find.version}
+          onShowOlder={() => findDispatch({ type: "SET_VERSION", version: "older" })}
+          onClearSearch={handleClearSearch}
+          offset={find.offset}
+          limit={find.limit}
+          onPageChange={(offset, limit) => findDispatch({ type: "SET_PAGE", offset, limit })}
+          listProps={{
+            // A delete or refresh re-asks the server, so a removed row cannot linger in the
+            // answer (the latest-rows list refreshes itself; the Find page is the hook's).
+            onDelete: (id, scope) => {
+              void Promise.resolve(deleteDoc(id, scope)).then(findResult.retry)
+            },
+            onRefresh: () => {
+              void loadDocuments()
+              findResult.retry()
+            },
+            currentUserId: user?.id ?? "",
+            onSelect: setSelectedDocId,
+            selectedDocId,
+            folders,
+          }}
+        />
+      ) : null,
+  }
 
   // The document surface — the push/split grid (D-01). The list shrinks but stays visible
   // (minmax(0,1fr)) while a fixed 430px detail-panel track mounts when a document is
@@ -627,7 +814,14 @@ export function LibraryPage({
   // ⭐ ONE definition, mounted by the Documents tab and the Views tab. `lead` is the only
   // thing that differs between them, which is what keeps the tab shell from becoming the
   // tenth conditional branch inside this component (the ledger's named seam for this file).
-  const documentSurface = (lead: ReactNode) => (
+  // ⭐ Phase 271-04 — ONE optional second argument, `findSlots`, and nothing else changes shape. Given
+  // it, the column renders `findSlots.top`, then `findSlots.body` if there is one, else the shipped lead +
+  // list + pager; the bar lives inside `findSlots.top`. Not given (the Views tab), the column is
+  // byte-for-byte what it was.
+  const documentSurface = (
+    lead: ReactNode,
+    findSlots?: { top: ReactNode; body: ReactNode | null },
+  ) => (
     <div
       className="grid flex-1 min-h-0 min-w-0 gap-6"
       style={{
@@ -646,34 +840,41 @@ export function LibraryPage({
             "[&_table_td:nth-child(2)_button]:whitespace-normal [&_table_td:nth-child(2)_button]:[overflow-wrap:anywhere]",
         )}
       >
-        {lead}
-        {filterBarEl}
-        <div data-testid="documents-doclist">
-          <DocumentList
-            documents={pagedDocuments}
-            onDelete={deleteDoc}
-            onRefresh={loadDocuments}
-            folderId={listFolderId}
-            currentUserId={user?.id ?? ""}
-            onSelect={setSelectedDocId}
-            selectedDocId={selectedDocId}
-            folders={folders}
-          />
-        </div>
-        {/* Phase 217.1-06 — the client-side pager (the sketch's table footer). Shown on
-            the folder view only; a filter/view resolve carries its own server count. */}
-        {filteredDocs === null && (
-          <div data-testid="documents-tfoot">
-            <DocumentsPager
-              total={listDocuments.length}
-              offset={pageOffset}
-              limit={pageSize}
-              onChange={(off, lim) => {
-                setPageOffset(off)
-                setPageSize(lim)
-              }}
-            />
-          </div>
+        {findSlots && findSlots.top}
+        {findSlots && findSlots.body ? (
+          findSlots.body
+        ) : (
+          <>
+            {lead}
+            {!findSlots && filterBarEl}
+            <div data-testid="documents-doclist">
+              <DocumentList
+                documents={pagedDocuments}
+                onDelete={deleteDoc}
+                onRefresh={loadDocuments}
+                folderId={listFolderId}
+                currentUserId={user?.id ?? ""}
+                onSelect={setSelectedDocId}
+                selectedDocId={selectedDocId}
+                folders={folders}
+              />
+            </div>
+            {/* Phase 217.1-06 — the client-side pager (the sketch's table footer). Shown on
+                the folder view only; a filter/view resolve carries its own server count. */}
+            {filteredDocs === null && (
+              <div data-testid="documents-tfoot">
+                <DocumentsPager
+                  total={listDocuments.length}
+                  offset={pageOffset}
+                  limit={pageSize}
+                  onChange={(off, lim) => {
+                    setPageOffset(off)
+                    setPageSize(lim)
+                  }}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -955,7 +1156,7 @@ export function LibraryPage({
               value="documents"
               className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
             >
-              {documentSurface(documentsLead)}
+              {documentSurface(documentsLead, documentsFind)}
             </TabsContent>
 
             <TabsContent

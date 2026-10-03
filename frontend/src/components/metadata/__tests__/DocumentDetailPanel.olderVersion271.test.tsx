@@ -69,7 +69,11 @@ beforeEach(() => {
   updateDocumentMetadata.mockResolvedValue({})
 })
 
-const editControls = () => screen.queryAllByRole("button", { name: /^(Edit|Add) / })
+// InlineEdit's controls are named `Edit <field>` / `Add <field>` (InlineEdit.tsx). Matched on
+// the metadata field keys so another section's button cannot satisfy or break the count.
+const FIELD_KEYS = "title|author|date|document_type|topics|language|summary"
+const editControls = () =>
+  screen.queryAllByRole("button", { name: new RegExp(`^(Edit|Add) (${FIELD_KEYS})$`) })
 
 describe("DocumentDetailPanel — an older version (Phase 271-04)", () => {
   it("states it is version history and offers no inline edit", async () => {

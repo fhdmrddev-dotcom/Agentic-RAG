@@ -237,7 +237,7 @@ describe("LibraryPage — Find at rest costs nothing (D-01 / T-271-17)", () => {
     expect(nameInput()).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Version: Latest" })).toBeInTheDocument()
     expect(screen.getByText("browse-only.pdf")).toBeInTheDocument()
-    expect(screen.getByLabelText("Choose files")).toBeInTheDocument()
+    expect(screen.getByText(/Documents not assigned to a folder/)).toBeInTheDocument()
     await sleep(500)
     expect(mockSearchDocuments).not.toHaveBeenCalled()
   })
@@ -260,7 +260,7 @@ describe("LibraryPage — an active search (D-03)", () => {
       folder: null,
       relationship: null,
     })
-    expect(screen.queryByLabelText("Choose files")).toBeNull()
+    expect(screen.queryByText(/Documents not assigned to a folder/)).toBeNull()
     expect(screen.queryByText("browse-only.pdf")).toBeNull()
     expect(screen.getByText("2 documents")).toBeInTheDocument()
     const order = screen.getAllByText(/^Acme [AB]\.pdf$/).map((el) => el.textContent)
@@ -317,7 +317,7 @@ describe("LibraryPage — an active search (D-03)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear search" }))
     expect((nameInput() as HTMLInputElement).value).toBe("")
     expect(screen.getByRole("button", { name: "Version: Latest" })).toBeInTheDocument()
-    expect(screen.getByLabelText("Choose files")).toBeInTheDocument()
+    expect(screen.getByText(/Documents not assigned to a folder/)).toBeInTheDocument()
     expect(screen.getByText("browse-only.pdf")).toBeInTheDocument()
   })
 
@@ -327,7 +327,8 @@ describe("LibraryPage — an active search (D-03)", () => {
     fireEvent.click(within(screen.getByTestId("library-sidebar")).getByText("Research"))
     expect((nameInput() as HTMLInputElement).value).toBe("")
     expect(screen.queryByText("Acme A.pdf")).toBeNull()
-    expect(screen.getByLabelText(/Choose files|Read-only folder/)).toBeInTheDocument()
+    expect(screen.queryByText("Exact match on fields. No AI ranking.")).toBeNull()
+    expect(screen.getByTestId("documents-doclist")).toBeInTheDocument()
   })
 
   it("a row click opens the detail panel for THAT row — including an older version not in `documents`", async () => {
@@ -338,7 +339,8 @@ describe("LibraryPage — an active search (D-03)", () => {
     })
     renderPage()
     await search("acme")
-    fireEvent.click(screen.getByRole("button", { name: /Acme A\.pdf/ }))
+    // The filename cell's button (the row also carries a Download control naming the file).
+    fireEvent.click(screen.getByText("Acme A.pdf").closest("button")!)
     expect(await screen.findByLabelText("Document details")).toHaveTextContent("panel:Acme A.pdf")
   })
 })
@@ -350,7 +352,7 @@ describe("LibraryPage — Ask leaves the Library (D-02)", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Ask" }))
     expect(screen.queryByRole("button", { name: "Version: Latest" })).toBeNull()
     expect(screen.queryByText("Exact match on fields. No AI ranking.")).toBeNull()
-    expect(screen.queryByLabelText("Choose files")).toBeNull()
+    expect(screen.queryByText(/Documents not assigned to a folder/)).toBeNull()
     expect(screen.queryByText("Acme A.pdf")).toBeNull()
     expect(screen.queryByText("browse-only.pdf")).toBeNull()
     expect(screen.queryByRole("table")).toBeNull()
