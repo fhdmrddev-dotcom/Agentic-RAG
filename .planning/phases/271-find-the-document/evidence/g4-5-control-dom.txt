@@ -1,0 +1,11 @@
+{
+  "latestEditControls": 8,
+  "latestEditLabels": [
+    "Add title",
+    "Add author",
+    "Edit date",
+    "Edit document_type",
+    "Add topics",
+    "Add language"
+  ]
+}

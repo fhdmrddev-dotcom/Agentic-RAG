@@ -1,0 +1,25 @@
+{
+  "latestEditControls": 8,
+  "latestEditLabels": [
+    "Add title",
+    "Add author",
+    "Edit date",
+    "Edit document_type",
+    "Add topics",
+    "Add language"
+  ],
+  "partA": "control done",
+  "olderRowActionLabels": [
+    "Lease 2024.pdf",
+    "Download v1 (viewed, not latest) — Lease 2024.pdf",
+    "Re-ingest document",
+    "Move to folder",
+    "Delete document"
+  ],
+  "reingestFound": 1,
+  "afterClickDialog": null,
+  "requests": [
+    "POST /documents/e1e5d5a4-c7ff-4104-8a81-ae7a71714626/reingest"
+  ],
+  "toastsAndAlerts": []
+}

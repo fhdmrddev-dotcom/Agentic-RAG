@@ -1,0 +1,74 @@
+{
+  "＋ Document type": {
+    "clickThenEsc": {
+      "focusInside": false,
+      "stillOpen": true
+    },
+    "keyboard": {
+      "tabbedInside": false,
+      "stillOpen": true,
+      "focusBack": "＋ Added by"
+    }
+  },
+  "＋ Added by": {
+    "clickThenEsc": {
+      "focusInside": false,
+      "stillOpen": true
+    },
+    "keyboard": {
+      "tabbedInside": false,
+      "stillOpen": true,
+      "focusBack": "＋ Date"
+    }
+  },
+  "＋ Date": {
+    "clickThenEsc": {
+      "focusInside": false,
+      "stillOpen": true
+    },
+    "keyboard": {
+      "tabbedInside": false,
+      "stillOpen": true,
+      "focusBack": "＋ Folder"
+    }
+  },
+  "＋ Folder": {
+    "clickThenEsc": {
+      "focusInside": false,
+      "stillOpen": true
+    },
+    "keyboard": {
+      "tabbedInside": false,
+      "stillOpen": true,
+      "focusBack": "＋ Relationship"
+    }
+  },
+  "＋ Relationship": {
+    "clickThenEsc": {
+      "focusInside": false,
+      "stillOpen": true
+    },
+    "keyboard": {
+      "tabbedInside": false,
+      "stillOpen": true,
+      "focusBack": "Version: Latest"
+    }
+  },
+  "Version: Latest": {
+    "clickThenEsc": {
+      "focusInside": false,
+      "stillOpen": true
+    },
+    "keyboard": {
+      "tabbedInside": true,
+      "stillOpen": false,
+      "focusBack": "Version: Latest"
+    }
+  },
+  "＋ condition (shipped)": {
+    "clickThenEsc": {
+      "focusInside": false,
+      "stillOpen": true
+    }
+  }
+}

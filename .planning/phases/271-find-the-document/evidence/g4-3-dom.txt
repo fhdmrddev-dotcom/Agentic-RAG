@@ -1,0 +1,68 @@
+{
+  "railText": "",
+  "railLabels": [
+    "Expand navigation",
+    "New chat",
+    "Chat",
+    "Workflows",
+    "Library",
+    "Connections",
+    "Skills",
+    "Experts",
+    "Organization admin",
+    "Account menu",
+    "Open navigation",
+    "Filing rules",
+    "Choose files"
+  ],
+  "linkRole": null,
+  "tabBoxes": [
+    {
+      "t": "Documents",
+      "x": 577.28125
+    },
+    {
+      "t": "Views",
+      "x": 637.40625
+    },
+    {
+      "t": "Ingestion",
+      "x": 716.421875
+    },
+    {
+      "t": "Indexing",
+      "x": 790.71875
+    },
+    {
+      "t": "Health",
+      "x": 853.59375
+    },
+    {
+      "t": "Add files",
+      "x": 164.609375
+    },
+    {
+      "t": "In progress",
+      "x": 249.203125
+    },
+    {
+      "t": "Needs attention",
+      "x": 360.125
+    },
+    {
+      "t": "History",
+      "x": 421.5
+    }
+  ],
+  "linkBox": {
+    "x": 1341.109375,
+    "y": 35,
+    "width": 115.484375,
+    "height": 26
+  },
+  "filingRulesBody": "Library\nFiling rules\n\nSuggest a folder for matching uploads — never a silent move. You accept or dismiss each suggestion on the document.\n\nNew rule\nAll (1)\nArrival (0)\nExtracted (1)\nAUTOMATION\nInvoices to Contracts\nExtracted\ndocument_type is Invoice\n→\n📁\nContracts",
+  "selectedAfterBack": [
+    "Ingestion",
+    "Add files"
+  ]
+}
