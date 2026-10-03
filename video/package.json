@@ -1,0 +1,23 @@
+{
+  "name": "syrel-video",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Syrel motion-graphic videos (Remotion). Free under the Remotion license for individuals and companies of up to 3 people.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render:overview": "remotion render src/index.ts SyrelOverview out/syrel-overview.mp4",
+    "still:overview": "remotion still src/index.ts SyrelOverview out/frame.png --frame=60"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.532",
+    "@remotion/google-fonts": "^4.0.532",
+    "@remotion/transitions": "4.0.532",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "remotion": "^4.0.532"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}
