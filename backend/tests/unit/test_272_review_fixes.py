@@ -456,3 +456,55 @@ async def test_wr03_the_handler_reports_an_unread_spelling_as_kind_4(monkeypatch
     assert seen == {"resolve": 0, "search": 0}
     assert ctx.empty_filter_fields_in_run == set(), "kind 4 never locks"
     assert [a["result_kind"] for a in audits] == ["provider_error"]
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# WR-07 — the RPC adapter fails CLOSED on an empty folder scope (D-18 one layer down)
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# `folder_ids if folder_ids else None` turned `[]` into SQL NULL, which both RPC bodies read as
+# "no folder restriction" — so any caller handing retrieval an empty scope searched the whole KB.
+
+
+@pytest.mark.parametrize("hybrid", [True, False])
+@pytest.mark.parametrize("document_ids", [None, ["d1"]])
+async def test_wr07_an_empty_folder_scope_makes_no_rpc_call_and_no_embed(monkeypatch, caplog, hybrid, document_ids):
+    from app.config import settings
+    from app.services import retrieval_rpc
+    from app.services.retrieval_service import search_documents
+
+    calls: list = []
+    embeds: list = []
+
+    async def _rec(*a, **k):
+        calls.append(a)
+        return []
+
+    def _embed(texts, **k):
+        embeds.append(texts)
+        return [[0.1, 0.2]]
+
+    monkeypatch.setattr(retrieval_rpc, "_call_as_user", _rec)
+    monkeypatch.setattr(retrieval_rpc, "embed_texts", _embed)
+    monkeypatch.setattr(settings, "hybrid_search_enabled", hybrid)
+    monkeypatch.setattr(settings, "rerank_enabled", False)
+    kwargs = {} if document_ids is None else {"document_ids": document_ids}
+    with caplog.at_level("ERROR"):
+        results, avg = await search_documents("q", "u1", supabase=object(), user_settings=None, folder_ids=[], **kwargs)
+    assert results == [] and avg == 0.0
+    assert calls == [] and embeds == []
+    assert any("D-18" in r.getMessage() and "folder" in r.getMessage() for r in caplog.records)
+
+
+async def test_wr07_none_still_means_no_folder_restriction(monkeypatch):
+    from app.services import retrieval_rpc
+
+    seen: list = []
+
+    async def _rec(user_id, sql, *args, **kw):
+        seen.append(args)
+        return []
+
+    monkeypatch.setattr(retrieval_rpc, "_call_as_user", _rec)
+    await retrieval_rpc._keyword_search("q", "u1", object(), None, 5, folder_ids=None)
+    await retrieval_rpc._keyword_search("q", "u1", object(), None, 5, folder_ids=["f1"])
+    assert seen[0][-1] is None and seen[1][-1] == ["f1"]

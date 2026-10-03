@@ -128,6 +128,12 @@ async def _vector_search(
     if document_ids is not None and len(document_ids) == 0:
         logger.error("D-18: an empty document set reached _vector_search; returning [] without a DB call")
         return []
+    # 272-REVIEW WR-07 — the same inversion one argument over: SQL NULL means "no folder
+    # restriction", so an EMPTY folder scope must stop here rather than become NULL below. `None`
+    # stays None (no restriction); a list is passed through VERBATIM.
+    if folder_ids is not None and len(folder_ids) == 0:
+        logger.error("D-18: an empty folder scope reached _vector_search; returning [] without a DB call")
+        return []
     # SEED-065: embed_texts is a SYNC OpenAI HTTP call. Running it directly on the
     # event loop froze ALL request serving for the embedding round-trip — under a
     # search-heavy llm_batch_agents fan-out (N concurrent sub-agents) that stacked
@@ -157,7 +163,7 @@ async def _vector_search(
             top_n,
             match_threshold,
             metadata_filter if metadata_filter else None,
-            folder_ids if folder_ids else None,
+            folder_ids,  # WR-07: verbatim — `[]` returned above, None stays None
             current_model,
             list(document_ids),
             FILTERED_EXACT_MAX_CHUNKS,
@@ -178,7 +184,7 @@ async def _vector_search(
         top_n,
         match_threshold,
         metadata_filter if metadata_filter else None,
-        folder_ids if folder_ids else None,
+        folder_ids,  # WR-07: verbatim — `[]` returned above, None stays None
         current_model,
         # Phase 241 (D-09 / D-11) — the ONLY caller that passes these: HNSW is the vector
         # index, so `_keyword_search` below deliberately carries nothing. Resolved in the
@@ -203,6 +209,10 @@ async def _keyword_search(
     if document_ids is not None and len(document_ids) == 0:
         logger.error("D-18: an empty document set reached _keyword_search; returning [] without a DB call")
         return []
+    # 272-REVIEW WR-07 — an EMPTY folder scope is a restriction to nothing, never NULL ("all").
+    if folder_ids is not None and len(folder_ids) == 0:
+        logger.error("D-18: an empty folder scope reached _keyword_search; returning [] without a DB call")
+        return []
     if document_ids is not None:
         # Phase 272 (D-14 / D-19): the SAME set the vector arm gets; the folder scope is kept.
         return await _call_as_user(
@@ -213,7 +223,7 @@ async def _keyword_search(
             user_id,
             top_n,
             metadata_filter if metadata_filter else None,
-            folder_ids if folder_ids else None,
+            folder_ids,  # WR-07: verbatim — `[]` returned above, None stays None
             list(document_ids),
         )
     # Phase 164 (D-164-02): same user-context swap as `_vector_search` — keyword_search_chunks
@@ -228,5 +238,5 @@ async def _keyword_search(
         user_id,
         top_n,
         metadata_filter if metadata_filter else None,
-        folder_ids if folder_ids else None,
+        folder_ids,  # WR-07: verbatim — `[]` returned above, None stays None
     )
