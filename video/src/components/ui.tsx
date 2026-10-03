@@ -2,11 +2,12 @@ import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { body, C, display, enter, gradientText, STAGGER } from "../theme";
 
-/** Ambient layer: slow-drifting glow orbs + a faint dot grid. Sine-eased loops, never linear travel. */
-export const Background: React.FC = () => {
+/** Ambient layer: slow-drifting glow orbs + a faint dot grid. Sine-eased loops, never linear travel.
+ *  `speed` scales the drift (1 = calm cut; the energetic cut uses ~2.5). */
+export const Background: React.FC<{ speed?: number }> = ({ speed = 1 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const t = frame / fps;
+  const t = (frame / fps) * speed;
   const orb = (x: number, y: number, size: number, color: string, phase: number, amp: number) => (
     <div
       style={{

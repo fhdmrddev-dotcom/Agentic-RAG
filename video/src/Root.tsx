@@ -9,6 +9,15 @@ import { Workflows } from "./scenes/Workflows";
 import { Connected } from "./scenes/Connected";
 import { Experts } from "./scenes/Experts";
 import { Close } from "./scenes/Close";
+import { E_SCENES, ENERGETIC_DURATION, SyrelEnergetic, VO_FRAMES } from "./energetic/SyrelEnergetic";
+import { AMBIENT_SPEED } from "./energetic/theme";
+import { EOpening, type SceneProps } from "./energetic/scenes/EOpening";
+import { EAsk } from "./energetic/scenes/EAsk";
+import { EWork } from "./energetic/scenes/EWork";
+import { EWorkflows } from "./energetic/scenes/EWorkflows";
+import { EConnect } from "./energetic/scenes/EConnect";
+import { EExperts } from "./energetic/scenes/EExperts";
+import { EClose } from "./energetic/scenes/EClose";
 
 const VIDEO = { width: 1920, height: 1080, fps: 30 } as const;
 
@@ -17,6 +26,14 @@ const withBg = (Scene: React.FC): React.FC => () => (
   <AbsoluteFill>
     <Background />
     <Scene />
+  </AbsoluteFill>
+);
+
+// Energetic scene previews: fast ambient background + the scene's own timing props.
+const withFastBg = (Scene: React.FC<SceneProps>, duration: number, voFrames: number): React.FC => () => (
+  <AbsoluteFill>
+    <Background speed={AMBIENT_SPEED} />
+    <Scene duration={duration} voFrames={voFrames} />
   </AbsoluteFill>
 );
 
@@ -31,6 +48,22 @@ export const RemotionRoot: React.FC = () => (
       <Composition id="Connected" component={withBg(Connected)} durationInFrames={SCENES.connected} {...VIDEO} />
       <Composition id="Experts" component={withBg(Experts)} durationInFrames={SCENES.experts} {...VIDEO} />
       <Composition id="Close" component={withBg(Close)} durationInFrames={SCENES.close} {...VIDEO} />
+    </Folder>
+    <Composition
+      id="SyrelEnergetic"
+      component={SyrelEnergetic}
+      durationInFrames={ENERGETIC_DURATION}
+      defaultProps={{ musicSrc: null }}
+      {...VIDEO}
+    />
+    <Folder name="Energetic-scenes">
+      <Composition id="E-Opening" component={withFastBg(EOpening, E_SCENES.opening, VO_FRAMES[0])} durationInFrames={E_SCENES.opening} {...VIDEO} />
+      <Composition id="E-Ask" component={withFastBg(EAsk, E_SCENES.ask, VO_FRAMES[1])} durationInFrames={E_SCENES.ask} {...VIDEO} />
+      <Composition id="E-Work" component={withFastBg(EWork, E_SCENES.work, VO_FRAMES[2])} durationInFrames={E_SCENES.work} {...VIDEO} />
+      <Composition id="E-Workflows" component={withFastBg(EWorkflows, E_SCENES.workflows, VO_FRAMES[3])} durationInFrames={E_SCENES.workflows} {...VIDEO} />
+      <Composition id="E-Connect" component={withFastBg(EConnect, E_SCENES.connect, VO_FRAMES[4])} durationInFrames={E_SCENES.connect} {...VIDEO} />
+      <Composition id="E-Experts" component={withFastBg(EExperts, E_SCENES.experts, VO_FRAMES[5])} durationInFrames={E_SCENES.experts} {...VIDEO} />
+      <Composition id="E-Close" component={withFastBg(EClose, E_SCENES.close, VO_FRAMES[6])} durationInFrames={E_SCENES.close} {...VIDEO} />
     </Folder>
   </>
 );
