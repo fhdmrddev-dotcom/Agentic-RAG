@@ -326,16 +326,21 @@ $$;
 
 
 --
--- Name: keyword_search_chunks(text, uuid, integer, jsonb, uuid[]); Type: FUNCTION; Schema: public; Owner: -
+-- Name: keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.keyword_search_chunks(search_query text, match_user_id uuid, match_count integer DEFAULT 20, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[]) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, rank double precision)
+CREATE FUNCTION public.keyword_search_chunks(search_query text, match_user_id uuid, match_count integer DEFAULT 20, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_document_ids uuid[] DEFAULT NULL::uuid[]) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, rank double precision)
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
 DECLARE
   tsq tsquery;
 BEGIN
+  -- D-18: an EMPTY set means "the filter matched nothing" — zero rows, never "all".
+  IF p_document_ids IS NOT NULL AND cardinality(p_document_ids) = 0 THEN
+    RETURN;
+  END IF;
+
   tsq := plainto_tsquery('english', search_query);
   RETURN QUERY
   SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
@@ -353,6 +358,7 @@ BEGIN
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
     AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
+    AND (p_document_ids IS NULL OR dc.document_id = ANY (p_document_ids))     -- Phase 272 D-14
   ORDER BY rank DESC
   LIMIT match_count;
 END;
@@ -360,14 +366,61 @@ $$;
 
 
 --
--- Name: match_document_chunks(public.vector, uuid, integer, double precision, jsonb, uuid[], text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: match_document_chunks(public.vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_embedding_model text DEFAULT NULL::text) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
+CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_embedding_model text DEFAULT NULL::text, p_document_ids uuid[] DEFAULT NULL::uuid[], p_exact_max_chunks integer DEFAULT NULL::integer) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
     AS $$
+DECLARE
+  n_chunks integer;
 BEGIN
+  -- D-18: an EMPTY set means "the filter matched nothing" — zero rows, never "all".
+  IF p_document_ids IS NOT NULL AND cardinality(p_document_ids) = 0 THEN
+    RETURN;
+  END IF;
+
+  -- Size the set (bounded: stops counting one past the threshold). Branch choice only — the
+  -- number is never returned, so counting through the DEFINER owner discloses nothing.
+  IF p_document_ids IS NOT NULL AND p_exact_max_chunks IS NOT NULL THEN
+    SELECT count(*) INTO n_chunks
+    FROM (
+      SELECT 1 FROM public.document_chunks c
+      WHERE c.document_id = ANY (p_document_ids)
+      LIMIT p_exact_max_chunks + 1
+    ) bounded;
+  END IF;
+
+  IF n_chunks IS NOT NULL AND n_chunks <= p_exact_max_chunks THEN
+    -- EXACT branch (SC#3): the ORDER BY is an expression (`+ 0`), so the HNSW index cannot serve
+    -- it and the set is ranked exactly. Every predicate below is today's, verbatim, plus the set.
+    -- ⚠ backend/tests/integration/test_272_rpc_document_scope.py holds this statement verbatim
+    --   (EXACT_BRANCH_SQL) and fails if the two drift.
+    RETURN QUERY
+    SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
+           1 - (dc.embedding OPERATOR(public.<=>) query_embedding) AS similarity
+    FROM public.document_chunks dc
+    JOIN public.documents d ON d.id = dc.document_id
+    WHERE dc.document_id = ANY (p_document_ids)
+      AND dc.org_id = ANY (SELECT public.current_user_org_ids())
+      AND (
+        dc.user_id = auth.uid()
+        OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
+        OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility)
+      )
+      AND (d.source_state IS NULL OR d.source_state != 'source_disconnected')
+      AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
+      AND d.is_latest = true
+      AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
+      AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
+      AND (p_embedding_model IS NULL OR dc.embedding_model = p_embedding_model)
+    ORDER BY (dc.embedding OPERATOR(public.<=>) query_embedding) + 0
+    LIMIT match_count;
+    RETURN;
+  END IF;
+
+  -- INDEX branch: migration 170's body verbatim + the set restriction (NULL = unrestricted).
   RETURN QUERY
   SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
          1 - (dc.embedding OPERATOR(public.<=>) query_embedding) AS similarity
@@ -385,6 +438,7 @@ BEGIN
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
     AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
     AND (p_embedding_model IS NULL OR dc.embedding_model = p_embedding_model)  -- D-10 stale-model filter
+    AND (p_document_ids IS NULL OR dc.document_id = ANY (p_document_ids))     -- Phase 272 D-14
   ORDER BY dc.embedding OPERATOR(public.<=>) query_embedding
   LIMIT match_count;
 END;
@@ -4404,6 +4458,13 @@ CREATE INDEX idx_dept_members_org_id ON public.dept_members USING btree (org_id)
 --
 
 CREATE INDEX idx_dept_members_user_id ON public.dept_members USING btree (user_id);
+
+
+--
+-- Name: idx_document_chunks_document_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_chunks_document_id ON public.document_chunks USING btree (document_id);
 
 
 --
@@ -8821,15 +8882,19 @@ GRANT EXECUTE ON FUNCTION public.folder_is_org_shared(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.folder_is_org_shared(uuid) TO service_role;
 
 -- App search RPCs
-REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) FROM anon;
-GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) TO service_role;
+-- Phase 272 (migration 200): both signatures gained trailing params (p_document_ids; the vector
+-- RPC also p_exact_max_chunks) and the OLD ones were DROPPED, so the ACLs below name the NEW
+-- signatures. Mirrored from migration 200 verbatim -- an old signature here would ERROR on a
+-- greenfield database, where the dump no longer contains that function.
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) TO service_role;
 
-REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) FROM anon;
-GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) FROM anon;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) TO service_role;
 
 REVOKE EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) FROM anon;

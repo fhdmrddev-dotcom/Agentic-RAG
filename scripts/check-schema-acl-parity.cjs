@@ -441,6 +441,51 @@ function aclsIn(sql, file) {
 }
 
 /**
+ * ⭐ DROP-AWARENESS (Phase 272-03). A function's ACL history ends where a LATER migration drops
+ * that exact signature.
+ *
+ * ⛔ WHY IT EXISTS — measured, not anticipated. Migration 200 replaced
+ *    `match_document_chunks(vector, …, text)` and `keyword_search_chunks(text, …, uuid[])` with
+ *    longer signatures (DROP old → CREATE new, the 033/036/073 precedent), and re-granted the NEW
+ *    ones. Before this, the gate kept expecting migration 181's EIGHT tuples on the dropped
+ *    signatures, so the ONLY way to turn it green was to leave `REVOKE … ON FUNCTION <old sig>`
+ *    in the supplement — which ERRORS on a greenfield database, where the regenerated dump no
+ *    longer contains that function, and rolls back the whole one-paste bootstrap. A gate whose
+ *    green state breaks the artifact it guards is the failure mode this file exists to prevent.
+ *
+ * ⛔ IDENTITY IS STILL THE ARGUMENT LIST. A drop retires ONLY tuples whose signature matches
+ *    exactly (after reading `public.vector` and `vector` as the same type — a DROP and a GRANT
+ *    may qualify an argument type differently and Postgres resolves both to one function). A
+ *    drop of `f(integer)` never retires `f(text)` (pinned in --self-test), and an ACL written
+ *    AFTER the drop — a re-creation under the same signature — is expected again.
+ */
+const DROP_FN_RE = /^\s*DROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?([\s\S]+?)\s*(?:\b(?:CASCADE|RESTRICT)\b)?\s*$/i;
+
+/** Read a signature's argument types without schema qualification (`public.vector` → `vector`). */
+function identityOf(signature) {
+  const open = signature.indexOf('(');
+  if (open === -1) return signature;
+  return signature.slice(0, open + 1)
+    + signature.slice(open + 1).replace(/\b(?:public|pg_catalog)\./g, '');
+}
+
+/** Every function signature a chunk of SQL DROPs, with the statement index it sits at. */
+function dropsIn(sql, file) {
+  const out = [];
+  const chunks = statements(sql);
+  for (let s = 0; s < chunks.length; s += 1) {
+    const m = DROP_FN_RE.exec(chunks[s]);
+    if (!m) continue;
+    const re = /([A-Za-z_"][\w."]*\s*\([^)]*\))/g;
+    let x;
+    while ((x = re.exec(m[1])) !== null) {
+      out.push({ signature: normaliseSignature(x[1]), file, s });
+    }
+  }
+  return out;
+}
+
+/**
  * Scan the migrations directory.
  *
  * `migrationCount` is the FILTERED `readdirSync` length and is the ONLY authority for how many
@@ -462,11 +507,28 @@ function scanMigrations(dir, minFiles) {
       + 'A gate that passes over nothing is worse than absent.',
     );
   }
-  const acls = [];
+  let acls = [];
+  const retired = [];
   for (const f of files) {
-    acls.push(...aclsIn(fs.readFileSync(path.join(dir, f), 'utf8'), `migrations/${f}`));
+    const sql = fs.readFileSync(path.join(dir, f), 'utf8');
+    const file = `migrations/${f}`;
+    // Statement order matters WITHIN a file too: 200 drops the old signature, then grants the new.
+    const events = [
+      ...aclsIn(sql, file).map((a) => ({ s: Number(a.stmtId.split('#').pop()), acl: a })),
+      ...dropsIn(sql, file).map((d) => ({ s: d.s, drop: d })),
+    ].sort((x, y) => x.s - y.s);
+    for (const ev of events) {
+      if (ev.acl) { acls.push(ev.acl); continue; }
+      const id = identityOf(ev.drop.signature);
+      const keep = [];
+      for (const a of acls) {
+        if (a.kind === 'function' && identityOf(a.signature) === id) retired.push({ acl: a, by: file });
+        else keep.push(a);
+      }
+      acls = keep;
+    }
   }
-  return { migrationCount, acls };
+  return { migrationCount, acls, retired };
 }
 
 /** The supplement's mirrored tuple set. */
@@ -581,11 +643,11 @@ function analyse({
   minFiles = MIN_MIGRATION_FILES,
   minTuples = MIN_ACL_TUPLES,
 }) {
-  const { migrationCount, acls } = scanMigrations(migrationsDir, minFiles);
+  const { migrationCount, acls, retired } = scanMigrations(migrationsDir, minFiles);
   // R2-CR-01: the file floor above proves the directory was READ, never that anything was
   // PARSED out of it. Neutering either ACL regex kept migrationCount at 148 and drove acls to
   // [], and the gate then reported `mirrored: 0/0` as a PASS, exit 0. Refuse that here.
-  if (acls.length < minTuples) {
+  if (acls.length + retired.length < minTuples) {
     throw new VacuousScanError(
       `only ${acls.length} ACL tuple(s) parsed from ${migrationCount} migration file(s) in `
       + `${migrationsDir}, below the floor of ${minTuples} — the directory was read but nothing `
@@ -613,6 +675,7 @@ function analyse({
     missing,
     mirrored,
     tail,
+    retired,
     artifactPath,
     supplementPath,
     fn: statementStats(acls, 'function'),
@@ -633,6 +696,16 @@ function report(result, log = console.log) {
     + ` · mirrored: ${mirrored.length}/${expected.size}`
     + ` · tail: ${tail.lines} lines · md5 ${tail.artifactMd5}`,
   );
+  if (result.retired && result.retired.length) {
+    // Printed, never silent: a retired tuple is one this gate STOPPED expecting, and a reader must
+    // be able to see which signature a later DROP FUNCTION ended and where.
+    const byDrop = new Map();
+    for (const { acl, by } of result.retired) {
+      const k = `${acl.signature} (dropped in ${by})`;
+      byDrop.set(k, (byDrop.get(k) || 0) + 1);
+    }
+    log(`  retired by a later DROP FUNCTION: ${result.retired.length} tuple(s) — ${[...byDrop.entries()].map(([k, n]) => `${k}: ${n}`).join(' · ')}`);
+  }
   if (tbl.perFile.size) {
     log(`  table/column statements per migration: ${[...tbl.perFile.entries()].sort().map(([f, c]) => `${f} (${c})`).join(' · ')}`);
   }
@@ -1118,6 +1191,38 @@ function runSelfTest() {
     check('NEW RED arm 5e (COUNTERFACTUAL, CRLF): an identical \\r\\n pair is tail-OK and its line count matches the \\n pair',
       crlfRes.tail.ok && crlfRes.tail.lines === identRes.tail.lines,
       `crlf ${crlfRes.tail.lines} lines vs lf ${identRes.tail.lines} lines`);
+
+    // ── DROP-AWARENESS arm (272-03): a later DROP FUNCTION retires EXACTLY that signature ────
+    const dropDir = path.join(tmp, 'migrations-drop');
+    fs.mkdirSync(dropDir);
+    padToFloor(dropDir);
+    fs.writeFileSync(path.join(dropDir, '990_grant_old.sql'),
+      'REVOKE EXECUTE ON FUNCTION public.rpc(vector, integer) FROM PUBLIC;\n'
+      + 'GRANT EXECUTE ON FUNCTION public.rpc(vector, integer) TO authenticated;\n'
+      + 'REVOKE EXECUTE ON FUNCTION public.keep(text) FROM PUBLIC;\n');
+    fs.writeFileSync(path.join(dropDir, '991_replace.sql'),
+      'DROP FUNCTION IF EXISTS public.rpc(\n  public.vector, integer\n);\n'
+      + 'DROP FUNCTION IF EXISTS public.keep(integer);\n'
+      + 'REVOKE EXECUTE ON FUNCTION public.rpc(vector, integer, uuid[]) FROM PUBLIC;\n');
+    const supDrop = path.join(tmp, 'supplement-drop.sql');
+    fs.writeFileSync(supDrop,
+      'REVOKE EXECUTE ON FUNCTION public.rpc(vector, integer, uuid[]) FROM PUBLIC;\n'
+      + 'REVOKE EXECUTE ON FUNCTION public.keep(text) FROM PUBLIC;\n');
+    const dropRes = analyse({ minTuples: 1, migrationsDir: dropDir, supplementPath: supDrop, artifactPath: artifactFor(supDrop) });
+    const dropLines = [];
+    const dropCode = report(dropRes, (l) => dropLines.push(l));
+    check('DROP-AWARE: tuples on a signature a LATER migration drops are no longer expected',
+      dropCode === 0 && dropRes.retired.length === 2, `exit=${dropCode}, retired=${dropRes.retired.length}`);
+    check('DROP-AWARE: the retirement is PRINTED, never silent',
+      dropLines.some((l) => l.includes('retired by a later DROP FUNCTION') && l.includes('public.rpc(vector, integer)')));
+    check('DROP-AWARE (COUNTERFACTUAL): dropping keep(integer) does NOT retire keep(text)',
+      !dropRes.retired.some((r) => r.acl.signature === 'public.keep(text)')
+      && [...dropRes.expected.values()].some((v) => v.label.includes('public.keep(text)')));
+    const supDropMissing = path.join(tmp, 'supplement-drop-missing.sql');
+    fs.writeFileSync(supDropMissing, 'REVOKE EXECUTE ON FUNCTION public.keep(text) FROM PUBLIC;\n');
+    const dropRed = analyse({ minTuples: 1, migrationsDir: dropDir, supplementPath: supDropMissing, artifactPath: artifactFor(supDropMissing) });
+    check('DROP-AWARE (RED): the NEW signature written after the drop is still expected',
+      report(dropRed, () => {}) === 1 && dropRed.missing.some((k) => k.includes('public.rpc(vector, integer, uuid[])')));
 
     // ── count assertion ─────────────────────────────────────────────────────────────────────
     const emptyDir = path.join(tmp, 'empty-migrations');
