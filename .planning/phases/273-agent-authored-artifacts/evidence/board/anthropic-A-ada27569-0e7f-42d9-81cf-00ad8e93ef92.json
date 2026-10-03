@@ -1,0 +1,335 @@
+{
+  "provider": "anthropic",
+  "model": "claude-opus-5-5",
+  "turn": "A",
+  "thread_id": "7d368657-c9ba-47eb-a5d6-5c57c609d44a",
+  "prompt": "Here is our FY25 revenue by region and quarter:\n\n```csv\nquarter,region,revenue_usd_k,notes\nQ1,North,1210,\"Q1 North: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ1,South,980,\"Q1 South: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ1,East,1335,\"Q1 East: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ1,West,1104,\"Q1 West: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ2,North,1268,\"Q2 North: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ2,South,1017,\"Q2 South: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ2,East,1392,\"Q2 East: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ2,West,1151,\"Q2 West: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ3,North,1342,\"Q3 North: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ3,South,1076,\"Q3 South: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ3,East,1459,\"Q3 East: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ3,West,1203,\"Q3 West: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ4,North,1415,\"Q4 North: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ4,South,1129,\"Q4 South: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ4,East,1532,\"Q4 East: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ4,West,1288,\"Q4 West: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\n```\n\nShow it as a line chart.",
+  "calling_mode_predicted": "NATIVE (native SDK adapter)",
+  "verdicts": {
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "PASS"
+  },
+  "turn_data": {
+    "run_id": "ada27569-0e7f-42d9-81cf-00ad8e93ef92",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "claude-opus-5-5",
+      "provider": "anthropic",
+      "error": null,
+      "started_at": "2026-10-03 19:26:20.836591+00:00",
+      "completed_at": "2026-10-03 19:26:39.459796+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "7bf30e53-f283-426a-aeb1-46494426af7b",
+        "content": "Revenue grew every quarter in all four regions, and the regions stayed in the same order all year. **East** was highest each quarter, ending Q4 at $1,532K, followed by North, West and South. Growth from Q1 to Q4 was similar across regions, between about 15% and 17%. North grew fastest (+16.9%) and East slowest (+14.8%). Total FY25 revenue was **$19.9M**, up from $4.63M in Q1 to $5.36M in Q4.\n\nThese figures are unaudited management accounts and may change after the year-end close. I left the notes column out of the chart.",
+        "tool_calls": [
+          {
+            "args": {
+              "rows": "<stored in artifact a_njt2ih47n8, 4 rows>",
+              "chart": {
+                "x": "quarter",
+                "y": [
+                  "North",
+                  "South",
+                  "East",
+                  "West"
+                ],
+                "kind": "line"
+              },
+              "title": "FY25 Revenue by Region and Quarter",
+              "columns": [
+                {
+                  "name": "quarter",
+                  "type": "string"
+                },
+                {
+                  "name": "North",
+                  "type": "number",
+                  "unit": "$K"
+                },
+                {
+                  "name": "South",
+                  "type": "number",
+                  "unit": "$K"
+                },
+                {
+                  "name": "East",
+                  "type": "number",
+                  "unit": "$K"
+                },
+                {
+                  "name": "West",
+                  "type": "number",
+                  "unit": "$K"
+                }
+              ],
+              "component": "chart"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_njt2ih47n8\", \"label\": \"chart 1\", \"component\": \"chart\", \"kind\": \"line\", \"stacked\": false, \"series_count\": 4, \"row_count\": 4, \"from_label\": null, \"same_rows\": null, \"operations\": null, \"columns\": [{\"name\": \"quarter\", \"type\": \"string\"}, {\"name\": \"North\", \"type\": \"number\"}, {\"name\": \"South\", \"type\": \"number\"}, {\"name\": \"East\", \"type\": \"number\"}, {\"name\": \"West\", \"type\": \"number\"}], \"values\": {\"quarter\": [\"Q1\", \"Q2\", \"Q3\", \"Q4\"]}, \"note\": \"Shown to the user below your answer as chart 1. Now write one or two sentences about what it shows; do not repeat its numbers as a table. To change, filter, sort or redraw it later, call show_artifact again with from_artifact=\\\"a_njt2ih47n8\\\" (or \\\"chart 1\\\") and NO columns or rows.\"}",
+            "status": "done",
+            "tool_call_id": "toolu_01YFv3rU9KaqN8y2HBQeLLaH"
+          }
+        ]
+      }
+    ],
+    "tool_call_names": [
+      "show_artifact"
+    ],
+    "show_artifact_calls": 1,
+    "refused_calls": 0,
+    "artifact_ids_from_results": [
+      "a_njt2ih47n8"
+    ],
+    "final_answer_empty": false,
+    "final_answer_is_fallback": false,
+    "persisted_json_fence": false,
+    "redis": {
+      "present": true,
+      "ttl": 599,
+      "event_types": {
+        "iteration_start": 2,
+        "tool_preparing": 1,
+        "tool_args_progress": 1,
+        "tool_start": 1,
+        "artifact": 1,
+        "tool_end": 1,
+        "planning": 1,
+        "delta": 40,
+        "suggestions": 1,
+        "stream_end": 1,
+        "done": 1
+      },
+      "delta_count": 40,
+      "delta_text": "Revenue grew every quarter in all four regions, and the regions stayed in the same order all year. **East** was highest each quarter, ending Q4 at $1,532K, followed by North, West and South. Growth from Q1 to Q4 was similar across regions, between about 15% and 17%. North grew fastest (+16.9%) and East slowest (+14.8%). Total FY25 revenue was **$19.9M**, up from $4.63M in Q1 to $5.36M in Q4.\n\nThese figures are unaudited management accounts and may change after the year-end close. I left the notes column out of the chart.",
+      "artifact_events": 1
+    }
+  },
+  "message_artifacts": [
+    {
+      "id": "a_njt2ih47n8",
+      "label": "chart 1",
+      "component": "chart",
+      "parent_id": null,
+      "run_id": "ada27569-0e7f-42d9-81cf-00ad8e93ef92",
+      "tool_call_id": "toolu_01YFv3rU9KaqN8y2HBQeLLaH",
+      "row_count": 4,
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 4,
+        "source_count": 0
+      },
+      "at": "2026-10-03 19:26:28.99235+00"
+    }
+  ],
+  "reload_http": 200,
+  "reload_artifacts": [
+    {
+      "id": "a_njt2ih47n8",
+      "thread_id": "7d368657-c9ba-47eb-a5d6-5c57c609d44a",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "ada27569-0e7f-42d9-81cf-00ad8e93ef92",
+      "tool_call_id": "toolu_01YFv3rU9KaqN8y2HBQeLLaH",
+      "parent_id": null,
+      "label": "chart 1",
+      "component": "chart",
+      "spec": {
+        "rows": [
+          [
+            "Q1",
+            1210,
+            980,
+            1335,
+            1104
+          ],
+          [
+            "Q2",
+            1268,
+            1017,
+            1392,
+            1151
+          ],
+          [
+            "Q3",
+            1342,
+            1076,
+            1459,
+            1203
+          ],
+          [
+            "Q4",
+            1415,
+            1129,
+            1532,
+            1288
+          ]
+        ],
+        "chart": {
+          "x": "quarter",
+          "y": [
+            "North",
+            "South",
+            "East",
+            "West"
+          ],
+          "kind": "line",
+          "slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "stacked": false
+        },
+        "title": "FY25 Revenue by Region and Quarter",
+        "metric": null,
+        "columns": [
+          {
+            "name": "quarter",
+            "type": "string",
+            "unit": null
+          },
+          {
+            "name": "North",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "South",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "East",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "West",
+            "type": "number",
+            "unit": "$K"
+          }
+        ]
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 4,
+        "source_count": 0
+      },
+      "row_count": 4,
+      "spec_version": 1,
+      "created_at": "2026-10-03T19:26:28.99235+00:00"
+    }
+  ],
+  "reload_by_message": [
+    {
+      "message_id": "7bf30e53-f283-426a-aeb1-46494426af7b",
+      "artifacts": [
+        {
+          "id": "a_njt2ih47n8",
+          "thread_id": "7d368657-c9ba-47eb-a5d6-5c57c609d44a",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "ada27569-0e7f-42d9-81cf-00ad8e93ef92",
+          "tool_call_id": "toolu_01YFv3rU9KaqN8y2HBQeLLaH",
+          "parent_id": null,
+          "label": "chart 1",
+          "component": "chart",
+          "spec": {
+            "rows": [
+              [
+                "Q1",
+                1210,
+                980,
+                1335,
+                1104
+              ],
+              [
+                "Q2",
+                1268,
+                1017,
+                1392,
+                1151
+              ],
+              [
+                "Q3",
+                1342,
+                1076,
+                1459,
+                1203
+              ],
+              [
+                "Q4",
+                1415,
+                1129,
+                1532,
+                1288
+              ]
+            ],
+            "chart": {
+              "x": "quarter",
+              "y": [
+                "North",
+                "South",
+                "East",
+                "West"
+              ],
+              "kind": "line",
+              "slots": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "stacked": false
+            },
+            "title": "FY25 Revenue by Region and Quarter",
+            "metric": null,
+            "columns": [
+              {
+                "name": "quarter",
+                "type": "string",
+                "unit": null
+              },
+              {
+                "name": "North",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "South",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "East",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "West",
+                "type": "number",
+                "unit": "$K"
+              }
+            ]
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [],
+            "row_count": 4,
+            "source_count": 0
+          },
+          "row_count": 4,
+          "spec_version": 1,
+          "created_at": "2026-10-03T19:26:28.99235+00:00"
+        }
+      ]
+    }
+  ]
+}

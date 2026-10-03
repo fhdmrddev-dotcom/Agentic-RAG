@@ -248,14 +248,143 @@ restart still stands (Task 2). `C:\Python312\python.exe` in the command line is 
 launcher's child reports on Windows; the operator should still confirm the restart uses the
 backend venv.
 
+## Task 2 — operator restart (done)
+
+The operator restarted the backend and frontend on the merged tree, sandbox ON. Single uvicorn
+listener on :8000, **PID 62844, started 2026-10-03 23:14:55**. (Recorded as reported by the
+orchestrator, which drove Tasks 2-4; this executor ran no live drive.)
+
+## Operator ruling — STRUCTURED row (RESEARCH OQ1), 2026-10-03
+
+The Task 1 roster finding (no derived row routes STRUCTURED; OpenRouter is NATIVE under
+`openrouter_tool_strategy = quality`) was put to the operator. Ruling: run the live SC#2 holdback
+check on `lmstudio:nvidia_nvidia-nemotron-nano-9b-v2`, per request. The required OpenRouter row stays
+on the board as a NATIVE row.
+
+## Task 3 — board method and results
+
+### Seed
+
+```
+run-273-board.py --seed → upload HTTP 201 · ingestion completed · query_tables read 16 rows ·
+all 16 values equal fixture: True
+```
+
+### Run
+
+```
+run-273-board.py --run --providers openai,anthropic,google,deepseek,zhipu,minimax,moonshot,openrouter,lmstudio
+exit 0 · evidence/board/*.json (one per run, 18) + evidence/board/board-summary.json
+```
+
+Per derived row: fresh thread; prompt A (inline CSV with a notes column, 6,567 bytes — the
+long-message axis) "… Show it as a line chart."; then prompt B in the SAME thread "Make it a bar
+chart and show only Q3."; each routed per request with `model` + `provider` (no global setting
+mutated). Verdicts computed from `messages.tool_calls`, `message_artifacts`, `runs` and the Redis
+`run:{run_id}` stream per run_id. BOARD_TABLE, verbatim:
+
+```
+| anthropic | claude-opus-5-5 | NATIVE | V1 PASS | V2 PASS | V3 PASS | refused 0/0 | leak none |
+| deepseek | deepseek-v4-pro | NATIVE | PASS | PASS | FAIL | refused 0/1 | none |
+| google | gemini-3.8-flash | NATIVE | PASS | PASS | PASS | 0/0 | none |
+| lmstudio (EXTRA) | qwen-agentworld-35b-a3b | NATIVE | FAIL | FAIL | FAIL | 0/0 | none |  (chose execute_code; no artifact)
+| minimax | MiniMax-M3 | PASS | PASS | PASS |
+| moonshot | kimi-k3 | PASS | PASS | PASS |
+| openai | gpt-5.6-luna | PASS | PASS | PASS |
+| openrouter | z-ai/glm-5.3-flash | PASS | PASS | PASS |
+| zhipu | glm-5.3-flash | PASS | PASS | PASS |
+```
+
+Thread ids: anthropic `7d368657-c9ba-47eb-a5d6-5c57c609d44a`, deepseek
+`4cad1a72-a247-46e6-ac27-68a5178dc520`, google `f64563b6-8ad4-49ce-a70f-52c9e06cdf69`, lmstudio
+`e613a7d7-4e51-4bed-a12a-6ca650d3aa14`, minimax `2cc80d64-ba37-47fa-ab9a-1a672553c5c8`, moonshot
+`61146467-36d4-4d1d-be31-e4215c53aa76`, openai `605a8ca1-cd14-462d-a78d-d65356c5b6a5`, openrouter
+`6b4a1162-c5bc-4869-a49b-52abb3290fca`, zhipu `808bede7-b2ad-4d34-8497-aa1d089fe7f2`.
+
+Totals, 8 required rows: **V1 8/8 · V2 8/8 · V3 7/8 · leak `none` 8/8** (and `none` on the extra
+row). Empty / "never wrote an answer" fallback: **0 runs** (RESEARCH OQ2 observation).
+
+### V2's three readings
+
+- (a) board script: every row `reload_records = artifact_rows = 2`, `reload_missing = 0` (8 required
+  rows); the extra lmstudio row has 0 rows.
+- (b) `ARTIFACT_BOARD_EVIDENCE=… npx vitest run uat/273-board-render.test.ts` → **1 file, 19 tests
+  passed**.
+- (c) Chrome MCP reload of all 8 required board threads → **2 `artifact-block` each, 0
+  `artifact-notice`, no `{"` on the page**; re-checked after the second backend restart: identical.
+  Screenshot: `evidence/g4/board-openai-reload.jpg` (openai row only — the other seven were counted
+  in the DOM without a per-row screenshot; a deviation from the plan's per-row screenshot, recorded).
+
+### FAIL — deepseek V3 (finding F-1)
+
+Read from `messages.tool_calls`, thread `4cad1a72-…`: turn B call 1
+`show_artifact(from_artifact=a_v99qzkgrki, …)` **REFUSED** — reason *"its settings weren't valid"*,
+detail *"`transform.chart` is not a show_artifact field. Use only the documented fields."* The retry
+re-sent the rows INLINE (4 rows) → chart 2 `parent_id` NULL. Zero retrieval / code calls in turn B
+(SC#3's "no new retrieval or code call" holds), but D-06 by-reference was not used. **F-1:** the
+refusal detail should name where `chart` belongs (top level) — small follow-up, not fixed in this
+plan.
+
+### FAIL — lmstudio extra row
+
+`qwen-agentworld-35b-a3b` chose `execute_code`; no artifact on either turn. EXTRA row (self-hosted),
+not one of the 8 required.
+
+### STRUCTURED / SC#2 live leak — OWED
+
+Drove `lmstudio:nvidia_nvidia-nemotron-nano-9b-v2` per request via a scratch wrapper over
+`run-273-board.py` helpers. Evidence: `evidence/structured/lmstudio-nemotron-leak-A.json`,
+`-leak-B.json`, `-search.json`. Every run hit the 600 s timeout **NOT TERMINAL** (the local 9B is
+too slow); the model never called `show_artifact` (turn B called `execute_code` / `query_tables`); no
+`delta` contained tool-call text (`delta_has_call_text: false` — the deltas were newlines only); the
+non-tool ```json observation was not completed (probe stopped). **Verdict: OWED** — the holdback is
+proven by `test_273_structured_holdback.py` only; no live STRUCTURED `show_artifact` turn was
+observed. The Gemini Continue probe (RESEARCH I-4) was not driven.
+
+### G-4 drives (Chrome MCP) — detail in 273-VALIDATION.md §2
+
+- **G4-1 (D-17) PASS** — thread `c9b81979-698d-4eff-94a1-1000e7ab5d0d`, `deepseek-v4-flash`. Q3
+  hover: East 1,459 · North 1,342 · West 1,203 · South 1,076 = fixture. Legend South → `aria-pressed
+  false`, 3 lines. Bar chart: tools `[show_artifact]`, parent chart 1, "Redrawn from chart 1 · same 4
+  rows · …". Only Q3: tools `[show_artifact, show_artifact]` (first refused, self-corrected, D-12),
+  parent chart 2, "From chart 2 · filtered to quarter = Q3 · 1 of 4 rows".
+- **G4-2 (D-18) PASS** — mid-session reload: 3/3 `innerText`-identical, 0 notices, no JSON. After
+  backend restart: 3/3 identical, PNG card present, 0 notices.
+- **G4-3 (D-19) PASS** for the arms driven — in-page fetch rewrite of `/threads/{id}/snapshot`
+  (`gauge_widget` component; `pie` kind) → both catalogue notices verbatim, chart 3 still rendered,
+  answer text intact. No DB rows written (nothing to delete). Missing-column arm and the migration-202
+  CHECK (I-1 belt) were NOT driven live.
+- **G4-4 (D-20) PASS** — PNG prompt → `execute_code` → output-file card `q3_revenue_by_region.png`
+  69.7 KB, no new artifact; chart prompt → artifact (G4-1).
+- **4-axis:** cross-provider (board) PASS · multi-tool (G4-1 turn 1) PASS · parallel-thread (G4-1 in
+  the browser while the board streamed via the API) PASS · long-message (prompt A, 6,567 bytes) PASS.
+
+### Observations
+
+- **O-1** hidden-tab only: chart 1's end-of-line labels absent while `visibilityState = hidden`;
+  identical when visible. Cosmetic.
+- **O-2** first open of a thread after page load sometimes blank up to 7 s (whole thread, not
+  artifact-specific; likely pre-existing snapshot latency).
+- **O-3** G4-1 turn 3 had two rail steps (one refused), not the plan's "exactly one"; zero retrieval /
+  code held.
+- **SEED-335 watch:** no "Unmarked claims" footer observed on artifact-led answers. Observation only;
+  the seed was not edited.
+
+## Task 4 — after-restart half and sign-off
+
+Backend restarted again: **PID 62784, started 2026-10-04 00:17:04**. G4-2 after-restart: 3/3
+identical (`evidence/g4/G4-2-after-backend-restart.jpg`); all 8 board threads re-checked: 2 blocks /
+0 notices / no JSON each. **Operator sign-off: "approved", 2026-10-04**, on G4-1..G4-4 and the board
+(including the deepseek V3 FAIL and the OWED STRUCTURED check, presented as such).
+
 ## OWED (recorded, never executed here)
 
-- Task 2: operator restart of backend (venv) + frontend on the merged tree; the post-restart
-  `message_artifacts` probe.
-- Task 3: `--seed`, `--run` (8 rows + extra), `--observe`, Chrome reload per row, G4-1..G4-4,
-  parallel-thread axis; the operator ruling on the STRUCTURED row (finding above).
-- Task 4: D-18 after-restart comparison; operator sign-off per scenario.
+- **SC#2 / OV-273-04 live STRUCTURED holdback check** — no STRUCTURED row completed a `show_artifact`
+  turn; unit-test proof only. Observations (i) search turn and (ii) non-tool ```json reply also OWED.
+- **F-1** — deepseek by-reference refusal detail should name where `chart` belongs.
+- G4-3 arms not driven live: missing-column notice; migration-202 CHECK refusal of `gauge_widget`.
+- Per-row reload screenshots for 7 of 8 board rows (DOM counts were measured).
 - Production: migration 202 BEFORE the backend that writes `message_artifacts` deploys, then
   `get_advisors(security)`. No production write in this plan.
-- OV-273-02 (tool_dispatcher registry/handler split) and OV-273-03 (prompt-assembly seam).
+- OV-273-02 (tool_dispatcher registry/handler split) and OV-273-03 (prompt-assembly seam, SEED-192).
 - CLAUDE.md split (warn band; abridged rows stale by decision).

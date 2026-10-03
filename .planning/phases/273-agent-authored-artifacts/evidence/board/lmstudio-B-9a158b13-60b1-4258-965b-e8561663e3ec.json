@@ -1,0 +1,67 @@
+{
+  "provider": "lmstudio",
+  "model": "qwen-agentworld-35b-a3b",
+  "turn": "B",
+  "thread_id": "e613a7d7-4e51-4bed-a12a-6ca650d3aa14",
+  "prompt": "Make it a bar chart and show only Q3.",
+  "calling_mode_predicted": "NATIVE",
+  "verdicts": {
+    "v1": "FAIL",
+    "v2_board": "FAIL",
+    "v3": "FAIL"
+  },
+  "turn_data": {
+    "run_id": "9a158b13-60b1-4258-965b-e8561663e3ec",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "qwen-agentworld-35b-a3b",
+      "provider": "lmstudio",
+      "error": null,
+      "started_at": "2026-10-03 19:34:41.189586+00:00",
+      "completed_at": "2026-10-03 19:36:35.882347+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "7d8149a6-8991-4e8f-8888-7ea01fc42fb8",
+        "content": "\n\n*[Response truncated \u2014 output token limit reached. Start a new chat or reduce document length.]*",
+        "tool_calls": null
+      }
+    ],
+    "tool_call_names": [],
+    "show_artifact_calls": 0,
+    "refused_calls": 0,
+    "artifact_ids_from_results": [],
+    "final_answer_empty": false,
+    "final_answer_is_fallback": false,
+    "persisted_json_fence": false,
+    "redis": {
+      "present": true,
+      "ttl": 599,
+      "event_types": {
+        "iteration_start": 1,
+        "reasoning_delta": 716,
+        "delta": 1,
+        "suggestions": 1,
+        "stream_end": 1,
+        "done": 1
+      },
+      "delta_count": 1,
+      "delta_text": "\n\n*[Response truncated \u2014 output token limit reached. Start a new chat or reduce document length.]*",
+      "artifact_events": 0
+    }
+  },
+  "message_artifacts": [],
+  "reload_http": 200,
+  "reload_artifacts": [],
+  "reload_by_message": [
+    {
+      "message_id": "d7937046-6bb7-4dfe-b13f-02492c74759e",
+      "artifacts": null
+    },
+    {
+      "message_id": "7d8149a6-8991-4e8f-8888-7ea01fc42fb8",
+      "artifacts": null
+    }
+  ]
+}
