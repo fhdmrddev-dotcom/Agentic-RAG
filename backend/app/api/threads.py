@@ -85,6 +85,7 @@ from app.services.thread_handoff import (
     write_handoff,
 )
 from app.services.audit_service import write_audit_entry
+from app.services.artifact_history import attach_artifacts  # 273 (I-2 / ART-05) — reload attach
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import finalize_run, insert_assistant_message
@@ -596,6 +597,7 @@ async def get_snapshot(
         user_id=current_user["id"],
         supabase=supabase,
     )
+    messages = await attach_artifacts(messages, thread_id=str(thread_id), user_id=current_user["id"], supabase=supabase)
 
     # Step 3: active_runs SELECT (mirror of /active-runs at threads.py:543-551).
     # Same defense-in-depth + status='streaming' partial-index filter.
@@ -1504,6 +1506,7 @@ async def get_messages(
         user_id=current_user["id"],
         supabase=supabase,
     )
+    messages = await attach_artifacts(messages, thread_id=thread_id, user_id=current_user["id"], supabase=supabase)
 
     return messages
 

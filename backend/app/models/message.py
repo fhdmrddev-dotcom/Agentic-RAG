@@ -156,6 +156,13 @@ class MessageResponse(BaseModel):
     is_rated: bool | None = None
     # Phase 223 (BUG-260902-03 / D-223-06): armed connector IDs active when user message was sent
     active_connector_ids: list[UUID] | None = None
+    # Phase 273 (I-2 / ART-05): the agent-authored artifacts this assistant message showed, in call
+    # order — each the SAME object the live `artifact` SSE event carried (the stored
+    # `message_artifacts` row), or `{id, missing: true}` when the row is not visible. Attached
+    # server-side by `artifact_history.attach_artifacts`, keyed by the artifact id parsed from the
+    # persisted show_artifact result (never the call id). ⛔ response_model drops unnamed keys
+    # SILENTLY — deleting this field makes reload render no artifacts, with no error anywhere.
+    artifacts: list[dict] | None = None
 
 
 # ── Phase 267 (D-267-11 / D-267-15 / D-267-16 / PACK-23 / PACK-24) — transcript payloads ──────────

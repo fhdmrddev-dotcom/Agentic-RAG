@@ -61,6 +61,8 @@ from app.services.openai_service import (
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
+from app.services.artifact_history import redact_artifact_args  # 273 (I-4) — the one persist hook
+from app.services.structured_text_holdback import StructuredTextHoldback  # 273 (SC#2, Pitfall 2, OV-273-04)
 from app.services.citation_markers import (
     apply_citation_instruction,
     normalize_citation_markers,
@@ -1976,6 +1978,7 @@ async def run_agent_loop(
         if persisted_tool_calls:
             completed_tools = [tc for tc in persisted_tool_calls if tc.get("status") == "done"]
             if completed_tools:
+                completed_tools = redact_artifact_args(completed_tools)  # 273 (I-4) — inline rows never re-sent
                 row["tool_calls"] = _strip_nul(completed_tools)
         if unique_citations:
             row["source_refs"] = unique_citations   # Full citation objects (D-13)
@@ -2170,6 +2173,7 @@ async def run_agent_loop(
                 new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
                 dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
                 empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
+                turn_tool_calls=persisted_tool_calls,  # 273 (D-04) — caption source (by-reference)
                 iteration=0,
                 parent_run_id=None,
                 per_run_task_semaphore=_per_run_task_semaphore,
@@ -2332,6 +2336,8 @@ async def run_agent_loop(
                     finish_reason: str | None = None
                     _announced_tools_shared: set[int] = set()
                     _build_from_progress: bool = False
+                    # 273 (SC#2, Pitfall 2, OV-273-04): set per provider call on the STRUCTURED path only.
+                    _structured_holdback: StructuredTextHoldback | None = None
 
                     async def _on_chunk(_event):
                         """ONE provider-agnostic consumer handler (D-02 / D-04) for
@@ -2379,7 +2385,14 @@ async def run_agent_loop(
                             _text = _event.get("content", "")
                             if _text:
                                 full_content += _text
-                                await _emit(redis, run_id, 'delta', content=_text)
+                                if _structured_holdback is None:
+                                    await _emit(redis, run_id, 'delta', content=_text)
+                                else:
+                                    # 273 (SC#2, Pitfall 2, OV-273-04): only EMISSION is gated — a
+                                    # tool-call block is never streamed as answer text.
+                                    _released = _structured_holdback.feed(_text)
+                                    if _released:
+                                        await _emit(redis, run_id, 'delta', content=_released)
                         elif _etype == "reasoning_delta":
                             # OpenAI-path only today (DeepSeek reasoning_content +
                             # <think>-stripped Kimi/MiniMax/GLM). The adapter routes
@@ -2605,6 +2618,9 @@ async def run_agent_loop(
                         stream, calling_mode = await open_stream(
                             active_provider_name, _gw_request
                         )
+                        # 273 (SC#2, Pitfall 2, OV-273-04): one holdback per STRUCTURED provider call.
+                        if calling_mode == CallingMode.STRUCTURED:
+                            _structured_holdback = StructuredTextHoldback()
 
                         # Fallback: inject for other structured-mode models (unknown models).
                         # Happens after the first call; subsequent iterations will have instructions.
@@ -2673,6 +2689,16 @@ async def run_agent_loop(
                         # Parse tool calls based on calling mode
                         if calling_mode == CallingMode.STRUCTURED:
                             structured_calls = parse_structured_tool_calls(full_content)
+                            # 273 (SC#2, Pitfall 2, OV-273-04): settle the held text. A parsed call is
+                            # dropped and the streamed preamble folds BEFORE the tool events (the
+                            # native-path fold below never fires here: full_content is cleared first);
+                            # an unparsed block was ordinary text and is flushed so the answer completes.
+                            if _structured_holdback is not None:
+                                _held = _structured_holdback.finish(bool(structured_calls))
+                                if structured_calls and _structured_holdback.released_text:
+                                    await _emit(redis, run_id, 'turn_boundary')
+                                elif _held:
+                                    await _emit(redis, run_id, 'delta', content=_held)
                             if structured_calls:
                                 # Convert to tool_calls_buffer format for uniform execution
                                 for idx, call in enumerate(structured_calls):
@@ -3049,6 +3075,7 @@ async def run_agent_loop(
                 new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
                 dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
                 empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
+                turn_tool_calls=persisted_tool_calls,  # 273 (D-04) — caption source (by-reference)
                 iteration=iteration,
                 # Phase 085 additions —
                 # parent_run_id is None at the top-level run; task_service
