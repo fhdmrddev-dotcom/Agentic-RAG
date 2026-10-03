@@ -110,6 +110,39 @@ def _refused(reason: str, detail: str) -> dict:
     return refusal_payload(ArtifactRefusal(reason=reason, detail=detail))
 
 
+# 273-REVIEW WR-07: the unknown-reference refusal names at most this many (the newest) labels.
+_MAX_LABELS_NAMED = 20
+
+
+def _labels_phrase(labels: list[str]) -> str:
+    if len(labels) <= _MAX_LABELS_NAMED:
+        return ", ".join(labels)
+    shown = labels[-_MAX_LABELS_NAMED:]
+    return ", ".join(shown) + f" (and {len(labels) - len(shown):,} earlier)"
+
+
+def _refusal_text(payload: dict) -> str:
+    """A refusal as JSON, always < RESULT_MAX_CHARS (273-REVIEW WR-07).
+
+    ``tool_end`` and persistence cut a result at 2,000 characters. A cut refusal is no longer JSON,
+    so the rail misses ``status: "refused"`` (a green "done" node), the body falls back to "Show an
+    artifact" and history redaction mislabels the rows. Only the model-facing ``detail`` is
+    shortened; ``reason`` is a closed template (≤ 120). JSON escaping makes the size non-linear in
+    the detail's length, so it is re-measured after every cut.
+    """
+    text = json.dumps(payload, ensure_ascii=False)
+    if len(text) < RESULT_MAX_CHARS:
+        return text
+    detail = str(payload.get("detail") or "")
+    keep = len(detail)
+    while keep > 0:
+        keep = max(0, keep - (len(text) - RESULT_MAX_CHARS + 1))
+        text = json.dumps(dict(payload, detail=detail[:keep] + "…"), ensure_ascii=False)
+        if len(text) < RESULT_MAX_CHARS:
+            return text
+    return json.dumps(dict(payload, detail=""), ensure_ascii=False)
+
+
 class _TransformRefused(Exception):
     def __init__(self, refusal: ArtifactRefusal):
         super().__init__(refusal.reason)
@@ -462,7 +495,7 @@ async def handle_show_artifact(args: dict, ctx: "ToolContext") -> "ToolResult":
     from app.services.tool_dispatcher import ToolResult
 
     def _out(payload: dict) -> ToolResult:
-        return ToolResult(result=json.dumps(payload, ensure_ascii=False))
+        return ToolResult(result=_refusal_text(payload))
 
     # 1. Belt — chat top-level only.
     user = getattr(ctx, "current_user", None) or {}
@@ -517,7 +550,7 @@ async def handle_show_artifact(args: dict, ctx: "ToolContext") -> "ToolResult":
                 logger.exception("show_artifact: list_thread_labels failed")
                 labels = []
             if labels:
-                detail = ("Artifacts in this thread: " + ", ".join(labels) + ". Use one of these labels "
+                detail = ("Artifacts in this thread: " + _labels_phrase(labels) + ". Use one of these labels "
                           "or an artifact_id from an earlier show_artifact result.")
             else:
                 detail = ("No artifact has been shown in this thread yet. Send columns and rows "

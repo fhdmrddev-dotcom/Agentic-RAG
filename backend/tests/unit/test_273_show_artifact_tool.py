@@ -634,3 +634,36 @@ def test_no_retrieval_or_sandbox_import():
     code = "\n".join(l for l in _SRC.splitlines() if not l.lstrip().startswith("#"))
     assert not re.search(r"^\s*(from|import)\s+app\.services\.(retrieval_service|sandbox_service|sql_service)", code, re.M)
     assert "execute_code(" not in code
+
+
+# ── 273-REVIEW WR-07: every refusal stays valid JSON under the 2,000-char cut ──────────────────
+
+
+def _assert_whole_refusal(res):
+    assert len(res.result) < sat.RESULT_MAX_CHARS, len(res.result)
+    obj = json.loads(res.result)  # a cut payload would not parse — and the rail would read it as "done"
+    assert set(obj) == {"status", "reason", "detail"} and obj["status"] == "refused"
+    return obj
+
+
+def test_wr07_unknown_reference_on_a_long_thread_names_only_the_newest_labels():
+    labels = [f"chart {i}" for i in range(1, 401)]
+    res, ins, *_ = _call(args={"component": "table", "title": "t", "from_artifact": "chart 999"}, labels=labels)
+    obj = _assert_whole_refusal(res)
+    assert "chart 400" in obj["detail"]
+    assert "chart 1," not in obj["detail"]
+    assert "380 earlier" in obj["detail"]
+    ins.assert_not_called()
+
+
+def test_wr07_a_refusal_detail_built_from_long_column_names_is_cut_to_fit():
+    parent = _parent()
+    names = [f'{i:02d}' + '"' * 62 for i in range(20)]  # JSON-escaped, each name doubles in size
+    parent["spec"]["columns"] = [{"name": n, "type": "number", "unit": None} for n in names]
+    parent["spec"]["rows"] = [[1] * 20]
+    parent["spec"]["chart"] = {"kind": "line", "x": names[0], "y": [names[1]], "stacked": False, "slots": [0]}
+    args = {"component": "table", "title": "t", "from_artifact": "chart 1",
+            "transform": {"filter": [{"column": "nope", "op": "eq", "value": 1}]}}
+    res, ins, *_ = _call(args=args, parent=parent)
+    _assert_whole_refusal(res)
+    ins.assert_not_called()
