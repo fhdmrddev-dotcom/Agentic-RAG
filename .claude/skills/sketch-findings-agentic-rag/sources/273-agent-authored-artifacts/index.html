@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>273 · Agent-authored artifacts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:hsl(216 45% 4%);--elev:hsl(220 40% 5%);--card:hsl(220 30% 7%);--pop:hsl(220 30% 8%);
+  --muted:hsl(220 30% 11%);--accent:hsl(220 25% 14%);
+  --text:hsl(226 60% 97%);--text-m:hsl(220 16% 65%);--text-d:hsl(220 16% 52%);
+  --border:hsl(220 20% 16%);--border-s:hsl(220 20% 16% / .55);
+  --primary:hsl(239 100% 82%);--primary-dim:hsl(239 100% 82% / .15);
+  --green:hsl(142 71% 55%);--amber:hsl(38 92% 60%);--a-bg:hsl(38 92% 60% / .08);--a-bd:hsl(38 92% 60% / .28);
+  --rose:hsl(350 89% 72%);
+  /* chart surface + categorical slots: validated (dataviz validate_palette.js, dark, surface #0d1017): ALL PASS */
+  --surface:#0d1017;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;
+  --sans:'Inter',system-ui,sans-serif;--head:'Manrope','Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 var(--sans)}
+button{font:inherit;color:inherit;cursor:pointer;transition:all .15s ease}
+header.top{position:sticky;top:0;z-index:30;background:hsl(216 45% 4% / .94);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+header.top h1{font:700 15px var(--head);margin:0}
+.grp{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.grp .lbl{font-size:11px;color:var(--text-d);text-transform:uppercase;letter-spacing:.06em;margin-right:4px}
+.seg{background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:4px 10px;font-size:12.5px;color:var(--text-m)}
+.seg:hover{color:var(--text);border-color:hsl(220 20% 24%)}
+.seg.on{background:var(--primary-dim);border-color:hsl(239 100% 82% / .45);color:var(--text)}
+.note{max-width:760px;margin:18px auto 0;padding:0 20px;color:var(--text-m);font-size:12.5px}
+.note b{color:var(--text)}
+#frame{margin:0 auto;max-width:800px;padding:8px 20px 120px;transition:max-width .2s ease}
+
+/* chat */
+.msg{margin:18px 0}
+.msg.u{margin-left:auto;max-width:78%;width:fit-content;background:var(--muted);border:1px solid var(--border);border-radius:14px 14px 4px 14px;padding:8px 13px}
+.msg.a .by{font-size:12px;color:var(--text-d);margin-bottom:6px;display:flex;gap:8px;align-items:center}
+.msg.a .by .av{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--primary),hsl(258 90% 66%));display:inline-block}
+.msg.a p{margin:6px 0 10px}
+.rail{border-left:1px solid var(--border);margin:4px 0 12px 9px;padding:2px 0 2px 14px;display:flex;flex-direction:column;gap:3px}
+.step{font-size:12.5px;color:var(--text-m);display:flex;gap:8px;align-items:baseline;position:relative}
+.step:before{content:"";position:absolute;left:-19px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 2px var(--bg)}
+.step.warn:before{background:var(--amber)}
+.step .n{font:500 11px var(--mono);color:var(--text-d);width:12px}
+.step .t{font:500 12px var(--mono);color:var(--text)}
+.step .ess{color:var(--text-m)}
+.step.warn .ess{color:var(--amber)}
+.streaming:after{content:"▍";color:var(--primary);animation:blink 1s steps(2) infinite;margin-left:2px}
+@keyframes blink{50%{opacity:0}}
+
+/* artifact frames */
+.art{margin:14px 0 6px;position:relative}
+.art .ttl{font:600 13.5px var(--head);color:var(--text);margin:0 0 6px}
+.art .cap{font-size:11.5px;color:var(--text-d);margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.art .cap .src{color:var(--text-m)}
+.art.a{padding:4px 0}
+.art.b{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.art.b .hd{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border-s)}
+.art.b .hd .ttl{margin:0;flex:1}
+.chip{font:500 11px var(--sans);color:var(--text-m);background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.art.b .bd{padding:10px 14px 6px}
+.art.b .cap{margin:0;padding:8px 14px 10px;border-top:1px solid var(--border-s)}
+.art.flash{animation:flash 1.2s ease}
+@keyframes flash{0%,60%{box-shadow:0 0 0 2px var(--primary)}100%{box-shadow:0 0 0 0 transparent}}
+.from{font:500 11.5px var(--sans);color:var(--primary);background:var(--primary-dim);border:1px solid hsl(239 100% 82% / .3);border-radius:999px;padding:1px 9px}
+.from:hover{background:hsl(239 100% 82% / .25)}
+.lineage{color:var(--text-m)}
+
+/* chart */
+.legend{display:flex;flex-wrap:wrap;gap:4px 6px;margin:0 0 4px}
+.lg{display:flex;align-items:center;gap:6px;background:none;border:1px solid transparent;border-radius:6px;padding:2px 7px;font-size:12px;color:var(--text-m)}
+.lg:hover{border-color:var(--border);color:var(--text)}
+.lg .sw{width:10px;height:10px;border-radius:3px}
+.lg[aria-pressed="false"]{color:var(--text-d);text-decoration:line-through}
+.lg[aria-pressed="false"] .sw{opacity:.25}
+.cw{position:relative}
+.cw svg{display:block;width:100%;height:auto;overflow:visible}
+.cw .axis{font:11px var(--sans);fill:var(--text-d)}
+.cw .dl{font:500 11px var(--sans);fill:var(--text-m)}
+.cw .grid{stroke:var(--border);stroke-width:1}
+.tip{position:absolute;pointer-events:none;background:var(--pop);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;min-width:130px;box-shadow:0 8px 24px hsl(0 0% 0% / .45);opacity:0;transition:opacity .1s;z-index:5}
+.tip .h{color:var(--text-d);font-size:11px;margin-bottom:3px}
+.tip .r{display:flex;gap:8px;align-items:center;justify-content:space-between;color:var(--text-m)}
+.tip .r.hot{color:var(--text)}
+.tip .r .k{display:flex;gap:6px;align-items:center}
+.tip .r .sw{width:8px;height:8px;border-radius:2px}
+.tip .r .v{font-variant-numeric:tabular-nums;color:var(--text)}
+.empty{font-size:12px;color:var(--text-d);padding:30px 0;text-align:center}
+
+/* table */
+.tbl{max-height:calc(15 * 31px + 34px);overflow:auto;border:1px solid var(--border-s);border-radius:8px}
+.art.b .tbl{border:none;border-radius:0}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{position:sticky;top:0;background:var(--pop);text-align:left;font-weight:500;color:var(--text-m);padding:0;border-bottom:1px solid var(--border)}
+th button{background:none;border:none;width:100%;text-align:inherit;padding:7px 10px;display:flex;gap:4px;align-items:center;justify-content:inherit}
+th button:hover{color:var(--text)}
+th.num,td.num{text-align:right}
+th.num button{justify-content:flex-end}
+th .ar{font-size:10px;color:var(--text-d)}
+th[aria-sort="ascending"] .ar,th[aria-sort="descending"] .ar{color:var(--primary)}
+td{padding:6px 10px;border-bottom:1px solid var(--border-s);color:var(--text);height:31px}
+td.num{font-variant-numeric:tabular-nums}
+tr:hover td{background:hsl(220 30% 10%)}
+
+/* metric */
+.mets{display:flex;flex-wrap:wrap;gap:10px}
+.met{flex:1 1 150px;min-width:140px;padding:10px 12px;border:1px solid var(--border-s);border-radius:10px;background:hsl(220 30% 8%)}
+.art.a .met:only-child{border:none;background:none;padding:2px 0}
+.met .l{font-size:12px;color:var(--text-m)}
+.met .v{font:700 26px var(--head);letter-spacing:-.01em;margin:2px 0;font-variant-numeric:tabular-nums}
+.met .v small{font:500 13px var(--sans);color:var(--text-m);margin-left:3px}
+.met .d{font-size:12px;color:var(--text-m);display:flex;gap:5px;align-items:center}
+.met .d .up{color:var(--green)} .met .d .dn{color:var(--rose)}
+
+/* notices */
+.ntc-a{display:flex;gap:8px;align-items:baseline;font-size:12.5px;color:var(--text-m);margin:12px 0 4px}
+.ntc-a .i{color:var(--text-d)}
+.ntc-b{margin:12px 0 4px;border:1px dashed hsl(220 20% 26%);border-radius:12px;padding:12px 14px;background:hsl(220 30% 6%)}
+.ntc-b .t{font-weight:600;font-size:13px;display:flex;gap:8px;align-items:center}
+.ntc-b .r{font-size:12.5px;color:var(--text-m);margin-top:3px}
+.ntc-b .s{font-size:11.5px;color:var(--text-d);margin-top:6px}
+.skel{height:230px;border-radius:10px;background:linear-gradient(90deg,hsl(220 30% 8%),hsl(220 30% 11%),hsl(220 30% 8%));background-size:200% 100%;animation:sh 1.4s linear infinite;display:flex;align-items:center;justify-content:center;color:var(--text-d);font-size:12px}
+@keyframes sh{to{background-position:-200% 0}}
+.kindbar{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 2px}
+.sk-lbl{font-size:11px;color:var(--text-d);text-transform:uppercase;letter-spacing:.06em;margin:22px 0 4px}
+hr.sep{border:none;border-top:1px dashed var(--border);margin:26px 0}
+
+/* toolbar */
+#sketch-tools{position:fixed;bottom:12px;right:12px;z-index:9999;font:12px system-ui;background:rgba(0,0,0,.75);color:#fff;padding:8px 10px;border-radius:8px;opacity:.45;display:flex;gap:6px;align-items:center}
+#sketch-tools:hover{opacity:1}
+#sketch-tools button{background:#333;border:1px solid #555;border-radius:5px;color:#fff;padding:2px 8px}
+#sketch-tools button.on{background:#555}
+#toast{position:fixed;bottom:56px;left:50%;transform:translateX(-50%);background:var(--pop);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:12.5px;opacity:0;transition:opacity .2s;z-index:50}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>273 · Agent-authored artifacts</h1>
+  <div class="grp" id="g-screen"><span class="lbl">Screen</span></div>
+  <div class="grp" id="g-var"><span class="lbl">Variant</span></div>
+  <div class="grp" id="g-extra"></div>
+</header>
+<div class="note" id="note"></div>
+<main id="frame"></main>
+<div id="toast"></div>
+<div id="sketch-tools">
+  <span>Viewport</span>
+  <button data-w="390">Phone</button><button data-w="768">Tablet</button><button data-w="800" class="on">Desktop</button>
+</div>
+
+<script>
+/* ───────────── data (a real-ish table from a quarterly report) ───────────── */
+const REGIONS=['Americas','EMEA','APAC','LATAM'];               // slot order = colour order, fixed
+const COLOR={Americas:'var(--s1)',EMEA:'var(--s2)',APAC:'var(--s3)',LATAM:'var(--s4)'};
+const REV={Americas:[620,655,641,702],EMEA:[412,438,471,505],APAC:[233,259,298,331],LATAM:[98,104,121,117]};
+const QS=['Q1','Q2','Q3','Q4'];
+const ROWS=[];QS.forEach((q,i)=>REGIONS.forEach(r=>ROWS.push({quarter:q,region:r,revenue:REV[r][i]})));
+const SEG=['Enterprise','Mid-market','SMB'];
+const SCOL={Enterprise:'var(--s1)','Mid-market':'var(--s2)',SMB:'var(--s3)'};
+const DEALS=[[180,94],[240,121],[310,140],[150,77],[420,168],[275,133],[95,61],[130,70],[60,48],[110,66],[75,52],[140,81],[22,19],[35,27],[18,14],[41,31],[28,22],[52,35]]
+  .map((d,i)=>({segment:SEG[Math.floor(i/6)],deal_k:d[0],days:d[1]}));
+const SRC='query_tables · Quarterly_Report_FY25.pdf p.4';
+
+const S={screen:1,v:{1:'b',2:'a',3:'a',4:'b'},kind:'line',metric:'single',state:'stream',w:800};
+const hidden={};      // chartId -> Set(series)
+const sorts={};       // tableId -> {key,dir}
+
+/* ───────────── helpers ───────────── */
+const fmtK=v=>'$'+v.toLocaleString()+'K';
+const el=(h)=>{const d=document.createElement('div');d.innerHTML=h.trim();return d.firstChild};
+function niceTop(max){const raw=max/4;const p=Math.pow(10,Math.floor(Math.log10(raw)));const step=[1,2,2.5,5,10].map(k=>k*p).find(s=>s>=raw);return{top:Math.ceil(max/step)*step,step}}
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.style.opacity=1;clearTimeout(e._t);e._t=setTimeout(()=>e.style.opacity=0,1600)}
+function rTop(x,y,w,h,r){r=Math.min(r,w/2,h);if(h<=0)return'';return`M${x},${y+h}V${y+r}Q${x},${y} ${x+r},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+h}Z`}
+
+/* ───────────── chart renderer (the closed `chart` component) ───────────── */
+function chart(spec){
+  const id=spec.id;hidden[id]??=new Set();
+  return`<div class="legend" data-chart="${id}" ${spec.series.length<2?'hidden':''}>${spec.series.map(s=>`<button class="lg" aria-pressed="${!hidden[id].has(s)}" data-s="${s}"><span class="sw" style="background:${spec.colors[s]}"></span>${s}</button>`).join('')}</div>
+  <div class="cw" id="cw-${id}"><svg viewBox="0 0 640 250" role="img" aria-label="${spec.title}"></svg><div class="tip"></div></div>`;
+}
+function drawChart(spec){
+  const id=spec.id,wrap=document.getElementById('cw-'+id);if(!wrap)return;
+  const svg=wrap.querySelector('svg'),tip=wrap.querySelector('.tip');
+  const vis=spec.series.filter(s=>!hidden[id].has(s));
+  const W=640,H=250,L=46,R=spec.kind==='line'?74:12,T=10,B=26,pw=W-L-R,ph=H-T-B;
+  let h='';
+  if(!vis.length){svg.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" class="axis">All series hidden — click a legend entry</text>`;wrap.onmousemove=null;tip.style.opacity=0;return}
+  if(spec.kind==='scatter'){
+    const pts=spec.rows.filter(r=>vis.includes(r.segment));
+    const xm=niceTop(Math.max(...spec.rows.map(r=>r.deal_k))),ym=niceTop(Math.max(...spec.rows.map(r=>r.days)));
+    const sx=v=>L+v/xm.top*pw,sy=v=>T+ph-v/ym.top*ph;
+    for(let v=0;v<=ym.top;v+=ym.step)h+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${sy(v)}" y2="${sy(v)}"/><text class="axis" x="${L-8}" y="${sy(v)+4}" text-anchor="end">${v}</text>`;
+    for(let v=0;v<=xm.top;v+=xm.step)h+=`<text class="axis" x="${sx(v)}" y="${H-6}" text-anchor="middle">$${v}K</text>`;
+    h+=`<text class="axis" x="${L}" y="${T+2}" dx="4">days to close</text>`;
+    pts.forEach(p=>h+=`<circle cx="${sx(p.deal_k)}" cy="${sy(p.days)}" r="5" fill="${spec.colors[p.segment]}" stroke="var(--surface)" stroke-width="2"/>`);
+    h+=`<circle class="hov" r="7" fill="none" stroke="var(--text)" stroke-width="1.5" style="display:none"/>`;
+    svg.innerHTML=h;const hov=svg.querySelector('.hov');
+    wrap.onmousemove=e=>{const b=svg.getBoundingClientRect(),k=W/b.width,mx=(e.clientX-b.left)*k,my=(e.clientY-b.top)*k;
+      let best=null,bd=22;pts.forEach(p=>{const d=Math.hypot(sx(p.deal_k)-mx,sy(p.days)-my);if(d<bd){bd=d;best=p}});
+      if(!best){tip.style.opacity=0;hov.style.display='none';return}
+      hov.setAttribute('cx',sx(best.deal_k));hov.setAttribute('cy',sy(best.days));hov.style.display='';
+      tip.innerHTML=`<div class="h">${best.segment}</div><div class="r hot"><span class="k">Deal size</span><span class="v">${fmtK(best.deal_k)}</span></div><div class="r hot"><span class="k">Days to close</span><span class="v">${best.days}</span></div>`;
+      place(tip,wrap,sx(best.deal_k)/k,sy(best.days)/k)};
+    wrap.onmouseleave=()=>{tip.style.opacity=0;hov.style.display='none'};return;
+  }
+  const xs=spec.xs,stacked=spec.kind==='area'||(spec.kind==='bar'&&spec.stacked);
+  const val=(s,i)=>spec.data[s][i];
+  const totals=xs.map((_,i)=>vis.reduce((a,s)=>a+val(s,i),0));
+  const ym=niceTop(stacked?Math.max(...totals):Math.max(...vis.flatMap(s=>xs.map((_,i)=>val(s,i)))));
+  const sy=v=>T+ph-v/ym.top*ph;
+  for(let v=0;v<=ym.top;v+=ym.step)h+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${sy(v)}" y2="${sy(v)}"/><text class="axis" x="${L-8}" y="${sy(v)+4}" text-anchor="end">${v>=1000?(v/1000)+'M':v}</text>`;
+  const band=pw/xs.length,cx=i=>spec.kind==='bar'?L+band*i+band/2:L+(xs.length===1?pw/2:pw*i/(xs.length-1));
+  xs.forEach((x,i)=>h+=`<text class="axis" x="${cx(i)}" y="${H-6}" text-anchor="middle">${x}</text>`);
+  h+=`<rect class="hband" x="0" y="${T}" width="0" height="${ph}" fill="hsl(220 30% 14% / .5)" style="display:none"/>`;
+  if(spec.kind==='line'){
+    vis.forEach(s=>{h+=`<path d="${xs.map((_,i)=>(i?'L':'M')+cx(i)+','+sy(val(s,i))).join('')}" fill="none" stroke="${spec.colors[s]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`});
+    // direct labels (<=4 series), text tokens not series colour
+    const ends=vis.map(s=>({s,y:sy(val(s,xs.length-1))})).sort((a,b)=>a.y-b.y);for(let i=1;i<ends.length;i++)if(ends[i].y-ends[i-1].y<13)ends[i].y=ends[i-1].y+13;
+    if(xs.length>1)ends.forEach(e=>h+=`<text class="dl" x="${cx(xs.length-1)+8}" y="${e.y+4}">${e.s}</text>`);
+  }else if(spec.kind==='area'){
+    const base=xs.map(()=>0);
+    vis.forEach(s=>{const top=xs.map((_,i)=>base[i]+val(s,i));
+      const d=xs.map((_,i)=>(i?'L':'M')+cx(i)+','+sy(top[i])).join('')+xs.map((_,i)=>'L'+cx(xs.length-1-i)+','+sy(base[xs.length-1-i])).join('')+'Z';
+      h+=`<path d="${d}" fill="${spec.colors[s]}" fill-opacity=".85" stroke="var(--surface)" stroke-width="2" stroke-linejoin="round"/>`;top.forEach((v,i)=>base[i]=v)});
+  }else{ // bar
+    const gap=2,inner=Math.min(band*0.72,vis.length*56);
+    xs.forEach((_,i)=>{const x0=L+band*i+(band-inner)/2;
+      if(spec.stacked){let acc=0;vis.forEach((s,j)=>{const v=val(s,i),y1=sy(acc+v),y0=sy(acc);const last=j===vis.length-1;
+        h+=last?`<path d="${rTop(x0,y1,inner,y0-y1-(j?gap:0),4)}" fill="${spec.colors[s]}"/>`:`<rect x="${x0}" y="${y1}" width="${inner}" height="${Math.max(0,y0-y1-(j?gap:0))}" fill="${spec.colors[s]}"/>`;acc+=v})}
+      else{const bw=(inner-gap*(vis.length-1))/vis.length;vis.forEach((s,j)=>{const y=sy(val(s,i));h+=`<path d="${rTop(x0+j*(bw+gap),y,bw,sy(0)-y,4)}" fill="${spec.colors[s]}"/>`})}});
+  }
+  h+=`<line class="xh" y1="${T}" y2="${T+ph}" stroke="var(--text-d)" stroke-dasharray="3 3" style="display:none"/>`;
+  if(spec.kind==='line')vis.forEach(s=>h+=`<circle class="mk" data-s="${s}" r="4.5" fill="${spec.colors[s]}" stroke="var(--surface)" stroke-width="2" style="display:none"/>`);
+  svg.innerHTML=h;
+  const xh=svg.querySelector('.xh'),hb=svg.querySelector('.hband');
+  wrap.onmousemove=e=>{const b=svg.getBoundingClientRect(),k=W/b.width,mx=(e.clientX-b.left)*k;
+    let i=spec.kind==='bar'?Math.floor((mx-L)/band):Math.round((mx-L)/(xs.length>1?pw/(xs.length-1):1));
+    if(mx<L-10||mx>W-R+10){tip.style.opacity=0;xh.style.display='none';hb.style.display='none';svg.querySelectorAll('.mk').forEach(m=>m.style.display='none');return}
+    i=Math.max(0,Math.min(xs.length-1,i));
+    if(spec.kind==='bar'){hb.setAttribute('x',L+band*i);hb.setAttribute('width',band);hb.style.display=''}else{xh.setAttribute('x1',cx(i));xh.setAttribute('x2',cx(i));xh.style.display=''}
+    svg.querySelectorAll('.mk').forEach(m=>{m.setAttribute('cx',cx(i));m.setAttribute('cy',sy(val(m.dataset.s,i)));m.style.display=''});
+    const order=[...vis].sort((a,b)=>val(b,i)-val(a,i));
+    const F=spec.fmt||fmtK;tip.innerHTML=`<div class="h">${spec.xLabel?spec.xLabel+' ':''}${xs[i]}</div>`+order.map(s=>`<div class="r"><span class="k"><span class="sw" style="background:${spec.colors[s]}"></span>${s}</span><span class="v">${F(val(s,i))}</span></div>`).join('')+(stacked?`<div class="r hot" style="border-top:1px solid var(--border);margin-top:3px;padding-top:3px"><span class="k">Total</span><span class="v">${F(totals[i])}</span></div>`:'');
+    place(tip,wrap,cx(i)/k,T/k+10)};
+  wrap.onmouseleave=()=>{tip.style.opacity=0;xh.style.display='none';hb.style.display='none';svg.querySelectorAll('.mk').forEach(m=>m.style.display='none')};
+}
+function place(tip,wrap,x,y){tip.style.opacity=1;const ww=wrap.clientWidth,tw=tip.offsetWidth;let l=x+14;if(l+tw>ww)l=x-tw-14;tip.style.left=Math.max(0,l)+'px';tip.style.top=y+'px'}
+
+/* spec builders (what show_artifact carries) */
+const KLABEL={line:'Line chart',bar:'Bar chart',bar_stacked:'Stacked bar chart',area:'Stacked area chart',scatter:'Scatter chart',table:'Table',metric:'Metric'};
+function revSpec(id,kind,stacked,qFilter){
+  const xs=qFilter?QS.filter(q=>qFilter.includes(q)):QS;
+  const data={};REGIONS.forEach(r=>data[r]=xs.map(q=>REV[r][QS.indexOf(q)]));
+  return{id,component:'chart',kind,stacked,title:qFilter?`Revenue by region, ${qFilter.join('+')} FY25 · $K`:'FY25 revenue by region · $K',xs,xLabel:'',series:REGIONS,colors:COLOR,data,rowCount:xs.length*REGIONS.length};
+}
+const scatterSpec=id=>({id,component:'chart',kind:'scatter',title:'Deal size vs. days to close, FY25 · by segment',series:SEG,colors:SCOL,rows:DEALS,rowCount:DEALS.length});
+
+/* frame (Screen 1 decides; Screens 2-4 reuse the Screen 1 choice) */
+function frame(spec,body,opts={}){
+  const f=S.v[1],kl=spec.kindLabel||KLABEL[spec.kind==='bar'&&spec.stacked?'bar_stacked':spec.kind]||KLABEL[spec.component];
+  const cap=opts.cap??`<span>Data:</span><span class="src">${SRC}</span><span>· ${spec.rowCount} rows</span>`;
+  const extra=opts.extra||'';
+  if(f==='a')return`<figure class="art a" id="art-${spec.id}" style="margin:14px 0 6px"><div class="ttl">${spec.title}</div>${body}<div class="cap">${extra}${cap}</div></figure>`;
+  return`<figure class="art b" id="art-${spec.id}" style="margin:14px 0 6px"><div class="hd"><div class="ttl">${spec.title}</div><span class="chip">${kl}</span></div><div class="bd">${body}</div><div class="cap">${extra}<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 1.5h5l3 3v10H4z"/><path d="M9 1.5v3h3"/></svg>${cap}</div></figure>`;
+}
+const chartArt=(spec,opts)=>frame(spec,chart(spec),opts);
+
+/* table component */
+function tableArt(id,rows,cols,title){
+  sorts[id]??={key:null,dir:1};const st=sorts[id];
+  let r=[...rows];if(st.key){const c=cols.find(c=>c.key===st.key);r.sort((a,b)=>c.num?(a[st.key]-b[st.key])*st.dir:String(a[st.key]).localeCompare(b[st.key])*st.dir)}
+  const body=`<div class="tbl"><table data-table="${id}"><thead><tr>${cols.map(c=>`<th class="${c.num?'num':''}" aria-sort="${st.key===c.key?(st.dir>0?'ascending':'descending'):'none'}"><button data-k="${c.key}">${c.label}<span class="ar">${st.key===c.key?(st.dir>0?'▲':'▼'):'↕'}</span></button></th>`).join('')}</tr></thead><tbody>${r.map(x=>`<tr>${cols.map(c=>`<td class="${c.num?'num':''}">${c.fmt?c.fmt(x[c.key]):x[c.key]}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  return frame({id,component:'table',title,rowCount:rows.length},body);
+}
+/* metric component */
+function metricArt(id,tiles,title){
+  const body=`<div class="mets">${tiles.map(t=>`<div class="met"><div class="l">${t.label}</div><div class="v">${t.value}<small>${t.unit||''}</small></div>${t.delta?`<div class="d"><span class="${t.delta.dir}">${t.delta.dir==='up'?'▲':'▼'} ${t.delta.text}</span><span>${t.delta.vs}</span></div>`:''}</div>`).join('')}</div>`;
+  return frame({id,component:'metric',title,rowCount:16},body);
+}
+
+/* chat bits */
+const user=t=>`<div class="msg u">${t}</div>`;
+const rail=steps=>`<div class="rail">${steps.map((s,i)=>`<div class="step ${s.warn?'warn':''}"><span class="n">${i+1}</span><span class="t">${s.t}</span><span class="ess">→ ${s.e}</span></div>`).join('')}</div>`;
+const asst=inner=>`<div class="msg a"><div class="by"><span class="av"></span>Assistant</div>${inner}</div>`;
+const RAIL1=[{t:'search_documents',e:'Found 6 chunks in "Quarterly_Report_FY25.pdf"'},{t:'query_tables',e:'1 table · 16 rows (p.4)'},{t:'show_artifact',e:'Line chart · 16 rows'}];
+
+/* ───────────── screens ───────────── */
+const SCREENS={
+ 1:{name:'Artifact in the answer',vars:{a:'A · Borderless, in the reading flow',b:'B · Framed card with header ★'},
+   note:'<b>Question:</b> how does an artifact sit in a chat answer, below the text (D-10)? Hover the chart (crosshair + values) and click legend entries (toggle a series; colours stay with the region). Screens 2-4 reuse whichever frame is selected here.',
+   render(){const sp=revSpec('c1','line');
+     return user('Chart revenue by region for FY25 from the quarterly report.')+asst(rail(RAIL1)+`<p>Americas leads every quarter and reached <b>$702K</b> in Q4. APAC grew fastest, <b>+42%</b> from Q1 to Q4. LATAM is the only region that dipped in Q4 (−3%).</p>`+chartArt(sp))+user('Thanks, that helps.');},
+   after(){drawChart(revSpec('c1','line'))}},
+ 2:{name:'The three components',vars:{a:'A · Metric = one tile ★',b:'B · Metric = strip of 1-4 tiles'},
+   note:'<b>Question:</b> do the three registry entries (chart · table · metric) read as one family? The kind buttons are a <b>sketch control</b> showing what the model can emit; the product has no kind toggle (D-06). Sort the table by clicking headers (16 rows, sticky header, scrolls after 15). <b>Variant B changes the metric spec</b> (1-4 values per artifact).',
+   render(){const k=S.kind;
+     const kinds=[['line','Line'],['bar','Bar · grouped'],['bar_stacked','Bar · stacked'],['area','Area (stacked)'],['scatter','Scatter (≤3 series)']];
+     const sp=k==='scatter'?scatterSpec('c2'):revSpec('c2',k==='bar_stacked'?'bar':k,k==='bar_stacked');
+     const met=S.v[2]==='a'?[{label:'Q4 FY25 revenue',value:'$1.66',unit:'M',delta:{dir:'up',text:'8.1%',vs:'vs Q3 ($1.53M)'}}]
+       :[{label:'Q4 FY25 revenue',value:'$1.66',unit:'M',delta:{dir:'up',text:'8.1%',vs:'vs Q3'}},{label:'FY25 revenue',value:'$6.01',unit:'M'},{label:'APAC, Q1→Q4',value:'+42',unit:'%',delta:{dir:'up',text:'$98K',vs:'added'}},{label:'LATAM Q4',value:'$117',unit:'K',delta:{dir:'dn',text:'3.3%',vs:'vs Q3'}}];
+     return `<div class="sk-lbl">chart · sketch control: what the model can emit</div><div class="kindbar">${kinds.map(([v,l])=>`<button class="seg ${k===v?'on':''}" data-kind="${v}">${l}</button>`).join('')}</div>`+
+       chartArt(sp,k==='scatter'?{cap:'<span>Data:</span><span class="src">query_documents · CRM_export_FY25.xlsx</span><span>· 18 rows</span>'}:{})+
+       `<div class="sk-lbl">table</div>`+tableArt('t2',ROWS,[{key:'quarter',label:'Quarter'},{key:'region',label:'Region'},{key:'revenue',label:'Revenue',num:true,fmt:fmtK}],'FY25 revenue by region and quarter')+
+       `<div class="sk-lbl">metric</div>`+metricArt('m2',met,S.v[2]==='a'?'Q4 revenue':'FY25 at a glance');},
+   after(){const k=S.kind;drawChart(k==='scatter'?scatterSpec('c2'):revSpec('c2',k==='bar_stacked'?'bar':k,k==='bar_stacked'))}},
+ 3:{name:'The follow-up chain',vars:{a:'A · Lineage caption line ★',b:'B · "↑ from chart 1" chip'},
+   note:'<b>Question:</b> after “make it a bar chart” and “only Q3”, how does each new artifact show where its rows came from? Each follow-up turn has <b>one</b> rail step and no retrieval or code (D-06, SC#3). Earlier artifacts are untouched (D-08).',
+   render(){const a=revSpec('f1','line'),b=revSpec('f2','bar'),c=revSpec('f3','bar',false,['Q3']);
+     const lin=(n,t)=>S.v[3]==='a'?{extra:`<span class="lineage">${t}</span><span>·</span>`}:{extra:`<button class="from" data-jump="${n}">↑ from chart 1</button>`};
+     return user('Chart revenue by region for FY25 from the quarterly report.')+asst(rail(RAIL1)+'<p>Americas leads every quarter; APAC grew fastest (+42% Q1→Q4).</p>'+chartArt(a,{extra:'<span class="chip">chart 1</span>'}))+
+       user('Make it a bar chart.')+asst(rail([{t:'show_artifact',e:'Bar chart · same 16 rows as chart 1'}])+'<p>Same data as a grouped bar chart.</p>'+chartArt(b,lin('f1','Redrawn from chart 1 · same 16 rows')))+
+       user('Only Q3.')+asst(rail([{t:'show_artifact',e:'Bar chart · chart 1 rows filtered to Q3 (4 rows)'}])+'<p>In Q3, Americas led with <b>$641K</b>, but it was the only region to fall versus Q2.</p>'+chartArt({...c,rowCount:4},lin('f1','From chart 1 · filtered to quarter = Q3 · 4 of 16 rows')));},
+   after(){drawChart(revSpec('f1','line'));drawChart(revSpec('f2','bar'));drawChart(revSpec('f3','bar',false,['Q3']))}},
+ 4:{name:'States',vars:{a:'A · Quiet notice',b:'B · Explicit notice ★'},
+   note:'<b>Question:</b> how loud is “This artifact can’t be shown” (D-12, SC#2), and do the other states read honestly? Cycle the states. ⛔ No state may show JSON, markup or the raw spec.',
+   render(){const st=S.state,v=S.v[4];
+     const notice=(reason)=>v==='a'?`<div class="ntc-a"><span class="i">⊘</span><span>This artifact can’t be shown: ${reason}</span></div>`
+       :`<div class="ntc-b"><div class="t"><span style="color:var(--text-d)">⊘</span>This artifact can’t be shown</div><div class="r">${reason}</div><div class="s">The rest of the answer is unaffected.</div></div>`;
+     if(st==='stream')return user('Chart revenue by region for FY25.')+asst(rail(RAIL1)+`<p class="streaming">Americas leads every quarter and reached <b>$702K</b> in Q4. APAC grew fastest</p>`+chartArt(revSpec('s1','line')));
+     if(st==='unknown')return user('Show the regional split as a pie chart.')+asst(rail([{t:'query_tables',e:'1 table · 16 rows (p.4)'},{t:'show_artifact',e:'refused · “pie” is not a chart kind',warn:true},{t:'show_artifact',e:'refused · “pie” is not a chart kind',warn:true}])+'<p>Americas holds 44% of FY25 revenue, EMEA 30%, APAC 19% and LATAM 7%.</p>'+notice('it asked for a pie chart, which isn’t one of the chart kinds we can draw.'));
+     if(st==='badprops')return user('(thread reopened next day)')+asst(rail(RAIL1)+'<p>Americas leads every quarter and reached <b>$702K</b> in Q4.</p>'+notice('its saved data is missing a column the chart needs (revenue).'));
+     if(st==='agent')return user('Plot 2, 4, 8, 16, 32 against steps 1 to 5.')+asst(rail([{t:'show_artifact',e:'Line chart · 5 rows'}])+'<p>Doubling each step gives an exponential curve.</p>'+chartArt({...revSpec('s4','line'),title:'Doubling sequence',series:['Value'],colors:{Value:'var(--s1)'},xs:['1','2','3','4','5'],xLabel:'Step',fmt:v=>v,data:{Value:[2,4,8,16,32]},rowCount:5},{cap:'<span>Values provided by the agent</span><span>· no source document in this turn · 5 rows</span>'}));
+     if(st==='overcap')return user('Chart daily ticket volume for FY25.')+asst(rail([{t:'query_documents',e:'1,240 rows'},{t:'show_artifact',e:'refused · 1,240 rows (max 500); aggregate first',warn:true},{t:'execute_code',e:'Aggregated to 12 monthly totals'},{t:'show_artifact',e:'Bar chart · 12 rows'}])+'<p>Volume peaked in March and November.</p>'+chartArt({...revSpec('s5','bar'),title:'Support tickets per month, FY25',series:['Tickets'],colors:{Tickets:'var(--s1)'},xs:['J','F','M','A','M','J','J','A','S','O','N','D'],xLabel:'Month',fmt:v=>v.toLocaleString(),data:{Tickets:[310,342,465,330,301,288,276,295,340,372,451,330]},rowCount:12},{cap:'<span>Data:</span><span class="src">query_documents · tickets_FY25 → execute_code (monthly totals)</span><span>· 12 rows</span>'}));
+     if(st==='skeleton')return user('Chart revenue by region for FY25.')+asst(rail([...RAIL1.slice(0,2),{t:'show_artifact',e:'Line chart · 16 rows'}])+`<p class="streaming">Americas leads every quarter</p><div class="skel">Line chart · 16 rows</div>`);
+   },
+   after(){const st=S.state;if(st==='stream')drawChart(revSpec('s1','line'));
+     if(st==='agent')drawChart({...revSpec('s4','line'),title:'Doubling sequence',series:['Value'],colors:{Value:'var(--s1)'},xs:['1','2','3','4','5'],xLabel:'Step',fmt:v=>v,data:{Value:[2,4,8,16,32]}});
+     if(st==='overcap')drawChart({...revSpec('s5','bar'),series:['Tickets'],colors:{Tickets:'var(--s1)'},xs:['J','F','M','A','M','J','J','A','S','O','N','D'],xLabel:'Month',fmt:v=>v.toLocaleString(),data:{Tickets:[310,342,465,330,301,288,276,295,340,372,451,330]}});}}
+};
+
+/* ───────────── shell ───────────── */
+function render(){
+  const sc=SCREENS[S.screen];
+  document.getElementById('g-screen').innerHTML='<span class="lbl">Screen</span>'+Object.entries(SCREENS).map(([n,s])=>`<button class="seg ${+n===S.screen?'on':''}" data-screen="${n}">${n} ${s.name}</button>`).join('');
+  document.getElementById('g-var').innerHTML='<span class="lbl">Variant</span>'+Object.entries(sc.vars).map(([k,l])=>`<button class="seg ${S.v[S.screen]===k?'on':''}" data-var="${k}">${l}</button>`).join('');
+  const ex=document.getElementById('g-extra');
+  ex.innerHTML=S.screen===4?'<span class="lbl">State</span>'+[['stream','Live: chart arrives, text still streaming ★'],['skeleton','Alt: skeleton until stream ends'],['unknown','Unknown kind (pie)'],['badprops','Bad props on reload'],['agent','Agent-supplied values'],['overcap','Over 500 rows']].map(([k,l])=>`<button class="seg ${S.state===k?'on':''}" data-state="${k}">${l}</button>`).join(''):'';
+  document.getElementById('note').innerHTML=sc.note;
+  document.getElementById('frame').innerHTML=sc.render();
+  sc.after&&sc.after();
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('button');if(!t)return;
+  if(t.dataset.screen){S.screen=+t.dataset.screen;render();window.scrollTo(0,0)}
+  else if(t.dataset.var){S.v[S.screen]=t.dataset.var;render()}
+  else if(t.dataset.state){S.state=t.dataset.state;render()}
+  else if(t.dataset.kind){S.kind=t.dataset.kind;render()}
+  else if(t.dataset.s){const id=t.closest('.legend').dataset.chart;const h=hidden[id];h.has(t.dataset.s)?h.delete(t.dataset.s):h.add(t.dataset.s);render()}
+  else if(t.dataset.k){const id=t.closest('table').dataset.table,st=sorts[id];if(st.key===t.dataset.k)st.dir=-st.dir;else{st.key=t.dataset.k;st.dir=1}render()}
+  else if(t.dataset.jump){const a=document.getElementById('art-'+t.dataset.jump);a.scrollIntoView({behavior:'smooth',block:'center'});a.classList.remove('flash');void a.offsetWidth;a.classList.add('flash')}
+  else if(t.dataset.w){S.w=+t.dataset.w;document.getElementById('frame').style.maxWidth=S.w+'px';document.querySelectorAll('#sketch-tools button').forEach(b=>b.classList.toggle('on',b===t));toast('Viewport '+t.textContent)}
+});
+render();
+</script>
+</body>
+</html>
