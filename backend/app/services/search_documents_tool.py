@@ -19,17 +19,359 @@ imported inside the handler.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal, Sequence, get_args
 
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+from app.models.document_search import _is_iso_day
+from app.models.document_view import ViewCondition
 from app.services.audit_service import write_audit_entry
+from app.services.retrieval_scope import canonical_stored_values
 from app.services.retrieval_service import search_documents
 
 if TYPE_CHECKING:
     from app.services.tool_dispatcher import ToolContext, ToolResult
 
 logger = logging.getLogger(__name__)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# 272-04 Task 1 — parse, validate and canonicalise `filters` (D-03 / D-04 / D-05 / D-20 / D-26)
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+#
+# ⛔ ONE dialect (D-03): `filters` IS Find's condition list and the legacy `metadata_filter` is
+#   mapped onto `eq` conditions here — both then go through the 271 compiler (via 272-03's
+#   resolver). Nothing in this module compiles a condition.
+# ⛔ Import-cycle rule (Pitfall 5): document_view_resolver / document_search_service /
+#   view_filter_compiler are imported FUNCTION-LOCALLY only (fenced by test_272_filter_validation).
+
+# D-03 — the operator vocabulary is DERIVED from ViewCondition.op, never retyped (a test asserts
+# set equality), so a widened compiler Literal widens the tool's parse with it.
+_VIEW_OPS: tuple[str, ...] = get_args(ViewCondition.model_fields["op"].annotation)
+_SearchOp = Literal[_VIEW_OPS]  # type: ignore[valid-type]
+
+# Find's three timestamptz date words (FindDate, resolved BEFORE the compiler — Pitfall 14: a custom
+# def keyed like one of them is shadowed by the date word). ``date`` — the document's OWN date and
+# the default for any period (D-05) — is NOT here: it is the compiler field ``date_typed``.
+DATE_WORDS: tuple[str, ...] = ("added", "source_created", "source_modified")
+_DATE_WORD_OPS: tuple[str, ...] = ("before", "after", "between", "within_next", "older_than")
+_DOCUMENT_DATE_OPS: tuple[str, ...] = ("eq", "gte", "lte", "is_empty") + _DATE_WORD_OPS
+_SCALAR_OPS: frozenset[str] = frozenset({"eq", "gte", "lte", "before", "after", "contains"})
+_UNITS: tuple[str, ...] = ("days", "weeks", "months")
+# Pitfall 12 — the rule a non-ISO date operand is refused with (a PostgREST 400 would otherwise
+# read as "retrieval unavailable").
+_ISO_RULE = (
+    "write days as YYYY-MM-DD; for a month or a quarter use between with two YYYY-MM-DD days "
+    "(e.g. 2025-10-01 and 2025-10-31)"
+)
+# 271 WR-04 — `.in_()` does not escape these inside a value, so a spelling carrying one never
+# rides `one_of`.
+_IN_UNSAFE = ('"', ",", "(", ")")
+
+
+class SearchCondition(BaseModel):
+    """One ``filters`` entry — 272-02's argument contract (``{field, op, value, value2, values, unit}``)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    field: str
+    op: _SearchOp
+    value: str | int | float | bool | None = None
+    value2: str | int | float | None = None
+    values: list[str | int | float] | None = None
+    unit: Literal["days", "weeks", "months"] | None = None
+
+
+@dataclasses.dataclass(frozen=True)
+class FilterRefusal:
+    """A filter the tool will not run, with the values the model could use instead (D-04)."""
+
+    field: str
+    message: str
+    allowed: list[str] = dataclasses.field(default_factory=list)
+
+
+def _parse_condition(entry: Any) -> SearchCondition | FilterRefusal:
+    if not isinstance(entry, dict):
+        return FilterRefusal(
+            "filters",
+            'Each filter must be an object such as {"field": "date", "op": "between", '
+            '"value": "2025-10-01", "value2": "2025-10-31"}. Retry with that shape.',
+        )
+    field = entry.get("field")
+    if not isinstance(field, str) or not field.strip():
+        return FilterRefusal("filters", "Each filter needs a `field` naming what to filter on. Retry with one.")
+    if entry.get("op") in (None, ""):
+        return FilterRefusal(
+            field,
+            f"The filter on {field} has no `op`. Use one of: {', '.join(_VIEW_OPS)}.",
+            list(_VIEW_OPS),
+        )
+    try:
+        return SearchCondition.model_validate(entry)
+    except ValidationError as exc:
+        loc = exc.errors()[0].get("loc") or ("",)
+        if loc[0] == "op":
+            return FilterRefusal(
+                field,
+                f"'{entry.get('op')}' is not a filter operator. Valid operators: {', '.join(_VIEW_OPS)}.",
+                list(_VIEW_OPS),
+            )
+        if loc[0] == "unit":
+            return FilterRefusal(
+                field, f"`unit` must be one of: {', '.join(_UNITS)}.", list(_UNITS),
+            )
+        return FilterRefusal(
+            field, f"The filter on {field} is malformed ({exc.errors()[0].get('msg')}). Retry with plain values.",
+        )
+
+
+def parse_filter_args(args: dict) -> list[SearchCondition] | FilterRefusal:
+    """``filters`` → conditions, then ``metadata_filter`` pairs appended as ``eq`` conditions (D-03).
+
+    Neither present → ``[]`` (no filter). A malformed argument → a :class:`FilterRefusal`.
+    """
+    conditions: list[SearchCondition] = []
+    raw = args.get("filters")
+    if raw is not None:
+        if not isinstance(raw, list):
+            return FilterRefusal(
+                "filters",
+                "`filters` must be a list of conditions, each like "
+                '{"field": "legal_entity", "op": "eq", "value": "Acme GmbH"}. Retry with a list.',
+            )
+        for entry in raw:
+            parsed = _parse_condition(entry)
+            if isinstance(parsed, FilterRefusal):
+                return parsed
+            conditions.append(parsed)
+    legacy = args.get("metadata_filter")
+    if legacy:
+        if not isinstance(legacy, dict):
+            return FilterRefusal(
+                "metadata_filter",
+                "`metadata_filter` must be an object of {field: value} pairs; prefer `filters`.",
+            )
+        for key, value in legacy.items():
+            entry = (
+                {"field": key, "op": "one_of", "values": value}
+                if isinstance(value, list)
+                else {"field": key, "op": "eq", "value": value}
+            )
+            parsed = _parse_condition(entry)
+            if isinstance(parsed, FilterRefusal):
+                return parsed
+            conditions.append(parsed)
+    return conditions
+
+
+def _as_dict(c: SearchCondition) -> dict:
+    out: dict = {"field": c.field, "op": c.op}
+    for key in ("value", "value2", "values", "unit"):
+        v = getattr(c, key)
+        if v is not None:
+            out[key] = list(v) if key == "values" else v
+    return out
+
+
+def _whole_number(v: Any) -> int | None:
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, int):
+        return v if v >= 0 else None
+    if isinstance(v, float) and v.is_integer() and v >= 0:
+        return int(v)
+    if isinstance(v, str) and v.strip().isdigit():
+        return int(v.strip())
+    return None
+
+
+def _number(v: Any) -> int | float | None:
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, str):
+        s = v.strip()
+        try:
+            return int(s)
+        except ValueError:
+            pass
+        try:
+            f = float(s)
+        except ValueError:
+            return None
+        return f if f == f and f not in (float("inf"), float("-inf")) else None
+    return None
+
+
+def _date_condition(d: dict, label: str) -> dict | FilterRefusal:
+    """D-05 / Pitfall 12 — date operands are ISO days; relative spans are whole numbers + a unit."""
+    field, op = d["field"], d["op"]
+    if op in ("within_next", "older_than"):
+        n = _whole_number(d.get("value"))
+        if n is None:
+            return FilterRefusal(
+                field, f"{op} on {label} needs a whole number in `value` (e.g. 7), not '{d.get('value')}'.",
+            )
+        if d.get("unit") is None:
+            return FilterRefusal(field, f"{op} on {label} needs `unit`: one of {', '.join(_UNITS)}.", list(_UNITS))
+        d["value"] = n
+        return d
+    if op == "is_empty":
+        return d
+    operands = [d.get("value")] + ([d.get("value2")] if op == "between" else [])
+    bad = next((v for v in operands if not _is_iso_day(v)), None)
+    if bad is not None or any(v is None for v in operands):
+        return FilterRefusal(field, f"{label} needs a day, not '{bad}': {_ISO_RULE}.")
+    return d
+
+
+def _pick_spelling(value: str, spellings: list[str]) -> dict:
+    """D-20 — the stored spelling(s) of a free custom string, as condition operands."""
+    if len(spellings) == 1:
+        return {"op": "eq", "value": spellings[0]}
+    if any(ch in s for s in spellings for ch in _IN_UNSAFE):
+        # 271 WR-04: `.in_()` would split / mis-quote this value — one exact containment instead,
+        # the exact-case spelling when there is one, else the first stored spelling.
+        return {"op": "eq", "value": value if value in spellings else spellings[0]}
+    return {"op": "one_of", "values": list(spellings)}
+
+
+async def validate_and_canonicalise(
+    conditions: Sequence[SearchCondition],
+    *,
+    user_id: str,
+    supabase: Any,
+    defs: Sequence[dict],
+    whitelist: set[str],
+    number_fields: set[str],
+) -> list[dict] | FilterRefusal:
+    """Every condition either canonicalised to what the stored data holds, or refused (D-04 / D-20).
+
+    ``defs`` are the caller's field definitions (own + system-global, ``list_field_definitions``
+    unchanged — D-26); ``whitelist`` / ``number_fields`` are ``_build_field_meta``'s, the same
+    allowed-field source the compiler re-checks against. Built-in ``title`` / ``author`` /
+    ``summary`` / ``document_type`` / ``language`` pass through: the compiler already matches them
+    case-insensitively (ilike / lowercased eq).
+    """
+    custom = {
+        d["field_key"]: d for d in defs
+        if d.get("enabled") and d.get("field_key") and d["field_key"] not in DATE_WORDS
+    }
+    valid_fields = set(whitelist) | {"date"} | set(DATE_WORDS)
+    out: list[dict] = []
+    for c in conditions:
+        d = _as_dict(c)
+        field, op = d["field"], d["op"]
+        if op in _SCALAR_OPS and d.get("value") in (None, ""):
+            return FilterRefusal(field, f"The {op} filter on {field} needs a `value`.")
+        if op == "one_of" and not d.get("values"):
+            return FilterRefusal(field, f"The one_of filter on {field} needs a non-empty `values` list.")
+        if op == "between" and (d.get("value") in (None, "") or d.get("value2") in (None, "")):
+            return FilterRefusal(
+                field, f"between on {field} needs both `value` (the start) and `value2` (the end), as YYYY-MM-DD days.",
+            )
+
+        # Date words first (Pitfall 14), then the document's own date (D-05).
+        if field in DATE_WORDS:
+            if op not in _DATE_WORD_OPS:
+                return FilterRefusal(
+                    field,
+                    f"{field} is a date: use before, after or between with YYYY-MM-DD days, or "
+                    f"within_next / older_than with a whole number and a unit — not {op}.",
+                    list(_DATE_WORD_OPS),
+                )
+            r = _date_condition(d, field)
+            if isinstance(r, FilterRefusal):
+                return r
+            out.append(r)
+            continue
+        if field == "date":
+            if op not in _DOCUMENT_DATE_OPS:
+                return FilterRefusal(
+                    field, f"date (the document's own date) does not take {op}; use between, before or after.",
+                    list(_DOCUMENT_DATE_OPS),
+                )
+            r = _date_condition(d, "date (the document's own date)")
+            if isinstance(r, FilterRefusal):
+                return r
+            out.append(r)
+            continue
+
+        if field not in valid_fields:
+            allowed = sorted(valid_fields)
+            return FilterRefusal(
+                field,
+                f"There is no field named '{field}'. Valid fields: {', '.join(allowed)}. "
+                "Retry with one of them, or ask which was meant.",
+                allowed,
+            )
+
+        defn = custom.get(field)
+        ftype = (defn or {}).get("field_type")
+        if defn is not None and ftype == "enum":
+            options = [str(o) for o in (defn.get("options") or [])]
+            by_lower = {o.lower(): o for o in options}
+
+            def _enum(v: Any) -> str | None:
+                return by_lower.get(str(v).strip().lower())
+
+            if op == "eq" or op == "contains":
+                hit = _enum(d["value"])
+                if hit is None:
+                    return FilterRefusal(
+                        field,
+                        f"{field} has no value '{d['value']}'. Valid values: {', '.join(options)}. "
+                        "Retry with one of them, or ask which was meant.",
+                        options,
+                    )
+                d["value"] = hit
+            elif op == "one_of":
+                mapped = [_enum(v) for v in d["values"]]
+                missing = [v for v, m in zip(d["values"], mapped) if m is None]
+                if missing:
+                    return FilterRefusal(
+                        field,
+                        f"{field} has no value '{missing[0]}'. Valid values: {', '.join(options)}. "
+                        "Retry with one of them, or ask which was meant.",
+                        options,
+                    )
+                d["values"] = mapped
+        elif defn is not None and (ftype == "number" or field in number_fields):
+            for key in ("value", "value2"):
+                if key in d:
+                    n = _number(d[key])
+                    if n is None:
+                        return FilterRefusal(field, f"{field} is a number field; '{d[key]}' is not a number.")
+                    d[key] = n
+            if "values" in d:
+                nums = [_number(v) for v in d["values"]]
+                if any(n is None for n in nums):
+                    return FilterRefusal(field, f"{field} is a number field; every value must be a number.")
+                d["values"] = nums
+        elif defn is not None and ftype == "boolean" and op == "eq":
+            b = {"true": True, "yes": True, "false": False, "no": False}.get(str(d["value"]).strip().lower())
+            if b is None:
+                return FilterRefusal(field, f"{field} is true or false, not '{d['value']}'.", ["true", "false"])
+            d["value"] = b
+        elif defn is not None and ftype in (None, "string") and op == "eq" and isinstance(d["value"], str):
+            # D-20 — the compiler's custom `eq` is a CASE-SENSITIVE `@>` containment, so the value is
+            # replaced by the stored spelling(s) read under the caller's RLS (272-03).
+            try:
+                spellings = await canonical_stored_values(user_id=user_id, field=field, value=d["value"])
+            except Exception:  # noqa: BLE001 — best effort: an unread spelling keeps the value as given
+                logger.warning("search_documents: stored spellings of %r could not be read", field, exc_info=True)
+                spellings = []
+            if spellings:
+                picked = _pick_spelling(d["value"], spellings)
+                d.pop("value", None)
+                d.update(picked)
+        out.append(d)
+    return out
 
 
 async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
