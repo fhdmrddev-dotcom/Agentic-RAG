@@ -332,6 +332,7 @@ $$;
 CREATE FUNCTION public.keyword_search_chunks(search_query text, match_user_id uuid, match_count integer DEFAULT 20, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_document_ids uuid[] DEFAULT NULL::uuid[]) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, rank double precision)
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
+    SET plan_cache_mode TO 'force_custom_plan'
     AS $$
 DECLARE
   tsq tsquery;
@@ -372,6 +373,7 @@ $$;
 CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_embedding_model text DEFAULT NULL::text, p_document_ids uuid[] DEFAULT NULL::uuid[], p_exact_max_chunks integer DEFAULT NULL::integer) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
+    SET plan_cache_mode TO 'force_custom_plan'
     AS $$
 DECLARE
   n_chunks integer;

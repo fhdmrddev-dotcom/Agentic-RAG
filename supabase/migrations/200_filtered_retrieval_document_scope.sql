@@ -51,6 +51,11 @@
 -- Apply discipline (CLAUDE.md): paste into the Supabase SQL editor.
 -- NEVER `supabase db push` / `db reset`. Safe to paste twice (DROP IF EXISTS / CREATE OR REPLACE /
 -- IF NOT EXISTS / REVOKE+GRANT are all idempotent).
+--
+-- ⛔ NEVER APPLY THIS FILE WITHOUT 201_retrieval_rpcs_force_custom_plan.sql IMMEDIATELY AFTER IT
+--    (272-05). The btree in step 1 makes PL/pgSQL's GENERIC plan of both bodies a whole-table join;
+--    a pooled connection switches to it after five calls, so UNFILTERED search regresses
+--    (recall_bench: 3-8 ms -> up to 1.56 s vector, up to 31 s keyword). 201 pins custom plans.
 -- ============================================================================
 
 BEGIN;

@@ -191,6 +191,18 @@ async def test_the_document_id_btree_exists(pg_pool):
     assert idx is not None and "btree (document_id)" in idx, idx
 
 
+@pytest.mark.parametrize("sig", [VECTOR_REGPROC, KEYWORD_REGPROC])
+async def test_both_rpcs_pin_custom_plans(pg_pool, sig):
+    """272-05 / migration 201: the btree above makes PL/pgSQL's GENERIC plan a whole-table
+    document_id join. A pooled connection switches to that plan after five calls, so without this
+    pin UNFILTERED search on recall_bench went 3-8 ms -> 0.45-1.56 s (vector) and 0.5-0.9 s ->
+    12-32 s (keyword). Evidence: .planning/phases/272-close-means-wrong/evidence/plancache-diagnosis.txt.
+    """
+    cfg = await pg_pool.fetchval("SELECT proconfig FROM pg_proc WHERE oid = $1::regprocedure", sig)
+    assert cfg is not None and "plan_cache_mode=force_custom_plan" in cfg, cfg
+    assert 'search_path=""' in cfg, cfg
+
+
 # ── D-18 + the DEFINER gate, as an org-A-only subject ───────────────────────────────────────
 
 async def test_an_empty_array_returns_zero_rows_from_both_rpcs(pg_pool, scope):
