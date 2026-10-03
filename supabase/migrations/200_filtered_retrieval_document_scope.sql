@@ -50,12 +50,20 @@
 --
 -- Apply discipline (CLAUDE.md): paste into the Supabase SQL editor.
 -- NEVER `supabase db push` / `db reset`. Safe to paste twice (DROP IF EXISTS / CREATE OR REPLACE /
--- IF NOT EXISTS / REVOKE+GRANT are all idempotent).
+-- IF NOT EXISTS / REVOKE+GRANT are all idempotent) — and, since 272-REVIEW WR-04, a re-paste no
+-- longer undoes 201: see the plan pin below.
 --
--- ⛔ NEVER APPLY THIS FILE WITHOUT 201_retrieval_rpcs_force_custom_plan.sql IMMEDIATELY AFTER IT
---    (272-05). The btree in step 1 makes PL/pgSQL's GENERIC plan of both bodies a whole-table join;
---    a pooled connection switches to it after five calls, so UNFILTERED search regresses
---    (recall_bench: 3-8 ms -> up to 1.56 s vector, up to 31 s keyword). 201 pins custom plans.
+-- ⛔ THE CUSTOM-PLAN PIN (272-05 → 272-REVIEW WR-04). The btree in step 1 makes PL/pgSQL's GENERIC
+--    plan of both bodies a whole-table join; a pooled connection switches to it after five calls,
+--    so UNFILTERED search regresses (recall_bench: 3-8 ms -> up to 1.56 s vector, up to 31 s
+--    keyword). Migration 201 pinned `plan_cache_mode = force_custom_plan` with ALTER FUNCTION … SET.
+--    ⚠ CREATE OR REPLACE REPLACES A FUNCTION'S WHOLE SET LIST (measured on the local DB: proconfig
+--    went from [search_path, plan_cache_mode] to [search_path] on a re-paste of this file), so the
+--    pin now lives IN BOTH DEFINITIONS below (`SET plan_cache_mode TO 'force_custom_plan'`) and 201
+--    stays as a harmless, idempotent no-op for a database that already ran it.
+--    ⛔ any later CREATE OR REPLACE of either function MUST carry the same clause — copying a body
+--    without it brings the regression back silently (tests/unit/test_272_review_fixes.py fences
+--    every definition from 200 on).
 -- ============================================================================
 
 BEGIN;
@@ -88,6 +96,7 @@ CREATE OR REPLACE FUNCTION public.match_document_chunks(
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
+ SET plan_cache_mode TO 'force_custom_plan'
 AS $function$
 DECLARE
   n_chunks integer;
@@ -173,6 +182,7 @@ CREATE OR REPLACE FUNCTION public.keyword_search_chunks(
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
+ SET plan_cache_mode TO 'force_custom_plan'
 AS $function$
 DECLARE
   tsq tsquery;
@@ -244,6 +254,14 @@ COMMIT;
 --      has_function_privilege('authenticated', 'public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer)', 'EXECUTE')),
 --     ('service_role can exec match_document_chunks',
 --      has_function_privilege('service_role', 'public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer)', 'EXECUTE')),
+--     ('match_document_chunks pins custom plans (WR-04: in the definition itself)',
+--      (select 'plan_cache_mode=force_custom_plan' = any (p.proconfig) from pg_proc p
+--        join pg_namespace n on n.oid = p.pronamespace
+--        where n.nspname = 'public' and p.proname = 'match_document_chunks')),
+--     ('keyword_search_chunks pins custom plans (WR-04: in the definition itself)',
+--      (select 'plan_cache_mode=force_custom_plan' = any (p.proconfig) from pg_proc p
+--        join pg_namespace n on n.oid = p.pronamespace
+--        where n.nspname = 'public' and p.proname = 'keyword_search_chunks')),
 --     ('idx_document_chunks_document_id exists',
 --      exists (select 1 from pg_indexes where schemaname = 'public'
 --                and indexname = 'idx_document_chunks_document_id'))

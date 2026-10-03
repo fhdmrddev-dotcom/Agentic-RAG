@@ -597,3 +597,47 @@ async def test_wr08_a_sub_agent_without_search_is_unchanged(monkeypatch):
     rounds = await _drive_sub_agent(monkeypatch, [_OTHER_SCHEMA])
     assert "Today's date" not in rounds[0]["messages"][0]["content"]
     assert rounds[0]["tools"] == [_OTHER_SCHEMA]
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# WR-04 — the custom-plan pin lives IN the function definitions, so re-pasting 200 cannot undo 201
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# CREATE OR REPLACE replaces a function's whole SET list (measured on the local DB by the review),
+# so a re-paste of 200 — or any later migration copying its bodies — silently dropped 201's
+# `plan_cache_mode=force_custom_plan` and brought back the measured 0.45-31 s regression.
+
+import pathlib  # noqa: E402
+import re  # noqa: E402
+
+_MIGRATIONS = pathlib.Path(__file__).resolve().parents[3] / "supabase" / "migrations"
+_RPC_CREATE = re.compile(
+    r"CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.(match_document_chunks|keyword_search_chunks)\s*\((.*?)\$function\$",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _rpc_creates_from_200():
+    found = []
+    for path in sorted(_MIGRATIONS.glob("*.sql")):
+        num = int(path.name.split("_", 1)[0])
+        if num < 200:
+            continue
+        sql = re.sub(r"--[^\n]*", "", path.read_text(encoding="utf-8"))
+        found += [(path.name, m.group(1), m.group(2)) for m in _RPC_CREATE.finditer(sql)]
+    return found
+
+
+def test_wr04_every_rpc_definition_from_200_on_pins_custom_plans():
+    creates = _rpc_creates_from_200()
+    assert {name for _f, name, _h in creates} == {"match_document_chunks", "keyword_search_chunks"}, creates
+    for fname, name, header in creates:
+        assert re.search(r"SET\s+plan_cache_mode\s+TO\s+'force_custom_plan'", header, re.IGNORECASE), (
+            f"{fname}: CREATE OR REPLACE FUNCTION public.{name} has no plan_cache_mode clause; "
+            "CREATE OR REPLACE replaces the SET list, so this definition would undo migration 201"
+        )
+        assert re.search(r"SET\s+search_path\s+TO\s+''", header, re.IGNORECASE), f"{fname}: {name} lost search_path"
+
+
+def test_wr04_migration_200_no_longer_claims_a_safe_re_paste_without_the_pin():
+    text = (_MIGRATIONS / "200_filtered_retrieval_document_scope.sql").read_text(encoding="utf-8")
+    assert "any later CREATE OR REPLACE" in text and "plan_cache_mode" in text
