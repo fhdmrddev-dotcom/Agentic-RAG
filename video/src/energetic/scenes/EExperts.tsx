@@ -22,13 +22,13 @@ const SPEND = [
 const INSTALL_AT = 22;
 const SPEND_AT = 48;
 
-export const EExperts: React.FC<SceneProps> = ({ duration }) => {
+export const EExperts: React.FC<SceneProps> = ({ duration, vo }) => {
   const frame = useCurrentFrame();
   useVideoConfig();
 
   return (
     <PushIn duration={duration}>
-      <Vo beat={6} />
+      <Vo beat={6} file={vo} />
       <Sfx at={0} src={SFX.whoosh} volume={0.35} />
       {[0, 1, 2].map((i) => (
         <Sfx key={i} at={INSTALL_AT + i * 6} src={SFX.click} volume={0.3} />

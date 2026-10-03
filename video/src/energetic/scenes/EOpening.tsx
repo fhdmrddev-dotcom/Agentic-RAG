@@ -5,7 +5,12 @@ import { body, C, display, gradientText } from "../../theme";
 import { PunchLine, PushIn, Vo } from "../kit";
 import { cut, F_QUICK, F_SLOW, pop, punch } from "../theme";
 
-export type SceneProps = { duration: number; voFrames: number };
+export type SceneProps = {
+  duration: number;
+  voFrames: number;
+  /** Optional voice file under public/ that replaces this scene's overview beat (feature clips). */
+  vo?: string;
+};
 
 // Hook lines punch in while the voice says them; the brand pops on the last word.
 export const EOpening: React.FC<SceneProps> = ({ duration, voFrames }) => {

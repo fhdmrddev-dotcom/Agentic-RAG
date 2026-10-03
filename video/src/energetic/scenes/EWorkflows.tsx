@@ -18,7 +18,7 @@ const PHASE = 14;
 const ROW = 92;
 const PIPS = 8;
 
-export const EWorkflows: React.FC<SceneProps> = ({ duration }) => {
+export const EWorkflows: React.FC<SceneProps> = ({ duration, vo }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const gauntletAt = FIRST + PHASES.length * PHASE + 2;
@@ -26,7 +26,7 @@ export const EWorkflows: React.FC<SceneProps> = ({ duration }) => {
 
   return (
     <PushIn duration={duration}>
-      <Vo beat={4} />
+      <Vo beat={4} file={vo} />
       <Sfx at={0} src={SFX.whoosh} volume={0.35} />
       {PHASES.map((_, i) => (
         <Sfx key={i} at={FIRST + i * PHASE + PHASE - 4} src={SFX.click} volume={0.28} />

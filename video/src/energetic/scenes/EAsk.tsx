@@ -17,7 +17,7 @@ const TYPE_AT = 10;
 const ANSWER_AT = 26;
 const WPF = 0.8; // words per frame while streaming
 
-export const EAsk: React.FC<SceneProps> = ({ duration }) => {
+export const EAsk: React.FC<SceneProps> = ({ duration, vo }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const typed = QUESTION.slice(0, Math.max(0, Math.floor((frame - TYPE_AT) * 4)));
@@ -36,7 +36,7 @@ export const EAsk: React.FC<SceneProps> = ({ duration }) => {
 
   return (
     <PushIn duration={duration}>
-      <Vo beat={2} />
+      <Vo beat={2} file={vo} />
       <Sfx at={0} src={SFX.whoosh} volume={0.35} />
       {segs.map((s) => (
         <Sfx key={s.cite} at={s.doneAt} src={SFX.click} volume={0.35} />

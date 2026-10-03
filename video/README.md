@@ -12,6 +12,41 @@ Remotion is free for individuals and companies of up to 3 people; a larger compa
 | `npm run render:overview` | Renders `out/syrel-overview.mp4` (1920×1080, 30 fps, ~63 s, ~1.5 min to render) |
 | `npx remotion still src/index.ts <SceneId> out/frame.png --frame=60` | One frame as a PNG, for quick checks |
 
+## Video library
+
+Three styles, all free: **narrated** (Kokoro voice, local), **documentary/explainer** (NotebookLM video wrapped in Syrel branding), and **music-driven promo** (no narration, original synthesized track).
+
+| Composition | Style | Purpose | Size · length | Render |
+|---|---|---|---|---|
+| `SyrelOverview` | calm motion graphics, no voice | sales / landing | 1920×1080 · 63 s | `npm run render:overview` |
+| `SyrelEnergetic` | narrated, energetic | landing hero, sales | 1920×1080 · 40 s | `npm run render:energetic` |
+| `SyrelEnergeticVertical` | narrated, energetic (re-laid-out 9:16, not cropped) | LinkedIn / Shorts / Reels | 1080×1920 · 40 s | `npm run render:vertical` |
+| `Clip-Chat`, `Clip-Library`, `Clip-Workflows`, `Clip-Connections`, `Clip-Experts`, `Clip-Admin` | narrated feature clips | docs-page embeds (Phase 276 guides) | 1920×1080 · 15.3 s each | `npm run render:clips` |
+| `BrandedEpisode` | NotebookLM video + Syrel intro/lower-third/outro | documentaries ("Syrel: The Build Story") and explainers | 1920×1080 · source + ~6 s | `npm run render:episode -- --props='{...}'` |
+| `SyrelPromo` | music-driven, no narration | landing / launch / social | 1920×1080 · 33.5 s | `npm run render:promo` |
+| `SyrelPromoVertical` | music-driven, no narration | Shorts / Reels / LinkedIn | 1080×1920 · 33.5 s | `npm run render:promo` |
+| `SyrelTeaser` | music-driven 15 s cutdown | ads, social | 1920×1080 · 15.5 s | `npm run render:promo` |
+
+### Feature clips (narrated)
+
+`npm run vo:clips` regenerates `public/vo/clip-<id>.wav` and `src/clips/clipTimings.ts` from the six lines in `tools/make_vo.py` (each ≤ 22 words, written from `docs/history/` "Still true" rows). Each clip = title card → the energetic scene re-voiced → end card ("Read the full guide in the Syrel docs" + Book a demo).
+
+### Branded NotebookLM episodes
+
+NotebookLM videos are large and generated outside the repo, so `public/notebooklm/` is git-ignored. Download the video (NotebookLM MCP `download_artifact`), copy it into `public/notebooklm/`, then:
+
+```bash
+npm run render:episode -- --props='{"src":"notebooklm/<file>.mp4","series":"Syrel: The Build Story","episodeLabel":"Episode 1 · Chapter 1","title":"A document chat you can trust"}'
+```
+
+`calculateMetadata` reads the source length (Mediabunny), so the composition always fits the video.
+
+### Music-driven promo
+
+Run `npm run music` once before rendering a promo (the WAV is git-ignored: it is regenerated deterministically in ~12 s). It synthesizes **"Syrel Pulse"** — an original 120 BPM track made in numpy (no samples, no downloads; ours to use anywhere) — to `public/music/syrel-pulse.wav` (~−14 LUFS, peaks ≤ −1 dBFS) and writes `src/promo/beatMap.ts`. Structure: 2-bar riser → impact + drop at bar 3 (bars 3–10) → breakdown bar 11 → build bar 12 → drop 2 bars 13–15 → final hit bar 16 + tail. Every cut lands on a beat from the map; `src/promo/music.ts` checks the generated and computed maps agree. Counters read real numbers from `frontend/src/landing/facts.ts` (providers, publish checks, built-in tools, connector services).
+
+**Swap the music:** put a free track (Pixabay Music, YouTube Audio Library) in `public/music/`, set `MUSIC.src`, `bpm` and `offsetS` (seconds to the first downbeat) in `src/promo/music.ts`. The picture re-times itself from those numbers; pick a track whose sections fall on the same bars, or edit `MUSIC.sections`.
+
 ## Structure
 
 - `src/theme.ts` — Deep Midnight colours and fonts (copied from `frontend/src/index.css`) and the motion identity: one entrance curve, one exit curve, three durations (300 / 500 / 800 ms), 100 ms stagger.

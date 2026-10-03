@@ -25,13 +25,13 @@ const LINES_AT = 12;
 const HUB_AT = 22;
 const GRANTS_AT = 42;
 
-export const EConnect: React.FC<SceneProps> = ({ duration }) => {
+export const EConnect: React.FC<SceneProps> = ({ duration, vo }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   return (
     <PushIn duration={duration}>
-      <Vo beat={5} />
+      <Vo beat={5} file={vo} />
       <Sfx at={0} src={SFX.whoosh} volume={0.35} />
       {GRANTS.map((_, i) => (
         <Sfx key={i} at={GRANTS_AT + i * 8} src={SFX.toggle} volume={0.35} />

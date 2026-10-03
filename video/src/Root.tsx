@@ -18,6 +18,10 @@ import { EWorkflows } from "./energetic/scenes/EWorkflows";
 import { EConnect } from "./energetic/scenes/EConnect";
 import { EExperts } from "./energetic/scenes/EExperts";
 import { EClose } from "./energetic/scenes/EClose";
+import { clipDuration, FeatureClip } from "./clips/FeatureClip";
+import { SyrelEnergeticVertical, VERTICAL_DURATION } from "./vertical/SyrelEnergeticVertical";
+import { BrandedEpisode, calculateEpisodeMetadata } from "./episodes/BrandedEpisode";
+import { PROMO_DURATION, SyrelPromo, SyrelTeaser, TEASER_DURATION } from "./promo/SyrelPromo";
 
 const VIDEO = { width: 1920, height: 1080, fps: 30 } as const;
 
@@ -64,6 +68,41 @@ export const RemotionRoot: React.FC = () => (
       <Composition id="E-Connect" component={withFastBg(EConnect, E_SCENES.connect, VO_FRAMES[4])} durationInFrames={E_SCENES.connect} {...VIDEO} />
       <Composition id="E-Experts" component={withFastBg(EExperts, E_SCENES.experts, VO_FRAMES[5])} durationInFrames={E_SCENES.experts} {...VIDEO} />
       <Composition id="E-Close" component={withFastBg(EClose, E_SCENES.close, VO_FRAMES[6])} durationInFrames={E_SCENES.close} {...VIDEO} />
+    </Folder>
+    <Composition
+      id="SyrelEnergeticVertical"
+      component={SyrelEnergeticVertical}
+      durationInFrames={VERTICAL_DURATION}
+      defaultProps={{ musicSrc: null }}
+      width={1080}
+      height={1920}
+      fps={30}
+    />
+    <Composition
+      id="BrandedEpisode"
+      component={BrandedEpisode}
+      durationInFrames={600}
+      calculateMetadata={calculateEpisodeMetadata}
+      defaultProps={{
+        src: "notebooklm/explainer-workflows-you-can-trust.mp4",
+        episodeLabel: "Explainer",
+        title: "Workflows you can trust",
+        series: "Syrel Explainers",
+      }}
+      {...VIDEO}
+    />
+    <Folder name="Promo">
+      <Composition id="SyrelPromo" component={SyrelPromo} durationInFrames={PROMO_DURATION} {...VIDEO} />
+      <Composition id="SyrelPromoVertical" component={SyrelPromo} durationInFrames={PROMO_DURATION} width={1080} height={1920} fps={30} />
+      <Composition id="SyrelTeaser" component={SyrelTeaser} durationInFrames={TEASER_DURATION} {...VIDEO} />
+    </Folder>
+    <Folder name="Clips">
+      <Composition id="Clip-Chat" component={FeatureClip} durationInFrames={clipDuration("chat")} defaultProps={{ id: "chat" as const }} {...VIDEO} />
+      <Composition id="Clip-Library" component={FeatureClip} durationInFrames={clipDuration("library")} defaultProps={{ id: "library" as const }} {...VIDEO} />
+      <Composition id="Clip-Workflows" component={FeatureClip} durationInFrames={clipDuration("workflows")} defaultProps={{ id: "workflows" as const }} {...VIDEO} />
+      <Composition id="Clip-Connections" component={FeatureClip} durationInFrames={clipDuration("connections")} defaultProps={{ id: "connections" as const }} {...VIDEO} />
+      <Composition id="Clip-Experts" component={FeatureClip} durationInFrames={clipDuration("experts")} defaultProps={{ id: "experts" as const }} {...VIDEO} />
+      <Composition id="Clip-Admin" component={FeatureClip} durationInFrames={clipDuration("admin")} defaultProps={{ id: "admin" as const }} {...VIDEO} />
     </Folder>
   </>
 );
