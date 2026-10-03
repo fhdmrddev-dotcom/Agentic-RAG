@@ -187,8 +187,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 272-01-PLAN.md — baselines; G-5 extraction FIRST: retrieval_service split (rpc / rank / documents, AST-pinned pure move) + retrieval_scope seam contracts (default predicates as data, ScopeResult); search handler moved to search_documents_tool.py (D-15), 11 patch sites retargeted (wave 1)
-- [ ] 272-02-PLAN.md — the `filters` contract: provider-safe schema on search_documents (op enum = ViewCondition.op, D-02 text removed) + the visible "Filtered: …" tool-card line from args, count-gate adoption (wave 1)
+- [x] 272-01-PLAN.md — baselines; G-5 extraction FIRST: retrieval_service split (rpc / rank / documents, AST-pinned pure move) + retrieval_scope seam contracts (default predicates as data, ScopeResult); search handler moved to search_documents_tool.py (D-15), 11 patch sites retargeted (wave 1)
+- [x] 272-02-PLAN.md — the `filters` contract: provider-safe schema on search_documents (op enum = ViewCondition.op, D-02 text removed) + the visible "Filtered: …" tool-card line from args, count-gate adoption (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -261,7 +261,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 270. The Document as an Object | 0/TBD | Not started | - |
 | 271. Find the Document | 0/TBD | Not started | - |
-| 272. Close Means Wrong | 0/5 | Planned (5 plans, 4 waves) | - |
+| 272. Close Means Wrong | 2/5 | In progress (wave 1 merged) | - |
 | 273. Agent-Authored Artifacts | 0/TBD | Not started | - |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
