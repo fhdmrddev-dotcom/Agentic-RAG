@@ -109,6 +109,29 @@ Platform; SEED-345). Any doc page that touches them says "not available today" a
 - **G4-4 Deep link + refresh:** paste `/docs/use/chat` into the address bar and refresh: the docs page
   renders — never the app login (`app.html` fallthrough) and never a 404.
 
+### Planning-time resolutions (orchestrator, autonomous plan-phase run 2026-10-04 — operator may overrule)
+Research (`276-RESEARCH.md` §Open Questions) raised six questions; the operator asked for an autonomous
+run, so each was resolved here rather than blocking. Every one is reversible.
+- **D-18:** Docs-home "narrated overview" (D-10) = **`SyrelEnergetic`** (it carries the voice-over
+  `vo/beat-1..7.wav`); `SyrelOverview` is silent and is not used for the docs-home slot.
+- **D-19:** The video work CONTEXT called "new" (`BrandedEpisode`, `SyrelPromo`, clips, vertical) is
+  **already committed** (`562dcba1e`, `0ab1639c9`). 276 embeds it; it does not re-create it.
+  `video/public/music/syrel-pulse.wav` stays gitignored — 276 commits a **compressed web copy**
+  (≤ 1.5 MB, e.g. `syrel-pulse.mp3` via ffmpeg) for the Player, and the muted landing hero must not
+  download any audio until the reader presses Unmute.
+- **D-20:** Production `/docs` `/redoc` `/openapi.json` are **bearer-token-gated** (401 without a valid
+  token). Accepted that a plain browser cannot use the production explorer; the public reference on
+  `/docs` (static filtered snapshot) is the browser path. Startup log line + parity-checklist entry +
+  post-deploy `curl` expecting 401 guard against `ENVIRONMENT` being unset.
+- **D-21:** The logo/name pass (D-14) **also covers the login screen** (`AuthCardShell` / `AuthPage`)
+  in the same one-pass commit — it is the first app surface a user sees.
+- **D-22:** Landing drift guard red at base (`facts.ts` tool count 29 vs `_TOOL_REGISTRY` 30, from 273):
+  **recorded as inherited, not fixed in 276** unless 276 is promoted together with 273. Landing
+  tasks note it rather than "fixing" a number that would be false in production.
+- **D-23:** Operator-owed checks (not blockers for planning/execution, blockers for deploy): Vercel
+  "Include source files outside the Root Directory" ON, and `ENVIRONMENT=production` on Coolify.
+  Onebox frontend build context moves to repo root in the same commit as the deploy artifacts.
+
 ### Claude's Discretion
 - **API renderer:** Scalar (`@scalar/api-reference-react`, MIT) recommended by research, reading the
   static pre-filtered JSON; fall back to Redoc static build if Scalar's bundle weight hurts. Either way
