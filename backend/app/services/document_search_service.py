@@ -35,7 +35,8 @@ Safety invariants:
   - **Server order is THE order** (D-03). Nulls last in both directions, ties on ``id``;
     the client never re-sorts.
   - **Values are bound, never interpolated** (SC#4): every value rides a builder param;
-    ``.in_`` quotes members; ids are UUID-typed by the request model; the name escapes
+    ``.in_`` carries ids only (it escapes neither a double quote nor a backslash, so filename lists go
+    through ``_pg_in_list`` — 271-REVIEW WR-04); ids are UUID-typed by the request model; the name escapes
     ``\\``, ``%`` and ``_`` before it is wrapped.
   - Every ``.execute()`` rides ``aexec`` (D-v2.5-01). No module-level mutable cache
     (multi-worker uvicorn, D-PRD-12).
@@ -76,6 +77,20 @@ _LINEAGE_COLUMNS = "id,user_id,filename,version_number,folder_id"
 _PAGE = 1000
 # Lineage reads filter ``filename IN (...)``; keep each request's URL bounded.
 _LINEAGE_BATCH = 100
+
+
+def _pg_in_list(values: list[str]) -> str:
+    r"""A PostgREST ``in.(...)`` list with EVERY member quoted and ``\`` / ``"`` escaped.
+
+    271-REVIEW WR-04: postgrest-py's ``.in_()`` quotes a value only when it holds ``,:()``
+    and escapes nothing inside the quotes. Measured against PostgREST 14.10, a filename like
+    ``Q3 "final", draft.pdf`` is then read as two wrong names — a 200, not an error — so the
+    lineage and relationship reads silently miss that document. File names come from users
+    and cloud drives, so they get this path; ids and UUIDs keep ``.in_()``.
+    """
+    return "(" + ",".join(
+        '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"' for v in values
+    ) + ")"
 
 # The three timestamptz dates (P-10). "Date in the document" is NOT here: it is the
 # shipped compiler's ``date`` field on ``date_typed`` (a ``date``), via ``filter_expr``.
@@ -280,7 +295,7 @@ async def _lineage_rows(rows: list[dict], supabase: Client) -> list[dict]:
                 supabase.table("documents")
                 .select(_LINEAGE_COLUMNS, count="exact" if count else None)
                 .in_("user_id", owners)
-                .in_("filename", chunk)
+                .filter("filename", "in", _pg_in_list(chunk))
             )
 
         out.extend(await _fetch_all(build))
@@ -371,7 +386,7 @@ async def _relationship_allow_list(
                 supabase.table("documents")
                 .select("id,user_id,filename")
                 .in_("user_id", sorted({k[0] for k in wanted}))
-                .in_("filename", sorted({k[1] for k in wanted}))
+                .filter("filename", "in", _pg_in_list(sorted({k[1] for k in wanted})))
                 .eq("is_latest", True)
             )
         ).data or []

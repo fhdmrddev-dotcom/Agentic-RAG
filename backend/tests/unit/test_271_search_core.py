@@ -70,6 +70,42 @@ def _like_to_regex(pattern: str) -> re.Pattern:
     return re.compile("^" + "".join(out) + "$", re.IGNORECASE | re.DOTALL)
 
 
+def parse_pgrst_in_list(value: str) -> list[str]:
+    r"""PostgREST's ``in.(...)`` list grammar, as MEASURED against the local server (14.10).
+
+    271-REVIEW WR-04, probed with uuid-cast errors that echo the parsed value back:
+      * ``("a\"b")`` -> ``a"b``, ``("a\\b")`` -> ``a\b``, ``("a\b")`` -> ``ab``: inside quotes a backslash
+        escapes the next character;
+      * ``(a\b)`` -> ``a\b``: an unquoted value is verbatim up to the next comma;
+      * ``("Q3 "final", draft.pdf")`` -> first value ``"Q3 "final"`` (quotes and all): a quoted
+        value that does not close cleanly is re-read verbatim to the next comma. NO 400 —
+        the request succeeds and silently matches the wrong names.
+    """
+    assert value.startswith("(") and value.endswith(")"), value
+    body = value[1:-1]
+    out: list[str] = []
+    i = 0
+    while i <= len(body):
+        if body.startswith('"', i):
+            j, buf = i + 1, []
+            while j < len(body) and body[j] != '"':
+                if body[j] == "\\" and j + 1 < len(body):
+                    buf.append(body[j + 1])
+                    j += 2
+                    continue
+                buf.append(body[j])
+                j += 1
+            if j < len(body) and (j + 1 == len(body) or body[j + 1] == ","):
+                out.append("".join(buf))
+                i = j + 2
+                continue
+        k = body.find(",", i)
+        k = len(body) if k == -1 else k
+        out.append(body[i:k])
+        i = k + 1
+    return out
+
+
 class FakeQuery:
     def __init__(self, client: "FakePostgrest", table: str):
         self.client = client
@@ -108,6 +144,17 @@ class FakeQuery:
 
     def or_(self, expr):
         self.calls.append(("or_", expr))
+        return self
+
+    def filter(self, col, op, val):
+        """``.filter(col, "in", "(...)")`` — a hand-quoted in-list (271-REVIEW WR-04).
+
+        Parsed with PostgREST's own grammar (``parse_pgrst_in_list``) and recorded as an
+        ``in_`` over the values the SERVER would see, so a quoting defect changes the answer.
+        """
+        if op != "in":  # pragma: no cover — the search core only hand-builds in-lists
+            raise AssertionError(f"the fake does not evaluate .filter op {op!r}")
+        self.calls.append(("in_", col, parse_pgrst_in_list(val)))
         return self
 
     def order(self, col, desc=False, **_k):
