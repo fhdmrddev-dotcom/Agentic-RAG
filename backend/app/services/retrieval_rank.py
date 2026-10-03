@@ -41,7 +41,9 @@ def _rrf_fuse(
     return result
 
 
-def _deduplicate_chunks(rows: list[dict], text_overlap_threshold: float = 0.85) -> list[dict]:
+def _deduplicate_chunks(
+    rows: list[dict], text_overlap_threshold: float = 0.85, *, same_document_only: bool = False,
+) -> list[dict]:
     """Remove near-duplicate chunks from a ranked result list.
 
     Two chunks are considered duplicates when their word-set Jaccard similarity
@@ -49,12 +51,20 @@ def _deduplicate_chunks(rows: list[dict], text_overlap_threshold: float = 0.85) 
     kept. This is a safety net against the old chunking algorithm producing
     near-identical overlapping chunks and, after the fix, against any edge cases
     in very repetitive documents.
+
+    ``same_document_only`` — Phase 272 (D-27, the FILTERED path only): compare a chunk only with
+    kept chunks of the SAME document. Inside a matched set every document is a distinct answer;
+    two monthly reports that differ only in the month and the figure (Jaccard 0.90) are not
+    duplicates, and collapsing them dropped a matched document (the 272-05 re-run probe). The
+    default (``False``) is the unfiltered behaviour, unchanged.
     """
     kept: list[dict] = []
     for candidate in rows:
         words_c = set(candidate["content"].lower().split())
         is_dup = False
         for existing in kept:
+            if same_document_only and existing.get("document_id") != candidate.get("document_id"):
+                continue
             words_e = set(existing["content"].lower().split())
             union = words_c | words_e
             if not union:

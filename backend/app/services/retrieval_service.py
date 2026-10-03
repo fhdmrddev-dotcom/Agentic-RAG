@@ -108,7 +108,8 @@ async def search_documents(
         if filtered:
             rows = _select_filtered_vector_rows(rows, match_threshold)
         avg_sim = _avg_cosine(rows)
-        rows = _deduplicate_chunks(rows)
+        # D-27: inside a matched set, near-duplicates collapse only within one document.
+        rows = _deduplicate_chunks(rows, same_document_only=filtered)
         # D-27: a filtered cut keeps one passage per matched document before filling by rank.
         rows = _cover_matched_documents(rows, top_k) if filtered else rows[:top_k]
         return _carry_low_similarity(rows, await _enrich_with_filenames(rows, supabase)), avg_sim
@@ -141,7 +142,8 @@ async def search_documents(
     )
 
     # Deduplicate before reranking so duplicate slots don't waste the reranker budget
-    fused = _deduplicate_chunks(fused)
+    # D-27: inside a matched set, near-duplicates collapse only within one document.
+    fused = _deduplicate_chunks(fused, same_document_only=filtered)
 
     # Take top-K before reranking
     # D-27: a filtered cut keeps one passage per matched document (no document is dropped by

@@ -60,9 +60,20 @@ _272_03_REASON = (
     "pure move proven at 272-01's merge (WAVE1_MERGE_SHA); 272-03 is the intended behaviour "
     "change (D-14 / D-18 / D-19: document_ids on both arms)"
 )
+# ⚠ RETIRED DELIBERATELY BY 272-05 (SEED-177). The post-restart probe found the second cause of
+# finding F-2: the near-duplicate filter dropped a matched document (Sep vs Oct report, Jaccard
+# 0.90). D-27 needs a keyword-only ``same_document_only`` on the filtered path; the default path is
+# pinned unchanged by ``test_272_filtered_both_arms::test_the_default_dedup_is_unchanged…``.
+_272_05_D27_REASON = (
+    "pure move proven at D27_PRE_DEDUP_SHA; 272-05 adds same_document_only on purpose (D-27: a "
+    "matched document is never collapsed into a different one); the default path is unchanged"
+)
+D27_PRE_DEDUP_SHA = "c29ec8635465af823590c30d6f3c902a392b1673"
+
 RETIRED: dict[str, str] = {
     "_vector_search": _272_03_REASON,
     "_keyword_search": _272_03_REASON,
+    "_deduplicate_chunks": _272_05_D27_REASON,
 }
 
 # The ONE function whose docstring is compared out: 272-01 rewrites `_call_as_user`'s G-5
@@ -195,6 +206,27 @@ def test_272_03_retired_cases_changed_on_purpose():
         assert isinstance(default, ast.Constant) and default.value is None, (
             f"{name}: document_ids must default to None (None = no filter, D-18)"
         )
+
+
+def test_272_05_dedup_retired_case_proven_and_changed_on_purpose():
+    """``_deduplicate_chunks`` was a pure move up to D27_PRE_DEDUP_SHA, and the live function's only
+    signature change is the keyword-only ``same_document_only`` defaulting to ``False``."""
+    base_fn = _top_level_function(_blob_at_base(_BASE_REL), "_deduplicate_chunks")
+    home = MOVE_MAP["_deduplicate_chunks"]
+    pre_fn = _top_level_function(_blob_at_base(home, D27_PRE_DEDUP_SHA), "_deduplicate_chunks")
+    assert base_fn is not None and pre_fn is not None
+    assert ast.dump(pre_fn) == ast.dump(base_fn), "the move was not pure before 272-05's D-27 change"
+
+    live = _top_level_function(_module_source(home), "_deduplicate_chunks")
+    assert live is not None
+    assert ast.dump(live) != ast.dump(base_fn), "identical again — restore it to the AST pin"
+    assert [a.arg for a in live.args.args] == [a.arg for a in base_fn.args.args]
+    assert [a.arg for a in live.args.kwonlyargs] == ["same_document_only"]
+    default = live.args.kw_defaults[0]
+    assert isinstance(default, ast.Constant) and default.value is False, (
+        "same_document_only must default to False — the unfiltered behaviour"
+    )
+    assert "_deduplicate_chunks" in RETIRED, _272_05_D27_REASON
 
 
 def test_back_compat_names():
