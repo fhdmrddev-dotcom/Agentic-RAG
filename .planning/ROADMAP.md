@@ -289,7 +289,14 @@ Plans:
   6. The docs home plays the Syrel overview through a lazily loaded Remotion player, guides embed their clips, and the landing reads "Syrel" with no "Agentic RAG" left in `src/landing/` (DOCS-06).
 
 **How we'd know this failed**: a docs page claims something `docs/history/` marks unbuilt (in-app Word/PDF preview, three deployment presets, v4.5 as live); the coverage gate reads a hand-typed list, or passes over zero parsed items; the docs entry pulls app dependencies into the landing bundle; `/docs` routing falls through to `app.html`; the public spec still lists internal operations; production Swagger stays open; the Remotion player loads on first paint and slows the landing.
-**Plans**: TBD (target 4, per G-8)
+**Plans**: 5 plans in 3 waves (G-8: 5 — content writing and the one-commit logo pass each need their own unit)
+
+Plans:
+- [ ] 276-01-PLAN.md — W1: gated live API docs (DOCS-04), OpenAPI snapshot drift + public "Syrel API" spec, one-pass Iris logo + Syrel rename
+- [ ] 276-02-PLAN.md — W1: package gate + deps, third Vite entry, /docs routing (dev/Vercel/nginx), onebox build context, parser + content plugin + changelog model + search index
+- [ ] 276-03-PLAN.md — W2: docs site UI (home, guide, stub, section, changelog, Scalar API reference, search, menu drawer, YouTube/empty video slots)
+- [ ] 276-04-PLAN.md — W2: content — 31 fact-checked written pages, stubs for every other IA page, changelog overrides, screenshots, fact-check log
+- [ ] 276-05-PLAN.md — W3: lazy Remotion Player slots, muted scroll-started landing promo + first-paint fences, DOCS-02 coverage gate + hook + CI, BASELINE pins, ledger close
 **Video library — three styles, decided 2026-10-04 (operator):** (1) **narrated explainers** — Remotion + local Kokoro voice, and NotebookLM explainers; (2) **documentaries** — NotebookLM cinematic "Syrel: The Build Story" (5 chapters), wrapped in Remotion `BrandedEpisode` intro/outro; (3) **music-driven promos, no narration** — `SyrelPromo` / `SyrelTeaser` / vertical cuts, beat-locked to an original synthesized track, for the landing hero and social. Discuss decides which style each docs/landing slot uses.
 **Logo chosen, insertion deferred (operator 2026-10-04):** #1 "Iris agent" — assets in `docs/brand/` (animated, lockup, mark). Placeholders stay until the operator says insert; when it happens it is one pass across landing, app, favicon, docs and `video/` `LogoPlaceholder`. Discuss decides whether 276 does that pass.
 **Flags**: Third-party API keys, webhooks and rate limits are **out of scope** (SEED-013 → v4.6 Open Platform; SEED-345). Content is drafted from the NotebookLM notebook "Syrel — Knowledge & Videos" and fact-checked against `docs/history/`; the first release writes about 30 core pages, and the rest ship as tracked stubs. **DOCS-04 reverses a recorded decision** (`backend/app/main.py`: "`GET /docs` deliberately keeps returning 200"), now approved by the operator on 2026-10-04; record it in CONTEXT `<decisions>`. Remotion is free only for companies of up to 3 people; recheck before the company grows. **G-2 satisfied** by sketch 276 (winner B). **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/landing/*` (Navigation, LandingFooter, CompareSection), `frontend/vercel.json`, `frontend/vite.config.ts`, `backend/app/main.py` (FIRES, 61 phases). Inputs: `.planning/research/docs-coverage-inventory.md`, `docs-information-architecture.md`, `docs/public/api/openapi.snapshot.json`.
@@ -305,7 +312,7 @@ Plans:
 | 273. Agent-Authored Artifacts | 6/6 | Complete — 1 UAT row OWED (live STRUCTURED-path holdback check; run it first) | 2026-10-04 |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
-| 276. Public Docs, API Reference & Video Library | 0/TBD | Not started | - |
+| 276. Public Docs, API Reference & Video Library | 0/5 | Planned | - |
 
 ---
 

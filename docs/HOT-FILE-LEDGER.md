@@ -11119,6 +11119,43 @@ cells rot within days.
 | [`frontend/src/components/chat/ScopeChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopechiptsx) | 1 / 1 / 102 (was `0 / 0 / 0`) | no (new) | young (created 268-03). The composer scope chip. ⛔ reads `held` from the payload, never `scope_mode` (D-268-12c) |
 | [`frontend/src/components/chat/ScopePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopepickertsx) | 1 / 1 / 285 (was `0 / 0 / 0`) | no (new) | young (created 268-03). DropdownMenu picker; Apply/Cancel are menu items (Radix traps Tab). ⛔ no `scope_mode` token |
 | [`frontend/src/components/chat/scopeCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopecopyts) | 2 / 1 / 196 (was `0 / 0 / 0`) | no (new) | young (created 268-03). ⛔ the ONE home of chip/picker/pending-note wording; `explainFor` keeps the Expert rule out of the leaves |
+| [`frontend/src/components/auth/AuthCardShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsauthauthcardshelltsx) | 1 / 1 / 53 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: Sparkles tile → Iris mark img. Asset swap only, no logic |
+| [`frontend/src/pages/AuthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesauthpagetsx) | 3 / 1 / 26 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: title prop → "Syrel". One string |
+| [`frontend/src/landing/components/CompareSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentscomparesectiontsx) | 2 / 1 / 121 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01: two prose strings → Syrel. ⛔ landing fence: no app/docs imports |
+| [`frontend/src/landing/components/LandingFooter.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentslandingfootertsx) | 2 / 1 / 49 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 mark + © Syrel; 276-03 Docs/Changelog links, absolute hashes. ⛔ shared by landing AND docs entries |
+| [`frontend/src/landing/components/Navigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsnavigationtsx) | 2 / 1 / 120 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 lockup img; 276-03 Docs link, drawer, optional docs slots. ⛔ shared by BOTH entries — landing passes no docs props |
+| [`frontend/src/landing/components/HeroSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsherosectiontsx) | 1 / 1 / 820 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-05: static PromoSlot; import("./HeroPromo") only after load + scroll + ≥50% visible. ⛔ no static Remotion import (first-paint fence) |
+| [`backend/app/api/api_docs.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_docspy) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-01 DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate |
+| [`frontend/src/docs/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsmaintsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02: docs entry mount. ⛔ no providers, no app imports (docsBundleFence) |
+| [`frontend/src/docs/DocsApp.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsdocsapptsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02 interim, 276-03 route → page. ⛔ the ONE route→page switch; no app imports |
+| [`frontend/src/docs/router.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsrouterts) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02: resolveRoute + navigate (History API). ⛔ the app has no router — keep this docs-only |
+| [`frontend/src/docs/types.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocstypests) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02: PageMeta/Section/Release/Chapter/Route — mirror of the docs-content.cjs contract |
+| [`frontend/src/docs/virtual-docs.d.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsvirtual-docsdts) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02: declarations for virtual:docs-manifest + virtual:docs-page/* |
+| [`frontend/src/docs/search/searchOptions.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocssearchsearchoptionsts) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02: SEARCH_OPTIONS. ⛔ ONE home — toJSON (plugin) and loadJSON (SearchBox) must share it |
+| [`frontend/src/docs/icons.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsiconstsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: inline SVG glyphs. ⛔ no icon package on public pages |
+| [`frontend/src/docs/pages/Home.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageshometsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: P1 docs home (sketch 276 B) |
+| [`frontend/src/docs/pages/Article.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesarticletsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: P2 guide article. ⛔ unreleased callout from frontmatter, never from prose |
+| [`frontend/src/docs/pages/Stub.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesstubtsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: P3 stub (D-07). ⛔ the Full guide coming badge is the deliverable words |
+| [`frontend/src/docs/pages/SectionIndex.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagessectionindextsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: P4 section index — every stub reachable (D-07) |
+| [`frontend/src/docs/pages/NotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesnotfoundtsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: P8 docs 404 inside the shell (G4-4) |
+| [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog. ⛔ v4.5 Not yet released from parseHistory released flag |
+| [`frontend/src/docs/pages/ChangelogVersion.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogversiontsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: changelog version page |
+| [`frontend/src/docs/pages/ApiReference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesapireferencetsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: P6 lazy Scalar. ⛔ telemetry off, agent disabled, test-request hidden; dynamic import only |
+| [`frontend/src/docs/components/Markdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsmarkdowntsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: react-markdown + gfm. ⛔ NO rehype-raw — raw HTML stays text (XSS) |
+| [`frontend/src/docs/components/DocBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsdocbadgetsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: the ONE honesty badge component (5 kinds, exact texts) |
+| [`frontend/src/docs/components/Breadcrumbs.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsbreadcrumbstsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: breadcrumbs |
+| [`frontend/src/docs/components/Pager.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentspagertsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: prev/next within sections.json order |
+| [`frontend/src/docs/components/TocPill.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentstocpilltsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: floating On this page pill (≥3 H2s) |
+| [`frontend/src/docs/components/ChapterStrip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentschapterstriptsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: chapter strip (home + changelog filter) |
+| [`frontend/src/docs/components/SearchBox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentssearchboxtsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: D-08 search. ⛔ index fetched on FIRST focus only; no server, no AI |
+| [`frontend/src/docs/components/SearchDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentssearchdialogtsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: header search dialog |
+| [`frontend/src/docs/components/DocsHeader.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsdocsheadertsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: Navigation current=docs + docs drawer/search slots |
+| [`frontend/src/docs/video/VideoSlot.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsvideovideoslottsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03 V0/YouTube; 276-05 lazy Remotion branch. ⛔ empty slot renders NOTHING |
+| [`frontend/src/docs/video/YouTubeFacade.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsvideoyoutubefacadetsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: D-12 facade. ⛔ no YouTube request before click; nocookie only |
+| [`frontend/src/docs/video/videos.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsvideovideosts) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03 youtube, 276-05 remotion entries. ⛔ durations tested against video/src constants |
+| [`frontend/src/docs/video/RemotionSlot.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsvideoremotionslottsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-05: lazy Player, SfxOn=false. ⛔ never statically imported |
+| [`frontend/src/landing/components/MenuDrawer.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsmenudrawertsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-03: ≤720 menu drawer for landing + docs. ⛔ classes live in landing.css |
+| [`frontend/src/landing/components/HeroPromo.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsheropromotsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-05: muted promo, Pause/Unmute. ⛔ reached only via import(); musicSrc null until Unmute |
 
 
 
@@ -18159,4 +18196,156 @@ Every triple below was re-derived with the CLAUDE.md recipe AFTER the phase's la
 ### `frontend/src/types/index.ts` — Phase 273 close
 
 **`96 / 75 / 1532`** at 273 close (was `95 / 74 / 1520`). G-5: ⚠ **FIRES**. **273-05**: `Message.artifacts` re-exports the wire TYPE from artifactSpec.ts, never re-declared. Seam OWED.
+
+## Phase 276 — rows added at planning (2026-10-04)
+
+Thirty-seven watched files named by 276 plans had no scan row (six existing landing/auth files absent their entire life, thirty-one created by the phase). Rows were added AT PLANNING so no parallel worktree edits the ledger; 276-05 re-derives every triple on the merged tree.
+
+### `frontend/src/components/auth/AuthCardShell.tsx`
+
+**`1 / 1 / 53`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-01 D-21: Sparkles tile → Iris mark img. Asset swap only, no logic. 276-05 re-derives the triple at close.
+
+### `frontend/src/pages/AuthPage.tsx`
+
+**`3 / 1 / 26`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-01 D-21: title prop → "Syrel". One string. 276-05 re-derives the triple at close.
+
+### `frontend/src/landing/components/CompareSection.tsx`
+
+**`2 / 1 / 121`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-01: two prose strings → Syrel. ⛔ landing fence: no app/docs imports. 276-05 re-derives the triple at close.
+
+### `frontend/src/landing/components/LandingFooter.tsx`
+
+**`2 / 1 / 49`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-01 mark + © Syrel; 276-03 Docs/Changelog links, absolute hashes. ⛔ shared by landing AND docs entries. 276-05 re-derives the triple at close.
+
+### `frontend/src/landing/components/Navigation.tsx`
+
+**`2 / 1 / 120`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-01 lockup img; 276-03 Docs link, drawer, optional docs slots. ⛔ shared by BOTH entries — landing passes no docs props. 276-05 re-derives the triple at close.
+
+### `frontend/src/landing/components/HeroSection.tsx`
+
+**`1 / 1 / 820`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-05: static PromoSlot; import("./HeroPromo") only after load + scroll + ≥50% visible. ⛔ no static Remotion import (first-paint fence). 276-05 re-derives the triple at close.
+
+### `backend/app/api/api_docs.py`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-01 DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/main.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-02: docs entry mount. ⛔ no providers, no app imports (docsBundleFence). 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/DocsApp.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-02 interim, 276-03 route → page. ⛔ the ONE route→page switch; no app imports. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/router.ts`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-02: resolveRoute + navigate (History API). ⛔ the app has no router — keep this docs-only. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/types.ts`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-02: PageMeta/Section/Release/Chapter/Route — mirror of the docs-content.cjs contract. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/virtual-docs.d.ts`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-02: declarations for virtual:docs-manifest + virtual:docs-page/*. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/search/searchOptions.ts`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-02: SEARCH_OPTIONS. ⛔ ONE home — toJSON (plugin) and loadJSON (SearchBox) must share it. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/icons.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: inline SVG glyphs. ⛔ no icon package on public pages. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/pages/Home.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: P1 docs home (sketch 276 B). 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/pages/Article.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: P2 guide article. ⛔ unreleased callout from frontmatter, never from prose. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/pages/Stub.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: P3 stub (D-07). ⛔ the Full guide coming badge is the deliverable words. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/pages/SectionIndex.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: P4 section index — every stub reachable (D-07). 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/pages/NotFound.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: P8 docs 404 inside the shell (G4-4). 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/pages/Changelog.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: P5 changelog. ⛔ v4.5 Not yet released from parseHistory released flag. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/pages/ChangelogVersion.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: changelog version page. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/pages/ApiReference.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: P6 lazy Scalar. ⛔ telemetry off, agent disabled, test-request hidden; dynamic import only. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/components/Markdown.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: react-markdown + gfm. ⛔ NO rehype-raw — raw HTML stays text (XSS). 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/components/DocBadge.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: the ONE honesty badge component (5 kinds, exact texts). 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/components/Breadcrumbs.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: breadcrumbs. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/components/Pager.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: prev/next within sections.json order. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/components/TocPill.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: floating On this page pill (≥3 H2s). 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/components/ChapterStrip.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: chapter strip (home + changelog filter). 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/components/SearchBox.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: D-08 search. ⛔ index fetched on FIRST focus only; no server, no AI. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/components/SearchDialog.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: header search dialog. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/components/DocsHeader.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: Navigation current=docs + docs drawer/search slots. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/video/VideoSlot.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03 V0/YouTube; 276-05 lazy Remotion branch. ⛔ empty slot renders NOTHING. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/video/YouTubeFacade.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: D-12 facade. ⛔ no YouTube request before click; nocookie only. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/video/videos.ts`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03 youtube, 276-05 remotion entries. ⛔ durations tested against video/src constants. 276-05 re-derives the triple at close.
+
+### `frontend/src/docs/video/RemotionSlot.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-05: lazy Player, SfxOn=false. ⛔ never statically imported. 276-05 re-derives the triple at close.
+
+### `frontend/src/landing/components/MenuDrawer.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: ≤720 menu drawer for landing + docs. ⛔ classes live in landing.css. 276-05 re-derives the triple at close.
+
+### `frontend/src/landing/components/HeroPromo.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-05: muted promo, Pause/Unmute. ⛔ reached only via import(); musicSrc null until Unmute. 276-05 re-derives the triple at close.
 
