@@ -857,7 +857,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -877,6 +877,7 @@ app.include_router(workflows.router)  # Phase 092 MODE-01 — published-workflow
 app.include_router(workflow_runs.router)  # Phase 188 RUNVIZ-03 — GET /workflow-runs/{id}: the one net-new read that gives a RUN an address (run + the definition version that RAN + the durable phase spine, D-188-14); ownership-gated 404 + require_canvas ALONE, path template registered in CANVAS_GATED_PATHS (D-188-15/16)
 app.include_router(metadata_fields.router)  # Phase 111 META-01 — custom metadata field-definition CRUD
 app.include_router(document_views.router)  # Phase 113 VIEW-01/02 — virtual-folder views CRUD + per-viewer resolve
+app.include_router(document_search.router)  # Phase 271 FIND-01/02/03 — document search beside RAG, no embedding call; own module, not api/documents.py
 app.include_router(document_relationships.router)  # Phase 116 REL-01/03 — typed document-relationship CRUD (visible-both gate + audit)
 app.include_router(classification_rules.router)  # Phase 118 CLASS-01 — classification-rule CRUD (leak-safe own+global, is_system_global hard-false, match_expr validation + audit)
 app.include_router(document_governance.router)  # Phase 119 DGOV-01/02 — read-only governance aggregation (broken-rel / unclassified / low-conf; owner-scoped reads, no write path)
