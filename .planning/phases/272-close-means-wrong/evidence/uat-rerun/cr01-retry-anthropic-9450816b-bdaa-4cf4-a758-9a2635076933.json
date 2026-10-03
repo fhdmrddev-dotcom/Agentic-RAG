@@ -1,0 +1,134 @@
+{
+  "label": "cr01-retry",
+  "prompt": "Which documents are tagged tax? Search them with the search_documents tool, filtering on topics = tax, and tell me what they say.",
+  "model": "claude-sonnet-5",
+  "provider": "anthropic",
+  "thread_id": "11f906a6-2b57-4f03-ae64-7d0867681420",
+  "run_id": "9450816b-bdaa-4cf4-a758-9a2635076933",
+  "run_status": "completed",
+  "run": {
+    "status": "completed",
+    "model": "claude-sonnet-5",
+    "provider": "anthropic",
+    "error": null
+  },
+  "search_query_audits": [
+    {
+      "id": "bc7915d8-ea34-46bc-969b-9abb44e9c902",
+      "at": "2026-10-03 13:04:04.239012+00",
+      "result_kind": "passages",
+      "filters": [
+        {
+          "op": "eq",
+          "field": "topics",
+          "value": "tax"
+        }
+      ],
+      "query_text": "tax",
+      "matched_document_count": 1,
+      "documents": [
+        "272-uat-tax-memo.md"
+      ]
+    }
+  ],
+  "tool_calls": [
+    {
+      "name": "search_documents",
+      "args": {
+        "query": "tax",
+        "filters": [
+          {
+            "op": "eq",
+            "field": "topics",
+            "value": "tax"
+          }
+        ]
+      },
+      "result_head": "[{\"content\": \"# Tax memo\\n\\nTax memo: corporate tax filing obligations for the 2026 fiscal year, prepared for the audit committee.\\n\\nTopics: Tax, Audit.\\nContract end: 2026-11-20.\", \"document_id\": \"dc40966d-bee6-465c-87a7-4cfa8a639104\", \"filename\": \"272-uat-tax-memo.md\", \"chunk_index\": 0, \"similarity\": 0.41358319786467823, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-09-30\", \"title\": \"Tax memo\", \"topics\": [\"Tax\", \"Audit\"], \"_source\": {\"date\": \"user\", \"topics\": \"user\", \"contract_end\": \"user\"}, \"_confidence\": {\"title\": 0.9, \"document_type\": 0.9}, \"contract_end\": \"2026-11-20\", \"document_type\": \"memo\"}}]"
+    }
+  ],
+  "answer": "Only one document is tagged **tax** in your library:\n\n**272-uat-tax-memo.md** \u2014 \"Tax memo\" (dated 2026-09-30)\n\nWhat it says: it's a tax memo covering corporate tax filing obligations for the 2026 fiscal year, prepared for the audit committee [1]. It's also tagged with the topic \"Audit,\" and its associated contract end date is 2026-11-20 [1].\n\nThat's the full extent of the content returned \u2014 the memo appears to be a brief notice/summary document rather than a detailed filing breakdown. If you'd like, I can pull the full document via analyze_document to see if there's more granular detail beyond this summary chunk.",
+  "raw": {
+    "audits": [
+      {
+        "id": "bc7915d8-ea34-46bc-969b-9abb44e9c902",
+        "at": "2026-10-03 13:04:04.239012+00",
+        "metadata": {
+          "run_id": "9450816b-bdaa-4cf4-a758-9a2635076933",
+          "filters": [
+            {
+              "op": "eq",
+              "field": "topics",
+              "value": "tax"
+            }
+          ],
+          "thread_id": "11f906a6-2b57-4f03-ae64-7d0867681420",
+          "folder_ids": [],
+          "query_text": "tax",
+          "result_kind": "passages",
+          "document_ids": [
+            "dc40966d-bee6-465c-87a7-4cfa8a639104"
+          ],
+          "similarities": {
+            "dc40966d-bee6-465c-87a7-4cfa8a639104": 0.414
+          },
+          "parent_run_id": null,
+          "matched_document_count": 1
+        }
+      }
+    ],
+    "messages": [
+      {
+        "id": "e4dfe1bf-d538-438c-b0ec-e9219deda7e8",
+        "role": "user",
+        "content": "Which documents are tagged tax? Search them with the search_documents tool, filtering on topics = tax, and tell me what they say.",
+        "tool_calls": null,
+        "source_refs": null,
+        "at": "2026-10-03 13:03:59.805179+00"
+      },
+      {
+        "id": "02d09867-0f79-40a8-b523-27d0b1ed250f",
+        "role": "assistant",
+        "content": "Only one document is tagged **tax** in your library:\n\n**272-uat-tax-memo.md** \u2014 \"Tax memo\" (dated 2026-09-30)\n\nWhat it says: it's a tax memo covering corporate tax filing obligations for the 2026 fiscal year, prepared for the audit committee [1]. It's also tagged with the topic \"Audit,\" and its associated contract end date is 2026-11-20 [1].\n\nThat's the full extent of the content returned \u2014 the memo appears to be a brief notice/summary document rather than a detailed filing breakdown. If you'd like, I can pull the full document via analyze_document to see if there's more granular detail beyond this summary chunk.",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "tax",
+              "filters": [
+                {
+                  "op": "eq",
+                  "field": "topics",
+                  "value": "tax"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Tax memo\\n\\nTax memo: corporate tax filing obligations for the 2026 fiscal year, prepared for the audit committee.\\n\\nTopics: Tax, Audit.\\nContract end: 2026-11-20.\", \"document_id\": \"dc40966d-bee6-465c-87a7-4cfa8a639104\", \"filename\": \"272-uat-tax-memo.md\", \"chunk_index\": 0, \"similarity\": 0.41358319786467823, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-09-30\", \"title\": \"Tax memo\", \"topics\": [\"Tax\", \"Audit\"], \"_source\": {\"date\": \"user\", \"topics\": \"user\", \"contract_end\": \"user\"}, \"_confidence\": {\"title\": 0.9, \"document_type\": 0.9}, \"contract_end\": \"2026-11-20\", \"document_type\": \"memo\"}}]",
+            "status": "done",
+            "tool_call_id": "toolu_016JuJkNtR78PkhtriSorhEu"
+          }
+        ],
+        "source_refs": [
+          {
+            "passage": "# Tax memo\n\nTax memo: corporate tax filing obligations for the 2026 fiscal year, prepared for the audit committee.\n\nTopics: Tax, Audit.\nContract end: 2026-11-20.",
+            "filename": "272-uat-tax-memo.md",
+            "similarity": 0.41358319786467823,
+            "chunk_index": 0,
+            "document_id": "dc40966d-bee6-465c-87a7-4cfa8a639104",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          }
+        ],
+        "at": "2026-10-03 13:04:07.377662+00"
+      }
+    ],
+    "run": {
+      "status": "completed",
+      "model": "claude-sonnet-5",
+      "provider": "anthropic",
+      "error": null
+    }
+  }
+}

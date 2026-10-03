@@ -620,3 +620,47 @@ Both seeds were allocated as max(id)+1 (333 → 334 → 335), and `check-seeds-r
 - 272-04's threat flag: `with_search_vocabulary` renders the caller's own field keys and enum option
   strings into the model's tool schema unescaped; a hostile option string could carry instructions
   to that caller's own model.
+
+## HUMAN-UAT 1 — live re-drive of CR-01, CR-02, WR-02 after restart (2026-10-03)
+
+**Live stack, verified first.** Exactly one listener on :8000, pid 30404
+(`uvicorn app.main:app --reload`), started 17:00:26 +04. That is after the last fix commit
+`e48c4eaf9` (15:07), the fix report `b98fef62e` (15:25) and HEAD `23166e577` (16:38). The same pid
+was still listening after the drives. Dev user `d8a54002…`, single org `22f9c615…` (asserted from
+`org_members`).
+
+**Seed (idempotent, local only).** A custom date field `contract_end`, plus two fixtures:
+`272-uat-tax-memo.md` (topics `["Tax","Audit"]`, date 2026-09-30, contract_end 2026-11-20) and
+`272-uat-taxation-essay.md` (topics `["taxation","Public policy"]`, date 2026-08-10, contract_end
+2027-06-30). A pre-existing `2025-1042S.pdf` carries `"withholding tax"`, which is a second non-match
+control. The scratch driver reuses `scripts/run-272-board.py`'s kit and lives in the session
+scratchpad, not the repo.
+
+All runs: anthropic `claude-sonnet-5`, per-request model + provider, `POST /threads/{id}/messages`.
+Verdicts are read from `audit_log` `search.query` rows and `messages.tool_calls`.
+
+| Rule | Run | `search.query` audit rows (kind · filters) | Verdict |
+|---|---|---|---|
+| CR-01 (unforced prompt) | `376e459a` | **none.** The model chose `query_documents_by_view {topics eq "tax"}`, which returned `total: 0`, and it answered "No documents are tagged … tax" | **rule not exercised. A live false zero on a sibling tool** (Gaps G-1) |
+| CR-01 (names search_documents) | `9450816b` | `bc7915d8` · passages · `topics eq tax` · matched 1 = `272-uat-tax-memo.md` | **PASS.** "Tax" matched; "taxation" and "withholding tax" did not |
+| CR-02 | `a38193eb` | `1107efa2` · invalid_filter · `contract_end within_next 60 days`, then `fa15f0e4` · passages · `contract_end between 2026-10-03..2026-12-02` → the memo | **PASS.** Refused as kind 3, naming date/added/source_created/source_modified. Nothing ran on `date`. The retry matched on contract_end (the memo's document date, 2026-09-30, is outside the window) |
+| WR-02 (unforced) | `09bc4bf2` | `fb90eb25` · no_documents_matched · July 2026 + Acme | rule not exercised. The model stopped and offered nearby months |
+| WR-02 (prompt asks for the retries) | `27e7f5b8` | `68ff85d8` no_documents_matched (Jul 2026) → `9642bc15` **refused_retry** (`date after 2026-06-30`) → `c464f8b3` **refused_retry** (`between 2026-01-01..2026-12-31`) → `4e47eb73` no_documents_matched (Jul 2025, **allowed**) | **PASS.** Both wide retries were refused with `violated_fields: ["date"]`; the disjoint retry was searched |
+
+**WR-02 supplementary proof (DIRECT HANDLER CALL, not a model run).** `handle_search_documents` was
+called from the working tree with a hand-built `ToolContext` (`empty_filter_fields_in_run=set()`)
+on a user-JWT client against the live local DB. Sequence: July 2026 Acme → no_documents_matched
+(lock `date, legal_entity`) → `after` → refused → whole year → refused → **date dropped** → refused →
+July 2025 → allowed → **Beta Ltd July 2026 (different value)** → allowed. This covers the dropped-field
+and different-value arms that the model run did not try. It proves the code on live data, not the
+uvicorn process. Its audit writes were rejected by `audit_log` RLS (42501), because the live agent
+loop writes with the service-role client and this harness did not. So this proof has no audit ids.
+That is a harness artefact, not a product defect.
+
+**G-1 (open, recorded, not fixed).** The 271 compiler sends `topics eq` to `@>` with a scalar value
+(`view_filter_compiler.py:169-170`). CR-01's rewrite lives only in
+`retrieval_scope._compiler_condition`, so `query_documents_by_view` (and very likely Find and Views,
+which use the same compiler) still return a false zero on a list field. Measured on the local DB:
+`metadata @> {"topics":"tax"}` → 0, `{"topics":"Tax"}` → 0, `{"topics":["Tax"]}` → 1.
+
+Evidence: `evidence/uat-rerun/` has 5 run JSONs plus the direct-handler JSON.

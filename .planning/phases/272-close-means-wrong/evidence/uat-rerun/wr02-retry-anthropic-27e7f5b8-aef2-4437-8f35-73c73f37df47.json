@@ -1,0 +1,405 @@
+{
+  "label": "wr02-retry",
+  "prompt": "What was revenue in July 2026 for Acme GmbH? Use search_documents with filters. If the July 2026 search finds nothing, do NOT stop: in the same turn search again (1) for Acme GmbH documents dated any time after 2026-06-30, (2) for Acme GmbH across the whole of 2026, and (3) for Acme GmbH in July 2025. Report exactly what each search returned.",
+  "model": "claude-sonnet-5",
+  "provider": "anthropic",
+  "thread_id": "cf4d1ad1-edc1-48f8-bd76-0816d1f76649",
+  "run_id": "27e7f5b8-aef2-4437-8f35-73c73f37df47",
+  "run_status": "completed",
+  "run": {
+    "status": "completed",
+    "model": "claude-sonnet-5",
+    "provider": "anthropic",
+    "error": null
+  },
+  "search_query_audits": [
+    {
+      "id": "68ff85d8-15ee-4136-a628-902f51f61265",
+      "at": "2026-10-03 13:05:04.383297+00",
+      "result_kind": "no_documents_matched",
+      "filters": [
+        {
+          "op": "eq",
+          "field": "legal_entity",
+          "value": "Acme GmbH"
+        },
+        {
+          "op": "between",
+          "field": "date",
+          "value": "2026-07-01",
+          "value2": "2026-07-31"
+        }
+      ],
+      "query_text": "revenue",
+      "matched_document_count": 0,
+      "documents": []
+    },
+    {
+      "id": "9642bc15-5c03-4f32-b043-e205a14375a0",
+      "at": "2026-10-03 13:05:04.386916+00",
+      "result_kind": "refused_retry",
+      "filters": [
+        {
+          "op": "eq",
+          "field": "legal_entity",
+          "value": "Acme GmbH"
+        },
+        {
+          "op": "after",
+          "field": "date",
+          "value": "2026-06-30"
+        }
+      ],
+      "query_text": "revenue",
+      "matched_document_count": null,
+      "documents": []
+    },
+    {
+      "id": "c464f8b3-c1ee-4df9-a304-58b172ee4ae0",
+      "at": "2026-10-03 13:05:04.389933+00",
+      "result_kind": "refused_retry",
+      "filters": [
+        {
+          "op": "eq",
+          "field": "legal_entity",
+          "value": "Acme GmbH"
+        },
+        {
+          "op": "between",
+          "field": "date",
+          "value": "2026-01-01",
+          "value2": "2026-12-31"
+        }
+      ],
+      "query_text": "revenue",
+      "matched_document_count": null,
+      "documents": []
+    },
+    {
+      "id": "4e47eb73-aafd-425f-9da8-9e90e6d242a2",
+      "at": "2026-10-03 13:05:04.481137+00",
+      "result_kind": "no_documents_matched",
+      "filters": [
+        {
+          "op": "eq",
+          "field": "legal_entity",
+          "value": "Acme GmbH"
+        },
+        {
+          "op": "between",
+          "field": "date",
+          "value": "2025-07-01",
+          "value2": "2025-07-31"
+        }
+      ],
+      "query_text": "revenue",
+      "matched_document_count": 0,
+      "documents": []
+    }
+  ],
+  "tool_calls": [
+    {
+      "name": "search_documents",
+      "args": {
+        "query": "revenue",
+        "filters": [
+          {
+            "op": "eq",
+            "field": "legal_entity",
+            "value": "Acme GmbH"
+          },
+          {
+            "op": "between",
+            "field": "date",
+            "value": "2026-07-01",
+            "value2": "2026-07-31"
+          }
+        ]
+      },
+      "result_head": "{\"status\": \"no_documents_matched\", \"reason\": \"zero_documents\", \"filter\": \"legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2026\", \"matched_documents\": 0, \"undated_excluded\": 0, \"nearby\": [{\"value\": \"2026-03\", \"label\": \"March 2026\", \"documents\": 1}, {\"value\": \"2025-10\", \"label\": \"October 2025\", \"documents\": 1}, {\"value\": \"2025-09\", \"label\": \"September 2025\", \"documents\": 1}], \"message\": \"No documents matched legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2026. Nearby values that do have documents: March 2026 (1 document), October 2025 (1 document), September 2025 (1 document).\", \"instruction\": \"Tell the person that no documents matched legal entity = Acme GmbH \\u00b7 d"
+    },
+    {
+      "name": "search_documents",
+      "args": {
+        "query": "revenue",
+        "filters": [
+          {
+            "op": "eq",
+            "field": "legal_entity",
+            "value": "Acme GmbH"
+          },
+          {
+            "op": "after",
+            "field": "date",
+            "value": "2026-06-30"
+          }
+        ]
+      },
+      "result_head": "{\"error\": \"refused_retry\", \"locked_fields\": [\"date\", \"legal_entity\"], \"violated_fields\": [\"date\"], \"message\": \"A filtered search on date, legal_entity already matched no documents in this turn, so a search that drops or widens date is refused: it would answer from outside what was asked. After a filter matches nothing, a later search may change a locked field only to a different value (eq / one_of), or to a range that does not contain the one that matched nothing. Dropping the field, is_empty, or a wider condition that still includes what was asked (a longer period around it, an open-ended before/after, contains on part of the value) is refused.\", \"instruction\": \"Tell the person nothing matc"
+    },
+    {
+      "name": "search_documents",
+      "args": {
+        "query": "revenue",
+        "filters": [
+          {
+            "op": "eq",
+            "field": "legal_entity",
+            "value": "Acme GmbH"
+          },
+          {
+            "op": "between",
+            "field": "date",
+            "value": "2026-01-01",
+            "value2": "2026-12-31"
+          }
+        ]
+      },
+      "result_head": "{\"error\": \"refused_retry\", \"locked_fields\": [\"date\", \"legal_entity\"], \"violated_fields\": [\"date\"], \"message\": \"A filtered search on date, legal_entity already matched no documents in this turn, so a search that drops or widens date is refused: it would answer from outside what was asked. After a filter matches nothing, a later search may change a locked field only to a different value (eq / one_of), or to a range that does not contain the one that matched nothing. Dropping the field, is_empty, or a wider condition that still includes what was asked (a longer period around it, an open-ended before/after, contains on part of the value) is refused.\", \"instruction\": \"Tell the person nothing matc"
+    },
+    {
+      "name": "search_documents",
+      "args": {
+        "query": "revenue",
+        "filters": [
+          {
+            "op": "eq",
+            "field": "legal_entity",
+            "value": "Acme GmbH"
+          },
+          {
+            "op": "between",
+            "field": "date",
+            "value": "2025-07-01",
+            "value2": "2025-07-31"
+          }
+        ]
+      },
+      "result_head": "{\"status\": \"no_documents_matched\", \"reason\": \"zero_documents\", \"filter\": \"legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2025\", \"matched_documents\": 0, \"undated_excluded\": 0, \"nearby\": [{\"value\": \"2025-09\", \"label\": \"September 2025\", \"documents\": 1}, {\"value\": \"2025-10\", \"label\": \"October 2025\", \"documents\": 1}, {\"value\": \"2026-03\", \"label\": \"March 2026\", \"documents\": 1}], \"message\": \"No documents matched legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2025. Nearby values that do have documents: September 2025 (1 document), October 2025 (1 document), March 2026 (1 document).\", \"instruction\": \"Tell the person that no documents matched legal entity = Acme GmbH \\u00b7 d"
+    }
+  ],
+  "answer": "Here's exactly what each search returned:\n\n1. **Acme GmbH, July 2026 (1\u201331 Jul 2026):** No documents matched. Filter used: legal entity = Acme GmbH \u00b7 document date 1\u201331 Jul 2026.\n\n2. **Acme GmbH, after 2026-06-30 (widening the date range):** Refused \u2014 the system blocks widening/dropping the date filter after a filtered search already matched zero documents in the same turn, since that would mean answering from outside the asked period.\n\n3. **Acme GmbH, all of 2026:** Same refusal \u2014 widening to the full year 2026 was blocked for the same reason.\n\n4. **Acme GmbH, July 2025:** No documents matched. Filter used: legal entity = Acme GmbH \u00b7 document date 1\u201331 Jul 2025.\n\nSo no documents matched for July 2026 or July 2025 for Acme GmbH, and I'm not able to retry with a wider date range once a filtered search comes back empty.\n\n**Nearby dates that do have Acme GmbH documents:** March 2026 (1 document), October 2025 (1 document), September 2025 (1 document).\n\nWould you like me to check revenue in one of those months instead (e.g., March 2026, which is the closest 2026 data point)?",
+  "raw": {
+    "audits": [
+      {
+        "id": "68ff85d8-15ee-4136-a628-902f51f61265",
+        "at": "2026-10-03 13:05:04.383297+00",
+        "metadata": {
+          "run_id": "27e7f5b8-aef2-4437-8f35-73c73f37df47",
+          "filters": [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2026-07-01",
+              "value2": "2026-07-31"
+            }
+          ],
+          "thread_id": "cf4d1ad1-edc1-48f8-bd76-0816d1f76649",
+          "folder_ids": [],
+          "query_text": "revenue",
+          "result_kind": "no_documents_matched",
+          "document_ids": [],
+          "parent_run_id": null,
+          "undated_excluded": 0,
+          "matched_document_count": 0
+        }
+      },
+      {
+        "id": "9642bc15-5c03-4f32-b043-e205a14375a0",
+        "at": "2026-10-03 13:05:04.386916+00",
+        "metadata": {
+          "run_id": "27e7f5b8-aef2-4437-8f35-73c73f37df47",
+          "filters": [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "after",
+              "field": "date",
+              "value": "2026-06-30"
+            }
+          ],
+          "thread_id": "cf4d1ad1-edc1-48f8-bd76-0816d1f76649",
+          "folder_ids": [],
+          "query_text": "revenue",
+          "result_kind": "refused_retry",
+          "document_ids": [],
+          "parent_run_id": null
+        }
+      },
+      {
+        "id": "c464f8b3-c1ee-4df9-a304-58b172ee4ae0",
+        "at": "2026-10-03 13:05:04.389933+00",
+        "metadata": {
+          "run_id": "27e7f5b8-aef2-4437-8f35-73c73f37df47",
+          "filters": [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2026-01-01",
+              "value2": "2026-12-31"
+            }
+          ],
+          "thread_id": "cf4d1ad1-edc1-48f8-bd76-0816d1f76649",
+          "folder_ids": [],
+          "query_text": "revenue",
+          "result_kind": "refused_retry",
+          "document_ids": [],
+          "parent_run_id": null
+        }
+      },
+      {
+        "id": "4e47eb73-aafd-425f-9da8-9e90e6d242a2",
+        "at": "2026-10-03 13:05:04.481137+00",
+        "metadata": {
+          "run_id": "27e7f5b8-aef2-4437-8f35-73c73f37df47",
+          "filters": [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2025-07-01",
+              "value2": "2025-07-31"
+            }
+          ],
+          "thread_id": "cf4d1ad1-edc1-48f8-bd76-0816d1f76649",
+          "folder_ids": [],
+          "query_text": "revenue",
+          "result_kind": "no_documents_matched",
+          "document_ids": [],
+          "parent_run_id": null,
+          "undated_excluded": 0,
+          "matched_document_count": 0
+        }
+      }
+    ],
+    "messages": [
+      {
+        "id": "b81e7fa4-d957-4ad7-ac65-dae1dfb4dcf1",
+        "role": "user",
+        "content": "What was revenue in July 2026 for Acme GmbH? Use search_documents with filters. If the July 2026 search finds nothing, do NOT stop: in the same turn search again (1) for Acme GmbH documents dated any time after 2026-06-30, (2) for Acme GmbH across the whole of 2026, and (3) for Acme GmbH in July 2025. Report exactly what each search returned.",
+        "tool_calls": null,
+        "source_refs": null,
+        "at": "2026-10-03 13:04:58.795135+00"
+      },
+      {
+        "id": "a202ff01-dd38-47d0-979e-1d23da4fb7cb",
+        "role": "assistant",
+        "content": "Here's exactly what each search returned:\n\n1. **Acme GmbH, July 2026 (1\u201331 Jul 2026):** No documents matched. Filter used: legal entity = Acme GmbH \u00b7 document date 1\u201331 Jul 2026.\n\n2. **Acme GmbH, after 2026-06-30 (widening the date range):** Refused \u2014 the system blocks widening/dropping the date filter after a filtered search already matched zero documents in the same turn, since that would mean answering from outside the asked period.\n\n3. **Acme GmbH, all of 2026:** Same refusal \u2014 widening to the full year 2026 was blocked for the same reason.\n\n4. **Acme GmbH, July 2025:** No documents matched. Filter used: legal entity = Acme GmbH \u00b7 document date 1\u201331 Jul 2025.\n\nSo no documents matched for July 2026 or July 2025 for Acme GmbH, and I'm not able to retry with a wider date range once a filtered search comes back empty.\n\n**Nearby dates that do have Acme GmbH documents:** March 2026 (1 document), October 2025 (1 document), September 2025 (1 document).\n\nWould you like me to check revenue in one of those months instead (e.g., March 2026, which is the closest 2026 data point)?",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "revenue",
+              "filters": [
+                {
+                  "op": "eq",
+                  "field": "legal_entity",
+                  "value": "Acme GmbH"
+                },
+                {
+                  "op": "between",
+                  "field": "date",
+                  "value": "2026-07-01",
+                  "value2": "2026-07-31"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "{\"status\": \"no_documents_matched\", \"reason\": \"zero_documents\", \"filter\": \"legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2026\", \"matched_documents\": 0, \"undated_excluded\": 0, \"nearby\": [{\"value\": \"2026-03\", \"label\": \"March 2026\", \"documents\": 1}, {\"value\": \"2025-10\", \"label\": \"October 2025\", \"documents\": 1}, {\"value\": \"2025-09\", \"label\": \"September 2025\", \"documents\": 1}], \"message\": \"No documents matched legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2026. Nearby values that do have documents: March 2026 (1 document), October 2025 (1 document), September 2025 (1 document).\", \"instruction\": \"Tell the person that no documents matched legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2026, and state the filter you used. Cite nothing. Do not search again without this filter, and do not use grep, query_documents, read_document or analyze_document to answer from outside it. If nearby values are listed, you may offer them and ask whether to use one.\"}",
+            "status": "done",
+            "tool_call_id": "toolu_01UEYQUAaDf9sNLFuaxi3YwP"
+          },
+          {
+            "args": {
+              "query": "revenue",
+              "filters": [
+                {
+                  "op": "eq",
+                  "field": "legal_entity",
+                  "value": "Acme GmbH"
+                },
+                {
+                  "op": "after",
+                  "field": "date",
+                  "value": "2026-06-30"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "{\"error\": \"refused_retry\", \"locked_fields\": [\"date\", \"legal_entity\"], \"violated_fields\": [\"date\"], \"message\": \"A filtered search on date, legal_entity already matched no documents in this turn, so a search that drops or widens date is refused: it would answer from outside what was asked. After a filter matches nothing, a later search may change a locked field only to a different value (eq / one_of), or to a range that does not contain the one that matched nothing. Dropping the field, is_empty, or a wider condition that still includes what was asked (a longer period around it, an open-ended before/after, contains on part of the value) is refused.\", \"instruction\": \"Tell the person nothing matched the filter. You may search again with a different value on the same field(s) (for example another month), but not without them.\"}",
+            "status": "done",
+            "tool_call_id": "toolu_01YAtFjuautXSC3BDS4e5X9k"
+          },
+          {
+            "args": {
+              "query": "revenue",
+              "filters": [
+                {
+                  "op": "eq",
+                  "field": "legal_entity",
+                  "value": "Acme GmbH"
+                },
+                {
+                  "op": "between",
+                  "field": "date",
+                  "value": "2026-01-01",
+                  "value2": "2026-12-31"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "{\"error\": \"refused_retry\", \"locked_fields\": [\"date\", \"legal_entity\"], \"violated_fields\": [\"date\"], \"message\": \"A filtered search on date, legal_entity already matched no documents in this turn, so a search that drops or widens date is refused: it would answer from outside what was asked. After a filter matches nothing, a later search may change a locked field only to a different value (eq / one_of), or to a range that does not contain the one that matched nothing. Dropping the field, is_empty, or a wider condition that still includes what was asked (a longer period around it, an open-ended before/after, contains on part of the value) is refused.\", \"instruction\": \"Tell the person nothing matched the filter. You may search again with a different value on the same field(s) (for example another month), but not without them.\"}",
+            "status": "done",
+            "tool_call_id": "toolu_01DL8s7X2DfcmiwpvVXcStw8"
+          },
+          {
+            "args": {
+              "query": "revenue",
+              "filters": [
+                {
+                  "op": "eq",
+                  "field": "legal_entity",
+                  "value": "Acme GmbH"
+                },
+                {
+                  "op": "between",
+                  "field": "date",
+                  "value": "2025-07-01",
+                  "value2": "2025-07-31"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "{\"status\": \"no_documents_matched\", \"reason\": \"zero_documents\", \"filter\": \"legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2025\", \"matched_documents\": 0, \"undated_excluded\": 0, \"nearby\": [{\"value\": \"2025-09\", \"label\": \"September 2025\", \"documents\": 1}, {\"value\": \"2025-10\", \"label\": \"October 2025\", \"documents\": 1}, {\"value\": \"2026-03\", \"label\": \"March 2026\", \"documents\": 1}], \"message\": \"No documents matched legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2025. Nearby values that do have documents: September 2025 (1 document), October 2025 (1 document), March 2026 (1 document).\", \"instruction\": \"Tell the person that no documents matched legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2025, and state the filter you used. Cite nothing. Do not search again without this filter, and do not use grep, query_documents, read_document or analyze_document to answer from outside it. If nearby values are listed, you may offer them and ask whether to use one.\"}",
+            "status": "done",
+            "tool_call_id": "toolu_019ZYZhVXCfokeHxJMBrVR2j"
+          }
+        ],
+        "source_refs": null,
+        "at": "2026-10-03 13:05:09.805996+00"
+      }
+    ],
+    "run": {
+      "status": "completed",
+      "model": "claude-sonnet-5",
+      "provider": "anthropic",
+      "error": null
+    }
+  }
+}
