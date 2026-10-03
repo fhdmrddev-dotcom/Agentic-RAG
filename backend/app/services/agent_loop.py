@@ -61,6 +61,7 @@ from app.services.openai_service import (
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
+from app.services.artifact_history import redact_artifact_args  # 273 (I-4) — the one persist hook
 from app.services.citation_markers import (
     apply_citation_instruction,
     normalize_citation_markers,
@@ -1976,6 +1977,7 @@ async def run_agent_loop(
         if persisted_tool_calls:
             completed_tools = [tc for tc in persisted_tool_calls if tc.get("status") == "done"]
             if completed_tools:
+                completed_tools = redact_artifact_args(completed_tools)  # 273 (I-4) — inline rows never re-sent
                 row["tool_calls"] = _strip_nul(completed_tools)
         if unique_citations:
             row["source_refs"] = unique_citations   # Full citation objects (D-13)
@@ -2170,6 +2172,7 @@ async def run_agent_loop(
                 new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
                 dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
                 empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
+                turn_tool_calls=persisted_tool_calls,  # 273 (D-04) — caption source (by-reference)
                 iteration=0,
                 parent_run_id=None,
                 per_run_task_semaphore=_per_run_task_semaphore,
@@ -3049,6 +3052,7 @@ async def run_agent_loop(
                 new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
                 dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
                 empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
+                turn_tool_calls=persisted_tool_calls,  # 273 (D-04) — caption source (by-reference)
                 iteration=iteration,
                 # Phase 085 additions —
                 # parent_run_id is None at the top-level run; task_service
