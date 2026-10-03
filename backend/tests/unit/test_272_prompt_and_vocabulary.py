@@ -78,8 +78,9 @@ def test_the_vocabulary_is_written_into_a_copy_of_the_search_tool():
         if want["function"]["name"] != "search_documents":
             assert got is want
     desc = _filters_desc(out)
-    assert "Fields for this workspace: legal_entity (enum: Acme GmbH, Beta Ltd)" in desc
-    assert "Common document types: report, contract" in desc
+    # 272-REVIEW WR-01: values are rendered as QUOTED data (was `enum: Acme GmbH, Beta Ltd`).
+    assert 'Fields for this workspace: legal_entity (enum: "Acme GmbH", "Beta Ltd")' in desc
+    assert 'Common document types: "report", "contract"' in desc
     assert SEARCH_DOCUMENTS_TOOL == before, "the module constant must never be mutated"
     assert _filters_desc(get_tools(SETTINGS)) == before["function"]["parameters"]["properties"]["filters"]["description"]
 
