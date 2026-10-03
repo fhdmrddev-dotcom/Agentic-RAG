@@ -3,9 +3,11 @@ seed_id: SEED-273
 title: "HNSW iterative scan: Postgres planner cost inflection on selective filters and re-evaluating the recall cliff"
 created: 2026-09-13
 planted_during: Phase 246 post-execution review (BUS-204)
-status: folded
+status: partially-answered
+partial: true
 folded_into: "272"
-status_note: "Folded into Phase 272 at discuss 2026-10-03: SC#3 requires the recall_bench re-measure with EXPLAIN (ANALYZE, BUFFERS) at every point. D-14 chooses exact scan over a pre-resolved small document set plus iterative_scan above the threshold for FILTERED searches only; unfiltered global knobs unchanged."
+answered_by: "Phase 272 (272-05, 2026-10-03) — .planning/phases/272-close-means-wrong/272-VALIDATION.md §2 + evidence/recall-ladder*.json + evidence/plancache-diagnosis.txt"
+status_note: "272-05: the FILTERED path is answered (exact scan below 2,000 chunks; measured recall 1.000 at every filtered size to 15,000 chunks, and the planner never picked HNSW for a filtered set). The UNFILTERED small-tenant cliff (ef 40, iterative off) is untouched by design (D-14) and stays open. Previous note, verbatim: Folded into Phase 272 at discuss 2026-10-03: SC#3 requires the recall_bench re-measure with EXPLAIN (ANALYZE, BUFFERS) at every point. D-14 chooses exact scan over a pre-resolved small document set plus iterative_scan above the threshold for FILTERED searches only; unfiltered global knobs unchanged."
 surface: Agentic-RAG
 severity: major
 category: database / pgvector / retrieval-quality / performance
@@ -89,3 +91,33 @@ When this seed triggers, the executing phase must:
 3. **Record Dual Metrics:**
    - Record `recall@20`, underfill, and p50/p95 latency.
    - Prove whether iterative scan restores recall to > 0.90 while keeping latency under 20 ms.
+
+
+---
+
+# Phase 272 (272-05, 2026-10-03) — what the ladder measured
+
+Bench: `recall_bench` (100,000 chunks, pgvector 0.8.0), caller owning 69,805 chunks; filtered sets
+of 500 / 1,000 / 2,000 / 5,000 / 10,000 / 15,000 chunks resolved by a `date` range (bench-only
+metadata), 25 query vectors, k = 20, ground truth from an independent exact statement. Body
+statements copied from `pg_get_functiondef`, EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) as a CUSTOM and
+a GENERIC plan at every point. Full table: `272-VALIDATION.md` §2.
+
+1. **Filtered recall is 1.000 at every point, on both branches, every mode, every ef.** With the
+   function pinned to custom plans the planner chose `Bitmap Index Scan on
+   idx_document_chunks_document_id` for every filtered set up to 15,000 chunks — **no HNSW node, so no
+   cliff and no iterative scan in play.** Shipped: `FILTERED_EXACT_MAX_CHUNKS = 2000` (the rule:
+   exact p95 ≤ unfiltered-control p95 + 50 ms) and `FILTERED_ITERATIVE_SCAN = relaxed_order` (lower
+   p95 above T; both modes 1.000). The residual is LATENCY, not recall: p95 46 ms at 2,000, 108 ms at
+   5,000, 140 ms at 10,000, 221 ms at 15,000 (shared read ~5,000 blocks there — above this seed's
+   `< 1,000` bar).
+2. **⚠ The checklist's GENERIC-plan leg found a ship-blocker in migration 200:** the new btree makes
+   PL/pgSQL's generic plan a whole-table join, and a pooled session switches to it after five calls.
+   Unfiltered vector search went 3-8 ms → up to 1.56 s; unfiltered keyword search up to 31 s.
+   **Migration 201** pins both RPCs to `plan_cache_mode = force_custom_plan`
+   (`evidence/plancache-diagnosis.txt`). ⭐ A custom-plan-only EXPLAIN — which is what 241 and 246
+   read — could not have seen this.
+3. **Still open (why `partial: true`):** the UNFILTERED small-tenant cliff. Global knobs are
+   unchanged by design (D-14: `hnsw_ef_search = 40`, `iterative_scan = off`), so a 0.2% tenant's
+   unfiltered search still reads the 246 curve. Trigger: the next phase touching the global knobs
+   or `retrieval_tuning.py`.
