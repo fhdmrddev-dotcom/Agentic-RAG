@@ -4124,7 +4124,7 @@ const BASELINE = {
   "TableArtifact.test.tsx": 7, // 273-02 — aria-sort, empties last, sticky + 512px; RAISED 6 → 7 at 273-REVIEW WR-04
   "MetricArtifact.test.tsx": 7, // 273-02 — glyph + percent delta, zero comparison; RAISED 6 → 7 at 273-REVIEW WR-04
   "ArtifactBlock.test.tsx": 8, // 273-02 — registry closed to 3, notices, boundary, busy frame
-  "ChartArtifact.test.tsx": 15, // 273-02 — legend toggles, hide, slots, no animation, tooltip
+  "ChartArtifact.test.tsx": 18, // 273-02 — legend toggles, hide, slots, no animation, tooltip; RAISED 15 → 18 at 273-REVIEW WR-05 (stackOffset=sign)
   // ── Phase 273-05 (D-16 · I-1 · I-2 · SC#2) — SIX NEW suites, BOTH KNOBS, SAME COMMIT. None of
   // their directories has a bare TARGETS entry (`src/components/chat`, `src/lib/api`,
   // `src/providers` — the last sits in NEITHER knob), so each is adopted by FILE path below.

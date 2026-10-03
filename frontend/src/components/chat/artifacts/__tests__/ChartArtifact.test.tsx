@@ -19,8 +19,8 @@ const seen = vi.hoisted(() => ({ yAxis: [] as Array<Record<string, unknown>> }))
 vi.mock("recharts", () => {
   const box =
     (name: string) =>
-    ({ children }: { children?: ReactNode }) =>
-      createElement("div", { "data-recharts": name }, children)
+    ({ children, stackOffset }: { children?: ReactNode; stackOffset?: string }) =>
+      createElement("div", { "data-recharts": name, "data-stack-offset": String(stackOffset ?? "") }, children)
   const series = (type: string) => (props: Record<string, unknown>) =>
     createElement("div", {
       "data-testid": "series",
@@ -217,5 +217,27 @@ describe("ChartTooltipContent", () => {
       "cycle days62",
       "Enterprise340",
     ])
+  })
+})
+
+describe("273-REVIEW WR-05 — stacked forms stack by sign", () => {
+  // recharts' default stackOffset "none" stacks cumulatively: [5, -3] drew the second segment from 5
+  // DOWN to 2, inside the first, while the tooltip said −3 and visibleDomain assumed sign stacking.
+  const plot = (name: string) =>
+    document.querySelector(`[data-recharts="${name}"]`)!.getAttribute("data-stack-offset")
+
+  it("a stacked bar chart uses stackOffset=sign", () => {
+    render(<ChartArtifact record={rec(chartRedrawn)} />)
+    expect(plot("BarChart")).toBe("sign")
+  })
+
+  it("an area chart (always stacked) uses stackOffset=sign", () => {
+    render(<ChartArtifact record={rec(chartAreaStacked)} />)
+    expect(plot("AreaChart")).toBe("sign")
+  })
+
+  it("grouped bars are not stacked at all", () => {
+    render(<ChartArtifact record={rec(chartBar)} />)
+    expect(plot("BarChart")).toBe("")
   })
 })

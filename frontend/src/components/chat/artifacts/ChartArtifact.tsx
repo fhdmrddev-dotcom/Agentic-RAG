@@ -285,7 +285,9 @@ export default function ChartArtifact({ record }: ArtifactBodyProps) {
     )
   } else if (chart.kind === "area") {
     plot = (
-      <AreaChart data={data} margin={margin} accessibilityLayer>
+      // 273-REVIEW WR-05: stack by sign (d3 diverging), the semantics visibleDomain already computes —
+      // the default "none" stacks [5, -3] as 5 then DOWN to 2, a segment drawn inside the first.
+      <AreaChart data={data} margin={margin} stackOffset="sign" accessibilityLayer>
         {grid}
         {categoryX}
         {yAxis}
@@ -309,7 +311,14 @@ export default function ChartArtifact({ record }: ArtifactBodyProps) {
     )
   } else if (chart.kind === "bar") {
     plot = (
-      <BarChart data={data} margin={margin} barCategoryGap="28%" barGap={2} accessibilityLayer>
+      <BarChart
+        data={data}
+        margin={margin}
+        barCategoryGap="28%"
+        barGap={2}
+        {...(stacked ? { stackOffset: "sign" as const } : {})}
+        accessibilityLayer
+      >
         {grid}
         {categoryX}
         {yAxis}
