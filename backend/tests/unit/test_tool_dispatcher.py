@@ -742,7 +742,7 @@ def test_search_documents_provider_failure_is_not_reported_as_zero_results(monke
     async def _boom(*_a, **_k):
         raise RuntimeError("Error code: 429 - insufficient_quota: You have no credits remaining.")
 
-    monkeypatch.setattr(td, "search_documents", _boom)
+    monkeypatch.setattr("app.services.search_documents_tool.search_documents", _boom)
     out = asyncio.run(td._handle_search_documents({"query": "Northwind usage"}, _fake_ctx()))
 
     assert isinstance(out, ToolResult)
@@ -772,7 +772,7 @@ def test_search_documents_provider_failure_does_not_raise_into_the_agent_loop(mo
     async def _boom(*_a, **_k):
         raise ValueError("provider down")
 
-    monkeypatch.setattr(td, "search_documents", _boom)
+    monkeypatch.setattr("app.services.search_documents_tool.search_documents", _boom)
     # Must NOT raise.
     out = asyncio.run(td._handle_search_documents({"query": "q"}, _fake_ctx()))
     assert "retrieval_unavailable" in out.result

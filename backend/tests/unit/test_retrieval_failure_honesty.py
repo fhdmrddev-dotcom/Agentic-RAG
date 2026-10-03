@@ -29,7 +29,7 @@ async def test_search_documents_exception_returns_retrieval_error_with_clean_cit
     mock_ctx.folder_subtree_ids = None
     mock_ctx.run_id = "run-456"
 
-    with patch("app.services.tool_dispatcher.search_documents", AsyncMock(side_effect=Exception("insufficient_quota"))):
+    with patch("app.services.search_documents_tool.search_documents", AsyncMock(side_effect=Exception("insufficient_quota"))):
         tool_result = await _handle_search_documents({"query": "quarterly earnings"}, mock_ctx)
 
     assert isinstance(tool_result, ToolResult)
@@ -90,7 +90,7 @@ async def test_task_service_harvests_retrieval_error():
     )
 
     with patch("app.services.task_service._stream_one_iteration", AsyncMock(side_effect=[mock_stream_result, mock_stream_result_final])), \
-         patch("app.services.tool_dispatcher.search_documents", AsyncMock(side_effect=Exception("insufficient_quota"))), \
+         patch("app.services.search_documents_tool.search_documents", AsyncMock(side_effect=Exception("insufficient_quota"))), \
          patch("app.services.task_service.insert_run", AsyncMock()), \
          patch("app.services.task_service.finalize_run", AsyncMock()), \
          patch("app.services.task_service._emit_terminal", AsyncMock(), create=True):
@@ -310,7 +310,7 @@ async def test_search_documents_provider_honesty_with_deepseek_fallback():
     mock_ctx.folder_subtree_ids = None
     mock_ctx.run_id = "run-456"
 
-    with patch("app.services.tool_dispatcher.search_documents", AsyncMock(side_effect=Exception("Connection refused"))):
+    with patch("app.services.search_documents_tool.search_documents", AsyncMock(side_effect=Exception("Connection refused"))):
         tool_result = await _handle_search_documents({"query": "quarterly earnings"}, mock_ctx)
 
     assert tool_result.retrieval_error is not None

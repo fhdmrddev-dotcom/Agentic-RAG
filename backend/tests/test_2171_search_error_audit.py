@@ -32,18 +32,18 @@ def _run_search(monkeypatch, *, error=False, hits=None, avg_sim=0.0):
     import app.services.tool_dispatcher as td
 
     write_audit_entry = AsyncMock()
-    monkeypatch.setattr(td, "write_audit_entry", write_audit_entry)
+    monkeypatch.setattr("app.services.search_documents_tool.write_audit_entry", write_audit_entry)
 
     if error:
         async def _boom(*a, **k):
             raise RuntimeError("quota exhausted")
 
-        monkeypatch.setattr(td, "search_documents", _boom)
+        monkeypatch.setattr("app.services.search_documents_tool.search_documents", _boom)
     else:
         async def _ok(*a, **k):
             return (hits or []), avg_sim
 
-        monkeypatch.setattr(td, "search_documents", _ok)
+        monkeypatch.setattr("app.services.search_documents_tool.search_documents", _ok)
 
     ctx = _ctx()
     # `ctx.spawn(<coro>)` is a fire-and-forget scheduler in production — the handler never

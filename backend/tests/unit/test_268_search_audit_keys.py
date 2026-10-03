@@ -42,12 +42,12 @@ def _run(monkeypatch, *, error=False, hits=None, parent=None, folders=FOLDERS):
     import app.services.tool_dispatcher as td
 
     write = AsyncMock()
-    monkeypatch.setattr(td, "write_audit_entry", write)
+    monkeypatch.setattr("app.services.search_documents_tool.write_audit_entry", write)
     if error:
         async def _boom(*a, **k):
             raise RuntimeError("quota exhausted")
 
-        monkeypatch.setattr(td, "search_documents", _boom)
+        monkeypatch.setattr("app.services.search_documents_tool.search_documents", _boom)
         monkeypatch.setattr(
             "app.services.openai_service.resolve_effective_embedding_provider", lambda s: "openai"
         )
@@ -55,7 +55,7 @@ def _run(monkeypatch, *, error=False, hits=None, parent=None, folders=FOLDERS):
         async def _ok(*a, **k):
             return (hits or []), 0.5
 
-        monkeypatch.setattr(td, "search_documents", _ok)
+        monkeypatch.setattr("app.services.search_documents_tool.search_documents", _ok)
 
     ctx, spawned = _ctx(parent=parent, folders=folders)
 

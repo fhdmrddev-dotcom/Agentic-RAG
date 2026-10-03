@@ -6,13 +6,12 @@ Tests verify:
 3. Non-40 server simulation (64) issues statement when user selects 40 (closing SEED-268).
 4. Matching server setting (200) skips statement (no-op shortcut).
 5. Null/missing pgvector GUC fallback (Finding 2b).
-6. retrieval_service.py strict fence assertion (D-246-01: 0 lines touched).
+6. retrieval_service.py strict fence (D-246-01) — RETIRED deliberately by 272-01; see the test body.
 """
 
 from __future__ import annotations
 
 import asyncio
-import subprocess
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -184,24 +183,31 @@ async def test_null_pgvector_guc_falls_back_cleanly():
     assert len(set_calls) == 1
 
 
-def test_retrieval_service_is_byte_unchanged():
-    """D-246-01 Strict Fence: retrieval_service.py must remain 100% byte-untouched in Phase 246.
+def test_retrieval_service_fence_retired_by_272_01():
+    """RETIRED DELIBERATELY by 272-01 (SEED-177: retire a fence deliberately, never trip it by surprise).
 
-    This prevents triggering its 3rd G-5 landing (19/11/456).
+    D-246-01 was a Phase-246-only strict fence: ``retrieval_service.py`` had to stay byte-untouched
+    so Phase 246 would not become its 3rd G-5 landing (19/11/456) without proposing the owed
+    extraction. 272-01 discharged the extraction it protected — the RPC adapter moved verbatim to
+    ``retrieval_rpc.py`` — so the file now legitimately differs. The old body also compared against
+    ``origin/develop`` and would stay red until develop is pushed, which proves nothing either way.
+
+    What it asserts instead are the discharge facts this probe module depends on: the knob call
+    site now lives in ``retrieval_rpc`` and ``retrieval_service`` no longer defines it.
     """
-    repo_root = Path(__file__).resolve().parents[3]
-    target_file = repo_root / "backend" / "app" / "services" / "retrieval_service.py"
-    assert target_file.is_file(), f"File not found: {target_file}"
+    import inspect
 
-    # Run git diff against origin/develop or HEAD~ commits to verify retrieval_service.py is clean
-    res = subprocess.run(
-        ["git", "diff", "--name-only", "origin/develop", "--", str(target_file)],
-        capture_output=True,
-        text=True,
-        cwd=str(repo_root),
+    import app.services.retrieval_rpc as rrpc
+    import app.services.retrieval_service as rs
+
+    repo_root = Path(__file__).resolve().parents[3]
+    service_src = (repo_root / "backend" / "app" / "services" / "retrieval_service.py").read_text(
+        encoding="utf-8"
     )
-    assert res.returncode == 0
-    assert res.stdout.strip() == "", (
-        f"VIOLATION OF D-246-01: backend/app/services/retrieval_service.py has uncommitted or "
-        f"branch modifications: {res.stdout.strip()}"
+    assert "async def _call_as_user" not in service_src, (
+        "retrieval_service.py defines _call_as_user again — the 272-01 extraction was undone"
     )
+    assert "async def _call_as_user" in inspect.getsource(rrpc)
+    assert "apply_hnsw_session_knobs" in inspect.getsource(rrpc._call_as_user)
+    # The back-compat name is a re-export of the moved function, not a second definition.
+    assert rs._call_as_user is rrpc._call_as_user

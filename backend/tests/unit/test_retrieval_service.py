@@ -81,13 +81,13 @@ def _make_supabase(rpc_data=None, docs_data=None, second_rpc_data=None):
 class TestSearchDocuments:
     def test_calls_embed_texts_with_query(self):
         sb = _make_supabase()
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]) as mock_embed:
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]) as mock_embed:
             search_documents("test query", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
             mock_embed.assert_called_once_with(["test query"], user_settings=VECTOR_ONLY_SETTINGS)
 
     def test_calls_supabase_rpc_match_document_chunks(self):
         sb = _make_supabase()
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             search_documents("hello", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
             sb.rpc.assert_called_once()
             call_args = sb.rpc.call_args
@@ -98,14 +98,14 @@ class TestSearchDocuments:
 
     def test_returns_empty_list_when_no_chunks_match(self):
         sb = _make_supabase(rpc_data=[])
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, avg_sim = search_documents("nothing", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
             assert result == []
             assert avg_sim == 0.0
 
     def test_returns_empty_list_when_rpc_data_is_none(self):
         sb = _make_supabase(rpc_data=None)
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, avg_sim = search_documents("nothing", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
             assert result == []
             assert avg_sim == 0.0
@@ -118,7 +118,7 @@ class TestSearchDocuments:
         docs_data = [{"id": doc_id, "filename": "report.pdf"}]
         sb = _make_supabase(rpc_data=rpc_data, docs_data=docs_data)
 
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, _ = search_documents("query", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
 
         # Documents table should have been queried
@@ -132,7 +132,7 @@ class TestSearchDocuments:
         docs_data = [{"id": doc_id, "filename": "notes.txt"}]
         sb = _make_supabase(rpc_data=rpc_data, docs_data=docs_data)
 
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, avg_sim = search_documents("query", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
 
         assert len(result) == 1
@@ -151,7 +151,7 @@ class TestSearchDocuments:
         docs_data = []
         sb = _make_supabase(rpc_data=rpc_data, docs_data=docs_data)
 
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, _ = search_documents("query", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
 
         assert len(result) == 1
@@ -167,7 +167,7 @@ class TestSearchDocuments:
         docs_data = [{"id": doc_id, "filename": "big.pdf"}]
         sb = _make_supabase(rpc_data=rpc_data, docs_data=docs_data)
 
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, _ = search_documents("query", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
 
         assert len(result) == 3
@@ -186,7 +186,7 @@ class TestSearchDocumentsPhase26:
         docs_data = [{"id": doc_id, "filename": "source.pdf"}]
         sb = _make_supabase(rpc_data=rpc_data, docs_data=docs_data)
 
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, avg_sim = search_documents("query", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
 
         assert len(result) == 1
@@ -202,7 +202,7 @@ class TestSearchDocumentsPhase26:
         docs_data = [{"id": doc_id, "filename": "source.pdf"}]
         sb = _make_supabase(rpc_data=rpc_data, docs_data=docs_data)
 
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, avg_sim = search_documents("query", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
 
         assert avg_sim == pytest.approx(0.8)
@@ -211,7 +211,7 @@ class TestSearchDocumentsPhase26:
         """avg_sim is 0.0 when vector search returns no rows."""
         sb = _make_supabase(rpc_data=[])
 
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, avg_sim = search_documents("query", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
 
         assert result == []
@@ -221,7 +221,7 @@ class TestSearchDocumentsPhase26:
         """Hybrid path with no results from either search returns ([], 0.0)."""
         sb = _make_supabase(rpc_data=[], second_rpc_data=[])
 
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, avg_sim = search_documents("query", USER_ID, sb, user_settings=HYBRID_SETTINGS)
 
         assert result == []
@@ -237,7 +237,7 @@ class TestSearchDocumentsPhase26:
         docs_data = [{"id": doc_id, "filename": "legacy.pdf"}]
         sb = _make_supabase(rpc_data=rpc_data, docs_data=docs_data)
 
-        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]):
+        with patch("app.services.retrieval_rpc.embed_texts", return_value=[FAKE_EMBEDDING]):
             result, avg_sim = search_documents("query", USER_ID, sb, user_settings=VECTOR_ONLY_SETTINGS)
 
         assert len(result) == 1

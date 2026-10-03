@@ -114,7 +114,7 @@ async def test_turn1_financial_document_retrieval_and_citations(expert_tool_ctx)
         # Return seeded 10-K chunk
         return [SEEDED_10K_CHUNK_1], 0.92
 
-    with patch("app.services.tool_dispatcher.search_documents", side_effect=mock_search):
+    with patch("app.services.search_documents_tool.search_documents", side_effect=mock_search):
         result = await _handle_search_documents({"query": "What was our Q3 revenue and YoY growth?"}, expert_tool_ctx)
 
     # 1. Verify scoping: folder_ids strictly restricted to the seeded financial folder
@@ -214,7 +214,7 @@ async def test_turn3_honest_out_of_scope_refusal(expert_tool_ctx):
         # Out-of-scope query finds nothing in financial reports folder
         return [], 0.0
 
-    with patch("app.services.tool_dispatcher.search_documents", side_effect=mock_empty_search):
+    with patch("app.services.search_documents_tool.search_documents", side_effect=mock_empty_search):
         result = await _handle_search_documents(
             {"query": "What is the employee vacation rollover policy?"},
             expert_tool_ctx,
