@@ -202,6 +202,7 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 272-05-PLAN.md — SEED-273 recall ladder → measured threshold, merged-tree gates, ledger close, 8-row SC#10 board, G-4 drive + operator sign-off checkpoint, owed prod parity (wave 4)
+
 **Flags**: ⛔ **G-5 FIRES and the refactor goes FIRST:** `backend/app/services/retrieval_service.py` has carried *"extraction still OWED (SEED-224, since 231). 241 is the SECOND landing; a THIRD must propose the extraction FIRST"*. This phase is that third landing. Plan 1 is the extraction, and the new filter seam must accept a **default predicate** so 275's archived exclusion rides it as data. `backend/app/services/tool_dispatcher.py` (FIRES, registry/handler split OWED) and `agent_loop.py` (FIRES, prompt-assembly seam OWED): propose each owed seam as the first option at discuss. **Extension Contract:** widen `search_documents`' existing arguments (it already forwards an equality `metadata_filter` at `tool_dispatcher.py:781`). Adding a tool is not the fix, and the tool count stays 29. **SC#10 FIRES** (tool schema + agent loop). **Provider-docs-first** for how each provider emits structured tool arguments. Recall: `SEED-273` / `SEED-076` / v4.1 `RECALL-01` (every filtered index walk returned ONE row at 246). Open question from `SEED-153`: who declares a dimension "close means wrong", a field-level property or the model's choice? Decide at discuss. Workflow-input binding and the publish-gauntlet gate from `SEED-153` are **not** in FIND-07. Record them as deferred, not silently dropped.
 
 #### Phase 273: Agent-Authored Artifacts
@@ -237,6 +238,7 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 273-06-PLAN.md — merged-tree gates + ledger close, 8-row SC#10 board from the effective registry (incl. OpenRouter structured-leak probe), G4-1..G4-4 Chrome drives, 4-axis rows, operator sign-off checkpoint (wave 4)
+
 **Flags**: **G-2 FIRES**: `/gsd:sketch` before plan. Load `Skill("sketch-findings-agentic-rag")` (the Phase 095 build-once inventory, the tool-card rail, output-file cards). **G-4** scenarios at scope time. **SC#10 FIRES** (structured output + streaming + UI state). **Closed-core decision at discuss:** if the spec is emitted through a new agent tool, the inventory goes 29 → 30 tools as a recorded, deliberate change. Otherwise the spec rides validated structured output. **Pydantic** validates on the way in (project rule). `recharts` is **already a frontend dependency** (measured in `frontend/package.json`), so no new chart dependency is expected. Persistence of spec + rows (and a size cap on attached rows) may need a migration; use the next free number. **Provider-docs-first** for structured output per provider. **G-5 audit at discuss:** `frontend/src/components/chat/MessageItem.tsx` (FIRES), `frontend/src/providers/StreamsProvider.tsx` (FIRES), `frontend/src/components/chat/OutputFileCard.tsx`, `backend/app/services/tool_dispatcher.py`, `backend/app/services/agent_loop.py`, `backend/app/models/message.py`, `frontend/src/types/index.ts`, `backend/app/api/threads.py`. Seeds: `SEED-193` (slice 1 plus the table/metric entries; the data-thread branch/compare half is deferred). `SEED-194` images ride this rail later. `SEED-185` (no URL router) means artifacts are not linkable. That is accepted, not solved.
 **UI hint**: yes
 
@@ -292,11 +294,20 @@ Plans:
 **Plans**: 5 plans in 3 waves (G-8: 5 — content writing and the one-commit logo pass each need their own unit)
 
 Plans:
+**Wave 1**
+
 - [ ] 276-01-PLAN.md — W1: gated live API docs (DOCS-04), OpenAPI snapshot drift + public "Syrel API" spec, one-pass Iris logo + Syrel rename
 - [ ] 276-02-PLAN.md — W1: package gate + deps, third Vite entry, /docs routing (dev/Vercel/nginx), onebox build context, parser + content plugin + changelog model + search index
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 276-03-PLAN.md — W2: docs site UI (home, guide, stub, section, changelog, Scalar API reference, search, menu drawer, YouTube/empty video slots)
 - [ ] 276-04-PLAN.md — W2: content — 31 fact-checked written pages, stubs for every other IA page, changelog overrides, screenshots, fact-check log
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 276-05-PLAN.md — W3: lazy Remotion Player slots, muted scroll-started landing promo + first-paint fences, DOCS-02 coverage gate + hook + CI, BASELINE pins, ledger close
+
 **Video library — three styles, decided 2026-10-04 (operator):** (1) **narrated explainers** — Remotion + local Kokoro voice, and NotebookLM explainers; (2) **documentaries** — NotebookLM cinematic "Syrel: The Build Story" (5 chapters), wrapped in Remotion `BrandedEpisode` intro/outro; (3) **music-driven promos, no narration** — `SyrelPromo` / `SyrelTeaser` / vertical cuts, beat-locked to an original synthesized track, for the landing hero and social. Discuss decides which style each docs/landing slot uses.
 **Logo chosen, insertion deferred (operator 2026-10-04):** #1 "Iris agent" — assets in `docs/brand/` (animated, lockup, mark). Placeholders stay until the operator says insert; when it happens it is one pass across landing, app, favicon, docs and `video/` `LogoPlaceholder`. Discuss decides whether 276 does that pass.
 **Flags**: Third-party API keys, webhooks and rate limits are **out of scope** (SEED-013 → v4.6 Open Platform; SEED-345). Content is drafted from the NotebookLM notebook "Syrel — Knowledge & Videos" and fact-checked against `docs/history/`; the first release writes about 30 core pages, and the rest ship as tracked stubs. **DOCS-04 reverses a recorded decision** (`backend/app/main.py`: "`GET /docs` deliberately keeps returning 200"), now approved by the operator on 2026-10-04; record it in CONTEXT `<decisions>`. Remotion is free only for companies of up to 3 people; recheck before the company grows. **G-2 satisfied** by sketch 276 (winner B). **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/landing/*` (Navigation, LandingFooter, CompareSection), `frontend/vercel.json`, `frontend/vite.config.ts`, `backend/app/main.py` (FIRES, 61 phases). Inputs: `.planning/research/docs-coverage-inventory.md`, `docs-information-architecture.md`, `docs/public/api/openapi.snapshot.json`.
