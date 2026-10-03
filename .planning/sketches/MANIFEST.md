@@ -2951,4 +2951,4 @@ reuses 267-B's event-card shape.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 273 | agent-authored-artifacts | Artifact frame in a chat answer, the chart/table/metric family, follow-up lineage, failure notice + states | ★ 1B framed card · 2A one metric tile · 3A lineage caption · 4B explicit notice + live render (operator, 2026-10-03) | phase-273, artifacts, chart, provenance, failure-notice |
-| 276 | public-docs | Syrel public /docs on the landing domain: docs app vs landing-native vs video-first learning path (home · guide · changelog) | — (pending) | landing, docs, changelog, video |
+| 276 | public-docs | Syrel public /docs on the landing domain: docs app vs landing-native vs video-first learning path (home · guide · changelog) | ★ B landing-native for home, guide and changelog (operator, 2026-10-04) | landing, docs, changelog, video |

@@ -2,7 +2,7 @@
 sketch: 276
 name: public-docs
 question: "What shape should Syrel's public /docs take on the landing domain — docs app, landing-native, or a video-first learning path?"
-winner: null
+winner: "B"
 tags: [landing, docs, changelog, video, marketing, responsive]
 ---
 
