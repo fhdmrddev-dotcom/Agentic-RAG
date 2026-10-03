@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING
 from openai import OpenAI
 
 from app.config import settings, get_model_capability, API_SURFACES, MODEL_CAPABILITIES
+# Phase 273 (I-1) — the show_artifact enums are derived from the closed Literals (pydantic +
+# stdlib only; no cycle).
+from app.models.artifact import ARTIFACT_COMPONENTS, CHART_KINDS
 
 logger = logging.getLogger(__name__)
 
@@ -1131,6 +1134,127 @@ ASK_USER_TOOL = {
 }
 
 
+# Phase 273 (ART-01..04 / D-01) — show_artifact: the ONE emission channel for an in-chat chart,
+# table or metric. Flat object, `component` + `title` required, every other key nullable via a type
+# array (Pattern 1 — the shape QUERY_DOCUMENTS_BY_VIEW_TOOL already ships across the roster; the
+# Gemini sanitizer collapses the arrays). No anyOf / oneOf / additionalProperties. The two enums are
+# DERIVED from models/artifact.py's closed Literals (I-1), never re-typed. D-11 / D-15: the
+# "in-chat visual vs a FILE" guidance and one compact example call live in the DESCRIPTION (a
+# STRUCTURED-mode model sees only top-level names, so the example is load-bearing); SYSTEM_PROMPT
+# is untouched.
+_ARTIFACT_CELL = {"type": ["string", "number", "null"]}
+SHOW_ARTIFACT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "show_artifact",
+        "description": (
+            "Show the user an interactive chart, table or single metric, rendered below your answer. "
+            "Use when: you have numbers worth seeing in the chat (a trend, a comparison, a breakdown, "
+            "one headline figure) — call this instead of drawing a chart with code. "
+            "Do not use for: a FILE the user asked for (a PNG, an image, a chart 'for the deck' or "
+            "'for the report') — use execute_code for that. "
+            "Data: `columns` [{name, type: number|string, unit?}] plus `rows`, one cell per column. "
+            "Pass bare numbers (1234.5, not \"$1,234\" or \"12%\"); units go in the column's `unit`. "
+            "Max 500 rows and 20 columns: aggregate first if you have more. "
+            "chart: {kind: line|bar|area|scatter, x: <a column>, y: [<number columns>], stacked?} — "
+            "at most 4 series (scatter 3); no pie, use a bar chart or a table for parts of a whole. "
+            "metric: {value_column, compare_column?, label?, compare_label?} over exactly one row. "
+            "table: columns and rows only. "
+            "To change, filter, sort or redraw an artifact you already showed (\"make it a bar chart\", "
+            "\"only Q3\", \"top 5\"), call again with from_artifact=<its artifact_id or label, e.g. "
+            "\"chart 1\"> and NO columns or rows; add transform {filter: [{column, op: eq|in|range, "
+            "value|values|min|max}], sort: {column, direction}, top_n, select: [columns]} to narrow it. "
+            "The stored values are reused exactly; nothing is re-fetched. "
+            "After the call, write one or two sentences about what it shows. "
+            "Example: {\"component\":\"chart\",\"title\":\"Revenue by quarter\",\"columns\":"
+            "[{\"name\":\"quarter\",\"type\":\"string\"},{\"name\":\"revenue\",\"type\":\"number\","
+            "\"unit\":\"$K\"}],\"rows\":[[\"Q1\",120],[\"Q2\",135]],\"chart\":{\"kind\":\"bar\","
+            "\"x\":\"quarter\",\"y\":[\"revenue\"]}}"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "component": {"type": "string", "enum": list(ARTIFACT_COMPONENTS),
+                              "description": "Which artifact: chart, table or metric."},
+                "title": {"type": "string", "description": "A short title (max 120 characters)."},
+                "from_artifact": {"type": ["string", "null"],
+                                  "description": "The artifact_id or label (e.g. 'chart 1') of an artifact "
+                                                 "already shown in this chat, to redraw it. Send no rows with it."},
+                "columns": {
+                    "type": ["array", "null"],
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "type": {"type": "string", "enum": ["number", "string"]},
+                            "unit": {"type": ["string", "null"]},
+                        },
+                        "required": ["name", "type"],
+                    },
+                },
+                "rows": {"type": ["array", "null"], "items": {"type": "array", "items": _ARTIFACT_CELL}},
+                "chart": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "kind": {"type": "string", "enum": list(CHART_KINDS)},
+                        "x": {"type": "string"},
+                        "y": {"type": "array", "items": {"type": "string"}},
+                        "stacked": {"type": ["boolean", "null"]},
+                    },
+                    "required": ["kind", "x", "y"],
+                },
+                "metric": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "value_column": {"type": "string"},
+                        "compare_column": {"type": ["string", "null"]},
+                        "label": {"type": ["string", "null"]},
+                        "compare_label": {"type": ["string", "null"]},
+                    },
+                    "required": ["value_column"],
+                },
+                "transform": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "filter": {
+                            "type": ["array", "null"],
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "column": {"type": "string"},
+                                    "op": {"type": "string", "enum": ["eq", "in", "range"]},
+                                    "value": _ARTIFACT_CELL,
+                                    "values": {"type": ["array", "null"], "items": _ARTIFACT_CELL},
+                                    "min": {"type": ["number", "null"]},
+                                    "max": {"type": ["number", "null"]},
+                                },
+                                "required": ["column", "op"],
+                            },
+                        },
+                        "select": {"type": ["array", "null"], "items": {"type": "string"}},
+                        "sort": {
+                            "type": ["object", "null"],
+                            "properties": {
+                                "column": {"type": "string"},
+                                "direction": {"type": "string", "enum": ["asc", "desc"]},
+                            },
+                            "required": ["column", "direction"],
+                        },
+                        "top_n": {"type": ["integer", "null"]},
+                    },
+                },
+            },
+            "required": ["component", "title"],
+        },
+    },
+}
+# Phase 273 (Pitfall 8 / deferred-ideas fence) — tools that exist ONLY for a top-level chat turn.
+# Subtracted from the harness/workflow authoring offer (harness/grounding.py — that offer stays
+# 28), excluded from task sub-agents (tool_dispatcher._SUB_AGENT_EXCLUDED) and absent from
+# get_explorer_tools(); the handler also refuses on parent_run_id / phase_whitelist as a belt.
+CHAT_ONLY_TOOLS = frozenset({"show_artifact"})
+
+
 EXPLORER_SYSTEM_PROMPT = (
     "You are a Knowledge Base Explorer. Navigate the user's document library using the fewest tool calls needed.\n\n"
     "## CRITICAL: Stop when you have the answer\n"
@@ -1194,7 +1318,10 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
              WORKSPACE_WRITE_TOOL, WORKSPACE_READ_TOOL, WORKSPACE_LIST_TOOL,
              WORKSPACE_DELETE_TOOL, WORKSPACE_DIFF_TOOL,
              # Phase 085 — D-085-25 — 3 new tools (24-tool toolbox after this line)
-             WRITE_TODOS_TOOL, TASK_TOOL, ASK_USER_TOOL]
+             WRITE_TODOS_TOOL, TASK_TOOL, ASK_USER_TOOL,
+             # Phase 273 (D-01) — ungated; registry + get_tools BOTH (dual wiring). Chat-only:
+             # see CHAT_ONLY_TOOLS for where it is subtracted.
+             SHOW_ARTIFACT_TOOL]
     # Phase 116 (REL-04) — D-116-10 / SC#1: get_related_documents is Deep-visible here
     # AND registered in tool_dispatcher._TOOL_REGISTRY (the dual-wiring contract — a
     # registry entry the model never SEES is dead; the Phase-101 render_template

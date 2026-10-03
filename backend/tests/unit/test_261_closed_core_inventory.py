@@ -37,9 +37,10 @@ def test_emitter_registry_contains_zero_expert_emitters():
 
 
 def test_tool_dispatcher_contains_zero_expert_tools_or_dispatchers():
-    """PACK-01: _TOOL_REGISTRY and tool_dispatcher have zero expert-specific tools and registry is closed (exactly 29)."""
-    assert len(_TOOL_REGISTRY) == 29, (
-        f"Tool registry drift: expected 29 tools, got {len(_TOOL_REGISTRY)}: "
+    """PACK-01: _TOOL_REGISTRY and tool_dispatcher have zero expert-specific tools and registry is closed (exactly 30)."""
+    # Phase 273: 29 → 30 — show_artifact, the deliberate 30th tool (a closed-core change recorded at discuss).
+    assert len(_TOOL_REGISTRY) == 30, (
+        f"Tool registry drift: expected 30 tools, got {len(_TOOL_REGISTRY)}: "
         f"{sorted(list(_TOOL_REGISTRY.keys()))}"
     )
     for tool_name in _TOOL_REGISTRY:

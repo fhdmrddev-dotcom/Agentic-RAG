@@ -405,7 +405,7 @@ def test_closed_core_inventory_is_unchanged():
     from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY  # noqa: PLC0415
     from app.services.tool_dispatcher import _TOOL_REGISTRY  # noqa: PLC0415
 
-    assert len(_TOOL_REGISTRY) == 29
+    assert len(_TOOL_REGISTRY) == 30  # Phase 273: 29 → 30, the deliberate show_artifact
     assert len(EMITTER_REGISTRY) == 1
     assert len(PHASE_TYPE_REGISTRY_ENTRIES) == 7
     assert len(PROGRAMMATIC_PHASE_REGISTRY) == 2

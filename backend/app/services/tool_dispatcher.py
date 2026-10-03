@@ -47,6 +47,8 @@ from app.utils.skill_visibility import build_skill_visibility_or
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 # Phase 272 (D-15) — handler moved to search_documents_tool.py; registry/handler split still OWED (→273)
 from app.services.search_documents_tool import handle_search_documents as _handle_search_documents
+# Phase 273 (D-14) — show_artifact handler in its own module; registry/handler split still OWED (OV-273-02)
+from app.services.show_artifact_tool import handle_show_artifact as _handle_show_artifact
 from app.services.web_search_service import web_search
 from app.services.sub_agent_service import run_sub_agent
 from app.services.audit_service import write_audit_entry
@@ -4106,7 +4108,9 @@ _SUB_AGENT_DEFAULT_READ_ONLY: frozenset[str] = frozenset({
 # don't own a panel slot); write_todos is the parent's UI hook, not the
 # sub-agent's. Defense-in-depth: also enforced in run_task_sub_agent's
 # sub_ctx.available_tools (which dispatch_tool reads on every call).
-_SUB_AGENT_EXCLUDED: frozenset[str] = frozenset({"task", "ask_user", "write_todos"})
+# Phase 273: show_artifact is chat-top-level only (openai_service.CHAT_ONLY_TOOLS) — an artifact
+# belongs under the chat answer, and a sub-agent has no message to put it under.
+_SUB_AGENT_EXCLUDED: frozenset[str] = frozenset({"task", "ask_user", "write_todos", "show_artifact"})
 
 
 async def _handle_task(args: dict, ctx: ToolContext) -> ToolResult:
@@ -4572,6 +4576,8 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "fetch_document_file": _handle_fetch_document_file,
     # Phase 151 (FILE-01) — registry + get_tools BOTH (self_improve-gated); G-5: handler + one line, threads.py untouched
     "attach_skill_file": _handle_attach_skill_file,
+    # Phase 273 (D-01 / D-14) — registry + get_tools BOTH; handler in show_artifact_tool.py, one line here
+    "show_artifact": _handle_show_artifact,
 }
 
 # Phase 267 (PACK-21 / D-267-01) — `EXPERT_CORE_TOOLS` and `EXPERT_DELIVERABLE_TOOLS` were DELETED
