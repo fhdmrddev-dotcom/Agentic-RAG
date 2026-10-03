@@ -221,8 +221,8 @@ Plans:
 
 **Wave 1**
 
-- [ ] 273-01-PLAN.md — closed Pydantic vocabulary (3 components, 4 kinds, caps, refusal catalogue, result contract), migration 202 `message_artifacts` (RLS mirrors messages, no client writes, immutable; [BLOCKING] local apply checkpoint), db/artifacts.py bound to thread + user, ToolContext.turn_tool_calls, frozen wire fixture (wave 1)
-- [ ] 273-02-PLAN.md — every new frontend artifact file: guard, closed registry, copy, caption/chart models, frame, notice, error boundary, table, metric, lazy recharts chart with legend toggles, palette vars, count-gate adoption (wave 1, parallel)
+- [x] 273-01-PLAN.md — closed Pydantic vocabulary (3 components, 4 kinds, caps, refusal catalogue, result contract), migration 202 `message_artifacts` (RLS mirrors messages, no client writes, immutable; [BLOCKING] local apply checkpoint), db/artifacts.py bound to thread + user, ToolContext.turn_tool_calls, frozen wire fixture (wave 1)
+- [x] 273-02-PLAN.md — every new frontend artifact file: guard, closed registry, copy, caption/chart models, frame, notice, error boundary, table, metric, lazy recharts chart with legend toggles, palette vars, count-gate adoption (wave 1, parallel)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
