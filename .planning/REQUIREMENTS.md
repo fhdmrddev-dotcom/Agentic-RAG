@@ -19,11 +19,11 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 
 ### Agent-authored artifacts (ART) - SEED-193 (SEED-194 rides the same rail later)
 
-- [ ] **ART-01**: Agent can emit a validated chart spec that renders as an interactive chart in chat.
-- [ ] **ART-02**: Components come from a closed registry; an unknown component or malformed props render nothing and show a notice, never raw passthrough.
-- [ ] **ART-03**: The underlying rows stay attached so a follow-up can re-encode the chart without re-running the query.
-- [ ] **ART-04**: Table and metric components join the registry as the second and third entries.
-- [ ] **ART-05**: The artifact reloads identically from history and works across the full native provider roster.
+- [x] **ART-01**: Agent can emit a validated chart spec that renders as an interactive chart in chat.
+- [x] **ART-02**: Components come from a closed registry; an unknown component or malformed props render nothing and show a notice, never raw passthrough.
+- [x] **ART-03**: The underlying rows stay attached so a follow-up can re-encode the chart without re-running the query.
+- [x] **ART-04**: Table and metric components join the registry as the second and third entries.
+- [x] **ART-05**: The artifact reloads identically from history and works across the full native provider roster.
 
 ### Retention (RET) - SEED-250
 
@@ -64,11 +64,11 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 | FIND-05 | Phase 270 | Complete |
 | FIND-06 | Phase 271 | Pending |
 | FIND-07 | Phase 272 | Complete (SC#4 6/8 by decision) |
-| ART-01 | Phase 273 | Pending |
-| ART-02 | Phase 273 | Pending |
-| ART-03 | Phase 273 | Pending |
-| ART-04 | Phase 273 | Pending |
-| ART-05 | Phase 273 | Pending |
+| ART-01 | Phase 273 | Complete |
+| ART-02 | Phase 273 | Complete |
+| ART-03 | Phase 273 | Complete |
+| ART-04 | Phase 273 | Complete |
+| ART-05 | Phase 273 | Complete |
 | RET-01 | Phase 275 | Pending |
 | RET-02 | Phase 275 | Pending |
 | RET-03 | Phase 275 | Pending |
