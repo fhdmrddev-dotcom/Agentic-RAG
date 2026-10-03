@@ -4080,6 +4080,9 @@ const BASELINE = {
   "LinkTargetCombobox.test.tsx": 9, // 271-03
   "documentAddedBy.test.ts": 6, // 271-03
   "DocumentRow.find271.test.tsx": 17, // 271-03
+  // ── Phase 271-04 — ADOPTED, not raised: in NEITHER knob before (RESEARCH Wave 0). Measured
+  // 10 passed on the merged wave-1 tree (ff4b98f01) BEFORE 271-04 touched ConditionPopover. ──
+  "ConditionPopover.test.tsx": 10, // 271-04 (2026-10-03)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5955,6 +5958,8 @@ const TARGETS = [
   "src/components/relationships/LinkTargetCombobox.test.tsx",
   "src/lib/__tests__/documentAddedBy.test.ts",
   "src/components/ingestion/__tests__/DocumentRow.find271.test.tsx",
+  // Phase 271-04 — adopted before ConditionPopover gains excludeFieldKeys. FILE-LEVEL.
+  "src/components/ingestion/ConditionPopover.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
