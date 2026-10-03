@@ -571,6 +571,16 @@ Evidence: `evidence/g4-3-at-rest-rerun2.png`, `g4-3-references-open-rerun2.png`,
 `g4-3-runcard-open-rerun2.png`, `g4-3-dom-rerun2.txt`, `g4-3-runcard-open-dom-rerun2.txt`. The first
 drive's and the `-rerun` files are untouched.
 
+## Operator sign-off (Task 4, 2026-10-03)
+
+| Item | Operator's selection (verbatim) | Recorded as |
+|---|---|---|
+| G-4 (G4-1, G4-2, G4-3) | **"Approved"** | Signed off, 2026-10-03, after the re-runs above. `272-VALIDATION.md` §4 sign-off column filled. |
+| SC#4 | **"Close with Google recorded unmet"** | A DECISION, never "all passed". **Met on 6 of 8 rows.** Google `gemini-3.5-flash` is **UNMET** on (a)/(b)/(c). That is model behaviour, investigated: the schema reaches Gemini intact, it emitted well-formed filters 3 times, and it prefers `query_documents` SQL, widens on its own and hits the 15-step cap. Our F-2 part is fixed. MiniMax-M3 is **UNSTABLE**: run-to-run variance, and one sample is not a measurement. The deferred "must filter" flag trigger FIRED and is planted as **SEED-334** (relates to SEED-153). |
+| O-1 | **"Plant a seed"** | **SEED-335**: the footer reads *"Unmarked claims read as general knowledge"* when an answer cites sources in a table column, while References lists 3 sources (relates to SEED-033). |
+
+Both seeds were allocated as max(id)+1 (333 → 334 → 335), and `check-seeds-register.cjs --files` passes on each.
+
 ## OWED (recorded, never executed here)
 
 1. ~~Operator: add OpenAI API credits~~ — done 2026-10-03; board and drive run (above).
@@ -588,7 +598,8 @@ drive's and the `-rerun` files are untouched.
      - ~~(v) then board (b) ×8 with `--prompts b --out board-rerun-b`, plus G4-3. Expected: all 3 Acme
        GmbH reports, including September 2025 at EUR 1,180,000.~~ Done: (b) 7/8 with 3/3 coverage on
        all 8, and G4-3 PASS with three figures (above).
-     - (iii) **the operator's G-4 sign-off on G4-1..G4-3 is the only item from (2) still owed.**
+     - ~~(iii) **the operator's G-4 sign-off on G4-1..G4-3 is the only item from (2) still owed.**~~
+       Done: **"Approved"**, 2026-10-03 (see "Operator sign-off" below).
 3. **Production parity, in this order, before the backend deploy:**
    a. A FREE read of the production `document_chunks` count (Supabase MCP `execute_sql` SELECT — not
       available to this executor, so OWED). If it is large, run alone first, outside any transaction:
