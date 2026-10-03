@@ -132,6 +132,36 @@ and the publish-gauntlet gate (see `<deferred>`). The tool count stays **29**: w
   `document_type`), so a mixed-case `author` can never match. The compiler path must compare
   consistently. Research picks the mechanism.
 
+### Resolved at planning (272-RESEARCH.md open questions; operator delegated, 2026-10-03)
+- **D-21:** **The document set is resolved in two steps** (research finding 1). In a chat run
+  `ctx.supabase` uses the service role, which skips row-level security.
+  1. The 271 compiler reads candidate ids **limited to the caller's organisations**.
+  2. Those ids are **re-read through the per-user connection** (`get_user_pg_connection`), where
+     the `documents` RLS policy (migration 154) decides what is visible.
+
+  A count or document set computed through the service role alone is a cross-org leak and is
+  forbidden. ⛔ Do **not** use Find's own/global-folder visibility rule for this: it drops
+  connection documents that are shared with the organisation.
+- **D-22:** **The prompt rewrite covers the other retrieval tools**, and the board checks every tool
+  call. The D-09 lock refuses only `search_documents`, and today's *"do not stop on zero results"*
+  rules send the agent on to `grep` / `query_documents` / `read_document`. Those rules are rewritten
+  for the filtered-empty case, so the agent does not reach for another retrieval tool to answer
+  outside the filter. Board prompt (c) fails a row if **any** tool call in that run retrieves
+  content from outside the filter, not only a `search_documents` call. This is accepted as a known
+  limit of D-09 (`grep`/`query_documents` are not structurally locked) and recorded, not hidden.
+- **D-23:** **The per-request vocabulary lists the caller's top `document_type` values**, capped at
+  15, beside the field list (D-02).
+- **D-24:** **The Library trend no longer counts refused searches as "found nothing."** Result kinds
+  (3) invalid filter and lock-refused calls are excluded from `knowledge_health.py`'s "found
+  nothing" count (a one-line, honoured-by-construction change). Kind (2), matched 0 documents, still
+  counts.
+- **D-25:** **"Matched, but nothing searchable yet" is a sub-reason of kind (2), not a fifth kind.**
+  Documents matched the filter but have no chunks yet (still ingesting). The result says so in its
+  reason string, and the four kinds of D-12 stay four.
+- **D-26:** **D-02's "the org's fields" is clarified.** Field definitions are visible **per user
+  (their own plus system-global)**, not per organisation. The vocabulary uses that existing
+  visibility rule unchanged, and no new organisation-level scoping is added in this phase.
+
 ### Claude's Discretion
 - The exact module boundaries of the D-13 extraction, and the name and home of the D-15 handler
   module.
