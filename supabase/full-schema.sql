@@ -483,6 +483,28 @@ COMMENT ON FUNCTION public.match_skills(query_embedding public.vector, match_use
 
 
 --
+-- Name: message_artifacts_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.message_artifacts_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+BEGIN
+    -- The ONLY permitted change: referential upkeep nulling run_id and/or parent_id.
+    IF (to_jsonb(NEW) - 'run_id' - 'parent_id') = (to_jsonb(OLD) - 'run_id' - 'parent_id')
+       AND (NEW.run_id IS NULL OR NEW.run_id IS NOT DISTINCT FROM OLD.run_id)
+       AND (NEW.parent_id IS NULL OR NEW.parent_id IS NOT DISTINCT FROM OLD.parent_id)
+    THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'message_artifacts rows are immutable once shown (D-08)'
+        USING ERRCODE = 'insufficient_privilege';
+END;
+$$;
+
+
+--
 -- Name: query_user_documents(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2244,6 +2266,138 @@ COMMENT ON COLUMN public.ingestion_jobs.claimed_at IS 'Timestamp when worker cla
 
 
 --
+-- Name: message_artifacts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.message_artifacts (
+    id text NOT NULL,
+    thread_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    org_id uuid NOT NULL,
+    run_id uuid,
+    tool_call_id text,
+    parent_id text,
+    label text NOT NULL,
+    component text NOT NULL,
+    spec jsonb NOT NULL,
+    caption jsonb NOT NULL,
+    row_count integer NOT NULL,
+    spec_version smallint DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT message_artifacts_component_check CHECK ((component = ANY (ARRAY['chart'::text, 'table'::text, 'metric'::text]))),
+    CONSTRAINT message_artifacts_id_check CHECK ((id ~ '^a_[0-9a-z]{10}$'::text)),
+    CONSTRAINT message_artifacts_label_check CHECK ((label ~ '^(chart|table|metric) [1-9][0-9]*$'::text)),
+    CONSTRAINT message_artifacts_row_count_check CHECK (((row_count >= 1) AND (row_count <= 500))),
+    CONSTRAINT message_artifacts_spec_size CHECK ((octet_length((spec)::text) <= 262144))
+);
+
+
+--
+-- Name: TABLE message_artifacts; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.message_artifacts IS 'Agent-authored artifacts (chart | table | metric) shown under an assistant answer (Phase 273, ART-01..05). One immutable row per show_artifact emission. Visibility mirrors public.messages; written only by the backend pool.';
+
+
+--
+-- Name: COLUMN message_artifacts.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.id IS 'Server-generated id a_ + 10 chars of [0-9a-z]. The FIRST key of the tool result, so a persisted result maps back to its row on reload.';
+
+
+--
+-- Name: COLUMN message_artifacts.thread_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.thread_id IS 'The thread the artifact was shown in. ON DELETE CASCADE: a thread delete removes its artifacts.';
+
+
+--
+-- Name: COLUMN message_artifacts.user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.user_id IS 'The thread owner. Part of the RLS predicate (auth.uid() = user_id), as on messages.';
+
+
+--
+-- Name: COLUMN message_artifacts.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.org_id IS 'The tenancy boundary. Passed explicitly from the validated active org when known; otherwise stamped by the autofill trigger, exactly as messages.';
+
+
+--
+-- Name: COLUMN message_artifacts.run_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.run_id IS 'The run that emitted it. ON DELETE SET NULL — the one column (with parent_id) the immutability trigger lets referential upkeep null.';
+
+
+--
+-- Name: COLUMN message_artifacts.tool_call_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.tool_call_id IS 'The provider tool-call id, for audit only. NOT a join key: Gemini repeats call_{idx} across turns.';
+
+
+--
+-- Name: COLUMN message_artifacts.parent_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.parent_id IS 'The artifact a by-reference emission (from_artifact) was derived from. ON DELETE SET NULL.';
+
+
+--
+-- Name: COLUMN message_artifacts.label; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.label IS 'chart N / table N / metric N — assigned at INSERT per component per thread under an advisory lock, never recomputed (UI-D-03). A from_artifact alias.';
+
+
+--
+-- Name: COLUMN message_artifacts.component; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.component IS 'The closed component set (I-1). Must equal ARTIFACT_COMPONENTS in backend/app/models/artifact.py.';
+
+
+--
+-- Name: COLUMN message_artifacts.spec; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.spec IS 'The validated spec (spec_version 1): title, columns, rows, chart | metric encoding. Never a free props bag (D-02).';
+
+
+--
+-- Name: COLUMN message_artifacts.caption; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.caption IS 'Server-derived caption: row_count, sources, source_count, lineage (D-04). Never model-written.';
+
+
+--
+-- Name: COLUMN message_artifacts.row_count; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.row_count IS 'Rows in spec.rows. 1..500; above the cap the call is refused, never truncated (D-09).';
+
+
+--
+-- Name: COLUMN message_artifacts.spec_version; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.spec_version IS 'Wire-contract version of spec. 1.';
+
+
+--
+-- Name: COLUMN message_artifacts.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.created_at IS 'Emission time. Orders a thread''s artifacts.';
+
+
+--
 -- Name: message_feedback; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3763,6 +3917,22 @@ ALTER TABLE ONLY public.ingestion_jobs
 
 
 --
+-- Name: message_artifacts message_artifacts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: message_artifacts message_artifacts_thread_label_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_thread_label_key UNIQUE (thread_id, label);
+
+
+--
 -- Name: message_feedback message_feedback_message_user_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4736,6 +4906,34 @@ CREATE INDEX idx_ingestion_jobs_user_id ON public.ingestion_jobs USING btree (us
 
 
 --
+-- Name: idx_message_artifacts_org; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_artifacts_org ON public.message_artifacts USING btree (org_id);
+
+
+--
+-- Name: idx_message_artifacts_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_artifacts_parent ON public.message_artifacts USING btree (parent_id);
+
+
+--
+-- Name: idx_message_artifacts_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_artifacts_run ON public.message_artifacts USING btree (run_id);
+
+
+--
+-- Name: idx_message_artifacts_thread; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_artifacts_thread ON public.message_artifacts USING btree (thread_id, created_at);
+
+
+--
 -- Name: idx_message_feedback_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5405,6 +5603,20 @@ CREATE TRIGGER folders_set_updated_at BEFORE UPDATE ON public.folders FOR EACH R
 --
 
 CREATE TRIGGER harness_audit_autofill_org_id BEFORE INSERT ON public.harness_audit FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: message_artifacts message_artifacts_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_artifacts_autofill_org_id BEFORE INSERT ON public.message_artifacts FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: message_artifacts message_artifacts_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_artifacts_immutable BEFORE UPDATE ON public.message_artifacts FOR EACH ROW EXECUTE FUNCTION public.message_artifacts_immutable();
 
 
 --
@@ -6172,6 +6384,38 @@ ALTER TABLE ONLY public.ingestion_jobs
 
 ALTER TABLE ONLY public.ingestion_jobs
     ADD CONSTRAINT ingestion_jobs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_artifacts message_artifacts_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.message_artifacts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: message_artifacts message_artifacts_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.runs(run_id) ON DELETE SET NULL;
+
+
+--
+-- Name: message_artifacts message_artifacts_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_artifacts message_artifacts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -7179,6 +7423,13 @@ CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SE
 
 
 --
+-- Name: message_artifacts Users can view their own message artifacts; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view their own message artifacts" ON public.message_artifacts FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
 -- Name: messages Users can view their own messages; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -7626,6 +7877,12 @@ ALTER TABLE public.harness_audit ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.ingestion_jobs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: message_artifacts; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.message_artifacts ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: message_feedback; Type: ROW SECURITY; Schema: public; Owner: -
@@ -8759,6 +9016,15 @@ REVOKE ALL ON TABLE public.expert_installs FROM authenticated;
 GRANT SELECT ON TABLE public.expert_installs TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_installs TO service_role;
 
+-- migration 202 — message_artifacts: owners READ (the messages predicate); only the backend writes.
+-- No UPDATE to ANY role, service_role included (D-08: an artifact is immutable once shown).
+REVOKE ALL ON TABLE public.message_artifacts FROM PUBLIC;
+REVOKE ALL ON TABLE public.message_artifacts FROM anon;
+REVOKE ALL ON TABLE public.message_artifacts FROM authenticated;
+REVOKE ALL ON TABLE public.message_artifacts FROM service_role;
+GRANT SELECT ON TABLE public.message_artifacts TO authenticated;
+GRANT SELECT, INSERT, DELETE ON TABLE public.message_artifacts TO service_role;
+
 
 -- ============================================================
 -- 6. Function EXECUTE privileges (migration 181 / Phase 248, CRED-03)
@@ -8943,3 +9209,9 @@ GRANT EXECUTE ON FUNCTION public.resize_embedding_column(integer) TO service_rol
 
 -- migration 012 — schema-qualified here; the migration relies on search_path.
 GRANT EXECUTE ON FUNCTION public.query_user_documents(text) TO authenticated;
+
+-- migration 202 — message_artifacts' immutability trigger function (Group A shape: trigger-only).
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.message_artifacts_immutable() TO service_role;
