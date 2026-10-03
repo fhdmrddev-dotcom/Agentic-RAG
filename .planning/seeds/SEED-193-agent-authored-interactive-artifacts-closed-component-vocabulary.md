@@ -3,7 +3,10 @@ seed_id: SEED-193
 title: The agent can only produce text and dead files — it should produce live artifacts, via a CLOSED component vocabulary the model composes rather than arbitrary agent-authored markup
 created: 2026-08-23
 planted_during: Operator note review, 2026-08-23 — three notes at once ("implement A2UI", image generation, and microsoft/data-formulator)
-status: planted
+status: folded
+partial: true
+status_note: "Folded into Phase 273 at discuss (2026-10-03): slice 1 (chart-as-spec) plus the table and metric registry entries. The data-thread branch/compare half stays DEFERRED (out of scope by the v4.5 roadmap)."
+folded_into: "273"
 priority: high
 surface: Agentic-RAG
 relates_to:
