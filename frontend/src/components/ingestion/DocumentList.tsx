@@ -15,7 +15,8 @@ import type { Document, Folder } from "@/types"
 
 interface Props {
   documents: Document[]
-  onDelete: (id: string, scope?: "version" | "all") => void
+  /** Awaited by the delete dialog: a rejection keeps it open with its error (271-REVIEW CR-02). */
+  onDelete: (id: string, scope?: "version" | "all") => void | Promise<void>
   onRefresh: () => void
   folderId?: string | null
   currentUserId: string

@@ -808,11 +808,14 @@ export function LibraryPage({
           listProps={{
             // A delete or refresh re-asks the server, so a removed row cannot linger in the
             // answer (the latest-rows list refreshes itself; the Find page is the hook's).
-            onDelete: (id, scope) => {
-              void Promise.resolve(deleteDoc(id, scope)).then(findResult.retry)
+            // 271-REVIEW CR-02: AWAITED, so DocumentList's `await onDelete()` sees a failure,
+            // keeps the dialog open and shows its error; the re-ask runs only after success.
+            onDelete: async (id, scope) => {
+              await deleteDoc(id, scope)
+              findResult.retry()
             },
             onRefresh: () => {
-              void loadDocuments()
+              loadDocuments().catch(console.error)
               findResult.retry()
             },
             currentUserId: user?.id ?? "",

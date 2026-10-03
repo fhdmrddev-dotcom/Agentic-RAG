@@ -451,4 +451,40 @@ describe("LibraryPage — 271 review fixes", () => {
     await sleep(50)
     expect(mockResolveAdHoc).not.toHaveBeenCalled()
   })
+
+  it("CR-02: a failed delete from Find keeps the dialog open with its error and does not re-ask", async () => {
+    const deleteDoc = vi.fn().mockRejectedValue(new Error("boom"))
+    mockUseDocuments.mockReturnValue({ ...mockUseDocuments(), deleteDoc })
+    renderPage()
+    await search("acme")
+    const callsBefore = mockSearchDocuments.mock.calls.length
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete document" })[0])
+    const dialog = await screen.findByRole("dialog")
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }))
+    await waitFor(() =>
+      expect(within(dialog).getByText("Delete failed. Please try again.")).toBeInTheDocument(),
+    )
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
+    expect(deleteDoc).toHaveBeenCalledWith("r-b", undefined)
+    await sleep(50)
+    expect(mockSearchDocuments.mock.calls.length).toBe(callsBefore)
+  })
+
+  it("CR-02: a successful delete from Find closes the dialog only after the delete, then re-asks the server", async () => {
+    let finish: () => void = () => {}
+    const deleteDoc = vi.fn(() => new Promise<void>((r) => (finish = r)))
+    mockUseDocuments.mockReturnValue({ ...mockUseDocuments(), deleteDoc })
+    renderPage()
+    await search("acme")
+    const callsBefore = mockSearchDocuments.mock.calls.length
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete document" })[0])
+    const dialog = await screen.findByRole("dialog")
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }))
+    await sleep(20)
+    // Still deleting: the dialog has not closed ahead of the request.
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
+    finish()
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    await waitFor(() => expect(mockSearchDocuments.mock.calls.length).toBeGreaterThan(callsBefore))
+  })
 })
