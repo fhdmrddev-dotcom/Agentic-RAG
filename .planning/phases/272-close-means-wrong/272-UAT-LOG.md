@@ -478,6 +478,99 @@ Google is unchanged in both rows:
 Scratch scripts (`g4drive-rerun.cjs`, `g4-2-refusal-rerender.cjs`) live in the session scratchpad,
 outside the repo tree.
 
+## Re-run after the operator's restart #3 (2026-10-03)
+
+### Live stack, verified before anything was trusted
+
+```
+$ git rev-parse --abbrev-ref HEAD ; git log --oneline -1
+develop
+c0393f7b2 docs(272-05): post-restart re-run - board (a)/(c) x8, G4-1/G4-2, D-27 dedup cause
+$ Get-NetTCPConnection -LocalPort 8000 -State Listen  (+ Get-Process StartTime)
+0.0.0.0 pid=42856 python start=2026-10-03T13:46:55.1013188+04:00
+$ git log -1 --format='%H %cI' 1cef556f3
+1cef556f330d5f5d69a740fe97d5bf70104ed49a 2026-10-03T13:16:04+04:00
+$ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health
+200
+```
+
+One listener, and it started 30 minutes after the dedup fix commit.
+
+**Behavioural probe 2**, before the 8 rows: `run-272-board.py --run --providers deepseek --prompts b
+--out board-rerun-probe2`, run `ad675312`, audit `38ca454d`. Verdict line, verbatim:
+
+```
+BOARD deepseek (b) PASS run=ad675312-7c26-47d1-8364-75e44d839d78 status=completed | legal_entity=Acme GmbH filter: True · citations 3 all Acme GmbH: True · filtered call returned 3/3 matched docs · Sep 2025 cited: True · EUR 1,180,000 in answer: True
+```
+
+Probe 1 (before restart #3) read `2/3 · Sep 2025 cited: False`. The only change between them is the
+process now serving `1cef556f3`, so the live code is proven by behaviour, not just by a timestamp.
+
+### Board (b) ×8
+
+`--prompts b --out board-rerun-b`. Evidence: `evidence/board-rerun-b/` (8 JSON, `board-summary.json`,
+`board-run-b.log`, `board-verdicts-readout.txt`). ⚠ The `.log` is gitignored by `*.log`, like
+`board-run.log` and `board-run-ac.log` before it, so it exists on disk only and the JSON files are the
+committed record. The roster lines are identical to the (a)/(c)
+re-run's (`diff` of the `SC10_ROSTER provider` lines is empty). Effective `runs.provider/model` ==
+requested on all 8.
+
+```
+| anthropic | claude-sonnet-5 | — | PASS | — |
+| deepseek | deepseek-v4-pro | — | PASS | — |
+| google | gemini-3.5-flash | — | FAIL | — |
+| minimax | MiniMax-M3 | — | PASS | — |
+| moonshot | kimi-k2.6 | — | PASS | — |
+| openai | gpt-5.6-luna | — | PASS | — |
+| openrouter | z-ai/glm-5.2 | — | PASS | — |
+| zhipu | glm-5.2 | — | PASS | — |
+```
+
+**(b) is 7/8, the same as the first board, and no verdict changed.** What changed is coverage: **all
+8 filtered calls returned 3/3 matched documents** (the 7 passing rows of the first board each got 2),
+and all 8 answers cite Sep 2025 at EUR 1,180,000. Attributed to **D-27** (threshold half `6922624d6`
+plus dedup half `1cef556f3`) on every row. The pass rule is unchanged; the coverage note is an
+observation the rule does not score.
+
+**Google (b), run `1c791074`: FAIL, with the cause changed.** The first call (`legal_entity = Acme
+GmbH`, audit `6732f57d`) returned all 3 reports, so it no longer needed the `read_document` on
+September that it made on the first board. It then widened on its own: `query_documents`, an
+unfiltered `search_documents` (audit `2efc5cec`, `filters: []`), and a search filtered on `title =
+"ACME Corporation - Q3 2026 Financial Results and Form 10-K Report"` (audit `0b0889e6`). It cited
+`acme_q3_2026_financial_report.md` and `acme_contract_renewal_schedule_2026.md`, which are not Acme
+GmbH. Our contribution named in the Google investigation (F-2) is gone. What remains is model
+behaviour, consistent with (a) and (c).
+
+**Complete board after every fix: (a) 6/8 · (b) 7/8 · (c) 7/8 = 20/24**, against 20/24 on the first
+board (7 · 7 · 6). Three of the four FAILs are Google (model behaviour, investigated). The fourth,
+MiniMax (a), is run-to-run variance and was flipped PASS on the first board.
+
+### G4-3 re-drive 2 (Playwright Chromium, rendered text at rest)
+
+Same method as before, using `g4drive-rerun2.cjs g4-3` from the session scratchpad, which is
+`g4drive-rerun.cjs` with the evidence suffix changed to `-rerun2`. Model = the saved deepseek /
+deepseek-v4-flash. Thread `ec595218`, run `2839d9dd` (`completed`), audit `fb979f54` (`legal_entity eq
+Acme GmbH`, `passages`, `matched_document_count = 3`, 3 `document_ids`).
+
+- **PASS. F-2 is closed on the lived surface.** At rest the answer reads *"Acme GmbH's revenue appears
+  in three monthly financial reports in your library:"*, then a table: **September 2025 EUR
+  1,180,000** · October 2025 EUR 1,240,000 · March 2026 EUR 1,410,000. It ends *"…I've limited this to
+  Acme GmbH as asked."*
+- The confidence badge reads `● High confidence`; on the first drive it was `● Low confidence`.
+- `References · 3 sources`: `272-board-acme-2025-09.md` (0.64), `-2025-10.md` (0.63), `-2026-03.md`
+  (0.63).
+- After one click, the card reads `Searching documents→View results` + **`Filtered: legal entity =
+  Acme GmbH`** (visible, 659×20). It was canonicalised from the typed `Acme Gmbh` (D-20).
+- **Observation O-1 (not a 272 defect, not fixed).** This answer named its sources in a *Source*
+  table column instead of `[n]` markers. So there are **0 inline citation markers**, and the footer
+  reads *"Unmarked claims read as general knowledge"* while References lists 3 sources. The first
+  G4-3 drive and probe 2 both used `[n]` markers. This is model formatting variance, but the footer
+  line overstates "unmarked" on a fully sourced answer. It is surfaced for the operator.
+
+Evidence: `evidence/g4-3-at-rest-rerun2.png`, `g4-3-references-open-rerun2.png`,
+`g4-3-runcard-open-rerun2.png`, `g4-3-dom-rerun2.txt`, `g4-3-runcard-open-dom-rerun2.txt`. The first
+drive's and the `-rerun` files are untouched.
+
 ## OWED (recorded, never executed here)
 
 1. ~~Operator: add OpenAI API credits~~ — done 2026-10-03; board and drive run (above).
@@ -490,10 +583,12 @@ outside the repo tree.
    - (i) is done: the restart at 13:09.
    - (ii) is partly done: (a) ×8, (c) ×8, Google (a)/(c), G4-1 and the G4-2 card text are re-run.
    - **Still owed:**
-     - (iv) **operator restart #3**, so that `1cef556f3` (D-27 dedup half) is live.
-     - (v) then board (b) ×8 with `--prompts b --out board-rerun-b`, plus G4-3. Expected: all 3 Acme
-       GmbH reports, including September 2025 at EUR 1,180,000.
-     - (iii) the operator's sign-off.
+     - ~~(iv) **operator restart #3**, so that `1cef556f3` (D-27 dedup half) is live.~~ Done
+       (listener pid 42856, started 13:46:55).
+     - ~~(v) then board (b) ×8 with `--prompts b --out board-rerun-b`, plus G4-3. Expected: all 3 Acme
+       GmbH reports, including September 2025 at EUR 1,180,000.~~ Done: (b) 7/8 with 3/3 coverage on
+       all 8, and G4-3 PASS with three figures (above).
+     - (iii) **the operator's G-4 sign-off on G4-1..G4-3 is the only item from (2) still owed.**
 3. **Production parity, in this order, before the backend deploy:**
    a. A FREE read of the production `document_chunks` count (Supabase MCP `execute_sql` SELECT — not
       available to this executor, so OWED). If it is large, run alone first, outside any transaction:
