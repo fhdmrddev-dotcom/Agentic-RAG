@@ -1,7 +1,10 @@
 ---
 seed_id: SEED-153
 title: "Where close means WRONG — accounting period, legal entity, contract version, jurisdiction — the dimension must be a structured FILTER, never a prompt instruction, and an empty filter must FAIL the phase rather than fall back to unfiltered search"
-status: planted
+status: folded
+partial: true
+folded_into: "272"
+status_note: "Chat half (structured date + dimension filters on search_documents, fail-closed empty result) folded into Phase 272 at discuss 2026-10-03 (FIND-07). Still OPEN: the workflow-input → filter binding and the publish-gauntlet gate (open question 3); out of FIND-07 by roadmap, recorded in 272-CONTEXT.md <deferred>. Open question 2 ANSWERED: the model decides, over the org's closed field list (D-01)."
 planted: 2026-08-12
 planted_by: External review 2026-08-12 (finding F4) — accepted, and judged MORE severe than the review rated it
 surface: Agentic-RAG

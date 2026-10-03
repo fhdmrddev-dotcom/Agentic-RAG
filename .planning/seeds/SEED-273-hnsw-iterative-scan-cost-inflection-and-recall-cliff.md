@@ -3,7 +3,9 @@ seed_id: SEED-273
 title: "HNSW iterative scan: Postgres planner cost inflection on selective filters and re-evaluating the recall cliff"
 created: 2026-09-13
 planted_during: Phase 246 post-execution review (BUS-204)
-status: planted
+status: folded
+folded_into: "272"
+status_note: "Folded into Phase 272 at discuss 2026-10-03: SC#3 requires the recall_bench re-measure with EXPLAIN (ANALYZE, BUFFERS) at every point. D-14 chooses exact scan over a pre-resolved small document set plus iterative_scan above the threshold for FILTERED searches only; unfiltered global knobs unchanged."
 surface: Agentic-RAG
 severity: major
 category: database / pgvector / retrieval-quality / performance
