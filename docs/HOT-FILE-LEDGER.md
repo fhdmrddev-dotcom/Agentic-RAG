@@ -10712,12 +10712,12 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 74 / 37 / 2372 | ⚠ **FIRES** | ⚠ absent from the SCAN LIST at 37 phases (its section existed). **272-02**: the `filters` arg on `SEARCH_DOCUMENTS_TOOL` + D-02 text only; vocabulary builder lives in search_documents_tool.py |
-| [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 0 / 0 / 0 | no (new) | young (created 272-01, D-13): the RPC adapter moved verbatim; 272-03 adds `document_ids`. ⛔ never `x if x else None` on document ids; unfiltered SQL byte-identical |
-| [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 0 / 0 / 0 | no (new) | young (created 272-01, D-13): pure `_rrf_fuse` / `_deduplicate_chunks` / `_avg_cosine`, AST-pinned; 272-03 adds the D-10 row selection. ⛔ no I/O |
-| [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 0 / 0 / 0 | no (new) | young (created 272-01, D-13): `_enrich_with_filenames` / `resolve_document_id` / `fetch_full_document`, moved verbatim and AST-pinned |
-| [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 0 / 0 / 0 | no (new) | young (272-01 contracts, 272-03 resolver). Default predicates are DATA (D-13). ⛔ every id/count is RLS-intersected (D-21); empty never means all (D-18) |
-| [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 0 / 0 / 0 | no (new) | young (created 272-01, D-15): handler, lock, ONE audit writer, vocabulary. ⛔ ToolResult imported function-locally (cycle); registry/handler split OWED → 273 |
+| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 75 / 38 / 2437 (was `74 / 37 / 2372`) | ⚠ **FIRES** | ⚠ STALE (`74/37/2372`). **272-02**: `filters` on SEARCH_DOCUMENTS_TOOL + D-02 text only. ⛔ no anyOf/oneOf/type arrays under `filters` (Gemini) |
+| [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
+| [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 2 / 1 / 111 (was `0 / 0 / 0`) | no (young) | young (272-01 move, AST-pinned; 272-03 D-10 `_select_filtered_vector_rows` + `_carry_low_similarity`). ⛔ no I/O |
+| [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 1 / 1 / 174 (was `0 / 0 / 0`) | no (young) | young (272-01 verbatim move, AST-pinned); unchanged since |
+| [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 2 / 1 / 416 (was `0 / 0 / 0`) | no (young) | young (272-01 contracts, 272-03 resolver). ⛔ every id/count is RLS-intersected (D-21); empty never means all (D-18) |
+| [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 4 / 1 / 1163 (was `0 / 0 / 0`) | no (young) | young (272-01 move; 272-04 kinds, D-09 lock, ONE audit writer, vocabulary). ⚠ option strings reach the schema unescaped. Split OWED → 273 |
 | [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 2 / 1 / 565 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). **271-05**: live on GoTrue JWTs: exact id sets, both directions, two-org fence; RLS alone held a widened leg. ⛔ no embedding import, no `.rpc(` |
 | [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 1 / 1 / 171 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ `extra="forbid"`; closed Literals; the 8 verbs pinned to `_INVERSE_LABEL`. 271-05 drove it through the route with real JWTs |
 | [`backend/app/api/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_searchpy) | 1 / 1 / 48 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ user-JWT client only; remaps `ResolveError`; no write. **271-05**: the fence calls THIS coroutine with a GoTrue token (P-04) |
@@ -10760,7 +10760,7 @@ cells rot within days.
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 4 / 4 / 614 (was `3 / 3 / 231`) | ⚠ **FIRES — 4 phases** | ⚠ row STALE (`3/3/231`). **267-04**: R1-R10 rows + the Will/Won't ledger; the per-row action area is ONE `ExpertRowActions` (the named seam, TAKEN). ⛔ the body stays a list |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
-| [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
+| [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 54 / 22 / 407 (was `51 / 23 / 351`) | **FIRES** | ✅ G-5 DISCHARGED (227-02). **272-02**: the filter line as visible text in both card branches. ⚠ recipe now reads 22 phases (was 23) |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 77 / 35 / 1027 (was `75 / 34 / 1000`) | **FIRES** | ⚠ row STALE (`75/34/1000`). honoured by construction (**267-04**): ONE early return after the last hook — event → card, marker → card, other system row → null. Hooks 3/0/7 unchanged |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 261 / 88 / 2434 (was `255 / 87 / 2156`) | **FIRES** | ⚠ STALE (`255/87/2156`). **268-01/03**: send resolves scoping ONCE + org stamps; +1 folder arm, 1 scope writer, 1 route. ⛔ 0 new send-path branches |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 104 / 38 / 4948 | **FIRES** | ⚠ row STALE an 8th time (`101/37/4815`; CLAUDE.md read `102/37/4880`). NOT modified by 253 — re-derived under CR-08. honoured by construction (**244-14**) |
@@ -10813,7 +10813,7 @@ cells rot within days.
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ **FIRES** | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 95 / 74 / 1520 (was `94 / 73 / 1459`) | ⚠ **FIRES** | ⚠ STALE (`94/73/1459`). **271-03**: Find wire types (`DocumentSearchRequest/Row/Response`, `RelVerb`), additive. Seam OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 84 / 61 / 952 (was `83 / 60 / 951`) | ⚠ **FIRES** | ⚠ STALE (`83/60/951`). **271-01**: ONE import + ONE `include_router(document_search.router)` after `document_views`. 0 new branches |
-| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 87 / 50 / 1593 | ⚠ **FIRES** | ⚠ STALE a 13th time (`83/48/1506`). honoured by construction (**249-01**): ONE derived frozenset + a Literal widened to the value the code already returned. ⛔ MODEL_CAPABILITIES seam OWED |
+| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 90 / 52 / 1698 (was `87 / 50 / 1593`) | ⚠ **FIRES** | ⚠ STALE (`87/50/1593`). **272-05**: the stale ef_search 'raised to 200' comment corrected; value 40 unchanged. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
@@ -10944,7 +10944,7 @@ cells rot within days.
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 28 / 14 / 332 (was `24 / 13 / 294`) | ⚠ **FIRES** | ⚠ STALE (`24/13/294`). **271-03**: `columns="find"` ignores `folderId` and renders nothing on zero (the Find body owns S7). ⛔ still seven `<td>` |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 53 / 18 / 1218 (was `50 / 17 / 994`) | ⚠ **FIRES** | ⚠ STALE (`50/17/994`). **271-02/04**: Filing rules sub-view + a SECOND `useReducer` for Find; `documentSurface(lead, findSlots?)`. ⛔ Views path byte-unchanged |
-| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 19 / 11 / 456 | ⚠ **FIRES** | ⛔ **extraction still OWED** (`SEED-224`, since 231) — 241 is the SECOND landing, capped at 11 lines by a fence; a THIRD must propose the extraction FIRST |
+| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 21 / 12 / 159 (was `19 / 11 / 456`) | ⚠ **FIRES** | ✅ **G-5 extraction DISCHARGED (272-01)**: moved to retrieval_rpc/rank/documents/scope (456 → 159 L); orchestrator only. ⛔ filtered retrieval never lands back here |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
@@ -10953,14 +10953,14 @@ cells rot within days.
 | [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 6 / 6 / 490 (was `5 / 5 / 450`) | ⚠ **FIRES** | ⚠ STALE (`5/5/450`). **271-03**: `searchDocuments` + `DocumentSearchError`, additive. ⛔ Find's hook imports from here, never the barrel |
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
-| [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 57 / 28 / 3580 (was `56 / 28 / 3573`, and `54 / 27 / 3557` before 268) | ⚠ **FIRES** | ⚠ STALE (`56/28/3573`). **268**: 4 org stamps (268-01) + ONE scope-note fold in `_reconstruct_history` (D-268-26): 1 kind check, 1 prepend. ⛔ prompt-assembly seam OWED |
+| [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 14 / 7 / 991 (was `11 / 6 / 737`) | ⚠ **FIRES** | ⚠ STALE (`11/6/737`). **272-04**: the trend skips `invalid_filter` / `refused_retry` rows (4 lines, D-24); kind 2 still counts |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 59 / 29 / 3608 (was `57 / 28 / 3580`) | ⚠ **FIRES** | ⚠ STALE (`57/28/3580`). **272-04**: honoured by construction (D-16, 27 lines: prompt, today_line, vocabulary, lock). ⛔ prompt-assembly seam OWED → 273 |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
 | [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 17 / 9 / 1029 (was `16 / 8 / 967`) | ⚠ **FIRES** | ⚠ STALE (`16/8/967`). **268-01**: takes the send path's `scoping`/`scoping_error` (resolve once); Continue SUMS segment tokens (D-268-20) |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
 | [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
-| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 93 / 40 / 5234 (was `92 / 39 / 5221`) | ⚠ **FIRES** | ⚠ STALE (`92/39/5221`). **268-03**: 4 additive audit keys in the 2 existing `search.query` dicts. ⛔ registry/handler split OWED |
+| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 95 / 41 / 5045 (was `93 / 40 / 5234`) | ⚠ **FIRES** | ⚠ STALE (`93/40/5234`). **272**: D-15 narrow cut (search handler moved out; +1 ctx field, 7 lines). ⛔ registry/handler split OWED → 273 |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
 | [`frontend/src/components/ingestion/DocumentUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentuploadtsx) | 10 / 1 / 144 | no (1 phase) | young (056) — ⚠ absent for its entire life. ⛔ It reports NO byte progress (`onUploadProgress` absent), so any upload percentage is unknowable |
@@ -11040,7 +11040,7 @@ cells rot within days.
 | [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 2 / 1 / 183 | no (new) | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state and verbs; `MessageInput.tsx` shrank `855 → 821` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 22 / 14 / 572 | **FIRES** | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253; re-derived under CR-08. **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
-| [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 10 / 6 / 218 | **FIRES** | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string: a literal copied elsewhere makes its byte-pin vacuous |
+| [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 11 / 7 / 352 (was `10 / 6 / 218`) | **FIRES** | ⚠ STALE (`10/6/218`). **272-02**: the 'Filtered: …' line derived from args (null when unfiltered). ⛔ the ONE home of the harness activity string |
 | [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 15 / 10 / 690 | ⚠ **FIRES** | ⚠ row STALE at `11/6/653`. **266-01**: mig 195's `expert_installs` ACL mirrored (REVOKE PUBLIC/anon/authenticated, GRANT SELECT). ⛔ `scripts/` is gate-EXEMPT: kept by hand |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
@@ -11048,7 +11048,7 @@ cells rot within days.
 | [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
 | [`.claude/settings.json`](docs/HOT-FILE-LEDGER.md#claudesettingsjson) | 9 / 4 / 202 | ⚠ **FIRES** | ⚠ **absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** `.claude/` is EXEMPT: no gate could ask. The ONE hook dispatch table; a too-narrow `matcher` fires NEVER, in silence |
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
-| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 20 / 11 / 970 | ⚠ **FIRES** | ⚠ the row was ACCURATE at 264 research (`19/10/958`) and **264-01 made it stale inside the same phase**. honoured by construction: ONE `sub_ctx` kwarg, read from `parent_ctx`, never re-derived |
+| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 21 / 12 / 973 (was `20 / 11 / 970`) | ⚠ **FIRES** | ⚠ STALE (`20/11/970`). **272-04**: ONE kwarg shares the D-09 lock set with sub-agents BY REFERENCE (3 lines); never a copy |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 10 / 6 / 705 | ⚠ **FIRES** | ⚠ **FIRES at 5 phases, absent from BOTH registers its ENTIRE LIFE — row added 256-04, in its FIRST edit's commit (O-6).** honoured by construction. ⛔ accumulators init `None` never `0`, above the loop |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 2 / 1 / 103 | no (new) | young (created 257-01). The single home of token-to-USD conversion (METER-02 / D-257-13). CostResult with Decimal arithmetic and None on unrated. |
@@ -17799,3 +17799,65 @@ The G-5 gate (`node scripts/check-hot-file-ledger.cjs 272`, run over every file 
 ### `backend/app/services/search_documents_tool.py`
 
 **`0 / 0 / 0`** at 272 planning. Young (created 272-01 by moving `tool_dispatcher._handle_search_documents` verbatim, D-15). 272-04 adds validation and canonicalisation (D-04, D-20), the four result kinds (D-12, D-25), the per-turn retry lock (D-09), the per-run vocabulary (D-02, D-23) and `today_line` (D-07). ⛔ **Binding invariants:** ONE `write_audit_entry` call site, used by every result kind, with additive keys; kind 2 short-circuits BEFORE any retrieval call (D-18); kind-1 `result` stays the JSON array the card renders, the model summary goes in `llm_content`; `ToolResult` imported function-locally (a module-level import of tool_dispatcher cycles); the full registry/handler split of `tool_dispatcher.py` stays OWED for Phase 273.
+
+## Phase 272 — close re-derivation (2026-10-03, plan `272-05`)
+
+Every triple below was re-derived with the CLAUDE.md recipe AFTER the phase's last source edit (272-05's constants commit), six-digit quick-task buckets subtracted. The set is every non-test source file the five plans touched: 14 files, 14 scan-list rows refreshed in place (old triple kept as `(was …)`), none duplicated. Live evidence: `.planning/phases/272-close-means-wrong/272-UAT-LOG.md`.
+
+⚠ **CLAUDE.md's abridged rows for these files were left stale BY DECISION.** CLAUDE.md measured 119,524 chars (476 under the 120,000 warn band) and refreshing nine rows would cross it; the split has been owed since 271. The gate reads THIS scan list, so G-5 still sees every row.
+
+### `backend/app/services/retrieval_service.py` — Phase 272
+
+**`21 / 12 / 159`** at 272 close (was `19 / 11 / 456`). ✅ **The G-5 extraction owed since Phase 231 (SEED-224) is DISCHARGED by 272-01**: a pure move (AST-identical to PHASE_BASE, `test_272_pure_move.py`) into `retrieval_rpc.py`, `retrieval_rank.py`, `retrieval_documents.py` and `retrieval_scope.py`; 272-03 then added `document_ids=` to the orchestrator (None byte-identical, empty → `([], 0.0)`). ⛔ This file is the orchestrator only; filtered retrieval never lands back here.
+
+### `backend/app/services/retrieval_rpc.py` — Phase 272
+
+**`3 / 1 / 232`** at 272 close. 272-01 move; 272-03 `document_ids` on both arms; **272-05 set `FILTERED_EXACT_MAX_CHUNKS = 2000` and `FILTERED_ITERATIVE_SCAN = "relaxed_order"` from the SEED-273 ladder** (rule and table in `272-VALIDATION.md` §2). ⚠ **272-05 also found that migration 200's btree makes PL/pgSQL's generic plan a whole-table join** (unfiltered search 3-8 ms → up to 1.56 s after five calls on a pooled session); migration 201 pins both RPCs to custom plans. ⛔ Binding: unfiltered SQL byte-identical; an empty set never reaches the DB; both arms get the SAME list.
+
+### `backend/app/services/retrieval_rank.py` — Phase 272
+
+**`2 / 1 / 111`** at 272 close. 272-01 move (AST-pinned); 272-03 `_select_filtered_vector_rows` (D-10) and `_carry_low_similarity` (by position, because enrich drops the chunk id). ⛔ No I/O.
+
+### `backend/app/services/retrieval_documents.py` — Phase 272
+
+**`1 / 1 / 174`** at 272 close. 272-01 verbatim move; unchanged since.
+
+### `backend/app/services/retrieval_scope.py` — Phase 272
+
+**`2 / 1 / 416`** at 272 close. 272-01 contracts (`DEFAULT_PREDICATES` as data, D-13); 272-03 the two-step RLS-decided resolver. Live: `test_272_scope_rls.py` 6 passed on the merged tree.
+
+### `backend/app/services/search_documents_tool.py` — Phase 272
+
+**`4 / 1 / 1163`** at 272 close. 272-01 verbatim move (D-15); 272-04 validation/canonicalisation, the four result kinds, the D-09 lock, ONE audit writer, the per-run vocabulary. ⚠ 272-04's threat flag stands: field keys and enum option strings reach the model's tool schema unescaped (the caller's own data). The full registry/handler split of `tool_dispatcher.py` stays OWED → Phase 273.
+
+### `backend/app/services/tool_dispatcher.py` — Phase 272
+
+**`95 / 41 / 5045`** at 272 close (was `93 / 40 / 5234`). D-15 narrow cut only: the search handler moved out (272-01) and one `ToolContext` field (`empty_filter_fields_in_run`, 7 lines with its comment, 272-04). ⛔ **The registry/handler split is OWED → Phase 273.** Tool inventory still 29 (`test_259` / `test_261` / `test_085` green on the merged tree).
+
+### `backend/app/services/openai_service.py` — Phase 272
+
+**`75 / 38 / 2437`** at 272 close (was `74 / 37 / 2372`). 272-02: the `filters` property on `SEARCH_DOCUMENTS_TOOL` and the D-02 text removal, nothing else (`test_272_tool_schema.py` green).
+
+### `backend/app/services/agent_loop.py` — Phase 272
+
+**`59 / 29 / 3608`** at 272 close (was `57 / 28 / 3580`). Honoured by construction (D-16): 272-04 changed 27 lines (prompt rewrite, a 2-line import, `today_line`, the vocabulary statement, lock init, two kwargs), no logic branch. ⛔ **The prompt-assembly seam is OWED → Phase 273.**
+
+### `backend/app/services/task_service.py` — Phase 272
+
+**`21 / 12 / 973`** at 272 close (was `20 / 11 / 970`). 272-04: ONE kwarg shares the D-09 lock set with sub-agents by reference (A5), so a sub-agent cannot become an unfiltered bypass.
+
+### `backend/app/api/knowledge_health.py` — Phase 272
+
+**`14 / 7 / 991`** at 272 close (was `11 / 6 / 737`; other phases also grew it). 272-04: 4 lines (D-24) so `invalid_filter` / `refused_retry` rows never count as "found nothing".
+
+### `backend/app/config.py` — Phase 272
+
+**`90 / 52 / 1698`** at 272 close (was `87 / 50 / 1593`). 272-05: comment-only — the stale "default raised from 40 to 200" note corrected to cite the revert (`521f4a025`); `hnsw_ef_search = 40` unchanged (D-14: no global knob change).
+
+### `frontend/src/lib/toolMeta.ts` — Phase 272
+
+**`11 / 7 / 352`** at 272 close (was `10 / 6 / 218`). 272-02: the "Filtered: …" line derived from the call's args (null when unfiltered).
+
+### `frontend/src/components/chat/ToolCallPanel.tsx` — Phase 272
+
+**`54 / 22 / 407`** at 272 close (was `51 / 23 / 351`). 272-02: the filter line rendered as visible text in both card branches. ⚠ The recipe now reads 22 phases where the row said 23; the recipe's reading is recorded, not the old figure.
