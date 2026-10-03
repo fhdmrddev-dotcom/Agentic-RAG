@@ -399,7 +399,7 @@ async def assemble_grounding_bundle(
     visibility rule, and a post-filter that drifts from the pushed-down query is precisely how
     SEED-124 / SEED-125 happened.
     """
-    from app.services.openai_service import get_tools  # function-local
+    from app.services.openai_service import CHAT_ONLY_TOOLS, get_tools  # function-local
     from app.utils.folder_utils import (  # function-local
         _resolve_caller_org_ids,
         fetch_visible_folders,
@@ -474,7 +474,10 @@ async def assemble_grounding_bundle(
     # CR-01 negative control — a capability on an ``llm_agent`` step STILL BLOCKS) and
     # ``tests/test_182_grounding_bundle.py`` (V22: the three names are ABSENT from
     # ``tools``), the latter proved non-vacuous by an observed plant.
-    schema_tool_names = {t["function"]["name"] for t in get_tools(None)}
+    # Phase 273 (Pitfall 8) — chat-only tools (show_artifact) are NOT a workflow capability: they
+    # are subtracted from the authoring offer, which therefore stays 28 with every gate on
+    # (frontend ``components/workflows/toolNames.test.ts:56`` pins that set).
+    schema_tool_names = {t["function"]["name"] for t in get_tools(None)} - CHAT_ONLY_TOOLS
     fidelity_tool_names = schema_tool_names | EXTERNAL_ACTION_CAPABILITIES
 
     # CR-01 — the caller's org set gates the skill read. Resolved HERE, in the async caller,

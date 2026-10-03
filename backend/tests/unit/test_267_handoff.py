@@ -408,7 +408,7 @@ def test_the_summary_emitter_is_a_name_not_a_registered_emitter_or_tool():
     assert "emit_handoff_summary" not in EMITTER_REGISTRY
     assert "emit_handoff_summary" not in _TOOL_REGISTRY
     assert len(EMITTER_REGISTRY) == 1
-    assert len(_TOOL_REGISTRY) == 29
+    assert len(_TOOL_REGISTRY) == 30  # Phase 273: 29 → 30, the deliberate show_artifact
 
 
 def test_the_service_filename_is_not_a_forbidden_expert_runtime_pattern():

@@ -70,7 +70,7 @@ def test_registry_and_reexport_are_the_moved_handler():
     td, tool = _td(), _tool()
     assert td._TOOL_REGISTRY["search_documents"] is tool.handle_search_documents
     assert td._handle_search_documents is tool.handle_search_documents
-    assert len(td._TOOL_REGISTRY) == 29
+    assert len(td._TOOL_REGISTRY) == 30  # Phase 273: 29 → 30, the deliberate show_artifact
 
 
 # ⚠ RETIRED ON PURPOSE BY 272-04 (SEED-177: retire a fence DELIBERATELY, never trip it by surprise):
