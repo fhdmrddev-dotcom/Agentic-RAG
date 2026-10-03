@@ -1125,8 +1125,11 @@ class Settings(BaseSettings):
     keyword_search_weight: float = 1.0
     rrf_k: int = 60  # RRF constant (standard: 60)
 
-    # Phase 246 (RECALL-01 / D-246-03) — default raised from 40 to 200, restoring
-    # recall from 0.040 to 1.000 for small tenants in a 100k chunk corpus (QUEUE-06).
+    # Phase 246 (RECALL-01 / D-246-03) raised this default 40 → 200 and then REVERTED it to 40
+    # (`521f4a025`): its "recall 0.040 → 1.000" at 200 was a planner flip to a sequential scan,
+    # not an index walk (SEED-273). The value is 40. Phase 272 (D-14) leaves it unchanged: a
+    # FILTERED search ranks small document sets exactly and widens only its own walk
+    # (retrieval_rpc.FILTERED_*); unfiltered search keeps these global knobs.
     hnsw_ef_search: int = 40
     hnsw_iterative_scan: str = "off"  # off | strict_order | relaxed_order
 

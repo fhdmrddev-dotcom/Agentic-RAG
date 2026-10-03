@@ -1,0 +1,1727 @@
+{
+  "measured_at": "2026-10-03T06:50:10.742343+00:00",
+  "database": {
+    "host": "127.0.0.1",
+    "port": 54322,
+    "database": "recall_bench"
+  },
+  "user_id": "7fcfb80e-d25c-4705-8916-a81f257deb17",
+  "server": {
+    "postgresql_version": "17.6",
+    "pgvector_version": "0.8.0",
+    "hnsw_ef_search": null,
+    "hnsw_iterative_scan": null
+  },
+  "corpus_chunks": 100000,
+  "prepare_sets": {
+    "cleared": "UPDATE 740",
+    "documents_assigned": {
+      "500": 20,
+      "1000": 40,
+      "2000": 80,
+      "5000": 200,
+      "10000": 400,
+      "15000": 600
+    }
+  },
+  "k": 20,
+  "query_vectors": 25,
+  "seed": "272",
+  "global_knobs": {
+    "hnsw_ef_search": 40,
+    "hnsw_iterative_scan": "off",
+    "hnsw_max_scan_tuples": 20000
+  },
+  "explain_method": "body statements copied from pg_get_functiondef; PREPARE + EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) EXECUTE under plan_cache_mode force_custom_plan and force_generic_plan; owner connection with the caller's claim GUCs set (DEFINER-faithful, no RLS quals); pg_stat_user_indexes.idx_scan never read",
+  "function_proconfig": [
+    "search_path=\"\"",
+    "plan_cache_mode=force_custom_plan"
+  ],
+  "body_statements": {
+    "exact": "SELECT dc.id, dc.document_id, dc.content, dc.chunk_index, 1 - (dc.embedding OPERATOR(public.<=>) $1) AS similarity FROM public.document_chunks dc JOIN public.documents d ON d.id = dc.document_id WHERE dc.document_id = ANY ($6) AND dc.org_id = ANY (SELECT public.current_user_org_ids()) AND ( dc.user_id = auth.uid() OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id)) OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility) ) AND (d.source_state IS NULL OR d.source_state != 'source_disconnected') AND 1 - (dc.embedding OPERATOR(public.<=>) $1) > $2 AND d.is_latest = true AND ($3 IS NULL OR d.metadata @> $3) AND ($4 IS NULL OR d.folder_id = ANY($4)) AND ($5 IS NULL OR dc.embedding_model = $5) ORDER BY (dc.embedding OPERATOR(public.<=>) $1) + 0 LIMIT $7",
+    "index": "SELECT dc.id, dc.document_id, dc.content, dc.chunk_index, 1 - (dc.embedding OPERATOR(public.<=>) $1) AS similarity FROM public.document_chunks dc JOIN public.documents d ON d.id = dc.document_id WHERE dc.org_id = ANY (SELECT public.current_user_org_ids()) AND ( dc.user_id = auth.uid() OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id)) OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility) ) AND (d.source_state IS NULL OR d.source_state != 'source_disconnected') AND 1 - (dc.embedding OPERATOR(public.<=>) $1) > $2 AND d.is_latest = true AND ($3 IS NULL OR d.metadata @> $3) AND ($4 IS NULL OR d.folder_id = ANY($4)) AND ($5 IS NULL OR dc.embedding_model = $5) AND ($6 IS NULL OR dc.document_id = ANY ($6)) ORDER BY dc.embedding OPERATOR(public.<=>) $1 LIMIT $7"
+  },
+  "points": [
+    {
+      "label": "control unfiltered (global knobs)",
+      "branch": "index",
+      "set_chunks_target": null,
+      "set_chunks": null,
+      "set_documents": null,
+      "iterative_scan": "off",
+      "ef_search": 40,
+      "k": 20,
+      "threshold": 0.3,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 0.89,
+      "recall_min": 0.0,
+      "underfill": 0.0,
+      "p50_ms": 5.97,
+      "p95_ms": 12.2,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Index Scan",
+            "index": "document_chunks_embedding_idx",
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Index Scan",
+            "index": "documents_pkey",
+            "relation": "documents"
+          },
+          {
+            "node": "Materialize",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "document_chunks_embedding_idx",
+          "documents_pkey"
+        ],
+        "hnsw_node": true,
+        "uses_document_id_btree": false,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 0,
+        "shared_hit_blocks": 640,
+        "execution_time_ms": 1.261,
+        "planning_time_ms": 0.591,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 100813,
+        "shared_hit_blocks": 898012,
+        "execution_time_ms": 1708.731,
+        "planning_time_ms": 0.641,
+        "actual_rows": 20
+      }
+    },
+    {
+      "label": "15000 exact",
+      "branch": "exact",
+      "set_chunks_target": 15000,
+      "set_chunks": 15000,
+      "set_documents": 600,
+      "iterative_scan": null,
+      "ef_search": null,
+      "k": 20,
+      "threshold": -2.0,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 1.0,
+      "recall_min": 1.0,
+      "underfill": 0.0,
+      "p50_ms": 193.93,
+      "p95_ms": 221.47,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Aggregate",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 5942,
+        "shared_hit_blocks": 175590,
+        "execution_time_ms": 185.637,
+        "planning_time_ms": 1.369,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": "document_chunks"
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 2690,
+        "shared_hit_blocks": 209909,
+        "execution_time_ms": 328.079,
+        "planning_time_ms": 0.949,
+        "actual_rows": 20
+      }
+    },
+    {
+      "label": "15000 index strict_order ef40",
+      "branch": "index",
+      "set_chunks_target": 15000,
+      "set_chunks": 15000,
+      "set_documents": 600,
+      "iterative_scan": "strict_order",
+      "ef_search": 40,
+      "k": 20,
+      "threshold": -2.0,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 1.0,
+      "recall_min": 1.0,
+      "underfill": 0.0,
+      "p50_ms": 191.91,
+      "p95_ms": 205.5,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Aggregate",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 5402,
+        "shared_hit_blocks": 176130,
+        "execution_time_ms": 241.504,
+        "planning_time_ms": 1.402,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 100986,
+        "shared_hit_blocks": 445677,
+        "execution_time_ms": 1021.069,
+        "planning_time_ms": 1.136,
+        "actual_rows": 20
+      }
+    },
+    {
+      "label": "15000 index strict_order ef60",
+      "branch": "index",
+      "set_chunks_target": 15000,
+      "set_chunks": 15000,
+      "set_documents": 600,
+      "iterative_scan": "strict_order",
+      "ef_search": 60,
+      "k": 20,
+      "threshold": -2.0,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 1.0,
+      "recall_min": 1.0,
+      "underfill": 0.0,
+      "p50_ms": 189.29,
+      "p95_ms": 223.93,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Aggregate",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 5311,
+        "shared_hit_blocks": 176221,
+        "execution_time_ms": 203.247,
+        "planning_time_ms": 1.488,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 100934,
+        "shared_hit_blocks": 445729,
+        "execution_time_ms": 932.075,
+        "planning_time_ms": 1.063,
+        "actual_rows": 20
+      }
+    },
+    {
+      "label": "15000 index strict_order ef80",
+      "branch": "index",
+      "set_chunks_target": 15000,
+      "set_chunks": 15000,
+      "set_documents": 600,
+      "iterative_scan": "strict_order",
+      "ef_search": 80,
+      "k": 20,
+      "threshold": -2.0,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 1.0,
+      "recall_min": 1.0,
+      "underfill": 0.0,
+      "p50_ms": 188.45,
+      "p95_ms": 232.27,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Aggregate",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 4661,
+        "shared_hit_blocks": 176871,
+        "execution_time_ms": 183.435,
+        "planning_time_ms": 1.38,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 100952,
+        "shared_hit_blocks": 445711,
+        "execution_time_ms": 876.434,
+        "planning_time_ms": 1.018,
+        "actual_rows": 20
+      }
+    },
+    {
+      "label": "15000 index strict_order ef100",
+      "branch": "index",
+      "set_chunks_target": 15000,
+      "set_chunks": 15000,
+      "set_documents": 600,
+      "iterative_scan": "strict_order",
+      "ef_search": 100,
+      "k": 20,
+      "threshold": -2.0,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 1.0,
+      "recall_min": 1.0,
+      "underfill": 0.0,
+      "p50_ms": 181.48,
+      "p95_ms": 197.27,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Aggregate",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 5332,
+        "shared_hit_blocks": 176200,
+        "execution_time_ms": 200.465,
+        "planning_time_ms": 1.376,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 100919,
+        "shared_hit_blocks": 445744,
+        "execution_time_ms": 942.581,
+        "planning_time_ms": 0.995,
+        "actual_rows": 20
+      }
+    },
+    {
+      "label": "15000 index relaxed_order ef40",
+      "branch": "index",
+      "set_chunks_target": 15000,
+      "set_chunks": 15000,
+      "set_documents": 600,
+      "iterative_scan": "relaxed_order",
+      "ef_search": 40,
+      "k": 20,
+      "threshold": -2.0,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 1.0,
+      "recall_min": 1.0,
+      "underfill": 0.0,
+      "p50_ms": 183.27,
+      "p95_ms": 202.22,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Aggregate",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 4833,
+        "shared_hit_blocks": 176699,
+        "execution_time_ms": 175.856,
+        "planning_time_ms": 1.362,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 100951,
+        "shared_hit_blocks": 445712,
+        "execution_time_ms": 894.271,
+        "planning_time_ms": 0.971,
+        "actual_rows": 20
+      }
+    },
+    {
+      "label": "15000 index relaxed_order ef60",
+      "branch": "index",
+      "set_chunks_target": 15000,
+      "set_chunks": 15000,
+      "set_documents": 600,
+      "iterative_scan": "relaxed_order",
+      "ef_search": 60,
+      "k": 20,
+      "threshold": -2.0,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 1.0,
+      "recall_min": 1.0,
+      "underfill": 0.0,
+      "p50_ms": 183.18,
+      "p95_ms": 229.69,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Aggregate",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 4794,
+        "shared_hit_blocks": 176738,
+        "execution_time_ms": 191.81,
+        "planning_time_ms": 1.488,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 100958,
+        "shared_hit_blocks": 445705,
+        "execution_time_ms": 924.122,
+        "planning_time_ms": 1.007,
+        "actual_rows": 20
+      }
+    },
+    {
+      "label": "15000 index relaxed_order ef80",
+      "branch": "index",
+      "set_chunks_target": 15000,
+      "set_chunks": 15000,
+      "set_documents": 600,
+      "iterative_scan": "relaxed_order",
+      "ef_search": 80,
+      "k": 20,
+      "threshold": -2.0,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 1.0,
+      "recall_min": 1.0,
+      "underfill": 0.0,
+      "p50_ms": 176.14,
+      "p95_ms": 193.24,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Aggregate",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 4144,
+        "shared_hit_blocks": 177388,
+        "execution_time_ms": 171.782,
+        "planning_time_ms": 1.322,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 100924,
+        "shared_hit_blocks": 445739,
+        "execution_time_ms": 834.873,
+        "planning_time_ms": 1.041,
+        "actual_rows": 20
+      }
+    },
+    {
+      "label": "15000 index relaxed_order ef100",
+      "branch": "index",
+      "set_chunks_target": 15000,
+      "set_chunks": 15000,
+      "set_documents": 600,
+      "iterative_scan": "relaxed_order",
+      "ef_search": 100,
+      "k": 20,
+      "threshold": -2.0,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 1.0,
+      "recall_min": 1.0,
+      "underfill": 0.0,
+      "p50_ms": 181.0,
+      "p95_ms": 218.96,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Aggregate",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 4516,
+        "shared_hit_blocks": 177016,
+        "execution_time_ms": 174.837,
+        "planning_time_ms": 1.295,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 100925,
+        "shared_hit_blocks": 445738,
+        "execution_time_ms": 813.564,
+        "planning_time_ms": 0.943,
+        "actual_rows": 20
+      }
+    },
+    {
+      "label": "15000 index off ef40",
+      "branch": "index",
+      "set_chunks_target": 15000,
+      "set_chunks": 15000,
+      "set_documents": 600,
+      "iterative_scan": "off",
+      "ef_search": 40,
+      "k": 20,
+      "threshold": -2.0,
+      "query_vectors": 25,
+      "scored": 25,
+      "recall_at_k": 1.0,
+      "recall_min": 1.0,
+      "underfill": 0.0,
+      "p50_ms": 210.49,
+      "p95_ms": 309.94,
+      "explain_custom": {
+        "plan_cache_mode": "force_custom_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Hash Join",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Hash",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Aggregate",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 4855,
+        "shared_hit_blocks": 176677,
+        "execution_time_ms": 191.913,
+        "planning_time_ms": 1.347,
+        "actual_rows": 20
+      },
+      "explain_generic": {
+        "plan_cache_mode": "force_generic_plan",
+        "nodes": [
+          {
+            "node": "Limit",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Sort",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Nested Loop",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Seq Scan",
+            "index": null,
+            "relation": "documents"
+          },
+          {
+            "node": "Bitmap Heap Scan",
+            "index": null,
+            "relation": "document_chunks"
+          },
+          {
+            "node": "Bitmap Index Scan",
+            "index": "idx_document_chunks_document_id",
+            "relation": null
+          },
+          {
+            "node": "ProjectSet",
+            "index": null,
+            "relation": null
+          },
+          {
+            "node": "Result",
+            "index": null,
+            "relation": null
+          }
+        ],
+        "index_names": [
+          "idx_document_chunks_document_id"
+        ],
+        "hnsw_node": false,
+        "uses_document_id_btree": true,
+        "seq_scan_on_chunks": false,
+        "shared_read_blocks": 100948,
+        "shared_hit_blocks": 445715,
+        "execution_time_ms": 899.502,
+        "planning_time_ms": 1.008,
+        "actual_rows": 20
+      }
+    }
+  ]
+}

@@ -35,14 +35,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # ── Phase 272 (D-14 / D-10) — the FILTERED path's three constants ────────────────────────────
-# PROVISIONAL — 272-05 sets these from the SEED-273 ladder; never an env var (deploy-artifact
-# parity: a value that ships in code needs no Coolify/Vercel twin to drift from).
+# MEASURED by 272-05 on recall_bench (100k chunks), 2026-10-03 — the SEED-273 ladder with custom
+# AND generic body EXPLAIN at every point: .planning/phases/272-close-means-wrong/evidence/
+# recall-ladder.json (+ recall-ladder-15000.json), table in 272-VALIDATION.md §2. Never an env var
+# (deploy-artifact parity: a value that ships in code needs no Coolify/Vercel twin to drift from).
 #
 # A filtered set holding at most this many chunks is ranked EXACTLY by match_document_chunks
-# (migration 200's exact branch: no graph walk, so no selective-filter recall cliff).
+# (migration 200's exact branch: no graph walk, so no selective-filter recall cliff). Rule: the
+# largest size whose exact p95 <= unfiltered-control p95 + 50 ms (34.4 + 50) with the btree and no
+# HNSW node: 2000 (p95 46.2 ms); 5000 read 108.2 ms. Recall was 1.000 at every size.
 FILTERED_EXACT_MAX_CHUNKS = 2000
-# Above that size the graph IS walked; the filtered call alone widens the walk this way. The
-# unfiltered call keeps the global knobs unchanged.
+# Above that size the INDEX branch runs; the filtered call alone sets this mode (the unfiltered call
+# keeps the global knobs). Both modes read recall 1.000 at ef 40 above T; relaxed_order had the
+# lower p95 at 5000 / 10000 / 15000 (120.8 / 152.2 / 202.2 vs 125.2 / 172.1 / 205.5 ms). ⚠ Up to
+# 15,000 chunks the custom planner chose the document_id btree, never HNSW, so this mode only
+# matters for a set large enough for the planner to walk the graph.
 FILTERED_ITERATIVE_SCAN = "relaxed_order"
 # Cosine similarity is >= -1, so -2.0 means the in-RPC threshold never prunes INSIDE a scoped
 # set (D-10). The configured threshold is applied afterwards, in Python, by
