@@ -61,7 +61,7 @@ describe("subscribeToRun — the `artifact` SSE branch", () => {
   it("calls onArtifact once with the record object, and the cursor still advances", async () => {
     const onArtifact = vi.fn()
     const onCursor = vi.fn()
-    const cbs: StreamCallbacks = { onTerminal: () => {}, onDelta: () => {}, onArtifact, onCursor } as StreamCallbacks
+    const cbs: StreamCallbacks = { onTerminal: () => {}, onDelta: () => {}, onArtifact, onCursor } as unknown as StreamCallbacks
     const wire =
       `id: 7-0\ndata: ${JSON.stringify({ type: "artifact", artifact: chartBar })}\n\n` +
       'data: {"type":"stream_end"}\n\n'
@@ -75,7 +75,7 @@ describe("subscribeToRun — the `artifact` SSE branch", () => {
 
   it("a frame with no onArtifact callback is consumed silently and still advances the cursor", async () => {
     const onCursor = vi.fn()
-    const cbs = { onTerminal: () => {}, onDelta: () => {}, onCursor } as StreamCallbacks
+    const cbs = { onTerminal: () => {}, onDelta: () => {}, onCursor } as unknown as StreamCallbacks
     const wire =
       `id: 8-0\ndata: ${JSON.stringify({ type: "artifact", artifact: table16 })}\n\n` +
       'data: {"type":"stream_end"}\n\n'

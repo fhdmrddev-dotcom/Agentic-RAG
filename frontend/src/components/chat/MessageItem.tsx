@@ -62,6 +62,7 @@ import { CitationList } from "./CitationList"
 import { SuggestionPills } from "./SuggestionPills"
 import { MessageFeedback } from "./MessageFeedback"
 import { OutputFileCard } from "./OutputFileCard"
+import { ArtifactBlock } from "./artifacts/ArtifactBlock"
 import { toolLabel, toolSummary, outerBannerLabel, harnessBannerProgress } from "@/lib/toolMeta"
 // Phase 087-05 (D-05 / chat-panel-seam.md): ADDITIVE seam renderers. Live runs
 // show quiet pointers / a paused cue; reloaded history resolves to self-contained
@@ -962,6 +963,8 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             `!!message.content` so an EMPTY early-cancel row is handled instead by
             the "cancelled — no output yet" affordance in the content region (no
             double indicator). Render-derive only — no shared-path fork (D-03/G-5). */}
+        {/* Phase 273-05 (D-10 / D-16): THE one artifact mount, after the answer, before the run status. Same records live and on reload (I-2). */}
+        {message.artifacts && message.artifacts.length > 0 && <ArtifactBlock artifacts={message.artifacts} />}
         {/* Phase 227 SC#1 / SC#3: RunTerminalStatus delegated to RunCard */}
         <RunTerminalStatus message={message} isStreaming={isStreaming} />
         {/* Active tool indicator — shown below content when a tool is running alongside text */}

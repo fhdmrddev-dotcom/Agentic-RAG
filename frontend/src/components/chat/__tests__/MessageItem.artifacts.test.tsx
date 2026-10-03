@@ -93,7 +93,7 @@ describe("MessageItem — the one artifact mount (D-16)", () => {
   it("renders the list AFTER the answer text and BEFORE the Generated-files panel", async () => {
     renderItem(
       <MessageItem
-        message={base({ artifacts: [chartBar, table16], finalOutputFiles: [{ filename: "revenue.xlsx", url: "https://x/y" }] })}
+        message={base({ artifacts: [chartBar, table16] as unknown as Message["artifacts"], finalOutputFiles: [{ filename: "revenue.xlsx", url: "https://x/y" }] })}
         isStreaming={false}
       />,
     )
@@ -118,7 +118,7 @@ describe("MessageItem — the one artifact mount (D-16)", () => {
   })
 
   it("the page text never carries spec JSON", async () => {
-    const { container } = renderItem(<MessageItem message={base({ artifacts: [chartBar, table16] })} isStreaming={false} />)
+    const { container } = renderItem(<MessageItem message={base({ artifacts: [chartBar, table16] as unknown as Message["artifacts"] })} isStreaming={false} />)
     await screen.findByTestId("chart-stub")
     expect(container.textContent).not.toContain('{"')
   })

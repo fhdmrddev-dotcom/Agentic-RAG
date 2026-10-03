@@ -4,6 +4,10 @@
 // api.ts ↔ types circular *type* reference creates no runtime import cycle.
 import type { TunerCandidate } from "@/lib/api"
 import type { ExpertConnectionState, ExpertInstallState } from "@/lib/api/experts"
+// Phase 273-05 (D-16 · I-2): the artifact wire type has ONE home, `artifactSpec.ts` (273-02).
+// Re-exported here as a TYPE only — never re-declared — so `Message` can name it.
+import type { ArtifactRecord, ArtifactMissing } from "@/components/chat/artifacts/artifactSpec"
+export type { ArtifactRecord as ArtifactRecordWire, ArtifactMissing as ArtifactMissingWire } from "@/components/chat/artifacts/artifactSpec"
 
 export interface Thread {
   id: string
@@ -252,6 +256,14 @@ export interface Message {
    * run rendered 12 download links per cell. Absent for runs that produced
    * no output files. */
   finalOutputFiles?: { filename: string; url?: string; size?: number; is_hero?: boolean }[]
+  /** Phase 273-05 (D-10 · D-16 · I-2): the agent-authored artifacts of this message, in
+   * emission order. The SAME object both ways: live, each `artifact` SSE event's record is
+   * appended by StreamsProvider's one `onArtifact` handler (deduped by id); on reload the
+   * backend attaches them as `MessageResponse.artifacts` (273-04) and `_mapMessageResponse`
+   * carries them through. Untrusted until rendered — `ArtifactBlock` runs each through the
+   * `parseArtifactRecord` guard, so nothing here is validated or narrowed. Absent when the
+   * message showed none. */
+  artifacts?: (ArtifactRecord | ArtifactMissing)[]
   /** Phase 076.2 D-01: DeepSeek reasoning/thinking content. Present on
    * assistant messages from thinking-enabled providers (DeepSeek V4).
    * Accumulated during streaming via reasoning_delta SSE events.
