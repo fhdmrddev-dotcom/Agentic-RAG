@@ -8,7 +8,7 @@
 
 Agentic RAG is a self-hostable platform for building an AI agent that answers **strictly from your own documents** (RAG — Retrieval-Augmented Generation: the agent retrieves relevant passages from your knowledge base and cites them, rather than answering from the model's general training). On top of question-answering, it lets you turn recurring knowledge work into **workflows** — durable, validated, multi-step procedures that produce a real, cited, integrity-checked deliverable (a filled `.docx`, `.pptx`, or `.xlsx`).
 
-Chat is the default interface. Document ingestion is a deliberate, manual file-upload flow — there are no automated connectors or background pipelines, so you always know exactly what is in the knowledge base.
+Chat is the default interface. Documents arrive two ways: manual file upload, or connected cloud folders (e.g. Google Drive) that sync into Library folders through watched connections (automatic syncing is off by default — an operator turns it on with `WATCH_PROCESS_ENABLED`) — with fail-closed deletion guards and anti-injection controls, so you still know exactly what is in the knowledge base.
 
 **Who it's for.** Technically-minded operators and evaluators at organizations (B2B-first; the platform is designed to serve from a few users to org-scale production from a single codebase). You do not need to be an expert coder to operate it, but you should be comfortable with API keys, environment variables, and Docker. The product is aimed at teams that want an agent which (1) answers only from their documents with citations, (2) automates recurring knowledge tasks as reviewable, validated workflows, and (3) can be deployed against published infrastructure requirements by the buyer.
 
@@ -26,7 +26,7 @@ Chat is the default interface. Document ingestion is a deliberate, manual file-u
 
 ### Document ingestion
 
-- **Manual upload only** — no connectors, no scheduled crawls. You upload a file and it is processed.
+- **Manual upload plus watched cloud folders.** Upload a file and it is processed, or connect a cloud folder (Google Drive) and it syncs into a Library folder on a schedule once the operator enables the watch loop (`WATCH_PROCESS_ENABLED`, off by default).
 - **Multi-aspect extraction.** Separate, swappable extractors handle each aspect of a document: text (PDF text via PyMuPDF, in-process), tables (Camelot / pdfium + pdfplumber), images embedded in PDF/DOCX (described by a vision model), and equations.
 - **Hierarchical chunking** (default size 1000 / overlap 200), then **OpenAI embeddings** (`text-embedding-3-small`, 1536 dimensions) stored in pgvector. Extracted tables become queryable via the `query_tables` tool.
 
@@ -244,7 +244,7 @@ These are deliberate constraints, not omissions:
 
 - **No LangChain, no LangGraph — raw provider SDK calls only.** Provider-specific behavior is confined to the gateway/service boundary; the shared SSE/chunk path never branches in a breaking way. Conventions do not transfer 1:1 between providers, so each is handled on its own official documentation.
 - **Stateless chat completions.** The app stores and re-sends history itself; there is no provider-side conversation state.
-- **Manual document ingestion only.** No connectors or automated pipelines — you always control exactly what is in the knowledge base.
+- **Controlled ingestion.** Manual upload or explicitly connected, watched cloud folders — you always control exactly what is in the knowledge base.
 - **Row-Level Security on every table.** Users only see their own data; global folders and global skills are the only shared scope. Workflow visibility, harness configs (strict-parsed to reject injected keys), per-phase tool whitelists, the network-less sandbox, and template rendering (deterministic code over model-supplied data only, inside a Jinja `SandboxedEnvironment`) are all safe-by-construction.
 - **Realtime is a hint, not a source of truth.** Clients always reconcile by fetching on (re)connect.
 - **Deep Mode is a red line — workflow features are additive.** The harness/workflow layer must keep non-workflow (Deep/Explorer) chat **byte-identical**; every engine addition is an additive seam, never a breaking change to a shared hot path.
