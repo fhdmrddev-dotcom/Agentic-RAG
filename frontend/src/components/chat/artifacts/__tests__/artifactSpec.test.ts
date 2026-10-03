@@ -19,9 +19,10 @@ import {
   metricWithDelta,
   missing,
   clone,
+  type Mutable,
 } from "./fixtures"
 
-type Rec = Record<string, any>
+type Rec = Mutable
 
 function fail(raw: unknown) {
   const r = parseArtifactRecord(raw)
@@ -312,7 +313,7 @@ const JUNK: unknown[] = [null, undefined, 0, -1, 1e9, NaN, "", "x", "__proto__",
 
 function mutate(root: Rec, r: () => number): Rec {
   // Walk to a random container and replace / delete one key.
-  let node: any = root
+  let node: Mutable = root
   for (let depth = 0; depth < 4; depth++) {
     if (node === null || typeof node !== "object") break
     const keys = Object.keys(node)

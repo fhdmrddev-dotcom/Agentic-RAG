@@ -16,7 +16,7 @@ import {
   table16,
   noSource,
   metricWithDelta,
-  clone,
+  mutable,
 } from "./fixtures"
 
 function rec(raw: unknown): ArtifactRecord {
@@ -42,7 +42,7 @@ describe("captionSegments", () => {
   })
 
   it("at most 3 sources named, then +N more counted from source_count", () => {
-    const r: any = clone(chartAreaStacked)
+    const r = mutable(chartAreaStacked)
     r.caption.sources = [
       { tool: "query_documents", document: "tickets_FY25.xlsx", page: null },
       { tool: "query_tables", document: "Quarterly_Report_FY25.pdf", page: 7 },
@@ -76,7 +76,7 @@ describe("captionSegments", () => {
   })
 
   it("operations render in the order filter → top-N → sort → columns", () => {
-    const r: any = clone(chartFromFilter)
+    const r = mutable(chartFromFilter)
     r.caption.lineage.operations = [
       { op: "select", columns: ["quarter", "revenue"] },
       { op: "sort", column: "revenue", direction: "desc" },

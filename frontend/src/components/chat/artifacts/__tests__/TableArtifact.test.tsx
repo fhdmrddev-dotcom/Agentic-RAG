@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest"
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import { TableArtifact } from "../TableArtifact"
 import { parseArtifactRecord, type ArtifactRecord } from "../artifactSpec"
-import { table16, noSource, clone } from "./fixtures"
+import { table16, noSource, mutable } from "./fixtures"
 
 function rec(raw: unknown): ArtifactRecord {
   const r = parseArtifactRecord(raw)
@@ -55,7 +55,7 @@ describe("TableArtifact", () => {
   })
 
   it("numbers sort numerically, never as text (2 < 10)", () => {
-    const r: any = clone(noSource)
+    const r = mutable(noSource)
     r.spec.rows = [
       ["A", 10],
       ["B", 2],
@@ -91,7 +91,7 @@ describe("TableArtifact", () => {
   })
 
   it("long text truncates with the full value in title, rendered as text", () => {
-    const r: any = clone(noSource)
+    const r = mutable(noSource)
     const long = "<b>Northwind Logistics International Holdings Limited</b> — EMEA consolidated"
     r.spec.rows[0][0] = long
     render(<TableArtifact record={rec(r)} />)

@@ -22,7 +22,7 @@ import {
   tooltipRows,
   visibleDomain,
 } from "../chartModel"
-import { chartBar, chartLine, chartAreaStacked, chartScatter, chartRedrawn, chartFromFilter, clone } from "./fixtures"
+import { chartBar, chartLine, chartAreaStacked, chartScatter, chartRedrawn, chartFromFilter, mutable } from "./fixtures"
 
 function rec(raw: unknown): ArtifactRecord {
   const r = parseArtifactRecord(raw)
@@ -37,7 +37,7 @@ describe("series slots and colour (UI-D-07)", () => {
     const r = rec(chartBar)
     expect(seriesSlots(r)).toEqual([0, 1, 2, 3])
     // A by-reference chart that inherited slot 2 for its only series keeps slot 2.
-    const inherited: any = clone(chartFromFilter)
+    const inherited = mutable(chartFromFilter)
     inherited.spec.chart.slots = [2]
     expect(seriesSlots(rec(inherited))).toEqual([2])
     expect(seriesColor(2)).toBe("var(--chart-3)")
@@ -133,7 +133,7 @@ describe("tooltipRows", () => {
   })
 
   it("a null value sorts last and prints a dash", () => {
-    const r: any = clone(chartBar)
+    const r = mutable(chartBar)
     r.spec.rows[2][2] = null
     const t = tooltipRows(rec(r), 2, none)
     expect(t.rows[t.rows.length - 1]).toMatchObject({ name: "EMEA", text: "—" })

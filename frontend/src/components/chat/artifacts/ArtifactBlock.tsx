@@ -16,7 +16,7 @@
  * Its only hook is a `useMemo` in THIS component, so mounting it can never change a parent's hook
  * order. No entrance animation (UI-D-09).
  */
-import { Suspense, useMemo } from "react"
+import { Suspense, createElement, useMemo } from "react"
 import { ArtifactBusyBody, ArtifactFrame } from "./ArtifactFrame"
 import { ArtifactErrorBoundary } from "./ArtifactErrorBoundary"
 import { ArtifactNotice } from "./ArtifactNotice"
@@ -42,7 +42,9 @@ function ArtifactSlot({ parsed }: { parsed: ParseResult }) {
         }
       >
         <ArtifactFrame record={record}>
-          <Renderer record={record} />
+          {/* createElement, not JSX: the renderer is a STABLE module-level entry of the closed
+              registry, never a component created during render. */}
+          {createElement(Renderer, { record })}
         </ArtifactFrame>
       </Suspense>
     </ArtifactErrorBoundary>

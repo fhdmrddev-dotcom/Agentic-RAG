@@ -352,3 +352,12 @@ export const ALL_VALID = [
 export function clone<T>(v: T): T {
   return structuredClone(v)
 }
+
+/** An untyped record a test can corrupt in place (the guard is what types it). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Mutable = Record<string, any>
+
+/** A deep clone typed for in-place corruption. */
+export function mutable(v: unknown): Mutable {
+  return structuredClone(v) as Mutable
+}

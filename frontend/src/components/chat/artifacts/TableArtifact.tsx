@@ -25,7 +25,7 @@ function isEmpty(v: Cell | undefined): boolean {
 }
 
 /** Row indexes in display order. Stable: ties keep the spec's order. */
-export function sortedRowIndexes(rows: Cell[][], columns: ArtifactColumn[], sort: SortState | null): number[] {
+function sortedRowIndexes(rows: Cell[][], columns: ArtifactColumn[], sort: SortState | null): number[] {
   const idx = rows.map((_, i) => i)
   if (!sort) return idx
   const numeric = columns[sort.col]?.type === "number"

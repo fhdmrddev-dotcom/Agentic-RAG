@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { MetricArtifact } from "../MetricArtifact"
 import { parseArtifactRecord, type ArtifactRecord } from "../artifactSpec"
-import { metricWithDelta, metricZeroCompare, clone } from "./fixtures"
+import { metricWithDelta, metricZeroCompare, mutable } from "./fixtures"
 
 function rec(raw: unknown): ArtifactRecord {
   const r = parseArtifactRecord(raw)
@@ -32,7 +32,7 @@ describe("MetricArtifact", () => {
   })
 
   it("a lower value reads ▼ in rose", () => {
-    const r: any = clone(metricWithDelta)
+    const r = mutable(metricWithDelta)
     r.spec.rows = [[1400, 1532]]
     render(<MetricArtifact record={rec(r)} />)
     expect(screen.getByTestId("metric-delta")).toHaveTextContent("▼ 8.6% vs Q3 ($1,532K)")
@@ -40,7 +40,7 @@ describe("MetricArtifact", () => {
   })
 
   it("an equal value reads = no change, muted", () => {
-    const r: any = clone(metricWithDelta)
+    const r = mutable(metricWithDelta)
     r.spec.rows = [[1532, 1532]]
     render(<MetricArtifact record={rec(r)} />)
     expect(screen.getByTestId("metric-delta")).toHaveTextContent("= no change vs Q3 ($1,532K)")
@@ -56,7 +56,7 @@ describe("MetricArtifact", () => {
   })
 
   it("no comparison column → no delta line", () => {
-    const r: any = clone(metricWithDelta)
+    const r = mutable(metricWithDelta)
     r.spec.metric.compare_column = null
     render(<MetricArtifact record={rec(r)} />)
     expect(screen.queryByTestId("metric-delta")).toBeNull()

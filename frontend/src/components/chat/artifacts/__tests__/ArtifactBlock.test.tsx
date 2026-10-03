@@ -13,7 +13,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 import { ArtifactBlock } from "../ArtifactBlock"
 import { ARTIFACT_COMPONENTS, lazyChartFrom, rendererFor } from "../artifactRegistry"
 import { ArtifactErrorBoundary } from "../ArtifactErrorBoundary"
-import { chartBar, table16, metricWithDelta, missing, clone } from "./fixtures"
+import { chartBar, table16, metricWithDelta, missing, mutable } from "./fixtures"
 
 const flags = vi.hoisted(() => ({ throwTable: false }))
 
@@ -129,10 +129,10 @@ describe("ArtifactBlock", () => {
   })
 
   it("an unknown component and a pie chart become notices; the valid sibling still renders", () => {
-    const unknown: any = clone(table16)
+    const unknown = mutable(table16)
     unknown.id = "a_aaaaaaaaaa"
     unknown.component = "gauge_widget"
-    const pie: any = clone(chartBar)
+    const pie = mutable(chartBar)
     pie.id = "a_bbbbbbbbbb"
     pie.spec.chart.kind = "pie"
     const { container } = render(<ArtifactBlock artifacts={[unknown, pie, table16]} />)
