@@ -34,16 +34,20 @@ interface Props {
   /** Rows per page. */
   limit: number
   onChange: (offset: number, limit: number) => void
+  /** Phase 271-04 (FIND-02): the total is the SERVER's exact count (Find), not the length of a
+   *  capped client-side list, so the 1000-row "may be larger" arm does not apply. Browse passes
+   *  nothing and renders byte-identically. */
+  exact?: boolean
 }
 
-export function DocumentsPager({ total, offset, limit, onChange }: Props) {
+export function DocumentsPager({ total, offset, limit, onChange, exact = false }: Props) {
   const start = total === 0 ? 0 : offset + 1
   const end = Math.min(offset + limit, total)
   const canGoBack = offset > 0
   const canGoForward = offset + limit < total
 
-  // ⭐ WR-04 / T-217.1-11a — the honest cap arm.
-  const capped = total >= ROW_CAP
+  // ⭐ WR-04 / T-217.1-11a — the honest cap arm. Skipped for an exact (server) total.
+  const capped = !exact && total >= ROW_CAP
 
   if (total === 0) return null
 

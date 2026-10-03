@@ -4089,6 +4089,9 @@ const BASELINE = {
   "FilterBar.find271.test.tsx": 11, // 271-04 (3 are the Views-tab DOM snapshot pins)
   "StructurePopovers.test.tsx": 22, // 271-04
   "FindQuickAdd.test.tsx": 12, // 271-04
+  // ── Phase 271-04 Task 2 — the Find results surface and the exact pager. BOTH KNOBS. ──
+  "DocumentsFindBody.test.tsx": 26, // 271-04
+  "DocumentsPager.exact271.test.tsx": 3, // 271-04
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5970,6 +5973,9 @@ const TARGETS = [
   "src/components/ingestion/FilterBar.find271.test.tsx",
   "src/components/library/find/__tests__/StructurePopovers.test.tsx",
   "src/components/library/find/__tests__/FindQuickAdd.test.tsx",
+  // Phase 271-04 Task 2 — FILE-LEVEL.
+  "src/components/library/find/__tests__/DocumentsFindBody.test.tsx",
+  "src/components/library/__tests__/DocumentsPager.exact271.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
