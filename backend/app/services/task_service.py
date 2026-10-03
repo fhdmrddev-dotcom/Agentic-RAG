@@ -689,6 +689,15 @@ async def run_task_sub_agent(
         sys_prompt = _build_sub_agent_system_prompt(
             description, instructions, allowed_tools
         )
+    # 272-REVIEW WR-08 — a sub-agent that can search is held to the parent's filter contract (the
+    # D-09 lock is SHARED), so it is told its terms: today's date (D-07) in the prompt and the
+    # run's vocabulary (D-02/D-23) in its search_documents schema. No search tool: unchanged.
+    if any(t.get("function", {}).get("name") == "search_documents" for t in sub_tool_schemas):
+        from app.services.search_documents_tool import load_search_vocabulary, today_line, with_search_vocabulary
+
+        sys_prompt += today_line()
+        vocab = await load_search_vocabulary(parent_ctx.current_user["id"], parent_ctx.supabase)
+        sub_tool_schemas = with_search_vocabulary(sub_tool_schemas, parent_ctx.user_settings, vocab)
     messages: list[dict] = [
         {"role": "system", "content": sys_prompt},
         {"role": "user", "content": description},
@@ -770,7 +779,11 @@ async def run_task_sub_agent(
                 tool_results_to_append.append({
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),
-                    "content": tr.result if isinstance(tr, ToolResult) else str(tr),
+                    # WR-08: the model reads llm_content when a tool sets it (agent_loop's rule).
+                    "content": (
+                        (tr.llm_content if tr.llm_content is not None else tr.result)
+                        if isinstance(tr, ToolResult) else str(tr)
+                    ),
                 })
                 # F7 (092-07): harvest the grounding from this ToolResult — same
                 # extend/extend/append shape the Deep loop uses (agent_loop.py:2229).

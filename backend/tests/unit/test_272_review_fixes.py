@@ -508,3 +508,92 @@ async def test_wr07_none_still_means_no_folder_restriction(monkeypatch):
     await retrieval_rpc._keyword_search("q", "u1", object(), None, 5, folder_ids=None)
     await retrieval_rpc._keyword_search("q", "u1", object(), None, 5, folder_ids=["f1"])
     assert seen[0][-1] is None and seen[1][-1] == ["f1"]
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# WR-08 — a sub-agent is told the filter contract's terms: llm_content, today's date, vocabulary
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# The D-09 lock is SHARED with sub-agents, but the sub-agent loop sent `tr.result` (the bare
+# passages) and never `llm_content` (filter label, undated count, low-similarity note), and its
+# system prompt carried no date and its schema no vocabulary.
+
+from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
+
+_SUMMARY = json.dumps({"filter_applied": "document date 1–31 Oct 2025", "undated_note": "12 documents have no document date"})
+_SEARCH_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "search_documents",
+        "parameters": {"type": "object", "properties": {"filters": {"type": "array", "description": "Conditions."}}},
+    },
+}
+_OTHER_SCHEMA = {"type": "function", "function": {"name": "read_document", "parameters": {"type": "object"}}}
+
+
+async def _drive_sub_agent(monkeypatch, schemas):
+    import asyncio
+
+    from app.services import task_service
+    from app.services.tool_dispatcher import ToolContext, ToolResult
+
+    redis = MagicMock()
+    ctx = ToolContext(
+        redis=redis, run_id="00000000-0000-0000-0000-0000000000aa", thread_id="00000000-0000-0000-0000-0000000000bb",
+        supabase=MagicMock(), pool=MagicMock(), user_settings=None,
+        current_user={"id": "00000000-0000-0000-0000-000000000001"}, folder_subtree_ids=None,
+        scoped_folder_path=None, emit=AsyncMock(), spawn=lambda c: None, parent_run_id=None,
+        per_run_task_semaphore=asyncio.Semaphore(3), available_tools=["search_documents"],
+    )
+    rounds: list = []
+
+    async def _fake_stream(*, messages, tools, **_kw):
+        rounds.append({"messages": [dict(m) for m in messages], "tools": tools})
+        if len(rounds) == 1:
+            return "", [{"id": "c1", "name": "search_documents", "arguments": '{"query": "revenue"}'}]
+        return "done", []
+
+    async def _fake_dispatch(name, args, sub_ctx):
+        return ToolResult(result='[{"content": "x"}]', llm_content=_SUMMARY)
+
+    vocab = sdt.SearchVocabulary(
+        fields=({"field_key": "legal_entity", "field_type": "enum", "options": ["Acme GmbH"], "enabled": True},),
+        document_types=(("report", 3),),
+    )
+
+    async def _load(user_id, supabase):
+        return vocab
+
+    monkeypatch.setattr(sdt, "load_search_vocabulary", _load)
+    with patch.object(task_service, "get_pg_pool", AsyncMock(return_value=MagicMock())), \
+        patch.object(task_service, "insert_run", AsyncMock()), \
+        patch.object(task_service, "finalize_run", AsyncMock()), \
+        patch.object(task_service, "get_tools", lambda us: list(schemas)), \
+        patch.object(task_service, "dispatch_tool", _fake_dispatch), \
+        patch.object(task_service, "_stream_one_iteration", _fake_stream):
+        await task_service.run_task_sub_agent(
+            parent_ctx=ctx, description="Find October revenue", instructions=None,
+            allowed_tools=[s["function"]["name"] for s in schemas], max_steps=3,
+        )
+    return rounds
+
+
+async def test_wr08_the_sub_agent_model_reads_llm_content(monkeypatch):
+    rounds = await _drive_sub_agent(monkeypatch, [_SEARCH_SCHEMA])
+    tool_msgs = [m for m in rounds[1]["messages"] if m.get("role") == "tool"]
+    assert [m["content"] for m in tool_msgs] == [_SUMMARY]
+
+
+async def test_wr08_the_sub_agent_prompt_has_today_and_the_schema_has_the_vocabulary(monkeypatch):
+    rounds = await _drive_sub_agent(monkeypatch, [_SEARCH_SCHEMA, _OTHER_SCHEMA])
+    system = rounds[0]["messages"][0]["content"]
+    assert sdt.today_line().strip() in system
+    search = next(t for t in rounds[0]["tools"] if t["function"]["name"] == "search_documents")
+    desc = search["function"]["parameters"]["properties"]["filters"]["description"]
+    assert 'legal_entity (enum: "Acme GmbH")' in desc and '"report"' in desc
+    assert _SEARCH_SCHEMA["function"]["parameters"]["properties"]["filters"]["description"] == "Conditions."
+
+
+async def test_wr08_a_sub_agent_without_search_is_unchanged(monkeypatch):
+    rounds = await _drive_sub_agent(monkeypatch, [_OTHER_SCHEMA])
+    assert "Today's date" not in rounds[0]["messages"][0]["content"]
+    assert rounds[0]["tools"] == [_OTHER_SCHEMA]
