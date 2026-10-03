@@ -4132,7 +4132,7 @@ const BASELINE = {
   "threads.artifact.test.ts": 6, // 273-05 (2026-10-03) — artifact SSE branch + reload mapper
   "streamsProviderArtifact.test.tsx": 5, // 273-05 — the ONE handler: append + replace-by-id
   "MessageItem.artifacts.test.tsx": 5, // 273-05 — the ONE mount: placement + live == reload DOM
-  "artifactParity.fence.test.ts": 7, // 273-05 — backend Literals/fixture vs frontend registry (I-1)
+  "artifactParity.fence.test.ts": 10, // 273-05 — backend Literals/fixture vs frontend registry (I-1); RAISED 7 → 10 at 273-REVIEW CR-01 (+3: the shared bad-spec parity fixture)
   "ShowArtifactBody.test.tsx": 17, // 273-05 — rail essence + body, never the spec or model text
   "ToolCallPanel.showArtifact.test.tsx": 16, // 273-05 — L-1..L-4, refused node, phrases
 }

@@ -135,6 +135,7 @@ _R = {
     "top_n_without_sort": "a top-N needs a sort order",
     "bad_filter": "a filter we can't apply",
     "title_too_long": "the title is over 120 characters",
+    "number_too_large": "a value in {column} is too large to show",
     "fallback": "its settings weren't valid",
 }
 
@@ -175,6 +176,22 @@ def _safe(name: Any) -> str | None:
 
 def _col_word(name: Any) -> str:
     return _safe(name) or "a column"
+
+
+def _js_len(s: str) -> int:
+    """A string's length as JavaScript's ``.length`` counts it — UTF-16 code units (273 CR-01).
+
+    Every length cap here must agree with the frontend guard (``artifactSpec.ts`` ``isStr``), which
+    counts UTF-16 units: an emoji is 1 for Python's ``len`` and 2 for the browser. ``surrogatepass``
+    keeps a lone surrogate countable instead of raising.
+    """
+    return len(s.encode("utf-16-le", "surrogatepass")) // 2
+
+
+def _check_js_len(v: Any, cap: int, field_name: str) -> Any:
+    if isinstance(v, str) and _js_len(v) > cap:
+        _raise("fallback", f"`{field_name}` must be at most {cap} characters (an emoji counts as 2).")
+    return v
 
 
 def _decode_once(v: Any, field_name: str) -> Any:
@@ -224,6 +241,16 @@ class Column(_Strict):
     type: ColumnType
     unit: str | None = Field(default=None, max_length=MAX_UNIT_CHARS)
 
+    @field_validator("name")
+    @classmethod
+    def _name_js_len(cls, v: str) -> str:
+        return _check_js_len(v, MAX_COLUMN_NAME_CHARS, "columns[].name")
+
+    @field_validator("unit")
+    @classmethod
+    def _unit_js_len(cls, v: str | None) -> str | None:
+        return _check_js_len(v, MAX_UNIT_CHARS, "columns[].unit")
+
 
 class ChartEnc(_Strict):
     kind: ChartKind
@@ -243,14 +270,21 @@ class MetricEnc(_Strict):
     label: str | None = Field(default=None, max_length=64)
     compare_label: str | None = Field(default=None, max_length=64)
 
+    @field_validator("label", "compare_label")
+    @classmethod
+    def _labels_js_len(cls, v: str | None, info) -> str | None:
+        return _check_js_len(v, 64, f"metric.{info.field_name}")
+
 
 class FilterOp(_Strict):
     column: str = Field(min_length=1, max_length=MAX_COLUMN_NAME_CHARS)
     op: FilterOpName
     value: Cell = None
     values: list[Cell] | None = None
-    min: float | None = None
-    max: float | None = None
+    # Finite only (273 CR-01): an infinite bound is echoed into the caption's operations and
+    # Postgres jsonb rejects Infinity, which read to the model as "couldn't save, try again".
+    min: float | None = Field(default=None, allow_inf_nan=False)
+    max: float | None = Field(default=None, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def _op_has_its_operand(self) -> "FilterOp":
@@ -296,7 +330,7 @@ class _ArgsBase(_Strict):
     @field_validator("title", mode="before")
     @classmethod
     def _title_len(cls, v: Any) -> Any:
-        if isinstance(v, str) and len(v.strip()) > MAX_TITLE_CHARS:
+        if isinstance(v, str) and _js_len(v.strip()) > MAX_TITLE_CHARS:  # UTF-16, as the browser counts
             _raise("title_too_long", f"`title` must be at most {MAX_TITLE_CHARS} characters.")
         return v.strip() if isinstance(v, str) else v
 
@@ -442,21 +476,58 @@ class StoredArtifactSpec(_Strict):
 # ── Dataset validation (first emission AND, in 273-03, after by-reference transforms) ───────────
 
 
+def _in_float64_range(val: float | int) -> bool:
+    """True when ``val`` is a finite number the browser's ``JSON.parse`` keeps finite (273 CR-01).
+
+    Python ints are unbounded and ``float("1" + "0" * 400 + ".5")`` is ``inf``; either one stores
+    (or, for inf, fails the jsonb insert) and reaches the frontend as ``Infinity``, which its guard
+    refuses — so the model would be told "shown" for a spec that only renders as a notice.
+    """
+    try:
+        return math.isfinite(float(val))
+    except OverflowError:
+        return False
+
+
+def _strict_number_value(s: str) -> float | int | None:
+    s = s.replace(",", "")
+    try:
+        return float(s) if "." in s else int(s)
+    except ValueError:  # e.g. more digits than int() will parse (sys.get_int_max_str_digits)
+        return None
+
+
+def _number_overflows(v: Any) -> bool:
+    """A number-shaped cell whose value is outside the float64 range (worded as "too large")."""
+    if isinstance(v, bool) or v is None:
+        return False
+    if isinstance(v, float):
+        return math.isinf(v)
+    if isinstance(v, int):
+        return not _in_float64_range(v)
+    if isinstance(v, str) and _STRICT_NUMBER.fullmatch(v.strip()):
+        val = _strict_number_value(v.strip())
+        return val is None or not _in_float64_range(val)
+    return False
+
+
 def _coerce_number(v: Any) -> tuple[bool, float | int | None]:
     if v is None:
         return True, None
     if isinstance(v, bool):
         return False, None
     if isinstance(v, int):
-        return True, v
+        return (True, v) if _in_float64_range(v) else (False, None)
     if isinstance(v, float):
         return (True, v) if math.isfinite(v) else (False, None)
     if isinstance(v, str):
         s = v.strip()
         if not _STRICT_NUMBER.fullmatch(s):
             return False, None
-        s = s.replace(",", "")
-        return True, (float(s) if "." in s else int(s))
+        val = _strict_number_value(s)
+        if val is None or not _in_float64_range(val):
+            return False, None
+        return True, val
     return False, None
 
 
@@ -518,6 +589,13 @@ def validate_dataset(
             cname = col.get("name")
             if col.get("type") == "number":
                 ok, val = _coerce_number(cell)
+                if not ok and _number_overflows(cell):
+                    return [], _refusal(
+                        "number_too_large",
+                        f"column `{cname}` rows[{i}] is outside the range a browser can show (about "
+                        "±1.8e308); scale it (e.g. to millions) and put the scale in `unit`.",
+                        column=_col_word(cname),
+                    )
                 if not ok:
                     return [], _refusal(
                         "not_a_number",
@@ -530,7 +608,7 @@ def validate_dataset(
                 if not ok:
                     return [], _refusal("not_text", f"column `{cname}` rows[{i}] must be text or null.",
                                         column=_col_word(cname))
-                if val is not None and len(val) > MAX_CELL_CHARS:
+                if val is not None and _js_len(val) > MAX_CELL_CHARS:  # UTF-16, as the browser counts
                     return [], _refusal(
                         "cell_too_long",
                         f"column `{cname}` rows[{i}] is longer than {MAX_CELL_CHARS} characters; shorten it.",
@@ -579,6 +657,22 @@ def validate_dataset(
             if by_name[y].get("type") != "number":
                 return [], _refusal("series_not_number", f"chart.y `{y}` must be a number column.",
                                     column=_col_word(y))
+        # 273 CR-01 — the two remaining rules of the frontend's parseChart, so a chart the model is
+        # told was shown is a chart the renderer draws.
+        x_name = chart.get("x")
+        if x_name in ys:
+            return [], _refusal(
+                "fallback",
+                f"chart.x `{x_name}` is also listed in chart.y; the x column is the axis, not a series. "
+                "Remove it from y.",
+            )
+        if kind == "scatter" and by_name[x_name].get("type") != "number":
+            return [], _refusal(
+                "series_not_number",
+                f"a scatter chart needs a number column on x, and `{x_name}` is text. Use a bar or line "
+                "chart for categories, or pick a number column for x.",
+                column=_col_word(x_name),
+            )
     elif component == "metric":
         if not metric:
             return [], _refusal("fallback", "a metric needs metric={value_column}.")
