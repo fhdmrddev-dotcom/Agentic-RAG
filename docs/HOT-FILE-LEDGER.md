@@ -10714,35 +10714,35 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 75 / 38 / 2437 (was `74 / 37 / 2372`) | ⚠ **FIRES** | ⚠ STALE (`74/37/2372`). **272-02**: `filters` on SEARCH_DOCUMENTS_TOOL + D-02 text only. ⛔ no anyOf/oneOf/type arrays under `filters` (Gemini) |
+| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 78 / 39 / 2569 (was `75 / 38 / 2437`) | ⚠ **FIRES** | **273-03**: 1 schema + CHAT_ONLY_TOOLS + 1 get_tools line. ⛔ no anyOf/oneOf/type arrays in SHOW_ARTIFACT_TOOL (Gemini) |
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 1 / 1 / 174 (was `0 / 0 / 0`) | no (young) | young (272-01 verbatim move, AST-pinned); unchanged since |
 | [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 2 / 1 / 416 (was `0 / 0 / 0`) | no (young) | young (272-01 contracts, 272-03 resolver). ⛔ every id/count is RLS-intersected (D-21); empty never means all (D-18) |
 | [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 4 / 1 / 1163 (was `0 / 0 / 0`) | no (young) | young (272-01 move; 272-04 kinds, D-09 lock, ONE audit writer, vocabulary). **272-REVIEW WR-01**: vocabulary values checked + JSON-quoted, note capped (2000). Split OWED → 273 |
-| [`frontend/src/components/chat/StepRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatsteprowtsx) | 2 / 1 / 249 | no (1 phase) | 273-05: `refused` node state (UI-D-02 amber pair) added to `NodeState` + class arms. ⛔ derived from the result marker in toolStepDerivation, never from a tool name |
-| [`frontend/src/components/chat/ToolCallDetails.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcalldetailstsx) | 2 / 1 / 171 | no (1 phase) | 273-05: ToolArgsBlock hidden for show_artifact (L-2); show_artifact dispatched BEFORE the `parsed.error` arm (L-3/L-4). ⛔ `detail` never rendered |
-| [`frontend/src/components/chat/tool-bodies/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesindexts) | 1 / 1 / 59 | no (1 phase) | 273-05: ShowArtifactBody registered + `ARGS_HIDDEN` (livePanel / paramsBlock), the ONE home both rail readers import. ⛔ do not widen livePanel beyond execute_code + show_artifact |
-| [`frontend/src/components/chat/toolStepDerivation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolstepderivationts) | 1 / 1 / 74 | no (1 phase) | 273-05: `nodeStateOf` returns `refused` for a done result whose JSON `status` is `refused` (marker-derived). Every other tool's state unchanged |
-| [`frontend/src/lib/toolNames.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolnamests) | 2 / 1 / 128 | no (1 phase) | 273-05: `show_artifact: "Show an artifact"` (UI-D-06). ⛔ keys == harness offer ∪ CHAT_ONLY_TOOLS, fenced from openai_service.py by `?raw` in workflows/toolNames.test.ts |
-| [`backend/app/models/artifact.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsartifactpy) | 0 / 0 / 0 | no (young) | 273-01. The closed show_artifact vocabulary (3 components, 4 kinds), caps, refusal catalogue, result contract. ⛔ extra=forbid everywhere; no props bag; ARTIFACT_COMPONENTS == mig 202 CHECK |
-| [`backend/app/db/artifacts.py`](docs/HOT-FILE-LEDGER.md#backendappdbartifactspy) | 0 / 0 / 0 | no (young) | 273-01. asyncpg insert (RETURNING row, server-assigned label) + keyed reads. ⛔ the pool BYPASSES RLS: every read binds thread_id AND user_id; no UPDATE statement (D-08) |
-| [`backend/app/services/show_artifact_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicesshowartifacttoolpy) | 0 / 0 / 0 | no (young) | 273-03. The show_artifact handler (D-14 narrow cut): validate, by-ref transforms, server caption, store, emit the RETURNING row, id-first result. ⛔ no `error` key; no retrieval import |
-| [`backend/app/services/artifact_history.py`](docs/HOT-FILE-LEDGER.md#backendappservicesartifacthistorypy) | 0 / 0 / 0 | no (young) | 273-04. `redact_artifact_args` (the ONE agent_loop persist hook, I-4) + `attach_artifacts` (reload, keyed by parsed artifact id — never tool_call_id: Gemini `call_0` collides) |
-| [`backend/app/services/structured_text_holdback.py`](docs/HOT-FILE-LEDGER.md#backendappservicesstructuredtextholdbackpy) | 0 / 0 / 0 | no (young) | 273-04. Gates STRUCTURED-mode `delta` emission so a tool-call block (```json / {"tool") never streams as answer text (Pitfall 2). ⛔ full_content accumulation unchanged; native untouched |
-| [`frontend/src/components/chat/artifacts/ArtifactBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactblocktsx) | 0 / 0 / 0 | no (young) | 273-02. Body of the ONE MessageItem mount: guard → registry → per-artifact boundary → component or notice. ⛔ never throws; keyed by id |
-| [`frontend/src/components/chat/artifacts/ArtifactErrorBoundary.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifacterrorboundarytsx) | 0 / 0 / 0 | no (young) | 273-02. The tree's FIRST React error boundary; fallback = the render-failed notice so one artifact cannot blank the message |
-| [`frontend/src/components/chat/artifacts/ArtifactFrame.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactframetsx) | 0 / 0 / 0 | no (young) | 273-02. The ONE home of the framed-card markup (sketch 1B): header, body slot, caption footer. ⛔ no animation (UI-D-09) |
-| [`frontend/src/components/chat/artifacts/ArtifactNotice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactnoticetsx) | 0 / 0 / 0 | no (young) | 273-02. "This artifact can't be shown" + one catalogue reason (sketch 4B). ⛔ never JSON, a spec key, a validation path or an exception message |
-| [`frontend/src/components/chat/artifacts/ChartArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartartifacttsx) | 0 / 0 / 0 | no (young) | 273-02. Lazy chunk; the ONLY recharts importer of 273. Legend = aria-pressed buttons driving `hide`. ⛔ colour from spec.chart.slots (UI-D-07); isAnimationActive false |
-| [`frontend/src/components/chat/artifacts/MetricArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsmetricartifacttsx) | 0 / 0 / 0 | no (young) | 273-02. One value per artifact (sketch 2A): label, value + unit, optional delta glyph + percent. ⛔ no inner tile (UI-D-04) |
-| [`frontend/src/components/chat/artifacts/TableArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactstableartifacttsx) | 0 / 0 / 0 | no (young) | 273-02. Click-to-sort (aria-sort), sticky header, 512px scroll (D-13). ⛔ cells are React text only |
-| [`frontend/src/components/chat/artifacts/artifactCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactcopyts) | 0 / 0 / 0 | no (young) | 273-02. The ONE home of every artifact string (UI-SPEC copy + notice catalogue + operation phrases); the rail body imports it too |
-| [`frontend/src/components/chat/artifacts/artifactRegistry.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactregistryts) | 0 / 0 / 0 | no (young) | 273-02. The CLOSED three-entry registry read via `own()` (I-1). ⛔ adding a component is a code change; fenced == backend Literal in 273-05 |
-| [`frontend/src/components/chat/artifacts/artifactSpec.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactspects) | 0 / 0 / 0 | no (young) | 273-02. `parseArtifactRecord` guard → ok or a closed NoticeReason. ⛔ hand-rolled (no zod); never throws; never surfaces the raw value |
-| [`frontend/src/components/chat/artifacts/captionModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscaptionmodelts) | 0 / 0 / 0 | no (young) | 273-02. Phrases the SERVER's caption facts (sources, lineage, counts) — never model text (D-04). Pure |
-| [`frontend/src/components/chat/artifacts/chartModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartmodelts) | 0 / 0 / 0 | no (young) | 273-02. Pure chart derivations: slots, visible domain, tooltip rows (high-first + Total), ticks, aria text. No React, no recharts |
-| [`frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesshowartifactbodytsx) | 0 / 0 / 0 | no (young) | 273-05. Rail essence + expanded line for show_artifact. ⛔ reads `reason`, never `detail` or `values` (L-3/L-4) |
+| [`frontend/src/components/chat/StepRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatsteprowtsx) | 3 / 2 / 253 (was `2 / 1 / 249`) | no (2 phases) | 273-05: `refused` node state (UI-D-02 amber pair). ⛔ derived from the result marker in toolStepDerivation, never from a tool name |
+| [`frontend/src/components/chat/ToolCallDetails.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcalldetailstsx) | 3 / 2 / 181 (was `2 / 1 / 171`) | no (2 phases) | 273-05: ToolArgsBlock hidden for show_artifact (L-2); dispatched BEFORE the `parsed.error` arm (L-3/L-4). ⛔ `detail` never rendered |
+| [`frontend/src/components/chat/tool-bodies/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesindexts) | 2 / 2 / 79 (was `1 / 1 / 59`) | no (2 phases) | 273-05: ShowArtifactBody + `ARGS_HIDDEN`, the ONE home both rail readers import. ⛔ do not widen livePanel beyond execute_code + show_artifact |
+| [`frontend/src/components/chat/toolStepDerivation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolstepderivationts) | 2 / 2 / 94 (was `1 / 1 / 74`) | no (2 phases) | 273-05: `nodeStateOf` → `refused` for a done result whose JSON `status` is `refused` (marker-derived). Every other tool unchanged |
+| [`frontend/src/lib/toolNames.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolnamests) | 3 / 2 / 131 (was `2 / 1 / 128`) | no (2 phases) | 273-05: `show_artifact: "Show an artifact"`. ⛔ keys == harness offer ∪ CHAT_ONLY_TOOLS, fenced by `?raw` in workflows/toolNames.test.ts |
+| [`backend/app/models/artifact.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsartifactpy) | 1 / 1 / 696 (was `0 / 0 / 0`) | no (young) | young (273-01). Closed show_artifact vocabulary, caps, refusal catalogue, result contract. ⛔ extra=forbid; ARTIFACT_COMPONENTS == mig 202 CHECK |
+| [`backend/app/db/artifacts.py`](docs/HOT-FILE-LEDGER.md#backendappdbartifactspy) | 1 / 1 / 195 (was `0 / 0 / 0`) | no (young) | young (273-01). insert (RETURNING row, server label) + keyed reads. ⛔ pool BYPASSES RLS: every read binds thread_id AND user_id; no UPDATE (D-08) |
+| [`backend/app/services/show_artifact_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicesshowartifacttoolpy) | 1 / 1 / 607 (was `0 / 0 / 0`) | no (young) | young (273-03). validate, by-ref transforms, server caption, store, emit the RETURNING row, id-first result. ⛔ no `error` key; no retrieval import |
+| [`backend/app/services/artifact_history.py`](docs/HOT-FILE-LEDGER.md#backendappservicesartifacthistorypy) | 1 / 1 / 155 (was `0 / 0 / 0`) | no (young) | young (273-04). `redact_artifact_args` (the ONE persist hook) + `attach_artifacts` (keyed by parsed artifact id, never tool_call_id) |
+| [`backend/app/services/structured_text_holdback.py`](docs/HOT-FILE-LEDGER.md#backendappservicesstructuredtextholdbackpy) | 1 / 1 / 100 (was `0 / 0 / 0`) | no (young) | young (273-04). Gates STRUCTURED `delta` emission so a tool-call block never streams. ⛔ full_content accumulation unchanged; native untouched |
+| [`frontend/src/components/chat/artifacts/ArtifactBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactblocktsx) | 2 / 1 / 76 (was `0 / 0 / 0`) | no (young) | young (273-02). Body of the ONE MessageItem mount: guard → registry → per-artifact boundary → component or notice. ⛔ never throws; keyed by id |
+| [`frontend/src/components/chat/artifacts/ArtifactErrorBoundary.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifacterrorboundarytsx) | 1 / 1 / 36 (was `0 / 0 / 0`) | no (young) | young (273-02). The tree's FIRST React error boundary; fallback = the render-failed notice so one artifact cannot blank the message |
+| [`frontend/src/components/chat/artifacts/ArtifactFrame.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactframetsx) | 1 / 1 / 66 (was `0 / 0 / 0`) | no (young) | young (273-02). The ONE home of the framed-card markup (sketch 1B): header, body slot, caption footer. ⛔ no animation (UI-D-09) |
+| [`frontend/src/components/chat/artifacts/ArtifactNotice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactnoticetsx) | 1 / 1 / 34 (was `0 / 0 / 0`) | no (young) | young (273-02). "This artifact can't be shown" + one catalogue reason. ⛔ never JSON, a spec key, a validation path or an exception message |
+| [`frontend/src/components/chat/artifacts/ChartArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartartifacttsx) | 2 / 1 / 456 (was `0 / 0 / 0`) | no (young) | young (273-02). Lazy chunk; the ONLY recharts importer. Legend = aria-pressed buttons. ⛔ colour from spec.chart.slots (UI-D-07); no animation |
+| [`frontend/src/components/chat/artifacts/MetricArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsmetricartifacttsx) | 1 / 1 / 92 (was `0 / 0 / 0`) | no (young) | young (273-02). One value per artifact (sketch 2A): label, value + unit, optional delta. ⛔ no inner tile (UI-D-04) |
+| [`frontend/src/components/chat/artifacts/TableArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactstableartifacttsx) | 2 / 1 / 127 (was `0 / 0 / 0`) | no (young) | young (273-02). Click-to-sort (aria-sort), sticky header, 512px scroll (D-13). ⛔ cells are React text only |
+| [`frontend/src/components/chat/artifacts/artifactCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactcopyts) | 3 / 1 / 266 (was `0 / 0 / 0`) | no (young) | young (273-02). The ONE home of every artifact string (copy + notice catalogue + operation phrases); the rail body imports it too |
+| [`frontend/src/components/chat/artifacts/artifactRegistry.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactregistryts) | 1 / 1 / 55 (was `0 / 0 / 0`) | no (young) | young (273-02). The CLOSED three-entry registry read via `own()` (I-1). ⛔ adding a component is a code change; fenced == backend Literal |
+| [`frontend/src/components/chat/artifacts/artifactSpec.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactspects) | 2 / 1 / 469 (was `0 / 0 / 0`) | no (young) | young (273-02). `parseArtifactRecord` → ok or a closed NoticeReason. ⛔ hand-rolled (no zod); never throws; never surfaces the raw value |
+| [`frontend/src/components/chat/artifacts/captionModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscaptionmodelts) | 1 / 1 / 73 (was `0 / 0 / 0`) | no (young) | young (273-02). Phrases the SERVER's caption facts (sources, lineage, counts) — never model text (D-04). Pure |
+| [`frontend/src/components/chat/artifacts/chartModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartmodelts) | 1 / 1 / 275 (was `0 / 0 / 0`) | no (young) | young (273-02). Pure chart derivations: slots, visible domain, tooltip rows, ticks, aria text. No React, no recharts |
+| [`frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesshowartifactbodytsx) | 1 / 1 / 192 (was `0 / 0 / 0`) | no (young) | young (273-05). Rail essence + expanded line for show_artifact. ⛔ reads `reason`, never `detail` or `values` (L-3/L-4) |
 | [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 2 / 1 / 565 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). **271-05**: live on GoTrue JWTs: exact id sets, both directions, two-org fence; RLS alone held a widened leg. ⛔ no embedding import, no `.rpc(` |
 | [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 1 / 1 / 171 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ `extra="forbid"`; closed Literals; the 8 verbs pinned to `_INVERSE_LABEL`. 271-05 drove it through the route with real JWTs |
 | [`backend/app/api/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_searchpy) | 1 / 1 / 48 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ user-JWT client only; remaps `ResolveError`; no write. **271-05**: the fence calls THIS coroutine with a GoTrue token (P-04) |
@@ -10785,11 +10785,11 @@ cells rot within days.
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 4 / 4 / 614 (was `3 / 3 / 231`) | ⚠ **FIRES — 4 phases** | ⚠ row STALE (`3/3/231`). **267-04**: R1-R10 rows + the Will/Won't ledger; the per-row action area is ONE `ExpertRowActions` (the named seam, TAKEN). ⛔ the body stays a list |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
-| [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 54 / 22 / 407 (was `51 / 23 / 351`) | **FIRES** | ✅ G-5 DISCHARGED (227-02). **272-02**: the filter line as visible text in both card branches. ⚠ recipe now reads 22 phases (was 23) |
+| [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
-| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 77 / 35 / 1027 (was `75 / 34 / 1000`) | **FIRES** | ⚠ row STALE (`75/34/1000`). honoured by construction (**267-04**): ONE early return after the last hook — event → card, marker → card, other system row → null. Hooks 3/0/7 unchanged |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 261 / 88 / 2434 (was `255 / 87 / 2156`) | **FIRES** | ⚠ STALE (`255/87/2156`). **268-01/03**: send resolves scoping ONCE + org stamps; +1 folder arm, 1 scope writer, 1 route. ⛔ 0 new send-path branches |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 104 / 38 / 4948 | **FIRES** | ⚠ row STALE an 8th time (`101/37/4815`; CLAUDE.md read `102/37/4880`). NOT modified by 253 — re-derived under CR-08. honoured by construction (**244-14**) |
+| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 78 / 36 / 1030 (was `77 / 35 / 1027`) | ⚠ **FIRES** | **273-05**: ONE ArtifactBlock mount (D-16), after the answer, before the run status. Hooks unchanged |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 264 / 89 / 2456 (was `261 / 88 / 2434`) | ⚠ **FIRES** | **273-04**: ONE `attach_artifacts` call on GET /messages and ONE on /snapshot. ⛔ 0 new send-path branches |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 106 / 40 / 4982 (was `104 / 38 / 4948`) | ⚠ **FIRES** | **273-05**: ONE onArtifact handler (D-16) — append or replace-by-id, text untouched. ⛔ `onTurnBoundary` still FLUSHES before moving |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
@@ -10814,7 +10814,7 @@ cells rot within days.
 | [`frontend/src/components/settings/ActionRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsactionrowtsx) | 1 / 1 / 153 | no (1 phase) | Single action permission row in grant list; renders direction, posture buttons, and forward-action reset affordance (CRED-02). |
 | [`frontend/src/components/settings/McpAuthDoor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmcpauthdoortsx) | 3 / 1 / 451 | no (1 phase) | Second writer of custom_client_id (Phase 222 BYO door). CRED-01 inline refusal shared with ConnectionFormPanel via customClientIdError; both doors must enforce the same boundary. |
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 5 / 3 / 65 (was `4 / 2 / 64`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/64`), now FIRES. **267-04**: `newThread` takes an optional Expert id, so an invite on a brand-new chat reaches the row (D-267-21; live G4-1). ⛔ `selectThread` stays a bare setState |
-| [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 21 / 8 / 1414 | **FIRES** | honoured by construction (193.1 / 211 / **214**) — ⚠ **extraction still OWED**; 214 changed no capability set |
+| [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 22 / 9 / 1417 (was `21 / 8 / 1414`) | ⚠ **FIRES** | **273-03**: the grounding offer subtracts CHAT_ONLY_TOOLS (1 import, 1 set difference). ⚠ extraction still OWED |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 52 / 26 / 2724 | **FIRES** | ⚠ row was STALE at `48 / 25 / 2585`. honoured by construction (193.2 / 194 / 192.2 / 200.1 / 214 / **256-05**) — 256-05 is **COMMENT-ONLY** |
 | [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 29 / 13 / 1942 | **FIRES** | ⚠ STALE (`28/12/1939`). **268-REVIEW WR-06**: the golden shell carries the definition's org — one kwarg. ⛔ ctx still withholds org |
@@ -10837,7 +10837,7 @@ cells rot within days.
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ **FIRES** | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 95 / 74 / 1520 (was `94 / 73 / 1459`) | ⚠ **FIRES** | ⚠ STALE (`94/73/1459`). **271-03**: Find wire types (`DocumentSearchRequest/Row/Response`, `RelVerb`), additive. Seam OWED |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 96 / 75 / 1532 (was `95 / 74 / 1520`) | ⚠ **FIRES** | **273-05**: `Message.artifacts` re-exports the wire TYPE from artifactSpec.ts, never re-declared. Seam OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 84 / 61 / 952 (was `83 / 60 / 951`) | ⚠ **FIRES** | ⚠ STALE (`83/60/951`). **271-01**: ONE import + ONE `include_router(document_search.router)` after `document_views`. 0 new branches |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 90 / 52 / 1698 (was `87 / 50 / 1593`) | ⚠ **FIRES** | ⚠ STALE (`87/50/1593`). **272-05**: the stale ef_search 'raised to 200' comment corrected; value 40 unchanged. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
@@ -10934,7 +10934,7 @@ cells rot within days.
 | [`frontend/src/components/settings/AvailabilityLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsavailabilitylinetsx) | 0 / 0 / 74 | no (new) | young (221-02) — a `ready` application renders `null`, never an empty element |
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 28 / 11 / 1858 | ⚠ **FIRES** | ⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**239-06**) |
-| [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 21 / 13 / 278 (was `20 / 12 / 236`) | ⚠ **FIRES** | ⚠ STALE (`20/12/236`). **268-03**: `scope_changed` joins the allowlist; `ScopeFolderRef`/`ScopeChangedEvent` additive, `path` on the SUBCLASS only (267 dumps byte-equal) |
+| [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 22 / 14 / 285 (was `21 / 13 / 278`) | ⚠ **FIRES** | **273-04**: `MessageResponse.artifacts` (optional, additive). ⛔ deleting it makes reload render no artifacts, silently |
 | [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 57 / 35 / 1742 (was `55 / 34 / 1723`) | ⚠ **FIRES** | ⚠ STALE (`55/34/1723`). **270-02**: ONE field (`document_download_url_ttl_seconds`, default 60), clamped 10..900 in code. ⛔ the unreachable-DB arm is byte-identical |
 | [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 7 / 2 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
 | [`backend/app/services/setup_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessetup_servicepy) | 4 / 2 / 514 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. Same deliberate non-catch as `api/setup.py`; its bool cannot express *the database refused the value* |
@@ -10963,7 +10963,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/stepActionWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepactionwordsts) | 2 / 1 / 91 | no (1 phase) | young (214) — the action half of a step's identity |
 | [`frontend/src/components/workflows/stepIdentityVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentityvocabularyts) | 1 / 1 / 206 | no (1 phase) | young (214-11) — ⚠ its six PAUSE sentences are consumed by NOTHING (`SEED-219`) |
 | [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 2 / 2 / 803 | no (2 phases) | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
-| [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 16 / 10 / 1935 (was `15 / 9 / 1859`) | ⚠ **FIRES** | ⚠ STALE (`15/9/1859`). **268-03**: `setThreadFolder` + `getScopeEffect` + 4 wire types, additive |
+| [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 19 / 11 / 1967 (was `16 / 10 / 1935`) | ⚠ **FIRES** | **273-05**: `onArtifact` SSE branch + `artifacts` carried through the mapper (Array.isArray guard), additive |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 6 / 4 / 748 | ⚠ **FIRES** | ⛔ row was STALE at `4/2/715` reading `no (2 phases)` — re-derived 263 planning. Holds `FullAppSettings`, not only skills. D-263-03 reuses its `POST /skills` caller, adds no endpoint. |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
@@ -10980,13 +10980,13 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 14 / 7 / 991 (was `11 / 6 / 737`) | ⚠ **FIRES** | ⚠ STALE (`11/6/737`). **272-04**: the trend skips `invalid_filter` / `refused_retry` rows (4 lines, D-24); kind 2 still counts |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 59 / 29 / 3608 (was `57 / 28 / 3580`) | ⚠ **FIRES** | ⚠ STALE (`57/28/3580`). **272-04**: honoured by construction (D-16, 27 lines: prompt, today_line, vocabulary, lock). ⛔ prompt-assembly seam OWED → 273 |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 61 / 30 / 3635 (was `59 / 29 / 3608`) | ⚠ **FIRES** | **273-04**: D-15: 2 kwargs + 1 persist hook + STRUCTURED holdback gate; prompt-assembly seam OWED (OV-273-03) |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
 | [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 17 / 9 / 1029 (was `16 / 8 / 967`) | ⚠ **FIRES** | ⚠ STALE (`16/8/967`). **268-01**: takes the send path's `scoping`/`scoping_error` (resolve once); Continue SUMS segment tokens (D-268-20) |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
 | [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
-| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 95 / 41 / 5045 (was `93 / 40 / 5234`) | ⚠ **FIRES** | ⚠ STALE (`93/40/5234`). **272**: D-15 narrow cut (search handler moved out; +1 ctx field, 7 lines). ⛔ registry/handler split OWED → 273 |
+| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 97 / 42 / 5057 (was `95 / 41 / 5045`) | ⚠ **FIRES** | **273**: D-14 narrow cut: 1 import, 1 registry line, 1 field, 1 exclusion; registry/handler split OWED (OV-273-02) |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
 | [`frontend/src/components/ingestion/DocumentUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentuploadtsx) | 10 / 1 / 144 | no (1 phase) | young (056) — ⚠ absent for its entire life. ⛔ It reports NO byte progress (`onUploadProgress` absent), so any upload percentage is unknowable |
@@ -11066,7 +11066,7 @@ cells rot within days.
 | [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 2 / 1 / 183 | no (new) | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state and verbs; `MessageInput.tsx` shrank `855 → 821` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 22 / 14 / 572 | **FIRES** | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253; re-derived under CR-08. **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
-| [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 11 / 7 / 352 (was `10 / 6 / 218`) | **FIRES** | ⚠ STALE (`10/6/218`). **272-02**: the 'Filtered: …' line derived from args (null when unfiltered). ⛔ the ONE home of the harness activity string |
+| [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
 | [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 15 / 10 / 690 | ⚠ **FIRES** | ⚠ row STALE at `11/6/653`. **266-01**: mig 195's `expert_installs` ACL mirrored (REVOKE PUBLIC/anon/authenticated, GRANT SELECT). ⛔ `scripts/` is gate-EXEMPT: kept by hand |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
@@ -18011,3 +18011,152 @@ The G-5 gate (`node scripts/check-hot-file-ledger.cjs 273`, over every file the 
 ### `frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx`
 
 **`0 / 0 / 0`** at 273 planning. Young; row added AT PLANNING. 273-05. Rail essence + expanded line for show_artifact. ⛔ reads `reason`, never `detail` or `values` (L-3/L-4).
+
+## Phase 273 — close re-derivation (2026-10-03, plan `273-06`)
+
+Every triple below was re-derived with the CLAUDE.md recipe AFTER the phase's last source edit, six-digit quick-task buckets subtracted. The set is every non-test source file in `git diff --name-only f76473497..HEAD` (the phase base), minus tests / sql / css / scripts / json: 35 files, 35 scan-list rows refreshed in place (old triple kept as `(was …)`), none duplicated. Live evidence: `.planning/phases/273-agent-authored-artifacts/273-UAT-LOG.md`.
+
+⚠ **CLAUDE.md's abridged rows for these files were left stale BY DECISION** (warn band; see the UAT log for the measured figure). The gate reads THIS scan list, so G-5 still sees every row.
+
+⛔ **Two seams this phase named and did NOT take, each with a re-open trigger:** OV-273-02 — the `tool_dispatcher.py` registry/handler split (the next phase whose `files_modified` names `tool_dispatcher.py` proposes the extraction FIRST); OV-273-03 — the `agent_loop.py` prompt-assembly seam (SEED-192).
+
+### `backend/app/api/threads.py` — Phase 273 close
+
+**`264 / 89 / 2456`** at 273 close (was `261 / 88 / 2434`). G-5: ⚠ **FIRES**. **273-04**: ONE `attach_artifacts` call on GET /messages and ONE on /snapshot. ⛔ 0 new send-path branches.
+
+### `backend/app/db/artifacts.py` — Phase 273 close
+
+**`1 / 1 / 195`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-01). insert (RETURNING row, server label) + keyed reads. ⛔ pool BYPASSES RLS: every read binds thread_id AND user_id; no UPDATE (D-08).
+
+### `backend/app/models/artifact.py` — Phase 273 close
+
+**`1 / 1 / 696`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-01). Closed show_artifact vocabulary, caps, refusal catalogue, result contract. ⛔ extra=forbid; ARTIFACT_COMPONENTS == mig 202 CHECK.
+
+### `backend/app/models/message.py` — Phase 273 close
+
+**`22 / 14 / 285`** at 273 close (was `21 / 13 / 278`). G-5: ⚠ **FIRES**. **273-04**: `MessageResponse.artifacts` (optional, additive). ⛔ deleting it makes reload render no artifacts, silently.
+
+### `backend/app/services/agent_loop.py` — Phase 273 close
+
+**`61 / 30 / 3635`** at 273 close (was `59 / 29 / 3608`). G-5: ⚠ **FIRES**. **273-04**: D-15: 2 kwargs + 1 persist hook + STRUCTURED holdback gate; prompt-assembly seam OWED (OV-273-03).
+
+### `backend/app/services/artifact_history.py` — Phase 273 close
+
+**`1 / 1 / 155`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-04). `redact_artifact_args` (the ONE persist hook) + `attach_artifacts` (keyed by parsed artifact id, never tool_call_id).
+
+### `backend/app/services/harness/grounding.py` — Phase 273 close
+
+**`22 / 9 / 1417`** at 273 close (was `21 / 8 / 1414`). G-5: ⚠ **FIRES**. **273-03**: the grounding offer subtracts CHAT_ONLY_TOOLS (1 import, 1 set difference). ⚠ extraction still OWED.
+
+### `backend/app/services/openai_service.py` — Phase 273 close
+
+**`78 / 39 / 2569`** at 273 close (was `75 / 38 / 2437`). G-5: ⚠ **FIRES**. **273-03**: 1 schema + CHAT_ONLY_TOOLS + 1 get_tools line. ⛔ no anyOf/oneOf/type arrays in SHOW_ARTIFACT_TOOL (Gemini).
+
+### `backend/app/services/show_artifact_tool.py` — Phase 273 close
+
+**`1 / 1 / 607`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-03). validate, by-ref transforms, server caption, store, emit the RETURNING row, id-first result. ⛔ no `error` key; no retrieval import.
+
+### `backend/app/services/structured_text_holdback.py` — Phase 273 close
+
+**`1 / 1 / 100`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-04). Gates STRUCTURED `delta` emission so a tool-call block never streams. ⛔ full_content accumulation unchanged; native untouched.
+
+### `backend/app/services/tool_dispatcher.py` — Phase 273 close
+
+**`97 / 42 / 5057`** at 273 close (was `95 / 41 / 5045`). G-5: ⚠ **FIRES**. **273**: D-14 narrow cut: 1 import, 1 registry line, 1 field, 1 exclusion; registry/handler split OWED (OV-273-02).
+
+### `frontend/src/components/chat/MessageItem.tsx` — Phase 273 close
+
+**`78 / 36 / 1030`** at 273 close (was `77 / 35 / 1027`). G-5: ⚠ **FIRES**. **273-05**: ONE ArtifactBlock mount (D-16), after the answer, before the run status. Hooks unchanged.
+
+### `frontend/src/components/chat/StepRow.tsx` — Phase 273 close
+
+**`3 / 2 / 253`** at 273 close (was `2 / 1 / 249`). G-5: no (2 phases). 273-05: `refused` node state (UI-D-02 amber pair). ⛔ derived from the result marker in toolStepDerivation, never from a tool name.
+
+### `frontend/src/components/chat/ToolCallDetails.tsx` — Phase 273 close
+
+**`3 / 2 / 181`** at 273 close (was `2 / 1 / 171`). G-5: no (2 phases). 273-05: ToolArgsBlock hidden for show_artifact (L-2); dispatched BEFORE the `parsed.error` arm (L-3/L-4). ⛔ `detail` never rendered.
+
+### `frontend/src/components/chat/ToolCallPanel.tsx` — Phase 273 close
+
+**`55 / 23 / 409`** at 273 close (was `54 / 22 / 407`). G-5: ⚠ **FIRES**. ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch.
+
+### `frontend/src/components/chat/artifacts/ArtifactBlock.tsx` — Phase 273 close
+
+**`2 / 1 / 76`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). Body of the ONE MessageItem mount: guard → registry → per-artifact boundary → component or notice. ⛔ never throws; keyed by id.
+
+### `frontend/src/components/chat/artifacts/ArtifactErrorBoundary.tsx` — Phase 273 close
+
+**`1 / 1 / 36`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). The tree's FIRST React error boundary; fallback = the render-failed notice so one artifact cannot blank the message.
+
+### `frontend/src/components/chat/artifacts/ArtifactFrame.tsx` — Phase 273 close
+
+**`1 / 1 / 66`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). The ONE home of the framed-card markup (sketch 1B): header, body slot, caption footer. ⛔ no animation (UI-D-09).
+
+### `frontend/src/components/chat/artifacts/ArtifactNotice.tsx` — Phase 273 close
+
+**`1 / 1 / 34`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). "This artifact can't be shown" + one catalogue reason. ⛔ never JSON, a spec key, a validation path or an exception message.
+
+### `frontend/src/components/chat/artifacts/ChartArtifact.tsx` — Phase 273 close
+
+**`2 / 1 / 456`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). Lazy chunk; the ONLY recharts importer. Legend = aria-pressed buttons. ⛔ colour from spec.chart.slots (UI-D-07); no animation.
+
+### `frontend/src/components/chat/artifacts/MetricArtifact.tsx` — Phase 273 close
+
+**`1 / 1 / 92`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). One value per artifact (sketch 2A): label, value + unit, optional delta. ⛔ no inner tile (UI-D-04).
+
+### `frontend/src/components/chat/artifacts/TableArtifact.tsx` — Phase 273 close
+
+**`2 / 1 / 127`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). Click-to-sort (aria-sort), sticky header, 512px scroll (D-13). ⛔ cells are React text only.
+
+### `frontend/src/components/chat/artifacts/artifactCopy.ts` — Phase 273 close
+
+**`3 / 1 / 266`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). The ONE home of every artifact string (copy + notice catalogue + operation phrases); the rail body imports it too.
+
+### `frontend/src/components/chat/artifacts/artifactRegistry.ts` — Phase 273 close
+
+**`1 / 1 / 55`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). The CLOSED three-entry registry read via `own()` (I-1). ⛔ adding a component is a code change; fenced == backend Literal.
+
+### `frontend/src/components/chat/artifacts/artifactSpec.ts` — Phase 273 close
+
+**`2 / 1 / 469`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). `parseArtifactRecord` → ok or a closed NoticeReason. ⛔ hand-rolled (no zod); never throws; never surfaces the raw value.
+
+### `frontend/src/components/chat/artifacts/captionModel.ts` — Phase 273 close
+
+**`1 / 1 / 73`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). Phrases the SERVER's caption facts (sources, lineage, counts) — never model text (D-04). Pure.
+
+### `frontend/src/components/chat/artifacts/chartModel.ts` — Phase 273 close
+
+**`1 / 1 / 275`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-02). Pure chart derivations: slots, visible domain, tooltip rows, ticks, aria text. No React, no recharts.
+
+### `frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx` — Phase 273 close
+
+**`1 / 1 / 192`** at 273 close (was `0 / 0 / 0`). G-5: no (young). young (273-05). Rail essence + expanded line for show_artifact. ⛔ reads `reason`, never `detail` or `values` (L-3/L-4).
+
+### `frontend/src/components/chat/tool-bodies/index.ts` — Phase 273 close
+
+**`2 / 2 / 79`** at 273 close (was `1 / 1 / 59`). G-5: no (2 phases). 273-05: ShowArtifactBody + `ARGS_HIDDEN`, the ONE home both rail readers import. ⛔ do not widen livePanel beyond execute_code + show_artifact.
+
+### `frontend/src/components/chat/toolStepDerivation.ts` — Phase 273 close
+
+**`2 / 2 / 94`** at 273 close (was `1 / 1 / 74`). G-5: no (2 phases). 273-05: `nodeStateOf` → `refused` for a done result whose JSON `status` is `refused` (marker-derived). Every other tool unchanged.
+
+### `frontend/src/lib/api/threads.ts` — Phase 273 close
+
+**`19 / 11 / 1967`** at 273 close (was `16 / 10 / 1935`). G-5: ⚠ **FIRES**. **273-05**: `onArtifact` SSE branch + `artifacts` carried through the mapper (Array.isArray guard), additive.
+
+### `frontend/src/lib/toolMeta.ts` — Phase 273 close
+
+**`12 / 8 / 367`** at 273 close (was `11 / 7 / 352`). G-5: ⚠ **FIRES**. **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string.
+
+### `frontend/src/lib/toolNames.ts` — Phase 273 close
+
+**`3 / 2 / 131`** at 273 close (was `2 / 1 / 128`). G-5: no (2 phases). 273-05: `show_artifact: "Show an artifact"`. ⛔ keys == harness offer ∪ CHAT_ONLY_TOOLS, fenced by `?raw` in workflows/toolNames.test.ts.
+
+### `frontend/src/providers/StreamsProvider.tsx` — Phase 273 close
+
+**`106 / 40 / 4982`** at 273 close (was `104 / 38 / 4948`). G-5: ⚠ **FIRES**. **273-05**: ONE onArtifact handler (D-16) — append or replace-by-id, text untouched. ⛔ `onTurnBoundary` still FLUSHES before moving.
+
+### `frontend/src/types/index.ts` — Phase 273 close
+
+**`96 / 75 / 1532`** at 273 close (was `95 / 74 / 1520`). G-5: ⚠ **FIRES**. **273-05**: `Message.artifacts` re-exports the wire TYPE from artifactSpec.ts, never re-declared. Seam OWED.
+
