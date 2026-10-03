@@ -10714,7 +10714,7 @@ cells rot within days.
 |---|---|---|---|
 | [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 75 / 38 / 2437 (was `74 / 37 / 2372`) | ⚠ **FIRES** | ⚠ STALE (`74/37/2372`). **272-02**: `filters` on SEARCH_DOCUMENTS_TOOL + D-02 text only. ⛔ no anyOf/oneOf/type arrays under `filters` (Gemini) |
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
-| [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 3 / 1 / 151 (was `2 / 1 / 111`) | no (young) | young. **272-05 D-27**: uncovered docs keep their best row (marked); `_cover_matched_documents` for the filtered cut. ⛔ no I/O |
+| [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 1 / 1 / 174 (was `0 / 0 / 0`) | no (young) | young (272-01 verbatim move, AST-pinned); unchanged since |
 | [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 2 / 1 / 416 (was `0 / 0 / 0`) | no (young) | young (272-01 contracts, 272-03 resolver). ⛔ every id/count is RLS-intersected (D-21); empty never means all (D-18) |
 | [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 4 / 1 / 1163 (was `0 / 0 / 0`) | no (young) | young (272-01 move; 272-04 kinds, D-09 lock, ONE audit writer, vocabulary). ⚠ option strings reach the schema unescaped. Split OWED → 273 |
@@ -10945,7 +10945,7 @@ cells rot within days.
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 28 / 14 / 332 (was `24 / 13 / 294`) | ⚠ **FIRES** | ⚠ STALE (`24/13/294`). **271-03**: `columns="find"` ignores `folderId` and renders nothing on zero (the Find body owns S7). ⛔ still seven `<td>` |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 53 / 18 / 1218 (was `50 / 17 / 994`) | ⚠ **FIRES** | ⚠ STALE (`50/17/994`). **271-02/04**: Filing rules sub-view + a SECOND `useReducer` for Find; `documentSurface(lead, findSlots?)`. ⛔ Views path byte-unchanged |
-| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 22 / 12 / 172 (was `21 / 12 / 159`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01). **272-05 D-27**: filtered cut + rerank call `_cover_matched_documents`; unfiltered path unchanged |
+| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 23 / 12 / 174 (was `22 / 12 / 172`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01). **272-05 D-27**: coverage cut + rerank; filtered dedup same-document only; unfiltered unchanged |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
@@ -17871,9 +17871,17 @@ The operator ruled on findings F-1/F-2/F-3 at the Task 4 checkpoint (`272-VALIDA
 
 **`3 / 1 / 151`** (was `2 / 1 / 111`). **D-27** (operator ruling on F-2, which refines D-10): `_select_filtered_vector_rows` keeps the above-threshold rows plus the BEST row of every matched document that has none, marked `low_similarity`. Before this, a matched document was dropped whenever another document's passage cleared 0.3, and the answer then gave a false count. New pure helper `_cover_matched_documents(rows, top_k)`: each document's best-ranked row first, then fill by rank, rank order kept. ⛔ Binding: no I/O, never mutates input, filtered path only.
 
+### `backend/app/services/retrieval_rank.py` — Phase 272 re-run (D-27 second cause)
+
+**`4 / 1 / 161`** (was `3 / 1 / 151`). The post-restart probe (deepseek (b), run `7a7234da`) returned 2 of 3 matched Acme GmbH reports with the threshold half of D-27 live: `_deduplicate_chunks` compares word-set Jaccard ACROSS documents, and the September and October fixtures score **0.90** (≥ 0.85), so September was collapsed into October. `_deduplicate_chunks` gains a keyword-only `same_document_only` (default `False` = unfiltered, unchanged); the filtered path collapses near-duplicates only within one document. `test_272_pure_move` retires the function from its AST pin BY NAME (SEED-177), proving the move pure at `c29ec8635` and pinning the divergence to the one kwarg. Commits `cfaa0fb4a` (RED) / `1cef556f3` (GREEN). ⛔ The unfiltered path still collapses cross-document near-duplicates — pinned by `test_the_default_dedup_is_unchanged_and_still_collapses_across_documents`.
+
 ### `backend/app/services/retrieval_service.py` — Phase 272 post-ruling
 
 **`22 / 12 / 172`** (was `21 / 12 / 159`). D-27: the filtered top-`k` cut (vector-only and hybrid) goes through `_cover_matched_documents`. The reranker sees the full filtered selection (`top_n=len(candidates)`) and is cut with coverage afterwards. ⛔ Unfiltered: `[:top_k]` and rerank `top_n=top_k` are byte-unchanged (`test_unfiltered_rpc_calls_are_pinned` green). The file is still the orchestrator only.
+
+### `backend/app/services/retrieval_service.py` — Phase 272 re-run (D-27 second cause)
+
+**`23 / 12 / 174`** (was `22 / 12 / 172`). Both dedup sites (vector-only and hybrid) pass `same_document_only=filtered`, two lines, no new branch. ⛔ Unfiltered: `_deduplicate_chunks(rows)` exactly as before.
 
 ### `frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`
 

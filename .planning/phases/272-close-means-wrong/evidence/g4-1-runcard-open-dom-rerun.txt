@@ -1,0 +1,82 @@
+after one click on the run card's status row
+search-filter-line: [
+ {
+  "text": "Filtered: document date 1–31 Oct 2025",
+  "visible": true,
+  "rect": [
+   515,
+   286,
+   659,
+   20
+  ]
+ }
+]
+search card summaries: [
+ "What was October revenue? Run · 1 step deepseek-v4-flash ⏱ 13.0s 1 Searching documents→View results Filtered: document date 1–31 Oct 2025 Thought for 1 second Assuming you mean October 2025 (the most ",
+ "Searching documents→View results",
+ "Searching documents→View results Filtered: document date 1–31 Oct 2025"
+]
+
+--- main innerText ---
+October Revenue Inquiry
+
+What was October revenue?
+
+Run · 1 step
+deepseek-v4-flash
+⏱
+13.0s
+1
+Searching documents→View results
+Filtered: document date 1–31 Oct 2025
+Thought for 1 second
+
+Assuming you mean October 2025 (the most recent completed October before today), I found two monthly financial reports:
+
+Acme GmbH — October 2025 revenue was EUR 1,240,000 1
+Beta Ltd — October 2025 revenue was GBP 860,000 12
+
+Acme GmbH — monthly financial report, October 2025 1
+Beta Ltd — monthly financial report, October 2025 2
+
+If you meant a specific entity or a different year, let me know and I'll narrow it down.
+
+● Medium confidence
+Unmarked claims read as general knowledge
+References · 2 sources
+[1]
+272-board-acme-2025-10.md
+·
+Chunk 1
+·
+0.48
+Open document
+
+# Acme GmbH — monthly financial report, October 2025 Reporting entity: Acme GmbH. Reporting period: October 2025. Total revenue for the period: EUR 1,240,000. Revenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.
+
+Show more
+[2]
+272-board-beta-2025-10.md
+·
+Chunk 1
+·
+0.45
+Open document
+
+# Beta Ltd — monthly financial report, October 2025 Reporting entity: Beta Ltd. Reporting period: October 2025. Total revenue for the period: GBP 860,000. Revenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.
+
+Show more
+
+Follow-up:
+
+What was Acme GmbH's revenue in September 2025?
+What was Beta Ltd's revenue in October 2024?
+Can you convert both companies' October 2025 revenue figures to USD?
+USING:
+All your documents
+deepseek
+deepseek-v4-flash
+General
+Enter ↵ · Shift+Enter for newline
+
+AI can make mistakes. Verify important information.

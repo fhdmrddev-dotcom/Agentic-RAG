@@ -272,6 +272,15 @@ def verdict(conn, prompt_key: str, data: dict) -> dict:
         ok = bool(good_filter) and bool(cited) and all_acme
         notes += [f"legal_entity=Acme GmbH filter: {bool(good_filter)}",
                   f"citations {len(cited)} all Acme GmbH: {all_acme and bool(cited)}"]
+        # D-27 coverage (an OBSERVATION beside the verdict, never part of the pass rule): how many
+        # of the filter's matched documents the filtered call returned, and whether the September
+        # 2025 report (EUR 1,180,000 — the one F-2 dropped) was cited.
+        for a in good_filter:
+            md = a["metadata"] or {}
+            notes.append(f"filtered call returned {len(md.get('document_ids') or [])}/"
+                         f"{md.get('matched_document_count')} matched docs")
+        sep_cited = any((facts.get(d) or {}).get("d") == "2025-09-15" for d in cited)
+        notes.append(f"Sep 2025 cited: {sep_cited} · EUR 1,180,000 in answer: {'1,180,000' in answer}")
     else:
         empty = [a for a in filtered_audits if (a["metadata"] or {}).get("result_kind") == "no_documents_matched"]
         says_nothing = bool(_NOTHING_RE.search(answer))
@@ -315,6 +324,8 @@ def verdict(conn, prompt_key: str, data: dict) -> dict:
 def run_board(token: str, org_id: str, conn, args) -> int:
     import sc10_188_run_board as sc10
 
+    out = _EVIDENCE.parent / args.out  # a re-run writes BESIDE the first board, never over it
+
     requests = kit._requests()
     base = kit.base_url()
     h = _headers(token, org_id)
@@ -324,7 +335,7 @@ def run_board(token: str, org_id: str, conn, args) -> int:
     print(f"settings source: {how}")
     probe = sc10.probe_keys(roster, settings)
     wanted = set(args.providers.split(",")) if args.providers else None
-    _EVIDENCE.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     table = []
     for entry in roster:
         pid = entry["provider"]
@@ -355,12 +366,12 @@ def run_board(token: str, org_id: str, conn, args) -> int:
                 v["verdict"] = "FAIL"
                 v["notes"].append(f"run status {status}: {(data['run'] or {}).get('error')}")
             row["results"][key] = v
-            (_EVIDENCE / f"{pid}-{key}-{run_id}.json").write_text(
+            (out / f"{pid}-{key}-{run_id}.json").write_text(
                 json.dumps({"prompt": PROMPTS[key], "provider": pid, "model": entry["model"], **v,
                             "raw": data}, indent=2, default=str), encoding="utf-8")
             print(f"BOARD {pid} ({key}) {v['verdict']} run={run_id} status={status} | " + " · ".join(v["notes"]))
         table.append(row)
-    (_EVIDENCE / "board-summary.json").write_text(json.dumps(table, indent=2, default=str), encoding="utf-8")
+    (out / "board-summary.json").write_text(json.dumps(table, indent=2, default=str), encoding="utf-8")
     print("\nBOARD_TABLE")
     for row in table:
         cells = [row.get("blocked") and "⛔" or row["results"].get(k, {}).get("verdict", "—") for k in ("a", "b", "c")]
@@ -376,6 +387,8 @@ def main() -> int:
     ap.add_argument("--providers", default="")
     ap.add_argument("--prompts", default="abc")
     ap.add_argument("--timeout", type=int, default=300)
+    ap.add_argument("--out", default="board",
+                    help="evidence subdirectory (default 'board'); a re-run passes e.g. 'board-rerun'")
     args = ap.parse_args()
     kit.load_env()
     kit.assert_localhost_only()

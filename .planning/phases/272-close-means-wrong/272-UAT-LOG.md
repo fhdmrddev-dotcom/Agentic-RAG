@@ -351,6 +351,133 @@ as max(id)+1 (332 → 333). Status `planted`, routed to Phase 273, `trigger_path
 The operator made no separate ruling. It stays a FAIL under the D-22 known limit: a broader search
 run *before* the empty one is outside the D-09 lock's reach.
 
+## Re-run after the operator's restart (2026-10-03)
+
+### Live stack, verified before anything was trusted
+
+```
+$ git rev-parse --abbrev-ref HEAD ; git rev-parse HEAD
+develop
+c29ec8635465af823590c30d6f3c902a392b1673
+$ Get-NetTCPConnection -LocalPort 8000 -State Listen   (+ Win32_Process for uvicorn)
+0.0.0.0 54676 python 2026-10-03T13:09:26.1366114+04:00
+56028 parent=27748 start=10/3/2026 1:09:26 PM  backend\venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+54676 parent=56028 start=10/3/2026 1:09:26 PM  C:\Python312\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+$ git log -1 --format=%cI 676024f6a
+2026-10-03T12:56:34+04:00
+$ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health
+200
+```
+
+There is one listener and it started after the last fix commit.
+
+**Behavioural probe.** One board (b) row: deepseek, run `7a7234da`, evidence in
+`evidence/board-rerun-probe/`. The audit row is `6c74ddef`.
+- The October report came back with `similarity 0.295` and `low_similarity: true`. A March row above
+  the threshold came back beside it. Under D-10 as first written, that combination could not happen,
+  so the process serves `6922624d6`.
+- **The call returned 2 of 3 matched documents.** Its `matched_document_count` is 3. September is
+  missing. The verdict line reads: `PASS · filtered call returned 2/3 matched docs · Sep 2025 cited:
+  False`.
+
+### Root cause: F-2's second cause, the dedup
+
+`retrieval_rank._deduplicate_chunks` drops a chunk whose word-set Jaccard with a kept chunk is
+≥ 0.85, and it compares chunks ACROSS documents. Measured on the stored fixture chunks:
+
+```
+272-board-acme-2025-09.md  272-board-acme-2025-10.md  0.900 DUP
+272-board-acme-2025-09.md  272-board-acme-2026-03.md  0.810
+272-board-acme-2025-10.md  272-board-acme-2026-03.md  0.810
+272-board-acme-2025-10.md  272-board-beta-2025-10.md  0.767
+(every other pair ≤ 0.727)
+dedup keeps: ['272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+```
+
+The two reports differ only in the month name and the figure. The first diagnosis of F-2 named the
+threshold alone, and that diagnosis was incomplete. It is corrected beside the original in
+VALIDATION §3.
+
+**Fix.** Rule 1 applies, because D-27 is the operator's ruling and this breaks it.
+- RED `cfaa0fb4a` adds 8 cases to `test_272_filtered_both_arms.py`. A guard case asserts the fixture
+  pair really crosses 0.85, so the rest cannot pass vacuously. Failing on the shipped tree: the pure
+  cases (missing `same_document_only`), and the filtered `search_documents` case, hybrid and
+  vector-only, which returned `{'dMar', 'dOct'}` instead of 3 documents. That is the live defect,
+  reproduced. Passing on the shipped tree: the unfiltered pins.
+- GREEN `1cef556f3` adds a keyword-only `same_document_only` to `_deduplicate_chunks`. The default,
+  `False`, is the unfiltered behaviour. Both filtered dedup sites pass `same_document_only=filtered`.
+- `test_272_pure_move` retires `_deduplicate_chunks` from its AST pin BY NAME (SEED-177). It proves
+  the move was pure at `c29ec8635` and pins the divergence to the one kwarg.
+- Targeted runs:
+  - `pytest tests/unit -k 272`: **152 passed**.
+  - `test_retrieval_service.py`: 15 failed, a **SET-IDENTICAL 15/15** match with `272-BASELINES.md`
+    lines 77-91.
+  - `pytest tests/unit -k "retriev or search or hybrid or rerank or dedup"`: `15 failed, 204 passed`,
+    **0 new**. One name had warning text glued to it, as before.
+- Ledger: both rows re-derived in the same commit as their sections. `retrieval_rank.py` is
+  `4 / 1 / 161`; `retrieval_service.py` is `23 / 12 / 174`. `check-hot-file-ledger.cjs 272` OK.
+- ⚠ **The reloader did NOT respawn on `1cef556f3`.** Listener PID 54676 was unchanged afterwards, so
+  the fix is not live until restart #3.
+
+### Board (a) ×8 and (c) ×8, re-run on the live process
+
+Method as in the first board, written to `evidence/board-rerun/`. `scripts/run-272-board.py` gained
+`--out` so a re-run can never overwrite `board/board-summary.json`. It also gained (b) coverage
+NOTES: `returned N/M matched docs` and `Sep 2025 cited`. They are observations only. **The pass rule
+is unchanged.**
+
+Why only (a) and (c): neither prompt's filter co-matches the one near-duplicate pair, so the
+un-restarted dedup cannot change their filtered results. (b) is owed after the restart.
+
+```
+| anthropic | claude-sonnet-5 | PASS | — | PASS |
+| deepseek | deepseek-v4-pro | PASS | — | PASS |
+| google | gemini-3.5-flash | FAIL | — | FAIL |
+| minimax | MiniMax-M3 | FAIL | — | PASS |
+| moonshot | kimi-k2.6 | PASS | — | PASS |
+| openai | gpt-5.6-luna | PASS | — | PASS |
+| openrouter | z-ai/glm-5.2 | PASS | — | PASS |
+| zhipu | glm-5.2 | PASS | — | PASS |
+```
+
+(a) is 6/8, down from 7/8. (c) is 7/8, up from 6/8. Two verdicts changed, both MiniMax, in opposite
+directions. **Neither is attributable to D-27 or F-3:**
+- MiniMax (a), run `cb275a0c`, audit `8f69c46f`, **PASS → FAIL.** It made one unfiltered
+  `search_documents("October revenue")` call (`filters: []`), then `query_documents` SQL, and cited
+  5 documents including `nulfix.txt` and `sample.pdf`. D-27 changes filtered calls only, and F-3 is
+  frontend only.
+- MiniMax (c), run `63051a8b`, **FAIL → PASS.** There was no entity-only pre-search this time. It
+  made two filtered-empty searches (July 2026, audit `33e17fd7`; July 2025, audit `7c45dbef`) and
+  cited 0 documents.
+
+Both are **unexplained: run-to-run model variance**. MiniMax's filter emission is not stable, so one
+sample of a MiniMax row is not a measurement.
+
+Google is unchanged in both rows:
+- (a): `filters: []` again; it used SQL.
+- (c): the first call was `legal_entity = Acme GmbH` with no date, then 13 more calls. It ended at the
+  15-step cap with no answer.
+
+### G-4 re-drive (Playwright Chromium, rendered text at rest)
+
+`-rerun` evidence; the first drive's files are untouched.
+
+- **G4-1 PASS.** The answer gives October 2025 with Acme GmbH EUR 1,240,000 and Beta Ltd GBP
+  860,000. Citations are October only, and `References · 2 sources`. After one click the card shows
+  **`Filtered: document date 1–31 Oct 2025`**; F-1 is accepted. Audit `a23161d1`.
+- **G4-2 PASS, and F-3 is verified.** The card reads **`Searching documents→no documents matched`**,
+  where it used to read `0 results`. The answer says nothing matched and gives no number, no citation
+  and no References. Audit `a7b215f8`.
+  - The model did not retry, so no refusal card appeared in this drive.
+  - The refusal text was read on REAL persisted data instead: the first G4-2 thread (`d420779b`, with
+    the lock's `refused_retry`, audit `c8b9c9ba`) was re-opened in the current frontend. Its card 2
+    reads **`Searching documents→refused — would drop the filter`**
+    (`evidence/g4-2-first-thread-*-rerun.*`).
+- **G4-3 OWED.** It depends on `1cef556f3`, which is not live.
+
+Scratch scripts (`g4drive-rerun.cjs`, `g4-2-refusal-rerender.cjs`) live in the session scratchpad,
+outside the repo tree.
+
 ## OWED (recorded, never executed here)
 
 1. ~~Operator: add OpenAI API credits~~ — done 2026-10-03; board and drive run (above).
@@ -359,6 +486,14 @@ run *before* the empty one is outside the D-09 lock's reach.
    not restart on change, so the D-27 retrieval code and the F-3 card are not live until then;
    (ii) a re-run of the 8 board (b) rows, the 3 Google rows and G4-3 (plus the G4-2 card text) on the
    restarted backend; (iii) **operator G-4 sign-off** on G4-1..G4-3.
+   **Update (re-run, 2026-10-03):**
+   - (i) is done: the restart at 13:09.
+   - (ii) is partly done: (a) ×8, (c) ×8, Google (a)/(c), G4-1 and the G4-2 card text are re-run.
+   - **Still owed:**
+     - (iv) **operator restart #3**, so that `1cef556f3` (D-27 dedup half) is live.
+     - (v) then board (b) ×8 with `--prompts b --out board-rerun-b`, plus G4-3. Expected: all 3 Acme
+       GmbH reports, including September 2025 at EUR 1,180,000.
+     - (iii) the operator's sign-off.
 3. **Production parity, in this order, before the backend deploy:**
    a. A FREE read of the production `document_chunks` count (Supabase MCP `execute_sql` SELECT — not
       available to this executor, so OWED). If it is large, run alone first, outside any transaction:

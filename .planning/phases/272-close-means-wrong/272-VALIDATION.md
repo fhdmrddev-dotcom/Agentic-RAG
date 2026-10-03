@@ -220,6 +220,50 @@ deepseek `deepseek-v4-pro` (tied with `deepseek-v4-flash`) · google `gemini-3.5
   the configured threshold (0.3) when any clears it (D-10 as written), so a matched document below it
   is dropped unless keyword fusion brings it back. Not fixed here (a behaviour change to D-10 needs a
   decision and a backend restart) — routed to the operator at Task 4.
+  ⚠ **CORRECTED at the re-run (below), and the original is kept:** the threshold was ONE of TWO
+  causes. The second is `retrieval_rank._deduplicate_chunks`, which compares word-set Jaccard ACROSS
+  documents: the September and October Acme reports score **0.90** (≥ 0.85), so September is
+  collapsed into October even after the threshold half is fixed.
+
+### 3b. Re-run after the operator's restart (2026-10-03) — published BESIDE the first board
+
+**Live stack, verified before anything was trusted:** exactly one listener on :8000, PID 54676
+(parent 56028, uvicorn `--reload`), started `2026-10-03T13:09:26+04:00`, after `676024f6a`
+(`12:56:34+04:00`); `/health` 200. **Behavioural probe** (deepseek (b), run `7a7234da`, evidence
+`evidence/board-rerun-probe/`): the October report (similarity 0.295, under 0.3) came back marked
+`low_similarity: true` BESIDE an above-threshold March row. Before `6922624d6` that combination
+could not happen (D-10 dropped it), so the live process serves the D-27 threshold fix. **But the
+filtered call returned 2 of 3 matched documents** (audit `6c74ddef`, `matched_document_count = 3`),
+and September was missing. Root cause: the dedup collapse above (Jaccard per fixture pair, Acme
+Sep/Oct **0.900** is the only pair ≥ 0.85; Acme Oct/Beta Oct 0.767; every other pair ≤ 0.81).
+**Fixed by TDD under Rule 1** (D-27 is the operator's ruling and this broke it): RED `cfaa0fb4a`,
+GREEN `1cef556f3`. On the filtered path, `_deduplicate_chunks(…, same_document_only=True)` collapses
+near-duplicates only within ONE document. The unfiltered path is unchanged and pinned. ⚠ **The
+reloader did not respawn on `1cef556f3`** (PID 54676 unchanged afterwards), so this fix is NOT live
+until the operator restarts again.
+
+**What was re-run on the live process, and why only that:** (a) ×8 and (c) ×8. Neither prompt's
+filter co-matches the only near-duplicate pair, so the un-restarted dedup cannot change their
+filtered results. (b) ×8 depends on the dedup fix and is **OWED after restart #3**, never run on code
+known to be incomplete. Raw: `evidence/board-rerun/` (16 JSON + `board-summary.json` +
+`board-run-ac.log` + `board-verdicts-readout.txt`). Roster re-derived at run time, identical to
+the first board. Effective `runs.provider/model` == requested on all 16 runs.
+
+| # | Provider | Model | (a) first → re-run | (b) first → re-run | (c) first → re-run | Re-run evidence (audit / run) | Attribution of every changed verdict |
+|---|---|---|---|---|---|---|---|
+| 1 | openai | gpt-5.6-luna | PASS → PASS | PASS → OWED | PASS → PASS | a run `dbee42f8` · c run `73dcdf27` | — |
+| 2 | anthropic | claude-sonnet-5 | PASS → PASS | PASS → OWED | PASS → PASS | a run `7326da8c` · c run `a57201c1` | — |
+| 3 | google | gemini-3.5-flash | FAIL → FAIL | FAIL → OWED | FAIL → FAIL | a `ad59c881` / `d6ab50f9` · c `21dbdc55`,`92f54a2a` / `5835720e` | unchanged. (a): `filters: []` again, scoped by `query_documents` SQL, cited 5 incl. unrelated files. (c): first call `legal_entity = Acme GmbH` with NO date, then 13 more calls, ended at the 15-step cap with no answer. Model behaviour (Task 4 investigation) |
+| 4 | deepseek | deepseek-v4-pro | PASS → PASS | PASS → OWED (probe: PASS by rule, 2/3 docs) | PASS → PASS | a run `889437d0` · c run `efcac385` · probe b `6c74ddef` / `7a7234da` | — |
+| 5 | zhipu | glm-5.2 | PASS → PASS | PASS → OWED | PASS → PASS | a run `61cd11e4` · c run `91f22d9a` | — |
+| 6 | minimax | MiniMax-M3 | PASS → **FAIL** | PASS → OWED | FAIL → **PASS** | a `8f69c46f` / `cb275a0c` · c `33e17fd7`,`7c45dbef` / `63051a8b` | **(a) unexplained by D-27 / F-3: run-to-run model variance.** It made one search with NO `filters` (`search_documents(query="October revenue")`), then `query_documents` SQL, and cited 5 including `nulfix.txt` and `sample.pdf`. D-27 only changes filtered calls and F-3 is frontend-only, so neither can produce this. **(c) unexplained by D-27 / F-3: run-to-run model variance.** This time there was no entity-only pre-search: two filtered-empty searches (July 2026, then July 2025), both `no_documents_matched`, 0 citations |
+| 7 | moonshot | kimi-k2.6 | PASS → PASS | PASS → OWED | PASS → PASS | a run `af964975` · c run `d1ff8796` | — |
+| 8 | openrouter | z-ai/glm-5.2 | PASS → PASS | PASS → OWED | PASS → PASS | a run `48cad518` · c run `2dbd5d4c` | — |
+
+**Re-run totals (live process = `c29ec8635`):** (a) **6/8** (was 7/8) · (c) **7/8** (was 6/8) · (b)
+**OWED** (restart #3). Both changed verdicts are MiniMax, in opposite directions, and neither is
+attributable to a fix. ⚠ That is the finding: **MiniMax's filter emission is not stable run to run**,
+so one sample of a MiniMax row is not a measurement. Google is stable in failing.
 
 ## 4. G-4 lived-experience scenarios (CONTEXT `<specifics>`), driven by 272-05
 
@@ -255,6 +299,18 @@ Threads: G4-1 `ff82bf25` (first drive) and `6cfb82df` (re-drive with the unfold 
 | **Google 0/3** | **Investigate first**, bounded. | Verdict: **(ii) model behaviour**, plus one cause on our side in row (b), which is F-2 and is now fixed. Evidence is in `272-UAT-LOG.md` → "Google 0/3 — bounded investigation". The schema survives the sanitizer whole, and Gemini emitted well-formed `filters` 3 times. It preferred `query_documents` SQL, never emitted a date filter, and run (c) ended at the 15-step iteration cap. **SC#4 Google rows (a) and (c) are recorded UNMET (model behaviour).** | Google (b) after the restart. (a) and (c) re-run only to confirm |
 | **F-3** | **Fast fix now.** | Fixed with TDD. `SearchDocumentsBody.summarize` now reads `refused — would drop the filter` / `invalid filter (<field>)` / `no documents matched` / `N matched — not searchable yet` / `search unavailable`. A new suite, `SearchDocumentsBody.test.ts` (9 cases, 6 RED on the shipped tree), is adopted in BOTH count-gate knobs. The workspace TODO showing a refused call as `COMPLETED` is a separate file (the panel's activity-derived todos), so it is **noted and not fixed**. | G4-2 card text, after the restart and a frontend reload |
 | **F-1** | **Accept, plant a seed.** | **SEED-333** planted, routed to Phase 273. Its `trigger_paths` include `RunCard.tsx`. | none |
+
+**Re-run of the G-4 drive after the operator's restart (2026-10-03)** — same method as above
+(Playwright 1.60 Chromium, headless, 1600×1000, dark, signed in through the UI, key events, model =
+the saved deepseek / deepseek-v4-flash), fresh threads. Vite served the F-3 source (the module text
+contains `refused — would drop the filter`). Evidence has a `-rerun` suffix, and the first drive's
+files are untouched.
+
+| # | Re-run result | Rendered text (verbatim) | Evidence |
+|---|---|---|---|
+| G4-1 | **PASS** (F-1 unchanged, accepted → SEED-333) | *"Assuming you mean October 2025 (the most recent completed October before today), I found two monthly financial reports: Acme GmbH — October 2025 revenue was EUR 1,240,000 · Beta Ltd — October 2025 revenue was GBP 860,000"*. Citation markers only `272-board-acme-2025-10.md` and `272-board-beta-2025-10.md`; `References · 2 sources`. After one click: card `Searching documents→View results` + **`Filtered: document date 1–31 Oct 2025`** (visible, 659×20). No March or September figure. Audit `a23161d1` (`date between 2025-10-01 and 2025-10-31`, `passages`), thread `86d3344e` | `evidence/g4-1-at-rest-rerun.png`, `g4-1-runcard-open-rerun.png`, `g4-1-references-open-rerun.png`, `g4-1-dom-rerun.txt`, `g4-1-runcard-open-dom-rerun.txt` |
+| G4-2 | **PASS; F-3 verified** | *"No documents matched the filter I used: legal entity = Acme GmbH · document date 1–31 July 2026. So I can't give you a July 2026 revenue figure…"* then nearby Mar 2026 / Oct 2025 / Sep 2025. No number, no citation marker, no References. ONE card: **`Searching documents→no documents matched`** + `Filtered: legal entity = Acme GmbH · document date 1–31 Jul 2026`. Before F-3 this read `0 results`. The model did not retry this time, so no refusal card rendered. Audit `a7b215f8` (`no_documents_matched`), thread `cc74f48d`. **The refusal text was verified on real persisted data:** the FIRST G4-2 thread (`d420779b`, whose second call is the lock's `refused_retry`, audit `c8b9c9ba`), re-opened in the current frontend, renders card 2 as **`Searching documents→refused — would drop the filter`** + `Filtered: legal entity = Acme GmbH` | `evidence/g4-2-at-rest-rerun.png`, `g4-2-runcard-open-rerun.png`, `g4-2-dom-rerun.txt`, `g4-2-runcard-open-dom-rerun.txt`, `g4-2-first-thread-runcard-open-rerun.png`, `g4-2-first-thread-dom-rerun.txt` |
+| G4-3 | **OWED after restart #3** | Not re-run. It depends on the dedup half of D-27 (`1cef556f3`), which the live process does not serve. Expected after the restart: *Acme GmbH* corrected, three figures (Mar 2026 EUR 1,410,000 · Oct 2025 EUR 1,240,000 · **Sep 2025 EUR 1,180,000**) | — |
 
 ## 5. Known limits recorded, not hidden
 - D-22: `grep` / `query_documents` / `read_document` are not structurally locked by D-09; the prompt

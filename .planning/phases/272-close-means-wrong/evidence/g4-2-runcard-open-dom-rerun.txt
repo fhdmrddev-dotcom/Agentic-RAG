@@ -1,0 +1,56 @@
+after one click on the run card's status row
+search-filter-line: [
+ {
+  "text": "Filtered: legal entity = Acme GmbH · document date 1–31 Jul 2026",
+  "visible": true,
+  "rect": [
+   515,
+   286,
+   659,
+   20
+  ]
+ }
+]
+search card summaries: [
+ "What was revenue for Acme GmbH in July? Run · 1 step deepseek-v4-flash ⏱ 9.8s 1 Searching documents→no documents matched Filtered: legal entity = Acme GmbH · document date 1–31 Jul 2026 Thought for 1 ",
+ "Searching documents→no documents matched",
+ "Searching documents→no documents matched Filtered: legal entity = Acme GmbH · document date 1–31 Jul 2026"
+]
+
+--- main innerText ---
+Acme GmbH July Revenue Query
+
+What was revenue for Acme GmbH in July?
+
+Run · 1 step
+deepseek-v4-flash
+⏱
+9.8s
+1
+Searching documents→no documents matched
+Filtered: legal entity = Acme GmbH · document date 1–31 Jul 2026
+Thought for 1 second
+
+No documents matched the filter I used: legal entity = Acme GmbH · document date 1–31 July 2026. So I can't give you a July 2026 revenue figure — there's nothing for Acme GmbH dated in that month.
+
+Nearby periods that do contain documents (for Acme GmbH, as far as the date axis goes):
+
+March 2026 — 1 document
+October 2025 — 1 document
+September 2025 — 1 document
+
+Would you like me to check any of these instead? (If you meant a specific earlier July — e.g. July 2025 — just say so and I'll re-run with that range.)
+
+Follow-up:
+
+What was Acme GmbH's revenue in July 2025?
+Can you show the document details for Acme GmbH in March 2026?
+What is the total revenue for Acme GmbH across all available periods?
+USING:
+All your documents
+deepseek
+deepseek-v4-flash
+General
+Enter ↵ · Shift+Enter for newline
+
+AI can make mistakes. Verify important information.
