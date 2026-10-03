@@ -20,12 +20,10 @@ SEARCH_DOCUMENTS_TOOL = {
         "description": (
             "Search the user's uploaded documents for relevant information. "
             "Returns matching chunks with similarity scores. "
-            "IMPORTANT: call this WITHOUT metadata_filter first. Only add "
-            "metadata_filter when the user explicitly names a document attribute "
-            "to filter on (e.g. 'only search French documents'). Do NOT guess "
-            "filter values like 'paper', 'thesis', or 'survey' — these will "
-            "silently return zero results if the metadata doesn't match exactly. "
-            "Supported filter keys (when needed): document_type, language, author, date."
+            "When the question names a period (a month, a quarter, a year) or a value "
+            "of a document field (an entity, a type, an author), pass it in `filters` "
+            "so only those documents are searched. A passage from outside the asked "
+            "period or value is a wrong answer, not a close one."
         ),
         "parameters": {
             "type": "object",
@@ -34,14 +32,81 @@ SEARCH_DOCUMENTS_TOOL = {
                     "type": "string",
                     "description": "The semantic search query to find relevant document chunks.",
                 },
+                # Phase 272 (FIND-07, D-03): Find's condition list as a tool ARGUMENT. The
+                # `op` enum EQUALS ViewCondition.op (pinned by test_272_tool_schema.py), and
+                # the subtree is provider-safe by construction: no anyOf/oneOf/allOf/
+                # additionalProperties/$ref and NO multi-type `type` arrays (value/value2 are
+                # plain strings — the handler coerces numbers), so Google's sanitizer keeps
+                # it whole and google-genai's Tool constructs (the Phase 115 incident).
+                # Field names are written literally: importing document_view_resolver here
+                # closes a real import cycle; the test derives them from the code sets.
+                "filters": {
+                    "type": "array",
+                    "description": (
+                        "Conditions every searched document must meet (AND). When the "
+                        "question names a period or a value of any listed field, pass it "
+                        "here as a filter — close means wrong. "
+                        "Operators: eq (equals), one_of (any of `values`), contains (text "
+                        "contains), is_empty (has no value), gte / lte (at least / at most), "
+                        "before / after (a date, YYYY-MM-DD), between (from `value` to "
+                        "`value2`, both inclusive, YYYY-MM-DD), within_next / older_than "
+                        "(a whole number in `value` plus `unit`). "
+                        "Dates: `date` is the document's own date and is the default for "
+                        "any period. Use `added` (uploaded here), `source_created` (created "
+                        "in the source file) or `source_modified` (modified in the source "
+                        "file) only when the person says uploaded, created or modified. "
+                        "Built-in fields: `title`, `author`, `date`, `document_type`, "
+                        "`topics`, `language`, `summary`; the organisation's own fields "
+                        "(e.g. `legal_entity`, `fiscal_period`) are valid too. "
+                        "Example, October 2025: "
+                        '{"field":"date","op":"between","value":"2025-10-01","value2":"2025-10-31"}. '
+                        "Example, one entity: "
+                        '{"field":"legal_entity","op":"eq","value":"Acme GmbH"}. '
+                        "An unknown field or value is answered with the list of valid "
+                        "ones; retry with one of them."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "field": {
+                                "type": "string",
+                                "description": "The field to filter on (a built-in, a date word, or one of the organisation's fields).",
+                            },
+                            "op": {
+                                "type": "string",
+                                "enum": [
+                                    "eq", "gte", "lte", "one_of", "contains",
+                                    "is_empty", "within_next", "older_than",
+                                    "before", "after", "between",
+                                ],
+                            },
+                            "value": {
+                                "type": "string",
+                                "description": "The value to compare with (dates as YYYY-MM-DD; the start for 'between').",
+                            },
+                            "value2": {
+                                "type": "string",
+                                "description": "The inclusive end for 'between' (YYYY-MM-DD).",
+                            },
+                            "values": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Membership list for 'one_of'.",
+                            },
+                            "unit": {
+                                "type": "string",
+                                "enum": ["days", "weeks", "months"],
+                                "description": "Span unit for within_next / older_than.",
+                            },
+                        },
+                        "required": ["field", "op"],
+                    },
+                },
                 "metadata_filter": {
                     "type": "object",
                     "description": (
-                        "Optional JSONB containment filter on document metadata. "
-                        "Each key-value pair must match stored metadata EXACTLY "
-                        "(case-insensitive). OMIT this parameter unless the user "
-                        "explicitly asks to scope by a metadata attribute. "
-                        "Wrong values silently return zero results."
+                        "Legacy equality shorthand ({key: value}); prefer `filters`. "
+                        "Each pair is applied as an eq filter."
                     ),
                     "additionalProperties": {"type": "string"},
                 },
