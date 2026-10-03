@@ -666,6 +666,67 @@ export interface DocumentDownloadUrl {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────────────
+// Phase 271 (FIND-01 / FIND-03) — the `POST /document-search` wire contract, typed from
+// 271-01's backend models (`backend/app/models/document_search.py`). Additive only.
+// `pages/findState.ts` produces a structurally identical body without importing these (it is
+// a zero-import leaf); `findState.test.ts` compares the two so they cannot drift.
+// ──────────────────────────────────────────────────────────────────────────────────────
+
+/** The 8 relationship verbs: both directions of the 4 stored types. Mirrors the backend
+ *  `RelVerb` Literal, whose members are `_INVERSE_LABEL`'s keys plus values. */
+export type RelVerb =
+  | "supersedes"
+  | "superseded_by"
+  | "amends"
+  | "amended_by"
+  | "references"
+  | "referenced_by"
+  | "attached_to"
+  | "has_attachment"
+
+export interface DocumentSearchRequest {
+  /** Metadata conditions (document type, Date in the document = field `date`, custom fields). */
+  filter_expr: ViewFilter
+  name?: string | null
+  folder?: { folder_id: string | null; include_subfolders: boolean } | null
+  added_by?: { kind: "me" | "connection" | "others"; connection_id?: string | null } | null
+  dates?: Array<{
+    which: "added" | "source_created" | "source_modified"
+    op: "before" | "after" | "between" | "within_next" | "older_than"
+    value: string | number | null
+    value2?: string | null
+    unit?: "days" | "weeks" | "months" | null
+  }>
+  relationship?: { verb: RelVerb; document_id: string } | null
+  version: "latest" | "has_earlier" | "older"
+  sort:
+    | "added_desc"
+    | "added_asc"
+    | "document_date_desc"
+    | "source_modified_desc"
+    | "source_created_desc"
+    | "name_asc"
+  offset: number
+  limit: number
+}
+
+/** One Find result row: the full document plus its visible lineage size and whether it has
+ *  older uploads. `version_count` drives the "v2 · 2 versions" tag (P-05: the browse chevron
+ *  keeps reading `version_number`). */
+export type DocumentSearchRow = Document & { version_count: number; has_earlier: boolean }
+
+export interface DocumentSearchResponse {
+  documents: DocumentSearchRow[]
+  /** The exact server count of matching rows — never the page length. */
+  total: number
+  /** Rows that would match with Version = "Older versions" (the older-versions hint, D-06). */
+  older_matches: number
+  sort: string
+  offset: number
+  limit: number
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────────
 // Phase 217 — the document DETAIL row types.
 //
 // Each mirrors a Pydantic model FIELD FOR FIELD, so plans 10 and 11 consume one shape

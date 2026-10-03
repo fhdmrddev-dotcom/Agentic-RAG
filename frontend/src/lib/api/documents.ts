@@ -17,6 +17,8 @@ import type {
   DocumentDownloadUrl,
   DocumentImageRow,
   DocumentQueryRow,
+  DocumentSearchRequest,
+  DocumentSearchResponse,
   ConversationResponse,
   DocumentTableRow,
   Folder,
@@ -154,6 +156,44 @@ export async function getDocumentDownloadUrl(documentId: string): Promise<Docume
   }
   if (!res.ok) throw new DownloadError(res.status, "Download failed.")
   return res.json() as Promise<DocumentDownloadUrl>
+}
+
+/**
+ * Phase 271 (FIND-01) — the Find failure, carrying the HTTP status (the `DownloadError` shape)
+ * so a 422 (a condition the server refused) can be told apart from a network failure.
+ */
+export class DocumentSearchError extends Error {
+  readonly status: number | "network"
+  constructor(status: number | "network", message: string) {
+    super(message)
+    this.status = status
+    this.name = "DocumentSearchError"
+  }
+}
+
+/**
+ * Phase 271 (FIND-01 / FIND-03 / D-03) — `POST /document-search`: exact field matching over
+ * the caller's visible documents, no embedding and no ranking.
+ *
+ * ⚠ Consumers import this from `@/lib/api/documents`, never from the `@/lib/api` barrel:
+ * every suite that mocks the barrel with a factory lacking this export would throw at mount
+ * (the 196-08 lesson). The barrel still re-exports it, because `apiBarrel.test.ts` requires
+ * every runtime export of this module there (D-207-06).
+ */
+export async function searchDocuments(body: DocumentSearchRequest): Promise<DocumentSearchResponse> {
+  const headers = await getAuthHeaders()
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/document-search`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new DocumentSearchError("network", "Couldn't run this search.")
+  }
+  if (!res.ok) throw new DocumentSearchError(res.status, "Couldn't run this search.")
+  return res.json() as Promise<DocumentSearchResponse>
 }
 
 export async function downloadSandboxOutput(

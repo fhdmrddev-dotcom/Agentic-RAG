@@ -21,6 +21,12 @@
  * `LibraryPage`'s `nth-child(n+3):nth-child(-n+5)` shed hides Type/Size/Chunks by position.
  * The version-history expand row is a SEPARATE `<tr>` and is the only `colSpan` user.
  * Phase 270: Download lives INSIDE the seventh cell; still seven <td>.
+ *
+ * Phase 271-03 (FIND-01 / D-07): `columns="find"` swaps cells 3-5 for Document type /
+ * Added by / Date and replaces the folder pill with a second name-cell line (folder path +
+ * version tag). STILL SEVEN <td>, in the same positions, so the shed hides the Find
+ * columns exactly as it hides browse's — and the second line, living in cell 2, survives it.
+ * Browse (`columns` absent or `"browse"`) renders byte-identically.
  */
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -48,8 +54,21 @@ import { formatBytes } from "@/lib/formatBytes"
 import { classifyIngestionError } from "@/components/library/ingestionErrorVocabulary"
 import { ChunkProportionBar } from "@/components/library/ChunkProportionBar"
 import { DocumentDownloadButton } from "@/components/metadata/DocumentDownloadButton"
+import { folderPathOf } from "@/components/chat/scopeCopy"
+import { NOT_RECORDED, addedBy } from "@/lib/documentAddedBy"
+import type { FindDateField } from "@/pages/findState"
 import type { Document, Folder } from "@/types"
 
+/** Phase 271-03 — which column set the row renders. */
+export type DocumentColumns = "browse" | "find"
+
+/** Phase 271-03 — the Find Date column: its header and the row field it reads. */
+export interface FindDateColumn {
+  label: string
+  field: FindDateField
+}
+
+// P-05 (271): NOT changed for Find — the chevron reads version_number; Find's tag reads version_count/is_latest.
 /** Phase 112 (D-01): the chevron toggles VERSION HISTORY ONLY. */
 export function hasVersions(doc: Document): boolean {
   return (doc.version_number ?? 1) > 1
@@ -81,6 +100,52 @@ export interface DocumentRowProps {
   onDeleteRequest: (doc: Document) => void
   onRefresh: () => void
   currentUserId: string
+  /** Phase 271-03 — `"find"` renders the Find column set (still seven cells). Default browse. */
+  columns?: DocumentColumns
+  /** Phase 271-03 — the Find Date column's row field (Find only). Default: Added. */
+  findDateColumn?: FindDateColumn
+}
+
+/** Phase 271-03 — a fact the row does not hold (270 D-09/D-10): italic, muted, never 0. */
+function NotRecordedCell() {
+  return <span className="italic text-muted-foreground">{NOT_RECORDED}</span>
+}
+
+const FIND_DATE_FORMAT: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" }
+
+/** Phase 271-03 — the Find Date cell. Reads ONLY the named field; a missing or unparseable
+ *  value reads "not recorded" — never a substituted date (270 rule). A date-only value
+ *  (`metadata.date`, "YYYY-MM-DD") is a calendar date, built in local time so it never
+ *  shifts a day west of UTC. */
+function FindDateCell({ doc, field }: { doc: Document; field: FindDateField }) {
+  const raw = field === "document_date" ? doc.metadata?.date : doc[field]
+  if (!raw) return <NotRecordedCell />
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw)
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(raw)
+  if (Number.isNaN(d.getTime())) return <NotRecordedCell />
+  return <time dateTime={raw}>{d.toLocaleDateString(undefined, FIND_DATE_FORMAT)}</time>
+}
+
+/** Phase 271-03 (D-07 / P-09) — the name cell's second line in Find: the folder path
+ *  (computed client-side with the shipped `folderPathOf`) and the version tag. A folder id
+ *  the caller cannot resolve renders no path — never a made-up name. */
+function FindNameSecondLine({ doc, folders }: { doc: Document; folders?: Folder[] }) {
+  const path = doc.folder_id == null ? null : folderPathOf(doc.folder_id, folders ?? [])
+  // `version_count` rides only on Find rows; a plain `Document` reads as undefined.
+  const versionCount = (doc as { version_count?: number }).version_count
+  const v = doc.version_number ?? 1
+  const tag =
+    doc.is_latest === false
+      ? { text: `v${v} · older version`, tone: "border-warning/30 bg-warning/10 text-warning" }
+      : versionCount != null && versionCount > 1
+        ? { text: `v${v} · ${versionCount} versions`, tone: "border-border text-muted-foreground" }
+        : null
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      {doc.folder_id == null ? <span>Not in a folder</span> : path && <span>{`/${path}`}</span>}
+      {tag && <span className={cn("text-xs rounded-md border px-2", tag.tone)}>{tag.text}</span>}
+    </div>
+  )
 }
 
 function VersionHistoryPanel({
@@ -310,7 +375,10 @@ export function DocumentRow({
   onDeleteRequest,
   onRefresh,
   currentUserId,
+  columns = "browse",
+  findDateColumn,
 }: DocumentRowProps) {
+  const isFind = columns === "find"
   // ── The folder tag pill (D-217.1-31): `Root` for `folder_id: null`, the resolved
   // folder name otherwise. A set-but-unresolvable id (folder deleted) renders no pill —
   // never a made-up name.
@@ -377,22 +445,42 @@ export function DocumentRow({
                 "suggested" _classification is present on this doc. */}
             <ClassificationRowChip doc={doc} onRefresh={onRefresh} />
           </div>
-          {showFolderPill && folderName && (
-            <div className="mt-1">
-              <span
-                data-testid="folder-pill"
-                className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground whitespace-nowrap"
-              >
-                {folderName}
-              </span>
-            </div>
+          {isFind ? (
+            // Phase 271-03: Find replaces the folder pill with the path + version line.
+            <FindNameSecondLine doc={doc} folders={folders} />
+          ) : (
+            showFolderPill && folderName && (
+              <div className="mt-1">
+                <span
+                  data-testid="folder-pill"
+                  className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground whitespace-nowrap"
+                >
+                  {folderName}
+                </span>
+              </div>
+            )
           )}
         </td>
-        <td className="px-4 py-3">{getFileIcon(doc.filename)}</td>
-        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatBytes(doc.file_size)}</td>
-        <td className="px-4 py-3 text-muted-foreground">
-          <ChunkProportionBar value={doc.chunk_count ?? 0} max={maxChunkCount} />
-        </td>
+        {isFind ? (
+          // Phase 271-03: cells 3-5 in Find — the positions SHED_COLUMNS_3_TO_5 hides.
+          <>
+            <td className="px-4 py-3 text-muted-foreground">
+              {doc.metadata?.document_type ? doc.metadata.document_type : <NotRecordedCell />}
+            </td>
+            <td className="px-4 py-3 text-muted-foreground">{addedBy(doc, currentUserId)}</td>
+            <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+              <FindDateCell doc={doc} field={findDateColumn?.field ?? "created_at"} />
+            </td>
+          </>
+        ) : (
+          <>
+            <td className="px-4 py-3">{getFileIcon(doc.filename)}</td>
+            <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatBytes(doc.file_size)}</td>
+            <td className="px-4 py-3 text-muted-foreground">
+              <ChunkProportionBar value={doc.chunk_count ?? 0} max={maxChunkCount} />
+            </td>
+          </>
+        )}
         <td className="px-4 py-3">
           {doc.status === "processing" ? (
             // The inline six-stage strip for an in-flight row — the SAME component the
