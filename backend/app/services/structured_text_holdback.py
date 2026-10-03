@@ -22,6 +22,12 @@ text it saw before this phase.
 * ``finish(True)`` (the text parsed as a tool call) drops the held block; ``finish(False)`` returns
   it so the answer completes byte-for-byte.
 
+⛔ 273-REVIEW CR-02 — ``finish(False)`` alone could not tell "held text that is an answer" from
+"held text that is a tool call which FAILED to parse" (a ``show_artifact`` spec cut off at the
+output-token limit, a missing comma). Flushing the second kind put up to 500 rows of spec into the
+answer — SC#2's leak, invisible to the model. ``failed_tool_call`` names that case so the loop
+drops it (``drop_held``) and says one plain sentence (``FAILED_CALL_NOTICE``) instead.
+
 Pure: no I/O, no logging. One instance per provider call.
 """
 from __future__ import annotations
@@ -31,6 +37,50 @@ import re
 _FENCE_OPENER = "```json"
 _INLINE_OPENER = re.compile(r'\{\s*"tool"\s*:')
 _INLINE_KEY = '"tool"'
+
+# A `"tool": "<name>` key. ``closed`` is absent when the text was cut off inside the name.
+_CALL_NAME = re.compile(r'"tool"\s*:\s*"(?P<name>[A-Za-z_][\w.-]*)(?P<closed>")?')
+# The key with no name yet: `{"tool": ` / `{"tool": "` at the very end of the text.
+_CALL_KEY_AT_END = re.compile(r'"tool"\s*:\s*"?\s*$')
+
+#: The one sentence a person sees where a failed tool-call block would have been (CR-02).
+FAILED_CALL_NOTICE = "*The agent's tool request was cut off or malformed, so it was not run.*"
+
+
+def failed_tool_call(held: str, known_tools: set[str] | None = None) -> bool:
+    """True when UNPARSED held text is a tool call that failed to parse, not an answer.
+
+    Called only after ``parse_structured_tool_calls`` found no call, so any held block naming a known
+    tool (or cut off while naming one) is a call that was truncated or malformed. An ordinary JSON
+    answer has no ``"tool"`` key naming one of our tools and stays a flush (byte-identical).
+    """
+    if not held:
+        return False
+    if known_tools is None:
+        from app.services.tool_parser import _get_known_tools  # lazy: tool_parser → openai_service
+
+        known_tools = _get_known_tools()
+    if _CALL_KEY_AT_END.search(held):
+        return True
+    for m in _CALL_NAME.finditer(held):
+        name = m.group("name")
+        if m.group("closed"):
+            if name in known_tools:
+                return True
+        elif m.end() == len(held) and any(t.startswith(name) for t in known_tools):
+            return True
+    return False
+
+
+def drop_held(full_content: str, held: str) -> str:
+    """``full_content`` without the held block (which was never emitted), so what persists is what
+    the person saw. The block is normally the suffix; ``rfind`` covers text appended after it."""
+    if not held:
+        return full_content
+    if full_content.endswith(held):
+        return full_content[: len(full_content) - len(held)]
+    at = full_content.rfind(held)
+    return full_content if at < 0 else full_content[:at] + full_content[at + len(held):]
 # How far back from the end a partial opener is looked for. The fence is 7 chars; the inline form is
 # `{` + whitespace + `"tool"` + whitespace — a model does not pad that with dozens of blanks.
 _PARTIAL_WINDOW = 64

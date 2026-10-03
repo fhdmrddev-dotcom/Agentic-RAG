@@ -300,6 +300,52 @@ async def test_structured_non_tool_json_reply_streams_byte_for_byte_and_never_fo
     assert run["dispatched"] == []
 
 
+# ── 273-REVIEW CR-02: a show_artifact call that FAILS to parse never lands in the answer ─────────
+
+# The likeliest real case: a large spec cut off at the output-token limit (no closing fence), and a
+# weak model's trailing comma. Both reproduce the reviewer's repro verbatim in shape.
+TRUNCATED_CALL = (
+    'Here is the chart.\n```json\n{"tool": "show_artifact", "arguments": {"component": "chart", '
+    '"title": "Revenue", "columns": [{"name": "q", "type": "string"}], "rows": [["Q1", 1'
+)
+# A missing comma after the tool name: neither the fence parse (json.loads) nor the inline fallback
+# regex (which needs `"name",`) accepts it. (A trailing comma alone is NOT this case — the inline
+# regex still extracts it as a call with unparseable args, which the model is told about.)
+MALFORMED_CALL = (
+    'Here is the chart.\n```json\n{"tool": "show_artifact" "arguments": {"component": "table", '
+    '"title": "T", "columns": [{"name": "q", "type": "string"}], "rows": [["Q1"]]}}\n```'
+)
+
+
+def test_cr02_failed_tool_call_detects_a_truncated_and_a_malformed_call():
+    from app.services.structured_text_holdback import failed_tool_call
+
+    known = {"show_artifact", "search_documents"}
+    for text in (TRUNCATED_CALL, MALFORMED_CALL):
+        held = text[text.index("```json"):]
+        assert failed_tool_call(held, known) is True
+    # a call cut off inside its own tool name, or right after the key
+    assert failed_tool_call('```json\n{"tool": "show_art', known) is True
+    assert failed_tool_call('{"tool": ', known) is True
+    # ordinary JSON answers are NOT failed calls — they must still flush byte-for-byte
+    assert failed_tool_call('```json\n{"retention_days": 30}\n```', known) is False
+    assert failed_tool_call('```json\n{"tool": "hammer" "weight": 2}\n```', known) is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("text", [TRUNCATED_CALL, MALFORMED_CALL], ids=["truncated", "malformed"])
+async def test_cr02_an_unparsed_show_artifact_call_never_streams_or_persists(text):
+    run = await _drive([_deltas(_split(text, 7))], CallingMode.STRUCTURED)
+    assert run["dispatched"] == []
+    live = "".join(_delta_texts(run["emits"]))
+    persisted = _persisted_field(run["persisted"], "content")
+    for seen in (live, persisted):
+        assert "show_artifact" not in seen and '"rows"' not in seen and "```json" not in seen, seen
+        assert seen.startswith("Here is the chart.")
+        assert "was not run" in seen  # one plain sentence instead of the raw spec
+    assert live == persisted, "live and reload must show the same answer (I-2)"
+
+
 @pytest.mark.asyncio
 async def test_native_delta_sequence_is_byte_identical():
     """NATIVE never parses text for calls, so every chunk goes out exactly as the provider sent it."""
