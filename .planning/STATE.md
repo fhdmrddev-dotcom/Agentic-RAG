@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: Find It, Show It
 status: executing
-last_updated: "2026-10-02T23:04:15.978Z"
-last_activity: 2026-10-02
+last_updated: "2026-10-03T15:31:23.274Z"
+last_activity: 2026-10-03
 progress:
   total_phases: 13
-  completed_phases: 1
-  total_plans: 10
-  completed_plans: 5
-  percent: 8
+  completed_phases: 3
+  total_plans: 21
+  completed_plans: 15
+  percent: 23
 ---
 
 # Project State
@@ -56,7 +56,7 @@ genuinely reviewed.
 
 Phase: 273
 Plan: Not started
-Status: Phase 273 CONTEXT GATHERED (2026-10-03) - 21 decisions in 273-CONTEXT.md; tools 29->30 (show_artifact) recorded; overrides OV-273-01..03. Next: /gsd:sketch 273 (G-2 REQUIRED), then /gsd:plan-phase 273.
+Status: Ready to execute
 Prior: Phase 272 COMPLETE (2026-10-03) — verification human_needed, self-verified. FIND-07 done. Review: 2 CR + 8 WR all fixed; HUMAN-UAT 2/3 (live re-drive pass; rules accepted); G-1 (topics eq in the shared compiler) fixed. Final backend gate 71 = baseline, 6474 passed. OWED (operator): production — migration 200 STEP 1 (CREATE INDEX CONCURRENTLY) alone → STEP 2 → 201 immediately → both VERIFY → get_advisors(security), each write approved; then backend+frontend deploy (271 also undeployed). Seeds: 333, 334, 335, 336. Owed to 273: D-15/D-16 seams. Next: /gsd:discuss-phase 273.
 Prior: Phase 271 EXECUTED — verification human_needed (2026-10-03). Owed to operator: sign-off on G-4 rows G4-1..G4-6 (driven in Playwright, not Chrome MCP), review of P-01 (default sort added_desc) and P-03 (Older versions = own rows only), deploy (no migration; backend+frontend together; then read-only probe of /document-search + security advisors), CLAUDE.md split (119,524 chars, 476 under the 120k band). Deferred: SEED-331, SEED-332, F-1, F-4. Next: /gsd:discuss-phase 272.
 Last activity: 2026-10-03
@@ -198,6 +198,7 @@ Last activity: 2026-09-29 -- Phase 269 closed
 | OV-273-01 | G-2 (sketch before discuss) | **Order only, not a skip.** Discussed first; `/gsd:sketch` stays REQUIRED before `/gsd:plan-phase 273`. | `273-CONTEXT.md` status line |
 | OV-273-02 | G-5 (`tool_dispatcher.py`, 40 phases) | **Narrow cut, 2nd deferral of the full registry/handler split.** `show_artifact` handler in its own module + one registry line. Re-open: next phase naming the file proposes the split FIRST. | `273-CONTEXT.md` D-14; operator choice at discuss |
 | OV-273-03 | G-5 (`agent_loop.py`, 28 phases) | **One persistence hook; prompt-assembly seam stays owed** (SEED-192). Guidance lives in the tool description; `SYSTEM_PROMPT` untouched. | `273-CONTEXT.md` D-15; operator choice at discuss |
+| OV-273-04 | G-5 (`agent_loop.py` FIRES; rail files incl. `ToolCallPanel.tsx`, `toolMeta.ts` FIRE) | **Widens OV-273-03 and D-16.** (a) `agent_loop.py`: STRUCTURED-path delta holdback (`StructuredTextHoldback`) — several named hunks beyond the one persist hook, so OpenRouter/`native_tools: False` tool-call JSON never streams as answer text (SC#2); applies to every tool on that path. (b) 7 existing rail files edited beyond D-16's one handler + one mount, closing UI-SPEC leak paths L-1..L-4. | Operator approved 2026-10-03 at plan-check (checker blocker 3); `273-04`/`273-05` cite it |
 
 `openai_service.py`, `StreamsProvider.tsx` and `MessageItem.tsx` (all FIRE) are honoured by construction (one schema + one `get_tools` line, one handler, one mount — D-16), not overridden. Closed core: tools **29 → 30** recorded at discuss (roadmap red line).
 

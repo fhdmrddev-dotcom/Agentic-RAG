@@ -217,7 +217,25 @@ Plans:
   5. Reloading the thread renders every artifact **identically** to its live render. The 8-row SC#10 board records a chart emitted and rendered per provider, with blocked rows named (ART-05).
 
 **How we'd know this failed**: a component accepts any props shape, so the "closed" vocabulary is open through passthrough; the unknown-component fallback prints the JSON; the live render comes from SSE state that is never persisted, so reload differs; rows live only in memory and a follow-up silently re-runs the query; one provider emits the spec as prose and the chat shows it as text; a prompt can add a component at runtime.
-**Plans**: TBD
+**Plans**: 6 plans
+
+**Wave 1**
+
+- [ ] 273-01-PLAN.md — closed Pydantic vocabulary (3 components, 4 kinds, caps, refusal catalogue, result contract), migration 202 `message_artifacts` (RLS mirrors messages, no client writes, immutable; [BLOCKING] local apply checkpoint), db/artifacts.py bound to thread + user, ToolContext.turn_tool_calls, frozen wire fixture (wave 1)
+- [ ] 273-02-PLAN.md — every new frontend artifact file: guard, closed registry, copy, caption/chart models, frame, notice, error boundary, table, metric, lazy recharts chart with legend toggles, palette vars, count-gate adoption (wave 1, parallel)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 273-03-PLAN.md — show_artifact handler module (validate, by-reference transforms, server caption, store, emit RETURNING row, id-first result), schema + CHAT_ONLY_TOOLS + one registry line, harness/sub-agent exclusions, count pins 29→30 (wave 2)
+- [ ] 273-04-PLAN.md — persist-time args redaction (the one agent_loop hook) + caption-source kwargs, reload attach in GET /messages + /snapshot, MessageResponse.artifacts, STRUCTURED-mode holdback so no tool-call text streams into the answer (wave 2, parallel)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 273-05-PLAN.md — `artifact` SSE branch + reload mapper, ONE StreamsProvider handler, ONE MessageItem mount, rail leak arms L-1..L-4 + refused node, toolNames/toolMeta, backend↔frontend parity fences (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 273-06-PLAN.md — merged-tree gates + ledger close, 8-row SC#10 board from the effective registry (incl. OpenRouter structured-leak probe), G4-1..G4-4 Chrome drives, 4-axis rows, operator sign-off checkpoint (wave 4)
 **Flags**: **G-2 FIRES**: `/gsd:sketch` before plan. Load `Skill("sketch-findings-agentic-rag")` (the Phase 095 build-once inventory, the tool-card rail, output-file cards). **G-4** scenarios at scope time. **SC#10 FIRES** (structured output + streaming + UI state). **Closed-core decision at discuss:** if the spec is emitted through a new agent tool, the inventory goes 29 → 30 tools as a recorded, deliberate change. Otherwise the spec rides validated structured output. **Pydantic** validates on the way in (project rule). `recharts` is **already a frontend dependency** (measured in `frontend/package.json`), so no new chart dependency is expected. Persistence of spec + rows (and a size cap on attached rows) may need a migration; use the next free number. **Provider-docs-first** for structured output per provider. **G-5 audit at discuss:** `frontend/src/components/chat/MessageItem.tsx` (FIRES), `frontend/src/providers/StreamsProvider.tsx` (FIRES), `frontend/src/components/chat/OutputFileCard.tsx`, `backend/app/services/tool_dispatcher.py`, `backend/app/services/agent_loop.py`, `backend/app/models/message.py`, `frontend/src/types/index.ts`, `backend/app/api/threads.py`. Seeds: `SEED-193` (slice 1 plus the table/metric entries; the data-thread branch/compare half is deferred). `SEED-194` images ride this rail later. `SEED-185` (no URL router) means artifacts are not linkable. That is accepted, not solved.
 **UI hint**: yes
 
@@ -262,7 +280,7 @@ Plans:
 | 270. The Document as an Object | 0/TBD | Not started | - |
 | 271. Find the Document | 0/TBD | Not started | - |
 | 272. Close Means Wrong | 5/5 | Complete (prod migrations 200+201 owed) | 2026-10-03 |
-| 273. Agent-Authored Artifacts | 0/TBD | Not started | - |
+| 273. Agent-Authored Artifacts | 0/6 | Planned | - |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
 

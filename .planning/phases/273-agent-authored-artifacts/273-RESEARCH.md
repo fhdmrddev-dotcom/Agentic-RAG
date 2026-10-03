@@ -689,17 +689,24 @@ export function rendererFor(c: unknown) {
 | A5 | 256 KiB per-artifact byte cap is comfortably above 500 rows × ≤20 columns of real data | Migration | Rare legitimate refusal; tune the constant |
 | A6 | The structured-mode leak (Pitfall 2) reproduces live on OpenRouter | Pitfall 2 | If the frontend already hides it somewhere unmeasured, the fix is unnecessary |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All five were resolved before execution (2026-10-03, plan-check revision). Each resolution is recorded inline as **RESOLVED** and is the authority the plans cite as "RESEARCH OQn (RESOLVED)".
 
 1. **Structured-mode text leak (Pitfall 2).**
    - Known: the code path streams the JSON and never folds it (measured lines).
    - Unclear: whether it reproduces live, and whether a fold that contains the tool-call text satisfies SC#2.
    - Recommendation: drive the OpenRouter row first in Plan 04; if confirmed, a one-line structured-branch `turn_boundary` emit, and record the operator's ruling on the fold content. Otherwise record the row ⛔ with the reason.
+   - **RESOLVED:** a STRUCTURED-path delta holdback (`StructuredTextHoldback`, 273-04 Task 2) — the tool-call block (a ```` ```json ```` fence or an inline `{"tool": …}`) is never emitted as a `delta`; the streamed preamble folds via `turn_boundary`; a block that does not parse as a tool call is flushed as ordinary text; NATIVE paths stay byte-identical. The operator ruling is recorded as **OV-273-04** in STATE.md, which is also the authority for the agent_loop.py holdback hunks beyond D-15. Live check: the OpenRouter board row in 273-06.
 2. **Artifact-only answers vs the empty-answer fallback (Pitfall 7).**
    - Recommendation: tool-result instruction only; measure on the board; escalate to an agent_loop change only if a provider still ends silently.
+   - **RESOLVED:** the success tool result's `note` instructs the model to write one or two sentences after the call (273-03); the board records, per row, whether the final content is empty or the "never wrote an answer" fallback (273-06, observation only). The "never wrote an answer" fallback in agent_loop.py is UNCHANGED in this phase.
 3. **Chat rail label home (Pitfall 8 knock-on).** `lib/toolNames.ts` (UI-SPEC) vs `lib/toolMeta.ts`. Recommendation: `toolNames.ts` + amend the harness fixture to `OFFERED ∪ CHAT_ONLY` with a comment naming this phase, so the coverage fence keeps meaning "every id a person can see is named".
+   - **RESOLVED:** the phrase `Show an artifact` lives in `lib/toolNames.ts` (the activity string `Showing an artifact` in `lib/toolMeta.ts`); `components/workflows/toolNames.test.ts` asserts the TOOL_PHRASES key set == OFFERED ∪ CHAT_ONLY, where CHAT_ONLY is parsed from the backend's `CHAT_ONLY_TOOLS` via `?raw` (never hand-typed) and OFFERED stays 28 (273-05 Task 2).
 4. **Number leniency.** Recommendation: accept plain numeric strings and `,` thousands separators only; refuse currency/percent strings with a fix-it detail.
+   - **RESOLVED:** as recommended — plain numeric strings and `,` thousands separators only; `$120`, `12%`, `12 kg`, `1.2.3` and booleans are refused with a detail naming the column and row (273-01 Task 1).
 5. **Metric caption with one row.** UI-SPEC has a "metric with no attached rows" caption arm; with the uniform dataset every metric has ≥1 row. Recommendation: omit the row-count segment when `component == "metric"`.
+   - **RESOLVED:** the metric caption omits the row-count segment (273-02 captionModel).
 
 ## Environment Availability
 

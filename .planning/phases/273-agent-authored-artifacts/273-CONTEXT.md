@@ -92,6 +92,10 @@ close against the base commit; count, do not substring-match.
   module that the loop calls once. The "prefer `show_artifact` over PNG" guidance goes in the
   `show_artifact` tool description in `openai_service.py`, so **`SYSTEM_PROMPT` is untouched**. The
   prompt-assembly seam stays owed, recorded as **OV-273-03**.
+  ⚠ **AMENDED 2026-10-03 at plan-check (OV-273-04, operator-approved):** `agent_loop.py` also gets
+  the STRUCTURED-path delta holdback (several named hunks), so OpenRouter tool-call JSON never
+  streams as answer text (SC#2). D-16 is widened the same way: 7 existing rail files gain
+  `show_artifact` arms to close UI-SPEC leak paths L-1..L-4.
 - **D-16:** **Frontend: one new SSE event, one mount.** A dedicated `artifact` event carries the
   validated spec, because `tool_end` results are cut at 2,000 characters and a 500-row spec will not
   fit. `StreamsProvider.tsx` gains **one** handler, and `MessageItem.tsx` gains **one**
