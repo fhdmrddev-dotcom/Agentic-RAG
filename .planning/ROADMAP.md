@@ -192,7 +192,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 272-03-PLAN.md — migration 200 (p_document_ids on both RPCs, exact branch, btree index, PUBLIC revoke; [BLOCKING] local apply checkpoint), both arms get one document set, two-step RLS resolver with undated / nearby / spelling / type counts (wave 2)
+- [x] 272-03-PLAN.md — migration 200 (p_document_ids on both RPCs, exact branch, btree index, PUBLIC revoke; [BLOCKING] local apply checkpoint), both arms get one document set, two-step RLS resolver with undated / nearby / spelling / type counts (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -261,7 +261,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 270. The Document as an Object | 0/TBD | Not started | - |
 | 271. Find the Document | 0/TBD | Not started | - |
-| 272. Close Means Wrong | 2/5 | In progress (wave 1 merged) | - |
+| 272. Close Means Wrong | 3/5 | In progress (wave 2 done) | - |
 | 273. Agent-Authored Artifacts | 0/TBD | Not started | - |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
