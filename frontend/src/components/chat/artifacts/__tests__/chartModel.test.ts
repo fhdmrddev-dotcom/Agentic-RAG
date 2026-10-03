@@ -181,3 +181,14 @@ describe("decollide (direct labels ≥ 16px apart)", () => {
     expect(Math.abs(out[0] - out[2])).toBeGreaterThanOrEqual(16)
   })
 })
+
+describe("273-REVIEW WR-04 — small values keep their significant digits", () => {
+  it("tooltip values and axis ticks below 1 are not rounded to 0", () => {
+    expect(formatValue(0.0045)).toBe("0.0045")
+    expect(formatValue(0.12345)).toBe("0.123")
+    expect(formatValue(1234.567)).toBe("1,234.57")
+    expect(formatValue(0)).toBe("0")
+    expect(formatTick(0.002)).toBe("0.002")
+    expect(formatTick(1500)).toBe("1.5K")
+  })
+})

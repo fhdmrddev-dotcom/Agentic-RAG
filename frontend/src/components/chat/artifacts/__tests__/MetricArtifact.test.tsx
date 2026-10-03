@@ -71,3 +71,15 @@ describe("MetricArtifact", () => {
     }
   })
 })
+
+describe("273-REVIEW WR-04 — a small metric is never a bare 0", () => {
+  it("0.0045 vs 0.0032 shows both values in full", () => {
+    const r = mutable(metricWithDelta)
+    r.spec.columns[0].unit = null
+    r.spec.columns[1].unit = null
+    r.spec.rows = [[0.0045, 0.0032]]
+    render(<MetricArtifact record={rec(r)} />)
+    expect(screen.getByTestId("metric-value")).toHaveTextContent(/^0\.0045$/)
+    expect(screen.getByTestId("metric-delta")).toHaveTextContent("vs Q3 (0.0032)")
+  })
+})

@@ -4120,9 +4120,9 @@ const BASELINE = {
   // adopted by FILE path below. Pinned at the measured passing counts (94 cases, 0 failing). ──
   "artifactSpec.test.ts": 28, // 273-02 (2026-10-03) — guard + closed catalogue + seeded never-throws
   "captionModel.test.ts": 12, // 273-02 — server-fact caption wording
-  "chartModel.test.ts": 19, // 273-02 — slots, visible domain, tooltip rows, a11y names
-  "TableArtifact.test.tsx": 6, // 273-02 — aria-sort, empties last, sticky + 512px
-  "MetricArtifact.test.tsx": 6, // 273-02 — glyph + percent delta, zero comparison
+  "chartModel.test.ts": 20, // 273-02 — slots, visible domain, tooltip rows, a11y names; RAISED 19 → 20 at 273-REVIEW WR-04
+  "TableArtifact.test.tsx": 7, // 273-02 — aria-sort, empties last, sticky + 512px; RAISED 6 → 7 at 273-REVIEW WR-04
+  "MetricArtifact.test.tsx": 7, // 273-02 — glyph + percent delta, zero comparison; RAISED 6 → 7 at 273-REVIEW WR-04
   "ArtifactBlock.test.tsx": 8, // 273-02 — registry closed to 3, notices, boundary, busy frame
   "ChartArtifact.test.tsx": 15, // 273-02 — legend toggles, hide, slots, no animation, tooltip
   // ── Phase 273-05 (D-16 · I-1 · I-2 · SC#2) — SIX NEW suites, BOTH KNOBS, SAME COMMIT. None of

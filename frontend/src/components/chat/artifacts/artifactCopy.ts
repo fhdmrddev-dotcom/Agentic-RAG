@@ -47,15 +47,24 @@ export const VALUE_MAX_CHARS = 40
 
 const NUMBER = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 })
 const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 })
+// 273-REVIEW WR-04: below 1 a fixed 2 decimals rounds a rate of 0.0045 to "0" — the stored number
+// misstated on the surface whose point is faithful numbers. Small magnitudes keep 3 (ticks 2)
+// SIGNIFICANT digits instead; 1 and above are unchanged.
+const SMALL = new Intl.NumberFormat("en-US", { maximumSignificantDigits: 3 })
+const SMALL_TICK = new Intl.NumberFormat("en-US", { maximumSignificantDigits: 2 })
+
+function isSmall(n: number): boolean {
+  return n !== 0 && Math.abs(n) < 1
+}
 
 /** Grouped, full-precision number (tooltip, table cell, metric). */
 export function formatNumber(n: number): string {
-  return NUMBER.format(n)
+  return isSmall(n) ? SMALL.format(n) : NUMBER.format(n)
 }
 
-/** Compact axis tick (`1.5K`, `2M`). */
+/** Compact axis tick (`1.5K`, `2M`, `0.002`). */
 export function formatCompact(n: number): string {
-  return COMPACT.format(n)
+  return isSmall(n) ? SMALL_TICK.format(n) : COMPACT.format(n)
 }
 
 /** A row count as people read it. */

@@ -101,3 +101,16 @@ describe("TableArtifact", () => {
     expect(cell.querySelector("b")).toBeNull()
   })
 })
+
+describe("273-REVIEW WR-04 — small numbers keep their significant digits", () => {
+  it("a 0.0012 cell reads 0.0012, never 0", () => {
+    const r = mutable(table16)
+    r.spec.rows[0][2] = 0.0012
+    r.spec.rows[1][2] = -0.0045
+    render(<TableArtifact record={rec(r)} />)
+    const cells = columnText(2)
+    expect(cells[0]).toBe("0.0012")
+    expect(cells[1]).toBe("-0.0045")
+    expect(cells).not.toContain("0")
+  })
+})
