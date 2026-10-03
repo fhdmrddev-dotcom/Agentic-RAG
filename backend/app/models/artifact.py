@@ -741,6 +741,24 @@ def _from_errors(errors: list[dict]) -> ArtifactRefusal:
     return _refusal("fallback", detail)
 
 
+def _strip_nul_deep(v: Any) -> Any:
+    """A copy of ``v`` with every NUL removed from every string (273-REVIEW WR-02).
+
+    Postgres ``jsonb`` rejects ``\\u0000``, so a NUL in any cell, title or name made the insert fail
+    and the model was told "couldn't save the artifact; try the call again" — a retry that fails
+    identically. Stripping matches ``agent_loop._strip_nul`` (document text carries NULs, e.g. the
+    v3.7 ``.msg`` incident). Applied to keys too, and BEFORE validation, so ``chart.x`` and the
+    column it names are stripped the same way and still match.
+    """
+    if isinstance(v, str):
+        return v.replace("\x00", "")
+    if isinstance(v, dict):
+        return {(_strip_nul_deep(k) if isinstance(k, str) else k): _strip_nul_deep(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_strip_nul_deep(x) for x in v]
+    return v
+
+
 def validate_args(raw: Any) -> ChartArgs | TableArgs | MetricArgs | ArtifactRefusal:
     """Validate ``show_artifact`` arguments. Never raises; never mutates ``raw``."""
     if isinstance(raw, str):
@@ -750,7 +768,8 @@ def validate_args(raw: Any) -> ChartArgs | TableArgs | MetricArgs | ArtifactRefu
             return _refusal("fallback", "the arguments must be a JSON object.")
     if not isinstance(raw, dict):
         return _refusal("fallback", "the arguments must be a JSON object.")
-    data = dict(raw)  # shallow copy — the caller's dict is persisted as-is (anti-pattern: mutating args)
+    # A NUL-free deep copy — the caller's dict is persisted as-is (anti-pattern: mutating args).
+    data = _strip_nul_deep(raw)
     comp = data.get("component")
     if isinstance(comp, str):
         data["component"] = comp.strip().lower()

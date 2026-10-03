@@ -114,6 +114,36 @@ def test_wr01_two_inline_calls_and_an_unknown_tool():
     assert json.loads(calls[1].function.arguments) == {"metric": {"value_column": "v"}}
 
 
+# ── WR-02: a NUL never reaches the jsonb insert (Postgres rejects \u0000 → a "try again" loop) ──
+
+
+def test_wr02_nul_is_stripped_from_every_string_before_storage():
+    raw = {
+        "component": "chart",
+        "title": "Rev\x00enue",
+        "columns": [{"name": "qu\x00arter", "type": "string", "unit": None},
+                    {"name": "rev", "type": "number", "unit": "$\x00K"}],
+        "rows": [["Q1\x00", 1], ["Q2", 2]],
+        "chart": {"kind": "bar", "x": "qu\x00arter", "y": ["rev"]},
+    }
+    snapshot = json.dumps(raw)
+    out = validate_args(raw)
+    assert not isinstance(out, ArtifactRefusal), out
+    assert "\x00" not in json.dumps(out.model_dump())
+    assert out.title == "Revenue"
+    assert [c.name for c in out.columns] == ["quarter", "rev"]
+    assert out.chart.x == "quarter"
+    assert out.rows[0][0] == "Q1"
+    assert json.dumps(raw) == snapshot, "validate_args must not mutate the caller's args (they persist as-is)"
+
+
+def test_wr02_a_title_that_is_only_nul_is_a_clear_refusal_not_a_save_failure():
+    out = validate_args({"component": "table", "title": "\x00\x00",
+                         "columns": [{"name": "k", "type": "string"}], "rows": [["a"]]})
+    assert isinstance(out, ArtifactRefusal)
+    assert "save" not in out.reason
+
+
 def test_cr01_length_caps_count_utf16_units_like_the_browser():
     # 60 emoji = 120 UTF-16 units (the frontend's cap) — accepted; one more emoji is refused.
     ok = validate_args({"component": "table", "title": "\U0001F600" * 60,
