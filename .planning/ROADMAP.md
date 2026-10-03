@@ -196,7 +196,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 272-04-PLAN.md — validation + canonicalisation, four result kinds, empty-set short-circuit, D-09 retry lock (shared with sub-agents), ONE audit writer, per-run vocabulary, today's date + prompt rewrite, trend fix (wave 3)
+- [x] 272-04-PLAN.md — validation + canonicalisation, four result kinds, empty-set short-circuit, D-09 retry lock (shared with sub-agents), ONE audit writer, per-run vocabulary, today's date + prompt rewrite, trend fix (wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -261,7 +261,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 270. The Document as an Object | 0/TBD | Not started | - |
 | 271. Find the Document | 0/TBD | Not started | - |
-| 272. Close Means Wrong | 3/5 | In progress (wave 2 done) | - |
+| 272. Close Means Wrong | 4/5 | In progress (wave 3 done) | - |
 | 273. Agent-Authored Artifacts | 0/TBD | Not started | - |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |

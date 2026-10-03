@@ -56,7 +56,7 @@ genuinely reviewed.
 
 Phase: 272
 Plan: Not started
-Status: Phase 272 EXECUTING — waves 1-2 done (3/5). WAVE1_MERGE_SHA 020a0f41f. 272-03: migration 200 APPLIED LOCALLY (11/11 verify PASS; NOT in production — owed, prod chunk count first, CONCURRENTLY index if large, then get_advisors(security)); resolver resolve_document_scope (two-step RLS, D-21). Deviation to review: scripts/check-schema-acl-parity.cjs now retires a grant when a later DROP FUNCTION drops that exact signature. Next: wave 3 = 272-04. Carry-forward: arms treat folder_ids=[] as 'no restriction' (pre-existing) — handler must never pass []; test_096 hangs (use --timeout).
+Status: Phase 272 EXECUTING — waves 1-3 done (4/5). 272-04: filters applied end to end (validate/canonicalise, four result kinds, empty-set + empty-folder-scope short-circuit, D-09 retry lock shared with sub-agents, ONE audit writer, per-run vocabulary + today's date, trend fix). Backend gate 71 = baseline, 6382 passed. Migration 200 local only (prod owed). Review items: scripts/check-schema-acl-parity.cjs deviation (272-03); field keys/enum options reach the tool schema unescaped (272-04 threat flag). Next: wave 4 = 272-05 on the main tree (recall ladder, 8-row board, G-4 sign-off).
 Prior: Phase 271 EXECUTED — verification human_needed (2026-10-03). Owed to operator: sign-off on G-4 rows G4-1..G4-6 (driven in Playwright, not Chrome MCP), review of P-01 (default sort added_desc) and P-03 (Older versions = own rows only), deploy (no migration; backend+frontend together; then read-only probe of /document-search + security advisors), CLAUDE.md split (119,524 chars, 476 under the 120k band). Deferred: SEED-331, SEED-332, F-1, F-4. Next: /gsd:discuss-phase 272.
 Last activity: 2026-10-03
 
