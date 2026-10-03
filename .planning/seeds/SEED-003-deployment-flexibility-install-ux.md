@@ -1,10 +1,18 @@
 ---
 title: Deployment Flexibility & Install/Config UX
 seed_id: SEED-003
-status: dormant
+status: partially-answered
+partial: true
+status_note: |
+  Moved `dormant` -> `partially-answered` on 2026-10-04 (release-history audit). Original line: `status: dormant`.
+  The trigger fired at v3.3 (Phases 157/158). AXIS SETTLED: production compose, one one-box preset,
+  OPERATOR.md runbook, browser install wizard, deploy-drift CI gate. AXIS OPEN: the scale-tier presets
+  (§6 — what v3.3 called "Solo/Team/Enterprise"; only one-box was built), Helm/k8s, signed versioned images,
+  upgrade automation. Previous trigger_when, verbatim, is kept in the body correction.
 planted: 2026-05-02
 planted_during: v2.5 (after Phase 059 ship, before Phase 060 kickoff)
-trigger_when: planning a milestone scoped to "distribution", "self-host", "packaging", "install", "deployment", "one-click setup", "enterprise install", or any milestone where the install/config experience for a non-developer operator becomes the bottleneck
+trigger_when: "Any phase whose files_modified names deploy/*, docker-compose.prod.yml, docs/OPERATOR.md or the setup wizard; OR the first customer install that is not a single box (team server, managed cloud, on-prem with SSO); OR a milestone scoped to distribution, packaging or enterprise install."
+trigger_paths: ["deploy/**", "docker-compose.prod.yml", "docs/OPERATOR.md", "frontend/src/pages/SetupWizard.tsx", "frontend/src/components/setup/**", "backend/app/services/setup_service.py", "backend/app/api/setup.py", "scripts/check-deploy-drift.sh"]
 trigger_surfaces:
   - "deployment"
 scope: Large
@@ -13,6 +21,27 @@ surface: Agentic-RAG
 ---
 
 # SEED-003: Deployment Flexibility & Install/Config UX
+
+## ⚠ CORRECTED 2026-10-04 — PARTIALLY ANSWERED by v3.3; the scale-tier presets were never built
+
+Release-history audit (`docs/history/v3.3-operator-ux.md`). This seed read `dormant`, but its trigger fired
+at v3.3, which shipped (measured 2026-10-04): `docker-compose.prod.yml`, **one** preset
+`deploy/onebox.env.example` (the only file in `deploy/`), `docs/OPERATOR.md`, the `/setup` browser install
+wizard (`frontend/src/pages/SetupWizard.tsx`, `backend/app/services/setup_service.py`,
+`backend/app/api/setup.py`), and the `deploy-artifacts` CI gate (`scripts/check-deploy-drift.sh`).
+
+⚠ **What v3.3 promised and did not build:** `v3.3-REQUIREMENTS.md` (DEPLOY-01) and the milestone summary
+describe **"Solo / Team / Enterprise" preset bundles**, which is this seed's §6 *Scale-tier presets*. Phase
+157 built one preset; the wizard's "managed" and "on-prem" choices only pre-fill different defaults. There
+are no separate preset files. Also still open from §5: Helm/k8s manifests, signed versioned images, upgrade
+automation.
+
+The previous `trigger_when`, verbatim (replaced by a concrete one with `trigger_paths`):
+> planning a milestone scoped to "distribution", "self-host", "packaging", "install", "deployment",
+> "one-click setup", "enterprise install", or any milestone where the install/config experience for a
+> non-developer operator becomes the bottleneck
+
+Related: SEED-341 (background loops ship off; the presets are where their defaults should differ).
 
 ## Why This Matters
 

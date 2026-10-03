@@ -1,7 +1,12 @@
 ---
 seed_id: SEED-140
 title: A user cannot stop a workflow mid-run — the run surface has no stop control, though an owned cancel endpoint and a `cancelled` status already exist
-status: open
+status: shipped
+status_note: |
+  Flipped `open` -> `shipped` on 2026-10-04 (release-history audit). The original line was `status: open`.
+  Evidence: v3.7 Phase 194 "Stop a Running Workflow" (RUN-01, closed 2026-08-20) and Phase 194.1-07,
+  commit d1d0ef668 (2026-08-16), which mounts the shared StopControl in WorkflowRunPage.tsx's title row.
+folded_into: "194"
 planted: 2026-08-08
 planted_by: Operator, during the 189-16 owed-rows UAT (2026-08-08) — "first we should have a stop button or something to stop the workflow during execution"
 surface: Agentic-RAG
@@ -22,6 +27,26 @@ trigger_when: unset
 ---
 
 # SEED-140 — there is no way to stop a running workflow
+
+## ⚠ CORRECTED 2026-10-04 — SHIPPED. ~~There is no way to stop a running workflow~~
+
+Release-history audit (`docs/history/v3.7-workflow-product-completion.md`). This seed still read
+`status: open` six weeks after its subject shipped. Measured in the tree on 2026-10-04:
+
+- `frontend/src/pages/WorkflowRunPage.tsx:94` imports the shared `StopControl`, and the title row renders
+  `{!isTerminal ? <StopControl threadId={run?.thread_id ?? null} variant="page" /> : null}`.
+- Added by `d1d0ef668` (2026-08-16, `feat(194.1-07): the FOURTH mount — a Stop in the run surface's title row`).
+- The requirement was v3.7 **Phase 194, "Stop a Running Workflow" (RUN-01)**, closed by the v3.7 close audit
+  on 2026-08-20 with its SC#2 failure ("pressed Stop, got 204, run reports `completed`") repaired and verified
+  in source (`.planning/milestones/v3.7-ROADMAP.md:52`).
+- The "far worker keeps running" residual (194 review CR-04) was folded into v3.8 Phase 204, which also
+  routes the spend-cap breaker through the same cancel path (`docs/history/v3.7-...md`, status row "Stopped
+  run stops the work, not just the record").
+
+**Still open, and NOT this seed:** 194 review WR-04 — the run surface says *"Stopped by you"* for runs an
+operator killed or a delete cascade ended. Planted as [[SEED-350]].
+
+The original observation below is kept as the record.
 
 ## The observation (operator, 2026-08-08)
 

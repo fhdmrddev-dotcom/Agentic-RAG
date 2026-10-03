@@ -12,7 +12,7 @@ planted: 2026-05-29
 planted_by: orchestrator (087 scenario-matrix round-3 testing)
 updated: 2026-08-13
 shipped_half: "Download wire-up — Phase 101.1 plan 09, commit 8b47e417, 2026-06-11"
-open_half: "Office/PDF/DOCX/XLSX/PPTX in-panel viewer + KB-documents-in-panel — NOT built (zero pdfjs/react-pdf imports in frontend/src as of 2026-08-13)"
+open_half: "Office/PDF/DOCX/XLSX/PPTX in-panel viewer + KB-documents-in-panel — NOT built (zero pdfjs/react-pdf imports in frontend/src as of 2026-08-13; re-measured 2026-10-04). Now held by SEED-338."
 routed_to: "Phase 108 (file_preview half) — see REQUIREMENTS.md § Future Requirements"
 trigger_when: RUN-02 makes produced files visible on the run surface (the REQUIREMENTS.md trigger) — OR a user needs to OPEN (not download) a workspace file that is NOT markdown/code/csv/text/image — OR demand appears to view KB documents in the panel
 priority: medium
@@ -21,6 +21,24 @@ surface: Agentic-RAG
 ---
 
 # SEED-037: Workspace Panel — Full File-Type Viewing + Working Download
+
+## ⚠ CORRECTED 2026-10-04 — the open half now lives in SEED-338
+
+Release-history audit (`docs/history/v2.7-agent-workspace-and-panel.md`, `v2.9-workflow-studio.md`).
+`status: shipped` + `partial: true` is the D-16 encoding of the original `partially-shipped`, and it is
+accurate for the **download** half. But every status-based scan reads `shipped` as done, and this seed
+carried no `trigger_paths`, so the **viewer** half was invisible to both sweeps for four months. The operator
+raised it again on 2026-10-04 and wants it built at a defined stage.
+
+Re-measured 2026-10-04: `FilePreview.tsx` (407 L) still routes PDF/DOCX/PPTX/XLSX to
+`"No preview available · Download"` (`:265`, `:287`, `:330`); no `pdfjs` / `react-pdf` / `mammoth` /
+`docx-preview` in `frontend/src` or `package.json`.
+
+**The open half (in-panel Office/PDF viewer + KB documents in the panel + later in-PDF highlighting) is now
+held by [[SEED-338]]**, with structured `trigger_paths` on `FilePreview.tsx`, `FilesSection.tsx`,
+`OutputFileCard.tsx` and `DocumentDetailPanel.tsx`. Status here is left unchanged on purpose: it describes
+this file's shipped half correctly, and the open half has a home that a sweep can see. Read SEED-338 for the
+trigger and the staged plan; the history below stays as the record.
 
 ## ⚠ Status — updated 2026-08-13 (this seed is HALF SHIPPED)
 

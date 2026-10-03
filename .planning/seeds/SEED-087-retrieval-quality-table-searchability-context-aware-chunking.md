@@ -24,6 +24,12 @@ trigger_when: unset
 
 # SEED-087 — Retrieval quality & table searchability
 
+> **Note 2026-10-04 (release-history audit).** Priority 1 below ("embed PDF/DOCX tables as chunks") shipped
+> for new ingests in v3.8 Phase 202 (TAB-02, `bbe73a917`). The backfill for older documents was never run:
+> `backfill_document_table_chunks` (`multimodal_service.py:444`) has no caller. That residual is held by
+> SEED-027 (now `partially-answered`). The context-aware chunking items here are unaffected, so this seed's
+> status is unchanged.
+
 ## What was assessed (and the verdict)
 
 A 5-agent read-only investigation (workflow `wf_9146d744-2f2`, 2026-06-15) pressure-tested the ingestion/chunking pipeline against the operator's question: *is it solid, are extracted tables/images re-ingested as searchable chunks, and is chunking blind or context-aware?*
