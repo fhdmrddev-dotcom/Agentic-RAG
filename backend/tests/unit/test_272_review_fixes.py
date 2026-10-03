@@ -641,3 +641,40 @@ def test_wr04_every_rpc_definition_from_200_on_pins_custom_plans():
 def test_wr04_migration_200_no_longer_claims_a_safe_re_paste_without_the_pin():
     text = (_MIGRATIONS / "200_filtered_retrieval_document_scope.sql").read_text(encoding="utf-8")
     assert "any later CREATE OR REPLACE" in text and "plan_cache_mode" in text
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# WR-05 — the document_id btree is built CONCURRENTLY, outside the transaction, and VERIFY reads
+#          `indisvalid` (an INVALID leftover of a failed concurrent build must fail loudly)
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+
+_M200 = _MIGRATIONS / "200_filtered_retrieval_document_scope.sql"
+
+
+def _code(text: str) -> str:
+    return "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("--"))
+
+
+def test_wr05_the_btree_is_built_concurrently_before_the_transaction():
+    code = _code(_M200.read_text(encoding="utf-8"))
+    head, sep, body = code.partition("\nBEGIN;")
+    assert sep, "migration 200 still opens a transaction for the function swap"
+    assert re.search(
+        r"CREATE\s+INDEX\s+CONCURRENTLY\s+IF\s+NOT\s+EXISTS\s+idx_document_chunks_document_id\s+ON\s+public\.document_chunks\s*\(\s*document_id\s*\)",
+        head, re.IGNORECASE,
+    ), "the btree must be built CONCURRENTLY, OUTSIDE BEGIN/COMMIT"
+    assert not re.search(r"CREATE\s+INDEX\s+(IF\s+NOT\s+EXISTS\s+)?idx_document_chunks_document_id", body, re.IGNORECASE), (
+        "a non-concurrent build inside the transaction takes a SHARE lock on document_chunks for the whole build"
+    )
+
+
+def test_wr05_the_transaction_refuses_a_missing_or_invalid_btree():
+    body = _code(_M200.read_text(encoding="utf-8")).partition("\nBEGIN;")[2]
+    assert "indisvalid" in body and "RAISE EXCEPTION" in body
+
+
+def test_wr05_verify_asserts_the_btree_is_valid_and_names_the_remedy():
+    verify = _M200.read_text(encoding="utf-8").split("-- VERIFY", 1)[1]
+    assert "indisvalid" in verify
+    assert "DROP INDEX CONCURRENTLY" in verify
+    assert "outside a transaction" in _M200.read_text(encoding="utf-8").split("BEGIN;")[0]

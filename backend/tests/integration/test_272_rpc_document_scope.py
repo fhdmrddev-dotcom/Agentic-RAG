@@ -189,6 +189,14 @@ async def test_the_document_id_btree_exists(pg_pool):
         "AND indexname = 'idx_document_chunks_document_id'"
     )
     assert idx is not None and "btree (document_id)" in idx, idx
+    # 272-REVIEW WR-05: a failed or cancelled CREATE INDEX CONCURRENTLY leaves an INVALID index with
+    # this name, which pg_indexes still lists and IF NOT EXISTS then skips. Validity is the fact.
+    valid = await pg_pool.fetchval(
+        "SELECT i.indisvalid FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid "
+        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'public' AND c.relname = 'idx_document_chunks_document_id'"
+    )
+    assert valid is True, "idx_document_chunks_document_id is INVALID: DROP INDEX CONCURRENTLY it, re-run 200's step 1"
 
 
 @pytest.mark.parametrize("sig", [VECTOR_REGPROC, KEYWORD_REGPROC])

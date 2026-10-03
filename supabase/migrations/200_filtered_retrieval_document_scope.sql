@@ -24,11 +24,24 @@
 -- 3. `idx_document_chunks_document_id` — the btree the exact branch needs. Without it
 --    `document_id = ANY(…)` sequentially scans document_chunks (measured on recall_bench,
 --    100k chunks: Parallel Seq Scan, shared read 6,590 → with the index: Bitmap Index Scan, 764).
---    ⚠ ON A LARGE PRODUCTION TABLE run this ALONE first, OUTSIDE any transaction (CONCURRENTLY
---    cannot run inside BEGIN/COMMIT), so ingest is never write-locked for the build:
---        CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_document_chunks_document_id
---          ON public.document_chunks (document_id);
---    after which the CREATE INDEX IF NOT EXISTS below is a no-op.
+--    272-REVIEW WR-05: it is built CONCURRENTLY in STEP 1, so ingest (INSERT/UPDATE/DELETE on
+--    document_chunks) is never blocked for the build. The safe path used to live only in a comment
+--    while the file itself built the index inside BEGIN, taking a SHARE lock for the whole build.
+--
+-- ⛔ HOW TO APPLY — TWO RUNS, IN THIS ORDER:
+--    STEP 1. Run the single `CREATE INDEX CONCURRENTLY …` statement below ON ITS OWN — a separate
+--            SQL-editor run containing nothing else. It must run outside a transaction block:
+--            CONCURRENTLY refuses to run inside BEGIN/COMMIT, and a multi-statement paste is one
+--            implicit transaction, so pasting the whole file at once fails on this statement
+--            (loudly, before anything else runs).
+--    STEP 2. Run everything from `BEGIN;` to `COMMIT;`. Its first statement REFUSES to continue
+--            unless the index exists AND is valid, so STEP 1 cannot be skipped silently.
+--    ⚠ A failed or cancelled CONCURRENTLY build leaves an INVALID index under this name; IF NOT
+--      EXISTS then skips it and the exact branch sequential-scans. Remedy (also outside a
+--      transaction): `DROP INDEX CONCURRENTLY IF EXISTS public.idx_document_chunks_document_id;`
+--      then re-run STEP 1. The VERIFY block below reads `indisvalid`, not just the index name.
+--    ⚠ `supabase db reset` / `regenerate-full-schema.sh --reset` replay files through the CLI,
+--      which may run a file as one batch; if STEP 1 fails there, apply it by hand as above.
 --
 -- 4. The OLD signatures are DROPPED first. CREATE OR REPLACE with an added parameter makes a NEW
 --    overload, and positional callers then fail with "function … is not unique" (the 033/036/073
@@ -66,11 +79,29 @@
 --    every definition from 200 on).
 -- ============================================================================
 
+-- ── STEP 1 (RUN ON ITS OWN, outside a transaction): the btree the exact branch needs ─────────
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_document_chunks_document_id
+  ON public.document_chunks (document_id);
+
+-- ── STEP 2 (one run, from BEGIN to COMMIT) ──────────────────────────────────────────────────
 BEGIN;
 
--- ── 1. The btree the exact branch needs ─────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_document_chunks_document_id
-  ON public.document_chunks (document_id);
+-- ── 1. Refuse to swap the functions without a VALID btree (STEP 1 cannot be skipped) ────────
+DO $guard$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_index i
+    JOIN pg_class c ON c.oid = i.indexrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'idx_document_chunks_document_id' AND i.indisvalid
+  ) THEN
+    RAISE EXCEPTION 'migration 200: idx_document_chunks_document_id is missing or INVALID. Run STEP 1 '
+      '(CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_document_chunks_document_id ON public.document_chunks '
+      '(document_id);) on its own first. If the index exists but is INVALID, run DROP INDEX CONCURRENTLY '
+      'IF EXISTS public.idx_document_chunks_document_id; then STEP 1 again.';
+  END IF;
+END
+$guard$;
 
 -- ── 2. Drop the OLD signatures (exactly one function per name must remain) ──────────────────
 DROP FUNCTION IF EXISTS public.match_document_chunks(
@@ -264,7 +295,15 @@ COMMIT;
 --        where n.nspname = 'public' and p.proname = 'keyword_search_chunks')),
 --     ('idx_document_chunks_document_id exists',
 --      exists (select 1 from pg_indexes where schemaname = 'public'
---                and indexname = 'idx_document_chunks_document_id'))
+--                and indexname = 'idx_document_chunks_document_id')),
+--     -- WR-05: an INVALID leftover of a failed CONCURRENTLY build still appears in pg_indexes.
+--     -- FAIL here → DROP INDEX CONCURRENTLY IF EXISTS public.idx_document_chunks_document_id;
+--     --             then re-run STEP 1 on its own.
+--     ('idx_document_chunks_document_id is VALID (indisvalid)',
+--      exists (select 1 from pg_index i join pg_class c on c.oid = i.indexrelid
+--                join pg_namespace n on n.oid = c.relnamespace
+--                where n.nspname = 'public' and c.relname = 'idx_document_chunks_document_id'
+--                  and i.indisvalid))
 --   )
 --   select case when ok then 'PASS' else '*** FAIL ***' end as status, what from checks;
 -- ============================================================================================
