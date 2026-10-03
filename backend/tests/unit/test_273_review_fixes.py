@@ -86,6 +86,34 @@ def test_cr01_a_range_filter_bound_must_be_finite():
     assert isinstance(out, ArtifactRefusal)
 
 
+# ── WR-01: the inline structured-format fallback keeps nested braces ─────────────────────────────
+
+
+def test_wr01_inline_call_whose_last_arg_is_an_object_parses_to_valid_json():
+    from app.services.tool_parser import parse_structured_tool_calls
+
+    args = {"component": "chart", "title": "Rev", "columns": [{"name": "q", "type": "string"},
+            {"name": "rev", "type": "number"}], "rows": [["Q1", 1]],
+            "chart": {"kind": "bar", "x": "q", "y": ["rev"]}}
+    text = "Here it is: " + json.dumps({"tool": "show_artifact", "arguments": args}) + " done."
+    calls = parse_structured_tool_calls(text, known_tools={"show_artifact"})
+    assert len(calls) == 1
+    assert calls[0].function.name == "show_artifact"
+    assert json.loads(calls[0].function.arguments) == args
+
+
+def test_wr01_two_inline_calls_and_an_unknown_tool():
+    from app.services.tool_parser import parse_structured_tool_calls
+
+    a = json.dumps({"tool": "search_documents", "arguments": {"query": "x", "filter": {"k": {"v": 1}}}})
+    b = json.dumps({"tool": "nope", "arguments": {}})
+    c = json.dumps({"tool": "show_artifact", "arguments": {"metric": {"value_column": "v"}}})
+    calls = parse_structured_tool_calls(f"{a} and {b} then {c}", known_tools={"search_documents", "show_artifact"})
+    assert [x.function.name for x in calls] == ["search_documents", "show_artifact"]
+    assert json.loads(calls[0].function.arguments) == {"query": "x", "filter": {"k": {"v": 1}}}
+    assert json.loads(calls[1].function.arguments) == {"metric": {"value_column": "v"}}
+
+
 def test_cr01_length_caps_count_utf16_units_like_the_browser():
     # 60 emoji = 120 UTF-16 units (the frontend's cap) — accepted; one more emoji is refused.
     ok = validate_args({"component": "table", "title": "\U0001F600" * 60,
