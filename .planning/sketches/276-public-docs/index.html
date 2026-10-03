@@ -296,7 +296,7 @@ const article = (tocInline=false) => `
   <ol class="steps"><li>A step can require every claim to cite a source.</li><li>A step can check that a file exists and opens.</li><li>A failed check retries a bounded number of times — never forever.</li></ol>
   <div class="callout"><span>ℹ️</span><div>Each step only gets the tools it lists. A step that asks for anything else is refused and the refusal is written to the audit log.</div></div>
   <h2 id="s3">Publish checks</h2>
-  <p>Before anyone else can run it, a workflow must pass <b>8 publish checks</b> — including a real run on your documents that an AI judge grades. A workflow that runs but produces bad output can't publish.</p>
+  <p>Before anyone else can run it, a workflow must pass <b>10 publish checks</b> — including a real run on your documents that an AI judge grades. A workflow that runs but produces bad output can't publish.</p>
   <div class="callout warn"><span>⚠️</span><div>Word and PDF files are <b>downloaded</b>, not previewed inside Syrel (yet).</div></div>
   <h2 id="s4">Run it and get the file</h2>
   <p>Press <b>Run</b>. You'll see each step tick off live, and the finished file appears at the end with a download link.</p>

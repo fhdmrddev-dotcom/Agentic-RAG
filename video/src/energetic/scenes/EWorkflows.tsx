@@ -16,7 +16,7 @@ const PHASES = [
 const FIRST = 14;
 const PHASE = 14;
 const ROW = 92;
-const PIPS = 8;
+const PIPS = 10;
 
 export const EWorkflows: React.FC<SceneProps> = ({ duration, vo }) => {
   const frame = useCurrentFrame();
@@ -96,7 +96,7 @@ export const EWorkflows: React.FC<SceneProps> = ({ duration, vo }) => {
                   <div
                     key={i}
                     style={{
-                      width: 34,
+                      width: 26,
                       height: 12,
                       borderRadius: 6,
                       background: on ? C.success : C.border,
@@ -108,7 +108,7 @@ export const EWorkflows: React.FC<SceneProps> = ({ duration, vo }) => {
               })}
             </div>
             <div style={{ scale: pop(frame, passedAt, fps), opacity: frame >= passedAt ? 1 : 0, transformOrigin: "left center" }}>
-              <Chip color={C.success}>8 / 8 passed · Published</Chip>
+              <Chip color={C.success}>10 / 10 passed · Published</Chip>
             </div>
           </div>
         </EPanel>

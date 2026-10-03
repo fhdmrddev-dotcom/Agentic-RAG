@@ -6,7 +6,7 @@ Written 2026-10-04 so any session can finish pending video work. Notebook: **"Sy
 
 | Artifact | Status | Note |
 |---|---|---|
-| Explainer: "Syrel: Workflows You Can Trust" `3d6fbe95-…` | ✅ done (9:16) | downloaded to `~/Downloads/gemini-notebook/Syrel/explainer-workflows-you-can-trust.mp4` |
+| Explainer: "Syrel: Workflows You Can Trust" `3d6fbe95-…` | ✅ done (9:16) — ⚠ its prompt said "8-stage gauntlet"; the code has **10** today. Regenerate before public use, or keep it as an internal draft. | downloaded to `~/Downloads/gemini-notebook/Syrel/explainer-workflows-you-can-trust.mp4` |
 | Documentary ep. 1 (cinematic) `9b0b14b0-…` | ⏳ queued at NotebookLM | download when `studio_status` says completed |
 | Documentary eps. 2–5 (cinematic) | ⛔ NOT CREATED — rate-limited | retry after the rolling window resets (it reset at 2026-10-04 01:24 UTC); create ONE at a time, ~2 min apart |
 

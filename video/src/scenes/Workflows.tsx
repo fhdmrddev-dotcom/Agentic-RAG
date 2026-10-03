@@ -17,7 +17,7 @@ const ROW = 96;
 export const Workflows: React.FC = () => {
   const frame = useCurrentFrame();
   const gauntletAt = FIRST + PHASES.length * PHASE + 4;
-  const PIPS = 8;
+  const PIPS = 10;
 
   return (
     <AbsoluteFill>
@@ -100,7 +100,7 @@ export const Workflows: React.FC = () => {
                 <div
                   key={i}
                   style={{
-                    width: 34,
+                    width: 26,
                     height: 12,
                     borderRadius: 6,
                     background: p > 0.5 ? C.success : C.border,
@@ -111,7 +111,7 @@ export const Workflows: React.FC = () => {
             })}
           </div>
           <div style={{ opacity: enter(frame, gauntletAt + PIPS * 4 + 4, 12) }}>
-            <Chip color={C.success}>8 / 8 passed · Published</Chip>
+            <Chip color={C.success}>10 / 10 passed · Published</Chip>
           </div>
         </div>
       </Panel>
