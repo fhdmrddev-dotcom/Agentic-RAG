@@ -175,31 +175,77 @@ Prompts (fixture: October + March + September reports for Acme GmbH and Beta Ltd
   the run (search_documents, grep, query_documents, read_document, analyze_document, …) retrieves
   content from outside the filter.
 
-⛔ **NOT YET RUN (2026-10-03, 272-05).** The fixture field and five reports were created as the dev
-user, but ingestion paused at embedding: OpenAI `429 — You have no credits remaining`. The query
-embedding of every kind-1 search uses the same key, so every row would measure the billing state,
-not filter emission. Rows stay blank (not ⛔ per provider — the block is environmental, not a provider
-defect) until credits are restored; then `scripts/run-272-board.py --seed` and `--run`
-(`272-UAT-LOG.md`, "BLOCKER").
+~~⛔ **NOT YET RUN (2026-10-03, 272-05).** Blocked by OpenAI `429 — You have no credits remaining`.~~
+**Unblocked the same day:** the operator added credits; the paused fixture jobs resumed on their own
+(all five `completed`, one embedded chunk each), a direct `text-embedding-3-small` probe returned 1536
+dims, and `--seed` re-ran idempotently (`SEED OK` ×5: `date_typed` = the ISO date, `legal_entity` set,
+`chunks=1`). **Run 2026-10-03** with `scripts/run-272-board.py --run`, one fresh thread per row × prompt,
+per-request `model` + `provider`, no global setting mutated; the `runs` row's effective
+`provider/model` equals the requested one on all 24 runs. Raw JSON per run: `evidence/board/`
+(24 files + `board-summary.json`); roster derivation and per-run lines: `evidence/board/board-run.log`;
+per-run audit ids, filters, tools and citations: `evidence/board/board-verdicts-readout.txt`.
+
+**Totals: 20 / 24 PASS** — (a) 7/8 · (b) 7/8 · (c) 6/8. No row ⛔ (every provider had a key).
 
 | # | Provider | Model (derived) | (a) | (b) | (c) | Evidence (audit ids / run ids) | Notes / ⛔ reason |
 |---|---|---|---|---|---|---|---|
-| 1 | openai | | | | | | |
-| 2 | anthropic | | | | | | |
-| 3 | google | | | | | | |
-| 4 | deepseek | | | | | | |
-| 5 | zhipu | | | | | | |
-| 6 | minimax | | | | | | |
-| 7 | moonshot | | | | | | `emit_tier: coerce` |
-| 8 | openrouter | | | | | | `native_tools: False` |
+| 1 | openai | gpt-5.6-luna | PASS | PASS | PASS | a `29a00ef9` / run `b48bda6f` · b `2cae94db` / `4d6d2d9b` · c `3b25b99a` / `ae6fd181` | one `search_documents` per prompt, filter emitted each time; (c) tools inspected: `search_documents` only |
+| 2 | anthropic | claude-sonnet-5 | PASS | PASS | PASS | a `42fbd879` / `58ad3294` · b `5765e719` / `e1a93c18` · c `2279bbf5` / `0a00a180` | one filtered call per prompt; (c) tools: `search_documents` only |
+| 3 | google | gemini-3.5-flash | **FAIL** | **FAIL** | **FAIL** | a `abfa1198`,`8b239da5` / `7bdfff7f` · b `6eafc0bd`,`da13c30c`,`b315a808` / `d79bb11b` · c `adfb0016`,`c191c25d`,`34054ca2` / `78784975` | (a) correct October figures but **no `filters` argument** on either search (it scoped by `query_documents` SQL) → FAIL by D-17; cited 8 docs incl. March and unrelated files. (b) emitted `legal_entity = Acme GmbH`, then an unfiltered search and a `title` filter on ACME Corporation → cited `acme_q3_2026_financial_report.md`. (c) never emitted entity + July; 14 tool calls (`query_documents` ×9, `grep` ×2, `search_documents` ×3), **no answer written**, 6 citations |
+| 4 | deepseek | deepseek-v4-pro | PASS | PASS | PASS | a `2bb4ae3b` / `ee3dd20b` · b `5ec900a8` / `f9da6a15` · c `01807bd4` / `c3cd0d50` | roster tie flash/pro → pro; (c) tools: `search_documents` only |
+| 5 | zhipu | glm-5.2 | PASS | PASS | PASS | a `32e80e8d` / `908595cb` · b `a8487fac` / `0106c2e5` · c `c86d2d4b` / `802e9614` | (c) tools: `search_documents` only |
+| 6 | minimax | MiniMax-M3 | PASS | PASS | **FAIL** | a `d001bfc7` / `f0e456cc` · b `a0287ebc` / `6c9b6b89` · c `47e0a64c`,`43041938` / `63ef49eb` | (a) also ran one `query_documents` after the filtered search (citations stayed October). (c) searched `legal_entity = Acme GmbH` WITHOUT the date first (`passages`, Sep + Mar), then entity + July (`no_documents_matched`); the answer says July has nothing but **cites Sep 2025 EUR 1,180,000 and Mar 2026 EUR 1,410,000** → FAIL. The D-09 lock cannot catch it: it fires only AFTER an empty filtered search |
+| 7 | moonshot | kimi-k2.6 | PASS | PASS | PASS | a `25240977` / `322eb03c` · b `60e940c4` / `c723435a` · c `30108aa0` / `89b97c06` | `emit_tier: coerce` — emitted the filter on all three; (c) tools: `search_documents` only |
+| 8 | openrouter | z-ai/glm-5.2 | PASS | PASS | PASS | a `e31dce50` / `2780ce00` · b `4b347e9e` / `53671b46` · c `55ccff7c` / `56b3fbc8` | `native_tools: False` (the non-native path) — emitted the filter on all three |
+
+**Roster derivation** (`sc10_188_run_board.derive_roster`, verbatim from `board-run.log`): 8 groups
+from `MODEL_CAPABILITIES`, every pick `capability_source=registry`: anthropic `claude-sonnet-5` ·
+deepseek `deepseek-v4-pro` (tied with `deepseek-v4-flash`) · google `gemini-3.5-flash` · minimax
+`MiniMax-M3` · moonshot `kimi-k2.6` (`emit_tier=coerce`) · openai `gpt-5.6-luna` (tied with
+`-sol`/`-terra`) · openrouter `z-ai/glm-5.2` (`native_tools=False`) · zhipu `glm-5.2`.
+
+**Reading.**
+- **Every PASS was earned by emission:** each passing row carries a `search.query` audit row whose
+  `filters` hold the asked dimension (`date between 2025-10-01 and 2025-10-31`; `legal_entity eq Acme
+  GmbH`; both together for (c), `result_kind = no_documents_matched`), and every passing (c) ran exactly
+  ONE tool call — the empty filtered search — so D-22 had nothing later to inspect.
+- **Google never emits the filter reliably; MiniMax pre-empts it once.** That is the CONTEXT
+  `<deferred>` trigger for the admin "must filter" field flag (D-01: *"revisit if the SC#10 board shows a
+  provider that will not emit filters reliably"*). It fired; it was not built (no re-scope).
+- ⚠ **Finding F-2, visible on EVERY passing (b) row:** `legal_entity = Acme GmbH` matches **3**
+  documents (audit `matched_document_count = 3`), but each of the seven passing rows received and
+  cited only **2**, and several answers say *"there are two monthly financial reports"* — a false
+  completeness claim inside a correct filter. The (b) rule (every citation is Acme GmbH) cannot see it.
+  Cause, read from the code: `retrieval_rank._select_filtered_vector_rows` returns ONLY the rows above
+  the configured threshold (0.3) when any clears it (D-10 as written), so a matched document below it
+  is dropped unless keyword fusion brings it back. Not fixed here (a behaviour change to D-10 needs a
+  decision and a backend restart) — routed to the operator at Task 4.
 
 ## 4. G-4 lived-experience scenarios (CONTEXT `<specifics>`), driven by 272-05
 
 | # | Scenario | I'd recognise failure if | Claude drive (evidence) | Operator sign-off |
 |---|---|---|---|---|
-| G4-1 | "October revenue" with October and March reports: answer states October 2025, every citation chip opens an October document, the card shows "Filtered: document date 1–31 Oct 2025" as visible text | a March figure appears, or the card shows no filter line | not yet driven — blocked by the OpenAI 429 (UAT log) | OWED until signed |
-| G4-2 | "Revenue for Acme GmbH in July" (no July docs): says nothing matched July for Acme GmbH, may name months that exist, NO citations | it answers with any number, or a second search card appears without the filter | not yet driven — blocked by the OpenAI 429 | OWED until signed |
-| G4-3 | "Revenue for Acme Gmbh" (wrong case/spelling): corrects to the real value and answers, or asks which entity | it says "no documents" for an entity that exists | not yet driven — blocked by the OpenAI 429 | OWED until signed |
+| G4-1 | "October revenue" with October and March reports: answer states October 2025, every citation chip opens an October document, the card shows "Filtered: document date 1–31 Oct 2025" as visible text | a March figure appears, or the card shows no filter line | **PASS, with observation F-1.** Answer: *"…October 2025 revenue splits as follows: Acme GmbH: EUR 1,240,000 [1] · Beta Ltd: GBP 860,000 [2]"*; markers `Citation 1: 272-board-acme-2025-10.md`, `Citation 2: 272-board-beta-2025-10.md`; References · 2 sources, both October. No March / September figure. The card line reads **`Filtered: document date 1–31 Oct 2025`** (visible, 659×20 px) — **after one click**: at rest the finished run card is folded to `✓ done` and the line is not in the DOM (F-1). Audit `352d7fb5` (`date between 2025-10-01 and 2025-10-31`, `passages`). `evidence/g4-1-at-rest.png`, `g4-1-runcard-open.png`, `g4-1-references-open.png`, `g4-1-dom.txt`, `g4-1-runcard-open-dom.txt` | OWED until signed |
+| G4-2 | "Revenue for Acme GmbH in July" (no July docs): says nothing matched July for Acme GmbH, may name months that exist, NO citations | it answers with any number, or a second search card appears without the filter | **PASS, with observation F-3.** Answer: *"No documents matched legal entity = Acme GmbH · document date 1–31 July 2026, so I can't give you a July revenue figure…"* then nearby months (Mar 2026, Oct 2025, Sep 2025 — 1 document each). No number, no citation marker, no References. A SECOND card exists and carries a filter line — **`Filtered: legal entity = Acme GmbH`** (the date dropped): it is the **D-09 lock refusing** the retry (audit `c8b9c9ba`, `result_kind = refused_retry`; first call `d9bc7f2b`, `no_documents_matched`). But the card summary reads **`Searching documents → 0 results`**, the same words as a real empty search, and the workspace TODO shows it `COMPLETED` (F-3). `evidence/g4-2-*.png`, `g4-2-dom.txt`, `g4-2-runcard-open-dom.txt` | OWED until signed |
+| G4-3 | "Revenue for Acme Gmbh" (wrong case/spelling): corrects to the real value and answers, or asks which entity | it says "no documents" for an entity that exists | **PASS by its written bar, with finding F-2.** The call carried **`Filtered: legal entity = Acme GmbH`** (canonicalised from `Acme Gmbh`, D-20; audit `bb2b1072`) and answered with figures. But it says *"here are the **two** monthly figures in your documents"* — March 2026 EUR 1,410,000 and October 2025 EUR 1,240,000 — while the filter matched **3** documents (`matched_document_count = 3`); September 2025 (EUR 1,180,000) was dropped by the D-10 threshold split (VALIDATION §3 "Finding F-2"). Rendered: `● Low confidence`. `evidence/g4-3-*.png`, `g4-3-dom.txt`, `g4-3-runcard-open-dom.txt` | OWED until signed |
+
+**How driven:** real Chromium (Playwright 1.60, `chromium-1223`, headless, 1600×1000, dark) from a
+scratch script outside the repo (271 precedent; no Chrome MCP in this executor), as the dev user
+signed in through the UI (`pressSequentially`, key events), against `http://localhost:5173/app.html`.
+Model = the operator's saved setting, **deepseek / deepseek-v4-flash** (the lived default, not a board
+row). Rendered text read at rest, then after one click on the run card's status row.
+Threads: G4-1 `ff82bf25` (first drive) and `6cfb82df` (re-drive with the unfold step) · G4-2
+`d420779b` · G4-3 `18995c2a`.
+
+**Findings for the operator (not fixed in 272-05):**
+- **F-1 (copy/layout):** a finished run card folds to `✓ done`, so the "Filtered: …" line is one click
+  away at rest. Pre-existing RunCard fold behaviour, not a 272 change; the line itself is visible text
+  (not a tooltip) once unfolded.
+- **F-2 (correctness, the serious one):** inside a matched filter set, documents whose passages fall
+  below the 0.3 threshold are dropped when ANY passage clears it, and the model then states a false
+  count. Seen on G4-3 and on all 7 passing board (b) rows.
+- **F-3 (copy):** `SearchDocumentsBody.tsx:14` summarises every non-array result as `0 results` — a
+  lock refusal (`refused_retry`), an invalid filter and a true empty match all read the same.
 
 ## 5. Known limits recorded, not hidden
 - D-22: `grep` / `query_documents` / `read_document` are not structurally locked by D-09; the prompt

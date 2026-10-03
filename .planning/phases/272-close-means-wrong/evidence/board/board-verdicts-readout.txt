@@ -1,0 +1,96 @@
+anthropic  (a) PASS req=claude-sonnet-5 eff=anthropic/claude-sonnet-5 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-10.md', '272-board-beta-2025-10.md']
+    audit ids: ['42fbd879-88e1-4e84-9ccc-a66477104ed6']
+    filters: [[{"op": "between", "field": "date", "value": "2025-10-01", "value2": "2025-10-31"}]]
+    answer: There are two legal entities with October 2025 monthly financial reports:  - **Acme GmbH**: Total revenue of **EUR 1,240,000**, driven by recurring service contracts and one-off project work, with operating costs in line
+anthropic  (b) PASS req=claude-sonnet-5 eff=anthropic/claude-sonnet-5 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['5765e719-cd97-48c8-b63e-060459a3732b']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    answer: I found multiple monthly financial reports for Acme GmbH:  - **March 2026**: Total revenue was EUR 1,410,000, driven by recurring service contracts and one-off project work, with operating costs in line with budget [1]. 
+anthropic  (c) PASS req=claude-sonnet-5 eff=anthropic/claude-sonnet-5 audits=1 kinds=['no_documents_matched'] tools=['search_documents'] cited=[]
+    audit ids: ['2279bbf5-0aca-499d-a46d-fc21fb9f426e']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}, {"op": "between", "field": "date", "value": "2026-07-01", "value2": "2026-07-31"}]]
+    answer: I couldn't find any documents for **Acme GmbH** dated in July 2026 (1–31 Jul 2026) — that's the most recent completed July relative to today's date.  No documents matched that filter. The nearest available financial data
+deepseek   (a) PASS req=deepseek-v4-pro eff=deepseek/deepseek-v4-pro audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-10.md', '272-board-beta-2025-10.md']
+    audit ids: ['2bb4ae3b-8ace-4e18-aaa4-fc10c1d77279']
+    filters: [[{"op": "between", "field": "date", "value": "2025-10-01", "value2": "2025-10-31"}]]
+    answer: October 2025 revenue, by entity:  - **Acme GmbH — EUR 1,240,000** [1] - **Beta Ltd — GBP 860,000** [2]  Both reports cover the October 2025 period, with revenue driven by recurring service contracts and one-off project w
+deepseek   (b) PASS req=deepseek-v4-pro eff=deepseek/deepseek-v4-pro audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['5ec900a8-b0e4-4b58-926c-b119988868de']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    answer: Acme GmbH's reported revenue depends on the period. There are two monthly financial reports in your library:  - **March 2026** — total revenue of **EUR 1,410,000** [1] - **October 2025** — total revenue of **EUR 1,240,00
+deepseek   (c) PASS req=deepseek-v4-pro eff=deepseek/deepseek-v4-pro audits=1 kinds=['no_documents_matched'] tools=['search_documents'] cited=[]
+    audit ids: ['01807bd4-b676-43c7-b8b8-49d0b5aafa45']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}, {"op": "between", "field": "date", "value": "2026-07-01", "value2": "2026-07-31"}]]
+    answer: Nothing matched for that query. I searched for revenue documents where **legal_entity = Acme GmbH** and **document date is in July 2026** (the most recent completed July before today), and there were no results.  The mon
+google     (a) FAIL req=gemini-3.5-flash eff=google/gemini-3.5-flash audits=2 kinds=['passages', 'passages'] tools=['query_documents', 'query_documents', 'search_documents', 'search_documents', 'query_documents'] cited=['272-board-acme-2025-10.md', '272-board-beta-2025-10.md', '272-board-beta-2026-03.md', 'acme_q3_2026_financial_report.md', 'northwind-commercials-renewal.md', 'nulfix.txt', 'sample.pdf', 'uat111_axisa_openrouter.md']
+    audit ids: ['abfa1198-e97c-4484-a272-27ff43a2da19', '8b239da5-cec1-4e23-a86b-1314796c11e5']
+    filters: [[], []]
+    answer: Based on today's date of October 3, 2026, the most recent completed October is **October 2025** (October 1, 2025 – October 31, 2025).   During this period, the revenue details for the active entities were:  * **Acme GmbH
+google     (b) FAIL req=gemini-3.5-flash eff=google/gemini-3.5-flash audits=3 kinds=['passages', 'passages', 'passages'] tools=['search_documents', 'query_documents', 'query_documents', 'read_document', 'query_documents', 'query_documents', 'search_documents', 'search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2025-10.md', '272-board-acme-2026-03.md', 'acme_contract_renewal_schedule_2026.md', 'acme_q3_2026_financial_report.md']
+    audit ids: ['6eafc0bd-c6f4-45ff-885c-e8abd5bc2590', 'da13c30c-54df-4d81-8745-8b0109654b4e', 'b315a808-dfc5-40ff-a2e5-c61856baade4']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}], [], [{"op": "eq", "field": "title", "value": "ACME Corporation - Q3 2026 Financial Results and Form 10-K Report"}]]
+    answer: Based on the financial records in your library, there are distinct documents for **Acme GmbH** (reporting in EUR) and **ACME Corporation** (reporting in USD).   ### Acme GmbH (Monthly Revenue) For the entity **Acme GmbH*
+google     (c) FAIL req=gemini-3.5-flash eff=google/gemini-3.5-flash audits=3 kinds=['passages', 'passages', 'passages'] tools=['query_documents', 'query_documents', 'query_documents', 'grep', 'search_documents', 'grep', 'query_documents', 'query_documents', 'query_documents', 'search_documents', 'query_documents', 'search_documents', 'query_documents', 'query_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2026-03.md', 'Pipeline-Awarded Projects- Budget 2026 (clean) (1).xlsx', 'acme_fulfilment_and_inventory_q3_2026.md', 'acme_q3_2026_financial_report.md', 'northwind-support-q3-2026.md']
+    audit ids: ['adfb0016-4d7c-49d0-9d6a-2f765d38fb60', 'c191c25d-c5cc-469e-adb6-713ad5e6c6f1', '34054ca2-c3c2-481e-9709-451e5ea13f9a']
+    filters: [[], [{"op": "eq", "field": "title", "value": "ACME Corporation - Q3 2026 Financial Results and Form 10-K Report"}], []]
+    answer: *The model produced 14 tool call(s) over 15 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*
+minimax    (a) PASS req=MiniMax-M3 eff=minimax/MiniMax-M3 audits=1 kinds=['passages'] tools=['search_documents', 'query_documents'] cited=['272-board-acme-2025-10.md', '272-board-beta-2025-10.md']
+    audit ids: ['d001bfc7-d1d0-45d9-a9ba-f1e0b8cf68ba']
+    filters: [[{"op": "between", "field": "date", "value": "2025-10-01", "value2": "2025-10-31"}]]
+    answer:   For **October 2025** (the most recent completed October), two entities filed results: - **Acme GmbH** — total revenue **EUR 1,240,000** [1] - **Beta Ltd** — total revenue **GBP 860,000** [2]  In both cases revenue was 
+minimax    (b) PASS req=MiniMax-M3 eff=minimax/MiniMax-M3 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2026-03.md']
+    audit ids: ['a0287ebc-3ba6-4035-9c4c-32235b6e412a']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    answer:   Acme GmbH's revenue figures appear in two monthly financial reports on file:  - **September 2025:** EUR 1,180,000 in total revenue for the period, driven by recurring service contracts and one-off project work. **[272-
+minimax    (c) FAIL req=MiniMax-M3 eff=minimax/MiniMax-M3 audits=2 kinds=['passages', 'no_documents_matched'] tools=['search_documents', 'search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2026-03.md']
+    audit ids: ['47e0a64c-05e9-4391-838d-5125f7ba2e99', '43041938-9910-4767-b9b2-2436e891cfa6']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}], [{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}, {"op": "between", "field": "date", "value": "2026-07-01", "value2": "2026-07-31"}]]
+    answer:   No Acme GmbH monthly financial report exists for July (the most recent completed July is July 2026, and there is no document with that date in your knowledge base). The Acme GmbH monthly reports available are for:  - *
+moonshot   (a) PASS req=kimi-k2.6 eff=moonshot/kimi-k2.6 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-10.md', '272-board-beta-2025-10.md']
+    audit ids: ['25240977-a7e7-4f17-89a1-e13f73e633fe']
+    filters: [[{"op": "between", "field": "date", "value": "2025-10-01", "value2": "2025-10-31"}]]
+    answer: Your documents show October 2025 revenue for both entities:  **Acme GmbH** — EUR **1,240,000** [1]   **Beta Ltd** — GBP **860,000** [2]  Both reports note that revenue was driven by recurring service contracts and one-of
+moonshot   (b) PASS req=kimi-k2.6 eff=moonshot/kimi-k2.6 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['60e940c4-77e7-4554-b70a-817387acd34e']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    answer: Acme GmbH revenue figures from your uploaded financial reports:  - **March 2026:** EUR 1,410,000 [1] - **October 2025:** EUR 1,240,000 [2]  If you need revenue for a specific month, quarter, or year, let me know and I ca
+moonshot   (c) PASS req=kimi-k2.6 eff=moonshot/kimi-k2.6 audits=1 kinds=['no_documents_matched'] tools=['search_documents'] cited=[]
+    audit ids: ['30108aa0-fdc9-4be1-9974-a68203a37cce']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}, {"op": "between", "field": "date", "value": "2026-07-01", "value2": "2026-07-31"}]]
+    answer: No documents matched **legal entity = Acme GmbH · document date 1–31 July 2026**. I don't have any files dated July 2026 for Acme GmbH in your library.  Nearby months that do have Acme GmbH documents are: - **March 2026*
+openai     (a) PASS req=gpt-5.6-luna eff=openai/gpt-5.6-luna audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-10.md', '272-board-beta-2025-10.md']
+    audit ids: ['29a00ef9-314a-4659-b13a-ce2c3575cfdc']
+    filters: [[{"op": "between", "field": "date", "value": "2025-10-01", "value2": "2025-10-31"}]]
+    answer: October 2025 revenue was:  - **Acme GmbH:** **EUR 1,240,000** [1] - **Beta Ltd:** **GBP 860,000** [2]  The figures are in different currencies, so they are not directly additive.
+openai     (b) PASS req=gpt-5.6-luna eff=openai/gpt-5.6-luna audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2026-03.md']
+    audit ids: ['2cae94db-a81c-4e70-94d1-1dde78434c3d']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    answer: Acme GmbH’s reported revenue was:  - **September 2025:** **EUR 1,180,000** — **[272-board-acme-2025-09.md]** — Monthly financial report   - **March 2026:** **EUR 1,410,000** — **[272-board-acme-2026-03.md]** — Monthly fi
+openai     (c) PASS req=gpt-5.6-luna eff=openai/gpt-5.6-luna audits=1 kinds=['no_documents_matched'] tools=['search_documents'] cited=[]
+    audit ids: ['3b25b99a-b240-4f0f-b53d-29ad35f89f7f']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}, {"op": "between", "field": "date", "value": "2026-07-01", "value2": "2026-07-31"}]]
+    answer: No documents matched **Acme GmbH** with a document date in **July 2026**, so I couldn’t determine the revenue. Nearby available periods are **March 2026, October 2025, and September 2025**.
+openrouter (a) PASS req=z-ai/glm-5.2 eff=openrouter/z-ai/glm-5.2 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-10.md', '272-board-beta-2025-10.md']
+    audit ids: ['e31dce50-57d7-441f-a732-36aac69996b8']
+    filters: [[{"op": "between", "field": "date", "value": "2025-10-01", "value2": "2025-10-31"}]]
+    answer: October 2025 revenue across both entities:  - **Acme GmbH**: EUR 1,240,000 [1] - **Beta Ltd**: GBP 860,000 [2]  Revenue was driven by recurring service contracts and one-off project work, with operating costs in line wit
+openrouter (b) PASS req=z-ai/glm-5.2 eff=openrouter/z-ai/glm-5.2 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['4b347e9e-57be-4cb4-8349-84f43cfa658b']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    answer: Here's the revenue for Acme GmbH across the monthly financial reports in your knowledge base:  | Period | Total Revenue | |---|---| | October 2025 | EUR 1,240,000 [2] | | March 2026 | EUR 1,410,000 [1] |  In both periods
+openrouter (c) PASS req=z-ai/glm-5.2 eff=openrouter/z-ai/glm-5.2 audits=1 kinds=['no_documents_matched'] tools=['search_documents'] cited=[]
+    audit ids: ['55ccff7c-1858-4db6-ba6c-1101b8c83761']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}, {"op": "between", "field": "date", "value": "2026-07-01", "value2": "2026-07-31"}]]
+    answer: No documents matched the filter I used: **legal entity = Acme GmbH** with a **document date of July 1–31, 2026**.  The only dated Acme GmbH documents I can find are from: - **March 2026** (1 document) - **October 2025** 
+zhipu      (a) PASS req=glm-5.2 eff=zhipu/glm-5.2 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-10.md', '272-board-beta-2025-10.md']
+    audit ids: ['32e80e8d-de00-43fb-bdf1-ae764bb51915']
+    filters: [[{"op": "between", "field": "date", "value": "2025-10-01", "value2": "2025-10-31"}]]
+    answer: October 2025 revenue (the most recent completed October), by entity:  - **Acme GmbH** — EUR 1,240,000 [1] - **Beta Ltd** — GBP 860,000 [2]  In both cases, revenue was driven by recurring service contracts and one-off pro
+zhipu      (b) PASS req=glm-5.2 eff=zhipu/glm-5.2 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2026-03.md']
+    audit ids: ['a8487fac-4d5d-4189-912c-e85d826a3473']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    answer: Acme GmbH's revenue is reported in two monthly financial reports in your knowledge base:  - **September 2025:** EUR 1,180,000 [1] - **March 2026:** EUR 1,410,000 [2]  Both periods cite recurring service contracts and one
+zhipu      (c) PASS req=glm-5.2 eff=zhipu/glm-5.2 audits=1 kinds=['no_documents_matched'] tools=['search_documents'] cited=[]
+    audit ids: ['c86d2d4b-a8ab-43fc-a86d-880f8672909c']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}, {"op": "between", "field": "date", "value": "2026-07-01", "value2": "2026-07-31"}]]
+    answer: I couldn't find any documents for **Acme GmbH** dated **July 2026** (the filter I used: legal entity = Acme GmbH, document date 1–31 July 2026).  There are no Acme GmbH documents from July in your knowledge base. The clo

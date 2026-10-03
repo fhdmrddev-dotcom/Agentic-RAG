@@ -146,11 +146,107 @@ paused jobs itself (`ingestion_queue_service.py:145-151`). Then:
 waits for ingestion, PATCHes `date` + `legal_entity`, asserts `date_typed` and chunks), then
 `--run`.
 
+### Blocker cleared (2026-10-03, continuation of 272-05)
+
+The operator added credits. Measured before anything was recorded: the five fixture jobs had resumed
+on their own (`ingestion_jobs.status = completed`, `documents.status = completed`, one chunk each,
+`embedding IS NOT NULL` on all five); one direct `text-embedding-3-small` call returned `EMBED OK dims
+1536`; `/health` 200. `--seed` re-ran idempotently:
+
+```
+dev user d8a54002-6a29-4b88-b918-cff2aa4a06d5 · single org 22f9c615-0eec-440a-8804-ed4784d6f57f (asserted from org_members)
+SEED field legal_entity exists type=enum options=['Acme GmbH', 'Beta Ltd']
+SEED OK  272-board-acme-2025-09.md id=1aaae022-… status=completed date_typed=2025-09-15 legal_entity=Acme GmbH chunks=1
+SEED OK  272-board-acme-2025-10.md id=7b0af230-… status=completed date_typed=2025-10-15 legal_entity=Acme GmbH chunks=1
+SEED OK  272-board-beta-2025-10.md id=d66d6436-… status=completed date_typed=2025-10-20 legal_entity=Beta Ltd chunks=1
+SEED OK  272-board-acme-2026-03.md id=bcdd9e20-… status=completed date_typed=2026-03-15 legal_entity=Acme GmbH chunks=1
+SEED OK  272-board-beta-2026-03.md id=295ceacf-… status=completed date_typed=2026-03-18 legal_entity=Beta Ltd chunks=1
+```
+
+Confounders checked in the org (176 latest documents, 35 dated): October 2025 holds only the two
+fixtures; one unrelated PDF is dated **2026-07-12** but has no `legal_entity`, so (c)'s combined filter
+still resolves empty; only the five fixtures carry `legal_entity`. The org also holds "ACME
+Corporation" documents (`acme_q3_2026_financial_report.md` and others). They are a realistic decoy
+for (b), and Google cited one.
+
+## SC#10 board (Task 3) — 20 / 24 PASS
+
+Method, exactly as `272-VALIDATION.md` §3: `scripts/run-272-board.py --run`; roster derived at run
+time from `MODEL_CAPABILITIES` (newest registry-backed id per provider + OpenRouter); one fresh thread
+per row × prompt; per-request `model` + `provider` on `POST /threads/{id}/messages` (no global
+setting mutated); verdicts from the run's `audit_log` `search.query` rows (`filters`, `result_kind`,
+`document_ids`) plus every persisted `messages.tool_calls` entry and `messages.source_refs`. Effective
+`runs.provider/model` == requested on all 24. Roster derivation verbatim: `evidence/board/board-run.log`.
+
+```
+| anthropic | claude-sonnet-5 | PASS | PASS | PASS |
+| deepseek | deepseek-v4-pro | PASS | PASS | PASS |
+| google | gemini-3.5-flash | FAIL | FAIL | FAIL |
+| minimax | MiniMax-M3 | PASS | PASS | FAIL |
+| moonshot | kimi-k2.6 | PASS | PASS | PASS |
+| openai | gpt-5.6-luna | PASS | PASS | PASS |
+| openrouter | z-ai/glm-5.2 | PASS | PASS | PASS |
+| zhipu | glm-5.2 | PASS | PASS | PASS |
+```
+
+Per prompt: (a) 7/8 · (b) 7/8 · (c) 6/8. Every FAIL with its evidence:
+- **google (a)** run `7bdfff7f`: both `search_documents` audits carry `filters: []`; it scoped by
+  `query_documents` SQL (`… metadata->>'date' LIKE '2025-10%'`). The figures were right; **D-17 fails a
+  correct answer without the filter**. Cited 8 documents, including `272-board-beta-2026-03.md`.
+- **google (b)** run `d79bb11b`: the first call carried `legal_entity = Acme GmbH`. It was followed by
+  `query_documents` ×4, `read_document`, an unfiltered search and a search filtered on `title = ACME
+  Corporation …`. Citations include `acme_q3_2026_financial_report.md` and
+  `acme_contract_renewal_schedule_2026.md`, which are not Acme GmbH.
+- **google (c)** run `78784975`: no search carried entity + July; 14 tool calls (`query_documents` ×9,
+  `grep` ×2, `search_documents` ×3), and the run ended *"The model produced 14 tool call(s) over 15
+  step(s) and never wrote an answer"*. It made 6 citations.
+- **minimax (c)** run `63ef49eb`: `search_documents(legal_entity = Acme GmbH)` with no date came first
+  (`passages`, Sep + Mar); then entity + July (`no_documents_matched`). The answer says July has
+  nothing, yet cites **EUR 1,180,000 (Sep 2025)** and **EUR 1,410,000 (Mar 2026)**. The D-09 lock only
+  fires after an empty search, so a broader search run *before* it is outside its reach (CONTEXT D-22
+  known limit, now observed).
+
+**Deferred-idea trigger fired:** CONTEXT `<deferred>` — the admin "must filter" field flag, *"revisit if
+the SC#10 board shows a provider that will not emit filters reliably"*. Google is that provider. It
+was recorded, not built: the phase is not re-scoped.
+
+⚠ **Finding F-2 — every passing (b) row, and G4-3.** `legal_entity = Acme GmbH` matches 3 documents
+(`matched_document_count = 3`). Each of the 7 passing rows returned and cited 2, and several answers
+claim *"two monthly financial reports"*. Cause, from the code: `retrieval_rank._select_filtered_vector_rows`
+keeps only above-threshold rows (0.3) when any clears it (D-10 as written). Keyword RRF fusion
+rescues one more at most. The (b) verdict rule, "every citation inside the filter", cannot see a
+dropped in-filter document. Not fixed: changing D-10's semantics is a decision, and it needs a
+backend restart. Routed to the operator.
+
+## G-4 drive (Task 3) — real Chromium, rendered text at rest
+
+No Chrome MCP in this executor, so the drive used Playwright 1.60 (`chromium-1223`, headless,
+1600×1000, dark) from a scratch script outside the repo (271 precedent). It signed in through the UI
+as the dev user, typed with key events, and ran against `http://localhost:5173/app.html` with the
+operator's saved model **deepseek / deepseek-v4-flash**. This is a substitution for the Chrome MCP
+drive and is named here.
+
+| # | Result | Rendered text (verbatim) | Audit |
+|---|---|---|---|
+| G4-1 | PASS (F-1) | answer *"…October 2025 revenue splits as follows: Acme GmbH: EUR 1,240,000 [1] · Beta Ltd: GBP 860,000 [2]"*; `References · 2 sources` = `272-board-acme-2025-10.md`, `272-board-beta-2025-10.md`; card line **`Filtered: document date 1–31 Oct 2025`** after one click (at rest the run card is folded to `✓ done`) | `352d7fb5` passages |
+| G4-2 | PASS (F-3) | *"No documents matched legal entity = Acme GmbH · document date 1–31 July 2026, so I can't give you a July revenue figure…"* + nearby Mar 2026 / Oct 2025 / Sep 2025; no number, no marker, no References. Card 1 `Filtered: legal entity = Acme GmbH · document date 1–31 Jul 2026` → `0 results`; card 2 `Filtered: legal entity = Acme GmbH` → `0 results` (this is the lock's refusal) | `d9bc7f2b` no_documents_matched · `c8b9c9ba` refused_retry |
+| G4-3 | PASS by bar (F-2) | card **`Filtered: legal entity = Acme GmbH`** (canonicalised from `Acme Gmbh`); *"here are the two monthly figures in your documents: March 2026: EUR 1,410,000 · October 2025: EUR 1,240,000"*; `● Low confidence`. September 2025 is missing | `bb2b1072` passages, matched 3 |
+
+Evidence: `evidence/g4-{1,2,3}-at-rest.png`, `-runcard-open.png`, `-references-open.png` (1 and 3),
+`-dom.txt`, `-runcard-open-dom.txt`.
+
+Findings (VALIDATION §4): **F-1** the finished run card folds, so the filter line is one click away
+(RunCard is unchanged by 272: last touched `c570922f4`, Phase 257). **F-2** the dropped in-filter
+document plus the false count. **F-3** `SearchDocumentsBody.tsx:14` renders `0 results` for any
+non-array result (refusal, invalid filter and empty match all look the same; the workspace TODO
+shows the refused call `COMPLETED`). That file is unchanged by 272, and the size of the fix is
+`/gsd:fast`.
+
 ## OWED (recorded, never executed here)
 
-1. **Operator: add OpenAI API credits** (above). Then the board (8 rows × (a)/(b)/(c)) and the G4-1..3
-   drive.
-2. **Operator G-4 sign-off** on G4-1..G4-3 (Task 4) — OWED until the drive has run.
+1. ~~Operator: add OpenAI API credits~~ — done 2026-10-03; board and drive run (above).
+2. **Operator G-4 sign-off** on G4-1..G4-3 and a ruling on F-1 / F-2 / F-3 and the Google / MiniMax
+   board FAILs (Task 4).
 3. **Production parity, in this order, before the backend deploy:**
    a. A FREE read of the production `document_chunks` count (Supabase MCP `execute_sql` SELECT — not
       available to this executor, so OWED). If it is large, run alone first, outside any transaction:

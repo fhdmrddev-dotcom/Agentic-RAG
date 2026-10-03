@@ -1,0 +1,312 @@
+{
+  "prompt": "What was October revenue?",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "verdict": "FAIL",
+  "notes": [
+    "date filter in Oct 2025: False",
+    "range in answer: True",
+    "citations 8 all October: False"
+  ],
+  "tool_calls_inspected": [
+    "query_documents({\"query\": \"SELECT id, filename, mime_type, metadata FROM documents LIMIT 50\"})",
+    "query_documents({\"query\": \"SELECT id, filename, mime_type, metadata FROM documents WHERE filename ILIKE '%budget%' OR filename ILIKE '%revenue%' OR filename ILIKE '%october%' O)",
+    "search_documents({\"query\": \"October revenue\"})",
+    "search_documents({\"query\": \"October 2025 financial report\"})",
+    "query_documents({\"query\": \"SELECT id, filename, metadata FROM documents WHERE filename ILIKE '%2025-10%' OR metadata->>'date' LIKE '2025-10%'\"})"
+  ],
+  "audit_ids": [
+    "abfa1198-e97c-4484-a272-27ff43a2da19",
+    "8b239da5-cec1-4e23-a86b-1314796c11e5"
+  ],
+  "audit_kinds": [
+    "passages",
+    "passages"
+  ],
+  "audit_filters": [
+    [],
+    []
+  ],
+  "cited": {
+    "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+      "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+      "filename": "272-board-acme-2025-10.md",
+      "d": "2025-10-15",
+      "ent": "Acme GmbH"
+    },
+    "d66d6436-f53f-4c50-b0b0-b2695dd36822": {
+      "id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+      "filename": "272-board-beta-2025-10.md",
+      "d": "2025-10-20",
+      "ent": "Beta Ltd"
+    },
+    "295ceacf-215f-4793-acd3-69cc2e18e141": {
+      "id": "295ceacf-215f-4793-acd3-69cc2e18e141",
+      "filename": "272-board-beta-2026-03.md",
+      "d": "2026-03-18",
+      "ent": "Beta Ltd"
+    },
+    "1ef08790-c1bb-44c1-b5ad-1e3156c21926": {
+      "id": "1ef08790-c1bb-44c1-b5ad-1e3156c21926",
+      "filename": "northwind-commercials-renewal.md",
+      "d": "2026-10-02",
+      "ent": null
+    },
+    "cce3e713-1f18-498a-87a6-cac8552fdfb1": {
+      "id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+      "filename": "acme_q3_2026_financial_report.md",
+      "d": "2026-09-30",
+      "ent": null
+    },
+    "72827799-f92c-4934-afb7-6cba833352aa": {
+      "id": "72827799-f92c-4934-afb7-6cba833352aa",
+      "filename": "uat111_axisa_openrouter.md",
+      "d": "2025-09-30",
+      "ent": null
+    },
+    "24831013-90de-43db-b627-b61bfe9026c7": {
+      "id": "24831013-90de-43db-b627-b61bfe9026c7",
+      "filename": "nulfix.txt",
+      "d": null,
+      "ent": null
+    },
+    "2346c5c2-944c-4de3-81ed-8fe4ee8778d6": {
+      "id": "2346c5c2-944c-4de3-81ed-8fe4ee8778d6",
+      "filename": "sample.pdf",
+      "d": null,
+      "ent": null
+    }
+  },
+  "answer_excerpt": "Based on today's date of October 3, 2026, the most recent completed October is **October 2025** (October 1, 2025 \u2013 October 31, 2025). \n\nDuring this period, the revenue details for the active entities were:\n\n* **Acme GmbH**: **EUR 1,240,000** [1]\n* **Beta Ltd**: **GBP 860,000** [2]\n\nBoth reports indicate that revenues were driven by recurring service contracts and one-off project work, with operating costs remaining in line with their respective budgets for the period [1, 2].\n\n**Sources:**\n* **272-board-acme-2025-10.md** [1]\n* **272-board-beta-2025-10.md** [2]",
+  "thread_id": "3c5fb61d-aace-497f-a222-c987511f4482",
+  "run_id": "7bdfff7f-5868-4d08-a8b9-4d14b588ca68",
+  "run_status": "completed",
+  "effective": {
+    "status": "completed",
+    "model": "gemini-3.5-flash",
+    "provider": "google",
+    "error": null
+  },
+  "raw": {
+    "audits": [
+      {
+        "id": "abfa1198-e97c-4484-a272-27ff43a2da19",
+        "at": "2026-10-03 08:06:48.25724+00",
+        "metadata": {
+          "run_id": "7bdfff7f-5868-4d08-a8b9-4d14b588ca68",
+          "filters": [],
+          "thread_id": "3c5fb61d-aace-497f-a222-c987511f4482",
+          "folder_ids": [],
+          "query_text": "October revenue",
+          "result_kind": "passages",
+          "document_ids": [
+            "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "24831013-90de-43db-b627-b61bfe9026c7",
+            "1ef08790-c1bb-44c1-b5ad-1e3156c21926",
+            "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "2346c5c2-944c-4de3-81ed-8fe4ee8778d6"
+          ],
+          "similarities": {
+            "1ef08790-c1bb-44c1-b5ad-1e3156c21926": 0.016,
+            "2346c5c2-944c-4de3-81ed-8fe4ee8778d6": 0.548,
+            "24831013-90de-43db-b627-b61bfe9026c7": 0.537,
+            "7b0af230-1ef4-46e5-b316-11888ce84ffb": 0.479,
+            "d66d6436-f53f-4c50-b0b0-b2695dd36822": 0.45
+          },
+          "parent_run_id": null
+        }
+      },
+      {
+        "id": "8b239da5-cec1-4e23-a86b-1314796c11e5",
+        "at": "2026-10-03 08:06:53.777677+00",
+        "metadata": {
+          "run_id": "7bdfff7f-5868-4d08-a8b9-4d14b588ca68",
+          "filters": [],
+          "thread_id": "3c5fb61d-aace-497f-a222-c987511f4482",
+          "folder_ids": [],
+          "query_text": "October 2025 financial report",
+          "result_kind": "passages",
+          "document_ids": [
+            "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "295ceacf-215f-4793-acd3-69cc2e18e141",
+            "72827799-f92c-4934-afb7-6cba833352aa",
+            "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "cce3e713-1f18-498a-87a6-cac8552fdfb1"
+          ],
+          "similarities": {
+            "295ceacf-215f-4793-acd3-69cc2e18e141": 0.503,
+            "72827799-f92c-4934-afb7-6cba833352aa": 0.491,
+            "7b0af230-1ef4-46e5-b316-11888ce84ffb": 0.575,
+            "cce3e713-1f18-498a-87a6-cac8552fdfb1": 0.489,
+            "d66d6436-f53f-4c50-b0b0-b2695dd36822": 0.575
+          },
+          "parent_run_id": null
+        }
+      }
+    ],
+    "messages": [
+      {
+        "id": "ad4e7212-e2b7-4586-ad02-9c00b62a9cde",
+        "role": "user",
+        "content": "What was October revenue?",
+        "tool_calls": null,
+        "source_refs": null,
+        "at": "2026-10-03 08:06:33.654344+00"
+      },
+      {
+        "id": "25a68da1-d45c-4ea9-94d0-97073dc95738",
+        "role": "assistant",
+        "content": "Based on today's date of October 3, 2026, the most recent completed October is **October 2025** (October 1, 2025 \u2013 October 31, 2025). \n\nDuring this period, the revenue details for the active entities were:\n\n* **Acme GmbH**: **EUR 1,240,000** [1]\n* **Beta Ltd**: **GBP 860,000** [2]\n\nBoth reports indicate that revenues were driven by recurring service contracts and one-off project work, with operating costs remaining in line with their respective budgets for the period [1, 2].\n\n**Sources:**\n* **272-board-acme-2025-10.md** [1]\n* **272-board-beta-2025-10.md** [2]",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "SELECT id, filename, mime_type, metadata FROM documents LIMIT 50"
+            },
+            "name": "query_documents",
+            "result": "[\n  {\n    \"id\": \"e9a7c4fd-757d-4421-b4ed-d1d768506dbf\",\n    \"filename\": \"Update UAE Credit Reports now include BNPL and micro-loan information.eml\",\n    \"metadata\": {\n      \"date\": \"2026-08-24T11:00:30+00:00\",\n      \"title\": \"Update: UAE Credit Reports now include BNPL and micro-loan information\",\n      \"author\": \"Etihad Credit Bureau\",\n      \"topics\": [\n        \"credit reports\",\n        \"BNPL\",\n        \"micro-loans\",\n        \"consumer finance\",\n        \"privacy policy\"\n      ],\n      \"summary\": \"An Etihad Credit Bureau email announcing that UAE credit reports now include BNPL and micro-loan information, explaining that these short-term loan checks appear in personal credit reports and encouraging recipients to access their report to review, verify, and correct information if needed.\",\n      \"email_to\": [\n        \"fhdmrd@gmail.com <fhdmrd@gmail.com>\"\n      ],\n      \"language\": \"en\",\n      \"email_from\": \"Etihad Credit Bureau <comms@insights.etihadbureau.ae>\",\n      \"_confidence\": {\n        \"date\": 0.99,\n        \"title\": 0.99,\n        \"author\": 0.98,\n        \"topics\": 0.92,\n        \"summary\": 0.97,\n        \"language\": 0.99,\n        \"document_type\": 0.98\n      },\n      \"document_type\": \"email\",\n      \"email_message_id\": \"<dec996b08e4e24849c6d1f7fdad618ad0081f07947896377519163f2bd4815d8@insights.etihadbureau.ae>\"\n    },\n    \"mime_type\": \"message/rfc822\"\n  },\n  {\n    \"id\": \"afeb4abc-6c14-43ef-9740-957b96542b26\",\n    \"filename\": \"Fahed Mrad Chapters 1-4_FM (Plan) - Copy.docx\",\n    \"metadata\": {\n      \"date\": \"March 2026\",\n      \"title\": \"Challenges And Strategies in Robotic Process Automation Integration: Crafting A Success Framework Within Business Process Management\",\n      \"author\": \"Fahed Mrad\",\n      \"source\": {\n        \"system\": \"google\",\n        \"version\": \"2026-03-29T08:23:10.000Z\",\n        \"external_id\": \"1qjN-XKD1Rcesg4ib0DFJ08vi-CyQ5Abn\"\n      },\n      \"topics\": [\n        \"Robotic Process Automation\",\n        \"Business Process Management\",\n        \"Digital Tran",
+            "status": "done",
+            "tool_call_id": "call_729075",
+            "thought_signature": "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"
+          },
+          {
+            "args": {
+              "query": "SELECT id, filename, mime_type, metadata FROM documents WHERE filename ILIKE '%budget%' OR filename ILIKE '%revenue%' OR filename ILIKE '%october%' OR filename ILIKE '%xlsx%' OR filename ILIKE '%csv%' OR mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
+            },
+            "name": "query_documents",
+            "result": "id | filename | metadata | mime_type\n--- | --- | --- | ---\n6435ef1e-03f4-4dfb-9639-6376a5860d7a | Pipeline-Awarded Projects- Budget 2026 (clean) (1).xlsx | {'title': 'Closed Won 26 / Pipeline / DT 2026 Revenue Forecast_Jun', 'topics': ['sales pipeline', 'closed won deals', 'revenue forecast', 'AED', 'account management', 'margin analysis'], 'summary': 'Extract from three spreadsheet sheets: a closed-won deals list for 2026, a sales pipeline with status/confidence/closure timing, and a 2026 revenue forecast with quarterly totals, YTD actuals, and detailed account-level forecast lines.', 'language': 'english', '_confidence': {'date': 0.2, 'title': 0.89, 'author': 0.1, 'topics': 0.9, 'summary': 0.95, 'language': 0.98, 'document_type': 0.93}, 'document_type': 'spreadsheet text extract'} | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\nde123e75-5a60-4d1b-89c6-bdb7a482ada0 | sample.csv | {'topics': ['Revenue', 'Region'], 'summary': 'This document contains a data table listing the revenue for different regions, specifically EMEA and APAC.', 'language': 'english', '_confidence': {'topics': 0.8, 'summary': 0.9, 'language': 1.0, 'document_type': 0.9}, 'document_type': 'data table'} | text/csv\n8991380f-2413-41b4-8f1d-12ab06e5d5c9 | sample.xlsx | {'title': 'Sheet: Revenue', 'topics': ['Finance', 'Revenue', 'Regional Sales'], 'summary': 'This document presents revenue data from different regions, specifically EMEA and APAC, with amounts 120 and 98 respectively.', 'language': 'english', '_confidence': {'title': 0.9, 'topics': 0.8, 'summary': 0.85}} | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\n5c2389da-36ac-441f-bf7f-af508e9ba3e5 | nulfix.csv | {'title': 'Regional Revenue Data', 'topics': ['Revenue', 'Region', 'EMEA', 'APAC'], 'summary': 'The document provides a table displaying revenue and run data for different regions, particularly EMEA and APAC, with specific figures for each.', 'language': 'en', '_confidence': {'title': 0.7, 'topics':",
+            "status": "done",
+            "tool_call_id": "call_901763",
+            "thought_signature": "EvoFCvcFAWkUfROPDfdv1kKHBZ+MdNBTlQCmDeOcAYb0uhKywkvbhdnOu2yZBQr1HEYuExrxrf3Yl5tczEshXoX4Tlb6/oWICl+ljhBM+pkq6hWMVGBimb0oYWf7cG+x107NNZcmBTsLBNzq/vS+VF9ByeOEFWAqlSu2kaoCryAnrrDyxizuL+zJvY0z3Z9lU2qAFLRMNyIraqJhSLx0t9n7ouzk7sxScgNYtqNKMKElvS9ut83v6/4g4FbBeGgosYPUF843+kI78WcznWrAE/wpmGxMeFdS75XxxdqFfrW5D/kv2xPF46JsYZLUWWVKjOpiy2Z+E+Lxick3F0GILb8Sf3XmAMF0s9fESLa0MZOu4bbLteLNwk9Tz6ytRrNy1Blj+3d+S8sEZgcBTq4/BYrLCH7ZBBg3L5JvZTgoya6CNktsqk/H64dkFbHtpenG3AkMyxQPRbAj8BKH2pDIW+HRkXUu271ECAYcvd1+epEFNeiSpKV0UXw1SEKY/rlmni62A6azTulOvOWsJ+ky1ooMsiEYIXHfk985dFnLQ+o9vh4kAOYTZtVBMa1cTlgFu8FHTBKMmFjKuZnC62i14fN0N9P7uBYPRayJjMMZdP7J4yipE03WRAnDamsdgdDB8Qplu86z1863InOuFcboucOmrsxxSS7XcLbUNsWk7/94zZCLl6H0HATf+mJBJe9I5NsORSm54jjqK4YjEjGOV+iWHnfgM8+zDIOVT6i6O8iTC+AFa2xae88qrQYkU8JJPwIptwsMf20Y8tFc7geoJ/o1x/Pz1SEYoMkFWwCTrYK239tgHytEM6NvAZ7qvfGNqph5TLZb5yInb+8/ftXrOGnn6QhIS0MbAp+gCKPrQINIgyyMlDWsilWJ1P73kHrBskxC0CuhQ+0bCpNyZ4ikBaBfeqq1Hg/KZSDaG3Kd+fhpDerAH3c0q0w5uUxr25x0Q7r+AJVRp/GYYbfxJ7wEYMoLJWCoQAjt5ZEOpEF7TUnPp5sP7GI7X9hN0ghD"
+          },
+          {
+            "args": {
+              "query": "October revenue"
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Acme GmbH \\u2014 monthly financial report, October 2025\\n\\nReporting entity: Acme GmbH.\\nReporting period: October 2025.\\n\\nTotal revenue for the period: EUR 1,240,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"7b0af230-1ef4-46e5-b316-11888ce84ffb\", \"filename\": \"272-board-acme-2025-10.md\", \"chunk_index\": 0, \"similarity\": 0.47856471000295864, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2025-10-15\", \"title\": \"Acme GmbH \\u2014 monthly financial report, October 2025\", \"topics\": [\"finance\", \"monthly reporting\", \"revenue\", \"operating costs\"], \"_source\": {\"date\": \"user\", \"legal_entity\": \"user\"}, \"summary\": \"Monthly financial report for Acme GmbH covering October 2025, stating total revenue of EUR 1,240,000. Revenue was driven by recurring service contracts and one-off project work, and operating costs were in line with budget.\", \"language\": \"en\", \"_confidence\": {\"title\": 0.99, \"author\": 0.2, \"topics\": 0.9, \"summary\": 0.97, \"language\": 0.99, \"document_type\": 0.98}, \"legal_entity\": \"Acme GmbH\", \"document_type\": \"monthly financial report\"}}, {\"content\": \"# Beta Ltd \\u2014 monthly financial report, October 2025\\n\\nReporting entity: Beta Ltd.\\nReporting period: October 2025.\\n\\nTotal revenue for the period: GBP 860,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"d66d6436-f53f-4c50-b0b0-b2695dd36822\", \"filename\": \"272-board-beta-2025-10.md\", \"chunk_index\": 0, \"similarity\": 0.4496926633137446, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2025-10-20\", \"title\": \"Beta Ltd \\u2014 monthly financial report, October 2025\", \"topics\": [\"financial report\", \"revenue\", \"operating costs\", \"mont",
+            "status": "done",
+            "tool_call_id": "call_125700",
+            "thought_signature": "EsEICr4IAWkUfRPbujMrlVlzRmyJYH6PoQgKx4ivFfge99CjHhySP8rLiXeAqD/v7G39rvD8Xb+mWE15tno8P2TfQlHlIrO+WF3COQYw9QQQz+zumTmpzgKQ1nBMLOnkP654IwTL51GyR+lDGh9YtFUxzVVntzB7KmHn3dVBUge+6lQhqbdSw1WUlfMEBKxD2QjjC69v2vX4gGjaUwOwLG9z1Yt9C/nioEp3gGbEcvjQeHu10h8/XBlAwgsJKG1DZIdUrdBMuo6uzeZWBJxi9TBpbp7jaXp4aBXgRpHqfB2FAJ0Bhn8c8URwjN0jhjnsY+XUN+IUsR5N93xG8TL7Lr3dtZPW9cknDZwm+aeDTN2KxumKG/+LpQE1ZYwNDsXwzlqBkS8HBJgMmRBXeUYotXErJ9//ON7YQRJgUwmQ7XJjxdzl9fQ+NEg+FKrDV0TZ3qOBP9sPBxdjzxpoOPH6AO6W+i4w+yZWy5L9admwoQvmuBcZ8KbG0VZzzSvxtliiVRnM9CjL01z714h3Jh+KYujRHPUfpqAOrzvtsvg38wpO9K4jVqen1xWBJAmBMXnX0NFP0qHyQzBFfIqW9N2vX97ZMk+IwKpnGDPpmkpE6YCDFhFruBDL7dch6kDWMlbluZj0ARWLliaFTH+C2g8GCza6oMnHt1JxEWAM/QJWHF6cSy9a5rOI48KYD+76c7ITGITkuv6N6gOwwwMem/WnVLuuF8tk+X6Lh7MPsaO3I9UvUHBLhCf8OA/pG10rudU12WWHXWPvHkuAGbv0V5Zi0Xuk1cllghFRyvqJJbxQDYQaAwh95KGRz7liUyqUxN2Ce/vqX6G28dELyupt/qsehphbgpMh3Qq9USX+iPDt5NQVb/x0hwI907g24vGT70OMfjd1sT1E9pbVgnE56pwSiqHPIJ4GZmKKoo+Nwllwlxx+D2lHIm6L2blNDkBsSBlDMien43yW08sBcZLlAeHvxG244JfeE+jCX1jRuhsN0bHFruJaSPLs4bLOgdaoP7l3Ciktk5i3iH9Av3Ypvuum3nlt0kErb3TzEI2gUN+akEJe8XMKpaJniwihXW54gX4ACTta9ETzphOmhg5H7y7HaB6wfv6A5Y24qABA5w4oyOJj5PKU5Y36+7bSU5kxH57wEPxVTMHHD7eWyl3Jjl1Uig9pv9PER3bXxmmn5F8BtM3laB8xxh9WNXBtBFx5NZ2AFRLCfcWnVLL7NAd5u+iaNzLtfVwVavsRtUwmHcVLw2BmM5zOsR2lw9gR2WvLAJkVipyNf+hMYHzZ+kFukhFLyBoT39TjhwIkLpf4Avtv1uQwsJuA7RT6LKcJjw7gF+zxzKIg6j6W9WWHKUItw9fs3kEIrUlTYG4nF24DTSdM1g8C2eCXh5M5tnMTuCNBSNp9lqQiBm70WmejodzKDBUOJeqKxUziowKx7RRU5Ed5R3dTMb4E"
+          },
+          {
+            "args": {
+              "query": "October 2025 financial report"
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Acme GmbH \\u2014 monthly financial report, October 2025\\n\\nReporting entity: Acme GmbH.\\nReporting period: October 2025.\\n\\nTotal revenue for the period: EUR 1,240,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"7b0af230-1ef4-46e5-b316-11888ce84ffb\", \"filename\": \"272-board-acme-2025-10.md\", \"chunk_index\": 0, \"similarity\": 0.5748878232240605, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2025-10-15\", \"title\": \"Acme GmbH \\u2014 monthly financial report, October 2025\", \"topics\": [\"finance\", \"monthly reporting\", \"revenue\", \"operating costs\"], \"_source\": {\"date\": \"user\", \"legal_entity\": \"user\"}, \"summary\": \"Monthly financial report for Acme GmbH covering October 2025, stating total revenue of EUR 1,240,000. Revenue was driven by recurring service contracts and one-off project work, and operating costs were in line with budget.\", \"language\": \"en\", \"_confidence\": {\"title\": 0.99, \"author\": 0.2, \"topics\": 0.9, \"summary\": 0.97, \"language\": 0.99, \"document_type\": 0.98}, \"legal_entity\": \"Acme GmbH\", \"document_type\": \"monthly financial report\"}}, {\"content\": \"# Beta Ltd \\u2014 monthly financial report, October 2025\\n\\nReporting entity: Beta Ltd.\\nReporting period: October 2025.\\n\\nTotal revenue for the period: GBP 860,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"d66d6436-f53f-4c50-b0b0-b2695dd36822\", \"filename\": \"272-board-beta-2025-10.md\", \"chunk_index\": 0, \"similarity\": 0.5745636430340356, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2025-10-20\", \"title\": \"Beta Ltd \\u2014 monthly financial report, October 2025\", \"topics\": [\"financial report\", \"revenue\", \"operating costs\", \"month",
+            "status": "done",
+            "tool_call_id": "call_429796",
+            "thought_signature": "EswLCskLAWkUfROE4KLJ8B8vJWycqhh9EudPQuMoJK+2nIxU5wZTVz+95WOTDWx1E22514Qeu3RS2tcGgMlfDEnV464moygBwfYN0n4GKVVO9akLmfSXs1MhV7AkR20dfZ6NfrgW8ov6H1N+FnQY/b5o/Po412zg+7ynaRN13m55nGyQysmNC/6I4BHC89oHBSZ8aQHuBTIn5xiNZdg04grr+bPSlzGNW9d2wzp4iSev8BMxk/R6VNBhLg/O0TPZTp6kE6sBmXGwBuBgNnItCOiBT4V59c0R5XO8OTlNhqC4N4/lmWZhAz85JDQXTgoGBnGGqFMKQsWiAt6cG83S5YvbwleRrOWOHXFDfOkZBHxPP34jkQkoZK7aa56JEBC6FOO5iTPXkblSdpAjSchNW3l40pTFGtrptWs7KuNoZdhTDb0v0eYV8vTE15PfH5adD9T1jRVnwc8pyqg9545MdlvfO1zYozXN4yIOUuKRcrY9/RfW57Ava4Ymv18wnXMD2sr3xJ0eTVzSylLTEjPrJuFojcEqhsDUOvWmQomEk8fxeNwnuPEl0jC697kmmrh0c2Nc0w0oLNJ3KlAv9yawk6KIkH+2//kOBRvi0AJ21c4cLRRNOPJAIq0fn1R/10/dXhWHe+22gqJUljWPEgX/WOuNGd6zn548q1fvPcZ0y3kNQGJ+UalRO5/bgVGxl/SCg/Wku0C/dJLZQTlMTlhe8gFi9VQHOECDI9fqWXe7qtGS9vgyeRUyfyj50qfc1o4MFdMrVeWxl0U5cKiVWvhK5xtAwV8+V81ls74lrC5R2ylivVRsOB9xLtzxeQNZtT8LAjWUFjoy3Atpd6Y5hAEZOP7t/9+UlixM7EQFTSuWU57Dr2pXxIXRVmhr3cpNIGoJ9Qt9TZbd1kRYDuNKiTO8X7e8LXWf4cw1iLHVfyB5Az0SzTdFaEMbCU9a7ZZTnW9WSjZ+VqvvvLS/Y/lLLcIr01nXizT60cnb+oBbGtaywYlQtayjTt/raPKZm9eAu3CD5YFLuBn7mLtP5MlBDIzNn+04tVZgkvO1Hf8erXlm+EEvxFRSQkec+RGHX9dgxeVJG9tYpuxXpkjLVwIlJ38sTqwcWldYQq16vdSIAMp4YeJXzzkrLBRXh6kI2aUfzJA3/s72tttSB/e6LMgHrc+zHC0yI4umSf+G1CUQ5TWKAa5b5JX3PnVkTTVRcncJDoBBdfgMn3x3TLs9EvwRQ33sxtaah6CC36w+1fxmVWUJxmOyqZccCfbvaNVB/SKei8VW4fPzG/dw0h4redppkmK9yfWOy9BDoGHjjqqXs6fm4wXooqxcaLH08l8ZbV+tXwQdH3qqtf7siEKNAaZH6gf4yJ/j7XlD03QggDpJ+x9t5LA46zuxtABx0Cyv97W+W+MicYDKBoHiIds5BMMrmj6M5T+jMvfw23ui7YR+t3/60aCtJZkVFlVnb/n0c/CYhY2ToSRtvx/KMCqS9ABpt/tk4D3ogsikkvpSB+V+ktesNoe4ffwKjftcKHZvchx0hrhqhOlzQdK1G+tFCNqR4SmX1w6n66MMxtBNU7N4SLpwKuyelwfiAWWrcZUE5ycHlIPBflxqmGGLeSB/Pe8qRIeLZGiV5xAAR7xTEkG0O4byQJfSdmvC7Ea/MQ6kgWuESd0GI8+p/uiGAabsFT51IMzORdsn5Nxj2gc5ewmV9xkML93hsRgn4jyvRr3N6M2nmygI/QuKr0gAB73cBswhQkcWYq+HRH0Wtvjt/e6+4+YXytXAq7yKz6tl+cigRj8Gyuj/vaL2prBEW4dWYsqBBszoYmE4cCa1Iz7GqY2JdhYsp8809jKanLjuNXMcNUb9Oj9DSS6TGG//rmsEGHv2y14KPVIaqFyFoF+yksDs8fbNDmB522GsjoGqUYZTy7tsOiATJuWiR2ffFD14ZPa3P/ML4hk62oOo4C3QioyVKd55OfDeKZVUTAioSeakTOV7I3o="
+          },
+          {
+            "args": {
+              "query": "SELECT id, filename, metadata FROM documents WHERE filename ILIKE '%2025-10%' OR metadata->>'date' LIKE '2025-10%'"
+            },
+            "name": "query_documents",
+            "result": "id | filename | metadata\n--- | --- | ---\ndd5610f4-9652-4f40-b870-0378efb763a6 | 2025-1042S.pdf | {'date': '2025-08-12', 'title': 'Form 1042-S (Amazon)', 'author': 'Internal Revenue Service / Amazon', 'topics': ['Form 1042-S', 'withholding tax', 'Amazon', 'royalties', 'non-U.S. person income', 'U.S. source income'], 'summary': 'An IRS Form 1042-S informational tax statement for recipient Fahad Mrad showing U.S.-source income paid by Amazon.com Services, Inc. for 2025. It reports gross income of $5.31, federal tax withheld of $1.59, and identifies the payment as other royalties. The document also includes explanatory text about how to use the form and references Amazon support resources.', 'language': 'en', '_confidence': {'date': 0.93, 'title': 0.84, 'author': 0.72, 'topics': 0.95, 'summary': 0.92, 'language': 0.99, 'document_type': 0.96}, 'document_type': 'tax form / informational statement'}\n7b0af230-1ef4-46e5-b316-11888ce84ffb | 272-board-acme-2025-10.md | {'date': '2025-10-15', 'title': 'Acme GmbH \u2014 monthly financial report, October 2025', 'topics': ['finance', 'monthly reporting', 'revenue', 'operating costs'], '_source': {'date': 'user', 'legal_entity': 'user'}, 'summary': 'Monthly financial report for Acme GmbH covering October 2025, stating total revenue of EUR 1,240,000. Revenue was driven by recurring service contracts and one-off project work, and operating costs were in line with budget.', 'language': 'en', '_confidence': {'title': 0.99, 'author': 0.2, 'topics': 0.9, 'summary': 0.97, 'language': 0.99, 'document_type': 0.98}, 'legal_entity': 'Acme GmbH', 'document_type': 'monthly financial report'}\nd66d6436-f53f-4c50-b0b0-b2695dd36822 | 272-board-beta-2025-10.md | {'date': '2025-10-20', 'title': 'Beta Ltd \u2014 monthly financial report, October 2025', 'topics': ['financial report', 'revenue', 'operating costs', 'monthly report'], '_source': {'date': 'user', 'legal_entity': 'user'}, 'summary': 'Monthly financial report for Beta Ltd covering October 2025. Total ",
+            "status": "done",
+            "tool_call_id": "call_97695",
+            "thought_signature": "Es4VCssVAWkUfRPOTU9J7RvWqq+y5hS250cKK3CVPmPzO9aQR6mwVixo0ANNU4G14HI92GN4uLU1+OxHTt9zxZ1pV/qOlQibtb6JROco1Fru5XMvDNCbZBagU2iRwM6xuldvXzDKwllZ0215VwjI5J6joBLCtBO+DsztEqGKMopVlz+scgZbOUFeci0bFT/zYvvS6REfD5WdpwE56z/7I0m20TW9FV3JGVErnc1srLUyw7qHvMdtecvBFLuR46C3NKoeqvsBbvCsfVBsE8yeDYeZJq7IJvIDquYO25FinTdVi1TOx4wIhjshh7JUfFNfFmuCkiHZLOSk56sA5PHNXR+808R/VTtjxb0/wCDJU8hrnG4Em7hHrR2Ul8up+DER0Lgw67OSt7co/OjyEWd/avWWRpdc12t+pNRmySx0R2EV7VKGgKMSG+Vn8w1aTYEPYNiwHMYqhCbOlPJ2R1/ndGcO5PFRGtUFV6FSn/qrGa7FgFFbDAbK2ukcRSoUVfPKiJ9/OFixD/G+rfYxiP40oNJFSu1JPLdNQ/BN2HUSAsoux5v17kZ22Vg3+8knd2J3jt9dlEztwHuupftNTC9hOsKSruUXfYrJeJcgwed9pdX9gxNAxurwa741jhD8U1QyYR7HZewR1qPLmwHoXEoGaIm9DvVCmPHcDEIzu4oAt6NClRUXja4luNVCOHg2oT0XyAzBTmRjctmCtIort92azxftmRbpO9YJJu4xvrW3kSBsYcrGAsM1kJ7AwslsgE1r/KCaHXstBlKPeHPqkP0dPhsFiadYZRwEVHRSC4JDoLcBB/l8FBr7k6vDbRFh9L8F0EIeh1pEqBklpIZFL1La6Gkes5UTEBSyJ/Y3rW/IQlmp1un72PwOTeJNL6ahKnbSDsYoPmG5zykoVENfujbJWtTFEcgGOueZ0a8h66GMDzlpehnADthcFYjq7m2vE9KXdJUAo5l6f/m7/DRhJ/1e2sK1q/K91pbeHxwGPyiHb3cKjW+Xjzbz6Gl2xM+DX3uDnb/GpWtnAe8oz+2ZIj89aDSz/DfW3WDXf8CUSxWRPHre0wRBsCuKWPFxF505mLwFpMi035QFjI3ZPY/U2ZRsi4HmIFty5JBeCsIG9odYHuD3hY0Lzq2DiUTus5NkNVp+mOz5C8dnWYbAMeBfkjm55qldCk0IOTBxnt2dQu8Ec7ghWAN2EHW24gN1QYIDM5GYzdCC2O4bOfJxDtk1HSrw4Ye/HVx4vMw/3zTbYFTP1WxnhdtNuXQ/RW9OA+pV9embKtJi1LsGktK6kNibgneVXB0PgtX4KA4dUEwzOL5vUPhsB4saEYPPs8KJbweLClTDWoX2DINSQ/iD9E9Wh5wc7PelODjZEHAv61M/pOTeNP67DKVuwDtcAiyn5ZDr0DkP9X+V1/xUyzdrVoiahawSM47vOpqBFtf0m8HKK18ZTC8CwNxezDF4n9o3P+g9fEmsVzlVbDSlHLCGi9o+ffM5uhdpg0+sKMrlsvruq/57xdm7+iFdVLF+AMYaLFM6K9jxDmAXz57xzhn5SpzlUme8DJJdOSShB85+WsOQIODLEgla8U7VHjEKl8IMMClJ3+RfsSol+UsuSG41Q9ovNbJ3jXPtbQzedqiDWSyN8+G92XusL7d+7lqhWFqBvpW235XY4OloQZFKC7L4+vLn+ffJc4n+sWB+qGi60/qMnXfC0x8PEwmqFT8nHFLFbF2y4mnQ8MIkMtWZ9Lm6Qc6Z46KAppTp1JlCCitQ/2IhePz6qHWpcPo2Z9GgzbtcSu7d0qU8fQi+Ai0pUw4QUOOYab5WpFj3ZN+5TeqaXX4seRglXcqWCRhrO5XMBPYLXlwpqXg5cAFDCpNuQaU0V1vEEWxI0rw5nbXTUUV9cq5k9qTKfmDt6KV/q+vrqHriv/9x6GW9JJL12qISCZ2dcgUGCT1qSBbCf6wdm8DQXCMzY6iKsRgn3Ujops8ydAQ2dVZ/3FKFS9jJEdRpgIvkqahOIQV7fWzZeWhHGXcQJdi8+1/piEVde5hq5moWzXwcXAUHcFbk1GVr7/0pF6T9na73sMgC3Bz1mEZ+aPY/l/aeYry1pbFCBCGWJhvrYlYjhQb6z7us01L0u6jfYwC1Cn7mfjV5pcB/x6hZgMiNmAfo3EsBfUzEUkIwntVLOnQzJA6WWdfg/oOk816jwzUCgOpy28qLZAy+9oxN3hVEEXfhhjSLRsjwH95yDsoPYNIXecA10AtTqMc0OuUEcRKUbnNnzGp7Jlthc2T8V+kbEetg4OFJotJ5TUmvZX0jOJ8PjhiUWR1hj4ScMO7z+QZy0SGIh/t/k3dupg3A0IuA+Y4byFj1O6spUPCCm+LbFxWmLDV4X7/Bo/HV/8VGdsHoKn6tbQ23MrtGzawRnY1NJuzC8RBK+CAMRr97192boe1Fq6dTSyy5Wbt4k2tgZ6TrpNR/TvtLr0uLecI+EoYR4dqR9EWLghFv0DvIxmN46bvlTvX3YDxV0ihBskrnIFWXW74pDbq+EBfC8+dHLB/857oPZPmVHiAFynQ7Q3+pQ6LUQdXCXG8QqZePovREUsKyMlE41WBgBGHDPs4h14IenjBQUXFQByGDteGsxV9dQcEEaiboR3NzZ+czXM+IQK1a55r/8FXbIgiNK6e4w7cmEILvv5f3hSWE7Zonz7ea5+rVETLUiV/Vb5fnwyve1dvjVQxTqifONu+iWgzkQQkYTFpGY7MsJOGPGK/C6PxcBUJCjvk6ikF622QYyCHU7NvgRgHf//Kj5PkUzIw+X5x94z8Suf9+yU6uMcTkowr7MJ01gInUV8S0/muuApAIoJS8CYvZu6PMqHxA4YTmF6OeJb1wxaSCBqI5phFkxkTKAxevEXhq5lcIT9b1x1UDhQXnvVdg3/zr9bvKRWQJ8+5s5TGT1m2eeeZ8KPEJPHlhupplf8gHpDB9EasKpfByO7XhnD75PycXdH/AHFZySt9Rcp6Lvvp9CF4+C+4bD6Bo3AwgVmQMzZHIPVOGKfLjlJWUfARWxiwqXFUO2YAkP0vY9Ak5ufLcSVCdiJzNOg6b2FRydfXmK1qecKMLrRZTgPs5vicAgt4owt7CmRx5v22tRybD85jpwbb4AS0MS6/8TXvaX+G9z4o+MzgHMNL3pclI0hfM4F6lobe3R5Vf54gewPv5KjH5lRceQrM1pkSTNpIn9shCm54W2+ug8ZKcbiPBnxC2UHpGjPzz0yEwecxGWgWTcdLrPvc9kwyUEF2iA5GpdEWVIzbVYIOnVGHq9GR4ag2KcENaQguF7BTkN4W3i5zquMxy/SNSfSEdKsTRJp5+BPwf6TU0nDP+I8TxffZPFaO4pwBfgs18uTJoWKfaDeW1FqhMMWTquRlA2/QDooFajfV/XtnPjixLfIDbqXx746/C/wvQS/+pCmPaMSpBPmxX50xq3YQt7Uxlyt8xzgm6xw3h/ECZB24phnwM8DHbYJ010TnaCaWxL9ZxwzdGLtMUl5dBlMYzQCQ7ULPqPqagCddE9D429UdYLOp4zC/k0HQjYkV/JreWN08m+kWH/C5tCyEErCKveIS4FmDzjk1zIofRPJuLyxwC9lH/k5iYzzT1Z9ysYlVyZUFKYPLUEwzxXUQ4ycxDPTk8hzq95jKY4I1oNV430j+8U2SsUHh7yjdX2QxuyfuzPYFltNxXPIK6+uXVJiQW"
+          }
+        ],
+        "source_refs": [
+          {
+            "passage": "# Acme GmbH \u2014 monthly financial report, October 2025\n\nReporting entity: Acme GmbH.\nReporting period: October 2025.\n\nTotal revenue for the period: EUR 1,240,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-acme-2025-10.md",
+            "similarity": 0.47856471000295864,
+            "chunk_index": 0,
+            "document_id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# Beta Ltd \u2014 monthly financial report, October 2025\n\nReporting entity: Beta Ltd.\nReporting period: October 2025.\n\nTotal revenue for the period: GBP 860,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-beta-2025-10.md",
+            "similarity": 0.4496926633137446,
+            "chunk_index": 0,
+            "document_id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "Quarterly Note\nRevenue rose 12 percent in Q3.",
+            "filename": "sample.pdf",
+            "similarity": 0.5482061993895398,
+            "chunk_index": 0,
+            "document_id": "2346c5c2-944c-4de3-81ed-8fe4ee8778d6",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "QuarterlyNote run 1787666896\nRevenue rose 12 percent.",
+            "filename": "nulfix.txt",
+            "similarity": 0.5365800412766092,
+            "chunk_index": 0,
+            "document_id": "24831013-90de-43db-b627-b61bfe9026c7",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# Northwind Logistics \u2014 Commercials & Renewal Position\n\n**Last updated:** 2 October 2026\n**Owner:** Priya Raghunathan\n\n## Current contract\n\n| | |\n|---|---|\n| **Annual recurring revenue** | **\u00a3284,000** |\n| Contract start | 4 March 2024 |\n| Current term ends | **31 January 2027** |\n| Licensed seats | 605 |\n| Effective price per seat / year | \u00a3469 |\n| Payment terms | Annual, in advance |\n| Auto-renew | **No** \u2014 active renewal required |\n| Notice period | 60 days (i.e. **by 2 December 2026**) |",
+            "filename": "northwind-commercials-renewal.md",
+            "similarity": 0.015873015873015872,
+            "chunk_index": 0,
+            "document_id": "1ef08790-c1bb-44c1-b5ad-1e3156c21926",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# Beta Ltd \u2014 monthly financial report, March 2026\n\nReporting entity: Beta Ltd.\nReporting period: March 2026.\n\nTotal revenue for the period: GBP 905,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-beta-2026-03.md",
+            "similarity": 0.5028949866549953,
+            "chunk_index": 0,
+            "document_id": "295ceacf-215f-4793-acd3-69cc2e18e141",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "Title: Q3 2025 Cloud Infrastructure Cost Review\nAuthor: Dana Whitfield\nDate: 2025-09-30\nDocument Type: Financial Report\nDepartment: Platform Engineering\n\nExecutive Summary\n\nThis report reviews cloud infrastructure spending for the third quarter of 2025\nacross the Platform Engineering organization. Total spend reached $1.24M, a 9%\nincrease over Q2, driven primarily by expanded GPU capacity for model-serving\nworkloads and a migration of the analytics pipeline to managed services.\n\nKey findings: compute accounted for 58% of spend, storage 21%, networking 12%,\nand managed data services the remaining 9%. The contract value for the renewed\nenterprise support agreement is 180000 dollars annually.\n\nRecommendations include rightsizing idle reserved instances, consolidating three\noverlapping observability vendors, and negotiating a committed-use discount for\nthe GPU fleet ahead of Q4 capacity planning.\n\n\n<!-- uat111 axis-a run 7 provider=openrouter -->",
+            "filename": "uat111_axisa_openrouter.md",
+            "similarity": 0.49136990779878553,
+            "chunk_index": 0,
+            "document_id": "72827799-f92c-4934-afb7-6cba833352aa",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "2025. Total outstanding term debt stood at $18.5 million, reflecting a net cash position of $35.7 million. Free cash flow for the quarter was $22.4 million after capital expenditures of $6.7 million.\n\n## Item 1A. Quantitative and Qualitative Disclosures About Risk Factors\nThe following represent the principal risk factors disclosed in the quarterly filing:\n1. **Supply Chain Concentration**: The Company relies on three primary Tier-1 suppliers in Southeast Asia for specialized semiconductor packaging and optical sub-assemblies. Any disruption from geopolitical tensions, natural disasters, or export restrictions could materially impair production schedules.\n2. **Foreign Currency Volatility**: With approximately 42% of revenue generated internationally (primarily APAC and EMEA), fluctuations in the US Dollar relative to the Euro and Japanese Yen introduce margin sensitivity and transaction exposure.\n3. **Regulatory Compliance and Data Privacy**: Expanding data governance regulations, including cross-border data transfer restrictions and sovereign AI compliance mandates, require substantial ongoing operational investments and pose exposure to potential penalties for non-compliance.",
+            "filename": "acme_q3_2026_financial_report.md",
+            "similarity": 0.48864162604754624,
+            "chunk_index": 2,
+            "document_id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          }
+        ],
+        "at": "2026-10-03 08:07:06.51368+00"
+      }
+    ],
+    "run": {
+      "status": "completed",
+      "model": "gemini-3.5-flash",
+      "provider": "google",
+      "error": null
+    }
+  }
+}

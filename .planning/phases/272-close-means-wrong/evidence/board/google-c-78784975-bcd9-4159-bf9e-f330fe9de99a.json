@@ -1,0 +1,471 @@
+{
+  "prompt": "What was revenue for Acme GmbH in July?",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "verdict": "FAIL",
+  "notes": [
+    "filtered call returned no_documents_matched: False",
+    "answer says nothing matched: False",
+    "citations: 6",
+    "later retrieval outside the filter: none"
+  ],
+  "tool_calls_inspected": [
+    "query_documents({\"query\": \"SELECT id, filename, mime_type, metadata FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH' OR filename ILIKE '%Acme%'\"})",
+    "query_documents({\"query\": \"SELECT id, filename, mime_type, metadata FROM documents WHERE filename ILIKE '272-board-acme%' ORDER BY filename\"})",
+    "query_documents({\"query\": \"SELECT id, filename, metadata FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH' ORDER BY filename\"})",
+    "grep({\"pattern\": \"Acme GmbH\"})",
+    "search_documents({\"query\": \"July revenue Acme\"})",
+    "grep({\"pattern\": \"July\"})",
+    "query_documents({\"query\": \"SELECT filename, id, mime_type, metadata->>'legal_entity' AS legal_entity FROM documents ORDER BY filename\"})",
+    "query_documents({\"query\": \"SELECT id, filename, metadata->>'legal_entity' AS legal_entity, metadata->>'date' AS date FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH)",
+    "query_documents({\"query\": \"SELECT id, filename, metadata->>'legal_entity' AS legal_entity, metadata->>'date' AS date FROM documents WHERE (filename ILIKE '%financial%' OR filen)",
+    "search_documents({\"query\": \"July OR monthly OR revenue OR breakdown OR segment OR GmbH\", \"filters\": [{\"op\": \"eq\", \"field\": \"title\", \"value\": \"ACME Corporation - Q3 2026 Financia)",
+    "query_documents({\"query\": \"SELECT id, filename, mime_type, metadata FROM documents WHERE filename ILIKE '%july%' OR filename ILIKE '%2026-07%' OR filename ILIKE '%2026_07%' OR )",
+    "search_documents({\"query\": \"July\"})",
+    "query_documents({\"query\": \"SELECT id, name, parent_id FROM folders\"})",
+    "query_documents({\"query\": \"SELECT d.id, d.filename, d.metadata FROM documents d WHERE d.folder_id = '07abbbbf-8f55-4fca-8ed3-6f27df7d0200'\"})"
+  ],
+  "audit_ids": [
+    "adfb0016-4d7c-49d0-9d6a-2f765d38fb60",
+    "c191c25d-c5cc-469e-adb6-713ad5e6c6f1",
+    "34054ca2-c3c2-481e-9709-451e5ea13f9a"
+  ],
+  "audit_kinds": [
+    "passages",
+    "passages",
+    "passages"
+  ],
+  "audit_filters": [
+    [],
+    [
+      {
+        "op": "eq",
+        "field": "title",
+        "value": "ACME Corporation - Q3 2026 Financial Results and Form 10-K Report"
+      }
+    ],
+    []
+  ],
+  "cited": {
+    "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657": {
+      "id": "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+      "filename": "272-board-acme-2026-03.md",
+      "d": "2026-03-15",
+      "ent": "Acme GmbH"
+    },
+    "f6534185-5747-4caf-b731-37c4f873bdee": {
+      "id": "f6534185-5747-4caf-b731-37c4f873bdee",
+      "filename": "northwind-support-q3-2026.md",
+      "d": "2026-09-30",
+      "ent": null
+    },
+    "6435ef1e-03f4-4dfb-9639-6376a5860d7a": {
+      "id": "6435ef1e-03f4-4dfb-9639-6376a5860d7a",
+      "filename": "Pipeline-Awarded Projects- Budget 2026 (clean) (1).xlsx",
+      "d": null,
+      "ent": null
+    },
+    "b57584f3-2de7-43e1-bc55-c608ecc7d8ce": {
+      "id": "b57584f3-2de7-43e1-bc55-c608ecc7d8ce",
+      "filename": "acme_fulfilment_and_inventory_q3_2026.md",
+      "d": "2026-09-30",
+      "ent": null
+    },
+    "cce3e713-1f18-498a-87a6-cac8552fdfb1": {
+      "id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+      "filename": "acme_q3_2026_financial_report.md",
+      "d": "2026-09-30",
+      "ent": null
+    },
+    "1aaae022-55ab-4f61-b6fa-d2e21f50fd06": {
+      "id": "1aaae022-55ab-4f61-b6fa-d2e21f50fd06",
+      "filename": "272-board-acme-2025-09.md",
+      "d": "2025-09-15",
+      "ent": "Acme GmbH"
+    }
+  },
+  "answer_excerpt": "*The model produced 14 tool call(s) over 15 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+  "thread_id": "53daf8ce-59a4-4853-8634-fbc16d9e15b1",
+  "run_id": "78784975-bcd9-4159-bf9e-f330fe9de99a",
+  "run_status": "completed",
+  "effective": {
+    "status": "completed",
+    "model": "gemini-3.5-flash",
+    "provider": "google",
+    "error": null
+  },
+  "raw": {
+    "audits": [
+      {
+        "id": "adfb0016-4d7c-49d0-9d6a-2f765d38fb60",
+        "at": "2026-10-03 08:08:30.404821+00",
+        "metadata": {
+          "run_id": "78784975-bcd9-4159-bf9e-f330fe9de99a",
+          "filters": [],
+          "thread_id": "53daf8ce-59a4-4853-8634-fbc16d9e15b1",
+          "folder_ids": [],
+          "query_text": "July revenue Acme",
+          "result_kind": "passages",
+          "document_ids": [
+            "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+            "1aaae022-55ab-4f61-b6fa-d2e21f50fd06",
+            "cce3e713-1f18-498a-87a6-cac8552fdfb1"
+          ],
+          "similarities": {
+            "1aaae022-55ab-4f61-b6fa-d2e21f50fd06": 0.611,
+            "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657": 0.612,
+            "cce3e713-1f18-498a-87a6-cac8552fdfb1": 0.612
+          },
+          "parent_run_id": null
+        }
+      },
+      {
+        "id": "c191c25d-c5cc-469e-adb6-713ad5e6c6f1",
+        "at": "2026-10-03 08:08:53.028556+00",
+        "metadata": {
+          "run_id": "78784975-bcd9-4159-bf9e-f330fe9de99a",
+          "filters": [
+            {
+              "op": "eq",
+              "field": "title",
+              "value": "ACME Corporation - Q3 2026 Financial Results and Form 10-K Report"
+            }
+          ],
+          "thread_id": "53daf8ce-59a4-4853-8634-fbc16d9e15b1",
+          "folder_ids": [],
+          "query_text": "July OR monthly OR revenue OR breakdown OR segment OR GmbH",
+          "result_kind": "passages",
+          "document_ids": [
+            "cce3e713-1f18-498a-87a6-cac8552fdfb1"
+          ],
+          "similarities": {
+            "cce3e713-1f18-498a-87a6-cac8552fdfb1": 0.405
+          },
+          "parent_run_id": null,
+          "matched_document_count": 1
+        }
+      },
+      {
+        "id": "34054ca2-c3c2-481e-9709-451e5ea13f9a",
+        "at": "2026-10-03 08:09:02.279382+00",
+        "metadata": {
+          "run_id": "78784975-bcd9-4159-bf9e-f330fe9de99a",
+          "filters": [],
+          "thread_id": "53daf8ce-59a4-4853-8634-fbc16d9e15b1",
+          "folder_ids": [],
+          "query_text": "July",
+          "result_kind": "passages",
+          "document_ids": [
+            "b57584f3-2de7-43e1-bc55-c608ecc7d8ce",
+            "6435ef1e-03f4-4dfb-9639-6376a5860d7a",
+            "f6534185-5747-4caf-b731-37c4f873bdee"
+          ],
+          "similarities": {
+            "6435ef1e-03f4-4dfb-9639-6376a5860d7a": 0.016,
+            "b57584f3-2de7-43e1-bc55-c608ecc7d8ce": 0.016,
+            "f6534185-5747-4caf-b731-37c4f873bdee": 0.016
+          },
+          "parent_run_id": null
+        }
+      }
+    ],
+    "messages": [
+      {
+        "id": "09ea78a0-2aac-4241-9dd9-f0436c6921c5",
+        "role": "user",
+        "content": "What was revenue for Acme GmbH in July?",
+        "tool_calls": null,
+        "source_refs": null,
+        "at": "2026-10-03 08:08:08.137145+00"
+      },
+      {
+        "id": "b7b7097c-fee5-4db5-9dfc-b0c48cf6abf9",
+        "role": "system",
+        "content": "\u23f8 Reached the iteration limit with 1 tool(s) still queued. Continue to run them.",
+        "tool_calls": [
+          {
+            "kind": "iteration_cap_paused",
+            "name": "query_documents",
+            "arguments": "{\"query\": \"SELECT id, filename, folder_id FROM documents WHERE filename ILIKE '%board-acme%'\"}",
+            "tool_call_id": "call_749064"
+          }
+        ],
+        "source_refs": null,
+        "at": "2026-10-03 08:09:16.942718+00"
+      },
+      {
+        "id": "f9d5cc88-9d89-45aa-bbb0-ec1465b13667",
+        "role": "assistant",
+        "content": "*The model produced 14 tool call(s) over 15 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "SELECT id, filename, mime_type, metadata FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH' OR filename ILIKE '%Acme%'"
+            },
+            "name": "query_documents",
+            "result": "[\n  {\n    \"id\": \"95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6\",\n    \"filename\": \"ACME_Q3_SOW_Contract.md\",\n    \"metadata\": {\n      \"title\": \"ACME Q3 Statement of Work (Q3 Contracts)\",\n      \"author\": \"Our Company\",\n      \"topics\": [\n        \"Q3 contracts\",\n        \"data platform migration\",\n        \"payment terms\",\n        \"invoice terms\"\n      ],\n      \"summary\": \"A Q3 statement of work between Our Company and ACME Corp for a data platform migration. It specifies payment terms of net 15 days from invoice date, a 2% early-payment discount if paid within 5 days, and a total contract value of USD 184,000 invoiced monthly.\",\n      \"language\": \"en\",\n      \"_confidence\": {\n        \"date\": 0.18,\n        \"title\": 0.99,\n        \"author\": 0.78,\n        \"topics\": 0.91,\n        \"summary\": 0.95,\n        \"language\": 0.99,\n        \"document_type\": 0.96\n      },\n      \"document_type\": \"statement of work\"\n    },\n    \"mime_type\": \"text/markdown\"\n  },\n  {\n    \"id\": \"cce3e713-1f18-498a-87a6-cac8552fdfb1\",\n    \"filename\": \"acme_q3_2026_financial_report.md\",\n    \"metadata\": {\n      \"date\": \"2026-09-30\",\n      \"title\": \"ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\",\n      \"author\": \"ACME Corporation\",\n      \"topics\": [\n        \"financial results\",\n        \"income statement\",\n        \"balance sheet\",\n        \"cash flow\",\n        \"risk factors\",\n        \"supply chain\",\n        \"foreign currency\",\n        \"data privacy\"\n      ],\n      \"summary\": \"Quarterly financial results for ACME Corporation for Q3 2026, including revenue growth, profitability, cash flow, balance sheet liquidity, and principal risk factors related to supply chain concentration, foreign currency volatility, and regulatory compliance.\",\n      \"language\": \"en\",\n      \"_confidence\": {\n        \"date\": 0.93,\n        \"title\": 0.99,\n        \"author\": 0.84,\n        \"topics\": 0.92,\n        \"summary\": 0.97,\n        \"language\": 0.99,\n        \"document_type\": 0.95\n      },\n      \"document_type\": \"financial results / form",
+            "status": "done",
+            "tool_call_id": "call_679662",
+            "thought_signature": "Er4ICrsIAWkUfRNVU5iHbsPzzT3NI4wIAMA7O+0MRbnlxkxqmf80X6I0IpsITeX28axSjbmEPfoQA7404mrUf5Bn1B0m6UdZ73dyMv1N7oaaW65V+QgcSkpiVktWXlHRoHagDl6EQfC8Pj9aND3dUrHcZY/NKgEqX0wpNlhmsuLSHtrDNDDhpZvTkWpWGSax5ZLOGyJti/x7Fc4yXbKo9fPlOPOYlrU+tFy0PmftABNpYt+DjULvLqcYmZBwsUfdoA7Oq9nU/DyZS7YjEwcVXLx61RBW5ImUtaddl9q22yS5+fAnVKxhvgn5ItOX4CoTWzQzvLbzWbxjoGov6cLxBhSSWQwIUhDGy/sqc6rdbLL5G4qXw1dmdA0Yli2ZHhaots5IQpyNFUEBS6UAAcwTk2yIRG+6bQO+bGeY+31xkMhegDRh/34EXnqql/CrmG+sBEs8cnwLGGcTZS6oRXe9GJgp+uA6NhNZq4aM6MWguzgKXvmDU/mk/dz9VwcEmHAugh1Rtup/USPZ60ajmbIRkn9HgHfe0ke7ialvGg7YP7gQ5pq6a5tnwk4Rd5d/AVf/5qhBjpn0ILRGv1TfT+lDKYhO4fidc/AKo6upWLvLS3IVCDXmz62fqKfEODVk3ZgO7kAfcly6VyBFHvYDXQgDFXJRjKHCNl/OCU/xLMDG69pg5hyuXTKpQ+wyjfyTj90Oz0HydhA6n1I6y4anOrS3U5RT/ADNG2Da1SZ1/vSt+ArL35DBScLe0vAo30oXaarmh0PBej11H6CY+WMET++jYERPQ+8T2JBcBqqkcgN67Rh/d8N5dKt+nb4Qp4lHUP2B0WlTUoXeS71sN5O+9QHZfjd1HSboXvZdMtrPYjKgyt6fTe8Ri3kpD7/ydk3lwPdA7bK5jxPQxoVpRm2MBMyoWOuohyh/EQWm+7xqB7VsUBuCabLLq5EUf+iK4KhLJ07wZ4BqIKcuHaswWDLCUBuBd+hHPGR02TyIsypul/Q83FxkYkwXbPi4ojwlCfN1UGq36nO/WtOOxWQ8t4dhoTRwiZwY5YmVvB398mvG4bGtKJWXEaEompFL/r7y472PXOZbaJrFEiBA3tk7JtQ12e9RI793xlTjmSjlFTS1mLVXADHJVFjwxSurdP/0tB4xIF/jVUyS8g9pN1AzSW7qsfIM82ogUz5kJ+S4cX3mjKbLBhKBJr7P4fK2pkkKFYXKnHVfp12BD31h7l77KAq22PilqojEumc3wgL2yMza2/mi4GWC8+2ho+uv2DX3/zvszl4DwydnJvMF5iRtsXUljKmihCf2OAQwcU4FT061DN24xlj2HHzve/ry8BUeyuNOd5SlOQ9BaNCialEVAw1KgDYUeKouhohb75zR9/nG0rhHhGsiWgY3p2dTU59jzRvZ42s4SJBQvqrvBzm+8QuI+2VRLrhiHsfhdnwE+CF3QlkRM77P"
+          },
+          {
+            "args": {
+              "query": "SELECT id, filename, mime_type, metadata FROM documents WHERE filename ILIKE '272-board-acme%' ORDER BY filename"
+            },
+            "name": "query_documents",
+            "result": "id | filename | metadata | mime_type\n--- | --- | --- | ---\n1aaae022-55ab-4f61-b6fa-d2e21f50fd06 | 272-board-acme-2025-09.md | {'date': '2025-09-15', 'title': 'Acme GmbH \u2014 monthly financial report, September 2025', 'topics': ['financial report', 'revenue', 'operating costs', 'monthly reporting'], '_source': {'date': 'user', 'legal_entity': 'user'}, 'summary': 'Monthly financial report for Acme GmbH covering September 2025. The report states total revenue of EUR 1,180,000, driven by recurring service contracts and one-off project work, with operating costs in line with budget.', 'language': 'en', '_confidence': {'title': 0.99, 'author': 0.3, 'topics': 0.93, 'summary': 0.96, 'language': 0.99, 'document_type': 0.98}, 'legal_entity': 'Acme GmbH', 'document_type': 'monthly financial report'} | text/markdown\n7b0af230-1ef4-46e5-b316-11888ce84ffb | 272-board-acme-2025-10.md | {'date': '2025-10-15', 'title': 'Acme GmbH \u2014 monthly financial report, October 2025', 'topics': ['finance', 'monthly reporting', 'revenue', 'operating costs'], '_source': {'date': 'user', 'legal_entity': 'user'}, 'summary': 'Monthly financial report for Acme GmbH covering October 2025, stating total revenue of EUR 1,240,000. Revenue was driven by recurring service contracts and one-off project work, and operating costs were in line with budget.', 'language': 'en', '_confidence': {'title': 0.99, 'author': 0.2, 'topics': 0.9, 'summary': 0.97, 'language': 0.99, 'document_type': 0.98}, 'legal_entity': 'Acme GmbH', 'document_type': 'monthly financial report'} | text/markdown\nbcdd9e20-790c-4b9e-a849-6f1f1f6c5657 | 272-board-acme-2026-03.md | {'date': '2026-03-15', 'title': 'Acme GmbH \u2014 monthly financial report, March 2026', 'topics': ['financial report', 'revenue', 'operating costs'], '_source': {'date': 'user', 'legal_entity': 'user'}, 'summary': 'Monthly financial report for Acme GmbH covering March 2026. Reports total revenue of EUR 1,410,000, driven by recurring service contracts and one-off project work,",
+            "status": "done",
+            "tool_call_id": "call_689641",
+            "thought_signature": "EqMDCqADAWkUfRPnA4JKwOWJCx5XFppkqcAPp5Z6zWr2/fzLlq7OPo3anGU6bakpYHGcTsbNXdxBiFYmdkHo2Lx/d5Rs8BfEZy7QwW50d37ClF9m3kEoDayYtIKoJxn8RLLG3hhoipWa9eqQdWXwiG9/o/AiijeOPE9b6+p4tjJhfmq1LdZsPhNWWmbAuR1EHIb2YpYiaE/ZI8IaSB7W1ECCiP3Lw5EZdSYtazSYhK5MRLNAJjGA1kQ6OZtqdEeRh65r77aWf96CVqa7sjvwNfmf0XVwlfkKFtoqZZopHfPRtItRbpg+qX82bpscCLSx3fuYOCXoOXVlTdJAKqj6LDYRLlKiiJP6g7bLl2wFYogVVR1v28Gz2EUq1DQUR4dhgZr1kiHZ3+wMjN6Qa8VDlTmIcxUkCbvgMLaH2p0symE1UZGr2Pps67D0g6K+Ag7siIZ40CzwEnZtCB+gTrGBAmSQ2Guzld8D4Mr1oYxrxA4jurH6q4m9W2mfq58AWm+8lqNeS6pAfSYN3BoJLzY18jIJinr2fB7OEobsskPJrYBiiPnpHNw="
+          },
+          {
+            "args": {
+              "query": "SELECT id, filename, metadata FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH' ORDER BY filename"
+            },
+            "name": "query_documents",
+            "result": "id | filename | metadata\n--- | --- | ---\n1aaae022-55ab-4f61-b6fa-d2e21f50fd06 | 272-board-acme-2025-09.md | {'date': '2025-09-15', 'title': 'Acme GmbH \u2014 monthly financial report, September 2025', 'topics': ['financial report', 'revenue', 'operating costs', 'monthly reporting'], '_source': {'date': 'user', 'legal_entity': 'user'}, 'summary': 'Monthly financial report for Acme GmbH covering September 2025. The report states total revenue of EUR 1,180,000, driven by recurring service contracts and one-off project work, with operating costs in line with budget.', 'language': 'en', '_confidence': {'title': 0.99, 'author': 0.3, 'topics': 0.93, 'summary': 0.96, 'language': 0.99, 'document_type': 0.98}, 'legal_entity': 'Acme GmbH', 'document_type': 'monthly financial report'}\n7b0af230-1ef4-46e5-b316-11888ce84ffb | 272-board-acme-2025-10.md | {'date': '2025-10-15', 'title': 'Acme GmbH \u2014 monthly financial report, October 2025', 'topics': ['finance', 'monthly reporting', 'revenue', 'operating costs'], '_source': {'date': 'user', 'legal_entity': 'user'}, 'summary': 'Monthly financial report for Acme GmbH covering October 2025, stating total revenue of EUR 1,240,000. Revenue was driven by recurring service contracts and one-off project work, and operating costs were in line with budget.', 'language': 'en', '_confidence': {'title': 0.99, 'author': 0.2, 'topics': 0.9, 'summary': 0.97, 'language': 0.99, 'document_type': 0.98}, 'legal_entity': 'Acme GmbH', 'document_type': 'monthly financial report'}\nbcdd9e20-790c-4b9e-a849-6f1f1f6c5657 | 272-board-acme-2026-03.md | {'date': '2026-03-15', 'title': 'Acme GmbH \u2014 monthly financial report, March 2026', 'topics': ['financial report', 'revenue', 'operating costs'], '_source': {'date': 'user', 'legal_entity': 'user'}, 'summary': 'Monthly financial report for Acme GmbH covering March 2026. Reports total revenue of EUR 1,410,000, driven by recurring service contracts and one-off project work, with operating costs in line with budget.', 'lang",
+            "status": "done",
+            "tool_call_id": "call_926761",
+            "thought_signature": "EqoDCqcDAWkUfRP0dTjFN2Falxy7bB/mIkIVJLgSCzONNLhO7PRidITQwlX3jgZy+Bc2r+UpdkCue1/ABryIzvkNZhIsQTxyBJZ1Fioe//TyP7FpEse6jABvWua6G+qW3NhuosweQNO+HrNY3x/pUSO9bzVhg1Y46Fw67eSVdK5y0cO41ixPDd0OWA/JBI4cEnisWoiRMfgw6ccAaZ5K39brpGhYqfahxCMom9FEuWvcYEnFMW2KCZGv1RyDphLC+mCHT8M15ulQx6aHlF9DRcF6o09e5x8bM1LzFsk5QuDrXqUIW/gMKX0Ege0tysvwVPataqXdz/229x5+WfwW+HUwjmNzD0Cx6TqI2ZYQQBgF3ENBQUI+b4zgoVGv0NgzMXx9AbHDSeQtjtKPrxzV2tRdT9+1VhETqKh+xEYpXeRU6doBhW+SvtHAPagdnqVkkFlVbtYtoExmMGxZnHYtocWMp/aGPc1o0PlZgGKY3EpJB19Qn2kXbxd0lPemAiiD/eW1MUcdUN4RW/IFi/BBlRGfdMTa/Lro0gNt/3pSeQDkNkwGN+GI+YmPVYsI"
+          },
+          {
+            "args": {
+              "pattern": "Acme GmbH"
+            },
+            "name": "grep",
+            "result": "{\"pattern\": \"Acme GmbH\", \"path\": null, \"matches\": [{\"document_id\": \"1aaae022-55ab-4f61-b6fa-d2e21f50fd06\", \"filename\": \"272-board-acme-2025-09.md\", \"folder_id\": null}, {\"document_id\": \"7b0af230-1ef4-46e5-b316-11888ce84ffb\", \"filename\": \"272-board-acme-2025-10.md\", \"folder_id\": null}, {\"document_id\": \"bcdd9e20-790c-4b9e-a849-6f1f1f6c5657\", \"filename\": \"272-board-acme-2026-03.md\", \"folder_id\": null}], \"total\": 3}",
+            "status": "done",
+            "tool_call_id": "call_697687",
+            "thought_signature": "EtwLCtkLAWkUfRMrW7v6Awtsg+aazp1qcR+3DDUaMgIoBN11Fz7TKPMfvQG1HqzMZHe9RcZKd610rhPxfng9lkFaOntTGQDY5/OxWwbVCb7qSz6i2pPi5iRWHKC+6VQi0AgDh6jHoKxz28HAyzL/f/oElqUySG/m7Z/6vdgbp1CWHlnVQY18mgYCkD/qfUs9ZCt/K/+J04ytkE+9HTLWb/rrTWvUCMcBLY1dDYOj5HAtNP4UDiKix661zM2bbzgx76s2rtXJUmlB5ecRF4I6d50is3HmbbuYi/VuXAUDT0mLXFtXK9tt+z83IZIxlpu7ZNNgb9Y80ve/+Pu230JyW41f5yfxvZQVoHXI3cctKumZ2JBmqhvnErKwjXU1qz/JeRL8OtYvAEMTvpUyZMYBbLs1kj13CfKsT7sy9ZqhoFSWJK4Al00KdEXNCeBLbUqNSNBghP6t+K/kDCgMt9sjRSzBmrmsZGVkyAq8WeEgbBhCMYQoqMMaMBcSMKe1wQJiDZS2UU51UaPxlthOjt7yiHs2zphxTa/mYiDwbpW3UfLEmALBMKtGKckUByBtNqcGBC7Sig43QcX1CEt1PKpfPm/4BoItGjLUvsSYv+1tlqSaqxDT+ySR4UHNhMyK+KOxbH7GKBdOtLX0nfMS/FpZKRgbhadtWgrAL5H7CeYkDuBotn2JA7TCkY/mPSBZYo7UY6MMgjAReYG1wxV+K6HyFUfvxP5wnXDqtuJ7f029CmsmQhBr8aGXvwy6n9kAlelQq1WJXzqx1L3mNHZ4ofdPXvwz1ylfq+s3n70OcekwEq5vpqGbDaWZsle7Pq+hO4yp0feY8hX5wchpCJ/7u5sPclB/sPfAl01WvRLXlcwRp0PMfaOq3KxWF65C33DNLF+ufyDX3McLmXLOMGEhbPNqzU4y4A02ldjuSTpqIVlZhBzCf0GDJ+6tj1UP3pBA5273dmUNvhnE/Hp/KlUc65xiXvcsnGEpl8KFwFs0B+LLf9sbcvYyEA7scKJvb+1nPHGiTti4s6FvHnAWM7O1WF+xFOm1ScWIP/zfaPZlMT0EGPxpIWJ75kgnBjtpVBGE5RAjrMAKcfENc4aizQbOZL3iUU1+sNwy38Hc4u9SG3hH1bR8OCR1X2ATxYFShTyGN+e4VAxqnFJmBYDr1PO11NFyvrsyWIryugvojKMvZwZPo4+OLOkr5Ubc5Jm6h20pTns+pTLha4P7vfUlv4Fuj8XbiUvKth4n3ekZT+T4gjCnmwaU0okAQnpDr6XP3oFty1jAOxpW/dwiBIUssxefVD8RoTPuRER58mTLjghFsGKxee4q0ZwqzENswiKNP96N+AfcLmLtSjofmOqASBqR/EgJKvPBj/Np5Y2+epNWf5iONThor4i0lIBSLfMULc5w/zyy2OWwrqFpr0O4hS7dx1nRP/h0+s4z4EtwmcqyqllQt4w2nANLHX+eLY21yUbvi+qtq/1CnfHeQDcCrwcNnEPvjohKOiw0nQB4Wmu4bKwRMgA0lL2Zk2rYmmgFZM9LjRG1y2p+/aCzm6Ig48Ci0Rqdoo3hFFqT2N9zE2Vs4ERX2FrdPR3rO0EgwscDiV/7N/SgJxfml8iaWjomJkMutF+FVYZAMKi7LV7aMKiBzPk89/1QaNIlXqyY0O6uMBZngNqhuO8NVz5mttV/0LkAY+A5/4ET5TlF6jB0asU+DJnpDaB+Vgt1dg4PWT85E1Uw3LyDgg4d06GwYriGTxvyh2bXM8QZfP/HoaeLVJtAc4Ymbq+H+eqOev518H7fiUXU79UBhaCa6+4wlIf+qMaU81MMIbOzQGVqt3mHVghkUB7CaNAe48/9oo9wgdGPB93eXkdY3fUO+qF6KjTQoMJ9RdpYW6hysBHHDvHhxfsfkNZjZ6fNVZYyhusSHygd6a5pwMjAUVwxfVTzvatSuneiETEnMRtV3TmIzK3OZFIwkkZGFAyfTbB459HxE5ClrqJze1DNXHrr5WLw4o0VeqFM6shN"
+          },
+          {
+            "args": {
+              "query": "July revenue Acme"
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Acme GmbH \\u2014 monthly financial report, March 2026\\n\\nReporting entity: Acme GmbH.\\nReporting period: March 2026.\\n\\nTotal revenue for the period: EUR 1,410,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"bcdd9e20-790c-4b9e-a849-6f1f1f6c5657\", \"filename\": \"272-board-acme-2026-03.md\", \"chunk_index\": 0, \"similarity\": 0.6119044369432296, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-03-15\", \"title\": \"Acme GmbH \\u2014 monthly financial report, March 2026\", \"topics\": [\"financial report\", \"revenue\", \"operating costs\"], \"_source\": {\"date\": \"user\", \"legal_entity\": \"user\"}, \"summary\": \"Monthly financial report for Acme GmbH covering March 2026. Reports total revenue of EUR 1,410,000, driven by recurring service contracts and one-off project work, with operating costs in line with budget.\", \"language\": \"en\", \"_confidence\": {\"title\": 0.99, \"author\": 0.2, \"topics\": 0.88, \"summary\": 0.96, \"language\": 0.99, \"document_type\": 0.98}, \"legal_entity\": \"Acme GmbH\", \"document_type\": \"monthly financial report\"}}, {\"content\": \"**EBITDA** | **$38.4** | $28.4 | **+35.2%** |\\n| EBITDA Margin (%) | **30.8%** | 27.0% | +380 bps |\\n| Net Income | $24.8 | $17.6 | +40.9% |\\n| **Operating Cash Flow** | **$29.1** | $21.3 | **+36.6%** |\\n\\n## Balance Sheet & Capital Resources\\nAs of September 30, 2026, ACME Corporation maintained total cash, cash equivalents, and short-term investments of $54.2 million compared to $46.8 million at December 31, 2025. Total outstanding term debt stood at $18.5 million, reflecting a net cash position of $35.7 million. Free cash flow for the quarter was $22.4 million after capital expenditures of $6.7 million.\", \"document_id\": \"cce3e713-1f18-498a-87a6-cac8552fdfb1\", \"filename\": \"acme_q3_2026_financial_report.md\", \"chunk_index\": 1, \"similarity\": 0.6116161487",
+            "status": "done",
+            "tool_call_id": "call_698334",
+            "thought_signature": "ErQDCrEDAWkUfRNrdDlYTSUrafA+9GbEnBywR6KzIn20/itSEFWmWoB4FryS8AhackTDlTVgnPPg7lQPq9XpgCUEjT3R7JMMewu5TF6OpVLBHv9BKFc/AmA2fsGS5gJLYM4+cwsKuVa6XJfpctn2rW4nWoF/C5QB+RNIpxsIX+ShXkZEkai2jGq7dTeC1UhXGpyf4hP9Ff6YsBAaPau+yolRp13c+ZqicgfQmVKYTDd8AvmFre/Mh6SGKK84omdvpcbXWv0ePJWrixk/kNIEdRxWIzcDS/H6JNGpP7lWQoGX3kTQDPkesNfBIU9Q2ItXiDZAJWl6w3CZ1BNMYMGIWOzmXw/Ro4Spl7r893rXAevlL1QIKvVCu3EYcT4kLM7CKEQ0ulZWlzTclKjuCQb6FFeFxPB7p4DWeZrN9lYv7Ki+gUlUf5tzAXVs3sx6ph1d5LgctcQte13SyK7mfl3jx4OlbR7p7c3q/9nX7YlM/Yqla0GN/tLepIRjEWuyy5KZCcRY1w7zlkvU1dn/toXmCLeUi1h62zXQfWLopy84bJM6DoYNbfNj+6EZaJ3aVGKPZTZmnVcyMA=="
+          },
+          {
+            "args": {
+              "pattern": "July"
+            },
+            "name": "grep",
+            "result": "{\"pattern\": \"July\", \"path\": null, \"matches\": [{\"document_id\": \"c86576b5-b1bb-4397-a81c-68bfa3ea40af\", \"filename\": \"northwind-usage-q3-2026.md\", \"folder_id\": \"6b19b49d-3726-4409-8f0f-5b590a87d5ef\"}, {\"document_id\": \"f6534185-5747-4caf-b731-37c4f873bdee\", \"filename\": \"northwind-support-q3-2026.md\", \"folder_id\": \"6b19b49d-3726-4409-8f0f-5b590a87d5ef\"}, {\"document_id\": \"6435ef1e-03f4-4dfb-9639-6376a5860d7a\", \"filename\": \"Pipeline-Awarded Projects- Budget 2026 (clean) (1).xlsx\", \"folder_id\": \"5789cf41-c1e7-4a65-9b0e-bc45ae1aa9e1\"}, {\"document_id\": \"b57584f3-2de7-43e1-bc55-c608ecc7d8ce\", \"filename\": \"acme_fulfilment_and_inventory_q3_2026.md\", \"folder_id\": \"6b3c6e8f-09b1-4d73-9ebc-65c44167b660\"}, {\"document_id\": \"3e4e9f43-d8b4-4133-81b7-f42800e58488\", \"filename\": \"acme_supplier_scorecard_q3_2026.md\", \"folder_id\": \"6b3c6e8f-09b1-4d73-9ebc-65c44167b660\"}, {\"document_id\": \"d18672af-f9f7-42c1-b56e-072b4405e4ed\", \"filename\": \"acme_learning_and_expense_policy_2026.md\", \"folder_id\": \"ed24e42a-e48c-4589-9217-f9a94f709246\"}], \"total\": 6}",
+            "status": "done",
+            "tool_call_id": "call_983187",
+            "thought_signature": "EsIDCr8DAWkUfRNUyP0mZwIpYW56MNVxvfORtBlgliJzRJz6TSyGo24+SUpFXmqHufjnscwFvUUmBrOWvWXhsG7lL3tw6w/Skp2/piPYQaHOZRfLV2VNP87wixdpUeKIF1Mx5PpnlsKVp46tFBfoGTbFVZwS5uiFc9toQG7MBKZC3bkvUpKYT3AJCl75+gURQdLX7iWTHBss98IIyt3VrP/Vqz0o6+sqm4XdHWjEdKZmMXnEIqgF+Gp+x2ukUPcvdBfw4kj90VsMmvDgbG1Li9/d2g4rv/5B2+4J/2pljhYeQaOO/IPYO7JKzfoRpNvqbGdUlEV/3jAACsAEIRaJ2QWuCexCvUvOkxLhKussF75xzy1innqam4K7l2GX4UyO9ZtiRNRWxYMi2kI05Jb5sZzXfWCE9i9I99ecPHeuSsjKTSO1u12jah+Ctfb9y9SJ9Lqgj0bOmK4BjvwlNhI/ZCDXKRF4PxKnXOgXcrf3DmxjbxwFFgNm0s7lF0CFtBjrJQF7IYFy4kGnTo+oB4xuAmTX0ZIuhgdz8nHTp4uY5Rj9FPaZBwcI2gpsV6/hcOgCD6lo9AmZqO95jE5v18TLLrx+HSPi"
+          },
+          {
+            "args": {
+              "query": "SELECT filename, id, mime_type, metadata->>'legal_entity' AS legal_entity FROM documents ORDER BY filename"
+            },
+            "name": "query_documents",
+            "result": "[\n  {\n    \"id\": \"c6862152-dc38-4422-8f2f-0e7360919f46\",\n    \"filename\": \"20% off Revibe tech \\ud83d\\udcf1.eml\",\n    \"mime_type\": \"message/rfc822\",\n    \"legal_entity\": null\n  },\n  {\n    \"id\": \"b5728a24-2787-4708-a4a1-1c0dd58ec933\",\n    \"filename\": \"2024-financial-statements-en (1).tiff\",\n    \"mime_type\": \"image/tiff\",\n    \"legal_entity\": null\n  },\n  {\n    \"id\": \"dd5610f4-9652-4f40-b870-0378efb763a6\",\n    \"filename\": \"2025-1042S.pdf\",\n    \"mime_type\": \"application/pdf\",\n    \"legal_entity\": null\n  },\n  {\n    \"id\": \"eda0c740-ba4b-4ef8-a555-f83b56f70cbd\",\n    \"filename\": \"245-UAT-finance-invoice.txt\",\n    \"mime_type\": \"text/plain\",\n    \"legal_entity\": null\n  },\n  {\n    \"id\": \"559b810e-45e7-4ef0-9aa9-efaa607425ef\",\n    \"filename\": \"245-UAT-finance-statement-watch.txt\",\n    \"mime_type\": \"text/plain\",\n    \"legal_entity\": null\n  },\n  {\n    \"id\": \"9552a407-93c4-4c7b-a103-a1e62f41ba91\",\n    \"filename\": \"245-UAT-native-doc-provenance-memo.pdf\",\n    \"mime_type\": \"application/pdf\",\n    \"legal_entity\": null\n  },\n  {\n    \"id\": \"6c5c479f-c3e5-444c-8dbe-711938c80977\",\n    \"filename\": \"245-UAT-policy-note.docx\",\n    \"mime_type\": \"application/vnd.openxmlformats-officedocument.wordprocessingml.document\",\n    \"legal_entity\": null\n  },\n  {\n    \"id\": \"4e623514-4cc4-4736-8452-27a43df6b7e2\",\n    \"filename\": \"245-UAT-quarterly-report.pdf\",\n    \"mime_type\": \"application/pdf\",\n    \"legal_entity\": null\n  },\n  {\n    \"id\": \"5b7920b2-c76a-41a2-b7e4-bd28fc27fbb4\",\n    \"filename\": \"245-UAT-readme.txt\",\n    \"mime_type\": \"text/plain\",\n    \"legal_entity\": null\n  },\n  {\n    \"id\": \"e4e2fe90-7196-4818-80a0-def9e0dc6b44\",\n    \"filename\": \"245-UAT-unsupported.png\",\n    \"mime_type\": \"image/png\",\n    \"legal_entity\": null\n  },\n  {\n    \"id\": \"1aaae022-55ab-4f61-b6fa-d2e21f50fd06\",\n    \"filename\": \"272-board-acme-2025-09.md\",\n    \"mime_type\": \"text/markdown\",\n    \"legal_entity\": \"Acme GmbH\"\n  },\n  {\n    \"id\": \"7b0af230-1ef4-46e5-b316-11888ce84ffb\",\n    \"filename\": \"272-board-acme-2025-10.md\",\n    \"mime_type\": \"te",
+            "status": "done",
+            "tool_call_id": "call_142272",
+            "thought_signature": "EqoHCqcHAWkUfRObx9M9hvwT4sCQtu9OYcJiuDQdKK8k0e/Ceaqg2PajerZHNa6t2vzwg7xyOs37fDpn6pjr+hIwyglfPsPFr7qAHdUDpkq1TMt3zFJW/Dv2OB/w5/YH+V/aMY0b4amftRndxg5QaaljwJ87OcjV9q13STDwg3d7Kl1QbLfJm8wizhTj9LW3bVB4JABlks9PmC6CBtAIO6ANobtBray2m1qEjpjq7eWhOSdTC/MSJQUX2OAw1I6L0+To1GOJjj02VaORCjuZAQmbFifoFhzxScbb2TxImXrMRBt4JwLhFii/WDjemEw3i+Nk35O/9zCw5AFUrUP5n2HVbTuXCTp0iAj6gejIxqANkO/uJ2ZegnRxu7btHxPi1rtcrAGpHguzIgJEv3GngL6bADpN4hi1F6yC94HSFtdzRixayRrP8wi0NiHvePcuUiiSzOkMaGwpDg6WCUa6g4jLZO563wltA/mVJ9I1jOunjjORKgTq5cgHypCaWQ0MKlmf3E6Tv8bQRy3GOabJbTlliCVLrs1izW1QZk/ZYESir+hW3fsXcKTCcDiGigc/1F0bje0Er6T8ZEKGn6Iu6olsQBanDyDNEE9LNB/vlaqh2/nBSj0AEhhPUJAaBik9JatPncJ+7az/6WfBMGDxSTCFkOh2Hwvt45rafiz7m4aPoLK2BmxfQzO3ySLbX/w5oTZp2Gs1qXon9BNKVPcM6yQeldQt8dNWdlKhf//iJXdfWMBmoUAJf4oef/qbIwlq3xYMdS53Sa7WGIgEbOKqbACrgLGnM3ZXT9MEzmMWq+PsR+pARcipmlp5Ut1/JQQMUV24Ksc4/v4vDneS1SL3kX7vmdVH+hsPQk/gBmvFF1RofdzSmDHzdTHoaivs4TnXDRDD03dsdspnNFxkLwttCiY2rEsr9C15ouIw0bJ5I923ruA4JNzCQpI0EDq5eWEVf4/pUZ+njClsWSybZeXZi6uSukDFbHTZALzggW5qMQiUsj/OYgcXBzIFo3vOA4zYmf8ATt7VDk130QojizkWRKi8T94nKo4KnLBtv/U1I4zd7BaQQo+j1fEup7B1PTJqdONLBYzPOyTW3LZQOwbCnTK+0eeCDfY8htZu6T3mz0Ggearj9WX5QhL+4qoo+z+kRG0y9lCaZOzSbXLwvSGqD0zkBqsHYupsRbypw3jKsmdx9iwgKksb7as6PUNeJ1+LZ7NGjW14FnrKBkH1pES0jXiVxfbWaQo7H4HQGPw="
+          },
+          {
+            "args": {
+              "query": "SELECT id, filename, metadata->>'legal_entity' AS legal_entity, metadata->>'date' AS date FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH' OR filename ILIKE '%board-acme%' ORDER BY filename"
+            },
+            "name": "query_documents",
+            "result": "id | date | filename | legal_entity\n--- | --- | --- | ---\n1aaae022-55ab-4f61-b6fa-d2e21f50fd06 | 2025-09-15 | 272-board-acme-2025-09.md | Acme GmbH\n7b0af230-1ef4-46e5-b316-11888ce84ffb | 2025-10-15 | 272-board-acme-2025-10.md | Acme GmbH\nbcdd9e20-790c-4b9e-a849-6f1f1f6c5657 | 2026-03-15 | 272-board-acme-2026-03.md | Acme GmbH",
+            "status": "done",
+            "tool_call_id": "call_295008",
+            "thought_signature": "EqAFCp0FAWkUfRP2WejIz7/cjVKzHKphbE0DaqQQisS4lLYMHpAQS6AYazhX6KZC2AkBY2ONkhZbc2aPFPNXjP4Ji7yy+HvYe8xve0Tw4+fz32U0z1PVwAvSzV0zknIv9OwieDvir07B9as8jklFMyzLzoJBZ7AMmy8lcv4mlT5sRt0hs3NoFUBZZiK7K0FGuPNTTg1o8Cp0PhPILeCIaD7pLXSLUwWy5WScE924h7y8VBzOWwFYAhTn23aRdERGWaw872TpoqebHLuCu6SGpI6UshobqeVnrXuG4DA2GZoulqZjSp7FLl+GWNVCBbYaSTWuS9ZzzftCGzYOYMfFWtshWBeSMhFBgL3oEbTb0Fn5SuV5HWUEkGNfeOzmTaSMW0ZMrw/Trl+xwf46RHtZrOctTbBsP5FIcXu0eRs+giQqsfDI+OsPzsCBqyoX0oVGiQF3YzHYI6WMQfVfB7dKwLv7l9FGz5p8XShXp3wOWc08LOIsvvhmKhBn5aXuaVsDZxO+ViO9cvfQNo3YbuZbj5ww1weHDBaqxmCk43tnHZhcR3QWm/arjqtrJRktz/H2V1Vi2r7X58htnyzlmlZUYvu9EjnDijO2XUaLBEquiB0PK6oi9AXfmbOsUup/bL06DXWVsRzsIXJq8XcK+f4wWzRwdzEaQ3ryquAmxyjeqKDMwMP+Qq6ZTEz9ulOgfTOXI5mk65kRqsIEvRJZ/0tKPWEoqJaJ2Si8nV8iQIklCCVNNHYpoAFWTXlfZnEBbzy1FF7BddMl6iqD50ecm2Rt/11HUAbPC1IhN1ZWRrTtDeq4aQ5q8FpD/TX9IgQuGajl3UIa5YOQ3IaJgKC9t1xBSMFqMD+dXrYcym2PfT5UA/ZboMtngngczkd2X7KMzOy9cmi6"
+          },
+          {
+            "args": {
+              "query": "SELECT id, filename, metadata->>'legal_entity' AS legal_entity, metadata->>'date' AS date FROM documents WHERE (filename ILIKE '%financial%' OR filename ILIKE '%report%' OR filename ILIKE '%board%') AND (filename ILIKE '%2026%' OR metadata->>'date' ILIKE '2026%') ORDER BY filename"
+            },
+            "name": "query_documents",
+            "result": "id | date | filename | legal_entity\n--- | --- | --- | ---\nbcdd9e20-790c-4b9e-a849-6f1f1f6c5657 | 2026-03-15 | 272-board-acme-2026-03.md | Acme GmbH\n295ceacf-215f-4793-acd3-69cc2e18e141 | 2026-03-18 | 272-board-beta-2026-03.md | Beta Ltd\ncce3e713-1f18-498a-87a6-cac8552fdfb1 | 2026-09-30 | acme_q3_2026_financial_report.md | None\ne9a7c4fd-757d-4421-b4ed-d1d768506dbf | 2026-08-24T11:00:30+00:00 | Update UAE Credit Reports now include BNPL and micro-loan information.eml | None\n632c04e1-9656-43f6-b1be-8d959f325c1b | 2026-06-25 | Weekly_Report_2026-06-25.docx | None",
+            "status": "done",
+            "tool_call_id": "call_705997",
+            "thought_signature": "EtMECtAEAWkUfROV+G08MEbTaVtjtG0nWlCuFYyC7EJbFuzoVsWZRCMxOUeF1oQ1KfK1YzW1pti2BW2UfCfA/iumotkxqyLTsqbMNIhsCDDMP0TmSEXWFSmrTc/0w+pl/7Laeon2U/rr7ttcteE3psDOGvBXp3CQLeDl1bMcVX98h20vObynktJMKurAP6sztvFAGsvQ85G9Br0PkrdGkUVyjLcfVo4rMoy7XhBPCWRGmv8cxvU7kR0LVLM9YX5FT/6ARJRXaJaAn/SaWIXVxc2HjgVlbAGvvTXatktQQTmSmXdSuPaKAklQmVYGXBFv0j1uXc+GPo6uBhjwc0+NT+tUfpv4ZIAxOEiTDS307N075VW7bsbrtWaS5+d4Ss5c+qoAgKc1UizEbOZNvVbTKHG5bB6UR+4mCyGggHmA7FDLSKeiKlZaPt+z4YNFhvdLCCMlQgvVYW931PLlScmUXB2dhvfi4FgJFUppNIU1DwkQWvQXONBzRj7FoK6u4BMZTJ30b0bOyIGaizj4WYknldQSgGAyY0Ur08yWGfdFcDqsyhmrm5sTrJLZb0NjjppEoToIOauMl7k7XNXHaF7vxWzsotYQYTsa7ATkN60vhKjpVEUhOlYtB/UDleNQfcsNvvq5Lj0y267xturIncUyLBv9KyYb1ZJu6yJpFjXSOZp1oHZ6tpyE/ZvHULH/uxDRKetb3cS6XiMvjFdydR8xhYSygTYKaN/P5PokmsMmo11AT3jXerlRlBG2wYrzoyTcwMwqV0eTP4IqkSG0eXJxjbWdENFVIw=="
+          },
+          {
+            "args": {
+              "query": "July OR monthly OR revenue OR breakdown OR segment OR GmbH",
+              "filters": [
+                {
+                  "op": "eq",
+                  "field": "title",
+                  "value": "ACME Corporation - Q3 2026 Financial Results and Form 10-K Report"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\\n\\n## Condensed Consolidated Statement of Operations (Unaudited)\\n*Quarter Ended September 30, 2026*\\n\\n| Financial Metric | Q3 2026 ($M) | Q3 2025 ($M) | YoY Change (%) |\\n| :--- | :--- | :--- | :--- |\\n| **Total Revenue** | **$124.5** | $105.3 | **+18.2%** |\\n| Cost of Goods Sold (COGS) | $44.6 | $39.5 | +12.9% |\\n| **Gross Profit** | **$79.9** | $65.8 | **+21.4%** |\\n| Gross Margin (%) | **64.2%** | 62.5% | +170 bps |\\n| Research & Development | $23.1 | $20.4 | +13.2% |\\n| Sales & Marketing | $16.3 | $14.8 | +10.1% |\\n| General & Administrative | $8.8 | $8.1 | +8.6% |\\n| **Operating Income (EBIT)** | **$31.7** | $22.5 | **+40.9%** |\\n| Depreciation & Amortization | $6.7 | $5.9 | +13.6% |\\n| **EBITDA** | **$38.4** | $28.4 | **+35.2%** |\\n| EBITDA Margin (%) | **30.8%** | 27.0% | +380 bps |\\n| Net Income | $24.8 | $17.6 | +40.9% |\\n| **Operating Cash Flow** | **$29.1** | $21.3 | **+36.6%** |\", \"document_id\": \"cce3e713-1f18-498a-87a6-cac8552fdfb1\", \"filename\": \"acme_q3_2026_financial_report.md\", \"chunk_index\": 0, \"similarity\": 0.4049804418569638, \"version_number\": 1, \"folder_id\": \"07abbbbf-8f55-4fca-8ed3-6f27df7d0200\", \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-09-30\", \"title\": \"ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\", \"author\": \"ACME Corporation\", \"topics\": [\"financial results\", \"income statement\", \"balance sheet\", \"cash flow\", \"risk factors\", \"supply chain\", \"foreign currency\", \"data privacy\"], \"summary\": \"Quarterly financial results for ACME Corporation for Q3 2026, including revenue growth, profitability, cash flow, balance sheet liquidity, and principal risk factors related to supply chain concentration, foreign currency volatility, and regulatory compliance.\", \"language\": \"en\", \"_confidence\": {\"date\": 0.93, \"title\": 0.99, \"author\": 0.84, \"topics\": 0.92, \"summary\": 0.97, \"language\": 0.99, \"document_type\": 0.9",
+            "status": "done",
+            "tool_call_id": "call_77832",
+            "thought_signature": "Es8ICswIAWkUfROP8GByK2v49KQnrHntBYhMKFV/Uis6wFPPV2evsFoI7Iov+cUGVT4pSwZFNRD/7q/WnWb+BD8/tUl3LTnVt2Ekl8c3MZF6NRYEC7vEe/v2jmYO2G3mE2f0J1Wd9ZiEV0P2WYwv0elYAUe5hFBJxoJWj1v1f6/PYAcQnmzsY1wA7xgQscGX+ZWmF0DHCLeMmOxIkhUsTs/dxNWneqYAg4ipoIf7BEl7MxUSQbW3krRSnC0KHDpyRUAub8k/auWPos18/Es7I2ZBNdChH1LLco/5N7/fp1cfyGXGdsaBdzqbmI8QlchhtsVoK27vFWQx9VFoLnq1fiUA8b/pdiTJRbfpRonEi9loO2bmzom22dTxC+f+QYEVbGy3Q/ixy82iYZdzndWR/0wgSnqKqDzkQ0WH7iu8OSmPYs8+oE85nCP16HZKHLWQXgIpODk9XEVLsaTKYUEhnirudd1ucv0qy5340QgyKlUmK7u+He1gEdeCmdweS/QyLrHEE/Tn64mQw8/koGUelsCU4y/IiqFoethgk3EwNNUrZmh7wR16Hj2AMjXB0fJzMQ2QRyRZV2PcUiXyVXqDrfQ2xysPznI7utiodz9YCrjf4lFPe9w7qriBKq8OEHxXd+N7by2aReOc++ZV5Clh3XZwcK3IKSkyQo45wRW21PErWpP9rjLSASo9MjoPQsAYWuOMLAyTzjMMRCcSXaGPPA2sB0tNJ6yPVMrctNn4+fdvZkKQHabteDGL/hKCgCCZMUckRtglTywOMpoVwsRD0UHaTJrMhmcjuY9+piXS9mMslcFqWKRgmnMSTOkiZnsTvs/DQjI/vxR4eKSaXnWOZQzCsi/XmUhWc33KDmGzAO+672/JaBoQHGFOpwhqtKEmxoGr1Q8y/U00ivGNRQoUfr+SR+sw87ny/Oe+OMe2a2BpZatIR4+C6zVcOvuI3/CFwlI2CMLvEf7J70hmjtZDHOFASsiBOrnc5N4JNgEdgC9x1/xeZihL5+WW8RfOApAwts043XQdVp7KIYf1L+eRNtu3fvZzDOd5BETXK9IeS9mejO95WK42ea5fI//a2zoXN4LSZBeFbl2PFlz80OQ8dHeezMsZEUSDWkaMbdPnLSDSKV5ZYu1cNIPrleiw6qoxsYX88BwpBRTSFWyY5PKwAiWjN2sUcEL4PI1+JqxAclDY+tAAA2qwHxVWZrcW3jmpvpjDww1aAakGYjGQMxqdEEI4fexYB+D/Lrrush8PI6GAjXfJP3WyOe9lL6akLhieWjoAY+yqeXG3r0XjhC6VquNemblRYGiDvaLahA0gHL+/yDEEqYOMlQu5hJca3y+1E/T5mmJXgOm1vZJdpRxowIQEl8FBq/gACGXvBlGSLYRhQkrsvzt2os2odtqu4zmoZVMdw3F7kBI1hSMOqnGUkVW+7GlmKW7s8JrfUOtHLuumr4Ug9gpy9XtYN6xV643EiqU="
+          },
+          {
+            "args": {
+              "query": "SELECT id, filename, mime_type, metadata FROM documents WHERE filename ILIKE '%july%' OR filename ILIKE '%2026-07%' OR filename ILIKE '%2026_07%' OR filename ILIKE '%202607%'"
+            },
+            "name": "query_documents",
+            "result": "No results.",
+            "status": "done",
+            "tool_call_id": "call_616161",
+            "thought_signature": "ErkECrYEAWkUfRO7TyIwT5XYncfnIsBTfym9eCwZ5uwZQm2lnbGWLlZj2EtCx0O/8W47h6VE4Mk3S+vI6LN1HxEd9LKUfCPsKLeWuhgQoJgkItzJnx1K4E9z+LTcAa/0C7TMT6jVs+CTL6BgEHTN6orzb6yXKqRfcNOuVJrOlJTG67joYfYiloUxVsg5gTx+0F8pk+7pYCoPL/51BtII2mMJTJuZ5zQCppOjI2du+mtjPlGOH3RPnSLnCAZ3I6jjHB3f7q6nBH+/3ObvhKczK6NTOJC9UH0pSm5O3Q9QwwKMMMUo7UGYm8ts/WEZYFVWAIW1BNcWWill20lii8rxkMHz2Sj2hjB7szVBnQqgXzQHW6bJszFg1h2P0x67CCJCTVII7WzO+xBwxz0Om8NtMECDovkFnwb4gOHokTRmU8uKBLO4ZGfw26WPA3jcm3HkM21MBu6HbXOFQtMQ+OC0M+St7Zt6b8zuS+bHRviEgSiAvM7/9pLp/QdSkTHK2M0aNxxRS8UZ/XmW2Oc4tZcz0Ex+J8IBjxfKFS8LJlBU4I/YzuVRdUXS3mxwA6+ssDIYeeDfIE0HQ6DSxDwyzKS3QXouzivfy2bSz/zu5pGPKi2cG/aZc++FRQ7BnQTBFUJ+sruZYUv25vwRCjGd87VIxosXeOSX7RoTOetjX56FYZbJ842BOEntr+ktkTc7uj9491bqHarqFrgKjz7KQaTMScIKhsuR9MR8CcE/eX92GEwKmaT3/BkWxZSyNso="
+          },
+          {
+            "args": {
+              "query": "July"
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"* |\\n| Reopened tickets | 4 | **2** |\\n\\nResponse and resolution times both improved. Volume rose 23%, which tracks the 96 new\\nsupervisor accounts onboarded in July rather than any decline in stability.\\n\\n## The incident that matters\\n\\n**INC-4471 \\u2014 depot rollup generation unavailable, 12 August 2026.**\\n\\n- **Duration: 6 hours 12 minutes** (08:14\\u201314:26 BST).\\n- **Impact:** all seven depots; Monday operating packs delayed by a full working day.\\n- **Cause:** a queue-worker exhaustion triggered by the July onboarding surge \\u2014 the\\n  concurrency ceiling had not been raised alongside the seat growth.\\n- **Resolution:** worker pool raised from 4 to 12; autoscaling threshold added.\\n- **Customer response:** Marcus Feld escalated the same morning and requested an RCA.\\n  The RCA was delivered on 19 August, one day later than the five-working-day commitment.\\n\\n\\u26a0 This is the **only** Sev-1 incident Northwind has experienced in 30 months as a customer,\\nbut it landed on their single most business-critical workflow, on their busiest day of the\\nweek. It is referenced in the Q3 QBR notes as their principal concern.\", \"document_id\": \"f6534185-5747-4caf-b731-37c4f873bdee\", \"filename\": \"northwind-support-q3-2026.md\", \"chunk_index\": 1, \"similarity\": 0.01639344262295082, \"version_number\": 1, \"folder_id\": \"6b19b49d-3726-4409-8f0f-5b590a87d5ef\", \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-09-30\", \"title\": \"Northwind Logistics \\u2014 Support Summary, Q3 2026\", \"author\": \"Aoife Brennan\", \"topics\": [\"customer support\", \"SLA performance\", \"incident review\", \"Q3 2026\", \"Northwind Logistics\"], \"summary\": \"Quarterly support summary for Northwind Logistics covering Q3 2026. Ticket volume increased from Q2 while response and resolution times improved. The main issue was incident INC-4471, a six-hour Sev-1 outage affecting depot rollup generation on 12 August 2026, caused by queue-worker exhaustion after onboardin",
+            "status": "done",
+            "tool_call_id": "call_801766",
+            "thought_signature": "EvgECvUEAWkUfRNsxgxpaaWcyF0GVy5voZnTdhcHz0OmarvEsj1GkPGnQpidW6f/zcntOW3vOuqmwTfB8CxK2FE/BYyLHHRN2Pjvsb2DOWSwoP6rZyN4M4ldtHyNnNJcrsPu/IWOZEx2acJKIkeT2g9WoUrVXhB7ywuELMuPn+4llGY6ilJOJviSMYhrWDZ9Vuur9YeC68f6vxnDMrTiOwGGV1epecpnQccslcmmUdOrbZ5nlR1rpINd0AF353GTlPBtPc7oM+VmoQolaMcP4yn1US5o5KRUoM9aEgLXjWr3l6gdTyL/miteJ87BS4w77o1Jzsd855ZaZLV0oPLg9TCBrSPyqvMEerUm2NwxPY2go17iz47/92cxQgBn1hVh8FNhM0CvV161bSxEm7kuoie5qtDYBkiKx1/GB6LkyPADoGPLkEqap3qKyv0j7hlFS+URr/hxbapPf2atts06ePoCVnKRU/0V+7tRRI7JU1zVp5vmE9X3wN4BcXQmXmgiZo50JAqjvvl9v3DWjWa2lKa4n1Aow99MuA2PhlFvewywx8Zvor9UL4ju8NtKDqOt1g8in6ZQ0PIEFHP+qJFRe45IupzsNyHruqXxyBgQQbsueuTxVTMssVmcN47prlfw2Cnlj0F5TA/f6lzKBtHfp+DK/QpTljiELnwRUkNm56JjOk+9rmZx9Bb5agNGGHRwJGPQ1WYSFqmJFeit43Ch/x4bCRdxIdrOgN7SEgU1XwAe5p3tHTHaRUOZjxA8jhc/yXDQD6D8LWIs3Qz2KZwswWRPTi3Mzoy52AdWZVFRrXJvv+Td4HfJnpXuRuFaYd0YnQOUhzlUP10th14="
+          },
+          {
+            "args": {
+              "query": "SELECT id, name, parent_id FROM folders"
+            },
+            "name": "query_documents",
+            "result": "[\n  {\n    \"id\": \"1a2d0273-b14d-487f-86ee-4d146e89d082\",\n    \"name\": \"Client ACME\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"2a33b3e3-4904-4671-af1c-d041805ded47\",\n    \"name\": \"Weekly reports\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"0e479f7e-98bc-46d7-90ad-852d0f027d9b\",\n    \"name\": \"Hybrid Search\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"33358dfe-1ad0-4907-89d2-86cff44808e1\",\n    \"name\": \"Test Wasim\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"75755ec9-5ba7-495b-ad93-7500011cf6f2\",\n    \"name\": \"Project Meridian \\u2014 Risks\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"1564da7e-2348-4237-b7a1-ec17c5ea8f4b\",\n    \"name\": \"PM Demo Project (sample data)\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"1fce5dee-0ae8-4147-9cc8-1b6fc8b07dfe\",\n    \"name\": \"SOPs\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"547139c4-b532-41e6-9192-1965b5b570a9\",\n    \"name\": \"Private\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"6b19b49d-3726-4409-8f0f-5b590a87d5ef\",\n    \"name\": \"Template-Test\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"b33bd4cb-ba40-4e9e-b804-857dd4b6ad75\",\n    \"name\": \"Q3 Contracts\",\n    \"parent_id\": \"1a2d0273-b14d-487f-86ee-4d146e89d082\"\n  },\n  {\n    \"id\": \"4ff33372-772d-45b4-9c0d-9d676d314c4d\",\n    \"name\": \"HR Policies\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"07abbbbf-8f55-4fca-8ed3-6f27df7d0200\",\n    \"name\": \"Financial Reports & Filings\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"b0cd923c-b62a-4f7b-a791-0038c8ff523f\",\n    \"name\": \"Contracts & Agreements\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"ed24e42a-e48c-4589-9217-f9a94f709246\",\n    \"name\": \"HR Policies & Handbook\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"8253ee1f-ebb5-498e-a3d7-9e2f23f40f7e\",\n    \"name\": \"My puplication\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"5789cf41-c1e7-4a65-9b0e-bc45ae1aa9e1\",\n    \"name\": \"Email testing\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"e400e289-a3b8-4f16-b005-8c8ef10ad860\",\n    \"name\": \"ToT\",\n    \"parent_id\": null\n  },\n  {\n    \"id\": \"1acc8391-a53f-4223-9725-a47ae4058f31\",\n    \"na",
+            "status": "done",
+            "tool_call_id": "call_695279",
+            "thought_signature": "EsQKCsEKAWkUfRP7kmrZFal1+iUfXRVNqds/G1jO/XdVFYsu3s4LLEuGKH9qCI/okhPWFHbgdLjM/hgn5BIs4S0PBDNsF1cd1J6ey+3tw7bQCJf1Pi/oVgrEe+fhTvjU4RI+puHas1k7eUidAuEYg7Ou41tVKJ7d2WpXxkmjKu7fgyWJ11NP86jKUE3ST5ATdgDQz55Ut0cBP3ALyZIgY6cPZO6CtJDesikVs7IAQu76DGpxaRkgPokk8P56qXN138+oO/GFKp6rMeIeLJLFdLPunuUWwbkKwBypTdip7tvn9PpD3HK4Uc+RCEVIIAx+ZSjMjKoz15YnKxTl4H1DN8Xm1LuFDjOgmtPxAa6DAO0aBrSF+yKFt4FkIZxTWDB1Eun1WdEOwqxbtTI5fMBK8X1r7ZrJGkEbT/EaaJU9FKNdX88cMZpwew+WDoozKx3tE2VQNs0BzJmTEg5UdTZ3wJ22VDtqZBGQh2ZyBP3KTk/eNrLzaumu5fekKWeXoh4ufipO2MQ/CxfAkl/qjrhZt9BSekOv4nYRIY3tedPINW8E3DZvZyRYkr0BLFxmE5Y+8042R9h1Z0bSmLWAgjie8nhMDzcVnRyfMdYlLmF7yUjx47Lh0/sn1JEzJyX/EZWP351iyn9iBZq48I7eGHwC5sHRsmAWvB7pvChjlhE4T4V9WCiklu6O6MftPfC81/rh1Z7TzIiQhWUXbnnFfjxdBzlnSPTgclYq9Q8prfnO8X4xwR29j5rVef+kkXqvUyTvjlss+hpdCYnLjnRYphz8lrF9rq5XeAnlcJGF4ZDZ5v7Hjpb6Ufl0yxEMgWrtfVP/wQ/r6QYkSiojaCPE5yMrErJ5B8kkJpa0QGyK6/8pUHZ5aT+GgqRDjktPv1OheGQiE9morkcNZS0kzLKK3Ko3kSER7ucQvWJQmgdXx7UbQNNxnaCgkcD26HqklRhjnIiWvEQGxVxdbAE8BhWgcz30vrBA1dRekqGp1p9xvx6aF77HmNMOcR5XK/AaaOWOnLMWLFM9vMMXqbWRFhZIVo8AxUeehLaeQzkOyA/vMIB5nA7yEkxDlGrNooCO8/vxEfA1SAKnT02xvwamvDFKO8T6BNF4kwc5jc/6MkyqAY8g1JHOxKn7gDsBd5A8ZxEO1iULsuI+cQBBM19fMOHt5jGHCGs6zuSqVEGsqJ8tIRcrFwvKbOC2Wj29SLZgoKsQGnP4j0RyCSoKc7s37vwzHpR+LUJ9TGuFZW49eLeuEO4nive7YnzQpZl6KpIB74Oj/Awzv1CLxHtr20+XNh5ZGJcmWut3KftvmZO8Wu2b+qH0N1dmxvTRWSqt7xDEo+4noma5EJ1OQ+HmEQSLY1Zdo+1Zc4gll3iRMPpEEhJEYrP07kpToHdk3ZTiLb5Q0zO9r01R5R5U7eervCysLmuN3/f6reEYx5vjCH1I+RmzE4nFraqymKrifjLnnWEU5H+xJJ9GTmUrqyb0xKEEcu4n5+vRtUaKlYB+JbGZWb78H7HA8DnKLtEdnpxTeqDNjrPlmgga4SFdf9DgHCz5tW3FGpdvgxoOtUtv5NNrB10BwjrV0xHMkBxTVzIh4vq572K0xcrtAYh8YCMywWzAi47L5XB0gEX6sdOoTAHO1NCt55oUrvQwIA7KVF1nr0KYjl01sJFwVtCWAr/FdeXbF8/6N5Cw+vfu/UgPA7U9eOl3bnKyL300FkXPOV6qj0PYYzpuLGhFZJN/qPsMnIwBMqPSJpyKmLkMqO3JrBPR8NaGa85N+72RbexXin35kGTwztPsRfShgC1NkZdGoA=="
+          },
+          {
+            "args": {
+              "query": "SELECT d.id, d.filename, d.metadata FROM documents d WHERE d.folder_id = '07abbbbf-8f55-4fca-8ed3-6f27df7d0200'"
+            },
+            "name": "query_documents",
+            "result": "id | filename | metadata\n--- | --- | ---\ncce3e713-1f18-498a-87a6-cac8552fdfb1 | acme_q3_2026_financial_report.md | {'date': '2026-09-30', 'title': 'ACME Corporation - Q3 2026 Financial Results and Form 10-K Report', 'author': 'ACME Corporation', 'topics': ['financial results', 'income statement', 'balance sheet', 'cash flow', 'risk factors', 'supply chain', 'foreign currency', 'data privacy'], 'summary': 'Quarterly financial results for ACME Corporation for Q3 2026, including revenue growth, profitability, cash flow, balance sheet liquidity, and principal risk factors related to supply chain concentration, foreign currency volatility, and regulatory compliance.', 'language': 'en', '_confidence': {'date': 0.93, 'title': 0.99, 'author': 0.84, 'topics': 0.92, 'summary': 0.97, 'language': 0.99, 'document_type': 0.95}, 'document_type': 'financial results / form 10-k report'}",
+            "status": "done",
+            "tool_call_id": "call_617676",
+            "thought_signature": "ErEDCq4DAWkUfRPN7WeXHBKrJGx8JXXquOLWvyLfy8byzq+2SwIG6s8ju/pTr32OCMkJlqSQ2oVZv9iEZWiEfnqV7R15+qYsV9ZcMYeD6lSU9op54xEkNIOuY/1k8G3YIN8I050gPlTABsVOCQHJVmhwXOXuIqKv91T+C7Pcu3TN5ZSyg0lJ5ikDz65rTObaWYHgi0xNPnZjlsW+pvgCr59PeyYSpMtDbyTnzxMJ691J4yp5fRn1X50c2thIFGv8Ket1xIS2U3CbwNKvEiRczsvZVy54dk2A6sG40R3LrAzWIU+EvA9t91Jh7oQMPQgntvEeBnONg34NH2nOBXB+26EPTt44J1TkDbP7H0PgQLMe2Bns7eeNWkeR6WhL8m/qZIpn2VMstPz93JfmHqdw13Pub9LNR5KjuWb5jZDHoTxR5Ec4l1Sx/qOzjOqOKXUkN899tqzmW10E5x2WlwzCyE/jISo/5uY5c3Noy+Qbet8B5yf5ongOxi9gVwIDT2XZ8oPD4cBC13MLjjFliFwLOC232H8uf+gHVOJqJ7ykxz17l5slt/wr/UDDFy4BTp0MCCOVNQ=="
+          }
+        ],
+        "source_refs": [
+          {
+            "passage": "# Acme GmbH \u2014 monthly financial report, March 2026\n\nReporting entity: Acme GmbH.\nReporting period: March 2026.\n\nTotal revenue for the period: EUR 1,410,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-acme-2026-03.md",
+            "similarity": 0.6119044369432296,
+            "chunk_index": 0,
+            "document_id": "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "**EBITDA** | **$38.4** | $28.4 | **+35.2%** |\n| EBITDA Margin (%) | **30.8%** | 27.0% | +380 bps |\n| Net Income | $24.8 | $17.6 | +40.9% |\n| **Operating Cash Flow** | **$29.1** | $21.3 | **+36.6%** |\n\n## Balance Sheet & Capital Resources\nAs of September 30, 2026, ACME Corporation maintained total cash, cash equivalents, and short-term investments of $54.2 million compared to $46.8 million at December 31, 2025. Total outstanding term debt stood at $18.5 million, reflecting a net cash position of $35.7 million. Free cash flow for the quarter was $22.4 million after capital expenditures of $6.7 million.",
+            "filename": "acme_q3_2026_financial_report.md",
+            "similarity": 0.6116161487154699,
+            "chunk_index": 1,
+            "document_id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# Acme GmbH \u2014 monthly financial report, September 2025\n\nReporting entity: Acme GmbH.\nReporting period: September 2025.\n\nTotal revenue for the period: EUR 1,180,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-acme-2025-09.md",
+            "similarity": 0.6105392897897325,
+            "chunk_index": 0,
+            "document_id": "1aaae022-55ab-4f61-b6fa-d2e21f50fd06",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\n\n## Condensed Consolidated Statement of Operations (Unaudited)\n*Quarter Ended September 30, 2026*\n\n| Financial Metric | Q3 2026 ($M) | Q3 2025 ($M) | YoY Change (%) |\n| :--- | :--- | :--- | :--- |\n| **Total Revenue** | **$124.5** | $105.3 | **+18.2%** |\n| Cost of Goods Sold (COGS) | $44.6 | $39.5 | +12.9% |\n| **Gross Profit** | **$79.9** | $65.8 | **+21.4%** |\n| Gross Margin (%) | **64.2%** | 62.5% | +170 bps |\n| Research & Development | $23.1 | $20.4 | +13.2% |\n| Sales & Marketing | $16.3 | $14.8 | +10.1% |\n| General & Administrative | $8.8 | $8.1 | +8.6% |\n| **Operating Income (EBIT)** | **$31.7** | $22.5 | **+40.9%** |\n| Depreciation & Amortization | $6.7 | $5.9 | +13.6% |\n| **EBITDA** | **$38.4** | $28.4 | **+35.2%** |\n| EBITDA Margin (%) | **30.8%** | 27.0% | +380 bps |\n| Net Income | $24.8 | $17.6 | +40.9% |\n| **Operating Cash Flow** | **$29.1** | $21.3 | **+36.6%** |",
+            "filename": "acme_q3_2026_financial_report.md",
+            "similarity": 0.5904453013850302,
+            "chunk_index": 0,
+            "document_id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "2025. Total outstanding term debt stood at $18.5 million, reflecting a net cash position of $35.7 million. Free cash flow for the quarter was $22.4 million after capital expenditures of $6.7 million.\n\n## Item 1A. Quantitative and Qualitative Disclosures About Risk Factors\nThe following represent the principal risk factors disclosed in the quarterly filing:\n1. **Supply Chain Concentration**: The Company relies on three primary Tier-1 suppliers in Southeast Asia for specialized semiconductor packaging and optical sub-assemblies. Any disruption from geopolitical tensions, natural disasters, or export restrictions could materially impair production schedules.\n2. **Foreign Currency Volatility**: With approximately 42% of revenue generated internationally (primarily APAC and EMEA), fluctuations in the US Dollar relative to the Euro and Japanese Yen introduce margin sensitivity and transaction exposure.\n3. **Regulatory Compliance and Data Privacy**: Expanding data governance regulations, including cross-border data transfer restrictions and sovereign AI compliance mandates, require substantial ongoing operational investments and pose exposure to potential penalties for non-compliance.",
+            "filename": "acme_q3_2026_financial_report.md",
+            "similarity": 0.5180714799563386,
+            "chunk_index": 2,
+            "document_id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "* |\n| Reopened tickets | 4 | **2** |\n\nResponse and resolution times both improved. Volume rose 23%, which tracks the 96 new\nsupervisor accounts onboarded in July rather than any decline in stability.\n\n## The incident that matters\n\n**INC-4471 \u2014 depot rollup generation unavailable, 12 August 2026.**\n\n- **Duration: 6 hours 12 minutes** (08:14\u201314:26 BST).\n- **Impact:** all seven depots; Monday operating packs delayed by a full working day.\n- **Cause:** a queue-worker exhaustion triggered by the July onboarding surge \u2014 the\n  concurrency ceiling had not been raised alongside the seat growth.\n- **Resolution:** worker pool raised from 4 to 12; autoscaling threshold added.\n- **Customer response:** Marcus Feld escalated the same morning and requested an RCA.\n  The RCA was delivered on 19 August, one day later than the five-working-day commitment.\n\n\u26a0 This is the **only** Sev-1 incident Northwind has experienced in 30 months as a customer,\nbut it landed on their single most business-critical workflow, on their busiest day of the\nweek. It is referenced in the Q3 QBR notes as their principal concern.",
+            "filename": "northwind-support-q3-2026.md",
+            "similarity": 0.01639344262295082,
+            "chunk_index": 1,
+            "document_id": "f6534185-5747-4caf-b731-37c4f873bdee",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "elivered on or before the date promised at order confirmation. The improvement over Q2 came mainly from the new pick-and-pack line at the Reno distribution centre, which began full operation in July.\n\n## Inventory Position (as of 2026-09-30)\n\n| Inventory class | Value | Weeks of cover | Stock-outs in quarter |\n| :--- | :--- | :--- | :--- |\n| Raw materials and components | $11.6M | 7.3 | 4 |\n| Work in progress | $4.9M | 2.1 | - |\n| Finished goods | $9.8M | 5.6 | 9 |\n| Service and spare parts | $2.3M | 14.2 | 2 |\n\n## Distribution Centres\n\n| Site | Share of orders shipped | On-time delivery | Notes |\n| :--- | :--- | :--- | :--- |\n| Reno, Nevada | 47% | 95.8% | New pick-and-pack line live in July |\n| Columbus, Ohio | 38% | 94.1% | Carrier change in September |\n| Rotterdam, Netherlands | 15% | 92.6% | Serves EMEA customers |",
+            "filename": "acme_fulfilment_and_inventory_q3_2026.md",
+            "similarity": 0.016129032258064516,
+            "chunk_index": 1,
+            "document_id": "b57584f3-2de7-43e1-bc55-c608ecc7d8ce",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# Northwind Logistics \u2014 Support Summary, Q3 2026\n\n**Reporting period:** 1 July 2026 \u2013 30 September 2026\n**Support Lead:** Aoife Brennan\n\n## Ticket volume\n\n| | Q2 2026 | **Q3 2026** |\n|---|---|---|\n| Tickets raised | 71 | **87** |\n| Resolved within SLA | 68 | **82** |\n| **SLA breaches** | 3 | **5** |\n| Median first response | 47 min | **38 min** |\n| Median time to resolve | 9h 05m | **7h 51m** |\n| Reopened tickets | 4 | **2** |\n\nResponse and resolution times both improved. Volume rose 23%, which tracks the 96 new\nsupervisor accounts onboarded in July rather than any decline in stability.",
+            "filename": "northwind-support-q3-2026.md",
+            "similarity": 0.015873015873015872,
+            "chunk_index": 0,
+            "document_id": "f6534185-5747-4caf-b731-37c4f873bdee",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "## Sheet: DT 2026 Revenue Forecast_Jun\n[Sheet: DT 2026 Revenue Forecast_Jun | Columns: DT 2026 Revenue Forecast | Column 2 | Column 3 | Column 4 | Column 5 | Column 6 | Column 7 | Column 8 | Column 9 | Column 10 | Column 11 | Column 12 | Column 13 | Column 14 | Column 15 | Column 16 | Column 17]\nJanuary - June: Actual (recognised)   |   July - December: Forecast   |   Currency: AED\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\nKEY TOTALS  -  YTD Jan-Jul confirmed, Aug-Dec on hold\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\nMetric\tQ1 (Jan-Mar)\tQ2 (Apr-Jun)\tQ3 (Jul-Sep)\tQ4 (Oct-Dec)\tFY 2026\t\t\t\t\t\t\t\t\t\t\t\nQ Revenue\t2950355.22\t2380934.87\t2177507.91\t0\t7508798\t\t\t\t\t\t\t\t\t\t\t\n80% DT Budget\t4576000\t4368000\t5824000\t6032000\t20800000\t\t\t\t\t\t\t\t\t\t\t\nGap\t1625644.78\t1987065.13\t3646492.09\t6032000\t13291202\t\t\t\t\t\t\t\t\t\t\t\nYTD ACTUAL (Jan - Jul)\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\nJan\tFeb\tMar\tApr\tMay\tJun\tJul\tYTD Total\t\t\t\t\t\t\t\t\t\n928211\t621460\t1064134\t918220\t682928.89\t779785.98\t2177507.91\t7172247.78\t\t\t\t\t\t\t\t\t\nDETAIL (all lines)",
+            "filename": "Pipeline-Awarded Projects- Budget 2026 (clean) (1).xlsx",
+            "similarity": 0.015625,
+            "chunk_index": 8,
+            "document_id": "6435ef1e-03f4-4dfb-9639-6376a5860d7a",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "[Table 1 | Page 3 | Columns: DT 2026 Revenue Forecast, Column 2, Column 3, Column 4, Column 5, Column 6, Column 7, Column 8, Column 9, Column 10, Column 11, Column 12, Column 13, Column 14, Column 15, Column 16, Column 17]\n| DT 2026 Revenue Forecast | Column 2 | Column 3 | Column 4 | Column 5 | Column 6 | Column 7 | Column 8 | Column 9 | Column 10 | Column 11 | Column 12 | Column 13 | Column 14 | Column 15 | Column 16 | Column 17 |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| January - June: Actual (recognised)   \\|   July - December: Forecast   \\|   Currency: AED |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |\n| KEY TOTALS  -  YTD Jan-Jul confirmed, Aug-Dec on hold |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |\n| Metric | Q1 (Jan-Mar) | Q2 (Apr-Jun) | Q3 (Jul-Sep) | Q4 (Oct-Dec) | FY 2026 |  |  |  |  |  |  |  |  |  |  |  |\n| Q Revenue | 2950355.22 | 2380934.87 | 2177507.91 | 0 | 7508798 |  |  |  |  |  |  |  |  |  |  |  |\n| 80% DT Budget | 4576000 | 4368000 | 5824000 | 6032000 | 20800000 |  |  |  |  |  |  |  |  |  |  |  |\n| Gap | 1625644.78 | 1987065.13 | 3646492.09 | 6032000 | 13291202 |  |  |  |  |  |  |  |  |  |  |  |\n| YTD ACTUAL (Jan - Jul) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |\n| Jan | Feb | Mar | Apr | May | Jun | Jul | YTD Total |  |  |  |  |  |  |  |  |  |\n| 928211 | 621460 | 1064134 | 918220 | 682928.89 | 779785.98 | 2177507.91 | 7172247.78 |  |  |  |  |  |  |  |  |  |\n| DETAIL (all lines) |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |\n| Account | Product | Type | TCV (AED) | Jan | Feb | Mar | Apr | May | Jun | Jul | Aug | Sep | Oct | Nov | Dec | FY 2026 Total |\n| Abu Dhabi Cooperative Society (ADCoop) \u2013 DocuSign Renewal | DocuSign | Renewal | 129375 |  |  |  |  |  |  |  |  | 129375 |  |  |  | 129375 |\n| Abu Dhabi Dept of Finance (AD DoF) \u2013 GSign Renewal | Gsign | Renewal | 75000 |  |  |  |  | 75000 |  |  |  |  |  |  |  | 75000 |\n| Abu Dhabi Pension Fund (ADPF) \u2013 NOTIS Renewal | NOTIS | Renewal | 35350 |  |  |  |  | 35350 |  |  |  |  |  |  |  | 35350 |\n| ADDED \u2013 Joget Renewal | Joget | Renewal | 286599 |  |  | 286599 |  |  |  |  |  |  |  |  |  | 286599 |\n| ADEK \u2013 Asset Management (AMC + CR MFA) | Asset Management | Implementation | 124250 |  |  |  |  | 101750 | 22500 |  |  |  |  |  |  | 124250 |\n| ADQCC \u2013 Outsystems Hubway Connect Renewal | Outsystems | Renewal | 94000 |  |  |  |  |  |  |  |  |  |  |  | 94000 | 94000 |\n| Federal National Council-\u2013 GSign Renewal | Outsystems | Renewal | 885000 |  |  |  |  |  |  |  |  |  |  |  |  | 0 |\n| Ajman DOF \u2013 Asset Tagging & Management | Asset Management | Implementation | 19110 |  |  |  | 11130 |  |  | 7980 |  |  |  |  |  | 19110 |\n| Ajman Freezone / Al Rostamani \u2013 M-Files | M-Files | Implementation | 123404 |  |  |  | 79654 |  |  | 43750 |  |  |  |  |  | 123404 |\n| Al Ansari Exchange \u2013 M-Files Services | M-Files | Implementation | 30000 |  |  |  | 15000 | 15000 |  |  |  |  |  |  |  | 30000 |\n| Al Marwan General Contracting \u2013 M-Files Renewal | M-Files | Renewal | 6630 |  |  | 6630 |  |  |  |  |  |  |  |  |  | 6630 |\n| Al Taresh Consultants \u2013 M-Files Renewal | M-Files | Renewal | 11772 |  | 11772 |  |  |  |  |  |  |  |  |  |  | 11772 |\n| Falcon and Associates-Doxis | Doxis | Renwal | 120000 |  |  |  |  |  |  |  |  |  | 120000 |  |  | 120000 |\n| AQAAR \u2013 Ajman Properties Corp \u2013 Doxis Renewal | Doxis | Renewal | 87200 |  |  |  |  | 87200 |  |  |  |  |  |  |  | 87200 |",
+            "filename": "Pipeline-Awarded Projects- Budget 2026 (clean) (1).xlsx",
+            "similarity": 0.015384615384615385,
+            "chunk_index": 23,
+            "document_id": "6435ef1e-03f4-4dfb-9639-6376a5860d7a",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          }
+        ],
+        "at": "2026-10-03 08:09:17.004952+00"
+      }
+    ],
+    "run": {
+      "status": "completed",
+      "model": "gemini-3.5-flash",
+      "provider": "google",
+      "error": null
+    }
+  }
+}

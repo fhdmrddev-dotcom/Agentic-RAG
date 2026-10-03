@@ -1,0 +1,148 @@
+{
+  "prompt": "What was revenue for Acme GmbH?",
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "verdict": "PASS",
+  "notes": [
+    "legal_entity=Acme GmbH filter: True",
+    "citations 2 all Acme GmbH: True"
+  ],
+  "tool_calls_inspected": [
+    "search_documents({\"query\": \"What was the revenue for Acme GmbH?\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}]})"
+  ],
+  "audit_ids": [
+    "2cae94db-a81c-4e70-94d1-1dde78434c3d"
+  ],
+  "audit_kinds": [
+    "passages"
+  ],
+  "audit_filters": [
+    [
+      {
+        "op": "eq",
+        "field": "legal_entity",
+        "value": "Acme GmbH"
+      }
+    ]
+  ],
+  "cited": {
+    "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657": {
+      "id": "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+      "filename": "272-board-acme-2026-03.md",
+      "d": "2026-03-15",
+      "ent": "Acme GmbH"
+    },
+    "1aaae022-55ab-4f61-b6fa-d2e21f50fd06": {
+      "id": "1aaae022-55ab-4f61-b6fa-d2e21f50fd06",
+      "filename": "272-board-acme-2025-09.md",
+      "d": "2025-09-15",
+      "ent": "Acme GmbH"
+    }
+  },
+  "answer_excerpt": "Acme GmbH\u2019s reported revenue was:\n\n- **September 2025:** **EUR 1,180,000** \u2014 **[272-board-acme-2025-09.md]** \u2014 Monthly financial report  \n- **March 2026:** **EUR 1,410,000** \u2014 **[272-board-acme-2026-03.md]** \u2014 Monthly financial report",
+  "thread_id": "253b2759-185c-434e-9ab6-b6a310d4e407",
+  "run_id": "4d6d2d9b-6607-4fd0-a4b9-f61ff8e51e97",
+  "run_status": "completed",
+  "effective": {
+    "status": "completed",
+    "model": "gpt-5.6-luna",
+    "provider": "openai",
+    "error": null
+  },
+  "raw": {
+    "audits": [
+      {
+        "id": "2cae94db-a81c-4e70-94d1-1dde78434c3d",
+        "at": "2026-10-03 08:12:08.667361+00",
+        "metadata": {
+          "run_id": "4d6d2d9b-6607-4fd0-a4b9-f61ff8e51e97",
+          "filters": [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            }
+          ],
+          "thread_id": "253b2759-185c-434e-9ab6-b6a310d4e407",
+          "folder_ids": [],
+          "query_text": "What was the revenue for Acme GmbH?",
+          "result_kind": "passages",
+          "document_ids": [
+            "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+            "1aaae022-55ab-4f61-b6fa-d2e21f50fd06"
+          ],
+          "similarities": {
+            "1aaae022-55ab-4f61-b6fa-d2e21f50fd06": 0.673,
+            "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657": 0.663
+          },
+          "parent_run_id": null,
+          "matched_document_count": 3
+        }
+      }
+    ],
+    "messages": [
+      {
+        "id": "b962d412-51f9-495c-933b-df70baa8e7dc",
+        "role": "user",
+        "content": "What was revenue for Acme GmbH?",
+        "tool_calls": null,
+        "source_refs": null,
+        "at": "2026-10-03 08:12:03.841817+00"
+      },
+      {
+        "id": "40197c0e-c04c-4730-ace6-ebcd0d9d8acd",
+        "role": "assistant",
+        "content": "Acme GmbH\u2019s reported revenue was:\n\n- **September 2025:** **EUR 1,180,000** \u2014 **[272-board-acme-2025-09.md]** \u2014 Monthly financial report  \n- **March 2026:** **EUR 1,410,000** \u2014 **[272-board-acme-2026-03.md]** \u2014 Monthly financial report",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "What was the revenue for Acme GmbH?",
+              "filters": [
+                {
+                  "op": "eq",
+                  "field": "legal_entity",
+                  "value": "Acme GmbH"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Acme GmbH \\u2014 monthly financial report, September 2025\\n\\nReporting entity: Acme GmbH.\\nReporting period: September 2025.\\n\\nTotal revenue for the period: EUR 1,180,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"1aaae022-55ab-4f61-b6fa-d2e21f50fd06\", \"filename\": \"272-board-acme-2025-09.md\", \"chunk_index\": 0, \"similarity\": 0.6726460049543864, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2025-09-15\", \"title\": \"Acme GmbH \\u2014 monthly financial report, September 2025\", \"topics\": [\"financial report\", \"revenue\", \"operating costs\", \"monthly reporting\"], \"_source\": {\"date\": \"user\", \"legal_entity\": \"user\"}, \"summary\": \"Monthly financial report for Acme GmbH covering September 2025. The report states total revenue of EUR 1,180,000, driven by recurring service contracts and one-off project work, with operating costs in line with budget.\", \"language\": \"en\", \"_confidence\": {\"title\": 0.99, \"author\": 0.3, \"topics\": 0.93, \"summary\": 0.96, \"language\": 0.99, \"document_type\": 0.98}, \"legal_entity\": \"Acme GmbH\", \"document_type\": \"monthly financial report\"}}, {\"content\": \"# Acme GmbH \\u2014 monthly financial report, March 2026\\n\\nReporting entity: Acme GmbH.\\nReporting period: March 2026.\\n\\nTotal revenue for the period: EUR 1,410,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"bcdd9e20-790c-4b9e-a849-6f1f1f6c5657\", \"filename\": \"272-board-acme-2026-03.md\", \"chunk_index\": 0, \"similarity\": 0.6627459155313689, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-03-15\", \"title\": \"Acme GmbH \\u2014 monthly financial report, March 2026\", \"topics\": [\"financial report\", \"revenue\", \"operating cos",
+            "status": "done",
+            "tool_call_id": "call_YQ6QwZK1YAl7DkOPmr9vjbPG"
+          }
+        ],
+        "source_refs": [
+          {
+            "passage": "# Acme GmbH \u2014 monthly financial report, September 2025\n\nReporting entity: Acme GmbH.\nReporting period: September 2025.\n\nTotal revenue for the period: EUR 1,180,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-acme-2025-09.md",
+            "similarity": 0.6726460049543864,
+            "chunk_index": 0,
+            "document_id": "1aaae022-55ab-4f61-b6fa-d2e21f50fd06",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# Acme GmbH \u2014 monthly financial report, March 2026\n\nReporting entity: Acme GmbH.\nReporting period: March 2026.\n\nTotal revenue for the period: EUR 1,410,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-acme-2026-03.md",
+            "similarity": 0.6627459155313689,
+            "chunk_index": 0,
+            "document_id": "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          }
+        ],
+        "at": "2026-10-03 08:12:12.154571+00"
+      }
+    ],
+    "run": {
+      "status": "completed",
+      "model": "gpt-5.6-luna",
+      "provider": "openai",
+      "error": null
+    }
+  }
+}
