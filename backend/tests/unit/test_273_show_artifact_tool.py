@@ -107,7 +107,9 @@ def _bar_args(**over):
 def _call(store=None, ctx=None, args=None, parent=None, labels=None):
     store = store or _Store()
     ctx = ctx or _ctx()
-    with patch(f"{MOD}.insert_artifact", new=AsyncMock(side_effect=store)) as ins, \
+    # `store.__call__` (a bound coroutine function) — AsyncMock only awaits a side_effect it can
+    # recognise as a coroutine function, and a callable INSTANCE is not one.
+    with patch(f"{MOD}.insert_artifact", new=AsyncMock(side_effect=store.__call__)) as ins, \
          patch(f"{MOD}.get_artifact_by_ref", new=AsyncMock(return_value=parent)) as get, \
          patch(f"{MOD}.list_thread_labels", new=AsyncMock(return_value=labels or [])) as lst:
         res = _run(sat.handle_show_artifact(args, ctx))
@@ -173,14 +175,29 @@ def test_first_emission_stores_once_emits_the_returned_row_and_answers_id_first(
 
 
 def test_result_stays_under_2000_chars_for_a_worst_case_dataset():
-    cols = [{"name": f"column_{i:02d}_" + "x" * 50, "type": "string"} for i in range(20)]
+    # 500 rows × 20 columns of 200-char strings (64-char column names) is ~2 MB — far above the
+    # 256 KiB store cap, so it can never be STORED; build_result is driven with it directly, which
+    # is a strictly worse case than anything the handler can reach.
+    cols = [{"name": f"column_{i:02d}_" + "x" * 54, "type": "string"} for i in range(20)]
     rows = [[f"{r:03d}" + "v" * 197 for _ in range(20)] for r in range(500)]
+    row = {"id": "a_0000000000", "label": "table 1", "component": "table", "row_count": 500,
+           "spec": {"title": "Wide", "columns": cols, "rows": rows, "chart": None, "metric": None}}
+    text = sat.build_result(row, from_label="table 9", same_rows=False,
+                            operations=[{"op": "filter_in", "column": "c", "values": ["v" * 200] * 50}])
+    assert len(text) < 2000
+    obj = json.loads(text)
+    assert list(obj.keys())[0] == "artifact_id"
+    assert "one or two sentences" in obj["note"]
+
+
+def test_result_under_2000_chars_for_the_largest_storable_wide_table():
+    cols = [{"name": f"column_{i:02d}", "type": "string"} for i in range(20)]
+    rows = [[f"{r:03d}-{c:02d}-" + "v" * 14 for c in range(20)] for r in range(500)]
     args = {"component": "table", "title": "Wide", "columns": cols, "rows": rows}
     res, ins, *_ = _call(args=args)
-    assert ins.call_count == 1
+    assert ins.call_count == 1, res.result
     assert len(res.result) < 2000
-    obj = json.loads(res.result)
-    assert list(obj.keys())[0] == "artifact_id"
+    assert list(json.loads(res.result).keys())[0] == "artifact_id"
 
 
 def test_values_are_at_most_twelve_distinct_per_string_column():
