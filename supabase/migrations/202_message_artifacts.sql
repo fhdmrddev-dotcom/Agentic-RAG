@@ -156,9 +156,13 @@ ALTER TABLE public.message_artifacts ENABLE ROW LEVEL SECURITY;
 
 -- Default privileges gave anon/authenticated ALL on a new public table; take them back
 -- (PUBLIC first — the CLAUDE.md trap), then grant only what is needed. No UPDATE anywhere (D-08).
+-- ⚠ service_role is revoked too: Supabase's default privileges grant it ALL on a new table, and a
+-- GRANT adds privileges without removing any — so without this line service_role still held
+-- UPDATE. Measured: the first local apply read `*** FAIL *** service_role cannot UPDATE`.
 REVOKE ALL ON TABLE public.message_artifacts FROM PUBLIC;
 REVOKE ALL ON TABLE public.message_artifacts FROM anon;
 REVOKE ALL ON TABLE public.message_artifacts FROM authenticated;
+REVOKE ALL ON TABLE public.message_artifacts FROM service_role;
 GRANT SELECT ON TABLE public.message_artifacts TO authenticated;
 GRANT SELECT, INSERT, DELETE ON TABLE public.message_artifacts TO service_role;
 

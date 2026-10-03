@@ -158,6 +158,20 @@ def test_public_is_revoked_before_anon_and_authenticated():
     assert idx("PUBLIC") < idx("authenticated")
 
 
+def test_service_role_default_all_is_revoked_before_its_grant():
+    """Supabase's default privileges give service_role ALL on a new table; a GRANT removes nothing.
+
+    Measured at 273-01 Task 3: without this REVOKE the live VERIFY read
+    ``*** FAIL *** service_role cannot UPDATE`` although no statement granted UPDATE.
+    """
+    stmts = _statements()
+    revoke = f"REVOKE ALL ON TABLE {TABLE} FROM service_role"
+    assert revoke in stmts, revoke
+    grant_i = next(i for i, s in enumerate(stmts)
+                   if s.startswith("GRANT") and f"ON TABLE {TABLE}" in s and s.endswith("TO service_role"))
+    assert stmts.index(revoke) < grant_i
+
+
 def _table_grants() -> list[tuple[set[str], set[str], str]]:
     out = []
     for stmt in _statements():

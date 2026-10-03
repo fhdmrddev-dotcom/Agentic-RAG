@@ -513,6 +513,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_installs TO service_
 REVOKE ALL ON TABLE public.message_artifacts FROM PUBLIC;
 REVOKE ALL ON TABLE public.message_artifacts FROM anon;
 REVOKE ALL ON TABLE public.message_artifacts FROM authenticated;
+REVOKE ALL ON TABLE public.message_artifacts FROM service_role;
 GRANT SELECT ON TABLE public.message_artifacts TO authenticated;
 GRANT SELECT, INSERT, DELETE ON TABLE public.message_artifacts TO service_role;
 
