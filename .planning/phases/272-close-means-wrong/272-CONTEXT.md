@@ -255,6 +255,17 @@ and the publish-gauntlet gate (see `<deferred>`). The tool count stays **29**: w
 ### Reviewed Todos (not folded)
 - `spike-nl-workflow-authoring.md` (score 0.6): matched on generic keywords (date, schema); it is about NL workflow authoring, not retrieval filters. Out of scope.
 
+### Seeds swept at planning (`check-seeds-register.cjs --phase 272`, 33 fired, 2026-10-03): all LEFT
+The sweep could not run at discuss (no plans yet), so it ran against the plans' `files_modified`.
+All 33 matches are **path matches** on shared hot files (`agent_loop.py`, `tool_dispatcher.py`,
+`openai_service.py`, `config.py`, `task_service.py`, `supabase/migrations/**`) and none asks for
+FIND-07's capability. Each is **left** (status unchanged, re-proposed at its next trigger), not folded:
+- **SEED-271** (`retrieval_top_k`/`rrf_k` unbounded): adjacent to retrieval but a validation concern outside FIND-07. Leave. Natural home: the next retrieval-tuning phase.
+- **SEED-192** (system-prompt monolith): owned by the prompt-assembly seam, which is OWED and moved to Phase 273 (D-16).
+- **SEED-188** (no adversarial prompt-injection test): filter values are compiler-whitelisted and bind-parameterised (D-04/D-21), so this phase adds no new injection surface. Leave.
+- **SEED-273** (already folded into 272) and **SEED-268** (already folded elsewhere): no change.
+- The other 28 (SEED-040, 052, 053, 054, 079, 170, 177, 185, 194, 198, 266, 272, 280, 284, 287, 288, 289, 290, 291, 299, 303, 304, 306, 308, 310, 319, 323, 326) are unrelated capabilities matched only by a shared file path. Leave.
+
 ### Reviewed reported bugs
 - No open `surface: Agentic-RAG` report has `affected_areas` overlapping chat retrieval (swept 2026-10-03).
 

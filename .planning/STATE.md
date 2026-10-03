@@ -56,7 +56,7 @@ genuinely reviewed.
 
 Phase: 272
 Plan: Not started
-Status: Phase 272 CONTEXT GATHERED (2026-10-03) — 20 decisions in `phases/272-close-means-wrong/272-CONTEXT.md`; SEED-153 (chat half, partial) + SEED-273 folded. G-2 skip RECORDED as a decision (D-08: one visible text line on the shipped search tool card, no new component; G-4 scenario drafted). Next: /gsd:plan-phase 272 (extraction of retrieval_service.py is plan 1).
+Status: Phase 272 PLANNED (2026-10-03) — 5 plans / 4 waves (01+02 wave 1; 03 wave 2 [DB, local mig 200 checkpoint]; 04 wave 3; 05 wave 4 main tree [recall ladder, 8-row board, G-4 sign-off]). Checker: round 1 → 2 blockers fixed by planner; round 2 → 0 blockers, 3 warnings fixed inline by orchestrator. Decision coverage 26/26, ledger gate OK. G-2 skip RECORDED (D-08). Operator asked to auto-continue into execution. Next: /gsd:execute-phase 272.
 Prior: Phase 271 EXECUTED — verification human_needed (2026-10-03). Owed to operator: sign-off on G-4 rows G4-1..G4-6 (driven in Playwright, not Chrome MCP), review of P-01 (default sort added_desc) and P-03 (Older versions = own rows only), deploy (no migration; backend+frontend together; then read-only probe of /document-search + security advisors), CLAUDE.md split (119,524 chars, 476 under the 120k band). Deferred: SEED-331, SEED-332, F-1, F-4. Next: /gsd:discuss-phase 272.
 Last activity: 2026-10-03
 

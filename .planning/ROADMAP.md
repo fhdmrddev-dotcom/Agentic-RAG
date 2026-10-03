@@ -261,7 +261,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 270. The Document as an Object | 0/TBD | Not started | - |
 | 271. Find the Document | 0/TBD | Not started | - |
-| 272. Close Means Wrong | 0/TBD | Not started | - |
+| 272. Close Means Wrong | 0/5 | Planned (5 plans, 4 waves) | - |
 | 273. Agent-Authored Artifacts | 0/TBD | Not started | - |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
