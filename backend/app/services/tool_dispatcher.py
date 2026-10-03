@@ -140,6 +140,12 @@ class ToolContext:
     # reference (deliberately unlike dead_gap_tokens_in_run, so a sub-agent cannot become an
     # unfiltered bypass). None on every unwired (harness/eval/test) caller => the lock is a no-op.
     empty_filter_fields_in_run: set | None = None
+    # Phase 273 (D-04 / Pattern 5) — the caption source of show_artifact. Set BY REFERENCE to
+    # agent_loop's `persisted_tool_calls` list in BOTH ToolContext builds (273-04), so the handler
+    # sees the tools this turn already ran (which documents / tables the values came from) at
+    # emission time. None on every unwired harness/eval/test caller => the caption reads "values
+    # provided by the agent". NOT shared with task sub-agents (show_artifact is excluded from them).
+    turn_tool_calls: list[dict] | None = None
     tool_index: int = 0  # current index in the tool_calls list (used by execute_code heartbeat)
     iteration: int = 0  # current agent loop iteration (used by harvest_output_files)
     # Phase 085 — D-085-09 / D-085-12 / D-085-15 / D-085-01
