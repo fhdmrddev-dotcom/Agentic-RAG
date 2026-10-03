@@ -3636,7 +3636,7 @@ const BASELINE = {
   "MessageItem.memo.test.tsx": 3,
   "MessageItem.sticky.test.tsx": 4,
   "RunCard.logo.test.tsx": 6,
-  "ToolCallPanel.test.tsx": 16,
+  "ToolCallPanel.test.tsx": 20, // RAISED 16 → 20 at 272-02 (D-08 filter line ×4)
   "MessageList.test.tsx": 30,
   "MessageList.dedup.test.tsx": 7,
   "MessageList.runline.baseline.test.tsx": 8,
@@ -4106,6 +4106,9 @@ const BASELINE = {
   "FindMetaLine.test.tsx": 10, // 271-02 (adopted 271-04)
   "AskHandoffCard.test.tsx": 7, // 271-02 (adopted 271-04) · RAISED 5 → 7 at 271-REVIEW-FIX (WR-01)
   "LibraryPage.filingRules271.test.tsx": 2, // 271-02 (adopted 271-04)
+  // ── Phase 272-02 (D-08) — ADOPTED: in NEITHER knob before (272-RESEARCH, measured). Pinned
+  // at the gate's own printed `— 27 new` (20 shipped banner cases + 7 searchFilterLine). ──
+  "toolMeta.test.ts": 27, // 272-02 (2026-10-03)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5999,6 +6002,10 @@ const TARGETS = [
   "src/components/library/find/__tests__/FindMetaLine.test.tsx",
   "src/components/library/find/__tests__/AskHandoffCard.test.tsx",
   "src/pages/__tests__/LibraryPage.filingRules271.test.tsx",
+  // Phase 272-02 (D-08) — ADOPTED: `toolMeta.test.ts` was in NEITHER knob (272-RESEARCH,
+  // measured), so its D-14 banner pins and the new searchFilterLine pins were guarded by
+  // nothing. FILE-LEVEL — there is no `src/lib/__tests__` directory entry.
+  "src/lib/__tests__/toolMeta.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
