@@ -76,6 +76,10 @@ DATE_WORDS: tuple[str, ...] = ("added", "source_created", "source_modified")
 _DATE_WORD_OPS: tuple[str, ...] = ("before", "after", "between", "within_next", "older_than")
 _DOCUMENT_DATE_OPS: tuple[str, ...] = ("eq", "gte", "lte", "is_empty") + _DATE_WORD_OPS
 _SCALAR_OPS: frozenset[str] = frozenset({"eq", "gte", "lte", "before", "after", "contains"})
+# CR-02 — relative spans are honoured only on `date` and the date words (the compiler always
+# narrows `date_typed`); a custom `field_type: "date"` takes fixed ISO days only.
+_RELATIVE_OPS: tuple[str, ...] = ("within_next", "older_than")
+_CUSTOM_DATE_OPS: tuple[str, ...] = ("eq", "gte", "lte", "before", "after", "between", "is_empty")
 _UNITS: tuple[str, ...] = ("days", "weeks", "months")
 # Pitfall 12 — the rule a non-ISO date operand is refused with (a PostgREST 400 would otherwise
 # read as "retrieval unavailable").
@@ -330,6 +334,15 @@ async def validate_and_canonicalise(
                 "Retry with one of them, or ask which was meant.",
                 allowed,
             )
+        if op in _RELATIVE_OPS:
+            # CR-02: the compiler's relative ops ALWAYS narrow `date_typed`, whatever the field —
+            # `contract_end within_next 30 days` silently filtered on the document date.
+            return FilterRefusal(
+                field,
+                f"{op} works only on date, added, source_created or source_modified. For {field}, "
+                f"use between with two YYYY-MM-DD days (or before / after one): {_ISO_RULE}.",
+                ["between", "before", "after"],
+            )
         if field in LIST_FIELDS and op not in LIST_FIELD_OPS:
             # CR-01: a stored ARRAY — `one_of` / ranges compiled to a never-matching text compare.
             return FilterRefusal(
@@ -370,6 +383,18 @@ async def validate_and_canonicalise(
                         options,
                     )
                 d["values"] = mapped
+        elif defn is not None and ftype == "date":
+            # CR-02: a custom date reaches a lexical `metadata->>` compare, so a non-ISO operand
+            # ("October") would silently mis-compare — the same ISO rule as `date`.
+            if op not in _CUSTOM_DATE_OPS:
+                return FilterRefusal(
+                    field, f"{field} is a date: use between, before, after, eq, gte, lte or is_empty "
+                    f"with YYYY-MM-DD days — not {op}.", list(_CUSTOM_DATE_OPS),
+                )
+            r = _date_condition(d, field)
+            if isinstance(r, FilterRefusal):
+                return r
+            d = r
         elif defn is not None and (ftype == "number" or field in number_fields):
             for key in ("value", "value2"):
                 if key in d:

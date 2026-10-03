@@ -125,3 +125,67 @@ def test_cr01_list_fields_are_exactly_the_list_typed_builtins():
 
     listy = {n for n, f in DocumentMetadata.model_fields.items() if "list" in str(f.annotation).lower()}
     assert set(rscope.LIST_FIELDS) == listy == {"topics"}
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# CR-02 — within_next / older_than are honoured ONLY on the document date and the date words
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# The compiler's relative operators always emit a fragment on `date_typed`, whatever the field, so
+# `contract_end within_next 30 days` silently filtered on the DOCUMENT date.
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        {"field": "contract_end", "op": "within_next", "value": 30, "unit": "days"},
+        {"field": "contract_end", "op": "within_next", "value": "30", "unit": "days"},
+        {"field": "legal_entity", "op": "older_than", "value": 3, "unit": "months"},
+        {"field": "client", "op": "older_than", "value": 3, "unit": "months"},
+        {"field": "title", "op": "within_next", "value": 7, "unit": "days"},
+    ],
+)
+async def test_cr02_a_relative_op_on_any_other_field_is_refused_naming_the_rule(entry):
+    r = await _validate(entry)
+    assert isinstance(r, sdt.FilterRefusal), r
+    assert r.field == entry["field"]
+    for word in ("date", "added", "source_created", "source_modified", "between"):
+        assert word in r.message
+    assert "between" in r.allowed
+
+
+@pytest.mark.parametrize("field", ["date", "added", "source_created", "source_modified"])
+async def test_cr02_relative_ops_stay_valid_on_the_date_fields(field):
+    out = await _validate({"field": field, "op": "within_next", "value": "30", "unit": "days"})
+    assert out == [{"field": field, "op": "within_next", "value": 30, "unit": "days"}]
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        {"field": "contract_end", "op": "between", "value": "October", "value2": "2025-10-31"},
+        {"field": "contract_end", "op": "before", "value": "next year"},
+        {"field": "contract_end", "op": "eq", "value": "2025-10"},
+    ],
+)
+async def test_cr02_a_custom_date_field_takes_iso_days_like_date(entry):
+    r = await _validate(entry)
+    assert isinstance(r, sdt.FilterRefusal), r
+    assert "YYYY-MM-DD" in r.message
+
+
+async def test_cr02_a_custom_date_field_accepts_iso_days():
+    out = await _validate(
+        {"field": "contract_end", "op": "between", "value": "2026-01-01", "value2": "2026-03-31"},
+        {"field": "contract_end", "op": "before", "value": "2026-12-31"},
+    )
+    assert out == [
+        {"field": "contract_end", "op": "between", "value": "2026-01-01", "value2": "2026-03-31"},
+        {"field": "contract_end", "op": "before", "value": "2026-12-31"},
+    ]
+
+
+def test_cr02_the_schema_says_where_relative_ops_work():
+    from app.services.openai_service import SEARCH_DOCUMENTS_TOOL
+
+    desc = SEARCH_DOCUMENTS_TOOL["function"]["parameters"]["properties"]["filters"]["description"]
+    assert "within_next / older_than work only on" in desc
