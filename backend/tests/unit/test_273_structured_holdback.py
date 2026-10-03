@@ -94,8 +94,51 @@ def test_a_json_block_that_is_not_a_tool_call_is_flushed_byte_for_byte(n):
     text = 'Set it like this:\n```json\n{"retention_days": 30}\n```\nThat keeps a month.'
     hb = _holdback()
     released = _feed_all(hb, _split(text, n))
-    assert released == "Set it like this:\n"
+    # 273-REVIEW WR-06(a): this used to assert `released == "Set it like this:\n"` — i.e. it PINNED
+    # the stall (an ordinary JSON answer froze at its opener until the stream ended). A block with no
+    # `"tool"` in it cannot be a call, so it is released at its closing fence and the rest streams.
+    assert released == text
     assert released + hb.finish(False) == text
+
+
+# ── 273-REVIEW WR-06(a): an ordinary ```json block is released at its closing fence ──────────────
+
+
+@pytest.mark.parametrize("n", [1, 3, 50])
+def test_wr06_a_closed_non_tool_json_block_streams_before_the_stream_ends(n):
+    block = '```json\n{"retention_days": 30, "tiers": [{"name": "hot"}]}\n```\n'
+    text = "Like this:\n" + block + "Then the rest of the answer streams"
+    hb = _holdback()
+    released = _feed_all(hb, _split(text, n))
+    assert released.startswith("Like this:\n" + block), released
+    assert released + hb.finish(False) == text
+
+
+@pytest.mark.parametrize("n", [1, 3, 50])
+def test_wr06_a_tool_call_after_a_released_block_is_still_held(n):
+    text = 'First:\n```json\n{"a": 1}\n```\nNow the call:\n' + FENCED_CALL
+    hb = _holdback()
+    released = _feed_all(hb, _split(text, n))
+    assert released == 'First:\n```json\n{"a": 1}\n```\nNow the call:\n'
+    assert "show_artifact" not in released
+    assert hb.finish(True) == ""
+
+
+@pytest.mark.parametrize("n", [1, 3, 50])
+def test_wr06_a_mid_line_fence_inside_a_json_string_does_not_release_a_call(n):
+    # A ``` inside a JSON string is not a closing fence (a closing fence starts its own line).
+    text = 'x\n```json\n{"code": "```", "tool": "search_documents", "arguments": {}}\n```'
+    hb = _holdback()
+    assert _feed_all(hb, _split(text, n)) == "x\n"
+    assert hb.finish(True) == ""
+
+
+@pytest.mark.parametrize("n", [1, 3, 50])
+def test_wr06_a_block_naming_tool_is_held_to_the_end(n):
+    text = 'Cfg:\n```json\n{"tool": "hammer", "weight": 2}\n```\nmore text'
+    hb = _holdback()
+    assert _feed_all(hb, _split(text, n)) == "Cfg:\n"
+    assert hb.finish(False) == text[len("Cfg:\n"):]
 
 
 def test_a_trailing_partial_opener_is_held_then_released_when_disambiguated():
@@ -166,7 +209,8 @@ USER_SETTINGS = SimpleNamespace(
 )
 
 
-async def _drive(streams: list[list[dict]], calling_mode, *, tool_result: str = "[]") -> dict:
+async def _drive(streams: list, calling_mode, *, tool_result: str = "[]",
+                 expect_raise: type[BaseException] | None = None) -> dict:
     """Run the real loop over canned provider streams. Returns emits, dispatches, persisted row."""
     tables = {"threads": {"folder_id": None}, "messages": [], "skills": [], "user_memory": []}
 
@@ -176,7 +220,7 @@ async def _drive(streams: list[list[dict]], calling_mode, *, tool_result: str = 
     supabase = MagicMock()
     supabase.table.side_effect = _Query
 
-    queue = [_Stream(s) for s in streams]
+    queue = [s if isinstance(s, _Stream) else _Stream(s) for s in streams]
 
     async def _open_stream(_provider, _request):
         return queue.pop(0), calling_mode
@@ -222,8 +266,16 @@ async def _drive(streams: list[list[dict]], calling_mode, *, tool_result: str = 
          patch("app.services.connector_service.list_connections", AsyncMock(return_value=[])), \
          patch("app.db.workspace.list_files_in_thread", AsyncMock(return_value=[])), \
          patch("app.services.suggestion_service.generate_suggestions", return_value=([], None)):
-        result = await _loop_mod.run_agent_loop(ctx, emit=_emit, emit_terminal=AsyncMock(), spawn=MagicMock())
-        await result.persist()
+        if expect_raise is None:
+            result = await _loop_mod.run_agent_loop(ctx, emit=_emit, emit_terminal=AsyncMock(), spawn=MagicMock())
+            await result.persist()
+        else:
+            # An aborted stream: the loop re-raises and the producer shell persists via the sink.
+            sink: dict = {}
+            with pytest.raises(expect_raise):
+                await _loop_mod.run_agent_loop(ctx, emit=_emit, emit_terminal=AsyncMock(), spawn=MagicMock(),
+                                               result_sink=sink)
+            await sink["persist"]()
 
     assert queue == [], "the loop did not consume every canned provider stream"
     insert.assert_awaited()
@@ -344,6 +396,34 @@ async def test_cr02_an_unparsed_show_artifact_call_never_streams_or_persists(tex
         assert seen.startswith("Here is the chart.")
         assert "was not run" in seen  # one plain sentence instead of the raw spec
     assert live == persisted, "live and reload must show the same answer (I-2)"
+
+
+# ── 273-REVIEW WR-06(b): a stream that aborts while text is held — live and persisted agree ──────
+
+
+class _AbortingStream(_Stream):
+    """Yields its events, then raises — a provider dying mid-stream (or a per-call timeout)."""
+
+    def __init__(self, events, exc: BaseException):
+        super().__init__(events)
+        self._exc = exc
+
+    def __iter__(self):
+        yield from self._events
+        raise self._exc
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("exc", [RuntimeError("provider died"), TimeoutError("per-call budget")],
+                         ids=["error", "timeout"])
+async def test_wr06_held_text_of_an_aborted_stream_is_not_persisted_unseen(exc):
+    text = PREAMBLE + FENCED_CALL[: len(FENCED_CALL) // 2]  # aborted inside the held call
+    events = [{"type": "delta", "content": c} for c in _split(text, 9)]
+    run = await _drive([_AbortingStream(events, exc)], CallingMode.STRUCTURED, expect_raise=type(exc))
+    live = "".join(_delta_texts(run["emits"]))
+    persisted = _persisted_field(run["persisted"], "content")
+    assert "show_artifact" not in persisted and '"rows"' not in persisted, persisted
+    assert persisted == live, "the reloaded message must hold exactly what the live view showed (I-2)"
 
 
 @pytest.mark.asyncio

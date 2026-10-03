@@ -2657,12 +2657,20 @@ async def run_agent_loop(
                         # to it. Bound here so the helper's except-block closes from the
                         # main thread BEFORE the producer's for-loop cleanup propagates
                         # GeneratorExit into _TracedStream.__iter__.
-                        await _drain_stream_with_close_on_cancel(
-                            stream,
-                            per_call_budget,
-                            _on_chunk,
-                            close_fn=stream.close,
-                        )
+                        try:
+                            await _drain_stream_with_close_on_cancel(
+                                stream,
+                                per_call_budget,
+                                _on_chunk,
+                                close_fn=stream.close,
+                            )
+                        except BaseException:
+                            # 273-REVIEW WR-06(b): the stream aborted (timeout, provider error,
+                            # cancel) while text was held. It was never emitted, so it must not
+                            # persist either — live and reload stay identical (I-2).
+                            if _structured_holdback is not None:
+                                full_content = drop_held(full_content, _structured_holdback.finish(False))
+                            raise
 
                         # XPROV-02b (Phase 175, Option B — post-drain, deepseek-leak-only).
                         # If the sanitizer detected a DSML leak (DeepSeek wrote a tool call

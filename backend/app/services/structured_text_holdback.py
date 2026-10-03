@@ -16,7 +16,12 @@ text it saw before this phase.
   ``{"tool":`` — so an ordinary ```` ```python ```` block, or a brace in prose, keeps streaming.
 * Text before the first opener streams. From the first complete opener onward everything is held
   until the stream ends (a parsed call can only start at an opener; holding the tail is what
-  keeps a 500-row spec off the screen).
+  keeps a 500-row spec off the screen) — with ONE exception (273-REVIEW WR-06(a)): a
+  ```` ```json ```` block whose closing fence (``` alone at the start of its own line) has arrived
+  and whose content holds no ``"tool"`` is released, and the text after it is scanned afresh. The
+  parser only ever accepts an object carrying a ``"tool"`` key, so such a block cannot be a call;
+  before this an ordinary JSON answer froze at its opener and appeared all at once at stream end.
+  A block that DOES contain ``"tool"`` (and every inline ``{"tool":`` opener) is held to the end.
 * A suffix that could still BECOME an opener (``"``"``, ``"```js"``, ``"{"``, ``'{ "to'``) is held
   until the next chunk disambiguates it — the 1-char-split case.
 * ``finish(True)`` (the text parsed as a tool call) drops the held block; ``finish(False)`` returns
@@ -118,33 +123,83 @@ def _partial_tail_start(buf: str) -> int:
     return len(buf)
 
 
+_CLOSING_FENCE = "```"
+
+
 class StructuredTextHoldback:
     """Gate the ``delta`` emit for one STRUCTURED provider call."""
 
     def __init__(self) -> None:
         self._pending = ""
         self._holding = False
+        self._sticky = False  # held until the stream ends (an inline opener, or a fence naming "tool")
+        self._scan = 0  # where the next closing-fence search starts inside _pending (incremental)
         self.released_text = False  # any non-whitespace text was released by feed()
+
+    def _fence_release_end(self) -> int | None:
+        """While holding a ```` ```json ```` block: the index just past its closing fence when the
+        block may be released (closed, and no ``"tool"`` inside), else None (wait, or now sticky)."""
+        buf = self._pending
+        start = len(_FENCE_OPENER)
+        pos = self._scan
+        while True:
+            idx = buf.find(_CLOSING_FENCE, pos)
+            if idx < 0:
+                self._scan = max(pos, len(buf) - (len(_CLOSING_FENCE) - 1))  # a fence may straddle chunks
+                return None
+            line_start = buf.rfind("\n", 0, idx) + 1
+            # A closing fence starts its own line (after the opener's line). A ``` inside a JSON
+            # string sits mid-line and is skipped.
+            if line_start > start and buf[line_start:idx].strip(" ") == "":
+                eol = buf.find("\n", idx + len(_CLOSING_FENCE))
+                rest = buf[idx + len(_CLOSING_FENCE):] if eol < 0 else buf[idx + len(_CLOSING_FENCE):eol]
+                if rest.strip() == "":
+                    if eol < 0:
+                        self._scan = idx  # the line has not ended yet: it may still become ```json
+                        return None
+                    if _INLINE_KEY in buf[start:idx]:
+                        self._sticky = True
+                        return None
+                    return idx + len(_CLOSING_FENCE)
+            pos = idx + len(_CLOSING_FENCE)
 
     def feed(self, chunk: str) -> str:
         """Return the part of ``chunk`` (plus anything previously pending) safe to emit now."""
         if not chunk:
             return ""
-        if self._holding:
-            self._pending += chunk
-            return ""
-        buf = self._pending + chunk
-        at = _first_opener(buf)
-        if at is not None:
+        self._pending += chunk
+        out: list[str] = []
+        while True:
+            if self._holding:
+                if self._sticky:
+                    break
+                end = self._fence_release_end()
+                if end is None:
+                    break
+                # WR-06(a): a closed ```json block with no "tool" in it cannot be a call — release it.
+                out.append(self._pending[:end])
+                self._pending = self._pending[end:]
+                self._holding = False
+                continue
+            buf = self._pending
+            at = _first_opener(buf)
+            if at is None:
+                at = _partial_tail_start(buf)
+                out.append(buf[:at])
+                self._pending = buf[at:]
+                break
+            out.append(buf[:at])
+            self._pending = buf[at:]
             self._holding = True
-        else:
-            at = _partial_tail_start(buf)
-        out, self._pending = buf[:at], buf[at:]
-        if out.strip():
+            self._sticky = not self._pending.startswith(_FENCE_OPENER)  # the inline form: to the end
+            self._scan = len(_FENCE_OPENER)
+        text = "".join(out)
+        if text.strip():
             self.released_text = True
-        return out
+        return text
 
     def finish(self, parsed_calls: bool) -> str:
         """End of stream: "" when the held text parsed as a tool call, else the held text."""
         held, self._pending, self._holding = self._pending, "", False
+        self._sticky, self._scan = False, 0
         return "" if parsed_calls else held
