@@ -56,7 +56,7 @@ genuinely reviewed.
 
 Phase: 272
 Plan: Not started
-Status: Phase 272 EXECUTING — waves 1-3 done (4/5). 272-04: filters applied end to end (validate/canonicalise, four result kinds, empty-set + empty-folder-scope short-circuit, D-09 retry lock shared with sub-agents, ONE audit writer, per-run vocabulary + today's date, trend fix). Backend gate 71 = baseline, 6382 passed. Migration 200 local only (prod owed). Review items: scripts/check-schema-acl-parity.cjs deviation (272-03); field keys/enum options reach the tool schema unescaped (272-04 threat flag). Next: wave 4 = 272-05 on the main tree (recall ladder, 8-row board, G-4 sign-off).
+Status: Phase 272 EXECUTED (5/5 plans, 2026-10-03) — code review + verifier pending. G-4 G4-1..3 operator-'Approved'. SC#4 closed BY DECISION: met 6/8; Google gemini-3.5-flash UNMET (model behaviour, investigated); MiniMax-M3 UNSTABLE; SEED-334 (must-filter flag) fired. Migrations 200 + 201 LOCAL ONLY — prod OWED: read prod document_chunks count (CONCURRENTLY index if large) → 200 → 201 IMMEDIATELY (201 fixes a plan-cache regression 200 alone causes) → VERIFY → get_advisors(security), each write operator-approved. Seeds planted: 333 (folded card), 334, 335 (absence hint). Owed to 273: D-15/D-16 seams.
 Prior: Phase 271 EXECUTED — verification human_needed (2026-10-03). Owed to operator: sign-off on G-4 rows G4-1..G4-6 (driven in Playwright, not Chrome MCP), review of P-01 (default sort added_desc) and P-03 (Older versions = own rows only), deploy (no migration; backend+frontend together; then read-only probe of /document-search + security advisors), CLAUDE.md split (119,524 chars, 476 under the 120k band). Deferred: SEED-331, SEED-332, F-1, F-4. Next: /gsd:discuss-phase 272.
 Last activity: 2026-10-03
 
