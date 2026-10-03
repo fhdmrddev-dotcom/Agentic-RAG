@@ -50,6 +50,27 @@ findings:
   info: 6
   total: 15
 status: issues_found
+fix_pass:
+  fixed_at: 2026-10-04
+  fixer: Claude (gsd-code-fixer)
+  scope: critical + warning
+  findings_in_scope: 9
+  fixed: 9
+  skipped: 0
+  info_fixed: 0
+  fix_status: all_fixed
+  requires_human_verification: [CR-02, WR-06]
+  outcomes:
+    CR-01: fixed (90af7ee94)
+    CR-02: fixed (4e7876c35 + 51f41d873) — requires human verification on a live STRUCTURED (OpenRouter) row
+    WR-01: fixed (a69898bdf)
+    WR-02: fixed (09d0be153)
+    WR-03: fixed (6a36ad3b4)
+    WR-04: fixed (c863af46b)
+    WR-05: fixed (317bf667c)
+    WR-06: fixed (18ee689e1) — (a) and (b) both fixed; requires human verification on a live STRUCTURED row
+    WR-07: fixed (8e75c05b9)
+    IN-01..IN-06: not attempted (out of scope; none was a directly-adjacent one-liner worth bundling)
 ---
 
 # Phase 273: Code Review Report
@@ -283,6 +304,86 @@ the artifact mount was inserted between the long BUG-260710-01 comment and `<Run
 now sits above the artifact line instead of the element it describes.
 **Fix:** reset state when `record.id` changes (key the boundary by id, or use `getDerivedStateFromProps`); move
 the mount above the BUG-260710-01 comment block.
+
+---
+
+## Fix notes (2026-10-04, gsd-code-fixer — scope: critical + warning)
+
+Every fix was written test-first: the new/extended test was run RED against the pre-fix code, then the fix made it
+green. One atomic commit per finding (CR-02 has a second, compaction commit — see below).
+
+- **CR-01 — fixed (`90af7ee94`).** `validate_dataset` now refuses a scatter with a text x (`series_not_number`, the
+  column named only if `_SAFE_NAME`), an x that is also a y (`fallback`), and any number outside the float64 range —
+  an unbounded int, an overflowing numeric string (the reviewer's `[[inf]]`), with a new closed reason
+  `"a value in {column} is too large to show"`. Range-filter bounds are `allow_inf_nan=False`. Every length cap
+  (title 120, column name 64, unit 16, metric labels 64, cells 200) now counts UTF-16 units (`_js_len`), matching
+  the browser. **Parity is pinned by ONE shared fixture** — `backend/tests/unit/fixtures/artifact_bad_specs_v1.json`
+  (23 bad + 6 good specs, large numbers as raw JSON literals) — read by `test_273_review_fixes.py` (`validate_args`)
+  AND `artifactParity.fence.test.ts` (`parseArtifactRecord`). RED: 7 of the 23 bad specs were accepted by the backend
+  before the fix. Refusals keep `{status, reason, detail}` with no `error` key.
+- **CR-02 — fixed (`4e7876c35`, compacted in `51f41d873`); requires human verification.** `failed_tool_call(held)`
+  recognises unparsed held text that names (or was cut off naming) a known tool; the loop drops it from
+  `full_content` and emits one plain sentence (`*The agent's tool request was cut off or malformed, so it was not
+  run.*`), so live == persisted and no JSON is shown. Ordinary ```` ```json ```` answers are byte-identical (all prior
+  holdback tests green). Tests: truncated (no closing fence) and malformed (missing comma) calls, driven through the
+  real loop. ⚠ A trailing comma alone is NOT this case — the inline fallback still extracts it as a call with
+  unparseable args, which the model is told about. ⚠ The first version pushed the structured `turn_boundary` emit
+  2,372 source chars from its `full_content = ""` reset, past the 2,000-char window of
+  `test_bug_260912_01_turn_boundary_event::test_every_site_precedes_a_full_content_reset` — the backend gate caught
+  it as a 72nd failure; `51f41d873` moved the drop+notice into `replace_failed_call` (distance now **1,931**, a
+  69-char margin — the next edit inside that span should expect this fence). Not done: feeding a tool error back so
+  the model can retry with fewer rows (would need a synthetic call in the loop — beyond OV-273-04's hunks).
+- **WR-01 — fixed (`a69898bdf`).** Inline calls decode brace-balanced with `json.JSONDecoder.raw_decode` from each
+  `{"tool":` opener; the legacy regex survives only as the fallback for text that is not valid JSON.
+- **WR-02 — fixed (`09d0be153`).** `validate_args` works on a NUL-free deep copy (keys included, so `chart.x` and its
+  column stay equal); caller args are not mutated; a title that is only NULs is an ordinary refusal, never
+  `save_failed`. Stripping (not refusing) matches `agent_loop._strip_nul`.
+- **WR-03 — fixed (`6a36ad3b4`).** `query_tables` now reports the RESOLVED filename (new
+  `retrieval_documents.resolve_document`, same two lookups as `resolve_document_id`, which is untouched). The caption
+  reads document + page from the `query_tables` RESULT (a head regex covers a result cut at 2,000 chars; the page is
+  named only when the server-side page filter guarantees it) and from `analyze_document`'s `sub_agent.filename`.
+  Model args never reach the caption. ⚠ This touches `multimodal_service.py` (G-5 FIRING) — 6 lines in
+  `handle_query_tables`; its ledger row was not re-derived here. Three existing caption tests pinned the args-derived
+  name and were updated to carry the name in the result.
+- **WR-04 — fixed (`c863af46b`).** Non-zero `|n| < 1` uses 3 significant digits (axis ticks 2); `>= 1` unchanged.
+  Rendered-content tests in the table, metric and chart-model suites.
+- **WR-05 — fixed (`317bf667c`).** Stacked bars and (always-stacked) areas pass `stackOffset="sign"`; grouped bars
+  unchanged. The ChartArtifact mock now exposes the plot's `stackOffset`.
+- **WR-06 — fixed (`18ee689e1`), both halves; requires human verification.** (a) A ```` ```json ```` block whose
+  closing fence (` ``` ` alone at the start of its own line) has arrived and whose content holds no `"tool"` is
+  released at once; the parser only accepts objects with a `"tool"` key, so it cannot be a call. A mid-line ` ``` `
+  inside a JSON string is not a closing fence; a block naming `"tool"` and every inline opener still hold to the end;
+  the closing-fence search is incremental (no rescans of a 500-row buffer). The old pure-holdback assertion
+  `released == "Set it like this:\n"` **pinned the stall** and now reads `released == text`. (b) If the compat-path
+  drain raises while text is held, the held text is dropped from `full_content` before re-raising, so the persisted
+  message equals what the live view showed (tested with a provider error and a per-call timeout).
+- **WR-07 — fixed (`8e75c05b9`).** The unknown-reference refusal names the newest 20 labels plus `(and N earlier)`,
+  and every refusal goes through `_refusal_text`, which shortens only the model-facing `detail` (re-measured after
+  each cut, since JSON escaping is non-linear) so the payload is always `< RESULT_MAX_CHARS`.
+- **IN-01..IN-06 — not attempted** (outside the critical + warning scope).
+
+**Gates after the fixes** (verdict lines verbatim):
+
+- `pytest tests/unit/test_273_*.py -q` → `281 passed, 1 warning` (218 before this pass)
+- `node scripts/check-backend-unit-baseline.cjs` → `71 failed, 6758 passed, 1 skipped, 2 xfailed, 2 xpassed` ·
+  `[GATE PASSED] Backend unit baseline satisfied (failed: 71 <= 71, errors: 0).` — failed SET `diff`-identical to
+  273-BASELINES.md (71 ids).
+- `npx tsc -p tsconfig.app.json --noEmit` → 70 errors; the `file:line:code` set is `diff`-identical to
+  273-BASELINES-FRONTEND.md (69 unique; 0 in any artifact file).
+- `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` (repo root), run twice:
+  - run 1: `total 9629  ·  failed 2  ·  pinned total 8874` · `FAIL  [failing-tests] 2 test(s) failed — the gate
+    requires 0.` No per-file decrease and no missing pinned file. Failing filenames were taken from the gate's own
+    JSON report **before** any re-run: `src/pages/WorkflowBuilderPage.canvas.test.tsx` (`STACK_TRACE_ERROR`) and
+    `src/pages/WorkflowRunPage.test.tsx` (`expected "vi.fn()" to be called at least once`). Both are in SEED-171's
+    named flaky set; both are **provably unmodified** (`git diff --numstat 3fa5765b4 HEAD` empty for the suites and
+    their pages; `git status` clean) and import nothing this pass touched (WorkflowRunPage's only link is a type-only
+    `@/types` import, itself unchanged). Re-run in isolation afterwards: `2 passed (2)` · `327 passed (327)` — one
+    sample, recorded as an observation, not as proof of innocence.
+  - run 2: `total 9629  ·  failed 0  ·  pinned total 8874` ·
+    `count gate OK — 389/389 pinned files present, no per-file decrease, 0 failing.`
+- No new vitest suite was created; the five touched suites were already in both knobs and their BASELINE pins were
+  raised in the same commits (`artifactParity.fence` 7→10, `chartModel` 19→20, `TableArtifact` 6→7,
+  `MetricArtifact` 6→7, `ChartArtifact` 15→18).
 
 ---
 
