@@ -262,3 +262,100 @@ def test_wr01_the_whole_note_is_capped():
     desc = _vocab_desc(fields=fields, types=[(f"type{i}", 1) for i in range(15)])
     assert len(desc) - len(base) <= sdt._VOCAB_NOTE_MAX + 1
     assert "an unknown field is answered with the full list" in desc
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# WR-02 — the D-09 lock refuses a WIDENING of a filter that matched nothing, not only a drop
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# The lock keyed on field PRESENCE, so after "No documents matched document date 1–31 Oct 2025" a
+# `date before 9999-12-31` or "widen to the year" passed it and searched outside what was asked.
+
+import json  # noqa: E402
+
+from tests.unit.test_272_retry_lock import ACME, OCT, Edges, _ctx  # noqa: E402
+
+_HIT = [{"document_id": "d1", "filename": "d1.pdf", "content": "x", "similarity": 0.8}]
+
+
+async def _locked(monkeypatch):
+    edges, ctx = Edges(monkeypatch), _ctx()
+    edges.scope_ids = ()
+    out = await sdt.handle_search_documents({"query": "revenue", "filters": [OCT, ACME]}, ctx)
+    assert json.loads(out.result)["status"] == "no_documents_matched"
+    edges.resolve_calls = edges.search_calls = 0
+    edges.scope_ids = ("d1",)
+    edges.hits = list(_HIT)
+    return edges, ctx
+
+
+@pytest.mark.parametrize(
+    "date_cond",
+    [
+        {"field": "date", "op": "before", "value": "9999-12-31"},
+        {"field": "date", "op": "after", "value": "2025-01-01"},
+        {"field": "date", "op": "between", "value": "2025-01-01", "value2": "2025-12-31"},
+        {"field": "date", "op": "between", "value": "2025-10-01", "value2": "2025-11-30"},
+        {"field": "date", "op": "is_empty"},
+        {"field": "date", "op": "gte", "value": "2025-09-30"},
+    ],
+)
+async def test_wr02_a_date_condition_that_contains_the_empty_window_is_refused(monkeypatch, date_cond):
+    edges, ctx = await _locked(monkeypatch)
+    out = await sdt.handle_search_documents({"query": "revenue", "filters": [date_cond, ACME]}, ctx)
+    body = json.loads(out.result)
+    assert body["error"] == "refused_retry", body
+    assert "date" in body["locked_fields"]
+    assert "wider" in body["message"] or "is_empty" in body["message"]
+    assert edges.resolve_calls == 0 and edges.search_calls == 0
+
+
+@pytest.mark.parametrize(
+    "entity_cond",
+    [
+        {"field": "legal_entity", "op": "contains", "value": "a"},
+        {"field": "legal_entity", "op": "contains", "value": "Acme"},
+        {"field": "legal_entity", "op": "is_empty"},
+    ],
+)
+async def test_wr02_a_wider_condition_on_a_locked_dimension_is_refused(monkeypatch, entity_cond):
+    edges, ctx = await _locked(monkeypatch)
+    out = await sdt.handle_search_documents({"query": "revenue", "filters": [OCT, entity_cond]}, ctx)
+    assert json.loads(out.result)["error"] == "refused_retry"
+    assert edges.search_calls == 0
+
+
+@pytest.mark.parametrize(
+    "date_cond",
+    [
+        {"field": "date", "op": "between", "value": "2025-09-01", "value2": "2025-09-30"},   # disjoint
+        {"field": "date", "op": "between", "value": "2025-10-10", "value2": "2025-10-20"},   # narrower
+        {"field": "date", "op": "between", "value": "2025-09-15", "value2": "2025-10-15"},   # overlaps, not ⊇
+        {"field": "date", "op": "eq", "value": "2025-11-03"},                                  # one other day
+        {"field": "date", "op": "after", "value": "2025-11-01"},                               # open, but after Oct
+    ],
+)
+async def test_wr02_a_different_or_narrower_date_is_still_allowed(monkeypatch, date_cond):
+    edges, ctx = await _locked(monkeypatch)
+    out = await sdt.handle_search_documents({"query": "revenue", "filters": [date_cond, ACME]}, ctx)
+    assert isinstance(json.loads(out.result), list), out.result
+    assert edges.search_calls == 1
+
+
+@pytest.mark.parametrize(
+    "entity_cond",
+    [
+        {"field": "legal_entity", "op": "eq", "value": "Beta Ltd"},
+        {"field": "legal_entity", "op": "one_of", "values": ["Acme GmbH", "Beta Ltd"]},
+    ],
+)
+async def test_wr02_a_different_dimension_value_is_still_allowed(monkeypatch, entity_cond):
+    edges, ctx = await _locked(monkeypatch)
+    out = await sdt.handle_search_documents({"query": "revenue", "filters": [OCT, entity_cond]}, ctx)
+    assert isinstance(json.loads(out.result), list), out.result
+    assert edges.search_calls == 1
+
+
+async def test_wr02_the_lock_set_still_reads_as_field_names(monkeypatch):
+    _edges, ctx = await _locked(monkeypatch)
+    assert ctx.empty_filter_fields_in_run == {"date", "legal_entity"}
+    assert sorted(ctx.empty_filter_fields_in_run) == ["date", "legal_entity"]

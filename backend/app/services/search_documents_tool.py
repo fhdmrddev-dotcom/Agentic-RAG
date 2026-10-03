@@ -483,6 +483,178 @@ def _lock_set(ctx: Any) -> set | None:
     return locked if isinstance(locked, set) else None
 
 
+class LockedField(str):
+    """A D-09 lock entry: the locked field NAME (it compares and hashes as that plain string, so the
+    lock set still reads as ``{"date", "legal_entity"}``) carrying the condition group(s) on that
+    field that matched nothing this turn (272-REVIEW WR-02)."""
+
+    groups: list
+
+    def __new__(cls, name: str) -> "LockedField":
+        obj = super().__new__(cls, name)
+        obj.groups = []
+        return obj
+
+
+def _lock_record(locked: set, applied: Sequence[dict]) -> None:
+    """Add each field of a zero-match filter to the lock, with the conditions that matched nothing."""
+    for field in dict.fromkeys(str(c.get("field")) for c in applied):
+        group = [dict(c) for c in applied if str(c.get("field")) == field]
+        entry = next((e for e in locked if e == field and isinstance(e, LockedField)), None)
+        if entry is None:
+            locked.discard(field)        # a plain-string member (an older caller) is upgraded
+            entry = LockedField(field)
+            locked.add(entry)
+        entry.groups.append(group)
+
+
+_LOCK_RULE = (
+    "After a filter matches nothing, a later search may change a locked field only to a different "
+    "value (eq / one_of), or to a range that does not contain the one that matched nothing. "
+    "Dropping the field, is_empty, or a wider condition that still includes what was asked "
+    "(a longer period around it, an open-ended before/after, contains on part of the value) is refused."
+)
+_PIN_OPS = ("eq", "one_of")
+_INTERVAL_OPS = ("gte", "lte", "before", "after", "between", "within_next", "older_than")
+
+
+def _order_key(v: Any) -> tuple | None:
+    """A comparable key: ("d", iso day), ("n", number) or ("s", lowered text); None if neither."""
+    if v is None or isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return ("n", float(v))
+    if isinstance(v, str):
+        s = v.strip()
+        if _is_iso_day(s):
+            return ("d", s)
+        n = _number(s)
+        return ("n", float(n)) if n is not None else ("s", s.lower())
+    return None
+
+
+def _interval(conds: Sequence[dict]) -> tuple | None:
+    """The AND of every range condition as ``(lo, hi)`` keys (None = open); None when undecidable.
+
+    Bounds are read INCLUSIVELY (``before d`` as ``<= d``), which can only make a new range look
+    wider than it is — so the lock errs toward refusing, never toward letting a widening through.
+    """
+    lo = hi = None
+    for c in conds:
+        op = c.get("op")
+        if op in ("gte", "after"):
+            bounds = (c.get("value"), None)
+        elif op in ("lte", "before"):
+            bounds = (None, c.get("value"))
+        elif op == "between":
+            bounds = (c.get("value"), c.get("value2"))
+        elif op in ("within_next", "older_than"):
+            n = _whole_number(c.get("value"))
+            if n is None:
+                return None
+            from app.services.document_view_resolver import _relative_window
+
+            bounds = _relative_window(op, n, c.get("unit"))
+        else:
+            continue
+        keys = []
+        for b in bounds:
+            k = None if b is None else _order_key(b)
+            if b is not None and k is None:
+                return None
+            keys.append(k)
+        for k in keys:
+            if k is not None and any(x is not None and x[0] != k[0] for x in (lo, hi)):
+                return None
+        if keys[0] is not None and (lo is None or keys[0] > lo):
+            lo = keys[0]
+        if keys[1] is not None and (hi is None or keys[1] < hi):
+            hi = keys[1]
+    return lo, hi
+
+
+def _inside(key: tuple, iv: tuple) -> bool | None:
+    lo, hi = iv
+    if any(b is not None and b[0] != key[0] for b in (lo, hi)):
+        return None
+    return (lo is None or lo <= key) and (hi is None or key <= hi)
+
+
+def _covers(new: tuple, old: tuple) -> bool | None:
+    """True when interval ``new`` contains interval ``old``; None when not comparable."""
+    (nlo, nhi), (olo, ohi) = new, old
+    keys = [k for k in (nlo, nhi, olo, ohi) if k is not None]
+    if len({k[0] for k in keys}) > 1:
+        return None
+    low_ok = nlo is None or (olo is not None and nlo <= olo)
+    high_ok = nhi is None or (ohi is not None and nhi >= ohi)
+    return low_ok and high_ok
+
+
+def _same(a: Sequence[dict], b: Sequence[dict]) -> bool:
+    def norm(conds: Sequence[dict]) -> list[str]:
+        return sorted(json.dumps(c, sort_keys=True, default=str) for c in conds)
+
+    return norm(a) == norm(b)
+
+
+def _widens(new: Sequence[dict], old: Sequence[dict]) -> bool:
+    """WR-02: True when ``new`` (the later conditions on one locked field) may match everything
+    ``old`` (the conditions on it that matched nothing) did, i.e. when it is not PROVABLY a
+    different or narrower value. Undecidable is True: the lock fails closed."""
+    if any(c.get("op") in _PIN_OPS for c in new):
+        return False                       # D-09: a different value (eq / one_of) is allowed
+    if _same(new, old):
+        return False                       # the same restriction is not a wider one
+    old_empty = any(c.get("op") == "is_empty" for c in old)
+    if any(c.get("op") == "is_empty" for c in new):
+        return not old_empty
+    if old_empty:
+        return False                       # a value-bearing condition is disjoint from "no value"
+    values: set | None = None
+    for c in old:
+        if c.get("op") == "eq":
+            vs = {c.get("value")}
+        elif c.get("op") == "one_of":
+            vs = set(c.get("values") or [])
+        else:
+            continue
+        values = vs if values is None else values & vs
+    texts = [str(c.get("value")).lower() for c in old if c.get("op") == "contains"]
+    old_iv = _interval(old) if any(c.get("op") in _INTERVAL_OPS for c in old) else None
+    for c in new:
+        if c.get("op") == "contains":
+            s = str(c.get("value") or "").lower()
+            if values and any(s not in str(v).lower() for v in values):
+                return False               # an asked value does not contain it: not a superset
+            if texts and any(s not in t for t in texts):
+                return False
+    if any(c.get("op") in _INTERVAL_OPS for c in new):
+        new_iv = _interval(new)
+        if new_iv is not None:
+            if values:
+                inside = [_inside(k, new_iv) for k in (_order_key(v) for v in values) if k is not None]
+                if inside and all(x is not None for x in inside) and not all(inside):
+                    return False           # an asked value falls outside the new range
+            if old_iv is not None and (new_iv == old_iv or _covers(new_iv, old_iv) is False):
+                return False               # equal, disjoint, narrower or overlapping: not wider
+    return True
+
+
+def _lock_violations(locked: set, requested: Sequence[dict]) -> list[str]:
+    """The locked fields this request drops or widens (D-09 / WR-02), in order."""
+    out: list[str] = []
+    for entry in sorted(locked):
+        new = [c for c in requested if str(c.get("field")) == entry]
+        if not new:
+            out.append(str(entry))
+            continue
+        groups = getattr(entry, "groups", None) or []
+        if any(_widens(new, g) for g in groups):
+            out.append(str(entry))
+    return out
+
+
 # ── the plain filter label (the model-facing twin of 272-02's `searchFilterLine`) ────────────────
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -660,17 +832,23 @@ def _invalid_filter(ctx: Any, query: str, refusal: FilterRefusal, requested: Seq
     )
 
 
-def _refused_retry(ctx: Any, query: str, locked: set, requested: Sequence[dict], ToolResult: Any):
-    """D-09 — a search that drops a field whose filter already matched nothing is refused."""
-    fields = sorted(locked)
+def _refused_retry(
+    ctx: Any, query: str, locked: set, requested: Sequence[dict], ToolResult: Any,
+    violated: Sequence[str] | None = None,
+):
+    """D-09: a search that drops (or, WR-02, widens) a field whose filter matched nothing is refused."""
+    fields = sorted(str(f) for f in locked)
+    violated = list(violated or fields)
     _write_search_audit(ctx, query=query, document_ids=[], filters=requested, result_kind=KIND_REFUSED)
     return ToolResult(
         result=json.dumps({
             "error": "refused_retry",
             "locked_fields": fields,
+            "violated_fields": violated,
             "message": (
                 f"A filtered search on {', '.join(fields)} already matched no documents in this turn, "
-                "so a search without that filter is refused: it would answer from outside what was asked."
+                f"so a search that drops or widens {', '.join(violated)} is refused: it would answer "
+                f"from outside what was asked. {_LOCK_RULE}"
             ),
             "instruction": (
                 "Tell the person nothing matched the filter. You may search again with a different "
@@ -699,7 +877,7 @@ def _no_documents(
     """Kind 2 (D-11 / D-25) — names the filter, cites nothing, may offer nearby values."""
     locked = _lock_set(ctx)
     if locked is not None:
-        locked.update(str(c.get("field")) for c in applied)  # D-09 — this turn cannot drop them
+        _lock_record(locked, applied)  # D-09: this turn cannot drop them (nor, WR-02, widen them)
     if lead is None:
         if reason == "not_searchable_yet":
             noun = "document" if matched == 1 else "documents"
@@ -968,10 +1146,12 @@ async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
     requested = [_as_dict(c) for c in parsed]
 
     # D-09 — after a zero match this turn, a search that DROPS one of that filter's fields is
-    # refused. A different value on the same field is allowed (the set is a subset check on fields).
+    # refused, and (272-REVIEW WR-02) so is one that WIDENS it. A different value is allowed.
     locked = _lock_set(ctx)
-    if locked and not locked <= {c.field for c in parsed}:
-        return _refused_retry(ctx, query, locked, requested, ToolResult)
+    if locked:
+        violated = _lock_violations(locked, requested)   # WR-02: a WIDER condition is a drop too
+        if violated:
+            return _refused_retry(ctx, query, locked, requested, ToolResult, violated)
 
     # D-18 (266 CR-01) — both retrieval arms read `folder_ids=[]` as NO folder restriction
     # (`folder_ids if folder_ids else None`), so an EMPTY folder scope handed to them widens to the
