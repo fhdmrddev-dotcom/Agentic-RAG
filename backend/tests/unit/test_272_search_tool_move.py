@@ -10,7 +10,8 @@ What this suite pins:
   tool core still holds **29** tools (Extension Contract — widen arguments, never add a tool);
 * the moved handler is AST-identical to ``_handle_search_documents`` at the plan's base commit,
   apart from its NAME and the function-local import that breaks the import cycle (its own test
-  function, so 272-04 can retire it BY NAME when it rewrites the handler);
+  function, so 272-04 can retire it BY NAME when it rewrites the handler) — ⚠ RETIRED by 272-04,
+  which rewrote the handler on purpose; the proof is kept as history at ``WAVE1_MERGE_SHA``;
 * the new module has no module-level import of ``tool_dispatcher`` (that would cycle — the
   dispatcher imports this module at load);
 * **patch-where-used**, driven both ways: a patch on the NEW module is hit, and a patch on the
@@ -72,34 +73,62 @@ def test_registry_and_reexport_are_the_moved_handler():
     assert len(td._TOOL_REGISTRY) == 29
 
 
-def test_handler_ast_identical_to_base():
-    """The moved handler == the base handler, modulo its NAME and the cycle-breaking import.
+# ⚠ RETIRED ON PURPOSE BY 272-04 (SEED-177: retire a fence DELIBERATELY, never trip it by surprise):
+# `test_handler_ast_identical_to_base` stood here. It proved the handler in search_documents_tool.py
+# was a VERBATIM move of PHASE_BASE's `_handle_search_documents` — and that proof HELD at 272-01's
+# merge (WAVE1_MERGE_SHA, recorded in 272-03-SUMMARY.md). 272-04 then rewrites the handler on
+# purpose (D-03 filters, D-09 retry lock, D-12 four result kinds + ONE audit writer, D-18 empty-set
+# short-circuit, D-19 scope AND), so comparing HEAD to the base would now fail for the right reason.
+# The pure-move proof is kept below as HISTORY against WAVE1_MERGE_SHA, and
+# `test_handler_was_rewritten_after_the_move` proves the retirement was necessary (not vacuous).
+WAVE1_MERGE_SHA = "020a0f41f7f9155783eb38790fef40e052bbcfcf"
 
-    ``handle_search_documents`` imports ``ToolResult`` function-locally (a module-level import of
-    ``tool_dispatcher`` would cycle: the dispatcher imports this module at load). Those leading
-    import statements are stripped before the compare — and asserted to be ONLY imports from
-    ``app.services.tool_dispatcher``, so nothing else can hide in the stripped prefix.
-    """
-    base_fn = _top_level_function(_blob_at_base(_TD_REL), "_handle_search_documents")
-    new_fn = _top_level_function(
-        (REPO_ROOT / _TOOL_REL).read_text(encoding="utf-8"), "handle_search_documents"
-    )
-    assert base_fn is not None, f"_handle_search_documents not found at {PLAN_BASE_SHA}"
-    assert new_fn is not None, "handle_search_documents not found in search_documents_tool.py"
 
+def _blob_at(sha: str, rel_path: str) -> str:
+    return subprocess.run(
+        ["git", "show", f"{sha}:{rel_path}"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    ).stdout
+
+
+def _normalised_handler(src: str):
+    """The handler with its NAME normalised and the leading cycle-breaking imports stripped
+    (asserted to be ONLY imports from ``app.services.tool_dispatcher``) — 272-01's normalisation."""
+    fn = _top_level_function(src, "handle_search_documents")
+    assert fn is not None, "handle_search_documents not found"
     stripped = []
-    while new_fn.body and isinstance(new_fn.body[0], (ast.Import, ast.ImportFrom)):
-        stripped.append(new_fn.body.pop(0))
+    while fn.body and isinstance(fn.body[0], (ast.Import, ast.ImportFrom)):
+        stripped.append(fn.body.pop(0))
     assert stripped, "POSITIVE CONTROL FAILED — no function-local cycle-breaking import found"
     for node in stripped:
         assert isinstance(node, ast.ImportFrom) and node.module == "app.services.tool_dispatcher", (
             f"a stripped leading statement is not an import from tool_dispatcher: {ast.dump(node)}"
         )
+    fn.name = "_handle_search_documents"
+    return fn
 
-    new_fn.name = base_fn.name
-    assert ast.dump(new_fn) == ast.dump(base_fn), (
-        "handle_search_documents is not a verbatim move of _handle_search_documents"
+
+def test_handler_move_proven_at_wave1_merge():
+    """History: at WAVE1_MERGE_SHA the moved handler == PHASE_BASE's, modulo name + the import."""
+    base_fn = _top_level_function(_blob_at_base(_TD_REL), "_handle_search_documents")
+    assert base_fn is not None, f"_handle_search_documents not found at {PLAN_BASE_SHA}"
+    moved_fn = _normalised_handler(_blob_at(WAVE1_MERGE_SHA, _TOOL_REL))
+    assert ast.dump(moved_fn) == ast.dump(base_fn), (
+        f"at {WAVE1_MERGE_SHA} handle_search_documents was not a verbatim move of _handle_search_documents"
     )
+
+
+def test_handler_was_rewritten_after_the_move():
+    """Non-vacuity of the retirement: HEAD's handler is NOT the base handler any more (272-04)."""
+    base_fn = _top_level_function(_blob_at_base(_TD_REL), "_handle_search_documents")
+    head_fn = _top_level_function((REPO_ROOT / _TOOL_REL).read_text(encoding="utf-8"), "handle_search_documents")
+    assert head_fn is not None
+    head_fn.name = base_fn.name
+    assert ast.dump(head_fn) != ast.dump(base_fn)
 
 
 def test_no_module_level_import_of_tool_dispatcher():

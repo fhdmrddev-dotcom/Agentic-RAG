@@ -1,17 +1,22 @@
-"""Phase 272 (D-15) — the ``search_documents`` tool handler, moved VERBATIM out of ``tool_dispatcher.py``.
+"""Phase 272 (D-15) — the ``search_documents`` tool handler, moved out of ``tool_dispatcher.py``.
 
 The narrow cut: search_documents' handler, its audit write and (272-04) the D-09 retry lock live
 here; the full registry/handler split of tool_dispatcher.py stays OWED and is flagged for Phase 273.
 
 ``tool_dispatcher`` keeps the ONE registry line (``"search_documents": _handle_search_documents``)
 and re-exports this handler under that old private name, so every caller and every
-``inspect.getsource(td._handle_search_documents)`` still resolves. ``tests/unit/test_272_search_tool_move.py``
-proves the body is AST-identical to the PHASE_BASE handler apart from its name and the
-function-local ``ToolResult`` import below.
+``inspect.getsource(td._handle_search_documents)`` still resolves. 272-01 moved the body VERBATIM;
+``tests/unit/test_272_search_tool_move.py`` keeps that proof as HISTORY, against the 272-01 merge
+(``WAVE1_MERGE_SHA``), because 272-04 rewrites the handler on purpose: it now honours ``filters``
+(D-03), returns four result kinds (D-12), short-circuits an empty set before any retrieval call
+(D-18), ANDs the filter with the folder / Expert scope (D-19), and refuses an unfiltered retry
+after a zero match (D-09).
 
-⚠ PATCH-WHERE-USED: the handler resolves ``search_documents`` and ``write_audit_entry`` from THIS
-module now. A test that patches ``app.services.tool_dispatcher.search_documents`` no longer
-reaches it — patch ``app.services.search_documents_tool.<name>``.
+⚠ PATCH-WHERE-USED: the handler resolves ``search_documents``, ``write_audit_entry``,
+``resolve_document_scope``, ``nearby_values``, ``canonical_stored_values``,
+``list_field_definitions`` and ``_build_field_meta`` from THIS module. A test that patches
+``app.services.tool_dispatcher.search_documents`` no longer reaches it — patch
+``app.services.search_documents_tool.<name>``.
 
 ⛔ Import-cycle rule: no module-level import of ``app.services.tool_dispatcher`` here (the
 dispatcher imports this module at load). ``ToolContext`` is a type-only import; ``ToolResult`` is
@@ -29,7 +34,13 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from app.models.document_search import _is_iso_day
 from app.models.document_view import ViewCondition
 from app.services.audit_service import write_audit_entry
-from app.services.retrieval_scope import canonical_stored_values
+from app.services.metadata_field_service import list_field_definitions
+from app.services.retrieval_scope import (
+    canonical_stored_values,
+    nearby_values,
+    requires_resolved_scope,
+    resolve_document_scope,
+)
 from app.services.retrieval_service import search_documents
 
 if TYPE_CHECKING:
@@ -374,112 +385,403 @@ async def validate_and_canonicalise(
     return out
 
 
-async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
-    # Function-local on purpose (D-15 / T-272-03): tool_dispatcher imports THIS module at load,
-    # so a module-level import of it would cycle. By call time the dispatcher is fully loaded.
-    from app.services.tool_dispatcher import ToolResult
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# 272-04 Task 2 — the four result kinds, the D-18 short-circuit, the D-09 lock, ONE audit writer
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+#
+# The four kinds (D-12) — the `result_kind` the audit row records:
+#   1. "passages"             — `result` stays the JSON ARRAY of hits (the card's SearchDocumentsBody
+#                               renders only Array.isArray); a filtered call's model-facing summary
+#                               rides `llm_content`.
+#   2. "no_documents_matched" — reason "zero_documents", or "not_searchable_yet" when documents
+#                               matched but no passage came back (D-25 — a sub-reason, not a 5th
+#                               kind). ⛔ NO "error" key: ToolCallDetails short-circuits on it.
+#   3. "invalid_filter"       — the valid values listed (D-04); nothing resolved, nothing searched.
+#   4. "provider_error"       — retrieval unavailable, the pre-272 shape (BUG-260815-05).
+# A lock refusal (D-09) records "refused_retry" — a refusal, not a search (D-24's trend skips it).
 
-    metadata_filter = args.get("metadata_filter") or None
+KIND_PASSAGES = "passages"
+KIND_NO_DOCUMENTS = "no_documents_matched"
+KIND_INVALID = "invalid_filter"
+KIND_UNAVAILABLE = "provider_error"
+KIND_REFUSED = "refused_retry"
+
+_LOW_SIMILARITY_NOTE = (
+    "Passages marked low_similarity are the closest text inside the filtered documents; they "
+    "may not answer the question directly — say so if you use them."
+)
+_EMPTY_INSTRUCTION = (
+    "Tell the person that no documents matched {label}, and state the filter you used. Cite "
+    "nothing. Do not search again without this filter, and do not use grep, query_documents, "
+    "read_document or analyze_document to answer from outside it. If nearby values are listed, "
+    "you may offer them and ask whether to use one."
+)
+
+
+async def _build_field_meta(user_id: str, supabase: Any) -> tuple[set[str], set[str]]:
+    """The D-04 allowed-field source — the compiler's own whitelist (``document_view_resolver``).
+
+    A thin module-level seam so the handler's callers can patch it where it is USED; the import is
+    function-local (Pitfall 5: document_view_resolver transitively imports tool_dispatcher).
+    """
+    from app.services.document_view_resolver import _build_field_meta as _meta
+
+    return await _meta(user_id, supabase)
+
+
+def _lock_set(ctx: Any) -> set | None:
+    """D-09 — the run's lock set, or None on every unwired caller (harness / eval / tests).
+
+    ``isinstance`` and not truthiness: a ``MagicMock`` ctx would otherwise hand back a mock
+    "set" whose every method answers truthy.
+    """
+    locked = getattr(ctx, "empty_filter_fields_in_run", None)
+    return locked if isinstance(locked, set) else None
+
+
+# ── the plain filter label (the model-facing twin of 272-02's `searchFilterLine`) ────────────────
+
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+_DATE_LABELS = {
+    "date": "document date",
+    "added": "added",
+    "source_created": "created in file",
+    "source_modified": "modified in file",
+}
+
+
+def _field_label(field: str) -> str:
+    return _DATE_LABELS.get(field, field.replace("_", " "))
+
+
+def _scalar(v: Any) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    return "" if v is None else str(v)
+
+
+def _day_parts(s: str) -> tuple[int, int, int] | None:
+    if not _is_iso_day(s):
+        return None
+    return int(s[:4]), int(s[5:7]), int(s[8:10])
+
+
+def _fmt_day(s: str) -> str:
+    p = _day_parts(s)
+    return f"{p[2]} {_MONTHS[p[1] - 1]} {p[0]}" if p else s
+
+
+def _fmt_range(a: str, b: str) -> str:
+    x, y = _day_parts(a), _day_parts(b)
+    if x and y:
+        if x[0] == y[0] and x[1] == y[1]:
+            return _fmt_day(a) if x[2] == y[2] else f"{x[2]}–{y[2]} {_MONTHS[x[1] - 1]} {x[0]}"
+        if x[0] == y[0]:
+            return f"{x[2]} {_MONTHS[x[1] - 1]} – {y[2]} {_MONTHS[y[1] - 1]} {y[0]}"
+    return f"{_fmt_day(a)} – {_fmt_day(b)}"
+
+
+def _fmt_span(value: str, unit: str) -> str:
+    u = unit[:-1] if value == "1" and unit.endswith("s") else unit
+    return f"{value} {u}" if u else value
+
+
+def _condition_label(c: dict) -> str:
+    label = _field_label(str(c.get("field", "")))
+    op = str(c.get("op", ""))
+    value, value2, unit = _scalar(c.get("value")), _scalar(c.get("value2")), _scalar(c.get("unit"))
+    if op == "eq":
+        return f"{label} = {_fmt_day(value)}"
+    if op == "one_of":
+        return f"{label} in {', '.join(_scalar(v) for v in (c.get('values') or []))}"
+    if op == "contains":
+        return f"{label} contains {value}"
+    if op == "is_empty":
+        return f"{label} is empty"
+    if op == "gte":
+        return f"{label} ≥ {_fmt_day(value)}"
+    if op == "lte":
+        return f"{label} ≤ {_fmt_day(value)}"
+    if op in ("before", "after"):
+        return f"{label} {op} {_fmt_day(value)}"
+    if op == "between":
+        return f"{label} {_fmt_range(value, value2)}" if value2 else f"{label} from {_fmt_day(value)}"
+    if op == "within_next":
+        return f"{label} within next {_fmt_span(value, unit)}"
+    if op == "older_than":
+        return f"{label} older than {_fmt_span(value, unit)}"
+    return f"{label} {op.replace('_', ' ')} {value}".strip()
+
+
+def _filter_label(conditions: Sequence[dict]) -> str:
+    """"document date 1–31 Oct 2025 · legal entity = Acme GmbH" — reads the same contract as the card."""
+    return " · ".join(_condition_label(c) for c in conditions)
+
+
+def _undated_sentence(undated: int | None, date_field: str | None) -> str | None:
+    if not undated:
+        return None
+    noun = "document has" if undated == 1 else "documents have"
+    return f"{undated} {noun} no {_field_label(date_field or 'date')} and could not be checked against the filter."
+
+
+# ── the ONE audit writer (D-12) ──────────────────────────────────────────────────────────────────
+
+
+def _write_search_audit(
+    ctx: Any,
+    *,
+    query: str,
+    document_ids: Sequence[str],
+    filters: Sequence[dict],
+    result_kind: str,
+    similarities: dict | None = None,
+    matched_document_count: int | None = None,
+    undated_excluded: int | None = None,
+    retrieval_status: str | None = None,
+) -> None:
+    """The ONE ``search.query`` writer every arm uses (D-12 / T-272-21).
+
+    Keys are ADDITIVE over the pre-272 row (``query_text, document_ids, similarities, run_id,
+    thread_id, parent_run_id, folder_ids`` and ``retrieval_status`` on a provider error), so
+    ``knowledge_health.py`` / ``document_queries.py`` / ``api/audit.py`` keep reading it.
+    ``similarities`` is omitted on a row with no hits to compute it from (the 217.1 BE-5 contract).
+
+    THE WRITE IS FIRE-AND-FORGET DIAGNOSTICS AND MUST NEVER KILL THE ANSWER — 217.1-11 once made a
+    provider outage raise into the agent loop from inside this very write (`'ToolContext' object has
+    no attribute 'spawn'`). So a failure is logged and swallowed here, for every arm, and nowhere else.
+    """
+    metadata: dict = {
+        "query_text": query,
+        "document_ids": list(document_ids),
+    }
+    if similarities is not None:
+        metadata["similarities"] = similarities
+    if retrieval_status is not None:
+        # The classified literal only — NEVER `str(exc)`, which stays in ToolResult.retrieval_error
+        # (T-217.1-15b).
+        metadata["retrieval_status"] = retrieval_status
+    coro = None
     try:
-        results, avg_sim = await search_documents(
-            args["query"], ctx.current_user["id"], ctx.supabase,
-            metadata_filter=metadata_filter,
-            user_settings=ctx.user_settings,
-            folder_ids=ctx.folder_subtree_ids,
+        metadata.update({
+            # Phase 268 (D-268-13, additive): the keys that join a search to its run — the ROOT run
+            # too, for a sub-agent — and the scope actually handed to retrieval.
+            "run_id": str(ctx.run_id),
+            "thread_id": str(ctx.thread_id),
+            "parent_run_id": str(ctx.parent_run_id) if ctx.parent_run_id else None,
+            "folder_ids": [str(f) for f in (ctx.folder_subtree_ids or [])],
+            # Phase 272 (D-12, additive): the filter AS APPLIED (canonical) and which kind fired.
+            "filters": [dict(f) for f in filters],
+            "result_kind": result_kind,
+        })
+        if matched_document_count is not None:
+            metadata["matched_document_count"] = matched_document_count
+        if undated_excluded is not None:
+            metadata["undated_excluded"] = undated_excluded
+        coro = write_audit_entry(
+            user_id=ctx.current_user["id"],
+            action_type="search.query",
+            metadata=metadata,
+            supabase=ctx.supabase,
         )
-    except Exception as exc:  # noqa: BLE001 — honest tool-result error, never raise into the loop
-        # BUG-260815-05 — A SEARCH THAT COULD NOT RUN MUST NOT READ AS A SEARCH THAT
-        # FOUND NOTHING. Measured 2026-08-15: the OpenAI balance hit zero, every
-        # `search_documents` raised `RateLimitError insufficient_quota` from the QUERY
-        # embedding (`retrieval_service._vector_search:73` -> `openai_service.embed_texts`),
-        # and the operator was told, three golden runs in a row and by the only surface
-        # they had, *"citations_required: nothing was retrieved (0 sources) — this step
-        # reads your documents and must show where its answer came from"*. That sentence
-        # sent them to re-check their documents, their folder and their prompt, all of
-        # which were correct: 5 docs, 18 chunks, 0 null embeddings, matching org_id.
-        #
-        # ⚠ EVERY document in this product is embedded with an OpenAI model, so EVERY
-        # search must embed its query at retrieval time. Embedding is the one path with
-        # no provider fallback (chat routes across seven providers; embedding does not).
-        # A zero balance therefore silently zeroes retrieval for the WHOLE knowledge
-        # base — the blast radius is not one workflow.
-        #
-        # ⚠ THIS IS THE `resolve_template_placeholders` SHAPE (Phase 193.1, D-26), NOT a
-        # new invention: *could not read* and *nothing to read* must never share a
-        # message. The value here is the honest third state.
-        #
-        # ⚠ The exception is CONVERTED, never re-raised. `agent_loop`'s generic
-        # `except Exception -> "Tool error: ..."` (`agent_loop.py:2598`) already caught
-        # it, but that string is addressed to the MODEL; it is not a retrieval verdict
-        # and it does not reach the phase record the author reads. Returning an explicit
-        # unavailable result puts the reason where a person will meet it.
-        logger.error("search_documents failed for run %s: %s", getattr(ctx, "run_id", None), exc)
-        from app.services.openai_service import resolve_effective_embedding_provider
-        provider = resolve_effective_embedding_provider(getattr(ctx, "user_settings", None))
-        # BE-4 (217.1 / LIB-06 / D-217.1-34): a provider outage must be VISIBLE in the
-        # analytics. Without this write, a failed search is indistinguishable from "your
-        # library had no answer" — every `search.query` reader would count it (or not)
-        # exactly like a real search that found nothing. The row carries `document_ids: []`
-        # and the classified `retrieval_status: "provider_error"` literal — NEVER `str(exc)`,
-        # which stays in the ToolResult.retrieval_error response object (T-217.1-15b).
-        # THE WRITE IS FIRE-AND-FORGET DIAGNOSTICS AND MUST NOT BE ABLE TO KILL THE
-        # HONEST RESULT BELOW - which is exactly what it did. 217.1-11 added this call
-        # and the four Phase 210 tests that guard RAG-09 went RED with
-        # "'ToolContext' object has no attribute 'spawn'", raised from INSIDE the
-        # except arm: the AttributeError propagated past the `return`, so a provider
-        # outage stopped producing `retrieval_unavailable` at all and raised into the
-        # agent loop instead - the precise outcome the test named
-        # `..._does_not_raise_into_the_agent_loop` exists to forbid.
-        #
-        # The ordering is the fix: an analytics row is worth having, and it is worth
-        # strictly less than the sentence that tells a person their library could not be
-        # searched. So the failure is logged and swallowed HERE, and nowhere else.
-        try:
-            ctx.spawn(write_audit_entry(
-                user_id=ctx.current_user["id"],
-                action_type="search.query",
-                metadata={
-                    "query_text": args["query"],
-                    "document_ids": [],
-                    "retrieval_status": "provider_error",
-                    # Phase 268 (D-268-13): the run join keys — see the success write below.
-                    "run_id": str(ctx.run_id),
-                    "thread_id": str(ctx.thread_id),
-                    "parent_run_id": str(ctx.parent_run_id) if ctx.parent_run_id else None,
-                    "folder_ids": [str(f) for f in (ctx.folder_subtree_ids or [])],
-                },
-                supabase=ctx.supabase,
-            ))
-        except Exception:  # noqa: BLE001 - diagnostics may never mask the outage
-            logger.warning(
-                "search_documents: the provider-error audit row could not be scheduled; "
-                "the retrieval failure itself is still reported", exc_info=True,
+        ctx.spawn(coro)
+    except Exception:  # noqa: BLE001 — diagnostics may never mask the answer
+        if coro is not None and hasattr(coro, "close"):
+            coro.close()
+        logger.warning(
+            "search_documents: the %s audit row could not be scheduled; the result itself is "
+            "still returned", result_kind, exc_info=True,
+        )
+
+
+# ── the arms ─────────────────────────────────────────────────────────────────────────────────────
+
+
+def _invalid_filter(ctx: Any, query: str, refusal: FilterRefusal, requested: Sequence[dict], ToolResult: Any):
+    """Kind 3 (D-04) — *"you misspelled it"* is never reported as *"no documents"*."""
+    _write_search_audit(ctx, query=query, document_ids=[], filters=requested, result_kind=KIND_INVALID)
+    return ToolResult(
+        result=json.dumps({
+            "error": "invalid_filter",
+            "field": refusal.field,
+            "allowed": list(refusal.allowed),
+            "message": refusal.message,
+            "instruction": (
+                "Retry search_documents with a valid field or value from `allowed`, or ask the "
+                "person which they meant. Do not drop the filter to search everything."
+            ),
+        }),
+        citations=[],
+        source_refs=[],
+    )
+
+
+def _refused_retry(ctx: Any, query: str, locked: set, requested: Sequence[dict], ToolResult: Any):
+    """D-09 — a search that drops a field whose filter already matched nothing is refused."""
+    fields = sorted(locked)
+    _write_search_audit(ctx, query=query, document_ids=[], filters=requested, result_kind=KIND_REFUSED)
+    return ToolResult(
+        result=json.dumps({
+            "error": "refused_retry",
+            "locked_fields": fields,
+            "message": (
+                f"A filtered search on {', '.join(fields)} already matched no documents in this turn, "
+                "so a search without that filter is refused: it would answer from outside what was asked."
+            ),
+            "instruction": (
+                "Tell the person nothing matched the filter. You may search again with a different "
+                "value on the same field(s) (for example another month), but not without them."
+            ),
+        }),
+        citations=[],
+        source_refs=[],
+    )
+
+
+def _no_documents(
+    ctx: Any,
+    query: str,
+    *,
+    applied: Sequence[dict],
+    label: str,
+    reason: str,
+    matched: int,
+    undated: int | None,
+    date_field: str | None,
+    nearby: list,
+    ToolResult: Any,
+    lead: str | None = None,
+):
+    """Kind 2 (D-11 / D-25) — names the filter, cites nothing, may offer nearby values."""
+    locked = _lock_set(ctx)
+    if locked is not None:
+        locked.update(str(c.get("field")) for c in applied)  # D-09 — this turn cannot drop them
+    if lead is None:
+        if reason == "not_searchable_yet":
+            noun = "document" if matched == 1 else "documents"
+            lead = (
+                f"{matched} {noun} matched {label}, but none of them has searchable passages yet "
+                "(they may still be processing)."
             )
-        return ToolResult(
-            result=json.dumps({
-                "error": "retrieval_unavailable",
-                "provider": provider,
-                "detail": (
-                    f"The document search could not run — the search provider ({provider}) returned: {exc}. "
-                    "This is NOT a result of zero matches: your documents were never queried. "
-                    "Say plainly that document search is unavailable; do not state or imply "
-                    "that the knowledge base contains no relevant information."
-                ),
-            }),
-            citations=[],
-            source_refs=[],
-            retrieval_error={
-                "provider": provider,
-                "detail": str(exc),
-                "retrieval_status": "provider_error",
-            },
+        else:
+            lead = f"No documents matched {label}."
+    parts = [lead]
+    undated_line = _undated_sentence(undated, date_field)
+    if undated_line:
+        parts.append(undated_line)
+    if nearby:
+        shown = ", ".join(
+            f"{n.get('label') or n.get('value')} ({n.get('documents')} document{'s' if n.get('documents') != 1 else ''})"
+            for n in nearby
         )
+        parts.append(f"Nearby values that do have documents: {shown}.")
+    _write_search_audit(
+        ctx, query=query, document_ids=[], filters=applied, result_kind=KIND_NO_DOCUMENTS,
+        matched_document_count=matched, undated_excluded=undated,
+    )
+    return ToolResult(
+        result=json.dumps({
+            "status": "no_documents_matched",
+            "reason": reason,
+            "filter": label,
+            "matched_documents": matched,
+            "undated_excluded": undated,
+            "nearby": nearby,
+            "message": " ".join(parts),
+            "instruction": _EMPTY_INSTRUCTION.format(label=label),
+        }),
+        citations=[],
+        source_refs=[],
+    )
+
+
+def _provider_error(ctx: Any, query: str, exc: Exception, filters: Sequence[dict], ToolResult: Any):
+    """Kind 4 — the pre-272 provider-error arm, unchanged in what it returns."""
+    # BUG-260815-05 — A SEARCH THAT COULD NOT RUN MUST NOT READ AS A SEARCH THAT
+    # FOUND NOTHING. Measured 2026-08-15: the OpenAI balance hit zero, every
+    # `search_documents` raised `RateLimitError insufficient_quota` from the QUERY
+    # embedding (`retrieval_service._vector_search:73` -> `openai_service.embed_texts`),
+    # and the operator was told, three golden runs in a row and by the only surface
+    # they had, *"citations_required: nothing was retrieved (0 sources) — this step
+    # reads your documents and must show where its answer came from"*. That sentence
+    # sent them to re-check their documents, their folder and their prompt, all of
+    # which were correct: 5 docs, 18 chunks, 0 null embeddings, matching org_id.
+    #
+    # ⚠ EVERY document in this product is embedded with an OpenAI model, so EVERY
+    # search must embed its query at retrieval time. Embedding is the one path with
+    # no provider fallback (chat routes across seven providers; embedding does not).
+    # A zero balance therefore silently zeroes retrieval for the WHOLE knowledge
+    # base — the blast radius is not one workflow.
+    #
+    # ⚠ THIS IS THE `resolve_template_placeholders` SHAPE (Phase 193.1, D-26), NOT a
+    # new invention: *could not read* and *nothing to read* must never share a
+    # message. The value here is the honest third state.
+    #
+    # ⚠ The exception is CONVERTED, never re-raised. `agent_loop`'s generic
+    # `except Exception -> "Tool error: ..."` already caught it, but that string is
+    # addressed to the MODEL; it is not a retrieval verdict and it does not reach the
+    # phase record the author reads. Returning an explicit unavailable result puts the
+    # reason where a person will meet it.
+    logger.error("search_documents failed for run %s: %s", getattr(ctx, "run_id", None), exc)
+    from app.services.openai_service import resolve_effective_embedding_provider
+    provider = resolve_effective_embedding_provider(getattr(ctx, "user_settings", None))
+    # BE-4 (217.1 / LIB-06 / D-217.1-34): a provider outage must be VISIBLE in the analytics —
+    # `document_ids: []` + the classified `retrieval_status="provider_error"` literal.
+    _write_search_audit(
+        ctx, query=query, document_ids=[], filters=filters, result_kind=KIND_UNAVAILABLE,
+        retrieval_status="provider_error",
+    )
+    return ToolResult(
+        result=json.dumps({
+            "error": "retrieval_unavailable",
+            "provider": provider,
+            "detail": (
+                f"The document search could not run — the search provider ({provider}) returned: {exc}. "
+                "This is NOT a result of zero matches: your documents were never queried. "
+                "Say plainly that document search is unavailable; do not state or imply "
+                "that the knowledge base contains no relevant information."
+            ),
+        }),
+        citations=[],
+        source_refs=[],
+        retrieval_error={
+            "provider": provider,
+            "detail": str(exc),
+            "retrieval_status": "provider_error",
+        },
+    )
+
+
+def _filter_unavailable(ctx: Any, query: str, detail: str, filters: Sequence[dict], ToolResult: Any):
+    """Kind 4 for the FILTER half — the document set could not be resolved (e.g. truncated)."""
+    logger.error("search_documents: filter resolution failed for run %s: %s", getattr(ctx, "run_id", None), detail)
+    _write_search_audit(
+        ctx, query=query, document_ids=[], filters=filters, result_kind=KIND_UNAVAILABLE,
+        retrieval_status="provider_error",
+    )
+    return ToolResult(
+        result=json.dumps({
+            "error": "retrieval_unavailable",
+            "provider": "document filter",
+            "detail": (
+                f"{detail} This is NOT a result of zero matches. Say plainly that the filtered "
+                "search could not run; do not state or imply that no documents match."
+            ),
+        }),
+        citations=[],
+        source_refs=[],
+        retrieval_error={"provider": "document filter", "detail": detail, "retrieval_status": "provider_error"},
+    )
+
+
+async def _clip_to_folder_scope(ctx: Any, query: str, results: list | None) -> list:
     # Phase 098 GOV-01 (SC#3 ⊆ assert + SC#4 clip + observable) — the loud runtime
     # backstop. The RPC p_folder_ids filter is the PRIMARY enforcement; this post-query
     # clip is the in-app guard for bugs / future tool paths (D-05/D-06). Gated on
     # `folder_subtree_ids is not None` so the shared search path is byte-identical for
     # Deep whole-KB (D-05a — mirrors _handle_glob:145); the additive folder_id enrich
-    # key is inert when this block is skipped.
+    # key is inert when this block is skipped. Phase 272 (D-19): it runs AFTER the
+    # document-set restriction too, so a filter can only ever NARROW the folder scope.
     if ctx.folder_subtree_ids is not None:
         _scope = set(map(str, ctx.folder_subtree_ids))   # Pitfall 1: set()-ify LOCALLY; the ctx channel stays a list
         _kept = [h for h in (results or []) if str(h.get("folder_id")) in _scope]
@@ -491,16 +793,17 @@ async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
                     ctx.redis, ctx.run_id, "scope_violation",
                     dropped=len(_dropped),
                     out_of_scope_folders=sorted({str(h.get("folder_id")) for h in _dropped}),
-                    query=args["query"],
+                    query=query,
                 )
             except Exception:   # best-effort (D-06) — an emit failure must NOT break a clean retrieval
                 logger.exception("scope_violation emit failed for run %s", getattr(ctx, "run_id", None))
-    tool_result = json.dumps(results) if results else "No relevant documents found."
+    return list(results or [])
 
+
+def _citations(ctx: Any, results: list, avg_sim: float) -> tuple[list[dict], list[dict], float | None]:
     source_refs: list[dict] = []
     citations: list[dict] = []
     similarity_score: float | None = None
-
     # Accumulate full citation objects for citations event (D-04, D-14)
     if results and isinstance(results, list):
         for hit in results:
@@ -531,45 +834,213 @@ async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
             ctx.has_connection_retrieval = True
         except Exception:
             pass
+    return source_refs, citations, similarity_score
 
+
+def _audit_ids_and_sims(results: list) -> tuple[list[str], dict[str, float]]:
     # Audit: fire-and-forget inside async generator (AUDIT-02)
     _audit_doc_ids = list({
         h.get("document_id") or h.get("id")
         for h in (results or [])
         if h.get("document_id") or h.get("id")
     })
-    # BE-5 (217.1 / LIB-07): persist the per-hit similarity the retrieval ALREADY returns
-    # (retrieval_service.py:173 — it was being thrown away before reaching audit_log.metadata,
-    # so `Average relevance` could only lie about a value the system has). Max similarity per
-    # document (a document can contribute several chunks), rounded to 3 dp — matching
-    # _fetch_low_confidence_queries' existing convention (knowledge_health.py:302).
+    # BE-5 (217.1 / LIB-07): persist the per-hit similarity the retrieval ALREADY returns.
+    # Max similarity per document (a document can contribute several chunks), rounded to 3 dp —
+    # matching _fetch_low_confidence_queries' existing convention (knowledge_health.py).
     _sims: dict[str, float] = {}
     for h in (results or []):
         _did = h.get("document_id") or h.get("id")
         _s = h.get("similarity")
         if _did and isinstance(_s, (int, float)):
             _sims[_did] = max(_sims.get(_did, 0.0), round(float(_s), 3))
-    ctx.spawn(write_audit_entry(
-        user_id=ctx.current_user["id"],
-        action_type="search.query",
-        metadata={
-            "query_text": args["query"],
-            "document_ids": _audit_doc_ids,
-            "similarities": _sims,
-            # Phase 268 (D-268-13, additive): SC#3's "retrieved-chunk records" do not exist, so
-            # every search row carries the keys that join it to its run — the ROOT run too, for a
-            # sub-agent — and the scope actually handed to retrieval, evidence independent of the
-            # result set. Readers only .get() known keys (api/audit.py, knowledge_health.py).
-            "run_id": str(ctx.run_id),
-            "thread_id": str(ctx.thread_id),
-            "parent_run_id": str(ctx.parent_run_id) if ctx.parent_run_id else None,
-            "folder_ids": [str(f) for f in (ctx.folder_subtree_ids or [])],
-        },
-        supabase=ctx.supabase,
-    ))
+    return _audit_doc_ids, _sims
 
+
+async def _search_unfiltered(args: dict, ctx: Any, ToolResult: Any):
+    """The pre-272 path, byte-for-byte in what it calls and returns.
+
+    ⛔ It passes NO ``document_ids`` kwarg (never ``document_ids=None``): test_260's fixed-signature
+    retrieval fakes would TypeError, and "no filter" must stay the call it always was.
+    """
+    try:
+        results, avg_sim = await search_documents(
+            args["query"], ctx.current_user["id"], ctx.supabase,
+            metadata_filter=None,
+            user_settings=ctx.user_settings,
+            folder_ids=ctx.folder_subtree_ids,
+        )
+    except Exception as exc:  # noqa: BLE001 — honest tool-result error, never raise into the loop
+        return _provider_error(ctx, args["query"], exc, [], ToolResult)
+    results = await _clip_to_folder_scope(ctx, args["query"], results)
+    tool_result = json.dumps(results) if results else "No relevant documents found."
+    source_refs, citations, similarity_score = _citations(ctx, results, avg_sim)
+    doc_ids, sims = _audit_ids_and_sims(results)
+    _write_search_audit(
+        ctx, query=args["query"], document_ids=doc_ids, similarities=sims,
+        filters=[], result_kind=KIND_PASSAGES,
+    )
     return ToolResult(
         result=tool_result,
+        source_refs=source_refs,
+        citations=citations,
+        similarity_score=similarity_score,
+    )
+
+
+async def _nearby_for(ctx: Any, applied: Sequence[dict], date_field: str | None, folder_ids: Any) -> list:
+    """D-11 — nearby values for the date field (or the first dimension), best effort."""
+    field = date_field or next(
+        (str(c["field"]) for c in applied if c.get("field") not in DATE_WORDS and c.get("field") != "date"),
+        None,
+    ) or (str(applied[0]["field"]) if applied else None)
+    if field is None:
+        return []
+    try:
+        return await nearby_values(
+            user_id=ctx.current_user["id"], conditions=list(applied), field=field,
+            folder_ids=folder_ids, supabase=ctx.supabase,
+        )
+    except Exception:  # noqa: BLE001 — a hint, never a reason to fail the honest kind-2 answer
+        logger.warning("search_documents: nearby values could not be read", exc_info=True)
+        return []
+
+
+async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
+    """``search_documents`` — honour the filter end to end (FIND-07; D-03 … D-25).
+
+    Order: parse → the D-09 lock → the empty-scope short-circuit → (unfiltered: the pre-272 path)
+    → field metadata + validate/canonicalise → resolve the RLS document set → empty → kind 2
+    BEFORE any retrieval call → retrieval on BOTH arms restricted to that set AND the folder scope
+    → folder clip → kind 1 (or kind 2 ``not_searchable_yet``).
+    """
+    # Function-local on purpose (D-15 / T-272-03): tool_dispatcher imports THIS module at load,
+    # so a module-level import of it would cycle. By call time the dispatcher is fully loaded.
+    from app.services.tool_dispatcher import ToolResult
+
+    query = args["query"]
+    parsed = parse_filter_args(args)
+    if isinstance(parsed, FilterRefusal):
+        return _invalid_filter(ctx, query, parsed, [], ToolResult)
+    requested = [_as_dict(c) for c in parsed]
+
+    # D-09 — after a zero match this turn, a search that DROPS one of that filter's fields is
+    # refused. A different value on the same field is allowed (the set is a subset check on fields).
+    locked = _lock_set(ctx)
+    if locked and not locked <= {c.field for c in parsed}:
+        return _refused_retry(ctx, query, locked, requested, ToolResult)
+
+    # D-18 (266 CR-01) — both retrieval arms read `folder_ids=[]` as NO folder restriction
+    # (`folder_ids if folder_ids else None`), so an EMPTY folder scope handed to them widens to the
+    # whole knowledge base. An empty scope is a restriction to nothing: kind 2, zero calls.
+    folder_ids = ctx.folder_subtree_ids
+    if folder_ids is not None and len(folder_ids) == 0:
+        label = _filter_label(requested) or "this chat's folder scope"
+        return _no_documents(
+            ctx, query, applied=requested, label=label, reason="zero_documents", matched=0,
+            undated=None, date_field=None, nearby=[], ToolResult=ToolResult,
+            lead="No documents are in this chat's scope (its folder scope is empty), so nothing could be searched.",
+        )
+
+    if not requires_resolved_scope(parsed):
+        return await _search_unfiltered(args, ctx, ToolResult)
+
+    uid = ctx.current_user["id"]
+    try:
+        defs = await list_field_definitions(uid, supabase=ctx.supabase)  # D-26: own + system-global
+        whitelist, number_fields = await _build_field_meta(uid, ctx.supabase)
+    except Exception as exc:  # noqa: BLE001
+        return _filter_unavailable(
+            ctx, query, f"The list of filterable fields could not be read ({type(exc).__name__}).",
+            requested, ToolResult,
+        )
+    canonical = await validate_and_canonicalise(
+        parsed, user_id=uid, supabase=ctx.supabase, defs=defs,
+        whitelist=whitelist, number_fields=number_fields,
+    )
+    if isinstance(canonical, FilterRefusal):
+        return _invalid_filter(ctx, query, canonical, requested, ToolResult)
+
+    from app.services.document_search_service import SearchTruncatedError
+    from app.services.document_view_resolver import ResolveError
+
+    try:
+        # D-19 / D-21: the folder (and Expert) scope is passed VERBATIM and ANDed in step 1; RLS
+        # decides in step 2.
+        scope = await resolve_document_scope(
+            user_id=uid, conditions=canonical, folder_ids=folder_ids, supabase=ctx.supabase,
+        )
+    except SearchTruncatedError:  # BEFORE ResolveError — it is a subclass of it
+        return _filter_unavailable(
+            ctx, query,
+            "The filter matched too many documents to resolve in one search; narrow the filter "
+            "(a shorter period, or one more field) and retry.",
+            canonical, ToolResult,
+        )
+    except ResolveError as exc:
+        if getattr(exc, "status", 422) >= 500:
+            return _filter_unavailable(ctx, query, str(exc.detail), canonical, ToolResult)
+        return _invalid_filter(
+            ctx, query, FilterRefusal("filters", f"The filter was refused: {exc.detail}."), canonical, ToolResult,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _filter_unavailable(
+            ctx, query, f"The document filter could not be resolved ({type(exc).__name__}).",
+            canonical, ToolResult,
+        )
+
+    applied = [dict(c) for c in scope.applied] or list(canonical)
+    label = _filter_label(applied)
+    if scope.is_empty:
+        # ⛔ D-18 — computed BEFORE and INSTEAD OF any retrieval call. An empty set handed on would
+        # be read as "no restriction" — the inversion test_267_cr02 records for Phase 266 CR-01.
+        nearby = await _nearby_for(ctx, applied, scope.date_field, folder_ids)
+        return _no_documents(
+            ctx, query, applied=applied, label=label, reason="zero_documents", matched=0,
+            undated=scope.undated_excluded, date_field=scope.date_field, nearby=nearby,
+            ToolResult=ToolResult,
+        )
+
+    try:
+        results, avg_sim = await search_documents(
+            query, uid, ctx.supabase,
+            metadata_filter=None,  # D-03: mapped onto `filters` above — one dialect
+            user_settings=ctx.user_settings,
+            folder_ids=folder_ids,
+            document_ids=scope.document_ids,
+        )
+    except Exception as exc:  # noqa: BLE001 — honest tool-result error, never raise into the loop
+        return _provider_error(ctx, query, exc, applied, ToolResult)
+
+    results = await _clip_to_folder_scope(ctx, query, results)
+    matched = len(scope.document_ids)
+    if not results:
+        # D-25 — documents matched but nothing came back (still ingesting): kind 2, sub-reason.
+        return _no_documents(
+            ctx, query, applied=applied, label=label, reason="not_searchable_yet", matched=matched,
+            undated=scope.undated_excluded, date_field=scope.date_field, nearby=[],
+            ToolResult=ToolResult,
+        )
+
+    source_refs, citations, similarity_score = _citations(ctx, results, avg_sim)
+    doc_ids, sims = _audit_ids_and_sims(results)
+    _write_search_audit(
+        ctx, query=query, document_ids=doc_ids, similarities=sims, filters=applied,
+        result_kind=KIND_PASSAGES, matched_document_count=matched, undated_excluded=scope.undated_excluded,
+    )
+    summary: dict = {
+        "filter_applied": label,
+        "matched_documents": matched,
+        "undated_excluded": scope.undated_excluded,
+        "passages": results,
+    }
+    undated_line = _undated_sentence(scope.undated_excluded, scope.date_field)
+    if undated_line:
+        summary["undated_note"] = undated_line
+    if any(h.get("low_similarity") for h in results):
+        summary["low_similarity_note"] = _LOW_SIMILARITY_NOTE  # D-10 — marked, never "nothing"
+    return ToolResult(
+        result=json.dumps(results),
+        llm_content=json.dumps(summary),
         source_refs=source_refs,
         citations=citations,
         similarity_score=similarity_score,

@@ -104,9 +104,25 @@ def test_an_unscoped_run_records_an_empty_folder_list(monkeypatch):
 
 
 def test_both_arms_carry_the_literal_run_key():
+    """Re-driven by 272-04 (D-12): the run join keys now live in ONE writer every arm uses.
+
+    This used to count the literal ``"run_id": str(ctx.run_id)`` in the handler == 2 — one per
+    hand-written audit write (success + provider error). 272-04 CENTRALISED the write into
+    ``search_documents_tool._write_search_audit`` (the four result kinds + the lock refusal would
+    otherwise need six copies), so the honest assertion is now: exactly ONE write site, it carries
+    the run key, the handler writes nothing itself, and both arms above still produce the key
+    (``test_the_success_row_…`` / ``test_the_provider_error_row_…`` drive them).
+    """
     import inspect
 
+    import app.services.search_documents_tool as sdt
     import app.services.tool_dispatcher as td
 
-    src = inspect.getsource(td._handle_search_documents)
-    assert src.count('"run_id": str(ctx.run_id)') == 2
+    module_code = [
+        ln for ln in inspect.getsource(sdt).splitlines() if not ln.lstrip().startswith("#")
+    ]
+    assert sum("write_audit_entry(" in ln for ln in module_code) == 1
+    writer = inspect.getsource(sdt._write_search_audit)
+    assert writer.count('"run_id": str(ctx.run_id)') == 1
+    assert "write_audit_entry(" in writer
+    assert "write_audit_entry(" not in inspect.getsource(td._handle_search_documents)

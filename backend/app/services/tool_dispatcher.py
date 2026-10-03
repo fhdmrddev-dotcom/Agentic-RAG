@@ -133,6 +133,13 @@ class ToolContext:
     # `scripts/`|`assets/`|`resources/`-prefixed relative miss — WR-01), so the set
     # grows only with genuinely-lost helper paths, never arbitrary model input (T-142-04).
     dead_gap_tokens_in_run: set | None = None
+    # Phase 272 (D-09) — per-turn STRUCTURAL retry lock for search_documents. The fields of a
+    # filtered search that matched ZERO documents this turn; a later search that drops one is
+    # refused. By-reference run accumulator (the dead_gap_tokens_in_run shape): init once in
+    # agent_loop.py, threaded into BOTH ToolContext builds — but SHARED with task sub-agents by
+    # reference (deliberately unlike dead_gap_tokens_in_run, so a sub-agent cannot become an
+    # unfiltered bypass). None on every unwired (harness/eval/test) caller => the lock is a no-op.
+    empty_filter_fields_in_run: set | None = None
     tool_index: int = 0  # current index in the tool_calls list (used by execute_code heartbeat)
     iteration: int = 0  # current agent loop iteration (used by harvest_output_files)
     # Phase 085 — D-085-09 / D-085-12 / D-085-15 / D-085-01
