@@ -100,6 +100,11 @@ def _normalised_handler(src: str):
     (asserted to be ONLY imports from ``app.services.tool_dispatcher``) — 272-01's normalisation."""
     fn = _top_level_function(src, "handle_search_documents")
     assert fn is not None, "handle_search_documents not found"
+    # A leading docstring is dropped (272-04 added one; the WAVE1 blob has none, so this is a
+    # no-op for the history proof) — so a comparison against a rewritten handler fails on the
+    # BODY, never on the positive control below.
+    if fn.body and isinstance(fn.body[0], ast.Expr) and isinstance(getattr(fn.body[0], "value", None), ast.Constant):
+        fn.body.pop(0)
     stripped = []
     while fn.body and isinstance(fn.body[0], (ast.Import, ast.ImportFrom)):
         stripped.append(fn.body.pop(0))
@@ -125,9 +130,7 @@ def test_handler_move_proven_at_wave1_merge():
 def test_handler_was_rewritten_after_the_move():
     """Non-vacuity of the retirement: HEAD's handler is NOT the base handler any more (272-04)."""
     base_fn = _top_level_function(_blob_at_base(_TD_REL), "_handle_search_documents")
-    head_fn = _top_level_function((REPO_ROOT / _TOOL_REL).read_text(encoding="utf-8"), "handle_search_documents")
-    assert head_fn is not None
-    head_fn.name = base_fn.name
+    head_fn = _normalised_handler((REPO_ROOT / _TOOL_REL).read_text(encoding="utf-8"))
     assert ast.dump(head_fn) != ast.dump(base_fn)
 
 
