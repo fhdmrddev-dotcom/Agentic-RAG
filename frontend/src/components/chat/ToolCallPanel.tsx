@@ -16,7 +16,7 @@ import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
 import { TOOL_BODIES } from "./tool-bodies"
 import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
 import { ExecuteCodeEditorInset } from "./tool-bodies/ExecuteCodeBody"
-import { toolLabel } from "@/lib/toolMeta"
+import { toolLabel, searchFilterLine } from "@/lib/toolMeta"
 import { preparingDescription } from "@/lib/providerLogo"
 import { StatusPill } from "./StatusPill"
 import { dedupToolCalls } from "@/lib/stepCount"
@@ -167,6 +167,9 @@ export function ToolCallPanel({ toolCalls, activatedSkills, isStreaming = false 
         }
         const tc = item.tc
         const summary = toolSummary(tc)
+        // Phase 272 (D-08): the applied filter as ONE visible line, from the call's
+        // persisted args (never the truncated result). Null for an unfiltered search.
+        const filterLine = searchFilterLine(tc.name, (tc.args ?? {}) as Record<string, unknown>)
         const agentState: SubAgentState | undefined = tc.sub_agent
         // Phase 075.8 Task 3 (sketch 002 D6): active-tool glow + bottom shimmer.
         // Applied to the per-tool wrapper when the tool is running or preparing.
@@ -244,6 +247,11 @@ export function ToolCallPanel({ toolCalls, activatedSkills, isStreaming = false 
               {isCollapsedToEssence ? (
                 <>
                   <ToolEssenceLine tc={tc} onExpand={() => expandStep(stepKey)} />
+                  {filterLine && (
+                    <div data-testid="search-filter-line" className="ml-8 mt-1 text-[10px] text-muted-foreground">
+                      {filterLine}
+                    </div>
+                  )}
                   {tc.sub_agent_model && (
                     <div className="ml-8 mt-1 text-[10px] text-muted-foreground italic font-mono">
                       Sub-agent: {tc.sub_agent_model}
@@ -315,6 +323,13 @@ export function ToolCallPanel({ toolCalls, activatedSkills, isStreaming = false 
                       }
                     />
                   </div>
+
+                  {/* Phase 272 (D-08): the applied filter, visible text, never a tooltip */}
+                  {filterLine && (
+                    <div data-testid="search-filter-line" className="ml-8 mt-1 text-[10px] text-muted-foreground">
+                      {filterLine}
+                    </div>
+                  )}
 
                   {/* Sub-agent model line */}
                   {tc.sub_agent_model && (

@@ -475,3 +475,88 @@ describe("ToolCallPanel — Phase 075.9 T3 clientKey dedup", () => {
     expect(editors.length).toBe(1)
   })
 })
+
+/**
+ * Phase 272 (FIND-07, D-08) — the applied filter is ONE plain, VISIBLE text line on the
+ * search card, in both the collapsed-essence and the full branch. ⛔ Never tooltip-only:
+ * OV-266-01 shipped a note that lived only in a `title` and nobody could see it. The words
+ * are the deliverable, so `textContent` is pinned with `toBe`, not a presence check.
+ */
+describe("ToolCallPanel — Phase 272 D-08: the search filter line", () => {
+  const D08_ARGS = {
+    query: "revenue",
+    filters: [
+      { field: "date", op: "between", value: "2025-10-01", value2: "2025-10-31" },
+      { field: "legal_entity", op: "eq", value: "Acme GmbH" },
+    ],
+  } as unknown as ToolCall["args"]
+  const D08_LINE = "Filtered: document date 1–31 Oct 2025 · legal entity = Acme GmbH"
+
+  function assertVisible(el: Element, root: Element) {
+    let node: Element | null = el
+    while (node && node !== root.parentElement) {
+      expect(node.hasAttribute("hidden")).toBe(false)
+      expect(node.getAttribute("aria-hidden")).not.toBe("true")
+      expect(node.classList.contains("sr-only")).toBe(false)
+      expect(node.classList.contains("hidden")).toBe(false)
+      node = node.parentElement
+    }
+    // No tooltip copy of the line anywhere in the panel (OV-266-01).
+    root.querySelectorAll("[title]").forEach((t) => {
+      expect(t.getAttribute("title") ?? "").not.toMatch(/Filtered/)
+    })
+  }
+
+  it("collapsed essence: a finished filtered search shows the exact line, visibly", () => {
+    const { container } = renderWithTooltip(
+      <ToolCallPanel toolCalls={[mkDoneTool({ id: "t1", iteration: 0, args: D08_ARGS })]} />,
+    )
+    // At rest the step is folded to its essence card.
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(1)
+    const lines = container.querySelectorAll("[data-testid='search-filter-line']")
+    expect(lines.length).toBe(1)
+    expect(lines[0].textContent).toBe(D08_LINE)
+    assertVisible(lines[0], container)
+  })
+
+  it("full branch: the expanded card still shows the exact line, once", () => {
+    const { container } = renderWithTooltip(
+      <ToolCallPanel toolCalls={[mkDoneTool({ id: "t1", iteration: 0, args: D08_ARGS })]} />,
+    )
+    fireEvent.click(container.querySelector("[data-testid='tool-result-summary']") as HTMLButtonElement)
+    // Expanded: the essence card is gone, the full branch renders.
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(0)
+    const lines = container.querySelectorAll("[data-testid='search-filter-line']")
+    expect(lines.length).toBe(1)
+    expect(lines[0].textContent).toBe(D08_LINE)
+    assertVisible(lines[0], container)
+  })
+
+  it("a RUNNING filtered search already shows the line (args are known at call start)", () => {
+    const { container } = renderWithTooltip(
+      <ToolCallPanel toolCalls={[mkActiveTool({ id: "t1", iteration: 0, args: D08_ARGS })]} />,
+    )
+    const lines = container.querySelectorAll("[data-testid='search-filter-line']")
+    expect(lines.length).toBe(1)
+    expect(lines[0].textContent).toBe(D08_LINE)
+  })
+
+  it("an unfiltered search and a non-search tool render no filter line", () => {
+    const { container } = renderWithTooltip(
+      <ToolCallPanel
+        toolCalls={[
+          mkDoneTool({ id: "t1", iteration: 0 }),
+          mkDoneTool({
+            id: "t2",
+            iteration: 0,
+            name: "query_documents",
+            args: D08_ARGS,
+          }),
+        ]}
+      />,
+    )
+    // POSITIVE CONTROL: both rows rendered.
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(2)
+    expect(container.querySelectorAll("[data-testid='search-filter-line']").length).toBe(0)
+  })
+})
