@@ -247,6 +247,15 @@ Threads: G4-1 `ff82bf25` (first drive) and `6cfb82df` (re-drive with the unfold 
 - **F-3 (copy):** `SearchDocumentsBody.tsx:14` summarises every non-array result as `0 results` — a
   lock refusal (`refused_retry`), an invalid filter and a true empty match all read the same.
 
+**Operator rulings at the Task 4 checkpoint (2026-10-03), and what was done with each:**
+
+| Item | Ruling | Done in 272-05 | Re-run owed |
+|---|---|---|---|
+| **F-2** | **Fix in 272.** Every matched document returns its best passage, up to `top_k`, with below-threshold ones marked `low_similarity`. Recorded as CONTEXT **D-27**, which refines D-10. | Fixed with TDD. RED: 7 new or changed cases in `test_272_filtered_both_arms.py`. GREEN: `retrieval_rank._select_filtered_vector_rows` keeps each uncovered document's best row, marked. The new `_cover_matched_documents` keeps one passage per document in the filtered top-`k` cut, and after rerank. The unfiltered path is unchanged, and `test_unfiltered_rpc_calls_are_pinned` stays green. | Board (b) × 8 and G4-3, **after a backend restart** |
+| **Google 0/3** | **Investigate first**, bounded. | Verdict: **(ii) model behaviour**, plus one cause on our side in row (b), which is F-2 and is now fixed. Evidence is in `272-UAT-LOG.md` → "Google 0/3 — bounded investigation". The schema survives the sanitizer whole, and Gemini emitted well-formed `filters` 3 times. It preferred `query_documents` SQL, never emitted a date filter, and run (c) ended at the 15-step iteration cap. **SC#4 Google rows (a) and (c) are recorded UNMET (model behaviour).** | Google (b) after the restart. (a) and (c) re-run only to confirm |
+| **F-3** | **Fast fix now.** | Fixed with TDD. `SearchDocumentsBody.summarize` now reads `refused — would drop the filter` / `invalid filter (<field>)` / `no documents matched` / `N matched — not searchable yet` / `search unavailable`. A new suite, `SearchDocumentsBody.test.ts` (9 cases, 6 RED on the shipped tree), is adopted in BOTH count-gate knobs. The workspace TODO showing a refused call as `COMPLETED` is a separate file (the panel's activity-derived todos), so it is **noted and not fixed**. | G4-2 card text, after the restart and a frontend reload |
+| **F-1** | **Accept, plant a seed.** | **SEED-333** planted, routed to Phase 273. Its `trigger_paths` include `RunCard.tsx`. | none |
+
 ## 5. Known limits recorded, not hidden
 - D-22: `grep` / `query_documents` / `read_document` are not structurally locked by D-09; the prompt
   rule plus the board's all-tool-calls check (prompt c) is the mitigation.

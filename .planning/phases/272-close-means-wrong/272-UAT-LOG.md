@@ -242,11 +242,123 @@ non-array result (refusal, invalid filter and empty match all look the same; the
 shows the refused call `COMPLETED`). That file is unchanged by 272, and the size of the fix is
 `/gsd:fast`.
 
+## Operator rulings at the Task 4 checkpoint (2026-10-03), executed
+
+The table is in `272-VALIDATION.md` §4. The details follow.
+
+### F-2 — "Fix in 272" (CONTEXT D-27)
+
+The operator's intent: inside a matched filter set, return the best passage from **every** matched
+document (up to `top_k`), with below-threshold ones marked `low_similarity`. Before this fix, a
+document scoring under 0.3 was dropped whenever any other passage cleared it. TDD:
+
+- RED `test(272-05)`. Seven cases in `backend/tests/unit/test_272_filtered_both_arms.py` failed on
+  the shipped tree for the stated reasons (`['a1'] == ['a1','b1','c1']`, `{'dA'} == {'dA','dB'}`,
+  and the missing `_cover_matched_documents`). One existing assertion, *"d2 is dropped"*, was changed
+  on purpose: it pinned the D-10 behaviour that D-27 replaces.
+- GREEN `fix(272-05)`. `retrieval_rank._select_filtered_vector_rows` keeps the above-threshold rows
+  and adds the best row of each document that has none, marked. The new pure helper
+  `_cover_matched_documents(rows, top_k)` takes each document's best-ranked row first, fills the
+  remaining slots by rank, and keeps rank order. `retrieval_service.search_documents` uses it for
+  the filtered cut on both paths. The reranker sees the full filtered selection
+  (`top_n=len(candidates)`) and its output is cut with coverage. The unfiltered path is unchanged:
+  `[:top_k]` and rerank `top_n=top_k`.
+- Targeted runs: `pytest tests/unit -k 272` gave **143 passed**. `test_retrieval_service.py` showed 15
+  failures, and they are the same 15 names listed in `272-BASELINES.md`, so they are inherited.
+- Known limit (D-27): coverage only applies inside each arm's candidate pool.
+
+### Google 0/3 — bounded investigation (provider-docs-first)
+
+**Verdict: (ii) model behaviour, and the SC#4 Google rows (a) and (c) are recorded UNMET.** One
+cause on our side contributed to row (b). That cause is F-2, now fixed, so (b) is re-run owed.
+
+1. **Provider docs.** Fetched 2026-10-03:
+   `https://ai.google.dev/gemini-api/docs/function-calling.md.txt`, sections "Notes and
+   limitations" and "Best practices". Nested `array` of `object` parameters are in the supported
+   OpenAPI subset. The only nesting caveat is for `any` mode (*"the API may reject very large or
+   deeply nested schemas"*), and we run `auto`. Best practices say *"Keep active set to 10-20 tools
+   maximum"*. `get_tools(None)` measured **28** tools, so we exceed Google's guidance. This is
+   **recorded, not fixed**: the tool roster is shared across providers, and trimming it per provider
+   is an architectural change (Rule 4) outside the bounded scope. It is a candidate cause of the tool
+   wandering, not a proven one.
+2. **Our sanitizer** (`google_service._sanitize_schema_for_google` / `_convert_tools_to_google`) was
+   run on the live `search_documents` definition. `filters` comes out as `ARRAY` of `OBJECT` with
+   all 6 item properties (`field, op, value, value2, values, unit`) and `items.required = [field,
+   op]`. Nothing was stripped and the Tool constructs.
+3. **Emission works.** Across the three runs Gemini emitted well-formed `filters` three times: (b)
+   call 1 `legal_entity eq Acme GmbH`, (b) call 8 and (c) call 11 `title eq "ACME Corporation …"`.
+   The declaration therefore reaches the model, and the model can fill it.
+4. **Behaviour.** (a) and (c) opened with `query_documents` SQL (9 of the 14 calls in (c)). No run
+   ever emitted a `date` filter, even after the SQL output showed `metadata.date` values. (c) ended
+   at the agent loop's 15-step iteration cap: the 15th call is recorded as `iteration_cap_paused`, and
+   the run says *"14 tool call(s) over 15 step(s) and never wrote an answer"*. That is the cap
+   working as designed, not a loop defect. The model's exploration consumed the budget.
+5. **Our contribution in (b).** The first call was correctly filtered, but it returned 2 of the 3 Acme
+   GmbH reports (F-2). Gemini's next call, a `query_documents` SQL query, listed 3 reports. It then
+   `read_document` the missing September report and widened to the "ACME Corporation" decoys. With
+   F-2 fixed, the first call now returns all three. Re-run owed.
+
+### F-3 — "Fast fix now"
+
+- RED `test(272-05)`. New suite `frontend/src/components/chat/tool-bodies/SearchDocumentsBody.test.ts`:
+  9 cases, 6 RED on the shipped tree. The five non-passage outcomes all read `0 results`
+  (`expected 1 to be 5` distinct). A `?raw` case ties the keys the card reads to the keys the handler
+  writes (`"error": "refused_retry"`, `"error": "invalid_filter"`, `"status":
+  "no_documents_matched"`, `"not_searchable_yet"`, `"matched_documents": matched`, `"error":
+  "retrieval_unavailable"`).
+- GREEN `fix(272-05)`. The card now reads `refused — would drop the filter` / `invalid filter
+  (<field>)` / `no documents matched` / `N matched — not searchable yet` / `search unavailable`.
+  Passages and an empty array are unchanged. The suite is adopted in BOTH count-gate knobs (BASELINE
+  `"SearchDocumentsBody.test.ts": 9` plus a file-level TARGETS entry, because `src/components/chat`
+  has no directory entry) in the same commit.
+- Gates: `npx tsc -p tsconfig.app.json --noEmit` reported **70** errors, the baseline count, with 0 in
+  any touched file. The count-gate verdict is quoted below.
+
+### Gates after the ruling fixes (main tree, 2026-10-03)
+
+- **Backend unit gate** (`node scripts/check-backend-unit-baseline.cjs`, from `backend/`), verbatim:
+  `71 failed, 6388 passed, 1 skipped, 2 xfailed, 2 xpassed` → `[GATE PASSED] Backend unit baseline
+  satisfied (failed: 71 <= 71, errors: 0)`. The **failed SET equals `272-BASELINES.md`**: 71 names
+  against 71. Diffing the sorted sets leaves one line, `test_no_change_save_does_not_reembed`, which
+  has warning text (`C:\Vibe…`) glued to it. After stripping that text the sets are identical.
+- **Vitest count gate** (`GSD_VITEST_MAX_WORKERS=2`, repo root), verbatim:
+  `SearchDocumentsBody.test.ts  9  9  0` · `total 9469 · failed 1 · pinned total 8714` →
+  `RESULT: COUNT GATE VIOLATED (1 reason(s))  [failing-tests]`. No per-file decrease, and every
+  pinned file is present. The one failure, read from the gate's own JSON report BEFORE any re-run,
+  is `src/pages/WorkflowBuilderPage.canvas.test.tsx` → *"clicking Canvas flips aria-selected …"*,
+  `Error: STACK_TRACE_ERROR`. That file is **provably unmodified**: `git diff --numstat
+  9c6cfdeb5 HEAD -- frontend/src/pages/` is empty and its last commit is `e3fe03121` (2026-08-28).
+  It is one of SEED-171's five named cap-independent flaky suites, and it ran while a concurrent
+  `tsc` was loading the box. Re-run alone afterwards: `154 passed`. That is an observation, and one
+  green sample of a flaky suite does not prove it innocent.
+- **Hot-file ledger gate** `node scripts/check-hot-file-ledger.cjs 272`: `ledger gate OK`.
+  `SearchDocumentsBody.tsx` had no row for its entire life. It was added at `3 / 3 / 71`, the commit
+  that took it across the G-5 threshold.
+- **Not run:** `graphify update .`. `graphify-out/GRAPH_REPORT.md` already had uncommitted changes
+  that are not this executor's, so it was left alone.
+- **Workspace TODO `COMPLETED` on a refused call:** noted and not fixed. The panel's "Derived from
+  activity" todo list takes its state from the tool call's completion, not from the result payload.
+  That is a different file from these lines.
+
+### F-1 — "Accept, plant a seed"
+
+**SEED-333** (`.planning/seeds/SEED-333-finished-run-card-folds-away-the-filter-line.md`), allocated
+as max(id)+1 (332 → 333). Status `planted`, routed to Phase 273, `trigger_paths` includes
+`frontend/src/components/chat/RunCard.tsx`. `check-seeds-register.cjs --files` passes.
+
+### MiniMax (c)
+
+The operator made no separate ruling. It stays a FAIL under the D-22 known limit: a broader search
+run *before* the empty one is outside the D-09 lock's reach.
+
 ## OWED (recorded, never executed here)
 
 1. ~~Operator: add OpenAI API credits~~ — done 2026-10-03; board and drive run (above).
-2. **Operator G-4 sign-off** on G4-1..G4-3 and a ruling on F-1 / F-2 / F-3 and the Google / MiniMax
-   board FAILs (Task 4).
+2. ~~A ruling on F-1 / F-2 / F-3 and the Google board FAILs~~ — ruled 2026-10-03 and executed
+   (above). **Still owed:** (i) an **operator backend RESTART**, because the `--reload` watcher does
+   not restart on change, so the D-27 retrieval code and the F-3 card are not live until then;
+   (ii) a re-run of the 8 board (b) rows, the 3 Google rows and G4-3 (plus the G4-2 card text) on the
+   restarted backend; (iii) **operator G-4 sign-off** on G4-1..G4-3.
 3. **Production parity, in this order, before the backend deploy:**
    a. A FREE read of the production `document_chunks` count (Supabase MCP `execute_sql` SELECT — not
       available to this executor, so OWED). If it is large, run alone first, outside any transaction:

@@ -161,6 +161,20 @@ and the publish-gauntlet gate (see `<deferred>`). The tool count stays **29**: w
 - **D-26:** **D-02's "the org's fields" is clarified.** Field definitions are visible **per user
   (their own plus system-global)**, not per organisation. The vocabulary uses that existing
   visibility rule unchanged, and no new organisation-level scoping is added in this phase.
+- **D-27 (operator, 2026-10-03, at the 272-05 Task 4 checkpoint — refines D-10 after finding F-2):**
+  **Inside a matched filter set, every matched document returns its best passage, up to `top_k`.**
+  A matched document with no passage above the similarity threshold (0.3) comes back with its best
+  passage **marked `low_similarity`**. It is no longer dropped because some *other* document's
+  passage cleared the threshold. This is what D-10 was meant to say, and SC#3 needs it ("a filter
+  that matches documents returns them"). Measured cause: `legal_entity = Acme GmbH` matched 3
+  reports, 2 came back, and the answers said "two" (all 7 passing board (b) rows, and G4-3). The
+  top-`k` cut on the filtered path also keeps one passage per matched document before it fills by
+  rank, so one document with many strong passages cannot push another out. The reranker reorders the
+  whole filtered set and is then cut the same way. ⛔ The unfiltered path is unchanged. **Known
+  limit:** coverage applies within each arm's candidate pool (`hybrid_candidate_count`, or
+  `2 × top_k` on the vector-only path). A matched document whose passages are all outside both pools
+  can still be missed. A per-document best-passage RPC would fix that, but it needs a migration and
+  is out of 272's scope.
 
 ### Claude's Discretion
 - The exact module boundaries of the D-13 extraction, and the name and home of the D-15 handler
