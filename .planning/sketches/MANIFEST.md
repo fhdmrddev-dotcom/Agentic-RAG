@@ -2945,3 +2945,9 @@ reuses 267-B's event-card shape.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 271 | find-the-document | Find\|Ask mode switch, structure filters (folder/relationship/version), Filing rules home | ★ 1A · 2A · 3A · keep older-versions hint (operator, 2026-10-03) | phase-271, document-search, filing-rules |
+
+## Sketch 273 — Agent-Authored Artifacts (Phase 273, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 273 | agent-authored-artifacts | Artifact frame in a chat answer, the chart/table/metric family, follow-up lineage, failure notice + states | ★ 1B framed card · 2A one metric tile · 3A lineage caption · 4B explicit notice + live render (operator, 2026-10-03) | phase-273, artifacts, chart, provenance, failure-notice |
