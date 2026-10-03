@@ -182,7 +182,25 @@ Plans:
   4. The behaviour holds across the **full native roster + OpenRouter** (8-row SC#10 board, derived from `MODEL_CAPABILITIES`). Blocked rows are recorded with their reason, never omitted.
 
 **How we'd know this failed**: the period appears in the query text but not as a filter argument; the filter reaches the keyword arm but not the vector arm (or the reverse); an empty result silently widens; the `freshness` validator kind "absorbs" the requirement (`SEED-153` says freshness is *not* this); one provider never emits the filter argument and passes by answering correctly by luck; the filter works but a selective one returns zero rows through the index, so fail-closed refuses questions that have answers.
-**Plans**: TBD
+**Plans**: 5 plans in 4 waves
+
+Plans:
+**Wave 1**
+
+- [ ] 272-01-PLAN.md — baselines; G-5 extraction FIRST: retrieval_service split (rpc / rank / documents, AST-pinned pure move) + retrieval_scope seam contracts (default predicates as data, ScopeResult); search handler moved to search_documents_tool.py (D-15), 11 patch sites retargeted (wave 1)
+- [ ] 272-02-PLAN.md — the `filters` contract: provider-safe schema on search_documents (op enum = ViewCondition.op, D-02 text removed) + the visible "Filtered: …" tool-card line from args, count-gate adoption (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 272-03-PLAN.md — migration 200 (p_document_ids on both RPCs, exact branch, btree index, PUBLIC revoke; [BLOCKING] local apply checkpoint), both arms get one document set, two-step RLS resolver with undated / nearby / spelling / type counts (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 272-04-PLAN.md — validation + canonicalisation, four result kinds, empty-set short-circuit, D-09 retry lock (shared with sub-agents), ONE audit writer, per-run vocabulary, today's date + prompt rewrite, trend fix (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 272-05-PLAN.md — SEED-273 recall ladder → measured threshold, merged-tree gates, ledger close, 8-row SC#10 board, G-4 drive + operator sign-off checkpoint, owed prod parity (wave 4)
 **Flags**: ⛔ **G-5 FIRES and the refactor goes FIRST:** `backend/app/services/retrieval_service.py` has carried *"extraction still OWED (SEED-224, since 231). 241 is the SECOND landing; a THIRD must propose the extraction FIRST"*. This phase is that third landing. Plan 1 is the extraction, and the new filter seam must accept a **default predicate** so 275's archived exclusion rides it as data. `backend/app/services/tool_dispatcher.py` (FIRES, registry/handler split OWED) and `agent_loop.py` (FIRES, prompt-assembly seam OWED): propose each owed seam as the first option at discuss. **Extension Contract:** widen `search_documents`' existing arguments (it already forwards an equality `metadata_filter` at `tool_dispatcher.py:781`). Adding a tool is not the fix, and the tool count stays 29. **SC#10 FIRES** (tool schema + agent loop). **Provider-docs-first** for how each provider emits structured tool arguments. Recall: `SEED-273` / `SEED-076` / v4.1 `RECALL-01` (every filtered index walk returned ONE row at 246). Open question from `SEED-153`: who declares a dimension "close means wrong", a field-level property or the model's choice? Decide at discuss. Workflow-input binding and the publish-gauntlet gate from `SEED-153` are **not** in FIND-07. Record them as deferred, not silently dropped.
 
 #### Phase 273: Agent-Authored Artifacts
