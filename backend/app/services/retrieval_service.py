@@ -10,11 +10,14 @@ What remains here is the orchestrator only — its decorator and body are byte-u
 * ``retrieval_documents.py`` — ``_enrich_with_filenames``, ``resolve_document_id``, ``fetch_full_document``
 
 ⛔ Filtered retrieval lands in ``retrieval_scope.py`` / ``retrieval_rpc.py`` — never back here.
+272-03 threads ONE parameter (``document_ids``) through the orchestrator and nothing more: the
+set is resolved in ``retrieval_scope.py``, restricted in ``retrieval_rpc.py``, marked in
+``retrieval_rank.py``.
 """
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 from langsmith import traceable
 from starlette.concurrency import run_in_threadpool
@@ -23,8 +26,14 @@ from supabase import Client
 from app.config import settings
 from app.services.rerank_service import rerank
 from app.services.retrieval_documents import _enrich_with_filenames
-from app.services.retrieval_rank import _avg_cosine, _deduplicate_chunks, _rrf_fuse
-from app.services.retrieval_rpc import _keyword_search, _vector_search
+from app.services.retrieval_rank import (
+    _avg_cosine,
+    _carry_low_similarity,
+    _deduplicate_chunks,
+    _rrf_fuse,
+    _select_filtered_vector_rows,
+)
+from app.services.retrieval_rpc import FILTERED_MATCH_FLOOR, _keyword_search, _vector_search
 
 # ── Back-compat re-exports (Phase 272, D-13) ─────────────────────────────────────────────────
 # These names moved; every measured importer still reads them from HERE, so they stay importable
@@ -56,7 +65,22 @@ async def search_documents(
     metadata_filter: dict | None = None,
     user_settings: UserEffectiveSettings | None = None,
     folder_ids: list[str] | None = None,
+    document_ids: Sequence[str] | None = None,
 ) -> tuple[list[dict], float]:
+    """Phase 272 (D-14 / D-18 / D-19 / D-10) — ``document_ids`` is the filtered-retrieval input.
+
+    * ``None`` — no filter. The calls are byte-identical to before (pinned by
+      ``test_272_pure_move::test_unfiltered_rpc_calls_are_pinned``).
+    * EMPTY — the filter matched nothing: ``([], 0.0)`` before any embed or RPC. ⛔ Never coerced
+      to ``None``, which would widen to the whole knowledge base.
+    * non-empty — the SAME set goes to the vector arm and the keyword arm, alongside the folder
+      scope (D-19: a filter narrows the chat scope, never replaces it). The vector RPC runs with
+      ``FILTERED_MATCH_FLOOR`` and the configured threshold is applied afterwards: if nothing
+      clears it, the top rows come back marked ``low_similarity`` instead of a false empty.
+    """
+    if document_ids is not None and len(document_ids) == 0:
+        return [], 0.0
+    filtered = document_ids is not None
     # Normalize metadata_filter values to lowercase for case-insensitive matching
     if metadata_filter:
         metadata_filter = {k: v.lower() if isinstance(v, str) else v for k, v in metadata_filter.items()}
@@ -75,22 +99,31 @@ async def search_documents(
         # Vector-only path — fetch 2x top_k so dedup has candidates to spare
         rows = await _vector_search(
             query, user_id, supabase, metadata_filter,
-            top_n=top_k * 2, match_threshold=match_threshold,
+            top_n=top_k * 2, match_threshold=FILTERED_MATCH_FLOOR if filtered else match_threshold,
             user_settings=user_settings,
             folder_ids=folder_ids,
+            document_ids=document_ids,
         )
+        if filtered:
+            rows = _select_filtered_vector_rows(rows, match_threshold)
         avg_sim = _avg_cosine(rows)
         rows = _deduplicate_chunks(rows)[:top_k]
-        return await _enrich_with_filenames(rows, supabase), avg_sim
+        return _carry_low_similarity(rows, await _enrich_with_filenames(rows, supabase)), avg_sim
 
     # Hybrid path: vector + keyword → RRF fusion → dedup → optional reranking
     vector_rows = await _vector_search(
         query, user_id, supabase, metadata_filter,
-        top_n=candidate_count, match_threshold=match_threshold,
+        top_n=candidate_count, match_threshold=FILTERED_MATCH_FLOOR if filtered else match_threshold,
         user_settings=user_settings,
         folder_ids=folder_ids,
+        document_ids=document_ids,
     )
-    keyword_rows = await _keyword_search(query, user_id, supabase, metadata_filter, top_n=candidate_count, folder_ids=folder_ids)
+    if filtered:
+        vector_rows = _select_filtered_vector_rows(vector_rows, match_threshold)
+    keyword_rows = await _keyword_search(
+        query, user_id, supabase, metadata_filter, top_n=candidate_count, folder_ids=folder_ids,
+        document_ids=document_ids,
+    )
 
     if not vector_rows and not keyword_rows:
         return [], 0.0
@@ -121,4 +154,6 @@ async def search_documents(
     else:
         candidates = candidates[:top_k]
 
-    return await _enrich_with_filenames(candidates, supabase), avg_sim
+    # D-10: `_rrf_fuse` copies each row (`dict(...)`) and rerank mutates in place, so the mark
+    # survives to here; enrichment rebuilds the dicts, so it is carried across by position.
+    return _carry_low_similarity(candidates, await _enrich_with_filenames(candidates, supabase)), avg_sim

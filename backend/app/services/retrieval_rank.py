@@ -72,3 +72,40 @@ def _avg_cosine(rows: list[dict]) -> float:
     """Average cosine similarity from vector search rows. Returns 0.0 if no rows."""
     sims = [row["similarity"] for row in rows if row.get("similarity") and row["similarity"] > 0]
     return sum(sims) / len(sims) if sims else 0.0
+
+
+def _select_filtered_vector_rows(rows: list[dict], threshold: float) -> list[dict]:
+    """Phase 272 (D-10) — apply the CONFIGURED similarity threshold to a FILTERED vector result.
+
+    A filtered call runs the RPC with ``retrieval_rpc.FILTERED_MATCH_FLOOR`` so the threshold never
+    prunes inside the scoped set; this applies it afterwards, honestly:
+
+    * rows that clear ``threshold`` (the RPC's own ``> match_threshold`` comparison) are returned
+      alone, unmarked;
+    * when NONE do, the rows are still returned — each copy marked ``low_similarity: True`` —
+      because "the matched documents hold nothing close to the question" is a different fact
+      from "nothing matched", and the second would be a false empty.
+
+    Pure: returns new dicts for marked rows, never mutates its input.
+    """
+    if not rows:
+        return []
+    above = [row for row in rows if (row.get("similarity") or 0.0) > threshold]
+    if above:
+        return above
+    return [{**row, "low_similarity": True} for row in rows]
+
+
+def _carry_low_similarity(source_rows: list[dict], enriched: list[dict]) -> list[dict]:
+    """Phase 272 (D-10) — re-attach ``low_similarity`` after ``_enrich_with_filenames``.
+
+    Enrichment rebuilds each hit as a NEW dict (and drops the chunk ``id``), so a mark carried on
+    the ranked rows would be lost there. Enrichment is one-entry-per-row in input order, so the
+    mark is carried by position. ⚠ The pinned enrich body is deliberately NOT edited for this.
+    """
+    if len(source_rows) != len(enriched):  # defensive: enrich contract is 1:1 in order
+        return enriched
+    for row, hit in zip(source_rows, enriched):
+        if row.get("low_similarity"):
+            hit["low_similarity"] = True
+    return enriched

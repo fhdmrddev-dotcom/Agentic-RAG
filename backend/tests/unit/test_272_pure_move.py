@@ -18,7 +18,8 @@ before any behaviour lands, and this suite is the proof that it is a move and no
 ⚠ Structured so a later plan can retire ONE AST case BY NAME without touching the rest: ``MOVE_MAP``
 minus ``RETIRED`` is what is compared. ``RETIRED`` is EMPTY in 272-01; 272-03 retires
 ``_vector_search`` / ``_keyword_search`` there because it changes them on purpose, with the reason
-written in as the dict value.
+written in as the dict value. 272-03 also retires ``test_search_documents_is_unchanged``; the move
+proof for all three survives as history against ``WAVE1_MERGE_SHA``.
 """
 from __future__ import annotations
 
@@ -30,6 +31,10 @@ from pathlib import Path
 import pytest
 
 PLAN_BASE_SHA = "f49d9ea2d354a42d66eb007de9d9ca6a451afe81"
+
+# 272-03 — the wave-1 merge commit (272-01 + 272-02). At THIS commit every moved function was still
+# a pure move; the three cases 272-03 retires below stay proven AS HISTORY against it.
+WAVE1_MERGE_SHA = "020a0f41f7f9155783eb38790fef40e052bbcfcf"
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -50,7 +55,15 @@ MOVE_MAP: dict[str, str] = {
 }
 
 # name → the reason it is no longer compared. EMPTY in 272-01 — nothing here changed on purpose.
-RETIRED: dict[str, str] = {}
+# ⚠ RETIRED DELIBERATELY BY 272-03 (SEED-177: retire a fence on purpose, never trip it by surprise).
+_272_03_REASON = (
+    "pure move proven at 272-01's merge (WAVE1_MERGE_SHA); 272-03 is the intended behaviour "
+    "change (D-14 / D-18 / D-19: document_ids on both arms)"
+)
+RETIRED: dict[str, str] = {
+    "_vector_search": _272_03_REASON,
+    "_keyword_search": _272_03_REASON,
+}
 
 # The ONE function whose docstring is compared out: 272-01 rewrites `_call_as_user`'s G-5
 # paragraph DELIBERATELY (the extraction it described as owed is discharged by this plan). Its
@@ -58,14 +71,14 @@ RETIRED: dict[str, str] = {}
 _DOCSTRING_STRIPPED = {"_call_as_user"}
 
 
-def _blob_at_base(rel_path: str) -> str:
-    """A tracked file's contents at the plan's base commit."""
+def _blob_at_base(rel_path: str, sha: str = PLAN_BASE_SHA) -> str:
+    """A tracked file's contents at the plan's base commit (or at ``sha``)."""
     # ⚠ `encoding` IS LOAD-BEARING ON WINDOWS (the test_214 precedent). `text=True` alone decodes
     # with the locale codec (cp1252 here), and these modules carry `⚠` / `—` in their comments —
     # so the reader thread dies with a `UnicodeDecodeError`, `.stdout` comes back `None`, and the
     # fence fails with an `AttributeError` that looks nothing like the property it pins.
     return subprocess.run(
-        ["git", "show", f"{PLAN_BASE_SHA}:{rel_path}"],
+        ["git", "show", f"{sha}:{rel_path}"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -122,11 +135,66 @@ def test_moved_functions_are_ast_identical():
     assert len(compared) == len(MOVE_MAP) - len(RETIRED)
 
 
-def test_search_documents_is_unchanged():
+def test_search_documents_fence_retired_by_272_03():
+    """⚠ RETIRED DELIBERATELY BY 272-03 (SEED-177) — formerly ``test_search_documents_is_unchanged``.
+    It pinned ``search_documents`` AST-identical to PHASE_BASE, which was the proof that 272-01 moved code without changing the
+    orchestrator. That proof is complete and survives as history:
+    ``test_272_03_retired_cases_proven_at_wave1_merge`` re-runs it against WAVE1_MERGE_SHA.
+    272-03 then changes ``search_documents`` ON PURPOSE (D-14 / D-18 / D-19 / D-10: the
+    ``document_ids`` parameter), so comparing the LIVE function to the base would fail by design.
+    The unfiltered behaviour stays pinned by ``test_unfiltered_rpc_calls_are_pinned`` (unchanged).
+
+    What it asserts instead: the retirement is NECESSARY, not cosmetic — the live orchestrator
+    really does differ from the base — and its history proof is registered below.
+    """
     base_fn = _top_level_function(_blob_at_base(_BASE_REL), "search_documents")
     new_fn = _top_level_function(_module_source(_BASE_REL), "search_documents")
     assert base_fn is not None and new_fn is not None
-    assert ast.dump(new_fn) == ast.dump(base_fn)
+    assert ast.dump(new_fn) != ast.dump(base_fn), (
+        "search_documents is AST-identical to PHASE_BASE again — the 272-03 retirement is stale; "
+        "restore test_search_documents_is_unchanged"
+    )
+    assert "search_documents" in _RETIRED_AT_WAVE1, _272_03_REASON
+
+
+# ── 272-03: the retired cases, proven as history + changed on purpose ────────────────────────
+
+_RETIRED_AT_WAVE1 = {
+    "_vector_search": "backend/app/services/retrieval_rpc.py",
+    "_keyword_search": "backend/app/services/retrieval_rpc.py",
+    "search_documents": _BASE_REL,
+}
+
+
+def test_272_03_retired_cases_proven_at_wave1_merge():
+    """The pure move of the three functions 272-03 changes was TRUE at the wave-1 merge: each,
+    parsed from that commit's blob, is AST-identical to its PHASE_BASE source."""
+    base_src = _blob_at_base(_BASE_REL)
+    found = []
+    for name, home in _RETIRED_AT_WAVE1.items():
+        base_fn = _top_level_function(base_src, name)
+        wave1_fn = _top_level_function(_blob_at_base(home, WAVE1_MERGE_SHA), name)
+        assert base_fn is not None, f"{name} not found at {PLAN_BASE_SHA}"
+        assert wave1_fn is not None, f"{name} not found in {home} at {WAVE1_MERGE_SHA}"
+        assert ast.dump(wave1_fn) == ast.dump(base_fn), (
+            f"{name} at WAVE1_MERGE_SHA is not AST-identical to PHASE_BASE — the move was not pure"
+        )
+        found.append(name)
+    assert len(found) == 3
+
+
+def test_272_03_retired_cases_changed_on_purpose():
+    """The divergence is the INTENDED change, not drift: each live function's LAST parameter is
+    ``document_ids`` defaulting to ``None``."""
+    for name, home in _RETIRED_AT_WAVE1.items():
+        fn = _top_level_function(_module_source(home), name)
+        assert fn is not None, f"{name} not found in {home}"
+        args = fn.args
+        assert args.args[-1].arg == "document_ids", f"{name}: last parameter is {args.args[-1].arg}"
+        default = args.defaults[-1]
+        assert isinstance(default, ast.Constant) and default.value is None, (
+            f"{name}: document_ids must default to None (None = no filter, D-18)"
+        )
 
 
 def test_back_compat_names():

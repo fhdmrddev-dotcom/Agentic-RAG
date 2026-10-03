@@ -699,13 +699,20 @@ def test_the_landing_on_the_hot_file_is_a_call_and_its_arguments():
     slack, which is deliberately tight. Driven RED against a real plant — threading the knobs
     through `_keyword_search` as well took it to 13 and this case failed by name alongside
     `test_keyword_search_carries_no_hnsw_argument`.
+
+    ⚠ RE-DRIVEN DELIBERATELY BY 272-03 (SEED-177: retire or move a fence on purpose, never trip it
+    by surprise): 272-03 adds the filtered-only iterative_scan constant + one filtered call — D-14.
+    The filtered ``match_document_chunks`` call carries the same two keyword arguments as the
+    unfiltered one (the ef_search expression, and ``FILTERED_ITERATIVE_SCAN`` instead of the
+    setting), so the count MEASURED after the change is **13** (was 11): exactly +2, no logic. The
+    cap is set to that measured 13 — zero slack — and the keyword arm still carries nothing.
     """
     lines = _hnsw_lines_in_retrieval_service()
     assert lines, (
         "POSITIVE CONTROL FAILED — no hnsw / retrieval_tuning line found in "
         "retrieval_service.py, so the cap below would pass vacuously."
     )
-    assert len(lines) <= 12, (
+    assert len(lines) <= 13, (
         f"the D-11 landing has grown to {len(lines)} non-comment lines:\n"
         + "\n".join(lines)
         + "\n⛔ G-5: put the logic in retrieval_tuning.py. This file's extraction is still OWED."

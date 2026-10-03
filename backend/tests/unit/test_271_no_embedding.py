@@ -49,6 +49,9 @@ _EMBED_SITES = [
     ("app.services.embedding_service", "embed_chunks"),
     ("app.services.embedding_service", "embed_texts"),
     ("app.services.retrieval_service", "embed_texts"),
+    # 272-03: the live retrieval embed resolves here since 272-01 moved `_vector_search` (the
+    # retrieval_service entry above is now a re-export only and blocks nothing on its own).
+    ("app.services.retrieval_rpc", "embed_texts"),
     ("app.services.multimodal_service", "embed_texts"),
     ("app.services.reembed_service", "embed_texts"),
     ("app.services.skill_embedding_service", "embed_texts"),
