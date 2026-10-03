@@ -63,10 +63,10 @@ from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
 from app.services.artifact_history import redact_artifact_args  # 273 (I-4) — the one persist hook
 from app.services.structured_text_holdback import (  # 273 (SC#2, Pitfall 2, OV-273-04)
-    FAILED_CALL_NOTICE,
     StructuredTextHoldback,
     drop_held,
     failed_tool_call,
+    replace_failed_call,
 )
 from app.services.citation_markers import (
     apply_citation_instruction,
@@ -2710,14 +2710,9 @@ async def run_agent_loop(
                                 _held = _structured_holdback.finish(bool(structured_calls))
                                 if structured_calls and _structured_holdback.released_text:
                                     await _emit(redis, run_id, 'turn_boundary')
-                                elif _held and failed_tool_call(_held):
-                                    # 273-REVIEW CR-02: a call that FAILED to parse (truncated at the
-                                    # token limit, malformed) is never flushed as answer text — it is
-                                    # dropped from what persists and replaced by one plain sentence.
-                                    full_content = drop_held(full_content, _held)
-                                    _fc_notice = ("\n\n" if full_content.strip() else "") + FAILED_CALL_NOTICE
-                                    full_content += _fc_notice
-                                    await _emit(redis, run_id, 'delta', content=_fc_notice)
+                                elif _held and failed_tool_call(_held):  # 273 CR-02: never as text
+                                    full_content, _fcn = replace_failed_call(full_content, _held)
+                                    await _emit(redis, run_id, 'delta', content=_fcn)
                                 elif _held:
                                     await _emit(redis, run_id, 'delta', content=_held)
                             if structured_calls:

@@ -77,6 +77,15 @@ def failed_tool_call(held: str, known_tools: set[str] | None = None) -> bool:
     return False
 
 
+def replace_failed_call(full_content: str, held: str) -> tuple[str, str]:
+    """CR-02: drop a failed call's held block from ``full_content`` and append the one plain
+    sentence. Returns ``(new_full_content, notice)`` — the notice is what the loop emits as a delta,
+    so the live view and the persisted message end with the same words."""
+    kept = drop_held(full_content, held)
+    notice = ("\n\n" if kept.strip() else "") + FAILED_CALL_NOTICE
+    return kept + notice, notice
+
+
 def drop_held(full_content: str, held: str) -> str:
     """``full_content`` without the held block (which was never emitted), so what persists is what
     the person saw. The block is normally the suffix; ``rfind`` covers text appended after it."""
