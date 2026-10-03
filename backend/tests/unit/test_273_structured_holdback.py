@@ -101,7 +101,9 @@ def test_a_json_block_that_is_not_a_tool_call_is_flushed_byte_for_byte(n):
 def test_a_trailing_partial_opener_is_held_then_released_when_disambiguated():
     hb = _holdback()
     assert hb.feed("Use ```j") == "Use "
-    assert hb.feed("ava\nint x;\n```") == "```java\nint x;\n```"
+    # the closing fence at the very end could still become ```json — held until the stream ends
+    assert hb.feed("ava\nint x;\n```") == "```java\nint x;\n"
+    assert hb.feed("\nok") == "```\nok"
     assert hb.finish(False) == ""
 
 
