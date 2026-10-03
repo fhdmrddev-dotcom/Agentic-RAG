@@ -319,9 +319,11 @@ const BASELINE = {
   "ModelDiscoveryPanel.a11y.test.tsx": 9,
   "ModelRegistryTab.a11y.test.tsx": 13,
   // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
-  "ClassificationRulesPage.test.tsx": 8,
+  // ⬆ RAISED 8 → 11 and 8 → 9 at 271-04, recording 271-02's Filing-rules cases (measured
+  //   `11` and `9` on the wave-1 gate run at ff4b98f01, the gate's own `actual` column).
+  "ClassificationRulesPage.test.tsx": 11,
   "ClassificationSection.test.tsx": 13,
-  "RuleBuilderPanel.test.tsx": 8,
+  "RuleBuilderPanel.test.tsx": 9,
   // ── 196-05 (AUTH-04 / D-04 … D-15) — THREE NEW FILES, each pinned in the SAME COMMIT ──
   // ── that creates it, because a `BASELINE` key naming a path that does not yet exist ──
   // ── makes this gate ERROR (exit 2) rather than fail. ──────────────────────────────────
@@ -3672,7 +3674,9 @@ const BASELINE = {
   // recurses into nothing — so without its own TARGETS line this file would never have been
   // EXECUTED, and a BASELINE key naming an unexecuted file makes this gate ERROR (exit 2)
   // rather than fail. Phase 214's `WorkflowScheduleModal` finding, avoided by looking.
-  "LibraryHeaderBar.test.tsx": 9,
+  // ⬆ RAISED 9 → 13 at 271-04, recording 271-02's Filing-rules header-link cases (measured `13`
+  //   on the wave-1 gate run at ff4b98f01).
+  "LibraryHeaderBar.test.tsx": 13,
   // 22 → 30: per-file selection (operator: "how can I select individual files") and the
   // two-column body that puts the folder tree inside the card it feeds.
   "SourcePreviewPanel.test.tsx": 30,
@@ -4080,6 +4084,28 @@ const BASELINE = {
   "LinkTargetCombobox.test.tsx": 9, // 271-03
   "documentAddedBy.test.ts": 6, // 271-03
   "DocumentRow.find271.test.tsx": 17, // 271-03
+  // ── Phase 271-04 — ADOPTED, not raised: in NEITHER knob before (RESEARCH Wave 0). Measured
+  // 10 passed on the merged wave-1 tree (ff4b98f01) BEFORE 271-04 touched ConditionPopover. ──
+  // ⬆ RAISED 10 → 13 at 271-04 Task 1: three excludeFieldKeys cases (P-06). The 10 shipped cases
+  //   are byte-unchanged.
+  "ConditionPopover.test.tsx": 13, // 271-04 (2026-10-03)
+  // ── Phase 271-04 Task 1 — every suite it CREATED, at its measured passing count. BOTH KNOBS. ──
+  "FilterBar.find271.test.tsx": 11, // 271-04 (3 are the Views-tab DOM snapshot pins)
+  "StructurePopovers.test.tsx": 22, // 271-04
+  "FindQuickAdd.test.tsx": 12, // 271-04
+  // ── Phase 271-04 Task 2 — the Find results surface and the exact pager. BOTH KNOBS. ──
+  "DocumentsFindBody.test.tsx": 26, // 271-04
+  "DocumentsPager.exact271.test.tsx": 3, // 271-04
+  // ── Phase 271-04 Task 3 — the page wiring and the older-version panel. BOTH KNOBS. ──
+  "LibraryPage.find271.test.tsx": 13, // 271-04
+  "DocumentDetailPanel.olderVersion271.test.tsx": 3, // 271-04
+  // ── Phase 271-02's suites, OWED to this plan (271-02 could not edit this file in wave 1).
+  // Measured passing on the wave-2 tree. ──
+  "askInChat.test.ts": 5, // 271-02 (adopted 271-04)
+  "FindModeSwitch.test.tsx": 7, // 271-02 (adopted 271-04)
+  "FindMetaLine.test.tsx": 10, // 271-02 (adopted 271-04)
+  "AskHandoffCard.test.tsx": 5, // 271-02 (adopted 271-04)
+  "LibraryPage.filingRules271.test.tsx": 2, // 271-02 (adopted 271-04)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5955,6 +5981,24 @@ const TARGETS = [
   "src/components/relationships/LinkTargetCombobox.test.tsx",
   "src/lib/__tests__/documentAddedBy.test.ts",
   "src/components/ingestion/__tests__/DocumentRow.find271.test.tsx",
+  // Phase 271-04 — adopted before ConditionPopover gains excludeFieldKeys. FILE-LEVEL.
+  "src/components/ingestion/ConditionPopover.test.tsx",
+  // Phase 271-04 Task 1 — FILE-LEVEL, never the directory.
+  "src/components/ingestion/FilterBar.find271.test.tsx",
+  "src/components/library/find/__tests__/StructurePopovers.test.tsx",
+  "src/components/library/find/__tests__/FindQuickAdd.test.tsx",
+  // Phase 271-04 Task 2 — FILE-LEVEL.
+  "src/components/library/find/__tests__/DocumentsFindBody.test.tsx",
+  "src/components/library/__tests__/DocumentsPager.exact271.test.tsx",
+  // Phase 271-04 Task 3 + 271-02's owed suites — FILE-LEVEL (`src/pages` and
+  // `src/components/library` are reached by named files only).
+  "src/pages/__tests__/LibraryPage.find271.test.tsx",
+  "src/components/metadata/__tests__/DocumentDetailPanel.olderVersion271.test.tsx",
+  "src/components/library/find/__tests__/askInChat.test.ts",
+  "src/components/library/find/__tests__/FindModeSwitch.test.tsx",
+  "src/components/library/find/__tests__/FindMetaLine.test.tsx",
+  "src/components/library/find/__tests__/AskHandoffCard.test.tsx",
+  "src/pages/__tests__/LibraryPage.filingRules271.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
