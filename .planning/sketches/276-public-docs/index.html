@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sketch 276 — Syrel public docs</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* Tokens copied from frontend/src/landing/landing.css + index.css .dark so the sketch IS the landing look */
+:root{
+  --bg:hsl(216 45% 4%); --card:hsl(220 30% 7%); --raised:hsl(220 28% 10%); --muted-bg:hsl(220 30% 11%);
+  --fg:hsl(226 60% 97%); --muted:hsl(220 16% 65%); --dim:hsl(220 14% 45%); --border:hsl(220 20% 16%);
+  --primary:hsl(239 100% 82%); --primary-strong:hsl(239 84% 67%); --violet:hsl(258 90% 66%); --violet-text:hsl(258 95% 84%);
+  --success:hsl(152 60% 52%); --warn:hsl(38 92% 60%);
+  --display:"Manrope","Inter",ui-sans-serif,system-ui,sans-serif; --body:"Inter",ui-sans-serif,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);-webkit-font-smoothing:antialiased}
+a{color:var(--primary);text-decoration:none;cursor:pointer;transition:color .15s}
+a:hover{color:hsl(239 100% 88%)}
+button{font-family:inherit;cursor:pointer}
+.hl{font-family:var(--display)}
+.mono{font-family:var(--mono)}
+.grad{background:linear-gradient(100deg,var(--primary),var(--violet-text));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ── sketch chrome ─────────────────────────────────────────── */
+#variant-nav{position:fixed;top:0;left:0;right:0;z-index:9998;background:hsl(220 40% 5%);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;gap:8px;align-items:center;font-family:system-ui;font-size:13px}
+#variant-nav .label{color:var(--dim);margin-right:6px}
+.variant-tab,.page-tab{background:transparent;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:999px;transition:all .15s}
+.variant-tab:hover,.page-tab:hover{color:var(--fg);border-color:hsl(239 100% 82% / .4)}
+.variant-tab.active,.page-tab.active{background:hsl(239 100% 82% / .14);color:var(--primary);border-color:hsl(239 100% 82% / .45)}
+#page-nav{position:fixed;top:45px;left:0;right:0;z-index:9997;background:hsl(220 40% 5% / .92);border-bottom:1px solid var(--border);padding:6px 16px;display:flex;gap:8px;align-items:center;font-family:system-ui;font-size:12px}
+body{padding-top:88px}
+#stage{margin:0 auto;transition:max-width .25s ease;max-width:100%;min-height:calc(100vh - 88px);background:var(--bg);position:relative;overflow:hidden}
+#stage.phone{max-width:390px;border-left:1px solid var(--border);border-right:1px solid var(--border)}
+#sketch-tools{position:fixed;bottom:12px;right:12px;z-index:9999;font-family:system-ui;font-size:12px;background:rgba(0,0,0,.75);color:#fff;padding:8px 12px;border-radius:8px;opacity:.45;transition:opacity .2s;display:flex;gap:6px;align-items:center}
+#sketch-tools:hover{opacity:1}
+#sketch-tools button{background:#222;color:#fff;border:1px solid #444;border-radius:6px;padding:3px 8px}
+#sketch-tools button.on{background:#4b4fd6;border-color:#6c6ff0}
+#toast{position:fixed;left:50%;bottom:28px;translate:-50% 20px;opacity:0;background:var(--raised);border:1px solid var(--border);color:var(--fg);padding:10px 16px;border-radius:10px;font-size:14px;transition:all .2s;z-index:9999}
+#toast.show{opacity:1;translate:-50% 0}
+
+/* ── shared landing chrome (Navigation + Footer clones) ───── */
+.wrap{width:100%;max-width:1160px;margin:0 auto;padding:0 32px}
+.site-nav{position:sticky;top:0;z-index:50;border-bottom:1px solid hsl(220 20% 16% / .6);background:hsl(216 45% 4% / .85);backdrop-filter:blur(12px)}
+.site-nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;max-width:1360px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;color:var(--fg)}
+.logo-ph{width:32px;height:32px;border-radius:8px;border:1.5px dashed hsl(239 100% 82% / .7);background:linear-gradient(135deg,hsl(239 100% 82% / .18),hsl(258 90% 66% / .18));display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--primary);line-height:1;text-align:center}
+.nav-links{display:flex;align-items:center;gap:4px}
+.nav-links a{font-size:14px;color:var(--muted);padding:0 8px}
+.nav-links a.cur{color:var(--fg);font-weight:600}
+.nav-links a.btn-primary{color:hsl(243 100% 32%);padding:0 14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;border-radius:8px;font-size:14px;font-weight:500;height:36px;padding:0 14px;border:1px solid transparent;transition:all .15s}
+.btn-primary{background:var(--primary);color:hsl(243 100% 32%)}
+.btn-primary:hover{background:hsl(239 100% 88%);color:hsl(243 100% 32%);transform:translateY(-1px)}
+.btn-ghost{border-color:var(--border);color:var(--fg);background:transparent}
+.btn-ghost:hover{border-color:hsl(239 100% 82% / .45);color:var(--fg)}
+.menu-btn{display:none}
+.footer{border-top:1px solid var(--border);margin-top:80px;padding:40px 0;color:var(--dim);font-size:13px}
+.footer .wrap{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;max-width:1360px}
+
+/* ── shared pieces ─────────────────────────────────────────── */
+.search{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:0 14px;height:46px;transition:border-color .15s,box-shadow .15s}
+.search:focus-within{border-color:hsl(239 100% 82% / .55);box-shadow:0 0 0 4px hsl(239 100% 82% / .12)}
+.search input{flex:1;background:transparent;border:0;outline:0;color:var(--fg);font-size:15px;font-family:var(--body)}
+.kbd{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--border);border-radius:5px;padding:2px 6px}
+.card{background:linear-gradient(180deg,var(--raised),var(--card));border:1px solid var(--border);border-radius:16px;padding:20px;transition:border-color .15s,transform .15s,box-shadow .15s}
+.card.link:hover{border-color:hsl(239 100% 82% / .45);transform:translateY(-2px);box-shadow:0 14px 40px hsl(240 80% 3% / .6);cursor:pointer}
+.ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,hsl(239 100% 82% / .22),hsl(258 90% 66% / .22));border:1px solid hsl(239 100% 82% / .3);color:var(--primary);font-family:var(--display);font-weight:800;font-size:13px}
+.eyebrow{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--primary);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;border:1px solid var(--border);color:var(--muted)}
+.pill.new{color:var(--success);border-color:hsl(152 60% 52% / .4);background:hsl(152 60% 52% / .1)}
+.pill.prog{color:var(--warn);border-color:hsl(38 92% 60% / .4);background:hsl(38 92% 60% / .1)}
+.video{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--border);background:#05070c;aspect-ratio:16/9;width:100%;min-width:0;align-self:start}
+.video video{width:100%;height:100%;display:block;object-fit:cover}
+.video .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at center,hsl(239 100% 70% / .18),transparent 60%);transition:opacity .2s}
+.video .play span{width:68px;height:68px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--violet));display:flex;align-items:center;justify-content:center;box-shadow:0 10px 40px hsl(239 100% 70% / .45);transition:transform .15s}
+.video:hover .play span{transform:scale(1.08)}
+.video.playing .play{opacity:0;pointer-events:none}
+.video .cap{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--muted);background:hsl(216 45% 4% / .7);padding:3px 8px;border-radius:6px}
+.callout{border:1px solid hsl(239 100% 82% / .3);background:hsl(239 100% 82% / .07);border-radius:12px;padding:14px 16px;display:flex;gap:12px;font-size:15px;line-height:1.55;color:var(--fg)}
+.callout.warn{border-color:hsl(38 92% 60% / .35);background:hsl(38 92% 60% / .07)}
+.prose{font-size:16px;line-height:1.75;color:hsl(226 30% 86%)}
+.prose h1{font-family:var(--display);font-size:40px;line-height:1.15;margin:8px 0 12px;color:var(--fg)}
+.prose h2{font-family:var(--display);font-size:24px;margin:40px 0 10px;color:var(--fg);scroll-margin-top:90px}
+.prose code{font-family:var(--mono);font-size:13.5px;background:var(--muted-bg);border:1px solid var(--border);border-radius:6px;padding:1px 6px;color:var(--violet-text)}
+.prose .lead{font-size:19px;color:var(--muted);margin:0 0 24px}
+.steps{counter-reset:s;list-style:none;padding:0;margin:16px 0}
+.steps li{counter-increment:s;position:relative;padding:0 0 14px 44px}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--muted-bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:13px;color:var(--primary)}
+.toc a{display:block;font-size:13px;color:var(--dim);padding:5px 0 5px 12px;border-left:2px solid transparent;transition:all .15s}
+.toc a:hover{color:var(--fg)}
+.toc a.on{color:var(--primary);border-left-color:var(--primary)}
+.crumbs{font-size:13px;color:var(--dim);display:flex;gap:8px;align-items:center}
+.pager{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:48px}
+.pager .card{padding:14px 18px}
+.pager small{color:var(--dim);display:block;font-size:12px;margin-bottom:4px}
+.helpful{display:flex;gap:10px;align-items:center;margin-top:36px;color:var(--dim);font-size:14px}
+.helpful button{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px}
+.helpful button:hover{border-color:hsl(239 100% 82% / .45);color:var(--fg)}
+
+/* ── Variant A: docs app (3-column) ───────────────────────── */
+.A-shell{display:grid;grid-template-columns:260px minmax(0,1fr) 210px;max-width:1360px;margin:0 auto;gap:0}
+.A-side{position:sticky;top:64px;height:calc(100vh - 152px);overflow:auto;padding:24px 16px 24px 32px;border-right:1px solid hsl(220 20% 16% / .6)}
+.A-side h6{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin:20px 0 8px 10px;font-weight:600}
+.A-side a{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--muted);padding:7px 10px;border-radius:8px}
+.A-side a:hover{background:var(--card);color:var(--fg)}
+.A-side a.on{background:hsl(239 100% 82% / .12);color:var(--primary);font-weight:600}
+.A-main{padding:36px 48px 0;min-width:0}
+.A-toc{position:sticky;top:64px;height:fit-content;padding:36px 24px 0 0}
+.A-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.A-hero{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
+
+/* ── Variant B: landing-native ───────────────────────────── */
+.B-hero{position:relative;padding:72px 0 40px;text-align:center;overflow:hidden}
+.B-hero::before{content:"";position:absolute;inset:-200px 10% auto;height:600px;background:radial-gradient(closest-side,hsl(239 90% 60% / .35),transparent);filter:blur(10px);pointer-events:none}
+.B-hero h1{font-family:var(--display);font-size:64px;line-height:1.05;margin:14px 0 14px;letter-spacing:-1.5px;position:relative}
+.B-hero p{font-size:19px;color:var(--muted);max-width:640px;margin:0 auto 26px;position:relative}
+.B-bento{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:150px;gap:14px}
+.B-bento .card{display:flex;flex-direction:column;justify-content:space-between}
+.B-bento .big{grid-column:span 2;grid-row:span 2}
+.B-bento .wide{grid-column:span 2}
+.B-chapters{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+.B-chapters .card{min-width:240px;flex:1}
+.B-article{max-width:740px;margin:0 auto;padding:40px 0 0}
+.B-tocpill{position:fixed;right:28px;bottom:70px;z-index:40;background:var(--raised);border:1px solid var(--border);border-radius:14px;box-shadow:0 20px 50px hsl(240 80% 3% / .7);font-size:13px;overflow:hidden;transition:all .2s;width:200px}
+.B-tocpill header{padding:10px 14px;display:flex;justify-content:space-between;cursor:pointer;color:var(--fg);font-weight:600}
+.B-tocpill .toc{padding:0 10px 10px;max-height:0;overflow:hidden;transition:max-height .25s}
+.B-tocpill.open .toc{max-height:300px}
+
+/* ── Variant C: learning path ────────────────────────────── */
+.C-top{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:28px;align-items:center;padding:48px 0 28px}
+.C-path{display:flex;flex-direction:column;gap:10px}
+.C-step{display:grid;grid-template-columns:40px 140px minmax(0,1fr) auto;gap:16px;align-items:center;padding:14px}
+.C-check{width:30px;height:30px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;color:transparent;transition:all .15s;font-weight:800}
+.C-step.done .C-check{border-color:var(--success);background:hsl(152 60% 52% / .15);color:var(--success)}
+.C-thumb{aspect-ratio:16/9;border-radius:10px;background:linear-gradient(135deg,hsl(239 60% 20%),hsl(258 60% 18%));border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--primary);font-size:12px;position:relative}
+.C-thumb::after{content:"▶";font-size:16px}
+.C-bar{height:8px;border-radius:4px;background:var(--border);overflow:hidden}
+.C-bar div{height:100%;background:linear-gradient(90deg,var(--primary),var(--violet));transition:width .3s}
+.C-shell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:36px;padding-top:32px}
+.C-timeline{position:relative;padding-left:28px}
+.C-timeline::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:linear-gradient(var(--primary),var(--violet))}
+.C-rel{position:relative;padding:10px 0 14px}
+.C-rel::before{content:"";position:absolute;left:-25px;top:16px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--primary)}
+.C-band{margin:26px 0 6px -28px;padding:10px 14px;border-radius:10px;background:hsl(239 100% 82% / .08);border:1px solid hsl(239 100% 82% / .25)}
+
+/* changelog shared */
+.rel-row{display:grid;grid-template-columns:90px 110px minmax(0,1fr);gap:16px;padding:14px 0;border-bottom:1px solid hsl(220 20% 16% / .6);align-items:baseline}
+.rel-row .v{font-family:var(--mono);color:var(--primary);font-weight:500}
+.rel-row .d{color:var(--dim);font-size:13px}
+.rel-row b{font-family:var(--display);font-size:16px;color:var(--fg)}
+.rel-row p{margin:4px 0 0;color:var(--muted);font-size:14px;line-height:1.5}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.chip{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:13px;transition:all .15s}
+.chip:hover{color:var(--fg)}
+.chip.on{color:var(--primary);border-color:hsl(239 100% 82% / .5);background:hsl(239 100% 82% / .1)}
+
+/* ── phone ───────────────────────────────────────────────── */
+.phone .nav-links a:not(.btn){display:none}
+.phone .menu-btn{display:inline-flex}
+.phone .wrap{padding:0 16px}
+.phone .A-shell{grid-template-columns:1fr}
+.phone .A-side,.phone .A-toc{display:none}
+.phone .A-side.drawer{display:block;position:fixed;top:152px;left:0;right:0;bottom:0;max-width:390px;margin:0 auto;height:auto;background:var(--bg);z-index:60;border:0}
+.phone .A-main{padding:24px 16px 0}
+.phone .A-grid,.phone .A-hero{grid-template-columns:1fr}
+.phone .B-hero h1{font-size:38px}
+.phone .B-hero p{font-size:16px}
+.phone .B-bento{grid-template-columns:1fr;grid-auto-rows:auto}
+.phone .B-bento .big,.phone .B-bento .wide{grid-column:auto;grid-row:auto}
+.phone .B-tocpill{right:auto;left:50%;translate:-50% 0}
+.phone .C-top,.phone .C-shell{grid-template-columns:1fr}
+.phone .C-step{grid-template-columns:34px minmax(0,1fr) auto}
+.phone .C-thumb{display:none}
+.phone .C-shell aside{display:none}
+.phone .prose h1{font-size:30px}
+.phone .rel-row{grid-template-columns:70px minmax(0,1fr)}
+.phone .rel-row .d{display:none}
+.phone .pager{grid-template-columns:1fr}
+.phone .footer .wrap{flex-direction:column}
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="label">Sketch 276 · direction:</span>
+  <button class="variant-tab active" data-v="A">A: Docs app (3-column)</button>
+  <button class="variant-tab" data-v="B">B: Landing-native</button>
+  <button class="variant-tab" data-v="C">C: Learning path (video-first)</button>
+</div>
+<div id="page-nav">
+  <span class="label" style="color:var(--dim);margin-right:6px">Page:</span>
+  <button class="page-tab active" data-p="home">Docs home</button>
+  <button class="page-tab" data-p="guide">Guide article · Workflows</button>
+  <button class="page-tab" data-p="changelog">Changelog</button>
+</div>
+
+<div id="stage"></div>
+
+<div id="sketch-tools">
+  <span>View:</span>
+  <button id="vp-desktop" class="on">Desktop</button>
+  <button id="vp-phone">Phone 390</button>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ───────────── content (real, from docs/history + product) ───────────── */
+const GUIDES = [
+  {id:"chat", mono:"Ch", title:"Chat with your knowledge", blurb:"Ask anything. Get answers cited to the page, with a confidence badge.", mins:4, sec:"Use Syrel"},
+  {id:"library", mono:"Li", title:"Library & documents", blurb:"Upload, organise with folders and saved views, find a document by what it is.", mins:6, sec:"Use Syrel"},
+  {id:"workflows", mono:"Wf", title:"Workflows", blurb:"Describe a process in plain English. Syrel runs every step in order and checks each one.", mins:8, sec:"Use Syrel"},
+  {id:"connections", mono:"Co", title:"Connections", blurb:"Google Workspace, Jira or any MCP server — grant each tool Allow, Ask or Deny.", mins:5, sec:"Use Syrel"},
+  {id:"experts", mono:"Ex", title:"Experts", blurb:"Install a ready-made Expert for a team. Spend is tracked per Expert.", mins:4, sec:"Use Syrel"},
+  {id:"skills", mono:"Sk", title:"Skills", blurb:"Teach Syrel a reusable skill and test it before it ships.", mins:5, sec:"Use Syrel"},
+  {id:"admin", mono:"Ad", title:"Admin & Control Room", blurb:"Users, models, spend, kill switches and the audit log.", mins:6, sec:"Run Syrel"},
+  {id:"deploy", mono:"De", title:"Deploy & self-host", blurb:"Run Syrel on your own infrastructure from one compose file.", mins:10, sec:"Run Syrel"},
+];
+const START = [
+  {t:"What is Syrel?", d:"The 2-minute version.", m:"?"},
+  {t:"Quickstart", d:"Upload a document and ask your first question.", m:"1"},
+  {t:"Security model", d:"Org isolation, encrypted keys, audit log.", m:"🔒"},
+];
+const CHAPTERS = [
+  {n:1,t:"A document chat you can trust",r:"v1.0 – v2.4"},
+  {n:2,t:"An agent that keeps working",r:"v2.5 – v2.8"},
+  {n:3,t:"Workflows anyone can author",r:"v2.9 – v3.3"},
+  {n:4,t:"Organisations and connections",r:"v3.4 – v4.2"},
+  {n:5,t:"A product you can sell",r:"v4.3 – v4.5"},
+];
+const REL = [
+  ["v4.5","in progress",5,"Find It, Show It","Find documents by what they are, respect named periods, live charts in chat.",true],
+  ["v4.4","2026-09-29",5,"Experts That Actually Work","Per-org Expert install, additive-only scope, per-Expert spend, five starter Experts."],
+  ["v4.3","2026-09-23",5,"What You Can Actually Sell","Every token priced, tiers enforced, Experts as installable bundles."],
+  ["v4.2","2026-09-18",4,"Connected Knowledge You Can Run","Honest sources, safe credentials, register your own model from the UI."],
+  ["v4.1","2026-09-13",4,"Ship It & Feel It","Calmer chat, steadier streaming, a measured search-quality fix."],
+  ["v4.0","2026-09-10",4,"Connected Knowledge","Connect a source once; the Library keeps reading it on a schedule."],
+  ["v3.9","2026-09-04",4,"Connections: Any Service, Any Tool","Connect a service, see its tools, grant each one, use it by name."],
+  ["v3.8","2026-08-26",4,"Document Intelligence & Automations","Tables and email, scheduled runs under a spend cap, first MCP connections."],
+  ["v3.7","2026-08-24",4,"Workflow Product Completion","Find, build, test-run, stop and review workflows end to end."],
+  ["v3.6","2026-08-09",4,"Visual Workflow Studio","Draw a business process on a drag-and-drop canvas."],
+  ["v3.5","2026-07-23",4,"UX Consolidation & Chat Polish","Chat tells the truth about what a run is doing."],
+  ["v3.4","2026-07-22",4,"Multi-Tenancy & Org Access","From per-user app to organisation-aware platform."],
+  ["v3.3","2026-07-18",3,"Operator UX","Control Room, model registry, encrypted keys, install wizard."],
+  ["v3.2","2026-07-10",3,"Skill Eval Studio","Test cases, with-vs-without comparisons, eval-gated publishing."],
+  ["v3.1","2026-06-28",3,"Workflow & Skill Studio — Trust","Honest structured output on every provider, Skill Trigger Tuner."],
+  ["v3.0","2026-06-21",3,"Document Management","Metadata, virtual folders, links, suggested classification."],
+  ["v2.9","2026-06-15",3,"Workflow Studio","Describe a workflow in plain language, get a cited Word deliverable."],
+  ["v2.8","2026-06-07",2,"Harness Engine & Workflow Mode","A strict, ordered, audited workflow mode alongside free chat."],
+  ["v2.7","2026-05-30",2,"Agent Workspace & Panel","A private workspace per chat: files, to-dos, helper agents."],
+  ["v2.6","2026-05-27",2,"Foundation","Better extraction, multi-worker server, nine providers."],
+  ["v2.5","2026-05-09",2,"Streams That Survive","Answers keep streaming through refreshes and tab switches."],
+  ["v2.4","2026-04-30",1,"Stability & Polish","Dependable tools on every provider, model fallback, live progress."],
+  ["v2.3","2026-04-19",1,"Memory, Multimodal & Experience","Remembers you, reads tables and images, library health."],
+  ["v2.2","2026-04-16",1,"Trust & Compliance","Evidence and confidence on every answer, tamper-resistant audit log."],
+  ["v2.1","2026-04-11",1,"Stability & RAG Correctness","No more blank answers; retrieval returns the right results."],
+  ["v2.0","2026-04-04",1,"Agent Skills & Code Execution","Teachable skills, tool memory, Python in a sandbox."],
+  ["v1.0","2026-03-29",1,"Knowledge Base Explorer","A real folder system, and an agent that explores your library."],
+];
+const SECTIONS = ["What a workflow is","Describe it in plain English","How each step is checked","Publish checks","Run it and get the file"];
+const VIDEO = "../../../video/out/syrel-overview.mp4#t=4.6"; // local render; on the real site this is a lazy <Player>
+
+/* ───────────── shared builders ───────────── */
+const esc = s => String(s);
+const nav = (cur="Docs") => `
+<header class="site-nav"><div class="wrap">
+  <a class="brand" href="#"><div class="logo-ph">logo</div><span class="hl">Syrel</span></a>
+  <nav class="nav-links">
+    <button class="btn btn-ghost menu-btn" onclick="toggleDrawer()">☰ Menu</button>
+    ${["Product","Tour","Workflows","Docs","Changelog"].map(l=>`<a class="${l===cur?'cur':''}" onclick="${l==='Docs'?"go('home')":l==='Changelog'?"go('changelog')":"toast('Back to the landing page (#"+l.toLowerCase()+")')"}">${l}</a>`).join("")}
+    <a style="font-size:14px;color:var(--muted);padding:0 8px" onclick="toast('Sign in → /app')">Sign in</a>
+    <a class="btn btn-primary" onclick="toast('Book a demo → VITE_DEMO_URL')">Book a demo</a>
+  </nav>
+</div></header>`;
+const footer = () => `<footer class="footer"><div class="wrap"><span>© 2026 Syrel</span><span>Docs · Changelog · Security · Status</span><span>Generated from the docs/ folder — every page has an owner and a last-reviewed date.</span></div></footer>`;
+const searchBox = (ph="Search the docs…") => `<label class="search"><span style="color:var(--dim)">⌕</span><input placeholder="${ph}" oninput="filterGuides(this.value)"><span class="kbd">/</span></label>`;
+const guideCard = g => `<div class="card link guide" data-t="${(g.title+' '+g.blurb).toLowerCase()}" onclick="go('guide')">
+  <div style="display:flex;gap:12px;align-items:center"><div class="ico">${g.mono}</div><b class="hl" style="font-size:17px">${g.title}</b></div>
+  <p style="color:var(--muted);font-size:14px;line-height:1.55;margin:12px 0 10px">${g.blurb}</p>
+  <span style="font-size:12px;color:var(--dim)">${g.mins} min read · has a 15-s clip</span></div>`;
+const video = (cap="Syrel in 60 seconds") => `<div class="video" onclick="playVideo(this)"><video src="${VIDEO}" muted playsinline preload="metadata"></video><div class="play"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="#0b0d24"><path d="M8 5v14l11-7z"/></svg></span></div><div class="cap">▶ ${cap}</div></div>`;
+const article = (tocInline=false) => `
+  <div class="crumbs">Docs <span>›</span> Use Syrel <span>›</span> <span style="color:var(--fg)">Workflows</span></div>
+  <h1 class="hl">Workflows</h1>
+  <p class="lead">Turn work you repeat every week into a workflow: Syrel runs each step in order, checks every step, and hands you a finished, cited file.</p>
+  <div style="display:flex;gap:8px;margin-bottom:22px"><span class="pill">8 min read</span><span class="pill">Last reviewed 2026-10-04</span><span class="pill new">Updated in v3.9</span></div>
+  <h2 id="s0">What a workflow is</h2>
+  <p>A workflow is a fixed list of steps. Each step can search a project's documents, run code, ask a person a question or produce a document. Steps run <b>in order</b> — the AI cannot skip or reorder them.</p>
+  ${video("Clip · a workflow run, 15 s")}
+  <h2 id="s1">Describe it in plain English</h2>
+  <p>Open <b>Workflows → New</b> and describe the job, for example <code>Every Monday, summarise the board folder into our status template</code>. Syrel drafts the steps for you; you can edit them on the canvas.</p>
+  <h2 id="s2">How each step is checked</h2>
+  <ol class="steps"><li>A step can require every claim to cite a source.</li><li>A step can check that a file exists and opens.</li><li>A failed check retries a bounded number of times — never forever.</li></ol>
+  <div class="callout"><span>ℹ️</span><div>Each step only gets the tools it lists. A step that asks for anything else is refused and the refusal is written to the audit log.</div></div>
+  <h2 id="s3">Publish checks</h2>
+  <p>Before anyone else can run it, a workflow must pass <b>8 publish checks</b> — including a real run on your documents that an AI judge grades. A workflow that runs but produces bad output can't publish.</p>
+  <div class="callout warn"><span>⚠️</span><div>Word and PDF files are <b>downloaded</b>, not previewed inside Syrel (yet).</div></div>
+  <h2 id="s4">Run it and get the file</h2>
+  <p>Press <b>Run</b>. You'll see each step tick off live, and the finished file appears at the end with a download link.</p>
+  <div class="helpful">Was this page helpful? <button onclick="toast('Thanks — logged')">👍 Yes</button><button onclick="toast('Thanks — tell us what was missing')">👎 No</button></div>
+  <div class="pager"><div class="card link" onclick="toast('← Library & documents')"><small>Previous</small><b class="hl">Library & documents</b></div><div class="card link" style="text-align:right" onclick="toast('Connections →')"><small>Next</small><b class="hl">Connections</b></div></div>`;
+const toc = () => `<div class="toc"><div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin:0 0 8px 12px;font-weight:600">On this page</div>${SECTIONS.map((s,i)=>`<a href="#s${i}" data-s="s${i}" onclick="event.preventDefault();document.getElementById('s${i}').scrollIntoView({behavior:'smooth'})">${s}</a>`).join("")}</div>`;
+const relRows = (filter=0) => REL.filter(r=>!filter||r[2]===filter).map(r=>`<div class="rel-row"><span class="v">${r[0]}</span><span class="d">${r[1]}</span><div><b>${r[3]}</b> ${r[5]?'<span class="pill prog">not yet released</span>':''}<p>${r[4]}</p></div></div>`).join("");
+const chapterChips = () => `<div class="chips"><button class="chip on" onclick="chapter(0,this)">All releases</button>${CHAPTERS.map(c=>`<button class="chip" onclick="chapter(${c.n},this)">${c.n}. ${c.t}</button>`).join("")}</div>`;
+
+/* ───────────── Variant A: docs app ───────────── */
+const A = {
+  side(cur){
+    const sec = s => GUIDES.filter(g=>g.sec===s).map(g=>`<a class="${cur===g.id?'on':''}" onclick="go('guide')">${g.title}</a>`).join("");
+    return `<aside class="A-side" id="drawer">
+      ${searchBox("Search…")}
+      <h6>Get started</h6><a class="${cur==='home'?'on':''}" onclick="go('home')">Overview</a><a onclick="toast('Quickstart')">Quickstart</a><a onclick="toast('Security model')">Security model</a>
+      <h6>Use Syrel</h6>${sec("Use Syrel")}
+      <h6>Run Syrel</h6>${sec("Run Syrel")}
+      <h6>Reference</h6><a class="${cur==='changelog'?'on':''}" onclick="go('changelog')">Changelog <span class="pill new" style="padding:0 7px">v4.4</span></a><a onclick="toast('FAQ')">FAQ</a></aside>`;
+  },
+  home(){ return nav()+`<div class="A-shell">${this.side('home')}<main class="A-main">
+    <span class="eyebrow">Documentation</span>
+    <h1 class="hl" style="font-size:44px;margin:10px 0 8px">Learn <span class="grad">Syrel</span></h1>
+    <p style="color:var(--muted);font-size:18px;margin:0 0 26px;max-width:640px">Everything you need to ask, automate and govern with your own knowledge.</p>
+    <div class="A-grid A-hero" style="align-items:start">${video()}<div style="display:flex;flex-direction:column;gap:12px">${START.map(s=>`<div class="card link" style="padding:14px 16px;flex:1" onclick="toast('${s.t}')"><b class="hl">${s.t}</b><div style="color:var(--muted);font-size:14px;margin-top:4px">${s.d}</div></div>`).join("")}</div></div>
+    <h2 class="hl" style="font-size:22px;margin:40px 0 14px">Guides</h2>
+    <div class="A-grid" id="guides">${GUIDES.map(guideCard).join("")}</div>
+    <h2 class="hl" style="font-size:22px;margin:40px 0 6px">What's new</h2>${REL.slice(0,3).map(r=>`<div class="rel-row"><span class="v">${r[0]}</span><span class="d">${r[1]}</span><div><b>${r[3]}</b> ${r[5]?'<span class="pill prog">not yet released</span>':''}<p>${r[4]}</p></div></div>`).join("")}
+    <p><a onclick="go('changelog')">Full changelog →</a></p>
+  </main><aside class="A-toc"><div class="card" style="padding:16px"><b class="hl" style="font-size:14px">Prefer a person?</b><p style="color:var(--muted);font-size:13px;line-height:1.5">See Syrel on your own documents in 30 minutes.</p><a class="btn btn-primary" style="width:100%" onclick="toast('Book a demo')">Book a demo</a></div></aside></div>`+footer(); },
+  guide(){ return nav()+`<div class="A-shell">${this.side('workflows')}<main class="A-main"><article class="prose">${article()}</article></main><aside class="A-toc">${toc()}</aside></div>`+footer(); },
+  changelog(){ return nav("Changelog")+`<div class="A-shell">${this.side('changelog')}<main class="A-main"><span class="eyebrow">Reference</span><h1 class="hl" style="font-size:40px;margin:8px 0">Changelog</h1><p style="color:var(--muted)">27 releases since March 2026, grouped into five chapters.</p>${chapterChips()}<div id="rels">${relRows()}</div></main><aside class="A-toc"><div class="toc"><div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin:0 0 8px 12px;font-weight:600">Chapters</div>${CHAPTERS.map(c=>`<a onclick="chapter(${c.n})">${c.n}. ${c.t}</a>`).join("")}</div></aside></div>`+footer(); },
+};
+
+/* ───────────── Variant B: landing-native ───────────── */
+const B = {
+  home(){ const [g0,...rest]=GUIDES; return nav()+`<section class="B-hero"><div class="wrap"><span class="eyebrow">Docs</span><h1>Everything Syrel does,<br><span class="grad">explained in minutes.</span></h1><p>Guides, short clips and the full release history — the same claims as the product, never more.</p><div style="max-width:560px;margin:0 auto 34px;position:relative">${searchBox("Search guides, features, errors…")}</div><div style="max-width:880px;margin:0 auto;position:relative;box-shadow:0 30px 120px hsl(239 100% 60% / .25);border-radius:16px">${video("Watch the 60-second tour")}</div></div></section>
+    <section class="wrap" style="margin-top:20px"><h2 class="hl" style="font-size:26px;margin:0 0 16px">Start with a guide</h2>
+    <div class="B-bento" id="guides">
+      <div class="card link big guide" data-t="${(g0.title+g0.blurb).toLowerCase()}" onclick="go('guide')"><div><div class="ico">${g0.mono}</div><b class="hl" style="font-size:24px;display:block;margin-top:14px">${g0.title}</b><p style="color:var(--muted);line-height:1.55">${g0.blurb}</p></div><div class="video" style="aspect-ratio:auto;height:120px;pointer-events:none"><div class="play"><span style="width:44px;height:44px">▶</span></div></div></div>
+      ${rest.map((g,i)=>`<div class="card link guide ${i===1?'wide':''}" data-t="${(g.title+g.blurb).toLowerCase()}" onclick="go('guide')"><div style="display:flex;gap:10px;align-items:center"><div class="ico">${g.mono}</div><b class="hl">${g.title}</b></div><span style="color:var(--muted);font-size:13px;line-height:1.45">${g.blurb}</span></div>`).join("")}
+    </div>
+    <h2 class="hl" style="font-size:26px;margin:52px 0 6px">How Syrel got here</h2><p style="color:var(--muted);margin:0 0 16px">Five chapters, 27 releases.</p>
+    <div class="B-chapters">${CHAPTERS.map(c=>`<div class="card link" onclick="go('changelog')"><span class="eyebrow">Chapter ${c.n}</span><b class="hl" style="display:block;font-size:18px;margin:8px 0">${c.t}</b><span class="mono" style="color:var(--dim);font-size:12px">${c.r}</span></div>`).join("")}</div></section>`+footer(); },
+  guide(){ return nav()+`<div class="wrap"><article class="prose B-article">${article()}</article></div><div class="B-tocpill" id="tocpill"><header onclick="this.parentElement.classList.toggle('open')"><span>On this page</span><span>▾</span></header>${toc()}</div>`+footer(); },
+  changelog(){ return nav("Changelog")+`<section class="B-hero" style="padding:56px 0 20px"><div class="wrap"><span class="eyebrow">Changelog</span><h1 style="font-size:52px">Shipped, <span class="grad">not promised.</span></h1><p>Every release, what it changed for you, and what's still in progress.</p></div></section><div class="wrap"><div class="B-chapters" style="margin-bottom:10px">${CHAPTERS.map(c=>`<div class="card link" onclick="chapter(${c.n})"><span class="eyebrow">Chapter ${c.n}</span><b class="hl" style="display:block;margin:6px 0">${c.t}</b><span class="mono" style="color:var(--dim);font-size:12px">${c.r}</span></div>`).join("")}</div>${chapterChips()}<div id="rels" style="max-width:900px">${relRows()}</div></div>`+footer(); },
+};
+
+/* ───────────── Variant C: learning path ───────────── */
+const C = {
+  path(){ return GUIDES.slice(0,6).map((g,i)=>`<div class="card C-step ${i<2?'done':''}" onclick="toggleDone(this)"><div class="C-check">✓</div><div class="C-thumb"></div><div><b class="hl" style="font-size:16px">${i+1}. ${g.title}</b><div style="color:var(--muted);font-size:13px;margin-top:4px">${g.blurb}</div></div><span class="pill">${g.mins} min + clip</span></div>`).join(""); },
+  home(){ return nav()+`<div class="wrap"><div class="C-top"><div><span class="eyebrow">Learn Syrel</span><h1 class="hl" style="font-size:52px;line-height:1.05;margin:12px 0">Go from first question<br>to <span class="grad">first workflow</span> in an afternoon.</h1><p style="color:var(--muted);font-size:18px">Six short lessons. Each has a 15-second clip and a 5-minute read.</p><div style="display:flex;gap:12px;align-items:center;margin-top:20px"><div class="C-bar" style="flex:1"><div id="bar" style="width:33%"></div></div><span id="barlbl" style="color:var(--muted);font-size:14px">2 of 6 done</span></div></div>${video("Start here · Syrel in 60 seconds")}</div>
+    <div class="C-path" id="guides">${this.path()}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:36px" class="C-more">${GUIDES.slice(6).map(guideCard).join("")}<div class="card link" onclick="go('changelog')"><span class="eyebrow">Changelog</span><b class="hl" style="display:block;margin:10px 0 6px;font-size:17px">v4.4 · Experts That Actually Work</b><span style="color:var(--muted);font-size:14px">See all 27 releases →</span></div></div></div>`+footer(); },
+  guide(){ return nav()+`<div class="wrap C-shell"><aside><div style="position:sticky;top:84px"><span class="eyebrow">Lesson 3 of 6</span><div class="C-path" style="margin-top:12px">${GUIDES.slice(0,6).map((g,i)=>`<a class="card" style="padding:10px 12px;display:flex;gap:10px;align-items:center;${i===2?'border-color:hsl(239 100% 82% / .5)':''}" onclick="toast('${g.title}')"><span class="C-check" style="width:22px;height:22px;font-size:11px;${i<2?'border-color:var(--success);color:var(--success);background:hsl(152 60% 52% / .15)':''}">✓</span><span style="color:${i===2?'var(--fg)':'var(--muted)'};font-size:14px">${g.title}</span></a>`).join("")}</div><div style="margin-top:22px">${toc()}</div></div></aside><article class="prose">${article()}<div style="margin-top:24px"><button class="btn btn-primary" onclick="toast('Lesson 3 marked done · next: Connections')">Mark lesson done → Next</button></div></article></div>`+footer(); },
+  changelog(){ let out="",cur=0; for(const r of REL){ if(r[2]!==cur){cur=r[2];const c=CHAPTERS[cur-1];out+=`<div class="C-band"><span class="eyebrow">Chapter ${c.n}</span> <b class="hl" style="margin-left:8px">${c.t}</b> <span class="mono" style="color:var(--dim);font-size:12px;margin-left:8px">${c.r}</span></div>`;} out+=`<div class="C-rel"><span class="mono" style="color:var(--primary)">${r[0]}</span> <span style="color:var(--dim);font-size:13px;margin-left:8px">${r[1]}</span> ${r[5]?'<span class="pill prog" style="margin-left:6px">not yet released</span>':''}<div><b class="hl" style="font-size:17px">${r[3]}</b></div><div style="color:var(--muted);font-size:14px;margin-top:2px">${r[4]}</div></div>`;}
+    return nav("Changelog")+`<div class="wrap" style="max-width:860px"><div style="padding:48px 0 10px"><span class="eyebrow">Changelog</span><h1 class="hl" style="font-size:44px;margin:10px 0">The Syrel story, release by release</h1></div><div class="C-timeline">${out}</div></div>`+footer(); },
+};
+
+/* ───────────── state + interactivity ───────────── */
+let V="A", P="home";
+const VARIANTS={A,B,C};
+function render(){ const stage=document.getElementById("stage"); stage.innerHTML=VARIANTS[V][P](); window.scrollTo(0,0); wireToc(); }
+function go(p){ P=p; document.querySelectorAll(".page-tab").forEach(t=>t.classList.toggle("active",t.dataset.p===p)); render(); }
+document.querySelectorAll(".variant-tab").forEach(b=>b.onclick=()=>{V=b.dataset.v;document.querySelectorAll(".variant-tab").forEach(t=>t.classList.toggle("active",t===b));render();});
+document.querySelectorAll(".page-tab").forEach(b=>b.onclick=()=>go(b.dataset.p));
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),1600);}
+function playVideo(el){const v=el.querySelector("video");if(!v)return;if(v.paused){v.muted=false;v.play().catch(()=>toast("Render video/out/syrel-overview.mp4 to play the real clip"));el.classList.add("playing");}else{v.pause();el.classList.remove("playing");}}
+function filterGuides(q){q=q.toLowerCase().trim();document.querySelectorAll(".guide,.C-step").forEach(c=>{const t=(c.dataset.t||c.textContent).toLowerCase();c.style.display=!q||t.includes(q)?"":"none";});}
+function chapter(n,btn){const box=document.getElementById("rels");if(box)box.innerHTML=relRows(n);document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));if(btn)btn.classList.add("on");else{const c=document.querySelectorAll(".chip")[n];if(c)c.classList.add("on");}if(!box)toast("Chapter "+n);}
+function toggleDone(el){el.classList.toggle("done");const all=document.querySelectorAll(".C-step"),d=document.querySelectorAll(".C-step.done").length;document.getElementById("bar").style.width=(d/all.length*100)+"%";document.getElementById("barlbl").textContent=d+" of "+all.length+" done";}
+function toggleDrawer(){const d=document.getElementById("drawer");if(d)d.classList.toggle("drawer");else toast(V==="B"?"B: menu opens a full-screen sheet":"C: menu opens the lesson list");}
+function wireToc(){const links=[...document.querySelectorAll(".toc a[data-s]")];if(!links.length)return;const onScroll=()=>{let cur=links[0].dataset.s;for(const a of links){const h=document.getElementById(a.dataset.s);if(h&&h.getBoundingClientRect().top<140)cur=a.dataset.s;}links.forEach(a=>a.classList.toggle("on",a.dataset.s===cur));};window.onscroll=onScroll;onScroll();}
+document.addEventListener("keydown",e=>{if(e.key==="/"&&document.activeElement.tagName!=="INPUT"){e.preventDefault();const i=document.querySelector(".search input");if(i)i.focus();}});
+const stage=document.getElementById("stage");
+document.getElementById("vp-desktop").onclick=e=>{stage.classList.remove("phone");e.target.classList.add("on");document.getElementById("vp-phone").classList.remove("on");};
+document.getElementById("vp-phone").onclick=e=>{stage.classList.add("phone");e.target.classList.add("on");document.getElementById("vp-desktop").classList.remove("on");};
+render();
+</script>
+</body>
+</html>
