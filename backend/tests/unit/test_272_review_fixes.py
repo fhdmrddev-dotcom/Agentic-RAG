@@ -359,3 +359,100 @@ async def test_wr02_the_lock_set_still_reads_as_field_names(monkeypatch):
     _edges, ctx = await _locked(monkeypatch)
     assert ctx.empty_filter_fields_in_run == {"date", "legal_entity"}
     assert sorted(ctx.empty_filter_fields_in_run) == ["date", "legal_entity"]
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# WR-03 — D-20 covers one_of (and legacy lists) too; enum contains is a substring; an unread
+#          spelling is "retrieval unavailable", never a silent case-sensitive match
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+
+_STORED = {
+    "client": {"acme gmbh": ["Acme GmbH"], "beta": ["BETA", "Beta"], "x, y": ["X, Y", "x, Y"]},
+    "author": {"smith": ["Smith"]},
+}
+
+
+async def test_wr03_a_custom_one_of_takes_every_stored_spelling(monkeypatch):
+    calls: list = []
+    out = await _validate(
+        {"field": "client", "op": "one_of", "values": ["acme gmbh", "beta", "Nobody"]},
+        stored=_STORED, calls=calls, monkeypatch=monkeypatch,
+    )
+    assert out == [{"field": "client", "op": "one_of", "values": ["Acme GmbH", "BETA", "Beta", "Nobody"]}]
+    assert calls == [("client", "acme gmbh"), ("client", "beta"), ("client", "Nobody")]
+
+
+async def test_wr03_a_legacy_metadata_filter_list_is_canonicalised_too(monkeypatch):
+    out = await _validate(stored=_STORED, monkeypatch=monkeypatch, metadata_filter={"client": ["acme gmbh"]})
+    assert out == [{"field": "client", "op": "one_of", "values": ["Acme GmbH"]}]
+
+
+async def test_wr03_a_free_text_builtin_one_of_is_canonicalised(monkeypatch):
+    out = await _validate(
+        {"field": "author", "op": "one_of", "values": ["smith"]}, stored=_STORED, monkeypatch=monkeypatch,
+    )
+    assert out == [{"field": "author", "op": "one_of", "values": ["Smith"]}]
+
+
+async def test_wr03_a_one_of_spelling_that_in_cannot_carry_is_refused(monkeypatch):
+    # 271 WR-04: `.in_()` does not escape `,` inside a value — and two spellings cannot ride eq.
+    r = await _validate(
+        {"field": "client", "op": "one_of", "values": ["x, y", "beta"]}, stored=_STORED, monkeypatch=monkeypatch,
+    )
+    assert isinstance(r, sdt.FilterRefusal) and "eq" in r.allowed
+
+
+async def test_wr03_enum_contains_is_a_substring_match():
+    out = await _validate({"field": "legal_entity", "op": "contains", "value": "acme"})
+    assert out == [{"field": "legal_entity", "op": "contains", "value": "acme"}]
+    r = await _validate({"field": "legal_entity", "op": "contains", "value": "Gamma"})
+    assert isinstance(r, sdt.FilterRefusal) and r.allowed == ["Acme GmbH", "Beta Ltd"]
+
+
+async def test_wr03_an_unread_spelling_is_raised_not_swallowed(monkeypatch):
+    async def _boom(**kw):
+        raise ConnectionError("db down")
+
+    monkeypatch.setattr(sdt, "canonical_stored_values", _boom)
+    with pytest.raises(sdt.SpellingLookupError):
+        await sdt.validate_and_canonicalise(
+            _conds({"field": "client", "op": "eq", "value": "acme gmbh"}), user_id=USER, supabase=object(),
+            defs=DEFS, whitelist=WHITELIST, number_fields=NUMBER_FIELDS,
+        )
+
+
+async def test_wr03_the_handler_reports_an_unread_spelling_as_kind_4(monkeypatch):
+    seen = {"resolve": 0, "search": 0}
+    audits: list = []
+
+    async def _boom(**kw):
+        raise ConnectionError("db down")
+
+    async def _defs(user_id, supabase=None):
+        return list(DEFS)
+
+    async def _meta(user_id, supabase):
+        return set(WHITELIST), set(NUMBER_FIELDS)
+
+    async def _resolve(**kw):
+        seen["resolve"] += 1
+
+    async def _search(*a, **k):
+        seen["search"] += 1
+
+    monkeypatch.setattr(sdt, "canonical_stored_values", _boom)
+    monkeypatch.setattr(sdt, "list_field_definitions", _defs)
+    monkeypatch.setattr(sdt, "_build_field_meta", _meta)
+    monkeypatch.setattr(sdt, "resolve_document_scope", _resolve)
+    monkeypatch.setattr(sdt, "search_documents", _search)
+    monkeypatch.setattr(sdt, "write_audit_entry", lambda **kw: audits.append(kw["metadata"]) or object())
+    ctx = _ctx()
+    out = await sdt.handle_search_documents(
+        {"query": "q", "filters": [{"field": "client", "op": "eq", "value": "acme gmbh"}]}, ctx,
+    )
+    body = json.loads(out.result)
+    assert body["error"] == "retrieval_unavailable"
+    assert "NOT a result of zero matches" in body["detail"]
+    assert seen == {"resolve": 0, "search": 0}
+    assert ctx.empty_filter_fields_in_run == set(), "kind 4 never locks"
+    assert [a["result_kind"] for a in audits] == ["provider_error"]

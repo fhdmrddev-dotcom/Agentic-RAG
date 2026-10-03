@@ -266,6 +266,24 @@ def _pick_spelling(value: str, spellings: list[str]) -> dict:
     return {"op": "one_of", "values": list(spellings)}
 
 
+class SpellingLookupError(Exception):
+    """272-REVIEW WR-03: the stored spellings (D-20) could not be read, so the filter cannot be matched
+    the way the data is stored. The handler reports it as kind 4 (retrieval unavailable): continuing
+    case-sensitively would read a transient DB error as "no documents" AND lock the field (D-09)."""
+
+    def __init__(self, field: str):
+        super().__init__(field)
+        self.field = field
+
+
+async def _stored_spellings(user_id: str, field: str, value: str) -> list[str]:
+    try:
+        return await canonical_stored_values(user_id=user_id, field=field, value=value)
+    except Exception as exc:  # noqa: BLE001 - classified, never swallowed (WR-03)
+        logger.warning("search_documents: stored spellings of %r could not be read", field, exc_info=True)
+        raise SpellingLookupError(field) from exc
+
+
 async def validate_and_canonicalise(
     conditions: Sequence[SearchCondition],
     *,
@@ -288,6 +306,8 @@ async def validate_and_canonicalise(
         if d.get("enabled") and d.get("field_key") and d["field_key"] not in DATE_WORDS
     }
     valid_fields = set(whitelist) | {"date"} | set(DATE_WORDS)
+    from app.services.view_filter_compiler import FREE_TEXT_FIELDS as free_text
+
     out: list[dict] = []
     for c in conditions:
         d = _as_dict(c)
@@ -363,7 +383,18 @@ async def validate_and_canonicalise(
             def _enum(v: Any) -> str | None:
                 return by_lower.get(str(v).strip().lower())
 
-            if op == "eq" or op == "contains":
+            if op == "contains":
+                # WR-03: substring semantics (ilike %v%), not the exact-option map. Refused only
+                # when no option contains it, so a misspelling still gets the option list (D-04).
+                part = str(d["value"]).strip().lower()
+                if not any(part in o.lower() for o in options):
+                    return FilterRefusal(
+                        field,
+                        f"No {field} value contains '{d['value']}'. Valid values: {', '.join(options)}. "
+                        "Retry with one of them, or ask which was meant.",
+                        options,
+                    )
+            elif op == "eq":
                 hit = _enum(d["value"])
                 if hit is None:
                     return FilterRefusal(
@@ -415,16 +446,38 @@ async def validate_and_canonicalise(
             d["value"] = b
         elif defn is not None and ftype in (None, "string") and op == "eq" and isinstance(d["value"], str):
             # D-20 — the compiler's custom `eq` is a CASE-SENSITIVE `@>` containment, so the value is
-            # replaced by the stored spelling(s) read under the caller's RLS (272-03).
-            try:
-                spellings = await canonical_stored_values(user_id=user_id, field=field, value=d["value"])
-            except Exception:  # noqa: BLE001 — best effort: an unread spelling keeps the value as given
-                logger.warning("search_documents: stored spellings of %r could not be read", field, exc_info=True)
-                spellings = []
+            # replaced by the stored spelling(s) read under the caller's RLS (272-03). WR-03: an
+            # unread spelling raises SpellingLookupError (kind 4), never a silent case-sensitive match.
+            spellings = await _stored_spellings(user_id, field, d["value"])
             if spellings:
                 picked = _pick_spelling(d["value"], spellings)
                 d.pop("value", None)
                 d.update(picked)
+        elif op == "one_of" and (
+            (defn is not None and ftype in (None, "string")) or (defn is None and field in free_text)
+        ):
+            # WR-03 — `one_of` compiles to a CASE-SENSITIVE `.in_()` on `metadata->>field` (custom
+            # strings AND the free-text built-ins), and every legacy metadata_filter list lands here.
+            # Each member becomes its stored spelling(s); one with none stays as given.
+            union: list = []
+            for v in d["values"]:
+                found = await _stored_spellings(user_id, field, v) if isinstance(v, str) else []
+                for x in found or [v]:
+                    if x not in union:
+                        union.append(x)
+            unsafe = any(isinstance(x, str) and ch in x for x in union for ch in _IN_UNSAFE)
+            if unsafe and len(union) > 1:
+                return FilterRefusal(
+                    field,
+                    f"A {field} value contains a comma, quote or bracket, so it cannot be matched as "
+                    "one of a list. Search one value at a time with eq.",
+                    ["eq"],
+                )
+            if unsafe:
+                d.pop("values", None)
+                d.update({"op": "eq", "value": union[0]})
+            else:
+                d["values"] = union
         out.append(d)
     return out
 
@@ -1177,10 +1230,18 @@ async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
             ctx, query, f"The list of filterable fields could not be read ({type(exc).__name__}).",
             requested, ToolResult,
         )
-    canonical = await validate_and_canonicalise(
-        parsed, user_id=uid, supabase=ctx.supabase, defs=defs,
-        whitelist=whitelist, number_fields=number_fields,
-    )
+    try:
+        canonical = await validate_and_canonicalise(
+            parsed, user_id=uid, supabase=ctx.supabase, defs=defs,
+            whitelist=whitelist, number_fields=number_fields,
+        )
+    except SpellingLookupError as exc:
+        return _filter_unavailable(
+            ctx, query,
+            f"The stored spellings of {exc.field} could not be read, so the filter could not be "
+            "matched the way the documents store it.",
+            requested, ToolResult,
+        )
     if isinstance(canonical, FilterRefusal):
         return _invalid_filter(ctx, query, canonical, requested, ToolResult)
 
