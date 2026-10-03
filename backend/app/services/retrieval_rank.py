@@ -81,19 +81,59 @@ def _select_filtered_vector_rows(rows: list[dict], threshold: float) -> list[dic
     prunes inside the scoped set; this applies it afterwards, honestly:
 
     * rows that clear ``threshold`` (the RPC's own ``> match_threshold`` comparison) are returned
-      alone, unmarked;
-    * when NONE do, the rows are still returned — each copy marked ``low_similarity: True`` —
-      because "the matched documents hold nothing close to the question" is a different fact
-      from "nothing matched", and the second would be a false empty.
+      unmarked;
+    * D-27 (operator, 2026-10-03 — refines D-10 after finding F-2): a matched document with NO row
+      above the threshold still returns its BEST row, marked ``low_similarity: True``. Before
+      D-27 such a document was dropped whenever any OTHER document cleared the threshold, and the
+      model then reported a false count ("two reports" when three matched);
+    * when NONE clear it, every row is returned marked — "the matched documents hold nothing
+      close to the question" is a different fact from "nothing matched", and the second would be
+      a false empty.
 
+    Input order (similarity, descending) is kept, so a document's first row is its best.
     Pure: returns new dicts for marked rows, never mutates its input.
     """
     if not rows:
         return []
     above = [row for row in rows if (row.get("similarity") or 0.0) > threshold]
-    if above:
-        return above
-    return [{**row, "low_similarity": True} for row in rows]
+    if not above:
+        return [{**row, "low_similarity": True} for row in rows]
+    covered = {row.get("document_id") for row in above}
+    out: list[dict] = []
+    for row in rows:
+        if (row.get("similarity") or 0.0) > threshold:
+            out.append(row)
+        elif row.get("document_id") not in covered:
+            covered.add(row.get("document_id"))
+            out.append({**row, "low_similarity": True})
+    return out
+
+
+def _cover_matched_documents(rows: list[dict], top_k: int) -> list[dict]:
+    """Phase 272 (D-27) — the FILTERED top-k cut: one passage per matched document first.
+
+    ``rows`` is a ranked list. A plain ``rows[:top_k]`` lets one document with many strong
+    passages fill every slot and silently drop another matched document (finding F-2). This keeps
+    each document's best-ranked row first — up to ``top_k`` documents — then fills the remaining
+    slots by rank, and returns the selection in its original rank order.
+
+    ⛔ Filtered path only: the unfiltered cut stays ``[:top_k]``. Pure, never mutates its input.
+    """
+    if top_k <= 0 or not rows:
+        return []
+    chosen: set[int] = set()
+    seen_docs: set = set()
+    for i, row in enumerate(rows):
+        if len(chosen) >= top_k:
+            break
+        if row.get("document_id") not in seen_docs:
+            seen_docs.add(row.get("document_id"))
+            chosen.add(i)
+    for i in range(len(rows)):
+        if len(chosen) >= top_k:
+            break
+        chosen.add(i)
+    return [rows[i] for i in sorted(chosen)]
 
 
 def _carry_low_similarity(source_rows: list[dict], enriched: list[dict]) -> list[dict]:

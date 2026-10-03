@@ -29,6 +29,7 @@ from app.services.retrieval_documents import _enrich_with_filenames
 from app.services.retrieval_rank import (
     _avg_cosine,
     _carry_low_similarity,
+    _cover_matched_documents,
     _deduplicate_chunks,
     _rrf_fuse,
     _select_filtered_vector_rows,
@@ -107,7 +108,9 @@ async def search_documents(
         if filtered:
             rows = _select_filtered_vector_rows(rows, match_threshold)
         avg_sim = _avg_cosine(rows)
-        rows = _deduplicate_chunks(rows)[:top_k]
+        rows = _deduplicate_chunks(rows)
+        # D-27: a filtered cut keeps one passage per matched document before filling by rank.
+        rows = _cover_matched_documents(rows, top_k) if filtered else rows[:top_k]
         return _carry_low_similarity(rows, await _enrich_with_filenames(rows, supabase)), avg_sim
 
     # Hybrid path: vector + keyword → RRF fusion → dedup → optional reranking
@@ -141,18 +144,28 @@ async def search_documents(
     fused = _deduplicate_chunks(fused)
 
     # Take top-K before reranking
-    candidates = fused[: max(top_k, rerank_top_n)]
+    # D-27: a filtered cut keeps one passage per matched document (no document is dropped by
+    # another's strong passages); the unfiltered cut is unchanged.
+    if filtered:
+        candidates = _cover_matched_documents(fused, max(top_k, rerank_top_n))
+    else:
+        candidates = fused[: max(top_k, rerank_top_n)]
 
     rerank_enabled = user_settings.rerank_enabled if user_settings else settings.rerank_enabled
     if rerank_enabled:
         # SEED-065: rerank is a SYNC Cohere-HTTP / local-ML call — same event-loop
         # blocking class as the embed above. Off by default, but when enabled it
         # compounds the stall, so wrap it in run_in_threadpool too (D-v2.5-01).
+        # D-27: a filtered set is reordered in full, then cut with coverage, so the reranker
+        # cannot drop a matched document either.
         candidates = await run_in_threadpool(
-            rerank, query, candidates, top_n=top_k, user_settings=user_settings
+            rerank, query, candidates, top_n=len(candidates) if filtered else top_k,
+            user_settings=user_settings,
         )
+        if filtered:
+            candidates = _cover_matched_documents(candidates, top_k)
     else:
-        candidates = candidates[:top_k]
+        candidates = _cover_matched_documents(candidates, top_k) if filtered else candidates[:top_k]
 
     # D-10: `_rrf_fuse` copies each row (`dict(...)`) and rerank mutates in place, so the mark
     # survives to here; enrichment rebuilds the dicts, so it is carried across by position.
