@@ -277,7 +277,7 @@ describe("P-05 — the chevron is unchanged", () => {
 // 271-VERIFICATION F-2 — POST /documents/{id}/reingest is latest-gated (404 on an older row,
 // which the list only logged), and PATCH /documents/{id}/move moves ONE row out of its
 // lineage's folder. So an older row offers neither, and says why in words. Delete stays:
-// the version delete removes exactly that row and promotes nothing (documents.py:1855-1886).
+// the version delete removes exactly that row and promotes nothing (documents.py:1864-1890).
 describe("F-2 — an older-version row offers only what works on it", () => {
   it("an older row has no Re-ingest and no Move, says why in words, and keeps Download and Delete", () => {
     renderList({

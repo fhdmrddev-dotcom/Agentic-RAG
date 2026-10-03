@@ -4083,7 +4083,7 @@ const BASELINE = {
   "relationshipLabels.test.ts": 5, // 271-03
   "LinkTargetCombobox.test.tsx": 9, // 271-03
   "documentAddedBy.test.ts": 6, // 271-03
-  "DocumentRow.find271.test.tsx": 17, // 271-03
+  "DocumentRow.find271.test.tsx": 19, // 271-03 · RAISED 17 → 19 at 271-REVIEW-FIX (F-2: older-row actions)
   // ── Phase 271-04 — ADOPTED, not raised: in NEITHER knob before (RESEARCH Wave 0). Measured
   // 10 passed on the merged wave-1 tree (ff4b98f01) BEFORE 271-04 touched ConditionPopover. ──
   // ⬆ RAISED 10 → 13 at 271-04 Task 1: three excludeFieldKeys cases (P-06). The 10 shipped cases
@@ -4092,19 +4092,19 @@ const BASELINE = {
   // ── Phase 271-04 Task 1 — every suite it CREATED, at its measured passing count. BOTH KNOBS. ──
   "FilterBar.find271.test.tsx": 11, // 271-04 (3 are the Views-tab DOM snapshot pins)
   "StructurePopovers.test.tsx": 22, // 271-04
-  "FindQuickAdd.test.tsx": 12, // 271-04
+  "FindQuickAdd.test.tsx": 18, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03)
   // ── Phase 271-04 Task 2 — the Find results surface and the exact pager. BOTH KNOBS. ──
   "DocumentsFindBody.test.tsx": 26, // 271-04
   "DocumentsPager.exact271.test.tsx": 3, // 271-04
   // ── Phase 271-04 Task 3 — the page wiring and the older-version panel. BOTH KNOBS. ──
-  "LibraryPage.find271.test.tsx": 13, // 271-04
+  "LibraryPage.find271.test.tsx": 18, // 271-04 · RAISED 13 → 18 at 271-REVIEW-FIX (CR-01 ×2, CR-02 ×2, WR-01)
   "DocumentDetailPanel.olderVersion271.test.tsx": 3, // 271-04
   // ── Phase 271-02's suites, OWED to this plan (271-02 could not edit this file in wave 1).
   // Measured passing on the wave-2 tree. ──
   "askInChat.test.ts": 5, // 271-02 (adopted 271-04)
   "FindModeSwitch.test.tsx": 7, // 271-02 (adopted 271-04)
   "FindMetaLine.test.tsx": 10, // 271-02 (adopted 271-04)
-  "AskHandoffCard.test.tsx": 5, // 271-02 (adopted 271-04)
+  "AskHandoffCard.test.tsx": 7, // 271-02 (adopted 271-04) · RAISED 5 → 7 at 271-REVIEW-FIX (WR-01)
   "LibraryPage.filingRules271.test.tsx": 2, // 271-02 (adopted 271-04)
 }
 
