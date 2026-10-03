@@ -18,7 +18,7 @@ result: [pending]
 
 ### 2. Operator confirms the three logic rules the fixer flagged
 expected: CR-01 element-match rule, WR-02 widening rule and WR-06 re-create rule accepted as the wanted rules (272-REVIEW-FIX.md).
-result: [pending]
+result: pass — operator selected "Accept" on all three, 2026-10-03
 
 ### 3. Production parity before any deploy
 expected: migration 200 STEP 1 (CREATE INDEX CONCURRENTLY) alone, then STEP 2, then 201; both VERIFY blocks 19/19 PASS; get_advisors(security) shows no new findings. Every write operator-approved per action.
@@ -27,9 +27,9 @@ result: [pending]
 ## Summary
 
 total: 3
-passed: 0
+passed: 1
 issues: 0
-pending: 3
+pending: 2
 skipped: 0
 blocked: 0
 
