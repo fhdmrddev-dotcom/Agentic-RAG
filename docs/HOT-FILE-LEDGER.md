@@ -10712,31 +10712,31 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 0 / 0 / 0 | no (new) | young (created 271-01). Row added AT PLANNING. ⛔ FastAPI-free Find core: no embedding import, no `.rpc(`; an unreachable folder or picked doc returns ZERO rows, never no narrowing |
-| [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 0 / 0 / 0 | no (new) | young (created 271-01). Row added AT PLANNING. ⛔ `extra="forbid"`; every verb, sort and version is a closed Literal; the 8 verbs are pinned equal to `_INVERSE_LABEL` keys + values |
-| [`backend/app/api/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_searchpy) | 0 / 0 / 0 | no (new) | young (created 271-01). Row added AT PLANNING. ⛔ user-JWT client only (RLS); a thin wrapper that remaps `ResolveError`; no DB write, no audit row |
-| [`frontend/src/pages/findState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesfindstatets) | 0 / 0 / 0 | no (new) | young (created 271-03). Row added AT PLANNING. ⛔ a STRICT LEAF: zero imports, no React, no I/O. Holds Find's conditions, name, version, sort, page and mode, never the result |
-| [`frontend/src/hooks/useDocumentFind.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentfindts) | 0 / 0 / 0 | no (new) | young (created 271-03). Row added AT PLANNING. ⛔ resting Find makes ZERO requests; an error KEEPS rows and chips, never the `resolveFilterIntoList` list swap |
-| [`frontend/src/lib/documentAddedBy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentaddedbyts) | 0 / 0 / 0 | no (new) | young (created 271-03). Row added AT PLANNING. ⛔ the ONE `addedBy` rule (connection first, never an email), moved out of DocumentFileFacts; both import it |
-| [`frontend/src/components/relationships/LinkTargetCombobox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipslinktargetcomboboxtsx) | 0 / 0 / 0 | no (new) | young (created 271-03 by EXTRACTION from CreateLinkDialog). Row added AT PLANNING. ⛔ one combobox, two mounts; APG roles move verbatim, never forked |
-| [`frontend/src/components/relationships/CreateLinkDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipscreatelinkdialogtsx) | 3 / 1 / 316 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 271 PLANNING. **271-03**: combobox body EXTRACTED to `LinkTargetCombobox`; chips, note, preview, footer stay. Suite adopted first |
-| [`frontend/src/components/relationships/relationshipLabels.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipsrelationshiplabelsts) | 1 / 1 / 43 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 271 PLANNING. **271-03**: + an 8-verb filter table DERIVED from the two maps by one stated transform, pinned; never retyped |
-| [`frontend/src/components/library/DocumentsPager.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarydocumentspagertsx) | 2 / 1 / 108 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 271 PLANNING. **271-04**: ONE optional `exact` prop skips the 1000-cap arm for a server-exact total; browse unchanged |
-| [`frontend/src/components/ingestion/FilterBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfilterbartsx) | 6 / 3 / 311 | ⚠ **FIRES** (3 phases) | ⚠ FIRES and absent its ENTIRE LIFE — row added AT 271 PLANNING. **271-04**: 4 optional props + a `FilterChip` export; the Views tab passes none and stays byte-identical |
-| [`frontend/src/components/ingestion/AutomationGroup.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionautomationgrouptsx) | 5 / 4 / 303 | ⚠ **FIRES** (4 phases) | ⚠ FIRES and absent its ENTIRE LIFE — row added AT 271 PLANNING. **271-02**: ONE string, the empty line becomes "No filing rules yet" (D-08). ⛔ no logic change |
-| [`frontend/src/components/library/find/StructurePopovers.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindstructurepopoverstsx) | 0 / 0 / 0 | no (new) | young (created 271-04). Row added AT PLANNING. ⛔ every option is backed by a server filter with a CONTENT test; one popover family (the ConditionPopover shell idiom) |
-| [`frontend/src/components/library/find/FindQuickAdd.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindquickaddtsx) | 0 / 0 / 0 | no (new) | young (created 271-04). Row added AT PLANNING. ⛔ the Version chip is ALWAYS visible (D-06); set chips use the shipped `FilterChip`, never an indigo wash |
-| [`frontend/src/components/library/find/FindModeSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmodeswitchtsx) | 0 / 0 / 0 | no (new) | young (created 271-02). Row added AT PLANNING. ⛔ `role="radiogroup"`, never `role="tab"`: a second tablist collides with the Library's `getByRole("tab")` cases |
-| [`frontend/src/components/library/find/FindMetaLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmetalinetsx) | 0 / 0 / 0 | no (new) | young (created 271-02). Row added AT PLANNING. ⛔ the ONLY count on screen in Find; the stated sort is the server's order and the client never re-sorts |
-| [`frontend/src/components/library/find/AskHandoffCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindaskhandoffcardtsx) | 0 / 0 / 0 | no (new) | young (created 271-02). Row added AT PLANNING. ⛔ no I/O and no list: renders a question and calls `onAskInChat`; nothing list- or passage-shaped renders in the Library (D-02) |
-| [`frontend/src/components/library/find/askInChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindaskinchatts) | 0 / 0 / 0 | no (new) | young (created 271-02). Row added AT PLANNING. ⛔ create the thread, THEN set the prefill, THEN navigate; a failed create navigates nowhere. Never sends |
-| [`frontend/src/components/library/find/DocumentsFindBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfinddocumentsfindbodytsx) | 0 / 0 / 0 | no (new) | young (created 271-04). Row added AT PLANNING. ⛔ owns the Find render so LibraryPage only wires props (its named seam); an error keeps the chips, never the folder list |
+| [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 2 / 1 / 565 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). **271-05**: live on GoTrue JWTs: exact id sets, both directions, two-org fence; RLS alone held a widened leg. ⛔ no embedding import, no `.rpc(` |
+| [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 1 / 1 / 171 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ `extra="forbid"`; closed Literals; the 8 verbs pinned to `_INVERSE_LABEL`. 271-05 drove it through the route with real JWTs |
+| [`backend/app/api/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_searchpy) | 1 / 1 / 48 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ user-JWT client only; remaps `ResolveError`; no write. **271-05**: the fence calls THIS coroutine with a GoTrue token (P-04) |
+| [`frontend/src/pages/findState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesfindstatets) | 1 / 1 / 361 (was `0 / 0 / 0`) | no (1 phase) | young (271-03). ⛔ STRICT LEAF: zero imports, no I/O. P-01 `DEFAULT_SORT = added_desc` awaits operator review |
+| [`frontend/src/hooks/useDocumentFind.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentfindts) | 1 / 1 / 104 (was `0 / 0 / 0`) | no (1 phase) | young (271-03). ⛔ resting Find makes ZERO requests; an error KEEPS rows and chips. Driven live in 271-05 |
+| [`frontend/src/lib/documentAddedBy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentaddedbyts) | 1 / 1 / 27 (was `0 / 0 / 0`) | no (1 phase) | young (271-03). ⛔ the ONE `addedBy` rule (connection first, never an email); DocumentFileFacts and the Find column import it |
+| [`frontend/src/components/relationships/LinkTargetCombobox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipslinktargetcomboboxtsx) | 1 / 1 / 177 (was `0 / 0 / 0`) | no (1 phase) | young (271-03, extracted). ⛔ one combobox, two mounts. 271-05 drove it in the Relationship editor (latest-only candidates) |
+| [`frontend/src/components/relationships/CreateLinkDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipscreatelinkdialogtsx) | 4 / 2 / 236 (was `3 / 1 / 316`) | no (2 phases) | **271-03**: the combobox body EXTRACTED to `LinkTargetCombobox`; chips, note, preview, footer stay. ⛔ create stays outgoing-only (D-117-1) |
+| [`frontend/src/components/relationships/relationshipLabels.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipsrelationshiplabelsts) | 2 / 2 / 104 (was `1 / 1 / 43`) | no (2 phases) | **271-03**: `RELATIONSHIP_FILTER_VERBS` DERIVED from the two maps, pinned to the backend `_INVERSE_LABEL`. ⛔ never retyped |
+| [`frontend/src/components/library/DocumentsPager.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarydocumentspagertsx) | 3 / 2 / 112 (was `2 / 1 / 108`) | no (2 phases) | **271-04**: ONE optional `exact` prop skips the 1000-row cap arm for a server-exact total. ⛔ browse renders byte-identically |
+| [`frontend/src/components/ingestion/FilterBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfilterbartsx) | 7 / 4 / 387 (was `6 / 3 / 311`) | ⚠ **FIRES** | ⚠ STALE (`6/3/311`). **271-04**: 4 optional props + `FilterChip`; Views DOM snapshot-pinned. ⚠ 271-05 F-1: Find's metadata chips read raw keys (`document_type is …`) |
+| [`frontend/src/components/ingestion/AutomationGroup.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionautomationgrouptsx) | 6 / 5 / 303 (was `5 / 4 / 303`) | ⚠ **FIRES** | **271-02**: ONE string (`No filing rules yet`, D-08). ⛔ no logic change. The next phase that touches it proposes the extraction first |
+| [`frontend/src/components/library/find/StructurePopovers.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindstructurepopoverstsx) | 2 / 1 / 686 (was `0 / 0 / 0`) | no (1 phase) | young (271-04). **271-05 fix**: focus moves INTO each editor on open (it stayed on the chip: Esc dead, Tab skipped 5 of 6). ⛔ one popover idiom |
+| [`frontend/src/components/library/find/FindQuickAdd.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindquickaddtsx) | 1 / 1 / 358 (was `0 / 0 / 0`) | no (1 phase) | young (271-04). ⛔ the Version chip is always visible (D-06). ⚠ 271-05 F-1: `＋ Document type` / `＋ Date` stay offered after those are set |
+| [`frontend/src/components/library/find/FindModeSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmodeswitchtsx) | 1 / 1 / 77 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ `role="radiogroup"`, never `role="tab"`. Driven in Chromium at 271-05 |
+| [`frontend/src/components/library/find/FindMetaLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmetalinetsx) | 1 / 1 / 101 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ the ONLY count in Find; the client never re-sorts. **271-05 G4-6 live**: the header follows the sort, nulls last |
+| [`frontend/src/components/library/find/AskHandoffCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindaskhandoffcardtsx) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ no I/O, no list. **271-05 G4-4 live**: Enter opened a NEW thread with the question unsent; no list rendered in the Library |
+| [`frontend/src/components/library/find/askInChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindaskinchatts) | 1 / 1 / 53 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ create thread → prefill → navigate; never sends. **271-05 G4-4 live**: POST /threads once, 0 message sends, prefill held 3 s |
+| [`frontend/src/components/library/find/DocumentsFindBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfinddocumentsfindbodytsx) | 1 / 1 / 262 (was `0 / 0 / 0`) | no (1 phase) | young (271-04). ⛔ owns the Find render; an error keeps the chips. **271-05 live**: zero box + `1 more match…` hint (9.39:1 on its wash) |
 | [`backend/app/models/document.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocumentpy) | 11 / 8 / 207 | ⚠ **FIRES — 8 phases** | ⚠ STALE (`10/7/183`). **270-02**: 4 optional file-fact fields + `source_connection_name` + the download-response model, additive. ⛔ optional fields only: a required one 500s five non-upload paths |
-| [`frontend/src/components/ingestion/DocumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentrowtsx) | 7 / 3 / 476 | ⚠ **FIRES** (3 phases) | ⚠ STALE (`5/2/469`); now FIRES at 3 phases. **270-04/05**: 2 Download mounts inside Actions, still seven `<td>`; nested table marked `data-version-history` (F-1, 270-05) |
+| [`frontend/src/components/ingestion/DocumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentrowtsx) | 8 / 4 / 564 (was `7 / 3 / 476`) | ⚠ **FIRES** | ⚠ STALE (`7/3/476`). **271-03**: Find cells 3-5 + name-cell 2nd line (folder · version tag). ⚠ 271-05 F-2: Re-ingest on an older row is a silent no-op |
 | [`backend/app/services/file_facts.py`](docs/HOT-FILE-LEDGER.md#backendappservicesfile_factspy) | 1 / 1 / 163 | no (1 phase) | young (created 270-01). ⛔ `read_file_facts` NEVER raises; a fact it cannot read is `None`, never `0` and never a substituted date. Re-measured `1/1/163` at 270 close |
 | [`frontend/src/lib/documentDownload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentdownloadts) | 2 / 1 / 63 | no (1 phase) | young (created 270-03). ⛔ the ONLY place the download label is derived and the request made. 270-04 names an older v1 row too (`Download v1 (viewed, not latest)`) |
 | [`frontend/src/components/metadata/DocumentDownloadButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdownloadbuttontsx) | 1 / 1 / 146 | no (1 phase) | young (created 270-03). ⛔ no `href`, no stored URL: the link is minted on click. The live drive found no signed URL in the DOM |
-| [`frontend/src/components/metadata/DocumentFileFacts.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentfilefactstsx) | 2 / 1 / 113 | no (1 phase) | young (created 270-03). ⛔ eight rows always present; a source date NEVER falls back to the upload date. 270-05 F-2: `Added by` tests the connection BEFORE "is it me" |
+| [`frontend/src/components/metadata/DocumentFileFacts.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentfilefactstsx) | 3 / 2 / 102 (was `2 / 1 / 113`) | no (2 phases) | young (270-03). **271-03**: `addedBy` MOVED to `lib/documentAddedBy.ts` and imported (no fork). ⛔ connection first (270 F-2) |
 | [`backend/app/services/expert_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_authoringpy) | 7 / 3 / 393 (was `4 / 2 / 389`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/389`), now FIRES. honoured by construction (**267-01**): the draft prompt says `tool_floor_enabled` is always true and has no effect. ⛔ every emitted string CAPPED |
 | [`backend/app/services/skill_body_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesskill_body_authoringpy) | 2 / 1 / 373 | no (new) | young (created 263). Row added AT CREATION — an absent row is invisible to G-5 at any count. ⛔ The ONE home of the borrowed craft doctrine; doctrine inlined here makes it an ENGINE (D-263-13). |
 | [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 6 / 3 / 1550 (was `3 / 2 / 1475`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`3/2/1475`), now FIRES. honoured by construction (**267-03**): 2 removals + ONE re-keyed connection picker. ⛔ no new section; extraction OWED before a 4th phase |
@@ -10775,9 +10775,9 @@ cells rot within days.
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 21 / 14 / 537 (was `20 / 13 / 510`) | ⚠ **FIRES** | ⚠ STALE (`20/13/510`). **268-03**: `folder_id`/`clear_folder` on `ThreadUpdate` + `ScopeEffect`, additive only. ⛔ a body touching both pairs is a 422 |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 58 / 29 / 1124 (was `52 / 27 / 1014`) | ⚠ **FIRES** | ⚠ row STALE (`52/27/1014`). honoured by construction (**267-03/04**): ONE prop, ONE memoised navigation provider + wrapper. Hooks 9/5/29 → 9/5/30. ⛔ the trailing fallback stays POSITIONAL |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 60 / 30 / 1134 (was `58 / 29 / 1124`) | ⚠ **FIRES** | ⚠ STALE (`58/29/1124`). **271-02**: `classification-rules` branch retired; `handleAskInChat` (new thread → prefill → navigate) on the ONE LibraryPage mount |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
-| [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 2 / 1 / 204 | no (1 phase) | ⚠ absent for its entire life — row added 244-04 at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases. `aria-hidden` on the count is load-bearing |
+| [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 4 / 3 / 249 (was `2 / 1 / 204`) | ⚠ **FIRES** | now FIRES (3 phases). **271-02**: optional `onOpenFilingRules`; link + pill in ONE right cluster, never a tab. 271-05 G4-3: Back returns to Ingestion |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
 | [`frontend/src/components/settings/ActionRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsactionrowtsx) | 1 / 1 / 153 | no (1 phase) | Single action permission row in grant list; renders direction, posture buttons, and forward-action reset affordance (CRED-02). |
 | [`frontend/src/components/settings/McpAuthDoor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmcpauthdoortsx) | 3 / 1 / 451 | no (1 phase) | Second writer of custom_client_id (Phase 222 BYO door). CRED-01 inline refusal shared with ConnectionFormPanel via customClientIdError; both doors must enforce the same boundary. |
@@ -10804,15 +10804,15 @@ cells rot within days.
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
-| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 207 / 123 / 519 (was `205 / 122 / 516`) | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — barrel. **270-03**: re-exports `getDocumentDownloadUrl` + its type, nothing else |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 94 / 73 / 1459 (was `93 / 72 / 1443`) | ⚠ **FIRES** | ⚠ STALE (`93/72/1443`). **270-03**: 4 optional fact fields + `source_connection_name` on `Document` + the download-response type, additive. Seam OWED |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 83 / 60 / 951 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**, Phase 259 router mount) |
+| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ **FIRES** | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 95 / 74 / 1520 (was `94 / 73 / 1459`) | ⚠ **FIRES** | ⚠ STALE (`94/73/1459`). **271-03**: Find wire types (`DocumentSearchRequest/Row/Response`, `RelVerb`), additive. Seam OWED |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 84 / 61 / 952 (was `83 / 60 / 951`) | ⚠ **FIRES** | ⚠ STALE (`83/60/951`). **271-01**: ONE import + ONE `include_router(document_search.router)` after `document_views`. 0 new branches |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 87 / 50 / 1593 | ⚠ **FIRES** | ⚠ STALE a 13th time (`83/48/1506`). honoured by construction (**249-01**): ONE derived frozenset + a Literal widened to the value the code already returned. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 91 / 35 / 2518 (was `87 / 34 / 2414`) | ⚠ **FIRES** | ⚠ STALE (`87/34/2414`). **270-02**: +1 route (`POST /{id}/download-url`) outside the 217 region + 1 batched read. ⛔ RLS read BEFORE service sign; 404 not 403; no `ingestion_step` literal |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 263 / 59 / 6211 (was `259 / 58 / 6196`) | ⚠ **FIRES** | ⚠ STALE (`259/58/6196`). **270-03/04** adopt the phase's new suites into BOTH knobs. Gate verdict recorded in 270-UAT-LOG.md |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 269 / 60 / 6281 (was `263 / 59 / 6211`) | ⚠ **FIRES** | ⚠ STALE (`263/59/6211`). **271-03/04** adopted the phase's suites into BOTH knobs. 271-05's verdict is in 271-UAT-LOG.md |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
@@ -10936,15 +10936,15 @@ cells rot within days.
 | [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 6 / 4 / 748 | ⚠ **FIRES** | ⛔ row was STALE at `4/2/715` reading `no (2 phases)` — re-derived 263 planning. Holds `FullAppSettings`, not only skills. D-263-03 reuses its `POST /skills` caller, adds no endpoint. |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
-| [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
-| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 50 / 17 / 994 (was `48 / 16 / 993`) | ⚠ **FIRES** | ⚠ STALE (`48/16/993`). **270-04/05**: `currentUserId` passed to the panel (1 line); **270-05 F-1**: `SHED_COLUMNS_3_TO_5` scoped to the list's own table, excludes `[data-version-history]` |
+| [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 28 / 14 / 332 (was `24 / 13 / 294`) | ⚠ **FIRES** | ⚠ STALE (`24/13/294`). **271-03**: `columns="find"` ignores `folderId` and renders nothing on zero (the Find body owns S7). ⛔ still seven `<td>` |
+| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 53 / 18 / 1218 (was `50 / 17 / 994`) | ⚠ **FIRES** | ⚠ STALE (`50/17/994`). **271-02/04**: Filing rules sub-view + a SECOND `useReducer` for Find; `documentSurface(lead, findSlots?)`. ⛔ Views path byte-unchanged |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 19 / 11 / 456 | ⚠ **FIRES** | ⛔ **extraction still OWED** (`SEED-224`, since 231) — 241 is the SECOND landing, capped at 11 lines by a fence; a THIRD must propose the extraction FIRST |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
-| [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 14 / 9 / 614 (was `12 / 7 / 596`) | ⚠ **FIRES** | honoured by construction (**270-04**): 1 import pair + 2 mounts (header Download row, first open `File` section) + 1 optional prop; 0 new state, 0 new effect |
+| [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 15 / 10 / 654 (was `14 / 9 / 614`) | ⚠ **FIRES** | ⚠ STALE (`14/9/614`). **271-04**: `is_latest === false` → read-only notice, values as text, `handleCommit` returns early. 271-05 G4-5: 0 edits vs 8 on latest |
 | [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
-| [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 5 / 5 / 450 | ⚠ **FIRES** (5 phases) | ⚠ STALE (`2/2/389`); now FIRES at 5 phases. **270-03**: ONE caller (`getDocumentDownloadUrl`) + its wire type, additive; re-exported by the `api.ts` barrel |
+| [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 6 / 6 / 490 (was `5 / 5 / 450`) | ⚠ **FIRES** | ⚠ STALE (`5/5/450`). **271-03**: `searchDocuments` + `DocumentSearchError`, additive. ⛔ Find's hook imports from here, never the barrel |
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
@@ -10983,8 +10983,8 @@ cells rot within days.
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 24 / 13 / 417 | ⚠ **FIRES** | ⛔ STALE a 3rd time (was `23/12/381` HERE and `23/12/417` in CLAUDE.md — **the 2 registers disagreed on LINES**, 262-01 reconciles). 244-14's `overflow-x-hidden` stands |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 33 / 24 / 378 | ⚠ **FIRES** | ⚠ STALE a 3rd time (was `32/23/374`, `31/23/351`); absent its ENTIRE LIFE at 23 phases before that. 262-01 re-derives INHERITED rot only; plan 05 adds the member. 244-04's fence stands |
-| [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 9 / 6 / 118 | ⚠ **FIRES** | ⚠ STALE (was `8/6/95`). ⛔ 2 of its 3 suites ran in **NEITHER** count-gate knob — 262-01 adopts both. Row added 235 when absent at 6 phases; plan 05 edits `NAV_ITEMS` |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 35 / 26 / 412 (was `33 / 24 / 378`) | ⚠ **FIRES** | ⚠ STALE (`33/24/378`). **271-02**: the `classification-rules` member REMOVED with its ChatLayout branch and rail entry in ONE commit; reachability fence green |
+| [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 12 / 8 / 153 (was `9 / 6 / 118`) | ⚠ **FIRES** | ⚠ STALE (`9/6/118`). **271-02**: the Classification entry REMOVED (7 entries); `Wand2` moved to the Filing rules link. 271-05 G4-3: the rail has none |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
 | [`frontend/src/lib/api/sources.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisourcests) | 5 / 1 / 312 | no (1 phase) | ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL.** ⛔ 235-13: it held TWO hand-written copies of the cause union the `?raw` fence is blind to; both now import the type |
@@ -11008,11 +11008,11 @@ cells rot within days.
 | [`backend/app/api/classification_rules.py`](docs/HOT-FILE-LEDGER.md#backendappapiclassification_rulespy) | 3 / 3 / 226 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |
 | [`backend/app/models/classification_rule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsclassification_rulepy) | 2 / 2 / 56 | no (2 phases) | row added 237 below threshold. Adds rule_scope ('watch' or 'classification') to RuleCreate, RuleUpdate, RuleResponse. |
 | [`backend/app/services/classification_rule_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesclassification_rule_servicepy) | 3 / 2 / 166 | no (2 phases) | row added 237 below threshold. Persists and queries rule_scope across rule CRUD and uploader rule evaluation. |
-| [`backend/app/services/document_view_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_view_resolverpy) | 2 / 2 / 379 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 373`. honoured by construction (**240**): `thread_key` added to the whitelist AND to the compiler — a promotion touches three places |
+| [`backend/app/services/document_view_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_view_resolverpy) | 4 / 4 / 403 (was `2 / 2 / 379`) | ⚠ **FIRES** | ⚠ now FIRES (row read `2/2/379`, planning measured `3/3/379`). **271-01**: `apply_fragments` + `validate_and_compile` EXTRACTED verbatim; `resolve_filter` unchanged |
 | [`backend/app/services/view_filter_compiler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesview_filter_compilerpy) | 4 / 3 / 288 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `3 / 2 / 283`. honoured by construction (**240**): one row in `PROMOTED_TYPED_COLUMNS`, no new leg, no new operator |
-| [`frontend/src/components/classification/ClassificationRulesPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationclassificationrulespagetsx) | 1 / 1 / 250 | no (1 phase) | row added 237 below threshold. Adds scope filter chips (All, Arrival, Extracted) and displays Arrival/Extracted badges. |
-| [`frontend/src/components/classification/RuleBuilderPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationrulebuilderpaneltsx) | 4 / 3 / 502 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
-| [`frontend/src/components/ingestion/ConditionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionconditionpopovertsx) | 3 / 2 / 404 | no (2 phases) | row added 237 below threshold. Restricts condition field choices to WATCH_FIELDS when ruleScope === 'watch'. |
+| [`frontend/src/components/classification/ClassificationRulesPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationclassificationrulespagetsx) | 3 / 3 / 264 (was `1 / 1 / 250`) | ⚠ **FIRES** | now FIRES (3 phases). **271-02**: ONE shape (P-07): no outer padding; header Back · Filing rules · subtitle · New rule; mounted only inside the Library |
+| [`frontend/src/components/classification/RuleBuilderPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationrulebuilderpaneltsx) | 6 / 5 / 501 (was `4 / 3 / 502`) | ⚠ **FIRES** | ⚠ STALE (`4/3/502`). **271-02**: two strings (`New filing rule`, `After extraction`). ⛔ no logic change |
+| [`frontend/src/components/ingestion/ConditionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionconditionpopovertsx) | 6 / 4 / 429 (was `3 / 2 / 404`) | ⚠ **FIRES** | ⚠ now FIRES (row read `3/2/404`). **271-04**: `FIND_EXCLUDED_FIELD_KEYS` + optional `excludeFieldKeys`. ⚠ Esc after a mouse open does nothing (inherited, 271-05) |
 | [`backend/app/services/sources/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesbasepy) | 9 / 5 / 336 | ⚠ **FIRES** | ⚠ row was STALE at `6 / 3 / 198`. 238's byte-unchanged claim is now SPENT: 239 added protocol resolution here. Routing stayed DATA (two dicts), never a branch |
 | [`backend/app/services/sources/adapters/google_drive.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersgoogle_drivepy) | 3 / 2 / 442 | no (2 phases — **crosses to 3 with 240**) | ⚠ row was STALE at `3 / 2 / 407`. honoured by construction (**240**): mail is a THIRD VIRTUAL ROOT, +35/-0 lines, all delegation. Named seam: `mail/` |
 | [`backend/app/services/sources/mail/mailbox.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesmailmailboxpy) | 0 / 0 / 147 | no (new) | young (240) — the PROVIDER-INDEPENDENT half of the mail shape. ⭐ Fenced in `test_boundary_fence.py`, so “knows nothing about Google” is mechanical, not a promise |
@@ -17611,3 +17611,158 @@ The G-5 gate (`node scripts/check-hot-file-ledger.cjs --files …`, run over eve
 ### `frontend/src/components/ingestion/AutomationGroup.tsx`
 
 **`5 / 4 / 303`** at 271 planning (buckets `118 155 165 237`). FIRES G-5 and had NO row for its entire life; the gate found it only because 271-02 renames its empty-state line. **271-02 (planned):** "No classification rules yet" becomes "No filing rules yet" (D-08), and its suite's matching assertion moves in the same commit. ⛔ **Binding invariant:** a copy change only; the group still renders on the Filing rules surface and the rules list, scope filter and actions are untouched. The next phase that touches it proposes the extraction first.
+
+## Phase 271 — close re-derivation (2026-10-03, plan `271-05`)
+
+Every triple below was re-derived AFTER the phase's last source edit (`565b05c41`, 271-05's focus fix) with the CLAUDE.md recipe; six-digit quick-task buckets are subtracted, and `LibraryPage.tsx` uses `git log --follow`. The set is every non-test source file in the five plans' `files_modified` plus the two files the phase touched without naming them (`frontend/src/lib/api.ts`, `scripts/vitest-count-gate.cjs`): 37 files, 37 rows refreshed in place (the old triple kept as `(was …)`), none duplicated. Live evidence is in `.planning/phases/271-find-the-document/271-UAT-LOG.md`.
+
+⚠ **The CLAUDE.md FIRING shortlist could NOT take this phase's new FIRING rows (P-12).** Its 14 existing rows for 271 files were refreshed in the same commit (119,306 → 119,524 chars, 476 under the 120,000 warn band). Five files now FIRE with no CLAUDE.md row: `document_view_resolver.py`, `ClassificationRulesPage.tsx`, `AutomationGroup.tsx`, `ConditionPopover.tsx`, `FilterBar.tsx` (about 1,300 chars together). They are carried HERE, and the gate still sees them (it reads this scan list). Per the CLAUDE.md context-budget rule, at the warn band **the CLAUDE.md split is scheduled**, not scrambled; no other row was shortened to make room.
+
+### `backend/app/services/document_search_service.py` — Phase 271
+
+**`2 / 1 / 565`** at 271 close. Created by 271-01: the FastAPI-free Find core. **Live (271-05):** `test_271_search_live.py` (10 cases) proves exact id SETS on seeded rows for every condition, both relationship directions, `older_matches` = the rows Show them returns, and the version states through the real restore route; `test_271_two_org_fence.py` (5 cases) proves the fence through GoTrue-issued JWTs. ⚠ Measured: with the service-role client the app legs ALONE still fence (S never saw B), so the fence has two walls; the RLS-only case widens the global-folder leg and the real JWT still refuses (the same widening through the service role leaked). RED drive: incoming verbs made outgoing-only → 2 live cases red, restored md5-identical. ⛔ No embedding or retrieval import, no `.rpc(`; an unreachable folder or picked document returns the zero shape.
+
+### `backend/app/models/document_search.py` — Phase 271
+
+**`1 / 1 / 171`** at 271 close. Created by 271-01, unchanged since. The live suites build every request through this model, so the route path is exercised end to end. ⛔ `extra="forbid"` everywhere; ids are UUIDs; at most one date per `which`.
+
+### `backend/app/api/document_search.py` — Phase 271
+
+**`1 / 1 / 48`** at 271 close. Created by 271-01, unchanged since. The P-04 fence calls this route coroutine with an anon-key client carrying a GoTrue access token (the `get_user_supabase` shape), never the service role. ⛔ no DB write, no audit row.
+
+### `backend/app/main.py` — Phase 271
+
+**`84 / 61 / 952`** at 271 close. **271-01:** one import and one `include_router` line placed after `document_views.router`; nothing else. Live: an unauthenticated `POST /document-search` on the running backend answered 403 (route mounted), not 404.
+
+### `backend/app/services/document_view_resolver.py` — Phase 271
+
+**`4 / 4 / 403`** at 271 close. **271-01:** `_apply`'s body and the validation block moved verbatim into module-level `apply_fragments` and `validate_and_compile`, shared with the Find core (D-115-6: a fork re-opens the leak). The five shipped resolver integration suites read **28 passed** before the extraction, after it, and again at 271-05 on the merged tree. It now measures 4 phases, so it FIRES: the next phase that touches it proposes the extraction first.
+
+### `frontend/src/App.tsx` — Phase 271
+
+**`35 / 26 / 412`** at 271 close. **271-02:** the `classification-rules` `ActiveView` member was removed in the same commit as its ChatLayout branch and its `NAV_ITEMS` entry (`b987bfb27`); `activeViewReachability` stays green and no path reaches `UnknownViewFallback`. Live (G4-3): the rail offers no Classification entry.
+
+### `frontend/src/components/classification/ClassificationRulesPage.tsx` — Phase 271
+
+**`3 / 3 / 264`** at 271 close. **271-02 (P-07):** one shape, no `embedded` flag; the outer padding and old h1 dropped; the sub-view header renders Back ("Library"), "Filing rules", the shipped subtitle and New rule. Its only mount is now inside `LibraryPage`. Live (G4-3): the sub-view reads Filing rules, never Classification rules, and the seeded rule is listed. It measures 3 phases, so it FIRES.
+
+### `frontend/src/components/classification/RuleBuilderPanel.tsx` — Phase 271
+
+**`6 / 5 / 501`** at 271 close. **271-02:** two label strings renamed; behaviour unchanged.
+
+### `frontend/src/components/ingestion/AutomationGroup.tsx` — Phase 271
+
+**`6 / 5 / 303`** at 271 close. **271-02:** the empty-state line renamed; nothing else.
+
+### `frontend/src/components/ingestion/ConditionPopover.tsx` — Phase 271
+
+**`6 / 4 / 429`** at 271 close. **271-04:** exports `FIND_EXCLUDED_FIELD_KEYS = [name, type, size]` and takes an optional `excludeFieldKeys`, so Find never offers a field the resolver rejects with 422 (P-06); a backend test reads the literal. Views and the rule builder pass nothing. ⚠ **271-05 observation (inherited, not fixed):** after a mouse click opens it, focus stays on the opener, so Esc does nothing; the Find editors had the same defect and were fixed in 271-05. It measures 4 phases, so it FIRES.
+
+### `frontend/src/components/ingestion/DocumentList.tsx` — Phase 271
+
+**`28 / 14 / 332`** at 271 close. **271-03:** a Find column set (`columns="find"`) that ignores `folderId` structurally and renders nothing on zero rows. Browse is byte-identical. ⚠ `handleReingest` sends a failed re-ingest only to `console.error` (shipped); 271-05 F-2 shows that is a silent no-op on an older-version Find row.
+
+### `frontend/src/components/ingestion/DocumentRow.tsx` — Phase 271
+
+**`8 / 4 / 564`** at 271 close. **271-03:** in Find mode cells 3-5 are Document type / Added by / Date and the name cell gains a second line (folder path and version tag) that survives the column shed; still seven `<td>`. Live (G4-5): `/Contracts/Leases · v1 · older version` stays visible with the panel open. ⚠ **271-05 F-2 (open, routed):** an older-version row still offers Re-ingest; the backend refuses (its owner read requires `is_latest`) and the press renders nothing. Hide or disable it on `is_latest === false`, or surface the refusal.
+
+### `frontend/src/components/ingestion/FilterBar.tsx` — Phase 271
+
+**`7 / 4 / 387`** at 271 close. **271-04:** four optional Find-only props and the `FilterChip` export; three snapshot cases pin the Views DOM. ⚠ **271-05 F-1 (open, routed):** in Find the metadata chips render the shipped field-key text (`document_type is Contract`, `date between 2019-01-01 – 2019-12-31`) where UI-SPEC S6 asks for `Document type is Contract`; a fix needs a Find-only label path because the Views DOM is pinned.
+
+### `frontend/src/components/layout/ChatLayout.tsx` — Phase 271
+
+**`60 / 30 / 1134`** at 271 close. **271-02:** the `classification-rules` branch retired with its union member; `handleAskInChat` added beside `handleTryInChat` and passed at the END of the one LibraryPage mount (renameFence's window holds). Live (G4-4): Enter in Ask created one new thread, sent no message, and the prefill survived 3 s.
+
+### `frontend/src/components/library/DocumentsPager.tsx` — Phase 271
+
+**`3 / 2 / 112`** at 271 close. **271-04:** one optional `exact` prop; browse unchanged.
+
+### `frontend/src/components/library/find/AskHandoffCard.tsx` — Phase 271
+
+**`1 / 1 / 44`** at 271 close. Created by 271-02. Live (G4-4): the card rendered and no table row existed in the Library while Ask was selected.
+
+### `frontend/src/components/library/find/askInChat.ts` — Phase 271
+
+**`1 / 1 / 53`** at 271 close. Created by 271-02. Live (G4-4): one `POST /threads`, zero `POST /threads/{id}/messages`; the DB shows the new thread with 0 messages beside the seeded older thread.
+
+### `frontend/src/components/library/find/DocumentsFindBody.tsx` — Phase 271
+
+**`1 / 1 / 262`** at 271 close. Created by 271-04. Live (G4-2): the zero box, `0 documents` in warning (10.81:1) and the hint `1 more match in older (superseded) versions.` (warning on its 10% wash, composited: 9.39:1).
+
+### `frontend/src/components/library/find/FindMetaLine.tsx` — Phase 271
+
+**`1 / 1 / 101`** at 271 close. Created by 271-02. Live (G4-1): the count read 4 → 3 → 2 → 1 as chips were added; (G4-6) the sort select re-requested and the date header followed it.
+
+### `frontend/src/components/library/find/FindModeSwitch.tsx` — Phase 271
+
+**`1 / 1 / 77`** at 271 close. Created by 271-02. Driven in Chromium at 271-05 (G4-4).
+
+### `frontend/src/components/library/find/FindQuickAdd.tsx` — Phase 271
+
+**`1 / 1 / 358`** at 271 close. Created by 271-04. ⚠ **271-05 F-1 (open, routed):** Document type and Date-in-the-document live in the shared filter, so their ＋ chips stay offered after they are set (UI-SPEC: a set single-value dimension replaces its ＋). A second pick replaces the first (271-04), so it does not AND a contradiction.
+
+### `frontend/src/components/library/find/StructurePopovers.tsx` — Phase 271
+
+**`2 / 1 / 686`** at 271 close. Created by 271-04. **271-05 fix (G-3, +8/-2):** the G-4 drive found focus stayed on the chip after an editor opened, so Esc did nothing and Tab moved to the next chip (5 of 6 editors unreachable by keyboard); the shipped tests dispatched Escape on the dialog directly. `EditorShell` now focuses its first enabled control on mount; a 6-case RED test (`FindQuickAdd.test.tsx`) failed first, and Chromium re-drove all six closing on Esc with focus returned to the chip.
+
+### `frontend/src/components/library/LibraryHeaderBar.tsx` — Phase 271
+
+**`4 / 3 / 249`** at 271 close. **271-02:** an optional `onOpenFilingRules`; the Filing rules link and the queue pill share one `ml-auto` cluster; the tablist is untouched. Live (G4-3): the link is not `role="tab"`, sits right of every tab, and Back lands on the Ingestion tab. It measures 3 phases, so it FIRES.
+
+### `frontend/src/components/metadata/DocumentDetailPanel.tsx` — Phase 271
+
+**`15 / 10 / 654`** at 271 close. **271-04:** an older-version row opens read-only (a `role="status"` notice, values as text, `handleCommit` returns early); latest rows unchanged. Live (G4-5): the notice renders and 0 inline edit controls exist; the same selector finds 8 on a latest row (control).
+
+### `frontend/src/components/metadata/DocumentFileFacts.tsx` — Phase 271
+
+**`3 / 2 / 102`** at 271 close. **271-03:** `addedBy` and `NOT_RECORDED` moved to `lib/documentAddedBy.ts`; this file imports them.
+
+### `frontend/src/components/relationships/CreateLinkDialog.tsx` — Phase 271
+
+**`4 / 2 / 236`** at 271 close. **271-03:** the typeahead body moved to `LinkTargetCombobox`; its suite was adopted into both gate knobs before the move and stays green.
+
+### `frontend/src/components/relationships/LinkTargetCombobox.tsx` — Phase 271
+
+**`1 / 1 / 177`** at 271 close. Created by 271-03 by extraction. Live (G4-2): candidates listed latest versions only (`Lease 2024.pdf` once, not its v1).
+
+### `frontend/src/components/relationships/relationshipLabels.ts` — Phase 271
+
+**`2 / 2 / 104`** at 271 close. **271-03:** the 8-verb filter table derived from `OUTGOING_LABEL` / `INCOMING_LABEL`. Live (G4-2): the editor lists all eight.
+
+### `frontend/src/hooks/useDocumentFind.ts` — Phase 271
+
+**`1 / 1 / 104`** at 271 close. Created by 271-03. Driven live in 271-05 (every G-4 Find row).
+
+### `frontend/src/lib/api.ts` — Phase 271
+
+**`208 / 124 / 523`** at 271 close. **271-03:** barrel re-exports only; consumers import from `@/lib/api/documents`.
+
+### `frontend/src/lib/api/documents.ts` — Phase 271
+
+**`6 / 6 / 490`** at 271 close. **271-03:** one caller and its error type, additive.
+
+### `frontend/src/lib/documentAddedBy.ts` — Phase 271
+
+**`1 / 1 / 27`** at 271 close. Created by 271-03. Live (G4-1): the Added by chip offers `Drive Finance (connected source)`, never an email.
+
+### `frontend/src/lib/nav-items.ts` — Phase 271
+
+**`12 / 8 / 153`** at 271 close. **271-02:** the Classification entry removed (7 entries).
+
+### `frontend/src/pages/findState.ts` — Phase 271
+
+**`1 / 1 / 361`** at 271 close. Created by 271-03. P-01 (default sort) is still flagged for operator review.
+
+### `frontend/src/pages/LibraryPage.tsx` — Phase 271
+
+**`53 / 18 / 1218`** at 271 close. **271-02:** the Filing rules sub-view (Library-local state; the tab shell is hidden, not unmounted, so Back restores the origin tab). **271-04:** a second `useReducer` for Find, `documentSurface(lead, findSlots?)`, its own `handleFindFilterChange` (never `resolveFilterIntoList`). `SHED_COLUMNS_3_TO_5` byte-unchanged. Derived with `--follow`.
+
+### `frontend/src/types/index.ts` — Phase 271
+
+**`95 / 74 / 1520`** at 271 close. **271-03:** Find's wire types, additive.
+
+### `scripts/vitest-count-gate.cjs` — Phase 271
+
+**`269 / 60 / 6281`** at 271 close. **271-03 / 271-04:** the phase's new suites adopted into TARGETS and BASELINE (271-04 also adopted 271-02's). Not edited by 271-05 (P-11), so `FindQuickAdd.test.tsx` (pinned 12) now runs 18: an under-pin, never a decrease.
+
