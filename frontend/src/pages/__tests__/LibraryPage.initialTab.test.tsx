@@ -393,7 +393,6 @@ describe("libraryTabAfterNavigate — the clearing rule, as a pure function", ()
       "skills",
       "settings",
       "workflows",
-      "classification-rules",
       "connections",
       "skill-studio",
       "control-room",

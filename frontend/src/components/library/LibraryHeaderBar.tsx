@@ -31,7 +31,8 @@
  * surface** — so the parents collapse here and the children stay where they are.
  */
 import { cn } from "@/lib/utils"
-import { Loader2 } from "lucide-react"
+import { ChevronRight, Loader2, Wand2 } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export interface LibraryHeaderBarProps {
   /** The active primary tab. */
@@ -68,6 +69,19 @@ export interface LibraryHeaderBarProps {
    * handed `tabs` and `inFlight`. The verdict is the server's (`D-235-05`).
    */
   attention?: Readonly<Record<string, number>>
+  /**
+   * Phase 271 (D-08 / D-09) — the door to **Filing rules**, which moved into the Library when its
+   * rail home was retired.
+   *
+   * ⛔ A SECONDARY LINK, NOT A SIXTH TAB. It renders in the right cluster, before the queue pill,
+   * as a plain button that carries no tab role — `TAB_LABELS` keeps its five keys (D-217-15), and a
+   * sixth tab beside the five would read as a Library section rather than a settings-like
+   * sub-view. It carries the `Wand2` glyph the retired rail entry wore (one concept, one mark).
+   *
+   * Absent ⇒ no link renders, so every caller other than `LibraryPage` gets the resting header
+   * byte-identical to before.
+   */
+  onOpenFilingRules?: () => void
   className?: string
 }
 
@@ -81,6 +95,7 @@ export function LibraryHeaderBar({
   onOpenQueue,
   listTestId,
   attention,
+  onOpenFilingRules,
   className,
 }: LibraryHeaderBarProps) {
   const live = inFlight > 0
@@ -168,37 +183,67 @@ export function LibraryHeaderBar({
         })}
       </div>
 
-      {/* ⭐ THE RECLAIMED CORNER DOES A JOB. The right half of this band was empty; it now carries
-          the one fact that had no home — whether the Library is still reading anything. */}
-      <button
-        type="button"
-        data-testid="library-queue-pill"
-        data-live={live ? "true" : "false"}
-        onClick={onOpenQueue}
-        className={cn(
-          "ml-auto flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors",
-          live
-            ? "border-sky-500/50 bg-sky-500/10 text-sky-400"
-            : "border-border/60 bg-card/60 text-muted-foreground hover:text-foreground",
+      {/* Phase 271 (D-09): ONE right cluster — the Filing rules link first, the queue pill second.
+          `ml-auto` moved from the pill onto this wrapper, so the link sits on the right with the
+          pill rather than beside the tabs, where it would read as a sixth tab. */}
+      <div className="ml-auto flex items-center gap-2">
+        {onOpenFilingRules && (
+          // ⚠ A LOCAL provider on purpose: this header renders standalone in its own suites and
+          // under callers with no app-level `TooltipProvider`; Radix throws without one.
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Filing rules"
+                  onClick={onOpenFilingRules}
+                  className="text-xs text-muted-foreground hover:text-foreground border border-transparent hover:border-border rounded-md px-2 py-1 inline-flex items-center gap-1 min-h-[44px] md:min-h-0 transition-colors"
+                >
+                  <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="hidden md:inline">Filing rules</span>
+                  <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              {/* For the icon-only width below 768px, where the label is hidden. */}
+              <TooltipContent side="bottom" className="md:hidden">
+                Filing rules
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
-      >
-        {live ? (
-          <>
-            <Loader2 className="h-3 w-3 animate-spin" />
-            {/* ⛔ "Reading", never "added". A file that is still being read is not in the Library
-                yet, and the whole point of this row is to stop the surface saying it is. */}
+
+        {/* ⭐ THE RECLAIMED CORNER DOES A JOB. The right half of this band was empty; it now carries
+            the one fact that had no home — whether the Library is still reading anything. */}
+        <button
+          type="button"
+          data-testid="library-queue-pill"
+          data-live={live ? "true" : "false"}
+          onClick={onOpenQueue}
+          className={cn(
+            "flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors",
+            live
+              ? "border-sky-500/50 bg-sky-500/10 text-sky-400"
+              : "border-border/60 bg-card/60 text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {live ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {/* ⛔ "Reading", never "added". A file that is still being read is not in the Library
+                  yet, and the whole point of this row is to stop the surface saying it is. */}
+              <span>
+                Reading {inFlight} file{inFlight === 1 ? "" : "s"}
+              </span>
+            </>
+          ) : (
             <span>
-              Reading {inFlight} file{inFlight === 1 ? "" : "s"}
+              {typeof totalDocuments === "number"
+                ? `${totalDocuments} document${totalDocuments === 1 ? "" : "s"}`
+                : "Nothing reading"}
             </span>
-          </>
-        ) : (
-          <span>
-            {typeof totalDocuments === "number"
-              ? `${totalDocuments} document${totalDocuments === 1 ? "" : "s"}`
-              : "Nothing reading"}
-          </span>
-        )}
-      </button>
+          )}
+        </button>
+      </div>
     </div>
   )
 }

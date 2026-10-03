@@ -24,6 +24,7 @@ import { IngestionTab } from "@/components/library/IngestionTab"
 import { IndexingTab } from "@/components/library/IndexingTab"
 import { HealthTab } from "@/components/library/HealthTab"
 import { LibraryHeaderBar } from "@/components/library/LibraryHeaderBar"
+import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
 import { LibraryStatTiles } from "@/components/library/LibraryStatTiles"
 // ⚠ `LibraryBreadcrumb` IS NO LONGER IMPORTED — sketch 231-A deleted the breadcrumb, and this
 //   comment is the record rather than a silent removal. The component and its three cases in
@@ -221,6 +222,11 @@ export function LibraryPage({
    * Absent ⇒ no tab carries a mark, which is what every caller other than `ChatLayout` gets.
    */
   attentionConditions?: readonly AttentionCondition[]
+  /**
+   * Phase 271 (D-02) — Ask leaves the Library through ChatLayout; the Library renders no answer.
+   * Consumed by the Documents tab in 271-04.
+   */
+  onAskInChat?: (question: string) => Promise<boolean> | void
 } = {}) {
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
@@ -239,6 +245,10 @@ export function LibraryPage({
     initialTab ? pageReducer(opening, { type: "SELECT_TAB", tab: initialTab }) : opening,
   )
   const tab = lib.selection.tab
+
+  // Phase 271 (D-09 / P-07) — the Filing rules sub-view (see the wrapper in the render). Back
+  // needs no stored origin: the tab shell stays MOUNTED (only hidden) while this is open.
+  const [filingRulesOpen, setFilingRulesOpen] = useState(false)
 
   // Phase 244 plan 04 — the shell says THAT, the tab strip says WHERE. Derived from conditions
   // the shell already resolved; a tab with nothing is ABSENT from the map, so the control
@@ -823,6 +833,14 @@ export function LibraryPage({
             ⚠ The four CHILD tabs are untouched and stay inside their own tab bodies. Folding the
             parent strip into one row is a space saving; swallowing its children is a lost surface,
             and the operator caught the sketch making exactly that mistake. */}
+        {/* Phase 271 (D-09): Library-local state, NOT a librarySelection action (that leaf's
+            suite pins six actions) and NOT an ActiveView (D-09); the app rail keeps highlighting
+            Library. While Filing rules is open this wrapper is HIDDEN, never unmounted, so the
+            origin tab, its selection and its tab-body state survive the round trip. */}
+        <div
+          hidden={filingRulesOpen}
+          className={cn("flex flex-col flex-1 min-h-0", filingRulesOpen && "hidden")}
+        >
         <div data-testid={`${tab}-pagehead`}>
           <LibraryHeaderBar
             tab={tab}
@@ -834,6 +852,7 @@ export function LibraryPage({
             onOpenQueue={() => dispatch({ type: "SELECT_TAB", tab: "ingestion" })}
             listTestId={`${tab}-tabslist`}
             attention={attentionByTab}
+            onOpenFilingRules={() => setFilingRulesOpen(true)}
           />
         </div>
 
@@ -977,6 +996,10 @@ export function LibraryPage({
             </TabsContent>
           </div>
         </Tabs>
+        </div>
+
+        {/* The Filing rules sub-view — its ONE mount (the top-level view was retired, D-09). */}
+        {filingRulesOpen && <ClassificationRulesPage onBack={() => setFilingRulesOpen(false)} />}
 
         {/* Mobile folder + Views navigation — the desktop sidebar lives here as a
             bottom-sheet below 768px (both groups, internally sectioned). */}
