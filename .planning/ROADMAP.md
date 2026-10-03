@@ -106,6 +106,7 @@ data-thread branch/compare half of `SEED-193`, the hardening/testing milestone, 
 - [ ] **Phase 273: Agent-Authored Artifacts**: a closed component registry (chart, table, metric), validated specs, rows attached for re-encoding, identical on reload, full provider roster (ART-01..05)
 - [ ] **Phase 274: Thread-Scoped Attachments**: chat attachments scoped to the thread, Library ingestion only from Documents, explicit promote-to-Library (ATT-01..03)
 - [ ] **Phase 275: Retention & Legal Hold**: policies per class or folder, legal hold, scheduled audited disposition with dry-run, archived documents out of default retrieval but findable (RET-01..04)
+- [ ] **Phase 276: Public Docs, API Reference & Video Library**: `/docs` in the landing look covering every surface, a Syrel API reference from OpenAPI, a coverage gate, a generated changelog, and Syrel videos (DOCS-01..06)
 
 ### Phase Details
 
@@ -273,6 +274,25 @@ Plans:
 **Flags**: ⛔ **This deletes customer data on a timer. It is the most dangerous feature in the milestone** (`SEED-250`). Ship it with the `SRC-06` fail-closed discipline: dry run before any real sweep; ambiguous means nothing is deleted; hold blocks **every** deletion path. **Migration(s)** at the next free number: `retention_policies`, the hold, the archive state, and new `audit_log` action types (extending migration 170's constrained list). **RLS on every new table**, plus `get_advisors(security)`. ⚠ Postgres grants function `EXECUTE` to `PUBLIC` by default, so revoke from `PUBLIC` rather than role by role. **security_enforcement**. The sweep is another claimant on `scheduler_service.py` (FIRES), not new machinery. **G-2 FIRES** (policy editor, hold control, disposition log). The renamed rules surface from 271 is a candidate home, decided at discuss. **G-4** scenarios at scope time. **G-5 audit at discuss:** `backend/app/services/scheduler_service.py` (FIRES), `backend/app/api/documents.py`, `backend/app/services/retrieval_service.py` (rides 272's extracted seam as a default predicate, never a new branch), `backend/app/api/document_governance.py`. "Document class" means the classification type (`document_type_norm`). **Deploy parity**: migrations to production before the backend, and no sweep enabled in production until the operator has read a dry run.
 **UI hint**: yes
 
+#### Phase 276: Public Docs, API Reference & Video Library
+
+**Goal**: A buyer, a user and a developer can each learn **everything Syrel does** from one public place, `/docs` on the landing domain, which looks like the landing page, **says only what has shipped**, and **cannot quietly fall behind the product**.
+**Depends on**: No functional dependency. It touches the landing entry, a new docs entry, `vercel.json`/`vite.config.ts` routing and the OpenAPI exposure in `backend/app/main.py`, none of which 274/275 edit, so it can run in parallel with them.
+**Requirements**: DOCS-01, DOCS-02, DOCS-03, DOCS-04, DOCS-05, DOCS-06
+**Success Criteria** (what must be TRUE):
+
+  1. `/docs`, a guide page and `/docs/changelog` render in sketch 276's direction B on desktop and at 390 px, as a third Vite entry (`docs.html` → `src/docs/`) that reuses the landing's Navigation, footer and tokens, and the landing bundle fence still holds (DOCS-01).
+  2. `node scripts/check-docs-coverage.cjs` derives its scan set from code (nav items, `_TOOL_REGISTRY`, step types, routers, settings tabs), passes on the shipped tree, and **fails** when a planted new tool or router has no `covers:` page; every inventory item maps to a page or to a tracked "coming soon" stub (DOCS-02).
+  3. The API reference renders every non-internal operation from a filtered OpenAPI snapshot titled "Syrel API", hides the internal set, and states plainly that requests use a signed-in user's token today, linking the SEED-013 plan (DOCS-03).
+  4. With the production flag set, unauthenticated `GET /docs`, `/redoc` and `/openapi.json` are refused; locally they still load (DOCS-04).
+  5. The changelog lists v1.0 → v4.4 from `docs/history/`, and v4.5 items carry "not yet released" (DOCS-05).
+  6. The docs home plays the Syrel overview through a lazily loaded Remotion player, guides embed their clips, and the landing reads "Syrel" with no "Agentic RAG" left in `src/landing/` (DOCS-06).
+
+**How we'd know this failed**: a docs page claims something `docs/history/` marks unbuilt (in-app Word/PDF preview, three deployment presets, v4.5 as live); the coverage gate reads a hand-typed list, or passes over zero parsed items; the docs entry pulls app dependencies into the landing bundle; `/docs` routing falls through to `app.html`; the public spec still lists internal operations; production Swagger stays open; the Remotion player loads on first paint and slows the landing.
+**Plans**: TBD (target 4, per G-8)
+**Flags**: Third-party API keys, webhooks and rate limits are **out of scope** (SEED-013 → v4.6 Open Platform; SEED-345). Content is drafted from the NotebookLM notebook "Syrel — Knowledge & Videos" and fact-checked against `docs/history/`; the first release writes about 30 core pages, and the rest ship as tracked stubs. **DOCS-04 reverses a recorded decision** (`backend/app/main.py`: "`GET /docs` deliberately keeps returning 200"), now approved by the operator on 2026-10-04; record it in CONTEXT `<decisions>`. Remotion is free only for companies of up to 3 people; recheck before the company grows. **G-2 satisfied** by sketch 276 (winner B). **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/landing/*` (Navigation, LandingFooter, CompareSection), `frontend/vercel.json`, `frontend/vite.config.ts`, `backend/app/main.py` (FIRES, 61 phases). Inputs: `.planning/research/docs-coverage-inventory.md`, `docs-information-architecture.md`, `docs/public/api/openapi.snapshot.json`.
+**UI hint**: yes
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -283,6 +303,7 @@ Plans:
 | 273. Agent-Authored Artifacts | 0/6 | Planned | - |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
+| 276. Public Docs, API Reference & Video Library | 0/TBD | Not started | - |
 
 ---
 

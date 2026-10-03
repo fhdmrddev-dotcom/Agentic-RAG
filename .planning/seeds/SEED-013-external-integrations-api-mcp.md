@@ -214,3 +214,7 @@ questions: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`.
 
 Status stays `planted` deliberately — the milestone is a CANDIDATE, not opened. It opens after
 v3.8 closes (204 running, 205 planned).
+
+## Routing — 2026-10-04 (operator)
+
+Decided: this seed becomes the **first phase after v4.5 closes**, a **v4.6 "Open Platform"** milestone: org-scoped API keys / service accounts, rate limits (SEED-345), outgoing webhooks. Kept OUT of Phase 276 (public docs) because it adds a new credential type and needs its own security review. Until it ships, the public API reference states that requests use a signed-in user token, and marketing must not say "API for everything" (say "everything in Syrel has an API"). Evidence: `.planning/research/docs-coverage-inventory.md` §h — no API-key / PAT / service-token auth exists; `get_current_user` (`backend/app/dependencies.py:300`) is the only path. Status stays `planted` until v4.6 assigns a phase number.

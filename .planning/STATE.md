@@ -61,6 +61,10 @@ Prior: Phase 272 COMPLETE (2026-10-03) — verification human_needed, self-verif
 Prior: Phase 271 EXECUTED — verification human_needed (2026-10-03). Owed to operator: sign-off on G-4 rows G4-1..G4-6 (driven in Playwright, not Chrome MCP), review of P-01 (default sort added_desc) and P-03 (Older versions = own rows only), deploy (no migration; backend+frontend together; then read-only probe of /document-search + security advisors), CLAUDE.md split (119,524 chars, 476 under the 120k band). Deferred: SEED-331, SEED-332, F-1, F-4. Next: /gsd:discuss-phase 272.
 Last activity: 2026-10-03
 
+### Roadmap Evolution
+
+- Phase 276 added (2026-10-04, operator): Public Docs, API Reference & Video Library — DOCS-01..06. Sketch 276 winner B. Inputs: `.planning/research/docs-coverage-inventory.md` (261 surfaces), `docs-information-architecture.md`, `docs/public/api/openapi.snapshot.json`. Operator decisions: production Swagger requires login (reverses the main.py "/docs stays 200" note); third-party API keys → SEED-013 as v4.6 Open Platform; Remotion + NotebookLM both used for video. Can run parallel to 274/275. Next: /gsd:discuss-phase 276.
+
 ### v4.5 roadmap (2026-09-29): 19 / 19 requirements mapped
 
 | Phase | Name | Requirements | Gate flags |
