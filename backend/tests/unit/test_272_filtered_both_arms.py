@@ -226,5 +226,108 @@ async def test_a_hit_that_clears_the_threshold_carries_no_mark(monkeypatch, reco
          "folder_id": None, "source_connection_id": None},
     ])
     hits, _avg = await search_documents("q", "u1", sb, user_settings=None, document_ids=["d1", "d2"])
-    assert [h["document_id"] for h in hits] == ["d1"]
+    # ⚠ D-27 (operator, 2026-10-03) REFINES D-10 and this case's old assertion with it: d2 used to
+    # be DROPPED (``== ["d1"]``) because one passage in the set cleared the threshold. That drop is
+    # finding F-2 — the model then reported "two" reports when three matched. d2 now comes back
+    # with its best passage, marked; d1's passage still carries no mark.
+    assert [h["document_id"] for h in hits] == ["d1", "d2"]
     assert "low_similarity" not in hits[0]
+    assert hits[1].get("low_similarity") is True
+
+
+# ── D-27 (operator, 2026-10-03, finding F-2): EVERY matched document keeps its best passage ──
+#
+# D-10 as first written dropped a matched document whose passages all fell under the threshold
+# whenever ANY other document's passage cleared it. Board prompt (b) and G4-3 measured the cost:
+# ``legal_entity = Acme GmbH`` matched 3 reports, 2 came back, and the answer said "two". Inside a
+# matched set the filter already guarantees scope, so each matched document returns its best
+# passage (up to top_k), below-threshold ones marked ``low_similarity``.
+
+def test_a_document_under_the_threshold_keeps_its_best_passage_marked():
+    from app.services.retrieval_rank import _select_filtered_vector_rows
+
+    rows = [
+        _row("a1", 0.9, "dA"), _row("b1", 0.25, "dB"), _row("a2", 0.2, "dA"),
+        _row("b2", 0.1, "dB"), _row("c1", 0.05, "dC"),
+    ]
+    out = _select_filtered_vector_rows(rows, 0.3)
+    assert [r["id"] for r in out] == ["a1", "b1", "c1"]
+    assert "low_similarity" not in out[0]
+    assert out[1]["low_similarity"] is True and out[2]["low_similarity"] is True
+    assert "low_similarity" not in rows[1], "pure: the input row is never mutated"
+
+
+def test_cover_keeps_one_passage_per_document_before_filling_by_rank():
+    from app.services.retrieval_rank import _cover_matched_documents
+
+    ranked = [_row(f"a{i}", 0.9 - i / 100, "dA") for i in range(1, 6)] + [
+        _row("b1", 0.4, "dB"), _row("c1", 0.35, "dC"),
+    ]
+    out = _cover_matched_documents(ranked, 5)
+    assert [r["id"] for r in out] == ["a1", "a2", "a3", "b1", "c1"], "rank order kept"
+
+
+def test_cover_never_exceeds_top_k_when_more_documents_match():
+    from app.services.retrieval_rank import _cover_matched_documents
+
+    ranked = [_row(f"x{i}", 0.9 - i / 100, f"d{i}") for i in range(6)]
+    assert [r["id"] for r in _cover_matched_documents(ranked, 3)] == ["x0", "x1", "x2"]
+    assert _cover_matched_documents([], 3) == []
+
+
+def _six_strong_and_one_weak() -> list[dict]:
+    strong = [
+        {"id": f"a{i}", "document_id": "dA", "content": f"alpha {i} " + " ".join(f"w{i}x{j}" for j in range(8)),
+         "chunk_index": i, "similarity": 0.9 - i / 100}
+        for i in range(6)
+    ]
+    weak = {"id": "b0", "document_id": "dB", "content": "beta lone passage words here", "chunk_index": 0,
+            "similarity": 0.2}
+    return [*strong, weak]
+
+
+_DOCS_AB = [
+    {"id": "dA", "filename": "a.md", "metadata": None, "version_number": 1,
+     "folder_id": None, "source_connection_id": None},
+    {"id": "dB", "filename": "b.md", "metadata": None, "version_number": 1,
+     "folder_id": None, "source_connection_id": None},
+]
+
+
+@pytest.mark.parametrize("hybrid", [True, False])
+async def test_a_weak_matched_document_survives_the_top_k_cut(monkeypatch, recorder, hybrid):
+    """dA fills every top_k slot on its own; dB still returns its best passage, marked."""
+    from app.services.retrieval_service import search_documents
+
+    _set_hybrid(monkeypatch, hybrid)
+    recorder["responses"]["vector"] = _six_strong_and_one_weak()
+    hits, _avg = await search_documents(
+        "q", "u1", _FakeSupabase(_DOCS_AB), user_settings=None, document_ids=["dA", "dB"],
+    )
+    assert len(hits) == 5
+    assert {h["document_id"] for h in hits} == {"dA", "dB"}
+    weak = [h for h in hits if h["document_id"] == "dB"]
+    assert len(weak) == 1 and weak[0].get("low_similarity") is True
+    assert all("low_similarity" not in h for h in hits if h["document_id"] == "dA")
+
+
+async def test_rerank_cannot_drop_a_matched_document(monkeypatch, recorder):
+    """The reranker may reorder a filtered set; the top_k cut still keeps one passage per document."""
+    import app.services.retrieval_service as rs
+    from app.services.retrieval_service import search_documents
+
+    _set_hybrid(monkeypatch, True)
+    monkeypatch.setattr(settings, "rerank_enabled", True)
+    seen: dict = {}
+
+    def _fake_rerank(query, documents, top_n=None, user_settings=None):
+        seen["top_n"] = top_n
+        return list(documents)[: top_n or len(documents)]
+
+    monkeypatch.setattr(rs, "rerank", _fake_rerank)
+    recorder["responses"]["vector"] = _six_strong_and_one_weak()
+    hits, _avg = await search_documents(
+        "q", "u1", _FakeSupabase(_DOCS_AB), user_settings=None, document_ids=["dA", "dB"],
+    )
+    assert {h["document_id"] for h in hits} == {"dA", "dB"}
+    assert len(hits) == 5
