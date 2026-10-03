@@ -417,3 +417,38 @@ describe("LibraryPage — Save as view and the Views tab (Pitfall 9 / D-114-1)",
     expect(screen.queryByPlaceholderText("Filter by file name…")).toBeNull()
   })
 })
+
+// ── 271-REVIEW fixes, each driven RED against the shipped page before its fix landed. ──
+describe("LibraryPage — 271 review fixes", () => {
+  it("CR-01: a metadata condition set in Find is resolved when the Views tab opens — its list matches the chip, never the unfiltered folder list", async () => {
+    mockResolveAdHoc.mockResolvedValue({
+      documents: [doc({ id: "c-1", filename: "contract-hit.pdf" })],
+      total: 1,
+    })
+    renderPage()
+    fireEvent.click(screen.getByRole("button", { name: "＋ Document type" }))
+    fireEvent.click(screen.getByRole("checkbox", { name: "Contract" }))
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }))
+    await waitFor(() => expect(mockSearchDocuments).toHaveBeenCalled())
+    // The Find path itself still never runs the browse resolver.
+    expect(mockResolveAdHoc).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole("tab", { name: /Views/ }))
+    expect(await screen.findByTestId("views-tab")).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText("contract-hit.pdf")).toBeInTheDocument())
+    expect(screen.queryByText("browse-only.pdf")).toBeNull()
+    expect(mockResolveAdHoc).toHaveBeenCalledTimes(1)
+    expect(mockResolveAdHoc).toHaveBeenCalledWith({
+      op: "and",
+      conditions: [{ field: "document_type", op: "eq", value: "Contract" }],
+    })
+  })
+
+  it("CR-01: opening the Views tab with no filter change since the last resolve costs no request", async () => {
+    renderPage()
+    fireEvent.click(screen.getByRole("tab", { name: /Views/ }))
+    expect(await screen.findByTestId("views-tab")).toBeInTheDocument()
+    await sleep(50)
+    expect(mockResolveAdHoc).not.toHaveBeenCalled()
+  })
+})

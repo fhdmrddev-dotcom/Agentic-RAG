@@ -480,7 +480,11 @@ export function LibraryPage({
   // it fills the list AND captures the own+global match count, which the FilterBar
   // consumes (it no longer fires its own count round-trip). An empty filter clears
   // the override so the folder view shows again. ───────────────────────────────
+  // 271-REVIEW CR-01: set when Find changes the shared filter WITHOUT resolving it (see
+  // `handleFindFilterChange`). Any resolve brings `filteredDocs` back in line, so it clears.
+  const viewsListStale = useRef(false)
   const resolveFilterIntoList = useCallback(async (f: ViewFilter, savedViewId?: string) => {
+    viewsListStale.current = false
     if (f.conditions.length === 0) {
       setFilteredDocs(null)
       setMatchCount(null)
@@ -545,7 +549,20 @@ export function LibraryPage({
     dispatch({ type: "CHANGE_FILTER", filter: next })
     setFilteredDocs(null)
     setMatchCount(null)
+    viewsListStale.current = next.conditions.length > 0
   }, [])
+
+  // 271-REVIEW CR-01: the Views tab shares `filter` but Find never resolves it, so entering
+  // Views after a Find change would show the chips over the UNFILTERED folder list. Resolve
+  // on entry through the SAME `resolveFilterIntoList` the Views tab uses (no fork): by id when
+  // the parked saved view's filter is unchanged, else ad hoc. Nothing changed → no request.
+  useEffect(() => {
+    if (tab !== "views" || !viewsListStale.current) return
+    const view = selectedViewId !== null ? views.find((v) => v.id === selectedViewId) : undefined
+    const unchanged =
+      view !== undefined && JSON.stringify(view.filter_expr) === JSON.stringify(filter)
+    void resolveFilterIntoList(filter, unchanged ? view.id : undefined)
+  }, [tab, selectedViewId, views, filter, resolveFilterIntoList])
 
   // Clear search: every Find condition, Version back to Latest, and the metadata filter.
   const handleClearSearch = useCallback(() => {
