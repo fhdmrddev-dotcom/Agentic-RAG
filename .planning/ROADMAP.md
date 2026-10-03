@@ -226,8 +226,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 273-03-PLAN.md — show_artifact handler module (validate, by-reference transforms, server caption, store, emit RETURNING row, id-first result), schema + CHAT_ONLY_TOOLS + one registry line, harness/sub-agent exclusions, count pins 29→30 (wave 2)
-- [ ] 273-04-PLAN.md — persist-time args redaction (the one agent_loop hook) + caption-source kwargs, reload attach in GET /messages + /snapshot, MessageResponse.artifacts, STRUCTURED-mode holdback so no tool-call text streams into the answer (wave 2, parallel)
+- [x] 273-03-PLAN.md — show_artifact handler module (validate, by-reference transforms, server caption, store, emit RETURNING row, id-first result), schema + CHAT_ONLY_TOOLS + one registry line, harness/sub-agent exclusions, count pins 29→30 (wave 2)
+- [x] 273-04-PLAN.md — persist-time args redaction (the one agent_loop hook) + caption-source kwargs, reload attach in GET /messages + /snapshot, MessageResponse.artifacts, STRUCTURED-mode holdback so no tool-call text streams into the answer (wave 2, parallel)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
