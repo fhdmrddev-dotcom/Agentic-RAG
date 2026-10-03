@@ -4082,7 +4082,13 @@ const BASELINE = {
   "DocumentRow.find271.test.tsx": 17, // 271-03
   // ── Phase 271-04 — ADOPTED, not raised: in NEITHER knob before (RESEARCH Wave 0). Measured
   // 10 passed on the merged wave-1 tree (ff4b98f01) BEFORE 271-04 touched ConditionPopover. ──
-  "ConditionPopover.test.tsx": 10, // 271-04 (2026-10-03)
+  // ⬆ RAISED 10 → 13 at 271-04 Task 1: three excludeFieldKeys cases (P-06). The 10 shipped cases
+  //   are byte-unchanged.
+  "ConditionPopover.test.tsx": 13, // 271-04 (2026-10-03)
+  // ── Phase 271-04 Task 1 — every suite it CREATED, at its measured passing count. BOTH KNOBS. ──
+  "FilterBar.find271.test.tsx": 11, // 271-04 (3 are the Views-tab DOM snapshot pins)
+  "StructurePopovers.test.tsx": 22, // 271-04
+  "FindQuickAdd.test.tsx": 12, // 271-04
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5960,6 +5966,10 @@ const TARGETS = [
   "src/components/ingestion/__tests__/DocumentRow.find271.test.tsx",
   // Phase 271-04 — adopted before ConditionPopover gains excludeFieldKeys. FILE-LEVEL.
   "src/components/ingestion/ConditionPopover.test.tsx",
+  // Phase 271-04 Task 1 — FILE-LEVEL, never the directory.
+  "src/components/ingestion/FilterBar.find271.test.tsx",
+  "src/components/library/find/__tests__/StructurePopovers.test.tsx",
+  "src/components/library/find/__tests__/FindQuickAdd.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

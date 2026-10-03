@@ -274,7 +274,7 @@ describe("DateEditor (P-10)", () => {
     render(<DateEditor onApply={onApply} onFilterCondition={onFilterCondition} onCancel={vi.fn()} />)
     fireEvent.click(screen.getByRole("radio", { name: "Date in the document" }))
     fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "after" } })
-    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2019-01-01" } })
+    fireEvent.change(screen.getByLabelText("On date"), { target: { value: "2019-01-01" } })
     fireEvent.click(screen.getByRole("button", { name: "Apply" }))
     expect(onFilterCondition).toHaveBeenCalledWith({ field: "date", op: "after", value: "2019-01-01" })
     expect(onApply).not.toHaveBeenCalled()
