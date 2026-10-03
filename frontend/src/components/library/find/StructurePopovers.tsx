@@ -21,7 +21,7 @@
  * beside "older versions" / "version history" so they never read like the Supersedes link
  * (D-07).
  */
-import { useId, useMemo, useState, type KeyboardEvent, type ReactNode } from "react"
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { Check, Folder as FolderIcon } from "lucide-react"
 import type { Document, Folder, ViewCondition } from "@/types"
 import { cn } from "@/lib/utils"
@@ -59,6 +59,12 @@ function EditorShell({
   canApply: boolean
   children: ReactNode
 }) {
+  // Move focus INTO the editor when it opens (271-05 G-4 finding): otherwise focus stays on the
+  // chip, Esc never reaches this handler and Tab walks to the next chip instead of the editor.
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>("input:not([disabled]), select:not([disabled]), button:not([disabled])")?.focus()
+  }, [])
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") {
       e.stopPropagation()
@@ -66,7 +72,7 @@ function EditorShell({
     }
   }
   return (
-    <div className={SHELL} role="dialog" aria-label={label} onKeyDown={onKeyDown}>
+    <div ref={ref} className={SHELL} role="dialog" aria-label={label} onKeyDown={onKeyDown}>
       {children}
       <div className="flex items-center justify-end gap-2 pt-1">
         <button
