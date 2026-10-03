@@ -163,3 +163,5 @@ ignoring it.
 ⚠ **This seed therefore stays `planted` on purpose.** It is not dormant and it is not answered:
 it is now a PREREQUISITE of a named future phase, and whoever plans that milestone must sequence
 these four ahead of 219 rather than beside it.
+
+> **2026-10-04:** the search half of this seed is now filed as a bug — `.planning/reported-bugs/BUG-261004-01-search-serves-documents-deleted-or-unshared-at-source.md` (major, open). Production had 0 affected documents at filing.
