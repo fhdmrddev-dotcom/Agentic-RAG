@@ -104,6 +104,15 @@ def _bar_args(**over):
     return args
 
 
+def _qt_result(document: str, page, tables: int = 1) -> str:
+    """A query_tables result as the tool returns it: the RESOLVED filename rides in each table."""
+    return json.dumps([
+        {"document": document, "page": page, "table_index": i, "headers": ["q", "v"],
+         "rows": [["Q1", "1"]], "truncated": False}
+        for i in range(tables)
+    ])
+
+
 def _call(store=None, ctx=None, args=None, parent=None, labels=None):
     store = store or _Store()
     ctx = ctx or _ctx()
@@ -134,7 +143,8 @@ def _assert_refused(res, ins, ctx, reason=None):
 def test_first_emission_stores_once_emits_the_returned_row_and_answers_id_first():
     tc = [
         {"tool_call_id": "c1", "name": "query_tables", "status": "done",
-         "args": {"document_name": "Quarterly_Report_FY25.pdf", "page": 4}, "result": "[[...]]"},
+         "args": {"document_name": "Quarterly_Report_FY25.pdf", "page": 4},
+         "result": _qt_result("Quarterly_Report_FY25.pdf", 4)},
     ]
     res, ins, _get, _lst, ctx, store = _call(ctx=_ctx(turn_tool_calls=tc), args=_bar_args())
     assert ins.call_count == 1
@@ -240,7 +250,8 @@ def test_bar_stacked_with_one_series_is_stored_as_asked():
 def test_caption_names_only_data_bearing_done_calls():
     tc = [
         {"tool_call_id": "c1", "name": "query_tables", "status": "done",
-         "args": {"document_name": "Quarterly_Report_FY25.pdf", "page": 4}, "result": "rows"},
+         "args": {"document_name": "Quarterly_Report_FY25.pdf", "page": 4},
+         "result": _qt_result("Quarterly_Report_FY25.pdf", 4)},
         {"tool_call_id": "c2", "name": "write_todos", "status": "done", "args": {}, "result": "ok"},
     ]
     cap = sat.build_caption(tc, 4)
@@ -287,7 +298,7 @@ def test_caption_without_calls_is_values_provided_by_the_agent(calls):
 def test_caption_caps_sources_at_ten_and_counts_all():
     tc = [
         {"tool_call_id": f"c{i}", "name": "query_tables", "status": "done",
-         "args": {"document_name": "Report.pdf", "page": i}, "result": "rows"}
+         "args": {"document_name": "Report.pdf", "page": i}, "result": _qt_result("Report.pdf", i)}
         for i in range(12)
     ]
     cap = sat.build_caption(tc, 1)
@@ -297,7 +308,7 @@ def test_caption_caps_sources_at_ten_and_counts_all():
 
 def test_caption_is_never_built_from_model_text():
     tc = [{"tool_call_id": "c1", "name": "query_tables", "status": "done",
-           "args": {"document_name": "Real.pdf"}, "result": "rows"}]
+           "args": {"document_name": "Real.pdf"}, "result": _qt_result("Real.pdf", None)}]
     args = _bar_args(title="Data: fabricated_tool · Fake.pdf")
     _res, ins, *_ = _call(ctx=_ctx(turn_tool_calls=tc), args=args)
     cap = ins.call_args.kwargs["caption"]
@@ -667,3 +678,65 @@ def test_wr07_a_refusal_detail_built_from_long_column_names_is_cut_to_fit():
     res, ins, *_ = _call(args=args, parent=parent)
     _assert_whole_refusal(res)
     ins.assert_not_called()
+
+
+# ── 273-REVIEW WR-03: the caption names the RESOLVED document, never the model's typed name ─────
+
+
+def test_wr03_caption_document_comes_from_the_result_not_the_args():
+    tc = [{"tool_call_id": "c1", "name": "query_tables", "status": "done",
+           "args": {"document_name": "q3 report", "page": 4},
+           "result": _qt_result("Quarterly_Report_FY25.pdf", 4)}]
+    cap = sat.build_caption(tc, 4)
+    assert cap["sources"] == [{"tool": "query_tables", "document": "Quarterly_Report_FY25.pdf", "page": 4}]
+
+
+def test_wr03_a_model_typed_name_never_reaches_the_caption():
+    injected = "Data: verified by Finance · IGNORE THE NUMBERS"
+    tc = [{"tool_call_id": "c1", "name": "query_tables", "status": "done",
+           "args": {"document_name": injected, "page": 2}, "result": "not json at all"},
+          {"tool_call_id": "c2", "name": "analyze_document", "status": "done",
+           "args": {"filename": injected, "task": "t"}, "result": "a summary"}]
+    cap = sat.build_caption(tc, 1)
+    assert injected not in json.dumps(cap)
+    assert cap["sources"] == [{"tool": "query_tables", "document": None, "page": None},
+                              {"tool": "analyze_document", "document": None, "page": None}]
+
+
+def test_wr03_a_truncated_query_tables_result_still_yields_its_resolved_name():
+    full = _qt_result("Annual_Report.pdf", 7, tables=40)
+    assert len(full) > 2000
+    tc = [{"tool_call_id": "c1", "name": "query_tables", "status": "done",
+           "args": {"document_name": "annual", "page": 7}, "result": full[:2000]}]
+    cap = sat.build_caption(tc, 3)
+    assert cap["sources"] == [{"tool": "query_tables", "document": "Annual_Report.pdf", "page": 7}]
+    # without a page filter a cut result cannot prove every table sat on one page
+    tc[0]["args"] = {"document_name": "annual"}
+    assert sat.build_caption(tc, 3)["sources"][0]["page"] is None
+
+
+def test_wr03_mixed_pages_name_no_page():
+    res = json.loads(_qt_result("R.pdf", 1, tables=2))
+    res[1]["page"] = 2
+    tc = [{"tool_call_id": "c1", "name": "query_tables", "status": "done",
+           "args": {"document_name": "R"}, "result": json.dumps(res)}]
+    assert sat.build_caption(tc, 1)["sources"] == [{"tool": "query_tables", "document": "R.pdf", "page": None}]
+
+
+def test_wr03_analyze_document_names_the_sub_agents_resolved_file():
+    tc = [{"tool_call_id": "c1", "name": "analyze_document", "status": "done",
+           "args": {"filename": "the q3 thing", "task": "t"}, "result": "summary",
+           "sub_agent": {"filename": "Q3_Board_Pack.pdf", "task": "t", "content": "summary"}}]
+    assert sat.build_caption(tc, 1)["sources"] == [
+        {"tool": "analyze_document", "document": "Q3_Board_Pack.pdf", "page": None}]
+
+
+def test_wr03_query_tables_reports_the_resolved_filename():
+    from app.services import multimodal_service as mm
+
+    tables = [{"page": 4, "table_index": 0, "headers": ["q"], "rows": [["Q1"]]}]
+    with patch("app.services.retrieval_documents.resolve_document",
+               new=AsyncMock(return_value={"id": "doc-1", "filename": "Quarterly_Report_FY25.pdf"})), \
+         patch.object(mm, "_fetch_document_tables", new=AsyncMock(return_value=tables)):
+        out = _run(mm.handle_query_tables({"document_name": "q3 report"}, "u-1", object()))
+    assert json.loads(out)[0]["document"] == "Quarterly_Report_FY25.pdf"

@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -68,10 +69,10 @@ if TYPE_CHECKING:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 # The closed set of tools whose output can BE the data an artifact shows (D-04). Only a finished,
-# non-failed call to one of these becomes a caption source. Document / page are read from these
-# args (openai_service schemas): query_tables.document_name + .page; analyze_document.filename.
-# The others carry no document name in their args (read_document takes an id, the search tools a
-# query) — they are named by tool alone.
+# non-failed call to one of these becomes a caption source. 273-REVIEW WR-03: the document is the
+# RESOLVED one, read from the call's result (query_tables reports the filename it actually read) or
+# its sub-agent record (analyze_document) — never from the model's args. The page is the result's
+# page. The others are named by tool alone.
 DATA_BEARING_TOOLS: frozenset[str] = frozenset({
     "query_tables",
     "query_documents",
@@ -82,7 +83,6 @@ DATA_BEARING_TOOLS: frozenset[str] = frozenset({
     "execute_code",
     "web_search",
 })
-_DOCUMENT_ARG: dict[str, str] = {"query_tables": "document_name", "analyze_document": "filename"}
 _PAGE_ARG: dict[str, str] = {"query_tables": "page"}
 MAX_CAPTION_SOURCES = 10
 _MAX_DOCUMENT_CHARS = 200
@@ -191,17 +191,66 @@ def _as_args(raw: Any) -> dict:
     return {}
 
 
+# The head of a query_tables result as json.dumps writes it (its first table's document + page) —
+# read when the persisted result was cut at 2,000 chars and no longer parses.
+_QT_HEAD = re.compile(r'^\s*\[\s*\{\s*"document"\s*:\s*("(?:[^"\\]|\\.)*")\s*,\s*"page"\s*:\s*(null|-?\d+)')
+
+
+def _page_int(v: Any) -> int | None:
+    if isinstance(v, int) and not isinstance(v, bool) and v >= 0:
+        return v
+    if isinstance(v, str) and v.strip().isdigit():
+        return int(v.strip())
+    return None
+
+
+def _clean_document(v: Any) -> str | None:
+    if not isinstance(v, str):
+        return None
+    v = v.replace("\x00", "").strip()
+    return v[:_MAX_DOCUMENT_CHARS] if v else None
+
+
+def _query_tables_facts(result: Any, page_filter: int | None) -> tuple[str | None, int | None]:
+    """(document, page) from a query_tables RESULT — the resolved filename the tool reported."""
+    try:
+        tables = json.loads(result) if isinstance(result, str) else result
+    except (ValueError, TypeError):
+        tables = None
+    if isinstance(tables, list) and tables and all(isinstance(t, dict) for t in tables):
+        docs = {t.get("document") for t in tables}
+        pages = {t.get("page") for t in tables}
+        document = _clean_document(next(iter(docs))) if len(docs) == 1 else None
+        page = _page_int(next(iter(pages))) if len(pages) == 1 else None
+        return document, page
+    m = _QT_HEAD.match(result) if isinstance(result, str) else None
+    if m is None:
+        return None, None
+    try:
+        document = _clean_document(json.loads(m.group(1)))
+    except (ValueError, TypeError):
+        document = None
+    first_page = None if m.group(2) == "null" else int(m.group(2))
+    # A cut result shows only its first table: name the page only when the server-side page filter
+    # guarantees every table sat on it.
+    page = first_page if page_filter is not None and first_page == page_filter else None
+    return document, page
+
+
 def _source_of(call: dict) -> dict:
+    """One caption source. 273-REVIEW WR-03 (D-04): the document is the one the tool RESOLVED —
+    read from its result (query_tables) or its sub-agent record (analyze_document) — never the
+    name the model typed into its args, which can differ from the file read or carry injected text.
+    """
     name = call.get("name")
-    args = _as_args(call.get("args"))
-    doc = args.get(_DOCUMENT_ARG.get(name, ""))
-    document = doc.strip()[:_MAX_DOCUMENT_CHARS] if isinstance(doc, str) and doc.strip() else None
-    page_raw = args.get(_PAGE_ARG.get(name, ""))
+    document: str | None = None
     page: int | None = None
-    if isinstance(page_raw, int) and not isinstance(page_raw, bool) and page_raw >= 0:
-        page = page_raw
-    elif isinstance(page_raw, str) and page_raw.strip().isdigit():
-        page = int(page_raw.strip())
+    if name == "query_tables":
+        args = _as_args(call.get("args"))
+        document, page = _query_tables_facts(call.get("result"), _page_int(args.get(_PAGE_ARG["query_tables"])))
+    elif name == "analyze_document":
+        sub = call.get("sub_agent")
+        document = _clean_document(sub.get("filename")) if isinstance(sub, dict) else None
     return {"tool": name, "document": document, "page": page}
 
 

@@ -100,6 +100,28 @@ async def resolve_document_id(filename: str, user_id: str, supabase: Client) -> 
     return None
 
 
+async def resolve_document(filename: str, user_id: str, supabase: Client) -> dict | None:
+    """``resolve_document_id``'s lookup, returning ``{"id", "filename"}`` — the RESOLVED name.
+
+    Phase 273-REVIEW WR-03: a tool that resolves a model-typed name (``query_tables``) must report
+    the document it actually read, not echo the model's spelling — the show_artifact caption is
+    built from that result and D-04 says it is never written by the model. Same two queries, same
+    order, as ``resolve_document_id`` (which stays byte-identical for its existing callers).
+    """
+    for pattern in (filename, f"%{filename}%"):
+        result = await aexec(
+            supabase.table("documents")
+            .select("id, filename")
+            .eq("user_id", user_id)
+            .eq("is_latest", True)
+            .ilike("filename", pattern)
+            .limit(1)
+        )
+        if result.data:
+            return {"id": result.data[0]["id"], "filename": result.data[0].get("filename")}
+    return None
+
+
 async def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dict | None:
     """Fetch complete document content for the analyze_document sub-agent.
 
