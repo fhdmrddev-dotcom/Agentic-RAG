@@ -331,3 +331,91 @@ async def test_rerank_cannot_drop_a_matched_document(monkeypatch, recorder):
     )
     assert {h["document_id"] for h in hits} == {"dA", "dB"}
     assert len(hits) == 5
+
+
+# ── D-27, second cause (272-05 re-run, 2026-10-03): the near-duplicate filter ─────────────────
+#
+# The post-restart probe (deepseek (b), run ``7a7234da``) returned 2 of the 3 matched Acme GmbH
+# reports even with the threshold half of D-27 live: ``_deduplicate_chunks`` compares word-set
+# Jaccard ACROSS documents, and the September and October reports differ only in a month name and
+# a figure (Jaccard 0.90 ≥ 0.85), so September was dropped as a "duplicate" of October. Inside a
+# matched set every document is a distinct answer; the filtered path collapses near-duplicates only
+# WITHIN one document. The unfiltered path is unchanged.
+
+def _report(cid: str, doc: str, month: str, figure: str, sim: float) -> dict:
+    body = (
+        f"# Acme GmbH — monthly financial report, {month}\n\nReporting entity: Acme GmbH.\n"
+        f"Reporting period: {month}.\n\nTotal revenue for the period: {figure}.\n\n"
+        "Revenue was driven by recurring service contracts and one-off project work. "
+        "Operating costs were in line with the budget for the period.\n"
+    )
+    return {"id": cid, "document_id": doc, "content": body, "chunk_index": 0, "similarity": sim}
+
+
+def _acme_reports() -> list[dict]:
+    return [
+        _report("mar", "dMar", "March 2026", "EUR 1,410,000", 0.301),
+        _report("oct", "dOct", "October 2025", "EUR 1,240,000", 0.295),
+        _report("sep", "dSep", "September 2025", "EUR 1,180,000", 0.29),
+    ]
+
+
+_DOCS_ACME = [
+    {"id": d, "filename": f"{d}.md", "metadata": None, "version_number": 1,
+     "folder_id": None, "source_connection_id": None}
+    for d in ("dMar", "dOct", "dSep")
+]
+
+
+def test_the_fixture_pair_really_is_a_near_duplicate():
+    """Guards the cases below from passing vacuously: Sep vs Oct must cross the 0.85 cutoff."""
+    rows = _acme_reports()
+    a, b = (set(r["content"].lower().split()) for r in rows[1:])
+    assert len(a & b) / len(a | b) >= 0.85
+
+
+def test_same_document_only_keeps_near_identical_rows_from_different_documents():
+    from app.services.retrieval_rank import _deduplicate_chunks
+
+    out = _deduplicate_chunks(_acme_reports(), same_document_only=True)
+    assert [r["document_id"] for r in out] == ["dMar", "dOct", "dSep"]
+
+
+def test_same_document_only_still_collapses_a_near_duplicate_inside_one_document():
+    from app.services.retrieval_rank import _deduplicate_chunks
+
+    oct_a = _report("o1", "dOct", "October 2025", "EUR 1,240,000", 0.4)
+    oct_b = {**_report("o2", "dOct", "October 2025", "EUR 1,240,000", 0.3), "chunk_index": 1}
+    assert [r["id"] for r in _deduplicate_chunks([oct_a, oct_b], same_document_only=True)] == ["o1"]
+
+
+def test_the_default_dedup_is_unchanged_and_still_collapses_across_documents():
+    """The unfiltered path's behaviour is pinned as it was: cross-document near-duplicates collapse."""
+    from app.services.retrieval_rank import _deduplicate_chunks
+
+    assert [r["document_id"] for r in _deduplicate_chunks(_acme_reports())] == ["dMar", "dOct"]
+
+
+@pytest.mark.parametrize("hybrid", [True, False])
+async def test_near_identical_matched_documents_all_come_back(monkeypatch, recorder, hybrid):
+    from app.services.retrieval_service import search_documents
+
+    _set_hybrid(monkeypatch, hybrid)
+    recorder["responses"]["vector"] = _acme_reports()
+    hits, _avg = await search_documents(
+        "revenue", "u1", _FakeSupabase(_DOCS_ACME), user_settings=None,
+        document_ids=["dMar", "dOct", "dSep"],
+    )
+    assert {h["document_id"] for h in hits} == {"dMar", "dOct", "dSep"}, hits
+
+
+@pytest.mark.parametrize("hybrid", [True, False])
+async def test_the_unfiltered_search_still_collapses_them(monkeypatch, recorder, hybrid):
+    from app.services.retrieval_service import search_documents
+
+    _set_hybrid(monkeypatch, hybrid)
+    recorder["responses"]["vector"] = _acme_reports()
+    hits, _avg = await search_documents(
+        "revenue", "u1", _FakeSupabase(_DOCS_ACME), user_settings=None, document_ids=None,
+    )
+    assert {h["document_id"] for h in hits} == {"dMar", "dOct"}, hits
