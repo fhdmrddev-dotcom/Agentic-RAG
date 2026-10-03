@@ -160,6 +160,25 @@ export type ParseResult =
   | { ok: true; record: ArtifactRecord }
   | { ok: false; reason: NoticeReason; ctx?: NoticeContext; id?: string }
 
+/** What every registry component receives: a record that already passed the guard. */
+export interface ArtifactBodyProps {
+  record: ArtifactRecord
+}
+
+/**
+ * A render-time failure that names its OWN catalogue reason (e.g. `chart-unavailable` when the
+ * chart chunk fails to load). `ArtifactErrorBoundary` shows that reason; any other thrown value
+ * shows `render-failed`. It carries a code, never a message for people.
+ */
+export class ArtifactNoticeError extends Error {
+  readonly reason: NoticeReason
+  constructor(reason: NoticeReason) {
+    super(reason)
+    this.name = "ArtifactNoticeError"
+    this.reason = reason
+  }
+}
+
 // ── Narrowing helpers ────────────────────────────────────────────────────────────────────────
 
 class Refusal {

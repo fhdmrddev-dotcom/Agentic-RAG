@@ -108,8 +108,11 @@ describe("ArtifactBlock", () => {
     expect(within(firstRow).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Q1", "LATAM", "210"])
   })
 
-  it("shows the same-size busy frame while the chart chunk loads", () => {
-    render(<ArtifactBlock artifacts={[chartBar]} />)
+  it("shows the same-size busy frame while the chart chunk loads", async () => {
+    // A fresh module graph, so the lazy chart has not resolved in an earlier test.
+    vi.resetModules()
+    const { ArtifactBlock: Fresh } = await import("../ArtifactBlock")
+    render(<Fresh artifacts={[chartBar]} />)
     const busy = screen.getByTestId("artifact-block").querySelector('[aria-busy="true"]')
     expect(busy).not.toBeNull()
     expect(busy).toHaveClass("h-[240px]")

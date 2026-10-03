@@ -94,6 +94,48 @@ export function captionSource(tool: string, document: string | null, page: numbe
   return `${truncateValue(tool)}${doc}`
 }
 
+// ── Table ────────────────────────────────────────────────────────────────────────────────────
+
+/** Sort glyphs: muted ↕ when unsorted, ▲ / ▼ in the reserved accent when sorted. */
+export const SORT_GLYPH = { none: "↕", ascending: "▲", descending: "▼" } as const
+
+/** A column heading: the name, then its unit in parentheses when it has one. */
+export function columnHeading(name: string, unit: string | null): string {
+  return unit ? `${name} (${unit})` : name
+}
+
+// ── Metric ───────────────────────────────────────────────────────────────────────────────────
+
+export const DELTA_GLYPH = { up: "▲", down: "▼", same: "=" } as const
+export const METRIC_NO_CHANGE = "no change"
+
+const CURRENCY_PREFIX = /^[$€£¥₹]/
+
+/** A unit split into a currency prefix and a suffix: `$K` → `$` + `K`, `days` → `` + `days`. */
+export function splitUnit(unit: string | null): { prefix: string; suffix: string } {
+  if (!unit) return { prefix: "", suffix: "" }
+  if (CURRENCY_PREFIX.test(unit)) return { prefix: unit.slice(0, 1), suffix: unit.slice(1) }
+  return { prefix: "", suffix: unit }
+}
+
+/** A number with its unit as running text: `$1,532K`, `12 days`, `8%`. */
+export function withUnit(n: number, unit: string | null): string {
+  const { prefix, suffix } = splitUnit(unit)
+  const gap = suffix.length > 1 && /^[A-Za-z]/.test(suffix) ? " " : ""
+  return `${prefix}${formatNumber(n)}${gap}${suffix}`
+}
+
+/** The muted tail of the delta line: `vs Q3 ($1,532K)`. */
+export function metricCompareTail(compareLabel: string, compareText: string): string {
+  return `vs ${truncateValue(compareLabel)} (${compareText})`
+}
+
+const PERCENT = new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+export function percentText(p: number): string {
+  return `${PERCENT.format(p)}%`
+}
+
 // ── Lineage operation phrases (closed set, D-07) ─────────────────────────────────────────────
 
 function rangeBound(v: number | string | null): string {
