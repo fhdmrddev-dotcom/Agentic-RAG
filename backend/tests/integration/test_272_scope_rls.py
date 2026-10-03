@@ -24,8 +24,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.dependencies import get_supabase
 from app.services import retrieval_scope as rscope
+from tests.integration._271_gotrue_users import _admin, require_gotrue
 from tests.integration._rls_harness import requires_pg
 from tests.integration.test_163_rls_documents import _add_comember, _drop_user
 
@@ -68,6 +68,9 @@ async def _field_def(pool, *, uid, org):
 
 @pytest.fixture
 async def world(pg_pool, two_orgs_two_users):
+    # Step 1 is a SERVICE-ROLE PostgREST read (:54321) built from backend/.env — never the
+    # placeholder `app.config.settings` the unit conftest installs (the 271 precedent).
+    require_gotrue()
     a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
     m = uuid4().hex[:8]
     docs: list[str] = []
@@ -127,7 +130,7 @@ async def world(pg_pool, two_orgs_two_users):
 
 async def _resolve(uid, conditions, folder_ids=None):
     return await rscope.resolve_document_scope(
-        user_id=uid, conditions=conditions, folder_ids=folder_ids, supabase=get_supabase(),
+        user_id=uid, conditions=conditions, folder_ids=folder_ids, supabase=_admin(),
     )
 
 
@@ -150,7 +153,7 @@ async def test_undated_count_is_rls_intersected(world):
 async def test_nearby_months_count_only_what_the_caller_can_read(world):
     out = await rscope.nearby_values(
         user_id=world["s"], conditions=[ACME, OCTOBER], field="date", folder_ids=None,
-        supabase=get_supabase(),
+        supabase=_admin(),
     )
     assert out == [
         {"value": "2025-10", "label": "October 2025", "documents": 1},

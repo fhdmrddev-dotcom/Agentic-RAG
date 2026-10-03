@@ -283,7 +283,7 @@ async def test_a_python_enforced_predicate_is_applied_with_no_code_change(harnes
         predicates=DEFAULT_PREDICATES + (extra,),
     )
     q = [q for q in sb.queries if q.table == "documents"][0]
-    assert ("metadata->>document_type", "report") in q.args_of("eq")
+    assert ("document_type_norm", "report") in q.args_of("eq")  # the compiler's typed leg
     assert res.applied == (_ACME,), "a default predicate is not a caller condition"
 
 
