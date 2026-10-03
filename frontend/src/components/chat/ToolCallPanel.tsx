@@ -13,10 +13,10 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
-import { TOOL_BODIES } from "./tool-bodies"
+import { TOOL_BODIES, ARGS_HIDDEN } from "./tool-bodies"
 import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
 import { ExecuteCodeEditorInset } from "./tool-bodies/ExecuteCodeBody"
-import { toolLabel, searchFilterLine } from "@/lib/toolMeta"
+import { stepLabel, searchFilterLine } from "@/lib/toolMeta"
 import { preparingDescription } from "@/lib/providerLogo"
 import { StatusPill } from "./StatusPill"
 import { dedupToolCalls } from "@/lib/stepCount"
@@ -278,7 +278,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills, isStreaming = false 
                     <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
                       {tc.status === "preparing" ? (
                         <span className="font-semibold text-foreground/50 italic">
-                          Preparing {toolLabel(tc.name)}…
+                          Preparing {stepLabel(tc.name)}…
                           {(() => {
                             const prepDesc = preparingDescription(tc)
                             return prepDesc ? (
@@ -301,7 +301,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills, isStreaming = false 
                               tc.status === "running" ? "text-primary" : "text-foreground/80",
                             )}
                           >
-                            {tc.status === "running" ? `Running ${toolLabel(tc.name)}` : toolLabel(tc.name)}
+                            {tc.status === "running" ? `Running ${stepLabel(tc.name)}` : stepLabel(tc.name)}
                           </span>
                           {summary && (
                             <span className="ml-1.5 opacity-50">"{summary}"</span>
@@ -354,20 +354,22 @@ export function ToolCallPanel({ toolCalls, activatedSkills, isStreaming = false 
                   {/* 075.6 Plan 02 / SPEC Req #4: live code panel during preparing */}
                   {tc.status === "preparing" && tc.argsCodeText && tc.argsCodeText.length > 0 && tc.argsBytesStreamed != null && (() => {
                     const panelKey = tc.clientKey ?? tc.id ?? `idx-${i}`
-                    const isExecuteCode = tc.name === "execute_code"
+                    // Phase 273-05 (L-1, OV-273-04): header-only for every tool in the one
+                    // shared set (execute_code as before, plus show_artifact, whose args ARE the spec).
+                    const hideArgsBody = ARGS_HIDDEN.livePanel.has(tc.name)
                     const prepDesc = preparingDescription(tc)
                     return (
                       <ToolArgsLivePanel
                         title={
                           prepDesc
-                            ? `Generating ${toolLabel(tc.name)}: ${prepDesc}`
-                            : `Generating ${toolLabel(tc.name)}…`
+                            ? `Generating ${stepLabel(tc.name)}: ${prepDesc}`
+                            : `Generating ${stepLabel(tc.name)}…`
                         }
                         contentText={tc.argsCodeText!}
                         byteCount={tc.argsBytesStreamed!}
                         expanded={panelExpanded[panelKey] ?? (i === lastPreparingIndex)}
                         onToggle={() => togglePanel(panelKey, i === lastPreparingIndex)}
-                        hideBody={isExecuteCode}
+                        hideBody={hideArgsBody}
                       />
                     )
                   })()}

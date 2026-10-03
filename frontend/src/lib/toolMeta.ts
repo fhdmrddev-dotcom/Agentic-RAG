@@ -20,6 +20,8 @@ export function toolLabel(name: string): string {
   if (name === "load_skill") return "Loading skill"
   if (name === "save_skill") return "Saving skill"
   if (name === "read_skill_file") return "Reading skill file"
+  // Phase 273-05 (UI-D-06, OV-273-04): the activity string (`Showing an artifact…`).
+  if (name === "show_artifact") return "Showing an artifact"
   if (name.includes("__")) {
     const [svc, act] = name.split("__")
     const formattedSvc = svc.charAt(0).toUpperCase() + svc.slice(1).replace(/_/g, " ")
@@ -27,6 +29,19 @@ export function toolLabel(name: string): string {
     return `${formattedSvc} · ${formattedAct}`
   }
   return toolName(name)
+}
+
+/**
+ * Phase 273-05 (UI-D-06) — the label a RAIL STEP wears (`Preparing {x}…`, `Running {x}`,
+ * `{x} → {result}`). For every tool but the ones below it is `toolLabel`, byte-for-byte as
+ * before. `show_artifact` reads the phrase (`Show an artifact`) in the step list and the
+ * activity string (`Showing an artifact`) only where the run says what it is doing NOW —
+ * the UI-SPEC rail table names both, and one string cannot be both.
+ */
+const STEP_PHRASE_TOOLS: ReadonlySet<string> = new Set(["show_artifact"])
+
+export function stepLabel(name: string): string {
+  return STEP_PHRASE_TOOLS.has(name) ? toolName(name) : toolLabel(name)
 }
 
 export function toolSummary(name: string, args: Record<string, unknown>): string | null {
