@@ -38,6 +38,8 @@ from app.models.document_view import ViewCondition
 from app.services.audit_service import write_audit_entry
 from app.services.metadata_field_service import list_field_definitions
 from app.services.retrieval_scope import (
+    LIST_FIELD_OPS,
+    LIST_FIELDS,
     canonical_stored_values,
     nearby_values,
     requires_resolved_scope,
@@ -170,15 +172,19 @@ def parse_filter_args(args: dict) -> list[SearchCondition] | FilterRefusal:
                 "`metadata_filter` must be an object of {field: value} pairs; prefer `filters`.",
             )
         for key, value in legacy.items():
-            entry = (
-                {"field": key, "op": "one_of", "values": value}
-                if isinstance(value, list)
-                else {"field": key, "op": "eq", "value": value}
-            )
-            parsed = _parse_condition(entry)
-            if isinstance(parsed, FilterRefusal):
-                return parsed
-            conditions.append(parsed)
+            if isinstance(value, list) and key in LIST_FIELDS:
+                # CR-01: pre-272 the legacy filter was `metadata @> {...}`, so a list on a LIST
+                # field meant EVERY listed value — one `eq` (element match) per member keeps that.
+                entries = [{"field": key, "op": "eq", "value": v} for v in value]
+            elif isinstance(value, list):
+                entries = [{"field": key, "op": "one_of", "values": value}]
+            else:
+                entries = [{"field": key, "op": "eq", "value": value}]
+            for entry in entries:
+                parsed = _parse_condition(entry)
+                if isinstance(parsed, FilterRefusal):
+                    return parsed
+                conditions.append(parsed)
     return conditions
 
 
@@ -323,6 +329,15 @@ async def validate_and_canonicalise(
                 f"There is no field named '{field}'. Valid fields: {', '.join(allowed)}. "
                 "Retry with one of them, or ask which was meant.",
                 allowed,
+            )
+        if field in LIST_FIELDS and op not in LIST_FIELD_OPS:
+            # CR-01: a stored ARRAY — `one_of` / ranges compiled to a never-matching text compare.
+            return FilterRefusal(
+                field,
+                f"{field} is a list field: use eq with one {field} value per filter (a document "
+                f"matches when its {field} include that value; two eq filters need both), contains "
+                f"for part of a value, or is_empty — not {op}.",
+                list(LIST_FIELD_OPS),
             )
 
         defn = custom.get(field)

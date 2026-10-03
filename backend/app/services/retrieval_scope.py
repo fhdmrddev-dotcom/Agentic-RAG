@@ -39,6 +39,7 @@ never at module level: ``document_view_resolver`` transitively imports ``harness
 from __future__ import annotations
 
 import calendar
+import json
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Sequence
@@ -160,6 +161,43 @@ _TOP_TYPES_SQL = (
 _ISO_RULE = "use YYYY-MM-DD (e.g. 2025-10-01), or between with two YYYY-MM-DD days"
 _ISO_DATE_OPS = ("eq", "gte", "lte", "before", "after", "between")
 
+# 272-REVIEW CR-01 — built-in fields stored as a JSON ARRAY (DocumentMetadata.topics: list[str]).
+# The compiler's `eq` is a SCALAR `metadata @> {"topics": "tax"}` containment, which never matches
+# `["tax", "audit"]`, and `one_of` compares the array's TEXT to each value — both silently match
+# nothing, and the D-09 lock then holds the agent to a false "nothing exists". So `eq` is handed to
+# the compiler as a case-insensitive match on the JSON-quoted ELEMENT (`%"tax"%` matches `"Tax"`
+# inside the array text and never `"taxation"`); `contains` / `is_empty` already work on the text;
+# every other op is refused. ⛔ Tests pin this tuple to the list-typed DocumentMetadata fields.
+LIST_FIELDS: tuple[str, ...] = ("topics",)
+LIST_FIELD_OPS: tuple[str, ...] = ("eq", "contains", "is_empty")
+
+
+def _like_literal(text: str) -> str:
+    """Escape LIKE's metacharacters so a value is matched literally (backslash is ILIKE's escape)."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _compiler_condition(cond: dict) -> dict:
+    """The condition the 271 compiler is handed — a list field's ``eq`` becomes an element match.
+
+    ``applied`` (what the label, the audit row and the lock read) keeps the condition as asked;
+    only the compiled form changes. Raises ``ResolveError`` for an op a list field cannot honour.
+    """
+    field = cond.get("field")
+    if field not in LIST_FIELDS:
+        return cond
+    op = cond.get("op")
+    if op == "eq":
+        element = json.dumps(str(cond.get("value")), ensure_ascii=False)  # how jsonb writes it
+        return {"field": field, "op": "contains", "value": _like_literal(element)}
+    if op in LIST_FIELD_OPS:
+        return cond
+    from app.services.document_view_resolver import ResolveError
+
+    raise ResolveError(
+        detail=f"{field} is a list field: use eq (one {field} value per filter), contains or is_empty"
+    )
+
 
 def _empty(applied: Sequence[dict]) -> ScopeResult:
     """The filter matched nothing (D-18) — a RESTRICTION to the empty set, never "no filter"."""
@@ -256,7 +294,8 @@ async def resolve_document_scope(
 
     effective = applied + [dict(p.condition) for p in predicates if p.condition is not None]
     date_conds = [c for c in effective if c.get("field") in _DATE_WORDS]
-    other_conds = [c for c in effective if c.get("field") not in _DATE_WORDS]
+    # CR-01: a list field's `eq` is compiled as an element match; `applied` keeps it as asked.
+    other_conds = [_compiler_condition(c) for c in effective if c.get("field") not in _DATE_WORDS]
     for c in other_conds:
         if c.get("field") == "date":
             _check_document_date(c)

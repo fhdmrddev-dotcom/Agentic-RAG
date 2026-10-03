@@ -92,16 +92,19 @@ async def world(pg_pool, two_orgs_two_users):
 
         ids = {
             "a_oct": await _doc(pg_pool, owner=a["uid"], org=a["org_id"], folder=fe, name=f"a-oct-{m}",
-                                metadata={"legal_entity": "Acme GmbH", "date": "2025-10-15", "document_type": "Report"}),
+                                metadata={"legal_entity": "Acme GmbH", "date": "2025-10-15", "document_type": "Report",
+                                          "topics": ["Tax", "audit"]}),
             "a_sep": await _doc(pg_pool, owner=a["uid"], org=a["org_id"], folder=fo, name=f"a-sep-{m}",
-                                metadata={"legal_entity": "Acme GmbH", "date": "2025-09-10", "document_type": "Report"}),
+                                metadata={"legal_entity": "Acme GmbH", "date": "2025-09-10", "document_type": "Report",
+                                          "topics": ["taxation"]}),
             "a_undated": await _doc(pg_pool, owner=a["uid"], org=a["org_id"], folder=fo, name=f"a-und-{m}",
                                     metadata={"legal_entity": "Acme GmbH", "document_type": "Memo"}),
             # Org A, but NOT visible to S: owned by A's admin, no folder, no connection.
             "a_private": await _doc(pg_pool, owner=a["uid"], org=a["org_id"], folder=None, name=f"a-prv-{m}",
                                     metadata={"legal_entity": "Acme GmbH", "document_type": "Secret"}),
             "b_oct": await _doc(pg_pool, owner=b["uid"], org=b["org_id"], folder=fb, name=f"b-oct-{m}",
-                                metadata={"legal_entity": "Acme GmbH", "date": "2025-10-20", "document_type": "Report"}),
+                                metadata={"legal_entity": "Acme GmbH", "date": "2025-10-20", "document_type": "Report",
+                                          "topics": ["tax"]}),
             "b_undated": await _doc(pg_pool, owner=b["uid"], org=b["org_id"], folder=fb, name=f"b-und-{m}",
                                     metadata={"legal_entity": "ACME GMBH", "document_type": "Invoice"}),
         }
@@ -183,3 +186,17 @@ async def test_folder_scope_is_anded_never_dropped(world):
     assert {world["a_oct"], world["a_sep"]} <= set(unscoped.document_ids)
     empty = await _resolve(world["s"], [ACME], folder_ids=[])
     assert empty.is_empty
+
+
+async def test_cr01_topics_eq_matches_an_element_of_the_stored_array(world):
+    """272-REVIEW CR-01: `topics` is stored as a JSON ARRAY. `eq` compiled to a scalar `@>`
+    containment, which never matches an array, so "documents about tax" resolved EMPTY and the D-09
+    lock then held the agent to a false "nothing exists". The resolver now matches one ELEMENT,
+    case-insensitively — and an element that merely CONTAINS the word is not a match."""
+    tax = {"field": "topics", "op": "eq", "value": "tax"}
+    s = await _resolve(world["s"], [tax])
+    assert set(s.document_ids) == {world["a_oct"]}, "Tax (any case) matches; taxation and org B do not"
+    t = await _resolve(world["t"], [tax])
+    assert set(t.document_ids) == {world["b_oct"]}, "positive control: org B's element match"
+    both = await _resolve(world["s"], [tax, {"field": "topics", "op": "eq", "value": "AUDIT"}])
+    assert set(both.document_ids) == {world["a_oct"]}, "two topics AND: a document carrying both"

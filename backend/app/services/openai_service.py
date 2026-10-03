@@ -58,6 +58,8 @@ SEARCH_DOCUMENTS_TOOL = {
                         "Built-in fields: `title`, `author`, `date`, `document_type`, "
                         "`topics`, `language`, `summary`; the organisation's own fields "
                         "(e.g. `legal_entity`, `fiscal_period`) are valid too. "
+                        "`topics` is a list: eq matches a document whose topics include "
+                        "the value (one topic per filter; one_of is not available on it). "
                         "Example, October 2025: "
                         '{"field":"date","op":"between","value":"2025-10-01","value2":"2025-10-31"}. '
                         "Example, one entity: "
