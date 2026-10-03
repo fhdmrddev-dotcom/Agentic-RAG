@@ -43,6 +43,7 @@ D-112-D02 invariant) or a field not in the live whitelist raises ``ValueError``
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Callable
 
@@ -94,6 +95,10 @@ NORMALIZED_LOWER_FIELDS: frozenset[str] = frozenset({
 # Genuinely un-normalized free-text fields → case-insensitive ``ilike`` on BOTH
 # sides (D-114-10). These are the only fields that warrant ILIKE for ``eq``.
 FREE_TEXT_FIELDS: frozenset[str] = frozenset({"title", "author", "summary"})
+
+# 272 G-1: built-in fields stored as a JSON ARRAY (DocumentMetadata.topics: list[str]).
+# `eq` on these matches one element (see _op_eq); mirrors retrieval_scope.LIST_FIELDS.
+LIST_VALUE_FIELDS: frozenset[str] = frozenset({"topics"})
 
 
 # ── WHERE-fragment descriptor (the widened compiler output, R-114-A) ───────────
@@ -166,7 +171,14 @@ def _op_eq(cond) -> Fragment:
         return Fragment(leg="custom", field=field, builder="eq", value=_lower(value))
     if field in FREE_TEXT_FIELDS:
         return Fragment(leg="custom", field=field, builder="ilike", value=value)
-    # boolean / number / custom string / enum / topics → containment @> fast path
+    if field in LIST_VALUE_FIELDS:
+        # 272 G-1: a JSON-array field. A scalar `@> {"topics": "tax"}` never matches
+        # `["Tax", "audit"]`, so match ONE ELEMENT instead: ILIKE on the JSON-quoted
+        # value inside the array's text (`%"tax"%`), case-insensitive, never `"taxation"`.
+        element = json.dumps(str(value), ensure_ascii=False)
+        escaped = element.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        return Fragment(leg="custom", field=field, builder="ilike", value=f"%{escaped}%")
+    # boolean / number / custom string / enum → containment @> fast path
     return Fragment(leg="containment", field=field, builder="contains", value=value)
 
 
