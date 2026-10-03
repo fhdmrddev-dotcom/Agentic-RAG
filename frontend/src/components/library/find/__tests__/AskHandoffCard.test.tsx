@@ -43,6 +43,21 @@ describe("AskHandoffCard (D-02)", () => {
     expect(screen.getByText("Opens a new chat with your question ready to send.")).toBeInTheDocument()
   })
 
+  it("WR-01: while a chat is being opened the button is disabled and cannot hand over twice", () => {
+    const onAskInChat = vi.fn()
+    render(<AskHandoffCard question="What changed?" onAskInChat={onAskInChat} pending />)
+    const button = screen.getByRole("button", { name: "Open in chat" })
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(onAskInChat).not.toHaveBeenCalled()
+  })
+
+  it("WR-01: a failed create is said on the card in words, never only in the console", () => {
+    render(<AskHandoffCard question="What changed?" onAskInChat={vi.fn()} failed />)
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't open a new chat. Try again.")
+    expect(screen.getByRole("button", { name: "Open in chat" })).toBeEnabled()
+  })
+
   it("⛔ contains no list or table markup — the Library lists nothing for a question", () => {
     const { container } = render(<AskHandoffCard question="What changed?" onAskInChat={vi.fn()} />)
     expect(container.querySelectorAll("ul, ol, li, table")).toHaveLength(0)

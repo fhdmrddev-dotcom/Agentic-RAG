@@ -15,9 +15,14 @@ export interface AskHandoffCardProps {
   /** The text currently typed in Ask mode. */
   question: string
   onAskInChat: (question: string) => unknown
+  /** 271-REVIEW WR-01: a new chat is being opened — the button is disabled so a double press
+   *  cannot create two threads. The in-flight guard itself is the page's. */
+  pending?: boolean
+  /** 271-REVIEW WR-01: the last attempt could not open a new chat — said here, in words. */
+  failed?: boolean
 }
 
-export function AskHandoffCard({ question, onAskInChat }: AskHandoffCardProps) {
+export function AskHandoffCard({ question, onAskInChat, pending = false, failed = false }: AskHandoffCardProps) {
   const text = question.trim()
   const empty = text === ""
 
@@ -31,13 +36,19 @@ export function AskHandoffCard({ question, onAskInChat }: AskHandoffCardProps) {
       {!empty && <p className="text-sm text-foreground">{`Your question: “${text}”`}</p>}
       <button
         type="button"
-        disabled={empty}
+        disabled={empty || pending}
+        aria-busy={pending || undefined}
         onClick={() => onAskInChat(text)}
         className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 border border-primary/40 text-primary px-3 py-1.5 text-sm font-medium transition-colors hover:bg-primary/25 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         Open in chat
         <ArrowRight className="h-4 w-4" aria-hidden="true" />
       </button>
+      {failed && (
+        <p role="alert" className="text-sm text-destructive">
+          Couldn't open a new chat. Try again.
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">Opens a new chat with your question ready to send.</p>
     </div>
   )

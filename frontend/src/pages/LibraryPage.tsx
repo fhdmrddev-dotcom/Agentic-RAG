@@ -750,8 +750,25 @@ export function LibraryPage({
     find.dates.length +
     (find.relationship ? 1 : 0) +
     (find.version !== "latest" ? 1 : 0)
+  // 271-REVIEW WR-01: ONE handoff at a time (the 267-03 `startScopedChat` guard). A double
+  // click, or Enter then a click, would otherwise create two threads. A create that answers
+  // `false` (or throws) is said on the Ask card instead of only in the console.
+  const askInFlight = useRef(false)
+  const [askState, setAskState] = useState<"idle" | "pending" | "failed">("idle")
   const askInChat = (question: string) => {
-    void onAskInChat?.(question)
+    if (!onAskInChat || askInFlight.current) return
+    askInFlight.current = true
+    setAskState("pending")
+    Promise.resolve(onAskInChat(question)).then(
+      (ok) => {
+        askInFlight.current = false
+        setAskState(ok === false ? "failed" : "idle")
+      },
+      () => {
+        askInFlight.current = false
+        setAskState("failed")
+      },
+    )
   }
   const documentsFind = {
     top: (
@@ -786,7 +803,12 @@ export function LibraryPage({
     ),
     body:
       find.mode === "ask" ? (
-        <AskHandoffCard question={find.askText} onAskInChat={askInChat} />
+        <AskHandoffCard
+          question={find.askText}
+          onAskInChat={askInChat}
+          pending={askState === "pending"}
+          failed={askState === "failed"}
+        />
       ) : searchActive ? (
         <DocumentsFindResults
           rows={findResult.rows}

@@ -487,4 +487,26 @@ describe("LibraryPage — 271 review fixes", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
     await waitFor(() => expect(mockSearchDocuments.mock.calls.length).toBeGreaterThan(callsBefore))
   })
+
+  it("WR-01: a double press opens ONE chat, and a failed create says so on the card in words", async () => {
+    let settle: (ok: boolean) => void = () => {}
+    const onAskInChat = vi.fn(() => new Promise<boolean>((r) => (settle = r)))
+    renderPage(onAskInChat)
+    fireEvent.click(screen.getByRole("radio", { name: "Ask" }))
+    const ask = screen.getByPlaceholderText("Ask a question about your documents")
+    fireEvent.change(ask, { target: { value: "Who signed it?" } })
+    const button = screen.getByRole("button", { name: /Open in chat/ })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    fireEvent.keyDown(ask, { key: "Enter" })
+    expect(onAskInChat).toHaveBeenCalledTimes(1)
+    expect(button).toBeDisabled()
+
+    settle(false)
+    expect(await screen.findByText("Couldn't open a new chat. Try again.")).toBeInTheDocument()
+    expect(button).toBeEnabled()
+    // The failure does not lock the card: a second try is a second request.
+    fireEvent.click(button)
+    expect(onAskInChat).toHaveBeenCalledTimes(2)
+  })
 })
