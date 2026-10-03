@@ -1,0 +1,152 @@
+{
+  "id": "a_k3j9x0p2qd",
+  "thread_id": "5b1f6c2e-8a47-4d3b-9e0f-2c7a1d9b4e63",
+  "user_id": "0f3a9c71-2b6e-4f18-a5d4-7e8b9c0d1a2f",
+  "org_id": "c4e2a817-6d09-4b5f-8a3e-91f0b7d2c654",
+  "run_id": "9d7e3b21-4c58-4a6f-b0e2-1f8c6a3d5b79",
+  "tool_call_id": "call_8Hq2vNw4Lr7Tz1Kb",
+  "parent_id": null,
+  "label": "chart 1",
+  "component": "chart",
+  "spec": {
+    "title": "Revenue by region, FY25",
+    "columns": [
+      {"name": "quarter", "type": "string", "unit": null},
+      {"name": "Americas", "type": "number", "unit": "$K"},
+      {"name": "EMEA", "type": "number", "unit": "$K"}
+    ],
+    "rows": [
+      ["Q1 FY25", 1240, 860.5],
+      ["Q2 FY25", 1315.5, 902],
+      ["Q3 FY25", 1287, 948.25],
+      ["Q4 FY25", 1452, 1011]
+    ],
+    "chart": {"kind": "bar", "x": "quarter", "y": ["Americas", "EMEA"], "stacked": false, "slots": [0, 1]},
+    "metric": null
+  },
+  "caption": {
+    "row_count": 4,
+    "sources": [
+      {"tool": "query_tables", "document": "Quarterly_Report_FY25.pdf", "page": 4}
+    ],
+    "source_count": 1,
+    "lineage": null
+  },
+  "row_count": 4,
+  "spec_version": 1,
+  "created_at": "2026-10-03T14:22:07.481233+00:00",
+  "examples": [
+    {
+      "id": "a_7m2c9t4wq1",
+      "thread_id": "5b1f6c2e-8a47-4d3b-9e0f-2c7a1d9b4e63",
+      "user_id": "0f3a9c71-2b6e-4f18-a5d4-7e8b9c0d1a2f",
+      "org_id": "c4e2a817-6d09-4b5f-8a3e-91f0b7d2c654",
+      "run_id": "9d7e3b21-4c58-4a6f-b0e2-1f8c6a3d5b79",
+      "tool_call_id": "call_3Fp9xMd2Qs6Wy8Jc",
+      "parent_id": null,
+      "label": "table 1",
+      "component": "table",
+      "spec": {
+        "title": "Open pipeline by region",
+        "columns": [
+          {"name": "region", "type": "string", "unit": null},
+          {"name": "open deals", "type": "number", "unit": null},
+          {"name": "pipeline", "type": "number", "unit": "$K"},
+          {"name": "win rate", "type": "number", "unit": "%"}
+        ],
+        "rows": [
+          ["Americas", 42, 3820, 31.5],
+          ["EMEA", 31, 2675.5, 28],
+          ["APAC", 18, 1240, 24.75],
+          ["LATAM", 9, null, 19]
+        ],
+        "chart": null,
+        "metric": null
+      },
+      "caption": {
+        "row_count": 4,
+        "sources": [
+          {"tool": "search_documents", "document": "Pipeline_Review_Oct.xlsx", "page": null},
+          {"tool": "search_documents", "document": "Regional_Targets_2026.docx", "page": 2}
+        ],
+        "source_count": 2,
+        "lineage": null
+      },
+      "row_count": 4,
+      "spec_version": 1,
+      "created_at": "2026-10-03T14:23:41.002917+00:00"
+    },
+    {
+      "id": "a_p0x8r5n3ve",
+      "thread_id": "5b1f6c2e-8a47-4d3b-9e0f-2c7a1d9b4e63",
+      "user_id": "0f3a9c71-2b6e-4f18-a5d4-7e8b9c0d1a2f",
+      "org_id": "c4e2a817-6d09-4b5f-8a3e-91f0b7d2c654",
+      "run_id": null,
+      "tool_call_id": "call_6Rt1yGb5Hn0Ue3Va",
+      "parent_id": null,
+      "label": "metric 1",
+      "component": "metric",
+      "spec": {
+        "title": "Q4 FY25 revenue",
+        "columns": [
+          {"name": "revenue", "type": "number", "unit": "$K"},
+          {"name": "prior quarter", "type": "number", "unit": "$K"}
+        ],
+        "rows": [[2463, 2235.25]],
+        "chart": null,
+        "metric": {"value_column": "revenue", "compare_column": "prior quarter", "label": "Q4 FY25 revenue", "compare_label": "vs Q3 FY25"}
+      },
+      "caption": {
+        "row_count": 1,
+        "sources": [],
+        "source_count": 0,
+        "lineage": null
+      },
+      "row_count": 1,
+      "spec_version": 1,
+      "created_at": "2026-10-03T14:25:12.660400+00:00"
+    },
+    {
+      "id": "a_4h6b1z9ks2",
+      "thread_id": "5b1f6c2e-8a47-4d3b-9e0f-2c7a1d9b4e63",
+      "user_id": "0f3a9c71-2b6e-4f18-a5d4-7e8b9c0d1a2f",
+      "org_id": "c4e2a817-6d09-4b5f-8a3e-91f0b7d2c654",
+      "run_id": "2a6c8e04-1b3d-4f57-9a8c-6e0d2b4f7a13",
+      "tool_call_id": "call_9Kd4pLs7Bv2Xn5Qe",
+      "parent_id": "a_k3j9x0p2qd",
+      "label": "chart 2",
+      "component": "chart",
+      "spec": {
+        "title": "Q3 FY25 revenue by region",
+        "columns": [
+          {"name": "quarter", "type": "string", "unit": null},
+          {"name": "Americas", "type": "number", "unit": "$K"},
+          {"name": "EMEA", "type": "number", "unit": "$K"}
+        ],
+        "rows": [
+          ["Q3 FY25", 1287, 948.25]
+        ],
+        "chart": {"kind": "bar", "x": "quarter", "y": ["Americas", "EMEA"], "stacked": false, "slots": [0, 1]},
+        "metric": null
+      },
+      "caption": {
+        "row_count": 1,
+        "sources": [
+          {"tool": "query_tables", "document": "Quarterly_Report_FY25.pdf", "page": 4}
+        ],
+        "source_count": 1,
+        "lineage": {
+          "parent_label": "chart 1",
+          "parent_row_count": 4,
+          "same_rows": false,
+          "operations": [
+            {"op": "filter_eq", "column": "quarter", "value": "Q3 FY25"}
+          ]
+        }
+      },
+      "row_count": 1,
+      "spec_version": 1,
+      "created_at": "2026-10-03T14:27:55.193845+00:00"
+    }
+  ]
+}
