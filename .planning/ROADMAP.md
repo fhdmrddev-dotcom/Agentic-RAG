@@ -154,17 +154,17 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 271-01-PLAN.md — baselines; extract apply_fragments/validate_and_compile; DocumentSearchRequest + document_search_service (structure filters, relationship both directions, version states, server sort/page/exact total, no embedding) + POST /document-search (wave 1)
-- [ ] 271-02-PLAN.md — retire the classification-rules view; Filing rules header link + Library sub-view; Ask handoff (askInChat, new thread, prefill, never send); FindModeSwitch / FindMetaLine / AskHandoffCard (wave 1)
-- [ ] 271-03-PLAN.md — findState leaf, wire types, searchDocuments, useDocumentFind; 8-verb table derived from relationshipLabels; LinkTargetCombobox extracted; Find column set (seven cells) + documentAddedBy (wave 1)
+- [x] 271-01-PLAN.md — baselines; extract apply_fragments/validate_and_compile; DocumentSearchRequest + document_search_service (structure filters, relationship both directions, version states, server sort/page/exact total, no embedding) + POST /document-search (wave 1)
+- [x] 271-02-PLAN.md — retire the classification-rules view; Filing rules header link + Library sub-view; Ask handoff (askInChat, new thread, prefill, never send); FindModeSwitch / FindMetaLine / AskHandoffCard (wave 1)
+- [x] 271-03-PLAN.md — findState leaf, wire types, searchDocuments, useDocumentFind; 8-verb table derived from relationshipLabels; LinkTargetCombobox extracted; Find column set (seven cells) + documentAddedBy (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 271-04-PLAN.md — quick-add builder on the one FilterBar + structure editors + always-visible Version chip; DocumentsFindBody states; LibraryPage wiring; older-version panel notice; wave-2 gates (wave 2)
+- [x] 271-04-PLAN.md — quick-add builder on the one FilterBar + structure editors + always-visible Version chip; DocumentsFindBody states; LibraryPage wiring; older-version panel notice; wave-2 gates (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 271-05-PLAN.md — live content proofs + two-org fence on real RLS (GoTrue JWTs); merged-tree gates; G4-1..G4-6 browser drive (operator sign-off OWED); ledger triples, SEED-243, BUG-260923-01 note (wave 3)
+- [x] 271-05-PLAN.md — live content proofs + two-org fence on real RLS (GoTrue JWTs); merged-tree gates; G4-1..G4-6 browser drive (operator sign-off OWED); ledger triples, SEED-243, BUG-260923-01 note (wave 3)
 
 **Flags**: **G-2 FIRES**: `/gsd:sketch` before plan (the search mode beside RAG, the filter builder, the rules surface's new name and home). Reuse the Phase 114 no-DSL filter/view builder and the sketch-findings skill; do not invent a second builder. **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/pages/LibraryPage.tsx` (FIRES), `frontend/src/components/layout/ChatLayout.tsx` (FIRES; Classification mounts at `:943`), `frontend/src/App.tsx` (the `ActiveView` union, fenced by `activeViewReachability.ts`), `frontend/src/lib/nav-items.ts`, `backend/app/api/documents.py`, `backend/app/api/classification_rules.py`, `frontend/src/components/classification/RuleBuilderPanel.tsx`, the folder tree (`FolderTree.tsx` / `NavRow.tsx` / `ViewsGroup.tsx`), `frontend/src/types/index.ts`, and the `lib/api/*` modules (the barrel split was TAKEN at 207, so add to a module, never to the barrel). Reuse the shipped view-filter compiler and typed columns (`date_typed`, `document_type_norm`, migration 074) before adding any. Migration: probably none. If one is needed, use the next free number. Seeds: `SEED-243` §decide 1-3, `SEED-005` Tier A. `SEED-224`'s five-tab redesign is **not** this phase.
 **UI hint**: yes
