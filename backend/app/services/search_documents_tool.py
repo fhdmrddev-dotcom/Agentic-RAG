@@ -24,9 +24,11 @@ imported inside the handler.
 """
 from __future__ import annotations
 
+import copy
 import dataclasses
 import json
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal, Sequence, get_args
 
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -40,6 +42,7 @@ from app.services.retrieval_scope import (
     nearby_values,
     requires_resolved_scope,
     resolve_document_scope,
+    top_document_types,
 )
 from app.services.retrieval_service import search_documents
 
@@ -1044,4 +1047,117 @@ async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
         source_refs=source_refs,
         citations=citations,
         similarity_score=similarity_score,
+    )
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# 272-04 Task 3 — the per-run vocabulary and today's date (D-02 / D-07 / D-23 / D-26)
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+#
+# A filter the model never emits does not exist. So each Deep run's `search_documents` description
+# lists the caller's ENABLED field definitions (own + system-global via `list_field_definitions`,
+# unchanged — D-26; no new org-level scoping) with types and enum options, plus the caller's top
+# document types (D-23, RLS-read by 272-03). The module constant SEARCH_DOCUMENTS_TOOL is never
+# mutated: the run gets a COPY, the connector-block precedent in agent_loop.
+
+_MAX_VOCAB_FIELDS = 20
+_MAX_VOCAB_OPTIONS = 25
+_MAX_VOCAB_TYPES = 15  # D-23
+
+
+@dataclasses.dataclass(frozen=True)
+class SearchVocabulary:
+    """What one run may filter on: field definitions (raw rows) and ``(document_type, count)`` pairs."""
+
+    fields: tuple[dict, ...]
+    document_types: tuple[tuple[str, int], ...]
+
+
+async def load_search_vocabulary(user_id: str, supabase: Any) -> SearchVocabulary | None:
+    """The caller's field definitions (D-26) + top document types (D-23). ``None`` on ANY failure:
+    chat never breaks on vocabulary — the run keeps the static schema (T-272-22)."""
+    try:
+        defs = await list_field_definitions(user_id, supabase=supabase)
+        types = await top_document_types(user_id=user_id, limit=_MAX_VOCAB_TYPES)
+    except Exception:  # noqa: BLE001
+        logger.warning("search_documents: the filter vocabulary could not be loaded; the static schema stands", exc_info=True)
+        return None
+    return SearchVocabulary(
+        fields=tuple(defs or ()),
+        document_types=tuple((str(t), int(n)) for t, n in (types or ())),
+    )
+
+
+def _vocabulary_entry(d: dict) -> str:
+    key, ftype = str(d["field_key"]), str(d.get("field_type") or "string")
+    if ftype == "enum":
+        options = [str(o) for o in (d.get("options") or [])]
+        shown = ", ".join(options[:_MAX_VOCAB_OPTIONS])
+        if len(options) > _MAX_VOCAB_OPTIONS:
+            shown += f", …and {len(options) - _MAX_VOCAB_OPTIONS} more"
+        return f"{key} (enum: {shown})"
+    return f"{key} ({ftype})"
+
+
+def _vocabulary_note(vocab: SearchVocabulary) -> str:
+    enabled = [d for d in vocab.fields if d.get("enabled") and d.get("field_key")]
+    listed = [d for d in enabled if d["field_key"] not in DATE_WORDS]
+    shadowed = [str(d["field_key"]) for d in enabled if d["field_key"] in DATE_WORDS]
+    parts: list[str] = []
+    if listed:
+        line = "Fields for this workspace: " + "; ".join(_vocabulary_entry(d) for d in listed[:_MAX_VOCAB_FIELDS])
+        if len(listed) > _MAX_VOCAB_FIELDS:
+            line += (
+                f"; …and {len(listed) - _MAX_VOCAB_FIELDS} more; an unknown field is answered "
+                "with the full list"
+            )
+        parts.append(line + ".")
+    for key in shadowed:
+        # Pitfall 14 — the date word wins, so a field spelled like it can never be filtered on.
+        parts.append(
+            f"(A workspace field named `{key}` is shadowed by the date word `{key}`, which always "
+            f"means the {_field_label(key)} date; that field cannot be filtered on here.)"
+        )
+    types = [t for t, _ in vocab.document_types[:_MAX_VOCAB_TYPES] if t]
+    if types:
+        parts.append("Common document types: " + ", ".join(types) + ".")
+    return " ".join(parts)
+
+
+def with_search_vocabulary(active_tools: list | None, user_settings: Any, vocab: SearchVocabulary | None) -> list | None:
+    """``active_tools`` with search_documents' ``filters`` description carrying the run's vocabulary.
+
+    No vocabulary (or nothing to say) → ``active_tools`` returned AS IS, so ``None`` keeps meaning
+    "the default get_tools()" downstream (the no-vocabulary path is byte-identical). Otherwise a NEW
+    list: ``None`` starts from ``get_tools(user_settings)`` exactly like the connector block; the
+    search entry is a deep COPY, every other entry the same object, order preserved.
+    """
+    if vocab is None:
+        return active_tools
+    note = _vocabulary_note(vocab)
+    if not note:
+        return active_tools
+    from app.services.openai_service import get_tools
+
+    base = list(active_tools) if active_tools is not None else list(get_tools(user_settings))
+    out: list = []
+    for tool in base:
+        fn = tool.get("function") if isinstance(tool, dict) else None
+        if isinstance(fn, dict) and fn.get("name") == "search_documents":
+            tool = copy.deepcopy(tool)
+            props = tool["function"].get("parameters", {}).get("properties", {})
+            if "filters" in props:
+                props["filters"]["description"] = f"{props['filters'].get('description', '')} {note}".strip()
+        out.append(tool)
+    return out
+
+
+def today_line(now: datetime | None = None) -> str:
+    """D-07 — no current date reached the agent before 272. Server UTC (A4: ``_relative_window``
+    reads ``date.today()``, the same server clock, which is UTC on the deployed containers)."""
+    now = now or datetime.now(timezone.utc)
+    return (
+        f"\n\nToday's date is {now.date().isoformat()} (UTC). When a question names a month or "
+        "quarter without a year, use the most recent completed one before today and state the "
+        "resolved date range in your answer."
     )

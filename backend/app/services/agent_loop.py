@@ -73,6 +73,8 @@ from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
 # Cycle-safe: agent_loop already imports tool_dispatcher above, and tool_dispatcher never imports
 # agent_loop at module level.
 from app.services.tool_dispatcher import _attachment_container_path
+# Phase 272 (D-07 / D-02 / D-23): today's date + the run's filter vocabulary (cycle-safe, as above).
+from app.services.search_documents_tool import load_search_vocabulary, today_line, with_search_vocabulary
 # Phase 164 (D-164-02): reuse the shared retrieval user-context seam for the match_skills
 # DEFINER RPC (retrieval_service is already in the import graph via tool_dispatcher above —
 # no new cycle; it never imports agent_loop).
@@ -700,7 +702,10 @@ SYSTEM_PROMPT = (
     "Pick the ONE tool that best fits the task:\n"
     "- **search_documents** → reading passage content: finding facts, quotes, figures, or explanations *inside* documents. "
     "The returned chunks are pre-extracted relevant passages — read them carefully. If they contain the answer, stop there. "
-    "Only add `metadata_filter` when the user explicitly asks to scope by author, date, or document type — never guess filter values.\n"
+    "When the question names a period (a month, a quarter, a year) or a value of a document field (an entity, a type, an author), "
+    "pass it as `filters` on search_documents so only those documents are searched — a passage from outside the asked period or value "
+    "is a wrong answer, not a close one. A period means the document's own date (`date`) unless the person says uploaded, created or "
+    "modified (then `added`, `source_created` or `source_modified`).\n"
     "- **query_documents** → metadata/structural questions: counts, lists, date-range filters, folder membership, file sizes "
     "(e.g. 'how many PDFs from 2023?', 'list all documents by John', 'which files are in the Reports folder'). "
     "These are SQL-style questions about document attributes, not about what documents say.\n"
@@ -736,9 +741,10 @@ SYSTEM_PROMPT = (
     "use search_documents. If it's about *which documents exist or their attributes* (counts, dates, folders, authors), "
     "use query_documents.\n\n"
 
-    "**Hybrid fallback — do not stop on zero results:** If query_documents returns no rows, the identifier may exist "
-    "inside document content — call search_documents with the key term. If search_documents returns no chunks, the user "
-    "may be asking about metadata — call query_documents. Always try the other tool before giving up.\n\n"
+    "**Hybrid fallback — do not stop on zero results (unfiltered searches only):** If query_documents returns no rows, the identifier may exist "
+    "inside document content — call search_documents with the key term. If an unfiltered search_documents returns no chunks, the user "
+    "may be asking about metadata — call query_documents. Always try the other tool before giving up — except after a filtered "
+    "search that matched no documents, which is a final answer (see Rules).\n\n"
 
     "**Multi-document comparison:** Call analyze_document once per document, then synthesize across them in your response. "
     "Do not call search_documents separately for each.\n\n"
@@ -747,9 +753,12 @@ SYSTEM_PROMPT = (
     "- Always cite which document your answer comes from.\n"
     "- Never call the same tool twice with the same arguments.\n"
     "- If search_documents returns relevant chunks, answer from those — do NOT also call read_document on the same document.\n"
-    "- **Zero results from search_documents:** If the tool returns no chunks at all, try grep (if the user referenced a "
+    "- **Zero results from search_documents (unfiltered):** If an unfiltered search returns no chunks at all, try grep (if the user referenced a "
     "specific phrase) or query_documents (to check whether the document exists). If still nothing, tell the user directly "
     "— do not fabricate.\n"
+    "- **A filtered search that matched no documents is a final answer:** say plainly that nothing matched the filter you used and "
+    "name it, cite nothing, and do not search again without the filter. Do not use grep, query_documents, read_document or "
+    "analyze_document to answer from outside it. You may offer the nearby values the tool lists and ask whether to use one.\n"
     "- **Zero results from query_documents:** If the SQL returns no rows, the identifier may appear inside document "
     "content rather than in filenames or metadata. Fall back to search_documents with the key identifier as the query.\n"
     "- **read_document out of bounds:** If a line range returns nothing or is out of bounds, fall back to analyze_document "
@@ -1474,6 +1483,7 @@ async def run_agent_loop(
         active_system_prompt = SYSTEM_PROMPT
         active_tools = None  # None = use default get_tools() in create_streaming_chat
         max_iterations = 15  # GEN-04: was 8
+    active_system_prompt += today_line()  # Phase 272 (D-07) — today's date + the month rule, both modes
 
     # Augment system prompt with folder scope context so LLM generates scoped queries
     if scoped_folder_path:
@@ -1671,6 +1681,9 @@ async def run_agent_loop(
                 + "\n".join(f"- {t}" for t in disabled_tools)
             )
             active_system_prompt = active_system_prompt + disabled_note
+
+        # Phase 272 (D-02 / D-23 / D-26) — the run's fields + top document types in search_documents' schema; None keeps the static one.
+        active_tools = with_search_vocabulary(active_tools, user_settings, await load_search_vocabulary(current_user["id"], supabase))
 
         # Phase 216 (CHAT-05 / D-216-04) — Connector tools in chat:
         # Load active connector connections for the user's org and register their function tools
@@ -2102,6 +2115,8 @@ async def run_agent_loop(
         # iteration; setattr would not survive). Sub-agents get a FRESH set()
         # (task_service) so a sub-agent's dead call never blocks the parent.
         _dead_gap_tokens_in_run: set[str] = set()
+        # Phase 272 (D-09) — the per-turn retry lock, by reference; SHARED with sub-agents (task_service).
+        _empty_filter_fields_in_run: set[str] = set()
 
         # Phase 085 D-085-15 — per-run task() concurrency semaphore.
         # Initialized ONCE per top-level run (outside the iteration loop) so
@@ -2154,6 +2169,7 @@ async def run_agent_loop(
                 previous_files_in_run=_previous_files_in_run,
                 new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
                 dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
+                empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
                 iteration=0,
                 parent_run_id=None,
                 per_run_task_semaphore=_per_run_task_semaphore,
@@ -3032,6 +3048,7 @@ async def run_agent_loop(
                 previous_files_in_run=_previous_files_in_run,
                 new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
                 dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
+                empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
                 iteration=iteration,
                 # Phase 085 additions —
                 # parent_run_id is None at the top-level run; task_service

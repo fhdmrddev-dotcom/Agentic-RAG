@@ -93,7 +93,7 @@ def test_a_given_tool_list_is_substituted_in_place_order_preserved():
     assert [t["function"]["name"] for t in out] == names
     assert out[-1] is connector
     assert "legal_entity (enum" in _filters_desc(out)
-    assert "legal_entity" not in _filters_desc(tools)
+    assert "legal_entity (enum" not in _filters_desc(tools), "the input list is never mutated"
 
 
 def test_caps_disabled_defs_and_date_word_collisions():

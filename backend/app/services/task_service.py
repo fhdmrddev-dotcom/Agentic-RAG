@@ -606,6 +606,9 @@ async def run_task_sub_agent(
         # sub-agent). This is the ONE run-scoped repeat-guard field that is fresh-
         # per-sub-agent (mirror previous_files_in_run={} above) rather than propagated.
         dead_gap_tokens_in_run=set(),
+        # Phase 272 (D-09 / A5) — SHARED by reference, deliberately unlike dead_gap_tokens_in_run
+        # above: a sub-agent in the same turn must not become an unfiltered-retry bypass.
+        empty_filter_fields_in_run=parent_ctx.empty_filter_fields_in_run,
         # D-085-12 — non-null parent_run_id makes _handle_task short-circuit
         # inside the sub-agent's own dispatch chain. 1-level nesting cap.
         parent_run_id=parent_ctx.run_id,
