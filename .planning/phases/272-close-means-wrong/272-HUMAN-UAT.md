@@ -35,7 +35,8 @@ blocked: 0
 
 ## Gaps
 
-- **G-1 (open, found by test 1, outside the review-fix scope): CR-01's false zero is live on `query_documents_by_view`.**
+- **G-1 — RESOLVED 2026-10-03 (`fa61bd42a`, operator chose "Fast-fix now").** `_op_eq` now matches one element of a JSON-array field (`LIST_VALUE_FIELDS`) via ILIKE on the JSON-quoted value; RED-first test `test_272_g1_topics_eq_compiler.py` (3 failed → 5 passed); proven on the local DB: `%"tax"%` matches `272-uat-tax-memo.md` only, not the taxation essay or `2025-1042S.pdf`. Original finding kept below.
+- ~~**G-1 (open, found by test 1, outside the review-fix scope): CR-01's false zero is live on `query_documents_by_view`.**~~
   The prompt "Which documents are tagged tax? Use the topics filter." (run 376e459a-d708-4537-91a9-92fd91fd1f56,
   anthropic claude-sonnet-5) was answered with `query_documents_by_view {topics eq "tax"}` → `total: 0`, and the
   user was told *"No documents are tagged with the topic "tax""* while `272-uat-tax-memo.md` carries `["Tax","Audit"]`.
