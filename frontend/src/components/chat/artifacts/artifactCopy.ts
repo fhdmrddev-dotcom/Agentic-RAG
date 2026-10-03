@@ -28,6 +28,8 @@ export const NOTICE_TITLE = "This artifact can't be shown"
 export const NOTICE_FOOTNOTE = "The rest of the answer is unaffected."
 export const ALL_SERIES_HIDDEN = "All series hidden. Turn one back on above."
 export const TOOLTIP_TOTAL = "Total"
+/** The legend row's group name for assistive tech. */
+export const LEGEND_GROUP_LABEL = "Series"
 export const EMPTY_CELL = "—"
 
 // ── Caption ──────────────────────────────────────────────────────────────────────────────────

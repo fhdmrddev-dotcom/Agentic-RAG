@@ -108,6 +108,16 @@
        tailwind.config.js beside the panel-* family, guarded by
        components/ui/__tests__/tabsContrast.test.ts. */
     --tab-active: 0 0% 100%;
+    /* Phase 273-02 (UI-SPEC §Data-viz palette · UI-D-07) — the agent-authored artifact palette.
+       DATA colour, not UI accent: four categorical slots validated by sketch 273 against the dark
+       --card (#0d1017) and measured ≥ 3:1 on the light --card (#ffffff), so ONE palette serves both
+       themes and colour never changes with the theme. Full colour values (not HSL channels) because
+       the components read them as `var(--chart-N)` directly; series `i` paints slot `slots[i]`, so
+       hiding a series or filtering rows never repaints the survivors. Same values in `.dark`. */
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-3: #199e70;
+    --chart-4: #c98500;
 
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   }
@@ -204,6 +214,11 @@
        sketch 218's fences A4 and A4b measure --muted against --background and must stay
        TRUE — they are the RECORDED FINDING, not a target. */
     --tab-active: 220 25% 16%;
+    /* Phase 273-02 — the artifact palette, identical to :root (one palette serves both themes). */
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-3: #199e70;
+    --chart-4: #c98500;
   }
 }
 

@@ -4112,6 +4112,16 @@ const BASELINE = {
   // ── Phase 272-05 (F-3, operator ruling 2026-10-03) — NEW suite, BOTH KNOBS, SAME COMMIT. The
   // search card named every non-passage result "0 results"; 9 cases, 6 RED on the shipped tree. ──
   "SearchDocumentsBody.test.ts": 9, // 272-05 (2026-10-03)
+  // ── Phase 273-02 (ART-01/02/04/05) — SEVEN NEW suites for the agent-authored artifact surface,
+  // BOTH KNOBS, SAME COMMIT. `src/components/chat` has NO bare-directory TARGETS entry, so each is
+  // adopted by FILE path below. Pinned at the measured passing counts (94 cases, 0 failing). ──
+  "artifactSpec.test.ts": 28, // 273-02 (2026-10-03) — guard + closed catalogue + seeded never-throws
+  "captionModel.test.ts": 12, // 273-02 — server-fact caption wording
+  "chartModel.test.ts": 19, // 273-02 — slots, visible domain, tooltip rows, a11y names
+  "TableArtifact.test.tsx": 6, // 273-02 — aria-sort, empties last, sticky + 512px
+  "MetricArtifact.test.tsx": 6, // 273-02 — glyph + percent delta, zero comparison
+  "ArtifactBlock.test.tsx": 8, // 273-02 — registry closed to 3, notices, boundary, busy frame
+  "ChartArtifact.test.tsx": 15, // 273-02 — legend toggles, hide, slots, no animation, tooltip
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6011,6 +6021,15 @@ const TARGETS = [
   "src/lib/__tests__/toolMeta.test.ts",
   // Phase 272-05 (F-3) — FILE-LEVEL: `src/components/chat` has NO bare-directory entry.
   "src/components/chat/tool-bodies/SearchDocumentsBody.test.ts",
+  // Phase 273-02 — the seven artifact suites. FILE-LEVEL: `src/components/chat` has NO
+  // bare-directory entry, so a directory entry here would be the first and is not this plan's call.
+  "src/components/chat/artifacts/__tests__/artifactSpec.test.ts",
+  "src/components/chat/artifacts/__tests__/captionModel.test.ts",
+  "src/components/chat/artifacts/__tests__/chartModel.test.ts",
+  "src/components/chat/artifacts/__tests__/TableArtifact.test.tsx",
+  "src/components/chat/artifacts/__tests__/MetricArtifact.test.tsx",
+  "src/components/chat/artifacts/__tests__/ArtifactBlock.test.tsx",
+  "src/components/chat/artifacts/__tests__/ChartArtifact.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
