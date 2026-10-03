@@ -161,7 +161,7 @@ def test_public_is_revoked_before_anon_and_authenticated():
 def _table_grants() -> list[tuple[set[str], set[str], str]]:
     out = []
     for stmt in _statements():
-        if not stmt.upper().startswith("GRANT") or "message_artifacts" not in stmt:
+        if not stmt.upper().startswith("GRANT") or f"ON TABLE {TABLE}" not in stmt:
             continue
         m = re.match(rf"GRANT (.+?) ON TABLE {re.escape(TABLE)} TO (.+)$", stmt, re.I)
         assert m, f"unparseable grant: {stmt}"

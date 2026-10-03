@@ -225,7 +225,7 @@ async def test_insert_rejects_an_unknown_component_before_any_query():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("ref", ["a_k3j9x0p2qd", "chart 1", "Chart 1", " table 12 "])
+@pytest.mark.parametrize("ref", ["a_k3j9x0p2qd", "chart 1", "Chart 1", " table 12 ", "A_K3J9X0P2QD"])
 async def test_get_by_ref_binds_ref_thread_and_user(ref):
     pool = FakePool()
     pool.read_row = {"id": "a_k3j9x0p2qd", "thread_id": THREAD, "label": "chart 1",
@@ -240,7 +240,7 @@ async def test_get_by_ref_binds_ref_thread_and_user(ref):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("ref", ["", "a_short", "chart", "chart 0", "pie 1", "1; DROP TABLE x", None, 7,
-                                 "a_K3J9X0P2QD", "chart 1 OR 1=1"])
+                                 "a_k3j9x0p2qd'--", "chart 1 OR 1=1"])
 async def test_malformed_ref_returns_none_without_a_query(ref):
     pool = FakePool()
     assert await dba.get_artifact_by_ref(pool, ref=ref, thread_id=THREAD, user_id=USER) is None

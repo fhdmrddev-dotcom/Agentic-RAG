@@ -508,6 +508,14 @@ REVOKE ALL ON TABLE public.expert_installs FROM authenticated;
 GRANT SELECT ON TABLE public.expert_installs TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_installs TO service_role;
 
+-- migration 202 — message_artifacts: owners READ (the messages predicate); only the backend writes.
+-- No UPDATE to ANY role, service_role included (D-08: an artifact is immutable once shown).
+REVOKE ALL ON TABLE public.message_artifacts FROM PUBLIC;
+REVOKE ALL ON TABLE public.message_artifacts FROM anon;
+REVOKE ALL ON TABLE public.message_artifacts FROM authenticated;
+GRANT SELECT ON TABLE public.message_artifacts TO authenticated;
+GRANT SELECT, INSERT, DELETE ON TABLE public.message_artifacts TO service_role;
+
 
 -- ============================================================
 -- 6. Function EXECUTE privileges (migration 181 / Phase 248, CRED-03)
@@ -692,3 +700,9 @@ GRANT EXECUTE ON FUNCTION public.resize_embedding_column(integer) TO service_rol
 
 -- migration 012 — schema-qualified here; the migration relies on search_path.
 GRANT EXECUTE ON FUNCTION public.query_user_documents(text) TO authenticated;
+
+-- migration 202 — message_artifacts' immutability trigger function (Group A shape: trigger-only).
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.message_artifacts_immutable() TO service_role;
