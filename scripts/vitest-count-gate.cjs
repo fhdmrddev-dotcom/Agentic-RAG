@@ -230,7 +230,7 @@ const BASELINE = {
   // ⬆ RAISED 27 → 44 at 267-03 (the gate's own printed count): CONNECTION_COPY's pinned
   //   literals, connectionGate's arms (exactly one of action/ask), gate order install →
   //   connection, the ledger columns, and the backend's OWN overlay row read via `?raw`.
-  "expertCatalog.test.ts": 49, // 267-REVIEW WR-06 +2, IN-06 +1; gate printed 49, so the pin lagged by 2
+  "expertCatalog.test.ts": 53, // 267-REVIEW WR-06 +2, IN-06 +1; gate printed 49, so the pin lagged by 2 · 276-07 +4 (decodeEntities)
   // ⬆ RAISED 8 → 13 at 266-04 (the file carried 9 at base — the 262-UAT 3.6 case sat above the
   //   pin): the card's control swap with no dead button, install → re-read → fresh modal state,
   //   the fetch poll that STOPS once nothing is installing (driven RED against a leaked
@@ -443,7 +443,7 @@ const BASELINE = {
   "VideoSlot.test.tsx": 11,
   "docsBundleFence.test.ts": 3,
   "docsCoverageGate.test.ts": 8,
-  "landingBrand.test.ts": 2,
+  "landingBrand.test.ts": 4, // 276-07 +2: app-wide scan of src/components + src/pages, and its planted case
   "Navigation.test.tsx": 5,
   "landingFirstPaintFence.test.ts": 2,
   "HeroPromo.test.tsx": 3,

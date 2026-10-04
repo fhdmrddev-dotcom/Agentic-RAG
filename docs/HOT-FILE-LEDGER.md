@@ -10744,9 +10744,9 @@ cells rot within days.
 | [`frontend/src/components/chat/artifacts/chartModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartmodelts) | 1 / 1 / 275 (was `0 / 0 / 0`) | no (young) | young (273-02). Pure chart derivations: slots, visible domain, tooltip rows, ticks, aria text. No React, no recharts |
 | [`frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesshowartifactbodytsx) | 1 / 1 / 192 (was `0 / 0 / 0`) | no (young) | young (273-05). Rail essence + expanded line for show_artifact. ⛔ reads `reason`, never `detail` or `values` (L-3/L-4) |
 | [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 2 / 1 / 565 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). **271-05**: live on GoTrue JWTs: exact id sets, both directions, two-org fence; RLS alone held a widened leg. ⛔ no embedding import, no `.rpc(` |
-| [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 1 / 1 / 171 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ `extra="forbid"`; closed Literals; the 8 verbs pinned to `_INVERSE_LABEL`. 271-05 drove it through the route with real JWTs |
+| [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 2 / 2 / 171 (was `1 / 1 / 171`) | no (2 phases) | young (271-01). **276-07**: the P-01 comment quotes the renamed label. ⛔ `extra="forbid"`; closed Literals; the 8 verbs pinned to `_INVERSE_LABEL` |
 | [`backend/app/api/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_searchpy) | 1 / 1 / 48 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ user-JWT client only; remaps `ResolveError`; no write. **271-05**: the fence calls THIS coroutine with a GoTrue token (P-04) |
-| [`frontend/src/pages/findState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesfindstatets) | 1 / 1 / 361 (was `0 / 0 / 0`) | no (1 phase) | young (271-03). ⛔ STRICT LEAF: zero imports, no I/O. P-01 `DEFAULT_SORT = added_desc` awaits operator review |
+| [`frontend/src/pages/findState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesfindstatets) | 2 / 2 / 361 (was `1 / 1 / 361`) | no (2 phases) | young (271-03). **276-07**: sort labels read "Added to Syrel (newest/oldest)". ⛔ STRICT LEAF: zero imports, no I/O |
 | [`frontend/src/hooks/useDocumentFind.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentfindts) | 1 / 1 / 104 (was `0 / 0 / 0`) | no (1 phase) | young (271-03). ⛔ resting Find makes ZERO requests; an error KEEPS rows and chips. Driven live in 271-05 |
 | [`frontend/src/lib/documentAddedBy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentaddedbyts) | 1 / 1 / 27 (was `0 / 0 / 0`) | no (1 phase) | young (271-03). ⛔ the ONE `addedBy` rule (connection first, never an email); DocumentFileFacts and the Find column import it |
 | [`frontend/src/components/relationships/LinkTargetCombobox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipslinktargetcomboboxtsx) | 1 / 1 / 177 (was `0 / 0 / 0`) | no (1 phase) | young (271-03, extracted). ⛔ one combobox, two mounts. 271-05 drove it in the Relationship editor (latest-only candidates) |
@@ -10755,7 +10755,7 @@ cells rot within days.
 | [`frontend/src/components/library/DocumentsPager.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarydocumentspagertsx) | 3 / 2 / 112 (was `2 / 1 / 108`) | no (2 phases) | **271-04**: ONE optional `exact` prop skips the 1000-row cap arm for a server-exact total. ⛔ browse renders byte-identically |
 | [`frontend/src/components/ingestion/FilterBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfilterbartsx) | 7 / 4 / 387 (was `6 / 3 / 311`) | ⚠ **FIRES** | ⚠ STALE (`6/3/311`). **271-04**: 4 optional props + `FilterChip`; Views DOM snapshot-pinned. ⚠ 271-05 F-1: Find's metadata chips read raw keys (`document_type is …`) |
 | [`frontend/src/components/ingestion/AutomationGroup.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionautomationgrouptsx) | 6 / 5 / 303 (was `5 / 4 / 303`) | ⚠ **FIRES** | **271-02**: ONE string (`No filing rules yet`, D-08). ⛔ no logic change. The next phase that touches it proposes the extraction first |
-| [`frontend/src/components/library/find/StructurePopovers.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindstructurepopoverstsx) | 2 / 1 / 686 (was `0 / 0 / 0`) | no (1 phase) | young (271-04). **271-05 fix**: focus moves INTO each editor on open (it stayed on the chip: Esc dead, Tab skipped 5 of 6). ⛔ one popover idiom |
+| [`frontend/src/components/library/find/StructurePopovers.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindstructurepopoverstsx) | 3 / 2 / 686 (was `2 / 1 / 686`) | no (2 phases) | young (271-04). **276-07**: the date label reads "Added to Syrel". ⛔ one popover idiom |
 | [`frontend/src/components/library/find/FindQuickAdd.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindquickaddtsx) | 1 / 1 / 358 (was `0 / 0 / 0`) | no (1 phase) | young (271-04). ⛔ the Version chip is always visible (D-06). ⚠ 271-05 F-1: `＋ Document type` / `＋ Date` stay offered after those are set |
 | [`frontend/src/components/library/find/FindModeSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmodeswitchtsx) | 1 / 1 / 77 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ `role="radiogroup"`, never `role="tab"`. Driven in Chromium at 271-05 |
 | [`frontend/src/components/library/find/FindMetaLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmetalinetsx) | 1 / 1 / 101 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ the ONLY count in Find; the client never re-sorts. **271-05 G4-6 live**: the header follows the sort, nulls last |
@@ -10767,7 +10767,7 @@ cells rot within days.
 | [`backend/app/services/file_facts.py`](docs/HOT-FILE-LEDGER.md#backendappservicesfile_factspy) | 1 / 1 / 163 | no (1 phase) | young (created 270-01). ⛔ `read_file_facts` NEVER raises; a fact it cannot read is `None`, never `0` and never a substituted date. Re-measured `1/1/163` at 270 close |
 | [`frontend/src/lib/documentDownload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentdownloadts) | 2 / 1 / 63 | no (1 phase) | young (created 270-03). ⛔ the ONLY place the download label is derived and the request made. 270-04 names an older v1 row too (`Download v1 (viewed, not latest)`) |
 | [`frontend/src/components/metadata/DocumentDownloadButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdownloadbuttontsx) | 1 / 1 / 146 | no (1 phase) | young (created 270-03). ⛔ no `href`, no stored URL: the link is minted on click. The live drive found no signed URL in the DOM |
-| [`frontend/src/components/metadata/DocumentFileFacts.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentfilefactstsx) | 3 / 2 / 102 (was `2 / 1 / 113`) | no (2 phases) | young (270-03). **271-03**: `addedBy` MOVED to `lib/documentAddedBy.ts` and imported (no fork). ⛔ connection first (270 F-2) |
+| [`frontend/src/components/metadata/DocumentFileFacts.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentfilefactstsx) | 4 / 3 / 102 (was `3 / 2 / 102`) | ⚠ **NOW FIRES — 3 phases** | **276-07**: ONE string, "Added to Syrel". ⛔ connection first (270 F-2). A next phase proposes no seam yet: 102 lines |
 | [`backend/app/services/expert_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_authoringpy) | 7 / 3 / 393 (was `4 / 2 / 389`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/389`), now FIRES. honoured by construction (**267-01**): the draft prompt says `tool_floor_enabled` is always true and has no effect. ⛔ every emitted string CAPPED |
 | [`backend/app/services/skill_body_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesskill_body_authoringpy) | 2 / 1 / 373 | no (new) | young (created 263). Row added AT CREATION — an absent row is invisible to G-5 at any count. ⛔ The ONE home of the borrowed craft doctrine; doctrine inlined here makes it an ENGINE (D-263-13). |
 | [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 6 / 3 / 1550 (was `3 / 2 / 1475`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`3/2/1475`), now FIRES. honoured by construction (**267-03**): 2 removals + ONE re-keyed connection picker. ⛔ no new section; extraction OWED before a 4th phase |
@@ -10929,7 +10929,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
 | [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 26 / 14 / 835 | ⚠ **FIRES** | ⚠ row was STALE at `24 / 13 / 772`. honoured by construction (**244-06**): a NEW request model, ⛔ no field added to an existing one — `folder_id: str` REQUIRED, so 422 fires before the handler |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 9 / 6 / 526 | ⚠ **FIRES** | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`). honoured by construction (**SEED-258**): the body cap is DERIVED, so no envelope knob exists to disagree |
-| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 45 / 21 / 2162 | ⚠ **FIRES** | ⚠ row STALE (`43/20/2113`; CLAUDE.md read `44/21/2140`) — a SEVENTH landing (…2113→2140→2162). ⛔ extraction still OWED. NOT modified by 253; re-derived under CR-08 |
+| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 46 / 22 / 2166 (was `45 / 21 / 2162`) | ⚠ **FIRES** | **276-07**: honoured by construction, ONE literal (`client_name="Syrel"`) + a comment. ⛔ extraction still OWED |
 | [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 13 / 5 / 982 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
 | [`backend/app/services/google/writes.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgooglewritespy) | 2 / 1 / 625 | no (1 phase) | ⚠ absent for its entire life — row added 221-02, which found `create_event` REFUSING every naive local time |
@@ -11095,10 +11095,10 @@ cells rot within days.
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
 | [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 1 / 1 / 159 | no (created 262-01) | ⚠ the AT-PLANNING row read `0/0/0`; measured in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse |
 | [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 1 / 1 / 72 | no (new) | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
-| [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 8 / 3 / 455 (was `4 / 2 / 224`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/224`), now FIRES. **267-03**: `CONNECTION_COPY` + `connectionGate`. **267-05 F-2** (`cdb173609`): an echoed slug is named from the curated service catalog |
-| [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 3 / 3 / 295 (was `2 / 2 / 213`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`2/2/213`), now FIRES. **267-03**: the requires state from `connectionGate`; no Start control while missing. ⛔ a member gets the ask sentence, never a disabled button |
-| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 7 / 4 / 359 (was `5 / 3 / 330`) | ⚠ **FIRES — 4 phases** | ⚠ row STALE (`5/3/330`). honoured by construction (**267-03**): ONE page-owned in-flight guard on Start Chat. Live: two clicks + a dblclick opened ONE thread |
-| [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 4 / 3 / 530 (was `3 / 2 / 438`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`3/2/438`), now FIRES. **267-03**: Brings / Missing pills from `connectionGate`; Connect only when `can_connect`. ⛔ words only from `expertCatalog.ts` |
+| [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 13 / 4 / 489 (was `8 / 3 / 455`) | ⚠ **FIRES — 4 phases** | **276-07**: `decodeEntities` (5 named entities, single pass, no DOM). Display-only; filters keep the raw value |
+| [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 5 / 4 / 296 (was `3 / 3 / 295`) | ⚠ **FIRES — 4 phases** | **276-07**: honoured by construction, the category text wrapped in `decodeEntities`. ⛔ words only from `expertCatalog.ts` |
+| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 8 / 5 / 359 (was `7 / 4 / 359`) | ⚠ **FIRES — 5 phases** | **276-07**: honoured by construction, the pill LABEL decoded; pill key and filter keep the raw value |
+| [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 6 / 4 / 531 (was `4 / 3 / 530`) | ⚠ **FIRES — 4 phases** | **276-07**: honoured by construction, the category text wrapped in `decodeEntities` |
 | [`frontend/src/components/experts/catalog/startScopedChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogstartscopedchatts) | 1 / 1 / 70 | no (new) | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
 | [`backend/app/services/expert_install_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_install_servicepy) | 3 / 1 / 648 | no (1 phase) | planning triple `0/0/0`. **266-05 F-1**: Retry hands on a STRING id (an asyncpg UUID crashed live). ⛔ org only from the active-org dep; never a SYSTEM_USER_ID row |
 | [`backend/app/services/expert_corpus.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_corpuspy) | 1 / 1 / 174 | no (1 phase) | planning triple `0/0/0`. First-party corpora are DATA: slug `fullmatch` + path containment, CRLF→LF before any hash. ⛔ nothing is imported from the corpus dir |
@@ -11143,7 +11143,7 @@ cells rot within days.
 | [`frontend/src/docs/pages/NotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesnotfoundtsx) | 1 / 1 / 20 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P8 docs 404 inside the shell (G4-4) |
 | [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 1 / 1 / 125 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog. ⛔ v4.5 Not yet released from parseHistory released flag |
 | [`frontend/src/docs/pages/BuildStory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesbuildstorytsx) | 0 / 0 / 0 | no (new) | young (created 276-07). Row added AT PLANNING. D-26: five chapters in order, releases from parseHistory, one VideoSlot each. ⛔ an id-less slot renders nothing |
-| [`frontend/src/pages/SetupWizard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessetupwizardtsx) | 2 / 2 / 345 | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: the static Iris mark in the header (D-27 logo pass). ⛔ no logic change |
+| [`frontend/src/pages/SetupWizard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessetupwizardtsx) | 3 / 3 / 352 (was `2 / 2 / 345`) | ⚠ **NOW FIRES — 3 phases** | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. **276-07**: the static Iris mark on the dark chip in the header. ⛔ no logic change |
 | [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 3 / 1 / 95 | no (1 phase) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
 | [`frontend/src/docs/pages/ChangelogVersion.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogversiontsx) | 1 / 1 / 52 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: changelog version page |
 | [`frontend/src/docs/pages/ApiReference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesapireferencetsx) | 1 / 1 / 135 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P6 lazy Scalar. ⛔ telemetry off, agent disabled, test-request hidden; dynamic import only |
@@ -13417,6 +13417,10 @@ route is `require_org_manage`, so its audience is exactly the audience who can a
 docstring's narrowing is unchanged: no secret and no provider body travels.
 
 ---
+
+### `backend/app/api/connectors.py` — Phase 276
+
+**`46 / 22 / 2166`** at 276-07 (was `45 / 21 / 2162`). **276-07 (D-27):** the MCP dynamic-registration `client_name` is `"Syrel"`, one literal plus a comment. A connection that already stores `custom_client_id` skips the registration block, so existing vendor applications keep the name they were registered with; `test_276_oauth_client_name.py` arm B asserts `register_client` is never called for one. ⛔ The extraction is still owed; this landing adds no branch.
 
 ### `frontend/src/providers/StreamsProvider.tsx` — `244-11`
 
@@ -17323,17 +17327,33 @@ Re-derived at `cdb173609` with the CLAUDE.md recipe (6-digit quick-task buckets 
 
 **`3 / 3 / 295`** (was `2 / 2 / 213`). Live UI-catalog (`g4-04a`): "MISSING Google Workspace / Requires Google Workspace — not connected / Details / Connect Google Workspace →", no Start. The member view was not driven in Chrome.
 
+### `frontend/src/components/experts/catalog/ExpertCard.tsx` — Phase 276
+
+**`5 / 4 / 296`** at 276-07. The category text is wrapped in `decodeEntities` (276-04 issue 2: a stored `Research &amp; Academic Methods` rendered the entity). +2 lines.
+
 ### `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` — Phase 267
 
 **`7 / 4 / 359`** (was `5 / 3 / 330`). UI-doubleclick PASS: one thread `ce0e2c5a-…` by SQL count.
+
+### `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` — Phase 276
+
+**`8 / 5 / 359`** at 276-07. The pill LABEL is decoded; the pill key and the filter keep the raw stored value, so an encoded category still selects its row (pinned in `expertCatalog.test.ts`).
 
 ### `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` — Phase 267
 
 **`4 / 3 / 530`** (was `3 / 2 / 438`). Crossed the threshold in 267.
 
+### `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` — Phase 276
+
+**`6 / 4 / 531`** at 276-07. The category text is wrapped in `decodeEntities`. +2 lines.
+
 ### `frontend/src/components/experts/catalog/expertCatalog.ts` — Phase 267
 
 **`8 / 3 / 455`** (was `4 / 2 / 224`). F-2 (live, `evidence/03`): with no connection row the server echoes the slug, so the card read `Requires google — not connected`. Fix `cdb173609` (RED `13856a7e9`, F-2a/F-2b in `expertCatalog.test.ts`): `connectionName` falls back to `getCuratedServiceEntry(slug).name`; a real server name is never overridden. Experts suites 151 passed.
+
+### `frontend/src/components/experts/catalog/expertCatalog.ts` — Phase 276
+
+**`13 / 4 / 489`** at 276-07. `decodeEntities(s)`: one regex over the five named entities (`&amp; &lt; &gt; &quot; &#39;`) through a lookup map, single pass, so `&amp;lt;` becomes `&lt;` and never `<`. No DOMParser, no innerHTML; React escapes the result as text (T-276-44).
 
 ### `frontend/src/components/layout/ChatLayout.tsx` — Phase 267
 
@@ -17719,6 +17739,10 @@ Every triple below was re-derived AFTER the phase's last source edit (`565b05c41
 
 **`1 / 1 / 171`** at 271 close. Created by 271-01, unchanged since. The live suites build every request through this model, so the route path is exercised end to end. ⛔ `extra="forbid"` everywhere; ids are UUIDs; at most one date per `which`.
 
+### `backend/app/models/document_search.py` — Phase 276
+
+**`2 / 2 / 171`** at 276-07. Comment-only: the P-01 comment quotes the renamed sort label.
+
 ### `backend/app/api/document_search.py` — Phase 271
 
 **`1 / 1 / 48`** at 271 close. Created by 271-01, unchanged since. The P-04 fence calls this route coroutine with an anon-key client carrying a GoTrue access token (the `get_user_supabase` shape), never the service role. ⛔ no DB write, no audit row.
@@ -17799,6 +17823,10 @@ Every triple below was re-derived AFTER the phase's last source edit (`565b05c41
 
 **`2 / 1 / 686`** at 271 close. Created by 271-04. **271-05 fix (G-3, +8/-2):** the G-4 drive found focus stayed on the chip after an editor opened, so Esc did nothing and Tab moved to the next chip (5 of 6 editors unreachable by keyboard); the shipped tests dispatched Escape on the dialog directly. `EditorShell` now focuses its first enabled control on mount; a 6-case RED test (`FindQuickAdd.test.tsx`) failed first, and Chromium re-drove all six closing on Esc with focus returned to the chip.
 
+### `frontend/src/components/library/find/StructurePopovers.tsx` — Phase 276
+
+**`3 / 2 / 686`** at 276-07. One string: the date option reads "Added to Syrel".
+
 ### `frontend/src/components/library/LibraryHeaderBar.tsx` — Phase 271
 
 **`4 / 3 / 249`** at 271 close. **271-02:** an optional `onOpenFilingRules`; the Filing rules link and the queue pill share one `ml-auto` cluster; the tablist is untouched. Live (G4-3): the link is not `role="tab"`, sits right of every tab, and Back lands on the Ingestion tab. It measures 3 phases, so it FIRES.
@@ -17810,6 +17838,10 @@ Every triple below was re-derived AFTER the phase's last source edit (`565b05c41
 ### `frontend/src/components/metadata/DocumentFileFacts.tsx` — Phase 271
 
 **`3 / 2 / 102`** at 271 close. **271-03:** `addedBy` and `NOT_RECORDED` moved to `lib/documentAddedBy.ts`; this file imports them.
+
+### `frontend/src/components/metadata/DocumentFileFacts.tsx` — Phase 276
+
+**`4 / 3 / 102`** at 276-07. One string: the `<dt>` reads "Added to Syrel" (D-27). It now measures 3 phases, so G-5 fires; at 102 lines no seam is proposed. The widened `landingBrand.test.ts` fence now covers this file.
 
 ### `frontend/src/components/relationships/CreateLinkDialog.tsx` — Phase 271
 
@@ -17846,6 +17878,10 @@ Every triple below was re-derived AFTER the phase's last source edit (`565b05c41
 ### `frontend/src/pages/findState.ts` — Phase 271
 
 **`1 / 1 / 361`** at 271 close. Created by 271-03. P-01 (default sort) is still flagged for operator review.
+
+### `frontend/src/pages/findState.ts` — Phase 276
+
+**`2 / 2 / 361`** at 276-07. The two sort labels read "Added to Syrel (newest)" / "(oldest)", and the `DEFAULT_SORT` comment matches.
 
 ### `frontend/src/pages/LibraryPage.tsx` — Phase 271
 
@@ -18360,6 +18396,8 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 ### `frontend/src/pages/SetupWizard.tsx`
 
 **`2 / 2 / 345`** at 276 planning. Absent from the scan list for its whole life; the row was added at 276-07 planning because 276-07 modifies it. 276-07 adds the static Iris mark to the header band (276-LOGO-INVENTORY §B). No logic change. 276-07 re-derives the triple at close.
+
+**`3 / 3 / 352`** re-derived at 276-07 (2026-10-04). The header band carries the static `syrel-mark-iris.svg` on the dark `#0A0E18` chip before "First-run setup" (decorative, `alt=""`). It now measures 3 phases, so G-5 fires; no seam is proposed for a 352-line wizard shell with this one visual change.
 
 ### `backend/app/services/email_provider.py`
 

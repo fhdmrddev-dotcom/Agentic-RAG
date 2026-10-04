@@ -82,7 +82,7 @@ export function DocumentFileFacts({
           {doc.source_author ? doc.source_author : <NotRecorded />}
         </dd>
 
-        <dt className="text-xs text-panel-muted-foreground">Added to Agentic RAG</dt>
+        <dt className="text-xs text-panel-muted-foreground">Added to Syrel</dt>
         <dd className="text-sm text-foreground">
           {formatFactDate(doc.created_at)}
           {version > 1 && ` · when v${version} was added`}

@@ -52,7 +52,7 @@ RelVerb = Literal[
 # D-06: Latest versions (default) / Has earlier versions / Older versions (superseded).
 VersionState = Literal["latest", "has_earlier", "older"]
 
-# P-01: the default is "Added to Agentic RAG (newest)".
+# P-01: the default is "Added to Syrel (newest)" (renamed from the old product name in 276-07).
 SortKey = Literal[
     "added_desc",
     "added_asc",

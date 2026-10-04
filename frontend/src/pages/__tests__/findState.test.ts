@@ -364,8 +364,8 @@ describe("toSearchRequest (271-01 wire contract)", () => {
 describe("SORT_OPTIONS and sortDateColumn", () => {
   it("lists the six sorts in the UI-SPEC order, default first", () => {
     expect(SORT_OPTIONS.map((o) => o.label)).toEqual([
-      "Added to Agentic RAG (newest)",
-      "Added to Agentic RAG (oldest)",
+      "Added to Syrel (newest)",
+      "Added to Syrel (oldest)",
       "Date in the document (newest)",
       "Last modified in the file (newest)",
       "Created in the file (newest)",

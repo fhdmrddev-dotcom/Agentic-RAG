@@ -229,7 +229,7 @@ describe("DateEditor (P-10)", () => {
     const names = screen.getAllByRole("radio").map((r) => (r as HTMLInputElement).labels?.[0]?.textContent)
     expect(names).toEqual([
       "Date in the document",
-      "Added to Agentic RAG",
+      "Added to Syrel",
       "Created in the file",
       "Last modified in the file",
     ])
@@ -237,11 +237,11 @@ describe("DateEditor (P-10)", () => {
     expect(ops).toEqual(["within_next", "older_than", "before", "after", "between"])
   })
 
-  it("Added to Agentic RAG between two dates dispatches a Find date (not a filter condition)", () => {
+  it("Added to Syrel between two dates dispatches a Find date (not a filter condition)", () => {
     const onApply = vi.fn()
     const onFilterCondition = vi.fn()
     render(<DateEditor onApply={onApply} onFilterCondition={onFilterCondition} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByRole("radio", { name: "Added to Agentic RAG" }))
+    fireEvent.click(screen.getByRole("radio", { name: "Added to Syrel" }))
     fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "between" } })
     fireEvent.change(screen.getByLabelText("From date"), { target: { value: "2019-01-01" } })
     fireEvent.change(screen.getByLabelText("To date"), { target: { value: "2019-12-31" } })

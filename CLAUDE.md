@@ -794,7 +794,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/ExternalActionSection.tsx` | 8 / 5 / 179 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/McpToolPicker.tsx` | 5 / 5 / 601 | honoured by construction (211 / **214**) |
 | `backend/app/models/connector.py` | 26 / 14 / 835 | ⚠ row STALE for the 2nd close at `25/14/800`, and its own cell repeated the CLAIM that was false. honoured by construction (**244-07**): `folder_id` typed, not branched |
-| `backend/app/api/connectors.py` | 45 / 21 / 2162 | ⚠ row STALE (`44/21/2140`) — a SEVENTH landing. ⛔ **extraction OWED**. NOT modified by 253 — re-derived under CR-08 |
+| `backend/app/api/connectors.py` | 46 / 22 / 2166 | ⚠ STALE (`45/21/2162`). **276-07**: DCR `client_name` → Syrel; stored ids not re-registered. ⛔ extraction OWED |
 | `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE; the 2nd read “238: comment-only” while 238 re-opened SEED-282 here. **238-04: display ≠ stored; the walk no longer mutates `SourceFile.path`** |
 | `backend/app/security/secret_cipher.py` | 4 / 2 / 256 | ⚠ absent for its ENTIRE LIFE — row added at **mig 180**, its SECOND phase. ⛔ `SECRET_COLUMNS` is the ONE encrypt-on-write set: a provider key column absent from it is stored PLAINTEXT and nothing says so |
 | `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
@@ -877,10 +877,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262). Row added AT CREATION. ⛔ every control is 3-state: `null` means NOT ASSERTED, never `false` — rendering null as off states a fact nobody measured |
 | `frontend/src/lib/activeViewReachability.ts` | 1 / 1 / 159 | ⚠ the AT-PLANNING row read `0/0/0`; measured 262-01 in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout fence — AST, never grep; it THROWS on a vacuous parse |
 | `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
-| `frontend/src/components/experts/catalog/expertCatalog.ts` | 8 / 3 / 455 | ⚠ now FIRES (`4/2/224`). **267-03**: `connectionGate`; F-2 fix `cdb173609` |
-| `frontend/src/components/experts/catalog/ExpertCard.tsx` | 3 / 3 / 295 | ⚠ now FIRES (`2/2/213`). **267-03**: requires state; no Start while missing |
-| `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 7 / 4 / 359 | ⚠ STALE (`5/3/330`). **267-03**: ONE in-flight guard; live dblclick → 1 thread |
-| `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 4 / 3 / 530 | ⚠ now FIRES (`3/2/438`). **267-03**: Brings/Missing; Connect only if `can_connect` |
+| `frontend/src/components/experts/catalog/expertCatalog.ts` | 13 / 4 / 489 | ⚠ STALE (`8/3/455`). **276-07**: `decodeEntities`, display-only |
+| `frontend/src/components/experts/catalog/ExpertCard.tsx` | 5 / 4 / 296 | ⚠ STALE (`3/3/295`). **276-07**: category text via `decodeEntities` |
+| `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 8 / 5 / 359 | ⚠ STALE (`7/4/359`). **276-07**: pill label decoded; filter stays raw |
+| `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 6 / 4 / 531 | ⚠ STALE (`4/3/530`). **276-07**: category text via `decodeEntities` |
 | `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
 | `backend/app/services/ingest_splice.py` | 19 / 7 / 930 (was `15 / 6 / 877`) | ⚠ STALE (`15/6/877`). **270-01**: ONE best-effort UPDATE after the splice writes the file facts; skipped when every fact is None. ⛔ a failed facts write logs and never fails ingest |
 | `frontend/src/components/ingestion/FolderTree.tsx` | 12 / 7 / 207 | ⚠ absent its ENTIRE LIFE — row added 266. **266-04**: ONE optional prop threaded. ⛔ no fetch here |
