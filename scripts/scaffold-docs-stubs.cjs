@@ -194,32 +194,9 @@ function slugsIn(cell) {
 }
 
 function parseInventory() {
-  const rows = [];
-  for (const t of tables(read(INVENTORY))) {
-    if (t.header[0] !== 'ID') continue;
-    const col = (name) => t.header.findIndex((h) => h.toLowerCase() === name.toLowerCase());
-    const iSurface = 1;
-    const iStatus = col('Status');
-    const iAudience = col('Audience');
-    // The HTTP API table (h.3) has no Status column; its "API ref" cell marks v4.5 routers
-    // as "public (v4.5)" (H8 /document-search).
-    const iApiRef = col('API ref');
-    let iPage = col('Proposed doc page');
-    if (iPage === -1) iPage = col('Doc page');
-    for (const r of t.rows) {
-      if (!/^[A-I]\d+$/.test(r[0])) continue;
-      let status = iStatus >= 0 ? r[iStatus] || '' : '';
-      if (iStatus < 0 && iApiRef >= 0) status = /\(v4\.5\)/.test(r[iApiRef] || '') ? 'v4.5' : 'shipped';
-      rows.push({
-        id: r[0],
-        surface: r[iSurface] || '',
-        status,
-        audience: iAudience >= 0 ? r[iAudience] || '' : '',
-        pages: iPage >= 0 ? slugsIn(r[iPage] || '') : [],
-      });
-    }
-  }
-  return rows;
+  // Phase 276-05: the inventory reader moved to scripts/lib/docs-content.cjs (one home, shared with
+  // scripts/check-docs-coverage.cjs).
+  return docs.parseInventory(read(INVENTORY));
 }
 
 function parseIA() {
@@ -260,14 +237,7 @@ function publicTags() {
 // ── planning ────────────────────────────────────────────────────────────────────────────
 
 function statusKind(status) {
-  const s = status.toLowerCase();
-  if (s.startsWith('v4.5')) return 'v4.5';
-  if (s.startsWith('locked')) return 'locked';
-  if (s.startsWith('not built')) return 'not-built';
-  if (s.startsWith('gated')) return 'gated';
-  if (s.startsWith('flag')) return 'flag';
-  if (s.startsWith('internal') || s.startsWith('policy')) return 'internal';
-  return 'shipped';
+  return docs.inventoryStatusKind(status);
 }
 
 const AUDIENCE_WORD = { user: 'any member', admin: 'organisation admins', operator: 'platform operators', developer: 'developers' };

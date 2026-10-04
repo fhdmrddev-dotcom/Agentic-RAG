@@ -143,3 +143,17 @@ export declare function buildSearchDocs(
 export declare function extractCodeKeys(repoRoot: string, io?: RepoIO): CodeKeys
 export declare function readRepoFile(repoRoot: string, rel: string): string
 export declare function findRepoRoot(start?: string): string
+
+/** Phase 276-05 — the coverage inventory reader (shared by the scaffolder and the coverage gate). */
+export interface InventoryRow {
+  id: string
+  surface: string
+  status: string
+  audience: string
+  pages: string[]
+}
+export type InventoryStatusKind = "v4.5" | "locked" | "not-built" | "gated" | "flag" | "internal" | "shipped"
+export declare const INVENTORY_PATH: string
+export declare function markdownTables(text: string): { header: string[]; rows: string[][] }[]
+export declare function parseInventory(text: string): InventoryRow[]
+export declare function inventoryStatusKind(status: string): InventoryStatusKind
