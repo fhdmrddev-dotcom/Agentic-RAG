@@ -70,6 +70,9 @@ export default defineConfig({
     },
   },
   build: {
+    // Phase 276-05 (G4-2) — dist/.vite/manifest.json lets scripts/check-landing-first-paint.cjs
+    // prove the landing's first-paint chunks carry no Remotion/Scalar/docs code.
+    manifest: true,
     rollupOptions: {
       input: {
         landing: path.resolve(__dirname, "index.html"),

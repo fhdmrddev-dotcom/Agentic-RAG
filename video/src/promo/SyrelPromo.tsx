@@ -315,8 +315,12 @@ const Finale: React.FC = () => {
   );
 };
 
-/** The full promo body on the beat-map timeline. Used by SyrelPromo, SyrelPromoVertical and SyrelTeaser. */
-export const PromoBody: React.FC<{ musicSrc?: string }> = ({ musicSrc = MUSIC.src }) => {
+/**
+ * The full promo body on the beat-map timeline. Used by SyrelPromo, SyrelPromoVertical and SyrelTeaser.
+ * `musicSrc: null` renders NO music element (Phase 276-05, D-19): the muted landing promo passes null
+ * until the reader presses Unmute, so no audio is downloaded before they ask. Renders keep the default.
+ */
+export const PromoBody: React.FC<{ musicSrc?: string | null }> = ({ musicSrc = MUSIC.src }) => {
   const frame = useCurrentFrame();
   const unit = useUnit();
   const shake = shakeAt(frame, SNARES, 9 * unit, 6);
@@ -324,7 +328,7 @@ export const PromoBody: React.FC<{ musicSrc?: string }> = ({ musicSrc = MUSIC.sr
   const pulse = frame >= MAP.drop1 && frame < MAP.finalHit ? 1 + 0.012 * Math.exp(-((frame - MAP.drop1) % BEAT) / 3) : 1;
   return (
     <AbsoluteFill>
-      <Audio src={staticFile(musicSrc)} volume={1} />
+      {musicSrc ? <Audio src={staticFile(musicSrc)} volume={1} /> : null}
       <Sfx at={MAP.drop1 - 10} src={SFX.whoosh} volume={0.3} />
       <Sfx at={MAP.drop2 - 12} src={SFX.whoosh} volume={0.3} />
       <Background speed={frame >= MAP.drop1 ? 3.5 : 1.5} />

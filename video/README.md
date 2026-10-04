@@ -81,3 +81,39 @@ npm run render:energetic   # out/syrel-energetic.mp4
 Each scene is sized from the measured speech length (`voTimings.ts`), so editing a line and re-running `npm run vo` keeps picture and voice in sync. Try another voice with `tools/.venv/Scripts/python.exe tools/make_vo.py --compare` (writes samples to `tools/samples/`).
 
 **Music:** pass a free track (e.g. from Pixabay Music or the YouTube Audio Library) via the `musicSrc` prop — put the file in `public/music/` and render with `--props='{"musicSrc":"track.mp3"}'`. It plays at 15% volume. **SFX** come from `https://remotion.media/*.wav` at render time; set `SFX_ENABLED = false` in `src/energetic/kit.tsx` to render offline.
+
+## Web playback (docs + landing, Phase 276)
+
+The same compositions also play **in the browser** through `@remotion/player` — no rendered MP4
+involved. The frontend imports them straight from `video/src` (the `@video/*` alias in
+`frontend/vite.config.ts` / `tsconfig.app.json`), always behind a dynamic `import()`:
+
+| Where | What plays | When it downloads |
+|---|---|---|
+| Docs home (`/docs`) | `SyrelEnergetic` — the narrated overview, voice only (`musicSrc: null`) | only after the reader presses play |
+| Six docs guides | `Clip-Chat`, `-Library`, `-Workflows`, `-Connections`, `-Experts`, `-Admin` (`FeatureClip`) | only after the reader presses play |
+| Landing hero | `SyrelPromo` (`PromoBody`), muted, looping | after the first scroll brings it ≥ 50% into view; never on first paint |
+
+Rules for web playback (each one exists so a reader's browser stays same-origin and light):
+
+- **No remote SFX.** `src/energetic/kit.tsx` exports `SfxOn`; the web wraps every composition in
+  `<SfxOn.Provider value={false}>`, so nothing is fetched from `remotion.media`. Studio and renders
+  keep the default (`true`) and are unchanged.
+- **Voice is same-origin.** The docs Vite plugin copies `public/vo/*.wav` to `/vo/` by allow-list.
+- **The landing promo is silent until asked.** It renders with `AudioOn` and `SfxOn` off and
+  `musicSrc: null` (no `<Audio>` element at all); pressing **Unmute** switches `musicSrc` to
+  `music/syrel-pulse.mp3`.
+- **`public/music/syrel-pulse.mp3` is the committed web copy** of the promo track (128 kbps, ≈ 0.5 MB).
+  The source WAV stays git-ignored. After `npm run music` regenerates the WAV, refresh the copy:
+  `ffmpeg -i public/music/syrel-pulse.wav -codec:a libmp3lame -b:a 128k public/music/syrel-pulse.mp3`.
+- **Posters** are stills rendered once from the same compositions and committed under
+  `frontend/public/docs-assets/posters/` (`npx remotion still src/index.ts <Composition> <out>.jpg
+  --frame=<n> --scale=0.6667 --image-format=jpeg --jpeg-quality=80`; clips use `--frame=240`, the
+  overview `165`, the promo `985`). Re-render a poster when its composition's look changes.
+- **`BrandedEpisode` is render-only.** It needs `calculateMetadata` and a local NotebookLM file, so
+  it never runs in the browser; its output goes to YouTube by an operator and plays on the docs
+  through the privacy-enhanced YouTube facade.
+
+**Licence.** Remotion is free for individuals and companies of up to 3 people — recheck the Remotion
+licence before the company grows past 3 (D-05). The Player is mounted with
+`acknowledgeRemotionLicense` on that basis.

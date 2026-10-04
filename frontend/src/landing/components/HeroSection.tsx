@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react"
+import { useCallback, useEffect, useRef, useState, type ComponentType } from "react"
 import { MODEL_PROVIDERS, LOCAL_RUNTIMES, GAUNTLET_STAGES, HERO_FACTS } from "../facts"
 
 export function HeroSection() {
@@ -144,14 +144,7 @@ export function HeroSection() {
                     borderRight: "1px solid hsl(220 20% 16% / 0.4)",
                   }}
                 >
-                  <div
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      background: "linear-gradient(135deg, hsl(239 84% 67%), hsl(258 90% 66%))",
-                    }}
-                  />
+                  <img src="/brand/syrel-mark-iris.svg" width={32} height={32} alt="" aria-hidden="true" />
                   <div style={{ height: 8 }} />
                   <div style={{ width: 32, height: 32, borderRadius: 8, background: "hsl(220 25% 14%)" }} />
                   <div
@@ -232,30 +225,14 @@ export function HeroSection() {
                     </div>
 
                     <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          flexShrink: 0,
-                          background: "linear-gradient(135deg, hsl(239 84% 67%), hsl(258 90% 66%))",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#ffffff"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{ width: 14, height: 14 }}
-                        >
-                          <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-                        </svg>
-                      </div>
+                      <img
+                        src="/brand/syrel-mark-iris.svg"
+                        width={32}
+                        height={32}
+                        alt=""
+                        aria-hidden="true"
+                        style={{ flexShrink: 0 }}
+                      />
 
                       <div
                         style={{
@@ -814,7 +791,95 @@ export function HeroSection() {
             </div>
           </div>
         </div>
+        <PromoSlot />
       </div>
     </section>
+  )
+}
+
+// ── Hero promo slot (Phase 276-05, UI-SPEC V4, D-10 / D-15 / G4-2) ──────────────────────────────
+// A static frame + poster. It imports NO Remotion code: the promo module arrives by a dynamic
+// import of ./HeroPromo only when the reader has scrolled at least once since window load AND the
+// slot is at least half visible — so it can never start on first paint, even on a screen tall
+// enough to show it without scrolling. Under prefers-reduced-motion it never starts by itself; a
+// play button starts it (muted). If the import fails, the poster simply stays.
+const PROMO_POSTER = "/docs-assets/posters/landing-promo.jpg"
+
+function PromoSlot() {
+  const slotRef = useRef<HTMLElement>(null)
+  const requested = useRef(false)
+  const [reduced] = useState(
+    () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true,
+  )
+  const [Promo, setPromo] = useState<ComponentType | null>(null)
+
+  const load = useCallback(() => {
+    if (requested.current) return
+    requested.current = true
+    import("./HeroPromo").then(
+      (m) => setPromo(() => m.HeroPromo),
+      () => {
+        requested.current = false // the poster stays; a later scroll or click may try again
+      },
+    )
+  }, [])
+
+  useEffect(() => {
+    if (reduced) return
+    const el = slotRef.current
+    if (!el || typeof IntersectionObserver === "undefined") return
+    let scrolled = false
+    let visible = false
+    let io: IntersectionObserver | null = null
+    const maybeStart = () => {
+      if (scrolled && visible) {
+        load()
+        detach()
+      }
+    }
+    const onScroll = () => {
+      scrolled = true
+      maybeStart()
+    }
+    const attach = () => {
+      window.addEventListener("scroll", onScroll, { passive: true })
+      io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) visible = e.intersectionRatio >= 0.5
+          maybeStart()
+        },
+        { threshold: [0, 0.5] },
+      )
+      io.observe(el)
+    }
+    function detach() {
+      window.removeEventListener("load", attach)
+      window.removeEventListener("scroll", onScroll)
+      io?.disconnect()
+    }
+    if (document.readyState === "complete") attach()
+    else window.addEventListener("load", attach, { once: true })
+    return detach
+  }, [reduced, load])
+
+  return (
+    <figure ref={slotRef} className="promo-slot" aria-label="Syrel promo video">
+      <div className="promo-frame">
+        {Promo ? (
+          <Promo />
+        ) : (
+          <>
+            <img className="promo-poster" src={PROMO_POSTER} alt="" loading="lazy" decoding="async" width={1280} height={720} />
+            {reduced && (
+              <button type="button" className="promo-play" aria-label="Play the Syrel promo" onClick={load}>
+                <svg viewBox="0 0 24 24" width={24} height={24} aria-hidden="true" focusable="false">
+                  <path d="M8 5v14l11-7z" fill="currentColor" />
+                </svg>
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </figure>
   )
 }

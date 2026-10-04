@@ -713,6 +713,78 @@ function extractCodeKeys(repoRoot, io) {
   return { nav, view, tool, step, check, router, settingsTab };
 }
 
+// ── Coverage inventory (.planning/research/docs-coverage-inventory.md) ─────────────────────────
+// Phase 276-05: the ONE reader of the inventory tables, shared by scripts/scaffold-docs-stubs.cjs
+// (which used to carry its own copy) and scripts/check-docs-coverage.cjs.
+const INVENTORY_PATH = '.planning/research/docs-coverage-inventory.md';
+
+function splitTableRow(line) {
+  // "| a | b | c |" → ["a","b","c"]; a `|` inside backticks does not appear in these tables.
+  return line.replace(/^\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim());
+}
+
+/** Every Markdown table in `text` → [{ header: [...], rows: [[...]] }]. */
+function markdownTables(text) {
+  const out = [];
+  const lines = normalizeNewlines(text).split('\n');
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (/^\|/.test(lines[i]) && /^\|[\s|:-]+\|\s*$/.test(lines[i + 1])) {
+      const t = { header: splitTableRow(lines[i]), rows: [] };
+      let j = i + 2;
+      while (j < lines.length && /^\|/.test(lines[j])) {
+        t.rows.push(splitTableRow(lines[j]));
+        j++;
+      }
+      out.push(t);
+      i = j - 1;
+    }
+  }
+  return out;
+}
+
+/**
+ * parseInventory(text) → [{ id, surface, status, audience, pages }] for every row of every table
+ * whose first header cell is "ID". The HTTP API table (h.3) has no Status column; its "API ref"
+ * cell marks v4.5 routers as "public (v4.5)" (H8 /document-search).
+ */
+function parseInventory(text) {
+  const rows = [];
+  for (const t of markdownTables(text)) {
+    if (t.header[0] !== 'ID') continue;
+    const col = (name) => t.header.findIndex((h) => h.toLowerCase() === name.toLowerCase());
+    const iStatus = col('Status');
+    const iAudience = col('Audience');
+    const iApiRef = col('API ref');
+    let iPage = col('Proposed doc page');
+    if (iPage === -1) iPage = col('Doc page');
+    for (const r of t.rows) {
+      if (!INVENTORY_ID.test(r[0])) continue;
+      let status = iStatus >= 0 ? r[iStatus] || '' : '';
+      if (iStatus < 0 && iApiRef >= 0) status = /\(v4\.5\)/.test(r[iApiRef] || '') ? 'v4.5' : 'shipped';
+      rows.push({
+        id: r[0],
+        surface: r[1] || '',
+        status,
+        audience: iAudience >= 0 ? r[iAudience] || '' : '',
+        pages: iPage >= 0 ? Array.from((r[iPage] || '').matchAll(/`([a-z0-9-]+(?:\/[a-z0-9-]+)+)(?:#[a-z0-9-]+)?`/g), (m) => m[1]) : [],
+      });
+    }
+  }
+  return rows;
+}
+
+/** An inventory Status cell → 'v4.5' | 'locked' | 'not-built' | 'gated' | 'flag' | 'internal' | 'shipped'. */
+function inventoryStatusKind(status) {
+  const s = String(status).toLowerCase();
+  if (s.startsWith('v4.5')) return 'v4.5';
+  if (s.startsWith('locked')) return 'locked';
+  if (s.startsWith('not built')) return 'not-built';
+  if (s.startsWith('gated')) return 'gated';
+  if (s.startsWith('flag')) return 'flag';
+  if (s.startsWith('internal') || s.startsWith('policy')) return 'internal';
+  return 'shipped';
+}
+
 /** Walk up from `start` (default: cwd) to the directory holding docs/history. */
 function findRepoRoot(start) {
   let dir = path.resolve(start || process.cwd());
@@ -754,4 +826,8 @@ module.exports = {
   extractCodeKeys,
   readRepoFile,
   findRepoRoot,
+  INVENTORY_PATH,
+  markdownTables,
+  parseInventory,
+  inventoryStatusKind,
 };

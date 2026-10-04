@@ -20,5 +20,18 @@ export default defineConfig({
       // Phase 276 — mirrors vite.config.ts: Remotion compositions are imported from ../video/src.
       "@video": path.resolve(__dirname, "../video/src"),
     },
+    // Phase 276-05 — mirrors vite.config.ts VIDEO_DEDUPE: files under ../video/src import these as
+    // bare specifiers and video/node_modules is absent in worktrees and CI, so they must resolve to
+    // frontend/node_modules (one React, one remotion) for a suite that imports a real composition.
+    dedupe: [
+      "react",
+      "react-dom",
+      "remotion",
+      "@remotion/player",
+      "@remotion/transitions",
+      "@remotion/media",
+      "@remotion/google-fonts",
+      "mediabunny",
+    ],
   },
 })

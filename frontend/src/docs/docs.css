@@ -221,6 +221,22 @@ a.d-card:hover, button.d-card:hover {
 .d-play-sm { width: 44px; height: 44px; }
 .d-video-poster:hover .d-play, .d-video-poster:focus-visible .d-play { transform: scale(1.08); }
 .d-video-caption { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--d-muted); margin-top: 8px; }
+/* Phase 276-05 — Remotion slot (UI-SPEC V2): loading ring, loaded Player, error line, transcript */
+.d-ring {
+  position: relative; width: 24px; height: 24px; border-radius: 999px;
+  border: 2px solid var(--d-primary); animation: d-ring-pulse 1.2s ease-in-out infinite;
+}
+@keyframes d-ring-pulse { 0%, 100% { opacity: .45; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.1); } }
+.d-video-player { position: absolute; inset: 0; outline: none; }
+.d-video-player:focus-visible { outline: 2px solid var(--d-primary); outline-offset: 2px; }
+.d-video-error { font-size: 14px; margin: 8px 0 0; }
+.d-textbtn {
+  padding: 0; border: 0; background: none; font: inherit; color: var(--d-primary); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.d-textbtn:hover { color: hsl(239 100% 88%); }
+.d-transcript summary { color: var(--d-primary); cursor: pointer; width: fit-content; }
+.d-transcript p { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--d-muted); }
 
 /* ── Home ── */
 .d-hero { position: relative; text-align: center; padding: 64px 0 48px; overflow: hidden; }

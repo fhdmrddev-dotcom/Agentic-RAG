@@ -23,10 +23,25 @@ export const SFX_ENABLED = true;
  */
 export const AudioOn = createContext(true);
 
-export const Sfx: React.FC<{ at: number; src: string; volume?: number }> = ({ at, src, volume = 0.4 }) => {
-  const { fps } = useVideoConfig();
+/**
+ * Remote-SFX gate (Phase 276-05, T-276-20). The SFX above are fetched from remotion.media — a
+ * third party. Web playback (the docs Player, the landing promo) wraps the composition in
+ * `<SfxOn.Provider value={false}>` so a reader's browser never requests them; the voice (Vo) stays
+ * governed by AudioOn alone. Studio and renders keep the default (true), so they are unchanged.
+ */
+export const SfxOn = createContext(true);
+
+type SfxProps = { at: number; src: string; volume?: number };
+
+export const Sfx: React.FC<SfxProps> = (props) => {
   const audioOn = useContext(AudioOn);
-  if (!SFX_ENABLED || !audioOn) return null;
+  const sfxOn = useContext(SfxOn);
+  if (!SFX_ENABLED || !audioOn || !sfxOn) return null;
+  return <SfxTrack {...props} />;
+};
+
+const SfxTrack: React.FC<SfxProps> = ({ at, src, volume = 0.4 }) => {
+  const { fps } = useVideoConfig();
   return (
     <Sequence from={at} durationInFrames={2 * fps} layout="none" name="sfx">
       <Audio src={src} volume={volume} />
