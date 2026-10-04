@@ -7,8 +7,8 @@ Written 2026-10-04 so any session can finish pending video work. Notebook: **"Sy
 | Artifact | Status | Note |
 |---|---|---|
 | Explainer: "Syrel: Workflows You Can Trust" `3d6fbe95-…` | ✅ done (9:16) — ⚠ its prompt said "8-stage gauntlet"; the code has **10** today. Regenerate before public use, or keep it as an internal draft. | downloaded to `~/Downloads/gemini-notebook/Syrel/explainer-workflows-you-can-trust.mp4` |
-| Documentary ep. 1 (cinematic) `9b0b14b0-…` | ⏳ queued at NotebookLM | download when `studio_status` says completed |
-| Documentary eps. 2–5 (cinematic) | ⛔ NOT CREATED — rate-limited | retry after the rolling window resets (it reset at 2026-10-04 01:24 UTC); create ONE at a time, ~2 min apart |
+| Documentary ep. 1 (cinematic) `9b0b14b0-…` "Syrel Chapter 1: The Friction of Progress" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep1-a-document-chat-you-can-trust.mp4` |
+| Documentary eps. 2–5 (cinematic) | ⏳ ALREADY CREATED — do NOT create again | The "rate-limited" calls (22:22–22:26 UTC) actually landed, with retries: **ep2 ×8, ep3 ×4, ep4 ×4, ep5 ×4** all `in_progress`. Keep one per episode, delete duplicates (operator approval pending), download as each completes. |
 
 Rate limit facts: ~2% of the weekly quota per video; the short rolling window throttles after ~3 videos ("Rate limited — code 8"). Check `usage_get` first.
 
