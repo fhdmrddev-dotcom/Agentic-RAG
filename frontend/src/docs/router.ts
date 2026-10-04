@@ -42,8 +42,12 @@ export function resolveRoute(pathname: string, manifest: RouteManifest): Route {
   return { kind: "not-found" }
 }
 
+/** Marks the synthetic popstate navigate() dispatches, so the app scrolls to top / to the hash on
+ *  a fresh navigation but leaves the browser's own scroll restoration alone on back/forward. */
+export const NAVIGATE_STATE = { docsNavigate: true } as const
+
 /** Client-side navigation: push the URL, then let the app re-resolve via its popstate listener. */
 export function navigate(to: string): void {
   window.history.pushState(null, "", to)
-  window.dispatchEvent(new PopStateEvent("popstate"))
+  window.dispatchEvent(new PopStateEvent("popstate", { state: NAVIGATE_STATE }))
 }
