@@ -39,6 +39,15 @@ Each focus prompt opens: `Documentary episode N of "Syrel: The Build Story" — 
 
 Candidates kept beside them (`epN-cand-18/30/45.png`). Style note: NotebookLM cinematic renders as **sketchbook / paper illustration**, not Syrel's dark UI — the BrandedEpisode intro/outro carries the brand.
 
+## Branded (Remotion BrandedEpisode) — ready for YouTube upload (operator)
+
+| Episode | File | Length |
+|---|---|---|
+| 1 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep1.mp4` | 5:25 (1080p) |
+| 2 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep2.mp4` | 5:31 (1080p) |
+
+Intro card + lower-third + outro checked by stills. The NotebookLM source carries a faint "Gemini Notebook" watermark bottom-right for the whole video. Render needs network (SFX from remotion.media).
+
 ## After download
 
 Wrap each in Remotion `BrandedEpisode` (`video/`, see `video/README.md` → Video library) and store raw downloads in `video/public/notebooklm/` (gitignored).
