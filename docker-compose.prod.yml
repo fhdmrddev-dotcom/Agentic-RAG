@@ -21,7 +21,11 @@ services:
   # ── frontend ── nginx: static SPA + /api/ reverse proxy (net-new image, Plan 02) ──
   frontend:
     build:
-      context: ./frontend
+      # Phase 276 (D-23): the REPO ROOT is the context, because the docs entry imports
+      # ../docs, ../scripts/lib and ../video/src from outside frontend/. The ignore file that
+      # applies is frontend/Dockerfile.dockerignore (BuildKit per-Dockerfile ignore).
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         # BUILD-TIME: Vite inlines import.meta.env.VITE_* into the JS bundle at build.
         # Interpolated from the root ./.env at parse time; change one => rebuild (`up --build`).
