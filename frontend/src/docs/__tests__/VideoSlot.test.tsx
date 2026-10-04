@@ -245,6 +245,7 @@ describe("VideoSlot — Remotion (276-05)", () => {
     // reset instead. This test therefore runs LAST in the file.
     vi.doUnmock("@video/clips/FeatureClip")
     vi.doUnmock("@video/energetic/SyrelEnergetic")
+    vi.doUnmock("../video/videos")
     vi.resetModules()
     const { VIDEOS } = await import("../video/videos")
     const fc = await import("@video/clips/FeatureClip")
