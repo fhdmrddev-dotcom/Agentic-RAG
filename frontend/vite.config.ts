@@ -3,6 +3,7 @@ import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import Icons from "unplugin-icons/vite"
 import { rewriteDevUrl } from "./devRouting"
+import { docsContent } from "./plugins/docsContent"
 
 // Entry routing for the dev + preview servers. The decision lives in devRouting.ts (a pure,
 // unit-tested function); this plugin only applies it. Phase 276 added the /docs → docs.html rule.
@@ -45,6 +46,9 @@ export default defineConfig({
     react(),
     Icons({ compiler: "jsx", jsx: "react" }),
     appRoutingPlugin(),
+    // Phase 276 — docs manifest, page chunks, search index and media copy (all parsing lives in
+    // scripts/lib/docs-content.cjs).
+    docsContent({ frontendDir: __dirname }),
   ],
   resolve: {
     alias: {
