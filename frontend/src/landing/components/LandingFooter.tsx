@@ -17,13 +17,16 @@ export function LandingFooter() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          fontSize: 13,
+          fontSize: 14,
           color: "hsl(220 16% 65%)",
           flexWrap: "wrap",
           gap: 16,
         }}
       >
-        <span>© {currentYear} Agentic RAG</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <img src="/brand/syrel-mark-iris.svg" width={20} height={20} alt="" />
+          © {currentYear} Syrel
+        </span>
         <div style={{ display: "flex", gap: 20 }}>
           <a
             href="https://github.com/fhdmrddev-dotcom/Agentic-RAG"

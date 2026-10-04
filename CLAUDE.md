@@ -829,7 +829,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/verdictModel.ts` | 6 / 3 / 355 | ⚠ absent for its ENTIRE LIFE |
 | `frontend/src/components/library/IngestionTab.tsx` | 17 / 6 / 512 | ⚠ row was STALE at `13 / 4 / 456` |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
-| `frontend/src/components/layout/NavPanel.tsx` | 24 / 13 / 417 | ⛔ STALE a 3rd time (was `23/12/417` here, `23/12/381` in the ledger — **the 2 registers disagreed on LINES**; 262-01 reconciles). 244-14's `overflow-x-hidden` stands |
+| `frontend/src/components/layout/NavPanel.tsx` | 25 / 14 / 416 (was `24 / 13 / 417`) | ⚠ STALE (`24/13/417`). **276-01** (D-14): Sparkles tile → Iris mark `<img>`, asset swap only. 244-14's `overflow-x-hidden` stands |
 | `frontend/src/App.tsx` | 35 / 26 / 412 (was `34 / 25 / 410`) | ⚠ STALE (`33/24/378`). **271-02**: the `classification-rules` member REMOVED with its ChatLayout branch and rail entry in ONE commit; reachability fence green |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 4 / 3 / 249 (was `2 / 1 / 204`) | now FIRES (3 phases). **271-02**: optional `onOpenFilingRules`; link + pill in ONE right cluster, never a tab. 271-05 G4-3: Back returns to Ingestion |

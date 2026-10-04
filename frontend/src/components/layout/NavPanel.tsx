@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Plus, Sparkles, Shield, Menu, Receipt, type LucideIcon } from "lucide-react"
+import { Plus, Shield, Menu, Receipt, type LucideIcon } from "lucide-react"
 import { ProfileMenu } from "./ProfileMenu"
 // Phase 166 Plan 05 (ADMIN-01 / D-166-05): NavPanel is inside OrgProvider in the app,
 // so the indigo org-admin shield reads `canManage` via the non-throwing useOrgOptional()
@@ -253,9 +253,8 @@ export function NavPanel({
           expanded ? "items-center justify-between w-full mb-1" : "flex-col items-center gap-1.5",
         )}
       >
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg gradient-primary shadow-sm shadow-primary/20 shrink-0">
-          <Sparkles className="w-4 h-4 text-white" />
-        </div>
+        {/* Phase 276 (D-14): the static Iris mark as an <img> (shared gradient ids — never inline). */}
+        <img src="/brand/syrel-mark-iris.svg" className="w-8 h-8 shrink-0" alt="Syrel" />
         {/* PINNED toggle (never hover) — the label-reveal the operator asked for. The
             aria-label flips Expand⇄Collapse; the parent persists the choice. */}
         <button

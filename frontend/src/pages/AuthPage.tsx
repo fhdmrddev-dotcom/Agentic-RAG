@@ -13,7 +13,7 @@ export function AuthPage({ onSignIn, onSignUp }: Props) {
 
   return (
     <AuthCardShell
-      title="Agentic RAG"
+      title="Syrel"
       subhead={mode === "signin" ? "Sign in to your account" : "Create a new account"}
     >
       {mode === "signin" ? (
