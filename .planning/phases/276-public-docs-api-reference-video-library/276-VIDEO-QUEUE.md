@@ -10,8 +10,8 @@ Written 2026-10-04 so any session can finish pending video work. Notebook: **"Sy
 | Documentary ep. 1 (cinematic) `9b0b14b0-…` "Syrel Chapter 1: The Friction of Progress" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep1-a-document-chat-you-can-trust.mp4` |
 | Documentary eps. 2–5 (cinematic) | ⛔ first attempt FAILED (all 4, 2026-10-04 06:48 UTC, no media, no quota used) | Re-creating strictly one at a time — see protocol below. |
 | Ep. 2 `6f07613e-f8ad-4602-8109-a377ce73ee40` "Syrel: Anatomy of an Agent (The Architecture of Persistence)" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep2-an-agent-that-keeps-working.mp4` |
-| Ep. 3 | ⏳ NOT YET CREATED | the 07:13 attempt was rate-limited and left ghost copies `68942998`, `732b1b05`, `ab6614a1`, `9a418335` — ignore them (they fail, no quota); create ep. 3 only AFTER ep. 2 completes |
-| Eps. 4–5 | ⏳ NOT YET CREATED | same: one at a time |
+| Ep. 3 `070798c0-c57d-479e-b189-a73df2ad1678` | ⏳ queued 2026-10-04 11:31 UTC (clean create, ghosts deleted first) | download + poster + BrandedEpisode when completed |
+| Eps. 4–5 | ⏳ NOT YET CREATED | ep. 4 at the next rolling reset (16:24 UTC), ep. 5 the window after — one per window |
 
 **ROOT CAUSE (measured 2026-10-04 08:20 UTC):** one cinematic video consumes ~50% of the **rolling** usage window (ep. 2 alone → 54%). Any cinematic create while the rolling window is ~50%+ used is rate-limited — even with nothing running — and leaves 4 ghosts. **Rule: one documentary per rolling window.** Check `usage_get` → create only when the rolling window is near 0% (it resets every ~5 h). Ghosts from the 08:19 attempt: `e0f44cd0`, `07ab8351`, `f0854e85`, `ec2d7657` (operator previously approved deleting ghosts; delete them before the next create). Next window reset: 2026-10-04 11:24 UTC.
 
