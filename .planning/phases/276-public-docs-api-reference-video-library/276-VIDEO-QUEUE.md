@@ -9,7 +9,7 @@ Written 2026-10-04 so any session can finish pending video work. Notebook: **"Sy
 | Explainer: "Syrel: Workflows You Can Trust" `3d6fbe95-…` | ✅ done (9:16) — ⚠ its prompt said "8-stage gauntlet"; the code has **10** today. Regenerate before public use, or keep it as an internal draft. | downloaded to `~/Downloads/gemini-notebook/Syrel/explainer-workflows-you-can-trust.mp4` |
 | Documentary ep. 1 (cinematic) `9b0b14b0-…` "Syrel Chapter 1: The Friction of Progress" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep1-a-document-chat-you-can-trust.mp4` |
 | Documentary eps. 2–5 (cinematic) | ⛔ first attempt FAILED (all 4, 2026-10-04 06:48 UTC, no media, no quota used) | Re-creating strictly one at a time — see protocol below. |
-| Ep. 2 retry `6f07613e-f8ad-4602-8109-a377ce73ee40` | ⏳ queued 07:09 UTC | the live one — download when completed |
+| Ep. 2 `6f07613e-f8ad-4602-8109-a377ce73ee40` "Syrel: Anatomy of an Agent (The Architecture of Persistence)" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep2-an-agent-that-keeps-working.mp4` |
 | Ep. 3 | ⏳ NOT YET CREATED | the 07:13 attempt was rate-limited and left ghost copies `68942998`, `732b1b05`, `ab6614a1`, `9a418335` — ignore them (they fail, no quota); create ep. 3 only AFTER ep. 2 completes |
 | Eps. 4–5 | ⏳ NOT YET CREATED | same: one at a time |
 
