@@ -236,6 +236,11 @@ html[data-theme="light"] .iris.chip, .forced-light .iris.chip { box-shadow: inse
 /* Variant C — Petal wave: a light travels round the petals (the Claude spark-shimmer idea) */
 .iris[data-motion="work"][data-variant="C"] .pt   { animation: irisWave 1.6s cubic-bezier(.45,0,.55,1) infinite; animation-delay: calc(var(--i) * .2667s); }
 .iris[data-motion="work"][data-variant="C"] .glow { animation: irisGlowSoft 1.6s cubic-bezier(.45,0,.55,1) infinite; }
+/* Variant D — Orbit + Petal wave: B's ring rotation and C's travelling light, together.
+   The ring (.spin) and the petals (.pt, inside it) are separate elements, so the two loops compose. */
+.iris[data-motion="work"][data-variant="D"] .spin { animation: irisOrbit 1.6s linear infinite; }
+.iris[data-motion="work"][data-variant="D"] .pt   { animation: irisWave 1.6s cubic-bezier(.45,0,.55,1) infinite; animation-delay: calc(var(--i) * .2667s); }
+.iris[data-motion="work"][data-variant="D"] .glow { animation: irisGlowSoft 1.6s cubic-bezier(.45,0,.55,1) infinite; }
 
 @keyframes irisBreathe  { 0%,100% { transform: none; } 50% { transform: translateY(-3px) scaleY(1.08); } }
 @keyframes irisCore     { 0%,100% { transform: none; } 50% { transform: scale(1.22); } }
@@ -259,6 +264,7 @@ html[data-reduced] .spin-ico, html[data-reduced] .dots span, html[data-reduced] 
       <button data-v="A" aria-pressed="true">A · Breathe</button>
       <button data-v="B" aria-pressed="false">B · Orbit</button>
       <button data-v="C" aria-pressed="false">C · Petal wave</button>
+      <button data-v="D" aria-pressed="false">D · Orbit + wave</button>
     </div>
   </div>
   <div class="grp"><span class="lbl">State</span>
@@ -339,6 +345,12 @@ html[data-reduced] .spin-ico, html[data-reduced] .dots span, html[data-reduced] 
     <h2>Lab · all states side by side</h2>
     <p class="sub">Each tile is locked to one state, in the current variant. Working states differ only in speed, so the change is smooth and never snaps. Colour carries the three conditions where the user needs to know something: amber when it needs you, red when it failed, dim when it was cancelled.</p>
     <div class="board" id="board"></div>
+  </section>
+
+  <section class="section">
+    <h2>Lab · B vs D side by side</h2>
+    <p class="sub">These tiles ignore the Variant control so B and D can be compared directly. Each pair runs at chat size (32px) and at 48px, through thinking (×1.0), tool running (×1.45) and streaming (×0.8). The State control still drives the rest of the page.</p>
+    <div class="board" id="compare"></div>
   </section>
 
   <section class="section">
@@ -424,7 +436,8 @@ class Iris {
     this.el.innerHTML = irisSVG(this.uid);
     this.el.dataset.motion = "rest";
     this.state = "idle";
-    this.variant = opts.variant || G.variant;
+    this.lockVariant = opts.lockVariant || null;   // a comparison tile that ignores the Variant control
+    this.variant = this.lockVariant || opts.variant || G.variant;
     this.el.dataset.variant = this.variant;
     this.settling = [];
     this.rampToken = 0;
@@ -531,7 +544,7 @@ const STATE_INFO = {
   error:     { label: "Error", motion: "Settles. Petals go grey and the core turns red. The red notice carries the reason.", derive: 'runStatus === "failed" || runStatus === "timed_out"' },
   cancelled: { label: "Cancelled", motion: "Settles, then dims to 50% grey (the quiet tier).", derive: 'runStatus === "cancelled" || runStatus === "stopped"' }
 };
-const VARIANT_INFO = { A: "Breathe", B: "Orbit", C: "Petal wave" };
+const VARIANT_INFO = { A: "Breathe", B: "Orbit", C: "Petal wave", D: "Orbit + Petal wave" };
 
 /* ───────── live transcript row ───────── */
 const ANSWER = "The 2026 amendment did change it. Amendment No. 3 (signed 12 March 2026) replaces §14.2, so the opt-out window is now 60 days' written notice instead of 90. The auto-renewal date stays at 1 January. For the 2027 renewal, notice must reach Northwind by 2 November 2026.";
@@ -608,12 +621,12 @@ function setState(s) {
   if (s === "thinking" && !WORK.has(G.state)) { clock = 0; typed = 0; }
   if (s === "streaming" && G.state !== "streaming") typed = Math.min(typed, 20);
   G.state = s;
-  ALL.forEach(function (a) { if (!a.fixed) a.set(s, G.variant); });
+  ALL.forEach(function (a) { if (!a.fixed) a.set(s, a.lockVariant || G.variant); });
   renderLive(); tickers(); readout(); pressed("segState", "s", s);
 }
 function setVariant(v) {
   G.variant = v;
-  ALL.forEach(function (a) { a.set(a.fixed || G.state, v); });
+  ALL.forEach(function (a) { a.set(a.fixed || G.state, a.lockVariant || v); });
   readout(); pressed("segVariant", "v", v);
 }
 function readout() {
@@ -670,6 +683,21 @@ function build() {
     c.innerHTML = "<b>" + STATE_INFO[s].label.replace(" (before the first token)", "") + "</b>" + (WORK.has(s) ? "×" + RATE[s] + " speed" : (TONE[s] || "static"));
     f.appendChild(c); board.appendChild(f);
     new Iris(a, { fixed: s, size: 48 }); new Iris(b, { fixed: s, size: 32 });
+  });
+
+  // B vs D comparison
+  const cmp = document.getElementById("compare");
+  ["B", "D"].forEach(function (v) {
+    ["thinking", "tool", "streaming"].forEach(function (s) {
+      const f = document.createElement("figure"); const slots = document.createElement("div");
+      slots.style.cssText = "display:flex;gap:12px;align-items:center";
+      const a = document.createElement("span"), b = document.createElement("span");
+      slots.appendChild(a); slots.appendChild(b); f.appendChild(slots);
+      const c = document.createElement("figcaption");
+      c.innerHTML = "<b>" + v + " · " + VARIANT_INFO[v] + "</b>" + STATE_INFO[s].label.replace(" (before the first token)", "") + " ×" + RATE[s];
+      f.appendChild(c); cmp.appendChild(f);
+      new Iris(a, { fixed: s, size: 48, lockVariant: v }); new Iris(b, { fixed: s, size: 32, lockVariant: v });
+    });
   });
 
   // decision 1
@@ -756,7 +784,7 @@ function wire() {
     const b = e.target.closest("button"); if (!b) return;
     G.layout = b.dataset.l; document.body.dataset.layout = G.layout; pressed("segLayout", "l", G.layout); renderLive(); readout();
     // avatars that were display:none had no running CSS animations; re-apply their state rates now
-    ALL.forEach(function (a) { a.set(a.fixed || G.state, G.variant, true); });
+    ALL.forEach(function (a) { a.set(a.fixed || G.state, a.lockVariant || G.variant, true); });
   });
   document.getElementById("segTheme").addEventListener("click", function (e) {
     const b = e.target.closest("button"); if (!b) return;
@@ -770,9 +798,9 @@ function wire() {
     const b = e.target.closest("button"); if (!b) return;
     forcedReduced = b.dataset.m === "reduced"; pressed("segMotion", "m", b.dataset.m);
     if (forcedReduced) document.documentElement.dataset.reduced = ""; else delete document.documentElement.dataset.reduced;
-    ALL.forEach(function (a) { a.set(a.fixed || G.state, G.variant, true); }); readout();
+    ALL.forEach(function (a) { a.set(a.fixed || G.state, a.lockVariant || G.variant, true); }); readout();
   });
-  if (REDUCED_MQ.addEventListener) REDUCED_MQ.addEventListener("change", function () { ALL.forEach(function (a) { a.set(a.fixed || G.state, G.variant, true); }); readout(); });
+  if (REDUCED_MQ.addEventListener) REDUCED_MQ.addEventListener("change", function () { ALL.forEach(function (a) { a.set(a.fixed || G.state, a.lockVariant || G.variant, true); }); readout(); });
 }
 
 build(); wire(); renderLive(); readout();

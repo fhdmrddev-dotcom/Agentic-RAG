@@ -2,7 +2,7 @@
 sketch: 276-iris-avatar
 name: iris-avatar
 question: "How does the Iris mark behave as the chat assistant avatar: moving while the agent works, settling to the static mark when idle or done, honest about the waiting, error and cancelled states?"
-winner: "pending operator review (recommended: B Orbit + the recommended layout)"
+winner: "pending operator review (recommended: B Orbit at 32px + the recommended layout; D Orbit + wave offered for larger marks)"
 tags: [phase-276, D-24, iris, avatar, motion, run-state, g2-sketch-gate]
 ---
 
@@ -18,13 +18,13 @@ static mark when idle or done, and stays static under `prefers-reduced-motion`. 
 Run `python -m http.server 8276` from `.planning/sketches/`, then open
 `http://127.0.0.1:8276/276-iris-avatar/index.html`. Opening the file directly also works.
 
-Top bar: **Variant** (A / B / C) × **State** (7) · **▶ Play a turn** (thinking → tool → streaming → done) ·
+Top bar: **Variant** (A / B / C / D) × **State** (7) · **▶ Play a turn** (thinking → tool → streaming → done) ·
 **Layout** (Recommended / Today) · **Theme** · **Chip** · **Motion** (Full / Reduced).
 
 The page has five parts. **Judge the motion at 32px in the transcript first.**
 
 1. A realistic transcript: a finished assistant row, then a live row whose content follows the state. The readout on the right shows the derivation predicate.
-2. The lab: sizes 96, 48, 32 and 20px, plus a board with every state side by side.
+2. The lab: sizes 96, 48, 32 and 20px, plus a board with every state side by side. Both follow the Variant control, so pick D to see D everywhere, including Play a turn. Below them, a fixed B vs D comparison.
 3. Decision 1: one avatar or two.
 4. Decision 5: before and after for the indicators.
 5. Decision 4 (light theme), then Decisions 2 and 3.
@@ -36,6 +36,16 @@ The page has five parts. **Judge the motion at 32px in the transcript first.**
 | **A · Breathe** | Petals open and close together (translate out 3 units + scaleY 1.08), the core swells, a soft glow breathes behind | `.pt`, `.core`, `.glow` | 1.6 s sine ease-in-out; keyframe 0% = rest |
 | **B · Orbit** | The petal ring turns 120° per cycle, with the glow breathing | `.spin`, `.glow` | 1.6 s linear; 120° is the mark's own symmetry (gradients alternate A/B), so the loop is seamless |
 | **C · Petal wave** | A light travels round the petals: each petal brightens and extends in turn, staggered by 1/6 cycle (the Claude spark-shimmer idea) | `.pt` (staggered), `.glow` | 1.6 s; the wave starts at the top petal, because the delays are positive and the keyframe's 0% equals rest |
+| **D · Orbit + wave** (operator request) | B's ring rotation and C's travelling light running together. The ring (`.spin`) carries the petals, and each petal (`.pt`, inside the ring) runs the wave, so the two loops compose without interfering | `.spin`, `.pt` ×6 (staggered), `.glow` | 1.6 s for both loops; reuses `irisOrbit` + `irisWave` + `irisGlowSoft`, with no new keyframe |
+
+**Animation count per avatar:** A 8 · **B 2** (`irisOrbit`, `irisGlow`) · C 7 (6 × `irisWave` + `irisGlowSoft`) ·
+**D 8** (`irisOrbit` + 6 × `irisWave` + `irisGlowSoft`). In D, one `playbackRate` drives all eight, so tool
+running speeds up the orbit and the wave together (×1.45) and streaming slows both (×0.8).
+
+**D's settle:** the orbit coasts forward to the next 120°, as in B. At the same moment each petal fades from
+its live opacity back to the rest value of 0.85, and the glow fades out. All eight settle animations start
+together. In the browser check, the ring went from 95° to 120° while the six petals eased from 0.38–0.99
+back to 0.85.
 
 All three use transform and opacity only. Keyframes are new: `irisBreathe`, `irisCore`, `irisGlow`,
 `irisGlowSoft`, `irisOrbit`, `irisWave`. The sketch never uses `brandPulse`.
@@ -57,6 +67,17 @@ motion feel is the operator's call and I could only check it through still scree
 - **The settle is the most satisfying.** The ring visibly slows to a stop, which reads as "done" by itself.
 - **It costs the least.** It animates two elements (`.spin`, `.glow`), against eight for A and seven for C. That matters in a non-virtualised, `React.memo` message list.
 - **The fallback is cheap.** If the operator finds B too spinner-like, A is the calm fallback and its settle is trivial (0% = rest).
+
+### B vs D at 32px (an honest comparison)
+
+Use **Lab · B vs D side by side** to compare them. Those tiles are locked to B or D, ignore the Variant
+control, and show each pair at 32px and 48px in thinking, tool running and streaming.
+
+- **What D adds:** at 48px and above, D reads richer than B. The ring turns *and* a highlight runs round it, which is closer to Claude's twinkle. At 32px with the chip, the mark is about 27px across and the petals are about 5–6px wide. The wave's brightness swing (0.38 → 1) is still visible there, but it is fighting the rotation for the eye.
+- **Two motions, one meaning:** the wave runs at 1/6-cycle stagger while the ring turns 120° per cycle. So the highlight moves round the ring *relative to petals that are themselves moving*, and its apparent speed is the sum of the two. That makes D feel noticeably faster and busier than B at the same `playbackRate`. Tool running (×1.45) pushes it closest to "busy spinner".
+- **Cost:** D runs 8 animations per avatar against B's 2. That only matters for the live row (finished rows are static), but it is 4× the compositor work for the same meaning.
+- **Settle:** both settle cleanly. B's is a single motion coming to rest; D's is two things stopping at once (coast plus fade). D's settle reads slightly less like "done" than B's.
+- **Verdict:** **B stays the recommendation for the 32px chat avatar.** If the operator likes D's richness, the strongest place for it is the larger, one-off marks where the inventory already wants the Iris animated: the empty-chat hero (64px) and the boot splash. There, D's extra layer reads clearly and nothing competes with it. Another option is D with the orbit slowed (e.g. ×0.6 of B's speed), so the wave leads and the rotation becomes ambient. That is a one-line change worth trying if D is preferred.
 
 ## State → motion
 
