@@ -291,7 +291,7 @@ Plans:
   6. The docs home plays the Syrel overview through a lazily loaded Remotion player, guides embed their clips, and the landing reads "Syrel" with no "Agentic RAG" left in `src/landing/` (DOCS-06).
 
 **How we'd know this failed**: a docs page claims something `docs/history/` marks unbuilt (in-app Word/PDF preview, three deployment presets, v4.5 as live); the coverage gate reads a hand-typed list, or passes over zero parsed items; the docs entry pulls app dependencies into the landing bundle; `/docs` routing falls through to `app.html`; the public spec still lists internal operations; production Swagger stays open; the Remotion player loads on first paint and slows the landing.
-**Plans**: 5 plans in 3 waves (G-8: 5 — content writing and the one-commit logo pass each need their own unit)
+**Plans**: 7 plans in 4 waves (G-8: 5 — content writing and the one-commit logo pass each need their own unit; plans 06-07 added mid-execution by operator direction D-24/D-26/D-27, justified in CONTEXT D-27)
 
 Plans:
 **Wave 1**
@@ -307,6 +307,11 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 276-05-PLAN.md — W3: lazy Remotion Player slots, muted scroll-started landing promo + first-paint fences, DOCS-02 coverage gate + hook + CI, BASELINE pins, ledger close
+
+**Wave 4** *(blocked on Wave 3 completion; 06 and 07 run in parallel on disjoint files)*
+
+- [ ] 276-06-PLAN.md — W4: animated Iris assistant avatar (sketch variant D, D-24/D-27): irisStateFor + IrisAvatar, one live avatar (RunCard logo static), redundant spinners removed, dead brandPulse removed, hero + splash + chrome chip
+- [ ] 276-07-PLAN.md — W4: app-wide logo pass (strings + fence, OAuth client name, rasters + manifest + OG, branded invite, leftovers) and the "Syrel: The Build Story" docs page (D-26)
 
 **Video library — three styles, decided 2026-10-04 (operator):** (1) **narrated explainers** — Remotion + local Kokoro voice, and NotebookLM explainers; (2) **documentaries** — NotebookLM cinematic "Syrel: The Build Story" (5 chapters), wrapped in Remotion `BrandedEpisode` intro/outro; (3) **music-driven promos, no narration** — `SyrelPromo` / `SyrelTeaser` / vertical cuts, beat-locked to an original synthesized track, for the landing hero and social. Discuss decides which style each docs/landing slot uses.
 **Logo chosen, insertion deferred (operator 2026-10-04):** #1 "Iris agent" — assets in `docs/brand/` (animated, lockup, mark). Placeholders stay until the operator says insert; when it happens it is one pass across landing, app, favicon, docs and `video/` `LogoPlaceholder`. Discuss decides whether 276 does that pass.

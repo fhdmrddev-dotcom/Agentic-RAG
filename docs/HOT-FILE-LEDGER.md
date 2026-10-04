@@ -10826,6 +10826,9 @@ cells rot within days.
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 41 / 19 / 1750 | **FIRES** | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 60 / 23 / 3297 | **FIRES** | ⚠ STALE (`58/21/3290`). **268-REVIEW WR-06**: the resume shell carries its run's org — the org read MOVED above the INSERT, one kwarg |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
+| [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 2 / 1 / 56 | no (1 phase) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse go (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
+| [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 0 / 0 / 0 | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |
+| [`frontend/src/components/chat/IrisAvatar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisavatartsx) | 0 / 0 / 0 | no (new) | young (created 276-06). Row added AT PLANNING. Sketch 276 variant D (D-27). ⛔ orbit period = 3 × wave period, sweep 360°; gradient ids from useId, sanitised; aria-hidden |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 6 / 2 / 320 | no (2 phases) | ⚠ row STALE (`4/1/283`; CLAUDE.md read `4/1/313`). NOT modified by 253 — re-derived under CR-08. Still ONE reasoning renderer; no duration derived from length |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 41 / 20 / 1007 (was `38 / 19 / 977`) | **FIRES** | ⚠ STALE (`38/19/977`). **268-03**: +2 optional ReactNode slots; hooks 8/6/4 → 8/6/4. ⛔ 0 new top-level controls |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 24 / 11 / 376 (was `21 / 9 / 307`) | **FIRES** | ⚠ row STALE (`21/9/307`). honoured by construction (**267-04**): the turn index skips system rows via ONE module-level helper; no prop added |
@@ -11139,6 +11142,9 @@ cells rot within days.
 | [`frontend/src/docs/pages/SectionIndex.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagessectionindextsx) | 1 / 1 / 68 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P4 section index — every stub reachable (D-07) |
 | [`frontend/src/docs/pages/NotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesnotfoundtsx) | 1 / 1 / 20 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P8 docs 404 inside the shell (G4-4) |
 | [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 1 / 1 / 125 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog. ⛔ v4.5 Not yet released from parseHistory released flag |
+| [`frontend/src/docs/pages/BuildStory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesbuildstorytsx) | 0 / 0 / 0 | no (new) | young (created 276-07). Row added AT PLANNING. D-26: five chapters in order, releases from parseHistory, one VideoSlot each. ⛔ an id-less slot renders nothing |
+| [`frontend/src/pages/SetupWizard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessetupwizardtsx) | 2 / 2 / 345 | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: the static Iris mark in the header (D-27 logo pass). ⛔ no logic change |
+| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 3 / 1 / 95 | no (1 phase) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
 | [`frontend/src/docs/pages/ChangelogVersion.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogversiontsx) | 1 / 1 / 52 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: changelog version page |
 | [`frontend/src/docs/pages/ApiReference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesapireferencetsx) | 1 / 1 / 135 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P6 lazy Scalar. ⛔ telemetry off, agent disabled, test-request hidden; dynamic import only |
 | [`frontend/src/docs/components/Markdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsmarkdowntsx) | 1 / 1 / 134 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: react-markdown + gfm. ⛔ NO rehype-raw — raw HTML stays text (XSS) |
@@ -14444,6 +14450,18 @@ against the unfixed guard.
 ⚠ **THE GENERAL LESSON, worth more than the fix:** a boolean guard that encodes "the other thing is
 not rendering" by naming *that thing's only input* silently rots the day a second input is added.
 Both renderers now read both inputs; nothing executable binds them, which is the residual risk.
+
+### `frontend/src/components/chat/WorkingBadge.tsx`
+
+**`2 / 1 / 56`** at 276 planning. Absent from the scan list for its whole life; the row was added at 276-06 planning because 276-06 modifies it. 276-06 removes the `✦` glyph and the `animate-brandPulse` class (sketch 276-iris-avatar decision 5: its planning-gap window is exactly the avatar's *thinking* state). The word "Working" stays: activity words are kept. 276-06 re-derives the triple at close.
+
+### `frontend/src/components/chat/irisState.ts`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). `irisStateFor(message, capPaused)` and `hasPendingAsk` (moved here from `MessageItem.tsx` so the precedence has ONE home). ⛔ Pure: it reads only the `message` prop and the caller's already-read lock; never a store. 276-06 re-derives the triple at close.
+
+### `frontend/src/components/chat/IrisAvatar.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). The animated Iris assistant avatar, sketch 276-iris-avatar variant D "Orbit + wave" (D-24, D-27). ⛔ The seamless-loop invariant: the orbit period must stay an integer multiple of the wave period (4.8 s = 3 × 1.6 s) and the orbit sweep must stay 360°; `IrisAvatar.test.tsx` pins it from `index.css`. 276-06 re-derives the triple at close.
 
 ### `frontend/src/components/settings/ActionRow.tsx`
 
@@ -18334,6 +18352,18 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: P5 changelog. ⛔ v4.5 Not yet released from parseHistory released flag. 276-05 re-derives the triple at close.
 
 **`1 / 1 / 125`** re-derived at the 276-05 close (2026-10-04), recipe in CLAUDE.md. Young; G-5 does not fire.
+
+### `frontend/src/docs/pages/BuildStory.tsx`
+
+**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). "Syrel: The Build Story" (D-26): the five chapters in order, each with its one-line summary, its releases and its `changelog.chapter-N` VideoSlot. ⛔ An id-less slot renders nothing (D-12); the page never promises a video that is not uploaded. 276-07 re-derives the triple at close.
+
+### `frontend/src/pages/SetupWizard.tsx`
+
+**`2 / 2 / 345`** at 276 planning. Absent from the scan list for its whole life; the row was added at 276-07 planning because 276-07 modifies it. 276-07 adds the static Iris mark to the header band (276-LOGO-INVENTORY §B). No logic change. 276-07 re-derives the triple at close.
+
+### `backend/app/services/email_provider.py`
+
+**`3 / 1 / 95`** at 276 planning. Absent from the scan list for its whole life; the row was added at 276-07 planning because 276-07 modifies it. 276-07 adds a hosted PNG lockup (absolute URL from `primary_frontend_origin()`, no new env var) and the product name to the Resend invite. ⛔ WR-02 stands: the org name and every interpolated URL are `html.escape`d. 276-07 re-derives the triple at close.
 
 ### `frontend/src/docs/pages/ChangelogVersion.tsx`
 
