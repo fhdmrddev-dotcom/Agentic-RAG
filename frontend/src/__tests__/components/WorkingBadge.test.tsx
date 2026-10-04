@@ -20,12 +20,16 @@ import { useState } from "react"
 import { WorkingBadge } from "@/components/chat/WorkingBadge"
 
 describe("WorkingBadge", () => {
-  it("renders ✦ Working when visible=true (Req #8 visibility on)", () => {
+  it("renders the word Working when visible=true, with no ✦ glyph and no pulse (276-06)", () => {
     const { getByText, container } = render(<WorkingBadge visible={true} />)
     expect(getByText("Working")).toBeTruthy()
     const wrapper = container.querySelector("[data-testid='working-badge']")
     expect(wrapper).toBeTruthy()
     expect(wrapper?.getAttribute("aria-hidden")).toBe("false")
+    // ~~✦ Working~~ — 276-06 (D-27, sketch decision 5): the Iris avatar's thinking state now
+    // carries the motion, so the badge is the word alone and does not animate.
+    expect(wrapper?.textContent).not.toContain("✦")
+    expect(wrapper?.className).not.toContain("animate-brandPulse")
   })
 
   it("hides inner content (aria-hidden=true) when visible=false", () => {
