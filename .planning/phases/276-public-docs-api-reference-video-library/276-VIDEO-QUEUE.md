@@ -30,6 +30,15 @@ Every call also includes the index source `fa8f1b50-c3c3-4847-9755-8e0e8015b65c`
 
 Each focus prompt opens: `Documentary episode N of "Syrel: The Build Story" — Chapter N, "<title>" (releases …). The product is Syrel (formerly Agentic RAG). … Only state what the sources mark as shipped; note where later releases changed things.`
 
+## Posters (for the docs page, D-26) — outside the repo
+
+| Episode | Poster (1280×720 PNG) | Frame |
+|---|---|---|
+| 1 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep1-poster.png` | 30% in — the sealed sandbox cube |
+| 2 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep2-poster.png` | 45% in — the 3D wall of agent cards |
+
+Candidates kept beside them (`epN-cand-18/30/45.png`). Style note: NotebookLM cinematic renders as **sketchbook / paper illustration**, not Syrel's dark UI — the BrandedEpisode intro/outro carries the brand.
+
 ## After download
 
 Wrap each in Remotion `BrandedEpisode` (`video/`, see `video/README.md` → Video library) and store raw downloads in `video/public/notebooklm/` (gitignored).
