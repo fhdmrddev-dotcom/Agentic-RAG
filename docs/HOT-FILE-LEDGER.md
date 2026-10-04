@@ -18460,3 +18460,9 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 ### `frontend/src/docs/search/searchIndex.ts`
 
 **`1 / 1 / 57`** measured at the 276-05 close (2026-10-04). Created by 276-03 as a deviation (outside every plan's `files_modified`), so it had no scan row and the ledger gate could not ask for one. young (created 276-03). Fetches the index + MiniSearch on FIRST focus only (both via import()/fetch). ⛔ never in first paint
+
+### `scripts/vitest-count-gate.cjs` — Phase 276
+Measured `279 / 63 / 6361` at 276-05's merge. 276-02 put `src/docs` in TARGETS. 276-05 pinned the phase's 20 new docs and landing suites (122 cases) in BASELINE, checked against a glob of the test folders rather than the plan's list (the glob caught `DocsApp.test.tsx`, which the plan missed). The gate read `total 9751 · failed 0 · pinned total 8996 · 409/409`. 276-02 renamed its Vercel suite to `docsVercelRouting.test.ts` because BASELINE is keyed by basename, so the plan's `vercelRouting.test.ts` would have merged with Phase 228's pin.
+
+### `.claude/settings.json` — Phase 276
+Measured `14 / 6 / 214` after registration. 276-05 added the docs-coverage hook entry and then reverted it, because that edit needs operator approval. The operator approved it on 2026-10-04, and the orchestrator registered `docs-coverage-guard.js` (PostToolUse `Write|Edit`, timeout 10s) next to `landing-drift-guard.js`. The hook informs and never blocks; CI (`.github/workflows/docs-coverage.yml`) is the backstop. ⛔ This is the only hook dispatch table, so if an entry is dropped the hook never fires and nothing reports it.
