@@ -2,7 +2,7 @@
 sketch: 276-iris-avatar
 name: iris-avatar
 question: "How does the Iris mark behave as the chat assistant avatar: moving while the agent works, settling to the static mark when idle or done, honest about the waiting, error and cancelled states?"
-winner: "pending operator review (recommended: B Orbit at 32px + the recommended layout; D Orbit + wave offered for larger marks)"
+winner: "D Orbit + wave (operator, 2026-10-04), with the recommended layout; seamless-loop fix applied and measured"
 tags: [phase-276, D-24, iris, avatar, motion, run-state, g2-sketch-gate]
 ---
 
@@ -36,19 +36,60 @@ The page has five parts. **Judge the motion at 32px in the transcript first.**
 | **A · Breathe** | Petals open and close together (translate out 3 units + scaleY 1.08), the core swells, a soft glow breathes behind | `.pt`, `.core`, `.glow` | 1.6 s sine ease-in-out; keyframe 0% = rest |
 | **B · Orbit** | The petal ring turns 120° per cycle, with the glow breathing | `.spin`, `.glow` | 1.6 s linear; 120° is the mark's own symmetry (gradients alternate A/B), so the loop is seamless |
 | **C · Petal wave** | A light travels round the petals: each petal brightens and extends in turn, staggered by 1/6 cycle (the Claude spark-shimmer idea) | `.pt` (staggered), `.glow` | 1.6 s; the wave starts at the top petal, because the delays are positive and the keyframe's 0% equals rest |
-| **D · Orbit + wave** (operator request) | B's ring rotation and C's travelling light running together. The ring (`.spin`) carries the petals, and each petal (`.pt`, inside the ring) runs the wave, so the two loops compose without interfering | `.spin`, `.pt` ×6 (staggered), `.glow` | 1.6 s for both loops; reuses `irisOrbit` + `irisWave` + `irisGlowSoft`, with no new keyframe |
+| **D · Orbit + wave** (**chosen**) | B's ring rotation and a travelling highlight running together. The ring (`.spin`) carries both the base petals (`.base`, dimmed to 0.7 while working) and an overlay highlight layer (`.wave` > `.wv` ×6), so the two loops compose | `.spin`, `.wv` ×6, `.glow` | ring **360° per 4.8 s, linear** (= 3 wave periods, the same 75°/s as B); wave `irisWaveBump` 1.6 s with negative delays spaced by period/6; glow `irisGlowSoft` 1.6 s |
 
 **Animation count per avatar:** A 8 · **B 2** (`irisOrbit`, `irisGlow`) · C 7 (6 × `irisWave` + `irisGlowSoft`) ·
-**D 8** (`irisOrbit` + 6 × `irisWave` + `irisGlowSoft`). In D, one `playbackRate` drives all eight, so tool
-running speeds up the orbit and the wave together (×1.45) and streaming slows both (×0.8).
+**D 8** (`irisOrbitTurn` + 6 × `irisWaveBump` + `irisGlowSoft`), plus two opacity *transitions* on `.base` and `.wave`
+for the fade in and out. In D, one `playbackRate` drives all eight, so tool running speeds up the orbit and the wave
+together (×1.45) and streaming slows both (×0.8). They stay phase-locked: the measured orbit-minus-wave `currentTime`
+stayed at 0 ms across state changes.
 
-**D's settle:** the orbit coasts forward to the next 120°, as in B. At the same moment each petal fades from
-its live opacity back to the rest value of 0.85, and the glow fades out. All eight settle animations start
-together. In the browser check, the ring went from 95° to 120° while the six petals eased from 0.38–0.99
-back to 0.85.
+**D's settle:** the orbit coasts forward to the next 120° stop (identical to rest for the base gradients), as in B.
+At the same time `data-motion` becomes `fade`: the wave keeps animating while its layer fades to 0 in 0.45 s,
+the base petals return to full opacity, and the glow eases out. After about 520 ms the avatar is at rest.
 
-All three use transform and opacity only. Keyframes are new: `irisBreathe`, `irisCore`, `irisGlow`,
-`irisGlowSoft`, `irisOrbit`, `irisWave`. The sketch never uses `brandPulse`.
+### D's loop seam — the cause and the fix (measured in Chrome, 2026-10-04)
+
+The operator reported: *"when the loop reaches the end point and starts again you feel it lagging a little"*.
+
+**How it was measured.** The live avatar's animations were paused and stepped through `currentTime` one
+60 fps frame at a time, across two orbit wraps with ±30 frames around each, in all three working states. At
+each step the harness read the ring's computed `transform`, every wave petal's opacity and the glow. From
+those it computed the **light position**: the brightness-weighted circular mean of the petals' on-screen
+angles, i.e. where the eye sees the highlight. It reports the largest frame-to-frame step at a wrap against
+the largest step mid-cycle (≥ 8 frames from any wrap).
+
+**Cause.** Rotation was already `linear`, and each petal's wave keyframes were continuous (one petal's opacity
+step at the wrap was 0.001). The defect was **the orbit's 0→120° loop**. 120° is the symmetry of the two
+alternating gradients but **not of the wave**, because each petal carries its own wave phase. At every 1.6 s
+wrap the ring snapped from 120° back to 0°, each petal suddenly sat where the petal two places before it had
+been, and the highlight teleported about 115°.
+
+| Light-position step per frame | at the wrap, **before** | at the wrap, **after** | mid-cycle (both) |
+|---|---|---|---|
+| thinking ×1.0 | **115.0°** | 5.0° | 5.4° |
+| tool ×1.45 | **112.8°** | 7.2° | 7.9° |
+| streaming ×0.8 | **116.0°** | 4.0° | 4.3° |
+
+**After the fix:**
+- The ring steps at a constant 1.25° / 1.81° / 1.00° per frame, with **zero** acceleration at the wrap. Before, the ring's matrix jumped 118–119° at the wrap.
+- One petal's opacity and the glow have a step of about 0.000 at the wrap.
+- A live, unpaused per-frame sample in a visible tab agreed: light speed at the wrap 5.00 vs 5.42 mid-cycle, ring 1.25 vs 1.25, largest frame gap 17–18 ms (no dropped frames).
+- A real-time `currentTime` recording over 5 wave cycles (1.67 turns), switching thinking → tool → streaming → thinking, showed 0 restarts, 0 backwards steps, orbit and wave `currentTime` identical throughout, and the rates tweened together.
+
+**What changed (D only; A, B and C are untouched):**
+1. **Orbit:** a new `irisOrbitTurn` turns 0→360° in 4.8 s, linear. That is an exact multiple of the wave period (3 × 1.6 s), so the combined pattern repeats seamlessly, and at 360° every petal maps to itself. The angular speed is unchanged.
+2. **Wave:** a new `irisWaveBump` is a smooth bump on a flat floor (0/30/70/100% = floor, 50% = peak, sine easing `cubic-bezier(.37,0,.63,1)`). The wrap falls in the flat zone. The old `irisWave` had keyframes at 16% and 42% that forced a mid-motion stop on every petal.
+3. **Offsets:** each petal gets a **negative** delay, evenly spaced: `calc((var(--i) - 6) * 1.6s / 6)`. Every petal is already mid-cycle at t = 0, and the highlight travels in the same direction as the ring.
+4. **No pop on entry or exit:** the highlight is now an overlay layer (`.wave` > `.wv`, own unique gradient `<uid>-w`) above the base petals. The layer's container fades in and out by CSS **transition**, so starting work and settling never jump, even though negative delays start each petal mid-cycle.
+5. **Glow:** `irisGlowSoft` (0/50/100%, sine easing, a 1.6 s period that divides 4.8 s) was already seamless; measured step at the wrap ≈ 0.000.
+6. **Frames:** only transform and opacity animate. There are no filter or box-shadow animations, and `will-change: transform` is set on the ring only, and only while it is working.
+
+Known edge (unchanged): re-entering work *during* a settle restarts the ring from its coast pose to 0°. Play a
+turn never does this, and the real component can skip it by not starting a settle shorter than its debounce.
+
+All variants use transform and opacity only. Keyframes are new: `irisBreathe`, `irisCore`, `irisGlow`,
+`irisGlowSoft`, `irisOrbit`, `irisWave`, `irisOrbitTurn`, `irisWaveBump`. The sketch never uses `brandPulse`.
 
 **Transitions never snap:**
 - **Spin-up:** entering a working state tweens `playbackRate` from 0.2 to the target over about 0.5 s.
@@ -58,6 +99,10 @@ All three use transform and opacity only. Keyframes are new: `irisBreathe`, `iri
 - **Colour changes** (amber, red, dim) transition `stop-color` and `fill`, never an animated property. That way a tone change and a settle can run at the same time ("settles and turns amber").
 
 ## Recommendation
+
+> **Operator verdict (2026-10-04): D · Orbit + wave.** D is what gets built, with the seamless-loop fix above. The
+> analysis below is kept as written, because it records why B was the first recommendation and what D trades
+> for its richness.
 
 **B · Orbit, with the recommended layout.** This is provisional: I verified the motion runs, but judging
 motion feel is the operator's call and I could only check it through still screenshots.
@@ -159,4 +204,5 @@ export const IrisAvatar = React.memo(function IrisAvatar({ state, size = 32 }: {
 - **The tests move with the code.** `MessageItem.test.tsx:141-217` pins the test id and `animate-brandPulse` iff streaming. That becomes `data-iris-state` assertions plus a pure `irisStateFor` table test. `RunCard.logo.test.tsx` and `RunCard.test.tsx` lose the pulse-on-avatar expectation.
 - **G-5:** `MessageItem.tsx` (35 phases) and `RunCard.tsx` are firing hot files. The change is one import plus one element swap in each, and the state logic lives in the new pure module.
 - **Accessibility:** the avatar is `aria-hidden`, because the activity words carry the state for screen readers.
+- **Building D:** the SVG needs the base group plus the six-ellipse highlight layer and its third gradient (`<uid>-w`). Copy the D CSS block and the two keyframes `irisOrbitTurn` / `irisWaveBump` verbatim, and port `Iris.settle`'s `fade` branch. Re-run the sketch's seam harness (pause, then step `currentTime` frame by frame across a wrap) as a manual check if the timings are ever touched: **the orbit period must stay an integer multiple of the wave period, and the orbit sweep must stay 360°.**
 - **Out of scope here:** the other D-24 placements (empty-chat hero, boot splash, SetupWizard) can reuse `<IrisAvatar state="idle">` or `"thinking"` later.

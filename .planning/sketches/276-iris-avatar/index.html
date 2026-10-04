@@ -236,17 +236,32 @@ html[data-theme="light"] .iris.chip, .forced-light .iris.chip { box-shadow: inse
 /* Variant C — Petal wave: a light travels round the petals (the Claude spark-shimmer idea) */
 .iris[data-motion="work"][data-variant="C"] .pt   { animation: irisWave 1.6s cubic-bezier(.45,0,.55,1) infinite; animation-delay: calc(var(--i) * .2667s); }
 .iris[data-motion="work"][data-variant="C"] .glow { animation: irisGlowSoft 1.6s cubic-bezier(.45,0,.55,1) infinite; }
-/* Variant D — Orbit + Petal wave: B's ring rotation and C's travelling light, together.
-   The ring (.spin) and the petals (.pt, inside it) are separate elements, so the two loops compose. */
-.iris[data-motion="work"][data-variant="D"] .spin { animation: irisOrbit 1.6s linear infinite; }
-.iris[data-motion="work"][data-variant="D"] .pt   { animation: irisWave 1.6s cubic-bezier(.45,0,.55,1) infinite; animation-delay: calc(var(--i) * .2667s); }
-.iris[data-motion="work"][data-variant="D"] .glow { animation: irisGlowSoft 1.6s cubic-bezier(.45,0,.55,1) infinite; }
+/* Variant D — Orbit + Petal wave (operator's choice). Seamless-loop rules, measured in Chrome:
+   1. The ring turns a FULL 360° in 4.8 s (= 3 wave periods, same 75°/s as B). A 120° loop is the
+      symmetry of the gradients but NOT of the wave (each petal has its own phase), so a 120° wrap
+      teleported the lit petal ~115° once per cycle. At 360° every petal maps to itself.
+   2. The wave is a smooth bump on a flat floor (0/30/70/100% = floor, 50% = peak, sine easing), so
+      the wrap sits in the flat zone and no keyframe forces a mid-motion stop.
+   3. Per-petal offsets are NEGATIVE delays, evenly spaced by period/6: every petal is mid-cycle at t=0.
+   4. The light is an overlay layer (.wave/.wv) above the base petals. Its container fades in and out
+      by TRANSITION, so entering work and settling never pop, and the wave keeps running while it fades.
+   5. One playbackRate drives ring + wave + glow (Iris.ramp), so they stay phase-locked at every speed. */
+.iris .base, .iris .wave { transition: opacity .45s cubic-bezier(.4,0,.2,1); }
+.iris .wave { opacity: 0; }
+.iris .wv { transform-box: view-box; transform-origin: 32px 32px; opacity: 0; }
+.iris[data-variant="D"][data-motion="work"] .wave { opacity: 1; }
+.iris[data-variant="D"][data-motion="work"] .base { opacity: .7; }
+.iris[data-motion="work"][data-variant="D"] .spin { animation: irisOrbitTurn 4.8s linear infinite; will-change: transform; }
+.iris[data-variant="D"]:is([data-motion="work"], [data-motion="fade"]) .wv { animation: irisWaveBump 1.6s cubic-bezier(.37,0,.63,1) infinite; animation-delay: calc((var(--i) - 6) * 1.6s / 6); }
+.iris[data-motion="work"][data-variant="D"] .glow { animation: irisGlowSoft 1.6s cubic-bezier(.37,0,.63,1) infinite; }
 
 @keyframes irisBreathe  { 0%,100% { transform: none; } 50% { transform: translateY(-3px) scaleY(1.08); } }
 @keyframes irisCore     { 0%,100% { transform: none; } 50% { transform: scale(1.22); } }
 @keyframes irisGlow     { 0%,100% { opacity: 0; transform: scale(.8); } 50% { opacity: .75; transform: scale(1.1); } }
 @keyframes irisGlowSoft { 0%,100% { opacity: .15; } 50% { opacity: .45; } }
 @keyframes irisOrbit    { from { transform: rotate(0deg); } to { transform: rotate(120deg); } }
+@keyframes irisOrbitTurn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes irisWaveBump  { 0%,30%,70%,100% { opacity: 0; transform: none; } 50% { opacity: .9; transform: translateY(-2.5px) scaleY(1.08); } }
 @keyframes irisWave     { 0%,100% { opacity: .85; transform: none; } 16% { opacity: 1; transform: translateY(-3px) scaleY(1.08); } 42% { opacity: .38; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -408,17 +423,20 @@ let UID = 0;
 const ALL = [];
 
 function irisSVG(u) {
-  let petals = "";
+  let petals = "", lights = "";
   for (let i = 0; i < 6; i++) {
     petals += '<g transform="rotate(' + (i * 60) + ' 32 32)"><ellipse class="pt" style="--i:' + i +
       '" cx="32" cy="17" rx="6.5" ry="13" fill="url(#' + u + (i % 2 ? '-b' : '-a') + ')"/></g>';
+    lights += '<g transform="rotate(' + (i * 60) + ' 32 32)"><ellipse class="wv" style="--i:' + i +
+      '" cx="32" cy="17" rx="6.5" ry="13" fill="url(#' + u + '-w)"/></g>';
   }
   return '<svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><defs>' +
     '<linearGradient id="' + u + '-a" x1="0" y1="0" x2="1" y2="1"><stop class="sa1" offset="0"/><stop class="sa2" offset=".5"/><stop class="sa3" offset="1"/></linearGradient>' +
     '<linearGradient id="' + u + '-b" x1="1" y1="0" x2="0" y2="1"><stop class="sb1" offset="0"/><stop class="sb2" offset="1"/></linearGradient>' +
+    '<linearGradient id="' + u + '-w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".55" stop-color="#D6D8FF"/><stop offset="1" stop-color="#A3A5FF"/></linearGradient>' +
     '<radialGradient id="' + u + '-g"><stop offset="0" stop-color="#C9CBFF" stop-opacity=".95"/><stop offset=".55" stop-color="#8E91FF" stop-opacity=".35"/><stop offset="1" stop-color="#6467F2" stop-opacity="0"/></radialGradient>' +
     '</defs><circle class="glow" cx="32" cy="32" r="18" fill="url(#' + u + '-g)"/>' +
-    '<g class="spin">' + petals + '</g><circle class="core" cx="32" cy="32" r="4.5"/></svg>';
+    '<g class="spin"><g class="base">' + petals + '</g><g class="wave">' + lights + '</g></g><circle class="core" cx="32" cy="32" r="4.5"/></svg>';
 }
 
 class Iris {
@@ -457,6 +475,7 @@ class Iris {
 
   set(state, variant, instant) {
     const wasWork = this.el.dataset.motion === "work";
+    if ((instant || isReduced()) && this.el.dataset.motion === "fade") this.el.dataset.motion = "rest";
     const reduced = isReduced();
     const willWork = WORK.has(state) && !reduced;
     const variantChanged = variant !== this.variant;
@@ -465,6 +484,7 @@ class Iris {
     if (TONE[state]) this.el.dataset.tone = TONE[state]; else delete this.el.dataset.tone;
     if (WORK.has(state) && reduced) this.el.dataset.lit = ""; else delete this.el.dataset.lit;
     if (reduced) this.cancelSettle();
+    if (willWork || instant || reduced) clearTimeout(this.fadeTimer);
 
     if (willWork) {
       this.cancelSettle();
@@ -508,19 +528,27 @@ class Iris {
      Orbit decelerates FORWARD to the next 120° (identical to rest by symmetry) at a matched speed. */
   settle() {
     this.rampToken++;
-    const snaps = this.anims().map(function (a) {
+    const fades = this.variant === "D";
+    const snaps = this.anims().filter(function (a) { return !a.effect.target.classList.contains("wv"); }).map(function (a) {
       const t = a.effect.target, cs = getComputedStyle(t);
-      return { t: t, name: a.animationName, tr: cs.transform, op: cs.opacity, prog: a.effect.getComputedTiming().progress, rate: a.playbackRate };
+      const tm = a.effect.getComputedTiming();
+      return { t: t, name: a.animationName, tr: cs.transform, op: cs.opacity, prog: tm.progress, dur: tm.duration, rate: a.playbackRate };
     });
-    this.el.dataset.motion = "rest";
+    // D: the wave layer keeps running under data-motion="fade" while its container fades out (CSS transition)
+    this.el.dataset.motion = fades ? "fade" : "rest";
+    clearTimeout(this.fadeTimer);
+    if (fades) { const el = this.el; this.fadeTimer = setTimeout(function () { if (el.dataset.motion === "fade") el.dataset.motion = "rest"; }, 520); }
     const out = [];
     snaps.forEach(function (s) {
-      if (s.name === "irisOrbit") {
-        const ang = (s.prog || 0) * 120, remaining = Math.max(120 - ang, 1);
-        const v = 120 / CYCLE_MS * (s.rate || 1);                      // deg per ms right now
+      if (s.name === "irisOrbit" || s.name === "irisOrbitTurn") {
+        const sweep = s.name === "irisOrbitTurn" ? 360 : 120;
+        const ang = (s.prog || 0) * sweep;
+        const target = Math.ceil((ang + 0.001) / 120) * 120;             // next 120° stop = identical to rest
+        const remaining = Math.max(target - ang, 1);
+        const v = sweep / s.dur * (s.rate || 1);                        // deg per ms right now
         const dur = Math.max(450, Math.min(1400, 2 * remaining / v));
         const y1 = Math.min(1, 0.3 * (v * dur / remaining));            // initial slope ≈ current speed
-        out.push(s.t.animate([{ transform: "rotate(" + ang + "deg)" }, { transform: "rotate(120deg)" }],
+        out.push(s.t.animate([{ transform: "rotate(" + ang + "deg)" }, { transform: "rotate(" + target + "deg)" }],
           { duration: dur, easing: "cubic-bezier(.3," + y1.toFixed(3) + ",.6,1)" }));
       } else {
         const rest = getComputedStyle(s.t);
