@@ -8,7 +8,12 @@ Written 2026-10-04 so any session can finish pending video work. Notebook: **"Sy
 |---|---|---|
 | Explainer: "Syrel: Workflows You Can Trust" `3d6fbe95-…` | ✅ done (9:16) — ⚠ its prompt said "8-stage gauntlet"; the code has **10** today. Regenerate before public use, or keep it as an internal draft. | downloaded to `~/Downloads/gemini-notebook/Syrel/explainer-workflows-you-can-trust.mp4` |
 | Documentary ep. 1 (cinematic) `9b0b14b0-…` "Syrel Chapter 1: The Friction of Progress" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep1-a-document-chat-you-can-trust.mp4` |
-| Documentary eps. 2–5 (cinematic) | ⏳ ALREADY CREATED — do NOT create again | The "rate-limited" calls (22:22–22:26 UTC) actually landed, with retries: **ep2 ×8, ep3 ×4, ep4 ×4, ep5 ×4** all `in_progress`. Duplicates DELETED 2026-10-04 (operator approved). Kept: **ep2 `a833b0e8-df4d-4084-a20b-7956fe435c42` · ep3 `9b81ef42-5ba0-4573-9c1f-38c75a3080a0` · ep4 `3e272465-7d2a-4d59-a4a4-02781e15b2d2` · ep5 `fea6288e-6f00-4db5-acf6-b0fa9c184613`**. Download each with `download_artifact` (artifact_type=video) when `studio_status` says completed, to `Syrel/build-story-epN-<slug>.mp4`; if one FAILS, re-create only that episode, once. |
+| Documentary eps. 2–5 (cinematic) | ⛔ first attempt FAILED (all 4, 2026-10-04 06:48 UTC, no media, no quota used) | Re-creating strictly one at a time — see protocol below. |
+| Ep. 2 retry `6f07613e-f8ad-4602-8109-a377ce73ee40` | ⏳ queued 07:09 UTC | the live one — download when completed |
+| Ep. 3 | ⏳ NOT YET CREATED | the 07:13 attempt was rate-limited and left ghost copies `68942998`, `732b1b05`, `ab6614a1`, `9a418335` — ignore them (they fail, no quota); create ep. 3 only AFTER ep. 2 completes |
+| Eps. 4–5 | ⏳ NOT YET CREATED | same: one at a time |
+
+**PROTOCOL (measured 2026-10-04):** this account runs **one cinematic generation at a time**. Creating a second while one is queued/in progress returns "Rate limited (code 8)" AND still leaves ~4 ghost copies that sit `in_progress` for hours then fail (no media, no quota). So: (1) `studio_status` — if any real episode is queued/in_progress, STOP; (2) create the next episode once; (3) on any error, never retry — check `studio_status`. Ep. 1 took ~3 h.
 
 Rate limit facts: ~2% of the weekly quota per video; the short rolling window throttles after ~3 videos ("Rate limited — code 8"). Check `usage_get` first.
 
