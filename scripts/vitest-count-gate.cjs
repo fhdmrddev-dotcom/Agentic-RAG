@@ -421,6 +421,32 @@ const BASELINE = {
   "cssClasses.test.ts": 1,
   "scenes.test.tsx": 9,
   "LandingPage.test.tsx": 7,
+  // Phase 276 — src/docs + new landing suites. Read from the gate's own printed `— N new` column on
+  // the 276-05 wave-3 run (2026-10-04), never a local vitest tail. Both directories were already in
+  // TARGETS (276-02 added "src/docs"), so these suites RAN and guarded nothing until now — TARGETS
+  // decides what runs, BASELINE what is guarded. Every docs suite is listed (completeness is
+  // DERIVED by globbing src/docs/__tests__, see 276-05-SUMMARY), plus the four landing suites
+  // Phase 276 added. LandingPage.test.tsx did not grow (7), so its pin above is unchanged.
+  "publicOpenapi.test.ts": 11,
+  "devRouting.test.ts": 7,
+  "docsVercelRouting.test.ts": 8,
+  "docsContent.test.ts": 14,
+  "changelog.test.ts": 8,
+  "search.test.ts": 5,
+  "router.test.ts": 7,
+  "Stub.test.tsx": 5,
+  "Article.test.tsx": 5,
+  "SearchBox.test.tsx": 5,
+  "ChangelogPage.test.tsx": 7,
+  "ApiReference.test.tsx": 3,
+  "DocsApp.test.tsx": 3,
+  "VideoSlot.test.tsx": 11,
+  "docsBundleFence.test.ts": 3,
+  "docsCoverageGate.test.ts": 8,
+  "landingBrand.test.ts": 2,
+  "Navigation.test.tsx": 5,
+  "landingFirstPaintFence.test.ts": 2,
+  "HeroPromo.test.tsx": 3,
   "MessageInput.connectors.test.tsx": 5,
   // SEED-235 (2026-09-01): 15 -> 19. Four cases for the SECOND approval in one run —
   // three for the defect (a stale decision rendered the next question as already answered
