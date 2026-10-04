@@ -42,6 +42,7 @@ const RESOLVED_PAGE_PREFIX = "\0" + PAGE_PREFIX
 export const MEDIA_NAME = /^[a-z0-9-]+\.(wav|mp3)$/
 const MEDIA_DIRS = { vo: "wav", music: "mp3" } as const
 
+/** Dev-middleware 404 body for a missing public spec (the build fails instead — see generateBundle). */
 export const MISSING_PUBLIC_SPEC_WARNING =
   "[docs-content] WARNING: docs/public/api/openapi.public.json is missing — /docs/api/reference will show its error state. Run node scripts/build-public-openapi.cjs"
 
@@ -173,11 +174,13 @@ export function docsContent(options: DocsContentOptions): Plugin {
     generateBundle() {
       const c = readContent()
       this.emitFile({ type: "asset", fileName: SEARCH_INDEX_FILE, source: searchIndexJson(c) })
-      if (fs.existsSync(publicSpec)) {
-        this.emitFile({ type: "asset", fileName: PUBLIC_SPEC_FILE, source: fs.readFileSync(publicSpec, "utf8") })
-      } else {
-        console.warn(MISSING_PUBLIC_SPEC_WARNING)
+      // 276-02 only warned here because 276-01 committed the spec in parallel. With both merged a
+      // missing spec is a broken build: /docs/api/reference would ship an error state to everyone.
+      // (Dev keeps answering 404 from the middleware below, so the page shows its error state.)
+      if (!fs.existsSync(publicSpec)) {
+        this.error("[docs-content] docs/public/api/openapi.public.json is missing — run node scripts/build-public-openapi.cjs")
       }
+      this.emitFile({ type: "asset", fileName: PUBLIC_SPEC_FILE, source: fs.readFileSync(publicSpec, "utf8") })
       for (const m of mediaFiles()) {
         this.emitFile({ type: "asset", fileName: `${m.dir}/${m.name}`, source: fs.readFileSync(m.abs) })
       }
