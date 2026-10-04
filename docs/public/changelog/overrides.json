@@ -1,0 +1,26 @@
+{
+  "v1.0": {
+    "note": "Global folders visible to every user no longer exist. Since v3.4 a folder is private or shared with your organisation, and only built-in platform content is visible to everyone. A chat's folder scope is no longer fixed at creation: since v4.4 you can change it mid-conversation."
+  },
+  "v2.0": {
+    "note": "Global skills visible to every user became sharing within your organisation in v3.4. Skills are no longer overwritten on save: since v3.2 every save creates an immutable version."
+  },
+  "v2.3": {
+    "note": "Library Health is no longer its own page. Since v3.9 it is the Health tab of the Library."
+  },
+  "v2.9": {
+    "note": "The publish check has ten stages today, not eight: Grounding and a final Commit check were added later. The read-only flow graph was replaced by a drag-and-drop canvas in v3.6."
+  },
+  "v3.0": {
+    "note": "Users can no longer share saved views, classification rules or custom fields with everyone: since v3.4 only platform-seeded content is shared that widely. The separate governance health page was folded into the Library's Health tab in v3.9."
+  },
+  "v3.6": {
+    "note": "The visual canvas is no longer off by default. Since v3.9 it is on for everyone, and an operator can still switch it off."
+  },
+  "v4.0": {
+    "note": "The scheduled watch loop that reads a connected folder every N minutes ships switched off. An operator has to turn on the watch process before a watched folder is read on a schedule."
+  },
+  "v4.3": {
+    "note": "A restricted Expert no longer takes tools away. Since v4.4 an Expert only adds tools, skills and connections; restricted now limits which knowledge folders the Expert reads. An Expert's sample documents are now copied into each organisation that installs it."
+  }
+}
