@@ -301,8 +301,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 276-03-PLAN.md — W2: docs site UI (home, guide, stub, section, changelog, Scalar API reference, search, menu drawer, YouTube/empty video slots)
-- [ ] 276-04-PLAN.md — W2: content — 31 fact-checked written pages, stubs for every other IA page, changelog overrides, screenshots, fact-check log
+- [x] 276-03-PLAN.md — W2: docs site UI (home, guide, stub, section, changelog, Scalar API reference, search, menu drawer, YouTube/empty video slots)
+- [x] 276-04-PLAN.md — W2: content — 31 fact-checked written pages, stubs for every other IA page, changelog overrides, screenshots, fact-check log
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -323,7 +323,7 @@ Plans:
 | 273. Agent-Authored Artifacts | 6/6 | Complete — 1 UAT row OWED (live STRUCTURED-path holdback check; run it first) | 2026-10-04 |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
-| 276. Public Docs, API Reference & Video Library | 2/5 | In Progress|  |
+| 276. Public Docs, API Reference & Video Library | 4/5 | In Progress|  |
 
 ---
 
