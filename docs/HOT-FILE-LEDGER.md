@@ -10838,7 +10838,7 @@ cells rot within days.
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ **FIRES** | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 96 / 75 / 1532 (was `95 / 74 / 1520`) | ⚠ **FIRES** | **273-05**: `Message.artifacts` re-exports the wire TYPE from artifactSpec.ts, never re-declared. Seam OWED |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 84 / 61 / 952 (was `83 / 60 / 951`) | ⚠ **FIRES** | ⚠ STALE (`83/60/951`). **271-01**: ONE import + ONE `include_router(document_search.router)` after `document_views`. 0 new branches |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 85 / 62 / 968 (was `84 / 61 / 952`) | ⚠ **FIRES** | ⚠ STALE (`84/61/952`). **276-01**: docs routes off in ctor; ONE `include_router(api_docs.router)` + boot log. 0 new branches |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 90 / 52 / 1698 (was `87 / 50 / 1593`) | ⚠ **FIRES** | ⚠ STALE (`87/50/1593`). **272-05**: the stale ef_search 'raised to 200' comment corrected; value 40 unchanged. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
@@ -11125,7 +11125,7 @@ cells rot within days.
 | [`frontend/src/landing/components/LandingFooter.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentslandingfootertsx) | 2 / 1 / 49 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 mark + © Syrel; 276-03 Docs/Changelog links, absolute hashes. ⛔ shared by landing AND docs entries |
 | [`frontend/src/landing/components/Navigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsnavigationtsx) | 2 / 1 / 120 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 lockup img; 276-03 Docs link, drawer, optional docs slots. ⛔ shared by BOTH entries — landing passes no docs props |
 | [`frontend/src/landing/components/HeroSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsherosectiontsx) | 1 / 1 / 820 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-05: static PromoSlot; import("./HeroPromo") only after load + scroll + ≥50% visible. ⛔ no static Remotion import (first-paint fence) |
-| [`backend/app/api/api_docs.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_docspy) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-01 DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate |
+| [`backend/app/api/api_docs.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_docspy) | 1 / 1 / 111 | no (1 phase) | young (created 276-01). DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate |
 | [`frontend/src/docs/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsmaintsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02: docs entry mount. ⛔ no providers, no app imports (docsBundleFence) |
 | [`frontend/src/docs/DocsApp.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsdocsapptsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02 interim, 276-03 route → page. ⛔ the ONE route→page switch; no app imports |
 | [`frontend/src/docs/router.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsrouterts) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02: resolveRoute + navigate (History API). ⛔ the app has no router — keep this docs-only |
@@ -18228,6 +18228,12 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 ### `backend/app/api/api_docs.py`
 
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-01 DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate. 276-05 re-derives the triple at close.
+
+**`1 / 1 / 111`** measured in 276-01's own creating commit. One router-level dependency (`require_api_docs_access`) over four `include_in_schema=False` routes; the token check is the existing `get_current_user` called directly, so no auth code is duplicated. `/openapi.json` returns `request.app.openapi()`, which keeps the Phase 182 canvas filter.
+
+### `backend/app/main.py` — Phase 276, honoured by construction
+
+**`85 / 62 / 968`** after 276-01 (was `84 / 61 / 952`). G-5 FIRES; honoured by construction: one constructor kwarg change (`docs_url=None, redoc_url=None, openapi_url=None`), one import, one `include_router(api_docs.router)`, one boot log line (`API docs: GATED/OPEN`, D-20), and the Phase 182 `/docs` comment struck through with a dated correction (D-03) rather than deleted. `app.openapi = build_canvas_aware_openapi(app)` is byte-unchanged. 0 new branches outside lifespan's one log if/else.
 
 ### `frontend/src/docs/main.tsx`
 
