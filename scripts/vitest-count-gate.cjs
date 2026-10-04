@@ -4508,6 +4508,8 @@ const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0)
 const TARGETS = [
   // Phase 226 (merge commit) — the public landing page: fence, facts, CSS-class lint, scenes, page.
   "src/landing",
+  // Phase 276 (276-02) — the public docs entry: routing, content pipeline, search, router. BASELINE pins land in 276-05's close pass.
+  "src/docs",
   "src/components/workflows",
   "src/pages/WorkflowBuilderPage.test.tsx",
   "src/pages/WorkflowBuilderPage.canvas.test.tsx",

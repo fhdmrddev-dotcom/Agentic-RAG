@@ -28,6 +28,7 @@ describe("rewriteDevUrl — docs entry (276-02)", () => {
     expect(rewriteDevUrl("/docs-assets/search-index.json")).toBe("/docs-assets/search-index.json")
     expect(rewriteDevUrl("/vo/clip-chat.wav")).toBe("/vo/clip-chat.wav")
     expect(rewriteDevUrl("/music/syrel-pulse.mp3")).toBe("/music/syrel-pulse.mp3")
+    expect(rewriteDevUrl("/docs.html")).toBe("/docs.html")
   })
 })
 

@@ -4,16 +4,17 @@
 // documented precedence over it: redirects → filesystem → rewrites (in array order). Memory note
 // `reference_vercel_filesystem_precedes_rewrites`: a real file always beats a rewrite, which is
 // why docs assets live under /docs-assets/ and never under /docs/.
-import fs from "node:fs"
-import path from "node:path"
+//
+// The file is read as `?raw` (typed by vite/client) rather than through node:fs, so this suite
+// adds nothing to the app typecheck's error set (tsconfig.app.json carries no node types).
 import { describe, expect, it } from "vitest"
+import vercelRaw from "../../../vercel.json?raw"
 
 type HostHas = { type: string; value: string }
 type Rule = { source: string; destination: string; has?: HostHas[]; permanent?: boolean }
 type VercelConfig = { redirects?: Rule[]; rewrites?: Rule[]; cleanUrls?: boolean }
 
-const configPath = path.resolve(__dirname, "../../../vercel.json")
-const config = JSON.parse(fs.readFileSync(configPath, "utf8")) as VercelConfig
+const config = JSON.parse(vercelRaw) as VercelConfig
 
 // The static output a `vite build` produces (the three entries + emitted docs assets).
 const FILESYSTEM = new Set([

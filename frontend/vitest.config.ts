@@ -17,6 +17,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Phase 276 — mirrors vite.config.ts: Remotion compositions are imported from ../video/src.
+      "@video": path.resolve(__dirname, "../video/src"),
     },
   },
 })
