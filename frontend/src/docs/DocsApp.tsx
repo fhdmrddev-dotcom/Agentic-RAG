@@ -5,7 +5,8 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
 import { changelog, chapters, loadPage, pages, sections } from "virtual:docs-manifest"
 import { LandingFooter } from "../landing/components/LandingFooter"
-import { Navigation } from "../landing/components/Navigation"
+import { DocsHeader, HERO_SEARCH_ID } from "./components/DocsHeader"
+import { SearchBox } from "./components/SearchBox"
 import { DocsDataProvider, type DocsData } from "./docsData"
 import { Article } from "./pages/Article"
 import { Home } from "./pages/Home"
@@ -102,7 +103,7 @@ export function DocsApp() {
   let body
   switch (route.kind) {
     case "home":
-      body = <Home />
+      body = <Home search={<SearchBox variant="hero" inputId={HERO_SEARCH_ID} />} />
       break
     case "article":
       body = <Article key={route.slug} slug={route.slug!} />
@@ -125,7 +126,7 @@ export function DocsApp() {
       )
       break
     default:
-      body = <NotFound />
+      body = <NotFound search={<SearchBox variant="drawer" />} />
   }
 
   return (
@@ -134,7 +135,7 @@ export function DocsApp() {
         <a className="d-skip" href="#content">
           Skip to content
         </a>
-        <Navigation />
+        <DocsHeader isHome={route.kind === "home"} />
         <main id="content" data-route={route.kind}>
           {body}
         </main>
