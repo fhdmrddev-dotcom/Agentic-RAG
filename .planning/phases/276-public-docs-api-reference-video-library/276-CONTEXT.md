@@ -146,6 +146,24 @@ run, so each was resolved here rather than blocking. Every one is reversible.
   (`facts.ts` GAUNTLET_STAGES, `0ab1639c9`); the NotebookLM Workflows explainer still says "8-stage"
   and is **not embedded publicly**.
 
+- **D-26 (operator, 2026-10-04):** The NotebookLM documentaries ("Syrel: The Build Story", 5 chapters)
+  get a dedicated docs page **"Syrel: The Build Story"**: the 5 chapters in order, each with a
+  one-line summary, the releases it covers and its player. It is linked from the docs home chapter
+  strip and from the changelog. The changelog chapter slots stay. Hosting is **YouTube**, per D-12:
+  self-hosted poster, `youtube-nocookie` player loaded on click, an empty slot renders nothing, and
+  the upload is an operator action. Each episode is wrapped by `BrandedEpisode` before upload.
+  Documentaries never autoplay and never appear in the landing hero.
+- **D-27 (operator, 2026-10-04):** The avatar motion is **sketch 276-iris-avatar variant D "Orbit + wave"**,
+  with the seamless loop: a full 360° ring turn equals 3 wave periods. The five sketch decisions are
+  accepted: one live avatar, with the RunCard provider logo static; `Bot` kept as the
+  unknown-provider fallback; new `iris*` keyframes, with the dead duplicate `brandPulse` removed;
+  a dark chip behind the mark in both themes; the redundant spinners removed. The full app-wide logo
+  pass from `276-LOGO-INVENTORY.md` ships in the same phase.
+  **G-8 justification for plans 6-7:** both were added by operator direction mid-execution (D-24, D-26,
+  D-27) after plans 01-05 had shipped. The avatar (chat hot files plus `index.css`) and the logo pass
+  plus the Build Story page (strings, backend, public assets, docs) have disjoint files, so they run as
+  two parallel plans rather than one oversized one.
+
 ### Claude's Discretion
 - **API renderer:** Scalar (`@scalar/api-reference-react`, MIT) recommended by research, reading the
   static pre-filtered JSON; fall back to Redoc static build if Scalar's bundle weight hurts. Either way
