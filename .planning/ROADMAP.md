@@ -296,8 +296,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 276-01-PLAN.md — W1: gated live API docs (DOCS-04), OpenAPI snapshot drift + public "Syrel API" spec, one-pass Iris logo + Syrel rename
-- [ ] 276-02-PLAN.md — W1: package gate + deps, third Vite entry, /docs routing (dev/Vercel/nginx), onebox build context, parser + content plugin + changelog model + search index
+- [x] 276-01-PLAN.md — W1: gated live API docs (DOCS-04), OpenAPI snapshot drift + public "Syrel API" spec, one-pass Iris logo + Syrel rename
+- [x] 276-02-PLAN.md — W1: package gate + deps, third Vite entry, /docs routing (dev/Vercel/nginx), onebox build context, parser + content plugin + changelog model + search index
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -323,7 +323,7 @@ Plans:
 | 273. Agent-Authored Artifacts | 6/6 | Complete — 1 UAT row OWED (live STRUCTURED-path holdback check; run it first) | 2026-10-04 |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
-| 276. Public Docs, API Reference & Video Library | 0/5 | Planned | - |
+| 276. Public Docs, API Reference & Video Library | 2/5 | In Progress|  |
 
 ---
 
