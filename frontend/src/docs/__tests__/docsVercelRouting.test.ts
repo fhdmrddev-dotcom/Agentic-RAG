@@ -5,6 +5,10 @@
 // `reference_vercel_filesystem_precedes_rewrites`: a real file always beats a rewrite, which is
 // why docs assets live under /docs-assets/ and never under /docs/.
 //
+// ⚠ Named docsVercelRouting, NOT vercelRouting: scripts/vitest-count-gate.cjs keys BASELINE by
+// BASENAME, and src/__tests__/routing/vercelRouting.test.ts (Phase 228) is already pinned — under
+// the shared name the gate summed both suites (8 → 16) and guarded neither on its own.
+//
 // The file is read as `?raw` (typed by vite/client) rather than through node:fs, so this suite
 // adds nothing to the app typecheck's error set (tsconfig.app.json carries no node types).
 import { describe, expect, it } from "vitest"
