@@ -6,8 +6,9 @@
 # scripts/lib/docs-content.cjs; the gate exits 2 if a source parses below its floor.
 #
 # The primary guard is the local PostToolUse hook .claude/hooks/docs-coverage-guard.js, which
-# fires in the turn an agent edits one of these files. This workflow is the final gate on shared
-# branches.
+# fires in the turn an agent edits one of these files — once the operator registers it in
+# .claude/settings.json (an approval-gated config edit; the exact entry is in the hook's header).
+# Until then this workflow is the only automatic run; it is always the final gate on shared branches.
 
 name: docs-coverage
 

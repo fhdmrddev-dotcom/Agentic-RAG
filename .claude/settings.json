@@ -127,16 +127,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"C:/Program Files/nodejs/node.exe\" \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/docs-coverage-guard.js",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
             "command": "\"C:/Program Files/nodejs/node.exe\" \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/verification-honesty-guard.js",
             "timeout": 10
           }

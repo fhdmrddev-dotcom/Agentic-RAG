@@ -7,6 +7,15 @@
  * docs page, is written. Silent when clean; when red it hands the findings back to the agent as
  * additionalContext in the SAME turn the edit was made (the primary guard — the CI workflow
  * .github/workflows/docs-coverage.yml is the backstop). Always exits 0: it informs, never blocks.
+ *
+ * ⚠ REGISTRATION IS OPERATOR-GATED. .claude/settings.json is the operator's configuration (see
+ * docs/HOT-FILE-LEDGER.md § .claude/settings.json, invariant 4), so 276-05 did NOT register this
+ * hook. Until the operator approves it, the CI workflow is the only automatic run. The entry to add
+ * to hooks.PostToolUse, beside the landing-drift-guard entry:
+ *
+ *   { "matcher": "Write|Edit", "hooks": [ { "type": "command",
+ *     "command": "\"C:/Program Files/nodejs/node.exe\" \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/docs-coverage-guard.js",
+ *     "timeout": 10 } ] }
  */
 
 'use strict';
