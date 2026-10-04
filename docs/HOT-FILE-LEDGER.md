@@ -10827,8 +10827,8 @@ cells rot within days.
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 60 / 23 / 3297 | **FIRES** | ⚠ STALE (`58/21/3290`). **268-REVIEW WR-06**: the resume shell carries its run's org — the org read MOVED above the INSERT, one kwarg |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 2 / 1 / 56 | no (1 phase) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse go (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
-| [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 0 / 0 / 0 | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |
-| [`frontend/src/components/chat/IrisAvatar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisavatartsx) | 0 / 0 / 0 | no (new) | young (created 276-06). Row added AT PLANNING. Sketch 276 variant D (D-27). ⛔ orbit period = 3 × wave period, sweep 360°; gradient ids from useId, sanitised; aria-hidden |
+| [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |
+| [`frontend/src/components/chat/IrisAvatar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisavatartsx) | 1 / 1 / 310 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. Sketch 276 variant D (D-27). ⛔ orbit period = 3 × wave period, sweep 360°; gradient ids from useId, sanitised; aria-hidden |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 6 / 2 / 320 | no (2 phases) | ⚠ row STALE (`4/1/283`; CLAUDE.md read `4/1/313`). NOT modified by 253 — re-derived under CR-08. Still ONE reasoning renderer; no duration derived from length |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 41 / 20 / 1007 (was `38 / 19 / 977`) | **FIRES** | ⚠ STALE (`38/19/977`). **268-03**: +2 optional ReactNode slots; hooks 8/6/4 → 8/6/4. ⛔ 0 new top-level controls |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 24 / 11 / 376 (was `21 / 9 / 307`) | **FIRES** | ⚠ row STALE (`21/9/307`). honoured by construction (**267-04**): the turn index skips system rows via ONE module-level helper; no prop added |
@@ -14457,11 +14457,11 @@ Both renderers now read both inputs; nothing executable binds them, which is the
 
 ### `frontend/src/components/chat/irisState.ts`
 
-**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). `irisStateFor(message, capPaused)` and `hasPendingAsk` (moved here from `MessageItem.tsx` so the precedence has ONE home). ⛔ Pure: it reads only the `message` prop and the caller's already-read lock; never a store. 276-06 re-derives the triple at close.
+**`1 / 1 / 44`** at 276-06 (was **`0 / 0 / 0`** at 276 planning). Young (created in Phase 276). `irisStateFor(message, capPaused)` and `hasPendingAsk` (moved here from `MessageItem.tsx` so the precedence has ONE home). ⛔ Pure: it reads only the `message` prop and the caller's already-read lock; never a store. 276-06 re-derives the triple at close.
 
 ### `frontend/src/components/chat/IrisAvatar.tsx`
 
-**`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). The animated Iris assistant avatar, sketch 276-iris-avatar variant D "Orbit + wave" (D-24, D-27). ⛔ The seamless-loop invariant: the orbit period must stay an integer multiple of the wave period (4.8 s = 3 × 1.6 s) and the orbit sweep must stay 360°; `IrisAvatar.test.tsx` pins it from `index.css`. 276-06 re-derives the triple at close.
+**`1 / 1 / 310`** at 276-06 (was **`0 / 0 / 0`** at 276 planning). Young (created in Phase 276). The animated Iris assistant avatar, sketch 276-iris-avatar variant D "Orbit + wave" (D-24, D-27). ⛔ The seamless-loop invariant: the orbit period must stay an integer multiple of the wave period (4.8 s = 3 × 1.6 s) and the orbit sweep must stay 360°; `IrisAvatar.test.tsx` pins it from `index.css`. 276-06 re-derives the triple at close.
 
 ### `frontend/src/components/settings/ActionRow.tsx`
 
