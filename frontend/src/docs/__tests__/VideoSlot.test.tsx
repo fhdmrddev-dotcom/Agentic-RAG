@@ -109,6 +109,12 @@ beforeEach(() => {
 
 const lastPlayer = () => h.playerProps[h.playerProps.length - 1] as PlayerProps
 
+// The first click imports the real kit (remotion + transitions) through RemotionSlot: ~4 s alone and
+// far longer on a loaded box. Measured at the 276-05 wave gate: the default 1 s findBy timeout
+// failed this suite under `--maxWorkers=2` while it passed in isolation — a timing defect in the
+// TEST, so the waits are widened rather than the gate re-run.
+const SLOW = { timeout: 30000 }
+
 describe("VideoSlot", () => {
   it("renders nothing for an unknown slot", () => {
     const { container } = render(<VideoSlot slot="clip.nope" />)
@@ -146,7 +152,7 @@ describe("VideoSlot", () => {
   })
 })
 
-describe("VideoSlot — Remotion (276-05)", () => {
+describe("VideoSlot — Remotion (276-05)", { timeout: 60000 }, () => {
   // ⚠ ORDER-DEPENDENT BY DESIGN: this must be the first Remotion test, because the module registry
   // is shared across the file and the import spy proves the FIRST download happens on click.
   it("home.overview: poster only, nothing imported until the click; then a licensed, controlled Player", async () => {
@@ -160,7 +166,7 @@ describe("VideoSlot — Remotion (276-05)", () => {
     expect(screen.queryByTestId("remotion-player")).toBeNull()
 
     fireEvent.click(button)
-    expect(await screen.findByTestId("remotion-player")).toBeInTheDocument()
+    expect(await screen.findByTestId("remotion-player", {}, SLOW)).toBeInTheDocument()
     expect(h.importSpy).toHaveBeenCalledTimes(1)
     const p = lastPlayer()
     expect(p.acknowledgeRemotionLicense).toBe(true)
@@ -173,7 +179,7 @@ describe("VideoSlot — Remotion (276-05)", () => {
     expect(p.durationInFrames).toBe(1199)
     expect(p.inputProps).toEqual({ musicSrc: null })
     // the narrated composition rendered, and web playback suppressed its remote SFX
-    const comp = await screen.findByTestId("composition")
+    const comp = await screen.findByTestId("composition", {}, SLOW)
     expect(comp.getAttribute("data-music")).toBe("null")
     expect(comp.innerHTML).toBe("")
     expect(container.innerHTML).not.toMatch(/remotion\.media/)
@@ -189,11 +195,11 @@ describe("VideoSlot — Remotion (276-05)", () => {
   it("clip.chat passes inputProps { id: 'chat' } and the clip's duration", async () => {
     render(<VideoSlot slot="clip.chat" />)
     fireEvent.click(screen.getByRole("button", { name: /^Play video: Chat with your knowledge, 0:15$/ }))
-    expect(await screen.findByTestId("remotion-player")).toBeInTheDocument()
+    expect(await screen.findByTestId("remotion-player", {}, SLOW)).toBeInTheDocument()
     const p = lastPlayer()
     expect(p.inputProps).toEqual({ id: "chat" })
     expect(p.durationInFrames).toBe(457)
-    expect((await screen.findByTestId("composition")).getAttribute("data-clip")).toBe("chat")
+    expect((await screen.findByTestId("composition", {}, SLOW)).getAttribute("data-clip")).toBe("chat")
   })
 
   it("an IA clip key with no shipped clip renders nothing (D-13)", () => {
@@ -207,7 +213,7 @@ describe("VideoSlot — Remotion (276-05)", () => {
     broken.load.mockRejectedValueOnce(new Error("offline"))
     render(<VideoSlot slot="clip.broken" />)
     fireEvent.click(screen.getByRole("button", { name: "Play video: Broken clip, 0:10" }))
-    const alert = await screen.findByRole("alert")
+    const alert = await screen.findByRole("alert", {}, SLOW)
     expect(alert).toHaveTextContent("This video couldn't load. Check your connection and try again.")
     expect(screen.queryByTestId("remotion-player")).toBeNull()
     // the poster returned
@@ -220,9 +226,9 @@ describe("VideoSlot — Remotion (276-05)", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Try loading the video again" }))
     })
-    expect(await screen.findByTestId("remotion-player")).toBeInTheDocument()
+    expect(await screen.findByTestId("remotion-player", {}, SLOW)).toBeInTheDocument()
     expect(broken.load).toHaveBeenCalledTimes(2)
-    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull())
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull(), SLOW)
   })
 
   it("kit's Sfx is a real renderer outside the web provider (non-vacuity of the SfxOn arm)", async () => {

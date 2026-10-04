@@ -131,7 +131,7 @@ afterAll(() => {
   if (TMP_BASE && TMP_BASE.startsWith(nodePath.resolve(os.tmpdir()))) fs.rmSync(TMP_BASE, { recursive: true, force: true })
 })
 
-describe("check-docs-coverage.cjs (DOCS-02)", () => {
+describe("check-docs-coverage.cjs (DOCS-02)", { timeout: 60000 }, () => {
   it("passes on a faithful copy of the real tree and prints the summary line", () => {
     const { status, out } = runGate(freshRoot())
     expect(out).toMatch(/\d+ code keys · \d+ inventory IDs · \d+ pages \(\d+ written \/ \d+ stubs\)/)

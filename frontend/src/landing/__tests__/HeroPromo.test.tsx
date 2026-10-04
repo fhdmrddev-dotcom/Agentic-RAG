@@ -35,6 +35,12 @@ vi.mock("@video/promo/SyrelPromo", () => ({
   PROMO_DURATION: 1005,
   PromoBody: (p: { musicSrc?: string | null }) => createElement("div", { "data-music": String(p.musicSrc) }),
 }))
+// The real kit pulls remotion + transitions (seconds to import on a loaded box); the promo only
+// needs its two contexts here.
+vi.mock("@video/energetic/kit", async () => {
+  const { createContext } = await import("react")
+  return { AudioOn: createContext(true), SfxOn: createContext(true) }
+})
 vi.mock("../components/HeroPromo", async (importOriginal) => {
   h.promoImport()
   return importOriginal()
@@ -99,7 +105,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe("Landing hero promo (V4)", () => {
+describe("Landing hero promo (V4)", { timeout: 60000 }, () => {
   // ⚠ ORDER-DEPENDENT BY DESIGN: the first test proves the FIRST import happens only after
   // load + scroll + ≥ 50% visibility (the module registry is shared across this file).
   it("imports nothing on mount or on visibility alone; starts muted after load + a scroll + ≥ 50%", async () => {
@@ -122,7 +128,7 @@ describe("Landing hero promo (V4)", () => {
     act(() => {
       window.dispatchEvent(new Event("scroll"))
     })
-    expect(await screen.findByTestId("promo-player")).toBeInTheDocument()
+    expect(await screen.findByTestId("promo-player", {}, { timeout: 30000 })).toBeInTheDocument()
     expect(h.promoImport).toHaveBeenCalledTimes(1)
     expect(h.playerImport).toHaveBeenCalledTimes(1)
 
@@ -147,7 +153,7 @@ describe("Landing hero promo (V4)", () => {
       window.dispatchEvent(new Event("scroll"))
     })
     fireIntersection(slot, 0.9)
-    await screen.findByTestId("promo-player")
+    await screen.findByTestId("promo-player", {}, { timeout: 30000 })
     expect(lastPlayer().inputProps.musicSrc).toBeNull()
 
     fireEvent.click(screen.getByRole("button", { name: "Unmute promo" }))
@@ -188,7 +194,7 @@ describe("Landing hero promo (V4)", () => {
     expect(screen.queryByTestId("promo-player")).toBeNull()
 
     fireEvent.click(screen.getByRole("button", { name: "Play the Syrel promo" }))
-    expect(await screen.findByTestId("promo-player")).toBeInTheDocument()
+    expect(await screen.findByTestId("promo-player", {}, { timeout: 30000 })).toBeInTheDocument()
     expect(lastPlayer().initiallyMuted).toBe(true)
     expect(lastPlayer().inputProps.musicSrc).toBeNull()
     expect(screen.getByRole("button", { name: "Pause promo" })).toBeInTheDocument()
