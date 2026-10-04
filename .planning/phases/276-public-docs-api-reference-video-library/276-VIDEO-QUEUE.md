@@ -13,6 +13,8 @@ Written 2026-10-04 so any session can finish pending video work. Notebook: **"Sy
 | Ep. 3 | ⏳ NOT YET CREATED | the 07:13 attempt was rate-limited and left ghost copies `68942998`, `732b1b05`, `ab6614a1`, `9a418335` — ignore them (they fail, no quota); create ep. 3 only AFTER ep. 2 completes |
 | Eps. 4–5 | ⏳ NOT YET CREATED | same: one at a time |
 
+**ROOT CAUSE (measured 2026-10-04 08:20 UTC):** one cinematic video consumes ~50% of the **rolling** usage window (ep. 2 alone → 54%). Any cinematic create while the rolling window is ~50%+ used is rate-limited — even with nothing running — and leaves 4 ghosts. **Rule: one documentary per rolling window.** Check `usage_get` → create only when the rolling window is near 0% (it resets every ~5 h). Ghosts from the 08:19 attempt: `e0f44cd0`, `07ab8351`, `f0854e85`, `ec2d7657` (operator previously approved deleting ghosts; delete them before the next create). Next window reset: 2026-10-04 11:24 UTC.
+
 **PROTOCOL (measured 2026-10-04):** this account runs **one cinematic generation at a time**. Creating a second while one is queued/in progress returns "Rate limited (code 8)" AND still leaves ~4 ghost copies that sit `in_progress` for hours then fail (no media, no quota). So: (1) `studio_status` — if any real episode is queued/in_progress, STOP; (2) create the next episode once; (3) on any error, never retry — check `studio_status`. Ep. 1 took ~3 h.
 
 Rate limit facts: ~2% of the weekly quota per video; the short rolling window throttles after ~3 videos ("Rate limited — code 8"). Check `usage_get` first.
