@@ -2,13 +2,15 @@
 // unchanged). It resolves the route against virtual:docs-manifest, renders the page component,
 // intercepts same-origin /docs links for client navigation, and on each navigation sets the title,
 // scrolls (top or hash), and moves focus to the page H1.
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
-import { changelog, chapters, loadPage, pages, sections } from "virtual:docs-manifest"
+import { Component, Suspense, lazy, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react"
+import { DOCS_DATA } from "./docsManifest"
 import { LandingFooter } from "../landing/components/LandingFooter"
 import { DocsHeader, HERO_SEARCH_ID } from "./components/DocsHeader"
 import { SearchBox } from "./components/SearchBox"
 import { DocsDataProvider, type DocsData } from "./docsData"
 import { Article } from "./pages/Article"
+import { Changelog } from "./pages/Changelog"
+import { ChangelogVersion } from "./pages/ChangelogVersion"
 import { Home } from "./pages/Home"
 import { NotFound } from "./pages/NotFound"
 import { SectionIndex } from "./pages/SectionIndex"
@@ -16,7 +18,37 @@ import { Stub } from "./pages/Stub"
 import { navigate, resolveRoute } from "./router"
 import type { Route } from "./types"
 
-const DATA: DocsData = { sections, pages, changelog, chapters, loadPage }
+const DATA: DocsData = DOCS_DATA
+
+// The API reference page is its own chunk (and Scalar a further one inside it): neither is in the
+// docs first-paint payload (UI-SPEC "Routing and loading contract").
+const ApiReference = lazy(() => import("./pages/ApiReference").then((m) => ({ default: m.ApiReference })))
+
+const API_LOADING = (
+  <p className="d-api-state d-muted" role="status">
+    Loading the API reference…
+  </p>
+)
+
+/** If the API reference route chunk itself fails to load, say so instead of blanking the page. */
+class RouteChunkBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <p className="d-api-state" role="alert">
+        The API reference couldn't load. Refresh the page, or{" "}
+        <a href="/docs-assets/openapi.public.json" download="openapi.public.json">
+          download the OpenAPI file
+        </a>
+        .
+      </p>
+    )
+  }
+}
 
 export function titleFor(route: Route, data: DocsData): string {
   switch (route.kind) {
@@ -115,14 +147,18 @@ export function DocsApp() {
       body = <SectionIndex sectionId={route.sectionId!} />
       break
     case "changelog":
+      body = <Changelog />
+      break
     case "changelog-version":
+      body = <ChangelogVersion key={route.version} version={route.version!} />
+      break
     case "api-reference":
       body = (
-        <article className="d-article">
-          <h1 tabIndex={-1} className="d-h1">
-            {titleFor(route, DATA).replace(" · Syrel Docs", "")}
-          </h1>
-        </article>
+        <RouteChunkBoundary>
+          <Suspense fallback={API_LOADING}>
+            <ApiReference />
+          </Suspense>
+        </RouteChunkBoundary>
       )
       break
     default:
