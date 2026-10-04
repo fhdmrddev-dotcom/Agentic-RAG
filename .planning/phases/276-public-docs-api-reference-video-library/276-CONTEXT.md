@@ -132,6 +132,20 @@ run, so each was resolved here rather than blocking. Every one is reversible.
   "Include source files outside the Root Directory" ON, and `ENVIRONMENT=production` on Coolify.
   Onebox frontend build context moves to repo root in the same commit as the deploy artifacts.
 
+### Operator direction mid-execution (2026-10-04)
+- **D-24 (overrides D-15 for one surface):** The Iris logo is mapped **across the whole application**,
+  not only the D-14 list, and the **chat assistant avatar is the Iris mark, animated** in the manner of
+  Claude.ai's assistant mark: it moves while the agent is working (thinking / tool-running / streaming)
+  and settles to the static mark when idle or done. It honours `prefers-reduced-motion` (static).
+  Pages still use the static lockup; the landing hero keeps one moving element (the promo).
+  Method: a full insertion-point inventory first (study), then a G-2 sketch of the avatar's motion
+  states for operator approval before it is built (`MessageItem.tsx` and the run surface are G-5 hot
+  files).
+- **D-25:** Video work is owned by the parallel session `agentic-rag-a1` (NotebookLM queue +
+  `276-VIDEO-QUEUE.md` only); 276-05 owns `video/` code. The publish gauntlet is **10 stages**
+  (`facts.ts` GAUNTLET_STAGES, `0ab1639c9`); the NotebookLM Workflows explainer still says "8-stage"
+  and is **not embedded publicly**.
+
 ### Claude's Discretion
 - **API renderer:** Scalar (`@scalar/api-reference-react`, MIT) recommended by research, reading the
   static pre-filtered JSON; fall back to Redoc static build if Scalar's bundle weight hurts. Either way
