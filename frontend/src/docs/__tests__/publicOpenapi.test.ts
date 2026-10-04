@@ -16,6 +16,8 @@ const nodePath = await vi.importActual<any>("node:path")
 const nodeOs = await vi.importActual<any>("node:os")
 const nodeModule = await vi.importActual<any>("node:module")
 const childProcess = await vi.importActual<any>("node:child_process")
+// via importActual, not the `process` global: tsconfig.app.json has no node types
+const nodeProcess = await vi.importActual<any>("node:process")
 
 const REPO_ROOT: string = (() => {
   const here = decodeURIComponent(import.meta.url).replace(/^file:\/\/\/?/, "")
@@ -48,7 +50,7 @@ function ops(doc: any): Array<{ method: string; path: string; op: any }> {
 const badgeNames = (op: any): string[] => (op["x-badges"] ?? []).map((b: any) => b.name)
 
 function runCli(args: string[]) {
-  return childProcess.spawnSync(process.execPath, [SCRIPT, ...args], {
+  return childProcess.spawnSync(nodeProcess.execPath, [SCRIPT, ...args], {
     cwd: REPO_ROOT,
     encoding: "utf-8",
   })
