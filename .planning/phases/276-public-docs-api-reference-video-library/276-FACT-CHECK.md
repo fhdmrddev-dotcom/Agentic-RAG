@@ -187,3 +187,105 @@ code wins and the row says so.
 | administer/models/providers | Eight providers | `facts.ts` `MODEL_PROVIDERS` | kept |
 | deploy/setup-wizard | Six steps incl. "preset"; no preset count stated | inventory A53 | kept (no "three presets") |
 | api/concepts/webhooks, limits-and-spend, roadmap-open-platform | Not available today; SEED-013 / SEED-345 | inventory h.2, H45, H47 | kept |
+| automate/workflows/runs, step-types, extend/templates-and-schemas, deliverables, use/code-execution | Word/PDF sentence on one line in the summary | SEED-338; README honesty rule | kept (added after the coverage sweep) |
+
+## Experts
+
+| Page | Claim | Source | Verdict |
+|---|---|---|---|
+| experts/what-are-experts | An Expert is data: skills, folders, connections, prompts, access | v4.3 What shipped (Experts as bundles); v4.4 How it works | kept |
+| experts/what-are-experts | An Expert only adds tools/skills/connections; never removes a tool | v4.4 Status today ("An Expert only adds tools"; `tool_floor_enabled` unread) | kept |
+| experts/what-are-experts | **Biased = chat folder + Expert folders; restricted = Expert folders only, stated before invite** | v4.4 How it works (`expert_scope.py`); v4.4 Status today ("Restricted / biased folder rules") | corrected — the plan's blanket "never restricts" holds for tools, not for knowledge; the page says so and keeps "adds, never takes a tool away" |
+| experts/what-are-experts | One active Expert per chat; a swap writes a transcript note | v4.4 Status today (`TRANSCRIPT_EVENT_KINDS`) | kept |
+| experts/what-are-experts | Per-org install copies sample docs; no duplicates; no cross-org read | v4.4 Status today | kept |
+| experts/what-are-experts | Five starter Experts by name | v4.4 Status today (mig 198) | kept |
+| experts/what-are-experts | Visibility depends on plan | v4.4 Key decisions (D-269-P1: starter library visible to enterprise tier) | kept |
+| experts/* | Restriction grep (`restrict(s\|ed)? (what\|the) .*Expert\|Experts? (narrow\|restrict)`) | manual read | 0 hits after rewording the v4.3-reversal note ("could take tools away") |
+| experts/catalog | Search by name/topic/capability; Details; "Start Chat" | `ExpertCatalogPage.tsx` / `ExpertCard.tsx` copy; screenshot | kept |
+| experts/catalog | Detail sections (When To Summon, Bound Folders, Bound Skills, Knowledge Composition, One-Click Action Prompts, Sample Deliverable Output) | `ExpertDetailModal.tsx` | kept |
+| experts/catalog | "Requires … — not connected" with offer to connect | v4.4 What shipped (honest requirements) | kept |
+| experts/catalog | Install states; admin installs from the catalog; retry | `ExpertCatalogPage.tsx` / `expertCatalog.ts` copy | kept |
+| experts/catalog | A signup org with no tier sees the refusal, not a blank page | v4.4 Key decisions D-269-P1 | kept |
+| experts/using-experts | Invite from the composer; no invite control until the restricted-cost statement answers | `InviteExpertDialog.tsx` header (expert-scope-preview); v4.4 What shipped | kept |
+| experts/using-experts | "Wait for this answer to finish before changing the Expert." | `expertCatalog.ts` copy | kept |
+| experts/using-experts | Handoff proven on one provider | v4.4 Status today (Unverified; SEED-327) | kept as Note |
+| experts/authoring | Org admin Experts tab; studio sections | inventory A40; v4.3 What shipped | kept |
+| experts/authoring | Who may author is a data setting; grants per user/role; disable/delete | v4.3 What shipped | kept |
+| experts/authoring | AI drafting from files; born-for skills approved one by one; save refuses unknown skills; skill loads for every org member | v4.3 What shipped + Status today (`suggested_new_skills`) | kept |
+| experts/authoring | Install needs `experts:manage`; Installing → Ready → Install failed | v4.4 How it works + Key decisions | kept |
+
+## Security
+
+| Page | Claim | Source | Verdict |
+|---|---|---|---|
+| security/data-isolation | Membership RLS; most requests reach the DB as the user | v3.4 What shipped + Status today (`get_user_pg_connection`, `get_user_supabase`) | kept |
+| security/data-isolation | **Service-credential paths scope in code (ingestion, schedules, workflow definitions)** | `db/workflows.py:995-1000` ("The service-role engine bypasses RLS, so EVERY query self-scopes created_by") | corrected — first draft said the API always talks to the database as the signed-in person |
+| security/data-isolation | Search is org- and folder-aware | v3.4 What shipped | kept |
+| security/data-isolation | `is_system_global` not user-settable | v3.4 What shipped; RLS `WITH CHECK (is_system_global = false)` in `supabase/full-schema.sql` | kept |
+| security/data-isolation | Connection-scoped visibility; documents record their connection | v4.0 What shipped + Status today | kept |
+| security/data-isolation | 404-not-403 for cross-owner/org misses and operator routes | inventory H44; `api/workflows.py` "draft not found" docstring; v3.3 Status today | kept |
+| security/data-isolation | Departments schema-only | v3.4 Status today ("no backend code reads dept_id") | kept |
+| security/secrets | Provider keys encrypted at rest with `SECRETS_ENCRYPTION_KEY`; unset → plaintext; malformed → refuse to start; comma list rotates; lost key → treated unset, env fallback | `security/secret_cipher.py` header (D-150-01/04/05/06) | kept |
+| security/secrets | **Connection secrets always encrypted; no key → refuse to store or use** | `services/connector_service.py` D-11 header (`ConnectorCipherUnavailable`, `ConnectorSecretNotEncrypted`) | corrected — first draft omitted that this path fails closed |
+| security/secrets | Credential columns not readable by app users | v3.6 Status today (mig 118 REVOKE) | kept |
+| security/secrets | Pasted secret refused in a non-secret field, kept out of the log | v4.2 What shipped + Status today | kept |
+| security/secrets | Secrets tab locked "coming soon" | inventory A50; `components/admin/ControlRoomPage.tsx` (`secrets` tab) | kept |
+| security/egress-controls | MCP destination: HTTPS only, all resolved addresses public, pinned | `security/egress.py` `validate_mcp_destination` (`scheme_not_tls`, public-address predicate, `PinnedDestination`) | kept |
+| security/egress-controls | Allow/Ask/Deny grants; approval names service; denial names grant | v3.9 What shipped + Status today; `ChatToolApprovalCard.tsx` | kept |
+| security/egress-controls | Write tools forced to Ask when connection content is in context | `tool_dispatcher.py:4790` TRUST-03 fence | kept |
+| security/egress-controls | Live sending off by default; "Not sent — recorded" | v3.6 Status today | kept |
+| security/egress-controls | Connection call receipts; active connectors per message | v3.9 What shipped + Status today | kept |
+| security/egress-controls | No generic HTTP step; no inbound webhooks except OAuth redirects | `docs/EXTENSION-CONTRACT.md` Refusal 2 (inventory G8); inventory H47 | kept |
+| security/sandbox-isolation | `SANDBOX_ENABLED`; per-chat container; 30-minute idle TTL; prebuilt image via `SANDBOX_IMAGE` | v2.0 Status today; `config.py:1161`; `sandbox_service.py:42` | kept |
+| security/sandbox-isolation | Docker socket = host root; single-tenant only | `docker-compose.prod.yml:117-119`; inventory I11 | kept |
+| security/sandbox-isolation | **No Syrel-added network or CPU/memory limits; code can reach the internet** | `sandbox_service.py:36-80` (only `name`/`labels` in `runtime_configs`); v3.5 What shipped (declared libraries install) | kept — not in history; stated from code so operators can decide |
+| security/audit-trails | Own audit log: actions, date pills, action filter, CSV; insert-only | v2.2 What shipped + Status today | kept |
+| security/audit-trails | Settings reachability caveat | `lib/nav-items.ts` | corrected (see navigating-syrel) |
+| security/audit-trails | Org audit tab; Control Room two-ledger browser, recorded CSV, append-only operator ledger | v3.3 + v3.4 What shipped / Status today | kept |
+| security/audit-trails | Workflow audit trail; connection receipts; Expert/scope notes; correction audit | v2.8, v3.9, v4.4, v3.0 What shipped | kept |
+| security/prompt-injection | Connection-sourced context forces write connector tools to Ask; Deny stays Deny; reads unaffected | `tool_dispatcher.py:4790-4803` | kept |
+| security/prompt-injection | Limits: no text sanitising; non-connector writes not held | same code (the fence is inside the connector dispatch path only) | kept |
+
+## API concepts, operator and internal endpoints
+
+| Page | Claim | Source | Verdict |
+|---|---|---|---|
+| api/concepts/authentication | No API keys, PATs, service accounts; user impersonation only | inventory h.2 (0 hits for `APIKeyHeader`/`x-api-key`); SEED-013 | kept (required sentences + link) |
+| api/concepts/authentication | `GET /public-config` returns `supabase_url`, `supabase_anon_key`, no token | `api/setup.py:210-220` | kept |
+| api/concepts/authentication | Token checked with Supabase Auth per request, then the ban check | `dependencies.py` `get_current_user` | kept |
+| api/concepts/authentication | `X-Org-Id` table (member / non-member 403 / one org default / 2+ → 400 / none → 403) | `dependencies.py:900-950` `get_active_org_id` | kept |
+| api/concepts/authentication | Org-scoped routers: connectors, experts, org, sources, threads, workspace | grep `get_active_org_id\|require_org_manage` over `app/api` | kept |
+| api/concepts/authentication | CORS limited to the frontend origins | inventory h.1 (`FRONTEND_URL` list) | kept |
+| api/concepts/authentication | Missing header → 403 "Not authenticated" | FastAPI 0.115.6 `HTTPBearer(auto_error=True)` (version read from `backend/venv`); 276-01 SUMMARY | kept |
+| api/concepts/orgs-and-rls | `PATCH /folders/{folder_id}/toggle-global`, `PATCH /skills/{skill_id}/toggle-global` | `openapi.public.json` | kept (first draft "POST/PATCH" **corrected**) |
+| api/concepts/orgs-and-rls | Skill share 409 `publish_gate_unmet` unless override | `api/skills.py` `toggle_global` | kept |
+| api/concepts/streaming | **POST /messages returns 201 JSON {message_id, run_id, model, provider}; it does not stream** | `api/threads.py:1914-1928`; `lib/api/threads.ts` `postMessage` | corrected — inventory H43 says "SSE on POST /threads/{id}/messages" (the pre-Phase-063 shape) |
+| api/concepts/streaming | `GET /runs/{run_id}/stream?since=0` SSE `data:` JSON with `type`; terminal done/error/cancelled/timed_out | `api/runs.py` `stream_run` / `replay_tail_consumer`; `services/run_transport.py:70` `TERMINAL_TYPES` | kept |
+| api/concepts/streaming | Replay from 0 is safe; a finished run yields its terminal event | `lib/api/threads.ts:854` comment; `api/runs.py:500-520` | kept |
+| api/concepts/streaming | 404 "Run not found"; 503 "Streaming infrastructure unavailable"; `invalid_since` event | `api/runs.py:422,437,168` | kept |
+| api/concepts/streaming | EventSource cannot send Authorization | `lib/api/threads.ts:862` | kept |
+| api/concepts/streaming | `model`/`provider` per request | `models/message.py` `MessageCreate` | kept |
+| api/concepts/streaming | First draft listed a "citations" event type | not found in `agent_loop.py` | removed |
+| api/concepts/errors | 403 detail strings (ban, org, feature, entitlement object fields) | `dependencies.py`; `services/entitlement_service.py:38-75` | kept |
+| api/concepts/errors | If-Match on `PATCH /workflows/{definition_id}`, `{id, version, token}`, stale → 409 with current token, optional for now | `api/workflows.py:1506-1545` docstring | kept |
+| api/concepts/errors | 409 "workflow is already published" | `api/workflows.py:1355` | kept |
+| api/concepts/errors | 503 auth unreachable / entitlement unavailable (fails closed) | `dependencies.py`; `entitlement_service.py:63-75` | kept |
+| api/reference/operator | Lead + the three facts verbatim from UI-SPEC P7 | `276-UI-SPEC.md` §P7; `api/api_docs.py` (276-01 production sign-in gate) | kept |
+| api/internal-endpoints | Flagged set with "UI-internal: may change" | `openapi.public.json` x-badges (276-01); D-17 (`lib/api/knowledge.ts` still calls `/knowledge-health/*`) | kept |
+| api/internal-endpoints | Hidden set and reasons (setup, OAuth callbacks, `/admin`, `/evals`, `/api/sources` alias, `/__test__`, live explorer) | inventory h.1/h.3; 276-01 SUMMARY; `main.py:917` (alias), `main.py:921-945` (test fixtures) | kept; the alias's "older prefix" **corrected** to "second prefix" |
+
+## Coordinator notes applied (2026-10-04, mid-execution)
+
+| Note | Action |
+|---|---|
+| Gauntlet is 10 stages (facts.ts `GAUNTLET_STAGES`; v2.9 history records 8→10) | already true on every page; `grep -rniE "8[- ]stage" docs/public` prints nothing |
+| Do not embed the NotebookLM "Workflows" explainer (its narration says 8-stage) | `video: explainer.automate-workflows` removed from `automate/workflows/overview`; no page references that slot (only `docs/public/README.md`'s contract example names it) |
+
+## Screenshots (D-09)
+
+| File | Captured from | Inspection |
+|---|---|---|
+| `frontend/public/docs-assets/shots/chat.png` | local app (the operator's running `develop` frontend on :5173, backend :8000; no server started by this executor), thread "ACME Kestrel MSA Liability Termination Terms", 1280×800 | synthetic Acme corpus; no email, key, token or real customer document; profile footer hidden by an injected style |
+| `frontend/public/docs-assets/shots/workflow-builder.png` | draft "Weekly Supplier Risk Review", Canvas view, step 2 selected, 1280×800 | test workflow; no PII |
+| `frontend/public/docs-assets/shots/experts-catalog.png` | Experts catalog, 1280×800 | starter Experts plus one org-custom test Expert; no PII. Shows a real product defect: a category chip renders `Research &amp; Academic Methods` (HTML entity not decoded) |
+| `library-documents.png`, `document-detail.png` | **not captured, by decision** | the local frontend runs `develop`, whose Library shows v4.5 UI (Find documents \| Ask, Filing rules, Download, File section). Unreleased UI on a `release: shipped` page would contradict the page; the two references were removed |

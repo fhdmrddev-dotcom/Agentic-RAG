@@ -7,8 +7,8 @@ status: stub
 release: shipped
 covers: [G3]
 summary: >-
-  Extend what Syrel produces and records with data: Word templates for deliverables, custom
-  metadata fields, and JSON schemas for step checks. Until the full guide is written, start with
-  What Syrel is.
+  Extend what Syrel produces and records with data: Word templates for deliverables, custom metadata fields, and JSON schemas for step checks.
+  Word and PDF files are downloaded, not previewed inside Syrel.
+  Until the full guide is written, start with What Syrel is.
 nearest: get-started/overview
 ---

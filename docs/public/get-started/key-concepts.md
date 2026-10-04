@@ -52,7 +52,7 @@ A short glossary of the words you will meet across Syrel and these docs.
 
 **Check.** A test a step must pass before it counts as done, such as "claims must carry citations".
 
-**Deliverable.** The file a workflow produces, for example a Word report filled from a template.
+**Deliverable.** The file a workflow produces, for example a Word report filled from a template. Word and PDF files are downloaded, not previewed inside Syrel.
 
 **Publishing.** The gate a workflow passes before it becomes a frozen version you can run and schedule, including a real test run graded by an independent judge.
 

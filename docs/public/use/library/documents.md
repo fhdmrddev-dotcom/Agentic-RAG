@@ -16,8 +16,6 @@ reviewed: 2026-10-04
 
 Open **Library** from the rail. The Library has five tabs: **Documents**, **Views**, **Ingestion**, **Indexing** and **Health**. This page covers the Documents tab, where you will spend most of your time.
 
-![The Library Documents tab with the folder tree and document table](/docs-assets/shots/library-documents.png)
-
 ## Folders
 
 The folder tree on the left shows every folder you can see: your own, and folders other members have shared with your organisation. Folders can be nested to any depth.

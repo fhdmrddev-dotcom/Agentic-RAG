@@ -49,3 +49,5 @@ When the workflow finishes, or when you cancel it, the chat returns to Deep mode
 | Ask a question or explore your documents | Deep mode (General or Explorer) |
 | Produce the same kind of result the same way every time | Workflow mode, by running a published workflow |
 | Get a cited, checked deliverable such as a filled report template | Workflow mode |
+
+Word and PDF files are downloaded, not previewed inside Syrel.

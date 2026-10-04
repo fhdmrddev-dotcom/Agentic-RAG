@@ -15,7 +15,7 @@ reviewed: 2026-10-04
 
 Chat is where you spend most of your time in Syrel. Each chat is a separate conversation with its own history, files and scope.
 
-![The Syrel chat with an answer, its citations and the workspace panel](/docs-assets/shots/chat.png)
+![A Syrel chat with an Expert active: the answer, its confidence badge and references, and the workspace panel](/docs-assets/shots/chat.png)
 
 ## Starting a chat
 

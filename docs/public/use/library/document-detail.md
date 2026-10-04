@@ -15,8 +15,6 @@ reviewed: 2026-10-04
 
 Select any document in the Library to open its panel on the right. The panel shows what Syrel knows about the document and lets you correct it.
 
-![The document panel with details, confidence chips and relationships](/docs-assets/shots/document-detail.png)
-
 ## Details and confidence
 
 The **Details** section lists the facts Syrel read from the document — such as title, type, author and dates — plus any custom fields your organisation defines. Each field carries a confidence chip saying how sure the extraction was. The section's header counts fields that are low-confidence or empty, so you can see at a glance what needs a look.

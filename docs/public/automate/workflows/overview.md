@@ -9,7 +9,6 @@ covers: [A21, C1, C8, C27]
 summary: >-
   A workflow is a fixed sequence of steps with checks between them. Syrel runs the steps in order,
   cites its sources, and cannot quietly skip a step or pass a failed check.
-video: explainer.automate-workflows
 reviewed: 2026-10-04
 ---
 

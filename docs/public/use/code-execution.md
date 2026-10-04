@@ -7,8 +7,8 @@ status: stub
 release: shipped
 covers: [B12, B14]
 summary: >-
-  When the sandbox is switched on, Syrel runs Python in an isolated container and hands back
-  charts and files such as Word, Excel, PowerPoint and PDF. Word and PDF files are downloaded, not
-  previewed inside Syrel. Until the full guide is written, start with Chatting with Syrel.
+  When the sandbox is switched on, Syrel runs Python in an isolated container and hands back charts and files such as Word, Excel, PowerPoint and PDF.
+  Word and PDF files are downloaded, not previewed inside Syrel.
+  Until the full guide is written, start with Chatting with Syrel.
 nearest: use/chat
 ---

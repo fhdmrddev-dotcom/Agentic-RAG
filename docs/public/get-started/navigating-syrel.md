@@ -38,7 +38,7 @@ An operator can change who sees Workflows and Settings from the Control Room's f
 ## Other places you reach from the rail
 
 - **The chat list.** Chats are grouped by date and can be filtered. Press ⌘K (Ctrl+K on Windows and Linux) to find a chat by name.
-- **A workflow run's page.** Opening a run from the Workflows page shows the run's own page: its steps, checks, timings and deliverable.
+- **A workflow run's page.** Opening a run from the Workflows page shows the run's own page: its steps, checks, timings and deliverable. Word and PDF files are downloaded, not previewed inside Syrel.
 - **Skill Studio.** Opening a skill's studio from the Skills page shows its evaluations, triggering and versions. It is visible to platform operators by default.
 - **Document details.** Selecting a document in the Library opens its detail panel on the right.
 

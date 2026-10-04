@@ -55,6 +55,8 @@ Selecting a step opens its settings beside the canvas. Depending on the step typ
 
 A workflow can ask for inputs when it runs: text, a number, a date, a choice from a list, or a file. Steps can use an input's value, and an outside action can take an argument from it. You can also attach a document template while building; every run then fills that same template with current information.
 
+Word and PDF files are downloaded, not previewed inside Syrel.
+
 ## Next
 
 When the draft does what you want, publish it: [Publishing (the gauntlet)](/docs/automate/workflows/publish).
