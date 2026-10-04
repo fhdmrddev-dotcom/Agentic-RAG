@@ -10838,7 +10838,7 @@ cells rot within days.
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ **FIRES** | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 96 / 75 / 1532 (was `95 / 74 / 1520`) | ⚠ **FIRES** | **273-05**: `Message.artifacts` re-exports the wire TYPE from artifactSpec.ts, never re-declared. Seam OWED |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 84 / 61 / 952 (was `83 / 60 / 951`) | ⚠ **FIRES** | ⚠ STALE (`83/60/951`). **271-01**: ONE import + ONE `include_router(document_search.router)` after `document_views`. 0 new branches |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 85 / 62 / 968 (was `84 / 61 / 952`) | ⚠ **FIRES** | ⚠ STALE (`84/61/952`). **276-01**: docs routes off in ctor; ONE `include_router(api_docs.router)` + boot log. 0 new branches |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 90 / 52 / 1698 (was `87 / 50 / 1593`) | ⚠ **FIRES** | ⚠ STALE (`87/50/1593`). **272-05**: the stale ef_search 'raised to 200' comment corrected; value 40 unchanged. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
@@ -11014,7 +11014,7 @@ cells rot within days.
 | [`frontend/src/components/sources/WatchRowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchrowcardtsx) | 3 / 2 / 770 | no (2 phases) | ⚠ row STALE (`2/1/649`) — 252-05 touched it (+121 L) and put it into BOTH count-gate knobs; it had run NOWHERE. NOT modified by 253; re-derived under CR-08 |
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
-| [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 24 / 13 / 417 | ⚠ **FIRES** | ⛔ STALE a 3rd time (was `23/12/381` HERE and `23/12/417` in CLAUDE.md — **the 2 registers disagreed on LINES**, 262-01 reconciles). 244-14's `overflow-x-hidden` stands |
+| [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 25 / 14 / 416 (was `24 / 13 / 417`) | ⚠ **FIRES** | ⚠ STALE (`24/13/417`). **276-01** (D-14): Sparkles tile → Iris mark `<img>`, asset swap only. 244-14's `overflow-x-hidden` stands |
 | [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 35 / 26 / 412 (was `33 / 24 / 378`) | ⚠ **FIRES** | ⚠ STALE (`33/24/378`). **271-02**: the `classification-rules` member REMOVED with its ChatLayout branch and rail entry in ONE commit; reachability fence green |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 12 / 8 / 153 (was `9 / 6 / 118`) | ⚠ **FIRES** | ⚠ STALE (`9/6/118`). **271-02**: the Classification entry REMOVED (7 entries); `Wand2` moved to the Filing rules link. 271-05 G4-3: the rail has none |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
@@ -11119,13 +11119,13 @@ cells rot within days.
 | [`frontend/src/components/chat/ScopeChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopechiptsx) | 1 / 1 / 102 (was `0 / 0 / 0`) | no (new) | young (created 268-03). The composer scope chip. ⛔ reads `held` from the payload, never `scope_mode` (D-268-12c) |
 | [`frontend/src/components/chat/ScopePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopepickertsx) | 1 / 1 / 285 (was `0 / 0 / 0`) | no (new) | young (created 268-03). DropdownMenu picker; Apply/Cancel are menu items (Radix traps Tab). ⛔ no `scope_mode` token |
 | [`frontend/src/components/chat/scopeCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopecopyts) | 2 / 1 / 196 (was `0 / 0 / 0`) | no (new) | young (created 268-03). ⛔ the ONE home of chip/picker/pending-note wording; `explainFor` keeps the Expert rule out of the leaves |
-| [`frontend/src/components/auth/AuthCardShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsauthauthcardshelltsx) | 1 / 1 / 53 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: Sparkles tile → Iris mark img. Asset swap only, no logic |
-| [`frontend/src/pages/AuthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesauthpagetsx) | 3 / 1 / 26 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: title prop → "Syrel". One string |
-| [`frontend/src/landing/components/CompareSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentscomparesectiontsx) | 2 / 1 / 121 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01: two prose strings → Syrel. ⛔ landing fence: no app/docs imports |
-| [`frontend/src/landing/components/LandingFooter.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentslandingfootertsx) | 2 / 1 / 49 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 mark + © Syrel; 276-03 Docs/Changelog links, absolute hashes. ⛔ shared by landing AND docs entries |
-| [`frontend/src/landing/components/Navigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsnavigationtsx) | 2 / 1 / 120 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 lockup img; 276-03 Docs link, drawer, optional docs slots. ⛔ shared by BOTH entries — landing passes no docs props |
+| [`frontend/src/components/auth/AuthCardShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsauthauthcardshelltsx) | 2 / 2 / 52 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: Sparkles tile → Iris mark img. Asset swap only, no logic |
+| [`frontend/src/pages/AuthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesauthpagetsx) | 4 / 2 / 26 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: title prop → "Syrel". One string |
+| [`frontend/src/landing/components/CompareSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentscomparesectiontsx) | 3 / 2 / 121 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01: two prose strings → Syrel. ⛔ landing fence: no app/docs imports |
+| [`frontend/src/landing/components/LandingFooter.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentslandingfootertsx) | 3 / 2 / 52 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 mark + © Syrel; 276-03 Docs/Changelog links, absolute hashes. ⛔ shared by landing AND docs entries |
+| [`frontend/src/landing/components/Navigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsnavigationtsx) | 3 / 2 / 91 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 lockup img; 276-03 Docs link, drawer, optional docs slots. ⛔ shared by BOTH entries — landing passes no docs props |
 | [`frontend/src/landing/components/HeroSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsherosectiontsx) | 1 / 1 / 820 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-05: static PromoSlot; import("./HeroPromo") only after load + scroll + ≥50% visible. ⛔ no static Remotion import (first-paint fence) |
-| [`backend/app/api/api_docs.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_docspy) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-01 DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate |
+| [`backend/app/api/api_docs.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_docspy) | 1 / 1 / 111 | no (1 phase) | young (created 276-01). DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate |
 | [`frontend/src/docs/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsmaintsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02: docs entry mount. ⛔ no providers, no app imports (docsBundleFence) |
 | [`frontend/src/docs/DocsApp.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsdocsapptsx) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02 interim, 276-03 route → page. ⛔ the ONE route→page switch; no app imports |
 | [`frontend/src/docs/router.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsrouterts) | 0 / 0 / 0 | no (new) | young (created 276). Row added AT PLANNING. 276-02: resolveRoute + navigate (History API). ⛔ the app has no router — keep this docs-only |
@@ -18205,6 +18205,16 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 
 **`1 / 1 / 53`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-01 D-21: Sparkles tile → Iris mark img. Asset swap only, no logic. 276-05 re-derives the triple at close.
 
+**`2 / 2 / 52`** after 276-01 (D-21): the Sparkles tile became `<img src="/brand/syrel-mark-iris.svg">`; the unused `Sparkles` import dropped. Shared by AuthPage AND AcceptInvitePage, so both show the mark.
+
+### `frontend/src/components/layout/NavPanel.tsx` — Phase 276, asset swap only
+
+**`25 / 14 / 416`** after 276-01 (was `24 / 13 / 417`). G-5 FIRES; honoured by construction (D-14): the gradient-primary Sparkles tile became `<img src="/brand/syrel-mark-iris.svg" className="w-8 h-8 shrink-0" alt="Syrel">` and the now-unused `Sparkles` import was dropped. No logic, no state, no new branch. An `<img>`, never inline SVG — the brand files share gradient ids `g`/`h`.
+
+### Landing brand files — Phase 276 (276-01)
+
+`AuthPage.tsx` **`4 / 2 / 26`** (title prop → "Syrel"); `CompareSection.tsx` **`3 / 2 / 121`** (two `<th>` cells → "Syrel"); `LandingFooter.tsx` **`3 / 2 / 52`** (mark img + "© {year} Syrel", font 13 → 14); `Navigation.tsx` **`3 / 2 / 91`** (brand block → lockup `<img>` in an `aria-label="Syrel home"` link; links untouched — 276-03 owns them). Fenced by `src/landing/__tests__/landingBrand.test.ts`.
+
 ### `frontend/src/pages/AuthPage.tsx`
 
 **`3 / 1 / 26`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-01 D-21: title prop → "Syrel". One string. 276-05 re-derives the triple at close.
@@ -18228,6 +18238,12 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 ### `backend/app/api/api_docs.py`
 
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-01 DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate. 276-05 re-derives the triple at close.
+
+**`1 / 1 / 111`** measured in 276-01's own creating commit. One router-level dependency (`require_api_docs_access`) over four `include_in_schema=False` routes; the token check is the existing `get_current_user` called directly, so no auth code is duplicated. `/openapi.json` returns `request.app.openapi()`, which keeps the Phase 182 canvas filter.
+
+### `backend/app/main.py` — Phase 276, honoured by construction
+
+**`85 / 62 / 968`** after 276-01 (was `84 / 61 / 952`). G-5 FIRES; honoured by construction: one constructor kwarg change (`docs_url=None, redoc_url=None, openapi_url=None`), one import, one `include_router(api_docs.router)`, one boot log line (`API docs: GATED/OPEN`, D-20), and the Phase 182 `/docs` comment struck through with a dated correction (D-03) rather than deleted. `app.openapi = build_canvas_aware_openapi(app)` is byte-unchanged. 0 new branches outside lifespan's one log if/else.
 
 ### `frontend/src/docs/main.tsx`
 

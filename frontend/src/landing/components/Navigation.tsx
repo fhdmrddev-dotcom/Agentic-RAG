@@ -23,43 +23,14 @@ export function Navigation() {
           height: 64,
         }}
       >
+        {/* Phase 276 (D-14/D-15): the static Iris lockup as an <img> — never inline SVG, the
+            brand files share gradient ids "g"/"h" and two inline copies would collide. */}
         <a
           href="/"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            fontSize: 16,
-            fontWeight: 700,
-            color: "hsl(226 60% 97%)",
-            textDecoration: "none",
-          }}
+          aria-label="Syrel home"
+          style={{ display: "flex", alignItems: "center", textDecoration: "none" }}
         >
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: "linear-gradient(135deg, hsl(239 84% 67%), hsl(258 90% 66%))",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#ffffff"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ width: 18, height: 18 }}
-              aria-hidden="true"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-            </svg>
-          </div>
-          <span className="hl">Agentic RAG</span>
+          <img src="/brand/syrel-lockup-iris.svg" height={28} alt="" aria-hidden="true" />
         </a>
 
         <nav className="nav-links" aria-label="Main navigation">

@@ -755,7 +755,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/FilesSection.tsx` | 10 / 6 / 363 | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption`, never re-derives its three readings |
 | `frontend/src/lib/api.ts` | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
 | `frontend/src/types/index.ts` | 95 / 74 / 1520 (was `94 / 73 / 1459`) | ⚠ STALE (`94/73/1459`). **271-03**: Find wire types (`DocumentSearchRequest/Row/Response`, `RelVerb`), additive. Seam OWED |
-| `backend/app/main.py` | 84 / 61 / 952 (was `83 / 60 / 951`) | ⚠ STALE (`83/60/951`). **271-01**: ONE import + ONE `include_router(document_search.router)` after `document_views`. 0 new branches |
+| `backend/app/main.py` | 85 / 62 / 968 (was `84 / 61 / 952`) | ⚠ STALE (`84/61/952`). **276-01**: docs routes off in ctor; ONE `include_router(api_docs.router)` + boot log. 0 new branches |
 | `backend/app/config.py` | 88 / 51 / 1695 | ⚠ STALE a 14th time (`87/50/1593`). **262**: `api_surface` + `API_SURFACES` + `provider_hint`. ⛔ `MODEL_CAPABILITIES` seam STILL OWED — 12 of 15 fields are now DB-settable, the dict is not |
 | `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
@@ -829,7 +829,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/verdictModel.ts` | 6 / 3 / 355 | ⚠ absent for its ENTIRE LIFE |
 | `frontend/src/components/library/IngestionTab.tsx` | 17 / 6 / 512 | ⚠ row was STALE at `13 / 4 / 456` |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
-| `frontend/src/components/layout/NavPanel.tsx` | 24 / 13 / 417 | ⛔ STALE a 3rd time (was `23/12/417` here, `23/12/381` in the ledger — **the 2 registers disagreed on LINES**; 262-01 reconciles). 244-14's `overflow-x-hidden` stands |
+| `frontend/src/components/layout/NavPanel.tsx` | 25 / 14 / 416 (was `24 / 13 / 417`) | ⚠ STALE (`24/13/417`). **276-01** (D-14): Sparkles tile → Iris mark `<img>`, asset swap only. 244-14's `overflow-x-hidden` stands |
 | `frontend/src/App.tsx` | 35 / 26 / 412 (was `34 / 25 / 410`) | ⚠ STALE (`33/24/378`). **271-02**: the `classification-rules` member REMOVED with its ChatLayout branch and rail entry in ONE commit; reachability fence green |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 4 / 3 / 249 (was `2 / 1 / 204`) | now FIRES (3 phases). **271-02**: optional `onOpenFilingRules`; link + pill in ONE right cluster, never a tab. 271-05 G4-3: Back returns to Ingestion |

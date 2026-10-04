@@ -22,7 +22,7 @@ describe("LandingPage Assembly & Interactivity", () => {
     render(<LandingPage />)
 
     // Primary brand header
-    const brandElements = screen.getAllByText(/Agentic RAG/i)
+    const brandElements = screen.getAllByText(/Syrel/i)
     expect(brandElements.length).toBeGreaterThan(0)
 
     // Navigation anchor links

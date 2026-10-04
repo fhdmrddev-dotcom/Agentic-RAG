@@ -100,9 +100,13 @@ Then edit `./.env` and fill in:
   **Configuration** below — get this one right or the backend can't reach the DB).
 - **One provider key** — e.g. `OPENAI_API_KEY`.
 - **`OPERATOR_EMAILS`** — your own email, so you're bootstrapped as the operator on first
-  boot. This is what unlocks `/admin` — **not** `ENVIRONMENT` (as of Phase 146, `ENVIRONMENT`
-  is only a deploy marker; the operator gate is `OPERATOR_EMAILS` + the `operator_users`
+  boot. This is what unlocks `/admin` — **not** `ENVIRONMENT` (as of Phase 146, ~~`ENVIRONMENT`
+  is only a deploy marker;~~ the operator gate is `OPERATOR_EMAILS` + the `operator_users`
   table).
+- **`ENVIRONMENT=production`** — keep it (the example already sets it). **CORRECTED
+  2026-10-04:** `ENVIRONMENT=production` now ALSO gates `/docs`, `/redoc`, `/openapi.json`
+  (Phase 276, DOCS-04): signed-out callers get 401. Left unset, the live API explorer is open to
+  anyone — the backend boot log says `API docs: OPEN` instead of `API docs: GATED`.
 - **`SECRETS_ENCRYPTION_KEY`** — generate a Fernet key so provider keys are encrypted at rest:
   ```bash
   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

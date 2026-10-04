@@ -39,7 +39,7 @@ export function CompareSection() {
             <thead>
               <tr>
                 <th style={{ width: "34%" }}>Capability</th>
-                <th className="us">Agentic RAG</th>
+                <th className="us">Syrel</th>
                 <th>General chat assistant</th>
                 <th>Enterprise search</th>
                 <th>Automation / RPA tool</th>
@@ -92,7 +92,7 @@ export function CompareSection() {
                 <thead>
                   <tr>
                     <th style={{ width: "34%" }}>Capability</th>
-                    <th className="us">Agentic RAG</th>
+                    <th className="us">Syrel</th>
                     <th>General AI chat</th>
                     <th>Enterprise search</th>
                     <th>Workflow platform</th>

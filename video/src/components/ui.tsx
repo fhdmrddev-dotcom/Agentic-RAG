@@ -145,31 +145,71 @@ export const Chip: React.FC<{
   </div>
 );
 
-/** Logo placeholder — the Syrel logo is not designed yet. */
-export const LogoPlaceholder: React.FC<{ size?: number }> = ({ size = 120 }) => (
-  <div
-    style={{
-      width: size,
-      height: size,
-      borderRadius: size * 0.28,
-      border: `2px dashed ${C.primary.replace(")", " / 0.6)")}`,
-      background: `linear-gradient(135deg, hsl(239 100% 82% / 0.15), hsl(258 90% 66% / 0.15))`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      color: C.primary,
-      fontFamily: body,
-      fontSize: size * 0.13,
-      fontWeight: 600,
-      textAlign: "center",
-      lineHeight: 1.2,
-    }}
-  >
-    Syrel
-    <br />
-    logo
-  </div>
-);
+/** The static Syrel Iris logo — mark + lowercase "syrel" wordmark in a `size`×`size` box.
+ *  Phase 276 (D-14): replaces the dashed placeholder. The export name and the `size` prop are kept
+ *  so every call site is untouched. Gradient ids are suffixed with `useId()` because the brand SVG
+ *  uses the bare ids "g"/"h" and two inline copies in one frame would collide (Pitfall 9).
+ *  Static only — the animated logo lives in the intro/outro compositions (D-15). */
+export const LogoPlaceholder: React.FC<{ size?: number }> = ({ size = 120 }) => {
+  const uid = React.useId().replace(/:/g, "");
+  const g = `syrel-g-${uid}`;
+  const h = `syrel-h-${uid}`;
+  const markSize = size * 0.7;
+  return (
+    <div
+      role="img"
+      aria-label="Syrel"
+      style={{
+        width: size,
+        height: size,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: size * 0.02,
+      }}
+    >
+      <svg viewBox="0 0 64 64" width={markSize} height={markSize} aria-hidden="true">
+        <defs>
+          <linearGradient id={g} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#D6D8FF" />
+            <stop offset=".5" stopColor="#A3A5FF" />
+            <stop offset="1" stopColor="#6467F2" />
+          </linearGradient>
+          <linearGradient id={h} x1="1" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#A3A5FF" />
+            <stop offset="1" stopColor="#3B3FD0" />
+          </linearGradient>
+        </defs>
+        {[0, 60, 120, 180, 240, 300].map((deg, i) => (
+          <ellipse
+            key={deg}
+            cx="32"
+            cy="17"
+            rx="6.5"
+            ry="13"
+            fill={`url(#${i % 2 === 0 ? g : h})`}
+            opacity=".85"
+            transform={`rotate(${deg} 32 32)`}
+          />
+        ))}
+        <circle cx="32" cy="32" r="4.5" fill="#F2F4FE" />
+      </svg>
+      <div
+        style={{
+          fontFamily: body,
+          fontSize: size * 0.2,
+          fontWeight: 700,
+          lineHeight: 1,
+          letterSpacing: "-0.02em",
+          color: "#F2F4FE",
+        }}
+      >
+        syrel
+      </div>
+    </div>
+  );
+};
 
 /** Check mark that draws itself (stroke-dashoffset), for success states. */
 export const Check: React.FC<{ progress: number; size?: number; color?: string }> = ({
