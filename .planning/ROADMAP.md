@@ -306,7 +306,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 276-05-PLAN.md — W3: lazy Remotion Player slots, muted scroll-started landing promo + first-paint fences, DOCS-02 coverage gate + hook + CI, BASELINE pins, ledger close
+- [x] 276-05-PLAN.md — W3: lazy Remotion Player slots, muted scroll-started landing promo + first-paint fences, DOCS-02 coverage gate + hook + CI, BASELINE pins, ledger close
 
 **Video library — three styles, decided 2026-10-04 (operator):** (1) **narrated explainers** — Remotion + local Kokoro voice, and NotebookLM explainers; (2) **documentaries** — NotebookLM cinematic "Syrel: The Build Story" (5 chapters), wrapped in Remotion `BrandedEpisode` intro/outro; (3) **music-driven promos, no narration** — `SyrelPromo` / `SyrelTeaser` / vertical cuts, beat-locked to an original synthesized track, for the landing hero and social. Discuss decides which style each docs/landing slot uses.
 **Logo chosen, insertion deferred (operator 2026-10-04):** #1 "Iris agent" — assets in `docs/brand/` (animated, lockup, mark). Placeholders stay until the operator says insert; when it happens it is one pass across landing, app, favicon, docs and `video/` `LogoPlaceholder`. Discuss decides whether 276 does that pass.
@@ -323,7 +323,7 @@ Plans:
 | 273. Agent-Authored Artifacts | 6/6 | Complete — 1 UAT row OWED (live STRUCTURED-path holdback check; run it first) | 2026-10-04 |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
-| 276. Public Docs, API Reference & Video Library | 4/5 | In Progress|  |
+| 276. Public Docs, API Reference & Video Library | 5/5 | Complete   | 2026-10-04 |
 
 ---
 
