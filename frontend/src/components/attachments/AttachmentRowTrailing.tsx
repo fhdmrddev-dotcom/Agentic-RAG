@@ -5,9 +5,10 @@
  *
  * Two readings, from the ONE lifetime rule (`isThreadLifeAttachment`):
  *   · THREAD-LIFE (a chat attachment, D-05): `this chat only`, then either the `⋯` (only the verb,
- *     the row is already in the panel) or — once saved — the `LibraryLinkSegment` with the FULL
- *     path VISIBLE. The chip shows only the leaf; the panel row is where the path can be read, so
- *     the tooltip is never its only home (sketch 274 A).
+ *     the row is already in the panel) or — once saved — the `LibraryLinkSegment`, drawn as sketch
+ *     274-A draws it: the leaf visible, the full path in the title and in screen-reader text.
+ *     (Built first with the full path visible; G-4 #3 measured that squeezing the file name to
+ *     zero width, so it now matches the sketch.)
  *   · TTL (a workflow template input, or a row whose wire did not say): the `Template` badge and
  *     the `expiryCaption` countdown MOVED here byte-for-byte from `FilesSection` (same classes, amber
  *     under 1 h via `isNearExpiry`), followed by the `⋯`.
@@ -41,7 +42,9 @@ export function AttachmentRowTrailing({ threadId, file }: AttachmentRowTrailingP
   const action =
     threadId && file.id ? (
       state.link ? (
-        <LibraryLinkSegment link={state.link} leaf={state.leaf} path={state.path} display="path" />
+        // Sketch 274-A draws the panel's mark as the chip's segment: the leaf visible, the full path
+        // in the title (G-4 #3 F-1 — a visible full path squeezed the file name to zero width).
+        <LibraryLinkSegment link={state.link} leaf={state.leaf} path={state.path} display="leaf" />
       ) : (
         <AttachmentActionsMenu threadId={threadId} file={file} variant="panel" triggerTabIndex={-1} />
       )
@@ -49,7 +52,7 @@ export function AttachmentRowTrailing({ threadId, file }: AttachmentRowTrailingP
 
   if (isThreadLifeAttachment(file)) {
     return (
-      <span className="flex min-w-0 max-w-[65%] flex-wrap items-center justify-end gap-1.5">
+      <span className="flex flex-shrink-0 items-center gap-1.5">
         <span className="flex-none text-[10px] text-panel-muted-foreground">{COPY.engine.CHIP_SCOPE}</span>
         {action}
       </span>

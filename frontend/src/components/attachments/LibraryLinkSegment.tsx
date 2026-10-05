@@ -48,8 +48,9 @@ export function LibraryLinkSegment({ link, leaf, path, display }: LibraryLinkSeg
 
   const full = [word, path ?? leaf, suffix].filter(Boolean).join(" · ")
   const className = cn(
-    "inline-flex min-w-0 items-center gap-1 rounded-full px-2 py-px text-left font-medium",
-    // The panel row shows the FULL path, so it wraps rather than truncating away the part a person needs.
+    // An explicit size, so the segment reads the same on the chip and the panel row instead of
+    // inheriting the panel's 13px name type (G-4 #3 F-1).
+    "inline-flex min-w-0 items-center gap-1 rounded-full px-2 py-px text-left text-[11px] font-medium",
     display === "path" && "whitespace-normal",
     saved ? "bg-success/15 text-success" : "bg-primary/10 text-primary",
     nav && "cursor-pointer transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
