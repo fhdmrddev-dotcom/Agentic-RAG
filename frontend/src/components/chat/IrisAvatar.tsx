@@ -29,6 +29,7 @@
  */
 import { memo, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
 import type { IrisState } from "./irisState"
+import { settleCoast } from "./irisMotion"
 
 const WORK: ReadonlySet<IrisState> = new Set<IrisState>(["thinking", "tool", "streaming"])
 /** playbackRate per working state: tool ×1.45 (≈1.1 s), streaming ×0.8 (≈2 s, the text moves). */
@@ -160,11 +161,8 @@ export const IrisAvatar = memo(function IrisAvatar({ state, size = 32 }: { state
         if (!snap.t) continue
         if (snap.name === "irisOrbitTurn") {
           const ang = snap.prog * 360
-          const target = Math.ceil((ang + 0.001) / 120) * 120 // next 120° stop = identical to rest
-          const remaining = Math.max(target - ang, 1)
           const v = (360 / snap.dur) * snap.rate // deg per ms right now
-          const dur = Math.max(450, Math.min(1400, (2 * remaining) / v))
-          const y1 = Math.min(1, 0.3 * ((v * dur) / remaining)) // initial slope ≈ current speed
+          const { target, dur, y1 } = settleCoast(ang, v)
           out.push(
             snap.t.animate([{ transform: `rotate(${ang}deg)` }, { transform: `rotate(${target}deg)` }], {
               duration: dur,
