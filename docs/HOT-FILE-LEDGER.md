@@ -10834,7 +10834,7 @@ cells rot within days.
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 24 / 11 / 376 (was `21 / 9 / 307`) | **FIRES** | ⚠ row STALE (`21/9/307`). honoured by construction (**267-04**): the turn index skips system rows via ONE module-level helper; no prop added |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
-| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 87 / 41 / 1106 (was `79 / 40 / 970`) | **FIRES** | ⚠ STALE (`79/40/970`). **268-03**: ONE scope PATCH home + 1 read; header folder pill REMOVED. useState 5→7, useEffect 4→6. ⛔ no scope branch in send |
+| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 91 / 42 / 1171 (was `87 / 41 / 1106`) | **FIRES** | **276-06**: hero tile → static Iris (`idle`, 64px): 1 import + 1 element swap; hook call sites 36 → 36. ⛔ no scope branch in send |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 15 / 8 / 836 | **FIRES** | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
@@ -11017,8 +11017,8 @@ cells rot within days.
 | [`frontend/src/components/sources/WatchRowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchrowcardtsx) | 3 / 2 / 770 | no (2 phases) | ⚠ row STALE (`2/1/649`) — 252-05 touched it (+121 L) and put it into BOTH count-gate knobs; it had run NOWHERE. NOT modified by 253; re-derived under CR-08 |
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
-| [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 25 / 14 / 416 (was `24 / 13 / 417`) | ⚠ **FIRES** | ⚠ STALE (`24/13/417`). **276-01** (D-14): Sparkles tile → Iris mark `<img>`, asset swap only. 244-14's `overflow-x-hidden` stands |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 35 / 26 / 412 (was `33 / 24 / 378`) | ⚠ **FIRES** | ⚠ STALE (`33/24/378`). **271-02**: the `classification-rules` member REMOVED with its ChatLayout branch and rail entry in ONE commit; reachability fence green |
+| [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 26 / 14 / 420 (was `25 / 14 / 416`) | ⚠ **FIRES** | **276-01** (D-14): Iris mark `<img>`; **276-06** (D-27): on the dark `#0A0E18` chip, classes only. 244-14's `overflow-x-hidden` stands |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 36 / 27 / 418 (was `35 / 26 / 412`) | ⚠ **FIRES** | **276-06**: boot splash spin ring → moving Iris (`thinking`) in a `role=status`; 1 import, hook call sites 9 → 9. Reachability fence green |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 12 / 8 / 153 (was `9 / 6 / 118`) | ⚠ **FIRES** | ⚠ STALE (`9/6/118`). **271-02**: the Classification entry REMOVED (7 entries); `Wand2` moved to the Filing rules link. 271-05 G4-3: the rail has none |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
@@ -11122,7 +11122,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ScopeChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopechiptsx) | 1 / 1 / 102 (was `0 / 0 / 0`) | no (new) | young (created 268-03). The composer scope chip. ⛔ reads `held` from the payload, never `scope_mode` (D-268-12c) |
 | [`frontend/src/components/chat/ScopePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopepickertsx) | 1 / 1 / 285 (was `0 / 0 / 0`) | no (new) | young (created 268-03). DropdownMenu picker; Apply/Cancel are menu items (Radix traps Tab). ⛔ no `scope_mode` token |
 | [`frontend/src/components/chat/scopeCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopecopyts) | 2 / 1 / 196 (was `0 / 0 / 0`) | no (new) | young (created 268-03). ⛔ the ONE home of chip/picker/pending-note wording; `explainFor` keeps the Expert rule out of the leaves |
-| [`frontend/src/components/auth/AuthCardShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsauthauthcardshelltsx) | 2 / 2 / 52 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: Sparkles tile → Iris mark img. Asset swap only, no logic |
+| [`frontend/src/components/auth/AuthCardShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsauthauthcardshelltsx) | 3 / 2 / 55 (was `2 / 2 / 52`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: Iris mark img; 276-06 (D-27): on the dark chip. Classes only, no logic |
 | [`frontend/src/pages/AuthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesauthpagetsx) | 4 / 2 / 26 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: title prop → "Syrel". One string |
 | [`frontend/src/landing/components/CompareSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentscomparesectiontsx) | 3 / 2 / 121 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01: two prose strings → Syrel. ⛔ landing fence: no app/docs imports |
 | [`frontend/src/landing/components/LandingFooter.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentslandingfootertsx) | 4 / 2 / 57 (was `3 / 2 / 52`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 mark + © Syrel; 276-03 Docs/Changelog links, absolute hashes. ⛔ shared by landing AND docs entries |
@@ -14461,11 +14461,11 @@ Both renderers now read both inputs; nothing executable binds them, which is the
 
 ### `frontend/src/components/chat/irisState.ts`
 
-**`1 / 1 / 44`** at 276-06 (was **`0 / 0 / 0`** at 276 planning). Young (created in Phase 276). `irisStateFor(message, capPaused)` and `hasPendingAsk` (moved here from `MessageItem.tsx` so the precedence has ONE home). ⛔ Pure: it reads only the `message` prop and the caller's already-read lock; never a store. 276-06 re-derives the triple at close.
+**`1 / 1 / 44`** at 276-06 (was **`0 / 0 / 0`** at 276 planning). Young (created in Phase 276). `irisStateFor(message, capPaused)` and `hasPendingAsk` (moved here from `MessageItem.tsx` so the precedence has ONE home). ⛔ Pure: it reads only the `message` prop and the caller's already-read lock; never a store. Re-derived at 276-06's close: unchanged at `1 / 1 / 44`.
 
 ### `frontend/src/components/chat/IrisAvatar.tsx`
 
-**`1 / 1 / 310`** at 276-06 (was **`0 / 0 / 0`** at 276 planning). Young (created in Phase 276). The animated Iris assistant avatar, sketch 276-iris-avatar variant D "Orbit + wave" (D-24, D-27). ⛔ The seamless-loop invariant: the orbit period must stay an integer multiple of the wave period (4.8 s = 3 × 1.6 s) and the orbit sweep must stay 360°; `IrisAvatar.test.tsx` pins it from `index.css`. 276-06 re-derives the triple at close.
+**`1 / 1 / 310`** at 276-06 (was **`0 / 0 / 0`** at 276 planning). Young (created in Phase 276). The animated Iris assistant avatar, sketch 276-iris-avatar variant D "Orbit + wave" (D-24, D-27). ⛔ The seamless-loop invariant: the orbit period must stay an integer multiple of the wave period (4.8 s = 3 × 1.6 s) and the orbit sweep must stay 360°; `IrisAvatar.test.tsx` pins it from `index.css`. Re-derived at 276-06's close: unchanged at `1 / 1 / 310`; mounted in MessageItem (gutter), ChatArea (idle hero, 64px) and App (boot splash, thinking, 56px).
 
 ### `frontend/src/components/settings/ActionRow.tsx`
 
@@ -17479,6 +17479,10 @@ Re-derived at `268-04` (after waves 1-2 merged) with the CLAUDE.md recipe (6-dig
 
 **`87 / 41 / 1106`** (was `79 / 40 / 970`). 268-03: `applyScopeChange` is the one scope PATCH home, beside the Expert one; the at-rest `ScopeEffect` read is made inside a promise chain so a suite whose `@/lib/api` mock lacks the export cannot crash at mount. Hook deltas stated, not hidden: `useState` 5 → 7, `useEffect` 4 → 6, `useCallback` 10 → 12, `useRef` 1 → 2. The header folder pill was removed. ⛔ The send path has no scope branch.
 
+### `frontend/src/components/chat/ChatArea.tsx` — Phase 276
+
+**`91 / 42 / 1171`** at 276-06 (was `87 / 41 / 1106`). G-5: ⚠ **FIRES**, honoured by construction: one import plus one element swap — the 64px gradient Sparkles hero tile became `<IrisAvatar state="idle" size={64} />`; hook call sites 36 → 36, no store read. Idle means static (D-24): a moving hero would claim work that is not happening.
+
 ### `frontend/src/components/chat/ExpertEventCard.tsx` — Phase 268
 
 **`4 / 2 / 278`** (was `1 / 1 / 197`). 268-03 added `ScopeChangedCard` through the existing tone lookup; the card reads `tool_calls[0]`, never `content`.
@@ -17738,6 +17742,10 @@ Every triple below was re-derived AFTER the phase's last source edit (`565b05c41
 ### `frontend/src/App.tsx` — Phase 271
 
 **`35 / 26 / 412`** at 271 close. **271-02:** the `classification-rules` `ActiveView` member was removed in the same commit as its ChatLayout branch and its `NAV_ITEMS` entry (`b987bfb27`); `activeViewReachability` stays green and no path reaches `UnknownViewFallback`. Live (G4-3): the rail offers no Classification entry.
+
+### `frontend/src/App.tsx` — Phase 276
+
+**`36 / 27 / 418`** at 276-06 (was `35 / 26 / 412`). G-5: ⚠ **FIRES**, honoured by construction: the `loading || setupStatus === null` return's spin ring became `<div role="status" aria-label="Loading Syrel"><IrisAvatar state="thinking" size={56} /></div>`; hook call sites 9 → 9. Under reduced motion it is the static mark with a lit core.
 
 ### `frontend/src/components/classification/ClassificationRulesPage.tsx` — Phase 271
 
@@ -18239,9 +18247,13 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 
 **`2 / 2 / 52`** after 276-01 (D-21): the Sparkles tile became `<img src="/brand/syrel-mark-iris.svg">`; the unused `Sparkles` import dropped. Shared by AuthPage AND AcceptInvitePage, so both show the mark.
 
+**`3 / 2 / 55`** after 276-06 (D-27): the mark `<img>` is wrapped in the avatar's dark `#0A0E18` chip (Tailwind classes, `w-14 h-14`, img at 84%), so the light core and petals stay legible on the light theme. `alt="Syrel"` kept.
+
 ### `frontend/src/components/layout/NavPanel.tsx` — Phase 276, asset swap only
 
 **`25 / 14 / 416`** after 276-01 (was `24 / 13 / 417`). G-5 FIRES; honoured by construction (D-14): the gradient-primary Sparkles tile became `<img src="/brand/syrel-mark-iris.svg" className="w-8 h-8 shrink-0" alt="Syrel">` and the now-unused `Sparkles` import was dropped. No logic, no state, no new branch. An `<img>`, never inline SVG — the brand files share gradient ids `g`/`h`.
+
+**`26 / 14 / 420`** after 276-06 (was `25 / 14 / 416`). Still honoured by construction: the same `<img>` now sits in a `w-8 h-8` span carrying the dark `#0A0E18` chip (D-27), img at 84%. Classes only; no logic, no state.
 
 ### Landing brand files — Phase 276 (276-01)
 
