@@ -3992,7 +3992,10 @@ const BASELINE = {
   //     cases 12b, 12c and 12d red, each on its own removed condition
   // `MessageItem.tsx` and `ChatAttachmentChip.tsx` were restored md5-identical after every plant
   // (`bab2a9868f07b37d2e29766d95574eed`, `0b092b18f2cf83756f1d2213c9f36306`).
-  "ComposerAttach.composition.test.tsx": 19,
+  // ⚠ RAISED 19 → 22 at 274-03. Measured: the suite held 21 cases at 274's base `75cd7378`
+  // (the +2 predates this phase and is folded in here only because this commit edits the suite),
+  // and 274-03 adds case `10c` — the composer posts `uploadWorkspaceTemplate(threadId, f, "thread")`.
+  "ComposerAttach.composition.test.tsx": 22,
   // ── Phase 244 (244-06 T3 / SHELL-04 / D-244-05 / D-244-27) — the cloud modal ────────────
   // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/chat` still has NO bare-directory TARGETS entry.
   //
@@ -4167,6 +4170,15 @@ const BASELINE = {
   "artifactParity.fence.test.ts": 10, // 273-05 — backend Literals/fixture vs frontend registry (I-1); RAISED 7 → 10 at 273-REVIEW CR-01 (+3: the shared bad-spec parity fixture)
   "ShowArtifactBody.test.tsx": 17, // 273-05 — rail essence + body, never the spec or model text
   "ToolCallPanel.showArtifact.test.tsx": 16, // 273-05 — L-1..L-4, refused node, phrases
+  // ── Phase 274-03 (D-05 · D-10 · D-12..D-15 · D-27 · SC#1) — FIVE NEW suites, BOTH KNOBS, SAME
+  // COMMIT. `src/components/attachments` is a NEW directory and is adopted as a directory entry;
+  // `src/lib` has no bare-directory entry, so the two `src/lib/__tests__` suites go by FILE path.
+  // Pinned at the measured passing counts (55 cases, 0 failing), each RED before its module existed.
+  "attachmentLifetime.test.ts": 11, // 274-03 — prefix strip (D-27) + thread-life rule (D-05), one home
+  "attachmentsApi.test.ts": 14, // 274-03 — ?lifetime=thread only for the composer (D-21), X-Org-Id on cloud attach, promote wire
+  "saveToLibraryCopy.test.ts": 7, // 274-03 — ?raw port fence vs sketch 274 COPY.js + ingest_splice.py
+  "FolderPathListbox.test.tsx": 11, // 274-03 — no Root, full sorted paths, APG combobox/listbox + keyboard
+  "SaveToLibraryDialog.test.tsx": 12, // 274-03 — disabled until picked, latest-wins preview, already screen, verbatim 403
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6088,6 +6100,11 @@ const TARGETS = [
   "src/components/chat/__tests__/artifactParity.fence.test.ts",
   "src/components/chat/tool-bodies/ShowArtifactBody.test.tsx",
   "src/components/chat/__tests__/ToolCallPanel.showArtifact.test.tsx",
+  // Phase 274-03 — `src/components/attachments` is new and adopted as a DIRECTORY (its three suites
+  // and any later one); the two `src/lib/__tests__` suites go by FILE path (no `src/lib` entry).
+  "src/components/attachments",
+  "src/lib/__tests__/attachmentLifetime.test.ts",
+  "src/lib/__tests__/attachmentsApi.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
