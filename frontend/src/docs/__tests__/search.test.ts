@@ -28,7 +28,19 @@ describe("search index (D-08)", () => {
     for (const p of pages) expect(ids.has(`page:${p.slug}`), p.slug).toBe(true)
     for (const r of changelog) expect(ids.has(`changelog:${r.version}`), r.version).toBe(true)
     for (const s of sections) expect(ids.has(`section:${s.id}`), s.id).toBe(true)
-    expect(docs).toHaveLength(pages.length + changelog.length + sections.length)
+    // + 1: the Build Story page (276-07, D-26)
+    expect(docs).toHaveLength(pages.length + changelog.length + sections.length + 1)
+  })
+
+  it("indexes the Build Story page exactly once (D-26)", () => {
+    const { docs, ms } = buildIndex()
+    const story = docs.filter((d) => d.id === "story:build-story")
+    expect(story).toHaveLength(1)
+    expect(story[0].url).toBe("/docs/changelog/build-story")
+    expect(story[0].title).toBe("Syrel: The Build Story")
+    expect(story[0].body).toContain("A document chat that can be trusted")
+    const loaded = MiniSearch.loadJSON(JSON.stringify(ms), SEARCH_OPTIONS)
+    expect(loaded.search("build story").map((h) => h.id)).toContain("story:build-story")
   })
 
   it("truncates indexed body text to about 2 KB", () => {

@@ -471,7 +471,7 @@ export const WHICH_DATE_OPTIONS: ReadonlyArray<{
   label: string
 }> = [
   { value: "document", label: "Date in the document" },
-  { value: "added", label: "Added to Agentic RAG" },
+  { value: "added", label: "Added to Syrel" },
   { value: "source_created", label: "Created in the file" },
   { value: "source_modified", label: "Last modified in the file" },
 ]

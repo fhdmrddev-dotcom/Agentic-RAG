@@ -20,8 +20,8 @@ beforeEach(() => {
 })
 
 const SORT_OPTIONS = [
-  { value: "added_desc", label: "Added to Agentic RAG (newest)" },
-  { value: "added_asc", label: "Added to Agentic RAG (oldest)" },
+  { value: "added_desc", label: "Added to Syrel (newest)" },
+  { value: "added_asc", label: "Added to Syrel (oldest)" },
   { value: "name_asc", label: "Name (A to Z)" },
 ] as const
 

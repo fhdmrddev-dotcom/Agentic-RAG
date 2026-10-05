@@ -470,7 +470,11 @@ function parseBullets(block) {
   return bullets;
 }
 
-/** The README's "arc in five chapters" table → [{ n, title, range }]. README wording wins. */
+/**
+ * The README's "arc in five chapters" table → [{ n, title, range, summary }]. README wording wins.
+ * `summary` is the third column ("What changed for the user"), read for the Build Story page
+ * (276-07, D-26); a chapter row without it throws naming the README.
+ */
 function parseChapters(historyDir) {
   const readmePath = path.join(historyDir, 'README.md');
   const text = normalizeNewlines(fs.readFileSync(readmePath, 'utf8'));
@@ -478,11 +482,14 @@ function parseChapters(historyDir) {
   if (!block) throw new Error(`${readmePath}: no "## The arc in five chapters" table`);
   const chapters = [];
   for (const line of block.split('\n')) {
-    const m = /^\|\s*(\d+)\.\s*([^|]+?)\s*\|\s*(v\d+\.\d+)\s*[–-]\s*(v\d+\.\d+)\s*\|/.exec(line);
-    if (m) chapters.push({ n: Number(m[1]), title: m[2], range: `${m[3]} – ${m[4]}`, from: m[3], to: m[4] });
+    const m = /^\|\s*(\d+)\.\s*([^|]+?)\s*\|\s*(v\d+\.\d+)\s*[–-]\s*(v\d+\.\d+)\s*\|([^|]*)\|?/.exec(line);
+    if (!m) continue;
+    const summary = m[5].trim();
+    if (!summary) throw new Error(`${readmePath}: chapter ${m[1]} in the arc table has no "What changed for the user" summary`);
+    chapters.push({ n: Number(m[1]), title: m[2], range: `${m[3]} – ${m[4]}`, summary });
   }
   if (chapters.length < 5) throw new Error(`${readmePath}: parsed ${chapters.length} chapters from the arc table, expected 5`);
-  return chapters.map(({ n, title, range }) => ({ n, title, range }));
+  return chapters;
 }
 
 function chapterFor(version, chapters) {
@@ -611,6 +618,23 @@ function buildSearchDocs(pages, changelog, sections, bodies) {
       status: 'written',
       release: r.released ? 'shipped' : r.version,
       url: `/docs/changelog/${r.version}`,
+    });
+  }
+  // 276-07 (D-26) — the Build Story page. Its chapters are the ones the releases carry (deduped by
+  // n), so the signature does not change and the page is indexed only when a changelog exists.
+  const chapters = [...new Map(changelog.map((r) => [r.chapter.n, r.chapter])).values()].sort((a, b) => a.n - b.n);
+  if (chapters.length) {
+    docs.push({
+      id: 'story:build-story',
+      title: 'Syrel: The Build Story',
+      headings: chapters.map((c) => `Chapter ${c.n}: ${c.title}`).join(' · '),
+      summary: 'The five chapters of how Syrel was built, release by release.',
+      body: clip(chapters.map((c) => `${c.title}. ${c.summary || ''}`).join(' '), SEARCH_BODY_CHARS),
+      slug: 'changelog/build-story',
+      section: sectionTitle.get('changelog') || 'Changelog',
+      status: 'written',
+      release: 'shipped',
+      url: '/docs/changelog/build-story',
     });
   }
   return docs;

@@ -36,7 +36,7 @@ const LABELS = [
   "Created in the file",
   "Last modified in the file",
   "Author in the file",
-  "Added to Agentic RAG",
+  "Added to Syrel",
   "Added by",
 ]
 
@@ -125,10 +125,10 @@ describe("DocumentFileFacts — recorded facts", () => {
 describe("DocumentFileFacts — Added to / Added by", () => {
   it("suffixes the version only above v1", () => {
     const v3 = render(<DocumentFileFacts doc={makeDoc({ version_number: 3 })} />)
-    expect(ddFor(v3.container, "Added to Agentic RAG")).toHaveTextContent("· when v3 was added")
+    expect(ddFor(v3.container, "Added to Syrel")).toHaveTextContent("· when v3 was added")
     v3.unmount()
     const v1 = render(<DocumentFileFacts doc={makeDoc({ version_number: 1 })} />)
-    expect(ddFor(v1.container, "Added to Agentic RAG").textContent).not.toMatch(/when v/)
+    expect(ddFor(v1.container, "Added to Syrel").textContent).not.toMatch(/when v/)
   })
 
   it("names who added it without ever showing an email", () => {

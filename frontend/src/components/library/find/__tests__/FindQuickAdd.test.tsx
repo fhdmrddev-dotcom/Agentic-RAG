@@ -115,9 +115,9 @@ describe("FindQuickAdd — set chips read as the condition they send", () => {
       dates: [{ which: "added", op: "between", value: "2019-01-01", value2: "2019-12-31", unit: null }],
     })
     expect(
-      screen.getByRole("button", { name: "Added to Agentic RAG between 1 Jan 2019 and 31 Dec 2019" }),
+      screen.getByRole("button", { name: "Added to Syrel between 1 Jan 2019 and 31 Dec 2019" }),
     ).toBeInTheDocument()
-    fireEvent.click(screen.getByRole("button", { name: "Remove Date condition (Added to Agentic RAG)" }))
+    fireEvent.click(screen.getByRole("button", { name: "Remove Date condition (Added to Syrel)" }))
     expect(dispatch).toHaveBeenLastCalledWith({ type: "REMOVE_DATE", which: "added" })
   })
 })

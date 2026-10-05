@@ -70,6 +70,9 @@ export function Changelog() {
             Shipped, <span className="d-gradient">not promised.</span>
           </h1>
           <p className="d-hero-sub">Every release, what it changed for you, and what has not shipped yet.</p>
+          <p className="d-story-link">
+            <a href="/docs/changelog/build-story">Syrel: The Build Story, chapter by chapter</a>
+          </p>
         </div>
       </section>
 

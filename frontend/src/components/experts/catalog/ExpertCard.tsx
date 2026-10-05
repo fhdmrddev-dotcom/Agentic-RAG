@@ -64,6 +64,7 @@ import {
   INSTALL_COPY,
   START_COPY,
   connectionLedgerColumns,
+  decodeEntities,
   installCardLine,
   installView,
 } from "./expertCatalog"
@@ -161,7 +162,7 @@ export function ExpertCard({
             </div>
             <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground">
               {/* An absent category says so; it is never folded under someone else's heading. */}
-              {expert.category?.trim() || "Uncategorised"}
+              {decodeEntities(expert.category?.trim() || "Uncategorised")}
               {" · "}
               {expert.is_system ? "System Template" : "Org Custom"}
             </p>

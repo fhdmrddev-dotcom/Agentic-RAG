@@ -17,6 +17,8 @@ export function resolveRoute(pathname: string, manifest: RouteManifest): Route {
   const rest = p.slice("/docs/".length)
 
   if (rest === "changelog") return { kind: "changelog", sectionId: "changelog" }
+  // 276-07 (D-26) — resolved BEFORE the version lookup; no release is named "build-story".
+  if (rest === "changelog/build-story") return { kind: "build-story", sectionId: "changelog" }
   if (rest.startsWith("changelog/")) {
     const version = rest.slice("changelog/".length)
     return manifest.changelog.some((r) => r.version === version)

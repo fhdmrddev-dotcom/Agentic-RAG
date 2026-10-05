@@ -43,7 +43,7 @@
  * every page load (UI-SPEC S5).
  *
  * ── ⚠ P-01 — THE DEFAULT SORT IS A RECORDED DEVIATION ─────────────────────────────────
- * `DEFAULT_SORT` is `"added_desc"` (Added to Agentic RAG, newest first), NOT the
+ * `DEFAULT_SORT` is `"added_desc"` (Added to Syrel, newest first), NOT the
  * "Modified (newest)" CONTEXT's specifics named. `source_modified_at` is null on every row
  * ingested before Phase 270, so a default on it would sink most of the library into one
  * unordered tail, and a bare "Modified" is ambiguous under 270's labelled dates. Flagged for
@@ -329,8 +329,8 @@ export function toSearchRequest<F extends FindFilterLike>(
 
 /** UI-SPEC §Copywriting, in order, default first. Every date says WHOSE date (270 rule). */
 export const SORT_OPTIONS: ReadonlyArray<{ value: FindSort; label: string }> = [
-  { value: "added_desc", label: "Added to Agentic RAG (newest)" },
-  { value: "added_asc", label: "Added to Agentic RAG (oldest)" },
+  { value: "added_desc", label: "Added to Syrel (newest)" },
+  { value: "added_asc", label: "Added to Syrel (oldest)" },
   { value: "document_date_desc", label: "Date in the document (newest)" },
   { value: "source_modified_desc", label: "Last modified in the file (newest)" },
   { value: "source_created_desc", label: "Created in the file (newest)" },

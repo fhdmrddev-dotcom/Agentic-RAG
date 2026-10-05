@@ -56,7 +56,7 @@ import type { ExpertBundle, Folder } from "@/types"
 import { cn } from "@/lib/utils"
 import { ExpertCard } from "./ExpertCard"
 import { ExpertDetailModal } from "./ExpertDetailModal"
-import { ALL_CATEGORIES, categoriesOf, filterExperts } from "./expertCatalog"
+import { ALL_CATEGORIES, categoriesOf, decodeEntities, filterExperts } from "./expertCatalog"
 
 /** How often the page re-reads the list while an install is running (T-266-28: only then). */
 export const INSTALL_POLL_MS = 4000
@@ -261,7 +261,7 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
                   : "border-border/70 bg-muted/30 text-muted-foreground hover:text-foreground",
               )}
             >
-              {c === ALL_CATEGORIES ? "All" : c}
+              {c === ALL_CATEGORIES ? "All" : decodeEntities(c)}
             </button>
           ))}
         </div>

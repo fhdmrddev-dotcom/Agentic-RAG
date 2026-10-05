@@ -52,7 +52,15 @@ describe("parseHistory — the real docs/history", () => {
   it("assigns every release a chapter from the README table", () => {
     const chapters = docsContent.parseChapters(HISTORY)
     expect(chapters.map((c) => c.n)).toEqual([1, 2, 3, 4, 5])
-    expect(chapters[0]).toEqual({ n: 1, title: "A document chat that can be trusted", range: "v1.0 – v2.4" })
+    // 276-07 (D-26): the README's third column ("What changed for the user") is the chapter summary.
+    expect(chapters[0]).toEqual({
+      n: 1,
+      title: "A document chat that can be trusted",
+      range: "v1.0 – v2.4",
+      summary:
+        "Folders, agent exploration, skills, sandboxed code, citations and confidence, audit log, memory, tables and images",
+    })
+    for (const c of chapters) expect(c.summary.length, `chapter ${c.n}`).toBeGreaterThan(10)
     for (const r of releases) {
       expect(r.chapter, r.version).toBeTruthy()
     }
@@ -60,6 +68,8 @@ describe("parseHistory — the real docs/history", () => {
     expect(releases.find((r) => r.version === "v2.5")!.chapter.n).toBe(2)
     expect(releases.find((r) => r.version === "v3.4")!.chapter.n).toBe(4)
     expect(releases.find((r) => r.version === "v4.5")!.chapter.n).toBe(5)
+    // a release's chapter carries the same summary as the README row
+    expect(releases.find((r) => r.version === "v1.0")!.chapter.summary).toBe(chapters[0].summary)
   })
 })
 

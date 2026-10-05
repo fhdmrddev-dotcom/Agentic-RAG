@@ -134,6 +134,9 @@ export function Home({ search }: { search?: ReactNode }) {
           Five chapters, {data.changelog.length} releases.
         </p>
         <ChapterStrip chapters={data.chapters} mode="link" />
+        <p className="d-story-link">
+          <a href="/docs/changelog/build-story">Read Syrel: The Build Story</a>
+        </p>
       </section>
     </div>
   )

@@ -30,7 +30,7 @@ const sections: Section[] = [
   { id: "changelog", title: "Changelog", purpose: "p", slugs: [] },
 ]
 const pages: PageMeta[] = [page("use/chat", "written"), page("use/chat-modes", "stub"), page("api/overview", "written")]
-const chapter = { n: 5, title: "A product you can sell", range: "v4.3 – v4.5" }
+const chapter = { n: 5, title: "A product you can sell", range: "v4.3 – v4.5", summary: "Metered usage and tiers" }
 const changelog: Release[] = [
   { version: "v4.5", name: "Find It, Show It", date: null, released: false, chapter, oneLiner: "x", shipped: ["y"], note: null },
   { version: "v4.4", name: "Experts", date: "2026-09-29", released: true, chapter, oneLiner: "x", shipped: ["y"], note: null },
@@ -60,6 +60,16 @@ describe("resolveRoute", () => {
       version: "v4.5",
       sectionId: "changelog",
     })
+  })
+
+  it("resolves the Build Story page before the version lookup (D-26)", () => {
+    const story = { kind: "build-story", sectionId: "changelog" }
+    expect(resolveRoute("/docs/changelog/build-story", manifest)).toEqual(story)
+    expect(resolveRoute("/docs/changelog/build-story/", manifest)).toEqual(story)
+    expect(resolveRoute("/docs/changelog/build-story?x=1#ch-2", manifest)).toEqual(story)
+    // nothing else under changelog/ is shadowed
+    expect(resolveRoute("/docs/changelog/v4.4", manifest)).toEqual({ kind: "changelog-version", version: "v4.4", sectionId: "changelog" })
+    expect(resolveRoute("/docs/changelog/nope", manifest)).toEqual({ kind: "not-found" })
   })
 
   it("resolves the API reference shell, and /docs/api to the api/overview page", () => {

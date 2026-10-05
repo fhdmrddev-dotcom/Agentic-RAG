@@ -110,7 +110,7 @@ describe("DocumentDetailPanel — Phase 270 placement", () => {
       "Created in the file",
       "Last modified in the file",
       "Author in the file",
-      "Added to Agentic RAG",
+      "Added to Syrel",
       "Added by",
     ]) {
       expect(screen.getByText(label)).toBeTruthy()
