@@ -53,6 +53,13 @@ Candidates kept beside them (`epN-cand-18/30/45.png`). Style note: NotebookLM ci
 |---|---|---|
 | 1 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep1.mp4` | 5:25 (1080p) |
 | 2 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep2.mp4` | 5:31 (1080p) |
+| 3 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep3.mp4` | 4:12 (1080p) — rendered 2026-10-05 |
+| 4 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep4.mp4` | 5:28 (1080p) — rendered 2026-10-05 |
+| 5 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep5.mp4` | 5:27 (1080p) — rendered 2026-10-05; ⚠ operator watch-through of the € price-tag scene (~1:36 raw / ~1:39 branded) before upload |
+
+**Watermark decision (operator, 2026-10-05): A — keep the "Gemini Notebook" watermark; upload as-is.** Eps 3–5 intro/outro checked by stills.
+
+**Docs wiring (owed after upload):** 276 is closed; videos.ts is this lane's. Posters are staged (uncommitted) at `frontend/public/docs-assets/posters/chapter-1..5.jpg`. Once the operator pastes the five YouTube ids: set `youtubeId` + `poster` per `changelog.chapter-N` in `frontend/src/docs/video/videos.ts`, relax BuildStory.test.tsx's all-null case so documentary wording is allowed only for chapters that have an id, run `GSD_VITEST_MAX_WORKERS=2 npx vitest run src/docs` + `node scripts/check-docs-coverage.cjs`, commit by path. Never commit MP4s; never embed the 8-stage explainer (D-25).
 
 Intro card + lower-third + outro checked by stills. The NotebookLM source carries a faint "Gemini Notebook" watermark bottom-right for the whole video. Render needs network (SFX from remotion.media).
 
