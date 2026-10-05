@@ -40,12 +40,12 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 
 ### Public docs, API reference & video (DOCS) - added 2026-10-04 (operator)
 
-- [ ] **DOCS-01**: Anyone can read Syrel's documentation at `/docs` on the landing domain, in the landing's own look (sketch 276 winner B), on desktop and phone.
-- [ ] **DOCS-02**: Every surface in the coverage inventory (`.planning/research/docs-coverage-inventory.md`, 261 items) has a docs page, and a gate fails the build when a new page, tool, step type or endpoint has none.
-- [ ] **DOCS-03**: A developer can browse a "Syrel API" reference generated from the OpenAPI document, with internal operations hidden and concept pages for auth, orgs, streaming and errors.
-- [ ] **DOCS-04**: In production, the live `/docs`, `/redoc` and `/openapi.json` require sign-in; locally they stay open.
-- [ ] **DOCS-05**: A visitor can read a changelog generated from `docs/history/`, where unreleased work is labelled as not yet released.
-- [ ] **DOCS-06**: The docs home and guides play Syrel videos (Remotion player and clips, NotebookLM explainers), and the landing page says Syrel instead of Agentic RAG.
+- [x] **DOCS-01**: Anyone can read Syrel's documentation at `/docs` on the landing domain, in the landing's own look (sketch 276 winner B), on desktop and phone.
+- [x] **DOCS-02**: Every surface in the coverage inventory (`.planning/research/docs-coverage-inventory.md`, 261 items) has a docs page, and a gate fails the build when a new page, tool, step type or endpoint has none.
+- [x] **DOCS-03**: A developer can browse a "Syrel API" reference generated from the OpenAPI document, with internal operations hidden and concept pages for auth, orgs, streaming and errors.
+- [x] **DOCS-04**: In production, the live `/docs`, `/redoc` and `/openapi.json` require sign-in; locally they stay open.
+- [x] **DOCS-05**: A visitor can read a changelog generated from `docs/history/`, where unreleased work is labelled as not yet released.
+- [x] **DOCS-06**: The docs home and guides play Syrel videos (Remotion player and clips, NotebookLM explainers), and the landing page says Syrel instead of Agentic RAG.
 
 ## Future Requirements
 
@@ -76,11 +76,11 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 | ATT-01 | Phase 274 | Pending |
 | ATT-02 | Phase 274 | Pending |
 | ATT-03 | Phase 274 | Pending |
-| DOCS-01 | Phase 276 | Pending |
-| DOCS-02 | Phase 276 | Pending |
-| DOCS-03 | Phase 276 | Pending |
-| DOCS-04 | Phase 276 | Pending |
-| DOCS-05 | Phase 276 | Pending |
-| DOCS-06 | Phase 276 | Pending |
+| DOCS-01 | Phase 276 | Complete |
+| DOCS-02 | Phase 276 | Complete |
+| DOCS-03 | Phase 276 | Complete |
+| DOCS-04 | Phase 276 | Complete |
+| DOCS-05 | Phase 276 | Complete |
+| DOCS-06 | Phase 276 | Complete |
 
 **Coverage:** 25 v1 requirements, 25 mapped, 0 unmapped, 0 duplicated (roadmap 2026-09-29; DOCS-01..06 added 2026-10-04).

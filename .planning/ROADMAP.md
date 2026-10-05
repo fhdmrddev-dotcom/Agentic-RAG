@@ -342,7 +342,7 @@ Plans:
 | 273. Agent-Authored Artifacts | 6/6 | Complete — 1 UAT row OWED (live STRUCTURED-path holdback check; run it first) | 2026-10-04 |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
-| 276. Public Docs, API Reference & Video Library | 7/7 | Complete   | 2026-10-05 |
+| 276. Public Docs, API Reference & Video Library | 7/7 | Complete    | 2026-10-05 |
 
 ---
 
