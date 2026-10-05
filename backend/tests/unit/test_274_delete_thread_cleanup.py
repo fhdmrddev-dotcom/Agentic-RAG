@@ -221,10 +221,13 @@ async def test_a_failed_chunk_is_logged_and_the_rest_still_run(caplog):
     sb.remove_raises_on = {0}
     paths = [f"{USER}/{THREAD}/f-{i}/v1" for i in range(150)]
     with caplog.at_level(logging.WARNING):
-        await _cleanup().remove_workspace_paths(sb, paths)  # must not raise
+        await _cleanup().remove_workspace_paths(sb, paths, thread_id=THREAD)  # must not raise
     assert [len(c) for c in sb.removed] == [100, 50], "the second chunk was not attempted"
     warned = [r for r in caplog.records if r.levelno >= logging.WARNING]
     assert warned and "100" in warned[0].getMessage()
+    # T-274-04 (secure-phase): the warning must name the THREAD, or an orphaned-bytes report cannot be
+    # traced back to the delete that caused it.
+    assert str(THREAD) in warned[0].getMessage()
 
 
 @pytest.mark.asyncio
