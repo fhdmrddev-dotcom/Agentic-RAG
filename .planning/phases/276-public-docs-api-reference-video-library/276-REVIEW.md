@@ -3,7 +3,8 @@ phase: 276-public-docs-api-reference-video-library
 reviewed: 2026-10-05
 depth: standard
 diff_base: 2b756b1cd
-status: issues_found
+status: fixed
+fix_status: all_fixed (2 critical + 12 warning + A-IN-03; A-IN-11 folded into A-WR-01); other info accepted
 files_reviewed: 138
 split: "Part A (52 files: backend, gates, hooks, CI, deploy, routing, landing) + Part B (86 files: docs UI, chat Iris avatar, renamed components, video). Sources: 276-REVIEW-A.md, 276-REVIEW-B.md."
 findings:
@@ -516,3 +517,26 @@ Use it at both sites, and consider a top-level error boundary in `docs/main.tsx`
 _Reviewed: 2026-10-05_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+
+# Fix results (gsd-code-fixer, 2026-10-05)
+
+| ID | Commit | Fix |
+|---|---|---|
+| A-WR-01 (+A-IN-11) | c4d5225fd | Docs gate is fail-closed: open only when ENVIRONMENT is unset/local/development/dev/test; staging and unknown values return 401; the boot WARNING fires when open outside local; main.py reads `settings.environment`; deploy docs synced |
+| A-WR-02 | 4beefabff | Public spec descriptions keep summary + first paragraph; internal-reference sentences are scrubbed (0/757 match); test pins the patterns |
+| A-WR-03 | a22b7d75c | First-paint markers are case-insensitive (driven RED) |
+| A-WR-04 | 7336d385c | MenuDrawer traps Tab/Shift+Tab |
+| A-WR-05 | 3b8f4307e | Root `.dockerignore` |
+| A-WR-06 | 666dfcab5 | `releasedVersion()` uses `parseHistory` and throws on an unparseable file |
+| A-WR-07 | 9745ab0fa | Spec copy: live explorer = bearer/scripts; browsers → `/docs/api/reference` |
+| A-IN-03 | e3a263401 | Stale "hook not registered" comments corrected |
+| B-CR-01 | b72eefdb7 | Scalar `style.css` lazy-loaded with Scalar; fence extended |
+| B-CR-02 | 835f6eb78 | Hash scroll fires after the Article body renders (`onBodyReady`) |
+| B-WR-01 | 9edd74c65 | Amber "waiting" only while streaming; the cap-pause is the only waiting state on a finished row |
+| B-WR-02 | 1bbbdfdde | Settle coasts to the following 120° stop (`irisMotion.ts`, tested at 3 spin rates) |
+| B-WR-03 | 43d0f8cd2 | Only a route change focuses H1; Markdown components memoised (stopped H2/video remounts) |
+| B-WR-04 | 98e6a31a6 | `safeDecode` + `DocsRootBoundary` |
+| B-WR-05 | 575bcbc4b | Web playback skips `@remotion/google-fonts` (`__VIDEO_WEB_PLAYBACK__`); no `fonts.gstatic.com` in any chunk |
+
+Remaining Info items: accepted as-is (recorded in the per-part reports). Owed: a Chrome check of `/docs/api/reference` styling on a production preview (verify-work).
