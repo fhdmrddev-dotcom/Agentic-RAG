@@ -4191,6 +4191,10 @@ const BASELINE = {
   "AttachmentActionsMenu.test.tsx": 14, // 274-04 — always-visible ⋯, chip/panel items, disabled verb + reason, segment states
   "AttachmentRowTrailing.test.tsx": 6, // 274-04 — panel slot: thread-life vs TTL byte-identical, full path visible, tabIndex -1
   "composerNoLibraryDoor.test.ts": 4, // 274-04 — D-18 comment-stripped ?raw negative proof over every composer door
+  // ── Phase 274-05 (D-27 / the 274-02 ↔ 274-03 contract) — ONE NEW suite under the same
+  // `src/components/attachments` DIRECTORY entry, so only BASELINE changes. Pinned at its measured
+  // passing count on the merged tree (6 cases, 0 failing); its NEGATIVE case proves it can fire.
+  "promoteContract.fence.test.ts": 6, // 274-05 — ?raw backend models/route vs attachments.ts keys, saved/already literal, prefix regex lockstep
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
