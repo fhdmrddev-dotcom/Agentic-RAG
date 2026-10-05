@@ -254,10 +254,12 @@ export function NavPanel({
         )}
       >
         {/* Phase 276 (D-14): the static Iris mark as an <img> (shared gradient ids — never inline).
-            276-06 (D-27): on the avatar's dark chip in both themes — the mark's light core and
-            petals vanish on the light theme's white, and no second artwork exists. */}
-        <span className="inline-grid place-items-center w-8 h-8 shrink-0 rounded-full bg-[#0A0E18] ring-1 ring-inset ring-black/10 dark:ring-white/10">
-          <img src="/brand/syrel-mark-iris.svg" className="w-[84%] h-[84%]" alt="Syrel" />
+            276-06 (D-27) put it on a dark chip in both themes because the light core vanished on white.
+            Superseded 2026-10-05 (operator): a light-theme artwork (`syrel-mark-iris-light.svg`, option B)
+            replaces the chip on light; dark keeps the chip and the original mark. */}
+        <span className="inline-grid place-items-center w-8 h-8 shrink-0 rounded-full dark:bg-[#0A0E18] dark:ring-1 dark:ring-inset dark:ring-white/10">
+          <img src="/brand/syrel-mark-iris-light.svg" className="dark:hidden w-[84%] h-[84%]" alt="Syrel" />
+          <img src="/brand/syrel-mark-iris.svg" className="hidden dark:block w-[84%] h-[84%]" alt="Syrel" />
         </span>
         {/* PINNED toggle (never hover) — the label-reveal the operator asked for. The
             aria-label flips Expand⇄Collapse; the parent persists the choice. */}

@@ -322,11 +322,12 @@ export function SetupWizard({ onExitToApp }: SetupWizardProps = {}) {
       {/* Header band — the OperatorBand-style wordmark + the 🔒 setup-session chip
           (minted once the token is accepted; echoed masked to last-4 only). */}
       <header className="flex items-center justify-between gap-3 border-b border-border/60 px-6 py-3">
-        {/* 276-07 (D-27): the static Iris mark on the dark #0A0E18 chip — the light-theme answer,
-            same chip as the chat avatar. Decorative: the heading names the screen. */}
+        {/* 276-07 (D-27): the static Iris mark — dark chip on the dark theme only; the light theme uses
+            syrel-mark-iris-light.svg (operator, 2026-10-05). Decorative: the heading names the screen. */}
         <span className="inline-flex items-center gap-2">
-          <span className="inline-grid h-7 w-7 place-items-center rounded-full bg-[#0A0E18] ring-1 ring-inset ring-black/10 dark:ring-white/10">
-            <img src="/brand/syrel-mark-iris.svg" alt="" aria-hidden="true" className="h-[84%] w-[84%]" />
+          <span className="inline-grid h-7 w-7 place-items-center rounded-full dark:bg-[#0A0E18] dark:ring-1 dark:ring-inset dark:ring-white/10">
+            <img src="/brand/syrel-mark-iris-light.svg" alt="" aria-hidden="true" className="dark:hidden h-[84%] w-[84%]" />
+            <img src="/brand/syrel-mark-iris.svg" alt="" aria-hidden="true" className="hidden dark:block h-[84%] w-[84%]" />
           </span>
           <span className="font-headline text-base font-semibold text-foreground">First-run setup</span>
         </span>
