@@ -129,6 +129,13 @@ describe("AttachmentRowTrailing — the panel row's trailing slot", () => {
     const triggers = more(container)
     expect(triggers).toHaveLength(1)
     expect(triggers[0].getAttribute("tabindex")).toBe("-1")
+    // Re-measured live after WR-05 kept the ⋯ beside the mark: the linked row's name fell to 34px.
+    // The ⋯ rides the TOP line with the scope word; the mark has the second line to itself.
+    const [top, second] = Array.from((container.firstElementChild as HTMLElement).children)
+    expect(top.textContent).toContain(COPY.engine.CHIP_SCOPE)
+    expect(top.contains(triggers[0])).toBe(true)
+    expect(top.contains(seg)).toBe(false)
+    expect(second.contains(seg)).toBe(true)
   })
 
   it("TTL row → the Template badge and countdown exactly as shipped, followed by the ⋯", () => {
