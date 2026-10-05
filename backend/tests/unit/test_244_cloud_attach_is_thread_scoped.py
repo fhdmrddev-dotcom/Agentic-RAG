@@ -108,8 +108,8 @@ async def _call(monkeypatch, *, filename: str, raw: bytes):
 async def test_a_cloud_pick_writes_a_thread_life_workspace_file(monkeypatch, stubbed):
     """⚠ RETIRED DELIBERATELY AND REWRITTEN — D-05, Phase 274: a chat attachment lives for its
     thread; the old `expires_at is not None` premise is retired on purpose (SEED-177 /
-    D-206-07 precedent: a fence is retired by a decision written into its body, never tripped
-    by surprise).
+    D-206-07 precedent: a fence is retired deliberately, by a decision written into its body,
+    never tripped by surprise).
 
     The original assertion read *"a chat attachment without a TTL is a Library row"*. That
     conflated two properties. What made the row thread-scoped was never its TTL — it is the
