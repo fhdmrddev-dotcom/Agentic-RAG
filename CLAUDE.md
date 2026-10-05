@@ -701,7 +701,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 80 / 37 / 1036 (was `79 / 37 / 1029`) | **276-REVIEW B-WR-01**: avatar cap-pause arg also needs a Continue left. No hook, no store read |
-| `backend/app/api/threads.py` | 261 / 88 / 2434 | ⚠ STALE (`255/87/2156`). **268**: send resolves scoping ONCE + org stamps; +1 folder arm, 1 scope writer, 1 route. ⛔ 0 new send-path branches |
+| `backend/app/api/threads.py` | 265 / 90 / 2459 (was `261 / 88 / 2434`) | **274-01**: delete_thread collects paths BEFORE the row delete, removes bytes AFTER it — 1 import, 0 new branches (AST-pinned). ⛔ 0 new send-path branches |
 | `frontend/src/providers/StreamsProvider.tsx` | 104 / 38 / 4948 | ⚠ row STALE an 8th time (`102/37/4880`). NOT modified by 253 — re-derived under CR-08. ⛔ `onTurnBoundary` FLUSHES before moving, or a turn's tail leaks into the next body |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
@@ -752,16 +752,16 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/PendingAskCard.tsx` | 15 / 8 / 836 | ⚠ row was STALE at `14/7/765`; G-5 FIRES at 8 phases. honoured by construction (**244-15**): ONE optional prop, ONE composed callback in the STACK, `useState` 9→9 — no new state on a 3-home shell |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
-| `frontend/src/components/panel/FilesSection.tsx` | 10 / 6 / 363 | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption`, never re-derives its three readings |
+| `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | `frontend/src/lib/api.ts` | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
-| `frontend/src/types/index.ts` | 95 / 74 / 1520 (was `94 / 73 / 1459`) | ⚠ STALE (`94/73/1459`). **271-03**: Find wire types (`DocumentSearchRequest/Row/Response`, `RelVerb`), additive. Seam OWED |
-| `backend/app/main.py` | 86 / 62 / 977 (was `85 / 62 / 968`) | ⚠ STALE (`85/62/968`). **276-REVIEW A-WR-01**: boot log +1 WARNING arm; refusals read `settings` (A-IN-11). 0 new route branches |
+| `frontend/src/types/index.ts` | 97 / 76 / 1533 (was `95 / 74 / 1520`) | **274-03**: `WorkspaceFile.expires_at?: string \| null` (null = thread-life), additive. Seam OWED |
+| `backend/app/main.py` | 87 / 63 / 978 (was `86 / 62 / 977`) | **274-02**: ONE `include_router(workspace_promote.router)` beside `workspace.router` + 1 import name. 0 new branches |
 | `backend/app/config.py` | 88 / 51 / 1695 | ⚠ STALE a 14th time (`87/50/1593`). **262**: `api_surface` + `API_SURFACES` + `provider_hint`. ⛔ `MODEL_CAPABILITIES` seam STILL OWED — 12 of 15 fields are now DB-settable, the dict is not |
 | `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 91 / 35 / 2518 (was `87 / 34 / 2414`) | ⚠ STALE (`87/34/2414`). **270-02**: +1 route (`POST /{id}/download-url`) outside the 217 region + 1 batched read. ⛔ RLS read BEFORE service sign; 404 not 403; no `ingestion_step` literal |
-| `scripts/vitest-count-gate.cjs` | 279 / 63 / 6361 (was `269 / 60 / 6281`) | ⚠ STALE (`269/60/6281`). **276-05** pinned 20 docs + landing suites (122 cases) in BASELINE; TARGETS already ran them (276-02) |
+| `scripts/vitest-count-gate.cjs` | 288 / 64 / 6404 (was `279 / 63 / 6361`) | **274-03/04/05**: `src/components/attachments` adopted as a TARGETS directory; 10 suites pinned in BASELINE, incl. 274-05's promote contract fence |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 at 256-03's head |
 | `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ **NOW FIRES at 3 phases, and its detail row still read `no (2 phases)` — present and WRONG, which stops an audit harder than absent.** Promoted here by 256-04; **256-03** closed its `None` finalize |
 | `frontend/src/components/panel/PhaseCard.tsx` | 17 / 11 / 788 | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253. honoured by construction (200 / **214**) |
@@ -820,7 +820,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 57 / 28 / 3580 | ⚠ STALE (`56/28/3573`). **268**: 4 org stamps + ONE scope-note fold in history (D-268-26); 1 kind check, 1 prepend. ⛔ prompt-assembly seam OWED |
+| `backend/app/services/agent_loop.py` | 65 / 31 / 3651 (was `57 / 28 / 3580`) | **274-01**: ONE literal — attachments stay with the conversation (D-26); `_ATTACHMENT_KIND` unchanged. ⛔ prompt-assembly seam OWED (OV-273-03) |
 | `backend/app/services/tool_dispatcher.py` | 93 / 40 / 5234 | ⚠ STALE (`92/39/5221`). **268-03**: +4 audit keys in the 2 existing `search.query` dicts. ⛔ registry/handler split OWED |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
@@ -836,7 +836,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/nav-items.ts` | 12 / 8 / 153 (was `10 / 7 / 141`) | ⚠ STALE (`9/6/118`). **271-02**: the Classification entry REMOVED (7 entries); `Wand2` moved to the Filing rules link. 271-05 G4-3: the rail has none |
 | `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |
 | `frontend/src/components/classification/RuleBuilderPanel.tsx` | 6 / 5 / 501 (was `4 / 3 / 502`) | ⚠ STALE (`4/3/502`). **271-02**: two strings (`New filing rule`, `After extraction`). ⛔ no logic change |
-| `backend/app/api/workspace.py` | 13 / 7 / 757 | ⚠ row was STALE at `11/6/654` ONE PLAN later — the fastest rot recorded here. honoured by construction (**244-06**): the persist tail EXTRACTED to ONE writer both doors call |
+| `backend/app/api/workspace.py` | 16 / 8 / 848 (was `13 / 7 / 757`) | ⚠ STALE (`13/7/757`). **274-01**: `?lifetime=thread` (fails closed to the TTL) + a REQUIRED `lifetime` kwarg on the ONE writer. ⛔ no minter reach (promote is its own module) |
 | `frontend/src/components/panel/TemplateUpload.tsx` | 2 / 2 / 91 | ⚠ absent for its entire life — row added 244-02 at the SECOND phase. **244**: the `accept=` literal is GONE; it reads the fenced constant |
 | `frontend/src/lib/stripComments.testutil.ts` | 1 / 1 / 28 | young (created 244-14 / IN-02). Row added AT CREATION. ⛔ The ONE home of *a `?raw` fence cannot tell code from a comment*; 3 consumers. Never apply it to a class-list or string-CONTENT assertion |
 | `frontend/src/lib/workspaceAllowedExt.ts` | 1 / 1 / 54 | young (created 244-02). Row added AT CREATION — an absent row is invisible to G-5 at any count |
@@ -888,7 +888,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05. ONE optional `caption`; ⛔ deliverable words never tooltip-only |
 | `backend/app/models/document.py` | 11 / 8 / 207 | ⚠ STALE (`10/7/183`). **270-02**: 4 optional file-fact fields + `source_connection_name` + the download-response model, additive. ⛔ optional fields only: a required one 500s five non-upload paths |
 | `frontend/src/components/ingestion/DocumentRow.tsx` | 8 / 4 / 564 (was `7 / 3 / 476`) | ⚠ STALE (`7/3/476`). **271-03**: Find cells 3-5 + name-cell 2nd line (folder · version tag). ⚠ 271-05 F-2: Re-ingest on an older row is a silent no-op |
-| `frontend/src/lib/api/documents.ts` | 6 / 6 / 490 (was `5 / 5 / 450`) | ⚠ STALE (`5/5/450`). **271-03**: `searchDocuments` + `DocumentSearchError`, additive. ⛔ Find's hook imports from here, never the barrel |
+| `frontend/src/lib/api/documents.ts` | 7 / 7 / 499 (was `6 / 6 / 490`) | **274-03**: `uploadWorkspaceTemplate(…, lifetime)` — only `"thread"` appends the query; cloud attach sends X-Org-Id via getAuthHeaders. ⛔ panel/workflow doors byte-unchanged |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

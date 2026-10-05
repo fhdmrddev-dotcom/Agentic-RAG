@@ -10788,7 +10788,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 80 / 37 / 1036 (was `79 / 37 / 1029`) | ⚠ **FIRES** | **276-REVIEW B-WR-01**: the avatar's cap-pause argument also requires a Continue left (`!continueExhausted && continuesRemaining > 0`). No hook, no store read |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 264 / 89 / 2456 (was `261 / 88 / 2434`) | ⚠ **FIRES** | **273-04**: ONE `attach_artifacts` call on GET /messages and ONE on /snapshot. ⛔ 0 new send-path branches |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 265 / 90 / 2459 (was `264 / 89 / 2456`) | ⚠ **FIRES** | **274-01**: delete_thread collects paths BEFORE the row delete, removes bytes AFTER it — 1 import, 0 new branches (AST-pinned). ⛔ 0 new send-path branches |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 106 / 40 / 4982 (was `104 / 38 / 4948`) | ⚠ **FIRES** | **273-05**: ONE onArtifact handler (D-16) — append or replace-by-id, text untouched. ⛔ `onTurnBoundary` still FLUSHES before moving |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
@@ -10838,16 +10838,16 @@ cells rot within days.
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 15 / 8 / 836 | **FIRES** | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
-| [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
+| [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ **FIRES** | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 96 / 75 / 1532 (was `95 / 74 / 1520`) | ⚠ **FIRES** | **273-05**: `Message.artifacts` re-exports the wire TYPE from artifactSpec.ts, never re-declared. Seam OWED |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 86 / 62 / 977 (was `85 / 62 / 968`) | ⚠ **FIRES** | ⚠ STALE (`85/62/968`). **276-REVIEW A-WR-01**: boot log +1 WARNING arm; refusals read `settings` (A-IN-11). 0 new route branches |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 97 / 76 / 1533 (was `96 / 75 / 1532`) | ⚠ **FIRES** | **274-03**: `WorkspaceFile.expires_at?: string \| null` (null = thread-life), additive. Seam OWED |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 87 / 63 / 978 (was `86 / 62 / 977`) | ⚠ **FIRES** | **274-02**: ONE `include_router(workspace_promote.router)` beside `workspace.router` + 1 import name. 0 new branches |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 90 / 52 / 1698 (was `87 / 50 / 1593`) | ⚠ **FIRES** | ⚠ STALE (`87/50/1593`). **272-05**: the stale ef_search 'raised to 200' comment corrected; value 40 unchanged. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 91 / 35 / 2518 (was `87 / 34 / 2414`) | ⚠ **FIRES** | ⚠ STALE (`87/34/2414`). **270-02**: +1 route (`POST /{id}/download-url`) outside the 217 region + 1 batched read. ⛔ RLS read BEFORE service sign; 404 not 403; no `ingestion_step` literal |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 272 / 61 / 6293 (was `269 / 60 / 6281`) | ⚠ **FIRES** | ⚠ STALE (`269/60/6281`). **272-02/05** adopted `toolMeta.test.ts` and `SearchDocumentsBody.test.ts` into BOTH knobs |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 288 / 64 / 6404 (was `272 / 61 / 6293`) | ⚠ **FIRES** | **274-03/04/05**: `src/components/attachments` adopted as a TARGETS directory; 10 suites pinned in BASELINE, incl. 274-05's promote contract fence |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
@@ -10979,11 +10979,11 @@ cells rot within days.
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
 | [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 15 / 10 / 654 (was `14 / 9 / 614`) | ⚠ **FIRES** | ⚠ STALE (`14/9/614`). **271-04**: `is_latest === false` → read-only notice, values as text, `handleCommit` returns early. 271-05 G4-5: 0 edits vs 8 on latest |
 | [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
-| [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 6 / 6 / 490 (was `5 / 5 / 450`) | ⚠ **FIRES** | ⚠ STALE (`5/5/450`). **271-03**: `searchDocuments` + `DocumentSearchError`, additive. ⛔ Find's hook imports from here, never the barrel |
+| [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 7 / 7 / 499 (was `6 / 6 / 490`) | ⚠ **FIRES** | **274-03**: `uploadWorkspaceTemplate(…, lifetime)` — only `"thread"` appends the query; cloud attach sends X-Org-Id via getAuthHeaders. ⛔ panel/workflow doors byte-unchanged |
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 14 / 7 / 991 (was `11 / 6 / 737`) | ⚠ **FIRES** | ⚠ STALE (`11/6/737`). **272-04**: the trend skips `invalid_filter` / `refused_retry` rows (4 lines, D-24); kind 2 still counts |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 61 / 30 / 3635 (was `59 / 29 / 3608`) | ⚠ **FIRES** | **273-04**: D-15: 2 kwargs + 1 persist hook + STRUCTURED holdback gate; prompt-assembly seam OWED (OV-273-03) |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 65 / 31 / 3651 (was `61 / 30 / 3635`) | ⚠ **FIRES** | **274-01**: ONE literal — attachments stay with the conversation (D-26); `_ATTACHMENT_KIND` unchanged. ⛔ prompt-assembly seam OWED (OV-273-03) |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
 | [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 17 / 9 / 1029 (was `16 / 8 / 967`) | ⚠ **FIRES** | ⚠ STALE (`16/8/967`). **268-01**: takes the send path's `scoping`/`scoping_error` (resolve once); Continue SUMS segment tokens (D-268-20) |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
@@ -11059,14 +11059,14 @@ cells rot within days.
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 3 / 2 / 160 | no (2 phases) | ⚠ row STALE THREE TIMES (`0/0/38`, `2/2/98`, `3/2/138`). **240**: the `is_enabled` refusal lands HERE, one predicate for both surfaces (BUG-260908-02) |
 | [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 9 / 1 / 1271 | no (1 phase) | ⚠ STALE at every close so far (`2/1/643` → `6/1/1022` → `8/1/1259`). SEED-258 removed its `MAX_FILE_BYTES`; `_guard` reads the operator setting at each use |
 | [`frontend/src/components/settings/connectionRowVerdict.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrowverdictts) | 2 / 2 / 99 | no (2 phases) | ⚠ **absent for its entire life — row added 239-03, and the ledger gate FAILED on it at this phase's base.** young (221 / 239). The row's verdict, DERIVED never stored. See §239-03 |
-| [`backend/app/api/workspace.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkspacepy) | 13 / 7 / 757 | ⚠ **FIRES** | ⚠ row was STALE at `11 / 6 / 654` one plan later. honoured by construction (**244-06**): the persist tail EXTRACTED to ONE writer both doors call; the 2nd route adds no 2nd gate |
+| [`backend/app/api/workspace.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkspacepy) | 16 / 8 / 848 (was `13 / 7 / 757`) | ⚠ **FIRES** | ⚠ STALE (`13/7/757`). **274-01**: `?lifetime=thread` (fails closed to the TTL) + a REQUIRED `lifetime` kwarg on the ONE writer. ⛔ no minter reach (promote is its own module) |
 | [`frontend/src/components/panel/TemplateUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltemplateuploadtsx) | 2 / 2 / 91 | no (2 phases) | ⚠ absent for its entire life — row added 244-02 at the SECOND phase, not the third. **244**: the `accept=` literal is GONE; it reads the fenced constant |
 | [`frontend/src/lib/workspaceAllowedExt.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibworkspaceallowedextts) | 1 / 1 / 54 | no (new) | young (created 244-02). Row added AT CREATION, per the `settingsSearchPayload.ts` precedent — an absent row is invisible to G-5 at any count |
 | [`frontend/src/lib/stripComments.testutil.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibstripcommentstestutilts) | 1 / 1 / 28 | no (new) | young (created 244-14 / IN-02). Row added AT CREATION. ⛔ The ONE home of *a `?raw` fence cannot tell code from a comment*; 3 consumers. Never apply it to a class-list or string-CONTENT assertion |
-| [`frontend/src/components/chat/ChatAttachmentChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatattachmentchiptsx) | 1 / 1 / 144 | no (new) | young (created 244-05). Row added AT CREATION. The ONE chip, THREE states; `sent` carrying `this chat only` is D-244-22's build obligation and `expired` is D-244-25's |
-| [`frontend/src/components/chat/composerCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcomposercopyts) | 3 / 1 / 111 | no (new) | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, fenced `?raw`. ⛔ `COPY.b` is deliberately NOT ported (D-244-23). **244-06**: `cloudSub` ported by SHAPE |
+| [`frontend/src/components/chat/ChatAttachmentChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatattachmentchiptsx) | 4 / 2 / 302 (was `1 / 1 / 144`) | no (2 phases) | **274-04**: name via `lib/attachmentLifetime`; thread-life rows show no expiry; the sent chip gets the In Library segment + ⋯. ⚠ FIRES on its next phase |
+| [`frontend/src/components/chat/composerCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcomposercopyts) | 4 / 2 / 111 (was `3 / 1 / 111`) | no (2 phases) | PORT of sketch 236's `COPY.js`, `?raw`-fenced. **274-04**: `expiredWhy` amended (D-24) with the sketch in one commit. ⛔ `COPY.b` NOT ported (D-244-23) |
 | [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
-| [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 2 / 1 / 183 | no (new) | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state and verbs; `MessageInput.tsx` shrank `855 → 821` |
+| [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 3 / 2 / 183 (was `2 / 1 / 183`) | no (2 phases) | Both attach doors' state + verbs. **274-03**: ONE edit — the composer uploads with `lifetime "thread"`. ⛔ it CANNOT reach `setValue` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 22 / 14 / 572 | **FIRES** | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253; re-derived under CR-08. **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
@@ -11168,18 +11168,19 @@ cells rot within days.
 | [`frontend/src/docs/search/searchIndex.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocssearchsearchindexts) | 1 / 1 / 57 | no (new) | young (created 276-03). Fetches the index + MiniSearch on FIRST focus only (both via import()/fetch). ⛔ never in first paint |
 | [`frontend/src/landing/components/MenuDrawer.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsmenudrawertsx) | 1 / 1 / 116 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: ≤720 menu drawer for landing + docs. ⛔ classes live in landing.css |
 | [`frontend/src/landing/components/HeroPromo.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsheropromotsx) | 1 / 1 / 161 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-05: muted promo, Pause/Unmute. ⛔ reached only via import(); musicSrc null until Unmute |
-| [`backend/app/api/workspace_promote.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkspace_promotepy) | 0 / 0 / 0 | no (young) | 274-02. Promote / preview / library-links (ATT-03). ⛔ user-JWT read before mint; minter + _enqueue_or_splice only; version_scope=folder; never in workspace.py (244 fence) |
-| [`backend/app/models/workspace_promote.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsworkspace_promotepy) | 0 / 0 / 0 | no (young) | 274-02. PromoteRequest (folder_id required, extra=forbid) + response models; LibraryLink saved\|already == mig 203 CHECK. ⛔ no org field in any body |
-| [`backend/app/services/thread_workspace_cleanup.py`](docs/HOT-FILE-LEDGER.md#backendappservicesthread_workspace_cleanuppy) | 0 / 0 / 0 | no (young) | 274-01. delete_thread's byte-cleanup seam (D-08): RLS-derived paths, removed after the row delete, logged never pass. ⛔ user-JWT only; own-uid prefix only |
-| [`frontend/src/components/attachments/AttachmentActionsMenu.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsattachmentactionsmenutsx) | 0 / 0 / 0 | no (young) | 274-04. The ONE ⋯ menu + dialog mount for chip and panel row (D-09). ⛔ never on a pending chip (D-18); Open in panel reveals only (D-23) |
-| [`frontend/src/components/attachments/AttachmentRowTrailing.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsattachmentrowtrailingtsx) | 0 / 0 / 0 | no (young) | 274-04. Panel Files trailing slot for template_input rows: thread-life vs TTL. ⛔ ⋯ is tabIndex -1 inside role=option; TTL markup moved byte-for-byte |
-| [`frontend/src/components/attachments/FolderPathListbox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsfolderpathlistboxtsx) | 0 / 0 / 0 | no (young) | 274-03. Searchable full-path folder listbox, APG combobox/listbox a11y. ⛔ NO Root option and no commit — it returns an id (D-10 amended) |
-| [`frontend/src/components/attachments/LibraryLinkSegment.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentslibrarylinksegmenttsx) | 0 / 0 / 0 | no (young) | 274-04. In Library / Already in Library · leaf or path · indexing… / couldn't index (D-13, D-25). ⛔ the full path is never tooltip-only |
-| [`frontend/src/components/attachments/SaveToLibraryDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentssavetolibrarydialogtsx) | 0 / 0 / 0 | no (young) | 274-03. The ONE Save-to-Library dialog (built once, mounted twice). ⛔ confirm disabled until a pick; result renders the POST, never the preview; refusals verbatim |
-| [`frontend/src/components/attachments/saveToLibraryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentssavetolibrarycopyts) | 0 / 0 / 0 | no (young) | 274-03. PORT of sketch 274 COPY.js (engine, shared, a), ?raw-fenced; net-new strings flagged. ⛔ never re-typed; the verb is never Attach or Import |
-| [`frontend/src/components/attachments/useLibraryLinks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsuselibrarylinksts) | 0 / 0 / 0 | no (young) | 274-04. Per-thread store: one library-links fetch per tick for every chip + row; polls only while indexing. ⛔ a FETCH, never Realtime (D-v2.5-03) |
-| [`frontend/src/lib/api/attachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiattachmentsts) | 0 / 0 / 0 | no (young) | 274-03. promote / preview / library-links clients + wire types. ⛔ getAuthHeaders (X-Org-Id); server sentence verbatim; field names fenced vs backend in 274-05 |
-| [`frontend/src/lib/attachmentLifetime.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibattachmentlifetimets) | 0 / 0 / 0 | no (young) | 274-03. ONE rule: thread-life (null expiry) + prefix-stripped display name. ⛔ its ^[0-9a-f]{8}- regex is lockstep with the backend's (fenced in 274-05) |
+| [`backend/app/api/workspace_promote.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkspace_promotepy) | 2 / 1 / 501 (was `0 / 0 / 0`) | no (young) | 274-02. Promote / preview / library-links (ATT-03). ⛔ user-JWT read before mint; minter + _enqueue_or_splice only; version_scope=folder; never in workspace.py (244 fence) |
+| [`backend/app/models/workspace_promote.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsworkspace_promotepy) | 1 / 1 / 101 (was `0 / 0 / 0`) | no (young) | 274-02. PromoteRequest (folder_id required, extra=forbid) + response models; LibraryLink saved\|already == mig 203 CHECK. ⛔ no org field in any body |
+| [`backend/app/services/thread_workspace_cleanup.py`](docs/HOT-FILE-LEDGER.md#backendappservicesthread_workspace_cleanuppy) | 1 / 1 / 110 (was `0 / 0 / 0`) | no (young) | 274-01. delete_thread's byte-cleanup seam (D-08): RLS-derived paths, removed after the row delete, logged never pass. ⛔ user-JWT only; own-uid prefix only |
+| [`frontend/src/components/attachments/AttachmentActionsMenu.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsattachmentactionsmenutsx) | 1 / 1 / 166 (was `0 / 0 / 0`) | no (young) | 274-04. The ONE ⋯ menu + dialog mount for chip and panel row (D-09). ⛔ never on a pending chip (D-18); Open in panel reveals only (D-23) |
+| [`frontend/src/components/attachments/AttachmentRowTrailing.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsattachmentrowtrailingtsx) | 1 / 1 / 79 (was `0 / 0 / 0`) | no (young) | 274-04. Panel Files trailing slot for template_input rows: thread-life vs TTL. ⛔ ⋯ is tabIndex -1 inside role=option; TTL markup moved byte-for-byte |
+| [`frontend/src/components/attachments/folderDisplay.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsfolderdisplayts) | 1 / 1 / 48 | no (young) | ⚠ absent at creation (274-04 pre-task; in no plan's files_modified) — row added 274-05. The ONE ` › ` path DISPLAY formatter. ⛔ `folderPathOf` stays /-joined |
+| [`frontend/src/components/attachments/FolderPathListbox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsfolderpathlistboxtsx) | 2 / 1 / 189 (was `0 / 0 / 0`) | no (young) | 274-03. Searchable full-path folder listbox, APG combobox/listbox a11y. ⛔ NO Root option and no commit — it returns an id (D-10 amended) |
+| [`frontend/src/components/attachments/LibraryLinkSegment.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentslibrarylinksegmenttsx) | 2 / 1 / 104 (was `0 / 0 / 0`) | no (young) | 274-04. In Library / Already in Library · leaf or path · indexing… / couldn't index (D-13, D-25). ⛔ the full path is never tooltip-only |
+| [`frontend/src/components/attachments/SaveToLibraryDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentssavetolibrarydialogtsx) | 2 / 1 / 284 (was `0 / 0 / 0`) | no (young) | 274-03. The ONE Save-to-Library dialog (built once, mounted twice). ⛔ confirm disabled until a pick; result renders the POST, never the preview; refusals verbatim |
+| [`frontend/src/components/attachments/saveToLibraryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentssavetolibrarycopyts) | 1 / 1 / 101 (was `0 / 0 / 0`) | no (young) | 274-03. PORT of sketch 274 COPY.js (engine, shared, a), ?raw-fenced; net-new strings flagged. ⛔ never re-typed; the verb is never Attach or Import |
+| [`frontend/src/components/attachments/useLibraryLinks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsuselibrarylinksts) | 1 / 1 / 192 (was `0 / 0 / 0`) | no (young) | 274-04. Per-thread store: one library-links fetch per tick for every chip + row; polls only while indexing. ⛔ a FETCH, never Realtime (D-v2.5-03) |
+| [`frontend/src/lib/api/attachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiattachmentsts) | 1 / 1 / 129 (was `0 / 0 / 0`) | no (young) | 274-03. promote / preview / library-links clients + wire types. ⛔ getAuthHeaders (X-Org-Id); server sentence verbatim; field names fenced vs backend in 274-05 |
+| [`frontend/src/lib/attachmentLifetime.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibattachmentlifetimets) | 1 / 1 / 35 (was `0 / 0 / 0`) | no (young) | 274-03. ONE rule: thread-life (null expiry) + prefix-stripped display name. ⛔ its ^[0-9a-f]{8}- regex is lockstep with the backend's (fenced in 274-05) |
 
 
 
@@ -18637,3 +18638,107 @@ The G-5 gate (`node scripts/check-hot-file-ledger.cjs .planning/phases/274-threa
 ### `frontend/src/lib/attachmentLifetime.ts`
 
 **`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-03. ONE rule: thread-life (null expiry) + prefix-stripped display name. ⛔ its ^[0-9a-f]{8}- regex is lockstep with the backend's (fenced in 274-05)
+
+## Phase 274 close — re-derivation (2026-10-05, plan `274-05`)
+
+Every triple below was re-derived with the CLAUDE.md recipe after the phase's last source edit, six-digit quick-task buckets subtracted. The set is every non-test source file named by a `(274-…)` commit (`git log --name-only -E --grep='^[a-z]+\(274'`) minus tests / sql / json / md: 23 files plus `scripts/run-274-board.py` (gate-exempt). Scan-list rows refreshed in place with the old triple kept as `(was …)`, none duplicated. The eight FIRING files' CLAUDE.md rows were refreshed in the same commit. Live evidence: `.planning/phases/274-thread-scoped-attachments/274-UAT-LOG.md`.
+
+⚠ **One file had no row at all:** `frontend/src/components/attachments/folderDisplay.ts` was created by 274-04's pre-task (the ` › ` separator fix) and named in no plan's `files_modified`, so the planning gate could not see it. Row added here, at its first phase.
+
+⛔ **Seams named and not taken (unchanged by 274):** OV-273-02 (`tool_dispatcher.py` registry/handler split — not touched), OV-273-03 (`agent_loop.py` prompt-assembly — 274 changed ONE literal). `ChatAttachmentChip.tsx`, `composerCopy.ts` and `useComposerAttachments.ts` now sit at 2 phases: the next phase to touch any of them FIRES G-5.
+
+### `backend/app/api/threads.py` — Phase 274 close
+
+**`265 / 90 / 2459`** at 274 close (was `264 / 89 / 2456`). G-5: ⚠ **FIRES**. **274-01**: delete_thread collects paths BEFORE the row delete, removes bytes AFTER it — 1 import, 0 new branches (AST-pinned). ⛔ 0 new send-path branches
+
+### `backend/app/api/workspace.py` — Phase 274 close
+
+**`16 / 8 / 848`** at 274 close (was `13 / 7 / 757`). G-5: ⚠ **FIRES**. ⚠ STALE (`13/7/757`). **274-01**: `?lifetime=thread` (fails closed to the TTL) + a REQUIRED `lifetime` kwarg on the ONE writer. ⛔ no minter reach (promote is its own module)
+
+### `backend/app/main.py` — Phase 274 close
+
+**`87 / 63 / 978`** at 274 close (was `86 / 62 / 977`). G-5: ⚠ **FIRES**. **274-02**: ONE `include_router(workspace_promote.router)` beside `workspace.router` + 1 import name. 0 new branches
+
+### `backend/app/services/agent_loop.py` — Phase 274 close
+
+**`65 / 31 / 3651`** at 274 close (was `61 / 30 / 3635`). G-5: ⚠ **FIRES**. **274-01**: ONE literal — attachments stay with the conversation (D-26); `_ATTACHMENT_KIND` unchanged. ⛔ prompt-assembly seam OWED (OV-273-03)
+
+### `frontend/src/components/panel/FilesSection.tsx` — Phase 274 close
+
+**`12 / 8 / 354`** at 274 close (was `10 / 6 / 363`). G-5: ⚠ **FIRES**. ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical
+
+### `frontend/src/lib/api/documents.ts` — Phase 274 close
+
+**`7 / 7 / 499`** at 274 close (was `6 / 6 / 490`). G-5: ⚠ **FIRES**. **274-03**: `uploadWorkspaceTemplate(…, lifetime)` — only `"thread"` appends the query; cloud attach sends X-Org-Id via getAuthHeaders. ⛔ panel/workflow doors byte-unchanged
+
+### `frontend/src/types/index.ts` — Phase 274 close
+
+**`97 / 76 / 1533`** at 274 close (was `96 / 75 / 1532`). G-5: ⚠ **FIRES**. **274-03**: `WorkspaceFile.expires_at?: string \| null` (null = thread-life), additive. Seam OWED
+
+### `scripts/vitest-count-gate.cjs` — Phase 274 close
+
+**`288 / 64 / 6404`** at 274 close (was `272 / 61 / 6293`). G-5: ⚠ **FIRES**. **274-03/04/05**: `src/components/attachments` adopted as a TARGETS directory; 10 suites pinned in BASELINE, incl. 274-05's promote contract fence
+
+### `frontend/src/components/chat/ChatAttachmentChip.tsx` — Phase 274 close
+
+**`4 / 2 / 302`** at 274 close (was `1 / 1 / 144`). G-5: no (2 phases). **274-04**: name via `lib/attachmentLifetime`; thread-life rows show no expiry; the sent chip gets the In Library segment + ⋯. ⚠ FIRES on its next phase
+
+### `frontend/src/components/chat/composerCopy.ts` — Phase 274 close
+
+**`4 / 2 / 111`** at 274 close (was `3 / 1 / 111`). G-5: no (2 phases). PORT of sketch 236's `COPY.js`, `?raw`-fenced. **274-04**: `expiredWhy` amended (D-24) with the sketch in one commit. ⛔ `COPY.b` NOT ported (D-244-23)
+
+### `frontend/src/components/chat/useComposerAttachments.ts` — Phase 274 close
+
+**`3 / 2 / 183`** at 274 close (was `2 / 1 / 183`). G-5: no (2 phases). Both attach doors' state + verbs. **274-03**: ONE edit — the composer uploads with `lifetime "thread"`. ⛔ it CANNOT reach `setValue`
+
+### `backend/app/api/workspace_promote.py` — Phase 274 close
+
+**`2 / 1 / 501`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `backend/app/models/workspace_promote.py` — Phase 274 close
+
+**`1 / 1 / 101`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `backend/app/services/thread_workspace_cleanup.py` — Phase 274 close
+
+**`1 / 1 / 110`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `frontend/src/components/attachments/AttachmentActionsMenu.tsx` — Phase 274 close
+
+**`1 / 1 / 166`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `frontend/src/components/attachments/AttachmentRowTrailing.tsx` — Phase 274 close
+
+**`1 / 1 / 79`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `frontend/src/components/attachments/FolderPathListbox.tsx` — Phase 274 close
+
+**`2 / 1 / 189`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `frontend/src/components/attachments/LibraryLinkSegment.tsx` — Phase 274 close
+
+**`2 / 1 / 104`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `frontend/src/components/attachments/SaveToLibraryDialog.tsx` — Phase 274 close
+
+**`2 / 1 / 284`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `frontend/src/components/attachments/saveToLibraryCopy.ts` — Phase 274 close
+
+**`1 / 1 / 101`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `frontend/src/components/attachments/useLibraryLinks.ts` — Phase 274 close
+
+**`1 / 1 / 192`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `frontend/src/lib/api/attachments.ts` — Phase 274 close
+
+**`1 / 1 / 129`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `frontend/src/lib/attachmentLifetime.ts` — Phase 274 close
+
+**`1 / 1 / 35`** at 274 close (was `0 / 0 / 0` at planning). G-5: no (young, 1 phase).
+
+### `frontend/src/components/attachments/folderDisplay.ts`
+
+**`1 / 1 / 48`** at 274 close. G-5: no (young). ⚠ absent at creation (274-04 pre-task; in no plan's files_modified) — row added 274-05. The ONE ` › ` path DISPLAY formatter. ⛔ `folderPathOf` stays /-joined
