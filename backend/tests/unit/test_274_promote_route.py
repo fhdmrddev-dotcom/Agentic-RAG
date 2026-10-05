@@ -327,6 +327,51 @@ async def test_the_minters_folder_refusals_reach_the_caller_verbatim(stubbed, st
     stubbed.enqueue.assert_not_awaited()
 
 
+# ── D-29 (274 review CR-01) · a folder outside the ACTIVE org is refused before any mint ───
+OTHER_ORG = "99999999-9999-4999-8999-999999999990"
+REFUSE_OTHER_ORG = "Cannot upload to a folder in another organization"
+
+
+@pytest.mark.asyncio
+async def test_a_folder_in_another_org_is_refused_403_and_nothing_is_read_or_minted(stubbed):
+    """PLANT to drive RED: drop the folder-org read (the minter's check compares `user_id` only,
+    so an org-A folder the person owns accepts an org-B document — and an org-SHARED org-A folder
+    then shows it to every member of org B)."""
+    sb = _RecSupabase({("folders", "select"): {"id": FOLDER_PICKED, "org_id": OTHER_ORG}})
+    with pytest.raises(HTTPException) as ei:
+        await _promote(sb)
+    assert ei.value.status_code == 403
+    assert ei.value.detail == REFUSE_OTHER_ORG
+    assert stubbed.mint_calls == 0
+    stubbed.content.assert_not_awaited()
+    stubbed.enqueue.assert_not_awaited()
+    reads = sb.ops("folders", "select")
+    assert len(reads) == 1
+    assert ("eq", ("id", FOLDER_PICKED)) in reads[0].filters
+
+
+@pytest.mark.asyncio
+async def test_a_folder_in_the_active_org_promotes_as_before(stubbed):
+    """The same read with the ACTIVE org is a pass, never a refusal (non-vacuity of the case above)."""
+    sb = _RecSupabase({("folders", "select"): {"id": FOLDER_PICKED, "org_id": ORG}})
+    result, resp, _bg, _sb = await _promote(sb)
+    assert resp.status_code == 201
+    assert result.outcome == "saved"
+    assert stubbed.mint_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_the_preview_refuses_a_folder_in_another_org_too(stubbed):
+    """PLANT to drive RED: refuse on the POST only — the preview would then hash the bytes and
+    describe a save that can never happen."""
+    sb = _RecSupabase({("folders", "select"): {"id": FOLDER_PICKED, "org_id": OTHER_ORG}})
+    with pytest.raises(HTTPException) as ei:
+        await _preview(sb)
+    assert ei.value.status_code == 403
+    assert ei.value.detail == REFUSE_OTHER_ORG
+    stubbed.content.assert_not_awaited()
+
+
 # ── D-28 · the stamp is best-effort ────────────────────────────────────────────────────────
 @pytest.mark.asyncio
 async def test_a_failed_stamp_never_fails_a_promote_whose_document_exists(stubbed, caplog):
@@ -520,12 +565,18 @@ async def test_library_links_degrades_to_no_links_when_the_mig_203_columns_are_m
 # ── static: what this module must never contain ────────────────────────────────────────────
 def test_the_module_has_no_service_role_no_folders_read_and_no_second_ingest_path():
     """PLANT to drive RED: add `get_supabase()` (a service-role read keyed on a client id —
-    BUG-260903-02), a `table("folders")` pre-check (D-12), a direct `splice_document`, or a
-    hand-rolled `documents` insert."""
+    BUG-260903-02), a direct `splice_document`, or a hand-rolled `documents` insert.
+
+    ⚠ AMENDED by D-29 (274 review CR-01) — the original forbade ANY `table("folders")` read (D-12:
+    the minter's folder check is the authority). That check compares `user_id` only, so the module
+    now reads the folder ONCE, for its `org_id`, through the injected user-JWT client. What stays
+    forbidden is everything else a folders reference could be: a write, or a second read."""
     body = _strip_comments(SRC)
     assert "async def promote_attachment" in body  # non-vacuity
-    for forbidden in ("get_supabase(", "service_role", 'table("folders")', "splice_document"):
+    for forbidden in ("get_supabase(", "service_role", "splice_document"):
         assert forbidden not in body, forbidden
+    folder_reads = re.findall(r'table\("folders"\)\s*\.(\w+)\(([^)]*)\)', body)
+    assert folder_reads == [("select", '"id, org_id"')], folder_reads
     assert not re.search(r'table\("documents"\)\s*\.insert\(', body)
     assert 'version_scope="folder"' in body
     assert 'on_conflict="link"' in body
