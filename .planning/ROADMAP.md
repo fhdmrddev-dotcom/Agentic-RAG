@@ -104,7 +104,7 @@ data-thread branch/compare half of `SEED-193`, the hardening/testing milestone, 
 - [ ] **Phase 271: Find the Document**: document-first search mode beside RAG, structure (folder path, relationships, version lineage) as filters, Classification renamed and mounted in the Library (FIND-01, FIND-02, FIND-03, FIND-06)
 - [x] **Phase 272: Close Means Wrong** (completed 2026-10-03 — self-verified, human_needed: prod parity owed): the agent passes date and dimension filters into retrieval, and an empty filter fails closed (FIND-07)
 - [x] **Phase 273: Agent-Authored Artifacts**: a closed component registry (chart, table, metric), validated specs, rows attached for re-encoding, identical on reload, full provider roster (ART-01..05)
-- [ ] **Phase 274: Thread-Scoped Attachments**: chat attachments scoped to the thread, Library ingestion only from Documents, explicit promote-to-Library (ATT-01..03)
+- [x] **Phase 274: Thread-Scoped Attachments** (completed 2026-10-05 — verified passed 4/4, security 31/31, operator-approved G-4; prod migrations 202→203 owed): chat attachments scoped to the thread, Library ingestion only from Documents, explicit promote-to-Library (ATT-01..03)
 - [ ] **Phase 275: Retention & Legal Hold**: policies per class or folder, legal hold, scheduled audited disposition with dry-run, archived documents out of default retrieval but findable (RET-01..04)
 - [ ] **Phase 276: Public Docs, API Reference & Video Library**: `/docs` in the landing look covering every surface, a Syrel API reference from OpenAPI, a coverage gate, a generated changelog, and Syrel videos (DOCS-01..06)
 
@@ -269,7 +269,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 274-05-PLAN.md — merged-tree gates + contract fence + ledger close + docs page, 8-row planted-fact board with second-thread negative, G-4 #1-#4 Chrome drives, D-18 audit, BUG-260905-01 / SEED-247 routing, operator sign-off
+- [x] 274-05-PLAN.md — merged-tree gates + contract fence + ledger close + docs page, 8-row planted-fact board with second-thread negative, G-4 #1-#4 Chrome drives, D-18 audit, BUG-260905-01 / SEED-247 routing, operator sign-off
 **Flags**: ⚠ **MEASURE FIRST: most of ATT-01/02 may already be true at HEAD.** `SEED-247` was routed at Phase 244 discuss: chat attachments reuse `workspace_files` (D-244-01), are read **inline, never embedded** (D-244-03), and cascade on thread delete (D-244-04). `BUG-260905-01` records the inverted doors. Drive the current behaviour before planning any build, and never re-propose the answered questions. **Discuss decision:** does "ingested" in ATT-01 mean inline-read (as today) or chunked and scoped to the thread (for files too large to read inline)? The second adds a retrieval scope term at the Phase 231 RLS sites, so it is not small. ATT-03 is `SEED-247`'s one open question (Q4): folder picker, the mint/splice path, and the dedup ruling against `documents_dedup_idx` (org-scoped since migration 196). **G-2 FIRES** (promote affordance, composer doors). **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/components/chat/ChatArea.tsx` (FIRES), `MessageInput.tsx` (FIRES), `useComposerAttachments.ts`, `ConnectedFilePickerModal.tsx`, `backend/app/api/workspace.py` (FIRES), `backend/app/services/ingest_splice.py` (FIRES), `backend/app/api/documents.py`, `frontend/src/components/library/LibraryCloudImport.tsx`, `LibraryPage.tsx`. Promotion reuses the shipped ingest path; there is no second one.
 **UI hint**: yes
 
@@ -340,7 +340,7 @@ Plans:
 | 271. Find the Document | 0/TBD | Not started | - |
 | 272. Close Means Wrong | 5/5 | Complete (prod migrations 200+201 owed) | 2026-10-03 |
 | 273. Agent-Authored Artifacts | 6/6 | Complete — 1 UAT row OWED (live STRUCTURED-path holdback check; run it first) | 2026-10-04 |
-| 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
+| 274. Thread-Scoped Attachments | 5/5 | Complete (prod migrations 202→203 + get_advisors owed) | 2026-10-05 |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
 | 276. Public Docs, API Reference & Video Library | 7/7 | Complete    | 2026-10-05 |
 

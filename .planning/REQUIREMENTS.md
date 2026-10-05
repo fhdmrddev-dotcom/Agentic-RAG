@@ -34,9 +34,9 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 
 ### Thread attachments (ATT) - SEED-247
 
-- [ ] **ATT-01**: A chat attachment is ingested and scoped to its thread, not the Library.
-- [ ] **ATT-02**: Cloud connection and Library ingestion happen only from the Documents section.
-- [ ] **ATT-03**: User can explicitly promote a thread attachment into the Library.
+- [x] **ATT-01**: A chat attachment is ingested and scoped to its thread, not the Library.
+- [x] **ATT-02**: Cloud connection and Library ingestion happen only from the Documents section.
+- [x] **ATT-03**: User can explicitly promote a thread attachment into the Library.
 
 ### Public docs, API reference & video (DOCS) - added 2026-10-04 (operator)
 
@@ -73,9 +73,9 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 | RET-02 | Phase 275 | Pending |
 | RET-03 | Phase 275 | Pending |
 | RET-04 | Phase 275 | Pending |
-| ATT-01 | Phase 274 | Pending |
-| ATT-02 | Phase 274 | Pending |
-| ATT-03 | Phase 274 | Pending |
+| ATT-01 | Phase 274 | Complete |
+| ATT-02 | Phase 274 | Complete |
+| ATT-03 | Phase 274 | Complete |
 | DOCS-01 | Phase 276 | Complete |
 | DOCS-02 | Phase 276 | Complete |
 | DOCS-03 | Phase 276 | Complete |
