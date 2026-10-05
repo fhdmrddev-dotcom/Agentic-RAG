@@ -4338,6 +4338,22 @@
               "type": "string",
               "title": "Thread Id"
             }
+          },
+          {
+            "name": "lifetime",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "template",
+                "thread"
+              ],
+              "type": "string",
+              "description": "How long the uploaded file lives. `thread` (the chat composer) keeps it for as long as the conversation exists (`expires_at` null); `template` (the default — the panel and workflow-launch uploads) expires after the configured template TTL.",
+              "default": "template",
+              "title": "Lifetime"
+            },
+            "description": "How long the uploaded file lives. `thread` (the chat composer) keeps it for as long as the conversation exists (`expires_at` null); `template` (the default — the panel and workflow-launch uploads) expires after the configured template TTL."
           }
         ],
         "requestBody": {

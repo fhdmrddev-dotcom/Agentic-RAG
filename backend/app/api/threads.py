@@ -85,6 +85,7 @@ from app.services.thread_handoff import (
     write_handoff,
 )
 from app.services.audit_service import write_audit_entry
+from app.services.thread_workspace_cleanup import collect_thread_workspace_paths, remove_workspace_paths  # 274 D-08
 from app.services.artifact_history import attach_artifacts  # 273 (I-2 / ART-05) — reload attach
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
@@ -1440,6 +1441,7 @@ async def delete_thread(
     except Exception:
         pass  # Best-effort cleanup — don't block thread deletion
 
+    workspace_paths = await collect_thread_workspace_paths(supabase, thread_id, current_user["id"])
     # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
     await aexec(
         supabase.table("threads")
@@ -1447,6 +1449,7 @@ async def delete_thread(
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
     )
+    await remove_workspace_paths(supabase, workspace_paths)
     background_tasks.add_task(
         write_audit_entry,
         user_id=current_user["id"],
