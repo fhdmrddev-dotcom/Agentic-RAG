@@ -432,18 +432,20 @@ const BASELINE = {
   "docsVercelRouting.test.ts": 8,
   "docsContent.test.ts": 14,
   "changelog.test.ts": 8,
-  "search.test.ts": 5,
-  "router.test.ts": 7,
+  "search.test.ts": 6, // 276-07 +1: the Build Story search doc
+  "router.test.ts": 8, // 276-07 +1: build-story resolved before the version lookup
   "Stub.test.tsx": 5,
   "Article.test.tsx": 5,
   "SearchBox.test.tsx": 5,
-  "ChangelogPage.test.tsx": 7,
+  "ChangelogPage.test.tsx": 8, // 276-07 +1: links the Build Story
   "ApiReference.test.tsx": 3,
-  "DocsApp.test.tsx": 3,
+  "DocsApp.test.tsx": 5, // 276-07 +2: home links the Build Story; route + title
+  "BuildStory.test.tsx": 7, // 276-07 (D-26): new suite
   "VideoSlot.test.tsx": 11,
   "docsBundleFence.test.ts": 3,
   "docsCoverageGate.test.ts": 8,
   "landingBrand.test.ts": 4, // 276-07 +2: app-wide scan of src/components + src/pages, and its planted case
+  "brandAssets.test.ts": 13, // 276-07 (D-27): new suite — raster dims, manifest, head tags, brandMeta, leftovers
   "Navigation.test.tsx": 5,
   "landingFirstPaintFence.test.ts": 2,
   "HeroPromo.test.tsx": 3,

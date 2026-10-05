@@ -46,6 +46,8 @@ export interface Chapter {
   n: number
   title: string
   range: string
+  /** The README arc table's "What changed for the user" column (276-07, D-26). */
+  summary: string
 }
 
 export interface Release {
@@ -66,6 +68,7 @@ export type RouteKind =
   | "section"
   | "changelog"
   | "changelog-version"
+  | "build-story"
   | "api-reference"
   | "not-found"
 

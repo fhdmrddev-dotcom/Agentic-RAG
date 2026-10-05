@@ -11130,19 +11130,19 @@ cells rot within days.
 | [`frontend/src/landing/components/HeroSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsherosectiontsx) | 2 / 2 / 885 (was `1 / 1 / 820`) | no (1 phase) | 276-05: static PromoSlot; `import("./HeroPromo")` only after load + scroll + ≥50% visible; mock rail + avatar → static Iris mark. ⛔ no static Remotion import (first-paint fence) |
 | [`backend/app/api/api_docs.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_docspy) | 1 / 1 / 111 | no (1 phase) | young (created 276-01). DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate |
 | [`frontend/src/docs/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsmaintsx) | 2 / 1 / 15 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-02: docs entry mount. ⛔ no providers, no app imports (docsBundleFence) |
-| [`frontend/src/docs/DocsApp.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsdocsapptsx) | 4 / 1 / 182 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-02 interim, 276-03 route → page. ⛔ the ONE route→page switch; no app imports |
-| [`frontend/src/docs/router.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsrouterts) | 2 / 1 / 53 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-02: resolveRoute + navigate (History API). ⛔ the app has no router — keep this docs-only |
-| [`frontend/src/docs/types.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocstypests) | 1 / 1 / 84 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-02: PageMeta/Section/Release/Chapter/Route — mirror of the docs-content.cjs contract |
+| [`frontend/src/docs/DocsApp.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsdocsapptsx) | 5 / 1 / 188 (was `4 / 1 / 182`) | no (new) | young (created 276). Row added AT PLANNING. 276-02 interim, 276-03 route → page, 276-07 build-story case. ⛔ the ONE route→page switch; no app imports |
+| [`frontend/src/docs/router.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsrouterts) | 3 / 1 / 55 (was `2 / 1 / 53`) | no (new) | young (created 276). Row added AT PLANNING. 276-02: resolveRoute + navigate. 276-07: build-story BEFORE the version branch. ⛔ the app has no router — keep this docs-only |
+| [`frontend/src/docs/types.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocstypests) | 2 / 1 / 87 (was `1 / 1 / 84`) | no (new) | young (created 276). Row added AT PLANNING. 276-02: PageMeta/Section/Release/Chapter/Route (276-07: Chapter.summary) — mirror of the docs-content.cjs contract |
 | [`frontend/src/docs/virtual-docs.d.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsvirtual-docsdts) | 1 / 1 / 21 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-02: declarations for virtual:docs-manifest + virtual:docs-page/* |
 | [`frontend/src/docs/search/searchOptions.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocssearchsearchoptionsts) | 1 / 1 / 34 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-02: SEARCH_OPTIONS. ⛔ ONE home — toJSON (plugin) and loadJSON (SearchBox) must share it |
 | [`frontend/src/docs/icons.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsiconstsx) | 1 / 1 / 85 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: inline SVG glyphs. ⛔ no icon package on public pages |
-| [`frontend/src/docs/pages/Home.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageshometsx) | 1 / 1 / 140 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P1 docs home (sketch 276 B) |
+| [`frontend/src/docs/pages/Home.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageshometsx) | 2 / 1 / 143 (was `1 / 1 / 140`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P1 docs home (sketch 276 B). 276-07: Build Story link under the chapter strip |
 | [`frontend/src/docs/pages/Article.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesarticletsx) | 1 / 1 / 75 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P2 guide article. ⛔ unreleased callout from frontmatter, never from prose |
 | [`frontend/src/docs/pages/Stub.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesstubtsx) | 1 / 1 / 71 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P3 stub (D-07). ⛔ the Full guide coming badge is the deliverable words |
 | [`frontend/src/docs/pages/SectionIndex.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagessectionindextsx) | 1 / 1 / 68 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P4 section index — every stub reachable (D-07) |
 | [`frontend/src/docs/pages/NotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesnotfoundtsx) | 1 / 1 / 20 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P8 docs 404 inside the shell (G4-4) |
-| [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 1 / 1 / 125 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog. ⛔ v4.5 Not yet released from parseHistory released flag |
-| [`frontend/src/docs/pages/BuildStory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesbuildstorytsx) | 0 / 0 / 0 | no (new) | young (created 276-07). Row added AT PLANNING. D-26: five chapters in order, releases from parseHistory, one VideoSlot each. ⛔ an id-less slot renders nothing |
+| [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 2 / 1 / 128 (was `1 / 1 / 125`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog; 276-07 hero link. ⛔ v4.5 Not yet released from parseHistory released flag |
+| [`frontend/src/docs/pages/BuildStory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesbuildstorytsx) | 1 / 1 / 88 (was `0 / 0 / 0`) | no (new) | young (created 276-07). Row added AT PLANNING. D-26: five chapters in order, releases from parseHistory, one VideoSlot each. ⛔ an id-less slot renders nothing |
 | [`frontend/src/pages/SetupWizard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessetupwizardtsx) | 3 / 3 / 352 (was `2 / 2 / 345`) | ⚠ **NOW FIRES — 3 phases** | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. **276-07**: the static Iris mark on the dark chip in the header. ⛔ no logic change |
 | [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 4 / 2 / 105 (was `3 / 1 / 95`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
 | [`frontend/src/docs/pages/ChangelogVersion.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogversiontsx) | 1 / 1 / 52 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: changelog version page |
@@ -18323,17 +18323,23 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 
 **`4 / 1 / 182`** re-derived at the 276-05 close (2026-10-04), recipe in CLAUDE.md. Young; G-5 does not fire.
 
+**`5 / 1 / 188`** re-derived at 276-07 (2026-10-05), counting its GREEN commit. One `titleFor` case ("Syrel: The Build Story · Syrel Docs") and one body case rendering `<BuildStory />`; still the ONE route→page switch. Young; G-5 does not fire.
+
 ### `frontend/src/docs/router.ts`
 
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-02: resolveRoute + navigate (History API). ⛔ the app has no router — keep this docs-only. 276-05 re-derives the triple at close.
 
 **`2 / 1 / 53`** re-derived at the 276-05 close (2026-10-04), recipe in CLAUDE.md. Young; G-5 does not fire.
 
+**`3 / 1 / 55`** re-derived at 276-07 (2026-10-05). `changelog/build-story` → `{ kind: "build-story", sectionId: "changelog" }`, placed ABOVE the `changelog/` version branch (no release is named build-story, so nothing is shadowed; router.test.ts pins v4.4 and an unknown version beside it). Young.
+
 ### `frontend/src/docs/types.ts`
 
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-02: PageMeta/Section/Release/Chapter/Route — mirror of the docs-content.cjs contract. 276-05 re-derives the triple at close.
 
 **`1 / 1 / 84`** re-derived at the 276-05 close (2026-10-04), recipe in CLAUDE.md. Young; G-5 does not fire.
+
+**`2 / 1 / 87`** re-derived at 276-07 (2026-10-05). `Chapter.summary: string` (the arc table's third column) and `RouteKind` gains `"build-story"`; `scripts/lib/docs-content.d.cts` changed in the same commit (the mirror rule above). Young.
 
 ### `frontend/src/docs/virtual-docs.d.ts`
 
@@ -18358,6 +18364,8 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: P1 docs home (sketch 276 B). 276-05 re-derives the triple at close.
 
 **`1 / 1 / 140`** re-derived at the 276-05 close (2026-10-04), recipe in CLAUDE.md. Young; G-5 does not fire.
+
+**`2 / 1 / 143`** re-derived at 276-07 (2026-10-05). A text link "Read Syrel: The Build Story" under the ChapterStrip in "How Syrel got here" (D-26). Young.
 
 ### `frontend/src/docs/pages/Article.tsx`
 
@@ -18389,9 +18397,13 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 
 **`1 / 1 / 125`** re-derived at the 276-05 close (2026-10-04), recipe in CLAUDE.md. Young; G-5 does not fire.
 
+**`2 / 1 / 128`** re-derived at 276-07 (2026-10-05). A hero link "Syrel: The Build Story, chapter by chapter"; the per-chapter slots and filter are unchanged. Young.
+
 ### `frontend/src/docs/pages/BuildStory.tsx`
 
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). "Syrel: The Build Story" (D-26): the five chapters in order, each with its one-line summary, its releases and its `changelog.chapter-N` VideoSlot. ⛔ An id-less slot renders nothing (D-12); the page never promises a video that is not uploaded. 276-07 re-derives the triple at close.
+
+**`1 / 1 / 88`** measured at 276-07 (2026-10-05) in its creating commit. Reads `useDocs()` only; chapters ascending, releases oldest first, reusing the changelog's `d-cl-band` / `d-cl-grid` / `d-rel-row`. Any episode wording lives only inside the `slotExists()` block, and `BuildStory.test.tsx` fails if the rendered page contains "documentar" while all five slots are empty. Young.
 
 ### `frontend/src/pages/SetupWizard.tsx`
 

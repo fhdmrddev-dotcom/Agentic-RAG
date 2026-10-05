@@ -9,6 +9,7 @@ import { DocsHeader, HERO_SEARCH_ID } from "./components/DocsHeader"
 import { SearchBox } from "./components/SearchBox"
 import { DocsDataProvider, type DocsData } from "./docsData"
 import { Article } from "./pages/Article"
+import { BuildStory } from "./pages/BuildStory"
 import { Changelog } from "./pages/Changelog"
 import { ChangelogVersion } from "./pages/ChangelogVersion"
 import { Home } from "./pages/Home"
@@ -65,6 +66,8 @@ export function titleFor(route: Route, data: DocsData): string {
       const r = data.changelog.find((x) => x.version === route.version)
       return `${r ? `${r.version} — ${r.name}` : "Changelog"} · Syrel Docs`
     }
+    case "build-story":
+      return "Syrel: The Build Story · Syrel Docs"
     case "api-reference":
       return "Syrel API · Syrel Docs"
     case "not-found":
@@ -151,6 +154,9 @@ export function DocsApp() {
       break
     case "changelog-version":
       body = <ChangelogVersion key={route.version} version={route.version!} />
+      break
+    case "build-story":
+      body = <BuildStory />
       break
     case "api-reference":
       body = (

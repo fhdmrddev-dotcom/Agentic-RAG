@@ -93,6 +93,18 @@ per file, counted with `readdirSync`) and the "arc in five chapters" table in
 sentence, the "What shipped" bullets and the chapter. A release whose Shipped line does not start
 with a date is **Not yet released**.
 
+Each chapter is `{ n, title, range, summary }`: the arc table's first column gives the number and
+title, the second the release range, and the third ("What changed for the user") the one-line
+`summary`. A chapter row without a summary fails the build, naming the README (276-07).
+
+**The Build Story page** (`/docs/changelog/build-story`, "Syrel: The Build Story", 276-07 / D-26)
+lists the five chapters in order, each with its summary, its range, its releases oldest first and
+its YouTube slot `changelog.chapter-N` in `frontend/src/docs/video/videos.ts`. A slot whose
+`youtubeId` is null renders nothing, so the page shows no video and promises none until an episode
+is uploaded and its id filled in. The page is linked from the docs home chapter strip and from the
+changelog hero, and it is one search document (`story:build-story`) built from the chapters the
+releases carry. It adds no `covers` keys, so the coverage gate is unchanged.
+
 Corrections to a history file's claims go in `docs/public/changelog/overrides.json`
 (`{ "<version>": { "note": "..." } }`) rather than editing the history source; an override for a
 version that does not exist fails the build.
