@@ -6,7 +6,7 @@ and, for the G-4 rows, from a real browser — never from a transcript. Raw evid
 lines and the D-18 audit: `274-UAT-LOG.md`.
 
 Status (2026-10-05): **partial.** Board, API halves, 4-axis API rows and the D-18 static + API halves are measured by
-274-05's executor. **The Chrome halves of G-4 #1-#4 and the D-18 live network-log / flyout click are PENDING-ORCHESTRATOR**
+274-05's executor. **The Chrome halves of G-4 #1-#4 and the D-18 live network-log / flyout click were measured by the orchestrator in Chrome — §6**
 (the executor has no browser), and the operator sign-off (Task 4) is owed. Verdict words are literal: PASS = measured and met;
 ⛔ = not driven, with the reason; PENDING-ORCHESTRATOR = the browser half, not yet measured; OWED = not measured.
 
@@ -60,7 +60,7 @@ attachment note (`agent_loop._build_attachment_note`) derives the name from the 
 `<8 hex>-` prefix; D-27's strip is applied on the chip, the dialog and the Library name, not in the agent prompt. Harmless to
 the answer; visible in the transcript.
 
-## 2. G-4 lived scenarios (D-16) — API half measured; Chrome half PENDING-ORCHESTRATOR
+## 2. G-4 lived scenarios (D-16) — API half measured here; Chrome half in §6
 
 API half: `scripts/run-274-board.py --promote-probe` → exit 0, 2026-10-05. One fixture: `274-g4-api-keeper.pdf`, **335,731
 bytes** (> 256 KB, so bucket-stored — Pitfall 6), sha256 `2415e706…fc74e8`, planted token `ATT274-probe-ffc1770b`. Folder X =
@@ -71,10 +71,10 @@ bytes** (> 256 KB, so bucket-stored — Pitfall 6), sha256 `2415e706…fc74e8`, 
 
 | Row | Named failure it refutes | API half (Claude, measured) | Chrome half | Operator |
 |---|---|---|---|---|
-| **G-4 #1** Library pollution | *"ATT-02 is met by hiding a button while an API path still writes Library rows"* | **PASS.** Attach (`POST …/workspace/files?lifetime=thread`, HTTP 200) → `documents(user)` **185 → 185**; the row reads `kind=template_input`, `expires_at=null`, `content_storage_path=d8a54002…/55bc9783…/4269d27a…/v1`; `POST /document-search {"name": token}` → 200, **total 0**; documents/chunks holding the token → **0**. The board adds 16 more attaches with `documents(user)` 185 → 185 across all of them. | PENDING-ORCHESTRATOR — attach a PDF in Chrome, network log shows only `/workspace/files*`, the file is absent from the Library and from Find, `documents` count unchanged | owed |
-| **G-4 #2** Agent can't see it | *"ATT-01 passes only because the agent could never read the attachment"* | **PASS via the board:** 8/8 providers answered the planted fact from the attachment (§1). | PENDING-ORCHESTRATOR — the same in the UI with a PDF; the chip reads `this chat only`, no `24h`, no hex prefix | owed |
-| **G-4 #3** Promote lands wrong | *"promotion lands at the Library root"* | **PASS.** preview X → `{promotable: true, duplicate_of: null, next_version: 1}`; promote X → **HTTP 201** `outcome: saved`, `folder_id = X`; `documents.folder_id` **= X** (`folder_matches_X = true`), `version_number 1`; `library-links` carries the mark (`saved`, `pending` → `completed` after the wait); the attachment row stamped `library_document_id=3cd6dddd…`, `library_link=saved`. **D-14:** a same-named, different-bytes PDF → preview X `{duplicate_of: null, next_version: 2}`; promote → 201, **version 2**, and version 1 stays with `is_latest=false`. **D-13:** the ORIGINAL bytes from a second thread → preview Y names **X** in `duplicate_of`; promote Y → **HTTP 200 `already`**, `folder_id` = **X**; `documents` in Y with that name → **0** (nothing copied, nothing moved). | PENDING-ORCHESTRATOR — the dialog (no Root, disabled until a pick), the chip's `In Library · <leaf>` + `indexing…` clearing, the panel's full path, the version warning and the already screen as rendered, Shift+F10 on the panel row | owed |
-| **G-4 #4** Delete eats the keeper | *"a promoted document still cascades when the thread is deleted"* | **PASS.** Thread T1 (`55bc9783…`): `storage.objects` under `<uid>/<T1>/` **1 → 0** across `DELETE /threads/T1` (HTTP 204); `workspace_files` for T1 → 0. Thread T2 (`1a719896…`, the `already` link): **1 → 0**. The Library copy `3cd6dddd…` is still in X, `completed`; `POST /documents/{id}/download-url` → 200, GET → 200, **335,731 bytes, sha256 equal to the original (`equals_original: true`)**. Version 2 (`74783d70…`, minted from T1) also survives, `completed`. **D-11:** the document has no FK to the thread — proven by the survival, not assumed. | PENDING-ORCHESTRATOR — the same with the UI's delete-chat, then open + download in the Library | owed |
+| **G-4 #1** Library pollution | *"ATT-02 is met by hiding a button while an API path still writes Library rows"* | **PASS.** Attach (`POST …/workspace/files?lifetime=thread`, HTTP 200) → `documents(user)` **185 → 185**; the row reads `kind=template_input`, `expires_at=null`, `content_storage_path=d8a54002…/55bc9783…/4269d27a…/v1`; `POST /document-search {"name": token}` → 200, **total 0**; documents/chunks holding the token → **0**. The board adds 16 more attaches with `documents(user)` 185 → 185 across all of them. | driven in Chrome (§6) — — attach a PDF in Chrome, network log shows only `/workspace/files*`, the file is absent from the Library and from Find, `documents` count unchanged | owed |
+| **G-4 #2** Agent can't see it | *"ATT-01 passes only because the agent could never read the attachment"* | **PASS via the board:** 8/8 providers answered the planted fact from the attachment (§1). | driven in Chrome (§6) — — the same in the UI with a PDF; the chip reads `this chat only`, no `24h`, no hex prefix | owed |
+| **G-4 #3** Promote lands wrong | *"promotion lands at the Library root"* | **PASS.** preview X → `{promotable: true, duplicate_of: null, next_version: 1}`; promote X → **HTTP 201** `outcome: saved`, `folder_id = X`; `documents.folder_id` **= X** (`folder_matches_X = true`), `version_number 1`; `library-links` carries the mark (`saved`, `pending` → `completed` after the wait); the attachment row stamped `library_document_id=3cd6dddd…`, `library_link=saved`. **D-14:** a same-named, different-bytes PDF → preview X `{duplicate_of: null, next_version: 2}`; promote → 201, **version 2**, and version 1 stays with `is_latest=false`. **D-13:** the ORIGINAL bytes from a second thread → preview Y names **X** in `duplicate_of`; promote Y → **HTTP 200 `already`**, `folder_id` = **X**; `documents` in Y with that name → **0** (nothing copied, nothing moved). | driven in Chrome (§6) — — the dialog (no Root, disabled until a pick), the chip's `In Library · <leaf>` + `indexing…` clearing, the panel's full path, the version warning and the already screen as rendered, Shift+F10 on the panel row | owed |
+| **G-4 #4** Delete eats the keeper | *"a promoted document still cascades when the thread is deleted"* | **PASS.** Thread T1 (`55bc9783…`): `storage.objects` under `<uid>/<T1>/` **1 → 0** across `DELETE /threads/T1` (HTTP 204); `workspace_files` for T1 → 0. Thread T2 (`1a719896…`, the `already` link): **1 → 0**. The Library copy `3cd6dddd…` is still in X, `completed`; `POST /documents/{id}/download-url` → 200, GET → 200, **335,731 bytes, sha256 equal to the original (`equals_original: true`)**. Version 2 (`74783d70…`, minted from T1) also survives, `completed`. **D-11:** the document has no FK to the thread — proven by the survival, not assumed. | driven in Chrome (§6) — — the same with the UI's delete-chat, then open + download in the Library | owed |
 
 ## 3. The 4-axis UAT bandwidth (CLAUDE.md UAT scoreboard recipe)
 
@@ -84,8 +84,8 @@ API half: `scripts/run-274-board.py --axes --providers anthropic` (claude-opus-5
 | Axis | What was driven | Result (persisted data) | Chrome half |
 |---|---|---|---|
 | Cross-provider | The full 8-row board (§1) | **PASS** — 8/8 required rows on all five verdicts | — |
-| Multi-tool | Thread `94109e86…`: a PDF attachment (`ATT274-multitool-9a03c354`) + ONE prompt asking for `execute_code` on the PDF AND `search_documents` over the Library | **PASS** — run `completed`; tool calls **`execute_code`, `search_documents`**; the answer carries the token AND a one-line summary of the Library's laptop/VPN setup document | PENDING-ORCHESTRATOR (optional — the API half is the measurement) |
-| Parallel-thread | Thread A `f6063d5f…` streams a ~900-word essay; 6 s in (A's run read `streaming`), thread B `98bc5bab…` attaches a `.md` (`ATT274-parallel-9db69948`) and asks | **PASS** — the runs overlap (A 14:46:48 → 14:47:19, B 14:46:54 → 14:47:27); B's answer has the token; **A's 7,318-char answer does not** — each landed in its own thread | PENDING-ORCHESTRATOR — the same in two tabs |
+| Multi-tool | Thread `94109e86…`: a PDF attachment (`ATT274-multitool-9a03c354`) + ONE prompt asking for `execute_code` on the PDF AND `search_documents` over the Library | **PASS** — run `completed`; tool calls **`execute_code`, `search_documents`**; the answer carries the token AND a one-line summary of the Library's laptop/VPN setup document | not driven in Chrome (optional; the API half is the measurement) (optional — the API half is the measurement) |
+| Parallel-thread | Thread A `f6063d5f…` streams a ~900-word essay; 6 s in (A's run read `streaming`), thread B `98bc5bab…` attaches a `.md` (`ATT274-parallel-9db69948`) and asks | **PASS** — the runs overlap (A 14:46:48 → 14:47:19, B 14:46:54 → 14:47:27); B's answer has the token; **A's 7,318-char answer does not** — each landed in its own thread | not driven in Chrome (optional; the API half is the measurement) — the same in two tabs |
 | Long-message | Thread `0ad11b98…`: a **6,692-byte** prompt about an attachment (`ATT274-long-1dd3f7c1`) | **PASS** — `completed`, tools `workspace_read`, `execute_code`; answer carries the token | — |
 
 The same observation as §1: the multi-tool and long-message answers name the file with its upload prefix
@@ -114,7 +114,7 @@ The same observation as §1: the multi-tool and long-message answers name the fi
 
 **Static + API halves: PASS.** The live half (network log, flyout click) is the orchestrator's.
 
-### Live half — PENDING-ORCHESTRATOR (Chrome)
+### Live half — measured by the orchestrator in Chrome (§6.5)
 
 During G-4 #1 the network log must show only `/threads/{id}/workspace/files?lifetime=thread` (and
 `/workspace/files/from-connection` for a cloud attach) — no `POST /documents/upload`, `/connectors/…/import`,
@@ -127,12 +127,89 @@ after (3 at 274-05's start). Click-path in 274-05-SUMMARY.md.
 | Row | Claude (274-05 executor) | Chrome (orchestrator) | Operator verdict |
 |---|---|---|---|
 | Board (§1) | PASS 8/8 | — | owed |
-| G-4 #1 | API PASS | PENDING-ORCHESTRATOR | owed |
-| G-4 #2 | PASS via the board | PENDING-ORCHESTRATOR | owed |
-| G-4 #3 | API PASS (saved / version 2 / already) | PENDING-ORCHESTRATOR | owed |
-| G-4 #4 | API PASS (1 → 0, byte-identical download) | PENDING-ORCHESTRATOR | owed |
+| G-4 #1 | API PASS | **PASS** (§6.1, local + cloud) | owed |
+| G-4 #2 | PASS via the board | **PASS** (§6.2) | owed |
+| G-4 #3 | API PASS (saved / version 2 / already) | **PASS** (§6.3) — F-1 found + fixed; residual gap named | owed |
+| G-4 #4 | API PASS (1 → 0, byte-identical download) | **PASS** (§6.4) | owed |
 | 4-axis (§3) | PASS ×4 | optional | owed |
-| D-18 (§4) | static + API PASS | PENDING-ORCHESTRATOR (network log, flyout click) | owed |
+| D-18 (§4) | static + API PASS | **PASS** (§6.5, network log + Manage click) | owed |
 
 `BUG-260905-01` and `SEED-247` are NOT yet re-routed: D-17 closes the bug only on driven G-4 #1 / #3 rows and the D-18 live
 half, which are the orchestrator's.
+
+## 6. Chrome halves — driven by the orchestrator, 2026-10-05 (Claude in Chrome, the live app on :5173/:8000)
+
+Driven in the operator's Chrome against develop at 7b66f608d+ (waves 1-2 merged). Counts read from local Postgres with a
+read-only asyncpg query. ⚠ The tab reported `document.visibilityState: hidden` for the whole drive: screenshots often timed out,
+timers were throttled and dialog exit animations did not finish (see §6.6). Every verdict below is from the DOM, the network log
+or the database, never from "it looked right".
+
+### 6.1 G-4 #1 — Library pollution: **PASS** (local AND cloud)
+- New chat → send → attach `274-g4-meridian-brief.pdf` (1,612 B) from the composer. Network log for the attach: **only**
+  `POST /threads/79b2bb0c…/workspace/files?lifetime=thread` → 200 (+ list/library-links GETs). No `/documents/upload`,
+  `/connectors/…/import`, `/sources/watches`, `/install`.
+- `documents(user)` **187 → 187**; `connector_watches` **3 → 3**; Library rows named `*meridian-brief*` **0**. The row is
+  `kind=template_input`, `expires_at=null`.
+- Cloud half: `+` → **From cloud storage** → Google Drive (Google Workspace connection) → `245-UAT-readme.txt` (a test fixture;
+  the operator's personal Drive files were deliberately NOT attached) → Attach. Network: **only**
+  `POST …/workspace/files/from-connection` → 200. `documents(user)` **190 → 190**, watches **3 → 3**, row `template_input`,
+  `expires_at=null`.
+- An empty new chat refuses an attach with *"Send a message first — a file belongs to a conversation."* (the shipped 244 rule).
+
+### 6.2 G-4 #2 — Agent can't see it: **PASS**
+- Pending chip: `274-g4-meridian-brief.pdf · 1.6 KB` (no prefix). Sent chip: `274-g4-meridian-brief.pdf · 1.6 KB · this chat only`
+  — **no `24h`, no hex prefix**.
+- Asked *"What is the Meridian freight-cap clearance code in the file I attached?"* (deepseek-v4-flash) → *"…is
+  ATT274-chrome-dee8d311."*
+- **F-3 (observation, not fixed):** the answer cites `Source: e8d656d5-274-g4-meridian-brief.pdf` — the agent is handed the stored
+  name, so it repeats the prefix (the board saw it in 7/11 answers). Cosmetic; the fix is the agent note using the display name.
+
+### 6.3 G-4 #3 — Promote lands wrong: **PASS** (one defect found and fixed in-phase)
+- Sent chip `⋯` (`aria-label="More actions for this file"`) visible without hover → menu **Save to Library… / Open in panel**.
+- Dialog: title, sub, file chip (no prefix), searchable listbox (`role=listbox`), **30 options, none Root**, confirm **disabled**
+  until a pick. Search `ddfd` → `SOPs › dddd › ddfd` → confirm enabled → **POST …/promote → 201**.
+- `documents`: `274-g4-meridian-brief.pdf`, `folder_id = 7ea141e8…` (**X**), `completed`, v1, `library_link=saved`.
+  Chip: `✓ In Library · ddfd` (`indexing…` while `processing`, cleared on `completed`).
+- **D-14:** attach the v2 bytes (same name) → `⋯` → Save to Library → pick X **by keyboard (ArrowDown + Enter)** → the dialog says,
+  BEFORE confirm: *"SOPs › dddd › ddfd already has a file called 274-g4-meridian-brief.pdf. Saving makes this version 2; version 1
+  stays in its history."* → saved → DB: v1 `is_latest=false`, v2 `is_latest=true`, both in X.
+- **D-13:** new chat, original bytes, the **panel row's** `⋯` (menu offers ONLY *Save to Library…*) → pick **Y** (`Client ACME › Q3
+  Contracts`) → result: *"Already in your Library — The same file is already in SOPs › dddd › ddfd, so nothing new was saved. You
+  picked Client ACME › Q3 Contracts. The existing copy was not moved."* → documents in Y with that name **0**; chip
+  `Already in Library · ddfd`.
+- **F-1 (DEFECT, found here, FIXED):** the panel Files row's after-mark was a full-path pill in a `max-w-[65%] flex-wrap` slot at the
+  row's inherited 13px type — the **file name measured 0 px wide**. Fixed TDD, committed by path: `26089e0c1` (test) → `6a7db8b79`
+  (segment `text-[11px]`, panel shows the LEAF with the full path in `title`, as sketch 274-A draws it); `c82b7b237` + `e486ab8af`
+  (tests) → fix (slot stacks scope over action; a chat attachment's row uses the chip's display-name rule, no `<8hex>-` prefix;
+  agent rows keep their path). Re-measured live: name **0 → 64 px**, reads `274-g4-…`; segment 11px,
+  `title="SOPs › dddd › ddfd"`. 463/463 targeted tests, tsc 66 (= base).
+  ⚠ **Residual gap vs sketch A (named, not fixed):** the sketch gives the name its own full line with `size · this chat only` and the
+  mark on a meta line under it. The shared `FileRow` panel density is one line (icon · name · size · age · trailing), so at the
+  panel's 345 px the name is still truncated (`274-g4-…`). Closing it needs a sub-line slot on `FileRow` — an operator call.
+- Not driven in Chrome (hidden-tab focus is unreliable): Shift+F10 on the panel row — covered by `FilesSection.test.tsx`
+  (Shift+F10 and ContextMenu cases, green).
+
+### 6.4 G-4 #4 — Delete eats the keeper: **PASS**
+- New chat → attach `274-g4-keeper.pdf` (335,738 B, bucket-stored) → `storage.objects` under `<uid>/002075a1…/` = **1**.
+- `⋯` → Save to Library → **Engineering** → chip `In Library · Engineering · indexing…` → document `processing` → `completed` →
+  chip `In Library · Engineering` (polling then stopped — no further `library-links` requests).
+- Delete the chat from the history list (*Thread options → Delete → "Delete thread?" → Delete*) → thread rows **0**,
+  `workspace_files` **0**, **`storage.objects` 1 → 0**.
+- Library: `Engineering › 274-g4-keeper.pdf` **Ready** with Download; its `documents`-bucket object is present, **335,738 B,
+  application/pdf**. (The byte-identical download was proven by the executor's API probe, §2 — clicking Download in Chrome would
+  save a file to the operator's machine and was not done without asking.)
+
+### 6.5 D-18 live half: **PASS**
+- §6.1's network logs (local + cloud attach) carry no Library-writing call.
+- Composer `+` menu: *Attach a file · From cloud storage · Invite Expert… · Browse Expert Catalog… · Manage · (tool toggles) · Add
+  connector* — no Library door.
+- `+` → **Manage** → the Connections page; requests: `GET /connectors/connections`, `/connectors/source-families`, `/features`,
+  `/workflows/published` only. `connector_watches` **3 → 3**.
+
+### 6.6 Other findings
+- **F-2 (pre-existing, low):** the upload response carries no `created_at` (`ws_write_file`'s result), so a freshly-sent chip depends
+  on the follow-up list refetch for its timestamp; when that refetch failed (a 401 from the hidden tab's stale token) the second
+  attachment's chip vanished until reload (`attachmentsForMessage` drops a row with no `created_at`). After reload it rendered
+  correctly. Fix is one line (return `created_at` from the upload). Not introduced by 274.
+- **Environment, not app:** in the hidden tab, Radix dialogs (cloud picker, delete confirm) stayed in the DOM after their action had
+  completed — exit animations do not run in a hidden tab. Every action they triggered was verified in the DB.

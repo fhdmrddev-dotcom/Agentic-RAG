@@ -3,14 +3,23 @@ id: BUG-260905-01
 title: Cloud import is in the CHAT composer, writes permanently to the Library ROOT with no folder choice — and chat has no local-file upload at all
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 reported: 2026-09-05
 reported_by: Operator, manual testing at Phase 229 close
 affected_areas: [chat, composer, connectors, ingestion, documents, library, folders]
-folded_into: 244
+folded_into: 274
+verified_closed_by: "274-VALIDATION.md §6.1 (G-4 #1 local + cloud attach: network log only /workspace/files*, documents 187→187 and 190→190, watches 3→3), §6.3 (G-4 #3: Save to Library into a REQUIRED folder, no Root, lands in the picked folder), §6.5 (D-18 live: composer + menu has no Library door; Manage opens Connections with GETs only) — driven in Chrome 2026-10-05; static/API halves §4. Operator sign-off: 274-VALIDATION.md §5."
+closed: 2026-10-05
 re_open_trigger: The driven UAT rows in 244-VALIDATION.md fail to reproduce any of the three fixes
 related: [SEED-247, ATTACH-01, SEED-213]
 ---
+
+## Closed at Phase 274 (2026-10-05)
+
+Closed on DRIVEN rows, as D-17 requires: the composer's local and cloud attach write only the thread
+(`/workspace/files?lifetime=thread`, `/workspace/files/from-connection`), the Library gains a document only through the explicit
+Save to Library action into a required, picked folder, and the composer's `+` → Manage writes nothing. Evidence:
+`.planning/phases/274-thread-scoped-attachments/274-VALIDATION.md` §6.1, §6.3, §6.5. Reverted if the operator rejects at 274-05 Task 4.
 
 ## Disposition at Phase 244 plan 06 (2026-09-12)
 
