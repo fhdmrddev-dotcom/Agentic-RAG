@@ -31,7 +31,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { folderPathOf } from "@/components/chat/scopeCopy"
 import { listFolders } from "@/lib/api/documents"
 import {
   PromoteError,
@@ -45,6 +44,7 @@ import { useCitationNavOptional } from "@/lib/citationNav"
 import { fileIcon } from "@/lib/fileIcon"
 import { formatBytes } from "@/lib/formatBytes"
 import type { Folder, WorkspaceFile } from "@/types"
+import { folderDisplayPath } from "./folderDisplay"
 import { FolderPathListbox } from "./FolderPathListbox"
 import { COPY } from "./saveToLibraryCopy"
 
@@ -148,7 +148,8 @@ export function SaveToLibraryDialog({ open, onClose, threadId, file, onSaved }: 
     else onClose()
   }
 
-  const pathOf = (id: string | null | undefined) => folderPathOf(id, folders)
+  // The sketch's spelling (` › `), the same one the folder list draws (274-04, display only).
+  const pathOf = (id: string | null | undefined) => folderDisplayPath(id, folders)
 
   const name = attachmentDisplayName(file)
 

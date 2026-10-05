@@ -151,7 +151,7 @@ describe("SaveToLibraryDialog", () => {
 
   it("picking a folder requests ONE preview for it and enables confirm; the required hint goes", async () => {
     renderDialog()
-    await pick("Suppliers/Meridian/Pricing")
+    await pick("Suppliers › Meridian › Pricing")
     await waitFor(() => expect(getPromotePreview).toHaveBeenCalledTimes(1))
     expect(getPromotePreview).toHaveBeenCalledWith("t-1", "wf-1", "s3")
     expect(confirmButton().disabled).toBe(false)
@@ -161,17 +161,17 @@ describe("SaveToLibraryDialog", () => {
   it("a same-name file there → the version warning BEFORE confirming (D-14)", async () => {
     vi.mocked(getPromotePreview).mockResolvedValue(preview({ next_version: 2 }))
     renderDialog()
-    await pick("Suppliers/Meridian/Pricing")
+    await pick("Suppliers › Meridian › Pricing")
     expect(
       await screen.findByText(
-        COPY.shared.versionWarn("Meridian-Q4-pricing.xlsx", "Suppliers/Meridian/Pricing", 2),
+        COPY.shared.versionWarn("Meridian-Q4-pricing.xlsx", "Suppliers › Meridian › Pricing", 2),
       ),
     ).toBeTruthy()
   })
 
   it("next_version 1 → no warning", async () => {
     renderDialog()
-    await pick("Suppliers/Meridian/Pricing")
+    await pick("Suppliers › Meridian › Pricing")
     await waitFor(() => expect(getPromotePreview).toHaveBeenCalled())
     await Promise.resolve()
     expect(screen.queryByTestId("save-to-library-version-warn")).toBeNull()
@@ -182,7 +182,7 @@ describe("SaveToLibraryDialog", () => {
       preview({ next_version: 2, duplicate_of: { document_id: "doc-9", folder_id: "f4" } }),
     )
     renderDialog()
-    await pick("Suppliers/Meridian/Pricing")
+    await pick("Suppliers › Meridian › Pricing")
     await waitFor(() => expect(getPromotePreview).toHaveBeenCalled())
     await Promise.resolve()
     expect(screen.queryByTestId("save-to-library-version-warn")).toBeNull()
@@ -193,21 +193,21 @@ describe("SaveToLibraryDialog", () => {
     const b = deferred<PromotePreview>()
     vi.mocked(getPromotePreview).mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise)
     renderDialog()
-    await pick("Suppliers/Meridian/Pricing")
-    await pick("Suppliers/Meridian")
+    await pick("Suppliers › Meridian › Pricing")
+    await pick("Suppliers › Meridian")
     await waitFor(() => expect(getPromotePreview).toHaveBeenCalledTimes(2))
     b.resolve(preview({ next_version: 3 }))
-    await screen.findByText(COPY.shared.versionWarn("Meridian-Q4-pricing.xlsx", "Suppliers/Meridian", 3))
+    await screen.findByText(COPY.shared.versionWarn("Meridian-Q4-pricing.xlsx", "Suppliers › Meridian", 3))
     a.resolve(preview({ next_version: 2 }))
     await a.promise
     await Promise.resolve()
     expect(
       screen.queryByText(
-        COPY.shared.versionWarn("Meridian-Q4-pricing.xlsx", "Suppliers/Meridian/Pricing", 2),
+        COPY.shared.versionWarn("Meridian-Q4-pricing.xlsx", "Suppliers › Meridian › Pricing", 2),
       ),
     ).toBeNull()
     expect(
-      screen.getByText(COPY.shared.versionWarn("Meridian-Q4-pricing.xlsx", "Suppliers/Meridian", 3)),
+      screen.getByText(COPY.shared.versionWarn("Meridian-Q4-pricing.xlsx", "Suppliers › Meridian", 3)),
     ).toBeTruthy()
   })
 
@@ -215,7 +215,7 @@ describe("SaveToLibraryDialog", () => {
     const post = deferred<PromoteResult>()
     vi.mocked(promoteAttachment).mockReturnValue(post.promise)
     const { onSaved, onClose } = renderDialog()
-    await pick("Suppliers/Meridian/Pricing")
+    await pick("Suppliers › Meridian › Pricing")
     fireEvent.click(confirmButton())
     const saving = await screen.findByRole("button", { name: COPY.shared.saving })
     expect((saving as HTMLButtonElement).disabled).toBe(true)
@@ -231,11 +231,11 @@ describe("SaveToLibraryDialog", () => {
     const already = result({ outcome: "already", folder_id: "f4", document_id: "doc-9" })
     vi.mocked(promoteAttachment).mockResolvedValue(already)
     const { onSaved, onClose } = renderDialog()
-    await pick("Suppliers/Meridian")
+    await pick("Suppliers › Meridian")
     fireEvent.click(confirmButton())
     expect(await screen.findByText(COPY.shared.alreadyTitle)).toBeTruthy()
-    expect(screen.getByText(COPY.shared.alreadyBody("Finance/Q4 2026 review"))).toBeTruthy()
-    expect(screen.getByText(COPY.shared.alreadyDiffFolder("Suppliers/Meridian"))).toBeTruthy()
+    expect(screen.getByText(COPY.shared.alreadyBody("Finance › Q4 2026 review"))).toBeTruthy()
+    expect(screen.getByText(COPY.shared.alreadyDiffFolder("Suppliers › Meridian"))).toBeTruthy()
     expect(screen.getByRole("button", { name: COPY.shared.done })).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: COPY.shared.openDoc }))
     expect(openDocument).toHaveBeenCalledWith("doc-9")
@@ -247,10 +247,10 @@ describe("SaveToLibraryDialog", () => {
     const already = result({ outcome: "already", folder_id: "s3" })
     vi.mocked(promoteAttachment).mockResolvedValue(already)
     const { onSaved, onClose } = renderDialog()
-    await pick("Suppliers/Meridian/Pricing")
+    await pick("Suppliers › Meridian › Pricing")
     fireEvent.click(confirmButton())
     await screen.findByText(COPY.shared.alreadyTitle)
-    expect(screen.queryByText(COPY.shared.alreadyDiffFolder("Suppliers/Meridian/Pricing"))).toBeNull()
+    expect(screen.queryByText(COPY.shared.alreadyDiffFolder("Suppliers › Meridian › Pricing"))).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: COPY.shared.done }))
     expect(onSaved).toHaveBeenCalledWith(already)
     expect(onClose).toHaveBeenCalled()
@@ -260,7 +260,7 @@ describe("SaveToLibraryDialog", () => {
     vi.mocked(useCitationNavOptional).mockReturnValue(null)
     vi.mocked(promoteAttachment).mockResolvedValue(result({ outcome: "already", folder_id: "f4" }))
     renderDialog()
-    await pick("Suppliers/Meridian")
+    await pick("Suppliers › Meridian")
     fireEvent.click(confirmButton())
     await screen.findByText(COPY.shared.alreadyTitle)
     expect(screen.queryByRole("button", { name: COPY.shared.openDoc })).toBeNull()
@@ -271,7 +271,7 @@ describe("SaveToLibraryDialog", () => {
       new PromoteError(403, "Cannot upload to a folder you do not own"),
     )
     const { onSaved, onClose } = renderDialog()
-    await pick("Suppliers/Meridian")
+    await pick("Suppliers › Meridian")
     fireEvent.click(confirmButton())
     const alert = await screen.findByRole("alert")
     expect(within(alert).getByText(COPY.shared.refuseLead)).toBeTruthy()
