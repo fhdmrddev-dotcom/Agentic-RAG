@@ -1,0 +1,110 @@
+{
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "calling_mode_predicted": "NATIVE",
+  "file": {
+    "name": "meridian-clearance-openai.md",
+    "body": "# Meridian supplier note\n\nThe Meridian freight-cap clearance code is ATT274-openai-05082d88.\n"
+  },
+  "question": "What is the Meridian freight-cap clearance code in the file I attached?",
+  "verdicts": {
+    "d05": "PASS",
+    "answer": "PASS",
+    "second_thread": "PASS",
+    "search_neg": "PASS",
+    "db_neg": "PASS"
+  },
+  "row": {
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "token": "ATT274-openai-05082d88",
+    "thread_a": "0e5324e2-2943-443c-80a2-75d477b50ed8",
+    "thread_b": "6cb89123-8a66-4ff9-8c12-9bba0be19cb8",
+    "upload_http": 200,
+    "d05": "PASS",
+    "ws_row": {
+      "id": "af19392a-cf8b-4b19-89b2-f536c9c01a57",
+      "path": "/b48bfa02-meridian-clearance-openai.md",
+      "kind": "template_input",
+      "expires_at": null,
+      "size_bytes": "93",
+      "content_storage_path": null,
+      "library_document_id": null,
+      "library_link": null
+    },
+    "answer": "PASS",
+    "run_a_status": "completed",
+    "a_tools": [
+      "execute_code"
+    ],
+    "a_final": "The Meridian freight-cap clearance code is **ATT274-openai-05082d88**.",
+    "second_thread": "PASS",
+    "run_b_status": "completed",
+    "b_tools": [
+      "search_documents"
+    ],
+    "b_final": "I couldn\u2019t find a **Meridian freight-cap clearance code** in the attached file. The retrieved document is **acme_msa_kestrel_freight_2026.md**, which lists freight terms and service levels but no clearance code. [1]",
+    "search_http": 200,
+    "search_total": 0,
+    "search_neg": "PASS",
+    "library_rows_with_token": 0,
+    "db_neg": "PASS"
+  },
+  "turn_a": {
+    "run_id": "01e03638-a76b-4147-bcb1-57f62e7e1e6b",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "gpt-5.6-luna",
+      "provider": "openai",
+      "error": null,
+      "started_at": "2026-10-05 14:38:04.184035+00:00",
+      "completed_at": "2026-10-05 14:38:37.453405+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "4b0dc6cc-867b-481f-b5ee-aebaab761812",
+        "content": "The Meridian freight-cap clearance code is **ATT274-openai-05082d88**."
+      }
+    ],
+    "tool_call_names": [
+      "execute_code"
+    ],
+    "final": "The Meridian freight-cap clearance code is **ATT274-openai-05082d88**."
+  },
+  "turn_b": {
+    "run_id": "3314ffb5-7b15-4458-bf19-1eb4eb37417e",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "gpt-5.6-luna",
+      "provider": "openai",
+      "error": null,
+      "started_at": "2026-10-05 14:38:38.517825+00:00",
+      "completed_at": "2026-10-05 14:38:49.771240+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "b9dc9f5e-ed66-4174-a51d-a1340420ee31",
+        "content": "I couldn\u2019t find a **Meridian freight-cap clearance code** in the attached file. The retrieved document is **acme_msa_kestrel_freight_2026.md**, which lists freight terms and service levels but no clearance code. [1]"
+      }
+    ],
+    "tool_call_names": [
+      "search_documents"
+    ],
+    "final": "I couldn\u2019t find a **Meridian freight-cap clearance code** in the attached file. The retrieved document is **acme_msa_kestrel_freight_2026.md**, which lists freight terms and service levels but no clearance code. [1]"
+  },
+  "upload_response": {
+    "file_id": "af19392a-cf8b-4b19-89b2-f536c9c01a57",
+    "path": "/b48bfa02-meridian-clearance-openai.md",
+    "version": 1,
+    "size_bytes": 93,
+    "mime_type": "text/markdown",
+    "kind": "template_input",
+    "expires_at": null,
+    "is_new": true,
+    "warning": null
+  }
+}

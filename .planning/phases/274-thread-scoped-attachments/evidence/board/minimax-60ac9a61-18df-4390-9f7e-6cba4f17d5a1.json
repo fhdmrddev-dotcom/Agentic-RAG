@@ -1,0 +1,114 @@
+{
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "calling_mode_predicted": "NATIVE",
+  "file": {
+    "name": "meridian-clearance-minimax.md",
+    "body": "# Meridian supplier note\n\nThe Meridian freight-cap clearance code is ATT274-minimax-9184da44.\n"
+  },
+  "question": "What is the Meridian freight-cap clearance code in the file I attached?",
+  "verdicts": {
+    "d05": "PASS",
+    "answer": "PASS",
+    "second_thread": "PASS",
+    "search_neg": "PASS",
+    "db_neg": "PASS"
+  },
+  "row": {
+    "provider": "minimax",
+    "model": "MiniMax-M3",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "token": "ATT274-minimax-9184da44",
+    "thread_a": "4439fca2-500a-4f8a-808d-132c06d4f8a3",
+    "thread_b": "fc20197f-9255-488a-a934-d9c77f8c2a87",
+    "upload_http": 200,
+    "d05": "PASS",
+    "ws_row": {
+      "id": "3de7c74b-49a8-4f76-8f76-0434bdb77380",
+      "path": "/2cd24322-meridian-clearance-minimax.md",
+      "kind": "template_input",
+      "expires_at": null,
+      "size_bytes": "94",
+      "content_storage_path": null,
+      "library_document_id": null,
+      "library_link": null
+    },
+    "answer": "PASS",
+    "run_a_status": "completed",
+    "a_tools": [
+      "execute_code"
+    ],
+    "a_final": "The Meridian freight-cap clearance code is **ATT274-minimax-9184da44**.",
+    "second_thread": "PASS",
+    "run_b_status": "completed",
+    "b_tools": [
+      "search_documents",
+      "search_documents",
+      "search_documents"
+    ],
+    "b_final": "I searched your library and couldn't find anything called a \"Meridian freight-cap clearance code.\" That exact term doesn't appear in any attached document, and the \"Meridian\" name and the freight content live in two separate, unrelated sets of files:\n\n**Meridian files** \u2014 all about Project Meridian, a CRM-to-cloud migration for Brightline Insurance (Project Charter, Week 9 Status Report, Weekly Me",
+    "search_http": 200,
+    "search_total": 0,
+    "search_neg": "PASS",
+    "library_rows_with_token": 0,
+    "db_neg": "PASS"
+  },
+  "turn_a": {
+    "run_id": "60ac9a61-18df-4390-9f7e-6cba4f17d5a1",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "MiniMax-M3",
+      "provider": "minimax",
+      "error": null,
+      "started_at": "2026-10-05 14:34:42.405895+00:00",
+      "completed_at": "2026-10-05 14:35:18.359666+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "eb62e413-9da1-4e1f-a5d4-5636438013c0",
+        "content": "\n\nThe Meridian freight-cap clearance code is **ATT274-minimax-9184da44**."
+      }
+    ],
+    "tool_call_names": [
+      "execute_code"
+    ],
+    "final": "The Meridian freight-cap clearance code is **ATT274-minimax-9184da44**."
+  },
+  "turn_b": {
+    "run_id": "78c2cc55-5b29-434a-9245-732f276296c4",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "MiniMax-M3",
+      "provider": "minimax",
+      "error": null,
+      "started_at": "2026-10-05 14:35:18.712213+00:00",
+      "completed_at": "2026-10-05 14:36:02.778812+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "f5a36235-96af-4f4e-9f12-6db8e0eb1eb1",
+        "content": "\n\nI searched your library and couldn't find anything called a \"Meridian freight-cap clearance code.\" That exact term doesn't appear in any attached document, and the \"Meridian\" name and the freight content live in two separate, unrelated sets of files:\n\n**Meridian files** \u2014 all about Project Meridian, a CRM-to-cloud migration for Brightline Insurance (Project Charter, Week 9 Status Report, Weekly Meeting Notes, Risk Log, Risk Register). None of them cover freight, caps, or clearance codes.\n\n**Freight files** \u2014 the ACME \u2194 Kestrel Freight Partners MSA and the Northwind Logistics renewal note. Neither mentions Meridian. The closest things to what you described are:\n\n- **ACME / Kestrel Freight MSA** \u2014 aggregate limitation-of-liability **cap of $2.35M** [1], and a service-credit cap of 12% of affected-month fees for missed service levels (one of which is a 97% customs clearance target within 2 business days) [3].\n- **Northwind Commercials Renewal** \u2014 a proposed **Freight Analytics module at ~\u00a362,000/year** as an expansion item, gated on closing support ticket SUP-9902 [4].\n\nCould you confirm which file you meant? A few possibilities:\n1. You may be thinking of the ACME/Kestrel MSA \u2014 in which case there is no \"Meridian\" element, but there is a $2.35M liability cap and a customs-clearance service level. Tell me which field you want and I'll pull it.\n2. You may be thinking of a different file that isn't currently in your library \u2014 if so, please re-attach it.\n3. The term \"Meridian freight-cap clearance code\" may be a shorthand I don't recognise \u2014 if you can give me a couple more words of context (e.g., is it a project code, a vendor reference, a budget line?), I'll search again with those terms."
+      }
+    ],
+    "tool_call_names": [
+      "search_documents",
+      "search_documents",
+      "search_documents"
+    ],
+    "final": "I searched your library and couldn't find anything called a \"Meridian freight-cap clearance code.\" That exact term doesn't appear in any attached document, and the \"Meridian\" name and the freight content live in two separate, unrelated sets of files:\n\n**Meridian files** \u2014 all about Project Meridian, a CRM-to-cloud migration for Brightline Insurance (Project Charter, Week 9 Status Report, Weekly Meeting Notes, Risk Log, Risk Register). None of them cover freight, caps, or clearance codes.\n\n**Freight files** \u2014 the ACME \u2194 Kestrel Freight Partners MSA and the Northwind Logistics renewal note. Neither mentions Meridian. The closest things to what you described are:\n\n- **ACME / Kestrel Freight MSA** \u2014 aggregate limitation-of-liability **cap of $2.35M** [1], and a service-credit cap of 12% of affected-month fees for missed service levels (one of which is a 97% customs clearance target within 2 business days) [3].\n- **Northwind Commercials Renewal** \u2014 a proposed **Freight Analytics module at ~\u00a362,000/year** as an expansion item, gated on closing support ticket SUP-9902 [4].\n\nCould you confirm which file you meant? A few possibilities:\n1. You may be thinking of the ACME/Kestrel MSA \u2014 in which case there is no \"Meridian\" element, but there is a $2.35M liability cap and a customs-clearance service level. Tell me which field you want and I'll pull it.\n2. You may be thinking of a different file that isn't currently in your library \u2014 if so, please re-attach it.\n3. The term \"Meridian freight-cap clearance code\" may be a shorthand I don't recognise \u2014 if you can give me a couple more words of context (e.g., is it a project code, a vendor reference, a budget line?), I'll search again with those terms."
+  },
+  "upload_response": {
+    "file_id": "3de7c74b-49a8-4f76-8f76-0434bdb77380",
+    "path": "/2cd24322-meridian-clearance-minimax.md",
+    "version": 1,
+    "size_bytes": 94,
+    "mime_type": "text/markdown",
+    "kind": "template_input",
+    "expires_at": null,
+    "is_new": true,
+    "warning": null
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "provider": "lmstudio",
+  "model": "qwen-agentworld-35b-a3b",
+  "required": false,
+  "calling_mode": "NATIVE",
+  "blocked": "extra (self-hosted) group \u2014 not one of the required 8; not driven unless named in --providers"
+}
