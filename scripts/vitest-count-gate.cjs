@@ -3671,6 +3671,7 @@ const BASELINE = {
   // and the index.css seamless-loop fence. Counts as the gate printed them (`— N new`).
   "irisState.test.ts": 21,
   "IrisAvatar.test.tsx": 28,
+  "irisMotion.test.ts": 5,
   "ToolCallPanel.test.tsx": 20, // RAISED 16 → 20 at 272-02 (D-08 filter line ×4)
   "MessageList.test.tsx": 30,
   "MessageList.dedup.test.tsx": 7,
@@ -4644,6 +4645,7 @@ const TARGETS = [
   // Phase 276-06 (D-24/D-27) — the Iris avatar. Named FILE-LEVEL (no bare src/components/chat entry), pinned in BASELINE beside MessageItem.test.tsx, same commit.
   "src/components/chat/__tests__/irisState.test.ts",
   "src/components/chat/__tests__/IrisAvatar.test.tsx",
+  "src/components/chat/__tests__/irisMotion.test.ts",
   "src/components/chat/__tests__/ChatArea.scopeChange.test.tsx",
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,
