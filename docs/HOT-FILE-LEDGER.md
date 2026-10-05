@@ -11144,7 +11144,7 @@ cells rot within days.
 | [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 1 / 1 / 125 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog. ⛔ v4.5 Not yet released from parseHistory released flag |
 | [`frontend/src/docs/pages/BuildStory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesbuildstorytsx) | 0 / 0 / 0 | no (new) | young (created 276-07). Row added AT PLANNING. D-26: five chapters in order, releases from parseHistory, one VideoSlot each. ⛔ an id-less slot renders nothing |
 | [`frontend/src/pages/SetupWizard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessetupwizardtsx) | 3 / 3 / 352 (was `2 / 2 / 345`) | ⚠ **NOW FIRES — 3 phases** | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. **276-07**: the static Iris mark on the dark chip in the header. ⛔ no logic change |
-| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 3 / 1 / 95 | no (1 phase) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
+| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 4 / 2 / 105 (was `3 / 1 / 95`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
 | [`frontend/src/docs/pages/ChangelogVersion.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogversiontsx) | 1 / 1 / 52 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: changelog version page |
 | [`frontend/src/docs/pages/ApiReference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesapireferencetsx) | 1 / 1 / 135 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P6 lazy Scalar. ⛔ telemetry off, agent disabled, test-request hidden; dynamic import only |
 | [`frontend/src/docs/components/Markdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsmarkdowntsx) | 1 / 1 / 134 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: react-markdown + gfm. ⛔ NO rehype-raw — raw HTML stays text (XSS) |
@@ -18402,6 +18402,8 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 ### `backend/app/services/email_provider.py`
 
 **`3 / 1 / 95`** at 276 planning. Absent from the scan list for its whole life; the row was added at 276-07 planning because 276-07 modifies it. 276-07 adds a hosted PNG lockup (absolute URL from `primary_frontend_origin()`, no new env var) and the product name to the Resend invite. ⛔ WR-02 stands: the org name and every interpolated URL are `html.escape`d. 276-07 re-derives the triple at close.
+
+**`4 / 2 / 105`** re-derived at 276-07 (2026-10-05), counting the 276-07 Task 2 commit. `ResendProvider.send_invite` prepends `<img src="{safe_logo}" alt="Syrel" width="160" height="80">` where `safe_logo = html.escape(primary_frontend_origin() + "/brand/syrel-lockup-email.png", quote=True)`; the body says "… on Syrel." and the plain-text subject becomes "You're invited to {org} on Syrel". `NoneLogProvider` is unchanged. Pinned by `backend/tests/unit/test_276_invite_email_brand.py` (planted `</a><script>` org). Two phases; G-5 does not fire.
 
 ### `frontend/src/docs/pages/ChangelogVersion.tsx`
 

@@ -1,9 +1,10 @@
 import path from "path"
-import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite'
+import { defineConfig, loadEnv, searchForWorkspaceRoot, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import Icons from "unplugin-icons/vite"
 import { rewriteDevUrl } from "./devRouting"
 import { docsContent } from "./plugins/docsContent"
+import { brandMeta } from "./plugins/brandMeta"
 
 // Entry routing for the dev + preview servers. The decision lives in devRouting.ts (a pure,
 // unit-tested function); this plugin only applies it. Phase 276 added the /docs → docs.html rule.
@@ -41,7 +42,11 @@ const VIDEO_DEDUPE = [
 ]
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Phase 276-07 (D-27) — VITE_APP_URL is the EXISTING configured app origin (no new env var).
+  // loadEnv reads .env files and process.env (Vercel / onebox build env) for VITE_-prefixed keys.
+  const env = loadEnv(mode, __dirname, "VITE_")
+  return {
   plugins: [
     react(),
     Icons({ compiler: "jsx", jsx: "react" }),
@@ -49,6 +54,8 @@ export default defineConfig({
     // Phase 276 — docs manifest, page chunks, search index and media copy (all parsing lives in
     // scripts/lib/docs-content.cjs).
     docsContent({ frontendDir: __dirname }),
+    // Phase 276-07 — absolutise og:image / twitter:image from VITE_APP_URL's origin, else relative.
+    brandMeta(env.VITE_APP_URL),
   ],
   resolve: {
     alias: {
@@ -81,4 +88,5 @@ export default defineConfig({
       },
     },
   },
+  }
 })
