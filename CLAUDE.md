@@ -851,6 +851,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `scripts/full-schema-supplement.sql` | 15 / 10 / 690 | ⚠ row STALE (`11/6/653`). **266-01**: mig 195's `expert_installs` ACL mirrored. ⛔ `scripts/` is gate-EXEMPT |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE (`9/4/202`). **276** (operator-approved): docs-coverage-guard registered beside landing-drift-guard. ⛔ The ONE hook table; a dropped entry fires NEVER |
 | `backend/app/services/forced_emit.py` | 10 / 6 / 705 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 5 phases — row added 256-04, in its FIRST edit's commit.** ⛔ accumulators init `None` never `0`, ABOVE the rung loop so a FAILED rung counts |
+| `backend/app/services/template_asset_service.py` | 4 / 3 / 344 | ⚠ absent its ENTIRE LIFE — row added 274-REVIEW WR-01. ONE claim-keyed gate on 3 reads: a workflow never resolves a thread-life chat row |
 | `backend/app/db/entitlements.py` | 2 / 1 / 169 | young (created 258). Row added AT CREATION — an absent row is invisible to G-5 at any count |
 | `backend/app/services/entitlement_service.py` | 2 / 1 / 130 | young (created 258). Row added AT CREATION. Single commercial boundary home (TIER-01/04) |
 | `backend/app/db/experts.py` | 5 / 4 / 749 | ⚠ row STALE (`4/3/567`). **266-01**: SIX install queries ADDED. ⛔ no existing query touched |
