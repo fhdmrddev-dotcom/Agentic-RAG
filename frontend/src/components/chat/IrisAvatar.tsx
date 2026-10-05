@@ -21,6 +21,13 @@
  * plain props. Colour changes are `stop-color` / `fill` transitions, never an animated
  * property, so "settles and turns amber" runs both at once.
  *
+ * Phase lock (276 G4-avatar): no avatar owns its own phase. Every working avatar follows ONE
+ * shared page clock (irisMotion.ts `PhaseClock`, on `document.timeline` time): a FRESH mount in
+ * a working state starts its loops where that clock puts the previous avatar at that instant,
+ * and every rate change re-reads the clock from the live loops. That is what keeps the live
+ * row's remount (its key moves from `temp-…` to `run-${runId}` when the send POST resolves) from
+ * snapping the ring back to 0°. A spin-up from REST still starts at 0°, which is the rest pose.
+ *
  * Known edge, accepted as the sketch records it: re-entering work DURING a settle restarts the
  * ring from its coast pose to 0°.
  *
@@ -29,7 +36,7 @@
  */
 import { memo, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
 import type { IrisState } from "./irisState"
-import { settleCoast } from "./irisMotion"
+import { clockPhase, readPhaseClock, settleCoast, startTimeFor, writePhaseClock } from "./irisMotion"
 
 const WORK: ReadonlySet<IrisState> = new Set<IrisState>(["thinking", "tool", "streaming"])
 /** playbackRate per working state: tool ×1.45 (≈1.1 s), streaming ×0.8 (≈2 s, the text moves). */
@@ -63,6 +70,34 @@ interface Live {
 function cssAnimations(el: HTMLElement): CSSAnimation[] {
   if (typeof CSSAnimation === "undefined") return []
   return el.getAnimations({ subtree: true }).filter((a): a is CSSAnimation => a instanceof CSSAnimation)
+}
+
+/** document.timeline's time (ms), the shared clock's time base; null where there is none (jsdom). */
+function timelineNow(): number | null {
+  const t = typeof document !== "undefined" ? document.timeline?.currentTime : null
+  return typeof t === "number" ? t : null
+}
+
+/**
+ * Put every loop at `pos` (ms into the orbit cycle) right now, playing at `rate`. Ring, wave and
+ * glow share one currentTime (the per-petal offsets are CSS delays), so one startTime places all.
+ */
+function lockPhase(anims: CSSAnimation[], pos: number, rate: number, now: number) {
+  const start = startTimeFor(pos, rate, now)
+  for (const a of anims) {
+    a.playbackRate = rate
+    a.startTime = start
+  }
+}
+
+/** Publish where these loops are now, so a remounted avatar can carry on from it. */
+function recordPhase(anims: CSSAnimation[]) {
+  const now = timelineNow()
+  const a = anims[0]
+  if (now == null || !a || a.startTime == null) return
+  const pos = a.currentTime
+  if (typeof pos !== "number") return
+  writePhaseClock({ at: now, pos, rate: a.playbackRate })
 }
 
 function targetOf(a: Animation): Element | null {
@@ -110,12 +145,16 @@ export const IrisAvatar = memo(function IrisAvatar({ state, size = 32 }: { state
       clearTimeout(s.rampTimer)
       if (!dur) {
         anims.forEach((a) => (a.playbackRate = to))
+        recordPhase(anims)
         return
       }
       const t0 = performance.now()
       // rAF pauses in background tabs; make sure the final rate still lands.
       s.rampTimer = setTimeout(() => {
-        if (token === s.rampToken) anims.forEach((a) => (a.playbackRate = to))
+        if (token === s.rampToken) {
+          anims.forEach((a) => (a.playbackRate = to))
+          recordPhase(anims)
+        }
       }, dur + 80)
       const step = (now: number) => {
         if (token !== s.rampToken) return
@@ -123,6 +162,7 @@ export const IrisAvatar = memo(function IrisAvatar({ state, size = 32 }: { state
         const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2
         const r = start + (to - start) * e
         anims.forEach((a) => (a.playbackRate = r))
+        recordPhase(anims) // the shared clock follows the tween, so a remount mid-tween lands in phase
         if (k < 1) s.raf = requestAnimationFrame(step)
       }
       step(t0)
@@ -201,11 +241,25 @@ export const IrisAvatar = memo(function IrisAvatar({ state, size = 32 }: { state
         el.dataset.motion = "work"
         return
       }
-      if (!wasWork) {
+      // Phase anchor for loops (re)starting now. Read AFTER data-motion is "work":
+      // getAnimations() flushes style, so the CSS loops exist by then.
+      const anchor = (pos: (now: number) => number, startRate: number) => {
+        const anims = cssAnimations(el)
+        const now = timelineNow()
+        if (anims.length && now != null) lockPhase(anims, pos(now), startRate, now)
+      }
+      if (instant) {
+        // A fresh mount (incl. the live row's temp → run-key remount): carry on from the
+        // shared clock at the full rate, never from 0° (G4-avatar).
         el.dataset.motion = "work"
-        ramp(instant ? rate : 0.2, rate, instant ? 0 : 560) // spin up from near-still
+        anchor((now) => clockPhase(readPhaseClock(), now), rate)
+        ramp(rate, rate, 0)
+      } else if (!wasWork) {
+        el.dataset.motion = "work"
+        anchor(() => 0, 0.2) // spin up from near-still, from 0° = the rest pose it is leaving
+        ramp(0.2, rate, 560)
       } else {
-        ramp(instant ? rate : null, rate, instant ? 0 : 650) // speed change, no restart
+        ramp(null, rate, 650) // speed change, no restart
       }
       return
     }
