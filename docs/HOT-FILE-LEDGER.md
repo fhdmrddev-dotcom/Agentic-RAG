@@ -10828,7 +10828,8 @@ cells rot within days.
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
 | [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |
-| [`frontend/src/components/chat/IrisAvatar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisavatartsx) | 1 / 1 / 310 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. Sketch 276 variant D (D-27). ⛔ orbit period = 3 × wave period, sweep 360°; gradient ids from useId, sanitised; aria-hidden |
+| [`frontend/src/components/chat/IrisAvatar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisavatartsx) | 3 / 1 / 362 (was `1 / 1 / 310`) | no (1 phase) | young. **G4-avatar**: working loops phase-locked to the shared `PhaseClock` (irisMotion.ts), so the temp→run-key remount never snaps to 0°. ⛔ 360° = 3 wave periods; no hooks in MessageItem |
+| [`frontend/src/components/chat/irisMotion.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirismotionts) | 2 / 1 / 97 | no (1 phase) | ⚠ absent since 276-REVIEW — row added AT TOUCH (G4-avatar). Pure settle + phase-clock arithmetic. ⛔ `ORBIT_MS` must equal index.css `irisOrbitTurn` (fenced) |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 6 / 2 / 320 | no (2 phases) | ⚠ row STALE (`4/1/283`; CLAUDE.md read `4/1/313`). NOT modified by 253 — re-derived under CR-08. Still ONE reasoning renderer; no duration derived from length |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 41 / 20 / 1007 (was `38 / 19 / 977`) | **FIRES** | ⚠ STALE (`38/19/977`). **268-03**: +2 optional ReactNode slots; hooks 8/6/4 → 8/6/4. ⛔ 0 new top-level controls |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 24 / 11 / 376 (was `21 / 9 / 307`) | **FIRES** | ⚠ row STALE (`21/9/307`). honoured by construction (**267-04**): the turn index skips system rows via ONE module-level helper; no prop added |
@@ -11126,7 +11127,7 @@ cells rot within days.
 | [`frontend/src/pages/AuthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesauthpagetsx) | 4 / 2 / 26 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: title prop → "Syrel". One string |
 | [`frontend/src/landing/components/CompareSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentscomparesectiontsx) | 3 / 2 / 121 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01: two prose strings → Syrel. ⛔ landing fence: no app/docs imports |
 | [`frontend/src/landing/components/LandingFooter.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentslandingfootertsx) | 4 / 2 / 57 (was `3 / 2 / 52`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 mark + © Syrel; 276-03 Docs/Changelog links, absolute hashes. ⛔ shared by landing AND docs entries |
-| [`frontend/src/landing/components/Navigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsnavigationtsx) | 4 / 2 / 150 (was `3 / 2 / 91`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 lockup img; 276-03 Docs link, drawer, optional docs slots. ⛔ shared by BOTH entries — landing passes no docs props |
+| [`frontend/src/landing/components/Navigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsnavigationtsx) | 5 / 2 / 153 (was `4 / 2 / 150`) | no (2 phases) | ⚠ STALE (`4/2/150`). **G4-1**: ONE optional `drawerClassName` prop passed through. ⛔ shared by BOTH entries — landing passes no docs props |
 | [`frontend/src/landing/components/HeroSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsherosectiontsx) | 2 / 2 / 885 (was `1 / 1 / 820`) | no (1 phase) | 276-05: static PromoSlot; `import("./HeroPromo")` only after load + scroll + ≥50% visible; mock rail + avatar → static Iris mark. ⛔ no static Remotion import (first-paint fence) |
 | [`backend/app/api/api_docs.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_docspy) | 1 / 1 / 111 | no (1 phase) | young (created 276-01). DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate |
 | [`frontend/src/docs/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsmaintsx) | 2 / 1 / 15 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-02: docs entry mount. ⛔ no providers, no app imports (docsBundleFence) |
@@ -11155,7 +11156,7 @@ cells rot within days.
 | [`frontend/src/docs/components/ChapterStrip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentschapterstriptsx) | 1 / 1 / 42 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: chapter strip (home + changelog filter) |
 | [`frontend/src/docs/components/SearchBox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentssearchboxtsx) | 1 / 1 / 193 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: D-08 search. ⛔ index fetched on FIRST focus only; no server, no AI |
 | [`frontend/src/docs/components/SearchDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentssearchdialogtsx) | 1 / 1 / 50 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: header search dialog |
-| [`frontend/src/docs/components/DocsHeader.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsdocsheadertsx) | 1 / 1 / 72 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: Navigation current=docs + docs drawer/search slots |
+| [`frontend/src/docs/components/DocsHeader.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsdocsheadertsx) | 2 / 1 / 73 (was `1 / 1 / 72`) | no (1 phase) | young. **G4-1**: tags the portaled drawer `d-drawer` so docs.css scopes its tokens to it |
 | [`frontend/src/docs/video/VideoSlot.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsvideovideoslottsx) | 2 / 1 / 141 (was `0 / 0 / 0`) | no (new) | young (created 276). 276-03 V0/YouTube; **276-05** Remotion poster → `import("./RemotionSlot")` on click, error + retry, transcript. ⛔ empty slot renders NOTHING |
 | [`frontend/src/docs/video/YouTubeFacade.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsvideoyoutubefacadetsx) | 1 / 1 / 67 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: D-12 facade. ⛔ no YouTube request before click; nocookie only |
 | [`frontend/src/docs/video/videos.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsvideovideosts) | 2 / 1 / 160 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03 youtube, 276-05 remotion entries. ⛔ durations tested against video/src constants |
@@ -11166,7 +11167,7 @@ cells rot within days.
 | [`frontend/src/docs/components/Callout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentscallouttsx) | 1 / 1 / 36 | no (new) | young (created 276-03). Unreleased / partial / note / warning callouts; copy comes from pages/copy.ts |
 | [`frontend/src/docs/pages/copy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagescopyts) | 1 / 1 / 15 | no (new) | young (created 276-03). ⛔ the ONE home of the honesty copy (unreleased sentences) shared by pages, callouts and tests |
 | [`frontend/src/docs/search/searchIndex.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocssearchsearchindexts) | 1 / 1 / 57 | no (new) | young (created 276-03). Fetches the index + MiniSearch on FIRST focus only (both via import()/fetch). ⛔ never in first paint |
-| [`frontend/src/landing/components/MenuDrawer.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsmenudrawertsx) | 1 / 1 / 116 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: ≤720 menu drawer for landing + docs. ⛔ classes live in landing.css |
+| [`frontend/src/landing/components/MenuDrawer.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsmenudrawertsx) | 3 / 1 / 136 (was `1 / 1 / 116`) | no (1 phase) | young. **G4-1**: sheet PORTALED to `document.body` (the header's backdrop-filter clipped it to 32px). ⛔ never render it inside `<header>`; classes live in landing.css |
 | [`frontend/src/landing/components/HeroPromo.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsheropromotsx) | 1 / 1 / 161 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-05: muted promo, Pause/Unmute. ⛔ reached only via import(); musicSrc null until Unmute |
 | [`backend/app/api/workspace_promote.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkspace_promotepy) | 2 / 1 / 501 (was `0 / 0 / 0`) | no (young) | 274-02. Promote / preview / library-links (ATT-03). ⛔ user-JWT read before mint; minter + _enqueue_or_splice only; version_scope=folder; never in workspace.py (244 fence) |
 | [`backend/app/models/workspace_promote.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsworkspace_promotepy) | 1 / 1 / 101 (was `0 / 0 / 0`) | no (young) | 274-02. PromoteRequest (folder_id required, extra=forbid) + response models; LibraryLink saved\|already == mig 203 CHECK. ⛔ no org field in any body |
@@ -14483,6 +14484,12 @@ Both renderers now read both inputs; nothing executable binds them, which is the
 ### `frontend/src/components/chat/IrisAvatar.tsx`
 
 **`1 / 1 / 310`** at 276-06 (was **`0 / 0 / 0`** at 276 planning). Young (created in Phase 276). The animated Iris assistant avatar, sketch 276-iris-avatar variant D "Orbit + wave" (D-24, D-27). ⛔ The seamless-loop invariant: the orbit period must stay an integer multiple of the wave period (4.8 s = 3 × 1.6 s) and the orbit sweep must stay 360°; `IrisAvatar.test.tsx` pins it from `index.css`. Re-derived at 276-06's close: unchanged at `1 / 1 / 310`; mounted in MessageItem (gutter), ChatArea (idle hero, 64px) and App (boot splash, thinking, 56px).
+
+**`3 / 1 / 362`** at 276 G4-avatar (2026-10-05). Measured live: ~2.6 s into `thinking` the ring snapped 14.6° → 0° in one frame. Cause, read from code: `MessageList.tsx` keys an assistant row `run-${runId}` when it has a runId and by `msg.id` otherwise; the placeholder is `temp-…` with no runId until the send POST resolves and `StreamsProvider` stamps `runId` on it, so the key changes, `MessageItem` remounts, and a fresh avatar's CSS loops started at 0. Fixed without touching keys or MessageItem (G-5): a fresh working mount sets every loop's WAAPI `startTime` from the shared `PhaseClock` in `irisMotion.ts` (on `document.timeline` time), and every `playbackRate` set re-records that clock. ⛔ A spin-up from REST still starts at 0° (the rest pose); only a fresh mount reads the clock.
+
+### `frontend/src/components/chat/irisMotion.ts`
+
+**`2 / 1 / 97`** at 276 G4-avatar (2026-10-05). Absent from the scan list since 276-REVIEW B-WR-02 created it; row added AT TOUCH. Pure motion arithmetic for IrisAvatar: `settleCoast` (the forward 120° settle) and the shared phase clock (`PhaseClock`, `clockPhase`, `startTimeFor`, one module-level reading). ⛔ `ORBIT_MS` must equal `irisOrbitTurn`'s CSS period; `IrisAvatar.test.tsx` fences it from `index.css`.
 
 ### `frontend/src/components/settings/ActionRow.tsx`
 
@@ -18331,6 +18338,8 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 
 **`4 / 2 / 150`** re-derived at the 276-05 close (was `3 / 2 / 91`). 2 phases (226, 276); G-5 does not fire.
 
+**`5 / 2 / 153`** at 276 G4-1 (2026-10-05). One optional `drawerClassName` prop, passed to MenuDrawer as `className`; the docs use it because the drawer is now portaled out of `.docs-root`.
+
 ### `frontend/src/landing/components/HeroSection.tsx`
 
 **`1 / 1 / 820`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-05: static PromoSlot; import("./HeroPromo") only after load + scroll + ≥50% visible. ⛔ no static Remotion import (first-paint fence). 276-05 re-derives the triple at close.
@@ -18521,6 +18530,8 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 
 **`1 / 1 / 72`** re-derived at the 276-05 close (2026-10-04), recipe in CLAUDE.md. Young; G-5 does not fire.
 
+**`2 / 1 / 73`** at 276 G4-1 (2026-10-05). Passes `drawerClassName="d-drawer"`; `docs.css` names `.d-drawer` beside `.docs-root` for the tokens, pinned type scale, focus ring and reduced-motion reset the portaled sheet used to inherit.
+
 ### `frontend/src/docs/video/VideoSlot.tsx`
 
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03 V0/YouTube; 276-05 lazy Remotion branch. ⛔ empty slot renders NOTHING. 276-05 re-derives the triple at close.
@@ -18550,6 +18561,8 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: ≤720 menu drawer for landing + docs. ⛔ classes live in landing.css. 276-05 re-derives the triple at close.
 
 **`1 / 1 / 116`** re-derived at the 276-05 close (2026-10-04), recipe in CLAUDE.md. Young; G-5 does not fire.
+
+**`3 / 1 / 136`** at 276 G4-1 (2026-10-05). Measured live at 390px on `/` and `/docs/use/chat`: the open drawer was 32px tall. The sticky `<header>`'s `backdrop-filter: blur(12px)` makes it the containing block for fixed descendants, so `top: 64px; bottom: 0` resolved against the 65px header. The sheet is now rendered with `createPortal(…, document.body)`; the focus trap, Escape, focus return, `aria-controls` and the body scroll lock are unchanged, and React events still bubble to the docs link interceptor. ⛔ Never render the sheet inside `<header>` again; `Navigation.test.tsx` pins it as a direct child of `<body>`.
 
 ### `frontend/src/landing/components/HeroPromo.tsx`
 
