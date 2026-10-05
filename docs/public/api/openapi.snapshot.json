@@ -4512,7 +4512,7 @@
      "workspace"
     ],
     "summary": "Promote Attachment",
-    "description": "Save ONE thread attachment into the chosen Library folder (ATT-03).\n\n201 `saved` \u2014 a new document was minted and handed to the ingest queue.\n200 `already` \u2014 the same bytes were already in the Library; linked, nothing copied. The\n`folder_id` is the EXISTING copy's (D-13). Also 200 when this attachment was promoted before.\n404 `Thread not found` / `File not found`; the minter's `Folder not found` (404) and\n`Cannot upload to a folder you do not own` (403) verbatim; 422 for a type the Library refuses.\n\nThe attachment itself stays in the thread, unchanged (D-11).",
+    "description": "Save ONE thread attachment into the chosen Library folder (ATT-03).\n\n201 `saved` \u2014 a new document was minted and handed to the ingest queue.\n200 `already` \u2014 the same bytes were already in the Library; linked, nothing copied. The\n`folder_id` is the EXISTING copy's (D-13). Also 200 when this attachment was promoted before.\n404 `Thread not found` / `File not found`; the minter's `Folder not found` (404) and\n`Cannot upload to a folder you do not own` (403) verbatim; 403 `Cannot upload to a folder in\nanother organization` for a folder outside the active org (D-29); 422 for a type the Library\nrefuses.\n\nThe attachment itself stays in the thread, unchanged (D-11).",
     "operationId": "promote_attachment_threads__thread_id__workspace_files__file_id__promote_post",
     "security": [
      {
@@ -4579,7 +4579,7 @@
      "workspace"
     ],
     "summary": "Promote Preview",
-    "description": "What saving this attachment into `folder_id` would do \u2014 refused, already there, or which\nversion (D-14). Read-only and advisory: the POST's answer is the one rendered as a result.",
+    "description": "What saving this attachment into `folder_id` would do \u2014 refused, already there, or which\nversion (D-14). Read-only and advisory: the POST's answer is the one rendered as a result.\nA folder outside the active org is the POST's own 403 here too (D-29).",
     "operationId": "promote_preview_threads__thread_id__workspace_files__file_id__promote_preview_get",
     "security": [
      {
