@@ -48,7 +48,9 @@ export function LibraryLinkSegment({ link, leaf, path, display }: LibraryLinkSeg
 
   const full = [word, path ?? leaf, suffix].filter(Boolean).join(" · ")
   const className = cn(
-    "inline-flex min-w-0 items-center gap-1 rounded-full px-2 py-px font-medium",
+    "inline-flex min-w-0 items-center gap-1 rounded-full px-2 py-px text-left font-medium",
+    // The panel row shows the FULL path, so it wraps rather than truncating away the part a person needs.
+    display === "path" && "whitespace-normal",
     saved ? "bg-success/15 text-success" : "bg-primary/10 text-primary",
     nav && "cursor-pointer transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
   )
@@ -60,7 +62,7 @@ export function LibraryLinkSegment({ link, leaf, path, display }: LibraryLinkSeg
       ) : (
         <CopyGlyph className="h-3 w-3 flex-none" aria-hidden="true" />
       )}
-      <span className="min-w-0 truncate">
+      <span className={display === "path" ? "min-w-0 break-words" : "min-w-0 truncate"}>
         {word}
         {folderText && ` · ${folderText}`}
       </span>

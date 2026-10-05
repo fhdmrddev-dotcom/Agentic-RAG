@@ -1543,7 +1543,9 @@ const BASELINE = {
   // 22 is read from THIS SCRIPT'S OWN printed `actual` column
   // (`FilesSection.test.tsx  11  22  +11`), never hand-counted from `it(`
   // literals.
-  "FilesSection.test.tsx": 22,
+  // RAISED 22 → 33 at 274-04 (measured): the base already read 28 (the pin lagged), +5 for the
+  // panel row's Save to Library slot, its tabIndex -1 trigger and the Shift+F10 / ContextMenu arm.
+  "FilesSection.test.tsx": 33,
   // 195-03 task 1 GREW this file 11 → 41: the widening's own coverage (ribbon /
   // tone / className / mimeType / the nine added extensions / the own-property
   // guard), ADDITIONS ONLY — `git diff` showed zero removed lines and all 11
@@ -3957,7 +3959,9 @@ const BASELINE = {
   // ⚠ Case 5a is COMMENT-STRIPPED on purpose. The chip's docblock EXPLAINS that it holds no copy,
   // so an unstripped grep measures the explanation — the first draft asserted its own
   // `grep -c ... is 0` while containing the sentence, making the claim false by stating it.
-  "ChatAttachmentChip.states.test.tsx": 10,
+  // RAISED 10 → 15 at 274-04 (measured): cases 1 and 4b retired DELIBERATELY under D-07 and
+  // rewritten; +4c (the TTL word kept on TTL rows), +7, +8, +9, +9b (the ⋯ and the In Library mark).
+  "ChatAttachmentChip.states.test.tsx": 15,
   // -- Phase 244 (244-05 T2+T3 / SHELL-04 / D-244-26 / D-244-27) — the ordered-block fence -----
   // BOTH KNOBS, SAME COMMIT. `src/components/chat` has no bare-directory TARGETS entry.
   //
@@ -4178,8 +4182,15 @@ const BASELINE = {
   "attachmentLifetime.test.ts": 11, // 274-03 — prefix strip (D-27) + thread-life rule (D-05), one home
   "attachmentsApi.test.ts": 14, // 274-03 — ?lifetime=thread only for the composer (D-21), X-Org-Id on cloud attach, promote wire
   "saveToLibraryCopy.test.ts": 7, // 274-03 — ?raw port fence vs sketch 274 COPY.js + ingest_splice.py
-  "FolderPathListbox.test.tsx": 11, // 274-03 — no Root, full sorted paths, APG combobox/listbox + keyboard
+  "FolderPathListbox.test.tsx": 12, // 274-03 — no Root, full sorted paths, APG combobox/listbox + keyboard; RAISED 11 → 12 at 274-04 (the sketch's › separator + /-tolerant search)
   "SaveToLibraryDialog.test.tsx": 12, // 274-03 — disabled until picked, latest-wins preview, already screen, verbatim 403
+  // ── Phase 274-04 (D-09 · D-11 · D-15 · D-18 · D-22..D-25) — FOUR NEW suites, all under the
+  // `src/components/attachments` DIRECTORY entry 274-03 already put in TARGETS, so only BASELINE
+  // changes. Pinned at the measured passing counts (32 cases, 0 failing), each RED before its module.
+  "useLibraryLinks.test.tsx": 8, // 274-04 — one fetch per thread, 4 s poll only while indexing, stops on completed AND failed
+  "AttachmentActionsMenu.test.tsx": 14, // 274-04 — always-visible ⋯, chip/panel items, disabled verb + reason, segment states
+  "AttachmentRowTrailing.test.tsx": 6, // 274-04 — panel slot: thread-life vs TTL byte-identical, full path visible, tabIndex -1
+  "composerNoLibraryDoor.test.ts": 4, // 274-04 — D-18 comment-stripped ?raw negative proof over every composer door
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the

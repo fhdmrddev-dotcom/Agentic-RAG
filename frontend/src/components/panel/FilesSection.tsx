@@ -79,6 +79,7 @@ import {
 import type { WorkspaceFile } from "@/types"
 import { FilePreview } from "./FilePreview"
 import { TemplateUpload } from "./TemplateUpload"
+import { AttachmentRowTrailing, requestAttachmentMenu } from "@/components/attachments/AttachmentRowTrailing"
 
 /**
  * ⚠ PHASE 199 PLAN 07 (sheet `c8-run-panel`) — THE HONESTY FIX, AND ITS THREE
@@ -129,7 +130,7 @@ export const EXPIRY_UNKNOWN = "expiry unknown"
 // ── Ephemeral-template expiry helpers (D-02) — compute on render from
 //    expires_at; NO per-second timer (Anti-Pattern). An agent file renders no
 //    trailing slot at all, so it is byte-identical either way (D-11). ──
-export function expiryCaption(expiresAt?: string): string {
+export function expiryCaption(expiresAt?: string | null): string {
   if (!expiresAt) return EXPIRY_UNKNOWN  // the wire did not say — say THAT
   const at = new Date(expiresAt).getTime()
   // 199 CR WR-02 — an UNPARSEABLE date is a third case, and totality over `string` did not
@@ -146,7 +147,7 @@ export function expiryCaption(expiresAt?: string): string {
   return `expires in ${Math.max(1, Math.floor(ms / 60_000))}m`
 }
 
-function isNearExpiry(expiresAt?: string): boolean {
+export function isNearExpiry(expiresAt?: string | null): boolean {
   if (!expiresAt) return false
   return new Date(expiresAt).getTime() - Date.now() < 3_600_000  // < 1h
 }
@@ -246,6 +247,12 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
         rowRefs.current.get(fileKey(files[prev]))?.focus()
         break
       }
+      case "F10":
+      case "ContextMenu": // 274-04: Shift+F10 / the menu key open the row's ⋯ (not a tab stop)
+        if (e.key === "F10" && !e.shiftKey) break
+        e.preventDefault()
+        if (file.id) requestAttachmentMenu(file.id)
+        break
       default:
         break
     }
@@ -316,23 +323,7 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
                    NO per-second timer (Anti-Pattern). Handed to the shared row as
                    its trailing slot, which renders BEFORE the size cell — the same
                    DOM order this markup shipped in. */
-                isTemplate ? (
-                  <span className="flex flex-shrink-0 items-center gap-1.5">
-                    <span className="rounded bg-accent px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-accent-foreground">
-                      Template
-                    </span>
-                    <span
-                      className={cn(
-                        "font-mono text-[10px]",
-                        isNearExpiry(file.expires_at)
-                          ? "text-amber-500"                       // needs-attention color (D-02)
-                          : "text-panel-muted-foreground",
-                      )}
-                    >
-                      {expiryCaption(file.expires_at)}
-                    </span>
-                  </span>
-                ) : undefined
+                isTemplate ? <AttachmentRowTrailing threadId={threadId} file={file} /> : undefined
               }
             >
               <div
