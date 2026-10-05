@@ -40,6 +40,11 @@ filename, so ``importlib.util.spec_from_file_location``) — never re-typed.
                  delete and 0 after (asserted on the table, never on ``remove()``'s return); the
                  Library copy still exists in X and downloads byte-identical via its signed URL.
 
+  --axes     The 4-axis rows' API half on ONE derived row (default anthropic; ``--providers``):
+             multi-tool (a PDF read by ``execute_code`` + ``search_documents`` in one prompt), long-message
+             (a >= 5 KB prompt about an attachment), parallel-thread (thread A streams a long answer while
+             thread B attaches and asks; each answer must land in its own thread).
+
   --fixtures DIR
              Write the Chrome-drive fixtures (fresh planted tokens, distinct bytes from the probe):
              a small PDF with a planted sentence (G-4 #1/#2), a > 256 KB PDF (G-4 #4), and a
@@ -110,14 +115,12 @@ def make_pdf(lines: list[str], *, min_bytes: int = 0, seed: str = "") -> bytes:
         c.showPage()
 
     page(lines)
-    n = 0
     filler = ("Section {p}.{i}: shipping schedules, carrier allocations and lane capacity notes for the "
               "quarter; figures are indicative and subject to the master agreement. ref {seed}-{p}-{i}")
-    while min_bytes and len(buf.getvalue()) < min_bytes:
-        n += 1
+    # reportlab buffers until save(), so the size is only knowable afterwards: size the page count
+    # from a measured ~9.5 KB per filler page and assert the floor below.
+    for n in range(1, (min_bytes // 9000) + 2 if min_bytes else 1):
         page([filler.format(p=n, i=i, seed=seed) for i in range(60)])
-        if n > 400:
-            break
     c.save()
     data = buf.getvalue()
     if min_bytes and len(data) < min_bytes:
@@ -455,6 +458,102 @@ def promote_probe(token: str, org_id: str, user_id: str, conn, args) -> int:
     return 0
 
 
+# ── --axes ──────────────────────────────────────────────────────────────────────────────────────
+
+def _entry(conn, provider: str) -> dict:
+    roster, _ = b273.derive_roster(conn)
+    e = next((r for r in roster if r["provider"] == provider and not r.get("derive_blocked")), None)
+    if not e:
+        raise SystemExit(f"no derived row for {provider}")
+    return e
+
+
+def _send_wait(conn, base, h, thread_id, content, entry, timeout) -> dict:
+    run_id, err = b273._send(base, h, thread_id, content, entry["model"], entry["provider"])
+    if not run_id:
+        return {"error": err}
+    status = b273._wait_run(conn, run_id, timeout)
+    run = kit._fetchone(conn, "SELECT status, started_at, completed_at FROM runs WHERE run_id = %s", (run_id,))
+    msgs = b273._run_messages(conn, thread_id, run["started_at"], None)
+    calls = [tc for m in msgs for tc in (m["tool_calls"] or [])]
+    return {"run_id": run_id, "run_status": status, "started_at": str(run["started_at"]),
+            "completed_at": str(run["completed_at"]), "tool_call_names": [tc.get("name") for tc in calls],
+            "text": "\n".join((m["content"] or "") for m in msgs)}
+
+
+def axes(token: str, org_id: str, user_id: str, conn, args) -> int:
+    """The 4-axis rows' API half (multi-tool · parallel-thread · long-message); cross-provider = the board."""
+    import threading  # noqa: PLC0415
+
+    base = kit.base_url()
+    h = b273._headers(token, org_id)
+    entry = _entry(conn, (args.providers or "anthropic").split(",")[0])
+    out = _EVIDENCE / "axes"
+    out.mkdir(parents=True, exist_ok=True)
+    res: dict = {"provider": entry["provider"], "model": entry["model"]}
+
+    # multi-tool: a PDF read in the sandbox + a Library search in ONE prompt
+    tok = _token("multitool")
+    pdf = make_pdf(["Meridian supplier brief (274 multi-tool axis).", "", FACT_LINE.format(token=tok)], seed=tok)
+    tm = _new_thread(base, h, "274 axis multi-tool")
+    code, _ = _upload(base, h, tm, "meridian-brief.pdf", pdf, "application/pdf")
+    prompt = ("Two things, please. First, use execute_code to open the PDF I attached and tell me the Meridian "
+              "freight-cap clearance code written in it. Second, use search_documents to search my Library for "
+              "anything about onboarding or laptop setup, and summarise what you find in one sentence.")
+    t = _send_wait(conn, base, h, tm, prompt, entry, args.timeout)
+    names = t.get("tool_call_names") or []
+    res["multi_tool"] = {"thread": tm, "upload_http": code, "run_status": t.get("run_status"), "tools": names,
+                         "token": tok, "token_in_answer": tok in t.get("text", ""),
+                         "used_execute_code": "execute_code" in names, "used_search_documents": "search_documents" in names,
+                         "answer_head": t.get("text", "")[:600]}
+    print(f"AXIS multi-tool {json.dumps(res['multi_tool'], default=str)[:700]}")
+
+    # long-message: a >= 5 KB prompt about an attachment
+    tok = _token("long")
+    tl = _new_thread(base, h, "274 axis long-message")
+    code, _ = _upload(base, h, tl, "meridian-note.md", f"# Meridian note\n\n{FACT_LINE.format(token=tok)}\n".encode(), "text/markdown")
+    para = ("Background for context: our freight team is reconciling carrier allocations across four regions, and "
+            "each lane has its own clearance arrangement negotiated with the port authority; codes rotate each "
+            "quarter and are distributed only through the supplier note, never by email. ")
+    long_prompt = (para * 24) + "\n\nGiven all of that, " + QUESTION
+    t = _send_wait(conn, base, h, tl, long_prompt, entry, args.timeout)
+    res["long_message"] = {"thread": tl, "prompt_bytes": len(long_prompt.encode("utf-8")), "upload_http": code,
+                           "run_status": t.get("run_status"), "tools": t.get("tool_call_names"), "token": tok,
+                           "token_in_answer": tok in t.get("text", ""), "answer_head": t.get("text", "")[:400]}
+    print(f"AXIS long-message {json.dumps(res['long_message'], default=str)[:600]}")
+
+    # parallel-thread: A streams a long answer while B attaches and asks
+    tok = _token("parallel")
+    ta, tb = _new_thread(base, h, "274 axis parallel A (long answer)"), _new_thread(base, h, "274 axis parallel B (attach)")
+    holder: dict = {}
+
+    def run_a():
+        holder["a"] = _send_wait(conn_a, base, h, ta, "Write a detailed, roughly 900-word essay on supply-chain "
+                                 "resilience for a mid-sized importer. Do not use any tools.", entry, args.timeout)
+
+    conn_a = kit.connect_db()
+    conn_a.autocommit = True
+    th = threading.Thread(target=run_a)
+    th.start()
+    time.sleep(6)
+    a_status_at_b = (kit._fetchone(conn, "SELECT status FROM runs WHERE thread_id = %s ORDER BY started_at DESC LIMIT 1",
+                                   (ta,)) or {}).get("status")
+    code, _ = _upload(base, h, tb, "meridian-note.md", f"# Meridian note\n\n{FACT_LINE.format(token=tok)}\n".encode(), "text/markdown")
+    b = _send_wait(conn, base, h, tb, QUESTION, entry, args.timeout)
+    th.join()
+    a = holder.get("a", {})
+    res["parallel_thread"] = {"thread_a": ta, "thread_b": tb, "a_status_when_b_attached": a_status_at_b,
+                              "a_run": {k: a.get(k) for k in ("run_id", "run_status", "started_at", "completed_at")},
+                              "b_run": {k: b.get(k) for k in ("run_id", "run_status", "started_at", "completed_at")},
+                              "overlap": bool(a.get("completed_at") and b.get("started_at") and b["started_at"] < a["completed_at"]),
+                              "token": tok, "b_answer_has_token": tok in b.get("text", ""),
+                              "a_answer_has_token": tok in a.get("text", ""), "a_answer_chars": len(a.get("text", "")),
+                              "b_answer_head": b.get("text", "")[:300]}
+    print(f"AXIS parallel-thread {json.dumps(res['parallel_thread'], default=str)[:800]}")
+    (out / f"axes-{entry['provider']}.json").write_text(json.dumps(res, indent=2, default=str), encoding="utf-8")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     g = ap.add_mutually_exclusive_group(required=True)
@@ -462,6 +561,7 @@ def main() -> int:
     g.add_argument("--run", action="store_true")
     g.add_argument("--promote-probe", action="store_true")
     g.add_argument("--fixtures", metavar="DIR")
+    g.add_argument("--axes", action="store_true")
     ap.add_argument("--providers", default="")
     ap.add_argument("--timeout", type=int, default=420)
     ap.add_argument("--out", default="board", help="evidence subdirectory (default 'board')")
@@ -482,6 +582,8 @@ def main() -> int:
     print(f"dev user {user_id} · single org {org_id} (asserted from org_members)")
     if args.promote_probe:
         return promote_probe(token, org_id, user_id, conn, args)
+    if args.axes:
+        return axes(token, org_id, user_id, conn, args)
     return run_board(token, org_id, user_id, conn, args)
 
 
