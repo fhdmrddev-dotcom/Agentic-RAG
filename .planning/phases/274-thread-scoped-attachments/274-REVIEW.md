@@ -57,6 +57,9 @@ findings:
   info: 6
   total: 15
 status: issues_found
+fix_pass: 2026-10-05
+fixed: [CR-01, CR-02, WR-01, WR-03, WR-04, WR-05, WR-07]
+deferred_by_orchestrator: [WR-02, WR-06, IN-01, IN-02, IN-03, IN-04, IN-05, IN-06]
 ---
 
 # Phase 274: Code Review Report
@@ -228,6 +231,112 @@ This is reachable whenever the client offers the verb on a linked file. `offerVe
 **File:** `backend/app/api/threads.py:1444-1452`, `backend/app/services/thread_workspace_cleanup.py:53-60`
 **Issue:** `write_file` upserts the row, then uploads to the bucket, then sets `content_storage_path`. An upload or agent write that lands after the collect, or an upload whose bucket PUT finishes after the cascade, leaves an object that no row names. The module already states that best-effort applies. Recorded so the residual is known rather than discovered.
 **Fix:** Optional. Add a periodic sweep of `workspace-files/<uid>/<thread>/` prefixes whose thread no longer exists, run as the owning user.
+
+## Fix log
+
+Fix pass 2026-10-05 (Claude, gsd-code-fixer, base `237c3f87a`). Every fix was TDD: the test was
+committed RED (run, and seen to fail for the stated reason) before the fix that turned it green.
+Scope was set by the orchestrator: WR-02, WR-06 and IN-01..IN-06 are deferred by it with re-open
+triggers and were not touched here.
+
+| Finding | Outcome | RED test | Fix |
+|---|---|---|---|
+| CR-01 | **fixed** (D-29 recorded in `274-CONTEXT.md`, amends D-12) | `b8c8dfeb2` | `d37ba9a14` |
+| CR-02 | **fixed** (promote boundary only; `ingest_splice.py` byte-unchanged) | `43c3e1d83` | `b3c3e3c6a` |
+| WR-03 | **fixed**, server + dialog | `43c3e1d83` · `404760095` | `b3c3e3c6a` · `c3078e4e6` |
+| WR-07 | **fixed** | `404760095` | `c3078e4e6` |
+| WR-04 | **fixed** | `1b8ae3510` | `e0d9e625d` |
+| WR-05 | **fixed** | `1b8ae3510` | `e0d9e625d` |
+| WR-01 | **driven real, then fixed** (requires human verification: see below) | `a3160b49f` | `025c4dda9` |
+| WR-02, WR-06, IN-01..IN-06 | left (orchestrator deferral) | — | — |
+
+Supporting commits: `dab49ee5a` (OpenAPI snapshot regenerated for the changed route docstrings;
+`build-public-openapi --check` OK), `f76bc1efa` (hot-file ledger row for
+`template_asset_service.py`, which was absent from both registers and FIRES at 3 phases with 274).
+
+**CR-01.** `POST .../promote` and `GET .../promote-preview` now read `folders.id, org_id` through the
+person's own user-JWT client, after the attachment's 404 collapse and before any byte is read. A
+visible folder whose org differs from the active org is refused with 403 `Cannot upload to a folder
+in another organization`. A folder RLS does not return is still the minter's own 404, and ownership is
+still the minter's 403. **The frontend was left alone on purpose:** `GET /folders` returns
+`FolderResponse`, which has no `org_id`, so the dialog cannot filter by org. The server refusal is the
+guard, and it renders under the folder lead (WR-07). The static fence that forbade any
+`table("folders")` was amended deliberately: exactly one folders reference, `.select("id, org_id")`.
+
+**CR-02.** A new `find_existing_copy` asks the minter's own completed dedup first, then any
+non-failed, `is_latest` copy of the same hash in the active org. The confirm (`mint_or_link`) and the
+preview both call it, so they cannot disagree about it. A hit is linked as `already` and nothing is
+minted, so the pending first copy is never retired. The attachment's own mark is re-read immediately
+before minting, and an `already` stamp carries `or=(library_document_id.is.null,
+library_document_id.neq.<doc>)`, so a racing chip + panel promote can no longer turn the first
+request's `saved` into `already`. The parity harness now runs the route's `mint_or_link`. It gained a
+"first copy still pending" case for the same folder and for another folder. **Residual, out of
+scope:** two requests that both pass every read before either inserts can still both mint into
+DIFFERENT folders, because `documents_dedup_idx` is per folder. The minter-level race for
+`/documents/upload` is logged separately by the orchestrator.
+
+**WR-03.** The server's `_existing_link` answers `already` whenever the linked copy is outside the
+picked folder. The dialog shows the already screen for any answer whose `folder_id` differs from the
+pick, whatever its `outcome` word says.
+
+**WR-07.** The dialog keeps `{status, message}` and picks the lead by cause:
+- 403, or the minter's 404 `Folder not found`: `refuseLead`.
+- 422, or a preview that says `promotable: false`: `netNew.typeRefused`.
+- Anything else, including 404 `File not found`: `netNew.saveFailed`.
+
+The server sentence stays verbatim underneath. No new string was needed for the leads.
+
+**WR-04 / WR-05.** On the panel row, `AttachmentActionsMenu` stays mounted in both states. It owns the
+ONE dialog, which is still built once and mounted twice, so a poll that turns the row linked no longer
+unmounts the already screen. `LibraryLinkSegment` takes `tabIndex`, and the panel passes `-1`. Once
+linked, the panel menu offers net-new `Open in Library`, the keyboard's way to the document via the
+row's Shift+F10. Enter on the row still opens the preview (`FilesSection.test.tsx` covers this,
+unchanged). ⚠ **Visible change:** a linked panel row now shows the segment AND the `⋯`. The sketch's
+panel row read "action or after-mark". The chip already showed both. `AttachmentRowTrailing.test.tsx`'s
+"linked → no ⋯" assertion was amended deliberately, with the reason in the test.
+
+**WR-01: driven before fixing.** `render_template` is workflow-fill-only: `get_tools` has none, and
+it is added only by a fill phase's whitelist. So the claim that reaches Branch 2 is a workflow run id,
+and the review's "Deep claim" arm is effectively unreachable through the tool. The workflow arm is
+real. In a rollback-only transaction on the local DB, a `template_input` PDF with `expires_at NULL`
+behaved as follows:
+1. The Branch-2 SELECT bound to workflow run W1 returned the PDF.
+2. W1's conditional stamp claimed it.
+3. W2 no longer saw it.
+4. The claim persisted with no expiry to ever clear it.
+
+Fix: one gate line on all three Branch-2 reads, `(expires_at IS NOT NULL OR $3::text IS NULL OR
+$3::text = 'deep')`. Re-driven through the REAL resolver (rollback-only):
+- W1 now gets `No template uploaded…` and claims nothing.
+- `'deep'` and `own_claim=None` still resolve the row.
+
+⚠ **Requires human verification.** A `.docx` attached through the COMPOSER can no longer serve as a
+workflow fill's template. The panel's `TemplateUpload` (D-21) and library assets remain the template
+doors, which is D-06's intent. Re-open trigger: an operator reports a composer-attached template that
+a workflow fill no longer finds.
+
+**Gate readings at the fix pass's head (verbatim):**
+- vitest count gate (`GSD_VITEST_MAX_WORKERS=2`, run once): `total 9983 · failed 1 · pinned total
+  9196`, `COUNT GATE VIOLATED (1 reason)`. The total is `+7` over the base's 9976, which is exactly
+  this pass's seven new cases (5 dialog, 2 row). The one failure was read from the gate's own JSON
+  before anything was re-run: `WorkflowBuilderPage.canvas.test.tsx` › *clicking Canvas flips
+  aria-selected…*, a `STACK_TRACE_ERROR`. It is one of SEED-171's named cap-independent flaky suites,
+  and it is provably unmodified: `git diff --numstat 237c3f87a HEAD -- frontend/` names only
+  `components/attachments/*`. Run alone afterwards it read `154 passed`. That is an observation, not
+  proof of innocence.
+- backend `pytest tests/unit -q --continue-on-collection-errors`, under the shared local-DB lock:
+  - First run at HEAD: `72 failed, 6931 passed`.
+  - Triage: the extra case was `test_email_ingestion.py::test_ingest_email_populates_metadata_and_attachments`
+    (a `Subject:` title-prefix assertion). It passes alone, and it passes alongside all three 274 test
+    files. That makes it order-dependent.
+  - A full run at the base state read `72 failed`. That count includes one artifact of the partial
+    restore (`test_276_openapi_snapshot_fresh`, because the snapshot stayed at HEAD), so the true base
+    is 71.
+  - Second run at HEAD: **`71 failed, 6932 passed, 1 skipped, 2 xfailed, 2 xpassed`**, with a failed
+    set ⊆ the base set (0 new).
+- `npx tsc -p tsconfig.app.json --noEmit`: 66 errors (base 66), none in `attachments/`.
+- `build-public-openapi --check` OK; hot-file ledger gate OK (469 rows); CLAUDE.md size gate OK
+  (119,578 chars).
 
 ---
 

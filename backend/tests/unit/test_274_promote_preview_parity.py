@@ -144,23 +144,29 @@ def _doc(*, id: str, folder_id: str, raw: bytes, version: int = 1, filename: str
 
 
 async def _preview_then_mint(db: dict, *, raw: bytes, folder_id: str = FOLDER_A):
-    from app.api.workspace_promote import preview_promotion
+    """Preview, then what the CONFIRM does over the same state.
+
+    ⚠ AMENDED (274 review CR-02): the confirm is `mint_or_link` — the route's own step, which asks
+    `find_existing_copy` and only then runs the REAL `ingest_splice.mint_document_row` (via its
+    async wrapper, with the route's exact parameters). It was the minter called directly; that
+    stopped being what the route does once the route links a copy still indexing.
+    """
+    from app.api.workspace_promote import mint_or_link, preview_promotion
 
     sb = _FakeSupabase(db)
     preview = await preview_promotion(
         sb, raw=raw, filename=NAME, user_id=USER, org_id=ORG, folder_id=folder_id,
     )
-    mint = ingest_splice.mint_document_row(
+    mint = await mint_or_link(
+        sb,
         raw=raw,
         filename=NAME,
         mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         user_id=USER,
-        supabase=sb,
-        folder_id=folder_id,
         org_id=ORG,
-        on_conflict="link",
-        version_scope="folder",
+        folder_id=folder_id,
     )
+    assert isinstance(mint, ingest_splice.MintResult)
     return preview, mint
 
 
@@ -227,4 +233,27 @@ async def test_parity_same_bytes_other_folder_is_already_in_the_library_there():
     assert mint.is_duplicate is True
     assert mint.document["id"] == "doc-existing"
     assert len(db["documents"]) == before, "a duplicate mints nothing"
+    _assert_parity(preview, mint)
+
+
+# ── 274 review CR-02 · the first copy is still INDEXING ───────────────────────────────────
+@pytest.mark.asyncio
+@pytest.mark.parametrize("folder_of_first", [FOLDER_A, FOLDER_B], ids=["same-folder", "other-folder"])
+async def test_parity_same_bytes_first_copy_still_pending_is_linked_and_keeps_is_latest(folder_of_first):
+    """PLANT to drive RED: keep the dedup `completed`-only. The preview then promises "version 2"
+    for byte-identical bytes, and the confirm RETIRES the pending first copy (`is_latest=False`) —
+    the only copy leaves the Library list and search while both chips read "In Library"."""
+    raw = b"bytes still being indexed"
+    first = _doc(id="doc-pending", folder_id=folder_of_first, raw=raw)
+    first["status"] = "pending"
+    db = _db(first)
+    preview, mint = await _preview_then_mint(db, raw=raw, folder_id=FOLDER_A)
+
+    assert preview.duplicate_of is not None, "a same-bytes copy still indexing is already in the Library"
+    assert preview.duplicate_of.document_id == "doc-pending"
+    assert preview.duplicate_of.folder_id == folder_of_first
+    assert mint.is_duplicate is True
+    assert mint.document["id"] == "doc-pending"
+    assert len(db["documents"]) == 1, "nothing is minted"
+    assert db["documents"][0]["is_latest"] is True, "the first copy is never retired"
     _assert_parity(preview, mint)

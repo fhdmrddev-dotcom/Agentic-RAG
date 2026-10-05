@@ -12,6 +12,10 @@
  *     one-line reason before any dialog opens, never a failure after confirm.
  *   · Once the file is linked the verb is not offered: the segment is the after-state.
  *   · Both homes open the ONE `SaveToLibraryDialog`; its `onSaved` refreshes the thread's marks.
+ *   · ⚠ 274 review WR-04/WR-05: on the panel row this menu stays MOUNTED once the file is linked
+ *     (it owns the dialog, and a poll that swapped it out unmounted D-13's already screen), and it
+ *     then offers `Open in Library` — the keyboard's way to the document, since the segment is not
+ *     a tab stop inside `role=option`.
  *
  * ⚠ THE WRAPPER STOPS CLICK AND KEY EVENTS FROM BUBBLING, and that is load-bearing. React events
  * bubble through portals along the REACT tree, so a keystroke in the dialog's folder search (or a
@@ -23,7 +27,7 @@
  * tab stop (see `AttachmentRowTrailing`). The bus is the `panelOpenSignal` shape.
  */
 import { useEffect, useId, useRef, useState } from "react"
-import { FolderPlus, MoreHorizontal, PanelRight } from "lucide-react"
+import { BookOpen, FolderPlus, MoreHorizontal, PanelRight } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { requestOpenPanel } from "@/components/panel/panelOpenSignal"
+import { useCitationNavOptional } from "@/lib/citationNav"
 import { cn } from "@/lib/utils"
 import type { WorkspaceFile } from "@/types"
 import { SaveToLibraryDialog } from "./SaveToLibraryDialog"
@@ -60,6 +65,7 @@ function stop(e: React.SyntheticEvent) {
 export function AttachmentActionsMenu({ threadId, file, variant, triggerTabIndex }: AttachmentActionsMenuProps) {
   const { stateFor } = useLibraryLinks(threadId)
   const state = stateFor(file.id)
+  const nav = useCitationNavOptional()
   const [open, setOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -81,6 +87,7 @@ export function AttachmentActionsMenu({ threadId, file, variant, triggerTabIndex
   if (!file.id) return null
 
   const offerVerb = state.link === null
+  const linkedDoc = variant === "panel" && nav ? state.link?.document_id ?? null : null
 
   return (
     <span role="presentation" className="inline-flex flex-none items-center" onClick={stop} onKeyDown={stop}>
@@ -143,6 +150,12 @@ export function AttachmentActionsMenu({ threadId, file, variant, triggerTabIndex
                 </p>
               )}
             </>
+          )}
+          {linkedDoc && (
+            <DropdownMenuItem onSelect={() => nav?.openDocument(linkedDoc)} className="gap-2 text-xs">
+              <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+              {COPY.netNew.openInLibrary}
+            </DropdownMenuItem>
           )}
           {variant === "chip" && (
             <DropdownMenuItem onSelect={() => requestOpenPanel()} className="gap-2 text-xs text-muted-foreground">

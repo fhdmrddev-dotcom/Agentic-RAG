@@ -18,6 +18,12 @@
  *   on open) and nothing else of it: not its top-level "no folder" item, not its move call.
  * ⛔ A REFUSAL IS THE SERVER'S SENTENCE, VERBATIM, under a plain lead line (D-12). The client never
  *   pre-filters folders by a rule of its own; the minter's 403 is the authority.
+ *   ⚠ 274 review WR-07: the lead names the CAUSE, read from `PromoteError.status` — folder rights
+ *   (403, or the minter's 404 `Folder not found`) → `refuseLead`; the file type (422, or a preview
+ *   that says `promotable: false`) → `typeRefused`; anything else → `saveFailed`. One lead for all
+ *   three sent a person looking for a folder permission when the type was the problem.
+ * ⚠ 274 review WR-03: an answer whose copy is NOT in the picked folder is the already screen
+ *   whatever its `outcome` says — D-13's difference is stated, never hidden.
  * ⛔ Every word comes from `COPY` (the port of the sketch). No string literal is rendered here.
  */
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -59,12 +65,24 @@ export interface SaveToLibraryDialogProps {
 
 type Stage = { kind: "pick" } | { kind: "already"; result: PromoteResult }
 
+/** A refusal the POST answered: its HTTP status (null when nothing answered) and the server's sentence. */
+type Refusal = { status: number | null; message: string }
+
+/** WR-07 — the lead line for a refusal, by cause. */
+function leadFor(r: Refusal): string {
+  if (r.status === 403 || (r.status === 404 && r.message === COPY.engine.REFUSE_NO_FOLDER)) {
+    return COPY.shared.refuseLead
+  }
+  if (r.status === 422) return COPY.netNew.typeRefused
+  return COPY.netNew.saveFailed
+}
+
 export function SaveToLibraryDialog({ open, onClose, threadId, file, onSaved }: SaveToLibraryDialogProps) {
   const [folders, setFolders] = useState<Folder[]>([])
   const [foldersFailed, setFoldersFailed] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
   const [preview, setPreview] = useState<PromotePreview | null>(null)
-  const [refusal, setRefusal] = useState<string | null>(null)
+  const [refusal, setRefusal] = useState<Refusal | null>(null)
   const [saving, setSaving] = useState(false)
   const [stage, setStage] = useState<Stage>({ kind: "pick" })
   const reqRef = useRef(0)
@@ -122,14 +140,16 @@ export function SaveToLibraryDialog({ open, onClose, threadId, file, onSaved }: 
     setRefusal(null)
     try {
       const result = await promoteAttachment(threadId, file.id, picked)
-      if (result.outcome === "already") {
+      // WR-03: a copy that is not in the folder just picked is the already screen, whatever the
+      // outcome word says (an attachment linked earlier, elsewhere).
+      if (result.outcome === "already" || result.folder_id !== picked) {
         setStage({ kind: "already", result })
       } else {
         onSaved(result)
         onClose()
       }
     } catch (e) {
-      setRefusal(e instanceof PromoteError ? e.message : COPY.netNew.saveFailed)
+      setRefusal(e instanceof PromoteError ? { status: e.status, message: e.message } : { status: null, message: "" })
     } finally {
       setSaving(false)
     }
@@ -194,7 +214,9 @@ export function SaveToLibraryDialog({ open, onClose, threadId, file, onSaved }: 
 
   const pickedPath = pathOf(picked)
   const previewRefusal = preview && !preview.promotable ? preview.refusal : null
-  const shownRefusal = refusal ?? previewRefusal
+  // A preview refusal is always the type (D-22): the folder is the POST's answer, never the preview's.
+  const shownRefusal: Refusal | null =
+    refusal ?? (previewRefusal !== null ? { status: 422, message: previewRefusal } : null)
   const showVersionWarn =
     !shownRefusal &&
     preview !== null &&
@@ -243,8 +265,12 @@ export function SaveToLibraryDialog({ open, onClose, threadId, file, onSaved }: 
             >
               <AlertTriangle size={15} aria-hidden="true" className="mt-px shrink-0 text-destructive" />
               <span>
-                <b className="block">{COPY.shared.refuseLead}</b>
-                <code className="mt-0.5 block font-mono text-[0.68rem] text-muted-foreground">{shownRefusal}</code>
+                <b className="block">{leadFor(shownRefusal)}</b>
+                {shownRefusal.message && (
+                  <code className="mt-0.5 block font-mono text-[0.68rem] text-muted-foreground">
+                    {shownRefusal.message}
+                  </code>
+                )}
               </span>
             </div>
           ) : showVersionWarn ? (

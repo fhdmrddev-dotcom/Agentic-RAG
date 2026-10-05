@@ -11182,6 +11182,7 @@ cells rot within days.
 | [`frontend/src/components/attachments/useLibraryLinks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsuselibrarylinksts) | 1 / 1 / 192 (was `0 / 0 / 0`) | no (young) | 274-04. Per-thread store: one library-links fetch per tick for every chip + row; polls only while indexing. ⛔ a FETCH, never Realtime (D-v2.5-03) |
 | [`frontend/src/lib/api/attachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiattachmentsts) | 1 / 1 / 129 (was `0 / 0 / 0`) | no (young) | 274-03. promote / preview / library-links clients + wire types. ⛔ getAuthHeaders (X-Org-Id); server sentence verbatim; field names fenced vs backend in 274-05 |
 | [`frontend/src/lib/attachmentLifetime.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibattachmentlifetimets) | 1 / 1 / 35 (was `0 / 0 / 0`) | no (young) | 274-03. ONE rule: thread-life (null expiry) + prefix-stripped display name. ⛔ its ^[0-9a-f]{8}- regex is lockstep with the backend's (fenced in 274-05) |
+| [`backend/app/services/template_asset_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestemplate_asset_servicepy) | 4 / 3 / 344 | ⚠ **FIRES** (3 phases) | ⚠ absent its ENTIRE LIFE — row added 274-REVIEW WR-01 (101 · 141 · 274). ONE gate line on 3 reads: a workflow claim never resolves a thread-life chat row |
 
 
 
@@ -18755,3 +18756,31 @@ Every triple below was re-derived with the CLAUDE.md recipe after the phase's la
 ### `frontend/src/components/attachments/folderDisplay.ts`
 
 **`1 / 1 / 48`** at 274 close. G-5: no (young). ⚠ absent at creation (274-04 pre-task; in no plan's files_modified) — row added 274-05. The ONE ` › ` path DISPLAY formatter. ⛔ `folderPathOf` stays /-joined
+
+
+## `backend/app/services/template_asset_service.py` — row added 2026-10-05 (274 review WR-01)
+
+**Re-derived with the recipe at the fix commit (`025c4dda9`), not copied forward:**
+
+```
+git log --oneline -- backend/app/services/template_asset_service.py | wc -l   → 4
+phase buckets                                                                 → 101 · 141 · 274 = 3 phases
+wc -l backend/app/services/template_asset_service.py                          → 344
+```
+
+⚠ **Absent from BOTH registers its entire life, and it FIRES at exactly 3 phases** — 274 is the touch
+that crossed the threshold. No plan of 274 named it in `files_modified`, so the ledger gate could not
+ask; the review fix pass found it by reading the file before editing it.
+
+**274-REVIEW WR-01 (honoured by construction).** Branch 2 of `resolve_template_source` admitted
+`expires_at IS NULL`, so once D-06 made composer attachments thread-life a WORKFLOW fill took the
+newest chat file of any type as its template and claimed it for good. Driven rollback-only on the
+local DB before the fix (W1 resolved a chat PDF, stamped `run_claim = W1`, W2 lost it with no expiry
+to clear it). The fix is ONE gate line, repeated on the three Branch-2 reads (main, foreign probe,
+expired probe): `(expires_at IS NOT NULL OR $3::text IS NULL OR $3::text = 'deep')`. Zero new
+branches; Branch 1 (library assets) untouched.
+
+⛔ **Invariants.** The gate is keyed on the resolving CLAIM, never on the file type: `'deep'` and
+`own_claim=None` admit thread-life rows exactly as before (pinned by
+`test_274_template_resolver_thread_life.py`). The three reads must keep the SAME gate — a probe
+without it reports a live chat file as "expired" or "belongs to a different run".

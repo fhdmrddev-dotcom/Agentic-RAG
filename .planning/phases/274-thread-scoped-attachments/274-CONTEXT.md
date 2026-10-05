@@ -187,6 +187,20 @@ phase does NOT rebuild it. It does four things:
   documents ON DELETE SET NULL`, `library_link text CHECK in ('saved','already')`), with no paired
   CHECK that would block document delete. Applied via SQL editor / local psql, never `supabase db push`.
 
+### Resolved at code review (Claude, 2026-10-05, 274-REVIEW fix pass)
+- **D-29 (amends D-12):** **The promote route DOES read the target folder — once, for its org.** D-12
+  said the minter's folder check is the authority and the route never reads `folders`. Review CR-01
+  measured that check as `user_id`-only: a folder the person owns in org A accepted a document stamped
+  with active org B, and an org-shared org-A folder then showed it to every member of org B. So both
+  `POST .../promote` and `GET .../promote-preview` read `folders.id, org_id` through the person's own
+  user-JWT client and refuse a visible folder whose org differs from `get_active_org_id` with **403
+  `Cannot upload to a folder in another organization`** (the minter's sentence shape), before any
+  byte is hashed or minted. A folder RLS does not return is still the minter's `404 Folder not found`,
+  and ownership is still the minter's 403: D-12 stands for everything except the org. The `/folders`
+  payload carries no `org_id`, so the dialog's list is NOT pre-filtered; the server refusal is the
+  guard. Re-open trigger: `FolderResponse` gains `org_id`, or `mint_document_row` learns the org check
+  itself (then this read is redundant and can go).
+
 ### Claude's Discretion
 - **The mechanism that separates chat attachments from workflow template inputs** (D-06): a new `kind`,
   a route parameter, or `expires_at = NULL`. Pick the one that keeps the agent allow-list and the chip

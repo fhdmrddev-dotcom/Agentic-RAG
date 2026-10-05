@@ -19,10 +19,15 @@ and the service role appears only inside the shared `_enqueue_or_splice`, after 
 **The rules the minter already decides, and this door does not re-decide:**
 - *Rights* — whoever can upload into the folder through the Library can promote into it. The
   minter's `404 Folder not found` / `403 Cannot upload to a folder you do not own` reach the caller
-  verbatim. This module never reads `folders` (D-12).
+  verbatim. ~~This module never reads `folders` (D-12).~~ ⚠ **AMENDED by D-29 (274 review CR-01):**
+  the minter's folder check compares `user_id` only, and this door stamps the ACTIVE org on the
+  document. So the module reads the folder ONCE, for its `org_id`, through the person's own
+  user-JWT client, and refuses a folder in another org with its own 403 (`REFUSE_OTHER_ORG`)
+  before anything is hashed or minted. Ownership stays the minter's answer.
 - *Duplicates* (D-13) — the same bytes already completed in this person's Library (in this org) are
   LINKED, not copied: 200 `already`, naming the EXISTING copy's folder even when it differs from the
-  one picked.
+  one picked. ⚠ 274 review CR-02: so are bytes whose copy is still INDEXING (`find_existing_copy`,
+  asked by this door before the minter) — the minter's completed-only dedup used to retire it.
 - *Versions* (D-14) — a same-named file in the CHOSEN folder becomes the next version. The minter is
   called with `version_scope="folder"`, so a same-named file in another folder is never retired.
 
@@ -92,6 +97,11 @@ router = APIRouter(
 #: The only `kind` a person can save (D-09). `agent` rows are the agent's own deliverables.
 _ATTACHMENT_KIND = "template_input"
 
+#: D-29 — this door's own folder refusal, in the minter's sentence shape. A folder the person
+#: owns in ANOTHER org would otherwise pass the minter's owner-only check and receive a document
+#: stamped with the active org (and an org-shared one would show it to the wrong org).
+REFUSE_OTHER_ORG = "Cannot upload to a folder in another organization"
+
 #: The prefix `workspace.py` stamps on a stored upload: `/{uuid4().hex[:8]}-{safe_name}`.
 #: ⛔ Lowercase only, exactly eight — the stamp is `uuid4().hex`, which never emits uppercase, so an
 #: uppercase run is a person's own name. Mirrored lockstep in `frontend/src/lib/attachmentLifetime.ts`.
@@ -137,6 +147,84 @@ def promotability(filename: str, row_mime: str | None) -> tuple[bool, str | None
     )
 
 
+async def find_existing_copy(
+    supabase: Client, *, content_hash: str, user_id: str, org_id: str
+) -> dict | None:
+    """The person's copy of these bytes already in the active org's Library, or None (D-13).
+
+    Two questions, in order:
+      1. the minter's own dedup — `status='completed'` (the completed-hash index's predicate);
+      2. ⚠ 274 review CR-02 — any NON-FAILED copy that is still the latest version
+         (`pending | processing | paused`). The minter's dedup misses it, so its folder-scoped
+         version step RETIRED that first copy, hit `documents_dedup_idx`'s 23505, and the `link`
+         arm returned the retired row as success: the only copy left the Library and search.
+         Asking here, before the minter runs, links it instead. `ingest_splice.py` (FIRING) stays
+         byte-unchanged; its own race for `/documents/upload` is logged separately.
+    Shared by the preview and the confirm, so the two can never disagree about it.
+    """
+    completed = await aexec(
+        supabase.table("documents")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("content_hash", content_hash)
+        .eq("status", "completed")
+        .eq("org_id", org_id)
+        .limit(1)
+    )
+    if completed.data:
+        return completed.data[0]
+    live = await aexec(
+        supabase.table("documents")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("content_hash", content_hash)
+        .neq("status", "failed")
+        .eq("is_latest", True)
+        .eq("org_id", org_id)
+        .order("created_at", desc=True)
+        .limit(1)
+    )
+    return live.data[0] if live.data else None
+
+
+async def mint_or_link(
+    supabase: Client,
+    *,
+    raw: bytes,
+    filename: str,
+    mime_type: str,
+    user_id: str,
+    org_id: str,
+    folder_id: str,
+) -> ingest_splice.MintResult:
+    """What confirming does: link an existing copy (CR-02), or mint through the shipped minter.
+
+    The parameters that matter stay here, once: `version_scope="folder"`, the active org, and
+    `on_conflict="link"` (a double-click race collapses into a duplicate, T-274-16).
+    """
+    existing = await find_existing_copy(
+        supabase, content_hash=hashlib.sha256(raw).hexdigest(), user_id=user_id, org_id=org_id,
+    )
+    if existing is not None:
+        return ingest_splice.MintResult(
+            document=existing,
+            is_duplicate=True,
+            storage_path=existing.get("file_path", ""),
+            version_number=existing.get("version_number", 1),
+        )
+    return await ingest_splice.async_mint_document_row(
+        raw=raw,
+        filename=filename,
+        mime_type=mime_type,
+        user_id=user_id,
+        supabase=supabase,
+        folder_id=folder_id,
+        org_id=org_id,
+        on_conflict="link",
+        version_scope="folder",  # T-274-12: never retire a same-named file in another folder
+    )
+
+
 async def preview_promotion(
     supabase: Client,
     *,
@@ -148,27 +236,19 @@ async def preview_promotion(
 ) -> PromotePreview:
     """What saving `raw` as `filename` into `folder_id` would do — without doing it (D-14).
 
-    Mirrors `ingest_splice.mint_document_row`'s two predicates, in its order:
-      1. dedup — user_id + content_hash + status='completed' + org_id. A hit wins: the minter
-         returns before it ever looks at versions (D-13).
-      2. folder-scoped version — user_id + filename + org_id + folder_id, highest version + 1.
+    Mirrors what `mint_or_link` does on confirm, in its order:
+      1. an existing copy — `find_existing_copy`, the SAME helper the confirm calls (the minter's
+         completed dedup, then any non-failed latest copy, CR-02). A hit wins (D-13).
+      2. folder-scoped version — `ingest_splice.mint_document_row`'s predicate: user_id + filename
+         + org_id + folder_id, highest version + 1.
 
     ⛔ Read-only. ⛔ Never reads `folders` — whether the person may write there is the minter's
-    answer on confirm (D-12), and a refusal surfaces then, verbatim.
+    answer on confirm (D-12), and a refusal surfaces then, verbatim (the org is the route's, D-29).
     """
     content_hash = hashlib.sha256(raw).hexdigest()
 
-    dup = await aexec(
-        supabase.table("documents")
-        .select("id, folder_id, version_number")
-        .eq("user_id", user_id)
-        .eq("content_hash", content_hash)
-        .eq("status", "completed")
-        .eq("org_id", org_id)
-        .limit(1)
-    )
-    if dup.data:
-        existing = dup.data[0]
+    existing = await find_existing_copy(supabase, content_hash=content_hash, user_id=user_id, org_id=org_id)
+    if existing is not None:
         return PromotePreview(
             promotable=True,
             refusal=None,
@@ -243,12 +323,33 @@ async def _attachment_bytes(request: Request, current_user: dict, supabase: Clie
             raise _not_found()
 
 
-async def _existing_link(supabase: Client, thread_id: str, fid: UUID) -> PromoteResult | None:
+async def _refuse_folder_outside_org(supabase: Client, folder_id: str, active_org: str) -> None:
+    """D-29 (amends D-12) — refuse a folder that belongs to another org, before any byte is read.
+
+    Read through the person's own user-JWT client (RLS). A folder RLS does not return is left to
+    the minter, whose `404 Folder not found` stays the answer; only a VISIBLE folder whose org
+    differs from the active one is refused here.
+    """
+    found = await aexec(
+        supabase.table("folders").select("id, org_id").eq("id", folder_id).maybe_single()
+    )
+    folder = found.data if found is not None else None
+    if folder and folder.get("org_id") and str(folder["org_id"]) != str(active_org):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=REFUSE_OTHER_ORG)
+
+
+async def _existing_link(
+    supabase: Client, thread_id: str, fid: UUID, picked_folder: str
+) -> PromoteResult | None:
     """An attachment already promoted returns that link instead of minting again (T-274-16).
 
     Only a document the person can still SEE through RLS counts: a deleted or no-longer-visible
     document is no link, and the promote proceeds. Any error here (e.g. migration 203 not yet
     applied) is logged and read as "not linked" — never a failed promote.
+
+    ⚠ 274 review WR-03: when the linked copy sits in a folder OTHER than `picked_folder`, the
+    answer is `already` naming that folder — never the stored `saved`, which made the dialog
+    close as if the file had just landed where the person pointed (D-13: stated, never hidden).
     """
     try:
         ws = await aexec(
@@ -274,11 +375,13 @@ async def _existing_link(supabase: Client, thread_id: str, fid: UUID) -> Promote
         logger.warning("Promote: could not read the Library mark of %s (%s); treating as unlinked", fid, exc)
         return None
 
-    outcome: LibraryLink = "already" if mark.get("library_link") == "already" else "saved"
+    linked_folder = str(doc["folder_id"]) if doc.get("folder_id") else None
+    elsewhere = linked_folder != str(picked_folder)
+    outcome: LibraryLink = "already" if mark.get("library_link") == "already" or elsewhere else "saved"
     return PromoteResult(
         outcome=outcome,
         document_id=str(doc["id"]),
-        folder_id=str(doc["folder_id"]) if doc.get("folder_id") else None,
+        folder_id=linked_folder,
         document_status=str(doc.get("status") or "pending"),
         filename=str(doc.get("filename") or ""),
         version_number=doc.get("version_number"),
@@ -310,14 +413,18 @@ async def promote_attachment(
     200 `already` — the same bytes were already in the Library; linked, nothing copied. The
     `folder_id` is the EXISTING copy's (D-13). Also 200 when this attachment was promoted before.
     404 `Thread not found` / `File not found`; the minter's `Folder not found` (404) and
-    `Cannot upload to a folder you do not own` (403) verbatim; 422 for a type the Library refuses.
+    `Cannot upload to a folder you do not own` (403) verbatim; 403 `Cannot upload to a folder in
+    another organization` for a folder outside the active org (D-29); 422 for a type the Library
+    refuses.
 
     The attachment itself stays in the thread, unchanged (D-11).
     """
     await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
     fid, row = await _reachable_attachment(request, current_user, thread_id, file_id)
+    await _refuse_folder_outside_org(supabase, str(body.folder_id), str(active_org))  # D-29
 
-    linked = await _existing_link(supabase, thread_id, fid)
+    picked = str(body.folder_id)
+    linked = await _existing_link(supabase, thread_id, fid, picked)
     if linked is not None:
         response.status_code = status.HTTP_200_OK
         return linked
@@ -330,18 +437,25 @@ async def promote_attachment(
 
     raw = await _attachment_bytes(request, current_user, supabase, row)
 
-    # ⛔ No folder pre-check: the minter's folder-owner refusal is the authority (D-12), and its
-    #    HTTPException reaches the caller untouched.
-    mint = await ingest_splice.async_mint_document_row(
+    # 274 review CR-02 — re-read the mark IMMEDIATELY before minting: the chip and the panel can
+    # promote ONE attachment at once, and the other request may have stamped its link while this
+    # one read the bytes. (`find_existing_copy` inside `mint_or_link` catches the window before
+    # that stamp lands: the other request's fresh copy is non-failed and latest.)
+    linked = await _existing_link(supabase, thread_id, fid, picked)
+    if linked is not None:
+        response.status_code = status.HTTP_200_OK
+        return linked
+
+    # ⛔ No folder OWNER pre-check: the minter's folder-owner refusal is the authority (D-12), and
+    #    its HTTPException reaches the caller untouched. Only the ORG was checked above (D-29).
+    mint = await mint_or_link(
+        supabase,
         raw=raw,
         filename=filename,
         mime_type=mime_type,
         user_id=current_user["id"],
-        supabase=supabase,
-        folder_id=str(body.folder_id),
         org_id=str(active_org),
-        on_conflict="link",
-        version_scope="folder",  # T-274-12: never retire a same-named file in another folder
+        folder_id=picked,
     )
     doc = dict(mint.document)
     outcome: LibraryLink = "already" if mint.is_duplicate else "saved"
@@ -360,13 +474,18 @@ async def promote_attachment(
 
     # D-28 — the `In Library` mark, through the person's own client (`workspace_files_update_own`).
     # Best-effort: the document already exists, so a failed stamp is logged, never a failed promote.
+    # CR-02: an `already` stamp never overwrites a mark that ALREADY names this document — a racing
+    # promote of the same attachment minted it and owns the `saved` word.
     try:
-        await aexec(
+        stamp = (
             supabase.table("workspace_files")
             .update({"library_document_id": doc["id"], "library_link": outcome})
             .eq("id", str(fid))
             .eq("thread_id", thread_id)
         )
+        if mint.is_duplicate:
+            stamp = stamp.or_(f"library_document_id.is.null,library_document_id.neq.{doc['id']}")
+        await aexec(stamp)
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "Promote: Library mark stamp failed for workspace file %s -> document %s (%s)",
@@ -416,9 +535,11 @@ async def promote_preview(
     supabase: Client = Depends(get_user_supabase_client),
 ) -> PromotePreview:
     """What saving this attachment into `folder_id` would do — refused, already there, or which
-    version (D-14). Read-only and advisory: the POST's answer is the one rendered as a result."""
+    version (D-14). Read-only and advisory: the POST's answer is the one rendered as a result.
+    A folder outside the active org is the POST's own 403 here too (D-29)."""
     await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
     _fid, row = await _reachable_attachment(request, current_user, thread_id, file_id)
+    await _refuse_folder_outside_org(supabase, str(folder_id), str(active_org))  # D-29
 
     filename = library_filename(row["path"])
     ok, refusal = promotability(filename, row.get("mime_type"))

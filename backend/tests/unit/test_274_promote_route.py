@@ -18,6 +18,7 @@ is created by this file. Worktrees isolate files, not the local database.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from pathlib import Path
@@ -327,6 +328,51 @@ async def test_the_minters_folder_refusals_reach_the_caller_verbatim(stubbed, st
     stubbed.enqueue.assert_not_awaited()
 
 
+# ── D-29 (274 review CR-01) · a folder outside the ACTIVE org is refused before any mint ───
+OTHER_ORG = "99999999-9999-4999-8999-999999999990"
+REFUSE_OTHER_ORG = "Cannot upload to a folder in another organization"
+
+
+@pytest.mark.asyncio
+async def test_a_folder_in_another_org_is_refused_403_and_nothing_is_read_or_minted(stubbed):
+    """PLANT to drive RED: drop the folder-org read (the minter's check compares `user_id` only,
+    so an org-A folder the person owns accepts an org-B document — and an org-SHARED org-A folder
+    then shows it to every member of org B)."""
+    sb = _RecSupabase({("folders", "select"): {"id": FOLDER_PICKED, "org_id": OTHER_ORG}})
+    with pytest.raises(HTTPException) as ei:
+        await _promote(sb)
+    assert ei.value.status_code == 403
+    assert ei.value.detail == REFUSE_OTHER_ORG
+    assert stubbed.mint_calls == 0
+    stubbed.content.assert_not_awaited()
+    stubbed.enqueue.assert_not_awaited()
+    reads = sb.ops("folders", "select")
+    assert len(reads) == 1
+    assert ("eq", ("id", FOLDER_PICKED)) in reads[0].filters
+
+
+@pytest.mark.asyncio
+async def test_a_folder_in_the_active_org_promotes_as_before(stubbed):
+    """The same read with the ACTIVE org is a pass, never a refusal (non-vacuity of the case above)."""
+    sb = _RecSupabase({("folders", "select"): {"id": FOLDER_PICKED, "org_id": ORG}})
+    result, resp, _bg, _sb = await _promote(sb)
+    assert resp.status_code == 201
+    assert result.outcome == "saved"
+    assert stubbed.mint_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_the_preview_refuses_a_folder_in_another_org_too(stubbed):
+    """PLANT to drive RED: refuse on the POST only — the preview would then hash the bytes and
+    describe a save that can never happen."""
+    sb = _RecSupabase({("folders", "select"): {"id": FOLDER_PICKED, "org_id": OTHER_ORG}})
+    with pytest.raises(HTTPException) as ei:
+        await _preview(sb)
+    assert ei.value.status_code == 403
+    assert ei.value.detail == REFUSE_OTHER_ORG
+    stubbed.content.assert_not_awaited()
+
+
 # ── D-28 · the stamp is best-effort ────────────────────────────────────────────────────────
 @pytest.mark.asyncio
 async def test_a_failed_stamp_never_fails_a_promote_whose_document_exists(stubbed, caplog):
@@ -354,6 +400,105 @@ async def test_an_already_linked_attachment_returns_its_link_without_minting(stu
     assert result.outcome == "saved"
     assert result.document_id == DOC_ID
     assert result.document_status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_an_already_linked_attachment_saved_into_another_folder_answers_already_naming_it(stubbed):
+    """274 review WR-03. PLANT to drive RED: return the stored mark's `saved` whatever folder was
+    picked — the dialog then closes as if the file had landed in the folder just chosen, and D-13's
+    "already in <folder> / you picked <other>" is hidden."""
+    sb = _RecSupabase({
+        ("workspace_files", "select"): {"library_document_id": DOC_ID, "library_link": "saved"},
+        ("documents", "select"): {**_doc(folder_id=FOLDER_EXISTING, status="completed")},
+    })
+    result, resp, _bg, _sb = await _promote(sb, folder=FOLDER_PICKED)
+    assert stubbed.mint_calls == 0
+    assert resp.status_code == 200
+    assert result.outcome == "already"
+    assert result.folder_id == FOLDER_EXISTING != FOLDER_PICKED
+    assert result.document_id == DOC_ID
+
+
+# ── 274 review CR-02 · a same-bytes copy that is still indexing is LINKED, never minted over ──
+PENDING_DOC = "abababab-abab-4bab-8bab-abababababab"
+
+
+def _live_copy_select(row: dict):
+    """The documents read: only the non-failed, latest, same-hash lookup finds `row`."""
+
+    def _select(b):
+        f = b.filters
+        if ("neq", ("status", "failed")) in f and ("eq", ("is_latest", True)) in f:
+            return [row]
+        return []
+
+    return _select
+
+
+@pytest.mark.asyncio
+async def test_a_same_bytes_copy_still_indexing_is_linked_and_never_minted_over(stubbed):
+    """PLANT to drive RED: mint without the non-failed check. The minter's dedup only matches
+    `completed`, so its folder-scoped version step RETIRES the pending v1, 23505s, and the `link`
+    arm returns the retired copy as success — the only copy then leaves the Library and search."""
+    pending = _doc(id=PENDING_DOC, folder_id=FOLDER_PICKED, status="pending", version_number=1)
+    sb = _RecSupabase({("documents", "select"): _live_copy_select(pending)})
+    result, resp, _bg, _sb = await _promote(sb)
+
+    assert stubbed.mint_calls == 0, "a copy still indexing must be linked, never minted over"
+    stubbed.enqueue.assert_not_awaited()
+    assert resp.status_code == 200
+    assert result.outcome == "already"
+    assert result.document_id == PENDING_DOC
+    assert result.document_status == "pending"
+
+    live = [c for c in sb.ops("documents", "select") if ("neq", ("status", "failed")) in c.filters]
+    assert len(live) == 1
+    f = live[0].filters
+    assert ("eq", ("user_id", USER["id"])) in f
+    assert ("eq", ("org_id", ORG)) in f
+    assert ("eq", ("content_hash", hashlib.sha256(RAW).hexdigest())) in f
+    assert ("eq", ("is_latest", True)) in f
+
+
+@pytest.mark.asyncio
+async def test_linking_a_live_copy_never_overwrites_a_mark_already_naming_that_document(stubbed):
+    """PLANT to drive RED: stamp `already` unconditionally. Two promotes of ONE attachment (chip +
+    panel) race: the first mints D and stamps `saved`; the second finds D still pending and must not
+    turn the first's `saved` into `already`."""
+    pending = _doc(id=PENDING_DOC, folder_id=FOLDER_PICKED, status="pending")
+    sb = _RecSupabase({("documents", "select"): _live_copy_select(pending)})
+    await _promote(sb)
+    stamps = sb.ops("workspace_files", "update")
+    assert len(stamps) == 1
+    assert stamps[0].payload == {"library_document_id": PENDING_DOC, "library_link": "already"}
+    assert (
+        "or_",
+        (f"library_document_id.is.null,library_document_id.neq.{PENDING_DOC}",),
+    ) in stamps[0].filters
+
+
+@pytest.mark.asyncio
+async def test_a_concurrent_promote_of_the_same_attachment_returns_the_link_made_meanwhile(stubbed):
+    """PLANT to drive RED: read the attachment's link only once, before the (slow) byte read. A
+    second request that started before the first stamped its mark then mints a second copy."""
+    seen = {"n": 0}
+
+    def _ws(_b):
+        seen["n"] += 1
+        return None if seen["n"] == 1 else {"library_document_id": DOC_ID, "library_link": "saved"}
+
+    def _docs(b):
+        if any(name == "maybe_single" for name, _a in b.filters):
+            return _doc(status="pending")
+        return []
+
+    sb = _RecSupabase({("workspace_files", "select"): _ws, ("documents", "select"): _docs})
+    result, resp, _bg, _sb = await _promote(sb)
+    assert stubbed.mint_calls == 0
+    assert resp.status_code == 200
+    assert result.outcome == "saved"
+    assert result.document_id == DOC_ID
+    assert sb.ops("workspace_files", "update") == [], "the first request's mark is left alone"
 
 
 @pytest.mark.asyncio
@@ -520,12 +665,18 @@ async def test_library_links_degrades_to_no_links_when_the_mig_203_columns_are_m
 # ── static: what this module must never contain ────────────────────────────────────────────
 def test_the_module_has_no_service_role_no_folders_read_and_no_second_ingest_path():
     """PLANT to drive RED: add `get_supabase()` (a service-role read keyed on a client id —
-    BUG-260903-02), a `table("folders")` pre-check (D-12), a direct `splice_document`, or a
-    hand-rolled `documents` insert."""
+    BUG-260903-02), a direct `splice_document`, or a hand-rolled `documents` insert.
+
+    ⚠ AMENDED by D-29 (274 review CR-01) — the original forbade ANY `table("folders")` read (D-12:
+    the minter's folder check is the authority). That check compares `user_id` only, so the module
+    now reads the folder ONCE, for its `org_id`, through the injected user-JWT client. What stays
+    forbidden is everything else a folders reference could be: a write, or a second read."""
     body = _strip_comments(SRC)
     assert "async def promote_attachment" in body  # non-vacuity
-    for forbidden in ("get_supabase(", "service_role", 'table("folders")', "splice_document"):
+    for forbidden in ("get_supabase(", "service_role", "splice_document"):
         assert forbidden not in body, forbidden
+    folder_reads = re.findall(r'table\("folders"\)\s*\.(\w+)\(([^)]*)\)', body)
+    assert folder_reads == [("select", '"id, org_id"')], folder_reads
     assert not re.search(r'table\("documents"\)\s*\.insert\(', body)
     assert 'version_scope="folder"' in body
     assert 'on_conflict="link"' in body
