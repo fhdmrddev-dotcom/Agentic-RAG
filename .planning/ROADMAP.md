@@ -259,8 +259,8 @@ Plans:
 
 **Wave 1**
 
-- [ ] 274-01-PLAN.md — lifetime split by door (`expires_at` NULL for the composer doors, TTL kept for panel/workflow), agent-note fix, thread-delete byte cleanup seam, migration 203 (the In-Library mark) applied locally [operator checkpoint]
-- [ ] 274-03-PLAN.md — composer thread-life opt-in, one lifetime/display-name rule, cloud-attach org header fix, attachment API client, sketch-274 copy port, the no-Root folder listbox, the ONE Save-to-Library dialog
+- [x] 274-01-PLAN.md — lifetime split by door (`expires_at` NULL for the composer doors, TTL kept for panel/workflow), agent-note fix, thread-delete byte cleanup seam, migration 203 (the In-Library mark) applied locally [operator checkpoint]
+- [x] 274-03-PLAN.md — composer thread-life opt-in, one lifetime/display-name rule, cloud-attach org header fix, attachment API client, sketch-274 copy port, the no-Root folder listbox, the ONE Save-to-Library dialog
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
