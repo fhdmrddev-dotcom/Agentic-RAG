@@ -38,7 +38,7 @@ vi.mock("../docsManifest", () => {
   }
 })
 
-const { DocsApp, titleFor } = await import("../DocsApp")
+const { DocsApp, DocsRootBoundary, safeDecode, titleFor } = await import("../DocsApp")
 
 afterEach(() => {
   window.history.replaceState(null, "", "/")
@@ -67,6 +67,30 @@ describe("DocsApp", () => {
     const h1 = await screen.findByRole("heading", { level: 1, name: "Chatting with Syrel" })
     expect(document.title).toBe("Chatting with Syrel · Syrel Docs")
     expect(document.activeElement).toBe(h1)
+  })
+
+  it("survives a malformed percent sequence in the hash instead of blanking the docs (B-WR-04)", async () => {
+    expect(safeDecode("100%")).toBe("100%")
+    expect(safeDecode("%E0%A4%A")).toBe("%E0%A4%A")
+    expect(safeDecode("caf%C3%A9")).toBe("café")
+    window.history.replaceState(null, "", "/docs/use/chat#100%")
+    render(<DocsApp />)
+    expect(await screen.findByRole("heading", { level: 1, name: "Chatting with Syrel" })).toBeInTheDocument()
+  })
+
+  it("the root boundary shows a recovery message instead of a blank page (B-WR-04)", () => {
+    const Boom = () => {
+      throw new Error("boom")
+    }
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+    render(
+      <DocsRootBoundary>
+        <Boom />
+      </DocsRootBoundary>,
+    )
+    spy.mockRestore()
+    expect(screen.getByRole("alert").textContent).toContain("Something went wrong showing this page.")
+    expect(screen.getByRole("link", { name: "Go to the docs home" }).getAttribute("href")).toBe("/docs")
   })
 
   it("renders the home page with the hero search box and no header search trigger", () => {

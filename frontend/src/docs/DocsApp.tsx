@@ -51,6 +51,36 @@ class RouteChunkBoundary extends Component<{ children: ReactNode }, { failed: bo
   }
 }
 
+/**
+ * 276-REVIEW B-WR-04: the top-level boundary (mounted in docs/main.tsx). Without it, any throw in
+ * the docs tree unmounted the whole root and the public docs showed a blank white page.
+ */
+export class DocsRootBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <main id="content" className="wrap">
+        <p className="d-api-state" role="alert">
+          Something went wrong showing this page. <a href="/docs">Go to the docs home</a>, or refresh the page.
+        </p>
+      </main>
+    )
+  }
+}
+
+/** 276-REVIEW B-WR-04: a malformed percent sequence (`#100%`) must not throw — fall back to the raw hash. */
+export function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return s
+  }
+}
+
 export function titleFor(route: Route, data: DocsData): string {
   switch (route.kind) {
     case "home":
@@ -122,11 +152,11 @@ export function DocsApp() {
   useEffect(() => {
     if (first.current) {
       first.current = false
-      if (loc.hash) document.getElementById(decodeURIComponent(loc.hash.slice(1)))?.scrollIntoView()
+      if (loc.hash) document.getElementById(safeDecode(loc.hash.slice(1)))?.scrollIntoView()
       return
     }
     if (fresh.current) {
-      const target = loc.hash ? document.getElementById(decodeURIComponent(loc.hash.slice(1))) : null
+      const target = loc.hash ? document.getElementById(safeDecode(loc.hash.slice(1))) : null
       if (target) target.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth" })
       else window.scrollTo(0, 0)
       fresh.current = false
