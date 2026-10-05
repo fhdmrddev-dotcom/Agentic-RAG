@@ -33,7 +33,8 @@
  *   2 — Harness error.
  *
  * Primary guard: .claude/hooks/docs-coverage-guard.js (PostToolUse, fires in the turn the edit is
- * made — registration in .claude/settings.json is operator-gated). Backstop:
+ * made — ~~registration in .claude/settings.json is operator-gated~~ registered in
+ * .claude/settings.json, CORRECTED 2026-10-05 per 276-REVIEW A-IN-03). Backstop:
  * .github/workflows/docs-coverage.yml.
  */
 
