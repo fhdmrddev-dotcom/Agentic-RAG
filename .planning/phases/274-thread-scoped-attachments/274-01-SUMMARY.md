@@ -200,3 +200,8 @@ was observed failing before its implementation: 9 failed in Task 1 RED, 21 faile
 - FOUND: .planning/phases/274-thread-scoped-attachments/274-BASELINES.md
 - FOUND commits: e113b45b3, 86f9b6df4, 511c6585d, 78ce2ce7a, 2df428445
 - NOT PRESENT (owed by design): `library_document_id` in supabase/full-schema.sql
+
+## Orchestrator close-out (post-merge)
+
+- Task 3 step (f) DONE by the orchestrator from the main repo root after merge: `bash scripts/regenerate-full-schema.sh` (live-DB dump, no reset) → `grep -c library_document_id supabase/full-schema.sql` = 8; diff limited to migration 203 (columns, FK, CHECK, partial index, updated `expires_at` comment). Committed by path.
+- Merge conflict in `docs/public/api/openapi.public.json` against 276 fix `4beefabff`; resolved by regenerating both OpenAPI artifacts from the merged tree (`scripts/export-openapi.py` + `build-public-openapi.cjs`), `--check` OK, `test_276_openapi_snapshot_fresh` green.
