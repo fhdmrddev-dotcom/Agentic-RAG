@@ -719,6 +719,18 @@ describe("FilesSection (Phase 274-04) — Save to Library on the panel row", () 
     expect(agentRow.textContent).not.toContain("this chat only")
   })
 
+  // 274 G-4 #3 (F-1, driven 2026-10-05): the panel row named a chat attachment by its stored
+  // `/<8hex>-` path, so with the after-mark beside it the row read `/1a36c413-2…` — no way to tell
+  // which file it was. A chat attachment's row uses the ONE display rule the chip uses; an agent
+  // row keeps its full path (case 7 above stays true).
+  it("a chat attachment row is named without the upload prefix; an agent row keeps its path", () => {
+    render(<FilesSection />)
+    const [chatRow, agentRow] = screen.getAllByRole("option")
+    expect(chatRow.textContent).toContain("Meridian-Q4-pricing.xlsx")
+    expect(chatRow.textContent).not.toContain("a1b2c3d4-")
+    expect(agentRow.textContent).toContain("pricing-variance.md")
+  })
+
   it("the ⋯ is tabIndex -1, and Tab never lands on it inside the listbox", async () => {
     render(<FilesSection />)
     const trigger = screen.getAllByRole("option")[0].querySelector(`button[aria-label="${MORE}"]`)!
