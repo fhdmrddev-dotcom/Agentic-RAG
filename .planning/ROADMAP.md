@@ -310,8 +310,8 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion; 06 and 07 run in parallel on disjoint files)*
 
-- [ ] 276-06-PLAN.md — W4: animated Iris assistant avatar (sketch variant D, D-24/D-27): irisStateFor + IrisAvatar, one live avatar (RunCard logo static), redundant spinners removed, dead brandPulse removed, hero + splash + chrome chip
-- [ ] 276-07-PLAN.md — W4: app-wide logo pass (strings + fence, OAuth client name, rasters + manifest + OG, branded invite, leftovers) and the "Syrel: The Build Story" docs page (D-26)
+- [x] 276-06-PLAN.md — W4: animated Iris assistant avatar (sketch variant D, D-24/D-27): irisStateFor + IrisAvatar, one live avatar (RunCard logo static), redundant spinners removed, dead brandPulse removed, hero + splash + chrome chip
+- [x] 276-07-PLAN.md — W4: app-wide logo pass (strings + fence, OAuth client name, rasters + manifest + OG, branded invite, leftovers) and the "Syrel: The Build Story" docs page (D-26)
 
 **Video library — three styles, decided 2026-10-04 (operator):** (1) **narrated explainers** — Remotion + local Kokoro voice, and NotebookLM explainers; (2) **documentaries** — NotebookLM cinematic "Syrel: The Build Story" (5 chapters), wrapped in Remotion `BrandedEpisode` intro/outro; (3) **music-driven promos, no narration** — `SyrelPromo` / `SyrelTeaser` / vertical cuts, beat-locked to an original synthesized track, for the landing hero and social. Discuss decides which style each docs/landing slot uses.
 **Logo chosen, insertion deferred (operator 2026-10-04):** #1 "Iris agent" — assets in `docs/brand/` (animated, lockup, mark). Placeholders stay until the operator says insert; when it happens it is one pass across landing, app, favicon, docs and `video/` `LogoPlaceholder`. Discuss decides whether 276 does that pass.
@@ -328,7 +328,7 @@ Plans:
 | 273. Agent-Authored Artifacts | 6/6 | Complete — 1 UAT row OWED (live STRUCTURED-path holdback check; run it first) | 2026-10-04 |
 | 274. Thread-Scoped Attachments | 0/TBD | Not started | - |
 | 275. Retention & Legal Hold | 0/TBD | Not started | - |
-| 276. Public Docs, API Reference & Video Library | 5/5 | Complete   | 2026-10-04 |
+| 276. Public Docs, API Reference & Video Library | 7/7 | Complete   | 2026-10-05 |
 
 ---
 
