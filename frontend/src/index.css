@@ -1090,16 +1090,24 @@
    tailwind.config.js. One <span class="iris chip"> per instance (IrisAvatar.tsx); gradient ids are
    unique per instance. Motion = CSS keyframes on transform/opacity only. State colour = CSS vars on
    stop-color/fill (transitioned), never an animated property. Settle = WAAPI from the captured pose.
-   The dark chip (#0A0E18) sits behind the mark in BOTH themes: on white the bare mark loses its
-   #F2F4FE core (276-LOGO-INVENTORY §B); in dark mode the chip is nearly invisible. */
+   ~~The dark chip (#0A0E18) sits behind the mark in BOTH themes~~ — superseded 2026-10-05
+   (operator, option B): the LIGHT theme draws the mark bare, in the deeper light-theme palette of
+   `public/brand/syrel-mark-iris-light.svg` (white core with an indigo ring); the DARK theme keeps
+   the original palette on the #0A0E18 chip. Tone overrides (amber/red/dim) apply in both. */
 .iris {
-  --ia1: #D6D8FF; --ia2: #A3A5FF; --ia3: #6467F2; --ib1: #A3A5FF; --ib2: #3B3FD0; --icore: #F2F4FE;
+  --ia1: #9497FF; --ia2: #6467F2; --ia3: #3B3FD0; --ib1: #7C7FFA; --ib2: #2A2DA8; --icore: #FFFFFF;
+  --icore-ring: #3B3FD0;
   --sz: 32px;
   position: relative; flex: none; display: inline-grid; place-items: center;
   width: var(--sz); height: var(--sz); border-radius: 50%; vertical-align: middle;
 }
-.iris.chip { background: #0A0E18; box-shadow: inset 0 0 0 1px hsl(222 47% 11% / .14), 0 1px 2px rgb(15 23 42 / .18); }
-.dark .iris.chip { box-shadow: inset 0 0 0 1px hsl(220 20% 20%); }
+.dark .iris {
+  --ia1: #D6D8FF; --ia2: #A3A5FF; --ia3: #6467F2; --ib1: #A3A5FF; --ib2: #3B3FD0; --icore: #F2F4FE;
+  --icore-ring: transparent;
+}
+.iris.chip { background: transparent; }
+.dark .iris.chip { background: #0A0E18; box-shadow: inset 0 0 0 1px hsl(220 20% 20%); }
+.iris .core { stroke: var(--icore-ring); stroke-width: 1.5; }
 .iris svg { width: 100%; height: 100%; display: block; overflow: visible; transition: opacity .5s; }
 .iris.chip svg { width: 84%; height: 84%; }
 .iris .sa1 { stop-color: var(--ia1); } .iris .sa2 { stop-color: var(--ia2); } .iris .sa3 { stop-color: var(--ia3); }
