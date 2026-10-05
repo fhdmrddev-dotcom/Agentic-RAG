@@ -94,6 +94,10 @@ describe("AttachmentRowTrailing — the panel row's trailing slot", () => {
     // The slot never claims a share of the row that the file name needs.
     expect(container.innerHTML).not.toContain("max-w-[65%]")
     expect(container.innerHTML).not.toContain("flex-wrap")
+    // Measured live: on one line, `this chat only` + the mark + size + age left the 345px row's
+    // name 0px wide. The slot STACKS scope over action (sketch A's two-line meta) so the name keeps
+    // its room.
+    expect((container.firstElementChild as HTMLElement).className).toContain("flex-col")
     expect(container.textContent).toContain(COPY.engine.CHIP_SCOPE)
     expect(more(container)).toHaveLength(0)
   })
