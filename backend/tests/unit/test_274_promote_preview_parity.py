@@ -144,23 +144,29 @@ def _doc(*, id: str, folder_id: str, raw: bytes, version: int = 1, filename: str
 
 
 async def _preview_then_mint(db: dict, *, raw: bytes, folder_id: str = FOLDER_A):
-    from app.api.workspace_promote import preview_promotion
+    """Preview, then what the CONFIRM does over the same state.
+
+    ⚠ AMENDED (274 review CR-02): the confirm is `mint_or_link` — the route's own step, which asks
+    `find_existing_copy` and only then runs the REAL `ingest_splice.mint_document_row` (via its
+    async wrapper, with the route's exact parameters). It was the minter called directly; that
+    stopped being what the route does once the route links a copy still indexing.
+    """
+    from app.api.workspace_promote import mint_or_link, preview_promotion
 
     sb = _FakeSupabase(db)
     preview = await preview_promotion(
         sb, raw=raw, filename=NAME, user_id=USER, org_id=ORG, folder_id=folder_id,
     )
-    mint = ingest_splice.mint_document_row(
+    mint = await mint_or_link(
+        sb,
         raw=raw,
         filename=NAME,
         mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         user_id=USER,
-        supabase=sb,
-        folder_id=folder_id,
         org_id=ORG,
-        on_conflict="link",
-        version_scope="folder",
+        folder_id=folder_id,
     )
+    assert isinstance(mint, ingest_splice.MintResult)
     return preview, mint
 
 
