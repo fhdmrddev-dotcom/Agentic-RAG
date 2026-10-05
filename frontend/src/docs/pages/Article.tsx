@@ -15,7 +15,11 @@ const link = (p: PageMeta | undefined): PagerLink | null => (p ? { title: p.titl
 
 type Body = { slug: string; md: string } | { slug: string; error: true } | null
 
-export function Article({ slug }: { slug: string }) {
+/**
+ * `onBodyReady` fires once the Markdown body has rendered (276-REVIEW B-CR-02): DocsApp resolves a
+ * pending `#section` deep link then, because the H2 it names does not exist before the body lands.
+ */
+export function Article({ slug, onBodyReady }: { slug: string; onBodyReady?: () => void }) {
   const data = useDocs()
   const page = pageBySlug(data, slug)
   const [body, setBody] = useState<Body>(null)
@@ -31,12 +35,18 @@ export function Article({ slug }: { slug: string }) {
     }
   }, [data, slug])
 
+  const current = body && body.slug === slug ? body : null
+  const md = current && "md" in current ? current.md : null
+
+  // Runs after commit, so the body's headings (and their ids) are already in the DOM.
+  useEffect(() => {
+    if (md !== null) onBodyReady?.()
+  }, [md, onBodyReady])
+
   if (!page) return null
   const section = sectionOf(data, page.section)
   const siblings = sectionPages(data, page.section)
   const at = siblings.findIndex((p) => p.slug === page.slug)
-  const current = body && body.slug === slug ? body : null
-  const md = current && "md" in current ? current.md : null
   const unreleased = page.release === "v4.5"
 
   return (

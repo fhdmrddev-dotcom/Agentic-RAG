@@ -1,8 +1,12 @@
 // Phase 276-03 (G4-4, UI-SPEC "Routing and loading contract") — the docs root: an unknown /docs/*
 // path renders the not-found page INSIDE the docs shell, document.title follows the route, and a
 // same-origin /docs link navigates client-side (no full page load) and lands focus on the new H1.
-import { fireEvent, render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
+
+// 276-REVIEW B-CR-02: a test can hold a page body back (a deferred loadPage), the way the real
+// per-page dynamic import arrives after the navigation effect has already run.
+const bodyGate = vi.hoisted(() => ({ wait: null as Promise<void> | null }))
 
 // The plugin is not part of the vitest config, so the one module that imports the virtual
 // manifest (docsManifest.ts) is replaced here.
@@ -33,7 +37,10 @@ vi.mock("../docsManifest", () => {
       pages: [page("use/chat", "Chatting with Syrel", "written"), page("use/chat-modes", "Deep mode", "stub")],
       changelog: [],
       chapters: [],
-      loadPage: (slug: string) => Promise.resolve(slug === "use/chat" ? "Body.\n\n## One\n\nText.\n" : ""),
+      loadPage: async (slug: string) => {
+        if (bodyGate.wait) await bodyGate.wait
+        return slug === "use/chat" ? "Body.\n\n## One\n\nText.\n" : ""
+      },
     },
   }
 })
@@ -42,7 +49,31 @@ const { DocsApp, DocsRootBoundary, safeDecode, titleFor } = await import("../Doc
 
 afterEach(() => {
   window.history.replaceState(null, "", "/")
+  bodyGate.wait = null
+  vi.unstubAllGlobals()
 })
+
+function holdBodies(): () => Promise<void> {
+  let release!: () => void
+  bodyGate.wait = new Promise<void>((res) => (release = res))
+  return async () => {
+    await act(async () => {
+      release()
+      await Promise.resolve()
+    })
+  }
+}
+
+function stubScrolling() {
+  const scrolled: Element[] = []
+  const intoView = vi.fn(function (this: Element) {
+    scrolled.push(this)
+  })
+  Object.defineProperty(Element.prototype, "scrollIntoView", { value: intoView, configurable: true, writable: true })
+  const scrollTo = vi.fn()
+  vi.stubGlobal("scrollTo", scrollTo)
+  return { scrolled, scrollTo }
+}
 
 describe("DocsApp", () => {
   it("renders an unknown /docs path as the docs not-found page, inside the shell", () => {
@@ -67,6 +98,36 @@ describe("DocsApp", () => {
     const h1 = await screen.findByRole("heading", { level: 1, name: "Chatting with Syrel" })
     expect(document.title).toBe("Chatting with Syrel · Syrel Docs")
     expect(document.activeElement).toBe(h1)
+  })
+
+  it("scrolls a first-load #section deep link once the deferred body has rendered (B-CR-02)", async () => {
+    const { scrolled } = stubScrolling()
+    const release = holdBodies()
+    window.history.replaceState(null, "", "/docs/use/chat#one")
+    render(<DocsApp />)
+    await screen.findByRole("heading", { level: 1, name: "Chatting with Syrel" })
+    // the body is still loading: the H2 does not exist and nothing has scrolled yet
+    expect(document.getElementById("one")).toBeNull()
+    expect(scrolled).toEqual([])
+    await release()
+    const h2 = await screen.findByRole("heading", { level: 2, name: "One" })
+    expect(h2.id).toBe("one")
+    expect(scrolled).toContain(h2)
+  })
+
+  it("lands a cross-page navigation to /docs/x#y on the section, not the top (B-CR-02)", async () => {
+    const { scrolled, scrollTo } = stubScrolling()
+    window.history.replaceState(null, "", "/docs/use")
+    render(<DocsApp />)
+    const release = holdBodies()
+    const { navigate } = await import("../router")
+    act(() => navigate("/docs/use/chat#one"))
+    await screen.findByRole("heading", { level: 1, name: "Chatting with Syrel" })
+    expect(scrollTo).toHaveBeenCalledWith(0, 0) // starts at the top while the body loads ...
+    expect(scrolled).toEqual([])
+    await release()
+    const h2 = await screen.findByRole("heading", { level: 2, name: "One" })
+    expect(scrolled).toContain(h2) // ... then lands on the section once it exists
   })
 
   it("survives a malformed percent sequence in the hash instead of blanking the docs (B-WR-04)", async () => {

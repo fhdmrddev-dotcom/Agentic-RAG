@@ -2,7 +2,18 @@
 // unchanged). It resolves the route against virtual:docs-manifest, renders the page component,
 // intercepts same-origin /docs links for client navigation, and on each navigation sets the title,
 // scrolls (top or hash), and moves focus to the page H1.
-import { Component, Suspense, lazy, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react"
+import {
+  Component,
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react"
 import { DOCS_DATA } from "./docsManifest"
 import { LandingFooter } from "../landing/components/LandingFooter"
 import { DocsHeader, HERO_SEARCH_ID } from "./components/DocsHeader"
@@ -147,23 +158,41 @@ export function DocsApp() {
     document.title = titleFor(route, DATA)
   }, [route])
 
+  // 276-REVIEW B-CR-02: a section deep link (`/docs/x#y`) names an H2 that does not exist yet when
+  // the navigation effect runs — Article's body arrives later through a dynamic import — so
+  // ~~resolving the hash once, in that effect~~ silently dropped it on first load and scrolled to
+  // the TOP on a fresh cross-page navigation. The target is now kept PENDING and resolved again
+  // the moment the page reports its body rendered (`onBodyReady`).
+  const pendingHash = useRef<{ id: string; smooth: boolean } | null>(null)
+  const scrollToPendingHash = useCallback((): boolean => {
+    const pending = pendingHash.current
+    if (!pending) return false
+    const target = document.getElementById(pending.id)
+    if (!target) return false
+    pendingHash.current = null
+    if (pending.smooth) target.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth" })
+    else target.scrollIntoView()
+    return true
+  }, [])
+
   // On navigation: scroll (top or hash target) and move focus to the H1.
   const first = useRef(true)
   useEffect(() => {
     if (first.current) {
       first.current = false
-      if (loc.hash) document.getElementById(safeDecode(loc.hash.slice(1)))?.scrollIntoView()
+      pendingHash.current = loc.hash ? { id: safeDecode(loc.hash.slice(1)), smooth: false } : null
+      scrollToPendingHash()
       return
     }
     if (fresh.current) {
-      const target = loc.hash ? document.getElementById(safeDecode(loc.hash.slice(1))) : null
-      if (target) target.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth" })
-      else window.scrollTo(0, 0)
       fresh.current = false
+      pendingHash.current = loc.hash ? { id: safeDecode(loc.hash.slice(1)), smooth: true } : null
+      // not rendered yet → start at the top; the pending target is scrolled to once the body lands
+      if (!scrollToPendingHash()) window.scrollTo(0, 0)
     }
     const h1 = document.querySelector<HTMLElement>("#content h1")
     h1?.focus({ preventScroll: true })
-  }, [routeKey, loc.hash])
+  }, [routeKey, loc.hash, scrollToPendingHash])
 
   let body
   switch (route.kind) {
@@ -171,7 +200,7 @@ export function DocsApp() {
       body = <Home search={<SearchBox variant="hero" inputId={HERO_SEARCH_ID} />} />
       break
     case "article":
-      body = <Article key={route.slug} slug={route.slug!} />
+      body = <Article key={route.slug} slug={route.slug!} onBodyReady={scrollToPendingHash} />
       break
     case "stub":
       body = <Stub key={route.slug} slug={route.slug!} />
