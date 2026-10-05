@@ -283,8 +283,10 @@ async def test_delete_thread_collects_before_and_removes_after_the_threads_delet
         order.append(("collect", thread_id, user_id))
         return collected
 
-    async def _remove(sb, paths):
+    async def _remove(sb, paths, thread_id=None):
+        # T-274-04: the delete hands its thread id to the remover so a failed chunk names it.
         order.append(("remove", list(paths)))
+        order.append(("remove-thread", thread_id))
 
     monkeypatch.setattr(threads, "collect_thread_workspace_paths", AsyncMock(side_effect=_collect))
     monkeypatch.setattr(threads, "remove_workspace_paths", AsyncMock(side_effect=_remove))
@@ -301,6 +303,7 @@ async def test_delete_thread_collects_before_and_removes_after_the_threads_delet
         ("collect", THREAD, USER),
         "threads.delete",
         ("remove", collected),
+        ("remove-thread", THREAD),
     ]
     bg.add_task.assert_called_once()
 

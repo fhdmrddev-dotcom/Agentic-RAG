@@ -1449,7 +1449,7 @@ async def delete_thread(
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
     )
-    await remove_workspace_paths(supabase, workspace_paths)
+    await remove_workspace_paths(supabase, workspace_paths, thread_id=thread_id)  # T-274-04
     background_tasks.add_task(
         write_audit_entry,
         user_id=current_user["id"],

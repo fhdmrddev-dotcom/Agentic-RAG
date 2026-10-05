@@ -91,11 +91,12 @@ async def collect_thread_workspace_paths(supabase, thread_id: str, user_id: str)
     return owned
 
 
-async def remove_workspace_paths(supabase, paths: list[str]) -> None:
+async def remove_workspace_paths(supabase, paths: list[str], thread_id: str | None = None) -> None:
     """Remove ``paths`` from the workspace bucket in chunks of at most ``REMOVE_CHUNK``.
 
-    Never raises: a failed chunk is logged with its size and the remaining chunks are still
-    attempted.
+    Never raises: a failed chunk is logged with its size and the thread it belonged to
+    (T-274-04 — an orphaned-bytes report must trace back to its delete), and the remaining
+    chunks are still attempted.
     """
     for start in range(0, len(paths), REMOVE_CHUNK):
         chunk = paths[start : start + REMOVE_CHUNK]
@@ -103,8 +104,9 @@ async def remove_workspace_paths(supabase, paths: list[str]) -> None:
             await run_in_threadpool(supabase.storage.from_(BUCKET_NAME).remove, chunk)
         except Exception as exc:
             logger.warning(
-                "Thread delete: failed to remove %d workspace storage object(s) (%s); "
+                "Thread delete %s: failed to remove %d workspace storage object(s) (%s); "
                 "those bytes are orphaned",
+                thread_id,
                 len(chunk),
                 exc,
             )
