@@ -1,7 +1,7 @@
 ---
 phase: 276-public-docs-api-reference-video-library
 verified: 2026-10-05T00:00:00Z
-status: human_needed
+status: passed
 score: 6/6 roadmap success criteria verified (automated); G-4 lived-experience checks and operator deploy items outstanding
 re_verification: false
 gaps: []
@@ -77,3 +77,10 @@ human_verification:
 ## Gaps summary
 
 None. The roadmap contract holds at the code level, and the status is `human_needed` only because G-4 lived-experience checks and deploy-time items cannot be verified programmatically.
+
+
+## G-4 outcome (2026-10-05, orchestrator-driven in Chrome; log: `276-UAT-LOG.md`)
+
+All human-verification rows were driven. Two defects that jsdom could not see were found, fixed and re-driven: the phone drawer collapsed under the blurred header (`e4500169b`), and the avatar ring snapped back at the temp→run row remount (`218889b32`, measured error after the fix 0.00°). Reduced motion is covered by unit tests only, because this Chrome cannot emulate it. Status was moved from `human_needed` to `passed` on that evidence.
+
+Correction to SC#4 wording above: after the review fix A-WR-01 the gate is **fail-closed**. Live docs stay open only when `ENVIRONMENT` is unset/local/development/dev/test (`backend/app/api/api_docs.py:70`); every other value, staging included, returns 401.
