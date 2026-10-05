@@ -4,7 +4,9 @@
 anyone, by a recorded decision (``main.py``'s Phase 182 comment: "App-wide ``docs_url`` gating has
 never been a convention"). The operator reversed that **for production only** on 2026-10-04:
 with ``ENVIRONMENT=production`` an unauthenticated caller gets 401; locally (``ENVIRONMENT``
-unset) the explorer loads exactly as before.
+unset) the explorer loads exactly as before. **CORRECTED (276-REVIEW A-WR-01):** the gate is now
+fail-closed — only unset / ``local`` / ``development`` / ``dev`` / ``test`` are open; ``staging``
+and every unknown value are gated too.
 
 **Why the conftest blanket override does not blind this file.** ``require_api_docs_access``
 calls ``get_current_user`` DIRECTLY (not through ``Depends``), so the blanket
@@ -101,6 +103,67 @@ def test_production_spellings_also_gate(client, monkeypatch, value):
     _pop_user_override()
     _gate_on(monkeypatch, value)
     assert client.get("/openapi.json").status_code == 401
+
+
+# ── 2b) fail-CLOSED (276-REVIEW A-WR-01) ─────────────────────────────────────
+# ~~Only production/prod gated~~ — that allow-list of GATED values served the full live map to
+# anyone under `staging`, `prd`, `live`, `production-eu`. The predicate is inverted: every value
+# that is not unset or explicitly local is gated.
+
+
+@pytest.mark.parametrize(
+    "value", ["staging", "Staging", "prd", "live", "production-eu", "qa", "something-new"]
+)
+@pytest.mark.parametrize("path", _DOC_PATHS)
+def test_non_local_values_fail_closed(client, monkeypatch, value, path):
+    _pop_user_override()
+    _gate_on(monkeypatch, value)
+    resp = client.get(path)
+    assert resp.status_code == 401, f"ENVIRONMENT={value!r} {path} -> {resp.status_code}"
+
+
+@pytest.mark.parametrize("value", ["local", "development", "dev", "test", " DEV ", "Local"])
+def test_explicitly_local_values_stay_open(client, monkeypatch, value):
+    _pop_user_override()
+    _gate_on(monkeypatch, value)
+    assert client.get("/openapi.json").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "value,gated,loud",
+    [
+        ("", False, False),
+        ("local", False, False),
+        ("dev", False, True),
+        ("development", False, True),
+        ("test", False, True),
+        ("staging", True, False),
+        ("production", True, False),
+    ],
+)
+def test_boot_log_level_predicates(monkeypatch, value, gated, loud):
+    """The OPEN boot line is a WARNING when the value is set to anything but `local`."""
+    from app.api import api_docs
+
+    _gate_on(monkeypatch, value)
+    assert api_docs._docs_gated() is gated
+    assert api_docs._docs_open_is_loud() is loud
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [("production", True), (" PROD ", True), ("staging", False), ("", False)],
+)
+def test_production_refusals_read_settings_not_os_environ(monkeypatch, value, expected):
+    """A-IN-11: main.py's refuse-to-start checks read `settings.environment` (which also loads
+    backend/.env), the same source of truth as the docs gate — never a raw os.getenv."""
+    from app.api import api_docs
+
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    _gate_on(monkeypatch, value)
+    assert api_docs.is_production_environment() is expected
+    main_src = (Path(__file__).resolve().parents[2] / "app" / "main.py").read_text(encoding="utf-8")
+    assert 'os.getenv("ENVIRONMENT"' not in main_src
 
 
 def test_production_refuses_an_invalid_bearer(client, monkeypatch):

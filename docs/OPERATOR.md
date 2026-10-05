@@ -107,6 +107,10 @@ Then edit `./.env` and fill in:
   2026-10-04:** `ENVIRONMENT=production` now ALSO gates `/docs`, `/redoc`, `/openapi.json`
   (Phase 276, DOCS-04): signed-out callers get 401. Left unset, the live API explorer is open to
   anyone — the backend boot log says `API docs: OPEN` instead of `API docs: GATED`.
+  **CORRECTED 2026-10-05 (276-REVIEW A-WR-01):** the gate is fail-closed. The explorer is open
+  only when `ENVIRONMENT` is unset or `local` / `development` / `dev` / `test` (any case); every
+  other value — `production`, `staging`, anything else — is gated. An open explorer under
+  `dev` / `development` / `test` logs `API docs: OPEN` at **WARNING**.
 - **`SECRETS_ENCRYPTION_KEY`** — generate a Fernet key so provider keys are encrypted at rest:
   ```bash
   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

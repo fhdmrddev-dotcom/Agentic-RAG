@@ -7,11 +7,14 @@ the live explorer is a complete map of every route a deployment serves, and the 
 now carries a static, filtered reference (``docs/public/api/openapi.public.json``) for anyone who
 is not signed in. So:
 
-* ``ENVIRONMENT`` unset (local dev) -> ``/docs``, ``/redoc``, ``/openapi.json`` and
+* ``ENVIRONMENT`` unset, or ``local`` / ``development`` / ``dev`` / ``test`` (any case,
+  surrounding spaces ignored) -> ``/docs``, ``/redoc``, ``/openapi.json`` and
   ``/docs/oauth2-redirect`` answer 200 with no token, exactly as before.
-* ``ENVIRONMENT=production`` (or ``prod``, any case, surrounding spaces ignored) -> no bearer is
-  a 401; a bearer goes through the EXISTING ``get_current_user`` (GoTrue validation, the 503 on
-  an unreachable auth service, the ban check). No new auth code lives here.
+* ~~``ENVIRONMENT=production`` (or ``prod``, any case, surrounding spaces ignored)~~ **Any other
+  value** — ``production``, ``staging``, ``prd``, anything (CORRECTED, 276-REVIEW A-WR-01: the
+  gate is fail-closed) -> no bearer is a 401; a bearer goes through the EXISTING
+  ``get_current_user`` (GoTrue validation, the 503 on an unreachable auth service, the ban
+  check). No new auth code lives here.
 
 **Why FastAPI's built-in docs routes are switched off rather than wrapped.** ``FastAPI(docs_url=
 ..., openapi_url=...)`` registers plain routes that take no dependencies. ``main.py`` now passes
@@ -27,7 +30,8 @@ header with **403** — the wrong code for "you have not signed in". ``auto_erro
 **The environment is read at REQUEST time**, never captured at import, so a test (or an operator
 restart with a changed env) sees the current value. ``main.py``'s lifespan logs
 ``API docs: GATED`` / ``API docs: OPEN`` from the same ``_docs_gated()`` helper, so a production
-deploy that forgot ``ENVIRONMENT`` says so in its boot log (D-20 fail-open guard).
+deploy that forgot ``ENVIRONMENT`` says so in its boot log (D-20 fail-open guard). The OPEN line
+is a WARNING when the value is set to anything but ``local`` (276-REVIEW A-WR-01).
 
 **The canvas-aware schema hook still applies.** ``/openapi.json`` returns
 ``request.app.openapi()``, which is ``build_canvas_aware_openapi(app)`` — the Phase 182 filter
@@ -58,9 +62,37 @@ _TITLE = "Syrel API"
 _bearer_optional = HTTPBearer(auto_error=False)
 
 
+# ~~Gated only for ``production`` / ``prod``.~~ CORRECTED (276-REVIEW A-WR-01): that allow-list
+# of GATED values failed OPEN for ``staging``, ``prd``, ``live``, ``production-eu`` and every
+# other spelling. The predicate is now inverted — FAIL-CLOSED. Only an unset value (local dev,
+# D-20) or one of these explicitly local spellings opens the explorer; every other value,
+# staging included, is gated.
+_OPEN_ENVIRONMENTS = frozenset({"", "local", "development", "dev", "test"})
+# The open values that are quiet in the boot log. An OPEN explorer under any other open value
+# (``dev``/``development``/``test``) logs at WARNING, so a deployed box carrying one is loud.
+_QUIET_OPEN_ENVIRONMENTS = frozenset({"", "local"})
+
+
+def _environment() -> str:
+    """``settings.environment`` normalised — the ONE reader of ENVIRONMENT (A-IN-11)."""
+    return (settings.environment or "").strip().lower()
+
+
+def is_production_environment() -> bool:
+    """True for ``production`` / ``prod`` — the refusal-to-start checks in ``main.py`` use this,
+    so they read the same source of truth (pydantic ``settings``, which also loads
+    ``backend/.env``) as the docs gate (276-REVIEW A-IN-11)."""
+    return _environment() in ("production", "prod")
+
+
 def _docs_gated() -> bool:
-    """True when this deployment is production — read per call, never cached."""
-    return (settings.environment or "").strip().lower() in ("production", "prod")
+    """True unless ENVIRONMENT is unset or explicitly local — read per call, never cached."""
+    return _environment() not in _OPEN_ENVIRONMENTS
+
+
+def _docs_open_is_loud() -> bool:
+    """True when the explorer is OPEN under a value that is neither unset nor ``local``."""
+    return not _docs_gated() and _environment() not in _QUIET_OPEN_ENVIRONMENTS
 
 
 async def require_api_docs_access(

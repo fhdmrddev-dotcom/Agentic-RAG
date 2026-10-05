@@ -318,9 +318,14 @@ async def lifespan(app_instance):
 
     # Phase 276 (DOCS-04, D-20) — say once whether the live API explorer is gated, so a production
     # deploy that forgot ENVIRONMENT=production is visible in its boot log instead of failing open.
-    from app.api.api_docs import _docs_gated
+    # 276-REVIEW A-WR-01: the gate is fail-closed (only unset/local/development/dev/test open it),
+    # and an OPEN explorer under any value other than unset/local logs at WARNING, not INFO.
+    from app.api.api_docs import _docs_gated, _docs_open_is_loud
     if _docs_gated():
         logger.info("API docs: GATED (ENVIRONMENT=%s)", settings.environment.strip())
+    elif _docs_open_is_loud():
+        logger.warning("API docs: OPEN (ENVIRONMENT=%r) — the live API explorer is served "
+                       "to anyone; only local installs should be open", settings.environment)
     else:
         logger.info("API docs: OPEN (ENVIRONMENT=%r)", settings.environment)
     if _setup_mode:
@@ -934,8 +939,12 @@ app.include_router(api_docs.router)  # Phase 276 DOCS-04 — gated live API expl
 # environment looks like production. Belt-and-suspenders so an accidental
 # env var flip in a prod-like deploy crashes loudly at startup rather than
 # silently exposing the route.
+# 276-REVIEW A-IN-11: ENVIRONMENT is read through ``settings`` (which also loads backend/.env),
+# the same source of truth as the docs gate, never a raw ``os.getenv``.
+from app.api.api_docs import is_production_environment as _is_production_env  # noqa: E402
+
 if os.getenv("ENABLE_TEST_FIXTURES", "0") == "1":
-    if os.getenv("ENVIRONMENT", "").lower() in ("production", "prod"):
+    if _is_production_env():
         raise RuntimeError(
             "ENABLE_TEST_FIXTURES=1 in production environment — refusing to start. "
             "This env var is for local Playwright e2e harness use only "
@@ -954,7 +963,7 @@ if os.getenv("ENABLE_TEST_FIXTURES", "0") == "1":
 # with a deterministic fake and bypasses auth with a fixed test user.
 # Zero API cost, millisecond-per-run execution (D-077-02).
 if os.getenv("MOCK_LLM_MODE", "0") == "1":
-    if os.getenv("ENVIRONMENT", "").lower() in ("production", "prod"):
+    if _is_production_env():
         raise RuntimeError(
             "MOCK_LLM_MODE=1 in production environment -- refusing to start. "
             "This env var is for local multi-worker harness use only "
