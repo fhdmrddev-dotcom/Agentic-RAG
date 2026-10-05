@@ -331,7 +331,10 @@ describe("ChatAttachmentChip — pending / sent / expired", () => {
     const chip = screen.getByTestId("chat-attachment-chip")
     const seg = chip.querySelector("[data-testid='library-link-segment']") as HTMLElement
     expect(seg).not.toBeNull()
-    expect(seg.textContent).toBe(`${SAVE_COPY.shared.inLibrary} · Pricing`)
+    // No citation navigator in this tree, so the segment is plain text whose hidden tail speaks
+    // the full path (a generic span may not carry aria-label).
+    expect(seg.textContent!.startsWith(`${SAVE_COPY.shared.inLibrary} · Pricing`)).toBe(true)
+    expect(seg.querySelector(".sr-only")!.textContent).toContain("Suppliers › Meridian › Pricing")
     expect(seg.getAttribute("title")).toBe("Suppliers › Meridian › Pricing")
     const scope = chip.querySelector("[data-chip-scope]")!
     expect(Boolean(scope.compareDocumentPosition(seg) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
