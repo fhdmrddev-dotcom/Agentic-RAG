@@ -1,7 +1,7 @@
 # Phase 274: Thread-Scoped Attachments - Context
 
 **Gathered:** 2026-10-05
-**Status:** Ready for planning (⚠ G-2 sketch owed BEFORE plan-phase, see D-15)
+**Status:** Ready for planning (G-2 sketch 274 resolved: winner A, see D-15)
 
 <domain>
 ## Phase Boundary
@@ -84,6 +84,12 @@ phase does NOT rebuild it. It does four things:
   A folder is **required**: unset means refuse, never silently root (same rule as D-244-06). The confirm
   word is **`Save to Library`**. ⛔ Never `Attach` (the composer's word) and never `Import` (the cloud
   door's word).
+  ⚠ **AMENDED 2026-10-05 by sketch 274 (the original above is kept, not deleted).** `MoveToFolderDialog`
+  **cannot be reused as-is**: it is a flat `Select` that calls `moveDocument` itself and offers
+  **"Root (no folder)"**, and `UploadFolderPicker` has the same Root sentinel. The binding rule is now:
+  **a folder picker with NO Root option that returns a folder id and leaves the commit to the caller**,
+  drawn as the sketch-274-A **searchable list of full paths** (D-15). Reuse `listFolders()`; do not
+  reuse either shipped picker's Root branch.
 - **D-11:** **Promotion COPIES.** The Library gets its own `documents` row through the shipped minter
   (`async_mint_document_row` → the normal splice/extraction/embedding pipeline). ⛔ No second ingest
   path, no hand-rolled insert. The thread attachment **stays** in the thread unchanged, and its chip
@@ -115,6 +121,15 @@ phase does NOT rebuild it. It does four things:
   (`.planning/sketches/236-the-file-that-belongs-to-this-chat/`) rather than starting fresh, and ports
   its `COPY.js`. The operator-approved mockup is the acceptance bar. Per D-244-27, a text-only contract is
   not sufficient: the sketch's ordered composition is what the build reproduces.
+  ✅ **RESOLVED 2026-10-05: sketch `274-save-to-library`, winner A (Menu on the chip).** The
+  acceptance bar is `.planning/sketches/274-save-to-library/index.html`, its README's *Build Contract*
+  and *WINNER* sections, and `COPY.js` (**ported, not re-typed**). Binding atoms: an always-visible
+  `⋯` in the chip (touch-reachable) → *Save to Library… / Open in panel*. The dialog is a searchable
+  full-path listbox with no Root, and confirm is disabled until a folder is picked. The chip gains a
+  segment (`✓ In Library · <leaf>` / `Already in Library · <leaf>`) carrying `· indexing…` until the
+  document is searchable. The same `⋯` sits on the panel Files row, and agent-written files get none.
+  The chip drops `24h` (D-07). ⚠ The listbox needs real listbox a11y (`role=option`, `aria-selected`,
+  keyboard), the 035-A obligation.
 - **D-16:** **G-4: all four operator scenarios are driven in Chrome at verification**, not just asserted:
   1. **Library pollution:** attach a PDF in chat → it is NOT in the Library and NOT found by document
      search.
@@ -179,6 +194,7 @@ phase does NOT rebuild it. It does four things:
 - `.planning/reported-bugs/BUG-260905-01-cloud-import-lives-in-chat-and-dumps-into-library-root.md`: disposition table; closes on driven rows (D-17)
 
 ### Design
+- `.planning/sketches/274-save-to-library/` (`index.html`, `COPY.js`, `README.md`): ⭐ **THE ACCEPTANCE BAR (winner A)**. Port `COPY.js`; reproduce the README *Build Contract* composition
 - `.planning/sketches/236-the-file-that-belongs-to-this-chat/index.html` + `COPY.js`: the chip contract D-15 extends
 - `.claude/skills/sketch-findings-agentic-rag/SKILL.md`: load before the sketch and before any chip/panel build
 

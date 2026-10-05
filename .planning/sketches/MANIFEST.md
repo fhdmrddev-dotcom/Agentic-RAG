@@ -2952,3 +2952,9 @@ reuses 267-B's event-card shape.
 |---|------|----------------|--------|------|
 | 273 | agent-authored-artifacts | Artifact frame in a chat answer, the chart/table/metric family, follow-up lineage, failure notice + states | ★ 1B framed card · 2A one metric tile · 3A lineage caption · 4B explicit notice + live render (operator, 2026-10-03) | phase-273, artifacts, chart, provenance, failure-notice |
 | 276 | public-docs | Syrel public /docs on the landing domain: docs app vs landing-native vs video-first learning path (home · guide · changelog) | ★ B landing-native for home, guide and changelog (operator, 2026-10-04) | landing, docs, changelog, video |
+
+## Sketch 274 — Save to Library (Phase 274, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 274 | save-to-library | How does a person keep a chat file, on purpose, and see that they did? (action on the chip · folder picker without Root · after-mark; dedup + version + refusal states) | — | phase-274, att-03, promote, library, folder-picker |
