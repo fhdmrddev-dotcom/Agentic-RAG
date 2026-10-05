@@ -441,6 +441,120 @@ function aclsIn(sql, file) {
 }
 
 /**
+ * ⭐ DROP-AWARENESS (Phase 272-03). A function's ACL history ends where a LATER migration drops
+ * that exact signature.
+ *
+ * ⛔ WHY IT EXISTS — measured, not anticipated. Migration 200 replaced
+ *    `match_document_chunks(vector, …, text)` and `keyword_search_chunks(text, …, uuid[])` with
+ *    longer signatures (DROP old → CREATE new, the 033/036/073 precedent), and re-granted the NEW
+ *    ones. Before this, the gate kept expecting migration 181's EIGHT tuples on the dropped
+ *    signatures, so the ONLY way to turn it green was to leave `REVOKE … ON FUNCTION <old sig>`
+ *    in the supplement — which ERRORS on a greenfield database, where the regenerated dump no
+ *    longer contains that function, and rolls back the whole one-paste bootstrap. A gate whose
+ *    green state breaks the artifact it guards is the failure mode this file exists to prevent.
+ *
+ * ⛔ IDENTITY IS STILL THE ARGUMENT LIST. A drop retires ONLY tuples whose signature matches
+ *    exactly (after reading `public.vector` and `vector` as the same type — a DROP and a GRANT
+ *    may qualify an argument type differently and Postgres resolves both to one function). A
+ *    drop of `f(integer)` never retires `f(text)` (pinned in --self-test), and an ACL written
+ *    AFTER the drop — a re-creation under the same signature — is expected again.
+ */
+const DROP_FN_RE = /^\s*DROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?([\s\S]+?)\s*(?:\b(?:CASCADE|RESTRICT)\b)?\s*$/i;
+
+/**
+ * Postgres spellings of one type (272-REVIEW WR-06). A DROP, a CREATE and a GRANT may name the
+ * same argument type differently (`int` / `integer`); Postgres resolves them to ONE function, so
+ * identity matching must too — otherwise a drop + re-create escapes the recreated-without-acl check.
+ */
+const TYPE_ALIASES = {
+  int: 'integer', int4: 'integer', int8: 'bigint', int2: 'smallint',
+  float8: 'double precision', float4: 'real', bool: 'boolean',
+  varchar: 'character varying', timestamptz: 'timestamp with time zone',
+};
+
+/** Read a signature's argument types without schema qualification (`public.vector` → `vector`). */
+function identityOf(signature) {
+  const open = signature.indexOf('(');
+  if (open === -1) return signature;
+  const args = signature.slice(open + 1, signature.lastIndexOf(')'))
+    .replace(/\b(?:public|pg_catalog)\./g, '')
+    .split(',')
+    .map((a) => a.trim())
+    .filter((a) => a.length > 0)
+    .map((a) => a.replace(/^([a-z0-9_]+)(\[\])?$/, (m, t, arr) => (TYPE_ALIASES[t] || t) + (arr || '')));
+  return `${signature.slice(0, open)}(${args.join(', ')})`;
+}
+
+/** Words a multi-word type name can START with, so `double precision` is never read as a name. */
+const TYPE_START_WORDS = new Set([
+  'double', 'character', 'char', 'varchar', 'timestamp', 'time', 'bit', 'interval', 'national',
+]);
+const CREATE_FN_RE = /^\s*CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([A-Za-z_"][\w."]*)\s*\(/i;
+
+/** Split on top-level commas only (a DEFAULT may hold parentheses or a cast). */
+function splitTopLevel(text) {
+  const parts = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of text) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) { parts.push(cur); cur = ''; } else cur += ch;
+  }
+  if (cur.trim()) parts.push(cur);
+  return parts;
+}
+
+/**
+ * The identity signature of every `CREATE [OR REPLACE] FUNCTION` in a chunk list — argument TYPES
+ * only (names, DEFAULTs and OUT parameters are not part of a function's identity).
+ */
+function createsIn(sql, file) {
+  const out = [];
+  const chunks = statements(sql);
+  for (let s = 0; s < chunks.length; s += 1) {
+    const m = CREATE_FN_RE.exec(chunks[s]);
+    if (!m) continue;
+    const start = m.index + m[0].length;
+    let depth = 1;
+    let i = start;
+    for (; i < chunks[s].length && depth > 0; i += 1) {
+      if (chunks[s][i] === '(') depth += 1;
+      if (chunks[s][i] === ')') depth -= 1;
+    }
+    const types = [];
+    for (const raw of splitTopLevel(chunks[s].slice(start, i - 1))) {
+      let arg = raw.replace(/\s+(?:DEFAULT\b|=)[\s\S]*$/i, '').trim().replace(/\s+/g, ' ');
+      let words = arg.split(' ');
+      const mode = words[0].toLowerCase();
+      if (mode === 'out') continue;                         // OUT params are not identity
+      if (['in', 'inout', 'variadic'].includes(mode)) words = words.slice(1);
+      if (words.length >= 2 && !TYPE_START_WORDS.has(words[0].toLowerCase())) words = words.slice(1);
+      arg = words.join(' ');
+      if (arg) types.push(arg);
+    }
+    out.push({ signature: identityOf(normaliseSignature(`${m[1]}(${types.join(', ')})`)), file, s });
+  }
+  return out;
+}
+
+/** Every function signature a chunk of SQL DROPs, with the statement index it sits at. */
+function dropsIn(sql, file) {
+  const out = [];
+  const chunks = statements(sql);
+  for (let s = 0; s < chunks.length; s += 1) {
+    const m = DROP_FN_RE.exec(chunks[s]);
+    if (!m) continue;
+    const re = /([A-Za-z_"][\w."]*\s*\([^)]*\))/g;
+    let x;
+    while ((x = re.exec(m[1])) !== null) {
+      out.push({ signature: normaliseSignature(x[1]), file, s });
+    }
+  }
+  return out;
+}
+
+/**
  * Scan the migrations directory.
  *
  * `migrationCount` is the FILTERED `readdirSync` length and is the ONLY authority for how many
@@ -462,11 +576,60 @@ function scanMigrations(dir, minFiles) {
       + 'A gate that passes over nothing is worse than absent.',
     );
   }
-  const acls = [];
+  let acls = [];
+  const retired = [];
+  // 272-REVIEW WR-06 — a DROP retires a signature's ACL history, but a later CREATE of the SAME
+  // identity gives the function DEFAULT privileges again (PUBLIC EXECUTE, and Supabase's anon
+  // grant). So: remember which grantees a drop's retired REVOKEs covered (`droppedRevokes`); on a
+  // re-create, EXPECT each of them to be revoked again AFTER it (`pending`). Whatever is still
+  // pending at the end is `[recreated-without-acl]` — the BUG-260911-01 class this gate guards.
+  const droppedRevokes = new Map();      // identity -> { grantees: Set, by: file }
+  const pending = new Map();             // identity -> { grantees: Set, droppedBy, createdBy }
   for (const f of files) {
-    acls.push(...aclsIn(fs.readFileSync(path.join(dir, f), 'utf8'), `migrations/${f}`));
+    const sql = fs.readFileSync(path.join(dir, f), 'utf8');
+    const file = `migrations/${f}`;
+    // Statement order matters WITHIN a file too: 200 drops the old signature, then grants the new.
+    const events = [
+      ...aclsIn(sql, file).map((a) => ({ s: Number(a.stmtId.split('#').pop()), acl: a })),
+      ...dropsIn(sql, file).map((d) => ({ s: d.s, drop: d })),
+      ...createsIn(sql, file).map((c) => ({ s: c.s, create: c })),
+    ].sort((x, y) => x.s - y.s);
+    for (const ev of events) {
+      if (ev.acl) {
+        acls.push(ev.acl);
+        if (ev.acl.kind === 'function' && ev.acl.verb === 'REVOKE') {
+          const p = pending.get(identityOf(ev.acl.signature));
+          if (p) p.grantees.delete(ev.acl.grantee);
+        }
+        continue;
+      }
+      if (ev.create) {
+        const id = identityOf(ev.create.signature);
+        const d = droppedRevokes.get(id);
+        if (d && d.grantees.size) {
+          pending.set(id, { grantees: new Set(d.grantees), droppedBy: d.by, createdBy: file });
+          droppedRevokes.delete(id);
+        }
+        continue;
+      }
+      const id = identityOf(ev.drop.signature);
+      pending.delete(id);                // a later drop ends a re-creation too
+      const keep = [];
+      const revoked = new Set();
+      for (const a of acls) {
+        if (a.kind === 'function' && identityOf(a.signature) === id) {
+          retired.push({ acl: a, by: file });
+          if (a.verb === 'REVOKE') revoked.add(a.grantee);
+        } else keep.push(a);
+      }
+      if (revoked.size) droppedRevokes.set(id, { grantees: revoked, by: file });
+      acls = keep;
+    }
   }
-  return { migrationCount, acls };
+  const recreated = [...pending.entries()]
+    .filter(([, p]) => p.grantees.size)
+    .map(([signature, p]) => ({ signature, grantees: [...p.grantees].sort(), droppedBy: p.droppedBy, createdBy: p.createdBy }));
+  return { migrationCount, acls, retired, recreated };
 }
 
 /** The supplement's mirrored tuple set. */
@@ -581,11 +744,11 @@ function analyse({
   minFiles = MIN_MIGRATION_FILES,
   minTuples = MIN_ACL_TUPLES,
 }) {
-  const { migrationCount, acls } = scanMigrations(migrationsDir, minFiles);
+  const { migrationCount, acls, retired, recreated } = scanMigrations(migrationsDir, minFiles);
   // R2-CR-01: the file floor above proves the directory was READ, never that anything was
   // PARSED out of it. Neutering either ACL regex kept migrationCount at 148 and drove acls to
   // [], and the gate then reported `mirrored: 0/0` as a PASS, exit 0. Refuse that here.
-  if (acls.length < minTuples) {
+  if (acls.length + retired.length < minTuples) {
     throw new VacuousScanError(
       `only ${acls.length} ACL tuple(s) parsed from ${migrationCount} migration file(s) in `
       + `${migrationsDir}, below the floor of ${minTuples} — the directory was read but nothing `
@@ -613,6 +776,8 @@ function analyse({
     missing,
     mirrored,
     tail,
+    retired,
+    recreated,
     artifactPath,
     supplementPath,
     fn: statementStats(acls, 'function'),
@@ -633,6 +798,16 @@ function report(result, log = console.log) {
     + ` · mirrored: ${mirrored.length}/${expected.size}`
     + ` · tail: ${tail.lines} lines · md5 ${tail.artifactMd5}`,
   );
+  if (result.retired && result.retired.length) {
+    // Printed, never silent: a retired tuple is one this gate STOPPED expecting, and a reader must
+    // be able to see which signature a later DROP FUNCTION ended and where.
+    const byDrop = new Map();
+    for (const { acl, by } of result.retired) {
+      const k = `${acl.signature} (dropped in ${by})`;
+      byDrop.set(k, (byDrop.get(k) || 0) + 1);
+    }
+    log(`  retired by a later DROP FUNCTION: ${result.retired.length} tuple(s) — ${[...byDrop.entries()].map(([k, n]) => `${k}: ${n}`).join(' · ')}`);
+  }
   if (tbl.perFile.size) {
     log(`  table/column statements per migration: ${[...tbl.perFile.entries()].sort().map(([f, c]) => `${f} (${c})`).join(' · ')}`);
   }
@@ -665,7 +840,23 @@ ${RED}THE BOOTSTRAP ARTIFACT HAS LOST ITS SUPPLEMENT TAIL${RST} (D-11 / MC-1):
     return 1;
   }
 
+  const recreated = result.recreated || [];
+  if (recreated.length) {
+    log(`\n${RED}${recreated.length} FUNCTION(S) WERE DROPPED AND RE-CREATED WITHOUT THEIR REVOKES${RST} — they run with DEFAULT privileges again:`);
+    for (const r of recreated) {
+      log(`  [recreated-without-acl]  ${r.signature}  ${YEL}—${RST} dropped in ${r.droppedBy}, re-created in ${r.createdBy}; `
+        + `no later REVOKE EXECUTE … FROM ${r.grantees.join(', ')}`);
+    }
+    log(`
+⛔ A DROP ends a function's ACL history, and CREATE gives the new one Postgres's DEFAULT
+   privileges: EXECUTE for PUBLIC (and, on Supabase, anon). The revokes written for the old
+   function do NOT carry over (272-REVIEW WR-06; the BUG-260911-01 class). Write the REVOKEs (from
+   PUBLIC first, then anon) and GRANTs again after the CREATE, in the same migration, then mirror
+   them into scripts/full-schema-supplement.sql.`);
+  }
+
   if (!missing.length) {
+    if (recreated.length) return 1;
     log(`${GRN}schema ACL parity OK${RST} — every function AND table/column ACL in supabase/migrations/ is mirrored in the supplement.`);
     return 0;
   }
@@ -1119,6 +1310,96 @@ function runSelfTest() {
       crlfRes.tail.ok && crlfRes.tail.lines === identRes.tail.lines,
       `crlf ${crlfRes.tail.lines} lines vs lf ${identRes.tail.lines} lines`);
 
+    // ── DROP-AWARENESS arm (272-03): a later DROP FUNCTION retires EXACTLY that signature ────
+    const dropDir = path.join(tmp, 'migrations-drop');
+    fs.mkdirSync(dropDir);
+    padToFloor(dropDir);
+    fs.writeFileSync(path.join(dropDir, '990_grant_old.sql'),
+      'REVOKE EXECUTE ON FUNCTION public.rpc(vector, integer) FROM PUBLIC;\n'
+      + 'GRANT EXECUTE ON FUNCTION public.rpc(vector, integer) TO authenticated;\n'
+      + 'REVOKE EXECUTE ON FUNCTION public.keep(text) FROM PUBLIC;\n');
+    fs.writeFileSync(path.join(dropDir, '991_replace.sql'),
+      'DROP FUNCTION IF EXISTS public.rpc(\n  public.vector, integer\n);\n'
+      + 'DROP FUNCTION IF EXISTS public.keep(integer);\n'
+      + 'REVOKE EXECUTE ON FUNCTION public.rpc(vector, integer, uuid[]) FROM PUBLIC;\n');
+    const supDrop = path.join(tmp, 'supplement-drop.sql');
+    fs.writeFileSync(supDrop,
+      'REVOKE EXECUTE ON FUNCTION public.rpc(vector, integer, uuid[]) FROM PUBLIC;\n'
+      + 'REVOKE EXECUTE ON FUNCTION public.keep(text) FROM PUBLIC;\n');
+    const dropRes = analyse({ minTuples: 1, migrationsDir: dropDir, supplementPath: supDrop, artifactPath: artifactFor(supDrop) });
+    const dropLines = [];
+    const dropCode = report(dropRes, (l) => dropLines.push(l));
+    check('DROP-AWARE: tuples on a signature a LATER migration drops are no longer expected',
+      dropCode === 0 && dropRes.retired.length === 2, `exit=${dropCode}, retired=${dropRes.retired.length}`);
+    check('DROP-AWARE: the retirement is PRINTED, never silent',
+      dropLines.some((l) => l.includes('retired by a later DROP FUNCTION') && l.includes('public.rpc(vector, integer)')));
+    check('DROP-AWARE (COUNTERFACTUAL): dropping keep(integer) does NOT retire keep(text)',
+      !dropRes.retired.some((r) => r.acl.signature === 'public.keep(text)')
+      && [...dropRes.expected.values()].some((v) => v.label.includes('public.keep(text)')));
+    const supDropMissing = path.join(tmp, 'supplement-drop-missing.sql');
+    fs.writeFileSync(supDropMissing, 'REVOKE EXECUTE ON FUNCTION public.keep(text) FROM PUBLIC;\n');
+    const dropRed = analyse({ minTuples: 1, migrationsDir: dropDir, supplementPath: supDropMissing, artifactPath: artifactFor(supDropMissing) });
+    check('DROP-AWARE (RED): the NEW signature written after the drop is still expected',
+      report(dropRed, () => {}) === 1 && dropRed.missing.some((k) => k.includes('public.rpc(vector, integer, uuid[])')));
+
+    // ── RECREATED-WITHOUT-ACL arm (272-REVIEW WR-06): a DROP + CREATE of the SAME signature ──
+    //    gives the function DEFAULT privileges again (PUBLIC EXECUTE, and Supabase's anon grant —
+    //    the BUG-260911-01 class). The DROP retires the old tuples, so before WR-06 the gate stopped
+    //    expecting them and went GREEN over a function that had silently regained PUBLIC execute.
+    const recDir = path.join(tmp, 'migrations-recreate');
+    fs.mkdirSync(recDir);
+    padToFloor(recDir);
+    fs.writeFileSync(path.join(recDir, '990_grant_f.sql'),
+      'REVOKE EXECUTE ON FUNCTION public.f(integer) FROM PUBLIC;\n'
+      + 'REVOKE EXECUTE ON FUNCTION public.f(integer) FROM anon;\n'
+      + 'GRANT EXECUTE ON FUNCTION public.f(integer) TO authenticated;\n');
+    fs.writeFileSync(path.join(recDir, '991_recreate_f.sql'),
+      'DROP FUNCTION IF EXISTS public.f(int);\n'
+      + 'CREATE OR REPLACE FUNCTION public.f(p_x integer DEFAULT 1)\n'
+      + ' RETURNS integer LANGUAGE sql SECURITY DEFINER SET search_path TO \'\'\n'
+      + 'AS $function$ SELECT p_x $function$;\n');
+    const supRec = path.join(tmp, 'supplement-recreate.sql');
+    fs.writeFileSync(supRec, '-- f(integer) mirrors nothing: the 990 tuples were retired by the drop\n');
+    const recRes = analyse({ minTuples: 1, migrationsDir: recDir, supplementPath: supRec, artifactPath: artifactFor(supRec) });
+    const recLines = [];
+    const recCode = report(recRes, (l) => recLines.push(l));
+    check('RECREATED (RED): DROP + CREATE of the same signature with no fresh ACL exits 1',
+      recCode === 1 && Array.isArray(recRes.recreated) && recRes.recreated.length === 1,
+      `exit=${recCode}, recreated=${JSON.stringify(recRes.recreated)}`);
+    check('RECREATED (RED): the failure names the signature and BOTH grantees the drop retired',
+      recLines.some((l) => l.includes('[recreated-without-acl]') && l.includes('public.f(integer)')
+        && l.includes('public') && l.includes('anon')));
+    // Counterfactual: the SAME drop + create, followed by fresh revokes (and the supplement
+    // mirroring them), is clean.
+    const recOkDir = path.join(tmp, 'migrations-recreate-ok');
+    fs.mkdirSync(recOkDir);
+    padToFloor(recOkDir);
+    fs.copyFileSync(path.join(recDir, '990_grant_f.sql'), path.join(recOkDir, '990_grant_f.sql'));
+    fs.writeFileSync(path.join(recOkDir, '991_recreate_f.sql'),
+      fs.readFileSync(path.join(recDir, '991_recreate_f.sql'), 'utf8')
+      + 'REVOKE EXECUTE ON FUNCTION public.f(integer) FROM PUBLIC;\n'
+      + 'REVOKE EXECUTE ON FUNCTION public.f(integer) FROM anon;\n');
+    const supRecOk = path.join(tmp, 'supplement-recreate-ok.sql');
+    fs.writeFileSync(supRecOk,
+      'REVOKE EXECUTE ON FUNCTION public.f(integer) FROM PUBLIC;\n'
+      + 'REVOKE EXECUTE ON FUNCTION public.f(integer) FROM anon;\n');
+    const recOk = analyse({ minTuples: 1, migrationsDir: recOkDir, supplementPath: supRecOk, artifactPath: artifactFor(supRecOk) });
+    check('RECREATED (COUNTERFACTUAL): the recreate WITH fresh revokes from PUBLIC and anon exits 0',
+      report(recOk, () => {}) === 0 && Array.isArray(recOk.recreated) && recOk.recreated.length === 0,
+      `recreated=${JSON.stringify(recOk.recreated)}`);
+    // Counterfactual: a CREATE OR REPLACE with NO prior drop keeps its ACL in Postgres — not flagged.
+    const replDir = path.join(tmp, 'migrations-replace-only');
+    fs.mkdirSync(replDir);
+    padToFloor(replDir);
+    fs.copyFileSync(path.join(recDir, '990_grant_f.sql'), path.join(replDir, '990_grant_f.sql'));
+    fs.writeFileSync(path.join(replDir, '991_replace_f.sql'),
+      'CREATE OR REPLACE FUNCTION public.f(p_x integer)\n RETURNS integer LANGUAGE sql AS $function$ SELECT 2 $function$;\n');
+    const supRepl = path.join(tmp, 'supplement-replace-only.sql');
+    fs.writeFileSync(supRepl, fs.readFileSync(path.join(recDir, '990_grant_f.sql')));
+    const replRes = analyse({ minTuples: 1, migrationsDir: replDir, supplementPath: supRepl, artifactPath: artifactFor(supRepl) });
+    check('RECREATED (COUNTERFACTUAL): CREATE OR REPLACE with no DROP keeps its ACL and is not flagged',
+      report(replRes, () => {}) === 0 && Array.isArray(replRes.recreated) && replRes.recreated.length === 0);
+
     // ── count assertion ─────────────────────────────────────────────────────────────────────
     const emptyDir = path.join(tmp, 'empty-migrations');
     fs.mkdirSync(emptyDir);
@@ -1198,6 +1479,7 @@ module.exports = {
   normaliseSignature,
   statements,
   aclsIn,
+  createsIn,
   analyse,
   report,
   assertTailIdentity,

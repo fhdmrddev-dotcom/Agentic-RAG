@@ -3,7 +3,10 @@ seed_id: SEED-243
 title: "Find the DOCUMENT, not just the answer — DMS-grade metadata, structure and search, and the classification page that has no home"
 created: 2026-09-04
 planted_during: "v3.9 close intake — operator, before /gsd:complete-milestone"
-status: planted
+status: answered
+partial: false
+folded_into: "271"
+status_note: "Flipped from `planted` at Phase 271 close (plan 271-05, 2026-10-03). §decide 1-3 delivered: (1) Classification renamed Filing rules and mounted inside the Library, rail entry removed; (2) POST /document-search finds DOCUMENTS by field beside RAG, no embedding call; (3) folder subtree, both relationship directions and version state are filters. The operator addition (download + file facts) shipped in Phase 270. Item 4 untouched (SEED-211 still deferred). OPEN: operator sign-off on G4-1..G4-6; P-01 (default sort) and P-03 (Older versions = own rows only) await operator review; 271-05 findings F-1 (raw-key metadata chips) and F-2 (Re-ingest on an older row is a silent no-op) are routed, not fixed."
 surface: Agentic-RAG
 severity: medium
 category: knowledge-base / document-management / search / IA
@@ -136,3 +139,12 @@ They are the same missing idea: **the document as an object in its own right**, 
 source of passages. You cannot run a document management system where the file cannot leave and its
 own properties are unknown — and both are cheap here precisely because the storage and the
 extraction pass already exist.
+
+## Answered by Phase 271 (2026-10-03, plan 271-05)
+
+Measured on the live local stack, not inferred from the plans. `POST /document-search` returned exact id sets
+for type + added by + document date + custom field, folder subtree on/off, both relationship directions and
+all three version states (`backend/tests/integration/test_271_search_live.py`), and the two-org fence held on
+GoTrue-issued JWTs (`test_271_two_org_fence.py`). G4-1..G4-6 were driven in Chromium and all passed their
+failure clauses (`.planning/phases/271-find-the-document/271-UAT-LOG.md`); operator sign-off on them is
+OWED. P-01 and P-03 await operator review. Findings F-1 and F-2 from that drive are routed in the UAT log.

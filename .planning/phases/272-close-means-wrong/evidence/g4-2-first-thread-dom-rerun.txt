@@ -1,0 +1,50 @@
+thread d420779b-59af-45b3-9bab-c13b3945cc3c (first G4-2 drive), re-opened in the current frontend; run card unfolded
+search-filter-line: [
+ "Filtered: legal entity = Acme GmbH · document date 1–31 Jul 2026",
+ "Filtered: legal entity = Acme GmbH"
+]
+search card summaries: [
+ "What was revenue for Acme GmbH in July? Run · 2 steps deepseek-v4-flash ⏱ 10.1s $0.0074 1 Searching documents→no documents matched Filtered: legal entity = Acme GmbH · document date 1–31 Jul 2026 2 Se",
+ "Searching documents→no documents matched",
+ "Searching documents→no documents matched Filtered: legal entity = Acme GmbH · document date 1–31 Jul 2026",
+ "Searching documents→refused — would drop the filter",
+ "Searching documents→refused — would drop the filter Filtered: legal entity = Acme GmbH"
+]
+
+--- main innerText ---
+Acme GmbH July Revenue Query
+
+What was revenue for Acme GmbH in July?
+
+Run · 2 steps
+deepseek-v4-flash
+⏱
+10.1s
+$0.0074
+1
+Searching documents→no documents matched
+Filtered: legal entity = Acme GmbH · document date 1–31 Jul 2026
+2
+Searching documents→refused — would drop the filter
+Filtered: legal entity = Acme GmbH
+
+No documents matched legal entity = Acme GmbH · document date 1–31 July 2026, so I can't give you a July revenue figure for Acme GmbH from your library.
+
+The filter I used was legal_entity = Acme GmbH combined with date between 2026-07-01 and 2026-07-31.
+
+Nearby periods that do have Acme-related documents are:
+
+March 2026 (1 document)
+October 2025 (1 document)
+September 2025 (1 document)
+
+Would you like me to run the search against one of those months instead?
+
+USING:
+All your documents
+deepseek
+deepseek-v4-flash
+General
+Enter ↵ · Shift+Enter for newline
+
+AI can make mistakes. Verify important information.

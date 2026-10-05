@@ -86,3 +86,13 @@ an entry into a menu must keep that fence green, not delete the view's door.
 ## Workarounds
 
 None needed functionally — every surface is reachable today. The cost is density, not access.
+
+## 2026-10-03: partial effect from Phase 271 (not a fix; status stays open)
+
+Phase 271 removed the **Classification** rail entry: the rules moved into the Library as **Filing rules**
+(a header link inside the Library, not a rail slot). So the rail lost one affordance. Measured in Chromium at
+271-05 (G4-3), as a fresh org-admin of its own org: the rail's labelled controls were New chat, Chat,
+Workflows, Library, Connections, Skills, Experts, Organization admin and the account menu, with no
+Classification. That account is not an operator, so the drive did not show Control Room or Spend.
+This report's complaint stands: Settings, Organization admin, Control Room and Spend still take rail slots
+for the people who have them. Evidence: `.planning/phases/271-find-the-document/evidence/g4-3-dom.txt`.

@@ -94,8 +94,8 @@ async def _search(folder_subtree_ids, monkeypatch):
             return [h for h in HITS if h["folder_id"] in set(map(str, folder_ids))], 0.71
         return list(HITS), 0.71
 
-    monkeypatch.setattr(td, "search_documents", _rpc)
-    monkeypatch.setattr(td, "write_audit_entry", AsyncMock())
+    monkeypatch.setattr("app.services.search_documents_tool.search_documents", _rpc)
+    monkeypatch.setattr("app.services.search_documents_tool.write_audit_entry", AsyncMock())
     emit = AsyncMock()
     ctx = SimpleNamespace(
         current_user={"id": "user-1"},
@@ -208,8 +208,8 @@ async def test_a_restricted_expert_with_folders_still_walls_the_search(monkeypat
     async def _leaky_rpc(*a, **k):  # an RPC that ignored its filter — the clip is the backstop
         return list(HITS), 0.71
 
-    monkeypatch.setattr(td, "search_documents", _leaky_rpc)
-    monkeypatch.setattr(td, "write_audit_entry", AsyncMock())
+    monkeypatch.setattr("app.services.search_documents_tool.search_documents", _leaky_rpc)
+    monkeypatch.setattr("app.services.search_documents_tool.write_audit_entry", AsyncMock())
     emit = AsyncMock()
     ctx = SimpleNamespace(
         current_user={"id": "user-1"}, supabase=object(), user_settings=None,

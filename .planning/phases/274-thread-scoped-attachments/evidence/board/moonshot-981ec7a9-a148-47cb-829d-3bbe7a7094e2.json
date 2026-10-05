@@ -1,0 +1,126 @@
+{
+  "provider": "moonshot",
+  "model": "kimi-k3",
+  "calling_mode_predicted": "NATIVE",
+  "file": {
+    "name": "meridian-clearance-moonshot.md",
+    "body": "# Meridian supplier note\n\nThe Meridian freight-cap clearance code is ATT274-moonshot-863e2ef7.\n"
+  },
+  "question": "What is the Meridian freight-cap clearance code in the file I attached?",
+  "verdicts": {
+    "d05": "PASS",
+    "answer": "PASS",
+    "second_thread": "PASS",
+    "search_neg": "PASS",
+    "db_neg": "PASS"
+  },
+  "row": {
+    "provider": "moonshot",
+    "model": "kimi-k3",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "token": "ATT274-moonshot-863e2ef7",
+    "thread_a": "edd20fa4-53db-4c59-9756-bc07e7d50a50",
+    "thread_b": "60a1d669-a1cb-4821-bf5c-0d2ffba468cc",
+    "upload_http": 200,
+    "d05": "PASS",
+    "ws_row": {
+      "id": "87bcf294-8aa2-48ec-ae3f-9c3ee65057cb",
+      "path": "/7c55b4c8-meridian-clearance-moonshot.md",
+      "kind": "template_input",
+      "expires_at": null,
+      "size_bytes": "95",
+      "content_storage_path": null,
+      "library_document_id": null,
+      "library_link": null
+    },
+    "answer": "PASS",
+    "run_a_status": "completed",
+    "a_tools": [
+      "workspace_read",
+      "workspace_list",
+      "workspace_list",
+      "workspace_read"
+    ],
+    "a_final": "The Meridian freight-cap clearance code in your attached file is **ATT274-moonshot-863e2ef7**.\n\nSource: **7c55b4c8-meridian-clearance-moonshot.md** (the Meridian supplier note you attached to this conversation).",
+    "second_thread": "PASS",
+    "run_b_status": "completed",
+    "b_tools": [
+      "search_documents",
+      "grep",
+      "grep",
+      "grep",
+      "grep",
+      "query_documents"
+    ],
+    "b_final": "I couldn't find any \"Meridian freight-cap clearance code\" in your files. I searched both semantically and with exact text matching across all document contents, and no document contains the terms \"freight-cap\" or \"clearance code\" \u2014 and nothing connects \"Meridian\" to freight or clearance codes.\n\nHere's what does exist in your library, in case one of these is what you meant:\n\n- **Project Meridian do",
+    "search_http": 200,
+    "search_total": 0,
+    "search_neg": "PASS",
+    "library_rows_with_token": 0,
+    "db_neg": "PASS"
+  },
+  "turn_a": {
+    "run_id": "981ec7a9-a148-47cb-829d-3bbe7a7094e2",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "kimi-k3",
+      "provider": "moonshot",
+      "error": null,
+      "started_at": "2026-10-05 14:36:03.224426+00:00",
+      "completed_at": "2026-10-05 14:36:44.998394+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "c93a7d56-924e-44fb-afe5-df5837106a3c",
+        "content": "The Meridian freight-cap clearance code in your attached file is **ATT274-moonshot-863e2ef7**.\n\nSource: **7c55b4c8-meridian-clearance-moonshot.md** (the Meridian supplier note you attached to this conversation)."
+      }
+    ],
+    "tool_call_names": [
+      "workspace_read",
+      "workspace_list",
+      "workspace_list",
+      "workspace_read"
+    ],
+    "final": "The Meridian freight-cap clearance code in your attached file is **ATT274-moonshot-863e2ef7**.\n\nSource: **7c55b4c8-meridian-clearance-moonshot.md** (the Meridian supplier note you attached to this conversation)."
+  },
+  "turn_b": {
+    "run_id": "f8949d25-8b0f-4c2c-918b-3d3dae4de2a3",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "kimi-k3",
+      "provider": "moonshot",
+      "error": null,
+      "started_at": "2026-10-05 14:36:45.508075+00:00",
+      "completed_at": "2026-10-05 14:38:02.974736+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "21a5fd83-f203-41f2-af2c-ec217a6d67ca",
+        "content": "I couldn't find any \"Meridian freight-cap clearance code\" in your files. I searched both semantically and with exact text matching across all document contents, and no document contains the terms \"freight-cap\" or \"clearance code\" \u2014 and nothing connects \"Meridian\" to freight or clearance codes.\n\nHere's what does exist in your library, in case one of these is what you meant:\n\n- **Project Meridian documents** \u2014 charter excerpt, risk register, risk workshop notes, status reports, sprint logs. These cover an internal project, and none mention freight caps or clearance codes.\n- **Freight / customs clearance documents** \u2014 the **ACME\u2013Kestrel Freight Master Services Agreement** and the **Northwind Logistics** commercial notes mention freight and customs *clearance* (e.g., \"customs clearance within 2 business days\"), but none mention Meridian or any clearance *code*.\n- **Your most recent attachment, `273-board-revenue.csv`** \u2014 contains none of these terms either.\n\nIt's possible the code is in a file that didn't upload successfully, or it may go by a different name. If you can tell me which specific file you attached (or re-attach it), I'll pull the code from it directly."
+      }
+    ],
+    "tool_call_names": [
+      "search_documents",
+      "grep",
+      "grep",
+      "grep",
+      "grep",
+      "query_documents"
+    ],
+    "final": "I couldn't find any \"Meridian freight-cap clearance code\" in your files. I searched both semantically and with exact text matching across all document contents, and no document contains the terms \"freight-cap\" or \"clearance code\" \u2014 and nothing connects \"Meridian\" to freight or clearance codes.\n\nHere's what does exist in your library, in case one of these is what you meant:\n\n- **Project Meridian documents** \u2014 charter excerpt, risk register, risk workshop notes, status reports, sprint logs. These cover an internal project, and none mention freight caps or clearance codes.\n- **Freight / customs clearance documents** \u2014 the **ACME\u2013Kestrel Freight Master Services Agreement** and the **Northwind Logistics** commercial notes mention freight and customs *clearance* (e.g., \"customs clearance within 2 business days\"), but none mention Meridian or any clearance *code*.\n- **Your most recent attachment, `273-board-revenue.csv`** \u2014 contains none of these terms either.\n\nIt's possible the code is in a file that didn't upload successfully, or it may go by a different name. If you can tell me which specific file you attached (or re-attach it), I'll pull the code from it directly."
+  },
+  "upload_response": {
+    "file_id": "87bcf294-8aa2-48ec-ae3f-9c3ee65057cb",
+    "path": "/7c55b4c8-meridian-clearance-moonshot.md",
+    "version": 1,
+    "size_bytes": 95,
+    "mime_type": "text/markdown",
+    "kind": "template_input",
+    "expires_at": null,
+    "is_new": true,
+    "warning": null
+  }
+}

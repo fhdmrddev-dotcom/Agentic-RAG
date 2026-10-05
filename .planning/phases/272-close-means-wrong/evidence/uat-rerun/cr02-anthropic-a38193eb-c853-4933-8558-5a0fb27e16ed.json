@@ -1,0 +1,207 @@
+{
+  "label": "cr02",
+  "prompt": "Using search_documents, find the contracts whose contract_end falls within the next 60 days (filter contract_end within_next 60 days) and summarise them.",
+  "model": "claude-sonnet-5",
+  "provider": "anthropic",
+  "thread_id": "dc4ae9d7-baf8-46fa-ab8b-84004664058a",
+  "run_id": "a38193eb-c853-4933-8558-5a0fb27e16ed",
+  "run_status": "completed",
+  "run": {
+    "status": "completed",
+    "model": "claude-sonnet-5",
+    "provider": "anthropic",
+    "error": null
+  },
+  "search_query_audits": [
+    {
+      "id": "1107efa2-5d06-4386-a349-d66ade5b6a35",
+      "at": "2026-10-03 13:04:23.725981+00",
+      "result_kind": "invalid_filter",
+      "filters": [
+        {
+          "op": "within_next",
+          "unit": "days",
+          "field": "contract_end",
+          "value": "60"
+        }
+      ],
+      "query_text": "contract end date expiration termination",
+      "matched_document_count": null,
+      "documents": []
+    },
+    {
+      "id": "fa15f0e4-3a1e-430d-ad4d-2abd7afc0df1",
+      "at": "2026-10-03 13:04:27.449467+00",
+      "result_kind": "passages",
+      "filters": [
+        {
+          "op": "between",
+          "field": "contract_end",
+          "value": "2026-10-03",
+          "value2": "2026-12-02"
+        }
+      ],
+      "query_text": "contract end date expiration termination",
+      "matched_document_count": 1,
+      "documents": [
+        "272-uat-tax-memo.md"
+      ]
+    }
+  ],
+  "tool_calls": [
+    {
+      "name": "search_documents",
+      "args": {
+        "query": "contract end date expiration termination",
+        "filters": [
+          {
+            "op": "within_next",
+            "unit": "days",
+            "field": "contract_end",
+            "value": "60"
+          }
+        ]
+      },
+      "result_head": "{\"error\": \"invalid_filter\", \"field\": \"contract_end\", \"allowed\": [\"between\", \"before\", \"after\"], \"message\": \"within_next works only on date, added, source_created or source_modified. For contract_end, use between with two YYYY-MM-DD days (or before / after one): write days as YYYY-MM-DD; for a month or a quarter use between with two YYYY-MM-DD days (e.g. 2025-10-01 and 2025-10-31).\", \"instruction\": \"Retry search_documents with a valid field or value from `allowed`, or ask the person which they meant. Do not drop the filter to search everything.\"}"
+    },
+    {
+      "name": "search_documents",
+      "args": {
+        "query": "contract end date expiration termination",
+        "filters": [
+          {
+            "op": "between",
+            "field": "contract_end",
+            "value": "2026-10-03",
+            "value2": "2026-12-02"
+          }
+        ]
+      },
+      "result_head": "[{\"content\": \"# Tax memo\\n\\nTax memo: corporate tax filing obligations for the 2026 fiscal year, prepared for the audit committee.\\n\\nTopics: Tax, Audit.\\nContract end: 2026-11-20.\", \"document_id\": \"dc40966d-bee6-465c-87a7-4cfa8a639104\", \"filename\": \"272-uat-tax-memo.md\", \"chunk_index\": 0, \"similarity\": 0.3286136481950209, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-09-30\", \"title\": \"Tax memo\", \"topics\": [\"Tax\", \"Audit\"], \"_source\": {\"date\": \"user\", \"topics\": \"user\", \"contract_end\": \"user\"}, \"_confidence\": {\"title\": 0.9, \"document_type\": 0.9}, \"contract_end\": \"2026-11-20\", \"document_type\": \"memo\"}}]"
+    }
+  ],
+  "answer": "Within the next 60 days (Oct 3 \u2013 Dec 2, 2026), I found **one** contract/document with a matching `contract_end` date:\n\n**272-uat-tax-memo.md** \u2014 Tax memo\n- **Contract end date:** November 20, 2026 [1]\n- **Summary:** A tax memo covering corporate tax filing obligations for the 2026 fiscal year, prepared for the audit committee [1]\n- **Topics:** Tax, Audit [1]\n- **Document date:** September 30, 2026\n\nNote: this result came back with a relatively low similarity score (0.33), largely because it's a metadata-based match (filtered by `contract_end` date) rather than a strong semantic match to the query text \u2014 the content itself is a tax memo, not a typical \"contract.\" No other documents in the knowledge base have a `contract_end` date falling in this window.",
+  "raw": {
+    "audits": [
+      {
+        "id": "1107efa2-5d06-4386-a349-d66ade5b6a35",
+        "at": "2026-10-03 13:04:23.725981+00",
+        "metadata": {
+          "run_id": "a38193eb-c853-4933-8558-5a0fb27e16ed",
+          "filters": [
+            {
+              "op": "within_next",
+              "unit": "days",
+              "field": "contract_end",
+              "value": "60"
+            }
+          ],
+          "thread_id": "dc4ae9d7-baf8-46fa-ab8b-84004664058a",
+          "folder_ids": [],
+          "query_text": "contract end date expiration termination",
+          "result_kind": "invalid_filter",
+          "document_ids": [],
+          "parent_run_id": null
+        }
+      },
+      {
+        "id": "fa15f0e4-3a1e-430d-ad4d-2abd7afc0df1",
+        "at": "2026-10-03 13:04:27.449467+00",
+        "metadata": {
+          "run_id": "a38193eb-c853-4933-8558-5a0fb27e16ed",
+          "filters": [
+            {
+              "op": "between",
+              "field": "contract_end",
+              "value": "2026-10-03",
+              "value2": "2026-12-02"
+            }
+          ],
+          "thread_id": "dc4ae9d7-baf8-46fa-ab8b-84004664058a",
+          "folder_ids": [],
+          "query_text": "contract end date expiration termination",
+          "result_kind": "passages",
+          "document_ids": [
+            "dc40966d-bee6-465c-87a7-4cfa8a639104"
+          ],
+          "similarities": {
+            "dc40966d-bee6-465c-87a7-4cfa8a639104": 0.329
+          },
+          "parent_run_id": null,
+          "matched_document_count": 1
+        }
+      }
+    ],
+    "messages": [
+      {
+        "id": "95dd1507-8400-4bb6-b9c0-9e17eac60000",
+        "role": "user",
+        "content": "Using search_documents, find the contracts whose contract_end falls within the next 60 days (filter contract_end within_next 60 days) and summarise them.",
+        "tool_calls": null,
+        "source_refs": null,
+        "at": "2026-10-03 13:04:20.096747+00"
+      },
+      {
+        "id": "a420721f-2bce-4554-802c-09b58dfb2f18",
+        "role": "assistant",
+        "content": "Within the next 60 days (Oct 3 \u2013 Dec 2, 2026), I found **one** contract/document with a matching `contract_end` date:\n\n**272-uat-tax-memo.md** \u2014 Tax memo\n- **Contract end date:** November 20, 2026 [1]\n- **Summary:** A tax memo covering corporate tax filing obligations for the 2026 fiscal year, prepared for the audit committee [1]\n- **Topics:** Tax, Audit [1]\n- **Document date:** September 30, 2026\n\nNote: this result came back with a relatively low similarity score (0.33), largely because it's a metadata-based match (filtered by `contract_end` date) rather than a strong semantic match to the query text \u2014 the content itself is a tax memo, not a typical \"contract.\" No other documents in the knowledge base have a `contract_end` date falling in this window.",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "contract end date expiration termination",
+              "filters": [
+                {
+                  "op": "within_next",
+                  "unit": "days",
+                  "field": "contract_end",
+                  "value": "60"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "{\"error\": \"invalid_filter\", \"field\": \"contract_end\", \"allowed\": [\"between\", \"before\", \"after\"], \"message\": \"within_next works only on date, added, source_created or source_modified. For contract_end, use between with two YYYY-MM-DD days (or before / after one): write days as YYYY-MM-DD; for a month or a quarter use between with two YYYY-MM-DD days (e.g. 2025-10-01 and 2025-10-31).\", \"instruction\": \"Retry search_documents with a valid field or value from `allowed`, or ask the person which they meant. Do not drop the filter to search everything.\"}",
+            "status": "done",
+            "tool_call_id": "toolu_012YSH2jRqaTUuX5ZURdURz1"
+          },
+          {
+            "args": {
+              "query": "contract end date expiration termination",
+              "filters": [
+                {
+                  "op": "between",
+                  "field": "contract_end",
+                  "value": "2026-10-03",
+                  "value2": "2026-12-02"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Tax memo\\n\\nTax memo: corporate tax filing obligations for the 2026 fiscal year, prepared for the audit committee.\\n\\nTopics: Tax, Audit.\\nContract end: 2026-11-20.\", \"document_id\": \"dc40966d-bee6-465c-87a7-4cfa8a639104\", \"filename\": \"272-uat-tax-memo.md\", \"chunk_index\": 0, \"similarity\": 0.3286136481950209, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-09-30\", \"title\": \"Tax memo\", \"topics\": [\"Tax\", \"Audit\"], \"_source\": {\"date\": \"user\", \"topics\": \"user\", \"contract_end\": \"user\"}, \"_confidence\": {\"title\": 0.9, \"document_type\": 0.9}, \"contract_end\": \"2026-11-20\", \"document_type\": \"memo\"}}]",
+            "status": "done",
+            "tool_call_id": "toolu_014pJ7njut71NXssJGH54Eqd"
+          }
+        ],
+        "source_refs": [
+          {
+            "passage": "# Tax memo\n\nTax memo: corporate tax filing obligations for the 2026 fiscal year, prepared for the audit committee.\n\nTopics: Tax, Audit.\nContract end: 2026-11-20.",
+            "filename": "272-uat-tax-memo.md",
+            "similarity": 0.3286136481950209,
+            "chunk_index": 0,
+            "document_id": "dc40966d-bee6-465c-87a7-4cfa8a639104",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          }
+        ],
+        "at": "2026-10-03 13:04:31.429724+00"
+      }
+    ],
+    "run": {
+      "status": "completed",
+      "model": "claude-sonnet-5",
+      "provider": "anthropic",
+      "error": null
+    }
+  }
+}

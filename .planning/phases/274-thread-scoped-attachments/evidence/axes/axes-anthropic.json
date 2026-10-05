@@ -1,0 +1,54 @@
+{
+  "provider": "anthropic",
+  "model": "claude-opus-5-5",
+  "multi_tool": {
+    "thread": "94109e86-a82c-4d42-b811-1e633fdb7008",
+    "upload_http": 200,
+    "run_status": "completed",
+    "tools": [
+      "execute_code",
+      "search_documents"
+    ],
+    "token": "ATT274-multitool-9a03c354",
+    "token_in_answer": true,
+    "used_execute_code": true,
+    "used_search_documents": true,
+    "answer_head": "**1. Meridian freight-cap clearance code:** The code in your attached PDF (`8286c543-meridian-brief.pdf`, \"Meridian supplier brief\") is **ATT274-multitool-9a03c354**.\n\n**2. Onboarding / laptop setup:** Your Library has step-by-step instructions for setting up VPN on a laptop: download the client from the company software portal, connect to `vpn.company.com` with your company login and two-factor authentication [1]. There's also an April 7\u201311, 2026 HR update on onboarding: Omar Hassan's IT setup is done but he's still waiting for Snowflake access, and Lena Kova\u010d's laptop has been ordered while "
+  },
+  "long_message": {
+    "thread": "0ad11b98-8a87-48a1-a3f5-824f4d561273",
+    "prompt_bytes": 6692,
+    "upload_http": 200,
+    "run_status": "completed",
+    "tools": [
+      "workspace_read",
+      "execute_code"
+    ],
+    "token": "ATT274-long-1dd3f7c1",
+    "token_in_answer": true,
+    "answer_head": "The Meridian freight-cap clearance code is **ATT274-long-1dd3f7c1**.\n\nIt's the only content in the note you attached, **ee06bdf0-meridian-note.md**. Since you said these codes are only shared through the supplier note and never by email, be careful about pasting it into email threads."
+  },
+  "parallel_thread": {
+    "thread_a": "f6063d5f-c6fb-4bf0-ba10-8c615e0ef521",
+    "thread_b": "98bc5bab-40a7-480c-8a80-2050d1f1512c",
+    "a_status_when_b_attached": "streaming",
+    "a_run": {
+      "run_id": "9bd9953f-1fc7-46ff-b95b-ccc27c0eeaaf",
+      "run_status": "completed",
+      "started_at": "2026-10-05 14:46:48.308002+00:00",
+      "completed_at": "2026-10-05 14:47:19.382953+00:00"
+    },
+    "b_run": {
+      "run_id": "ff678b65-9019-412c-955a-d6309dced106",
+      "run_status": "completed",
+      "started_at": "2026-10-05 14:46:54.437661+00:00",
+      "completed_at": "2026-10-05 14:47:27.580010+00:00"
+    },
+    "overlap": true,
+    "token": "ATT274-parallel-9db69948",
+    "b_answer_has_token": true,
+    "a_answer_has_token": false,
+    "a_answer_chars": 7318,
+    "b_answer_head": "The Meridian freight-cap clearance code is **ATT274-parallel-9db69948**.\n\nIt's stated directly in the file you attached, **48e8e641-meridian-note.md**."
+  }
+}

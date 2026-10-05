@@ -1,0 +1,336 @@
+{
+  "provider": "google",
+  "model": "gemini-3.8-flash",
+  "turn": "A",
+  "thread_id": "f64563b6-8ad4-49ce-a70f-52c9e06cdf69",
+  "prompt": "Here is our FY25 revenue by region and quarter:\n\n```csv\nquarter,region,revenue_usd_k,notes\nQ1,North,1210,\"Q1 North: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ1,South,980,\"Q1 South: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ1,East,1335,\"Q1 East: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ1,West,1104,\"Q1 West: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ2,North,1268,\"Q2 North: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ2,South,1017,\"Q2 South: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ2,East,1392,\"Q2 East: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ2,West,1151,\"Q2 West: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ3,North,1342,\"Q3 North: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ3,South,1076,\"Q3 South: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ3,East,1459,\"Q3 East: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ3,West,1203,\"Q3 West: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ4,North,1415,\"Q4 North: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ4,South,1129,\"Q4 South: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ4,East,1532,\"Q4 East: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\nQ4,West,1288,\"Q4 West: revenue recognised on signed contracts only; renewals booked in the quarter they were invoiced; one-off project work excluded from the recurring figure; FX translated at the quarter-end rate; figures are unaudited management accounts and may be restated after the year-end close; regional allocation follows the billing address of the contracting entity, not the delivery site.\"\n```\n\nShow it as a line chart.",
+  "calling_mode_predicted": "NATIVE (native SDK adapter)",
+  "verdicts": {
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "PASS"
+  },
+  "turn_data": {
+    "run_id": "4c0bc8f4-6356-41a3-8be5-0bacb3311ed5",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "gemini-3.8-flash",
+      "provider": "google",
+      "error": null,
+      "started_at": "2026-10-03 19:27:36.345512+00:00",
+      "completed_at": "2026-10-03 19:27:54.944283+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "d15fa76f-fd42-4791-b1fd-a20ed3f7044a",
+        "content": "The line chart tracks quarterly revenue trends across all four regions throughout FY25, highlighting steady upward growth in each region. The East region maintained the highest overall revenue each quarter, followed consistently by North, West, and South.",
+        "tool_calls": [
+          {
+            "args": {
+              "rows": "<stored in artifact a_j625o7tpsj, 4 rows>",
+              "chart": {
+                "x": "quarter",
+                "y": [
+                  "East",
+                  "North",
+                  "West",
+                  "South"
+                ],
+                "kind": "line"
+              },
+              "title": "FY25 Revenue by Region and Quarter",
+              "columns": [
+                {
+                  "name": "quarter",
+                  "type": "string"
+                },
+                {
+                  "name": "East",
+                  "type": "number",
+                  "unit": "$K"
+                },
+                {
+                  "name": "North",
+                  "type": "number",
+                  "unit": "$K"
+                },
+                {
+                  "name": "West",
+                  "type": "number",
+                  "unit": "$K"
+                },
+                {
+                  "name": "South",
+                  "type": "number",
+                  "unit": "$K"
+                }
+              ],
+              "component": "chart"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_j625o7tpsj\", \"label\": \"chart 1\", \"component\": \"chart\", \"kind\": \"line\", \"stacked\": false, \"series_count\": 4, \"row_count\": 4, \"from_label\": null, \"same_rows\": null, \"operations\": null, \"columns\": [{\"name\": \"quarter\", \"type\": \"string\"}, {\"name\": \"East\", \"type\": \"number\"}, {\"name\": \"North\", \"type\": \"number\"}, {\"name\": \"West\", \"type\": \"number\"}, {\"name\": \"South\", \"type\": \"number\"}], \"values\": {\"quarter\": [\"Q1\", \"Q2\", \"Q3\", \"Q4\"]}, \"note\": \"Shown to the user below your answer as chart 1. Now write one or two sentences about what it shows; do not repeat its numbers as a table. To change, filter, sort or redraw it later, call show_artifact again with from_artifact=\\\"a_j625o7tpsj\\\" (or \\\"chart 1\\\") and NO columns or rows.\"}",
+            "status": "done",
+            "tool_call_id": "call_577320",
+            "thought_signature": "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"
+          }
+        ]
+      }
+    ],
+    "tool_call_names": [
+      "show_artifact"
+    ],
+    "show_artifact_calls": 1,
+    "refused_calls": 0,
+    "artifact_ids_from_results": [
+      "a_j625o7tpsj"
+    ],
+    "final_answer_empty": false,
+    "final_answer_is_fallback": false,
+    "persisted_json_fence": false,
+    "redis": {
+      "present": true,
+      "ttl": 599,
+      "event_types": {
+        "iteration_start": 2,
+        "tool_preparing": 1,
+        "tool_args_progress": 1,
+        "tool_start": 1,
+        "artifact": 1,
+        "tool_end": 1,
+        "planning": 1,
+        "delta": 3,
+        "suggestions": 1,
+        "stream_end": 1,
+        "done": 1
+      },
+      "delta_count": 3,
+      "delta_text": "The line chart tracks quarterly revenue trends across all four regions throughout FY25, highlighting steady upward growth in each region. The East region maintained the highest overall revenue each quarter, followed consistently by North, West, and South.",
+      "artifact_events": 1
+    }
+  },
+  "message_artifacts": [
+    {
+      "id": "a_j625o7tpsj",
+      "label": "chart 1",
+      "component": "chart",
+      "parent_id": null,
+      "run_id": "4c0bc8f4-6356-41a3-8be5-0bacb3311ed5",
+      "tool_call_id": "call_577320",
+      "row_count": 4,
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 4,
+        "source_count": 0
+      },
+      "at": "2026-10-03 19:27:45.64918+00"
+    }
+  ],
+  "reload_http": 200,
+  "reload_artifacts": [
+    {
+      "id": "a_j625o7tpsj",
+      "thread_id": "f64563b6-8ad4-49ce-a70f-52c9e06cdf69",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "4c0bc8f4-6356-41a3-8be5-0bacb3311ed5",
+      "tool_call_id": "call_577320",
+      "parent_id": null,
+      "label": "chart 1",
+      "component": "chart",
+      "spec": {
+        "rows": [
+          [
+            "Q1",
+            1335,
+            1210,
+            1104,
+            980
+          ],
+          [
+            "Q2",
+            1392,
+            1268,
+            1151,
+            1017
+          ],
+          [
+            "Q3",
+            1459,
+            1342,
+            1203,
+            1076
+          ],
+          [
+            "Q4",
+            1532,
+            1415,
+            1288,
+            1129
+          ]
+        ],
+        "chart": {
+          "x": "quarter",
+          "y": [
+            "East",
+            "North",
+            "West",
+            "South"
+          ],
+          "kind": "line",
+          "slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "stacked": false
+        },
+        "title": "FY25 Revenue by Region and Quarter",
+        "metric": null,
+        "columns": [
+          {
+            "name": "quarter",
+            "type": "string",
+            "unit": null
+          },
+          {
+            "name": "East",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "North",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "West",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "South",
+            "type": "number",
+            "unit": "$K"
+          }
+        ]
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 4,
+        "source_count": 0
+      },
+      "row_count": 4,
+      "spec_version": 1,
+      "created_at": "2026-10-03T19:27:45.64918+00:00"
+    }
+  ],
+  "reload_by_message": [
+    {
+      "message_id": "d15fa76f-fd42-4791-b1fd-a20ed3f7044a",
+      "artifacts": [
+        {
+          "id": "a_j625o7tpsj",
+          "thread_id": "f64563b6-8ad4-49ce-a70f-52c9e06cdf69",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "4c0bc8f4-6356-41a3-8be5-0bacb3311ed5",
+          "tool_call_id": "call_577320",
+          "parent_id": null,
+          "label": "chart 1",
+          "component": "chart",
+          "spec": {
+            "rows": [
+              [
+                "Q1",
+                1335,
+                1210,
+                1104,
+                980
+              ],
+              [
+                "Q2",
+                1392,
+                1268,
+                1151,
+                1017
+              ],
+              [
+                "Q3",
+                1459,
+                1342,
+                1203,
+                1076
+              ],
+              [
+                "Q4",
+                1532,
+                1415,
+                1288,
+                1129
+              ]
+            ],
+            "chart": {
+              "x": "quarter",
+              "y": [
+                "East",
+                "North",
+                "West",
+                "South"
+              ],
+              "kind": "line",
+              "slots": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "stacked": false
+            },
+            "title": "FY25 Revenue by Region and Quarter",
+            "metric": null,
+            "columns": [
+              {
+                "name": "quarter",
+                "type": "string",
+                "unit": null
+              },
+              {
+                "name": "East",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "North",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "West",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "South",
+                "type": "number",
+                "unit": "$K"
+              }
+            ]
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [],
+            "row_count": 4,
+            "source_count": 0
+          },
+          "row_count": 4,
+          "spec_version": 1,
+          "created_at": "2026-10-03T19:27:45.64918+00:00"
+        }
+      ]
+    }
+  ]
+}

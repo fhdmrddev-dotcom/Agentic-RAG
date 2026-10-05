@@ -3,8 +3,12 @@
  * sketch = sketches/037-rule-builder-and-list (Winner A — the rules list + a right-side
  * push/split builder).
  *
- * The dedicated Classification-rules surface reached from the sidebar "Automation"
- * group (App.tsx ActiveView "classification-rules", routed by Plan 04). It composes:
+ * Phase 271 (D-08 / D-09 / P-07) — this is now the **Filing rules** sub-view, mounted INSIDE the
+ * Library (`LibraryPage`, behind the header link) and nowhere else. The top-level
+ * `classification-rules` view that used to host it was retired together with its rail entry, so
+ * there is exactly ONE shape: no outer padding and no stand-alone page title block (the Library
+ * supplies both), a header row of Back · "Filing rules" · subtitle · New rule. Behaviour below the
+ * header — list, scope filter, builder, states — is unchanged. It composes:
  *  - the rules list (the AutomationGroup row anatomy 037-A — ● name [G] · condition →
  *    📁 action · toggle · ⋯) from listRules();
  *  - the RuleBuilderPanel (Task 1) opened in the SAME right-side push/split panel the
@@ -18,7 +22,7 @@
  * full-width column below the breakpoint), WCAG 2.1 AA.
  */
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Plus } from "lucide-react"
+import { ChevronLeft, Plus } from "lucide-react"
 import { AutomationGroup } from "../ingestion/AutomationGroup"
 import { RuleBuilderPanel } from "./RuleBuilderPanel"
 import { listRules, listFolders, listMetadataFields } from "@/lib/api"
@@ -48,7 +52,7 @@ function useIsMobile(): boolean {
 // The builder panel is open either composing a NEW rule or editing an EXISTING one.
 type BuilderState = { mode: "new" } | { mode: "edit"; rule: ClassificationRule } | null
 
-export function ClassificationRulesPage() {
+export function ClassificationRulesPage({ onBack }: { onBack?: () => void } = {}) {
   const isMobile = useIsMobile()
 
   const [rules, setRules] = useState<ClassificationRule[]>([])
@@ -121,22 +125,33 @@ export function ClassificationRulesPage() {
   const panelOpen = builder !== null
 
   return (
-    <div className="flex h-full flex-col overflow-hidden p-8">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-headline font-bold text-foreground">
-            Classification rules
-          </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Suggest a folder for matching uploads — never a silent move. You accept or
-            dismiss each suggestion on the document.
-          </p>
-        </div>
+    // ⚠ No outer padding: the Library page that hosts this sub-view already supplies it.
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* One header row, the same shape as the Library's own (sketch 231-A): Back, the title, the
+          subtitle (hidden below lg so the row never wraps), and New rule as the one primary action. */}
+      <div className="mb-4 flex flex-none items-center gap-4 border-b border-border/50 px-1 pb-3">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring min-h-[44px] md:min-h-0"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            Library
+          </button>
+        )}
+        <h1 className="text-2xl font-headline font-bold text-foreground whitespace-nowrap">
+          Filing rules
+        </h1>
+        <p className="hidden lg:block truncate text-xs text-muted-foreground">
+          Suggest a folder for matching uploads — never a silent move. You accept or
+          dismiss each suggestion on the document.
+        </p>
         <button
           type="button"
           onClick={handleNewRule}
           aria-label="New rule"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-[filter] hover:brightness-110 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-[filter] hover:brightness-110 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           <Plus className="h-4 w-4" />
           New rule

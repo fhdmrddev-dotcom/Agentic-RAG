@@ -1,7 +1,14 @@
 ---
 seed_id: SEED-210
 title: The connector track has a rigorous envelope for what LEAVES and none for what ENTERS — synced documents flatten source ACLs, and source deletions never propagate
-status: planted
+status: partially-answered
+partial: true
+status_note: |
+  Moved `planted` -> `partially-answered` on 2026-10-04 (release-history audit). Original line: `status: planted`.
+  AXIS SETTLED: the v1 envelope shipped in v4.0 Phase 234 — option 3 (connection-scoped visibility, default
+  `private`) plus a source lifecycle state on every synced document. AXIS STILL OPEN: per-document source
+  ACLs (options 1/2, SEED-211, out of scope by v4.5 decision), and a document deleted or unshared at its
+  source still answers questions (search excludes only `source_disconnected`). Evidence in the body.
 planted: 2026-08-26
 planted_by: Claude, 2026-08-26, during the connector-scenarios brainstorm; grepped and confirmed absent from the seeds register, the Connections milestone candidate and docs/CONNECTOR-ARCHITECTURE.md
 surface: Agentic-RAG
@@ -18,10 +25,33 @@ re_open_trigger: >
   who could not open it at its source system; (4) a file is deleted, unshared or moved at a source
   system and the ingested copy keeps answering questions; (5) anyone proposes ingesting a shared
   drive, a SharePoint site, a mailbox or a channel wholesale.
-trigger_when: unset
+trigger_when: "Any phase that adds per-document source permissions (SEED-211), changes which source_state values search excludes, or ships SharePoint / shared-drive / mailbox sync (SEED-256); OR a customer security review asks how source permissions and deletions are honoured; OR a user retrieves content from a file deleted or unshared at its source."
+trigger_paths: ["backend/app/services/watch_service.py", "backend/app/services/retrieval_scope.py", "backend/app/services/retrieval_service.py", "supabase/migrations/170_documents_source_state.sql", "backend/app/models/connector.py"]
+trigger_surfaces: ["connectors", "retrieval", "ingestion"]
 ---
 
 # SEED-210 — the inbound half of the security envelope does not exist
+
+## ⚠ CORRECTED 2026-10-04 — PARTIALLY ANSWERED by v4.0 Phase 234. ~~The inbound half of the security envelope does not exist~~
+
+Scheduled folder sync shipped in v4.0, and so did a v1 inbound envelope. Measured in the tree on 2026-10-04:
+
+| This seed's question | What shipped | Where |
+|---|---|---|
+| Who may see a synced document? | **Option 3, connection-scoped visibility**, default `private`; values `private` / `org` / `dept` (`dept` inert by decision D-5) | `backend/app/models/connector.py:441`, `:462`, `:570`; `frontend/src/lib/api/org.ts:531` |
+| deleted at source | marked `source_state = 'missing_at_source'`, **retained** (not purged); only on a listing that is complete AND can prove deletion (H-5) | `backend/app/services/watch_service.py:11`, `:525-566`; `sources/base.py:71` |
+| unshared / revoked at source | marked `unauthorized_at_source` | `watch_service.py:12`; mig `170_documents_source_state.sql:7` |
+| source disconnected | `source_disconnected`, and **excluded from search** | mig `170`; `retrieval_scope.py:151`, `:157`; mig `200` |
+| per-document source ACLs (options 1/2) | **not built** — SEED-211, "out of scope by decision" in v4.5 | `docs/history/v4.5-find-it-show-it.md` |
+
+⚠ **The residual that still matters:** search excludes only `source_disconnected`. A document marked
+`missing_at_source` or `unauthorized_at_source` is still retrievable and citable, which is this seed's
+Problem 2 ("a document that was revoked ... still serving answers") in a narrower form. Whether those states
+should leave search, or be shown with a warning, is an open decision. It also makes SEED-343
+(permission-aware citations) reachable.
+
+So: `planted` was wrong (the trigger fired and v4.0 answered the v1 question deliberately, which this seed
+said was legitimate), and `answered` would be wrong too. `partially-answered` + `partial: true`.
 
 ## The asymmetry, stated plainly
 
@@ -133,3 +163,5 @@ ignoring it.
 ⚠ **This seed therefore stays `planted` on purpose.** It is not dormant and it is not answered:
 it is now a PREREQUISITE of a named future phase, and whoever plans that milestone must sequence
 these four ahead of 219 rather than beside it.
+
+> **2026-10-04:** the search half of this seed is now filed as a bug — `.planning/reported-bugs/BUG-261004-01-search-serves-documents-deleted-or-unshared-at-source.md` (major, open). Production had 0 affected documents at filing.

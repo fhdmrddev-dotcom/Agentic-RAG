@@ -13,13 +13,13 @@
  *
  * Pure presentational shell — no auth/route/accept logic (byte-frozen at the call sites, D-01).
  * Markup lifted verbatim from AuthPage (same tokens, same Sparkles glyph — zero visual change).
+ * Phase 276 (D-21): the Sparkles tile is now the static Iris mark image.
  */
 import type { ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Sparkles } from "lucide-react"
 
 export interface AuthCardShellProps {
-  /** The card title (e.g. "Agentic RAG" / "You've been invited"). */
+  /** The card title (e.g. "Syrel" / "You've been invited"). */
   title: ReactNode
   /** The state-specific sub-headline under the title. */
   subhead: ReactNode
@@ -37,9 +37,11 @@ export function AuthCardShell({ title, subhead, children }: AuthCardShellProps) 
       <Card className="w-full max-w-md ghost-border bg-card/80 backdrop-blur-sm shadow-xl shadow-black/5 relative z-10">
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="flex justify-center">
-            <div className="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/25">
-              <Sparkles className="w-7 h-7 text-white" />
-            </div>
+            {/* Phase 276 (D-14/D-21): the static Iris mark as an <img> (shared gradient ids).
+                276-06 (D-27): on the dark chip in both themes so it stays legible on light. */}
+            <span className="inline-grid place-items-center w-14 h-14 rounded-full bg-[#0A0E18] ring-1 ring-inset ring-black/10 dark:ring-white/10">
+              <img src="/brand/syrel-mark-iris.svg" className="w-[84%] h-[84%]" alt="Syrel" />
+            </span>
           </div>
           <div>
             <CardTitle className="text-2xl font-headline font-bold">{title}</CardTitle>

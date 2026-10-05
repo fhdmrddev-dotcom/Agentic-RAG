@@ -315,6 +315,19 @@ async def lifespan(app_instance):
     # four reconcilers run). needs_setup is a file+string check (D-05), NEVER a DB read — a
     # transient DB outage cannot flip a configured box into setup mode.
     _setup_mode = needs_setup(_setup_cfg)
+
+    # Phase 276 (DOCS-04, D-20) — say once whether the live API explorer is gated, so a production
+    # deploy that forgot ENVIRONMENT=production is visible in its boot log instead of failing open.
+    # 276-REVIEW A-WR-01: the gate is fail-closed (only unset/local/development/dev/test open it),
+    # and an OPEN explorer under any value other than unset/local logs at WARNING, not INFO.
+    from app.api.api_docs import _docs_gated, _docs_open_is_loud
+    if _docs_gated():
+        logger.info("API docs: GATED (ENVIRONMENT=%s)", settings.environment.strip())
+    elif _docs_open_is_loud():
+        logger.warning("API docs: OPEN (ENVIRONMENT=%r) — the live API explorer is served "
+                       "to anyone; only local installs should be open", settings.environment)
+    else:
+        logger.info("API docs: OPEN (ENVIRONMENT=%r)", settings.environment)
     if _setup_mode:
         # D-15 — surface the first-boot setup token to stdout (`docker compose logs backend`)
         # exactly once. Best-effort (mirrors every other lifespan side-effect): a setup-store
@@ -749,7 +762,12 @@ async def lifespan(app_instance):
         sandbox_manager.close_all()
 
 
-app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
+# Phase 276 (DOCS-04, D-03): FastAPI's built-in /docs, /redoc and /openapi.json routes are switched
+# off here and re-served by app/api/api_docs.py behind a production-only sign-in gate.
+app = FastAPI(
+    title="Agentic RAG API", version="1.0.0", lifespan=lifespan,
+    docs_url=None, redoc_url=None, openapi_url=None,
+)
 
 # Phase 182 (VALID-01 / D-182-R2-02) — the SCHEMA half of the canvas off-switch. `/openapi.json`
 # is anonymous + unconditional on every finalized deploy; while the canvas was off it still
@@ -762,10 +780,12 @@ app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
 #   * `include_in_schema=False` was REJECTED — it would hide both routes from /docs permanently,
 #     including while the canvas is ON, degrading the API docs for the whole remainder of v3.6
 #     (phases 183-189 all build on this seam). The dynamic hook tracks the live flag instead.
-#   * `GET /docs` deliberately keeps returning 200 in BOTH flag states. It is a static Swagger UI
+#   * ~~`GET /docs` deliberately keeps returning 200 in BOTH flag states. It is a static Swagger UI
 #     shell carrying no route information of its own — it renders whatever the filtered document
 #     says. App-wide `docs_url` gating has never been a convention in this codebase and is not
-#     introduced here.
+#     introduced here.~~
+#     CORRECTED 2026-10-04 (Phase 276, D-03, operator-approved): production now refuses unauthenticated /docs, /redoc and /openapi.json; see app/api/api_docs.py.
+#     The canvas FLAG still does not gate /docs (both flag states behave alike); ENVIRONMENT does.
 app.openapi = build_canvas_aware_openapi(app)
 
 # Phase 182 (VALID-01 / D-182-R2-01) — the canvas off-switch's request-path gate. Decides
@@ -857,7 +877,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -871,12 +891,14 @@ app.include_router(knowledge_health.router)
 app.include_router(feedback.router)
 app.include_router(sandbox_outputs.router)
 app.include_router(workspace.router)
+app.include_router(workspace_promote.router)  # Phase 274 ATT-03 — promote a thread attachment into the Library; own module, never workspace.py (its 244 fence)
 app.include_router(admin.router)
 app.include_router(panel.router)  # Phase 085 D-085-23 — thread-scoped panel data endpoints
 app.include_router(workflows.router)  # Phase 092 MODE-01 — published-workflows picker feed
 app.include_router(workflow_runs.router)  # Phase 188 RUNVIZ-03 — GET /workflow-runs/{id}: the one net-new read that gives a RUN an address (run + the definition version that RAN + the durable phase spine, D-188-14); ownership-gated 404 + require_canvas ALONE, path template registered in CANVAS_GATED_PATHS (D-188-15/16)
 app.include_router(metadata_fields.router)  # Phase 111 META-01 — custom metadata field-definition CRUD
 app.include_router(document_views.router)  # Phase 113 VIEW-01/02 — virtual-folder views CRUD + per-viewer resolve
+app.include_router(document_search.router)  # Phase 271 FIND-01/02/03 — document search beside RAG, no embedding call; own module, not api/documents.py
 app.include_router(document_relationships.router)  # Phase 116 REL-01/03 — typed document-relationship CRUD (visible-both gate + audit)
 app.include_router(classification_rules.router)  # Phase 118 CLASS-01 — classification-rule CRUD (leak-safe own+global, is_system_global hard-false, match_expr validation + audit)
 app.include_router(document_governance.router)  # Phase 119 DGOV-01/02 — read-only governance aggregation (broken-rel / unclassified / low-conf; owner-scoped reads, no write path)
@@ -900,6 +922,7 @@ app.include_router(schedules.workflow_router)  # Phase 204 SCHED-01 — the work
 app.include_router(sources.router)  # Phase 234 (LIB-08 / SURF-01 / VIS-05) — folder watches & source sync (/sources)
 app.include_router(sources.router, prefix="/api")  # Phase 234 alias (/api/sources)
 app.include_router(experts.router)  # Phase 259 (PACK-01 / PACK-06) — expert bundles manifest (/experts)
+app.include_router(api_docs.router)  # Phase 276 DOCS-04 — gated live API explorer
 # Phase 182 (D-182-04): the TEMPORARY Phase-181 "/canvas/ping" canary router was RETIRED here.
 # The real require_canvas-gated routes (POST /workflows/validate + GET /workflows/grounding-bundle,
 # mounted on workflows.router above) now carry the byte-identical 404-when-off gate, so the
@@ -917,8 +940,12 @@ app.include_router(experts.router)  # Phase 259 (PACK-01 / PACK-06) — expert b
 # environment looks like production. Belt-and-suspenders so an accidental
 # env var flip in a prod-like deploy crashes loudly at startup rather than
 # silently exposing the route.
+# 276-REVIEW A-IN-11: ENVIRONMENT is read through ``settings`` (which also loads backend/.env),
+# the same source of truth as the docs gate, never a raw ``os.getenv``.
+from app.api.api_docs import is_production_environment as _is_production_env  # noqa: E402
+
 if os.getenv("ENABLE_TEST_FIXTURES", "0") == "1":
-    if os.getenv("ENVIRONMENT", "").lower() in ("production", "prod"):
+    if _is_production_env():
         raise RuntimeError(
             "ENABLE_TEST_FIXTURES=1 in production environment — refusing to start. "
             "This env var is for local Playwright e2e harness use only "
@@ -937,7 +964,7 @@ if os.getenv("ENABLE_TEST_FIXTURES", "0") == "1":
 # with a deterministic fake and bypasses auth with a fixed test user.
 # Zero API cost, millisecond-per-run execution (D-077-02).
 if os.getenv("MOCK_LLM_MODE", "0") == "1":
-    if os.getenv("ENVIRONMENT", "").lower() in ("production", "prod"):
+    if _is_production_env():
         raise RuntimeError(
             "MOCK_LLM_MODE=1 in production environment -- refusing to start. "
             "This env var is for local multi-worker harness use only "

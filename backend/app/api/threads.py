@@ -85,6 +85,8 @@ from app.services.thread_handoff import (
     write_handoff,
 )
 from app.services.audit_service import write_audit_entry
+from app.services.thread_workspace_cleanup import collect_thread_workspace_paths, remove_workspace_paths  # 274 D-08
+from app.services.artifact_history import attach_artifacts  # 273 (I-2 / ART-05) — reload attach
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import finalize_run, insert_assistant_message
@@ -596,6 +598,7 @@ async def get_snapshot(
         user_id=current_user["id"],
         supabase=supabase,
     )
+    messages = await attach_artifacts(messages, thread_id=str(thread_id), user_id=current_user["id"], supabase=supabase)
 
     # Step 3: active_runs SELECT (mirror of /active-runs at threads.py:543-551).
     # Same defense-in-depth + status='streaming' partial-index filter.
@@ -1438,6 +1441,7 @@ async def delete_thread(
     except Exception:
         pass  # Best-effort cleanup — don't block thread deletion
 
+    workspace_paths = await collect_thread_workspace_paths(supabase, thread_id, current_user["id"])
     # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
     await aexec(
         supabase.table("threads")
@@ -1445,6 +1449,7 @@ async def delete_thread(
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
     )
+    await remove_workspace_paths(supabase, workspace_paths, thread_id=thread_id)  # T-274-04
     background_tasks.add_task(
         write_audit_entry,
         user_id=current_user["id"],
@@ -1504,6 +1509,7 @@ async def get_messages(
         user_id=current_user["id"],
         supabase=supabase,
     )
+    messages = await attach_artifacts(messages, thread_id=thread_id, user_id=current_user["id"], supabase=supabase)
 
     return messages
 

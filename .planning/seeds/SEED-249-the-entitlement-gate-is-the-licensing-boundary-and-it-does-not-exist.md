@@ -3,7 +3,14 @@ seed_id: SEED-249
 title: "`feature_visibility` tells the UI what to draw and stops NOBODY from calling the endpoint — `resolve_feature_access` has ZERO call sites outside the admin write path, so any tier sold on it is a suggestion, not a boundary"
 created: 2026-09-06
 planted_during: "2026-09-06 packaging analysis — operator asked how to sell a core plus paid plugins/tiers"
-status: planted
+status: partially-answered
+partial: true
+status_note: |
+  Moved `planted` -> `partially-answered` on 2026-10-04 (release-history audit). Original line: `status: planted`.
+  The trigger fired (tiered pricing, v4.3). AXIS SETTLED: an API-enforced tier gate exists for `experts` and
+  `workflows` (Phase 258, entitlement_service.require_capability). AXIS OPEN: `skills`, `code_execution`,
+  `custom_models`, `connectors`, `audit_export` are in the tier map but no route checks them; a fourth tier
+  needs a code edit to TIER_ORDER.
 surface: Agentic-RAG
 severity: high
 category: licensing / entitlements / api-authorization
@@ -18,7 +25,30 @@ trigger_when: >
   The moment tiered pricing, a paid add-on, an edition, or a self-hosted contract is
   seriously proposed. Also fires if any phase adds a route to a capability that is
   intended to be sellable.
+trigger_paths: ["backend/app/services/entitlement_service.py", "backend/app/db/entitlements.py", "supabase/migrations/186_tier_capabilities.sql", "backend/app/api/skills.py", "backend/app/api/connectors.py", "backend/app/api/admin.py"]
+trigger_surfaces: ["admin", "skills", "connectors", "sandbox"]
 ---
+
+## ⚠ CORRECTED 2026-10-04 — a tier gate now exists, but only for two of the capabilities it lists
+
+Release-history audit (`docs/history/v4.3-what-you-can-actually-sell.md`). This seed read `planted`, but its
+trigger fired in v4.3 and Phase 258 built the boundary it asked for. Measured 2026-10-04:
+
+- `backend/app/services/entitlement_service.py` (Phase 258, TIER-01..05): one fail-closed home,
+  `require_capability(...)`, reading `public.tier_capabilities` (mig `186`), structured 403 on denial.
+- Enforced on: `require_capability("experts")` (router level, `api/experts.py:75`) and
+  `require_capability("workflows")` (`api/workflows.py` authoring writes, `api/schedules.py`).
+- **Mapped but not enforced:** the tier map in mig `186` also names `skills`, `code_execution`,
+  `custom_models`, `connectors`, `audit_export` (and `chat`, `basic_rag`). No route calls
+  `require_capability` for any of them. A tier sold on those today is still a suggestion.
+- `TIER_ORDER` is a literal three-entry dict (`backend/app/db/entitlements.py:12`): adding a fourth tier is
+  a code change, not data.
+- `resolve_feature_access` (this seed's original subject, UI visibility) is a separate mechanism and was not
+  re-measured here.
+
+So the residual is: decide which of the five mapped capabilities are actually sold, and gate those at the API
+in the same single home; move tier ordering into data.
+
 
 ## The measurement
 

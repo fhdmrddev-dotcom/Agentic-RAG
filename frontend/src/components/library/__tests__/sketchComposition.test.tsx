@@ -37,7 +37,7 @@
  * uses it this way (`views-tab`, `ingestion-tab`, `indexing-tab`, `library-sidebar`).
  * ⚠ `data-block` is the SKETCH's marker and must never appear in the build.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -225,6 +225,11 @@ const INGESTION_SUBTAB_BY_BLOCK: Record<string, string> = {
   queue: "In progress",
   "needs-attention": "Needs attention",
 }
+
+// 271-05: warm the page's module graph ONCE, outside every case's 5 s budget. The first
+// case's dynamic import timed out at the phase BASE (20050816d) too, so this is inherited
+// load cost, not a regression; the case bodies are unchanged.
+beforeAll(async () => { await import("@/pages/LibraryPage") }, 30_000)
 
 describe("sketch-composition fence — §1 the contract itself", () => {
   // ⚠ THE NON-VACUITY CONTROL. A moved or misnamed JSON import can resolve to an empty

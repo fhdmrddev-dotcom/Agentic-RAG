@@ -1,0 +1,42 @@
+{
+  "rowsBefore": [
+    [
+      "",
+      "Lease 2024.pdf /Contracts/Leases v1 · older version",
+      "Lease",
+      "You",
+      "2 Mar 2024",
+      "Ready",
+      "Download v1 (viewed, not latest)"
+    ]
+  ],
+  "rowsWithPanel": [
+    [
+      "",
+      "Lease 2024.pdf /Contracts/Leases v1 · older version",
+      "Lease",
+      "You",
+      "2 Mar 2024",
+      "Ready",
+      "Download v1 (viewed, not latest)"
+    ]
+  ],
+  "headersWithPanel": [
+    "",
+    "Name",
+    "Document type",
+    "Added by",
+    "Added",
+    "Status",
+    "Actions"
+  ],
+  "statusText": "This is an older version (v1). It is version history: fields can only be changed on the latest version.",
+  "editControls": 0,
+  "popoverBox": {
+    "x": 415,
+    "y": 304,
+    "width": 288,
+    "height": 238
+  },
+  "viewport": 1600
+}

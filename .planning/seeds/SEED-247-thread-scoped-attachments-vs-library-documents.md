@@ -1,7 +1,9 @@
 ---
 seed_id: SEED-247
 title: A file attached in chat should belong to the THREAD, not the Library — the data model cannot express "temporary" at all
-status: planted
+status: answered
+status_note: "ANSWERED by Phase 274 (2026-10-05). Q4 (promote-to-Library) shipped as ATT-03: Save to Library copies a chat attachment into a required, picked folder through the shipped minter (version_scope=folder, link-on-same-bytes, version-on-same-name), driven in Chrome — 274-VALIDATION.md §6.3/§6.4. Q1-Q3 answered at Phase 244. Q2/Q5/Q6 (chunk + embed under a thread scope) stay OUT per 274 D-01; re-open trigger: someone needs to SEARCH inside an attachment rather than have the agent read it."
+folded_into: 274
 planted: 2026-09-05
 planted_by: Operator, 2026-09-05 at Phase 229 close — "anything in the chat should stay temporarily in that thread, not in the library itself … it should be ingested or scoped to that thread, not in the library"
 surface: Agentic-RAG

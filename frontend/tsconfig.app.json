@@ -26,7 +26,19 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@video/*": ["../video/src/*"],
+      "remotion": ["./node_modules/remotion"],
+      "@remotion/player": ["./node_modules/@remotion/player"],
+      "@remotion/media": ["./node_modules/@remotion/media"],
+      "@remotion/transitions": ["./node_modules/@remotion/transitions"],
+      "@remotion/transitions/*": ["./node_modules/@remotion/transitions/dist/presentations/*"],
+      "@remotion/google-fonts/*": ["./node_modules/@remotion/google-fonts/dist/cjs/*"],
+      "mediabunny": ["./node_modules/mediabunny"],
+      "react": ["./node_modules/@types/react"],
+      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "react-dom/client": ["./node_modules/@types/react-dom/client"]
     }
   },
   "include": ["src"]

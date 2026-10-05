@@ -342,6 +342,16 @@ describe("Composer attach — the ordered blocks sketch 236 draws", () => {
     await screen.findByTestId("chat-attachment-chip")
     expect(screen.queryByTestId("composer-refusal")).toBeNull()
   })
+
+  it('10c — Phase 274 (D-05 / D-21): the composer opts its upload into THREAD-LIFE with "thread"', async () => {
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    pickFile("Meridian-Q4-pricing.xlsx")
+
+    // ⛔ A chat attachment lives with its thread; only the composer asks for that. The panel's
+    // TemplateUpload and the workflow-launch door call with NO third argument (24h TTL kept).
+    await waitFor(() => expect(api.uploadWorkspaceTemplate).toHaveBeenCalledTimes(1))
+    expect(api.uploadWorkspaceTemplate).toHaveBeenCalledWith("t-1", expect.any(File), "thread")
+  })
 })
 
 // ── Block: the SENT message ──────────────────────────────────────────────────────────────

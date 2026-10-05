@@ -4,6 +4,10 @@
 // api.ts ↔ types circular *type* reference creates no runtime import cycle.
 import type { TunerCandidate } from "@/lib/api"
 import type { ExpertConnectionState, ExpertInstallState } from "@/lib/api/experts"
+// Phase 273-05 (D-16 · I-2): the artifact wire type has ONE home, `artifactSpec.ts` (273-02).
+// Re-exported here as a TYPE only — never re-declared — so `Message` can name it.
+import type { ArtifactRecord, ArtifactMissing } from "@/components/chat/artifacts/artifactSpec"
+export type { ArtifactRecord as ArtifactRecordWire, ArtifactMissing as ArtifactMissingWire } from "@/components/chat/artifacts/artifactSpec"
 
 export interface Thread {
   id: string
@@ -252,6 +256,14 @@ export interface Message {
    * run rendered 12 download links per cell. Absent for runs that produced
    * no output files. */
   finalOutputFiles?: { filename: string; url?: string; size?: number; is_hero?: boolean }[]
+  /** Phase 273-05 (D-10 · D-16 · I-2): the agent-authored artifacts of this message, in
+   * emission order. The SAME object both ways: live, each `artifact` SSE event's record is
+   * appended by StreamsProvider's one `onArtifact` handler (deduped by id); on reload the
+   * backend attaches them as `MessageResponse.artifacts` (273-04) and `_mapMessageResponse`
+   * carries them through. Untrusted until rendered — `ArtifactBlock` runs each through the
+   * `parseArtifactRecord` guard, so nothing here is validated or narrowed. Absent when the
+   * message showed none. */
+  artifacts?: (ArtifactRecord | ArtifactMissing)[]
   /** Phase 076.2 D-01: DeepSeek reasoning/thinking content. Present on
    * assistant messages from thinking-enabled providers (DeepSeek V4).
    * Accumulated during streaming via reasoning_delta SSE events.
@@ -647,6 +659,83 @@ export interface Document {
   updated_at: string
   table_count?: number
   image_count?: number
+  /** Phase 270 (D-01 / D-10) — facts read from the file at ingest; server-derived, not columns.
+   *  null renders "not recorded". Optional because Realtime `payload.new` and narrow-select
+   *  routes may omit them. */
+  page_count?: number | null
+  source_created_at?: string | null
+  source_modified_at?: string | null
+  source_author?: string | null
+  source_connection_name?: string | null
+}
+
+/** Phase 270 — response of `POST /documents/{id}/download-url`. `url` is a bearer token: use once, never store. */
+export interface DocumentDownloadUrl {
+  url: string
+  expires_in: number
+  version_number: number
+  filename: string
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────────
+// Phase 271 (FIND-01 / FIND-03) — the `POST /document-search` wire contract, typed from
+// 271-01's backend models (`backend/app/models/document_search.py`). Additive only.
+// `pages/findState.ts` produces a structurally identical body without importing these (it is
+// a zero-import leaf); `findState.test.ts` compares the two so they cannot drift.
+// ──────────────────────────────────────────────────────────────────────────────────────
+
+/** The 8 relationship verbs: both directions of the 4 stored types. Mirrors the backend
+ *  `RelVerb` Literal, whose members are `_INVERSE_LABEL`'s keys plus values. */
+export type RelVerb =
+  | "supersedes"
+  | "superseded_by"
+  | "amends"
+  | "amended_by"
+  | "references"
+  | "referenced_by"
+  | "attached_to"
+  | "has_attachment"
+
+export interface DocumentSearchRequest {
+  /** Metadata conditions (document type, Date in the document = field `date`, custom fields). */
+  filter_expr: ViewFilter
+  name?: string | null
+  folder?: { folder_id: string | null; include_subfolders: boolean } | null
+  added_by?: { kind: "me" | "connection" | "others"; connection_id?: string | null } | null
+  dates?: Array<{
+    which: "added" | "source_created" | "source_modified"
+    op: "before" | "after" | "between" | "within_next" | "older_than"
+    value: string | number | null
+    value2?: string | null
+    unit?: "days" | "weeks" | "months" | null
+  }>
+  relationship?: { verb: RelVerb; document_id: string } | null
+  version: "latest" | "has_earlier" | "older"
+  sort:
+    | "added_desc"
+    | "added_asc"
+    | "document_date_desc"
+    | "source_modified_desc"
+    | "source_created_desc"
+    | "name_asc"
+  offset: number
+  limit: number
+}
+
+/** One Find result row: the full document plus its visible lineage size and whether it has
+ *  older uploads. `version_count` drives the "v2 · 2 versions" tag (P-05: the browse chevron
+ *  keeps reading `version_number`). */
+export type DocumentSearchRow = Document & { version_count: number; has_earlier: boolean }
+
+export interface DocumentSearchResponse {
+  documents: DocumentSearchRow[]
+  /** The exact server count of matching rows — never the page length. */
+  total: number
+  /** Rows that would match with Version = "Older versions" (the older-versions hint, D-06). */
+  older_matches: number
+  sort: string
+  offset: number
+  limit: number
 }
 
 // ──────────────────────────────────────────────────────────────────────────────────────
@@ -1133,7 +1222,8 @@ export interface WorkspaceFile {
   created_at?: string
   updated_at?: string
   kind?: string          // 100: 'template_input' for ephemeral uploads (D-02 badge)
-  expires_at?: string    // 100: ISO timestamp; drives countdown + amber tint (D-02)
+  expires_at?: string | null    // 100: ISO timestamp; drives countdown + amber tint (D-02)
+  // 274 (D-05): null = lives with its thread (chat attachment); ISO = TTL (workflow template input); absent = the wire did not say
 }
 
 /** GET /threads/{tid}/ask_user/pending (panel.py:103) +

@@ -18,7 +18,7 @@
  * assertions to make RED pass — they ARE the D-14 guard.
  */
 import { describe, it, expect } from "vitest"
-import { harnessBannerProgress, outerBannerLabel } from "@/lib/toolMeta"
+import { harnessBannerProgress, outerBannerLabel, searchFilterLine } from "@/lib/toolMeta"
 import type { Phase, ToolCall } from "@/types"
 
 describe("outerBannerLabel — STATE-03 pre-answer honesty + D-14 guard", () => {
@@ -214,5 +214,115 @@ describe("outerBannerLabel — the harness banner ADVANCES (BUG-260815-04 / V-07
     expect(
       outerBannerLabel(searchTool, true, false, true, false, { phasesDone: 2, runningPhase: 3 }),
     ).toBe("Searching knowledge base…")
+  })
+})
+
+/**
+ * Phase 272 (FIND-07, D-08) — the search tool card's filter line.
+ *
+ * The line is derived from the call's ARGS (persisted whole), never from its result
+ * (truncated at 2000 chars on persist), so it reads the same after a reload. Every
+ * expected string is pinned with `toBe`: the words ARE the deliverable, and a presence
+ * assertion cannot see content drift.
+ */
+describe("searchFilterLine — D-08 filter line from args", () => {
+  const between = (field: string, value: string, value2: string) => ({
+    query: "q",
+    filters: [{ field, op: "between", value, value2 }],
+  })
+  const one = (cond: Record<string, unknown>) => ({ query: "q", filters: [cond] })
+
+  it("renders the D-08 example exactly (en dash U+2013, middle dot U+00B7)", () => {
+    expect(
+      searchFilterLine("search_documents", {
+        query: "q",
+        filters: [
+          { field: "date", op: "between", value: "2025-10-01", value2: "2025-10-31" },
+          { field: "legal_entity", op: "eq", value: "Acme GmbH" },
+        ],
+      }),
+    ).toBe("Filtered: document date 1–31 Oct 2025 · legal entity = Acme GmbH")
+  })
+
+  it("between: part of one month, across months, across years", () => {
+    expect(searchFilterLine("search_documents", between("date", "2025-10-03", "2025-10-17"))).toBe(
+      "Filtered: document date 3–17 Oct 2025",
+    )
+    expect(searchFilterLine("search_documents", between("date", "2025-09-01", "2025-10-31"))).toBe(
+      "Filtered: document date 1 Sep – 31 Oct 2025",
+    )
+    expect(searchFilterLine("search_documents", between("date", "2024-12-01", "2025-01-31"))).toBe(
+      "Filtered: document date 1 Dec 2024 – 31 Jan 2025",
+    )
+  })
+
+  it("date words: added, created in file, modified in file", () => {
+    expect(searchFilterLine("search_documents", between("added", "2025-10-01", "2025-10-31"))).toBe(
+      "Filtered: added 1–31 Oct 2025",
+    )
+    expect(
+      searchFilterLine("search_documents", one({ field: "source_created", op: "before", value: "2025-10-03" })),
+    ).toBe("Filtered: created in file before 3 Oct 2025")
+    expect(
+      searchFilterLine("search_documents", one({ field: "source_modified", op: "after", value: "2025-10-03" })),
+    ).toBe("Filtered: modified in file after 3 Oct 2025")
+  })
+
+  it("every other operator in plain words", () => {
+    const line = (c: Record<string, unknown>) => searchFilterLine("search_documents", one(c))
+    expect(line({ field: "document_type", op: "one_of", values: ["A", "B"] })).toBe(
+      "Filtered: document type in A, B",
+    )
+    expect(line({ field: "title", op: "contains", value: "x" })).toBe("Filtered: title contains x")
+    expect(line({ field: "author", op: "is_empty" })).toBe("Filtered: author is empty")
+    expect(line({ field: "amount", op: "gte", value: "5" })).toBe("Filtered: amount ≥ 5")
+    expect(line({ field: "amount", op: "lte", value: "5" })).toBe("Filtered: amount ≤ 5")
+    expect(line({ field: "renewal", op: "within_next", value: "7", unit: "days" })).toBe(
+      "Filtered: renewal within next 7 days",
+    )
+    expect(line({ field: "date", op: "older_than", value: "3", unit: "months" })).toBe(
+      "Filtered: document date older than 3 months",
+    )
+  })
+
+  it("legacy metadata_filter renders as eq, after filters when both are present", () => {
+    expect(searchFilterLine("search_documents", { query: "q", metadata_filter: { author: "Smith" } })).toBe(
+      "Filtered: author = Smith",
+    )
+    expect(
+      searchFilterLine("search_documents", {
+        query: "q",
+        filters: [{ field: "language", op: "eq", value: "de" }],
+        metadata_filter: { author: "Smith" },
+      }),
+    ).toBe("Filtered: language = de · author = Smith")
+  })
+
+  it("ISO days are parsed as strings (no timezone shift); a malformed date renders verbatim", () => {
+    // "2025-10-01" is a calendar day, never an instant — it must not become 30 Sep.
+    expect(
+      searchFilterLine("search_documents", one({ field: "date", op: "after", value: "2025-10-01" })),
+    ).toBe("Filtered: document date after 1 Oct 2025")
+    expect(
+      searchFilterLine("search_documents", one({ field: "date", op: "before", value: "October" })),
+    ).toBe("Filtered: document date before October")
+    expect(searchFilterLine("search_documents", between("date", "October", "2025-13-40"))).toBe(
+      "Filtered: document date October – 2025-13-40",
+    )
+  })
+
+  it("returns null when there is nothing to show", () => {
+    const f = [{ field: "date", op: "eq", value: "2025-10-01" }]
+    expect(searchFilterLine("query_documents", { query: "q", filters: f })).toBeNull()
+    expect(searchFilterLine("search_documents", { query: "q" })).toBeNull()
+    expect(searchFilterLine("search_documents", { query: "q", filters: [] })).toBeNull()
+    expect(searchFilterLine("search_documents", { query: "q", filters: "date=Oct" })).toBeNull()
+    expect(
+      searchFilterLine("search_documents", {
+        query: "q",
+        filters: [{ op: "eq", value: "x" }, { field: "date" }, null, "x"],
+      }),
+    ).toBeNull()
+    expect(searchFilterLine("search_documents", { query: "q", metadata_filter: {} })).toBeNull()
   })
 })

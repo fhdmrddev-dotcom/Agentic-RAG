@@ -1,0 +1,60 @@
+{
+  "supMeta": "1 document · Sorted by Added to Agentic RAG (newest) · Exact match on fields. No AI ranking. · Searching every folder you can see. Clear search",
+  "supRows": [
+    [
+      "",
+      "Lease 2024.pdf v2 /Contracts/Leases v2 · 2 versions",
+      "Lease",
+      "You",
+      "9 Mar 2024",
+      "Ready",
+      "Download v2 (latest)"
+    ]
+  ],
+  "hintText": "1 more match in older (superseded) versions. Show them",
+  "showRows": [
+    [
+      "",
+      "Lease 2024.pdf /Contracts/Leases v1 · older version",
+      "Lease",
+      "You",
+      "2 Mar 2024",
+      "Ready",
+      "Download v1 (viewed, not latest)"
+    ]
+  ],
+  "versionChip": "Version: Older versions (superseded)",
+  "byMeta": "0 documents · Sorted by Added to Agentic RAG (newest) · Exact match on fields. No AI ranking. · Searching every folder you can see. Clear search",
+  "byRows": [],
+  "zeroBox": true,
+  "by24": [
+    [
+      "",
+      "Lease 2021.pdf /Contracts/Leases",
+      "Lease",
+      "You",
+      "1 Mar 2024",
+      "Ready",
+      "Download"
+    ]
+  ],
+  "contrast": {
+    "hint": {
+      "fg": "rgb(247, 178, 59)",
+      "layers": [
+        "rgba(247,178,59,0.1)",
+        "rgba(6,9,15,1)"
+      ],
+      "composited_bg": "rgb(30.1,25.9,19.4)",
+      "ratio": 9.39
+    },
+    "zero_count": {
+      "fg": "rgb(247, 178, 59)",
+      "layers": [
+        "rgba(6,9,15,1)"
+      ],
+      "composited_bg": "rgb(6.0,9.0,15.0)",
+      "ratio": 10.81
+    }
+  }
+}

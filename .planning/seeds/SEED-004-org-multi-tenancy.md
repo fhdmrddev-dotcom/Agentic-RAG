@@ -1,7 +1,13 @@
 ---
 title: Org / Department / Role Multi-Tenancy
 seed_id: SEED-004
-status: dormant
+status: partially-answered
+partial: true
+status_note: |
+  Moved `dormant` -> `partially-answered` on 2026-10-04 (release-history audit). Original line: `status: dormant`.
+  The trigger fired at v3.4 (Phases 160-168). AXIS SETTLED: orgs, co-tenant model (ADR 160), personal-org
+  backfill, org-scoped RLS, org admin shell, roles/invitations, SAML SSO. AXIS OPEN: departments exist only in
+  schema (dept_id, migration 104; no backend reader), plus the deferred v3.4 STRETCH phases 169-173.
 planted: 2026-05-02
 planted_during: v2.5 (after Phase 059 ship, before Phase 060 kickoff)
 trigger_when: planning a v3.x or later milestone scoped to "tenancy", "organizations", "teams", "departments", "RBAC", "roles", "enterprise", or any milestone that touches the per-user data model or the global-vs-private folder visibility model
@@ -12,6 +18,20 @@ surface: Agentic-RAG
 ---
 
 # SEED-004: Org / Department / Role Multi-Tenancy
+
+## ⚠ CORRECTED 2026-10-04 — the org half shipped in v3.4; departments did not
+
+Release-history audit (`docs/history/v3.4-multi-tenancy-and-org-access.md`). This seed read `dormant`, but
+v3.4 was the milestone it was waiting for. Shipped: tenancy ADR (160, co-tenant default), org/dept/role
+schema (161, mig 104), personal-org backfill (162), RLS rewrite (163), SECURITY DEFINER audit + cross-org
+suite (164), `is_global` retirement (165), org admin shell + switcher (166), invitations/roles/greenlists
+(167), SAML SSO (168).
+
+**Still open:** departments. `dept_id` is defined only in `supabase/migrations/104_org_dept_role_schema.sql`;
+no file in `backend/app` reads it (measured 2026-10-04), and the `dept` ingest visibility is inert by decision
+(`frontend/src/lib/api/org.ts:531`). The deferred v3.4 STRETCH work is now held by: SEED-115 (dept-admin
+shell 169, dept-targeted skills 173), SEED-343 (permission-aware citations 171), SEED-344 (OIDC 172),
+SEED-345 (retention/rate-limit dials, ENT-02 of 170). ENT-01 of 170 shipped as the v4.3 tier gate.
 
 ## Why This Matters
 

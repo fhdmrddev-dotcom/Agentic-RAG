@@ -2939,3 +2939,22 @@ reuses 267-B's event-card shape.
 - **Chat A (composer chip)** vs **Chat B (header pill)**, plus the Restricted handling: *Save & say* vs *Lock*.
 - **Spend A (Expert filter that every card follows)** vs **Spend B (Group by Model / Expert)**.
 - Winner ★ (operator, 2026-09-28): **Chat A · composer chip**, **Restricted: Save & say**, **Spend A · filter every card follows**.
+
+## Sketch 271 — Find the Document (Phase 271, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 271 | find-the-document | Find\|Ask mode switch, structure filters (folder/relationship/version), Filing rules home | ★ 1A · 2A · 3A · keep older-versions hint (operator, 2026-10-03) | phase-271, document-search, filing-rules |
+
+## Sketch 273 — Agent-Authored Artifacts (Phase 273, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 273 | agent-authored-artifacts | Artifact frame in a chat answer, the chart/table/metric family, follow-up lineage, failure notice + states | ★ 1B framed card · 2A one metric tile · 3A lineage caption · 4B explicit notice + live render (operator, 2026-10-03) | phase-273, artifacts, chart, provenance, failure-notice |
+| 276 | public-docs | Syrel public /docs on the landing domain: docs app vs landing-native vs video-first learning path (home · guide · changelog) | ★ B landing-native for home, guide and changelog (operator, 2026-10-04) | landing, docs, changelog, video |
+
+## Sketch 274 — Save to Library (Phase 274, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 274 | save-to-library | How does a person keep a chat file, on purpose, and see that they did? (action on the chip · folder picker without Root · after-mark; dedup + version + refusal states) | — | phase-274, att-03, promote, library, folder-picker |

@@ -14,8 +14,11 @@ Starlette's router likewise answers a wrong-method probe with 405 and a trailing
 with a 307 redirect — both BEFORE any dependency runs. No rewrite of ``require_canvas`` can
 fix that; the flag decision has to happen before routing.
 
-**(2) The published schema.** ``GET /openapi.json`` is anonymous and unconditional on every
-finalized deploy, and it advertised both canvas paths plus every canvas-only response model.
+**(2) The published schema.** ``GET /openapi.json`` ~~is anonymous and unconditional on every
+finalized deploy~~ (CORRECTED 2026-10-05, 276-REVIEW A-IN-03: since Phase 276 it is served by
+``app/api/api_docs.py`` and sign-in-gated on any non-local ``ENVIRONMENT``; it is still reachable
+by every signed-in user, so this filter still matters), and it advertised both canvas paths plus
+every canvas-only response model.
 Schema generation never touches dependency injection at all.
 
 So this ONE module owns BOTH halves of the off-switch's non-discoverability contract:
@@ -129,7 +132,10 @@ _GATED_PATH_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     _compile_gated_pattern(p) for p in sorted(CANVAS_GATED_PATHS) if "{" in p
 )
 
-# The schema half's path — FastAPI's default ``openapi_url`` (main.py:593 passes no override).
+# The schema half's path — ~~FastAPI's default ``openapi_url`` (main.py:593 passes no override).~~
+# CORRECTED 2026-10-05 (276-REVIEW A-IN-03): main.py now passes ``openapi_url=None`` and
+# ``app/api/api_docs.py`` serves this same path (returning ``request.app.openapi()``, i.e. the
+# canvas-aware hook), so the path — and this staleness bound — is unchanged.
 # Named here only so the middleware knows where to bound the flag's staleness for the SYNC
 # ``build_canvas_aware_openapi`` hook, which cannot await for itself (T-184-UAT-02). This is
 # NOT a gated path: ``/openapi.json`` still answers 200 in both flag states, filtered.

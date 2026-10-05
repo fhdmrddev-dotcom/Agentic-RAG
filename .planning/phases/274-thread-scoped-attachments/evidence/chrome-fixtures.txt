@@ -1,0 +1,6 @@
+FIXTURES dir=C:\Users\fhdmr\AppData\Local\Temp\agentic-rag-274-g4-fixtures
+FIXTURE C:\Users\fhdmr\AppData\Local\Temp\agentic-rag-274-g4-fixtures\274-g4-meridian-brief.pdf bytes=1612 sha256=a550c942718251f7ed2d48964bbabef375a6361e17cb9ea27aace52f45a11059
+FIXTURE C:\Users\fhdmr\AppData\Local\Temp\agentic-rag-274-g4-fixtures\274-g4-keeper.pdf bytes=335738 sha256=8a57d5557439ad6247624c008be1d598755e2980a4b5014fa529a3bb8ef1a1d9
+FIXTURE C:\Users\fhdmr\AppData\Local\Temp\agentic-rag-274-g4-fixtures\v2\274-g4-meridian-brief.pdf bytes=1472 sha256=8dfdbe2720833e19fdd3642021bfa0a9caec4c18e74ddd6a054fe823353bbfd0
+FIXTURE planted token (brief) = ATT274-chrome-dee8d311 · unique word = quillfeatherdee8d311
+FIXTURE planted token (keeper) = ATT274-keeper-5dd2b0ac

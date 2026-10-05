@@ -12,7 +12,7 @@
  * is a `useState<ActiveView>` switch (App.tsx). The Workflows icon is a
  * DISTINCT non-gear lucide glyph (`Workflow`, NOT `Settings`) per REQ-7.
  */
-import { MessageSquare, FileText, Zap, Settings, Workflow, Wand2, Plug, GraduationCap } from "lucide-react"
+import { MessageSquare, FileText, Zap, Settings, Workflow, Plug, GraduationCap } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { GovernedFeature, EffectiveFeatures } from "@/lib/api"
 
@@ -35,10 +35,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // non-operators automatically (the map, not a hardcode).
   { view: "workflows", icon: Workflow, label: "Workflows", feature: "workflow_authoring" },
   { view: "documents", icon: FileText, label: "Library" },
-  // Phase 118 gap-closure (CLASS-01 reachability): the classification-rules
-  // top-level home (sketch 037-A "Automation"). Distinct non-reused glyph
-  // (Wand2 — automation), placed adjacent to Documents as a doc-automation home.
-  { view: "classification-rules", icon: Wand2, label: "Classification" },
+  // Phase 271 (D-09): the rules home that sat here since Phase 118 moved INTO the Library as
+  // "Filing rules" (a header link + Library-local sub-view). Its `ActiveView` member and its
+  // ChatLayout branch were retired in the same commit; the `Wand2` glyph moved with it to the
+  // Library header link, so the concept keeps its one mark.
   // ⚠ UNGOVERNED, AND DELIBERATELY SO — this entry exists because the Settings one
   // below CANNOT carry Connections. `Settings` is tagged `model_management`, which
   // `backend/app/api/features.py:21` classifies Operators-only, so `visibleNavItems`

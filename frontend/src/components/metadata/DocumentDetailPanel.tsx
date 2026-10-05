@@ -37,11 +37,14 @@ import { DocumentTablesSection } from "./DocumentTablesSection"
 import { DocumentImagesSection } from "./DocumentImagesSection"
 import { DocumentQueriesSection } from "./DocumentQueriesSection"
 import { TakeoffSection } from "./TakeoffSection"
+import { DocumentDownloadButton } from "./DocumentDownloadButton"
+import { DocumentFileFacts } from "./DocumentFileFacts"
 import { ConfidenceChip, TIER } from "./ConfidenceChip"
 import { InlineEdit, type InlineFieldType } from "./InlineEdit"
 import { updateDocumentMetadata, listMetadataFields } from "@/lib/api"
 import { usePlainLabel } from "@/lib/termMap"
 import { getFileIcon } from "@/lib/fileIcons"
+import { NOT_RECORDED } from "@/lib/documentAddedBy"
 import { cn } from "@/lib/utils"
 import type { Document, MetadataFieldDef } from "@/types"
 
@@ -140,6 +143,9 @@ export interface DocumentDetailPanelProps {
    *  contains, which is still the thing SC#3 asks for. A row that looked clickable and did
    *  nothing would be worse than a row that does not. */
   onOpenDocument?: (id: string) => void
+  /** Phase 270 (P-02) — the signed-in user's id. OPTIONAL: it only decides whether "Added by"
+   *  reads "You". Absent → "name not available", never an email. Display only, never authorization. */
+  currentUserId?: string
 }
 
 export function DocumentDetailPanel({
@@ -147,6 +153,7 @@ export function DocumentDetailPanel({
   onClose,
   onReconcile,
   onOpenDocument,
+  currentUserId,
 }: DocumentDetailPanelProps) {
   const isMobile = useIsMobile()
   const [customDefs, setCustomDefs] = useState<MetadataFieldDef[]>([])
@@ -235,7 +242,15 @@ export function DocumentDetailPanel({
   // The warn-count = LOW + EMPTY fields (the needs-review signal — GROUNDING triage).
   const lowPlusEmpty = fieldStates.filter((f) => f.isLow || f.empty).length
 
+  // Phase 271-04 (D-06 / T-271-16 / RESEARCH Pitfall 6) — Find can open an OLDER version of a
+  // document. `PATCH /{id}/metadata` is latest-only (documents.py:1981-1995) and answers 404 on
+  // a superseded row, so the panel says what this row is and offers no inline edit, instead of
+  // letting every save fail with no reason given. `undefined` (every pre-271 caller) is latest.
+  const isOlderVersion = doc.is_latest === false
+
   async function handleCommit(field: string, value: unknown) {
+    // Defence in depth: no editor renders on an older version, and none may save from one.
+    if (isOlderVersion) return
     setErrorField(null)
     try {
       // The audit row is written by Plan 01's route — only on a 200 do we claim
@@ -256,7 +271,8 @@ export function DocumentDetailPanel({
   const body = (
     <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-[hsl(var(--panel-border))] px-4 py-3">
+      <div className="border-b border-[hsl(var(--panel-border))]">
+      <div className="flex items-center gap-2 px-4 py-3">
         <span className="flex-none" aria-hidden="true">
           {getFileIcon(doc.filename)}
         </span>
@@ -272,6 +288,11 @@ export function DocumentDetailPanel({
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
+      </div>
+      {/* Phase 270 (UI-SPEC §1) — Download on its own row; keyed so a document change resets its state. */}
+      <div className="flex items-center gap-2 px-4 pb-3">
+        <DocumentDownloadButton key={doc.id} doc={doc} density="panel" />
+      </div>
       </div>
 
       {/* ── Phase 231 · TRUST-04 — where this document came from ──────────────────────────
@@ -298,6 +319,20 @@ export function DocumentDetailPanel({
           · Tables · Images · Found by (217-11) · Relationships (117) · Classification
           (118). The five 217 sections are INSERTED between Details and Relationships. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {isOlderVersion && (
+          <p
+            role="status"
+            className="mx-4 mt-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning"
+          >
+            {`This is an older version (v${doc.version_number ?? 1}). It is version history: fields can only be changed on the latest version.`}
+          </p>
+        )}
+        {/* Phase 270 (UI-SPEC §3) — the File section: FIRST, and open at rest because SC#4 needs the facts
+            visible; above Details and far above Chunks, where BUG-260908-01's unbounded list would bury it
+            (that bug stays open — overlap noted). */}
+        <PanelSection title="File" defaultOpen>
+          <DocumentFileFacts doc={doc} currentUserId={currentUserId} />
+        </PanelSection>
         {/* SEED-227 — the images this document has that were never read. Rendered ONLY
             when the backend stamped `_images`, which it does only on truncation, so the
             quiet case stays quiet. ⚠ Says "were read", past tense, against the ceiling
@@ -326,6 +361,7 @@ export function DocumentDetailPanel({
                 saved={savedField === fs.row.key}
                 errored={errorField === fs.row.key}
                 onCommit={handleCommit}
+                readOnly={isOlderVersion}
               />
             ))}
           </div>
@@ -513,11 +549,14 @@ function FieldRowView({
   saved,
   errored,
   onCommit,
+  readOnly = false,
 }: {
   state: FieldState
   saved: boolean
   errored: boolean
   onCommit: (field: string, value: unknown) => void
+  /** Phase 271-04 — an older version: show the value as text, never an editor. */
+  readOnly?: boolean
 }) {
   const { row, value, score, source, empty, isLow } = state
 
@@ -559,13 +598,17 @@ function FieldRowView({
               ⚠
             </span>
           )}
-          <InlineEdit
-            field={row.key}
-            fieldType={row.type}
-            value={value}
-            options={row.options}
-            onCommit={onCommit}
-          />
+          {readOnly ? (
+            <ReadOnlyValue value={value} />
+          ) : (
+            <InlineEdit
+              field={row.key}
+              fieldType={row.type}
+              value={value}
+              options={row.options}
+              onCommit={onCommit}
+            />
+          )}
         </div>
 
         {/* Save receipt — ONLY rendered after a successful PATCH (handleCommit).
@@ -591,6 +634,21 @@ function FieldRowView({
       </div>
     </div>
   )
+}
+
+/** Phase 271-04 — a field value as plain text (older versions). A missing value says so, in the
+ *  270 wording, rather than showing an empty line or a substituted value. */
+function ReadOnlyValue({ value }: { value: unknown }) {
+  const text =
+    value == null
+      ? ""
+      : Array.isArray(value)
+        ? value.map(String).join(", ")
+        : String(value)
+  if (text.trim() === "") {
+    return <span className="italic text-panel-muted-foreground">{NOT_RECORDED}</span>
+  }
+  return <span className="break-words">{text}</span>
 }
 
 export default DocumentDetailPanel

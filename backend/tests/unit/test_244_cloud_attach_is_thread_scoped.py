@@ -103,14 +103,27 @@ async def _call(monkeypatch, *, filename: str, raw: bytes):
     )
 
 
-# ── 1 · the row that IS written is a thread-scoped, expiring workspace file ───────────────
+# ── 1 · the row that IS written is a thread-scoped workspace file that lives with its thread ─
 @pytest.mark.asyncio
-async def test_a_cloud_pick_writes_an_expiring_workspace_file(monkeypatch, stubbed):
+async def test_a_cloud_pick_writes_a_thread_life_workspace_file(monkeypatch, stubbed):
+    """⚠ RETIRED DELIBERATELY AND REWRITTEN — D-05, Phase 274: a chat attachment lives for its
+    thread; the old `expires_at is not None` premise is retired on purpose (SEED-177 /
+    D-206-07 precedent: a fence is retired deliberately, by a decision written into its body,
+    never tripped by surprise).
+
+    The original assertion read *"a chat attachment without a TTL is a Library row"*. That
+    conflated two properties. What made the row thread-scoped was never its TTL — it is the
+    TABLE (`workspace_files`, not `documents`) and the ABSENT reach to the minter, which case 2
+    still fences on the source. Phase 274 (ATT-01) makes the composer doors write
+    `expires_at = NULL`, so the attachment survives as long as the conversation does, and
+    thread delete now removes its bytes (D-08).
+    """
     result = await _call(monkeypatch, filename="Meridian-Q4.docx", raw=_docx_bytes())
 
     assert stubbed["kind"] == "template_input"
-    assert stubbed["expires_at"] is not None, "a chat attachment without a TTL is a Library row"
+    assert stubbed["expires_at"] is None, "D-05: a composer attachment lives for its thread"
     assert result["kind"] == "template_input"
+    assert result["expires_at"] is None
     assert result["path"].endswith("Meridian-Q4.docx")
 
 

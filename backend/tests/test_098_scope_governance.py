@@ -140,7 +140,7 @@ async def test_deep_noop(make_tool_context, fake_redis, monkeypatch):
             0.85,
         )
 
-    monkeypatch.setattr(td, "search_documents", _fake_search)
+    monkeypatch.setattr("app.services.search_documents_tool.search_documents", _fake_search)
     ctx = make_tool_context(folder_subtree_ids=None, emit=_emit, spawn=_close_spawn)
 
     await _handle_search_documents({"query": "q"}, ctx)
@@ -212,7 +212,7 @@ async def test_clip_and_emit(make_tool_context, fake_redis, monkeypatch):
     async def _fake_search(*a, **k):
         return ([in_scope, out_scope], 0.85)
 
-    monkeypatch.setattr(td, "search_documents", _fake_search)
+    monkeypatch.setattr("app.services.search_documents_tool.search_documents", _fake_search)
     ctx = make_tool_context(folder_subtree_ids=["A"], emit=_emit, spawn=_close_spawn)
 
     result = await _handle_search_documents({"query": "q"}, ctx)

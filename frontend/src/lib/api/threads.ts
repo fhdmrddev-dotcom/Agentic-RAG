@@ -113,6 +113,9 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     // ...rest, exactly as 095.1-03 argued for started_at/completed_at above.
     cost_usd,
     is_rated,
+    // Phase 273-05 (I-2): attached by the backend (273-04); destructured so a wire `null`
+    // never rides through `...rest`.
+    artifacts,
     ...rest
   } = m
   const mapped: Message = {
@@ -138,6 +141,9 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     // undefined as "coverage not tracked" rather than "coverage incomplete".
     costUsd: cost_usd,
     isRated: is_rated,
+    // Phase 273-05 (I-2): the same records the live `artifact` event carried, never
+    // re-derived from tool_calls here. Validated at render by the guard, not here.
+    artifacts: Array.isArray(artifacts) ? artifacts : undefined,
   }
   if (confidence_level) {
     mapped.confidence = {
@@ -553,6 +559,11 @@ export interface StreamCallbacks {
    * panel below the per-cell delta panels. Backend wire event type is
    * `final_output_files`. Payload shape: { filename: string; url?: string }[]. */
   onFinalOutputFiles?: (files: { filename: string; url?: string; size?: number; is_hero?: boolean }[]) => void
+  /** Phase 273-05 (D-16 · I-2): one agent-authored artifact, the `artifact` key of the
+   * `artifact` SSE event: the stored `message_artifacts` row, exactly what reload returns in
+   * `MessageResponse.artifacts`. Untrusted, so it is handed on as `unknown`; the render-time
+   * guard (`parseArtifactRecord`) is the only place it is typed. NON-terminal. */
+  onArtifact?: (raw: unknown) => void
   onSources?: (sources: SourceReference[]) => void
   onCitations?: (citations: Citation[]) => void
   onConfidence?: (
@@ -1039,6 +1050,10 @@ export async function subscribeToRun(
           callbacks.onFinalOutputFiles(
             (parsed.files ?? []) as { filename: string; url?: string; size?: number; is_hero?: boolean }[],
           )
+        // Phase 273-05 (D-16): an agent-authored artifact, emitted the moment it is stored.
+        // NO `return`: the cursor-advance block below still fires for this frame.
+        else if (t === "artifact" && callbacks.onArtifact)
+          callbacks.onArtifact(parsed.artifact as unknown)
         else if (t === "sources" && callbacks.onSources)
           callbacks.onSources((parsed.sources ?? []) as SourceReference[])
         else if (t === "citations" && callbacks.onCitations)

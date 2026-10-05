@@ -109,6 +109,12 @@ export {
   // Phase 240 (SRC-05 SC#3) — the conversation read. Same rule as the five above: a symbol
   // missing from this barrel typechecks perfectly and is invisible to every consumer.
   fetchDocumentConversation,
+  // Phase 270 (FIND-04) — the per-click download mint.
+  getDocumentDownloadUrl,
+  // Phase 271 (FIND-01) — present ONLY to keep `apiBarrel.test.ts` (D-207-06) green. Every
+  // consumer imports these from `@/lib/api/documents`, never from here (196-08).
+  searchDocuments,
+  DocumentSearchError,
 } from "./api/documents"
 
 // ── skills ─────────────────────────────────────────────────────────

@@ -61,6 +61,13 @@ from app.services.openai_service import (
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
+from app.services.artifact_history import redact_artifact_args  # 273 (I-4) — the one persist hook
+from app.services.structured_text_holdback import (  # 273 (SC#2, Pitfall 2, OV-273-04)
+    StructuredTextHoldback,
+    drop_held,
+    failed_tool_call,
+    replace_failed_call,
+)
 from app.services.citation_markers import (
     apply_citation_instruction,
     normalize_citation_markers,
@@ -73,6 +80,8 @@ from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
 # Cycle-safe: agent_loop already imports tool_dispatcher above, and tool_dispatcher never imports
 # agent_loop at module level.
 from app.services.tool_dispatcher import _attachment_container_path
+# Phase 272 (D-07 / D-02 / D-23): today's date + the run's filter vocabulary (cycle-safe, as above).
+from app.services.search_documents_tool import load_search_vocabulary, today_line, with_search_vocabulary
 # Phase 164 (D-164-02): reuse the shared retrieval user-context seam for the match_skills
 # DEFINER RPC (retrieval_service is already in the import graph via tool_dispatcher above —
 # no new cycle; it never imports agent_loop).
@@ -700,7 +709,10 @@ SYSTEM_PROMPT = (
     "Pick the ONE tool that best fits the task:\n"
     "- **search_documents** → reading passage content: finding facts, quotes, figures, or explanations *inside* documents. "
     "The returned chunks are pre-extracted relevant passages — read them carefully. If they contain the answer, stop there. "
-    "Only add `metadata_filter` when the user explicitly asks to scope by author, date, or document type — never guess filter values.\n"
+    "When the question names a period (a month, a quarter, a year) or a value of a document field (an entity, a type, an author), "
+    "pass it as `filters` on search_documents so only those documents are searched — a passage from outside the asked period or value "
+    "is a wrong answer, not a close one. A period means the document's own date (`date`) unless the person says uploaded, created or "
+    "modified (then `added`, `source_created` or `source_modified`).\n"
     "- **query_documents** → metadata/structural questions: counts, lists, date-range filters, folder membership, file sizes "
     "(e.g. 'how many PDFs from 2023?', 'list all documents by John', 'which files are in the Reports folder'). "
     "These are SQL-style questions about document attributes, not about what documents say.\n"
@@ -736,9 +748,10 @@ SYSTEM_PROMPT = (
     "use search_documents. If it's about *which documents exist or their attributes* (counts, dates, folders, authors), "
     "use query_documents.\n\n"
 
-    "**Hybrid fallback — do not stop on zero results:** If query_documents returns no rows, the identifier may exist "
-    "inside document content — call search_documents with the key term. If search_documents returns no chunks, the user "
-    "may be asking about metadata — call query_documents. Always try the other tool before giving up.\n\n"
+    "**Hybrid fallback — do not stop on zero results (unfiltered searches only):** If query_documents returns no rows, the identifier may exist "
+    "inside document content — call search_documents with the key term. If an unfiltered search_documents returns no chunks, the user "
+    "may be asking about metadata — call query_documents. Always try the other tool before giving up — except after a filtered "
+    "search that matched no documents, which is a final answer (see Rules).\n\n"
 
     "**Multi-document comparison:** Call analyze_document once per document, then synthesize across them in your response. "
     "Do not call search_documents separately for each.\n\n"
@@ -747,9 +760,12 @@ SYSTEM_PROMPT = (
     "- Always cite which document your answer comes from.\n"
     "- Never call the same tool twice with the same arguments.\n"
     "- If search_documents returns relevant chunks, answer from those — do NOT also call read_document on the same document.\n"
-    "- **Zero results from search_documents:** If the tool returns no chunks at all, try grep (if the user referenced a "
+    "- **Zero results from search_documents (unfiltered):** If an unfiltered search returns no chunks at all, try grep (if the user referenced a "
     "specific phrase) or query_documents (to check whether the document exists). If still nothing, tell the user directly "
     "— do not fabricate.\n"
+    "- **A filtered search that matched no documents is a final answer:** say plainly that nothing matched the filter you used and "
+    "name it, cite nothing, and do not search again without the filter. Do not use grep, query_documents, read_document or "
+    "analyze_document to answer from outside it. You may offer the nearby values the tool lists and ask whether to use one.\n"
     "- **Zero results from query_documents:** If the SQL returns no rows, the identifier may appear inside document "
     "content rather than in filenames or metadata. Fall back to search_documents with the key identifier as the query.\n"
     "- **read_document out of bounds:** If a line range returns nothing or is out of bounds, fall back to analyze_document "
@@ -1312,8 +1328,8 @@ def _build_attachment_note(rows: list[dict] | None) -> str:
         "\n\n## Files attached to this conversation\n"
         "The user attached these files to THIS conversation. They are scoped to this "
         "conversation only, they are NOT in the knowledge base, and they will not be found by "
-        "search_documents. They expire, so use them in this conversation rather than assuming "
-        "they persist.\n"
+        "search_documents. They stay with this conversation for as long as it exists; use them "
+        "here rather than assuming they exist anywhere else.\n"
         "Read a text file with workspace_read; read ANY of them — spreadsheets, documents, "
         "slides, PDFs, images — from the path below inside execute_code.\n"
         + "\n".join(lines)
@@ -1474,6 +1490,7 @@ async def run_agent_loop(
         active_system_prompt = SYSTEM_PROMPT
         active_tools = None  # None = use default get_tools() in create_streaming_chat
         max_iterations = 15  # GEN-04: was 8
+    active_system_prompt += today_line()  # Phase 272 (D-07) — today's date + the month rule, both modes
 
     # Augment system prompt with folder scope context so LLM generates scoped queries
     if scoped_folder_path:
@@ -1671,6 +1688,9 @@ async def run_agent_loop(
                 + "\n".join(f"- {t}" for t in disabled_tools)
             )
             active_system_prompt = active_system_prompt + disabled_note
+
+        # Phase 272 (D-02 / D-23 / D-26) — the run's fields + top document types in search_documents' schema; None keeps the static one.
+        active_tools = with_search_vocabulary(active_tools, user_settings, await load_search_vocabulary(current_user["id"], supabase))
 
         # Phase 216 (CHAT-05 / D-216-04) — Connector tools in chat:
         # Load active connector connections for the user's org and register their function tools
@@ -1963,6 +1983,7 @@ async def run_agent_loop(
         if persisted_tool_calls:
             completed_tools = [tc for tc in persisted_tool_calls if tc.get("status") == "done"]
             if completed_tools:
+                completed_tools = redact_artifact_args(completed_tools)  # 273 (I-4) — inline rows never re-sent
                 row["tool_calls"] = _strip_nul(completed_tools)
         if unique_citations:
             row["source_refs"] = unique_citations   # Full citation objects (D-13)
@@ -2102,6 +2123,8 @@ async def run_agent_loop(
         # iteration; setattr would not survive). Sub-agents get a FRESH set()
         # (task_service) so a sub-agent's dead call never blocks the parent.
         _dead_gap_tokens_in_run: set[str] = set()
+        # Phase 272 (D-09) — the per-turn retry lock, by reference; SHARED with sub-agents (task_service).
+        _empty_filter_fields_in_run: set[str] = set()
 
         # Phase 085 D-085-15 — per-run task() concurrency semaphore.
         # Initialized ONCE per top-level run (outside the iteration loop) so
@@ -2154,6 +2177,8 @@ async def run_agent_loop(
                 previous_files_in_run=_previous_files_in_run,
                 new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
                 dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
+                empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
+                turn_tool_calls=persisted_tool_calls,  # 273 (D-04) — caption source (by-reference)
                 iteration=0,
                 parent_run_id=None,
                 per_run_task_semaphore=_per_run_task_semaphore,
@@ -2316,6 +2341,8 @@ async def run_agent_loop(
                     finish_reason: str | None = None
                     _announced_tools_shared: set[int] = set()
                     _build_from_progress: bool = False
+                    # 273 (SC#2, Pitfall 2, OV-273-04): set per provider call on the STRUCTURED path only.
+                    _structured_holdback: StructuredTextHoldback | None = None
 
                     async def _on_chunk(_event):
                         """ONE provider-agnostic consumer handler (D-02 / D-04) for
@@ -2363,7 +2390,14 @@ async def run_agent_loop(
                             _text = _event.get("content", "")
                             if _text:
                                 full_content += _text
-                                await _emit(redis, run_id, 'delta', content=_text)
+                                if _structured_holdback is None:
+                                    await _emit(redis, run_id, 'delta', content=_text)
+                                else:
+                                    # 273 (SC#2, Pitfall 2, OV-273-04): only EMISSION is gated — a
+                                    # tool-call block is never streamed as answer text.
+                                    _released = _structured_holdback.feed(_text)
+                                    if _released:
+                                        await _emit(redis, run_id, 'delta', content=_released)
                         elif _etype == "reasoning_delta":
                             # OpenAI-path only today (DeepSeek reasoning_content +
                             # <think>-stripped Kimi/MiniMax/GLM). The adapter routes
@@ -2589,6 +2623,9 @@ async def run_agent_loop(
                         stream, calling_mode = await open_stream(
                             active_provider_name, _gw_request
                         )
+                        # 273 (SC#2, Pitfall 2, OV-273-04): one holdback per STRUCTURED provider call.
+                        if calling_mode == CallingMode.STRUCTURED:
+                            _structured_holdback = StructuredTextHoldback()
 
                         # Fallback: inject for other structured-mode models (unknown models).
                         # Happens after the first call; subsequent iterations will have instructions.
@@ -2620,12 +2657,20 @@ async def run_agent_loop(
                         # to it. Bound here so the helper's except-block closes from the
                         # main thread BEFORE the producer's for-loop cleanup propagates
                         # GeneratorExit into _TracedStream.__iter__.
-                        await _drain_stream_with_close_on_cancel(
-                            stream,
-                            per_call_budget,
-                            _on_chunk,
-                            close_fn=stream.close,
-                        )
+                        try:
+                            await _drain_stream_with_close_on_cancel(
+                                stream,
+                                per_call_budget,
+                                _on_chunk,
+                                close_fn=stream.close,
+                            )
+                        except BaseException:
+                            # 273-REVIEW WR-06(b): the stream aborted (timeout, provider error,
+                            # cancel) while text was held. It was never emitted, so it must not
+                            # persist either — live and reload stay identical (I-2).
+                            if _structured_holdback is not None:
+                                full_content = drop_held(full_content, _structured_holdback.finish(False))
+                            raise
 
                         # XPROV-02b (Phase 175, Option B — post-drain, deepseek-leak-only).
                         # If the sanitizer detected a DSML leak (DeepSeek wrote a tool call
@@ -2657,6 +2702,19 @@ async def run_agent_loop(
                         # Parse tool calls based on calling mode
                         if calling_mode == CallingMode.STRUCTURED:
                             structured_calls = parse_structured_tool_calls(full_content)
+                            # 273 (SC#2, Pitfall 2, OV-273-04): settle the held text. A parsed call is
+                            # dropped and the streamed preamble folds BEFORE the tool events (the
+                            # native-path fold below never fires here: full_content is cleared first);
+                            # an unparsed block was ordinary text and is flushed so the answer completes.
+                            if _structured_holdback is not None:
+                                _held = _structured_holdback.finish(bool(structured_calls))
+                                if structured_calls and _structured_holdback.released_text:
+                                    await _emit(redis, run_id, 'turn_boundary')
+                                elif _held and failed_tool_call(_held):  # 273 CR-02: never as text
+                                    full_content, _fcn = replace_failed_call(full_content, _held)
+                                    await _emit(redis, run_id, 'delta', content=_fcn)
+                                elif _held:
+                                    await _emit(redis, run_id, 'delta', content=_held)
                             if structured_calls:
                                 # Convert to tool_calls_buffer format for uniform execution
                                 for idx, call in enumerate(structured_calls):
@@ -3032,6 +3090,8 @@ async def run_agent_loop(
                 previous_files_in_run=_previous_files_in_run,
                 new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
                 dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
+                empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
+                turn_tool_calls=persisted_tool_calls,  # 273 (D-04) — caption source (by-reference)
                 iteration=iteration,
                 # Phase 085 additions —
                 # parent_run_id is None at the top-level run; task_service

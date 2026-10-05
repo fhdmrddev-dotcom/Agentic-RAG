@@ -1,383 +1,61 @@
+"""Retrieval ORCHESTRATOR — ``search_documents``: embed → arms → fuse → rerank → enrich.
+
+Phase 272 (D-13) split this file. Its extraction had been owed since Phase 231 (SEED-224) and it
+FIRED G-5; 272-01 took that extraction FIRST, as a pure move, before Phase 272 adds any behaviour.
+What remains here is the orchestrator only — its decorator and body are byte-unchanged
+(``tests/unit/test_272_pure_move.py``). Everything it composes now lives in:
+
+* ``retrieval_rpc.py``       — ``_vector_literal``, ``_call_as_user``, ``_vector_search``, ``_keyword_search``
+* ``retrieval_rank.py``      — ``_rrf_fuse``, ``_deduplicate_chunks``, ``_avg_cosine`` (pure)
+* ``retrieval_documents.py`` — ``_enrich_with_filenames``, ``resolve_document_id``, ``fetch_full_document``
+
+⛔ Filtered retrieval lands in ``retrieval_scope.py`` / ``retrieval_rpc.py`` — never back here.
+272-03 threads ONE parameter (``document_ids``) through the orchestrator and nothing more: the
+set is resolved in ``retrieval_scope.py``, restricted in ``retrieval_rpc.py``, marked in
+``retrieval_rank.py``.
+"""
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 from langsmith import traceable
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 from app.config import settings
-from app.dependencies import get_user_pg_connection
-from app.services.openai_service import embed_texts
 from app.services.rerank_service import rerank
-from app.services.retrieval_tuning import apply_hnsw_session_knobs
-from app.utils.db import aexec
+from app.services.retrieval_documents import _enrich_with_filenames
+from app.services.retrieval_rank import (
+    _avg_cosine,
+    _carry_low_similarity,
+    _cover_matched_documents,
+    _deduplicate_chunks,
+    _rrf_fuse,
+    _select_filtered_vector_rows,
+)
+from app.services.retrieval_rpc import FILTERED_MATCH_FLOOR, _keyword_search, _vector_search
+
+# ── Back-compat re-exports (Phase 272, D-13) ─────────────────────────────────────────────────
+# These names moved; every measured importer still reads them from HERE, so they stay importable
+# and are the SAME objects as in their new homes (pinned by test_272_pure_move::test_back_compat_names):
+#   tool_dispatcher.py:47            search_documents, resolve_document_id, fetch_full_document
+#   agent_loop.py:79                 _call_as_user, _vector_literal
+#   checked_query_service.py:22      search_documents
+#   multimodal_service.py:1011       resolve_document_id (lazy)
+#   scripts/spike-097/derive_fields.py:61   search_documents
+#   tests/unit/test_retrieval_service.py:13 search_documents, _enrich_with_filenames
+#   tests/unit/test_271_no_embedding.py     embed_texts (its `_EMBED_SITES` hasattr fence)
+# ⚠ A PATCH of one of these names HERE no longer reaches the code that calls it — patch the
+#   module that now resolves it (patch-where-used).
+from app.services.openai_service import embed_texts  # noqa: F401 — re-export only
+from app.services.retrieval_documents import fetch_full_document, resolve_document_id  # noqa: F401
+from app.services.retrieval_rpc import _call_as_user, _vector_literal  # noqa: F401
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
 
 logger = logging.getLogger(__name__)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Private helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _vector_literal(embedding: list[float]) -> str:
-    """Format a float embedding as a pgvector literal (Phase 164 / RESEARCH Pitfall 3).
-
-    The asyncpg pool registers ONLY a jsonb codec (dependencies.py:74) — there is NO
-    vector codec, so a raw ``list[float]`` cannot be bound to a ``vector`` param the way
-    PostgREST/``supabase.rpc`` did implicitly. Build the ``'[...]'`` literal and cast it
-    at the call site (``$1::public.vector``) instead.
-    """
-    return "[" + ",".join(repr(float(x)) for x in embedding) + "]"
-
-
-async def _call_as_user(
-    user_id: str,
-    fn_sql: str,
-    *args,
-    hnsw_ef_search: int | None = None,
-    hnsw_iterative_scan: str | None = None,
-) -> list[dict]:
-    """Run a retrieval RPC (or any SELECT) over the Phase-163 asyncpg user-context (D-164-02).
-
-    Opens ``get_user_pg_connection(None, {"id": user_id})`` — the uid-synthesized
-    ``request.jwt.claims`` context (``SET LOCAL ROLE authenticated`` + both GUC forms, NO
-    token → no mid-run expiry, the 163 red line) — so the DEFINER bodies' nested
-    ``current_user_org_ids()`` / ``auth.uid()`` resolve the CALLER's org and a spoofed
-    ``match_user_id`` cannot cross orgs. Returns plain dicts so the shape is parity with the
-    old ``supabase.rpc(...).data`` (uuid columns are cast ``::text`` at the call site so ids
-    stay str-keyed exactly like the PostgREST JSON, keeping ``_rrf_fuse`` / enrich lookups
-    byte-compatible). Fail-closed: on a service-role/owner connection ``auth.uid()`` is NULL
-    → empty org set → 0 rows.
-
-    Phase 241 (QUEUE-06 / D-10 / D-11) — the two optional HNSW knobs ride the transaction this
-    context manager ALREADY opens, so the COMMIT that already happens auto-reverts every
-    ``SET LOCAL`` and a scan budget cannot leak to the next borrower of the pooled connection.
-    No new plumbing; absent both knobs this function is byte-identical to the shipped one.
-
-    ⛔ **G-5 — READ THIS BEFORE ADDING ANYTHING ELSE HERE.** This file's extraction has been
-    **OWED since Phase 231** and this landing does NOT discharge it. It is the SECOND milestone
-    landing, permitted because the ROADMAP forbids a *third* without proposing the extraction
-    first — so a THIRD must propose that extraction before it adds behaviour. The knob LOGIC
-    (validation, the `set_config` statements, the degrade-not-fail arms, the hardcoded memory
-    companions) deliberately lives in ``app/services/retrieval_tuning.py`` precisely so this
-    file's delta stays a call and its arguments. Do not move it back, and do not edit the ledger
-    row to say the obligation was met: ``docs/HOT-FILE-LEDGER.md`` still reads
-    *extraction still OWED*.
-    """
-    async with get_user_pg_connection(None, {"id": user_id}) as conn:
-        if hnsw_ef_search is not None or hnsw_iterative_scan is not None:
-            await apply_hnsw_session_knobs(
-                conn, ef_search=hnsw_ef_search, iterative_scan=hnsw_iterative_scan
-            )
-        rows = await conn.fetch(fn_sql, *args)
-    return [dict(r) for r in rows]
-
-
-async def _vector_search(
-    query: str,
-    user_id: str,
-    supabase: Client,
-    metadata_filter: dict | None,
-    top_n: int,
-    match_threshold: float,
-    user_settings: UserEffectiveSettings | None,
-    folder_ids: list[str] | None = None,
-) -> list[dict]:
-    # SEED-065: embed_texts is a SYNC OpenAI HTTP call. Running it directly on the
-    # event loop froze ALL request serving for the embedding round-trip — under a
-    # search-heavy llm_batch_agents fan-out (N concurrent sub-agents) that stacked
-    # into multi-second idle-request stalls (conc_probe cross_tab_latency p95=2.6s,
-    # threadpool only 6/200 = blocking, not starvation). Wrap in run_in_threadpool
-    # so the blocking HTTP call leaves the loop (the D-v2.5-01 pattern; supersedes
-    # the D-058-01 deferral that scoped 058 to Supabase only). Behavior identical.
-    query_embedding = (
-        await run_in_threadpool(embed_texts, [query], user_settings=user_settings)
-    )[0]
-    # Phase 111.1 D-10: filter search to the CURRENTLY-configured embedding model so a
-    # half-finished re-embed never compares across vector spaces (Pitfall 2). Stale-model
-    # chunks are excluded — that exclusion is the graceful-dip recall reduction (D-04),
-    # NOT a cross-vector-space comparison. The migration-073 backfill tagged pre-existing
-    # chunks text-embedding-3-small, so default to that when no model is configured.
-    current_model = (getattr(user_settings, "embedding_model", "") or "text-embedding-3-small")
-    # Phase 164 (D-164-02): run the DEFINER RPC over the asyncpg user-context (NOT the
-    # passed-in service-role `supabase` client — the org predicate resolves auth.uid()=caller
-    # only there). Positional args map the migration-073 signature order; the embedding is a
-    # pgvector literal cast `$1::public.vector` (Pitfall 3); id/document_id cast ::text so the
-    # dict shape matches the old PostgREST JSON (str ids for _rrf_fuse / enrich lookups).
-    return await _call_as_user(
-        user_id,
-        """SELECT id::text AS id, document_id::text AS document_id, content, chunk_index, similarity
-           FROM public.match_document_chunks($1::public.vector, $2, $3, $4, $5, $6, $7)""",
-        _vector_literal(query_embedding),
-        user_id,
-        top_n,
-        match_threshold,
-        metadata_filter if metadata_filter else None,
-        folder_ids if folder_ids else None,
-        current_model,
-        # Phase 241 (D-09 / D-11) — the ONLY caller that passes these: HNSW is the vector
-        # index, so `_keyword_search` below deliberately carries nothing. Resolved in the
-        # shipped `user_settings.x if user_settings else settings.x` idiom used at :365-372.
-        hnsw_ef_search=(user_settings.hnsw_ef_search if user_settings else settings.hnsw_ef_search),
-        hnsw_iterative_scan=(
-            user_settings.hnsw_iterative_scan if user_settings else settings.hnsw_iterative_scan
-        ),
-    )
-
-
-async def _keyword_search(
-    query: str,
-    user_id: str,
-    supabase: Client,
-    metadata_filter: dict | None,
-    top_n: int,
-    folder_ids: list[str] | None = None,
-) -> list[dict]:
-    # Phase 164 (D-164-02): same user-context swap as `_vector_search` — keyword_search_chunks
-    # is DEFINER, so its in-body org gate only scopes the caller when auth.uid() resolves.
-    # Positional args map the migration-025 signature; @@/plainto_tsquery/ts_rank_cd resolve
-    # under search_path='' (pg_catalog). Returns (id, document_id, content, chunk_index, rank).
-    return await _call_as_user(
-        user_id,
-        """SELECT id::text AS id, document_id::text AS document_id, content, chunk_index, rank
-           FROM public.keyword_search_chunks($1, $2, $3, $4, $5)""",
-        query,
-        user_id,
-        top_n,
-        metadata_filter if metadata_filter else None,
-        folder_ids if folder_ids else None,
-    )
-
-
-def _rrf_fuse(
-    vector_results: list[dict],
-    keyword_results: list[dict],
-    k: int = 60,
-    vector_weight: float = 1.0,
-    keyword_weight: float = 1.0,
-) -> list[dict]:
-    """Reciprocal Rank Fusion: score(d) = Σ weight/(k + rank_i(d))"""
-    scores: dict[str, float] = {}
-    docs: dict[str, dict] = {}
-
-    for rank, row in enumerate(vector_results):
-        chunk_id = row["id"]
-        scores[chunk_id] = scores.get(chunk_id, 0.0) + vector_weight / (k + rank + 1)
-        docs[chunk_id] = row
-
-    for rank, row in enumerate(keyword_results):
-        chunk_id = row["id"]
-        scores[chunk_id] = scores.get(chunk_id, 0.0) + keyword_weight / (k + rank + 1)
-        if chunk_id not in docs:
-            docs[chunk_id] = row
-
-    fused = sorted(scores.keys(), key=lambda cid: scores[cid], reverse=True)
-    result = []
-    for chunk_id in fused:
-        doc = dict(docs[chunk_id])
-        doc["rrf_score"] = scores[chunk_id]
-        result.append(doc)
-    return result
-
-
-async def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dict]:
-    if not rows:
-        return []
-    doc_ids = list({row["document_id"] for row in rows})
-    docs_result = await aexec(
-        supabase.table("documents")
-        # Phase 231 TRUST-04 — `source_connection_id` joins the same additive projection
-        # `folder_id` uses. It is the fact that distinguishes machine-placed knowledge from
-        # knowledge somebody chose to upload, and a citation cannot carry what the read omits.
-        .select("id, filename, metadata, version_number, folder_id, source_connection_id")
-        .in_("id", doc_ids)
-    )
-    doc_map = {doc["id"]: doc for doc in (docs_result.data or [])}
-
-    # Phase 231 TRUST-04 — resolve connection NAMES, not ids: "placed by Google Drive" is the
-    # fact a reader can act on; a uuid is not.
-    # ⚠ ONE extra query, and ONLY when a hit actually came from a connection. In a corpus with
-    #   no connections — every corpus today — this costs nothing and the shape is unchanged.
-    # ⚠ A name that cannot be resolved (deleted connection, or one this reader may not see) is
-    #   left as None and the surface says "a connection" rather than inventing one. D-4 sets
-    #   source_connection_id to NULL on delete, so an unresolved id is a real state, not an error.
-    conn_ids = list({
-        doc.get("source_connection_id")
-        for doc in doc_map.values()
-        if doc.get("source_connection_id")
-    })
-    conn_names: dict[str, str] = {}
-    if conn_ids:
-        conn_result = await aexec(
-            supabase.table("connector_connections").select("id, name").in_("id", conn_ids)
-        )
-        conn_names = {c["id"]: c.get("name") or "" for c in (conn_result.data or [])}
-
-    enriched = []
-    for row in rows:
-        doc = doc_map.get(row["document_id"], {})
-        entry: dict = {
-            "content": row["content"],
-            "document_id": row["document_id"],
-            "filename": doc.get("filename", "Unknown"),
-            "chunk_index": row.get("chunk_index"),
-            "similarity": row.get("similarity") or row.get("rrf_score") or row.get("rank") or 0.0,
-            "version_number": doc.get("version_number", 1),
-            # Phase 098 GOV-01 — additive folder_id for the post-query ⊆ scope clip
-            # (Deep-inert: Deep consumers never read it; the return shape is unchanged).
-            "folder_id": doc.get("folder_id"),
-            # Phase 231 TRUST-04 — provenance travels with the hit, so the citation built
-            # downstream carries the same fact the Library shows.
-            "source_connection_id": doc.get("source_connection_id"),
-            "source_connection_name": conn_names.get(doc.get("source_connection_id") or ""),
-        }
-        if doc.get("metadata"):
-            entry["metadata"] = doc["metadata"]
-        enriched.append(entry)
-    return enriched
-
-
-def _deduplicate_chunks(rows: list[dict], text_overlap_threshold: float = 0.85) -> list[dict]:
-    """Remove near-duplicate chunks from a ranked result list.
-
-    Two chunks are considered duplicates when their word-set Jaccard similarity
-    exceeds *text_overlap_threshold* (default 0.85). The higher-scoring chunk is
-    kept. This is a safety net against the old chunking algorithm producing
-    near-identical overlapping chunks and, after the fix, against any edge cases
-    in very repetitive documents.
-    """
-    kept: list[dict] = []
-    for candidate in rows:
-        words_c = set(candidate["content"].lower().split())
-        is_dup = False
-        for existing in kept:
-            words_e = set(existing["content"].lower().split())
-            union = words_c | words_e
-            if not union:
-                continue
-            jaccard = len(words_c & words_e) / len(union)
-            if jaccard >= text_overlap_threshold:
-                is_dup = True
-                break
-        if not is_dup:
-            kept.append(candidate)
-    return kept
-
-
-def _avg_cosine(rows: list[dict]) -> float:
-    """Average cosine similarity from vector search rows. Returns 0.0 if no rows."""
-    sims = [row["similarity"] for row in rows if row.get("similarity") and row["similarity"] > 0]
-    return sum(sims) / len(sims) if sims else 0.0
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Public API
-# ─────────────────────────────────────────────────────────────────────────────
-
-async def resolve_document_id(filename: str, user_id: str, supabase: Client) -> str | None:
-    """Case-insensitive filename lookup for a user's document (latest version only). Tries exact match then partial match."""
-    # Exact case-insensitive match — only resolve to the latest version
-    result = await aexec(
-        supabase.table("documents")
-        .select("id")
-        .eq("user_id", user_id)
-        .eq("is_latest", True)
-        .ilike("filename", filename)
-        .limit(1)
-    )
-    if result.data:
-        return result.data[0]["id"]
-    # Partial match (allows approximate filenames like "Elitefooty PRD")
-    result = await aexec(
-        supabase.table("documents")
-        .select("id")
-        .eq("user_id", user_id)
-        .eq("is_latest", True)
-        .ilike("filename", f"%{filename}%")
-        .limit(1)
-    )
-    if result.data:
-        return result.data[0]["id"]
-    return None
-
-
-async def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dict | None:
-    """Fetch complete document content for the analyze_document sub-agent.
-
-    Prefers `full_markdown` (the raw extracted text stored at ingest time) over
-    concatenating chunks. Chunks now have context-enriched embeddings but store
-    raw content, so either path produces clean text — but `full_markdown` avoids
-    any repeated context headers if the chunk storage format ever changes.
-    """
-    # Phase 231 TRUST-04 — `source_connection_id` must be SELECTED here or the citation this
-    # function feeds carries a key that is always None: a field written and never readable, which
-    # is the same shape as Phase 230's `claimed_at` before its sweeper existed.
-    #
-    # ⚠ FINDING, DELIBERATELY NOT ACTED ON IN THIS PHASE — this read is OWNER-SCOPED
-    #   (`.eq("user_id", user_id)`), so it is a FIFTH retrieval path and it does NOT honour the
-    #   connection-scoped predicate the four sites now share. Consequence: a second org member
-    #   can find an org-visible connection document through search, but `analyze_document` on it
-    #   returns nothing.
-    #   ✅ It fails CLOSED — narrower than the new rule, never wider — which is why it is a
-    #      usability gap and not a leak, and why widening it is not urgent.
-    #   ⛔ It is NOT widened here on purpose: the four sites moved together inside ONE transaction
-    #      precisely so no fifth definition of "who may read this" could drift from them. Adding a
-    #      fifth in Python, in a different commit, is the exact hazard H-1 is written against.
-    #      Routed to the reviewer as a decision, not silently taken.
-    doc_result = await aexec(
-        supabase.table("documents")
-        .select("id, filename, metadata, version_number, full_markdown, source_connection_id")
-        .eq("id", document_id)
-        .eq("user_id", user_id)
-        .single()
-    )
-    if not doc_result.data:
-        return None
-
-    doc = doc_result.data
-
-    # Use full_markdown when available (set during ingestion from the raw extracted text)
-    full_text = doc.get("full_markdown") or ""
-    if not full_text:
-        # Fallback: reassemble from chunks (documents ingested before full_markdown was stored)
-        chunks_result = await aexec(
-            supabase.table("document_chunks")
-            .select("content")
-            .eq("document_id", document_id)
-            .order("chunk_index")
-        )
-        full_text = "\n\n".join(c["content"] for c in (chunks_result.data or []))
-
-    # Phase 231 TRUST-04 — resolve the connection's NAME here too, so the full-document citation
-    # says the same thing as a search-hit citation. ⚠ ONE query, and only when this document
-    # actually came from a connection.
-    source_connection_id = doc.get("source_connection_id")
-    source_connection_name = None
-    if source_connection_id:
-        conn_result = await aexec(
-            supabase.table("connector_connections")
-            .select("id, name")
-            .eq("id", source_connection_id)
-            .limit(1)
-        )
-        rows = conn_result.data or []
-        # An unresolved name stays None — the surface then says "a connection" rather than
-        # inventing one. D-4 nulls the id on delete, so this is a real state, not an error.
-        source_connection_name = (rows[0].get("name") if rows else None) or None
-
-    return {
-        "document_id": doc["id"],
-        "filename": doc["filename"],
-        "metadata": doc.get("metadata"),
-        "content": full_text,
-        "source_connection_id": source_connection_id,
-        "source_connection_name": source_connection_name,
-    }
 
 
 @traceable(name="search-documents", run_type="retriever")
@@ -388,7 +66,22 @@ async def search_documents(
     metadata_filter: dict | None = None,
     user_settings: UserEffectiveSettings | None = None,
     folder_ids: list[str] | None = None,
+    document_ids: Sequence[str] | None = None,
 ) -> tuple[list[dict], float]:
+    """Phase 272 (D-14 / D-18 / D-19 / D-10) — ``document_ids`` is the filtered-retrieval input.
+
+    * ``None`` — no filter. The calls are byte-identical to before (pinned by
+      ``test_272_pure_move::test_unfiltered_rpc_calls_are_pinned``).
+    * EMPTY — the filter matched nothing: ``([], 0.0)`` before any embed or RPC. ⛔ Never coerced
+      to ``None``, which would widen to the whole knowledge base.
+    * non-empty — the SAME set goes to the vector arm and the keyword arm, alongside the folder
+      scope (D-19: a filter narrows the chat scope, never replaces it). The vector RPC runs with
+      ``FILTERED_MATCH_FLOOR`` and the configured threshold is applied afterwards: if nothing
+      clears it, the top rows come back marked ``low_similarity`` instead of a false empty.
+    """
+    if document_ids is not None and len(document_ids) == 0:
+        return [], 0.0
+    filtered = document_ids is not None
     # Normalize metadata_filter values to lowercase for case-insensitive matching
     if metadata_filter:
         metadata_filter = {k: v.lower() if isinstance(v, str) else v for k, v in metadata_filter.items()}
@@ -407,22 +100,34 @@ async def search_documents(
         # Vector-only path — fetch 2x top_k so dedup has candidates to spare
         rows = await _vector_search(
             query, user_id, supabase, metadata_filter,
-            top_n=top_k * 2, match_threshold=match_threshold,
+            top_n=top_k * 2, match_threshold=FILTERED_MATCH_FLOOR if filtered else match_threshold,
             user_settings=user_settings,
             folder_ids=folder_ids,
+            document_ids=document_ids,
         )
+        if filtered:
+            rows = _select_filtered_vector_rows(rows, match_threshold)
         avg_sim = _avg_cosine(rows)
-        rows = _deduplicate_chunks(rows)[:top_k]
-        return await _enrich_with_filenames(rows, supabase), avg_sim
+        # D-27: inside a matched set, near-duplicates collapse only within one document.
+        rows = _deduplicate_chunks(rows, same_document_only=filtered)
+        # D-27: a filtered cut keeps one passage per matched document before filling by rank.
+        rows = _cover_matched_documents(rows, top_k) if filtered else rows[:top_k]
+        return _carry_low_similarity(rows, await _enrich_with_filenames(rows, supabase)), avg_sim
 
     # Hybrid path: vector + keyword → RRF fusion → dedup → optional reranking
     vector_rows = await _vector_search(
         query, user_id, supabase, metadata_filter,
-        top_n=candidate_count, match_threshold=match_threshold,
+        top_n=candidate_count, match_threshold=FILTERED_MATCH_FLOOR if filtered else match_threshold,
         user_settings=user_settings,
         folder_ids=folder_ids,
+        document_ids=document_ids,
     )
-    keyword_rows = await _keyword_search(query, user_id, supabase, metadata_filter, top_n=candidate_count, folder_ids=folder_ids)
+    if filtered:
+        vector_rows = _select_filtered_vector_rows(vector_rows, match_threshold)
+    keyword_rows = await _keyword_search(
+        query, user_id, supabase, metadata_filter, top_n=candidate_count, folder_ids=folder_ids,
+        document_ids=document_ids,
+    )
 
     if not vector_rows and not keyword_rows:
         return [], 0.0
@@ -437,20 +142,33 @@ async def search_documents(
     )
 
     # Deduplicate before reranking so duplicate slots don't waste the reranker budget
-    fused = _deduplicate_chunks(fused)
+    # D-27: inside a matched set, near-duplicates collapse only within one document.
+    fused = _deduplicate_chunks(fused, same_document_only=filtered)
 
     # Take top-K before reranking
-    candidates = fused[: max(top_k, rerank_top_n)]
+    # D-27: a filtered cut keeps one passage per matched document (no document is dropped by
+    # another's strong passages); the unfiltered cut is unchanged.
+    if filtered:
+        candidates = _cover_matched_documents(fused, max(top_k, rerank_top_n))
+    else:
+        candidates = fused[: max(top_k, rerank_top_n)]
 
     rerank_enabled = user_settings.rerank_enabled if user_settings else settings.rerank_enabled
     if rerank_enabled:
         # SEED-065: rerank is a SYNC Cohere-HTTP / local-ML call — same event-loop
         # blocking class as the embed above. Off by default, but when enabled it
         # compounds the stall, so wrap it in run_in_threadpool too (D-v2.5-01).
+        # D-27: a filtered set is reordered in full, then cut with coverage, so the reranker
+        # cannot drop a matched document either.
         candidates = await run_in_threadpool(
-            rerank, query, candidates, top_n=top_k, user_settings=user_settings
+            rerank, query, candidates, top_n=len(candidates) if filtered else top_k,
+            user_settings=user_settings,
         )
+        if filtered:
+            candidates = _cover_matched_documents(candidates, top_k)
     else:
-        candidates = candidates[:top_k]
+        candidates = _cover_matched_documents(candidates, top_k) if filtered else candidates[:top_k]
 
-    return await _enrich_with_filenames(candidates, supabase), avg_sim
+    # D-10: `_rrf_fuse` copies each row (`dict(...)`) and rerank mutates in place, so the mark
+    # survives to here; enrichment rebuilds the dicts, so it is carried across by position.
+    return _carry_low_similarity(candidates, await _enrich_with_filenames(candidates, supabase)), avg_sim

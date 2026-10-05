@@ -114,6 +114,8 @@ environment. When a change touches the left column, do the right column **in clo
 | **CORS / allowed origins** | `FRONTEND_URL` (Coolify) must list every live frontend origin, comma-separated. |
 | **Security advisors check** | Run `scripts/check-security-advisors.sh` against the cloud project using `SUPABASE_ACCESS_TOKEN`. Must exit 0 (no ERROR-level findings). |
 | **Anything that touches a table/column GRANT or REVOKE, or `supabase/full-schema.sql`** | Run `backend/venv/Scripts/python scripts/check-greenfield-privileges.py` (local, no flags, no DSN, no env var). It builds a throwaway scratch database on the local cluster, applies `supabase/full-schema.sql` **alone**, and proves a greenfield bootstrap carries the same TABLE and COLUMN privileges as a replayed migration history — measured as the **`authenticated` role**, never through the service role. Exit **0** = clear · **1** = a privilege violation · **2** = harness error, ⛔ **and a SKIP is exit 2, never a pass** (an unreachable database prints `SKIPPED` and names `scripts/start-local-infra.ps1`). ⚠ This is the TABLE half; `node scripts/check-schema-acl-parity.cjs` is the FUNCTION half. `pg_dump --no-privileges` means a REVOKE a migration issues is absent from every greenfield deploy unless it is mirrored into `scripts/full-schema-supplement.sql` — silently, and in the permissive direction. |
+| **`ENVIRONMENT=production` on the backend (Phase 276, DOCS-04, D-23)** | **Coolify → backend → Environment Variables** must carry `ENVIRONMENT=production`. Since Phase 276 it is no longer just a marker: it is what makes `/docs`, `/redoc` and `/openapi.json` refuse unauthenticated callers. ⚠ Unset, the live API explorer **fails OPEN** silently — the boot log says `API docs: OPEN (ENVIRONMENT='')` instead of `API docs: GATED`. **CORRECTED 2026-10-05 (276-REVIEW A-WR-01):** only unset / `local` / `development` / `dev` / `test` open it; `staging` and every other value are gated (fail-closed), and an open explorer under `dev`/`development`/`test` logs at WARNING. |
+| **Vercel "Include source files outside of the Root Directory in the Build Step" (Phase 276, D-23)** | Must be **ON** in the Vercel project settings. The docs build reads `docs/public/**` and `docs/history/**`, which sit outside the `frontend/` root directory. |
 | **Subdomain routing (`app.<domain>`)** | Attach `app.<domain>` to Vercel project, set `VITE_APP_URL=https://app.<domain>`, add to Coolify `FRONTEND_URL`, and update Cloud Supabase Auth Site URL & redirect allowlist (full 7-step runbook in `docs/OPERATOR.md`). |
 
 **Settings drift is the #1 cloud gotcha.** Many settings columns exist in the DB but some are
@@ -154,6 +156,12 @@ Before `master → production`:
 - [ ] **Landing CTAs verified on the deployed page** — click "Open app" and the demo CTA and
       confirm neither fell back to `/app` or `#start`. The fallbacks make this invisible otherwise.
 - [ ] Smoke-tested the live app (login, chat stream, a doc ingest) on the real domain.
+- [ ] **Live API explorer refuses anonymous callers (Phase 276, DOCS-04, D-20):**
+      `curl -s -o /dev/null -w '%{http_code}' https://<api-host>/docs` must print **`401`**.
+      A `200` means `ENVIRONMENT=production` is missing on Coolify (row in §5) and the explorer
+      is open to the internet.
+- [ ] **Coolify backend has `ENVIRONMENT=production`** and **Vercel's "Include source files outside
+      of the Root Directory in the Build Step" is ON** (Phase 276, D-23 — both are §5 rows).
 
 ---
 
@@ -171,6 +179,8 @@ Before `master → production`:
 ---
 
 ## Changelog
+- **2026-10-05** — 276-REVIEW A-WR-01: the docs gate is now fail-closed. `/docs`, `/redoc`, `/openapi.json` and the oauth2 redirect stay open only for an unset `ENVIRONMENT` or `local` / `development` / `dev` / `test`; `staging` and every other value are gated. A-IN-11: the refuse-to-start checks for `ENABLE_TEST_FIXTURES` / `MOCK_LLM_MODE` now read the same `settings.environment` (so `ENVIRONMENT` set only in `backend/.env` counts).
+- **2026-10-04** — Phase 276 (DOCS-04, D-03 / D-20 / D-23): `ENVIRONMENT=production` now ALSO gates `/docs`, `/redoc` and `/openapi.json` (401 without a signed-in token; local stays open). Added §5 rows for `ENVIRONMENT=production` on Coolify and the Vercel "Include source files outside of the Root Directory" setting, and a §6 post-deploy `curl` that must print `401`. Not deployed by this change.
 - **2026-09-16** — Added the greenfield privilege gate (`scripts/check-greenfield-privileges.py`) to the parity checklist (§5) and the pre-promotion checklist (§6) (Phase 253 CRED-03). It measures the TABLE half of the bootstrap artifact's privilege posture on a real scratch database, as `authenticated`; a SKIP is exit 2, never a pass. ⚠ Its first run found `supabase/full-schema.sql` **unappliable** on a greenfield database (`type "vector" does not exist`, 42704, introduced at `a7efe17d1`) and `connector_tokens.access_token_ciphertext` readable by `authenticated` on every new deployment — both fixed in the same phase.
 - **2026-09-14** — Added security advisor verification check (`scripts/check-security-advisors.sh`) using `SUPABASE_ACCESS_TOKEN` to parity checklist (§5) and pre-promotion checklist (§6) (Phase 248 CRED-04).
 - **2026-07-11** — Parity checklist: noted migration 097 (`097_operator_flags.sql`, three

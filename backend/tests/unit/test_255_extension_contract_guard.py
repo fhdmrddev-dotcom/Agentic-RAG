@@ -86,6 +86,8 @@ def test_tool_registry_is_closed():
         "write_todos", "task", "ask_user", "render_template",
         "query_documents_by_view", "get_related_documents",
         "fetch_document_file", "attach_skill_file",
+        # Phase 273 — show_artifact, the deliberate 30th tool (closed-core change recorded at discuss)
+        "show_artifact",
     }
     actual_tools = set(_TOOL_REGISTRY.keys())
     assert actual_tools == expected_tools, (

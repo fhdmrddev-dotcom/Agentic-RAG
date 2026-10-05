@@ -1008,16 +1008,20 @@ async def handle_query_tables(args: dict, user_id: str, supabase: "Client") -> s
     Error cases return {"error": "..."} JSON consistent with existing tool patterns.
     """
     import json  # noqa: PLC0415
-    from app.services.retrieval_service import resolve_document_id  # noqa: PLC0415
+    from app.services import retrieval_documents  # noqa: PLC0415
 
     document_name = (args.get("document_name") or "").strip()
     column_filter: dict | None = args.get("column_filter") or None
     page_filter: int | None = args.get("page")
 
-    # Pitfall 7: must resolve document_name → UUID first
-    doc_id = await resolve_document_id(document_name, user_id, supabase)
-    if not doc_id:
+    # Pitfall 7: must resolve document_name → UUID first. 273-REVIEW WR-03: keep the RESOLVED
+    # filename too — each table below reports it, so the result (and the show_artifact caption built
+    # from it) names the document actually read, never the model's spelling of it.
+    doc = await retrieval_documents.resolve_document(document_name, user_id, supabase)
+    if not doc:
         return json.dumps({"error": f"Document '{document_name}' not found."})
+    doc_id = doc["id"]
+    resolved_name = doc.get("filename") or document_name
 
     tables = await _fetch_document_tables(doc_id, user_id, page_filter, supabase)
     if not tables:
@@ -1052,7 +1056,7 @@ async def handle_query_tables(args: dict, user_id: str, supabase: "Client") -> s
 
         truncated = len(rows) > 50
         output.append({
-            "document": document_name,
+            "document": resolved_name,
             "page": tbl.get("page"),
             "table_index": tbl["table_index"],
             "headers": headers,

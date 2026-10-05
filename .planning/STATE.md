@@ -1,16 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.4
-milestone_name: Experts That Actually Work — ✅ SHIPPED
-status: milestone_complete
-last_updated: "2026-09-29T19:00:00.000Z"
-last_activity: 2026-09-29 -- v4.4 milestone COMPLETED (tag v4.4)
+milestone: v4.5
+milestone_name: Find It, Show It — 🚧 IN PROGRESS
+status: ready_to_plan
+last_updated: 2026-10-05T17:10:08.932Z
+last_activity: 2026-10-05
 progress:
-  total_phases: 5
+  total_phases: 14
   completed_phases: 5
-  total_plans: 24
-  completed_plans: 24
-  percent: 100
+  total_plans: 33
+  completed_plans: 33
+  percent: 36
+stopped_at: Phase 274 complete (5/5, verified passed) — next unstarted v4.5 phase is 275 (Retention & Legal Hold)
 ---
 
 # Project State
@@ -32,8 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Planning next milestone (`/gsd:new-milestone`; phases resume at 270, migrations at 199)
-**265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`).
+**Current focus:** Phase 275 — Retention & Legal Hold (274 and 276 complete)
 
 ---
 
@@ -49,11 +49,38 @@ genuinely reviewed.
 
 ## Milestone close (2026-09-29)
 
-**v4.4 Experts That Actually Work COMPLETED by hand** (not `milestone.complete`): archives in `.planning/milestones/v4.4-*`, tag `v4.4`, 17/17 requirements, audit `tech_debt`. Full pre-close STATE: `milestones/v4.4-STATE-at-close.md`. ⛔ Nothing deployed — migs 194-198 + `464ec8354` owed to production.
+**v4.4 Experts That Actually Work COMPLETED by hand** (not `milestone.complete`): archives in `.planning/milestones/v4.4-*`, tag `v4.4`, 17/17 requirements, audit `tech_debt`. Full pre-close STATE: `milestones/v4.4-STATE-at-close.md`. ✅ LIVE 2026-09-29 — production `82babd8d0` (master `86d9559bb`, tag `v4.4` pushed); migrations 195/196/197 applied via MCP BEFORE the backend, 198 AFTER it; advisors: no ERROR findings. Owed: operator smoke test (install contract-reviewer in an enterprise org, sandbox code-run in a new chat, embedding key in Coolify env).
 
 ---
 
-## Current Position
+## Current Position (v4.5)
+
+Phase: 275 (Retention & Legal Hold) — not started
+Plan: Not started
+Status: Ready to plan
+Prior: Phase 274 COMPLETE (2026-10-05) — verification passed 4/4, security 31/31 (threats_open 0), operator approved G-4 #1-#4. 5 plans + review fixes (CR-01 cross-org folder D-29, CR-02 in-flight duplicate, WR-01/03/04/05/07, T-274-04). BUG-260905-01 closed, SEED-247 answered, BUG-261005-01 filed (shared minter race). Final gates: backend 71 = ceiling (6932 passed), vitest 9983 · 0 failed · 424/424, tsc 66 = base. OWED (operator): production migrations 202 → 203 before the backend deploy, then get_advisors(security). Deferred with triggers: F-1 residual (FileRow sub-line), F-2, F-3, WR-02, WR-06, IN-01..06. Next: /gsd:discuss-phase 275.
+Prior: Phase 272 COMPLETE (2026-10-03) — verification human_needed, self-verified. FIND-07 done. Review: 2 CR + 8 WR all fixed; HUMAN-UAT 2/3 (live re-drive pass; rules accepted); G-1 (topics eq in the shared compiler) fixed. Final backend gate 71 = baseline, 6474 passed. OWED (operator): production — migration 200 STEP 1 (CREATE INDEX CONCURRENTLY) alone → STEP 2 → 201 immediately → both VERIFY → get_advisors(security), each write approved; then backend+frontend deploy (271 also undeployed). Seeds: 333, 334, 335, 336. Owed to 273: D-15/D-16 seams. Next: /gsd:discuss-phase 273.
+Prior: Phase 271 EXECUTED — verification human_needed (2026-10-03). Owed to operator: sign-off on G-4 rows G4-1..G4-6 (driven in Playwright, not Chrome MCP), review of P-01 (default sort added_desc) and P-03 (Older versions = own rows only), deploy (no migration; backend+frontend together; then read-only probe of /document-search + security advisors), CLAUDE.md split (119,524 chars, 476 under the 120k band). Deferred: SEED-331, SEED-332, F-1, F-4. Next: /gsd:discuss-phase 272.
+Last activity: 2026-10-05
+
+### Roadmap Evolution
+
+- Phase 276 added (2026-10-04, operator): Public Docs, API Reference & Video Library — DOCS-01..06. Sketch 276 winner B. Inputs: `.planning/research/docs-coverage-inventory.md` (261 surfaces), `docs-information-architecture.md`, `docs/public/api/openapi.snapshot.json`. Operator decisions: production Swagger requires login (reverses the main.py "/docs stays 200" note); third-party API keys → SEED-013 as v4.6 Open Platform; Remotion + NotebookLM both used for video. Can run parallel to 274/275. Next: /gsd:discuss-phase 276.
+
+### v4.5 roadmap (2026-09-29): 19 / 19 requirements mapped
+
+| Phase | Name | Requirements | Gate flags |
+|---|---|---|---|
+| 270 | The Document as an Object | FIND-04, FIND-05 | migration 199 · security (signed URL) · G-2 · G-4 |
+| 271 | Find the Document | FIND-01, FIND-02, FIND-03, FIND-06 | G-2 sketch · G-4 · SEED-211 fence |
+| 272 | Close Means Wrong | FIND-07 | ⛔ G-5: `retrieval_service.py` extraction FIRST · SC#10 · SEED-273 recall |
+| 273 | Agent-Authored Artifacts | ART-01..05 | G-2 sketch · G-4 · SC#10 · closed-core tool-count decision |
+| 274 | Thread-Scoped Attachments | ATT-01..03 | measure first (244 D-244-01/03/04) · G-2 · G-4 |
+| 275 | Retention & Legal Hold | RET-01..04 | ⛔ fail-closed + dry-run first · migrations · RLS · G-2 · G-4 |
+
+Order: 270 → 271 → 272 → 273 → 274 → 275 (273 can move earlier if `tool_dispatcher.py` / `agent_loop.py` are free). Full detail: `ROADMAP.md` § v4.5. Next: `/gsd:discuss-phase 270` (sweep reported-bugs and `node scripts/check-seeds-register.cjs --phase 270` there).
+
+**The v4.4 block below is the v4.4 close history, kept verbatim.**
 
 Milestone: v4.4 Experts That Actually Work
 Phase: 269 (starter-expert-library) — CLOSED (5 of 5 plans; verification passed)
@@ -83,7 +110,7 @@ Status: Phase 269 closed — verification `passed`; nothing deployed; ~~next: op
 - **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
-Resume file: .planning/phases/269-starter-expert-library/269-05-SUMMARY.md
+Resume file: None
 Last activity: 2026-09-29 -- Phase 269 closed
 
 ---
@@ -169,6 +196,24 @@ Last activity: 2026-09-29 -- Phase 269 closed
 **Routed to the operator:** the biased-no-folder narrowing finding (D-267-35). A biased Expert on a thread with no folder narrows retrieval from all documents to its own folders; the event card states this as "Dropped: All your documents". It is recorded in SEED-303 and was not fixed here.
 
 **CLAUDE.md size:** 116,523 chars after 267's cells were shortened. This is under the 120,000 warn band, so no split is scheduled.
+
+## Guardrail overrides — Phase 273 (2026-10-03)
+
+| Id | Rule | Override | Evidence |
+|---|---|---|---|
+| OV-273-01 | G-2 (sketch before discuss) | **Order only, not a skip.** Discussed first; `/gsd:sketch` stays REQUIRED before `/gsd:plan-phase 273`. | `273-CONTEXT.md` status line |
+| OV-273-02 | G-5 (`tool_dispatcher.py`, 40 phases) | **Narrow cut, 2nd deferral of the full registry/handler split.** `show_artifact` handler in its own module + one registry line. Re-open: next phase naming the file proposes the split FIRST. | `273-CONTEXT.md` D-14; operator choice at discuss |
+| OV-273-03 | G-5 (`agent_loop.py`, 28 phases) | **One persistence hook; prompt-assembly seam stays owed** (SEED-192). Guidance lives in the tool description; `SYSTEM_PROMPT` untouched. | `273-CONTEXT.md` D-15; operator choice at discuss |
+| OV-273-04 | G-5 (`agent_loop.py` FIRES; rail files incl. `ToolCallPanel.tsx`, `toolMeta.ts` FIRE) | **Widens OV-273-03 and D-16.** (a) `agent_loop.py`: STRUCTURED-path delta holdback (`StructuredTextHoldback`) — several named hunks beyond the one persist hook, so OpenRouter/`native_tools: False` tool-call JSON never streams as answer text (SC#2); applies to every tool on that path. (b) 7 existing rail files edited beyond D-16's one handler + one mount, closing UI-SPEC leak paths L-1..L-4. | Operator approved 2026-10-03 at plan-check (checker blocker 3); `273-04`/`273-05` cite it |
+| OV-273-05 | UAT closure | **Phase closed with 1 owed UAT row, by decision.** Live STRUCTURED-path (OpenRouter-style) holdback check for CR-02/WR-06 is unit-proven only — no fast STRUCTURED-routed model exists (nemotron-nano-9b timed out, never chose show_artifact). Run it FIRST when a fast STRUCTURED model is configured or the next phase touches `structured_text_holdback.py`. Also owed: F-1 DeepSeek by-ref refusal wording; prod migration 202 before backend deploy + `get_advisors(security)`; OV-273-02/03. | `273-HUMAN-UAT.md` (2 pass, 1 owed), `273-VERIFICATION.md` 5/5, operator 2026-10-04 |
+
+`openai_service.py`, `StreamsProvider.tsx` and `MessageItem.tsx` (all FIRE) are honoured by construction (one schema + one `get_tools` line, one handler, one mount — D-16), not overridden. Closed core: tools **29 → 30** recorded at discuss (roadmap red line).
+
+## Guardrail overrides — Phase 271 (2026-10-03)
+
+| Id | Rule | Override | Evidence |
+|---|---|---|---|
+| OV-271-01 | G-2 (sketch before discuss) | **Order only, not a skip.** Operator chose to discuss first; `/gsd:sketch` stays REQUIRED before `/gsd:plan-phase 271`. | `271-CONTEXT.md` status line |
 
 ## Guardrail overrides — Phase 266 (2026-09-25)
 

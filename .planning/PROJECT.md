@@ -10,11 +10,22 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: none — v4.4 shipped, next via `/gsd:new-milestone`
+## Current Milestone: v4.5 Find It, Show It
 
-Phase numbering resumes at **270**, migrations at **199**. ⛔ Carried: `SEED-013` Open Platform,
-`SEED-294` commercial blockers (non-engineering), `SEED-325` NULL-tier signup gap, `SEED-327`
-(`forced_emit` system prompt dropped by OpenAI-compat/Responses adapters), `SEED-328` deferred review items.
+**Goal:** Find documents by what they ARE (type, owner, date, structure), get the file back out, and let the
+agent answer with interactive artifacts instead of dead images and prose.
+
+**Target features (operator intake 2026-09-29; hardening/testing milestone and plugins/ecosystem work POSTPONED by operator):**
+- **Find the DOCUMENT** (`SEED-243`, `SEED-153`, `SEED-224`) - document-first metadata search beside (never inside) RAG search; rename + re-home the Classification page; download the original file + rich file facts; structure (folder path, relationships, version lineage) as searchable fields.
+- **A2UI artifact rail** (`SEED-193`, later `SEED-194`) - the agent emits a validated spec from a CLOSED component registry (never free markup); chart-as-spec first, then table / metric / comparison.
+- **Retention & archival** (`SEED-250`) - the one absent DMS capability: policy, legal hold, disposition audit.
+- **Thread-scoped attachments** (`SEED-247`) - chat attachments belong to the thread, not the Library.
+
+Phase numbering resumes at **270**, migrations at **199**. Research skipped (seeds hold the analysis).
+Solo running: Claude builds and reviews; phases close `verification_mode: self-verified`.
+Carried: `SEED-013`, `SEED-294` (non-engineering), `SEED-325`, `SEED-327`, `SEED-328`.
+
+**Progress:** 270 ✓ · 271 executed (human_needed) · **272 Close Means Wrong ✓ 2026-10-03 — FIND-07 validated**: the agent's search carries structured date/dimension filters on both retrieval arms, an empty filter fails closed with a structural retry lock, and a small filtered set is searched exactly (recall 1.000, 500–15,000 chunks). SC#4 met on 6/8 providers by decision (Google unmet, MiniMax unstable → SEED-334). Migrations 200+201 local only — production owed.
 
 ---
 
@@ -26,9 +37,7 @@ migrations 194-198, 7 days. **17 / 17 requirements satisfied.** Integration 6/6.
 A client can install an Expert and get grounded answers from its own knowledge in their own org:
 per-org corpus provisioning (266), additive scope with stated costs (267), per-Expert spend and
 mid-thread folder scope (268), a five-Expert starter library (269) — each proven by a live drive.
-⚠ All five phases closed `self-verified`. ⛔ **Deploy checklist before the next production push:**
-migrations 194-198 via the SQL editor, the image must carry `464ec8354`, run `get_advisors(security)`
-(`266-PROD-PARITY.md`, `269-PROD-PARITY.md`).
+⚠ All five phases closed `self-verified`. ✅ **DEPLOYED 2026-09-29** — production `82babd8d0`; migrations 194-198 all in production; `get_advisors(security)` shows no ERROR findings. Operator smoke test owed.
 
 ---
 
@@ -1418,3 +1427,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-09-23 — **milestone v4.4 Experts That Actually Work STARTED** via /gsd:new-milestone. Phase numbering continues at **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`). SEED-304 tenancy decided: per-org copy.*
 
 *Last updated: 2026-09-29 — **milestone v4.4 Experts That Actually Work COMPLETED** (git tag `v4.4`; 5 phases, 24 plans, 17/17 requirements; nothing deployed — migrations 194-198 + `464ec8354` owed to production). STATE.md and the archives were done by hand, not via `milestone.complete`.*
+
+*Last updated: 2026-10-03 — **Phase 272 Close Means Wrong COMPLETE** (FIND-07; 5 plans + review fixes; self-verified, human_needed: production migrations 200 STEP 1 → STEP 2 → 201 owed).*

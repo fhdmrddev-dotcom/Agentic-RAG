@@ -20,6 +20,8 @@ export function toolLabel(name: string): string {
   if (name === "load_skill") return "Loading skill"
   if (name === "save_skill") return "Saving skill"
   if (name === "read_skill_file") return "Reading skill file"
+  // Phase 273-05 (UI-D-06, OV-273-04): the activity string (`Showing an artifact…`).
+  if (name === "show_artifact") return "Showing an artifact"
   if (name.includes("__")) {
     const [svc, act] = name.split("__")
     const formattedSvc = svc.charAt(0).toUpperCase() + svc.slice(1).replace(/_/g, " ")
@@ -27,6 +29,19 @@ export function toolLabel(name: string): string {
     return `${formattedSvc} · ${formattedAct}`
   }
   return toolName(name)
+}
+
+/**
+ * Phase 273-05 (UI-D-06) — the label a RAIL STEP wears (`Preparing {x}…`, `Running {x}`,
+ * `{x} → {result}`). For every tool but the ones below it is `toolLabel`, byte-for-byte as
+ * before. `show_artifact` reads the phrase (`Show an artifact`) in the step list and the
+ * activity string (`Showing an artifact`) only where the run says what it is doing NOW —
+ * the UI-SPEC rail table names both, and one string cannot be both.
+ */
+const STEP_PHRASE_TOOLS: ReadonlySet<string> = new Set(["show_artifact"])
+
+export function stepLabel(name: string): string {
+  return STEP_PHRASE_TOOLS.has(name) ? toolName(name) : toolLabel(name)
 }
 
 export function toolSummary(name: string, args: Record<string, unknown>): string | null {
@@ -51,6 +66,140 @@ export function toolSummary(name: string, args: Record<string, unknown>): string
   if (args.query) return args.query as string
   if (args.filename) return args.filename as string
   return null
+}
+
+/**
+ * Phase 272 (FIND-07, D-08) — the ONE home of the filter line on the search tool card,
+ * e.g. "Filtered: document date 1–31 Oct 2025 · legal entity = Acme GmbH".
+ *
+ * D-08 — derived from the call's ARGS, never its result: the result is truncated at
+ * 2000 chars on persist while args persist whole, so the line is identical after a
+ * reload. It states what the model ASKED for; what the server APPLIED is on the audit
+ * row (272-04, D-12).
+ *
+ * The args shape is the `filters` contract of SEARCH_DOCUMENTS_TOOL
+ * (`{field, op, value, value2, values, unit}`, op = ViewCondition.op), plus the legacy
+ * `metadata_filter` object, rendered as `eq` after the conditions. ISO days are formatted
+ * by string parsing only: a calendar day is not an instant, and parsing one as a date
+ * object would shift it a day back in a negative-offset timezone. Anything unparseable
+ * renders verbatim — this never throws on model-emitted args.
+ */
+export function searchFilterLine(name: string, args: Record<string, unknown>): string | null {
+  if (name !== "search_documents") return null
+  const conds: unknown[] = Array.isArray(args.filters) ? args.filters : []
+  const legacyRaw = args.metadata_filter
+  const legacy =
+    legacyRaw && typeof legacyRaw === "object" && !Array.isArray(legacyRaw)
+      ? Object.entries(legacyRaw as Record<string, unknown>).map(([field, value]) => ({
+          field,
+          op: "eq",
+          value,
+        }))
+      : []
+  const parts = [...conds, ...legacy]
+    .map(formatCondition)
+    .filter((p): p is string => Boolean(p))
+  return parts.length ? `Filtered: ${parts.join(" · ")}` : null
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+const DATE_WORD_LABELS: Record<string, string> = {
+  date: "document date",
+  added: "added",
+  source_created: "created in file",
+  source_modified: "modified in file",
+}
+
+function fieldLabel(field: string): string {
+  return DATE_WORD_LABELS[field] ?? field.replace(/_/g, " ")
+}
+
+function scalarText(v: unknown): string {
+  if (typeof v === "string") return v
+  if (typeof v === "number" || typeof v === "boolean") return String(v)
+  return ""
+}
+
+interface IsoDay {
+  y: number
+  m: number // 1-12
+  d: number
+}
+
+function parseIsoDay(s: string): IsoDay | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim())
+  if (!match) return null
+  const y = Number(match[1])
+  const m = Number(match[2])
+  const d = Number(match[3])
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null
+  return { y, m, d }
+}
+
+/** "2025-10-03" → "3 Oct 2025"; anything else verbatim. */
+function formatIsoDay(s: string): string {
+  const day = parseIsoDay(s)
+  return day ? `${day.d} ${MONTHS[day.m - 1]} ${day.y}` : s
+}
+
+/** Collapse the shared month / year: "1–31 Oct 2025", "1 Sep – 31 Oct 2025". */
+function formatRange(a: string, b: string): string {
+  const x = parseIsoDay(a)
+  const y = parseIsoDay(b)
+  if (x && y) {
+    if (x.y === y.y && x.m === y.m) {
+      if (x.d === y.d) return formatIsoDay(a)
+      return `${x.d}–${y.d} ${MONTHS[x.m - 1]} ${x.y}`
+    }
+    if (x.y === y.y) return `${x.d} ${MONTHS[x.m - 1]} – ${y.d} ${MONTHS[y.m - 1]} ${y.y}`
+  }
+  return `${formatIsoDay(a)} – ${formatIsoDay(b)}`
+}
+
+function formatSpan(value: string, unit: string): string {
+  const u = value === "1" && unit.endsWith("s") ? unit.slice(0, -1) : unit
+  return u ? `${value} ${u}` : value
+}
+
+function formatCondition(c: unknown): string | null {
+  if (!c || typeof c !== "object" || Array.isArray(c)) return null
+  const cond = c as Record<string, unknown>
+  const field = typeof cond.field === "string" ? cond.field.trim() : ""
+  const op = typeof cond.op === "string" ? cond.op.trim() : ""
+  if (!field || !op) return null
+  const label = fieldLabel(field)
+  const value = scalarText(cond.value)
+  const value2 = scalarText(cond.value2)
+  const unit = typeof cond.unit === "string" ? cond.unit : ""
+  switch (op) {
+    case "eq":
+      return `${label} = ${formatIsoDay(value)}`
+    case "one_of": {
+      const values = Array.isArray(cond.values) ? cond.values.map(scalarText).filter(Boolean) : []
+      return `${label} in ${values.join(", ")}`
+    }
+    case "contains":
+      return `${label} contains ${value}`
+    case "is_empty":
+      return `${label} is empty`
+    case "gte":
+      return `${label} ≥ ${formatIsoDay(value)}`
+    case "lte":
+      return `${label} ≤ ${formatIsoDay(value)}`
+    case "before":
+      return `${label} before ${formatIsoDay(value)}`
+    case "after":
+      return `${label} after ${formatIsoDay(value)}`
+    case "between":
+      return value2 ? `${label} ${formatRange(value, value2)}` : `${label} from ${formatIsoDay(value)}`
+    case "within_next":
+      return `${label} within next ${formatSpan(value, unit)}`
+    case "older_than":
+      return `${label} older than ${formatSpan(value, unit)}`
+    default:
+      return `${label} ${op.replace(/_/g, " ")} ${value}`.trim()
+  }
 }
 
 /**

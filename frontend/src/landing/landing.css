@@ -807,3 +807,67 @@ a:hover {
   .appgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .catgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ── Phase 276-03: shared header Menu button + ≤720px menu drawer (landing AND docs) ──
+ * These live here, not in docs.css, so the landing never imports docs code (UI-SPEC P0). */
+.show-m { display: none; }
+.nav-menu-btn { position: relative; height: 36px; padding: 0 12px; font-size: 14px; font-weight: 600; }
+.nav-menu-btn::before { content: ""; position: absolute; inset: -4px; }
+.nav-search-slot { display: inline-flex; }
+.menu-drawer {
+  position: fixed; top: 64px; left: 0; right: 0; bottom: 0; z-index: 49;
+  background: hsl(216 45% 4%); overflow-y: auto; padding: 16px;
+  display: flex; flex-direction: column;
+  animation: menu-drawer-in .15s ease-out;
+}
+.menu-drawer:focus { outline: none; }
+.menu-drawer-top { margin-bottom: 8px; }
+.menu-drawer-row {
+  display: flex; align-items: center; min-height: 48px; font-size: 16px;
+  color: hsl(226 60% 97%); border-bottom: 1px solid hsl(220 20% 16%);
+}
+.menu-drawer-row:hover { color: hsl(239 100% 82%); }
+.menu-drawer-sections { margin-top: 16px; }
+.menu-drawer-eyebrow { font-size: 14px; margin: 0 0 8px; }
+.menu-drawer-list { display: flex; flex-direction: column; }
+.menu-drawer-list > a {
+  display: flex; align-items: center; min-height: 48px; font-size: 16px;
+  color: hsl(226 60% 97%); border-bottom: 1px solid hsl(220 20% 16%);
+}
+.d-btn-block { display: flex; width: 100%; height: 48px; font-size: 16px; font-weight: 600; margin-top: 16px; flex-shrink: 0; }
+@keyframes menu-drawer-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .menu-drawer { animation: none; } }
+@media (max-width: 720px) {
+  .nav-links .show-m { display: inline-flex; }
+}
+@media (min-width: 721px) { .menu-drawer { display: none; } }
+
+/* ── Phase 276-05: hero promo slot (UI-SPEC P9 / V4) ──
+ * The frame and poster are static; the Player inside arrives only after a scroll (HeroPromo.tsx). */
+.promo-slot { max-width: 880px; margin: 56px auto 0; }
+.promo-frame {
+  position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden;
+  border-radius: 16px; border: 1px solid hsl(220 20% 16%); background: #05070C;
+  box-shadow: 0 32px 120px hsl(239 100% 60% / 0.25);
+}
+.promo-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.promo-play {
+  position: absolute; top: 50%; left: 50%; width: 68px; height: 68px; margin: -34px 0 0 -34px;
+  display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px;
+  cursor: pointer; color: hsl(243 100% 12%);
+  background: linear-gradient(135deg, hsl(239 100% 82%), hsl(258 90% 66%));
+  box-shadow: 0 10px 40px hsl(239 100% 70% / 0.45);
+}
+.promo-play:focus-visible, .promo-btn:focus-visible { outline: 2px solid hsl(239 100% 82%); outline-offset: 2px; }
+.promo-player { position: absolute; inset: 0; }
+.promo-controls { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 8px; }
+.promo-btn {
+  position: relative; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid hsl(220 20% 16%); border-radius: 999px; cursor: pointer;
+  background: hsl(220 28% 10% / 0.85); color: hsl(226 60% 97%);
+}
+.promo-btn:hover { background: hsl(220 28% 14% / 0.92); }
+@media (max-width: 720px) {
+  .promo-slot { margin-top: 40px; }
+  .promo-btn::before { content: ""; position: absolute; inset: -4px; } /* 44px hit area on phone */
+}

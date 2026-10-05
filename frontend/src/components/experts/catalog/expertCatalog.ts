@@ -77,6 +77,12 @@ export function categoriesOf(experts: ExpertBundle[]): string[] {
   return [...seen].sort((a, b) => a.localeCompare(b))
 }
 
+/** 276-07: display-only, single-pass decode of five named entities ("&amp;lt;" → "&lt;", never "<"). Filters use the raw value. */
+const ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" }
+export function decodeEntities(s: string): string {
+  return s.replace(/&(?:amp|lt|gt|quot|#39);/g, (m) => ENTITIES[m])
+}
+
 /**
  * Resolve folder ids to names, IN INPUT ORDER, with an honest entry for every id that cannot be
  * named. ⛔ Never drops, never returns a blank name.

@@ -191,6 +191,11 @@ async def resolve_template_source(
     # behavior, single static query, no dynamic SQL). This mirrors the pure
     # `claim_visible` helper (the single source of the run-eligibility truth).
 
+    # Phase 274 review WR-01 — `(expires_at IS NOT NULL OR $3::text IS NULL OR $3::text = 'deep')`
+    # on all three reads below: a THREAD-LIFE chat attachment (`expires_at NULL`, D-06) is never a
+    # WORKFLOW run's template. Driven rollback-only: without it a run took a weeks-old chat PDF as
+    # its template and claimed it for good. `'deep'` and `own_claim=None` admit NULL as before.
+
     def _foreign_error() -> dict:
         # D-141-05: name the condition ONLY — never the foreign run's id/filename/bytes.
         return _result(
@@ -210,6 +215,7 @@ async def resolve_template_source(
           AND created_by = $2
           AND kind = 'template_input'
           AND (expires_at IS NULL OR expires_at > now())
+          AND (expires_at IS NOT NULL OR $3::text IS NULL OR $3::text = 'deep')
           AND (run_claim IS NULL OR run_claim = $3 OR $3 IS NULL)
         ORDER BY created_at DESC
         LIMIT 1
@@ -247,6 +253,7 @@ async def resolve_template_source(
                   AND created_by = $2
                   AND kind = 'template_input'
                   AND (expires_at IS NULL OR expires_at > now())
+                  AND (expires_at IS NOT NULL OR $3::text IS NULL OR $3::text = 'deep')
                   AND run_claim IS NOT NULL
                   AND run_claim <> $3
                 ORDER BY created_at DESC
@@ -269,11 +276,13 @@ async def resolve_template_source(
             WHERE thread_id = $1
               AND created_by = $2
               AND kind = 'template_input'
+              AND (expires_at IS NOT NULL OR $3::text IS NULL OR $3::text = 'deep')
             ORDER BY created_at DESC
             LIMIT 1
             """,
             thread_id,
             user_id,
+            own_claim,
         )
         if expired_row is not None:
             return _result(

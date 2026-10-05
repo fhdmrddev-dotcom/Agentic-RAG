@@ -1118,6 +1118,22 @@ export function makeStreamCallbacks(opts: {
         prev.map((m) => (m.id === assistantId ? { ...m, finalOutputFiles: files } : m)),
       )
     },
+    // Phase 273-05 (D-16): THE one artifact handler. Appends the record in arrival order,
+    // replacing a same-id record in place (a replayed frame after a reconnect never
+    // duplicates a card). Never touches `content` or `narrationContent`: an artifact is not
+    // answer text. The record stays untrusted here; ArtifactBlock's guard types it.
+    onArtifact: (raw: unknown) => {
+      const rec = raw as NonNullable<Message["artifacts"]>[number]
+      const id = raw && typeof raw === "object" && typeof (raw as { id?: unknown }).id === "string" ? (raw as { id: string }).id : null
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const list = m.artifacts ?? []
+          const at = id === null ? -1 : list.findIndex((a) => a && a.id === id)
+          return { ...m, artifacts: at === -1 ? [...list, rec] : list.map((a, i) => (i === at ? rec : a)) }
+        }),
+      )
+    },
     onSources: (sources: SourceReference[]) => {
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, sources } : m)),

@@ -57,21 +57,23 @@ EXPECTED_TOOLS = [
     "fetch_document_file",
     # Phase 151 Plan 04: attach_skill_file (FILE-01) — phase-end 29
     "attach_skill_file",
+    # Phase 273 Plan 03: show_artifact (ART-01..04) — phase-end 30
+    "show_artifact",
 ]
 
 
-def test_registry_has_exactly_29_entries():
-    """_TOOL_REGISTRY must contain exactly 29 tool handlers after Phase 151.
+def test_registry_has_exactly_30_entries():
+    """_TOOL_REGISTRY must contain exactly 30 tool handlers after Phase 273.
 
     (16 base + 5 workspace from Phase 084 + write_todos from Plan 01 + task from
     Plan 02 + ask_user from Plan 03 = 24; + render_template from Phase 101 = 25;
     + query_documents_by_view from Phase 115 = 26; + get_related_documents from
     Phase 116 = 27; + fetch_document_file from Phase 151 FILE-02 = 28;
-    + attach_skill_file from Phase 151 FILE-01 = 29).
+    + attach_skill_file from Phase 151 FILE-01 = 29; + show_artifact from Phase 273 = 30).
     Phase-end gate — registry entries are NOT capability-gated (the gate is in
     get_tools()/dispatch), so both FILE-01/02 tools are always present here.
     """
-    assert len(_TOOL_REGISTRY) == 29
+    assert len(_TOOL_REGISTRY) == 30  # Phase 273: 29 → 30, the deliberate show_artifact
 
 
 def test_registry_contains_all_expected_tools():
@@ -742,7 +744,7 @@ def test_search_documents_provider_failure_is_not_reported_as_zero_results(monke
     async def _boom(*_a, **_k):
         raise RuntimeError("Error code: 429 - insufficient_quota: You have no credits remaining.")
 
-    monkeypatch.setattr(td, "search_documents", _boom)
+    monkeypatch.setattr("app.services.search_documents_tool.search_documents", _boom)
     out = asyncio.run(td._handle_search_documents({"query": "Northwind usage"}, _fake_ctx()))
 
     assert isinstance(out, ToolResult)
@@ -772,7 +774,7 @@ def test_search_documents_provider_failure_does_not_raise_into_the_agent_loop(mo
     async def _boom(*_a, **_k):
         raise ValueError("provider down")
 
-    monkeypatch.setattr(td, "search_documents", _boom)
+    monkeypatch.setattr("app.services.search_documents_tool.search_documents", _boom)
     # Must NOT raise.
     out = asyncio.run(td._handle_search_documents({"query": "q"}, _fake_ctx()))
     assert "retrieval_unavailable" in out.result

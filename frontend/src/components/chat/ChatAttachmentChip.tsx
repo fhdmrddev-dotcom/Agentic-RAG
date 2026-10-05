@@ -34,6 +34,19 @@
  * nobody made — and the unknown reading is NOT amber: painting an absent field amber
  * manufactures an alarm out of a missing value.
  *
+ * ⭐ PHASE 274 (D-05 / D-07) — A CHAT ATTACHMENT NOW LIVES FOR ITS THREAD. The composer uploads
+ * with `expires_at: null`, and `isThreadLifeAttachment` (`lib/attachmentLifetime`, the ONE rule) is
+ * what this chip asks. A thread-life row renders NO expiry span at all: no `24h`, no countdown and
+ * no `expiry unknown` — the scope word is the whole promise. The three readings above still apply,
+ * byte-unchanged, to the rows that carry a TTL (workflow template inputs) and to a row whose wire
+ * did not say; the `expired` state still renders for a row that genuinely expired.
+ *
+ * ⭐ PHASE 274 (D-09 / D-11 / D-18) — THE SENT CHIP CARRIES THE `⋯` AND THE AFTER-MARK. Only the
+ * `sent` state gets `AttachmentActionsMenu` (Save to Library… / Open in panel) and, once linked,
+ * the `LibraryLinkSegment`. The PENDING chip is the composer's and has no Library door (D-18,
+ * fenced by `components/attachments/__tests__/composerNoLibraryDoor.test.ts`); the expired chip has
+ * nothing to save. The thread is read with `useViewingThread()`, so `MessageItem` is not modified.
+ *
  * ⛔ NO `dangerouslySetInnerHTML` and no hand-drawn mark. The filename is attacker-controlled
  * text (T-244-05-03): React escapes it as a text node, and the row is bounded by
  * `truncate max-w-[140px]` — the `ActiveConnectorChips` template — so a 4 KB filename cannot
@@ -45,7 +58,12 @@
 import { X } from "lucide-react"
 import { fileIcon } from "@/lib/fileIcon"
 import { formatBytes } from "@/lib/formatBytes"
+import { attachmentDisplayName, isThreadLifeAttachment } from "@/lib/attachmentLifetime"
 import { expiryCaption } from "@/components/panel/FilesSection"
+import { AttachmentActionsMenu } from "@/components/attachments/AttachmentActionsMenu"
+import { LibraryLinkSegment } from "@/components/attachments/LibraryLinkSegment"
+import { useLibraryLinks } from "@/components/attachments/useLibraryLinks"
+import { useViewingThread } from "@/providers/StreamsProvider"
 import { COPY } from "./composerCopy"
 import { cn } from "@/lib/utils"
 import type { WorkspaceFile } from "@/types"
@@ -73,11 +91,12 @@ export function chatAttachmentState(
   return expiryCaption(file.expires_at) === "expired" ? "expired" : requested
 }
 
-/** The display name of an attachment. `path` is the workspace-relative name the server stamped. */
-export function attachmentDisplayName(file: WorkspaceFile): string {
-  const segments = file.path.split("/")
-  return segments[segments.length - 1] || file.path
-}
+/**
+ * The display name of an attachment — RE-EXPORTED, no longer derived here (Phase 274, D-27).
+ * `lib/attachmentLifetime` owns it: the last path segment with the server's upload prefix
+ * stripped. The export name stays because `MessageItem` and the composer import it from here.
+ */
+export { attachmentDisplayName }
 
 /**
  * ── THE DETACH REGISTRY (Phase 244 / 244-05 T2) ─────────────────────────────────────────
@@ -94,7 +113,10 @@ export function attachmentDisplayName(file: WorkspaceFile): string {
  * which sit in `MessageInput.tsx` for the same reason.
  *
  * ⛔ ITS LIMIT, STATED RATHER THAN HIDDEN: after a hard reload, within the TTL, a detached file
- * falls back inside the time window and re-associates with the next sent message. The honest
+ * falls back inside the time window and re-associates with the next sent message.
+ * ⚠ PHASE 274 WIDENS THAT LIMIT, recorded rather than hidden: a thread-life attachment has no TTL,
+ * so the window no longer closes on one. It is still bounded — the file associates with the NEXT
+ * sent message only — and single-attachment removal (a DELETE) remains deferred. The honest
  * close is a DELETE route on the workspace door — backend scope this plan does not carry — and
  * until then the chip is at least TRUE (the file does belong to this chat, and the agent can read
  * it). ⛔ Do not "fix" this with a persisted client-side hide: that would claim the bytes are
@@ -186,16 +208,25 @@ export function attachmentsForMessage(
 }
 
 export function ChatAttachmentChip({ file, state, onRemove }: ChatAttachmentChipProps) {
+  // Hooks first and unconditional. Only a SENT chip reads the thread's Library marks, so a
+  // pending composer chip never asks (D-18: the composer has no Library door).
+  const threadId = useViewingThread()
   const effective = chatAttachmentState(file, state)
+  const linkThread = effective === "sent" ? threadId : null
+  const { stateFor } = useLibraryLinks(linkThread)
+  const libraryState = stateFor(file.id)
   const name = attachmentDisplayName(file)
   const caption = expiryCaption(file.expires_at)
+  // D-07: a thread-life row makes no time promise at all.
+  const threadLife = isThreadLifeAttachment(file)
 
-  // The drawn TTL word for the ordinary case; the honest reading when the wire did not say.
+  // The drawn TTL word for a TTL row; the honest reading when the wire did not say.
   // ⛔ Never a per-second countdown — `FilesSection` computes on render with NO timer, and the
   // sketch draws a flat `24h`, which is the PROMISE, not a clock.
   const expiryWord = caption === COPY.engine.TTL_HOURS + "h" || caption.startsWith("expires in")
     ? COPY.a.chipTtl
     : caption
+  const actionable = effective === "sent" && linkThread !== null && Boolean(file.id)
 
   const base = cn(
     "inline-flex items-center gap-1.5 pl-2 pr-1.5 py-0.5 rounded-full text-xs font-medium",
@@ -223,7 +254,11 @@ export function ChatAttachmentChip({ file, state, onRemove }: ChatAttachmentChip
   }
 
   return (
-    <span data-testid="chat-attachment-chip" data-chip-state={effective} className={base}>
+    <span
+      data-testid="chat-attachment-chip"
+      data-chip-state={effective}
+      className={cn(base, actionable && "pr-0.5")}
+    >
       {fileIcon(name, 13, { ribbon: false, tone: "inherit" })}
       <span data-chip-name className="truncate max-w-[140px]">
         {name}
@@ -237,9 +272,20 @@ export function ChatAttachmentChip({ file, state, onRemove }: ChatAttachmentChip
       >
         {effective === "sent" ? COPY.a.sentNote : COPY.a.chipScope}
       </span>
-      <span data-chip-expiry className="text-muted-foreground">
-        {expiryWord}
-      </span>
+      {!threadLife && (
+        <span data-chip-expiry className="text-muted-foreground">
+          {expiryWord}
+        </span>
+      )}
+      {actionable && libraryState.link && (
+        <LibraryLinkSegment
+          link={libraryState.link}
+          leaf={libraryState.leaf}
+          path={libraryState.path}
+          display="leaf"
+        />
+      )}
+      {actionable && linkThread && <AttachmentActionsMenu threadId={linkThread} file={file} variant="chip" />}
       {effective === "pending" && onRemove && (
         <button
           type="button"

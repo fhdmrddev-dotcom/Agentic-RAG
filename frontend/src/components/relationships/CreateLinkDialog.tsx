@@ -19,9 +19,14 @@
  *
  * a11y — the typeahead is NET-NEW a11y: the Select→typeahead swap LOSES the APG roles
  * the shadcn Select gave for free, so they are wired BY HAND (there is no cmdk dep):
- * role="combobox" + aria-expanded/aria-controls/aria-activedescendant on the input,
+ * the combobox role + aria-expanded/aria-controls/aria-activedescendant on the input,
  * role="listbox" on the list, role="option" + a unique id per candidate. Focus-trap +
  * restore come FREE from the reused shadcn Dialog — the input stays INSIDE it.
+ *
+ * Phase 271-03 (D-04): the typeahead itself now lives in `LinkTargetCombobox.tsx`, MOVED
+ * there so the Find Relationship filter mounts the same combobox (never a fork). This
+ * dialog keeps the rel-type chips, the exclusion note, the preview and the footer, and
+ * passes `maxVisible={Infinity}` so its candidate list stays uncapped as shipped.
  */
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -36,6 +41,7 @@ import { listDocuments, createRelationship, ApiError } from "@/lib/api"
 import type { Document, RelType, RelationshipRow } from "@/types"
 import { cn } from "@/lib/utils"
 import { OUTGOING_LABEL, REL_TYPES } from "./relationshipLabels"
+import { LinkTargetCombobox } from "./LinkTargetCombobox"
 
 interface Props {
   open: boolean
@@ -61,20 +67,18 @@ export function CreateLinkDialog({
 }: Props) {
   const [relType, setRelType] = useState<RelType>("references")
   const [candidates, setCandidates] = useState<Document[]>([])
-  const [query, setQuery] = useState("")
   const [target, setTarget] = useState<string>("") // the chosen target doc id
-  const [activeIndex, setActiveIndex] = useState(-1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const listboxId = useRef(`rel-target-listbox-${Math.random().toString(36).slice(2)}`).current
+  const inputId = useRef(`rel-target-input-${Math.random().toString(36).slice(2)}`).current
 
-  // Reset-on-open + load the candidate source (the MoveToFolderDialog posture).
+  // Reset-on-open + load the candidate source (the MoveToFolderDialog posture). The
+  // combobox's own query and active option reset with it: the dialog content unmounts on
+  // close, so a reopen mounts a fresh combobox.
   useEffect(() => {
     if (!open) return
     setRelType("references")
     setTarget("")
-    setQuery("")
-    setActiveIndex(-1)
     setError(null)
     listDocuments()
       .then(setCandidates)
@@ -93,43 +97,14 @@ export function CreateLinkDialog({
 
   const howManyExcluded = excludedByType.size
 
-  /** The actionable candidate set: always drop self; drop already-linked-with-type;
-   *  then filter by the typeahead query. Re-derives on relType (via excludedByType)
-   *  and on query. */
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return candidates
-      .filter((d) => d.id !== sourceDocId) // self always hidden (D-117-4)
-      .filter((d) => !excludedByType.has(d.id)) // per-type exclusion
-      .filter((d) => (q === "" ? true : d.filename.toLowerCase().includes(q)))
-  }, [candidates, sourceDocId, excludedByType, query])
-
-  // Keep the active descendant in range as the filtered set changes.
-  useEffect(() => {
-    setActiveIndex((i) => (i >= filtered.length ? filtered.length - 1 : i))
-  }, [filtered.length])
+  /** The ids the combobox never offers: self always (D-117-4), plus the docs already
+   *  linked OUTGOING with the selected type. Re-derives on relType (via excludedByType). */
+  const excludeIds = useMemo(
+    () => new Set<string>([sourceDocId, ...excludedByType]),
+    [sourceDocId, excludedByType],
+  )
 
   const targetDoc = candidates.find((d) => d.id === target) ?? null
-
-  function choose(doc: Document) {
-    setTarget(doc.id)
-    setQuery(doc.filename)
-    setActiveIndex(-1)
-  }
-
-  function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (filtered.length === 0) return
-    if (e.key === "ArrowDown") {
-      e.preventDefault()
-      setActiveIndex((i) => (i + 1) % filtered.length)
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault()
-      setActiveIndex((i) => (i <= 0 ? filtered.length - 1 : i - 1))
-    } else if (e.key === "Enter" && activeIndex >= 0) {
-      e.preventDefault()
-      choose(filtered[activeIndex])
-    }
-  }
 
   async function handleConfirm() {
     if (!target) return
@@ -155,9 +130,6 @@ export function CreateLinkDialog({
       setLoading(false)
     }
   }
-
-  const activeOptionId = activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined
-  const listVisible = query.trim() !== "" || activeIndex >= 0 || target === ""
 
   return (
     <Dialog
@@ -186,8 +158,8 @@ export function CreateLinkDialog({
                   onClick={() => {
                     setRelType(t)
                     // Per-type re-derive: a now-excluded chosen target must clear.
+                    // (The combobox resets its own active option when the excluded set changes.)
                     setTarget("")
-                    setActiveIndex(-1)
                   }}
                   className={cn(
                     "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
@@ -203,76 +175,24 @@ export function CreateLinkDialog({
             </div>
           </div>
 
-          {/* (2) the typeahead combobox (APG roles wired by hand). */}
+          {/* (2) the typeahead combobox — the extracted LinkTargetCombobox (271-03). */}
           <div>
             <label
-              htmlFor={`${listboxId}-input`}
+              htmlFor={inputId}
               className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.06em] text-panel-muted-foreground"
             >
               Target document
             </label>
-            <input
-              id={`${listboxId}-input`}
-              type="text"
-              role="combobox"
-              aria-expanded={listVisible}
-              // Only reference the listbox while it is actually in the tree (WR-04):
-              // the <ul id={listboxId}> is conditionally rendered on listVisible, so a
-              // static aria-controls would dangle (point at a non-existent element)
-              // when collapsed. aria-expanded already conveys popup presence.
-              aria-controls={listVisible ? listboxId : undefined}
-              aria-activedescendant={activeOptionId}
-              aria-autocomplete="list"
-              autoComplete="off"
+            <LinkTargetCombobox
+              inputId={inputId}
+              candidates={candidates}
+              excludeIds={excludeIds}
+              value={target === "" ? null : target}
+              onChoose={(doc) => setTarget(doc ? doc.id : "")}
               placeholder="Search documents…"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                setTarget("") // typing invalidates a prior pick
-                setActiveIndex(-1)
-              }}
-              onKeyDown={onInputKeyDown}
-              className={cn(
-                "w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm text-foreground",
-                "placeholder:text-panel-muted-foreground-dim",
-                "focus:border-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-              )}
+              listboxLabel="Target document candidates"
+              maxVisible={Number.POSITIVE_INFINITY}
             />
-            {listVisible && (
-              <ul
-                id={listboxId}
-                role="listbox"
-                aria-label="Target document candidates"
-                className="mt-1 max-h-44 overflow-y-auto rounded-md border border-border/60"
-              >
-                {filtered.length === 0 ? (
-                  <li className="px-3 py-2 text-xs text-panel-muted-foreground">
-                    No matching documents
-                  </li>
-                ) : (
-                  filtered.map((d, i) => (
-                    <li
-                      key={d.id}
-                      id={`${listboxId}-opt-${i}`}
-                      role="option"
-                      aria-selected={target === d.id}
-                      onMouseDown={(e) => {
-                        e.preventDefault() // keep focus in the input
-                        choose(d)
-                      }}
-                      className={cn(
-                        "cursor-pointer truncate px-3 py-2 text-sm",
-                        i === activeIndex || target === d.id
-                          ? "bg-accent text-foreground"
-                          : "text-foreground hover:bg-accent/50",
-                      )}
-                    >
-                      {d.filename}
-                    </li>
-                  ))
-                )}
-              </ul>
-            )}
             {/* Honest per-type exclusion note (panel-AA token). */}
             {howManyExcluded > 0 && (
               <p className="mt-1.5 text-xs text-panel-muted-foreground">

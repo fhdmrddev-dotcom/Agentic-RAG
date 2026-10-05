@@ -5,6 +5,10 @@ import path from "path"
 
 export default defineConfig({
   plugins: [react(), Icons({ compiler: "jsx", jsx: "react" })],
+  // 276-REVIEW B-WR-05 — mirrors vite.config.ts: suites import the compositions as the web host does.
+  define: {
+    __VIDEO_WEB_PLAYBACK__: "true",
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/setupTests.ts"],
@@ -17,6 +21,21 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Phase 276 — mirrors vite.config.ts: Remotion compositions are imported from ../video/src.
+      "@video": path.resolve(__dirname, "../video/src"),
     },
+    // Phase 276-05 — mirrors vite.config.ts VIDEO_DEDUPE: files under ../video/src import these as
+    // bare specifiers and video/node_modules is absent in worktrees and CI, so they must resolve to
+    // frontend/node_modules (one React, one remotion) for a suite that imports a real composition.
+    dedupe: [
+      "react",
+      "react-dom",
+      "remotion",
+      "@remotion/player",
+      "@remotion/transitions",
+      "@remotion/media",
+      "@remotion/google-fonts",
+      "mediabunny",
+    ],
   },
 })

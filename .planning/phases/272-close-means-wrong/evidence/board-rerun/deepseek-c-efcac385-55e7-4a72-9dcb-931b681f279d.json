@@ -1,0 +1,126 @@
+{
+  "prompt": "What was revenue for Acme GmbH in July?",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "verdict": "PASS",
+  "notes": [
+    "filtered call returned no_documents_matched: True",
+    "answer says nothing matched: True",
+    "citations: 0",
+    "later retrieval outside the filter: none"
+  ],
+  "tool_calls_inspected": [
+    "search_documents({\"query\": \"revenue for Acme GmbH\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}, {\"op\": \"between\", \"field\": \"date\", \"value\": \"2026-07)"
+  ],
+  "audit_ids": [
+    "25e9572f-2129-4fca-9f49-5257091d8825"
+  ],
+  "audit_kinds": [
+    "no_documents_matched"
+  ],
+  "audit_filters": [
+    [
+      {
+        "op": "eq",
+        "field": "legal_entity",
+        "value": "Acme GmbH"
+      },
+      {
+        "op": "between",
+        "field": "date",
+        "value": "2026-07-01",
+        "value2": "2026-07-31"
+      }
+    ]
+  ],
+  "cited": {},
+  "answer_excerpt": "I couldn't find any revenue data for Acme GmbH dated in July 2026 \u2014 no documents matched the filter I used (legal entity = **Acme GmbH**, document date **1\u201331 July 2026**).\n\nFor context, here are the nearby months that do have documents for Acme GmbH:\n- **March 2026** (1 document)\n- **October 2025** (1 document)\n- **September 2025** (1 document)\n\nWould you like me to pull revenue from one of those months instead \u2014 or did you mean a different July/year?",
+  "thread_id": "393d4f24-3be9-44b3-8455-4f54a479585a",
+  "run_id": "efcac385-55e7-4a72-9dcb-931b681f279d",
+  "run_status": "completed",
+  "effective": {
+    "status": "completed",
+    "model": "deepseek-v4-pro",
+    "provider": "deepseek",
+    "error": null
+  },
+  "raw": {
+    "audits": [
+      {
+        "id": "25e9572f-2129-4fca-9f49-5257091d8825",
+        "at": "2026-10-03 09:17:17.581832+00",
+        "metadata": {
+          "run_id": "efcac385-55e7-4a72-9dcb-931b681f279d",
+          "filters": [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2026-07-01",
+              "value2": "2026-07-31"
+            }
+          ],
+          "thread_id": "393d4f24-3be9-44b3-8455-4f54a479585a",
+          "folder_ids": [],
+          "query_text": "revenue for Acme GmbH",
+          "result_kind": "no_documents_matched",
+          "document_ids": [],
+          "parent_run_id": null,
+          "undated_excluded": 0,
+          "matched_document_count": 0
+        }
+      }
+    ],
+    "messages": [
+      {
+        "id": "11b67474-3cd5-47e8-aa35-fa528bbd18f4",
+        "role": "user",
+        "content": "What was revenue for Acme GmbH in July?",
+        "tool_calls": null,
+        "source_refs": null,
+        "at": "2026-10-03 09:17:13.354973+00"
+      },
+      {
+        "id": "d74042a3-2fa3-4656-aa7c-b4238e1f14ec",
+        "role": "assistant",
+        "content": "I couldn't find any revenue data for Acme GmbH dated in July 2026 \u2014 no documents matched the filter I used (legal entity = **Acme GmbH**, document date **1\u201331 July 2026**).\n\nFor context, here are the nearby months that do have documents for Acme GmbH:\n- **March 2026** (1 document)\n- **October 2025** (1 document)\n- **September 2025** (1 document)\n\nWould you like me to pull revenue from one of those months instead \u2014 or did you mean a different July/year?",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "revenue for Acme GmbH",
+              "filters": [
+                {
+                  "op": "eq",
+                  "field": "legal_entity",
+                  "value": "Acme GmbH"
+                },
+                {
+                  "op": "between",
+                  "field": "date",
+                  "value": "2026-07-01",
+                  "value2": "2026-07-31"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "{\"status\": \"no_documents_matched\", \"reason\": \"zero_documents\", \"filter\": \"legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2026\", \"matched_documents\": 0, \"undated_excluded\": 0, \"nearby\": [{\"value\": \"2026-03\", \"label\": \"March 2026\", \"documents\": 1}, {\"value\": \"2025-10\", \"label\": \"October 2025\", \"documents\": 1}, {\"value\": \"2025-09\", \"label\": \"September 2025\", \"documents\": 1}], \"message\": \"No documents matched legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2026. Nearby values that do have documents: March 2026 (1 document), October 2025 (1 document), September 2025 (1 document).\", \"instruction\": \"Tell the person that no documents matched legal entity = Acme GmbH \\u00b7 document date 1\\u201331 Jul 2026, and state the filter you used. Cite nothing. Do not search again without this filter, and do not use grep, query_documents, read_document or analyze_document to answer from outside it. If nearby values are listed, you may offer them and ask whether to use one.\"}",
+            "status": "done",
+            "tool_call_id": "call_00_4GBbpvHGRi9blsNmrsro4579"
+          }
+        ],
+        "source_refs": null,
+        "at": "2026-10-03 09:17:20.896887+00"
+      }
+    ],
+    "run": {
+      "status": "completed",
+      "model": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "error": null
+    }
+  }
+}

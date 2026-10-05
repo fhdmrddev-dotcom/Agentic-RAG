@@ -1,0 +1,136 @@
+{
+  "provider": "google",
+  "model": "gemini-3.8-flash",
+  "calling_mode_predicted": "NATIVE (native SDK adapter)",
+  "file": {
+    "name": "meridian-clearance-google.md",
+    "body": "# Meridian supplier note\n\nThe Meridian freight-cap clearance code is ATT274-google-a73b1a24.\n"
+  },
+  "question": "What is the Meridian freight-cap clearance code in the file I attached?",
+  "verdicts": {
+    "d05": "PASS",
+    "answer": "PASS",
+    "second_thread": "PASS",
+    "search_neg": "PASS",
+    "db_neg": "PASS"
+  },
+  "row": {
+    "provider": "google",
+    "model": "gemini-3.8-flash",
+    "required": true,
+    "calling_mode": "NATIVE (native SDK adapter)",
+    "token": "ATT274-google-a73b1a24",
+    "thread_a": "ab60c716-6c23-40d8-8cf0-cb068c009b31",
+    "thread_b": "bc475a55-5188-4692-935a-156aa34c5350",
+    "upload_http": 200,
+    "d05": "PASS",
+    "ws_row": {
+      "id": "1dcbbd75-cf7c-4c64-b800-03cf5c4b4e4e",
+      "path": "/0116decf-meridian-clearance-google.md",
+      "kind": "template_input",
+      "expires_at": null,
+      "size_bytes": "93",
+      "content_storage_path": null,
+      "library_document_id": null,
+      "library_link": null
+    },
+    "answer": "PASS",
+    "run_a_status": "completed",
+    "a_tools": [
+      "workspace_list",
+      "workspace_read"
+    ],
+    "a_final": "Based on the attached file (`0116decf-meridian-clearance-google.md`), the Meridian freight-cap clearance code is:\n\n**`ATT274-google-a73b1a24`**",
+    "second_thread": "PASS",
+    "run_b_status": "completed",
+    "b_tools": [
+      "glob",
+      "grep",
+      "grep",
+      "grep",
+      "grep",
+      "read_document",
+      "workspace_list",
+      "query_documents",
+      "search_documents",
+      "grep",
+      "grep",
+      "grep",
+      "grep"
+    ],
+    "b_final": "There is no file attached to your message, and a search across your document library does not contain a **\"Meridian freight-cap clearance code\"** or any mention of a \"freight-cap clearance code.\"\n\nHere is what is currently present in your files regarding the relevant terms:\n\n1. **Project Meridian Documents** (e.g., *Project-Meridian-Charter-Excerpt.docx*, *Project-Meridian-Status-Report-Week09.doc",
+    "search_http": 200,
+    "search_total": 0,
+    "search_neg": "PASS",
+    "library_rows_with_token": 0,
+    "db_neg": "PASS"
+  },
+  "turn_a": {
+    "run_id": "5a52dbcf-3c22-4704-a6ac-8909762d336b",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "gemini-3.8-flash",
+      "provider": "google",
+      "error": null,
+      "started_at": "2026-10-05 14:32:59.519858+00:00",
+      "completed_at": "2026-10-05 14:33:24.680771+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "779dd7b6-c692-4c29-b343-ebd4ab64e358",
+        "content": "Based on the attached file (`0116decf-meridian-clearance-google.md`), the Meridian freight-cap clearance code is:\n\n**`ATT274-google-a73b1a24`**"
+      }
+    ],
+    "tool_call_names": [
+      "workspace_list",
+      "workspace_read"
+    ],
+    "final": "Based on the attached file (`0116decf-meridian-clearance-google.md`), the Meridian freight-cap clearance code is:\n\n**`ATT274-google-a73b1a24`**"
+  },
+  "turn_b": {
+    "run_id": "163593ef-3bc3-49bb-a969-b52b3c2f5894",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "gemini-3.8-flash",
+      "provider": "google",
+      "error": null,
+      "started_at": "2026-10-05 14:33:25.749876+00:00",
+      "completed_at": "2026-10-05 14:34:41.030834+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "66df6536-6d0f-44c5-b952-3bfd6587f9c1",
+        "content": "There is no file attached to your message, and a search across your document library does not contain a **\"Meridian freight-cap clearance code\"** or any mention of a \"freight-cap clearance code.\"\n\nHere is what is currently present in your files regarding the relevant terms:\n\n1. **Project Meridian Documents** (e.g., *Project-Meridian-Charter-Excerpt.docx*, *Project-Meridian-Status-Report-Week09.docx*, *Project-Meridian-Risk-Workshop-Notes.docx*):\n   - These documents focus on project management, milestone tracking, and risk assessment; they do not contain any references to freight, shipping caps, or customs clearance codes.\n\n2. **Freight & Shipping Documents**:\n   - **[acme_msa_kestrel_freight_2026.md]**: A Master Services Agreement between ACME Corporation and Kestrel Freight Partners Ltd. (Agreement Reference: `MSA-2026-KFP-007`) [1]. It includes:\n     - **Aggregate liability cap**: $2.35M [1, 2]\n     - **Customs clearance SLA**: Target of 97% within 2 business days [3]\n     - **Service credit cap**: Capped at 12% of monthly fees [3]\n   - **[northwind-commercials-renewal.md]**: References an optional **Freight Analytics module** (\u00a362,000/year) [4].\n\nIf you intended to attach a specific document or spreadsheet, please upload it and I will gladly locate the exact code for you."
+      }
+    ],
+    "tool_call_names": [
+      "glob",
+      "grep",
+      "grep",
+      "grep",
+      "grep",
+      "read_document",
+      "workspace_list",
+      "query_documents",
+      "search_documents",
+      "grep",
+      "grep",
+      "grep",
+      "grep"
+    ],
+    "final": "There is no file attached to your message, and a search across your document library does not contain a **\"Meridian freight-cap clearance code\"** or any mention of a \"freight-cap clearance code.\"\n\nHere is what is currently present in your files regarding the relevant terms:\n\n1. **Project Meridian Documents** (e.g., *Project-Meridian-Charter-Excerpt.docx*, *Project-Meridian-Status-Report-Week09.docx*, *Project-Meridian-Risk-Workshop-Notes.docx*):\n   - These documents focus on project management, milestone tracking, and risk assessment; they do not contain any references to freight, shipping caps, or customs clearance codes.\n\n2. **Freight & Shipping Documents**:\n   - **[acme_msa_kestrel_freight_2026.md]**: A Master Services Agreement between ACME Corporation and Kestrel Freight Partners Ltd. (Agreement Reference: `MSA-2026-KFP-007`) [1]. It includes:\n     - **Aggregate liability cap**: $2.35M [1, 2]\n     - **Customs clearance SLA**: Target of 97% within 2 business days [3]\n     - **Service credit cap**: Capped at 12% of monthly fees [3]\n   - **[northwind-commercials-renewal.md]**: References an optional **Freight Analytics module** (\u00a362,000/year) [4].\n\nIf you intended to attach a specific document or spreadsheet, please upload it and I will gladly locate the exact code for you."
+  },
+  "upload_response": {
+    "file_id": "1dcbbd75-cf7c-4c64-b800-03cf5c4b4e4e",
+    "path": "/0116decf-meridian-clearance-google.md",
+    "version": 1,
+    "size_bytes": 93,
+    "mime_type": "text/markdown",
+    "kind": "template_input",
+    "expires_at": null,
+    "is_new": true,
+    "warning": null
+  }
+}

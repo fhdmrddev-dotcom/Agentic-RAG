@@ -24,6 +24,21 @@
  */
 import { describe, it, expect } from "vitest"
 import { TOOL_PHRASES, toolName } from "./toolNames"
+import openaiServiceSource from "../../../../backend/app/services/openai_service.py?raw"
+
+/**
+ * Phase 273-05 (RESEARCH OQ3, RESOLVED) — the CHAT-ONLY tools: offered to the chat agent but
+ * subtracted from the harness authoring offer (`harness/grounding.py`), so they are never in
+ * `OFFERED_TOOL_IDS` below, yet the chat rail still names them. Parsed from the backend constant
+ * `CHAT_ONLY_TOOLS = frozenset({...})` in `openai_service.py` through `?raw` — NEVER hand-typed, so
+ * a tool added to that set without a phrase fails the key-set case here.
+ */
+function parseChatOnly(source: string): string[] {
+  const m = /^CHAT_ONLY_TOOLS\s*=\s*frozenset\(\{([^}]*)\}\)/m.exec(source)
+  if (!m) return []
+  return [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1])
+}
+const CHAT_ONLY_TOOL_IDS = parseChatOnly(openaiServiceSource)
 
 /**
  * The ids the panel is actually handed, published in `200-CHECKLIST.md` §0 (X-13) and
@@ -115,8 +130,24 @@ describe("toolName — the phrase a person reads", () => {
       expect(Object.keys(TOOL_PHRASES)).not.toContain(dead)
     }
     // The stronger claim, and the one that keeps a third dead entry from appearing: the
-    // table's key set is EXACTLY the offered set.
-    expect(Object.keys(TOOL_PHRASES).slice().sort()).toEqual([...OFFERED_TOOL_IDS].slice().sort())
+    // table's key set is EXACTLY the offered set ∪ the chat-only set (Phase 273, OQ3 RESOLVED —
+    // the original equality was against the offered set alone; `show_artifact` is named for the
+    // chat rail and deliberately never offered to the harness).
+    expect(Object.keys(TOOL_PHRASES).slice().sort()).toEqual(
+      [...OFFERED_TOOL_IDS, ...CHAT_ONLY_TOOL_IDS].slice().sort(),
+    )
+  })
+
+  it("Phase 273 — the chat-only set is parsed from the backend constant, disjoint from the offer", () => {
+    // NON-VACUITY: the parse found the constant; an empty set would make the equality above
+    // collapse back to the offered set and pass for the wrong reason.
+    expect(CHAT_ONLY_TOOL_IDS.length).toBeGreaterThanOrEqual(1)
+    expect(CHAT_ONLY_TOOL_IDS).toContain("show_artifact")
+    expect(OFFERED_TOOL_IDS).toHaveLength(28)
+    const offered = new Set<string>(OFFERED_TOOL_IDS)
+    expect(CHAT_ONLY_TOOL_IDS.filter((id) => offered.has(id))).toEqual([])
+    // Every chat-only id resolves to a phrase too.
+    expect(CHAT_ONLY_TOOL_IDS.filter((id) => toolName(id) === id)).toEqual([])
   })
 
   it("SP-MNR-01 — no phrase is itself a raw snake_case id", () => {

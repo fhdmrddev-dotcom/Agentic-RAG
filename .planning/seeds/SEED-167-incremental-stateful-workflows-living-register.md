@@ -64,6 +64,11 @@ trigger_when:
 surface: Agentic-RAG
 ---
 
+> **Note 2026-10-04 (release-history audit).** The STATE-READ axis recorded above as shipped has a hole:
+> `{{prior_run.*}}` is interpolated by `_exec_llm_single` / `_exec_llm_agent` / `_exec_llm_batch_agents` only,
+> never by `_exec_llm_emit` (`harness/phase_types.py:1496-1501`), the step that writes the deliverable. Held
+> by **SEED-339**. Status unchanged.
+
 # SEED-167: Incremental / stateful workflows — the "living risk register"
 
 > ## ⚠⚠ READ `SEED-168` FIRST — THIS SEED IS AN INSTANCE, NOT THE REQUIREMENT

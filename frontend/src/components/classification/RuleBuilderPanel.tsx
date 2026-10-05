@@ -237,7 +237,7 @@ export function RuleBuilderPanel({
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-foreground">
-          {isEdit ? "Edit rule" : "New classification rule"}
+          {isEdit ? "Edit rule" : "New filing rule"}
         </h2>
         <button
           type="button"
@@ -284,7 +284,7 @@ export function RuleBuilderPanel({
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
             )}
           >
-            <span className="text-xs font-semibold">After extraction (Classification)</span>
+            <span className="text-xs font-semibold">After extraction</span>
             <span className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
               Matches extracted metadata: document type, topics, custom fields
             </span>

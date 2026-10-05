@@ -20,8 +20,15 @@ re_open_triggers:
 priority: low now (dev-debris-amplified) / medium at scale
 suggested_phase: fold into the SEED-065 diagnosis spike (frontend perf trace) — or a focused thread-list virtualization/perf phase if confirmed
 surface: Agentic-RAG
-trigger_when: unset
+trigger_when: "Any phase whose files_modified names StreamsProvider.tsx, useMessages.ts, useThreads.ts or ChatArea.tsx; OR a thread's first open shows blank for more than ~2 s again (Phase 273 O-2 saw up to 7 s)."
+trigger_paths: ["frontend/src/providers/StreamsProvider.tsx", "frontend/src/hooks/useMessages.ts", "frontend/src/hooks/useThreads.ts", "frontend/src/components/chat/ChatArea.tsx"]
 ---
+
+> **Note 2026-10-04 (release-history audit, `docs/history/v4.5-find-it-show-it.md`).** Still observed: Phase
+> 273's UAT recorded **O-2**, *"a thread's first open after page load sometimes blank up to 7 s (whole thread,
+> not artifact-specific)"* (`.planning/phases/273-agent-authored-artifacts/273-UAT-LOG.md:366`,
+> `273-VALIDATION.md:108`). Same symptom as this seed; `trigger_when` was `unset`, so a concrete trigger and
+> `trigger_paths` were added. Status unchanged.
 
 # SEED-067 — New-chat / thread-select frontend latency
 

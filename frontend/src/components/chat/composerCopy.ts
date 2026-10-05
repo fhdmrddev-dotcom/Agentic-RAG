@@ -95,7 +95,7 @@ const shared = {
   /** The agent's ONE-LINE pointer in the transcript — the run surface owns the heavy receipt. */
   agentReadLine: (name: string): string => `Read ${name}`,
   expiredChip: "No longer available",
-  expiredWhy: "Files attached to a chat are kept for 24 hours.",
+  expiredWhy: "This file expired after 24 hours. Files attached to a chat now last as long as the chat; workflow template files still expire after 24 hours.", // amended by Phase 274 D-24
   refusalDismiss: "OK",
   /**
    * ⭐ NOT PORTED FROM THE SKETCH — sketch 236 does not draw this case, because it draws a chat

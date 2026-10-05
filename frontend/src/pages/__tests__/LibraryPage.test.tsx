@@ -18,7 +18,7 @@
  * - @/lib/api — PARTIAL (importOriginal), so only the five functions this page and its
  *   children actually call are stubbed and every other export stays real
  */
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest"
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, Folder, SavedView } from "@/types"
@@ -179,6 +179,11 @@ const SELECTED_ROW_CLASS = "bg-primary/10"
 function viewRow(scope: HTMLElement, name: string): HTMLElement {
   return within(scope).getByRole("button", { name })
 }
+
+// 271-05: warm the page's module graph ONCE, outside every case's 5 s budget. The first
+// case's dynamic import timed out at the phase BASE (20050816d) too, so this is inherited
+// load cost, not a regression; the case bodies are unchanged.
+beforeAll(async () => { await import("@/pages/LibraryPage") }, 30_000)
 
 describe("LibraryPage", () => {
   beforeEach(() => {

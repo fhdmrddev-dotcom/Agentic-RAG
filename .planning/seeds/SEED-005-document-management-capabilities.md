@@ -10,6 +10,10 @@ status_note: |
   (v3.0 — in progress)
 
   Mapped `active` -> `open`. Reason: being worked now.
+
+  2026-10-03 (Phase 271 close, plan 271-05): Phase 271 shipped Tier-A document SEARCH, finding whole
+  documents by metadata, folder subtree, relationships (both directions) and version state beside RAG
+  (SEED-243, answered). Status stays `open`: Tier B (retention, check-in/out, approvals) is undelivered.
 planted: 2026-05-02
 planted_during: v2.5 (after Phase 059 ship, before Phase 060 kickoff)
 trigger_when: planning a milestone scoped to "document management", "DM", "DMS", "lifecycle", "workflow", "approvals", "metadata views", "retention", or when users start asking for features beyond the current basic folder + version + audit capabilities
