@@ -56,14 +56,21 @@ export async function uploadDocument(file: File, folderId?: string | null): Prom
 // NO-Content-Type detail is load-bearing so the browser sets the multipart
 // boundary itself. The server is the real gate (validate_ooxml magic-byte
 // check, Plan 100-04); the panel reconciles by upserting the returned row.
+//
+// Phase 274 (D-05 / D-21): `lifetime` is an OPT-IN. Only the chat composer passes
+// "thread" (the file then lives with its thread, `expires_at: null`). The panel's
+// TemplateUpload and the workflow-launch door pass nothing, so their requests stay
+// byte-identical — no query string, the 24h TTL kept.
 export async function uploadWorkspaceTemplate(
   threadId: string,
   file: File,
+  lifetime: "template" | "thread" = "template",
 ): Promise<WorkspaceFile> {
   const token = await getAuthToken()
   const formData = new FormData()
   formData.append("file", file)
-  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files`, {
+  const qs = lifetime === "thread" ? "?lifetime=thread" : ""
+  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files${qs}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },  // NO Content-Type — browser sets the boundary
     body: formData,
@@ -98,10 +105,12 @@ export async function attachConnectionFileToThread(
   connectionId: string,
   fileId: string,
 ): Promise<WorkspaceFile> {
-  const token = await getAuthToken()
+  // Phase 274 (SC#1): the shared auth header builder, so the request carries X-Org-Id. It sent only
+  // a bearer, and `get_active_org_id` answers 400 to a caller in two orgs with no X-Org-Id.
+  const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files/from-connection`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ connection_id: connectionId, file_id: fileId }),
   })
   if (!res.ok) {
