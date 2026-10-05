@@ -228,3 +228,26 @@ async def test_parity_same_bytes_other_folder_is_already_in_the_library_there():
     assert mint.document["id"] == "doc-existing"
     assert len(db["documents"]) == before, "a duplicate mints nothing"
     _assert_parity(preview, mint)
+
+
+# ── 274 review CR-02 · the first copy is still INDEXING ───────────────────────────────────
+@pytest.mark.asyncio
+@pytest.mark.parametrize("folder_of_first", [FOLDER_A, FOLDER_B], ids=["same-folder", "other-folder"])
+async def test_parity_same_bytes_first_copy_still_pending_is_linked_and_keeps_is_latest(folder_of_first):
+    """PLANT to drive RED: keep the dedup `completed`-only. The preview then promises "version 2"
+    for byte-identical bytes, and the confirm RETIRES the pending first copy (`is_latest=False`) —
+    the only copy leaves the Library list and search while both chips read "In Library"."""
+    raw = b"bytes still being indexed"
+    first = _doc(id="doc-pending", folder_id=folder_of_first, raw=raw)
+    first["status"] = "pending"
+    db = _db(first)
+    preview, mint = await _preview_then_mint(db, raw=raw, folder_id=FOLDER_A)
+
+    assert preview.duplicate_of is not None, "a same-bytes copy still indexing is already in the Library"
+    assert preview.duplicate_of.document_id == "doc-pending"
+    assert preview.duplicate_of.folder_id == folder_of_first
+    assert mint.is_duplicate is True
+    assert mint.document["id"] == "doc-pending"
+    assert len(db["documents"]) == 1, "nothing is minted"
+    assert db["documents"][0]["is_latest"] is True, "the first copy is never retired"
+    _assert_parity(preview, mint)
