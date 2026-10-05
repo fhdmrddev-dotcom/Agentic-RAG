@@ -122,17 +122,17 @@ During G-4 #1 the network log must show only `/threads/{id}/workspace/files?life
 `SELECT count(*) FROM connector_watches WHERE user_id = 'd8a54002-6a29-4b88-b918-cff2aa4a06d5'` reads the same before and
 after (3 at 274-05's start). Click-path in 274-05-SUMMARY.md.
 
-## 5. Sign-off (Task 4) — OWED
+## 5. Sign-off (Task 4) — APPROVED by the operator, 2026-10-05
 
 | Row | Claude (274-05 executor) | Chrome (orchestrator) | Operator verdict |
 |---|---|---|---|
-| Board (§1) | PASS 8/8 | — | owed |
-| G-4 #1 | API PASS | **PASS** (§6.1, local + cloud) | owed |
-| G-4 #2 | PASS via the board | **PASS** (§6.2) | owed |
-| G-4 #3 | API PASS (saved / version 2 / already) | **PASS** (§6.3) — F-1 found + fixed; residual gap named | owed |
-| G-4 #4 | API PASS (1 → 0, byte-identical download) | **PASS** (§6.4) | owed |
-| 4-axis (§3) | PASS ×4 | optional | owed |
-| D-18 (§4) | static + API PASS | **PASS** (§6.5, network log + Manage click) | owed |
+| Board (§1) | PASS 8/8 | — | **approved** (operator, 2026-10-05) |
+| G-4 #1 | API PASS | **PASS** (§6.1, local + cloud) | **approved** (operator, 2026-10-05) |
+| G-4 #2 | PASS via the board | **PASS** (§6.2) | **approved** (operator, 2026-10-05) |
+| G-4 #3 | API PASS (saved / version 2 / already) | **PASS** (§6.3) — F-1 found + fixed; residual gap named | **approved** (operator, 2026-10-05) |
+| G-4 #4 | API PASS (1 → 0, byte-identical download) | **PASS** (§6.4) | **approved** (operator, 2026-10-05) |
+| 4-axis (§3) | PASS ×4 | optional | **approved** (operator, 2026-10-05) |
+| D-18 (§4) | static + API PASS | **PASS** (§6.5, network log + Manage click) | **approved** (operator, 2026-10-05) |
 
 `BUG-260905-01` and `SEED-247` are NOT yet re-routed: D-17 closes the bug only on driven G-4 #1 / #3 rows and the D-18 live
 half, which are the orchestrator's.
@@ -213,3 +213,12 @@ or the database, never from "it looked right".
   correctly. Fix is one line (return `created_at` from the upload). Not introduced by 274.
 - **Environment, not app:** in the hidden tab, Radix dialogs (cloud picker, delete confirm) stayed in the DOM after their action had
   completed — exit animations do not run in a hidden tab. Every action they triggered was verified in the DB.
+
+### Deferred at sign-off (operator approved without ruling on these; routed as follow-ups, not built in 274)
+- **F-1 residual:** the panel Files row's name still truncates at the panel's 345 px; sketch 274-A gives it a full line with a meta
+  line under it. Needs a sub-line slot on the shared `FileRow`. Re-open: the operator asks for it, or the next phase touching
+  `FileRow`/`FilesSection`.
+- **F-2:** return `created_at` from the upload (`POST /workspace/files`) so a sent chip never depends on the follow-up refetch.
+  Pre-existing (244). Re-open: a chip reported vanishing after send.
+- **F-3:** the agent's attachment note hands the model the stored `<8hex>-` name, so answers cite it. Use the display name.
+  Re-open: the next touch of `agent_loop._build_attachment_note`.
