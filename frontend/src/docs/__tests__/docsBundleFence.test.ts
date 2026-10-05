@@ -114,6 +114,9 @@ describe("Docs bundle fence (T-276-14)", () => {
     // positive control: the API reference page exists and loads Scalar dynamically
     const all = crawl(DOCS_ENTRY, true).edges
     expect(all.some((e) => e.dynamic && e.spec === "@scalar/api-reference-react")).toBe(true)
+    // 276-REVIEW B-CR-01: Scalar's stylesheet is imported by the host (the package injects
+    // none) — and only behind import(), so it never joins the docs first paint
+    expect(all.some((e) => e.dynamic && e.spec === "@scalar/api-reference-react/style.css")).toBe(true)
   })
 
   it("docs main.tsx mounts no auth, stream or org provider", () => {

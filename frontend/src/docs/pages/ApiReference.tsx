@@ -15,8 +15,15 @@ export const PUBLIC_SPEC_URL = "/docs-assets/openapi.public.json"
 type ScalarProps = { configuration: Record<string, unknown> }
 type ScalarModule = { ApiReferenceReact: ComponentType<ScalarProps> }
 
+// 276-REVIEW B-CR-01: @scalar/api-reference-react does NOT inject its own CSS — the host must
+// import `style.css`, and nothing did, so the reference shipped as an unstyled Vue tree. The
+// stylesheet rides the SAME dynamic import (lazy, never in first paint). It holds only `data:`
+// URLs, so it adds no third-party request.
 const defaultLoad = (): Promise<ScalarModule> =>
-  import("@scalar/api-reference-react") as unknown as Promise<ScalarModule>
+  Promise.all([
+    import("@scalar/api-reference-react"),
+    import("@scalar/api-reference-react/style.css"),
+  ]).then(([mod]) => mod as unknown as ScalarModule)
 
 /** Deep Midnight tokens mapped onto Scalar's CSS variables (UI-SPEC P6). */
 const DEEP_MIDNIGHT_CSS = `
