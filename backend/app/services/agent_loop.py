@@ -1328,8 +1328,8 @@ def _build_attachment_note(rows: list[dict] | None) -> str:
         "\n\n## Files attached to this conversation\n"
         "The user attached these files to THIS conversation. They are scoped to this "
         "conversation only, they are NOT in the knowledge base, and they will not be found by "
-        "search_documents. They expire, so use them in this conversation rather than assuming "
-        "they persist.\n"
+        "search_documents. They stay with this conversation for as long as it exists; use them "
+        "here rather than assuming they exist anywhere else.\n"
         "Read a text file with workspace_read; read ANY of them — spreadsheets, documents, "
         "slides, PDFs, images — from the path below inside execute_code.\n"
         + "\n".join(lines)

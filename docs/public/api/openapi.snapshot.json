@@ -4068,7 +4068,7 @@
      "workspace"
     ],
     "summary": "Upload Template",
-    "description": "Upload an ephemeral .docx/.pptx/.xlsx template (TMPL-01, D-12/D-05).\n\nThe single net-new workspace WRITE endpoint. Validates OOXML by magic bytes\n(D-12), reads the TTL from app_settings (D-05), and persists via write_file\nwith kind='template_input' + expires_at = now + TTL. Bad files -> 422 at the\ndoor (nothing persisted); a thread the user does not own -> 404 (RLS half of\nSC#1 via _verify_thread_ownership). No SSE emit \u2014 the handler has no run\ncontext; the panel reconciles by upserting the returned row (Plan 100-06).",
+    "description": "Upload a file into this thread's workspace (TMPL-01, D-12; Phase 274 ATT-01).\n\nValidates the file by magic bytes (D-12) and persists it via write_file with\nkind='template_input'. The `lifetime` query parameter decides how long it lives:\nthe chat composer sends `lifetime=thread`, which writes a thread-life row\n(`expires_at` null \u2014 it lives as long as the conversation and is removed when the\nthread is deleted); an upload with no `lifetime` keeps the template TTL from\napp_settings (expires_at = now + TTL), unchanged for the panel and workflow-launch\nuploads. Bad files -> 422 at the door (nothing persisted); a thread the user does\nnot own -> 404. No SSE emit \u2014 the panel reconciles by upserting the returned row.",
     "operationId": "upload_template_threads__thread_id__workspace_files_post",
     "security": [
      {
@@ -4084,6 +4084,22 @@
        "type": "string",
        "title": "Thread Id"
       }
+     },
+     {
+      "name": "lifetime",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "template",
+        "thread"
+       ],
+       "type": "string",
+       "description": "How long the uploaded file lives. `thread` (the chat composer) keeps it for as long as the conversation exists (`expires_at` null); `template` (the default \u2014 the panel and workflow-launch uploads) expires after the configured template TTL.",
+       "default": "template",
+       "title": "Lifetime"
+      },
+      "description": "How long the uploaded file lives. `thread` (the chat composer) keeps it for as long as the conversation exists (`expires_at` null); `template` (the default \u2014 the panel and workflow-launch uploads) expires after the configured template TTL."
      }
     ],
     "requestBody": {
@@ -4198,7 +4214,7 @@
      "workspace"
     ],
     "summary": "Attach Connection File",
-    "description": "Attach ONE connected-cloud file to THIS THREAD (Phase 244 / SHELL-04 / D-244-05).\n\n\u26d4 **THIS ROUTE MINTS NO ``documents`` ROW.** It is the un-inversion of `BUG-260905-01`:\nthe composer's cloud door used to call the LIBRARY's single-file import, so a file picked\nmid-chat was written permanently into the Library root. The bytes now land in\n``workspace_files`` under the same 24h TTL read gate as a local attach, and both composer\ndoors mean the same thing \u2014 *this conversation* (D-244-05).\n\n\u2b50 It lives HERE, not in ``connectors.py``, and the placement is the guarantee: this module\nimports neither ``import_single_file`` nor ``ingest_splice``, so *\"the chat writes nothing\nto the KB\"* is structural rather than a promise a future edit can quietly break.\n\nThe provider's bytes are untrusted and go through the SAME ``_persist_workspace_upload``\nthe local door uses \u2014 ``validate_upload``'s magic-byte / container gate, the 10 MB cap and\nthe filename sanitiser. \u26d4 No second, laxer gate for \"our own\" cloud.",
+    "description": "Attach ONE connected-cloud file to THIS THREAD (Phase 244 / SHELL-04 / D-244-05).\n\n\u26d4 **THIS ROUTE MINTS NO ``documents`` ROW.** It is the un-inversion of `BUG-260905-01`:\nthe composer's cloud door used to call the LIBRARY's single-file import, so a file picked\nmid-chat was written permanently into the Library root. The bytes now land in\n``workspace_files`` as a thread-life row (``expires_at`` null \u2014 Phase 274, D-05), exactly\nlike a local composer attach: it lives as long as the conversation and is removed when the\nthread is deleted. Both composer doors mean the same thing \u2014 *this conversation*\n(D-244-05). The default upload route keeps the template TTL (D-21).\n\n\u2b50 It lives HERE, not in ``connectors.py``, and the placement is the guarantee: this module\nimports neither ``import_single_file`` nor ``ingest_splice``, so *\"the chat writes nothing\nto the KB\"* is structural rather than a promise a future edit can quietly break.\n\nThe provider's bytes are untrusted and go through the SAME ``_persist_workspace_upload``\nthe local door uses \u2014 ``validate_upload``'s magic-byte / container gate, the 10 MB cap and\nthe filename sanitiser. \u26d4 No second, laxer gate for \"our own\" cloud.",
     "operationId": "attach_connection_file_threads__thread_id__workspace_files_from_connection_post",
     "security": [
      {

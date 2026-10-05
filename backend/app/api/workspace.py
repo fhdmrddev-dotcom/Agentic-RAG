@@ -12,6 +12,7 @@ import logging
 import re
 import zipfile
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
@@ -271,17 +272,27 @@ async def upload_template(
     thread_id: str,
     request: Request,
     file: UploadFile = File(...),
+    lifetime: Literal["template", "thread"] = Query(
+        "template",
+        description=(
+            "How long the uploaded file lives. `thread` (the chat composer) keeps it for as long "
+            "as the conversation exists (`expires_at` null); `template` (the default — the panel "
+            "and workflow-launch uploads) expires after the configured template TTL."
+        ),
+    ),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Upload an ephemeral .docx/.pptx/.xlsx template (TMPL-01, D-12/D-05).
+    """Upload a file into this thread's workspace (TMPL-01, D-12; Phase 274 ATT-01).
 
-    The single net-new workspace WRITE endpoint. Validates OOXML by magic bytes
-    (D-12), reads the TTL from app_settings (D-05), and persists via write_file
-    with kind='template_input' + expires_at = now + TTL. Bad files -> 422 at the
-    door (nothing persisted); a thread the user does not own -> 404 (RLS half of
-    SC#1 via _verify_thread_ownership). No SSE emit — the handler has no run
-    context; the panel reconciles by upserting the returned row (Plan 100-06).
+    Validates the file by magic bytes (D-12) and persists it via write_file with
+    kind='template_input'. The `lifetime` query parameter decides how long it lives:
+    the chat composer sends `lifetime=thread`, which writes a thread-life row
+    (`expires_at` null — it lives as long as the conversation and is removed when the
+    thread is deleted); an upload with no `lifetime` keeps the template TTL from
+    app_settings (expires_at = now + TTL), unchanged for the panel and workflow-launch
+    uploads. Bad files -> 422 at the door (nothing persisted); a thread the user does
+    not own -> 404. No SSE emit — the panel reconciles by upserting the returned row.
     """
     await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
     # WR-04 (100-REVIEW): reject by the parser-declared part size BEFORE
@@ -297,6 +308,10 @@ async def upload_template(
         supabase=supabase,
         filename=file.filename or "",
         raw=raw,
+        # ⛔ `==`, never a bare pass-through: a direct caller that omits `lifetime` receives
+        # FastAPI's `Query(...)` object, and anything that is not exactly "thread" must fail
+        # CLOSED to the template TTL (Phase 274, D-21).
+        lifetime="thread" if lifetime == "thread" else "template",
     )
 
 
@@ -308,6 +323,7 @@ async def _persist_workspace_upload(
     supabase: Client,
     filename: str,
     raw: bytes,
+    lifetime: Literal["template", "thread"],
 ) -> dict:
     """The ONE writer of an ephemeral ``kind='template_input'`` workspace file.
 
@@ -317,14 +333,22 @@ async def _persist_workspace_upload(
     laxer gate; there is one, and both routes call it. Behaviour is byte-identical to the
     Phase-100 inline version — the caller still owns the pre-read ``file.size`` short-circuit,
     because only a multipart part declares a size before it is materialised (WR-04).
+
+    ⭐ Phase 274 (ATT-01 / D-05, D-06): ``lifetime`` is REQUIRED, so every caller chooses. A
+    ``thread`` row writes ``expires_at = NULL`` — every read gate already admits NULL, and the
+    template sweeper and the run pin both require ``expires_at IS NOT NULL``, so the row is never
+    swept or pinned and lives until thread delete removes it (D-08). ``kind`` stays
+    ``template_input`` on both arms: the agent allow-list and the chip test ONE string.
     """
     if len(raw) == 0:
         raise HTTPException(422, "File is empty")
     if len(raw) > MAX_FILE_SIZE:
         raise HTTPException(422, "File too large. Maximum size is 10 MB.")
     ext = validate_upload(filename, raw)  # D-12/D-09 magic-byte + content gate
-    ttl_hours = (await load_app_settings_async()).template_ttl_hours  # D-05
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
+    expires_at: datetime | None = None  # D-05: thread-life
+    if lifetime == "template":
+        ttl_hours = (await load_app_settings_async()).template_ttl_hours  # D-05
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
     # WR-05 (100-REVIEW): sanitize the ORIGINAL filename to validate_path's charset
     # (^/[a-zA-Z0-9._/\- ]+$, no '..') so ordinary names — "Q3 Report (final).docx",
     # "P&L 2026.xlsx", "Übersicht.docx", "report..v2.docx" — don't surface a
@@ -355,7 +379,8 @@ async def _persist_workspace_upload(
     except WorkspaceError as e:
         raise HTTPException(422, str(e))
     result["kind"] = "template_input"
-    result["expires_at"] = expires_at.isoformat()
+    # The key is ALWAYS present — `null` is the thread-life answer, never an omission.
+    result["expires_at"] = expires_at.isoformat() if expires_at else None
     return result
 
 
@@ -373,8 +398,10 @@ async def attach_connection_file(
     ⛔ **THIS ROUTE MINTS NO ``documents`` ROW.** It is the un-inversion of `BUG-260905-01`:
     the composer's cloud door used to call the LIBRARY's single-file import, so a file picked
     mid-chat was written permanently into the Library root. The bytes now land in
-    ``workspace_files`` under the same 24h TTL read gate as a local attach, and both composer
-    doors mean the same thing — *this conversation* (D-244-05).
+    ``workspace_files`` as a thread-life row (``expires_at`` null — Phase 274, D-05), exactly
+    like a local composer attach: it lives as long as the conversation and is removed when the
+    thread is deleted. Both composer doors mean the same thing — *this conversation*
+    (D-244-05). The default upload route keeps the template TTL (D-21).
 
     ⭐ It lives HERE, not in ``connectors.py``, and the placement is the guarantee: this module
     imports neither ``import_single_file`` nor ``ingest_splice``, so *"the chat writes nothing
@@ -448,6 +475,7 @@ async def attach_connection_file(
         supabase=supabase,
         filename=filename,
         raw=raw,
+        lifetime="thread",  # D-05: the composer is this route's only caller
     )
 
 
