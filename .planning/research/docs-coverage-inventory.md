@@ -42,7 +42,7 @@ Nav rail on `develop` (7): Chat · Workflows (`workflow_authoring`) · Library �
 | A4 | Maintenance banner | `App.tsx` reads public `/health` | shipped | user | `administer/control-room/kill-switches` |
 | A5 | Chat: thread list, composer, model picker, tool cards, run status strip, thinking block | view `chat` | shipped | user | `use/chat` |
 | A6 | Chat modes: Deep (agent) vs Workflow (harness) pill | `models/thread.py:433` `mode: deep\|harness` | shipped | user | `use/chat-modes` |
-| A7 | Chat attachments: upload plus connected-file picker | `ChatAttachmentChip`, `ConnectedFilePickerModal` | shipped (thread-scoped attachments = v4.5 Phase 274, not built) | user | `use/attachments` |
+| A7 | Chat attachments: upload plus connected-file picker | `ChatAttachmentChip`, `ConnectedFilePickerModal` | shipped (thread-scoped attachments + Save to Library shipped in v4.5 Phase 274) | user | `use/attachments` |
 | A8 | Chat scope: folder scope chip, scope-effect note | `ChatArea.tsx`, `/threads/{id}/scope-effect` | shipped | user | `use/chat-scope` |
 | A9 | Thread handoff (summarise into a new thread) | `POST /threads/{id}/handoff` | shipped | user | `use/chat` |
 | A10 | Workspace panel: Files, Todos, Tasks/phase timeline, ask-user card, diffs, template upload | `components/panel/*` | shipped | user | `use/workspace-panel` |
