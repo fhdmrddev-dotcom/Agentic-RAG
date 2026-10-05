@@ -3642,7 +3642,10 @@ CREATE TABLE public.workspace_files (
     expires_at timestamp with time zone,
     run_claim text,
     org_id uuid NOT NULL,
+    library_document_id uuid,
+    library_link text,
     CONSTRAINT workspace_files_kind_check CHECK (((kind IS NULL) OR (kind = ANY (ARRAY['template_input'::text, 'agent'::text])))),
+    CONSTRAINT workspace_files_library_link_check CHECK (((library_link IS NULL) OR (library_link = ANY (ARRAY['saved'::text, 'already'::text])))),
     CONSTRAINT workspace_files_path_length CHECK ((char_length(path) <= 500)),
     CONSTRAINT workspace_files_size_limit CHECK ((size_bytes <= 10485760))
 );
@@ -3659,7 +3662,7 @@ COMMENT ON COLUMN public.workspace_files.kind IS 'Phase 100 TMPL-01. NULL/''agen
 -- Name: COLUMN workspace_files.expires_at; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.workspace_files.expires_at IS 'Phase 100 TMPL-01. NULL = never expires (agent files). Non-NULL = read-path filter excludes the row once now() passes it (D-06); the lifespan sweep GCs row + Storage bytes (D-07); kickoff run-pin extends it to cover the run (D-09).';
+COMMENT ON COLUMN public.workspace_files.expires_at IS 'Phase 100 TMPL-01; Phase 274 D-05/D-06. NULL = lives with the thread (agent files, and chat attachments from Phase 274 on — removed with their bytes when the thread is deleted). Non-NULL = TTL (workflow template inputs): the read-path filter excludes the row once now() passes it, the lifespan sweep GCs row + Storage bytes, and the kickoff run-pin extends it.';
 
 
 --
@@ -3674,6 +3677,20 @@ COMMENT ON COLUMN public.workspace_files.run_claim IS 'Phase 141 (COLL-02). Run-
 --
 
 COMMENT ON COLUMN public.workspace_files.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
+-- Name: COLUMN workspace_files.library_document_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.library_document_id IS 'Phase 274 (ATT-03 / D-28). The Library document this chat attachment was saved as, or the identical document that already existed. ON DELETE SET NULL: a promoted document stays deletable, and the attachment then reads "not in the Library".';
+
+
+--
+-- Name: COLUMN workspace_files.library_link; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.library_link IS 'Phase 274 (ATT-03 / D-28). saved = this attachment was saved to the Library; already = an identical document already existed. Meaningful ONLY when library_document_id is non-null (no pairing CHECK: SET NULL nulls only the FK column).';
 
 
 --
@@ -5333,6 +5350,13 @@ CREATE INDEX idx_workspace_files_expires_at ON public.workspace_files USING btre
 
 
 --
+-- Name: idx_workspace_files_library_document_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_files_library_document_id ON public.workspace_files USING btree (library_document_id) WHERE (library_document_id IS NOT NULL);
+
+
+--
 -- Name: idx_workspace_files_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6888,6 +6912,14 @@ ALTER TABLE ONLY public.workflow_schedules
 
 ALTER TABLE ONLY public.workspace_file_versions
     ADD CONSTRAINT workspace_file_versions_workspace_file_id_fkey FOREIGN KEY (workspace_file_id) REFERENCES public.workspace_files(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workspace_files workspace_files_library_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_files
+    ADD CONSTRAINT workspace_files_library_document_id_fkey FOREIGN KEY (library_document_id) REFERENCES public.documents(id) ON DELETE SET NULL;
 
 
 --
