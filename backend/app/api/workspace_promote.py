@@ -19,7 +19,11 @@ and the service role appears only inside the shared `_enqueue_or_splice`, after 
 **The rules the minter already decides, and this door does not re-decide:**
 - *Rights* — whoever can upload into the folder through the Library can promote into it. The
   minter's `404 Folder not found` / `403 Cannot upload to a folder you do not own` reach the caller
-  verbatim. This module never reads `folders` (D-12).
+  verbatim. ~~This module never reads `folders` (D-12).~~ ⚠ **AMENDED by D-29 (274 review CR-01):**
+  the minter's folder check compares `user_id` only, and this door stamps the ACTIVE org on the
+  document. So the module reads the folder ONCE, for its `org_id`, through the person's own
+  user-JWT client, and refuses a folder in another org with its own 403 (`REFUSE_OTHER_ORG`)
+  before anything is hashed or minted. Ownership stays the minter's answer.
 - *Duplicates* (D-13) — the same bytes already completed in this person's Library (in this org) are
   LINKED, not copied: 200 `already`, naming the EXISTING copy's folder even when it differs from the
   one picked.
@@ -91,6 +95,11 @@ router = APIRouter(
 
 #: The only `kind` a person can save (D-09). `agent` rows are the agent's own deliverables.
 _ATTACHMENT_KIND = "template_input"
+
+#: D-29 — this door's own folder refusal, in the minter's sentence shape. A folder the person
+#: owns in ANOTHER org would otherwise pass the minter's owner-only check and receive a document
+#: stamped with the active org (and an org-shared one would show it to the wrong org).
+REFUSE_OTHER_ORG = "Cannot upload to a folder in another organization"
 
 #: The prefix `workspace.py` stamps on a stored upload: `/{uuid4().hex[:8]}-{safe_name}`.
 #: ⛔ Lowercase only, exactly eight — the stamp is `uuid4().hex`, which never emits uppercase, so an
@@ -243,6 +252,21 @@ async def _attachment_bytes(request: Request, current_user: dict, supabase: Clie
             raise _not_found()
 
 
+async def _refuse_folder_outside_org(supabase: Client, folder_id: str, active_org: str) -> None:
+    """D-29 (amends D-12) — refuse a folder that belongs to another org, before any byte is read.
+
+    Read through the person's own user-JWT client (RLS). A folder RLS does not return is left to
+    the minter, whose `404 Folder not found` stays the answer; only a VISIBLE folder whose org
+    differs from the active one is refused here.
+    """
+    found = await aexec(
+        supabase.table("folders").select("id, org_id").eq("id", folder_id).maybe_single()
+    )
+    folder = found.data if found is not None else None
+    if folder and folder.get("org_id") and str(folder["org_id"]) != str(active_org):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=REFUSE_OTHER_ORG)
+
+
 async def _existing_link(supabase: Client, thread_id: str, fid: UUID) -> PromoteResult | None:
     """An attachment already promoted returns that link instead of minting again (T-274-16).
 
@@ -310,12 +334,15 @@ async def promote_attachment(
     200 `already` — the same bytes were already in the Library; linked, nothing copied. The
     `folder_id` is the EXISTING copy's (D-13). Also 200 when this attachment was promoted before.
     404 `Thread not found` / `File not found`; the minter's `Folder not found` (404) and
-    `Cannot upload to a folder you do not own` (403) verbatim; 422 for a type the Library refuses.
+    `Cannot upload to a folder you do not own` (403) verbatim; 403 `Cannot upload to a folder in
+    another organization` for a folder outside the active org (D-29); 422 for a type the Library
+    refuses.
 
     The attachment itself stays in the thread, unchanged (D-11).
     """
     await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
     fid, row = await _reachable_attachment(request, current_user, thread_id, file_id)
+    await _refuse_folder_outside_org(supabase, str(body.folder_id), str(active_org))  # D-29
 
     linked = await _existing_link(supabase, thread_id, fid)
     if linked is not None:
@@ -330,8 +357,8 @@ async def promote_attachment(
 
     raw = await _attachment_bytes(request, current_user, supabase, row)
 
-    # ⛔ No folder pre-check: the minter's folder-owner refusal is the authority (D-12), and its
-    #    HTTPException reaches the caller untouched.
+    # ⛔ No folder OWNER pre-check: the minter's folder-owner refusal is the authority (D-12), and
+    #    its HTTPException reaches the caller untouched. Only the ORG was checked above (D-29).
     mint = await ingest_splice.async_mint_document_row(
         raw=raw,
         filename=filename,
@@ -416,9 +443,11 @@ async def promote_preview(
     supabase: Client = Depends(get_user_supabase_client),
 ) -> PromotePreview:
     """What saving this attachment into `folder_id` would do — refused, already there, or which
-    version (D-14). Read-only and advisory: the POST's answer is the one rendered as a result."""
+    version (D-14). Read-only and advisory: the POST's answer is the one rendered as a result.
+    A folder outside the active org is the POST's own 403 here too (D-29)."""
     await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
     _fid, row = await _reachable_attachment(request, current_user, thread_id, file_id)
+    await _refuse_folder_outside_org(supabase, str(folder_id), str(active_org))  # D-29
 
     filename = library_filename(row["path"])
     ok, refusal = promotability(filename, row.get("mime_type"))
