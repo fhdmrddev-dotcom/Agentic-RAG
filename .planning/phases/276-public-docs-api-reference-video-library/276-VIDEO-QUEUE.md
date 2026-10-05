@@ -10,8 +10,9 @@ Written 2026-10-04 so any session can finish pending video work. Notebook: **"Sy
 | Documentary ep. 1 (cinematic) `9b0b14b0-…` "Syrel Chapter 1: The Friction of Progress" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep1-a-document-chat-you-can-trust.mp4` |
 | Documentary eps. 2–5 (cinematic) | ⛔ first attempt FAILED (all 4, 2026-10-04 06:48 UTC, no media, no quota used) | Re-creating strictly one at a time — see protocol below. |
 | Ep. 2 `6f07613e-f8ad-4602-8109-a377ce73ee40` "Syrel: Anatomy of an Agent (The Architecture of Persistence)" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep2-an-agent-that-keeps-working.mp4` |
-| Ep. 3 `070798c0-c57d-479e-b189-a73df2ad1678` | ⏳ queued 2026-10-04 11:31 UTC (clean create, ghosts deleted first) | download + poster + BrandedEpisode when completed |
-| Eps. 4–5 | ⏳ NOT YET CREATED | ep. 4 at the next rolling reset (16:24 UTC), ep. 5 the window after — one per window |
+| Ep. 3 `070798c0-c57d-479e-b189-a73df2ad1678` "Syrel Chapter 3: The Human Layer" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep3-workflows-anyone-can-author.mp4`; poster `posters/build-story-ep3-poster.png` (30%, not hand-picked); BrandedEpisode render OWED |
+| Ep. 4 `94dc500b-89ab-4db6-9c8c-0b150456e458` | ⏳ queued 2026-10-05 03:17 UTC (clean create) | download + poster + brand when completed |
+| Ep. 5 | ⏳ NOT YET CREATED | create only after ep. 4 completes AND `usage_get` rolling ≈ 0% |
 
 **ROOT CAUSE (measured 2026-10-04 08:20 UTC):** one cinematic video consumes ~50% of the **rolling** usage window (ep. 2 alone → 54%). Any cinematic create while the rolling window is ~50%+ used is rate-limited — even with nothing running — and leaves 4 ghosts. **Rule: one documentary per rolling window.** Check `usage_get` → create only when the rolling window is near 0% (it resets every ~5 h). Ghosts from the 08:19 attempt: `e0f44cd0`, `07ab8351`, `f0854e85`, `ec2d7657` (operator previously approved deleting ghosts; delete them before the next create). Next window reset: 2026-10-04 11:24 UTC.
 
