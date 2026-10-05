@@ -52,7 +52,9 @@ export function AttachmentRowTrailing({ threadId, file }: AttachmentRowTrailingP
 
   if (isThreadLifeAttachment(file)) {
     return (
-      <span className="flex flex-shrink-0 items-center gap-1.5">
+      // Stacked (sketch A's two-line meta): on one line, scope + mark + size + age measured the
+      // 345px panel row's file name at 0px wide (G-4 #3 F-1).
+      <span className="flex flex-shrink-0 flex-col items-end gap-0.5">
         <span className="flex-none text-[10px] text-panel-muted-foreground">{COPY.engine.CHIP_SCOPE}</span>
         {action}
       </span>

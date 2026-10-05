@@ -80,6 +80,7 @@ import type { WorkspaceFile } from "@/types"
 import { FilePreview } from "./FilePreview"
 import { TemplateUpload } from "./TemplateUpload"
 import { AttachmentRowTrailing, requestAttachmentMenu } from "@/components/attachments/AttachmentRowTrailing"
+import { attachmentDisplayName, isThreadLifeAttachment } from "@/lib/attachmentLifetime"
 
 /**
  * ⚠ PHASE 199 PLAN 07 (sheet `c8-run-panel`) — THE HONESTY FIX, AND ITS THREE
@@ -301,7 +302,9 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
               key={key}
               asChild
               density="panel"
-              name={file.path}
+              // 274 G-4 #3 F-1: a chat attachment is named by the chip's ONE display rule (no
+              // `<8hex>-` upload prefix); every other row keeps its path.
+              name={isThreadLifeAttachment(file) ? attachmentDisplayName(file) : file.path}
               // ⚠ Load-bearing: without it the mime-first branches disappear and
               // an extensionless file falls to the default glyph.
               mimeType={file.mime_type}
