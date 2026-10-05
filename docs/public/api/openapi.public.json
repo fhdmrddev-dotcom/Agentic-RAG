@@ -4755,6 +4755,189 @@
         }
       }
     },
+    "/threads/{thread_id}/workspace/files/{file_id}/promote": {
+      "post": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Promote Attachment",
+        "operationId": "promote_attachment_threads__thread_id__workspace_files__file_id__promote_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Thread Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromoteResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/threads/{thread_id}/workspace/files/{file_id}/promote-preview": {
+      "get": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Promote Preview",
+        "description": "Read-only and advisory: the POST's answer is the one rendered as a result.",
+        "operationId": "promote_preview_threads__thread_id__workspace_files__file_id__promote_preview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Thread Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          },
+          {
+            "name": "folder_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The Library folder the person is considering.",
+              "title": "Folder Id"
+            },
+            "description": "The Library folder the person is considering."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromotePreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/threads/{thread_id}/workspace/library-links": {
+      "get": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "List Library Links",
+        "description": "Without migration 203's columns every `link` is null — never a 500.",
+        "operationId": "list_library_links_threads__thread_id__workspace_library_links_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryLinksResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/threads/{thread_id}/todos": {
       "get": {
         "tags": [
@@ -12255,6 +12438,36 @@
         ],
         "title": "AssetRef"
       },
+      "AttachmentLibraryState": {
+        "properties": {
+          "workspace_file_id": {
+            "type": "string",
+            "title": "Workspace File Id"
+          },
+          "promotable": {
+            "type": "boolean",
+            "title": "Promotable"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LibraryLinkInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_file_id",
+          "promotable",
+          "link"
+        ],
+        "title": "AttachmentLibraryState",
+        "description": "One thread attachment: can it be saved, and where is it already."
+      },
       "AuthorModelRegistryResponse": {
         "properties": {
           "models": {
@@ -14370,6 +14583,31 @@
         "title": "DraftRow",
         "description": "Same binding typing rule as ``DraftCreateResponse.token``: ``str``, never ``datetime``, never parsed.\n\nTyped ``str`` for the same Pydantic-drops-the-fraction reason recorded on ``DraftCreateResponse.token`` (:184-188), serialized via ``.isoformat()`` in the builder.\n\nBecause ``token`` is OPAQUE BY CONTRACT and parsing it is forbidden: Postgres keeps microseconds, a JS ``Date`` keeps milliseconds, and a parsed-and-re-rendered token matches ZERO rows — every later save then refuses as stale (probed live 2026-08-01). One field the server compares byte-for-byte; one the client may format. Never collapse them.\n\n⚠ THERE ARE NOW **THREE** TIME-SHAPED FIELDS ON THIS ROW AND THEY ARE THREE DIFFERENT FACTS. ``token`` is ``to_char(updated_at …)`` — opaque, never parsed. ``updated_at`` is when the DRAFT was last edited. ``last_run_at`` is when it was last RUN, from ``workflow_runs``, and a draft genuinely can have runs — the publish gauntlet's golden run is one. Collapsing any pair of these is a lie in a different direction each time.\n\n**What it is:** whether ANY run of this definition exists, by ANYBODY. A ROW-LEVEL fact, mirroring ``PublishedWorkflow`` field-for-field so the library speaks ONE language across its three shelves.\n\n⚠ **What it is NOT:** it is not ``last_run_at`` / ``last_run_status``, which are OWNER-SCOPED and answer *did MY last run of this work?*. ``has_any_run=true`` with ``last_run_at=null`` means *somebody ran it, and it was not you*.\n\n⚠ **On THIS shelf the two agree today, and that is precisely why the field is still projected here rather than \"only where it can differ\".** A draft is owner-scoped, so the caller IS the only person with runs of it — but \"the two agree\" is an UNSTATED invariant that nothing enforces, and a shelf that omitted the key would be claiming the opposite of what ``PublishedWorkflow`` says about the same concept.\n\n⚠ **The ``response_model`` trap applies verbatim** — ``response_model=list[DraftRow]`` drops undeclared keys silently, so this model and the builder move together."
       },
+      "DuplicateOf": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "folder_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "folder_id"
+        ],
+        "title": "DuplicateOf"
+      },
       "ExpertBundleCreate": {
         "properties": {
           "name": {
@@ -16328,6 +16566,67 @@
         ],
         "title": "InputFieldSpec"
       },
+      "LibraryLinkInfo": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "saved",
+              "already"
+            ],
+            "title": "Outcome"
+          },
+          "folder_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Id"
+          },
+          "document_status": {
+            "type": "string",
+            "title": "Document Status"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "outcome",
+          "folder_id",
+          "document_status",
+          "filename"
+        ],
+        "title": "LibraryLinkInfo",
+        "description": "An attachment's `In Library` mark, built only from a document the person can still see."
+      },
+      "LibraryLinksResponse": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentLibraryState"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "LibraryLinksResponse"
+      },
       "LlmAgentPhaseConfig": {
         "properties": {
           "phase_type": {
@@ -17999,6 +18298,133 @@
           "fn"
         ],
         "title": "ProgrammaticPhaseConfig"
+      },
+      "PromotePreview": {
+        "properties": {
+          "promotable": {
+            "type": "boolean",
+            "title": "Promotable"
+          },
+          "refusal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refusal"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "duplicate_of": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DuplicateOf"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "promotable",
+          "refusal",
+          "filename",
+          "duplicate_of",
+          "next_version"
+        ],
+        "title": "PromotePreview",
+        "description": "- `duplicate_of` set — the same bytes are already in the Library; confirming links to that\n  copy. `next_version` then carries that copy's version number, exactly what the minter returns for a duplicate (`MintResult.version_number`), so the parity test can hold the two equal in every case. The dialog keys its warning on `duplicate_of`, never on this number.\n- otherwise `next_version` — the version the new document will be in the chosen folder.\n  `1` is a fresh document; anything above it is a new version of a same-named file THERE."
+      },
+      "PromoteRequest": {
+        "properties": {
+          "folder_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Folder Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "folder_id"
+        ],
+        "title": "PromoteRequest",
+        "description": "⛔ A FOLDER IS REQUIRED.\n\n⛔ `extra=\"forbid\"`: the body carries a folder and nothing else."
+      },
+      "PromoteResult": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "saved",
+              "already"
+            ],
+            "title": "Outcome"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "folder_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Id"
+          },
+          "document_status": {
+            "type": "string",
+            "title": "Document Status"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "version_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "document_id",
+          "folder_id",
+          "document_status",
+          "filename",
+          "version_number"
+        ],
+        "title": "PromoteResult",
+        "description": "POST .../promote — 201 with `saved`, 200 with `already`.\n\n⚠ On `already`, `folder_id` is the EXISTING document's folder, which may differ from the one picked."
       },
       "PromotionGate": {
         "properties": {
