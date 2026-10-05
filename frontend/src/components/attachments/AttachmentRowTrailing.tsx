@@ -44,26 +44,35 @@ export function AttachmentRowTrailing({ threadId, file }: AttachmentRowTrailingP
   // POST stamps the mark before it answers — so the next poll swapped the menu for the segment and
   // unmounted the dialog while it showed D-13's "already in <folder> / you picked <other>". Linked,
   // the menu offers `Open in Library` instead of the verb (WR-04's keyboard reach).
-  const action =
-    threadId && file.id ? (
-      <span className="flex min-w-0 items-center gap-1">
-        {state.link && (
-          // Sketch 274-A draws the panel's mark as the chip's segment: the leaf visible, the full path
-          // in the title (G-4 #3 F-1 — a visible full path squeezed the file name to zero width).
-          // WR-04: not a tab stop inside `role=option`.
-          <LibraryLinkSegment link={state.link} leaf={state.leaf} path={state.path} display="leaf" tabIndex={-1} />
-        )}
-        <AttachmentActionsMenu threadId={threadId} file={file} variant="panel" triggerTabIndex={-1} />
-      </span>
+  const live = Boolean(threadId && file.id)
+  const menu = live ? (
+    <AttachmentActionsMenu threadId={threadId as string} file={file} variant="panel" triggerTabIndex={-1} />
+  ) : null
+  const segment =
+    live && state.link ? (
+      // Sketch 274-A draws the panel's mark as the chip's segment: the leaf visible, the full path
+      // in the title (G-4 #3 F-1 — a visible full path squeezed the file name to zero width).
+      // WR-04: not a tab stop inside `role=option`.
+      <LibraryLinkSegment link={state.link} leaf={state.leaf} path={state.path} display="leaf" tabIndex={-1} />
     ) : null
+  const action = live ? (
+    <span className="flex min-w-0 items-center gap-1">
+      {segment}
+      {menu}
+    </span>
+  ) : null
 
   if (isThreadLifeAttachment(file)) {
     return (
       // Stacked (sketch A's two-line meta): on one line, scope + mark + size + age measured the
-      // 345px panel row's file name at 0px wide (G-4 #3 F-1).
+      // 345px panel row's file name at 0px wide (G-4 #3 F-1). The ⋯ rides the scope line and the
+      // mark has the second line to itself — beside the mark it took the name back to 34px.
       <span className="flex flex-shrink-0 flex-col items-end gap-0.5">
-        <span className="flex-none text-[10px] text-panel-muted-foreground">{COPY.engine.CHIP_SCOPE}</span>
-        {action}
+        <span className="flex flex-none items-center gap-1">
+          <span className="text-[10px] text-panel-muted-foreground">{COPY.engine.CHIP_SCOPE}</span>
+          {menu}
+        </span>
+        {segment && <span className="flex min-w-0 items-center">{segment}</span>}
       </span>
     )
   }
