@@ -91,7 +91,7 @@ export function useComposerAttachments(threadId?: string | null): ComposerAttach
         return
       }
       try {
-        land(await uploadWorkspaceTemplate(threadId, f))
+        land(await uploadWorkspaceTemplate(threadId, f, "thread"))
       } catch (e) {
         setRefusal({ fileName: f.name, message: e instanceof Error ? e.message : "Upload failed" })
       }
