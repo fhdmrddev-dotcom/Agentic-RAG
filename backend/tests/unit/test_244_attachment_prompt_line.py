@@ -116,9 +116,17 @@ def test_an_unknown_kind_is_not_announced_either():
     assert _build_attachment_note([{**_agent_row("/y.bin"), "kind": "some_future_kind"}]) == ""
 
 
-def test_the_note_says_the_files_expire():
+def test_the_note_says_the_files_stay_with_this_conversation():
+    """⚠ RETIRED DELIBERATELY AND REWRITTEN — D-26, Phase 274.
+
+    This case was `test_the_note_says_the_files_expire` and asserted `"expire" in note`. Phase 274
+    (ATT-01 / D-05) made a composer attachment live for the life of its thread (`expires_at`
+    NULL), so the sentence *"They expire"* became a false statement the model acts on. The
+    invariant is inverted on purpose, in the same commit as the literal it pins.
+    """
     note = _build_attachment_note([_row("/x-report.docx")])
-    assert "expire" in note.lower()
+    assert "stay with this conversation" in note
+    assert "They expire" not in note
 
 
 # ── 2. ZERO attachments ⇒ the empty string. S-2: empty renders nothing ────────
