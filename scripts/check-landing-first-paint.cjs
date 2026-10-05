@@ -38,7 +38,12 @@ function findRepoRoot() {
 }
 
 const LANDING_ENTRY = "index.html"
-/** Markers that must never appear in a landing first-paint chunk. */
+/**
+ * Markers that must never appear in a landing first-paint chunk. Matched CASE-INSENSITIVELY
+ * (276-REVIEW A-WR-03): ~~a case-sensitive `includes("minisearch")`~~ could never fire, because the
+ * built MiniSearch chunk carries `MiniSearch` and not the lowercase string. The self-test plants
+ * each library's real text, so a blind marker fails it instead of passing vacuously.
+ */
 const FORBIDDEN_MARKERS = ["@remotion", "acknowledgeRemotionLicense", "remotion.media", "scalar", "minisearch"]
 
 class HarnessError extends Error {}
@@ -78,9 +83,9 @@ function checkDist(distDir) {
       const abs = path.join(distDir, rel)
       if (!fs.existsSync(abs)) throw new HarnessError(`reachable chunk ${rel} is missing from ${distDir}`)
       visited.push(rel)
-      const text = fs.readFileSync(abs, "utf8")
+      const text = fs.readFileSync(abs, "utf8").toLowerCase()
       for (const marker of FORBIDDEN_MARKERS) {
-        if (text.includes(marker)) findings.push({ file: rel, marker })
+        if (text.includes(marker.toLowerCase())) findings.push({ file: rel, marker })
       }
     }
     for (const next of chunk.imports || []) queue.push(next) // imports only — never dynamicImports
@@ -140,6 +145,27 @@ function selfTest() {
       run(base("planted", planted, { ...cleanFiles, "assets/hoisted.js": "x={acknowledgeRemotionLicense:!0}" })),
       1,
     )
+    // 276-REVIEW A-WR-03: one planted first-paint chunk PER marker, each carrying the text the
+    // real built chunk carries (the MiniSearch dist ships `MiniSearch`, never `minisearch`), so a
+    // marker that cannot see its own library fails the self-test instead of passing vacuously.
+    const PLANTS = {
+      "@remotion": "import('@remotion/player')",
+      acknowledgeRemotionLicense: "x={acknowledgeRemotionLicense:!0}",
+      "remotion.media": "fetch('https://remotion.media/whoosh.wav')",
+      scalar: "class Q{static name='@scalar/api-reference'}",
+      MiniSearch: "class MiniSearch{constructor(e){this._options=e}}",
+    }
+    for (const [marker, text] of Object.entries(PLANTS)) {
+      const m = JSON.parse(JSON.stringify(cleanManifest))
+      m["index.html"].imports.push("_hoisted.js")
+      m["_hoisted.js"] = { file: "assets/hoisted.js" }
+      const slug = marker.replace(/[^a-z0-9]/gi, "_")
+      expect(
+        `planted reachable chunk carrying the ${marker} library text → 1`,
+        run(base(`plant-${slug}`, m, { ...cleanFiles, "assets/hoisted.js": text })),
+        1,
+      )
+    }
     expect("missing manifest → 2", run(inTmp("nothing-here")), 2)
     const noEntry = { "app.html": { file: "assets/app.js", isEntry: true } }
     expect("landing entry absent → 2", run(base("no-entry", noEntry, { "assets/app.js": "" })), 2)
