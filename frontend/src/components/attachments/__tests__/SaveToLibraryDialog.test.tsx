@@ -282,6 +282,69 @@ describe("SaveToLibraryDialog", () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
+  // 274 review WR-03 — a `saved` answer whose copy is NOT in the picked folder (an attachment already
+  // linked elsewhere, offered the verb from a stale store or a second tab) must state the
+  // difference, never close as if the file had just landed where the person pointed.
+  it("a saved answer naming ANOTHER folder → the already screen with the picked-elsewhere line, not a silent close", async () => {
+    const elsewhere = result({ outcome: "saved", folder_id: "f4", document_id: "doc-9" })
+    vi.mocked(promoteAttachment).mockResolvedValue(elsewhere)
+    const { onSaved, onClose } = renderDialog()
+    await pick("Suppliers › Meridian")
+    fireEvent.click(confirmButton())
+    expect(await screen.findByText(COPY.shared.alreadyTitle)).toBeTruthy()
+    expect(screen.getByText(COPY.shared.alreadyBody("Finance › Q4 2026 review"))).toBeTruthy()
+    expect(screen.getByText(COPY.shared.alreadyDiffFolder("Suppliers › Meridian"))).toBeTruthy()
+    expect(onSaved).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  // 274 review WR-07 — the lead line names the CAUSE: folder rights (403, or the minter's 404
+  // `Folder not found`) vs the file type (422) vs anything else. The server sentence stays verbatim.
+  it("a 422 type refusal → the TYPE lead, never the folder lead", async () => {
+    vi.mocked(promoteAttachment).mockRejectedValue(
+      new PromoteError(422, "Unsupported file type: application/json. Allowed: application/pdf."),
+    )
+    renderDialog()
+    await pick("Suppliers › Meridian")
+    fireEvent.click(confirmButton())
+    const alert = await screen.findByRole("alert")
+    expect(within(alert).getByText(COPY.netNew.typeRefused)).toBeTruthy()
+    expect(within(alert).queryByText(COPY.shared.refuseLead)).toBeNull()
+    expect(within(alert).getByText(/^Unsupported file type: /)).toBeTruthy()
+  })
+
+  it("a preview that says the type is refused → the TYPE lead too", async () => {
+    vi.mocked(getPromotePreview).mockResolvedValue(
+      preview({ promotable: false, refusal: "Unsupported file type: text/x-python.", next_version: null }),
+    )
+    renderDialog()
+    await pick("Suppliers › Meridian")
+    const alert = await screen.findByRole("alert")
+    expect(within(alert).getByText(COPY.netNew.typeRefused)).toBeTruthy()
+    expect(within(alert).queryByText(COPY.shared.refuseLead)).toBeNull()
+  })
+
+  it("the minter's 404 `Folder not found` → the FOLDER lead", async () => {
+    vi.mocked(promoteAttachment).mockRejectedValue(new PromoteError(404, COPY.engine.REFUSE_NO_FOLDER))
+    renderDialog()
+    await pick("Suppliers › Meridian")
+    fireEvent.click(confirmButton())
+    const alert = await screen.findByRole("alert")
+    expect(within(alert).getByText(COPY.shared.refuseLead)).toBeTruthy()
+    expect(within(alert).getByText(COPY.engine.REFUSE_NO_FOLDER)).toBeTruthy()
+  })
+
+  it("a 404 that is NOT the folder (the file is gone) → the save-failed lead, never the folder lead", async () => {
+    vi.mocked(promoteAttachment).mockRejectedValue(new PromoteError(404, "File not found"))
+    renderDialog()
+    await pick("Suppliers › Meridian")
+    fireEvent.click(confirmButton())
+    const alert = await screen.findByRole("alert")
+    expect(within(alert).getByText(COPY.netNew.saveFailed)).toBeTruthy()
+    expect(within(alert).queryByText(COPY.shared.refuseLead)).toBeNull()
+    expect(within(alert).getByText("File not found")).toBeTruthy()
+  })
+
   it("folders fail to load → the load-failed line in an alert, confirm disabled", async () => {
     vi.mocked(listFolders).mockRejectedValue(new Error("boom"))
     renderDialog()
