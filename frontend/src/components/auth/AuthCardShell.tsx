@@ -38,9 +38,10 @@ export function AuthCardShell({ title, subhead, children }: AuthCardShellProps) 
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="flex justify-center">
             {/* Phase 276 (D-14/D-21): the static Iris mark as an <img> (shared gradient ids).
-                276-06 (D-27): on the dark chip in both themes so it stays legible on light. */}
-            <span className="inline-grid place-items-center w-14 h-14 rounded-full bg-[#0A0E18] ring-1 ring-inset ring-black/10 dark:ring-white/10">
-              <img src="/brand/syrel-mark-iris.svg" className="w-[84%] h-[84%]" alt="Syrel" />
+                276-06 (D-27) chip superseded 2026-10-05: light theme uses syrel-mark-iris-light.svg. */}
+            <span className="inline-grid place-items-center w-14 h-14 rounded-full dark:bg-[#0A0E18] dark:ring-1 dark:ring-inset dark:ring-white/10">
+              <img src="/brand/syrel-mark-iris-light.svg" className="dark:hidden w-[84%] h-[84%]" alt="Syrel" />
+              <img src="/brand/syrel-mark-iris.svg" className="hidden dark:block w-[84%] h-[84%]" alt="Syrel" />
             </span>
           </div>
           <div>
