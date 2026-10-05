@@ -13,6 +13,8 @@
  *   - badges the UI-internal set "UI-internal: may change" (D-17: /knowledge-health/* stays,
  *     the app still calls it) and every V45_OPERATIONS entry "Not yet released";
  *   - groups every surviving tag under exactly one x-tagGroups group;
+ *   - scrubs docstrings (A-WR-02): an operation keeps summary + the first paragraph of its
+ *     description, and every description loses sentences naming internal references;
  *   - adds a reusable X-Org-Id header parameter;
  *   - prunes schemas no surviving path can reach (port of canvas_gate._collect_refs/_closure).
  *   - adds NO `servers` entry: every deployment has its own host, and the reference renders with
@@ -204,6 +206,94 @@ function closure(seed, definitions) {
   return found
 }
 
+// ── Description scrub (276-REVIEW A-WR-02) ─────────────────────────────────────
+// FastAPI fills `description` from the route docstring, and those docstrings are engineering
+// notes: threat/decision ids, bug ids, RLS / service-role mechanics, file paths. Everything here
+// is world-readable, so:
+//   - an OPERATION keeps its `summary` and only the FIRST PARAGRAPH of its description;
+//   - every description string (operations, parameters, responses, schemas, properties) then
+//     loses any sentence/line that names an internal reference;
+//   - an emptied description is deleted, never published as "".
+// The review's named set — threat/decision/review ids, bug and seed ids, phase numbers, RLS and
+// service-role mechanics, decision tags, Python file paths — plus the project's other id shapes
+// measured in the snapshot (requirement ids such as `ADMIN-04`, `PACK-09`, `D-LOCK-03`, `H-5`, and
+// planning words such as `Plan 05`, `Pitfall 1`, `LANDMINE 1`, `Measured 2026`). Standard names
+// that share the CAPS-digit shape (UTF-8, SHA-256, ISO-8601, ...) are excluded.
+const INTERNAL_REF = new RegExp(
+  [
+    String.raw`\b(?:T|D|WR|CR|IN)-\d`,
+    String.raw`BUG-\d`,
+    String.raw`SEED-\d`,
+    String.raw`Phase \d`,
+    String.raw`\bRLS\b`,
+    String.raw`[Ss]ervice[- _]role`,
+    String.raw`D-v\d`,
+    String.raw`\w+\.py\b`,
+    String.raw`\b(?!(?:UTF|SHA|ISO|AES|RFC|HTTP|TLS|IPV|MD)-)[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+[a-z]?\b`,
+    String.raw`\b(?:Plan|Pitfall|LANDMINE|Landmine|Wave|Pattern|Measured)[- ]\d`,
+  ].join("|"),
+)
+
+function firstParagraph(text) {
+  return String(text).replace(/\r\n/g, "\n").trim().split(/\n\s*\n/)[0]
+}
+
+const BLOCK_LINE = /^\s*(?:[-*+]\s|\d+[.)]\s|\||#|```)/
+
+/** Re-join hard-wrapped prose so a sentence is filtered whole, never cut at a line break. */
+function unwrap(paragraph) {
+  const out = []
+  for (const line of paragraph.split("\n")) {
+    if (out.length && line.trim() && !BLOCK_LINE.test(line) && !BLOCK_LINE.test(out[out.length - 1])) {
+      out[out.length - 1] = `${out[out.length - 1].trimEnd()} ${line.trim()}`
+    } else {
+      out.push(line)
+    }
+  }
+  return out
+}
+
+function scrubInternal(text) {
+  const paragraphs = String(text).replace(/\r\n/g, "\n").trim().split(/\n\s*\n/)
+  const keptParas = []
+  for (const para of paragraphs) {
+    const kept = []
+    for (const line of unwrap(para)) {
+      if (!INTERNAL_REF.test(line)) {
+        kept.push(line)
+        continue
+      }
+      const sentences = line.split(/(?<=[.!?])\s+/).filter((s) => !INTERNAL_REF.test(s))
+      if (sentences.length) kept.push(sentences.join(" "))
+    }
+    const joined = kept.join("\n").trim()
+    if (joined) keptParas.push(joined)
+  }
+  return keptParas.join("\n\n")
+}
+
+function setOrDelete(obj, key, value) {
+  if (value) obj[key] = value
+  else delete obj[key]
+}
+
+/** Scrub every string `description` under `node` (objects named "description" are left alone). */
+function scrubDescriptions(node) {
+  if (Array.isArray(node)) {
+    for (const item of node) scrubDescriptions(item)
+  } else if (node && typeof node === "object") {
+    for (const [k, v] of Object.entries(node)) {
+      if (k === "description" && typeof v === "string") setOrDelete(node, k, scrubInternal(v))
+      else scrubDescriptions(v)
+    }
+  }
+}
+
+function scrubOperation(op) {
+  if (typeof op.description === "string") setOrDelete(op, "description", firstParagraph(op.description))
+  scrubDescriptions(op)
+}
+
 function prefixDescription(op, note) {
   op.description = op.description ? `${note}\n\n${op.description}` : note
 }
@@ -228,6 +318,7 @@ function buildPublicSpec(snapshot, opts = {}) {
       const op = item[method]
       if (!op) continue
       if (!Array.isArray(op.tags) || op.tags.length === 0) op.tags = [SYSTEM_TAG]
+      scrubOperation(op) // A-WR-02 — before the badge notes are prefixed
       const badges = []
       if (isFlagged(p)) {
         badges.push({ ...BADGE_INTERNAL })
@@ -270,6 +361,7 @@ function buildPublicSpec(snapshot, opts = {}) {
   const keep = closure(seed, definitions)
   const schemas = {}
   for (const [name, def] of Object.entries(definitions)) if (keep.has(name)) schemas[name] = def
+  scrubDescriptions(schemas) // A-WR-02 — schema/property docstrings are engineering notes too
 
   const components = { ...(src.components || {}), schemas }
   components.parameters = { ...(components.parameters || {}), XOrgId: X_ORG_ID_PARAM }
@@ -355,6 +447,8 @@ function main(argv) {
 
 module.exports = {
   buildPublicSpec,
+  INTERNAL_REF,
+  scrubInternal,
   releasedVersion,
   serialize,
   V45_OPERATIONS,

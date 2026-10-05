@@ -213,6 +213,46 @@ describe("public Syrel API spec (DOCS-03)", () => {
     expect(pub.servers).toBeUndefined()
   })
 
+  it("publishes no internal references in any description (A-WR-02)", () => {
+    // The review's named patterns, written out here independently of the script's own regex.
+    const NAMED = /\b(T|D|WR|CR|IN)-\d|BUG-\d|SEED-\d|Phase \d|RLS|service[- ]role|D-v\d|\w+\.py/
+    const descriptions: Array<{ where: string; text: string }> = []
+    const walk = (node: any, where: string) => {
+      if (Array.isArray(node)) node.forEach((n, i) => walk(n, `${where}[${i}]`))
+      else if (node && typeof node === "object") {
+        for (const [k, v] of Object.entries<any>(node)) {
+          if (k === "description" && typeof v === "string") descriptions.push({ where, text: v })
+          else walk(v, `${where}.${k}`)
+        }
+      }
+    }
+    walk(pub.paths, "paths")
+    walk(pub.components.schemas, "schemas")
+    expect(descriptions.length).toBeGreaterThan(100) // non-vacuity: descriptions still ship
+    const leaks = descriptions.filter((d) => NAMED.test(d.text) || lib.INTERNAL_REF.test(d.text))
+    expect(leaks.map((l) => `${l.where}: ${l.text.slice(0, 80)}`)).toEqual([])
+    // every published op still names itself
+    for (const o of ops(pub)) expect(o.op.summary, `${o.method} ${o.path}`).toBeTruthy()
+    // non-vacuity: the SNAPSHOT does carry such notes, so the scrub removed something real
+    const snapText = nodeFs.readFileSync(SNAPSHOT, "utf-8")
+    expect(snapText).toMatch(/T-071-04-01/)
+  })
+
+  it("scrubs only the offending sentence, keeps the first paragraph of an op description", () => {
+    expect(
+      lib.scrubInternal(
+        "Re-extract a document. Owner-only RLS check — 404 on miss\n(T-071-04-01 mitigation). Returns 202.",
+      ),
+    ).toBe("Re-extract a document. Returns 202.")
+    const snap = readJson(SNAPSHOT)
+    const p = Object.keys(snap.paths).find((k) => !k.startsWith("/admin"))!
+    const m = METHODS.find((x) => snap.paths[p][x])!
+    snap.paths[p][m].description = "Public first line.\n\nSecond paragraph never ships (see api.py)."
+    const { doc } = lib.buildPublicSpec(snap, { historyDir: HISTORY })
+    expect(doc.paths[p][m].description).toContain("Public first line.")
+    expect(doc.paths[p][m].description).not.toContain("Second paragraph")
+  })
+
   it("carries nothing secret-shaped", () => {
     const text = nodeFs.readFileSync(PUBLIC, "utf-8")
     expect(text).not.toMatch(/(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{8,}/)
