@@ -19,13 +19,29 @@ vi.mock("@/lib/supabase", () => ({
   supabase: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) } },
 }))
 vi.mock("@/components/panel/panelOpenSignal", () => ({ requestOpenPanel: vi.fn() }))
-vi.mock("@/lib/citationNav", () => ({ useCitationNavOptional: vi.fn(() => null) }))
+const nav = vi.hoisted(() => ({ current: null as null | { openDocument: (id: string) => void } }))
+vi.mock("@/lib/citationNav", () => ({ useCitationNavOptional: vi.fn(() => nav.current) }))
 const linkState = vi.fn()
 vi.mock("../useLibraryLinks", () => ({
   useLibraryLinks: () => ({ stateFor: (id: string | undefined) => linkState(id) }),
   refreshLibraryLinks: vi.fn(),
 }))
-vi.mock("../SaveToLibraryDialog", () => ({ SaveToLibraryDialog: () => null }))
+// A recording stand-in for the ONE dialog: whether it is open, and whether it was ever unmounted.
+const dialog = vi.hoisted(() => ({ unmounts: 0 }))
+vi.mock("../SaveToLibraryDialog", async () => {
+  const React = await import("react")
+  return {
+    SaveToLibraryDialog: ({ open }: { open: boolean }) => {
+      React.useEffect(
+        () => () => {
+          dialog.unmounts++
+        },
+        [],
+      )
+      return open ? React.createElement("div", { "data-testid": "save-dialog-open" }) : null
+    },
+  }
+})
 
 // eslint-disable-next-line import/first
 import { AttachmentRowTrailing } from "../AttachmentRowTrailing"
@@ -50,9 +66,27 @@ function more(container: HTMLElement) {
   return container.querySelectorAll<HTMLButtonElement>(`button[aria-label="${COPY.a.moreLabel}"]`)
 }
 
+/** WR-04's net-new menu word (`COPY.netNew.openInLibrary`), spelled out so a rename goes red here. */
+const OPEN_IN_LIBRARY = "Open in Library"
+
+const LINKED = {
+  promotable: true,
+  link: {
+    document_id: "doc-1",
+    outcome: "saved" as const,
+    folder_id: "s3",
+    document_status: "processing" as const,
+    filename: "Meridian-Q4-pricing.xlsx",
+  },
+  leaf: "Pricing",
+  path: "Suppliers › Meridian › Pricing",
+}
+
 describe("AttachmentRowTrailing — the panel row's trailing slot", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    nav.current = null
+    dialog.unmounts = 0
     linkState.mockReturnValue({ promotable: true, link: null, leaf: null, path: null })
   })
 
@@ -70,19 +104,12 @@ describe("AttachmentRowTrailing — the panel row's trailing slot", () => {
   // wrapped, inherited the row's 13px type and squeezed the FILE NAME to zero width. Sketch 274-A
   // draws the panel's mark as the chip's segment — the LEAF visible, the full path in the title.
   // The original assertion (full path VISIBLE on the row) is retired deliberately for that reason.
-  it("thread-life, linked → the LEAF is visible (sketch A), the full path is in the title, compact, the name keeps its room, no ⋯", () => {
-    linkState.mockReturnValue({
-      promotable: true,
-      link: {
-        document_id: "doc-1",
-        outcome: "saved",
-        folder_id: "s3",
-        document_status: "processing",
-        filename: "Meridian-Q4-pricing.xlsx",
-      },
-      leaf: "Pricing",
-      path: "Suppliers › Meridian › Pricing",
-    })
+  // ⚠ AMENDED by 274 review WR-05: this case read "… no ⋯". On the panel the ⋯ (and so the ONE
+  // dialog it owns) now stays mounted when the row is linked, because unmounting it on the swap
+  // threw away D-13's "already in <folder> / you picked <other>" screen on the next poll. The
+  // assertion at the end is changed deliberately from `toHaveLength(0)` to one non-tab-stop ⋯.
+  it("thread-life, linked → the LEAF is visible (sketch A), the full path is in the title, compact, the name keeps its room, the ⋯ stays (not a tab stop)", () => {
+    linkState.mockReturnValue(LINKED)
     const { container } = render(<AttachmentRowTrailing threadId="t-1" file={file()} />)
     const seg = screen.getByTestId("library-link-segment")
     expect(seg.textContent).toContain(`${COPY.shared.inLibrary} · Pricing`)
@@ -99,7 +126,9 @@ describe("AttachmentRowTrailing — the panel row's trailing slot", () => {
     // its room.
     expect((container.firstElementChild as HTMLElement).className).toContain("flex-col")
     expect(container.textContent).toContain(COPY.engine.CHIP_SCOPE)
-    expect(more(container)).toHaveLength(0)
+    const triggers = more(container)
+    expect(triggers).toHaveLength(1)
+    expect(triggers[0].getAttribute("tabindex")).toBe("-1")
   })
 
   it("TTL row → the Template badge and countdown exactly as shipped, followed by the ⋯", () => {
@@ -134,6 +163,42 @@ describe("AttachmentRowTrailing — the panel row's trailing slot", () => {
     await userEvent.setup().click(more(container)[0])
     expect(onRowClick).not.toHaveBeenCalled()
     expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([COPY.netNew.saveVerbMenu])
+  })
+
+  // 274 review WR-05 — the Save dialog is owned by the ⋯. When the POST stamps the mark, the next
+  // poll swaps the row to its linked reading; that swap must not unmount the dialog showing the
+  // answer (D-13's difference is stated, never hidden).
+  it("the Save dialog survives the row turning linked mid-dialog (the next poll)", async () => {
+    const user = userEvent.setup()
+    const { container, rerender } = render(<AttachmentRowTrailing threadId="t-1" file={file()} />)
+    await user.click(more(container)[0])
+    await user.click(screen.getByRole("menuitem", { name: COPY.netNew.saveVerbMenu }))
+    expect(screen.getByTestId("save-dialog-open")).toBeTruthy()
+
+    linkState.mockReturnValue(LINKED)
+    rerender(<AttachmentRowTrailing threadId="t-1" file={file()} />)
+
+    expect(screen.getByTestId("library-link-segment")).toBeTruthy()
+    expect(screen.getByTestId("save-dialog-open")).toBeTruthy()
+    expect(dialog.unmounts).toBe(0)
+  })
+
+  // 274 review WR-04 — inside `role=option` the segment is NOT a tab stop (Tab leaves the list,
+  // arrows move within it); keyboard reach to the Library document is the row's ⋯ menu
+  // (Shift+F10), which offers it once the file is linked.
+  it("linked, with a document navigator → the segment is tabIndex -1 and the ⋯ menu opens the Library document", async () => {
+    const openDocument = vi.fn()
+    nav.current = { openDocument }
+    linkState.mockReturnValue(LINKED)
+    const user = userEvent.setup()
+    const { container } = render(<AttachmentRowTrailing threadId="t-1" file={file()} />)
+    const seg = screen.getByTestId("library-link-segment")
+    expect(seg.tagName).toBe("BUTTON")
+    expect(seg.getAttribute("tabindex")).toBe("-1")
+    await user.click(more(container)[0])
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([OPEN_IN_LIBRARY])
+    await user.click(screen.getByRole("menuitem", { name: OPEN_IN_LIBRARY }))
+    expect(openDocument).toHaveBeenCalledWith("doc-1")
   })
 
   it("no viewed thread → the scope word and no ⋯", () => {
