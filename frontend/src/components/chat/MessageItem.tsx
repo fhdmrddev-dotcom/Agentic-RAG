@@ -1,6 +1,10 @@
 import { memo, useState } from "react"
-import { Sparkles, Loader2, RotateCcw, User, Play, Ban } from "lucide-react"
+import { Loader2, RotateCcw, User, Play, Ban } from "lucide-react"
 import type { Message } from "@/types"
+// Phase 276-06 (D-24 / D-27): the Iris assistant avatar. The state is a plain expression over
+// the `message` prop + the lock this component already reads; no new hook, no new store read.
+import { IrisAvatar } from "./IrisAvatar"
+import { irisStateFor, hasPendingAsk } from "./irisState"
 import { Button } from "@/components/ui/button"
 // Phase 092 (CONT-01 / D-07): the inline Continue card reads the per-thread
 // workflow lock (carries capPaused + continuesRemaining) keyed by the OWNING
@@ -103,14 +107,8 @@ function seamKindFor(name: string): SeamKind | null {
   return null
 }
 
-/** A paused run is one with an ask_user tool still awaiting the user (D2). */
-function hasPendingAsk(toolCalls: ToolCall[] | undefined): boolean {
-  return (
-    toolCalls?.some(
-      (tc) => tc.name === "ask_user" && (tc.status === "running" || tc.status === "interrupted"),
-    ) ?? false
-  )
-}
+// `hasPendingAsk` (a paused run = an ask_user still awaiting the user, D2) MOVED to
+// `irisState.ts` at 276-06 so the avatar's precedence and this row's paused cue share ONE home.
 
 
 
@@ -460,6 +458,10 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   // (timed_out / stopped) still renders from the terminal block below; the
   // no-tools-yet thinking indicator renders from its own branch (both untouched).
   const isMessageStreaming = message.runStatus === "streaming"
+  // Phase 276-06 (D-24 / D-27): a plain expression, not a hook. The cap-pause belongs to the
+  // turn the Continue card renders on, so only the LAST assistant row reads it; earlier rows
+  // of a paused thread stay idle.
+  const irisState = irisStateFor(message, isLastAssistant ? workflowLock?.capPaused : false)
 
   return (
     <div
@@ -468,16 +470,16 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
       data-streaming={isStreaming ? "true" : "false"}
     >
       {/* Phase 068.5 (D-068.5-05..07 + L-068.5-04 + RESEARCH §Finding #8):
-          Pulse fires ONLY on runStatus === 'streaming' — the literal value
-          from the 5-value codebase enum (NOT 'running' or 'queued' which do
-          not exist). Resume button gate at lines 109-120 uses 'failed' ||
-          'timed_out'; mutual exclusivity is structural (enum is one value
-          at a time). Pattern S1 enum-conditional render. */}
-      <div
-        data-testid="assistant-bot-icon"
-        className={`flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center mt-0.5 shadow-sm shadow-primary/20${message.runStatus === "streaming" ? " animate-brandPulse" : ""}`}
-      >
-        <Sparkles className="w-4 h-4 text-white" />
+          ~~Pulse fires ONLY on runStatus === 'streaming'~~ — REVERSED at 276-06
+          (D-24 / D-27): the gradient glyph and its pulse are replaced by the
+          Iris avatar, driven by `irisStateFor` (irisState.ts, the one home of
+          the precedence order). It moves while the agent works (thinking /
+          tool / streaming), settles when idle or done, is still amber while
+          waiting on the user, grey with a red core on failed / timed_out, dim
+          on cancelled, and never moves under reduced motion. The test id and
+          the 5-value enum are unchanged. */}
+      <div data-testid="assistant-bot-icon" data-iris-state={irisState} className="flex-shrink-0 mt-0.5">
+        <IrisAvatar state={irisState} />
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
         {/* 075.6 Plan 03 / Req #8 — pinned ✦ Working badge at top of active
@@ -891,7 +893,9 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
         ) : isStreaming && !hasAnyTools ? (
           // No tools yet — first LLM call is thinking
           <span className="flex items-center gap-2 text-muted-foreground text-sm animate-fadeSlideUp">
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            {/* Phase 276-06 (D-27, sketch decision 5): the leading spinner and the trailing three
+                bouncing dots were removed — the Iris avatar's thinking state now carries the
+                motion. The activity words below stay (Phase 174 STATE-03). */}
             {/* Phase 174 / STATE-03: count already-stamped cross-provider reasoning
                 as activity so the pre-first-token window reads "Reasoning…" instead
                 of the dead "Setting up agent…". Scoped to the reasoning-before-any-
@@ -913,11 +917,6 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             ) : (
               <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, false, !message.content && !!message.reasoningContent)}</span>
             )}
-            <span className="flex gap-1 items-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
-            </span>
           </span>
         ) : message.runStatus === "cancelled" ? (
           // BUG-260710-02 (Phase 147 / D-03): cancelling BEFORE the first visible

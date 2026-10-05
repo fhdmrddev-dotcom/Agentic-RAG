@@ -493,25 +493,7 @@
   animation: pulseGlow 2s ease-in-out infinite;
 }
 
-/* Phase 068.5 (D-068.5-05..07): brand-mark breathing pulse for in-flight
-   assistant turns. Soft scale (1.0 → 1.05) + opacity (0.85 → 1.0) at 1.5s
-   ease-in-out. Sibling of pulseGlow above; Tailwind utility registered in
-   tailwind.config.js extend.animation. Applied to MessageItem Bot icon
-   when message.runStatus === 'streaming' (Pattern S1 + L-068.5-04). */
-@keyframes brandPulse {
-  0%, 100% {
-    transform: scale(1.0);
-    opacity: 0.85;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 1.0;
-  }
-}
-
-.animate-brandPulse {
-  animation: brandPulse 1.5s ease-in-out infinite;
-}
+/* Phase 276-06 (D-27): the Phase 068.5 "gentle" brand-pulse duplicate (1.0 → 1.05) that sat here was removed — the later definition below (scale 0.82, opacity 0.55) always won, so the live avatar had been shrinking and dimming (276-LOGO-INVENTORY §A). The avatar now uses the iris* keyframes at the end of this file. */
 
 .animate-shimmer {
   background: linear-gradient(
@@ -1100,5 +1082,67 @@
     transform: none !important;
     transition: none !important;
   }
+}
+
+/* ═════════ Phase 276-06 (D-24 / D-27) — the Iris assistant avatar ═════════
+   Ported from sketch 276-iris-avatar variant D "Orbit + wave" (the operator's pick); A, B and C
+   are not shipped. Attribute-driven selectors, not utilities, so this lives here and never in
+   tailwind.config.js. One <span class="iris chip"> per instance (IrisAvatar.tsx); gradient ids are
+   unique per instance. Motion = CSS keyframes on transform/opacity only. State colour = CSS vars on
+   stop-color/fill (transitioned), never an animated property. Settle = WAAPI from the captured pose.
+   The dark chip (#0A0E18) sits behind the mark in BOTH themes: on white the bare mark loses its
+   #F2F4FE core (276-LOGO-INVENTORY §B); in dark mode the chip is nearly invisible. */
+.iris {
+  --ia1: #D6D8FF; --ia2: #A3A5FF; --ia3: #6467F2; --ib1: #A3A5FF; --ib2: #3B3FD0; --icore: #F2F4FE;
+  --sz: 32px;
+  position: relative; flex: none; display: inline-grid; place-items: center;
+  width: var(--sz); height: var(--sz); border-radius: 50%; vertical-align: middle;
+}
+.iris.chip { background: #0A0E18; box-shadow: inset 0 0 0 1px hsl(222 47% 11% / .14), 0 1px 2px rgb(15 23 42 / .18); }
+.dark .iris.chip { box-shadow: inset 0 0 0 1px hsl(220 20% 20%); }
+.iris svg { width: 100%; height: 100%; display: block; overflow: visible; transition: opacity .5s; }
+.iris.chip svg { width: 84%; height: 84%; }
+.iris .sa1 { stop-color: var(--ia1); } .iris .sa2 { stop-color: var(--ia2); } .iris .sa3 { stop-color: var(--ia3); }
+.iris .sb1 { stop-color: var(--ib1); } .iris .sb2 { stop-color: var(--ib2); }
+.iris stop { transition: stop-color .5s ease; }
+.iris .core { fill: var(--icore); transition: fill .5s ease; }
+.iris .pt, .iris .spin, .iris .glow, .iris .core { transform-box: view-box; transform-origin: 32px 32px; }
+.iris .pt { opacity: .85; }
+.iris .glow { opacity: 0; }
+.iris[data-lit] .glow { opacity: .5; }                 /* reduced motion: working = lit core, no movement */
+.iris[data-tone="amber"] { --ia1: #FFE6B3; --ia2: #F7B645; --ia3: #D9890B; --ib1: #F7B645; --ib2: #A15C06; --icore: #FFF7E6; }
+.iris[data-tone="red"]   { --ia1: #CDD0DA; --ia2: #9AA0B4; --ia3: #6B7187; --ib1: #9AA0B4; --ib2: #4A5066; --icore: #F87171; }
+.iris[data-tone="dim"]   { --ia1: #CDD0DA; --ia2: #9AA0B4; --ia3: #6B7187; --ib1: #9AA0B4; --ib2: #4A5066; --icore: #C9CCD6; }
+.iris[data-tone="dim"] svg { opacity: .5; }
+
+/* Variant D — Orbit + Petal wave. Seamless-loop rules, measured in Chrome (sketch README):
+   1. The ring turns a FULL 360° in 4.8 s (= 3 wave periods). A 120° loop is the symmetry of the
+      gradients but NOT of the wave (each petal has its own phase), so a 120° wrap teleported the
+      lit petal ~115° once per cycle. At 360° every petal maps to itself.
+   2. The wave is a smooth bump on a flat floor (0/30/70/100% = floor, 50% = peak, sine easing), so
+      the wrap sits in the flat zone and no keyframe forces a mid-motion stop.
+   3. Per-petal offsets are NEGATIVE delays, evenly spaced by period/6: every petal is mid-cycle at t=0.
+   4. The light is an overlay layer (.wave/.wv) above the base petals. Its container fades in and out
+      by TRANSITION, so entering work and settling never pop, and the wave keeps running while it fades.
+   5. One playbackRate drives ring + wave + glow (IrisAvatar's ramp), so they stay phase-locked.
+   ⛔ The orbit period must stay an integer multiple of the wave period and the sweep must stay
+   360° — pinned by src/components/chat/__tests__/IrisAvatar.test.tsx, which reads this file. */
+.iris .base, .iris .wave { transition: opacity .45s cubic-bezier(.4,0,.2,1); }
+.iris .wave { opacity: 0; }
+.iris .wv { transform-box: view-box; transform-origin: 32px 32px; opacity: 0; }
+.iris[data-motion="work"] .wave { opacity: 1; }
+.iris[data-motion="work"] .base { opacity: .7; }
+.iris[data-motion="work"] .spin { animation: irisOrbitTurn 4.8s linear infinite; will-change: transform; }
+.iris:is([data-motion="work"], [data-motion="fade"]) .wv { animation: irisWaveBump 1.6s cubic-bezier(.37,0,.63,1) infinite; animation-delay: calc((var(--i) - 6) * 1.6s / 6); }
+.iris[data-motion="work"] .glow { animation: irisGlowSoft 1.6s cubic-bezier(.37,0,.63,1) infinite; }
+
+@keyframes irisGlowSoft { 0%,100% { opacity: .15; } 50% { opacity: .45; } }
+@keyframes irisOrbitTurn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes irisWaveBump  { 0%,30%,70%,100% { opacity: 0; transform: none; } 50% { opacity: .9; transform: translateY(-2.5px) scaleY(1.08); } }
+
+/* Reduced motion: the avatar never moves (IrisAvatar shows a lit core instead), and the
+   RunCard shimmer bar, never gated until 276-06, stops too (sketch README decision 5). */
+@media (prefers-reduced-motion: reduce) {
+  .iris *, .tool-progress-bar::after { animation: none !important; }
 }
 

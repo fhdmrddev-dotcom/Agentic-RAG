@@ -6,6 +6,7 @@ import { render, screen } from "@testing-library/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { MessageItem } from "@/components/chat/MessageItem"
 import type { Message } from "@/types"
+import { useStreamsStore } from "@/stores/streamsStore"
 
 const NOW = new Date().toISOString()
 
@@ -77,12 +78,13 @@ describe("MessageItem – assistant messages", () => {
   })
 
   it("shows the bot icon for assistant messages", () => {
-    const { container } = renderWithTooltip(
+    renderWithTooltip(
       <MessageItem message={makeMessage({ role: "assistant" })} />,
     )
-    // Bot icon parent has gradient-primary class after redesign
-    const botIconWrapper = container.querySelector(".gradient-primary")
-    expect(botIconWrapper).toBeInTheDocument()
+    // ~~Bot icon parent has gradient-primary class after redesign~~ — 276-06 (D-24/D-27):
+    // the assistant mark is the Iris avatar (`.iris`) inside the same test id.
+    const botIconWrapper = screen.getByTestId("assistant-bot-icon")
+    expect(botIconWrapper.querySelector(".iris")).toBeInTheDocument()
   })
 
   it("applies text foreground for assistant messages", () => {
@@ -131,80 +133,79 @@ describe("MessageItem – streaming state", () => {
 })
 
 // =============================================================================
-// Phase 068.5 — pulse class gating on runStatus (D-068.5-05..07 + L-068.5-04)
+// Phase 068.5 — ~~pulse class gating on runStatus~~ → Phase 276-06 (D-24 / D-27): the Iris
+// avatar's state, read from `data-iris-state` on the SAME binding test id.
 //
-// RESEARCH §Finding #8: the codebase enum is the 5-value
+// RESEARCH §Finding #8 still holds: the codebase enum is the 5-value
 // 'streaming' | 'completed' | 'failed' | 'cancelled' | 'timed_out'.
-// The pulse fires ONLY on 'streaming' — NEVER on 'running' or 'queued'
-// (those values do not exist in this enum).
-//
-// data-testid="assistant-bot-icon" is the binding gate marker — the Vitest
-// assertion reads the className from this element. Pulse on 'streaming'
-// and Resume button on terminal failure states ('failed' || 'timed_out')
-// are mutually exclusive (enum is one value at a time).
+// ~~The pulse fires ONLY on 'streaming'~~ — reversed at 276-06: the pulse is gone and the
+// Iris avatar is driven by `irisStateFor` (`irisState.ts`, the ONE home of the precedence
+// order). The seven cases are migrated IN PLACE (same subjects, same count); each also proves
+// the old gradient glyph is gone (no `.lucide-sparkles`). Tests 8-9 are new.
 // =============================================================================
-describe("Phase 068.5 — pulse class gating on runStatus", () => {
-  it("Test 1 — runStatus === 'streaming' applies animate-brandPulse to the Bot icon", () => {
+function irisAvatar(): HTMLElement {
+  const botIcon = screen.getByTestId("assistant-bot-icon")
+  expect(botIcon.querySelector(".iris")).not.toBeNull()
+  expect(botIcon.querySelector(".lucide-sparkles")).toBeNull()
+  return botIcon
+}
+
+describe("Phase 068.5 → 276-06 — the Iris avatar state on runStatus", () => {
+  it("Test 1 — runStatus === 'streaming' with content → data-iris-state=streaming", () => {
     renderWithTooltip(
       <MessageItem
         message={makeMessage({ role: "assistant", content: "Streaming reply…", runStatus: "streaming" })}
       />,
     )
-    const botIcon = screen.getByTestId("assistant-bot-icon")
-    expect(botIcon.className).toContain("animate-brandPulse")
+    expect(irisAvatar().getAttribute("data-iris-state")).toBe("streaming")
   })
 
-  it("Test 2 — runStatus === 'completed' does NOT apply animate-brandPulse", () => {
+  it("Test 2 — runStatus === 'completed' → idle", () => {
     renderWithTooltip(
       <MessageItem
         message={makeMessage({ role: "assistant", content: "Done.", runStatus: "completed" })}
       />,
     )
-    const botIcon = screen.getByTestId("assistant-bot-icon")
-    expect(botIcon.className).not.toContain("animate-brandPulse")
+    expect(irisAvatar().getAttribute("data-iris-state")).toBe("idle")
   })
 
-  it("Test 3 — runStatus === 'failed' does NOT apply animate-brandPulse", () => {
+  it("Test 3 — runStatus === 'failed' → error", () => {
     renderWithTooltip(
       <MessageItem
         message={makeMessage({ role: "assistant", content: "Oops.", runStatus: "failed" })}
       />,
     )
-    const botIcon = screen.getByTestId("assistant-bot-icon")
-    expect(botIcon.className).not.toContain("animate-brandPulse")
+    expect(irisAvatar().getAttribute("data-iris-state")).toBe("error")
   })
 
-  it("Test 4 — runStatus === 'cancelled' does NOT apply animate-brandPulse", () => {
+  it("Test 4 — runStatus === 'cancelled' → cancelled", () => {
     renderWithTooltip(
       <MessageItem
         message={makeMessage({ role: "assistant", content: "Stopped.", runStatus: "cancelled" })}
       />,
     )
-    const botIcon = screen.getByTestId("assistant-bot-icon")
-    expect(botIcon.className).not.toContain("animate-brandPulse")
+    expect(irisAvatar().getAttribute("data-iris-state")).toBe("cancelled")
   })
 
-  it("Test 5 — runStatus === 'timed_out' does NOT apply animate-brandPulse", () => {
+  it("Test 5 — runStatus === 'timed_out' → error", () => {
     renderWithTooltip(
       <MessageItem
         message={makeMessage({ role: "assistant", content: "Timed out.", runStatus: "timed_out" })}
       />,
     )
-    const botIcon = screen.getByTestId("assistant-bot-icon")
-    expect(botIcon.className).not.toContain("animate-brandPulse")
+    expect(irisAvatar().getAttribute("data-iris-state")).toBe("error")
   })
 
-  it("Test 6 — runStatus === undefined (DB-loaded historical message) does NOT apply animate-brandPulse", () => {
+  it("Test 6 — runStatus === undefined (DB-loaded historical message) → idle", () => {
     renderWithTooltip(
       <MessageItem
         message={makeMessage({ role: "assistant", content: "Old message." })}
       />,
     )
-    const botIcon = screen.getByTestId("assistant-bot-icon")
-    expect(botIcon.className).not.toContain("animate-brandPulse")
+    expect(irisAvatar().getAttribute("data-iris-state")).toBe("idle")
   })
 
-  it("Test 7 — mutual exclusivity: 'failed' shows Resume button AND no pulse (enum one-value-at-a-time)", () => {
+  it("Test 7 — mutual exclusivity: 'failed' shows Resume button AND the avatar is settled in error", () => {
     renderWithTooltip(
       <MessageItem
         message={makeMessage({ role: "assistant", content: "Failed run.", runStatus: "failed" })}
@@ -213,9 +214,52 @@ describe("Phase 068.5 — pulse class gating on runStatus", () => {
     )
     // Retry turn button is rendered for failed runs (BUG-260818-01 / L-068.5-04 / Phase 063/066 gate)
     expect(screen.getByRole("button", { name: /retry turn/i })).toBeInTheDocument()
-    // Pulse class is NOT applied (mutual exclusivity is structural)
-    const botIcon = screen.getByTestId("assistant-bot-icon")
-    expect(botIcon.className).not.toContain("animate-brandPulse")
+    // The avatar reads error and is at rest (mutual exclusivity is structural)
+    const avatar = irisAvatar()
+    expect(avatar.getAttribute("data-iris-state")).toBe("error")
+    expect(avatar.querySelector(".iris")!.getAttribute("data-motion")).toBe("rest")
+  })
+
+  it("Test 8 — pre-first-token: thinking; the spinner and three dots are gone, the activity words stay", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "", runStatus: "streaming" })}
+        isStreaming={true}
+      />,
+    )
+    expect(irisAvatar().getAttribute("data-iris-state")).toBe("thinking")
+    const row = screen.getByTestId("assistant-message")
+    expect(row.querySelector(".animate-dotBounce")).toBeNull()
+    expect(row.querySelector(".animate-spin")).toBeNull()
+    expect(screen.getByText("Setting up agent…")).toBeInTheDocument()
+  })
+
+  it("Test 9 — a cap-paused lock reads waiting on the LAST assistant row only; an earlier row stays idle", () => {
+    useStreamsStore.setState({
+      workflowLockByThread: new Map([
+        ["thread-1", { runId: "run-cap-1", mode: "cap_paused", capPaused: true, continuesRemaining: 2 }],
+      ]),
+    })
+    try {
+      const last = renderWithTooltip(
+        <MessageItem
+          message={makeMessage({ role: "assistant", content: "Partial.", runStatus: "completed" })}
+          isLastAssistant
+        />,
+      )
+      expect(irisAvatar().getAttribute("data-iris-state")).toBe("waiting")
+      last.unmount()
+
+      renderWithTooltip(
+        <MessageItem
+          message={makeMessage({ id: "msg-0", role: "assistant", content: "Earlier.", runStatus: "completed" })}
+          isLastAssistant={false}
+        />,
+      )
+      expect(irisAvatar().getAttribute("data-iris-state")).toBe("idle")
+    } finally {
+      useStreamsStore.setState({ workflowLockByThread: new Map() })
+    }
   })
 })
 

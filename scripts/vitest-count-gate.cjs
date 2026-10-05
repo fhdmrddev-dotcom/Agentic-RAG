@@ -3659,12 +3659,16 @@ const BASELINE = {
   "ChatAreaBanner.test.tsx": 9,
   "ChatAreaMode.test.tsx": 5,
   "RunCard.characterization.test.tsx": 8,
-  "MessageItem.test.tsx": 24,
+  "MessageItem.test.tsx": 26, // RAISED 24 → 26 at 276-06 (+Test 8 pre-token thinking, +Test 9 cap-pause on the last row)
   "MessageItem.clamp.test.tsx": 5,
   "MessageItem.fallbackNotice.test.tsx": 3,
   "MessageItem.memo.test.tsx": 3,
   "MessageItem.sticky.test.tsx": 4,
   "RunCard.logo.test.tsx": 6,
+  // Phase 276-06 (D-24/D-27) — the Iris avatar: the precedence table + the rendering contract
+  // and the index.css seamless-loop fence. Counts as the gate printed them (`— N new`).
+  "irisState.test.ts": 21,
+  "IrisAvatar.test.tsx": 28,
   "ToolCallPanel.test.tsx": 20, // RAISED 16 → 20 at 272-02 (D-08 filter line ×4)
   "MessageList.test.tsx": 30,
   "MessageList.dedup.test.tsx": 7,
@@ -4623,6 +4627,9 @@ const TARGETS = [
   "src/components/chat/__tests__/scopeCopy.test.ts",
   "src/components/chat/__tests__/ScopeChip.test.tsx",
   "src/components/chat/__tests__/ScopePicker.test.tsx",
+  // Phase 276-06 (D-24/D-27) — the Iris avatar. Named FILE-LEVEL (no bare src/components/chat entry), pinned in BASELINE beside MessageItem.test.tsx, same commit.
+  "src/components/chat/__tests__/irisState.test.ts",
+  "src/components/chat/__tests__/IrisAvatar.test.tsx",
   "src/components/chat/__tests__/ChatArea.scopeChange.test.tsx",
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,

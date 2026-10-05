@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { AlertTriangle, Lock } from "lucide-react"
+// Phase 276-06 (D-24 / D-27): the boot splash is the moving Iris (a real wait).
+import { IrisAvatar } from "./components/chat/IrisAvatar"
 import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
@@ -297,7 +299,11 @@ function App() {
   if (loading || setupStatus === null) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        {/* Phase 276-06: the Iris in its thinking state replaces the generic spin ring; under
+            reduced motion it is the static mark with the lit core. */}
+        <div role="status" aria-label="Loading Syrel">
+          <IrisAvatar state="thinking" size={56} />
+        </div>
       </div>
     )
   }

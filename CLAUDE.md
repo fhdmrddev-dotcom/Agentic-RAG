@@ -700,7 +700,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 77 / 35 / 1027 | ⚠ STALE (`75/34/1004`). **267-04**: ONE early return after the last hook; hooks unchanged |
+| `frontend/src/components/chat/MessageItem.tsx` | 79 / 37 / 1029 | **276-06**: Iris avatar = 1 element swap, no hook; pre-token spinner+dots gone |
 | `backend/app/api/threads.py` | 261 / 88 / 2434 | ⚠ STALE (`255/87/2156`). **268**: send resolves scoping ONCE + org stamps; +1 folder arm, 1 scope writer, 1 route. ⛔ 0 new send-path branches |
 | `frontend/src/providers/StreamsProvider.tsx` | 104 / 38 / 4948 | ⚠ row STALE an 8th time (`102/37/4880`). NOT modified by 253 — re-derived under CR-08. ⛔ `onTurnBoundary` FLUSHES before moving, or a turn's tail leaks into the next body |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
@@ -742,11 +742,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/runs.py` | 41 / 19 / 1750 | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches |
 | `backend/app/services/harness_engine.py` | 60 / 23 / 3297 | ⚠ STALE (`58/21/3290`). **268-REVIEW WR-06**: the resume shell carries its run's org — the org read MOVED above the INSERT, one kwarg |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE (`4/1/313`) and it does NOT fire yet — 2 phases, not 1. NOT modified by 253. ⛔ the ONE renderer of the model's process prose, now from TWO sources |
-| `frontend/src/components/chat/RunCard.tsx` | 29 / 14 / 723 | ⭐ G-5 DISCHARGED (243-02). ⚠ row STALE at `28/14/710`. **BUG-260912-01**: its state-2 guard asked `!reasoningContent` ALONE and shipped a VISIBLE mid-stream double once the fold gained a 2nd input |
+| `frontend/src/components/chat/RunCard.tsx` | 31 / 16 / 729 | **276-06**: provider logo static, header spinner gone (D-27). ⛔ Bot stays the unknown-provider fallback |
 | `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE (`38/19/977`). **268-03**: +2 optional ReactNode slots; hooks unchanged. ⛔ 0 new top-level controls |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26) |
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE (`23/10/366`). **267-04**: the turn index skips system rows; no prop added |
-| `frontend/src/components/chat/ChatArea.tsx` | 87 / 41 / 1106 | ⚠ STALE (`79/40/970`). **268-03**: ONE scope PATCH home + 1 read; header pill removed; useState 5→7. ⛔ no scope branch in send |
+| `frontend/src/components/chat/ChatArea.tsx` | 91 / 42 / 1171 | **276-06**: hero tile → static Iris (`idle`): 1 import + 1 swap, hooks unchanged. ⛔ no scope branch in send |
 | `frontend/src/stores/streamsStore.ts` | 22 / 14 / 572 | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253. **244-15**: ONE action type + ONE bare no-op stub; ⛔ `void`, never `Promise<void>` |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string; a literal copied elsewhere makes its pin vacuous |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 15 / 8 / 836 | ⚠ row was STALE at `14/7/765`; G-5 FIRES at 8 phases. honoured by construction (**244-15**): ONE optional prop, ONE composed callback in the STACK, `useState` 9→9 — no new state on a 3-home shell |
@@ -829,8 +829,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/verdictModel.ts` | 6 / 3 / 355 | ⚠ absent for its ENTIRE LIFE |
 | `frontend/src/components/library/IngestionTab.tsx` | 17 / 6 / 512 | ⚠ row was STALE at `13 / 4 / 456` |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
-| `frontend/src/components/layout/NavPanel.tsx` | 25 / 14 / 416 (was `24 / 13 / 417`) | ⚠ STALE (`24/13/417`). **276-01** (D-14): Sparkles tile → Iris mark `<img>`, asset swap only. 244-14's `overflow-x-hidden` stands |
-| `frontend/src/App.tsx` | 35 / 26 / 412 (was `34 / 25 / 410`) | ⚠ STALE (`33/24/378`). **271-02**: the `classification-rules` member REMOVED with its ChatLayout branch and rail entry in ONE commit; reachability fence green |
+| `frontend/src/components/layout/NavPanel.tsx` | 26 / 14 / 420 (was `25 / 14 / 416`) | **276-01**: Iris mark `<img>`; **276-06** (D-27): on the dark chip, classes only. 244-14's `overflow-x-hidden` stands |
+| `frontend/src/App.tsx` | 36 / 27 / 418 (was `35 / 26 / 412`) | **276-06**: boot splash spin ring → moving Iris (`thinking`) in a `role=status`; no hook. Reachability fence green |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 4 / 3 / 249 (was `2 / 1 / 204`) | now FIRES (3 phases). **271-02**: optional `onOpenFilingRules`; link + pill in ONE right cluster, never a tab. 271-05 G4-3: Back returns to Ingestion |
 | `frontend/src/lib/nav-items.ts` | 12 / 8 / 153 (was `10 / 7 / 141`) | ⚠ STALE (`9/6/118`). **271-02**: the Classification entry REMOVED (7 entries); `Wand2` moved to the Filing rules link. 271-05 G4-3: the rail has none |

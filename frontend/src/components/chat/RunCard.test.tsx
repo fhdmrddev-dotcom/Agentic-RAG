@@ -11,7 +11,8 @@
  *   1. memo wrap — RunCard.tsx declares `export const RunCard = memo(function RunCard(...))`
  *   2. R-1 acceptance — renders `<div data-testid="run-card">` for tool-bearing turns
  *   3. R-5 partial — sticky-header element has classes `sticky top-0 z-10 backdrop-blur-md`
- *   4. Brand-pulse — avatar carries `animate-brandPulse` IFF runStatus === "streaming"
+ *   4. Brand-pulse — ~~avatar carries `animate-brandPulse` IFF runStatus === "streaming"~~
+ *      276-06 (D-27): the avatar NEVER pulses and the header spinner is gone (one live avatar)
  *   5. Timer — displays `{elapsed}.{tenths}s` in font-mono, recomputes during streaming
  *   6. Iteration counter — displays `Step {iterationCount + 1}` IFF iterationCount != null
  *   7. Active-glow — outer frame has border-primary/35 + shadow IFF streaming + hasTools
@@ -72,11 +73,15 @@ describe("RunCard", () => {
     expect(header!.className).toMatch(/backdrop-blur/)
   })
 
-  it("brand-pulse: avatar carries animate-brandPulse when runStatus === streaming", () => {
+  // ~~avatar carries animate-brandPulse when runStatus === streaming~~ — reversed at 276-06
+  // (D-27: one live avatar per turn). The gutter Iris moves; the provider logo is static and the
+  // header spinner is gone, while the shimmer bar keeps the sticky header visibly alive.
+  it("brand-pulse: while streaming the avatar is static, the header has no spinner, the shimmer bar stays", () => {
     render(<RunCard message={makeMessage({ runStatus: "streaming" })} isStreaming={true} />)
     const card = screen.getByTestId("run-card")
-    const html = card.outerHTML
-    expect(html).toMatch(/animate-brandPulse/)
+    expect(screen.getByTestId("run-card-avatar").className).not.toMatch(/animate-brandPulse/)
+    expect(card.querySelector("header .animate-spin")).toBeNull()
+    expect(card.querySelector(".tool-progress-bar")).not.toBeNull()
   })
 
   it("brand-pulse: avatar does NOT carry animate-brandPulse when terminal", () => {
