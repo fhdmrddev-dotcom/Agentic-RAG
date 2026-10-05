@@ -264,8 +264,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 274-02-PLAN.md — promote / promote-preview / library-links in their own module through the shipped minter (`version_scope=folder`, org-scoped, link-on-conflict), minter-parity proof, pinned minter set, OpenAPI + docs coverage
-- [ ] 274-04-PLAN.md — the ⋯ menu + In Library segment on the sent chip and the panel Files row, no 24h on chat attachments, corrected expired copy, composer no-Library-door fence
+- [x] 274-02-PLAN.md — promote / promote-preview / library-links in their own module through the shipped minter (`version_scope=folder`, org-scoped, link-on-conflict), minter-parity proof, pinned minter set, OpenAPI + docs coverage
+- [x] 274-04-PLAN.md — the ⋯ menu + In Library segment on the sent chip and the panel Files row, no 24h on chat attachments, corrected expired copy, composer no-Library-door fence
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
