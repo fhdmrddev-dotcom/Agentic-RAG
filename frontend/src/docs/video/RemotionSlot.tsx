@@ -9,6 +9,9 @@
 //   - The composition is wrapped in kit's SfxOn provider set to false: the SFX are hosted on
 //     remotion.media (a third party) and a reader's browser must never request them. The voiceover
 //     (/vo/*.wav, same origin) still plays — the overview and the clips are narrated.
+//   - No Google Fonts: this build defines `__VIDEO_WEB_PLAYBACK__` (vite.config.ts), so the
+//     compositions' theme skips @remotion/google-fonts and uses the page's own font stack — no
+//     fonts.gstatic.com request (276-REVIEW B-WR-05).
 //   - autoPlay is safe here because playback is user-initiated (the click that mounted us).
 //   - acknowledgeRemotionLicense: Remotion is free for companies of up to 3 people (D-05; see
 //     video/README.md for the recheck rule).

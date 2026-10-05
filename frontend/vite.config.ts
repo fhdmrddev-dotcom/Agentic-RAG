@@ -57,6 +57,12 @@ export default defineConfig(({ mode }) => {
     // Phase 276-07 — absolutise og:image / twitter:image from VITE_APP_URL's origin, else relative.
     brandMeta(env.VITE_APP_URL),
   ],
+  // 276-REVIEW B-WR-05 — this build is the WEB host of the Remotion compositions, so
+  // video/src/theme.ts skips @remotion/google-fonts (no fonts.gstatic.com request from web
+  // playback) and uses the page's own font stack. Remotion's bundler never defines it.
+  define: {
+    __VIDEO_WEB_PLAYBACK__: "true",
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

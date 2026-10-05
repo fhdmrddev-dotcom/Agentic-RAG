@@ -38,8 +38,8 @@ vi.mock("@remotion/player", () => {
 })
 
 // Fonts: the compositions call @remotion/google-fonts at import time (jsdom has no FontFace).
-vi.mock("@remotion/google-fonts/Manrope", () => ({ loadFont: () => ({ fontFamily: "Manrope" }) }))
-vi.mock("@remotion/google-fonts/Inter", () => ({ loadFont: () => ({ fontFamily: "Inter" }) }))
+vi.mock("@remotion/google-fonts/Manrope", () => ({ loadFont: vi.fn(() => ({ fontFamily: "Manrope" })) }))
+vi.mock("@remotion/google-fonts/Inter", () => ({ loadFont: vi.fn(() => ({ fontFamily: "Inter" })) }))
 
 // The compositions themselves are stubbed for the slot tests; each stub renders kit's REAL Sfx so
 // the web provider (SfxOn=false) is what keeps it from rendering. The duration test (last) drops
@@ -243,6 +243,19 @@ describe("VideoSlot — Remotion (276-05)", { timeout: 60000 }, () => {
       createElement(kit.SfxOn.Provider, { value: false }, createElement(kit.Sfx, { at: 0, src: kit.SFX.whoosh })),
     )
     expect(container.innerHTML).toBe("")
+  })
+
+  it("web playback never calls @remotion/google-fonts — no fonts.gstatic.com request (B-WR-05)", async () => {
+    // kit (imported above) pulls in theme.ts, so its module-level font decision has already run.
+    const theme = await import("@video/theme")
+    const manrope = await import("@remotion/google-fonts/Manrope")
+    const inter = await import("@remotion/google-fonts/Inter")
+    expect(theme.WEB_PLAYBACK).toBe(true) // vitest.config.ts defines the web-host flag
+    expect(manrope.loadFont).not.toHaveBeenCalled()
+    expect(inter.loadFont).not.toHaveBeenCalled()
+    // the page's own CSS stack, not a loaded family
+    expect(theme.display).toBe('"Manrope", "Inter", ui-sans-serif, system-ui, sans-serif')
+    expect(theme.body).toBe('"Inter", ui-sans-serif, system-ui, sans-serif')
   })
 
   it("every Remotion duration in VIDEOS equals its composition's own constant", async () => {

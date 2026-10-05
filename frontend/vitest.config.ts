@@ -5,6 +5,10 @@ import path from "path"
 
 export default defineConfig({
   plugins: [react(), Icons({ compiler: "jsx", jsx: "react" })],
+  // 276-REVIEW B-WR-05 — mirrors vite.config.ts: suites import the compositions as the web host does.
+  define: {
+    __VIDEO_WEB_PLAYBACK__: "true",
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/setupTests.ts"],

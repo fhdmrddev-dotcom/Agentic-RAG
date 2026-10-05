@@ -100,6 +100,11 @@ Rules for web playback (each one exists so a reader's browser stays same-origin 
   `<SfxOn.Provider value={false}>`, so nothing is fetched from `remotion.media`. Studio and renders
   keep the default (`true`) and are unchanged.
 - **Voice is same-origin.** The docs Vite plugin copies `public/vo/*.wav` to `/vo/` by allow-list.
+- **No Google Fonts request.** `src/theme.ts` calls `@remotion/google-fonts` only when the build-time
+  flag `__VIDEO_WEB_PLAYBACK__` is absent. `frontend/vite.config.ts` (and `vitest.config.ts`) define
+  it, so web playback uses the host page's own `"Manrope"` / `"Inter"` CSS stack and never requests
+  `fonts.gstatic.com`. Remotion's bundler (Studio and CLI renders) never defines it, so renders keep
+  loading the Google fonts (276-REVIEW B-WR-05).
 - **The landing promo is silent until asked.** It renders with `AudioOn` and `SfxOn` off and
   `musicSrc: null` (no `<Audio>` element at all); pressing **Unmute** switches `musicSrc` to
   `music/syrel-pulse.mp3`.
