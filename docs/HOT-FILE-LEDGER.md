@@ -10787,7 +10787,7 @@ cells rot within days.
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
-| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 79 / 37 / 1029 (was `78 / 36 / 1030`) | ⚠ **FIRES** | **276-06**: the Iris avatar = ONE element swap + one plain expression, no hook; pre-token spinner+dots gone; `hasPendingAsk` moved to irisState.ts |
+| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 80 / 37 / 1036 (was `79 / 37 / 1029`) | ⚠ **FIRES** | **276-REVIEW B-WR-01**: the avatar's cap-pause argument also requires a Continue left (`!continueExhausted && continuesRemaining > 0`). No hook, no store read |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 264 / 89 / 2456 (was `261 / 88 / 2434`) | ⚠ **FIRES** | **273-04**: ONE `attach_artifacts` call on GET /messages and ONE on /snapshot. ⛔ 0 new send-path branches |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 106 / 40 / 4982 (was `104 / 38 / 4948`) | ⚠ **FIRES** | **273-05**: ONE onArtifact handler (D-16) — append or replace-by-id, text untouched. ⛔ `onTurnBoundary` still FLUSHES before moving |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
@@ -18192,6 +18192,9 @@ Every triple below was re-derived with the CLAUDE.md recipe AFTER the phase's la
 ### `frontend/src/components/chat/MessageItem.tsx` — Phase 276
 
 **`79 / 37 / 1029`** at 276-06 (was `78 / 36 / 1030`). G-5: ⚠ **FIRES**, honoured by construction: one import pair, one element swap (`<IrisAvatar>` inside the unchanged `assistant-bot-icon` test id) and one plain expression `irisStateFor(message, isLastAssistant ? workflowLock?.capPaused : false)`; hook call sites 6 → 6, no new store read. `hasPendingAsk` moved to `irisState.ts` (one home). The pre-first-token spinner and three dots are gone; the activity words stay (Phase 174 STATE-03).
+
+
+**`80 / 37 / 1036`** after 276-REVIEW B-WR-01 (2026-10-05, counting its fix commit). One plain expression grows into a named `capPauseWaiting` const: the last row's cap pause reads as waiting only while a Continue is still possible (`!continueExhausted && workflowLock.continuesRemaining > 0`), so an exhausted pause (the card's no-action stop message) settles to idle. Hook call sites 6 → 6, no new store read; `continueExhausted` is the existing local state. The ask/approval live-gating itself lives in `irisState.ts`.
 
 ### `frontend/src/components/chat/StepRow.tsx` — Phase 273 close
 

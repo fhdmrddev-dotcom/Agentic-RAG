@@ -461,7 +461,14 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   // Phase 276-06 (D-24 / D-27): a plain expression, not a hook. The cap-pause belongs to the
   // turn the Continue card renders on, so only the LAST assistant row reads it; earlier rows
   // of a paused thread stay idle.
-  const irisState = irisStateFor(message, isLastAssistant ? workflowLock?.capPaused : false)
+  // 276-REVIEW B-WR-01: an EXHAUSTED cap pause (no Continue left — the card shows a stop
+  // message with no action) is not "waiting on you", so it passes false.
+  const capPauseWaiting =
+    isLastAssistant &&
+    !!workflowLock?.capPaused &&
+    !continueExhausted &&
+    workflowLock.continuesRemaining > 0
+  const irisState = irisStateFor(message, capPauseWaiting)
 
   return (
     <div

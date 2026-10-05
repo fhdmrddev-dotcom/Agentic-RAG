@@ -261,6 +261,40 @@ describe("Phase 068.5 → 276-06 — the Iris avatar state on runStatus", () => 
       useStreamsStore.setState({ workflowLockByThread: new Map() })
     }
   })
+
+  it("Test 10 — an EXHAUSTED cap pause (no Continue left) reads idle, not waiting (276-REVIEW B-WR-01)", () => {
+    useStreamsStore.setState({
+      workflowLockByThread: new Map([
+        ["thread-1", { runId: "run-cap-1", mode: "cap_paused", capPaused: true, continuesRemaining: 0 }],
+      ]),
+    })
+    try {
+      renderWithTooltip(
+        <MessageItem
+          message={makeMessage({ role: "assistant", content: "Partial.", runStatus: "completed" })}
+          isLastAssistant
+        />,
+      )
+      expect(irisAvatar().getAttribute("data-iris-state")).toBe("idle")
+    } finally {
+      useStreamsStore.setState({ workflowLockByThread: new Map() })
+    }
+  })
+
+  it("Test 11 — a finished row whose ask_user was left 'interrupted' by Stop settles to idle (276-REVIEW B-WR-01)", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({
+          role: "assistant",
+          content: "Stopped.",
+          runStatus: "completed",
+          tool_calls: [{ name: "ask_user", args: {}, status: "interrupted" }],
+        })}
+        isLastAssistant
+      />,
+    )
+    expect(irisAvatar().getAttribute("data-iris-state")).toBe("idle")
+  })
 })
 
 // =============================================================================

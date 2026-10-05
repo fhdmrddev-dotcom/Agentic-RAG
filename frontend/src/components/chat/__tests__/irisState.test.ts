@@ -42,10 +42,17 @@ const CASES: Array<[string, Message, boolean | undefined, IrisState]> = [
   ["timed_out → error", msg({ runStatus: "timed_out" }), undefined, "error"],
   ["cancelled + a pending ask_user → cancelled", msg({ runStatus: "cancelled", tool_calls: [tool("ask_user", "running")] }), undefined, "cancelled"],
   ["streaming + ask_user running → waiting (waiting beats tool)", msg({ runStatus: "streaming", tool_calls: [tool("ask_user", "running")] }), undefined, "waiting"],
-  ["completed + ask_user interrupted → waiting", msg({ runStatus: "completed", tool_calls: [tool("ask_user", "interrupted")] }), undefined, "waiting"],
+  // 276-REVIEW B-WR-01: ~~completed + ask_user interrupted → waiting~~ — Stop marks every running tool
+  // interrupted, ask_user included, so a finished row must settle; ask/approval wait only while live.
+  ["completed + ask_user interrupted → idle (a finished row settles)", msg({ runStatus: "completed", tool_calls: [tool("ask_user", "interrupted")] }), undefined, "idle"],
+  ["streaming + ask_user interrupted → waiting", msg({ runStatus: "streaming", tool_calls: [tool("ask_user", "interrupted")] }), undefined, "waiting"],
+  ["completed + an undecided approval → idle (decision not always written back)", msg({ runStatus: "completed", content: "done", toolApproval: approval() }), undefined, "idle"],
+  ["runStatus undefined + a running ask_user → idle (historic row)", msg({ tool_calls: [tool("ask_user", "running")] }), undefined, "idle"],
+  ["failed + capPaused → error (terminal states outrank the pause)", msg({ runStatus: "failed" }), true, "error"],
   ["streaming + an undecided tool approval → waiting", msg({ runStatus: "streaming", toolApproval: approval() }), undefined, "waiting"],
   ["streaming + an allowed approval, no content, no tools → thinking", msg({ runStatus: "streaming", toolApproval: approval("allow") }), undefined, "thinking"],
   ["completed + capPaused → waiting", msg({ runStatus: "completed", content: "partial" }), true, "waiting"],
+  ["completed + capPaused exhausted (caller passes false) → idle", msg({ runStatus: "completed", content: "partial" }), false, "idle"],
   ["completed + not capPaused → idle", msg({ runStatus: "completed", content: "done" }), false, "idle"],
   ["runStatus undefined → idle", msg({ content: "historic row" }), undefined, "idle"],
   ["streaming, no content, no tools → thinking", msg({ runStatus: "streaming" }), undefined, "thinking"],
