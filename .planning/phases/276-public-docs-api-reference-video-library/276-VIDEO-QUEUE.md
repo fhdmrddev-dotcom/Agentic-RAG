@@ -11,8 +11,10 @@ Written 2026-10-04 so any session can finish pending video work. Notebook: **"Sy
 | Documentary eps. 2–5 (cinematic) | ⛔ first attempt FAILED (all 4, 2026-10-04 06:48 UTC, no media, no quota used) | Re-creating strictly one at a time — see protocol below. |
 | Ep. 2 `6f07613e-f8ad-4602-8109-a377ce73ee40` "Syrel: Anatomy of an Agent (The Architecture of Persistence)" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep2-an-agent-that-keeps-working.mp4` |
 | Ep. 3 `070798c0-c57d-479e-b189-a73df2ad1678` "Syrel Chapter 3: The Human Layer" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep3-workflows-anyone-can-author.mp4`; poster `posters/build-story-ep3-poster.png` (30%, not hand-picked); BrandedEpisode render OWED |
-| Ep. 4 `94dc500b-89ab-4db6-9c8c-0b150456e458` | ⏳ queued 2026-10-05 03:17 UTC (clean create) | download + poster + brand when completed |
-| Ep. 5 | ⏳ NOT YET CREATED | create only after ep. 4 completes AND `usage_get` rolling ≈ 0% |
+| Ep. 4 `94dc500b-89ab-4db6-9c8c-0b150456e458` "Scaling the Boundaries: Orgs, Automations, and the Outside World" | ✅ done (5:22) | downloaded 2026-10-05 06:23 UTC to `~/Downloads/gemini-notebook/Syrel/build-story-ep4-organisations-and-connections.mp4` (+ copy in `video/public/notebooklm/`); poster `posters/build-story-ep4-poster.png` (45% — tables → emails sketch); BrandedEpisode render OWED |
+| Ep. 5 | ⏳ NOT YET CREATED | create only after ep. 4 completes AND `usage_get` rolling ≈ 0%. Checked 2026-10-05 06:23 UTC: rolling **67.6%** used → NOT created. Rolling window resets **2026-10-05 07:24 UTC**; weekly 22.3% used. |
+
+**Leftover failed artifacts (no media, no quota):** the four 2026-10-04 06:48 UTC failures `3e272465`, `9b81ef42`, `a833b0e8`, `fea6288e`. Delete them before the ep. 5 create (operator previously approved deleting ghosts).
 
 **ROOT CAUSE (measured 2026-10-04 08:20 UTC):** one cinematic video consumes ~50% of the **rolling** usage window (ep. 2 alone → 54%). Any cinematic create while the rolling window is ~50%+ used is rate-limited — even with nothing running — and leaves 4 ghosts. **Rule: one documentary per rolling window.** Check `usage_get` → create only when the rolling window is near 0% (it resets every ~5 h). Ghosts from the 08:19 attempt: `e0f44cd0`, `07ab8351`, `f0854e85`, `ec2d7657` (operator previously approved deleting ghosts; delete them before the next create). Next window reset: 2026-10-04 11:24 UTC.
 
@@ -37,6 +39,8 @@ Each focus prompt opens: `Documentary episode N of "Syrel: The Build Story" — 
 |---|---|---|
 | 1 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep1-poster.png` | 30% in — the sealed sandbox cube |
 | 2 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep2-poster.png` | 45% in — the 3D wall of agent cards |
+| 3 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep3-poster.png` | 30% in (not hand-picked) |
+| 4 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep4-poster.png` | 45% in — spreadsheets flowing into emails (18% had a clipped label; 30% was a plain diagram) |
 
 Candidates kept beside them (`epN-cand-18/30/45.png`). Style note: NotebookLM cinematic renders as **sketchbook / paper illustration**, not Syrel's dark UI — the BrandedEpisode intro/outro carries the brand.
 
