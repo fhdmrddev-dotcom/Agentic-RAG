@@ -60,17 +60,24 @@ export function MenuDrawer({ open, onClose, toggleRef, appUrl, demoUrl, top, sec
         (el): el is HTMLElement => !!el,
       )
       if (items.length === 0) return
-      const first = items[0]
-      const last = items[items.length - 1]
+      // 276-REVIEW A-WR-04: ~~intervene only at the first/last item~~ — the browser's default
+      // then moved focus from the toggle to the header CTA (outside the trap), so forward Tab
+      // looped toggle <-> header CTA and never reached the sheet. EVERY Tab is now managed over
+      // the item list, so focus can only ever land on the toggle or inside the sheet.
+      e.preventDefault()
       const active = document.activeElement as HTMLElement | null
-      const inside = active && (active === toggleRef.current || sheet.contains(active))
-      if (e.shiftKey && (active === first || !inside)) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && (active === last || !inside)) {
-        e.preventDefault()
-        first.focus()
+      const i = active ? items.indexOf(active) : -1
+      let next: number
+      if (i !== -1) {
+        next = e.shiftKey ? (i === 0 ? items.length - 1 : i - 1) : (i + 1) % items.length
+      } else if (active === sheet) {
+        // the sheet itself (focused on open, tabIndex=-1): forward to its first control,
+        // back to the toggle that sits before it
+        next = e.shiftKey ? 0 : Math.min(1, items.length - 1)
+      } else {
+        next = e.shiftKey ? items.length - 1 : 0
       }
+      items[next].focus()
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)

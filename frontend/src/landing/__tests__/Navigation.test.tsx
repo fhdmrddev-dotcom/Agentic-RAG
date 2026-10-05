@@ -54,6 +54,52 @@ describe("Navigation (shared landing + docs header)", () => {
     expect(document.body.style.overflow).toBe("")
   })
 
+  it("traps Tab and Shift+Tab inside the open drawer (toggle + sheet), never the header CTA (A-WR-04)", () => {
+    render(<Navigation />)
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }))
+    const dialog = screen.getByRole("dialog", { name: "Menu" })
+    const toggle = screen.getByRole("button", { name: "Close menu" })
+    const links = within(dialog).getAllByRole("link")
+    const firstLink = links[0]
+    const lastLink = links[links.length - 1]
+    const inTrap = () => document.activeElement === toggle || dialog.contains(document.activeElement)
+
+    // the sheet is focused on open; Shift+Tab from it goes back to the toggle
+    expect(document.activeElement).toBe(dialog)
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true })
+    expect(document.activeElement).toBe(toggle)
+
+    // forward Tab from the toggle lands INSIDE the dialog (it used to escape to the header CTA)
+    fireEvent.keyDown(document, { key: "Tab" })
+    expect(document.activeElement).toBe(firstLink)
+
+    // Tab from the last control wraps to the toggle; Shift+Tab from the toggle wraps to the last
+    lastLink.focus()
+    fireEvent.keyDown(document, { key: "Tab" })
+    expect(document.activeElement).toBe(toggle)
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true })
+    expect(document.activeElement).toBe(lastLink)
+
+    // focus parked OUTSIDE the trap (the header CTA) is pulled back in on the next Tab
+    const headerCta = within(screen.getByRole("navigation", { name: "Main navigation" })).getByRole("link", {
+      name: "Book a demo",
+    })
+    headerCta.focus()
+    fireEvent.keyDown(document, { key: "Tab" })
+    expect(inTrap()).toBe(true)
+
+    // a full forward cycle never leaves the trap
+    for (let n = 0; n < links.length + 2; n++) {
+      fireEvent.keyDown(document, { key: "Tab" })
+      expect(inTrap()).toBe(true)
+    }
+
+    // Escape closes and returns focus to the toggle
+    fireEvent.keyDown(document, { key: "Escape" })
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }))
+  })
+
   it("closes the drawer when a link inside it is chosen", () => {
     render(<Navigation />)
     fireEvent.click(screen.getByRole("button", { name: "Menu" }))
