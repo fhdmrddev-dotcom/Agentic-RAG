@@ -12,12 +12,14 @@ export interface NavigationProps {
   drawerTop?: ReactNode
   /** docs only — the section links listed in the drawer under "Sections" */
   drawerSections?: ReactNode
+  /** docs only — a class on the drawer sheet, which is portaled outside `.docs-root` (G4-1) */
+  drawerClassName?: string
 }
 
 const LINK_STYLE = { fontSize: 14, color: "hsl(220 16% 65%)", padding: "0 8px" } as const
 const CURRENT_STYLE = { ...LINK_STYLE, color: "hsl(226 60% 97%)", fontWeight: 600 } as const
 
-export function Navigation({ current, searchSlot, drawerTop, drawerSections }: NavigationProps = {}) {
+export function Navigation({ current, searchSlot, drawerTop, drawerSections, drawerClassName }: NavigationProps = {}) {
   const appUrl = (import.meta.env.VITE_APP_URL as string | undefined) || "/app"
   const demoUrl = (import.meta.env.VITE_DEMO_URL as string | undefined) || "#start"
   const [open, setOpen] = useState(false)
@@ -144,6 +146,7 @@ export function Navigation({ current, searchSlot, drawerTop, drawerSections }: N
         demoUrl={demoUrl}
         top={drawerTop}
         sections={drawerSections}
+        className={drawerClassName}
       />
     </header>
   )

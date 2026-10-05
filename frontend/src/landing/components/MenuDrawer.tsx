@@ -4,7 +4,14 @@
 //
 // A real modal: role="dialog" aria-modal, body scroll locked, focus trapped across the toggle
 // button + the sheet, Esc or choosing a link closes it, and focus returns to the toggle.
+//
+// 276 G4-1: the sheet is PORTALED to document.body. Rendered in place it sat inside the sticky
+// <header>, whose `backdrop-filter: blur(12px)` makes the header the containing block for fixed
+// descendants — so `.menu-drawer`'s `top: 64px; bottom: 0` resolved against the 65px header and
+// the open drawer measured 32px tall at a 390px viewport (landing and docs alike). React events
+// still bubble through the React tree, so the docs link interceptor keeps working.
 import { useEffect, useRef, type ReactNode, type RefObject } from "react"
+import { createPortal } from "react-dom"
 
 export interface MenuDrawerProps {
   open: boolean
@@ -16,6 +23,11 @@ export interface MenuDrawerProps {
   top?: ReactNode
   /** docs only — the docs section links */
   sections?: ReactNode
+  /**
+   * docs only — an extra class on the sheet. Portaled to <body>, the sheet sits outside
+   * `.docs-root`, so the docs scope its tokens and pinned type scale to this class too.
+   */
+  className?: string
 }
 
 const LINKS: { label: string; href: string }[] = [
@@ -30,7 +42,7 @@ const LINKS: { label: string; href: string }[] = [
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'
 
-export function MenuDrawer({ open, onClose, toggleRef, appUrl, demoUrl, top, sections }: MenuDrawerProps) {
+export function MenuDrawer({ open, onClose, toggleRef, appUrl, demoUrl, top, sections, className }: MenuDrawerProps) {
   const sheetRef = useRef<HTMLDivElement>(null)
 
   // Body scroll lock while open.
@@ -83,13 +95,13 @@ export function MenuDrawer({ open, onClose, toggleRef, appUrl, demoUrl, top, sec
     return () => document.removeEventListener("keydown", onKey)
   }, [open, onClose, toggleRef])
 
-  if (!open) return null
+  if (!open || typeof document === "undefined") return null
 
-  return (
+  return createPortal(
     <div
       ref={sheetRef}
       id="menu-drawer"
-      className="menu-drawer"
+      className={className ? `menu-drawer ${className}` : "menu-drawer"}
       role="dialog"
       aria-modal="true"
       aria-label="Menu"
@@ -118,6 +130,7 @@ export function MenuDrawer({ open, onClose, toggleRef, appUrl, demoUrl, top, sec
       <a className="btn btn-primary d-btn-block" href={demoUrl}>
         Book a demo
       </a>
-    </div>
+    </div>,
+    document.body,
   )
 }

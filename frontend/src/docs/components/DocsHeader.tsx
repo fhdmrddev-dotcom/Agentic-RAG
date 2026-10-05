@@ -59,6 +59,7 @@ export function DocsHeader({ isHome }: { isHome: boolean }) {
             </button>
           )
         }
+        drawerClassName="d-drawer"
         drawerTop={<SearchBox variant="drawer" />}
         drawerSections={sections.map((s) => (
           <a key={s.id} href={docsUrl(s.id)}>

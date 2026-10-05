@@ -9,7 +9,10 @@
  * ───────────────────────────────────────────────────────────────────────────── */
 @import "../landing/landing.css";
 
-.docs-root {
+/* 276 G4-1: the ≤720px menu drawer is portaled to <body> (out from under the header's
+ * backdrop-filter), so it leaves `.docs-root`. The docs tag it `.d-drawer`, and every rule it used
+ * to inherit from `.docs-root` (tokens, type, focus ring, reduced motion) names it too. */
+.docs-root, .d-drawer {
   --d-bg: hsl(216 45% 4%);
   --d-card: hsl(220 30% 7%);
   --d-raised: hsl(220 28% 10%);
@@ -23,27 +26,29 @@
   --d-violet-text: hsl(258 95% 84%);
   --d-amber: hsl(38 92% 60%);
   --d-green: hsl(152 60% 52%);
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
   font-size: 16px;
   line-height: 1.5;
   color: var(--d-fg);
   overflow-wrap: anywhere;
 }
+.docs-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 .docs-root main { flex: 1; min-width: 0; }
 
 /* ── Reused landing classes, pinned to the docs scale ── */
-.docs-root .btn { font-size: 14px; font-weight: 600; }
-.docs-root .btn-primary { font-size: 14px; font-weight: 600; }
-.docs-root .btn-outline { font-size: 14px; font-weight: 600; }
-.docs-root .eyebrow { font-size: 14px; font-weight: 600; margin: 0; }
+.docs-root .btn, .d-drawer .btn { font-size: 14px; font-weight: 600; }
+.docs-root .btn-primary, .d-drawer .btn-primary { font-size: 14px; font-weight: 600; }
+.docs-root .btn-outline, .d-drawer .btn-outline { font-size: 14px; font-weight: 600; }
+.docs-root .eyebrow, .d-drawer .eyebrow { font-size: 14px; font-weight: 600; margin: 0; }
 .docs-root .hl { font-family: "Manrope", "Inter", ui-sans-serif, system-ui, sans-serif; }
 .docs-root .mono, .docs-root .d-mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 14px; }
 .docs-root .grid3 { gap: 12px; }
 
 /* ── Focus + skip link ── */
-.docs-root :focus-visible { outline: 2px solid var(--d-primary); outline-offset: 2px; }
+.docs-root :focus-visible, .d-drawer :focus-visible { outline: 2px solid var(--d-primary); outline-offset: 2px; }
 .d-skip {
   position: absolute; left: 16px; top: -64px; z-index: 100;
   background: var(--d-raised); color: var(--d-fg); border: 1px solid var(--d-border);
@@ -394,7 +399,8 @@ a.d-card:hover, button.d-card:hover {
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
-  .docs-root *, .docs-root *::before, .docs-root *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  .docs-root *, .docs-root *::before, .docs-root *::after,
+  .d-drawer *, .d-drawer *::before, .d-drawer *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
   a.d-card:hover, button.d-card:hover { transform: none; }
   .d-video-poster:hover .d-play, .d-video-poster:focus-visible .d-play { transform: none; }
 }

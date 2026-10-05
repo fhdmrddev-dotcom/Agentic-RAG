@@ -100,6 +100,31 @@ describe("Navigation (shared landing + docs header)", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }))
   })
 
+  it("portals the open drawer to <body>, outside the backdrop-filtered <header> (G4-1)", () => {
+    // The sticky header's `backdrop-filter` makes it the containing block for fixed descendants,
+    // so a drawer rendered inside it resolved `bottom: 0` against the 65px header and measured
+    // 32px tall at 390px. jsdom cannot measure layout, so pin the DOM position that fixes it.
+    render(<Navigation drawerClassName="d-drawer" />)
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }))
+    const dialog = screen.getByRole("dialog", { name: "Menu" })
+    const header = document.querySelector("header")
+    expect(header).not.toBeNull()
+    expect(dialog.parentElement).toBe(document.body)
+    expect(header!.contains(dialog)).toBe(false)
+    expect(dialog.closest("header")).toBeNull()
+    expect(dialog.id).toBe("menu-drawer")
+    expect(dialog.classList.contains("menu-drawer")).toBe(true)
+    expect(dialog.classList.contains("d-drawer")).toBe(true)
+    // the toggle still controls the portaled sheet by id
+    const toggle = screen.getByRole("button", { name: "Close menu" })
+    expect(toggle.getAttribute("aria-controls")).toBe(dialog.id)
+    expect(header!.contains(toggle)).toBe(true)
+
+    fireEvent.keyDown(document, { key: "Escape" })
+    expect(document.getElementById("menu-drawer")).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }))
+  })
+
   it("closes the drawer when a link inside it is chosen", () => {
     render(<Navigation />)
     fireEvent.click(screen.getByRole("button", { name: "Menu" }))
