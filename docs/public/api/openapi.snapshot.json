@@ -4506,6 +4506,190 @@
     }
    }
   },
+  "/threads/{thread_id}/workspace/files/{file_id}/promote": {
+   "post": {
+    "tags": [
+     "workspace"
+    ],
+    "summary": "Promote Attachment",
+    "description": "Save ONE thread attachment into the chosen Library folder (ATT-03).\n\n201 `saved` \u2014 a new document was minted and handed to the ingest queue.\n200 `already` \u2014 the same bytes were already in the Library; linked, nothing copied. The\n`folder_id` is the EXISTING copy's (D-13). Also 200 when this attachment was promoted before.\n404 `Thread not found` / `File not found`; the minter's `Folder not found` (404) and\n`Cannot upload to a folder you do not own` (403) verbatim; 422 for a type the Library refuses.\n\nThe attachment itself stays in the thread, unchanged (D-11).",
+    "operationId": "promote_attachment_threads__thread_id__workspace_files__file_id__promote_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "thread_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Thread Id"
+      }
+     },
+     {
+      "name": "file_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "File Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PromoteRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PromoteResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/threads/{thread_id}/workspace/files/{file_id}/promote-preview": {
+   "get": {
+    "tags": [
+     "workspace"
+    ],
+    "summary": "Promote Preview",
+    "description": "What saving this attachment into `folder_id` would do \u2014 refused, already there, or which\nversion (D-14). Read-only and advisory: the POST's answer is the one rendered as a result.",
+    "operationId": "promote_preview_threads__thread_id__workspace_files__file_id__promote_preview_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "thread_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Thread Id"
+      }
+     },
+     {
+      "name": "file_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "File Id"
+      }
+     },
+     {
+      "name": "folder_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "description": "The Library folder the person is considering.",
+       "title": "Folder Id"
+      },
+      "description": "The Library folder the person is considering."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PromotePreview"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/threads/{thread_id}/workspace/library-links": {
+   "get": {
+    "tags": [
+     "workspace"
+    ],
+    "summary": "List Library Links",
+    "description": "Every live attachment of the thread: can it be saved, and its `In Library` mark \u2014 in ONE\nrequest (D-15). A mark is reported only for a document the person can still see (T-274-14).\nWithout migration 203's columns every `link` is null \u2014 never a 500.",
+    "operationId": "list_library_links_threads__thread_id__workspace_library_links_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "thread_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Thread Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LibraryLinksResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/admin/spend/summary": {
    "get": {
     "tags": [
@@ -14693,6 +14877,36 @@
     ],
     "title": "AssetRef"
    },
+   "AttachmentLibraryState": {
+    "properties": {
+     "workspace_file_id": {
+      "type": "string",
+      "title": "Workspace File Id"
+     },
+     "promotable": {
+      "type": "boolean",
+      "title": "Promotable"
+     },
+     "link": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LibraryLinkInfo"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "workspace_file_id",
+     "promotable",
+     "link"
+    ],
+    "title": "AttachmentLibraryState",
+    "description": "One thread attachment: can it be saved, and where is it already."
+   },
    "AuthorModelRegistryResponse": {
     "properties": {
      "models": {
@@ -16933,6 +17147,32 @@
     "title": "DraftRow",
     "description": "A drafts-shelf row (the caller's own drafts \u2014 D-103-4).\n\nPhase 103-06 (REQ-7 D9/D10): ``definition`` is ADDITIVE so the drafts-shelf\ncard can derive the tier badge + phase chain client-side; optional to keep the\npre-103 id/slug/version/name shelf shape valid.\n\nPhase 186 (D-186-07): ``token`` is ADDITIVE too \u2014 the Open-a-draft path needs a\nconcurrency token in hand before its first autosave, or that save would have to write\nunguarded. Same binding typing rule as ``DraftCreateResponse.token``: ``str``, never\n``datetime``, never parsed.\n\nPhase 192.1 (LIB-05 / D-15): ``updated_at`` is ADDITIVE and DEFAULTED \u2014 the recency half\nof the library identity line. Typed ``str`` for the same Pydantic-drops-the-fraction\nreason recorded on ``DraftCreateResponse.token`` (:184-188), serialized via\n``.isoformat()`` in the builder.\n\n\u26a0 D-16 \u2014 THERE ARE TWO FIELDS HERE OFF ONE SOURCE COLUMN, AND THAT IS DELIBERATE.\n``token`` is ``to_char(updated_at \u2026)`` in disguise (``db/workflows.py:93-95``), so a\nreader will reasonably ask why ``updated_at`` is not simply parsed out of it. Because\n``token`` is OPAQUE BY CONTRACT and parsing it is forbidden: Postgres keeps microseconds,\na JS ``Date`` keeps milliseconds, and a parsed-and-re-rendered token matches ZERO rows \u2014\nevery later save then refuses as stale (probed live 2026-08-01). One field the server\ncompares byte-for-byte; one the client may format. Never collapse them.\n\nPhase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` are ADDITIVE and\nDEFAULTED, mirroring ``PublishedWorkflow`` field-for-field so the library speaks ONE\nlanguage across its three shelves. See that model's docblock for the binding typing rules\n(``str`` never ``datetime``; a plain nullable ``str`` never an enum) and for D-08's three\narms \u2014 they apply here verbatim.\n\n\u26a0 THERE ARE NOW **THREE** TIME-SHAPED FIELDS ON THIS ROW AND THEY ARE THREE DIFFERENT\nFACTS. ``token`` is ``to_char(updated_at \u2026)`` \u2014 opaque, never parsed. ``updated_at`` is\nwhen the DRAFT was last edited. ``last_run_at`` is when it was last RUN, from\n``workflow_runs``, and a draft genuinely can have runs \u2014 the publish gauntlet's golden run\nis one. Collapsing any pair of these is a lie in a different direction each time.\n\n\u2500\u2500 Phase 192.2 gap round 1 (CR-01 / DEC-08-A) \u2014 ``has_any_run`` \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n**What it is:** whether ANY run of this definition exists, by ANYBODY. A ROW-LEVEL fact,\nmirroring ``PublishedWorkflow`` field-for-field so the library speaks ONE language across\nits three shelves.\n\n\u26a0 **What it is NOT:** it is not ``last_run_at`` / ``last_run_status``, which are\nOWNER-SCOPED and answer *did MY last run of this work?*. ``has_any_run=true`` with\n``last_run_at=null`` means *somebody ran it, and it was not you*.\n\n\u26a0 **On THIS shelf the two agree today, and that is precisely why the field is still\nprojected here rather than \"only where it can differ\".** A draft is owner-scoped, so the\ncaller IS the only person with runs of it \u2014 but \"the two agree\" is an UNSTATED invariant\nthat nothing enforces, and a shelf that omitted the key would be claiming the opposite of\nwhat ``PublishedWorkflow`` says about the same concept. See that model's docblock for the\ntyping rule (``bool | None``, defaulting to ``None``, never coerced) and\n``_HAS_ANY_RUN_SQL`` in ``app/db/workflows.py`` for the disclosure budget; neither is\nrestated here.\n\n\u26a0 **The ``response_model`` trap applies verbatim** \u2014 ``response_model=list[DraftRow]``\ndrops undeclared keys silently, so this model and the builder move together."
    },
+   "DuplicateOf": {
+    "properties": {
+     "document_id": {
+      "type": "string",
+      "title": "Document Id"
+     },
+     "folder_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Folder Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "document_id",
+     "folder_id"
+    ],
+    "title": "DuplicateOf",
+    "description": "The completed Library copy that holds the same bytes (D-13)."
+   },
    "ExpertBundleCreate": {
     "properties": {
      "name": {
@@ -19042,6 +19282,68 @@
     ],
     "title": "InputFieldSpec"
    },
+   "LibraryLinkInfo": {
+    "properties": {
+     "document_id": {
+      "type": "string",
+      "title": "Document Id"
+     },
+     "outcome": {
+      "type": "string",
+      "enum": [
+       "saved",
+       "already"
+      ],
+      "title": "Outcome"
+     },
+     "folder_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Folder Id"
+     },
+     "document_status": {
+      "type": "string",
+      "title": "Document Status"
+     },
+     "filename": {
+      "type": "string",
+      "title": "Filename"
+     }
+    },
+    "type": "object",
+    "required": [
+     "document_id",
+     "outcome",
+     "folder_id",
+     "document_status",
+     "filename"
+    ],
+    "title": "LibraryLinkInfo",
+    "description": "An attachment's `In Library` mark, built only from a document the person can still see."
+   },
+   "LibraryLinksResponse": {
+    "properties": {
+     "files": {
+      "items": {
+       "$ref": "#/components/schemas/AttachmentLibraryState"
+      },
+      "type": "array",
+      "title": "Files"
+     }
+    },
+    "type": "object",
+    "required": [
+     "files"
+    ],
+    "title": "LibraryLinksResponse",
+    "description": "GET .../library-links \u2014 every attachment of the thread, in ONE request (D-15)."
+   },
    "LlmAgentPhaseConfig": {
     "properties": {
      "phase_type": {
@@ -20779,6 +21081,133 @@
      "fn"
     ],
     "title": "ProgrammaticPhaseConfig"
+   },
+   "PromotePreview": {
+    "properties": {
+     "promotable": {
+      "type": "boolean",
+      "title": "Promotable"
+     },
+     "refusal": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refusal"
+     },
+     "filename": {
+      "type": "string",
+      "title": "Filename"
+     },
+     "duplicate_of": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DuplicateOf"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "next_version": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Version"
+     }
+    },
+    "type": "object",
+    "required": [
+     "promotable",
+     "refusal",
+     "filename",
+     "duplicate_of",
+     "next_version"
+    ],
+    "title": "PromotePreview",
+    "description": "GET .../promote-preview \u2014 what confirming WOULD do, read-only (D-14).\n\n- `promotable: false` + `refusal` \u2014 the Library refuses this type (D-22); nothing is hashed.\n- `duplicate_of` set \u2014 the same bytes are already in the Library; confirming links to that\n  copy. `next_version` then carries that copy's version number, exactly what the minter\n  returns for a duplicate (`MintResult.version_number`), so the parity test can hold the two\n  equal in every case. The dialog keys its warning on `duplicate_of`, never on this number.\n- otherwise `next_version` \u2014 the version the new document will be in the chosen folder.\n  `1` is a fresh document; anything above it is a new version of a same-named file THERE."
+   },
+   "PromoteRequest": {
+    "properties": {
+     "folder_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Folder Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "folder_id"
+    ],
+    "title": "PromoteRequest",
+    "description": "Phase 274 (ATT-03 / D-10) \u2014 save ONE thread attachment into a Library folder.\n\n\u26d4 A FOLDER IS REQUIRED. There is no default and no Root sentinel: an unset folder is refused\nby validation, never read as \"the top of the Library\" (D-10, the D-244-06 rule that a chat\ndoor never writes to a root it did not name).\n\n\u26d4 `extra=\"forbid\"`: the body carries a folder and nothing else. The org comes ONLY from the\nmembership-validated `X-Org-Id` dependency, so no body key can choose one (T-274-13)."
+   },
+   "PromoteResult": {
+    "properties": {
+     "outcome": {
+      "type": "string",
+      "enum": [
+       "saved",
+       "already"
+      ],
+      "title": "Outcome"
+     },
+     "document_id": {
+      "type": "string",
+      "title": "Document Id"
+     },
+     "folder_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Folder Id"
+     },
+     "document_status": {
+      "type": "string",
+      "title": "Document Status"
+     },
+     "filename": {
+      "type": "string",
+      "title": "Filename"
+     },
+     "version_number": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version Number"
+     }
+    },
+    "type": "object",
+    "required": [
+     "outcome",
+     "document_id",
+     "folder_id",
+     "document_status",
+     "filename",
+     "version_number"
+    ],
+    "title": "PromoteResult",
+    "description": "POST .../promote \u2014 201 with `saved`, 200 with `already`.\n\n\u26a0 On `already`, `folder_id` is the EXISTING document's folder, which may differ from the one\npicked. The dialog says so rather than hiding it (D-13)."
    },
    "PromotionGate": {
     "properties": {
