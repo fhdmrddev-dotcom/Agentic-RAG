@@ -160,7 +160,7 @@ BOARD documents(user) after = 185 (delta 0) · connector_watches(user) after = 3
 
 ## Task 3 — the G-4 API probe (`--promote-probe`), exit 0
 
-Verbatim lines in `evidence/g4-api/promote-probe.log`; summarised in 274-VALIDATION.md §2. Headline readings:
+Verbatim lines in `evidence/g4-api/promote-probe.txt`; summarised in 274-VALIDATION.md §2. Headline readings:
 attach → `documents(user)` 185 → 185, search total 0; promote X → 201 `saved`, `documents.folder_id = X`; version 2 on a
 same-named different-bytes file with version 1 kept (`is_latest=false`); the original bytes from a second thread → 200 `already`
 naming X, nothing in Y; `storage.objects` 1 → 0 on each thread delete (T1, T2); the Library copy downloads byte-identical

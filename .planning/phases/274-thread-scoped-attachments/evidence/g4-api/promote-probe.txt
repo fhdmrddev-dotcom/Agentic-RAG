@@ -1,0 +1,26 @@
+dev user d8a54002-6a29-4b88-b918-cff2aa4a06d5 · single org 22f9c615-0eec-440a-8804-ed4784d6f57f (asserted from org_members)
+PROBE folder_X = {"path": "Client ACME / Q3 Contracts", "id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"}
+PROBE folder_Y = {"path": "Engineering", "id": "41c78005-1139-4829-89ea-e11e56294828"}
+PROBE fixture = {"name": "274-g4-api-keeper.pdf", "bytes": 335731, "sha256": "2415e7068871952e852f7bd67e8c324b963912a81427e39baa9292f783fc74e8", "token": "ATT274-probe-ffc1770b", "v2_bytes": 1483, "v2_sha256": "967593a999e52ace8037e47cff0e3f5b55e21f06771275868f171316d182e0c1"}
+PROBE attach = {"thread": "55bc9783-a168-4a4f-80de-51a1d5f5fd7b", "http": 200, "documents_before": 185, "documents_after": 185, "ws_row": {"id": "4269d27a-0df8-42fb-960d-4c04a085a81a", "path": "/648ef8d7-274-g4-api-keeper.pdf", "kind": "template_input", "expires_at": null, "size_bytes": "335731", "content_storage_path": "d8a54002-6a29-4b88-b918-cff2aa4a06d5/55bc9783-a168-4a4f-80de-51a1d5f5fd7b/4269d27a-0df8-42fb-960d-4c04a085a81a/v1", "library_document_id": null, "library_link": null}}
+PROBE search_after_attach = {"http": 200, "total": 0, "library_rows_with_token": 0}
+PROBE preview_X = {"http": 200, "body": {"promotable": true, "refusal": null, "filename": "274-g4-api-keeper.pdf", "duplicate_of": null, "next_version": 1}}
+PROBE promote_X = {"http": 201, "body": {"outcome": "saved", "document_id": "3cd6dddd-814f-4cb4-81fd-7f4e032a4d9b", "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75", "document_status": "pending", "filename": "274-g4-api-keeper.pdf", "version_number": 1}}
+PROBE document_row = {"id": "3cd6dddd-814f-4cb4-81fd-7f4e032a4d9b", "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75", "filename": "274-g4-api-keeper.pdf", "status": "pending", "version_number": 1, "is_latest": true}
+PROBE folder_matches_X = true
+PROBE library_links_after_promote = {"http": 200, "body": {"files": [{"workspace_file_id": "4269d27a-0df8-42fb-960d-4c04a085a81a", "promotable": true, "link": {"document_id": "3cd6dddd-814f-4cb4-81fd-7f4e032a4d9b", "outcome": "saved", "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75", "document_status": "pending", "filename": "274-g4-api-keeper.pdf"}}]}}
+PROBE ws_mark = {"id": "4269d27a-0df8-42fb-960d-4c04a085a81a", "path": "/648ef8d7-274-g4-api-keeper.pdf", "kind": "template_input", "expires_at": null, "size_bytes": "335731", "content_storage_path": "d8a54002-6a29-4b88-b918-cff2aa4a06d5/55bc9783-a168-4a4f-80de-51a1d5f5fd7b/4269d27a-0df8-42fb-960d-4c04a085a81a/v1", "library_document_id": "3cd6dddd-814f-4cb4-81fd-7f4e032a4d9b", "library_link": "saved"}
+PROBE document_status_after_wait = "completed"
+PROBE library_links_after_completed = {"http": 200, "body": {"files": [{"workspace_file_id": "4269d27a-0df8-42fb-960d-4c04a085a81a", "promotable": true, "link": {"document_id": "3cd6dddd-814f-4cb4-81fd-7f4e032a4d9b", "outcome": "saved", "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75", "document_status": "completed", "filename": "274-g4-api-keeper.pdf"}}]}}
+PROBE preview_v2_X = {"upload_http": 200, "http": 200, "body": {"promotable": true, "refusal": null, "filename": "274-g4-api-keeper.pdf", "duplicate_of": null, "next_version": 2}}
+PROBE promote_v2_X = {"http": 201, "body": {"outcome": "saved", "document_id": "74783d70-82a0-4b76-9193-700334bda9a2", "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75", "document_status": "pending", "filename": "274-g4-api-keeper.pdf", "version_number": 2}}
+PROBE versions_in_X = [{"id": "3cd6dddd-814f-4cb4-81fd-7f4e032a4d9b", "version_number": 1, "is_latest": false, "status": "completed"}, {"id": "74783d70-82a0-4b76-9193-700334bda9a2", "version_number": 2, "is_latest": true, "status": "pending"}]
+PROBE preview_original_Y = {"thread": "1a719896-f385-46d0-8194-a29bbe1da184", "upload_http": 200, "http": 200, "body": {"promotable": true, "refusal": null, "filename": "274-g4-api-keeper.pdf", "duplicate_of": {"document_id": "3cd6dddd-814f-4cb4-81fd-7f4e032a4d9b", "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75"}, "next_version": 1}}
+PROBE promote_original_Y = {"http": 200, "body": {"outcome": "already", "document_id": "3cd6dddd-814f-4cb4-81fd-7f4e032a4d9b", "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75", "document_status": "completed", "filename": "274-g4-api-keeper.pdf", "version_number": 1}}
+PROBE documents_in_Y_with_name = 0
+PROBE delete_T1 = {"thread": "55bc9783-a168-4a4f-80de-51a1d5f5fd7b", "storage_objects_before": 1, "http": 204, "storage_objects_after": 0, "workspace_files_after": 0}
+PROBE delete_T2 = {"thread": "1a719896-f385-46d0-8194-a29bbe1da184", "storage_objects_before": 1, "http": 204, "storage_objects_after": 0, "workspace_files_after": 0}
+PROBE keeper_after_delete = {"id": "3cd6dddd-814f-4cb4-81fd-7f4e032a4d9b", "folder_id": "b33bd4cb-ba40-4e9e-b804-857dd4b6ad75", "status": "completed", "filename": "274-g4-api-keeper.pdf", "is_latest": false}
+PROBE keeper_download = {"http": 200, "get_http": 200, "bytes": 335731, "sha256": "2415e7068871952e852f7bd67e8c324b963912a81427e39baa9292f783fc74e8", "equals_original": true}
+PROBE watches_unchanged = {"before": 3, "after": 3}
+PROBE evidence → C:\Vibe Apps\Agentic RAG\.planning\phases\274-thread-scoped-attachments\evidence\g4-api\promote-probe-ATT274-probe-ffc1770b.json

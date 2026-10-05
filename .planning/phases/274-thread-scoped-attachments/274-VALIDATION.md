@@ -2,7 +2,7 @@
 
 Rows are filled from PERSISTED data (`workspace_files`, `documents`, `document_chunks`, `storage.objects`, `messages`, `runs`)
 and, for the G-4 rows, from a real browser — never from a transcript. Raw evidence: `evidence/board/` (one JSON per row +
-`board-summary.json` + `board-run.log`), `evidence/g4-api/` (the API half of G-4 #1/#3/#4), `evidence/axes/`. Method, gate
+`board-summary.json` + `board-run.txt`), `evidence/g4-api/` (the API half of G-4 #1/#3/#4), `evidence/axes/`. Method, gate
 lines and the D-18 audit: `274-UAT-LOG.md`.
 
 Status (2026-10-05): **partial.** Board, API halves, 4-axis API rows and the D-18 static + API halves are measured by
@@ -52,7 +52,7 @@ the knowledge base's own retrieval tools confirming D-01 (never chunked, never e
 SQL count. Several B answers also said plainly *"I don't see an attachment in this chat"* (anthropic, google, zhipu).
 
 Per-row evidence: `evidence/board/<provider>-<run_a>.json` (file body, both turns' persisted messages and tool calls, the
-`workspace_files` row, upload response); `board-summary.json`; `board-run.log`.
+`workspace_files` row, upload response); `board-summary.json`; `board-run.txt`.
 
 **Observation (not a criterion; for G-4 #2 to judge):** in thread A, four models named the file WITH its stored upload prefix
 (e.g. anthropic: *"from … the file you attached (**55ab08ff-meridian-…**)"*; deepseek, google, moonshot likewise). The agent's
@@ -65,7 +65,7 @@ the answer; visible in the transcript.
 API half: `scripts/run-274-board.py --promote-probe` → exit 0, 2026-10-05. One fixture: `274-g4-api-keeper.pdf`, **335,731
 bytes** (> 256 KB, so bucket-stored — Pitfall 6), sha256 `2415e706…fc74e8`, planted token `ATT274-probe-ffc1770b`. Folder X =
 `Client ACME / Q3 Contracts` (`b33bd4cb-ba40-4e9e-b804-857dd4b6ad75`, nested), Y = `Engineering`
-(`41c78005-1139-4829-89ea-e11e56294828`). Full log: `evidence/g4-api/promote-probe.log`; JSON:
+(`41c78005-1139-4829-89ea-e11e56294828`). Full log: `evidence/g4-api/promote-probe.txt`; JSON:
 `evidence/g4-api/promote-probe-ATT274-probe-ffc1770b.json`. Chrome fixtures (distinct bytes, fresh tokens):
 `evidence/chrome-fixtures.txt`.
 
@@ -79,7 +79,7 @@ bytes** (> 256 KB, so bucket-stored — Pitfall 6), sha256 `2415e706…fc74e8`, 
 ## 3. The 4-axis UAT bandwidth (CLAUDE.md UAT scoreboard recipe)
 
 API half: `scripts/run-274-board.py --axes --providers anthropic` (claude-opus-5-5, the derived anthropic row) → exit 0,
-2026-10-05. Evidence: `evidence/axes/axes-run.log`, `evidence/axes/axes-anthropic.json`.
+2026-10-05. Evidence: `evidence/axes/axes-run.txt`, `evidence/axes/axes-anthropic.json`.
 
 | Axis | What was driven | Result (persisted data) | Chrome half |
 |---|---|---|---|
