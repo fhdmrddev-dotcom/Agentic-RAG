@@ -68,21 +68,26 @@ describe("public Syrel API spec (DOCS-03)", () => {
   })
 
   it("takes its version from the newest RELEASED docs/history file (derived, never typed)", () => {
-    const released: string[] = []
+    // 276-REVIEW A-WR-06: derived through parseHistory — the SAME parser the changelog uses —
+    // never a second line-3 reader that could silently skip a file.
+    const docsContent = requireCjs(nodePath.join(REPO_ROOT, "scripts", "lib", "docs-content.cjs"))
+    const releases: Array<{ version: string; released: boolean }> = docsContent.parseHistory(HISTORY)
+    expect(releases.length).toBeGreaterThanOrEqual(20)
+    const newest = releases.find((r) => r.released)
+    expect(newest).toBeDefined()
+    expect(pub.info.version).toBe(newest!.version.slice(1))
+    expect(lib.releasedVersion(HISTORY)).toBe(newest!.version.slice(1))
+  })
+
+  it("throws (never skips) when a history file cannot be parsed (A-WR-06)", () => {
+    const dir = tmpDir()
     for (const f of nodeFs.readdirSync(HISTORY) as string[]) {
-      const m = /^v(\d+)\.(\d+)/.exec(f)
-      if (!m) continue
-      const line = nodeFs.readFileSync(nodePath.join(HISTORY, f), "utf-8").split(/\r?\n/)[2] ?? ""
-      const shipped = /\*\*Shipped:\*\*\s*(.*)$/.exec(line)?.[1] ?? ""
-      if (/^\d{4}-\d{2}-\d{2}/.test(shipped)) released.push(`${m[1]}.${m[2]}`)
+      nodeFs.copyFileSync(nodePath.join(HISTORY, f), nodePath.join(dir, f))
     }
-    expect(released.length).toBeGreaterThanOrEqual(20)
-    released.sort((a, b) => {
-      const [a1, a2] = a.split(".").map(Number)
-      const [b1, b2] = b.split(".").map(Number)
-      return a1 - b1 || a2 - b2
-    })
-    expect(pub.info.version).toBe(released[released.length - 1])
+    expect(lib.releasedVersion(dir)).toBe(pub.info.version)
+    // A file with no parseable Shipped line is an error naming the file, never a silent skip.
+    nodeFs.writeFileSync(nodePath.join(dir, "v9.9-broken.md"), "# v9.9 — Broken\n\nno shipped line here\n")
+    expect(() => lib.releasedVersion(dir)).toThrow(/v9\.9-broken\.md/)
   })
 
   it("publishes zero /admin paths (D-16) and none of the hidden set", () => {

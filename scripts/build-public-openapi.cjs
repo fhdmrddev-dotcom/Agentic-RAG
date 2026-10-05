@@ -32,12 +32,12 @@
 
 const fs = require("fs")
 const path = require("path")
+const { parseHistory } = require("./lib/docs-content.cjs")
 
 const ROOT = path.resolve(__dirname, "..")
 const DEFAULT_SNAPSHOT = path.join(ROOT, "docs", "public", "api", "openapi.snapshot.json")
 const DEFAULT_OUT = path.join(ROOT, "docs", "public", "api", "openapi.public.json")
 const DEFAULT_HISTORY = path.join(ROOT, "docs", "history")
-const MIN_HISTORY_FILES = 20
 
 const METHODS = ["get", "put", "post", "delete", "patch", "options", "head", "trace"]
 
@@ -144,34 +144,26 @@ function isFlagged(p) {
   return FLAGGED_EXACT.has(p) || FLAGGED_PREFIXES.some((pre) => p.startsWith(pre))
 }
 
-/** Newest released version from docs/history: "Shipped:" value must start with YYYY-MM-DD. */
+/**
+ * Newest released version from docs/history.
+ *
+ * ~~Re-parsed the "Shipped:" fact from line 3 of each file and silently skipped a file whose line 3
+ * did not match.~~ CORRECTED (276-REVIEW A-WR-06): that second parser could let `info.version`
+ * regress while the changelog showed a newer release. It now uses `parseHistory` — the ONE home
+ * of history parsing, the same parser the changelog uses — which THROWS on any file it cannot
+ * parse and on a collapsed scan set (MIN_HISTORY_FILES). No silent skip.
+ */
 function releasedVersion(historyDir) {
-  let files
+  if (!fs.existsSync(historyDir)) throw new HarnessError(`cannot read ${historyDir}: no such directory`)
+  let releases
   try {
-    files = fs.readdirSync(historyDir)
+    releases = parseHistory(historyDir) // newest first
   } catch (err) {
-    throw new HarnessError(`cannot read ${historyDir}: ${err.message}`)
+    throw new HarnessError(`cannot derive a version from docs/history: ${err.message}`)
   }
-  let parsed = 0
-  const released = []
-  for (const f of files) {
-    const m = /^v(\d+)\.(\d+)/.exec(f)
-    if (!m || !f.endsWith(".md")) continue
-    const third = fs.readFileSync(path.join(historyDir, f), "utf-8").split(/\r?\n/)[2] || ""
-    const shipped = /\*\*Shipped:\*\*\s*(.*)$/.exec(third)
-    if (!shipped) continue
-    parsed += 1
-    if (/^\d{4}-\d{2}-\d{2}/.test(shipped[1])) released.push([Number(m[1]), Number(m[2])])
-  }
-  if (parsed < MIN_HISTORY_FILES) {
-    throw new HarnessError(
-      `only ${parsed} docs/history files parsed (need ${MIN_HISTORY_FILES}) — refusing to derive a version`,
-    )
-  }
+  const released = releases.filter((r) => r.released)
   if (released.length === 0) throw new HarnessError("no released version found in docs/history")
-  released.sort((a, b) => a[0] - b[0] || a[1] - b[1])
-  const [maj, min] = released[released.length - 1]
-  return `${maj}.${min}`
+  return released[0].version.slice(1)
 }
 
 const REF_PREFIX = "#/components/schemas/"
