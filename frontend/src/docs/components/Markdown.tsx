@@ -8,7 +8,7 @@
 // tables scroll inside a focusable region; screenshots under /docs-assets/shots/ become figures
 // with their real 1280x800 size; "> **Note:**" / "> **Warning:**" blockquotes become callouts; a
 // bare `::video` paragraph is where the page's frontmatter video slot goes.
-import type { ReactNode } from "react"
+import { useMemo, type ReactNode } from "react"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { headingId } from "../headingId"
@@ -48,7 +48,23 @@ function isExternal(href: string | undefined): boolean {
 }
 
 export function Markdown({ children, video }: { children: string; video?: string | null }) {
-  const components: Components = {
+  // 276-REVIEW B-WR-03: memoised. ~~A fresh `components` object every render~~ gave react-markdown
+  // NEW component types each time, so any parent re-render (DocsApp's setLoc on a `#` popstate)
+  // REMOUNTED every heading — dropping the focus the browser had just put on the H2 — and every
+  // video slot with it.
+  const components = useMemo(() => buildComponents(video), [video])
+
+  return (
+    <div className="d-prose">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {children}
+      </ReactMarkdown>
+    </div>
+  )
+}
+
+function buildComponents(video: string | null | undefined): Components {
+  return {
     h2({ node, children: kids }) {
       const id = headingId(textOf(node as HNode))
       // The "#" link sits BESIDE the heading, not inside it, so the heading's accessible name
@@ -123,12 +139,4 @@ export function Markdown({ children, video }: { children: string; video?: string
       return <blockquote>{kids}</blockquote>
     },
   }
-
-  return (
-    <div className="d-prose">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {children}
-      </ReactMarkdown>
-    </div>
-  )
 }

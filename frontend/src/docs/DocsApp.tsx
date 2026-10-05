@@ -177,7 +177,13 @@ export function DocsApp() {
 
   // On navigation: scroll (top or hash target) and move focus to the H1.
   const first = useRef(true)
+  const prevRouteKey = useRef(routeKey)
   useEffect(() => {
+    // 276-REVIEW B-WR-03: only a ROUTE change moves focus to the H1. ~~Every run did~~ — so an
+    // in-page `#` link (or Scalar's hash routing) fired popstate, re-ran this effect on the new
+    // hash and yanked focus to the top of the page (WCAG 2.4.3). Fragment focus is the browser's.
+    const routeChanged = prevRouteKey.current !== routeKey
+    prevRouteKey.current = routeKey
     if (first.current) {
       first.current = false
       pendingHash.current = loc.hash ? { id: safeDecode(loc.hash.slice(1)), smooth: false } : null
@@ -190,6 +196,7 @@ export function DocsApp() {
       // not rendered yet → start at the top; the pending target is scrolled to once the body lands
       if (!scrollToPendingHash()) window.scrollTo(0, 0)
     }
+    if (!routeChanged) return
     const h1 = document.querySelector<HTMLElement>("#content h1")
     h1?.focus({ preventScroll: true })
   }, [routeKey, loc.hash, scrollToPendingHash])

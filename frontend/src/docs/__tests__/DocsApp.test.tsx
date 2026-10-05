@@ -130,6 +130,25 @@ describe("DocsApp", () => {
     expect(scrolled).toContain(h2) // ... then lands on the section once it exists
   })
 
+  it("an in-page # navigation leaves focus where the browser put it; only a route change moves it (B-WR-03)", async () => {
+    stubScrolling()
+    window.history.replaceState(null, "", "/docs/use/chat")
+    render(<DocsApp />)
+    const h2 = await screen.findByRole("heading", { level: 2, name: "One" })
+    // the browser's fragment jump focuses the H2 (tabIndex -1) and fires popstate (state null)
+    h2.focus()
+    act(() => {
+      window.history.pushState(null, "", "/docs/use/chat#one")
+      window.dispatchEvent(new PopStateEvent("popstate", { state: null }))
+    })
+    expect(document.activeElement).toBe(h2)
+    // a real route change still lands focus on the new page's H1
+    const { navigate } = await import("../router")
+    act(() => navigate("/docs/use"))
+    const h1 = await screen.findByRole("heading", { level: 1, name: "Use Syrel" })
+    expect(document.activeElement).toBe(h1)
+  })
+
   it("survives a malformed percent sequence in the hash instead of blanking the docs (B-WR-04)", async () => {
     expect(safeDecode("100%")).toBe("100%")
     expect(safeDecode("%E0%A4%A")).toBe("%E0%A4%A")
