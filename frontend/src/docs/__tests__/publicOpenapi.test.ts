@@ -65,6 +65,10 @@ describe("public Syrel API spec (DOCS-03)", () => {
     expect(pub.info.title).toBe("Syrel API")
     expect(pub.info.description).toContain("no API keys")
     expect(pub.info.description).toContain("SEED-013")
+    // A-WR-07: the live explorer is bearer-only in production — never promised as a browser page
+    expect(pub.info.description).not.toContain("signed-in API explorer")
+    expect(pub.info.description).toContain("/docs/api/reference")
+    expect(pub.info.description).toContain("not a browser")
   })
 
   it("takes its version from the newest RELEASED docs/history file (derived, never typed)", () => {

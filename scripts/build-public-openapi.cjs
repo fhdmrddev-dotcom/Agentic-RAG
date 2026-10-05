@@ -42,6 +42,9 @@ const DEFAULT_HISTORY = path.join(ROOT, "docs", "history")
 const METHODS = ["get", "put", "post", "delete", "patch", "options", "head", "trace"]
 
 const TITLE = "Syrel API"
+// 276-REVIEW A-WR-07: ~~"each deployment's own signed-in API explorer documents them"~~ — false in a
+// browser in production (the page and its /openapi.json fetch both need a bearer the browser never
+// sends). The copy now says what is true: bearer-only, for scripts/curl; browsers use this reference.
 const DESCRIPTION =
   "The HTTP API behind Syrel's own interface.\n\n" +
   "**Authentication.** Syrel has no API keys, personal access tokens or service accounts today. " +
@@ -49,7 +52,11 @@ const DESCRIPTION =
   "(`Authorization: Bearer <token>`). The planned answer is SEED-013 (Open Platform).\n\n" +
   "**Organizations.** Requests that act inside an organization send its id in the `X-Org-Id` header.\n\n" +
   "Operator (`/admin`) endpoints are not listed here; they answer 404 to anyone who is not an " +
-  "operator, and each deployment's own signed-in API explorer documents them."
+  "operator.\n\n" +
+  "**Live schema.** Each deployment also serves its full live schema at `/openapi.json` (and an " +
+  "explorer at `/docs`). In production both require a signed-in caller " +
+  "(`Authorization: Bearer <token>`), so they are meant for scripts and `curl`, not a browser. " +
+  "In a browser, use this public reference at `/docs/api/reference`."
 
 class HarnessError extends Error {}
 
