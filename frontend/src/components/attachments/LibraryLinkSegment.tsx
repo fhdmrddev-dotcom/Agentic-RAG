@@ -30,11 +30,17 @@ export interface LibraryLinkSegmentProps {
   path: string | null
   /** `leaf` on the chip (full path in the tooltip), `path` on the panel row (full path visible). */
   display: "leaf" | "path"
+  /**
+   * `-1` inside a listbox option (274 review WR-04): an interactive tab stop inside `role=option`
+   * breaks the listbox, and Enter on it bubbled to the row and opened the file preview instead.
+   * Keyboard reach is then the row's `⋯` menu (Shift+F10), which offers the document.
+   */
+  tabIndex?: number
 }
 
 const INDEXING = new Set(["pending", "processing", "paused"])
 
-export function LibraryLinkSegment({ link, leaf, path, display }: LibraryLinkSegmentProps) {
+export function LibraryLinkSegment({ link, leaf, path, display, tabIndex }: LibraryLinkSegmentProps) {
   const nav = useCitationNavOptional()
   const saved = link.outcome === "saved"
   const word = saved ? COPY.shared.inLibrary : COPY.shared.alreadyInLibrary
@@ -91,6 +97,7 @@ export function LibraryLinkSegment({ link, leaf, path, display }: LibraryLinkSeg
       data-outcome={link.outcome}
       title={path ?? undefined}
       aria-label={full}
+      tabIndex={tabIndex}
       onClick={(e) => {
         e.stopPropagation()
         nav.openDocument(link.document_id)

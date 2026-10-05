@@ -4,9 +4,10 @@
  * import, one slot line and one key arm; nothing else of that G-5 file changes.
  *
  * Two readings, from the ONE lifetime rule (`isThreadLifeAttachment`):
- *   · THREAD-LIFE (a chat attachment, D-05): `this chat only`, then either the `⋯` (only the verb,
- *     the row is already in the panel) or — once saved — the `LibraryLinkSegment`, drawn as sketch
+ *   · THREAD-LIFE (a chat attachment, D-05): `this chat only`, then the `⋯` (only the verb, the row
+ *     is already in the panel) and — once saved — the `LibraryLinkSegment` beside it, drawn as sketch
  *     274-A draws it: the leaf visible, the full path in the title and in screen-reader text.
+ *     (~~either the `⋯` or the segment~~ — 274 review WR-05: the `⋯` owns the dialog, so it stays.)
  *     (Built first with the full path visible; G-4 #3 measured that squeezing the file name to
  *     zero width, so it now matches the sketch.)
  *   · TTL (a workflow template input, or a row whose wire did not say): the `Template` badge and
@@ -39,15 +40,21 @@ export function AttachmentRowTrailing({ threadId, file }: AttachmentRowTrailingP
   const { stateFor } = useLibraryLinks(threadId)
   const state = stateFor(file.id)
 
+  // ⚠ 274 review WR-05: the `⋯` stays MOUNTED in both states. It owns the ONE Save dialog, and the
+  // POST stamps the mark before it answers — so the next poll swapped the menu for the segment and
+  // unmounted the dialog while it showed D-13's "already in <folder> / you picked <other>". Linked,
+  // the menu offers `Open in Library` instead of the verb (WR-04's keyboard reach).
   const action =
     threadId && file.id ? (
-      state.link ? (
-        // Sketch 274-A draws the panel's mark as the chip's segment: the leaf visible, the full path
-        // in the title (G-4 #3 F-1 — a visible full path squeezed the file name to zero width).
-        <LibraryLinkSegment link={state.link} leaf={state.leaf} path={state.path} display="leaf" />
-      ) : (
+      <span className="flex min-w-0 items-center gap-1">
+        {state.link && (
+          // Sketch 274-A draws the panel's mark as the chip's segment: the leaf visible, the full path
+          // in the title (G-4 #3 F-1 — a visible full path squeezed the file name to zero width).
+          // WR-04: not a tab stop inside `role=option`.
+          <LibraryLinkSegment link={state.link} leaf={state.leaf} path={state.path} display="leaf" tabIndex={-1} />
+        )}
         <AttachmentActionsMenu threadId={threadId} file={file} variant="panel" triggerTabIndex={-1} />
-      )
+      </span>
     ) : null
 
   if (isThreadLifeAttachment(file)) {

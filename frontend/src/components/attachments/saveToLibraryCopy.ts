@@ -77,6 +77,10 @@ const a = {
  *                          ⚠ 274 review WR-07: also the dialog's LEAD over a 422 / a type-refusing
  *                          preview, so a type refusal never reads as a folder one.
  *   · `saveFailed` doubles as the lead over any refusal that is neither the folder nor the type.
+ *   · `openInLibrary`    — 274 review WR-04: the panel row's `⋯` menu item once the file is linked.
+ *                          The segment is not a tab stop inside `role=option`, so the row's
+ *                          Shift+F10 menu is the keyboard's way to the document. (`openDoc`'s
+ *                          "Open it" names nothing in a file row's menu.)
  *   · `couldntIndex`     — D-25: the segment's terminal state when ingestion `failed`, so it never
  *                          reads `indexing…` forever.
  *   · `noFolders`        — D-10: there is no Root, so a person with no folders must be told where
@@ -99,6 +103,7 @@ const netNew = {
   saveVerbMenu: "Save to Library…",
   unknownFolder: "your Library",
   saveFailed: "Couldn't save this file. Try again.",
+  openInLibrary: "Open in Library",
 } as const
 
 export const COPY = { engine, shared, a, netNew } as const
