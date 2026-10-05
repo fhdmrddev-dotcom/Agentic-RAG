@@ -66,7 +66,11 @@ describe("AttachmentRowTrailing — the panel row's trailing slot", () => {
     expect(triggers[0].getAttribute("tabindex")).toBe("-1")
   })
 
-  it("thread-life, linked → the FULL path is VISIBLE on the row, and there is no ⋯", () => {
+  // 274 G-4 #3 (F-1, driven in Chrome 2026-10-05): the full-path pill took up to 65% of the row,
+  // wrapped, inherited the row's 13px type and squeezed the FILE NAME to zero width. Sketch 274-A
+  // draws the panel's mark as the chip's segment — the LEAF visible, the full path in the title.
+  // The original assertion (full path VISIBLE on the row) is retired deliberately for that reason.
+  it("thread-life, linked → the LEAF is visible (sketch A), the full path is in the title, compact, the name keeps its room, no ⋯", () => {
     linkState.mockReturnValue({
       promotable: true,
       link: {
@@ -81,8 +85,15 @@ describe("AttachmentRowTrailing — the panel row's trailing slot", () => {
     })
     const { container } = render(<AttachmentRowTrailing threadId="t-1" file={file()} />)
     const seg = screen.getByTestId("library-link-segment")
-    expect(seg.textContent).toContain(`${COPY.shared.inLibrary} · Suppliers › Meridian › Pricing`)
+    expect(seg.textContent).toContain(`${COPY.shared.inLibrary} · Pricing`)
+    expect(seg.textContent).not.toContain(`${COPY.shared.inLibrary} · Suppliers`)
+    expect(seg.getAttribute("title")).toBe("Suppliers › Meridian › Pricing")
     expect(seg.textContent).toContain(COPY.shared.indexing)
+    expect(seg.className).toContain("text-[11px]")
+    expect(seg.className).not.toContain("whitespace-normal")
+    // The slot never claims a share of the row that the file name needs.
+    expect(container.innerHTML).not.toContain("max-w-[65%]")
+    expect(container.innerHTML).not.toContain("flex-wrap")
     expect(container.textContent).toContain(COPY.engine.CHIP_SCOPE)
     expect(more(container)).toHaveLength(0)
   })
