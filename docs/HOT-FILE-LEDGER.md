@@ -11168,6 +11168,18 @@ cells rot within days.
 | [`frontend/src/docs/search/searchIndex.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocssearchsearchindexts) | 1 / 1 / 57 | no (new) | young (created 276-03). Fetches the index + MiniSearch on FIRST focus only (both via import()/fetch). ⛔ never in first paint |
 | [`frontend/src/landing/components/MenuDrawer.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsmenudrawertsx) | 1 / 1 / 116 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: ≤720 menu drawer for landing + docs. ⛔ classes live in landing.css |
 | [`frontend/src/landing/components/HeroPromo.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsheropromotsx) | 1 / 1 / 161 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-05: muted promo, Pause/Unmute. ⛔ reached only via import(); musicSrc null until Unmute |
+| [`backend/app/api/workspace_promote.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkspace_promotepy) | 0 / 0 / 0 | no (young) | 274-02. Promote / preview / library-links (ATT-03). ⛔ user-JWT read before mint; minter + _enqueue_or_splice only; version_scope=folder; never in workspace.py (244 fence) |
+| [`backend/app/models/workspace_promote.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsworkspace_promotepy) | 0 / 0 / 0 | no (young) | 274-02. PromoteRequest (folder_id required, extra=forbid) + response models; LibraryLink saved|already == mig 203 CHECK. ⛔ no org field in any body |
+| [`backend/app/services/thread_workspace_cleanup.py`](docs/HOT-FILE-LEDGER.md#backendappservicesthread_workspace_cleanuppy) | 0 / 0 / 0 | no (young) | 274-01. delete_thread's byte-cleanup seam (D-08): RLS-derived paths, removed after the row delete, logged never pass. ⛔ user-JWT only; own-uid prefix only |
+| [`frontend/src/components/attachments/AttachmentActionsMenu.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsattachmentactionsmenutsx) | 0 / 0 / 0 | no (young) | 274-04. The ONE ⋯ menu + dialog mount for chip and panel row (D-09). ⛔ never on a pending chip (D-18); Open in panel reveals only (D-23) |
+| [`frontend/src/components/attachments/AttachmentRowTrailing.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsattachmentrowtrailingtsx) | 0 / 0 / 0 | no (young) | 274-04. Panel Files trailing slot for template_input rows: thread-life vs TTL. ⛔ ⋯ is tabIndex -1 inside role=option; TTL markup moved byte-for-byte |
+| [`frontend/src/components/attachments/FolderPathListbox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsfolderpathlistboxtsx) | 0 / 0 / 0 | no (young) | 274-03. Searchable full-path folder listbox, APG combobox/listbox a11y. ⛔ NO Root option and no commit — it returns an id (D-10 amended) |
+| [`frontend/src/components/attachments/LibraryLinkSegment.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentslibrarylinksegmenttsx) | 0 / 0 / 0 | no (young) | 274-04. In Library / Already in Library · leaf or path · indexing… / couldn't index (D-13, D-25). ⛔ the full path is never tooltip-only |
+| [`frontend/src/components/attachments/SaveToLibraryDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentssavetolibrarydialogtsx) | 0 / 0 / 0 | no (young) | 274-03. The ONE Save-to-Library dialog (built once, mounted twice). ⛔ confirm disabled until a pick; result renders the POST, never the preview; refusals verbatim |
+| [`frontend/src/components/attachments/saveToLibraryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentssavetolibrarycopyts) | 0 / 0 / 0 | no (young) | 274-03. PORT of sketch 274 COPY.js (engine, shared, a), ?raw-fenced; net-new strings flagged. ⛔ never re-typed; the verb is never Attach or Import |
+| [`frontend/src/components/attachments/useLibraryLinks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsattachmentsuselibrarylinksts) | 0 / 0 / 0 | no (young) | 274-04. Per-thread store: one library-links fetch per tick for every chip + row; polls only while indexing. ⛔ a FETCH, never Realtime (D-v2.5-03) |
+| [`frontend/src/lib/api/attachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiattachmentsts) | 0 / 0 / 0 | no (young) | 274-03. promote / preview / library-links clients + wire types. ⛔ getAuthHeaders (X-Org-Id); server sentence verbatim; field names fenced vs backend in 274-05 |
+| [`frontend/src/lib/attachmentLifetime.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibattachmentlifetimets) | 0 / 0 / 0 | no (young) | 274-03. ONE rule: thread-life (null expiry) + prefix-stripped display name. ⛔ its ^[0-9a-f]{8}- regex is lockstep with the backend's (fenced in 274-05) |
 
 
 
@@ -18568,3 +18580,55 @@ Measured `279 / 63 / 6361` at 276-05's merge. 276-02 put `src/docs` in TARGETS. 
 
 ### `.claude/settings.json` — Phase 276
 Measured `14 / 6 / 214` after registration. 276-05 added the docs-coverage hook entry and then reverted it, because that edit needs operator approval. The operator approved it on 2026-10-04, and the orchestrator registered `docs-coverage-guard.js` (PostToolUse `Write|Edit`, timeout 10s) next to `landing-drift-guard.js`. The hook informs and never blocks; CI (`.github/workflows/docs-coverage.yml`) is the backstop. ⛔ This is the only hook dispatch table, so if an entry is dropped the hook never fires and nothing reports it.
+
+## Phase 274 rows — added AT PLANNING (2026-10-05)
+
+The G-5 gate (`node scripts/check-hot-file-ledger.cjs .planning/phases/274-thread-scoped-attachments`, over every file the five 274 plans name) found 12 source files with no scan-list row, all of them modules this phase creates. Rows are added in the plan commit, the commit that first names each file (the 273 precedent). Executing plans do NOT edit this file, because 274-01/274-03 and 274-02/274-04 run as parallel worktrees and a shared ledger edit would conflict; 274-05 re-derives every phase-touched triple once, at close, together with the CLAUDE.md FIRING rows for `workspace.py`, `threads.py`, `main.py`, `agent_loop.py`, `FilesSection.tsx`, `lib/api/documents.ts` and `types/index.ts`.
+
+### `backend/app/api/workspace_promote.py`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-02. Promote / preview / library-links (ATT-03). ⛔ user-JWT read before mint; minter + _enqueue_or_splice only; version_scope=folder; never in workspace.py (244 fence)
+
+### `backend/app/models/workspace_promote.py`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-02. PromoteRequest (folder_id required, extra=forbid) + response models; LibraryLink saved|already == mig 203 CHECK. ⛔ no org field in any body
+
+### `backend/app/services/thread_workspace_cleanup.py`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-01. delete_thread's byte-cleanup seam (D-08): RLS-derived paths, removed after the row delete, logged never pass. ⛔ user-JWT only; own-uid prefix only
+
+### `frontend/src/components/attachments/AttachmentActionsMenu.tsx`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-04. The ONE ⋯ menu + dialog mount for chip and panel row (D-09). ⛔ never on a pending chip (D-18); Open in panel reveals only (D-23)
+
+### `frontend/src/components/attachments/AttachmentRowTrailing.tsx`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-04. Panel Files trailing slot for template_input rows: thread-life vs TTL. ⛔ ⋯ is tabIndex -1 inside role=option; TTL markup moved byte-for-byte
+
+### `frontend/src/components/attachments/FolderPathListbox.tsx`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-03. Searchable full-path folder listbox, APG combobox/listbox a11y. ⛔ NO Root option and no commit — it returns an id (D-10 amended)
+
+### `frontend/src/components/attachments/LibraryLinkSegment.tsx`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-04. In Library / Already in Library · leaf or path · indexing… / couldn't index (D-13, D-25). ⛔ the full path is never tooltip-only
+
+### `frontend/src/components/attachments/SaveToLibraryDialog.tsx`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-03. The ONE Save-to-Library dialog (built once, mounted twice). ⛔ confirm disabled until a pick; result renders the POST, never the preview; refusals verbatim
+
+### `frontend/src/components/attachments/saveToLibraryCopy.ts`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-03. PORT of sketch 274 COPY.js (engine, shared, a), ?raw-fenced; net-new strings flagged. ⛔ never re-typed; the verb is never Attach or Import
+
+### `frontend/src/components/attachments/useLibraryLinks.ts`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-04. Per-thread store: one library-links fetch per tick for every chip + row; polls only while indexing. ⛔ a FETCH, never Realtime (D-v2.5-03)
+
+### `frontend/src/lib/api/attachments.ts`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-03. promote / preview / library-links clients + wire types. ⛔ getAuthHeaders (X-Org-Id); server sentence verbatim; field names fenced vs backend in 274-05
+
+### `frontend/src/lib/attachmentLifetime.ts`
+
+**`0 / 0 / 0`** at 274 planning. Young; row added AT PLANNING. 274-03. ONE rule: thread-life (null expiry) + prefix-stripped display name. ⛔ its ^[0-9a-f]{8}- regex is lockstep with the backend's (fenced in 274-05)

@@ -255,7 +255,21 @@ Plans:
   4. Deleting the thread removes its un-promoted attachments and leaves promoted documents untouched (ATT-01, ATT-03).
 
 **How we'd know this failed**: ATT-01 passes only because the agent could never read the attachment; ATT-02 is met by hiding a button while an API path still writes Library rows from chat; promotion lands at the Library root with no folder choice; a promoted document still cascades when the thread is deleted; another thread cites the attachment.
-**Plans**: TBD
+**Plans**: 5 plans in 3 waves (G-8 target 3-5; the frontend is split into the dialog and its two mounts because one plan would carry ~25 files)
+
+**Wave 1**
+
+- [ ] 274-01-PLAN.md — lifetime split by door (`expires_at` NULL for the composer doors, TTL kept for panel/workflow), agent-note fix, thread-delete byte cleanup seam, migration 203 (the In-Library mark) applied locally [operator checkpoint]
+- [ ] 274-03-PLAN.md — composer thread-life opt-in, one lifetime/display-name rule, cloud-attach org header fix, attachment API client, sketch-274 copy port, the no-Root folder listbox, the ONE Save-to-Library dialog
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 274-02-PLAN.md — promote / promote-preview / library-links in their own module through the shipped minter (`version_scope=folder`, org-scoped, link-on-conflict), minter-parity proof, pinned minter set, OpenAPI + docs coverage
+- [ ] 274-04-PLAN.md — the ⋯ menu + In Library segment on the sent chip and the panel Files row, no 24h on chat attachments, corrected expired copy, composer no-Library-door fence
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 274-05-PLAN.md — merged-tree gates + contract fence + ledger close + docs page, 8-row planted-fact board with second-thread negative, G-4 #1-#4 Chrome drives, D-18 audit, BUG-260905-01 / SEED-247 routing, operator sign-off
 **Flags**: ⚠ **MEASURE FIRST: most of ATT-01/02 may already be true at HEAD.** `SEED-247` was routed at Phase 244 discuss: chat attachments reuse `workspace_files` (D-244-01), are read **inline, never embedded** (D-244-03), and cascade on thread delete (D-244-04). `BUG-260905-01` records the inverted doors. Drive the current behaviour before planning any build, and never re-propose the answered questions. **Discuss decision:** does "ingested" in ATT-01 mean inline-read (as today) or chunked and scoped to the thread (for files too large to read inline)? The second adds a retrieval scope term at the Phase 231 RLS sites, so it is not small. ATT-03 is `SEED-247`'s one open question (Q4): folder picker, the mint/splice path, and the dedup ruling against `documents_dedup_idx` (org-scoped since migration 196). **G-2 FIRES** (promote affordance, composer doors). **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/components/chat/ChatArea.tsx` (FIRES), `MessageInput.tsx` (FIRES), `useComposerAttachments.ts`, `ConnectedFilePickerModal.tsx`, `backend/app/api/workspace.py` (FIRES), `backend/app/services/ingest_splice.py` (FIRES), `backend/app/api/documents.py`, `frontend/src/components/library/LibraryCloudImport.tsx`, `LibraryPage.tsx`. Promotion reuses the shipped ingest path; there is no second one.
 **UI hint**: yes
 
