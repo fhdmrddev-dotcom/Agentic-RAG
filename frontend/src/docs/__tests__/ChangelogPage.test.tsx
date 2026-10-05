@@ -36,6 +36,12 @@ describe("Changelog page (P5)", () => {
     expect(versions[0]).toBe("v4.5")
   })
 
+  it("links the Build Story page (D-26)", () => {
+    renderWithDocs(<Changelog />, data)
+    const link = screen.getByRole("link", { name: "Syrel: The Build Story, chapter by chapter" })
+    expect(link.getAttribute("href")).toBe("/docs/changelog/build-story")
+  })
+
   it("dates v4.5 '—' and badges it Not yet released; a shipped row shows its date", () => {
     renderWithDocs(<Changelog />, data)
     const v45 = releaseLinks().find((a) => a.getAttribute("href") === "/docs/changelog/v4.5")!

@@ -38,7 +38,7 @@ vi.mock("../docsManifest", () => {
   }
 })
 
-const { DocsApp } = await import("../DocsApp")
+const { DocsApp, titleFor } = await import("../DocsApp")
 
 afterEach(() => {
   window.history.replaceState(null, "", "/")
@@ -76,5 +76,21 @@ describe("DocsApp", () => {
     expect(screen.getByRole("combobox", { name: "Search the docs" })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /Search docs/ })).toBeNull()
     expect(document.title).toBe("Syrel Docs")
+  })
+
+  it("links the Build Story from the home page's chapter section (D-26)", () => {
+    window.history.replaceState(null, "", "/docs")
+    render(<DocsApp />)
+    const link = screen.getByRole("link", { name: "Read Syrel: The Build Story" })
+    expect(link.getAttribute("href")).toBe("/docs/changelog/build-story")
+  })
+
+  it("routes /docs/changelog/build-story to the Build Story page and titles it (D-26)", () => {
+    const data = { sections: [], pages: [], changelog: [], chapters: [], loadPage: () => Promise.resolve("") }
+    expect(titleFor({ kind: "build-story", sectionId: "changelog" }, data)).toBe("Syrel: The Build Story · Syrel Docs")
+    window.history.replaceState(null, "", "/docs/changelog/build-story")
+    render(<DocsApp />)
+    expect(screen.getByRole("heading", { level: 1, name: "Syrel: The Build Story" })).toBeInTheDocument()
+    expect(document.title).toBe("Syrel: The Build Story · Syrel Docs")
   })
 })
