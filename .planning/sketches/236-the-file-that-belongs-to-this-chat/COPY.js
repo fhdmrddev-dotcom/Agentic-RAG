@@ -80,7 +80,7 @@ const COPY = {
     sendLabel: "Send",
     agentReadLine: (name) => `Read ${name}`,
     expiredChip: "No longer available",
-    expiredWhy: "Files attached to a chat are kept for 24 hours.",
+    expiredWhy: "This file expired after 24 hours. Files attached to a chat now last as long as the chat; workflow template files still expire after 24 hours.", // amended by Phase 274 D-24
     refusalDismiss: "OK",
   },
 

@@ -16,12 +16,15 @@
  * keyboard walk (ArrowDown / ArrowUp wrap, Enter chooses). The list is ALWAYS expanded — it is the
  * dialog's body, not a popup — so `aria-controls` never dangles while folders exist.
  *
- * Paths come from the shipped `folderPathOf` (chat's scope vocabulary), so the path a person reads
- * here is the same string the dialog's sentences use. Folder names are rendered as text nodes only.
+ * Paths come from `folderDisplay.ts`, so the path a person reads here is the same string the
+ * dialog's sentences use, spelled with the sketch's ` › ` (274-04 moved the DISPLAY off the
+ * `/`-joined `folderPathOf`; that string still backs the search so a typed `/` keeps matching).
+ * Folder names are rendered as text nodes only.
  */
 import { useEffect, useId, useMemo, useState } from "react"
 import { Folder as FolderGlyph } from "lucide-react"
 import { folderPathOf } from "@/components/chat/scopeCopy"
+import { FOLDER_PATH_SEPARATOR, folderDisplayPath } from "./folderDisplay"
 import { cn } from "@/lib/utils"
 import type { Folder } from "@/types"
 import { COPY } from "./saveToLibraryCopy"
@@ -37,8 +40,10 @@ export interface FolderPathListboxProps {
 
 interface FolderRow {
   id: string
-  /** The full path, `/`-joined — what search matches against. */
+  /** The full path as displayed, ` › `-joined. */
   path: string
+  /** The same path `/`-joined — search matches this too, so a typed `/` still finds it. */
+  slashPath: string
   leaf: string
   /** The parent path with its trailing separator, or "" for a top-level folder. */
   parents: string
@@ -54,12 +59,13 @@ export function FolderPathListbox({ folders, value, onChange, labelledBy }: Fold
     () =>
       folders
         .map((f) => {
-          const parentPath = folderPathOf(f.parent_id, folders)
+          const parentPath = folderDisplayPath(f.parent_id, folders)
           return {
             id: f.id,
-            path: folderPathOf(f.id, folders) ?? f.name,
+            path: folderDisplayPath(f.id, folders) ?? f.name,
+            slashPath: folderPathOf(f.id, folders) ?? f.name,
             leaf: f.name,
-            parents: parentPath ? `${parentPath}/` : "",
+            parents: parentPath ? `${parentPath}${FOLDER_PATH_SEPARATOR}` : "",
           }
         })
         .sort((x, y) => x.path.localeCompare(y.path)),
@@ -68,7 +74,9 @@ export function FolderPathListbox({ folders, value, onChange, labelledBy }: Fold
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return q === "" ? rows : rows.filter((r) => r.path.toLowerCase().includes(q))
+    return q === ""
+      ? rows
+      : rows.filter((r) => r.path.toLowerCase().includes(q) || r.slashPath.toLowerCase().includes(q))
   }, [rows, query])
 
   // Keep the active descendant in range as the filtered set changes.

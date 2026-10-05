@@ -31,6 +31,15 @@ vi.mock("@/lib/api", () => ({
   uploadWorkspaceTemplate: vi.fn(),
 }))
 
+// Phase 274-04: a template_input row's trailing slot reads the thread's Library marks. The store
+// is stubbed (nothing linked, everything promotable) so no case reaches the network; the store has
+// its own suite (`components/attachments/__tests__/useLibraryLinks.test.tsx`).
+vi.mock("@/components/attachments/useLibraryLinks", () => ({
+  useLibraryLinks: () => ({ stateFor: () => ({ promotable: true, link: null, leaf: null, path: null }) }),
+  refreshLibraryLinks: vi.fn(),
+}))
+vi.mock("@/components/attachments/SaveToLibraryDialog", () => ({ SaveToLibraryDialog: () => null }))
+
 vi.mock("@/components/panel/FilePreview", () => ({
   FilePreview: ({ file, onBack }: { file: { path: string }; onBack: () => void }) => (
     <div data-testid="file-preview">
@@ -661,5 +670,94 @@ describe("FilesSection (Phase 195-05) — the shared-row conversion contract", (
     // the case reds for a reason that has nothing to do with its subject.
     await userEvent.setup().click(row)
     expect(container.querySelector("[data-testid='file-preview']")).not.toBeNull()
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase 274 plan 04 Task 3 (D-09 / D-15 / D-19) — the chat attachment row: the trailing slot is
+// delegated to `AttachmentRowTrailing`, the row stays a `role=option` in the listbox, its `⋯` is
+// NOT a tab stop, and the focused row reaches the menu with Shift+F10 or the ContextMenu key.
+// ════════════════════════════════════════════════════════════════════════════
+describe("FilesSection (Phase 274-04) — Save to Library on the panel row", () => {
+  const MORE = "More actions for this file"
+
+  const chatFile = {
+    id: "file-chat",
+    path: "a1b2c3d4-Meridian-Q4-pricing.xlsx",
+    size_bytes: 86_016,
+    mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    version: 1,
+    kind: "template_input",
+    expires_at: null,
+  }
+  const agentFile = {
+    id: "file-agent-274",
+    path: "pricing-variance.md",
+    size_bytes: 3_072,
+    mime_type: "text/markdown",
+    version: 1,
+  }
+
+  beforeEach(() => {
+    useViewingThread.mockReturnValue("thread-1")
+    useWorkspaceFiles.mockReturnValue({
+      data: [chatFile, agentFile],
+      isLoading: false,
+      error: null,
+      reconcile: vi.fn(),
+    })
+  })
+
+  it("the chat attachment row reads `this chat only` with ONE ⋯; the agent row gets nothing new", () => {
+    render(<FilesSection />)
+    const [chatRow, agentRow] = screen.getAllByRole("option")
+    expect(chatRow.textContent).toContain("this chat only")
+    expect(chatRow.querySelectorAll(`button[aria-label="${MORE}"]`)).toHaveLength(1)
+    expect(chatRow.textContent).not.toContain("Template")
+    // D-09: an agent-written file gets NO save action — its trailing slot is still undefined.
+    expect(agentRow.querySelectorAll("button")).toHaveLength(0)
+    expect(agentRow.textContent).not.toContain("this chat only")
+  })
+
+  it("the ⋯ is tabIndex -1, and Tab never lands on it inside the listbox", async () => {
+    render(<FilesSection />)
+    const trigger = screen.getAllByRole("option")[0].querySelector(`button[aria-label="${MORE}"]`)!
+    expect(trigger.getAttribute("tabindex")).toBe("-1")
+    const user = userEvent.setup()
+    for (let i = 0; i < 4; i++) {
+      await user.tab()
+      expect(document.activeElement?.getAttribute("aria-label")).not.toBe(MORE)
+    }
+  })
+
+  it("clicking the ⋯ opens the menu and does NOT open the file preview", async () => {
+    const { container } = render(<FilesSection />)
+    const trigger = screen.getAllByRole("option")[0].querySelector<HTMLButtonElement>(`button[aria-label="${MORE}"]`)!
+    await userEvent.setup().click(trigger)
+    expect(container.querySelector("[data-testid='file-preview']")).toBeNull()
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Save to Library…"])
+  })
+
+  it("Shift+F10 on the focused row opens THAT row's menu; Enter still opens the preview", async () => {
+    render(<FilesSection />)
+    const user = userEvent.setup()
+    const row = screen.getAllByRole("option")[0]
+    row.focus()
+    await user.keyboard("{Shift>}{F10}{/Shift}")
+    expect(await screen.findAllByRole("menuitem")).toHaveLength(1)
+    await user.keyboard("{Escape}")
+    expect(screen.queryAllByRole("menuitem")).toHaveLength(0)
+    screen.getAllByRole("option")[0].focus()
+    await user.keyboard("{Enter}")
+    expect(screen.getByTestId("file-preview")).toBeInTheDocument()
+  })
+
+  it("the ContextMenu key on the focused row opens its menu too", async () => {
+    render(<FilesSection />)
+    const row = screen.getAllByRole("option")[0]
+    row.focus()
+    await userEvent.setup().keyboard("{ContextMenu}")
+    expect(await screen.findAllByRole("menuitem")).toHaveLength(1)
+    expect(screen.queryByTestId("file-preview")).toBeNull()
   })
 })

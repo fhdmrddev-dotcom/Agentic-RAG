@@ -64,10 +64,10 @@ describe("FolderPathListbox", () => {
     expect(options).toHaveLength(5)
     expect(options.map((o) => o.textContent)).toEqual([
       "Contracts",
-      "Contracts/Active suppliers",
+      "Contracts › Active suppliers",
       "Suppliers",
-      "Suppliers/Meridian",
-      "Suppliers/Meridian/Pricing",
+      "Suppliers › Meridian",
+      "Suppliers › Meridian › Pricing",
     ])
     for (const o of options) expect(o.textContent).not.toMatch(/root/i)
   })
@@ -77,7 +77,7 @@ describe("FolderPathListbox", () => {
     const pricing = screen.getAllByRole("option")[4]
     const leaf = within(pricing).getByText("Pricing")
     expect(leaf.className).toMatch(/font-semibold|font-bold/)
-    const parents = within(pricing).getByText("Suppliers/Meridian/")
+    const parents = within(pricing).getByText("Suppliers › Meridian ›")
     expect(parents.className).toMatch(/muted/)
   })
 
@@ -85,6 +85,19 @@ describe("FolderPathListbox", () => {
     render(<Harness />)
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "meri" } })
     expect(screen.getAllByRole("option")).toHaveLength(2)
+  })
+
+  it("274-04 — paths are spelled with the sketch's ` › `, and a query typed with `/` or `›` still finds them", () => {
+    // Sketch 274 A draws `Suppliers › Meridian › Pricing`; 274-03 shipped `/` (its deviation #3)
+    // and 274-04 moved the DISPLAY to the drawn separator. A person may still type either.
+    render(<Harness />)
+    for (const o of screen.getAllByRole("option")) expect(o.textContent).not.toContain("/")
+    for (const q of ["meridian/pri", "Meridian › Pri"]) {
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: q } })
+      const options = screen.getAllByRole("option")
+      expect(options).toHaveLength(1)
+      expect(options[0].textContent).toBe("Suppliers › Meridian › Pricing")
+    }
   })
 
   it("a query that matches nothing shows the no-match line and no options", () => {
