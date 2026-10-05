@@ -162,6 +162,31 @@ phase does NOT rebuild it. It does four things:
   delete cleanup; (2) frontend: the shared dialog + the two mounts + chip states; (3) live proof: the
   8-row roster + G-4 drives + negative ATT-02 audit + bug close.
 
+### Resolved at plan-phase (Claude, 2026-10-05, autonomous chain; research open questions 1-6)
+- **D-21:** **The workspace panel's `TemplateUpload` door keeps its 24h TTL.** Only the composer's two
+  attach doors (local + cloud) write `expires_at = NULL`. The panel door is a workflow-template-input
+  door (D-06). Re-open trigger: an operator reports a panel-uploaded file expiring mid-chat.
+- **D-22:** **Types the Library door refuses (`.json .py .js .sh`) get the action disabled with a
+  stated reason, before the dialog opens**, never a post-confirm surprise. The menu item stays visible
+  and reads disabled with one line (ported into `COPY.js`-derived copy as a net-new string). The
+  promote route still refuses them server-side (422, the Library door's own allow-list, never a
+  second list).
+- **D-23:** **"Open in panel" reveals the panel only** (`requestOpenPanel`). Selecting the file row
+  inside `WorkspacePanel` is out of scope.
+- **D-24:** **`expiredWhy` copy is corrected** so it no longer claims chat attachments are kept 24
+  hours. It describes rows that expired under the old rule plus workflow template inputs.
+- **D-25:** **The chip segment gains a failed state** (`couldn't index`) when the promoted document's
+  ingestion fails, rather than reading `indexing…` forever. Net-new copy, flagged as such.
+- **D-26:** **The agent note's "They expire" line (`agent_loop.py` ~:1331) is corrected** to say
+  chat attachments last for the thread. This is a one-line, comment-sized string edit in a FIRING file
+  and is honoured by construction (no branch, no allow-list change). Without it every model is told
+  something false. `test_244_attachment_prompt_line.py` is updated deliberately in the same commit.
+- **D-27:** **The 8-hex storage prefix is stripped from the filename before minting** (D-14 can never
+  match otherwise), and `_EXT_MIME_OVERRIDES` is applied before `mimetypes` guessing.
+- **D-28:** **Migration 203 adds the mark** (`workspace_files.library_document_id uuid REFERENCES
+  documents ON DELETE SET NULL`, `library_link text CHECK in ('saved','already')`), with no paired
+  CHECK that would block document delete. Applied via SQL editor / local psql, never `supabase db push`.
+
 ### Claude's Discretion
 - **The mechanism that separates chat attachments from workflow template inputs** (D-06): a new `kind`,
   a route parameter, or `expires_at = NULL`. Pick the one that keeps the agent allow-list and the chip
