@@ -1,0 +1,126 @@
+{
+  "provider": "openrouter",
+  "model": "z-ai/glm-5.3-flash",
+  "calling_mode_predicted": "NATIVE",
+  "file": {
+    "name": "meridian-clearance-openrouter.md",
+    "body": "# Meridian supplier note\n\nThe Meridian freight-cap clearance code is ATT274-openrouter-b3079276.\n"
+  },
+  "question": "What is the Meridian freight-cap clearance code in the file I attached?",
+  "verdicts": {
+    "d05": "PASS",
+    "answer": "PASS",
+    "second_thread": "PASS",
+    "search_neg": "PASS",
+    "db_neg": "PASS"
+  },
+  "row": {
+    "provider": "openrouter",
+    "model": "z-ai/glm-5.3-flash",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "token": "ATT274-openrouter-b3079276",
+    "thread_a": "5f8c6fff-6e34-45df-9a24-91a29352e588",
+    "thread_b": "d650e5a5-1845-4780-9306-b00f960a98f8",
+    "upload_http": 200,
+    "d05": "PASS",
+    "ws_row": {
+      "id": "d319ca74-2d54-4c1c-a78a-345d35d1fab0",
+      "path": "/b72a4716-meridian-clearance-openrouter.md",
+      "kind": "template_input",
+      "expires_at": null,
+      "size_bytes": "97",
+      "content_storage_path": null,
+      "library_document_id": null,
+      "library_link": null
+    },
+    "answer": "PASS",
+    "run_a_status": "completed",
+    "a_tools": [
+      "workspace_read",
+      "execute_code",
+      "execute_code"
+    ],
+    "a_final": "The clearance code in your attached file is:\n\n**ATT274-openrouter-b3079276**\n\nIt's stated in the note as \"The Meridian freight-cap clearance code is ATT274-openrouter-b3079276.\"",
+    "second_thread": "PASS",
+    "run_b_status": "completed",
+    "b_tools": [
+      "search_documents",
+      "grep",
+      "grep",
+      "grep",
+      "grep",
+      "query_documents",
+      "grep"
+    ],
+    "b_final": "I searched your library thoroughly (semantic search plus content scans for \"Meridian\", \"freight-cap\", \"clearance code\", \"clearance\", and \"code\"), and I can't find any \"Meridian freight-cap clearance code\" in any of your attached files. Rather than guess, here's exactly what does exist on those two threads:\n\n**Meridian-related files** (all project management documents \u2014 no codes in them):\n- Project",
+    "search_http": 200,
+    "search_total": 0,
+    "search_neg": "PASS",
+    "library_rows_with_token": 0,
+    "db_neg": "PASS"
+  },
+  "turn_a": {
+    "run_id": "9856fc50-d551-488f-8704-b1dddae31072",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "z-ai/glm-5.3-flash",
+      "provider": "openrouter",
+      "error": null,
+      "started_at": "2026-10-05 14:38:50.914928+00:00",
+      "completed_at": "2026-10-05 14:39:55.007552+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "4cfa9bda-0fdf-4682-afdf-3b3077305204",
+        "content": "The clearance code in your attached file is:\n\n**ATT274-openrouter-b3079276**\n\nIt's stated in the note as \"The Meridian freight-cap clearance code is ATT274-openrouter-b3079276.\""
+      }
+    ],
+    "tool_call_names": [
+      "workspace_read",
+      "execute_code",
+      "execute_code"
+    ],
+    "final": "The clearance code in your attached file is:\n\n**ATT274-openrouter-b3079276**\n\nIt's stated in the note as \"The Meridian freight-cap clearance code is ATT274-openrouter-b3079276.\""
+  },
+  "turn_b": {
+    "run_id": "8e6bf876-510b-4211-8238-afea314e1f69",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "z-ai/glm-5.3-flash",
+      "provider": "openrouter",
+      "error": null,
+      "started_at": "2026-10-05 14:39:55.360858+00:00",
+      "completed_at": "2026-10-05 14:42:28.741461+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "14b6e249-fc88-4d90-a06d-e34827f1fcb3",
+        "content": "I searched your library thoroughly (semantic search plus content scans for \"Meridian\", \"freight-cap\", \"clearance code\", \"clearance\", and \"code\"), and I can't find any \"Meridian freight-cap clearance code\" in any of your attached files. Rather than guess, here's exactly what does exist on those two threads:\n\n**Meridian-related files** (all project management documents \u2014 no codes in them):\n- Project-Meridian-Charter-Excerpt.docx\n- Project-Meridian-Risk-Workshop-Notes.docx\n- Project-Meridian-Status-Report-Week09.docx\n- weekly-meeting-notes-week8/week9.md, risk-log.md, sprint-task-log.md, project-charter-source.md, kb_doc3_metrics_decisions.md\n\n**Freight-related files** (commercial agreements, also no clearance code):\n- **acme_msa_kestrel_freight_2026.md** \u2014 the ACME \u2194 Kestrel Freight Partners MSA. The only \"clearance\" it mentions is the customs clearance service level (97% within 2 business days [3]), and its only cap is the $2.35M aggregate liability cap [1]. Neither has an alphanumeric code attached.\n- acme_contract_renewal_schedule_2026.md\n- The Northwind Logistics account docs (renewal note, QBR notes, account profile)\n\nSo there's no code matching that description anywhere in your library \u2014 I don't want to invent one. A couple of possibilities:\n\n1. **You attached it elsewhere** \u2014 the file may have been uploaded in a different conversation thread; I can only see documents in this workspace.\n2. **Different wording** \u2014 if you tell me the code's approximate format (e.g. \"MER-FC-\u2026\" or similar) or the exact filename you attached, I'll search for it directly.\n3. **It's not in any document** \u2014 if the code lives in an email or a system outside your library, it won't surface here.\n\nWhich file did you attach it in, or what does the code roughly look like? I'll track it down."
+      }
+    ],
+    "tool_call_names": [
+      "search_documents",
+      "grep",
+      "grep",
+      "grep",
+      "grep",
+      "query_documents",
+      "grep"
+    ],
+    "final": "I searched your library thoroughly (semantic search plus content scans for \"Meridian\", \"freight-cap\", \"clearance code\", \"clearance\", and \"code\"), and I can't find any \"Meridian freight-cap clearance code\" in any of your attached files. Rather than guess, here's exactly what does exist on those two threads:\n\n**Meridian-related files** (all project management documents \u2014 no codes in them):\n- Project-Meridian-Charter-Excerpt.docx\n- Project-Meridian-Risk-Workshop-Notes.docx\n- Project-Meridian-Status-Report-Week09.docx\n- weekly-meeting-notes-week8/week9.md, risk-log.md, sprint-task-log.md, project-charter-source.md, kb_doc3_metrics_decisions.md\n\n**Freight-related files** (commercial agreements, also no clearance code):\n- **acme_msa_kestrel_freight_2026.md** \u2014 the ACME \u2194 Kestrel Freight Partners MSA. The only \"clearance\" it mentions is the customs clearance service level (97% within 2 business days [3]), and its only cap is the $2.35M aggregate liability cap [1]. Neither has an alphanumeric code attached.\n- acme_contract_renewal_schedule_2026.md\n- The Northwind Logistics account docs (renewal note, QBR notes, account profile)\n\nSo there's no code matching that description anywhere in your library \u2014 I don't want to invent one. A couple of possibilities:\n\n1. **You attached it elsewhere** \u2014 the file may have been uploaded in a different conversation thread; I can only see documents in this workspace.\n2. **Different wording** \u2014 if you tell me the code's approximate format (e.g. \"MER-FC-\u2026\" or similar) or the exact filename you attached, I'll search for it directly.\n3. **It's not in any document** \u2014 if the code lives in an email or a system outside your library, it won't surface here.\n\nWhich file did you attach it in, or what does the code roughly look like? I'll track it down."
+  },
+  "upload_response": {
+    "file_id": "d319ca74-2d54-4c1c-a78a-345d35d1fab0",
+    "path": "/b72a4716-meridian-clearance-openrouter.md",
+    "version": 1,
+    "size_bytes": 97,
+    "mime_type": "text/markdown",
+    "kind": "template_input",
+    "expires_at": null,
+    "is_new": true,
+    "warning": null
+  }
+}

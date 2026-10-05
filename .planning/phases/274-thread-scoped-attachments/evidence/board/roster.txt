@@ -1,0 +1,28 @@
+model_capability_unknown model_id=claude-sonnet-5-5 inferred_provider=anthropic native_tools=True
+model_capability_unknown model_id=claude-opus-5 inferred_provider=anthropic native_tools=True
+model_capability_unknown model_id=claude-opus-5-5 inferred_provider=anthropic native_tools=True
+model_capability_unknown model_id=glm-5.3 inferred_provider=zhipu native_tools=True
+model_capability_unknown model_id=gemini-3.8-flash inferred_provider=google native_tools=True
+model_capability_unknown model_id=gemini-3.6-flash inferred_provider=google native_tools=True
+model_capability_unknown model_id=kimi-k3 inferred_provider=moonshot native_tools=True
+model_capability_unknown model_id=glm-5.3-flash inferred_provider=zhipu native_tools=True
+model_capability_unknown model_id=gemini-3.7-flash inferred_provider=google native_tools=True
+ROSTER overlay rows read by load_all_model_overrides: 49 · direct SQL (removed=false): 49
+ROSTER seed ids (MODEL_CAPABILITIES): 61 · union rows: 80
+ROSTER eligible (enabled, not deprecated, not removed): 77
+ROSTER openrouter_tool_strategy (app settings) = <OpenRouterToolStrategy.QUALITY: 'quality'>
+ROSTER groups=9 (required 8, extra 1)
+ROSTER REQUIRED provider=anthropic  newest=claude-opus-5-5 source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE (native SDK adapter) ids_in_group=10 tied_with=['claude-sonnet-5-5', 'claude-opus-5-5']
+ROSTER REQUIRED provider=deepseek   newest=deepseek-v4-pro source=seed + overlay native_tools=True emit_tier=force predicted_calling_mode=NATIVE ids_in_group=2 tied_with=['deepseek-v4-flash', 'deepseek-v4-pro']
+ROSTER REQUIRED provider=google     newest=gemini-3.8-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE (native SDK adapter) ids_in_group=10
+ROSTER EXTRA    provider=lmstudio   newest=qwen-agentworld-35b-a3b source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=6
+ROSTER REQUIRED provider=minimax    newest=MiniMax-M3 source=seed native_tools=True emit_tier=force predicted_calling_mode=NATIVE ids_in_group=8
+ROSTER REQUIRED provider=moonshot   newest=kimi-k3 source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=4
+ROSTER REQUIRED provider=openai     newest=gpt-5.6-luna source=seed native_tools=True emit_tier=force_strict predicted_calling_mode=NATIVE ids_in_group=12 tied_with=['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
+ROSTER REQUIRED provider=openrouter newest=z-ai/glm-5.3-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=15
+ROSTER REQUIRED provider=zhipu      newest=glm-5.3-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=10 tied_with=['glm-5.3', 'glm-5.3-flash']
+ROSTER rows predicted STRUCTURED: NONE
+ROSTER ⚠ no derived row is predicted STRUCTURED — the live SC#2 holdback check needs a STRUCTURED row; see 273-UAT-LOG.md (the plan assumed OpenRouter is STRUCTURED).
+ROSTER STRUCTURED-routing candidates (keyed, enabled, any group): ['lmstudio:nvidia_nvidia-nemotron-nano-9b-v2']
+
+Binary file (standard input) matches

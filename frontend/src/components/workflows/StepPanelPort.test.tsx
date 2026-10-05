@@ -31,6 +31,7 @@ import {
 } from "./stepCardSectionContext"
 import { stepGaps, stillMissingHeading, STEP_ANCHOR_WHAT_IT_DOES } from "./stepReadinessContext"
 import { TOOL_PHRASES, toolName } from "./toolNames"
+import openaiServiceSource from "../../../../backend/app/services/openai_service.py?raw"
 import { TEMPLATE_SECTION_HEADING } from "./TemplateAttachSection"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 
@@ -45,8 +46,18 @@ function phaseOf(config: Record<string, unknown>): PhaseSpecJSON {
   }
 }
 
+/**
+ * Phase 273-05 (RESEARCH OQ3, RESOLVED): the phrase table also names the CHAT-ONLY tools, which
+ * the harness authoring offer subtracts (`CHAT_ONLY_TOOLS`, `openai_service.py`). They are parsed
+ * from that constant through `?raw` — never hand-typed — and removed here, so this stays the
+ * offered set rather than "every phrase".
+ */
+const CHAT_ONLY_TOOL_IDS = new Set(
+  [...(/^CHAT_ONLY_TOOLS\s*=\s*frozenset\(\{([^}]*)\}\)/m.exec(openaiServiceSource)?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1]),
+)
+
 /** Every id the server can offer, in the server's own `sorted()` order — the real 28. */
-const ALL_TOOL_IDS = Object.keys(TOOL_PHRASES).sort()
+const ALL_TOOL_IDS = Object.keys(TOOL_PHRASES).filter((id) => !CHAT_ONLY_TOOL_IDS.has(id)).sort()
 
 function railsOf(over: Partial<PhaseFormRails> = {}): PhaseFormRails {
   return { order: { index: 1, total: 3 }, toolOptions: [], gates: [], ...over }

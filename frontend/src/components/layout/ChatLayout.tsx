@@ -14,13 +14,13 @@ import { ThreadNavigationProvider, type ThreadNavigation } from "@/components/ch
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
 import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
 import { LibraryPage } from "@/pages/LibraryPage"
+import { askInChat } from "@/components/library/find/askInChat"
 // Phase 235-08 — the tab union from the page's own leaf, the `type StudioTab` idiom below.
 import type { LibraryTab } from "@/pages/librarySelection"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { ConnectionsPage } from "@/pages/ConnectionsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
 import { WorkflowsPage } from "@/pages/WorkflowsPage"
-import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
 import { UnknownViewFallback } from "./UnknownViewFallback"
 import { SkillStudioPage, type StudioTab } from "@/pages/SkillStudioPage"
 // Phase 146 (ADMIN-01): the Control Room mounts here as a full-surface branch
@@ -280,6 +280,19 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
     onSetPrefillMessage(`Use the ${skillName} skill`)
     onNavigate("chat")
   }, [onSetPrefillMessage, onNavigate])
+
+  // Phase 271 (D-02 / P-08) — the Library's Ask exit. ⛔ It deliberately does NOT copy
+  // `handleTryInChat` above, which prefills the CURRENT thread and creates none: an Ask question
+  // must land in a NEW conversation, pre-filled and never sent. The order (create → prefill →
+  // navigate; a failed create does nothing else) lives in `askInChat.ts`, where it is tested.
+  const handleAskInChat = useCallback(
+    (question: string) =>
+      askInChat(
+        { createThread: () => newThread(), setPrefill: onSetPrefillMessage, navigate: () => onNavigate("chat") },
+        question,
+      ),
+    [newThread, onSetPrefillMessage, onNavigate],
+  )
 
   // ── Phase 188 Plan 09 (RUNVIZ-03 / D-188-11): the run surface's per-view id, held
   //    LOCALLY in exactly the style of the other per-view state above (`panelState`,
@@ -902,7 +915,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               `undefined` on every ordinary entry, so the Library keeps its own default; it
               is set only by App's `handleOpenLibraryHealth`. */}
           {activeView === "documents" ? (
-            <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} attentionConditions={attentionConditions} />
+            <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} attentionConditions={attentionConditions} onAskInChat={handleAskInChat} />
           ) : activeView === "skills" ? (
             <SkillsPage
               onTryInChat={handleTryInChat}
@@ -940,12 +953,6 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               onLaunch={doRun}
               onOpenRun={canvasEnabled ? openRunSurface : undefined}
             />
-          ) : activeView === "classification-rules" ? (
-            // Phase 118 gap-closure (CLASS-01 reachability): the rules-authoring
-            // page mounts here as a top-level home (the Plan-04 ActiveView seam +
-            // sketch 037-A), additive BEFORE the trailing KnowledgeHealthPage else.
-            // Self-fetches via listRules() — no props; three-homes, no router.
-            <ClassificationRulesPage />
           ) : activeView === "skill-studio" ? (
             // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio
             // focused full-surface mounts here (additive branch BEFORE the trailing

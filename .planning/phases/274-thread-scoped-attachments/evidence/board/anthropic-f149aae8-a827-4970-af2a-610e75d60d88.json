@@ -1,0 +1,116 @@
+{
+  "provider": "anthropic",
+  "model": "claude-opus-5-5",
+  "calling_mode_predicted": "NATIVE (native SDK adapter)",
+  "file": {
+    "name": "meridian-clearance-anthropic.md",
+    "body": "# Meridian supplier note\n\nThe Meridian freight-cap clearance code is ATT274-anthropic-979f0716.\n"
+  },
+  "question": "What is the Meridian freight-cap clearance code in the file I attached?",
+  "verdicts": {
+    "d05": "PASS",
+    "answer": "PASS",
+    "second_thread": "PASS",
+    "search_neg": "PASS",
+    "db_neg": "PASS"
+  },
+  "row": {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "required": true,
+    "calling_mode": "NATIVE (native SDK adapter)",
+    "token": "ATT274-anthropic-979f0716",
+    "thread_a": "88923833-74ff-4833-94cc-d4113727a823",
+    "thread_b": "3c6a0ca2-5207-44c4-89dd-281a5e38e431",
+    "upload_http": 200,
+    "d05": "PASS",
+    "ws_row": {
+      "id": "386267c5-f4b6-45a3-9ed0-da3ff8f2a850",
+      "path": "/55ab08ff-meridian-clearance-anthropic.md",
+      "kind": "template_input",
+      "expires_at": null,
+      "size_bytes": "96",
+      "content_storage_path": null,
+      "library_document_id": null,
+      "library_link": null
+    },
+    "answer": "PASS",
+    "run_a_status": "completed",
+    "a_tools": [
+      "workspace_read",
+      "execute_code"
+    ],
+    "a_final": "The Meridian freight-cap clearance code is **ATT274-anthropic-979f0716**.\n\nThat's from the \"Meridian supplier note\" in the file you attached (**55ab08ff-meridian-clearance-anthropic.md**).",
+    "second_thread": "PASS",
+    "run_b_status": "completed",
+    "b_tools": [
+      "search_documents",
+      "grep",
+      "grep"
+    ],
+    "b_final": "I couldn't find a \"Meridian freight-cap clearance code\" in your documents. Two things to flag:\n\n1. **I don't see an attachment in this chat.** If you meant to attach a file just now, it didn't come through. I could only search the documents already in your library.\n2. **Nothing in your library matches.** I searched for \"freight cap\", \"clearance code\" and \"Meridian\" near \"code\" or \"freight\", and no",
+    "search_http": 200,
+    "search_total": 0,
+    "search_neg": "PASS",
+    "library_rows_with_token": 0,
+    "db_neg": "PASS"
+  },
+  "turn_a": {
+    "run_id": "f149aae8-a827-4970-af2a-610e75d60d88",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "claude-opus-5-5",
+      "provider": "anthropic",
+      "error": null,
+      "started_at": "2026-10-05 14:30:12.119592+00:00",
+      "completed_at": "2026-10-05 14:30:55.717213+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "301af23a-5ae8-443d-b11f-b621ab7f7095",
+        "content": "The Meridian freight-cap clearance code is **ATT274-anthropic-979f0716**.\n\nThat's from the \"Meridian supplier note\" in the file you attached (**55ab08ff-meridian-clearance-anthropic.md**)."
+      }
+    ],
+    "tool_call_names": [
+      "workspace_read",
+      "execute_code"
+    ],
+    "final": "The Meridian freight-cap clearance code is **ATT274-anthropic-979f0716**.\n\nThat's from the \"Meridian supplier note\" in the file you attached (**55ab08ff-meridian-clearance-anthropic.md**)."
+  },
+  "turn_b": {
+    "run_id": "dc646d73-f596-424f-a85f-8038339a88e7",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "claude-opus-5-5",
+      "provider": "anthropic",
+      "error": null,
+      "started_at": "2026-10-05 14:30:56.358175+00:00",
+      "completed_at": "2026-10-05 14:31:17.825579+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "6220c6e6-4b28-4a51-a922-6325ed7fa95a",
+        "content": "I couldn't find a \"Meridian freight-cap clearance code\" in your documents. Two things to flag:\n\n1. **I don't see an attachment in this chat.** If you meant to attach a file just now, it didn't come through. I could only search the documents already in your library.\n2. **Nothing in your library matches.** I searched for \"freight cap\", \"clearance code\" and \"Meridian\" near \"code\" or \"freight\", and none of them turned up in any document.\n\nThe closest results were about freight but don't contain anything like that code:\n- **acme_msa_kestrel_freight_2026.md**: a freight agreement between ACME and Kestrel Freight Partners. It has a $2.35M overall limit on liability [1] and a service target of clearing customs within 2 business days for 97% of entries per month [5]. It doesn't mention Meridian or any clearance code.\n- **northwind-commercials-renewal.md**: a renewal note that covers a Freight Analytics add-on [4], also with no such code.\n\nIf you can re-attach the file or tell me its name, I'll look again. If the code is in your Project Meridian materials, those may not be uploaded yet."
+      }
+    ],
+    "tool_call_names": [
+      "search_documents",
+      "grep",
+      "grep"
+    ],
+    "final": "I couldn't find a \"Meridian freight-cap clearance code\" in your documents. Two things to flag:\n\n1. **I don't see an attachment in this chat.** If you meant to attach a file just now, it didn't come through. I could only search the documents already in your library.\n2. **Nothing in your library matches.** I searched for \"freight cap\", \"clearance code\" and \"Meridian\" near \"code\" or \"freight\", and none of them turned up in any document.\n\nThe closest results were about freight but don't contain anything like that code:\n- **acme_msa_kestrel_freight_2026.md**: a freight agreement between ACME and Kestrel Freight Partners. It has a $2.35M overall limit on liability [1] and a service target of clearing customs within 2 business days for 97% of entries per month [5]. It doesn't mention Meridian or any clearance code.\n- **northwind-commercials-renewal.md**: a renewal note that covers a Freight Analytics add-on [4], also with no such code.\n\nIf you can re-attach the file or tell me its name, I'll look again. If the code is in your Project Meridian materials, those may not be uploaded yet."
+  },
+  "upload_response": {
+    "file_id": "386267c5-f4b6-45a3-9ed0-da3ff8f2a850",
+    "path": "/55ab08ff-meridian-clearance-anthropic.md",
+    "version": 1,
+    "size_bytes": 96,
+    "mime_type": "text/markdown",
+    "kind": "template_input",
+    "expires_at": null,
+    "is_new": true,
+    "warning": null
+  }
+}

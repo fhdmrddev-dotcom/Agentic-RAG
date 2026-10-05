@@ -1,7 +1,11 @@
 ---
 seed_id: SEED-153
 title: "Where close means WRONG — accounting period, legal entity, contract version, jurisdiction — the dimension must be a structured FILTER, never a prompt instruction, and an empty filter must FAIL the phase rather than fall back to unfiltered search"
-status: planted
+status: partially-answered
+partial: true
+folded_into: "272"
+answered_by: "Phase 272 (272-05, 2026-10-03) — chat half only; .planning/phases/272-close-means-wrong/272-VALIDATION.md §3-§4 + evidence/board/ + evidence/g4-*"
+status_note: "Chat half (structured date + dimension filters on search_documents, fail-closed empty result) folded into Phase 272 at discuss 2026-10-03 (FIND-07). Still OPEN: the workflow-input → filter binding and the publish-gauntlet gate (open question 3); out of FIND-07 by roadmap, recorded in 272-CONTEXT.md <deferred>. Open question 2 ANSWERED: the model decides, over the org's closed field list (D-01). 272-05 (2026-10-03): the chat half is ANSWERED on the live stack — 8-row board 20/24 PASS (google 0/3, minimax (c) FAIL); freshness untouched. Workflow binding, gauntlet gate, citation post-gate stay OPEN."
 planted: 2026-08-12
 planted_by: External review 2026-08-12 (finding F4) — accepted, and judged MORE severe than the review rated it
 surface: Agentic-RAG
@@ -114,3 +118,18 @@ answered.
 
 [[SEED-076]] (adjacent, not the same) · [[SEED-152]] (explicitly NOT a mitigation) · [[SEED-146]] ·
 [[SEED-014]]
+
+## What Phase 272 answered (FIND-07, 272-05, 2026-10-03) — the chat half only
+
+- **Answered, measured on the live stack:** `search_documents` takes a structured `filters` argument
+  over the org's closed field list (D-01/D-03); the document set is RLS-decided and passed to both
+  retrieval arms (D-19/D-21); a filter that matches zero documents returns `no_documents_matched` with
+  ZERO retrieval calls (SC#2) and the turn's retry lock refuses a later search that drops that field
+  (D-09). The audit row records the filter and the result kind (SC#1). Freshness/ranking untouched.
+- **Board (272-VALIDATION.md §3):** 20/24 PASS across the derived 8-provider roster. Google
+  (gemini-3.5-flash) 0/3: it answered October correctly WITHOUT a filter (FAIL by D-17) and never
+  emitted the combined entity + July filter. MiniMax (c) ran an entity-only search before the July
+  filter and cited out-of-window figures, which the retry lock does not cover (it fires only after an
+  empty search). That is the CONTEXT trigger for the deferred "must filter" field flag; it was not built.
+- **Still OPEN, unchanged:** the workflow-input → filter binding, the publish-gauntlet gate, and the
+  citation post-gate (chat holds the last one by construction; workflows do not). `partial: true` stays.

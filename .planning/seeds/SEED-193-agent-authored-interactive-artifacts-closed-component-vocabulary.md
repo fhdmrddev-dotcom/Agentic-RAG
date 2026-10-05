@@ -3,7 +3,10 @@ seed_id: SEED-193
 title: The agent can only produce text and dead files — it should produce live artifacts, via a CLOSED component vocabulary the model composes rather than arbitrary agent-authored markup
 created: 2026-08-23
 planted_during: Operator note review, 2026-08-23 — three notes at once ("implement A2UI", image generation, and microsoft/data-formulator)
-status: planted
+status: partially-answered
+partial: true
+status_note: "Phase 273 (2026-10-03, built; live UAT + operator sign-off pending in 273-06) ANSWERED slice 1 (chart-as-spec) plus the table and metric entries of a CLOSED registry (show_artifact; 3 components, 4 chart kinds), and by-reference re-encoding of stored rows. Was: folded into 273 at discuss. The data-thread branch/compare half stays DEFERRED (out of scope by the v4.5 roadmap)."
+folded_into: "273"
 priority: high
 surface: Agentic-RAG
 relates_to:
@@ -109,3 +112,13 @@ This seed is the seed of the NEXT milestone after Connections. The one genuine s
 external API in chat, the model decides, it generates an image and puts it in the artifact"* — is an
 ARTIFACT concern that needs a connection, so Connections ships first (the call) and Artifacts second
 (the render). See `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md` -> "Deliberately NOT in this milestone".
+
+---
+
+## ANSWERED IN PART by Phase 273 (2026-10-03) — what shipped, and what did not
+
+- **Answered:** the agent emits live artifacts through `show_artifact`, a CLOSED vocabulary (`chart`, `table`, `metric`; chart kinds `line` / `bar` / `area` / `scatter`) validated server-side (`backend/app/models/artifact.py`), stored immutably in `message_artifacts` (migration 202) and rendered by a closed frontend registry (`frontend/src/components/chat/artifacts/`). No model-authored markup reaches the page; an unknown or malformed spec renders a worded notice.
+- **Answered:** trigger (a) above — *a chart the user then wants to CHANGE*. A follow-up re-encodes the STORED rows by reference (`from_artifact` + filter / sort / top_n / select) with no retrieval re-run, and the new artifact records its parent.
+- **NOT answered, still deferred:** the data-thread branch/compare half (Data Formulator's ambitious half). It stays out of scope by the v4.5 roadmap; re-open when a phase scopes branching or comparing artifacts.
+- **Not addressed:** SEED-194 (image generation) can now ride the same rail as a fourth registry entry; SEED-185 (no URL router) still makes an artifact unlinkable.
+- Live verification (8-row board, G-4 drives, operator sign-off) is recorded in `.planning/phases/273-agent-authored-artifacts/273-VALIDATION.md` / `273-UAT-LOG.md`. Flip `status` to `answered` only if a later phase takes the branch/compare half or the operator consciously retires it.

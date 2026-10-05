@@ -1,0 +1,48 @@
+# .dockerignore (repo root) — 276-REVIEW A-WR-05.
+#
+# The onebox frontend image builds from the REPO ROOT (docker-compose.prod.yml: `context: .` +
+# `dockerfile: frontend/Dockerfile`). Its primary ignore file is frontend/Dockerfile.dockerignore,
+# BuildKit's per-Dockerfile ignore (assumption A3). This file is the FALLBACK for any builder that
+# does not read per-Dockerfile ignores (DOCKER_BUILDKIT=0, older engines, some CI builders):
+# without it the whole repo — the root .env with the service-role key, backend/.env, backend/venv
+# (1.7 GB), .git — becomes build context, and `COPY frontend/ ./` would carry frontend/.env* into
+# `vite build`, which inlines their VITE_* values into the shipped bundle.
+#
+# Keep it a SUPERSET-COMPATIBLE twin of frontend/Dockerfile.dockerignore: the frontend build reads
+# frontend/, docs/public/, docs/history/, scripts/lib/, video/src/ and video/public/ — never
+# exclude those. The backend image builds from ./backend (its own context), so nothing here
+# affects it.
+
+# Secrets — VITE_* are build args, never copied from a file (T-157-SEC, T-276-08)
+**/.env
+**/.env.*
+
+# Dependencies + build output
+**/node_modules
+backend/venv
+frontend/dist
+frontend/dist-ssr
+
+# Everything the frontend image never reads
+.git
+.planning/
+.claude/
+.agent-bus/
+graphify-out/
+scratch/
+screenshots/
+supabase/
+deploy/
+
+# Video: only video/src and the wav VO / mp3 music under video/public are wanted
+video/out/
+video/public/notebooklm/
+video/public/music/*.wav
+video/tools/
+
+# Logs, tests, coverage
+**/*.log
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/e2e/

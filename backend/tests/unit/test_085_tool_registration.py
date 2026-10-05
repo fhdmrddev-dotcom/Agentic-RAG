@@ -277,17 +277,18 @@ def test_get_tools_returns_25_tools_with_no_conditional_enabled():
 
     eff = SimpleNamespace(web_search_enabled=False, sandbox_enabled=False)
     base_tools = get_tools(eff)
-    assert len(base_tools) == 25, (
-        f"Expected exactly 25 tools in base (no web/sandbox); got {len(base_tools)}: "
+    # Phase 273: 25 → 26 — show_artifact is ungated (appended after ask_user).
+    assert len(base_tools) == 26, (
+        f"Expected exactly 26 tools in base (no web/sandbox); got {len(base_tools)}: "
         f"{[t['function']['name'] for t in base_tools]}"
     )
 
-    # And both conditionals on → 28 (phase-end target: + web_search + execute_code
-    # + fetch_document_file).
+    # And both conditionals on → 29 (phase-end target: + web_search + execute_code
+    # + fetch_document_file). Phase 273: 28 → 29 (show_artifact).
     eff_all = SimpleNamespace(web_search_enabled=True, sandbox_enabled=True)
     all_tools = get_tools(eff_all)
-    assert len(all_tools) == 28, (
-        f"Expected exactly 28 tools with both conditionals on; got {len(all_tools)}: "
+    assert len(all_tools) == 29, (
+        f"Expected exactly 29 tools with both conditionals on; got {len(all_tools)}: "
         f"{[t['function']['name'] for t in all_tools]}"
     )
 

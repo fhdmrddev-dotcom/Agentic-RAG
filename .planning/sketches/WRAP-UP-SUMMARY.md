@@ -709,3 +709,23 @@ Phase 187's contribution is **specificity and honesty at the seam where the AI h
 decision, and the reason 187 carries a threat model), and the **G-5 hot-file audit** for
 `WorkflowBuilderPage.tsx` (151-C touches the describe screen) and `PhaseNode.tsx` (148-C + 149-C
 both touch the face). `WorkflowCanvas.tsx` already has an extraction due in Phase 188.
+
+---
+
+# Sketch Wrap-Up: Phase 273 (2026-10-03)
+
+**Sketches processed:** 1 (scope chosen by operator: 273 only; the ~70-folder backlog of 152-271 stays unwrapped)
+**Design area:** Agent-Authored Artifacts → `references/agent-authored-artifacts.md`
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/`
+
+| # | Name | Winner | Design Area |
+|---|------|--------|-------------|
+| 273 | agent-authored-artifacts | 1B framed card · 2A one metric tile · 3A lineage caption · 4B explicit notice + live render | Agent-Authored Artifacts |
+
+**Key decisions:**
+- Framed artifact card after the answer text: title, kind chip, and a server-derived source caption in the footer.
+- Chart, table and metric read as one family; a metric is ONE tile.
+- A follow-up states its rows in words.
+- A dashed "This artifact can't be shown" notice with one plain reason, never JSON.
+- The card renders as soon as it arrives.
+- Validated dark categorical slots: `#3987e5 #d95926 #199e70 #c98500`.

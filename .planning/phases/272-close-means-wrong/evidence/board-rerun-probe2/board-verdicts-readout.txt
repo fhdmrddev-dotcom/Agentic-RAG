@@ -1,0 +1,5 @@
+deepseek   (b) PASS req=deepseek-v4-pro eff=deepseek/deepseek-v4-pro audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['38ca454d-c50c-4ba2-aacd-fe6c35c1b4e5']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    notes: legal_entity=Acme GmbH filter: True · citations 3 all Acme GmbH: True · filtered call returned 3/3 matched docs · Sep 2025 cited: True · EUR 1,180,000 in answer: True
+    answer: Acme GmbH's revenue appears in three monthly financial reports in your library:  | Period | Revenue | |--------|---------| | September 2025 | EUR 1,180,000 [3] | | October 2025 | EUR 1,240,000 [1] | | March 2026 | EUR 1,410,000 [2] |  The most recent figure is

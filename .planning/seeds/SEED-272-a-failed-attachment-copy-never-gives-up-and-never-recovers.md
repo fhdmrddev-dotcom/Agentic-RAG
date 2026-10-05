@@ -25,6 +25,12 @@ trigger_paths:
   - "backend/app/services/tool_dispatcher.py"
 ---
 
+> **Confirmed 2026-10-04 (release-history audit, `docs/history/v4.1-ship-it-and-feel-it.md`).** Still
+> `planted` and still accurate: no commit after `111eebb48` (the 2026-09-12 WR-03 change this seed measured)
+> touches `_hydration_failures` / `_ATTACHMENT_HYDRATION_MAX_ATTEMPTS` in `tool_dispatcher.py` or
+> `sandbox_service.py`; the per-process `WeakKeyDictionary` (`tool_dispatcher.py:1824`) and the cap of 2
+> (`:1830`) are unchanged.
+
 # The finding
 
 `244-14` (review `WR-03`) rewrote attachment hydration so a failed copy is **named on every

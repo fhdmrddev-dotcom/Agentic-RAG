@@ -17,14 +17,28 @@ export function LandingFooter() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          fontSize: 13,
+          fontSize: 14,
           color: "hsl(220 16% 65%)",
           flexWrap: "wrap",
           gap: 16,
         }}
       >
-        <span>© {currentYear} Agentic RAG</span>
-        <div style={{ display: "flex", gap: 20 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <img src="/brand/syrel-mark-iris.svg" width={20} height={20} alt="" />
+          © {currentYear} Syrel
+        </span>
+        {/* Phase 276 (UI-SPEC P0 footer): shared by the landing and the docs, so every link is
+            absolute — a "#security" anchor would point nowhere from a /docs page. */}
+        <nav aria-label="Footer" style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+          <a href="/docs" style={{ color: "hsl(220 16% 65%)" }}>
+            Docs
+          </a>
+          <a href="/docs/changelog" style={{ color: "hsl(220 16% 65%)" }}>
+            Changelog
+          </a>
+          <a href="/#security" style={{ color: "hsl(220 16% 65%)" }}>
+            Security
+          </a>
           <a
             href="https://github.com/fhdmrddev-dotcom/Agentic-RAG"
             target="_blank"
@@ -33,16 +47,10 @@ export function LandingFooter() {
           >
             GitHub
           </a>
-          <a href="#features" style={{ color: "hsl(220 16% 65%)" }}>
-            Features
-          </a>
-          <a href="#security" style={{ color: "hsl(220 16% 65%)" }}>
-            Security
-          </a>
           <a href={appUrl} style={{ color: "hsl(220 16% 65%)" }}>
             Sign in
           </a>
-        </div>
+        </nav>
       </div>
     </footer>
   )

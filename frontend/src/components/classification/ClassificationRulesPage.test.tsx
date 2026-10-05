@@ -112,7 +112,7 @@ describe("ClassificationRulesPage", () => {
     listRules.mockResolvedValue([])
     renderPage()
     await waitFor(() =>
-      expect(screen.getByText(/no classification rules yet/i)).toBeInTheDocument(),
+      expect(screen.getByText(/no filing rules yet/i)).toBeInTheDocument(),
     )
   })
 
@@ -120,10 +120,10 @@ describe("ClassificationRulesPage", () => {
     renderPage()
     await waitFor(() => expect(screen.getByText("Acme Invoices")).toBeInTheDocument())
     // No builder until the user opens one.
-    expect(screen.queryByText(/new classification rule/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/new filing rule/i)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: /new rule/i }))
     // The builder panel appears (state-switch, no router).
-    expect(await screen.findByText(/new classification rule/i)).toBeInTheDocument()
+    expect(await screen.findByText(/new filing rule/i)).toBeInTheDocument()
     // The Rule name field (owned by RuleBuilderPanel) is present.
     expect(screen.getByLabelText(/rule name/i)).toBeInTheDocument()
   })
@@ -165,5 +165,47 @@ describe("ClassificationRulesPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /all \(2\)/i }))
     expect(screen.getByText("Acme Invoices")).toBeInTheDocument()
     expect(screen.getByText("Incoming PDFs")).toBeInTheDocument()
+  })
+})
+
+// Phase 271 (D-08 / D-09 / P-07) — one shape: the Filing rules sub-view inside the Library.
+describe("ClassificationRulesPage — named Filing rules, mounted inside the Library", () => {
+  it("titles the surface 'Filing rules' and never reads 'Classification rules'", async () => {
+    const { container } = renderPage()
+    await waitFor(() => expect(screen.getByText("Acme Invoices")).toBeInTheDocument())
+    expect(screen.getByRole("heading", { level: 1, name: "Filing rules" })).toBeInTheDocument()
+    expect(container.textContent).not.toMatch(/classification rules/i)
+    // The shipped subtitle sentence, verbatim (036-A: suggested ≠ moved).
+    expect(
+      screen.getByText(
+        "Suggest a folder for matching uploads — never a silent move. You accept or dismiss each suggestion on the document.",
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("renders a 'Library' back button only when onBack is given, and it calls onBack", async () => {
+    const onBack = vi.fn()
+    const { unmount } = renderPage()
+    await waitFor(() => expect(screen.getByText("Acme Invoices")).toBeInTheDocument())
+    expect(screen.queryByRole("button", { name: "Library" })).not.toBeInTheDocument()
+    unmount()
+
+    render(
+      <TooltipProvider>
+        <ClassificationRulesPage onBack={onBack} />
+      </TooltipProvider>,
+    )
+    await waitFor(() => expect(screen.getByText("Acme Invoices")).toBeInTheDocument())
+    fireEvent.click(screen.getByRole("button", { name: "Library" }))
+    expect(onBack).toHaveBeenCalledTimes(1)
+    // New rule is still the single primary action and still opens the builder.
+    fireEvent.click(screen.getByRole("button", { name: /new rule/i }))
+    expect(await screen.findByText(/new filing rule/i)).toBeInTheDocument()
+  })
+
+  it("drops its own outer padding — the Library supplies it", async () => {
+    const { container } = renderPage()
+    await waitFor(() => expect(screen.getByText("Acme Invoices")).toBeInTheDocument())
+    expect((container.firstElementChild as HTMLElement).className).not.toMatch(/\bp-8\b/)
   })
 })

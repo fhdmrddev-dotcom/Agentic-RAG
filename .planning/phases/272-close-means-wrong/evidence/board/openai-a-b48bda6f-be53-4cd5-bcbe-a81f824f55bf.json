@@ -1,0 +1,153 @@
+{
+  "prompt": "What was October revenue?",
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "verdict": "PASS",
+  "notes": [
+    "date filter in Oct 2025: True",
+    "range in answer: True",
+    "citations 2 all October: True"
+  ],
+  "tool_calls_inspected": [
+    "search_documents({\"query\": \"October revenue total revenue amount\", \"filters\": [{\"op\": \"between\", \"field\": \"date\", \"value\": \"2025-10-01\", \"value2\": \"2025-10-31\"}]})"
+  ],
+  "audit_ids": [
+    "29a00ef9-314a-4659-b13a-ce2c3575cfdc"
+  ],
+  "audit_kinds": [
+    "passages"
+  ],
+  "audit_filters": [
+    [
+      {
+        "op": "between",
+        "field": "date",
+        "value": "2025-10-01",
+        "value2": "2025-10-31"
+      }
+    ]
+  ],
+  "cited": {
+    "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+      "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+      "filename": "272-board-acme-2025-10.md",
+      "d": "2025-10-15",
+      "ent": "Acme GmbH"
+    },
+    "d66d6436-f53f-4c50-b0b0-b2695dd36822": {
+      "id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+      "filename": "272-board-beta-2025-10.md",
+      "d": "2025-10-20",
+      "ent": "Beta Ltd"
+    }
+  },
+  "answer_excerpt": "October 2025 revenue was:\n\n- **Acme GmbH:** **EUR 1,240,000** [1]\n- **Beta Ltd:** **GBP 860,000** [2]\n\nThe figures are in different currencies, so they are not directly additive.",
+  "thread_id": "1046016e-061d-4f90-bc13-94053bb069a4",
+  "run_id": "b48bda6f-be53-4cd5-bcbe-a81f824f55bf",
+  "run_status": "completed",
+  "effective": {
+    "status": "completed",
+    "model": "gpt-5.6-luna",
+    "provider": "openai",
+    "error": null
+  },
+  "raw": {
+    "audits": [
+      {
+        "id": "29a00ef9-314a-4659-b13a-ce2c3575cfdc",
+        "at": "2026-10-03 08:11:57.132978+00",
+        "metadata": {
+          "run_id": "b48bda6f-be53-4cd5-bcbe-a81f824f55bf",
+          "filters": [
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2025-10-01",
+              "value2": "2025-10-31"
+            }
+          ],
+          "thread_id": "1046016e-061d-4f90-bc13-94053bb069a4",
+          "folder_ids": [],
+          "query_text": "October revenue total revenue amount",
+          "result_kind": "passages",
+          "document_ids": [
+            "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "d66d6436-f53f-4c50-b0b0-b2695dd36822"
+          ],
+          "similarities": {
+            "7b0af230-1ef4-46e5-b316-11888ce84ffb": 0.464,
+            "d66d6436-f53f-4c50-b0b0-b2695dd36822": 0.425
+          },
+          "parent_run_id": null,
+          "undated_excluded": 141,
+          "matched_document_count": 2
+        }
+      }
+    ],
+    "messages": [
+      {
+        "id": "815624cc-c788-4d2c-991e-44ef4c17fbc4",
+        "role": "user",
+        "content": "What was October revenue?",
+        "tool_calls": null,
+        "source_refs": null,
+        "at": "2026-10-03 08:11:49.707237+00"
+      },
+      {
+        "id": "ad4759cc-a233-49ae-a204-44d42ea7fc3c",
+        "role": "assistant",
+        "content": "October 2025 revenue was:\n\n- **Acme GmbH:** **EUR 1,240,000** [1]\n- **Beta Ltd:** **GBP 860,000** [2]\n\nThe figures are in different currencies, so they are not directly additive.",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "October revenue total revenue amount",
+              "filters": [
+                {
+                  "op": "between",
+                  "field": "date",
+                  "value": "2025-10-01",
+                  "value2": "2025-10-31"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Acme GmbH \\u2014 monthly financial report, October 2025\\n\\nReporting entity: Acme GmbH.\\nReporting period: October 2025.\\n\\nTotal revenue for the period: EUR 1,240,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"7b0af230-1ef4-46e5-b316-11888ce84ffb\", \"filename\": \"272-board-acme-2025-10.md\", \"chunk_index\": 0, \"similarity\": 0.46399452609408587, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2025-10-15\", \"title\": \"Acme GmbH \\u2014 monthly financial report, October 2025\", \"topics\": [\"finance\", \"monthly reporting\", \"revenue\", \"operating costs\"], \"_source\": {\"date\": \"user\", \"legal_entity\": \"user\"}, \"summary\": \"Monthly financial report for Acme GmbH covering October 2025, stating total revenue of EUR 1,240,000. Revenue was driven by recurring service contracts and one-off project work, and operating costs were in line with budget.\", \"language\": \"en\", \"_confidence\": {\"title\": 0.99, \"author\": 0.2, \"topics\": 0.9, \"summary\": 0.97, \"language\": 0.99, \"document_type\": 0.98}, \"legal_entity\": \"Acme GmbH\", \"document_type\": \"monthly financial report\"}}, {\"content\": \"# Beta Ltd \\u2014 monthly financial report, October 2025\\n\\nReporting entity: Beta Ltd.\\nReporting period: October 2025.\\n\\nTotal revenue for the period: GBP 860,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"d66d6436-f53f-4c50-b0b0-b2695dd36822\", \"filename\": \"272-board-beta-2025-10.md\", \"chunk_index\": 0, \"similarity\": 0.4252067655819859, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2025-10-20\", \"title\": \"Beta Ltd \\u2014 monthly financial report, October 2025\", \"topics\": [\"financial report\", \"revenue\", \"operating costs\", \"mont",
+            "status": "done",
+            "tool_call_id": "call_oz0kcn5SPPhWLBWGQsQ0wqJr"
+          }
+        ],
+        "source_refs": [
+          {
+            "passage": "# Acme GmbH \u2014 monthly financial report, October 2025\n\nReporting entity: Acme GmbH.\nReporting period: October 2025.\n\nTotal revenue for the period: EUR 1,240,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-acme-2025-10.md",
+            "similarity": 0.46399452609408587,
+            "chunk_index": 0,
+            "document_id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# Beta Ltd \u2014 monthly financial report, October 2025\n\nReporting entity: Beta Ltd.\nReporting period: October 2025.\n\nTotal revenue for the period: GBP 860,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-beta-2025-10.md",
+            "similarity": 0.4252067655819859,
+            "chunk_index": 0,
+            "document_id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          }
+        ],
+        "at": "2026-10-03 08:11:59.526798+00"
+      }
+    ],
+    "run": {
+      "status": "completed",
+      "model": "gpt-5.6-luna",
+      "provider": "openai",
+      "error": null
+    }
+  }
+}

@@ -77,6 +77,13 @@ the same fact at v2.5 close and it has held continuously since. **"MCP-backed" o
 chosen direction, not existing infrastructure.** Nothing in this doc should be read as describing a
 client that exists or is being built by Phase 189.
 
+> ⚠ **SUPERSEDED 2026-10-04 — the paragraph above was true on 2026-08-07 and is kept as history, not
+> as a description of today.** An MCP client now ships: `backend/app/services/mcp_client.py`
+> (526 lines), first added at `a1aa25c48` (**Phase 206, 2026-08-25**, v3.8), with live outbound
+> egress guarded by `app.security.egress.validate_mcp_destination` and per-tool grants (v3.9).
+> The "zero MCP code" measurements on this page (here and under *"The measured evidence…"* below)
+> describe the codebase **before v3.8**. Current state: `docs/history/v3.8-…` and `v3.9-…`.
+
 ## What it does NOT decide
 
 This is the substrate-and-sequencing decision only. The following are Phase 190 / CONN-02 / CONN-03

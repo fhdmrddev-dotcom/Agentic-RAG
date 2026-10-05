@@ -1,0 +1,53 @@
+{
+  "thread_id": "d1de4f36-62ac-458f-a000-e5b031ef61fc",
+  "result": {
+    "run_status": "NOT TERMINAL (streaming)",
+    "tool_calls": [],
+    "delta_has_call_text": false,
+    "persisted_has_json_fence": false,
+    "delta_equals_persisted": false,
+    "delta_len": 10,
+    "persisted_len": 0
+  },
+  "turn": {
+    "run_id": "b1ca91d4-d7fb-4883-880e-cb469ad8add5",
+    "run_status": "NOT TERMINAL (streaming)",
+    "run": {
+      "status": "streaming",
+      "model": "nvidia_nvidia-nemotron-nano-9b-v2",
+      "provider": "lmstudio",
+      "error": null,
+      "started_at": "2026-10-03 19:43:15.853883+00:00",
+      "completed_at": null
+    },
+    "assistant_messages": [],
+    "tool_call_names": [],
+    "show_artifact_calls": 0,
+    "refused_calls": 0,
+    "artifact_ids_from_results": [],
+    "final_answer_empty": true,
+    "final_answer_is_fallback": false,
+    "persisted_json_fence": false,
+    "redis": {
+      "present": true,
+      "ttl": -1,
+      "event_types": {
+        "iteration_start": 6,
+        "reasoning_delta": 4780,
+        "delta": 5,
+        "tool_preparing": 5,
+        "tool_end": 5,
+        "planning": 5,
+        "system_warning": 5,
+        "tool_start": 3,
+        "code_execution_start": 2,
+        "code_executing": 7,
+        "code_stderr": 7,
+        "code_execution_complete": 2
+      },
+      "delta_count": 5,
+      "delta_text": "\n\n\n\n\n\n\n\n\n\n",
+      "artifact_events": 0
+    }
+  }
+}

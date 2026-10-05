@@ -27,7 +27,322 @@
 - ✅ **v4.1 Ship It & Feel It** — Phases **242-246** (shipped 2026-09-13, git tag `v4.1`). 5 phases, **25 plans**, migrations **177-180**, 3 days. **18/19 requirements delivered · 1 ⛔ unmet BY MEASUREMENT.** A deliberate **CONSOLIDATION** milestone — no new capability axis; every requirement closed something already in a register. The ship claims closed against the **database and the branch** rather than the deploy record; the chat surface stopped getting in the way (follow-scroll driven with a **real wheel** — 0 px drift, closing `BUG-260823-01` after two fixes that had passed on synthetic events; all five `SHELL` criteria driven in a browser); and v4.0's verification debt got **written verdicts** plus a greppable marker so a self-verification can no longer read as a review. ⭐ **Its best work is the requirement it did NOT deliver:** 246 proved by `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff through the index — every index walk returns **ONE row**, every good recall figure is a **~1.1 s sequential scan** — so the 200 default was **refused and reverted to 40**, with `RECALL-01` left open on `SEED-273`. ⭐ 246 is also the **first peer-reviewed phase since `OV-SOLO-01` was re-armed**. ⚠ Migrations **179/180 are not in cloud** and `production` is **287 commits behind**, so v4.1's own output is undeployed ([`audit`](milestones/v4.1-MILESTONE-AUDIT.md)).
 - ✅ **v4.2 The Connected Knowledge You Can Actually Run** — Phases **247-254** (shipped 2026-09-18, git tag `v4.2`). 8 phases (247-251 scoped; **252 / 253 / 254 inserted by audit**), **31 plans**, migration **181**, 6 days. **25/26 requirements satisfied · 1 ⛔ unsatisfied (`DEBT-06`).** Integration **19/19** · flows **3/3**. **26 requirements in 6 categories**, 25 mapped to the five scoped phases and `DEBT-06` held as a **milestone-wide standing gate** that ends the milestone **unmet, by measurement**. ⚠ **The bullet above is CORRECTED, not rewritten: its closing claim — *"migrations 179/180 are not in cloud and `production` is 287 commits behind, so v4.1's own output is undeployed"* — was true when written and is now FALSE.** Measured at this scoping: `production` moved `e65610ac2 → eebc4c42f` (**292 commits**), `production..develop` is **0**, migrations **179 and 180 are applied and verified in cloud** (177/178 measured **already present** — `scripts/pending-cloud-migrations.sh` diffs git refs, not the live database, and over-reported by two), and `get_advisors(security)` returns **zero ERROR findings**. **v4.1 IS deployed.** v4.2 is therefore the SECOND consecutive **consolidation** milestone — no new capability axis, every requirement closes something already in a register, and each was **DRIVEN against the tree on 2026-09-13 rather than read from a `status:` field**, a method that caught three wrong register entries (two stale toward *"still broken"*, one toward *"fine"*). Watch-loop honesty (247) · the credential boundary (248) · the model you actually run (249) · run-honesty residue (250) · register integrity (251) — then **three phases the audit added**: the four blockers five green verifications could not see (252) · the bootstrap artifact that shipped every function wide open (253) · the independent review of 249-253 (254). **v4.2 opened on deployed code for the first time in three milestones, and closed on it.**
 - ✅ **v4.3 What You Can Actually Sell** — Phases **255-264** (shipped 2026-09-23, git tag `v4.3`). 10 phases (255-260 scoped; 261-264 added in-milestone), **39 plans**, migrations **182-192**, 6 days. **31/32 requirements delivered · PACK-05 carried to SEED-304 by decision.** Extension contract, token metering + USD, enforceable tiers, Experts as data.
-- ✅ **v4.4 Experts That Actually Work** — Phases **265-269** (shipped 2026-09-29, git tag `v4.4`). 5 phases, **24 plans**, migrations **194-198**, 7 days. **17/17 requirements satisfied** (audit `tech_debt`, no blockers). A client installs an Expert and gets grounded answers from its own knowledge in their own org — proven by live drives as a real user, never by a mocked test. ⚠ **Nothing deployed:** migrations 194-198 and `464ec8354` are not on production.
+- ✅ **v4.4 Experts That Actually Work** — Phases **265-269** (shipped 2026-09-29, git tag `v4.4`). 5 phases, **24 plans**, migrations **194-198**, 7 days. **17/17 requirements satisfied** (audit `tech_debt`, no blockers). A client installs an Expert and gets grounded answers from its own knowledge in their own org — proven by live drives as a real user, never by a mocked test. ✅ **DEPLOYED 2026-09-29** — production `82babd8d0`; migrations 195-198 applied to production (194 already was). Operator smoke test owed.
+- 🚧 **v4.5 Find It, Show It** — Phases **270-275** (started 2026-09-29). 6 phases, 19 requirements, migrations from **199**. Find a document by what it IS and get the file back out (270-272), let the agent answer with interactive artifacts from a closed component registry (273), keep chat attachments in their thread (274), and retention with legal hold (275).
+
+---
+
+## v4.5 Find It, Show It — 🚧 IN PROGRESS
+
+**Started:** 2026-09-29. **Roadmap created:** 2026-09-29.
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **19 v1 requirements, 19 mapped, 0 orphans.**
+
+**Goal:** Find documents by what they ARE (type, owner, date, structure), get the file back out, and
+let the agent answer with interactive artifacts instead of dead images and prose.
+
+**Milestone rule (every phase):** a success criterion is met by a **live drive as a real user in a
+real org**, with the evidence recorded (DB row, transcript, screenshot). A mocked or fixture test alone
+does not meet it. Tests still ship, but they are not the proof. ⛔ *Presence assertions cannot see
+content drift*: where the words or values are the deliverable (a file fact, a filter result, a refusal,
+a chart's numbers), assert the rendered **content**.
+
+**Red line (every phase — the Extension Contract, `docs/EXTENSION-CONTRACT.md`):** the closed core
+(**7 phase types / 1 emitter / 29 tools** at v4.4 close) is re-counted against each phase's base commit.
+Count it; do not substring-match it. A filter is DATA passed to retrieval. An artifact component is
+closed code in a registry, and a prompt can never add one at runtime. If Phase 273 adds an agent tool,
+that is a deliberate, recorded change to the inventory made at discuss. It must never be discovered
+at close.
+
+**Numbering:** Phases **270-275**. **Migrations resume at `199`**, measured at roadmap creation (`ls
+supabase/migrations | tail` ends at `198_starter_expert_library.sql`). Only Phase 270 is pre-assigned a
+number. Every later phase takes the **next free** number at its own discuss, after running `ls` again.
+A ROADMAP has named an already-taken number three times (184, 185, 193).
+
+**Solo running:** Claude builds and reviews. Phases close `verification_mode: self-verified`, and the
+review runs as a fresh-context `/gsd:code-review`.
+
+**Out of scope (operator, at intake):** `SEED-211` permissions derived from metadata. That is a security
+fork, not a findability feature. **No phase here may let a metadata filter grant or deny access.** Also
+out of scope: `SEED-224`'s full five-tab document-space redesign, `SEED-194` image generation, the
+data-thread branch/compare half of `SEED-193`, the hardening/testing milestone, and plugins/ecosystem
+(`SEED-291..294`).
+
+### Phase Table
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 270 | The Document as an Object | A person can get the original file of any document they can see, and the detail panel says what the file is, with every date labelled for what it means | FIND-04, FIND-05 | 4 | migration **199** · security_enforcement (the signed URL is a bearer token) · **G-2** · G-5 (`documents.py`, `DocumentDetailPanel.tsx`, `DocumentList.tsx`, `types/index.ts`) · UI hint |
+| 271 | Find the Document | A person who knows a document exists finds it by type, owner, dates, fields, folder, relationships and version state, in a document search that sits beside the answer search, and the rules surface lives inside the Library | FIND-01, FIND-02, FIND-03, FIND-06 | 5 | **G-2 sketch** · **G-4** · G-5 (`LibraryPage.tsx`, `ChatLayout.tsx`, `App.tsx`, `nav-items.ts`, `documents.py`) · SEED-211 fence · UI hint |
+| 272 | Close Means Wrong | When a question names a period or a dimension, retrieval is filtered to it structurally. When nothing matches, the agent says so instead of answering from the nearest wrong document | FIND-07 | 4 | ⛔ **G-5 FIRES: `retrieval_service.py` extraction OWED (SEED-224). The third landing proposes it FIRST** · `tool_dispatcher.py` seam owed · **SC#10** · SEED-273 recall cliff |
+| 273 | Agent-Authored Artifacts | The agent answers with an interactive chart, table or metric composed from a closed set of our components. The artifact keeps its data, survives reload and works on every provider | ART-01..05 | 5 | **G-2 sketch** · **G-4** · **SC#10** · closed-core inventory decision · G-5 (`MessageItem.tsx`, `StreamsProvider.tsx`, `tool_dispatcher.py`, `agent_loop.py`) · UI hint |
+| 274 | Thread-Scoped Attachments | What a person drops into a chat stays in that chat, and the Library grows only when somebody deliberately puts something there | ATT-01, ATT-02, ATT-03 | 4 | ⚠ **measure first** (244 may already satisfy most of ATT-01/02) · **G-2** · **G-4** · G-5 (`ChatArea.tsx`, `MessageInput.tsx`, `workspace.py`, `ingest_splice.py`) · UI hint |
+| 275 | Retention & Legal Hold | An admin sets how long documents are kept and what happens after. A legal hold stops it, and disposition runs on schedule, writes an audit record, and never deletes what it cannot prove it should | RET-01..04 | 4 | ⛔ **deletes customer data on a timer, so fail-closed + dry-run first** · migration(s) · RLS + `get_advisors(security)` · **G-2 sketch** · **G-4** · G-5 (`scheduler_service.py`, `documents.py`, `retrieval_service.py`) · deploy parity · UI hint |
+
+**Dependency order:** 270 → 271 → 272 → 273 → 274 → 275.
+
+- **270 comes first.** It is cheap and security-bearing, and its file facts (pages, source-created
+  date) become searchable dimensions in 271.
+
+- **271 comes before 272.** The agent's dimension filters use the same field vocabulary the person
+  searches by.
+
+- **272 comes before 275.** RET-04's "archived drops out of default retrieval" rides the filter seam
+  272 extracts, so it is a default predicate there rather than a second landing on `retrieval_service.py`.
+
+- **273 has no functional dependency on the FIND track.** It is sequenced after 272 only because both
+  land on `tool_dispatcher.py` and `agent_loop.py`. It can run earlier if those hot files are free.
+
+- **274 comes after 271**, because the Library IA must be settled before chat's doors move into it,
+  and `LibraryPage.tsx` must not be edited concurrently.
+
+- **275 comes last.** It needs 271 (archived documents stay *findable*), 272 (the retrieval seam) and
+  274 (a promoted attachment becomes a document a policy can reach, and a thread attachment never is).
+
+### Phase Checklist
+
+- [ ] **Phase 270: The Document as an Object**: download the original file (org-checked, short-lived URL, latest vs viewed version stated) and rich file facts on the detail panel (FIND-04, FIND-05)
+- [ ] **Phase 271: Find the Document**: document-first search mode beside RAG, structure (folder path, relationships, version lineage) as filters, Classification renamed and mounted in the Library (FIND-01, FIND-02, FIND-03, FIND-06)
+- [x] **Phase 272: Close Means Wrong** (completed 2026-10-03 — self-verified, human_needed: prod parity owed): the agent passes date and dimension filters into retrieval, and an empty filter fails closed (FIND-07)
+- [x] **Phase 273: Agent-Authored Artifacts**: a closed component registry (chart, table, metric), validated specs, rows attached for re-encoding, identical on reload, full provider roster (ART-01..05)
+- [x] **Phase 274: Thread-Scoped Attachments** (completed 2026-10-05 — verified passed 4/4, security 31/31, operator-approved G-4; prod migrations 202→203 owed): chat attachments scoped to the thread, Library ingestion only from Documents, explicit promote-to-Library (ATT-01..03)
+- [ ] **Phase 275: Retention & Legal Hold**: policies per class or folder, legal hold, scheduled audited disposition with dry-run, archived documents out of default retrieval but findable (RET-01..04)
+- [ ] **Phase 276: Public Docs, API Reference & Video Library**: `/docs` in the landing look covering every surface, a Syrel API reference from OpenAPI, a coverage gate, a generated changelog, and Syrel videos (DOCS-01..06)
+
+### Phase Details
+
+#### Phase 270: The Document as an Object
+
+**Goal**: A person can get the **original file** of any document they can access back out of the product, and the document's detail panel says **what the file is**: its own facts, with every date labelled for what it means.
+**Depends on**: Nothing (first phase of v4.5).
+**Requirements**: FIND-04, FIND-05
+**Success Criteria** (what must be TRUE):
+
+  1. From the Library list and from the document detail panel, a user downloads the original file of a document they can access, and the downloaded bytes match what was uploaded (the file's hash equals the row's `content_hash`) (FIND-04).
+  2. For a document with version history, the download control **says** whether it fetches the latest version or the version being viewed, and it fetches the one it names (FIND-04).
+  3. A signed-in member of org B who asks for a download link to an org-A document gets a refusal and **no URL is minted**. A URL minted for an authorised user stops working after its stated short lifetime (FIND-04).
+  4. The detail panel shows created, modified, pages, size, type and uploader. "Created" in the source file and "added" to this system are **labelled as different facts**. A document ingested before this phase shows "not recorded" for a fact it lacks, never a `0` or a wrong date (FIND-05).
+
+**How we'd know this failed**: the URL is minted with the service role before any org check (the `BUG-260903-02` shape); the link still works an hour later; a 2019 contract reads "created 2026-09-…" because the upload date sits under the source-created label; old documents show `0 pages`; the panel shows v1 while the download returns the latest; the download works for the uploader and 403s for an org colleague who can see the document.
+**Plans**: 5 plans in 3 waves
+
+Plans:
+
+- [x] 270-01-PLAN.md — baselines + ledger rows, migration 199 (fact columns + TTL setting), `file_facts.py` + the one best-effort write in `splice_document` (wave 1)
+- [x] 270-02-PLAN.md — `POST /documents/{id}/download-url` (RLS read first, service-role sign second, bounded TTL, no-store), facts + connection name on `DocumentResponse` (wave 1)
+- [x] 270-03-PLAN.md — Wave-0 save-strategy spike, `documentDownload.ts`, `DocumentDownloadButton`, `DocumentFileFacts`, API fn + barrel (wave 1)
+- [x] 270-04-PLAN.md — mounts: panel header Download + first `File` section, list-row and version-history Download (wave 2)
+- [x] 270-05-PLAN.md — merged-tree gates, live SC#1-4 proofs + G-4 drive (checkpoint), ledger triples, audit-trail seed, prod parity (wave 3)
+
+**Flags**: **Migration `199`** for the file-fact columns (page count, plus source-created date and author read from PDF/DOCX properties; exact shape decided at discuss). Apply via the SQL editor, regenerate `full-schema.sql`, run `get_advisors(security)`. **Backfill is a discuss decision:** re-extract existing files from storage, or show "not recorded" honestly. The page count is one line at `extraction_service.py`'s page loop (SEED-243). **security_enforcement**: the org check runs through the user-JWT / RLS path before the URL is minted. The URL is a bearer token, so it must be short-lived. **G-2 fires** (download control + panel file facts). The UI is small and sits on shipped surfaces. A skip must be a recorded decision, and OV-266-01 shows what a skip cost: a note that was invisible because it lived only in a tooltip. **G-4** scenarios at scope time. **G-5 audit at discuss:** `backend/app/api/documents.py` (85/33, DISCHARGED at 229), `frontend/src/components/metadata/DocumentDetailPanel.tsx` (FIRES), `frontend/src/components/ingestion/DocumentList.tsx` (FIRES, seam taken), `frontend/src/types/index.ts` (seam OWED), and the extraction service (run `node scripts/check-hot-file-ledger.cjs`, which catches rows that are absent). **Deploy parity**: the migration goes to production before the backend, and the signed-URL lifetime is set as a setting, not hardcoded. Seeds: `SEED-243` (both operator halves).
+**UI hint**: yes
+
+#### Phase 271: Find the Document
+
+**Goal**: A person who knows a document exists can **find it by what it is** (type, owner, dates, custom fields, folder, relationships, version state) in a document search that sits **beside** the answer search and returns **documents**. The classification rules surface lives inside the Library under a name people recognise.
+**Depends on**: Phase 270 (its file facts join the searchable dimensions).
+**Requirements**: FIND-01, FIND-02, FIND-03, FIND-06
+**Success Criteria** (what must be TRUE):
+
+  1. A user finds a known document by combining type, owner, a date range and a custom-field value, **without typing any phrase that appears inside it**, and gets back one row per document rather than passages (FIND-01).
+  2. Document search and RAG search are two distinct, labelled modes. A document search makes **no embedding call**, its order is a stated field sort, and no result list is ever a merge or re-rank of the two (FIND-02).
+  3. A user narrows by folder path (subfolders included), by relationship (e.g. "supersedes X", "referenced by X", in both directions), and by version state (latest only / has earlier versions / superseded), and each narrowing returns exactly the documents the stored data says it should (FIND-03).
+  4. Classification is no longer a separate rail entry. Its rules surface opens from inside the Library under a name that describes what people do there, and every existing rule still loads and still applies to a new upload (FIND-06).
+  5. Document search returns only what the caller's org access allows: a two-org fence driven against the real RLS path shows zero cross-org rows (FIND-01).
+
+**How we'd know this failed**: "document search" is RAG with a filter bolted on, so it returns chunks or calls the embedder; the UI offers a filter the backend silently ignores (a green presence test with no content effect); the relationship filter matches outgoing links only; a version filter hides the latest row; the rename leaves a dead `ActiveView` member, a stale nav entry, or a route that `activeViewReachability.ts` rejects; a metadata value starts deciding who can see a document (the `SEED-211` fork, out of scope).
+**Plans**: 5 plans in 3 waves
+
+Plans:
+**Wave 1**
+
+- [x] 271-01-PLAN.md — baselines; extract apply_fragments/validate_and_compile; DocumentSearchRequest + document_search_service (structure filters, relationship both directions, version states, server sort/page/exact total, no embedding) + POST /document-search (wave 1)
+- [x] 271-02-PLAN.md — retire the classification-rules view; Filing rules header link + Library sub-view; Ask handoff (askInChat, new thread, prefill, never send); FindModeSwitch / FindMetaLine / AskHandoffCard (wave 1)
+- [x] 271-03-PLAN.md — findState leaf, wire types, searchDocuments, useDocumentFind; 8-verb table derived from relationshipLabels; LinkTargetCombobox extracted; Find column set (seven cells) + documentAddedBy (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 271-04-PLAN.md — quick-add builder on the one FilterBar + structure editors + always-visible Version chip; DocumentsFindBody states; LibraryPage wiring; older-version panel notice; wave-2 gates (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 271-05-PLAN.md — live content proofs + two-org fence on real RLS (GoTrue JWTs); merged-tree gates; G4-1..G4-6 browser drive (operator sign-off OWED); ledger triples, SEED-243, BUG-260923-01 note (wave 3)
+
+**Flags**: **G-2 FIRES**: `/gsd:sketch` before plan (the search mode beside RAG, the filter builder, the rules surface's new name and home). Reuse the Phase 114 no-DSL filter/view builder and the sketch-findings skill; do not invent a second builder. **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/pages/LibraryPage.tsx` (FIRES), `frontend/src/components/layout/ChatLayout.tsx` (FIRES; Classification mounts at `:943`), `frontend/src/App.tsx` (the `ActiveView` union, fenced by `activeViewReachability.ts`), `frontend/src/lib/nav-items.ts`, `backend/app/api/documents.py`, `backend/app/api/classification_rules.py`, `frontend/src/components/classification/RuleBuilderPanel.tsx`, the folder tree (`FolderTree.tsx` / `NavRow.tsx` / `ViewsGroup.tsx`), `frontend/src/types/index.ts`, and the `lib/api/*` modules (the barrel split was TAKEN at 207, so add to a module, never to the barrel). Reuse the shipped view-filter compiler and typed columns (`date_typed`, `document_type_norm`, migration 074) before adding any. Migration: probably none. If one is needed, use the next free number. Seeds: `SEED-243` §decide 1-3, `SEED-005` Tier A. `SEED-224`'s five-tab redesign is **not** this phase.
+**UI hint**: yes
+
+#### Phase 272: Close Means Wrong
+
+**Goal**: When a question names a period or a dimension, the agent's retrieval is **filtered to it structurally**, so "October revenue" cannot return March. When nothing matches, the agent **says so** instead of answering from the nearest wrong document.
+**Depends on**: Phase 271 (the agent filters by the same field vocabulary the person searches by).
+**Requirements**: FIND-07
+**Success Criteria** (what must be TRUE):
+
+  1. Asked for "October revenue" in a knowledge base holding both October and March reports, the agent's search call carries a date filter, and **every cited source falls inside October**, as the tool call and the audit row show. The same holds for a named custom-field dimension (e.g. legal entity) (FIND-07).
+  2. Asked about a period or dimension value with **no** matching documents, the agent says nothing matched that filter and cites nothing from outside it. It never falls back to an unfiltered search (FIND-07; `SEED-153` fail-closed).
+  3. A filter that matches documents **returns them**. On a small tenant with a selective filter, results are not falsely empty, and this is measured against the `SEED-273` HNSW recall cliff rather than assumed.
+  4. The behaviour holds across the **full native roster + OpenRouter** (8-row SC#10 board, derived from `MODEL_CAPABILITIES`). Blocked rows are recorded with their reason, never omitted.
+
+**How we'd know this failed**: the period appears in the query text but not as a filter argument; the filter reaches the keyword arm but not the vector arm (or the reverse); an empty result silently widens; the `freshness` validator kind "absorbs" the requirement (`SEED-153` says freshness is *not* this); one provider never emits the filter argument and passes by answering correctly by luck; the filter works but a selective one returns zero rows through the index, so fail-closed refuses questions that have answers.
+**Plans**: 5 plans in 4 waves
+
+Plans:
+**Wave 1**
+
+- [x] 272-01-PLAN.md — baselines; G-5 extraction FIRST: retrieval_service split (rpc / rank / documents, AST-pinned pure move) + retrieval_scope seam contracts (default predicates as data, ScopeResult); search handler moved to search_documents_tool.py (D-15), 11 patch sites retargeted (wave 1)
+- [x] 272-02-PLAN.md — the `filters` contract: provider-safe schema on search_documents (op enum = ViewCondition.op, D-02 text removed) + the visible "Filtered: …" tool-card line from args, count-gate adoption (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 272-03-PLAN.md — migration 200 (p_document_ids on both RPCs, exact branch, btree index, PUBLIC revoke; [BLOCKING] local apply checkpoint), both arms get one document set, two-step RLS resolver with undated / nearby / spelling / type counts (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 272-04-PLAN.md — validation + canonicalisation, four result kinds, empty-set short-circuit, D-09 retry lock (shared with sub-agents), ONE audit writer, per-run vocabulary, today's date + prompt rewrite, trend fix (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 272-05-PLAN.md — SEED-273 recall ladder → measured threshold, merged-tree gates, ledger close, 8-row SC#10 board, G-4 drive + operator sign-off checkpoint, owed prod parity (wave 4)
+
+**Flags**: ⛔ **G-5 FIRES and the refactor goes FIRST:** `backend/app/services/retrieval_service.py` has carried *"extraction still OWED (SEED-224, since 231). 241 is the SECOND landing; a THIRD must propose the extraction FIRST"*. This phase is that third landing. Plan 1 is the extraction, and the new filter seam must accept a **default predicate** so 275's archived exclusion rides it as data. `backend/app/services/tool_dispatcher.py` (FIRES, registry/handler split OWED) and `agent_loop.py` (FIRES, prompt-assembly seam OWED): propose each owed seam as the first option at discuss. **Extension Contract:** widen `search_documents`' existing arguments (it already forwards an equality `metadata_filter` at `tool_dispatcher.py:781`). Adding a tool is not the fix, and the tool count stays 29. **SC#10 FIRES** (tool schema + agent loop). **Provider-docs-first** for how each provider emits structured tool arguments. Recall: `SEED-273` / `SEED-076` / v4.1 `RECALL-01` (every filtered index walk returned ONE row at 246). Open question from `SEED-153`: who declares a dimension "close means wrong", a field-level property or the model's choice? Decide at discuss. Workflow-input binding and the publish-gauntlet gate from `SEED-153` are **not** in FIND-07. Record them as deferred, not silently dropped.
+
+#### Phase 273: Agent-Authored Artifacts
+
+**Goal**: The agent can answer with a **live** chart, table or metric composed from a **closed set of our components** rather than a dead PNG or free markup. The artifact keeps its data for follow-ups, reloads identically, and works on every provider.
+**Depends on**: No functional dependency in v4.5. It is sequenced after Phase 272 because both land on `tool_dispatcher.py` and `agent_loop.py`, and it rides 272's seams rather than editing those files concurrently.
+**Requirements**: ART-01, ART-02, ART-03, ART-04, ART-05
+**Success Criteria** (what must be TRUE):
+
+  1. Asked to chart data it has retrieved, the agent produces an **interactive** chart in the chat (hovering shows values, series can be toggled), not a matplotlib PNG in an output-file card (ART-01).
+  2. A spec that names an unregistered component, or carries malformed props, renders **nothing** except a visible notice that it could not be shown. No raw spec text, JSON or markup ever reaches the page (ART-02).
+  3. A follow-up such as "make it a bar chart" or "only Q3" re-encodes the same chart from the rows attached to it, with **no new retrieval or code-execution call** in that turn (ART-03).
+  4. The agent can also emit a **table** and a **metric** artifact. They are the registry's second and third entries, and the registry holds exactly those three (ART-04).
+  5. Reloading the thread renders every artifact **identically** to its live render. The 8-row SC#10 board records a chart emitted and rendered per provider, with blocked rows named (ART-05).
+
+**How we'd know this failed**: a component accepts any props shape, so the "closed" vocabulary is open through passthrough; the unknown-component fallback prints the JSON; the live render comes from SSE state that is never persisted, so reload differs; rows live only in memory and a follow-up silently re-runs the query; one provider emits the spec as prose and the chat shows it as text; a prompt can add a component at runtime.
+**Plans**: 6 plans
+
+**Wave 1**
+
+- [x] 273-01-PLAN.md — closed Pydantic vocabulary (3 components, 4 kinds, caps, refusal catalogue, result contract), migration 202 `message_artifacts` (RLS mirrors messages, no client writes, immutable; [BLOCKING] local apply checkpoint), db/artifacts.py bound to thread + user, ToolContext.turn_tool_calls, frozen wire fixture (wave 1)
+- [x] 273-02-PLAN.md — every new frontend artifact file: guard, closed registry, copy, caption/chart models, frame, notice, error boundary, table, metric, lazy recharts chart with legend toggles, palette vars, count-gate adoption (wave 1, parallel)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 273-03-PLAN.md — show_artifact handler module (validate, by-reference transforms, server caption, store, emit RETURNING row, id-first result), schema + CHAT_ONLY_TOOLS + one registry line, harness/sub-agent exclusions, count pins 29→30 (wave 2)
+- [x] 273-04-PLAN.md — persist-time args redaction (the one agent_loop hook) + caption-source kwargs, reload attach in GET /messages + /snapshot, MessageResponse.artifacts, STRUCTURED-mode holdback so no tool-call text streams into the answer (wave 2, parallel)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 273-05-PLAN.md — `artifact` SSE branch + reload mapper, ONE StreamsProvider handler, ONE MessageItem mount, rail leak arms L-1..L-4 + refused node, toolNames/toolMeta, backend↔frontend parity fences (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 273-06-PLAN.md — merged-tree gates + ledger close, 8-row SC#10 board from the effective registry (incl. OpenRouter structured-leak probe), G4-1..G4-4 Chrome drives, 4-axis rows, operator sign-off checkpoint (wave 4)
+
+**Flags**: **G-2 FIRES**: `/gsd:sketch` before plan. Load `Skill("sketch-findings-agentic-rag")` (the Phase 095 build-once inventory, the tool-card rail, output-file cards). **G-4** scenarios at scope time. **SC#10 FIRES** (structured output + streaming + UI state). **Closed-core decision at discuss:** if the spec is emitted through a new agent tool, the inventory goes 29 → 30 tools as a recorded, deliberate change. Otherwise the spec rides validated structured output. **Pydantic** validates on the way in (project rule). `recharts` is **already a frontend dependency** (measured in `frontend/package.json`), so no new chart dependency is expected. Persistence of spec + rows (and a size cap on attached rows) may need a migration; use the next free number. **Provider-docs-first** for structured output per provider. **G-5 audit at discuss:** `frontend/src/components/chat/MessageItem.tsx` (FIRES), `frontend/src/providers/StreamsProvider.tsx` (FIRES), `frontend/src/components/chat/OutputFileCard.tsx`, `backend/app/services/tool_dispatcher.py`, `backend/app/services/agent_loop.py`, `backend/app/models/message.py`, `frontend/src/types/index.ts`, `backend/app/api/threads.py`. Seeds: `SEED-193` (slice 1 plus the table/metric entries; the data-thread branch/compare half is deferred). `SEED-194` images ride this rail later. `SEED-185` (no URL router) means artifacts are not linkable. That is accepted, not solved.
+**UI hint**: yes
+
+#### Phase 274: Thread-Scoped Attachments
+
+**Goal**: What a person drops into a chat **stays in that chat**, and the Library grows only when somebody **deliberately** puts something there.
+**Depends on**: Phase 271 (the Library IA is settled before chat's doors move into it; `LibraryPage.tsx` is not edited concurrently).
+**Requirements**: ATT-01, ATT-02, ATT-03
+**Success Criteria** (what must be TRUE):
+
+  1. A file attached in chat, from disk or from a cloud connection, is used by the agent in that thread. It does **not** appear in the Library, in document search, or in retrieval from any other thread (ATT-01).
+  2. The chat composer has **no** door that writes into the Library or connects a cloud source for ingestion. Those actions live in the Documents section, and a person looking for them there finds them (ATT-02).
+  3. A user **promotes** a thread attachment into a chosen Library folder with an explicit action. It then appears in the Library and in document search, and a file that duplicates an existing Library document is handled the way the stated dedup rule says (ATT-03).
+  4. Deleting the thread removes its un-promoted attachments and leaves promoted documents untouched (ATT-01, ATT-03).
+
+**How we'd know this failed**: ATT-01 passes only because the agent could never read the attachment; ATT-02 is met by hiding a button while an API path still writes Library rows from chat; promotion lands at the Library root with no folder choice; a promoted document still cascades when the thread is deleted; another thread cites the attachment.
+**Plans**: 5 plans in 3 waves (G-8 target 3-5; the frontend is split into the dialog and its two mounts because one plan would carry ~25 files)
+
+**Wave 1**
+
+- [x] 274-01-PLAN.md — lifetime split by door (`expires_at` NULL for the composer doors, TTL kept for panel/workflow), agent-note fix, thread-delete byte cleanup seam, migration 203 (the In-Library mark) applied locally [operator checkpoint]
+- [x] 274-03-PLAN.md — composer thread-life opt-in, one lifetime/display-name rule, cloud-attach org header fix, attachment API client, sketch-274 copy port, the no-Root folder listbox, the ONE Save-to-Library dialog
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 274-02-PLAN.md — promote / promote-preview / library-links in their own module through the shipped minter (`version_scope=folder`, org-scoped, link-on-conflict), minter-parity proof, pinned minter set, OpenAPI + docs coverage
+- [x] 274-04-PLAN.md — the ⋯ menu + In Library segment on the sent chip and the panel Files row, no 24h on chat attachments, corrected expired copy, composer no-Library-door fence
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 274-05-PLAN.md — merged-tree gates + contract fence + ledger close + docs page, 8-row planted-fact board with second-thread negative, G-4 #1-#4 Chrome drives, D-18 audit, BUG-260905-01 / SEED-247 routing, operator sign-off
+**Flags**: ⚠ **MEASURE FIRST: most of ATT-01/02 may already be true at HEAD.** `SEED-247` was routed at Phase 244 discuss: chat attachments reuse `workspace_files` (D-244-01), are read **inline, never embedded** (D-244-03), and cascade on thread delete (D-244-04). `BUG-260905-01` records the inverted doors. Drive the current behaviour before planning any build, and never re-propose the answered questions. **Discuss decision:** does "ingested" in ATT-01 mean inline-read (as today) or chunked and scoped to the thread (for files too large to read inline)? The second adds a retrieval scope term at the Phase 231 RLS sites, so it is not small. ATT-03 is `SEED-247`'s one open question (Q4): folder picker, the mint/splice path, and the dedup ruling against `documents_dedup_idx` (org-scoped since migration 196). **G-2 FIRES** (promote affordance, composer doors). **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/components/chat/ChatArea.tsx` (FIRES), `MessageInput.tsx` (FIRES), `useComposerAttachments.ts`, `ConnectedFilePickerModal.tsx`, `backend/app/api/workspace.py` (FIRES), `backend/app/services/ingest_splice.py` (FIRES), `backend/app/api/documents.py`, `frontend/src/components/library/LibraryCloudImport.tsx`, `LibraryPage.tsx`. Promotion reuses the shipped ingest path; there is no second one.
+**UI hint**: yes
+
+#### Phase 275: Retention & Legal Hold
+
+**Goal**: An admin can say **how long** a class of documents or a folder is kept and **what happens after**. A legal hold stops it, and disposition runs on its own schedule, writes an audit record, and **never deletes what it cannot prove it should**.
+**Depends on**: Phase 271 (archived documents stay findable through document search), Phase 272 (the retrieval filter seam carries the archived exclusion), Phase 274 (a promoted attachment is a document a policy can reach; a thread attachment never is).
+**Requirements**: RET-01, RET-02, RET-03, RET-04
+**Success Criteria** (what must be TRUE):
+
+  1. An org admin sets a retention policy on a document class or a folder (period + action: archive / delete / review), and a non-admin member of the same org can neither create nor change one (RET-01).
+  2. A document under legal hold is **not** disposed by the sweep and **cannot** be deleted through the ordinary delete path, for as long as the hold stands (RET-02).
+  3. A **dry run** reports exactly what a sweep would dispose before any real sweep has run. A scheduled sweep then disposes exactly that set and writes one audit record per action naming the document, the policy, the action and the time. An incomplete or ambiguous evaluation disposes **nothing** (RET-03).
+  4. An archived document no longer appears in default chat retrieval, but document search with an archive filter still finds it, and it can be opened and downloaded (RET-04).
+
+**How we'd know this failed**: the hold is checked by the sweep but not by `DELETE /documents/{id}` (so it is decorative); the first real sweep runs before a dry run exists; an audit record omits the policy; the archived exclusion applies to one retrieval arm only; a policy reaches another org's documents; the sweep touches `workspace_files`; a service-role delete path bypasses the hold.
+**Plans**: TBD
+**Flags**: ⛔ **This deletes customer data on a timer. It is the most dangerous feature in the milestone** (`SEED-250`). Ship it with the `SRC-06` fail-closed discipline: dry run before any real sweep; ambiguous means nothing is deleted; hold blocks **every** deletion path. **Migration(s)** at the next free number: `retention_policies`, the hold, the archive state, and new `audit_log` action types (extending migration 170's constrained list). **RLS on every new table**, plus `get_advisors(security)`. ⚠ Postgres grants function `EXECUTE` to `PUBLIC` by default, so revoke from `PUBLIC` rather than role by role. **security_enforcement**. The sweep is another claimant on `scheduler_service.py` (FIRES), not new machinery. **G-2 FIRES** (policy editor, hold control, disposition log). The renamed rules surface from 271 is a candidate home, decided at discuss. **G-4** scenarios at scope time. **G-5 audit at discuss:** `backend/app/services/scheduler_service.py` (FIRES), `backend/app/api/documents.py`, `backend/app/services/retrieval_service.py` (rides 272's extracted seam as a default predicate, never a new branch), `backend/app/api/document_governance.py`. "Document class" means the classification type (`document_type_norm`). **Deploy parity**: migrations to production before the backend, and no sweep enabled in production until the operator has read a dry run.
+**UI hint**: yes
+
+#### Phase 276: Public Docs, API Reference & Video Library
+
+**Goal**: A buyer, a user and a developer can each learn **everything Syrel does** from one public place, `/docs` on the landing domain, which looks like the landing page, **says only what has shipped**, and **cannot quietly fall behind the product**.
+**Depends on**: No functional dependency. It touches the landing entry, a new docs entry, `vercel.json`/`vite.config.ts` routing and the OpenAPI exposure in `backend/app/main.py`, none of which 274/275 edit, so it can run in parallel with them.
+**Requirements**: DOCS-01, DOCS-02, DOCS-03, DOCS-04, DOCS-05, DOCS-06
+**Success Criteria** (what must be TRUE):
+
+  1. `/docs`, a guide page and `/docs/changelog` render in sketch 276's direction B on desktop and at 390 px, as a third Vite entry (`docs.html` → `src/docs/`) that reuses the landing's Navigation, footer and tokens, and the landing bundle fence still holds (DOCS-01).
+  2. `node scripts/check-docs-coverage.cjs` derives its scan set from code (nav items, `_TOOL_REGISTRY`, step types, routers, settings tabs), passes on the shipped tree, and **fails** when a planted new tool or router has no `covers:` page; every inventory item maps to a page or to a tracked "coming soon" stub (DOCS-02).
+  3. The API reference renders every non-internal operation from a filtered OpenAPI snapshot titled "Syrel API", hides the internal set, and states plainly that requests use a signed-in user's token today, linking the SEED-013 plan (DOCS-03).
+  4. With the production flag set, unauthenticated `GET /docs`, `/redoc` and `/openapi.json` are refused; locally they still load (DOCS-04).
+  5. The changelog lists v1.0 → v4.4 from `docs/history/`, and v4.5 items carry "not yet released" (DOCS-05).
+  6. The docs home plays the Syrel overview through a lazily loaded Remotion player, guides embed their clips, and the landing reads "Syrel" with no "Agentic RAG" left in `src/landing/` (DOCS-06).
+
+**How we'd know this failed**: a docs page claims something `docs/history/` marks unbuilt (in-app Word/PDF preview, three deployment presets, v4.5 as live); the coverage gate reads a hand-typed list, or passes over zero parsed items; the docs entry pulls app dependencies into the landing bundle; `/docs` routing falls through to `app.html`; the public spec still lists internal operations; production Swagger stays open; the Remotion player loads on first paint and slows the landing.
+**Plans**: 7 plans in 4 waves (G-8: 5 — content writing and the one-commit logo pass each need their own unit; plans 06-07 added mid-execution by operator direction D-24/D-26/D-27, justified in CONTEXT D-27)
+
+Plans:
+**Wave 1**
+
+- [x] 276-01-PLAN.md — W1: gated live API docs (DOCS-04), OpenAPI snapshot drift + public "Syrel API" spec, one-pass Iris logo + Syrel rename
+- [x] 276-02-PLAN.md — W1: package gate + deps, third Vite entry, /docs routing (dev/Vercel/nginx), onebox build context, parser + content plugin + changelog model + search index
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 276-03-PLAN.md — W2: docs site UI (home, guide, stub, section, changelog, Scalar API reference, search, menu drawer, YouTube/empty video slots)
+- [x] 276-04-PLAN.md — W2: content — 31 fact-checked written pages, stubs for every other IA page, changelog overrides, screenshots, fact-check log
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 276-05-PLAN.md — W3: lazy Remotion Player slots, muted scroll-started landing promo + first-paint fences, DOCS-02 coverage gate + hook + CI, BASELINE pins, ledger close
+
+**Wave 4** *(blocked on Wave 3 completion; 06 and 07 run in parallel on disjoint files)*
+
+- [x] 276-06-PLAN.md — W4: animated Iris assistant avatar (sketch variant D, D-24/D-27): irisStateFor + IrisAvatar, one live avatar (RunCard logo static), redundant spinners removed, dead brandPulse removed, hero + splash + chrome chip
+- [x] 276-07-PLAN.md — W4: app-wide logo pass (strings + fence, OAuth client name, rasters + manifest + OG, branded invite, leftovers) and the "Syrel: The Build Story" docs page (D-26)
+
+**Video library — three styles, decided 2026-10-04 (operator):** (1) **narrated explainers** — Remotion + local Kokoro voice, and NotebookLM explainers; (2) **documentaries** — NotebookLM cinematic "Syrel: The Build Story" (5 chapters), wrapped in Remotion `BrandedEpisode` intro/outro; (3) **music-driven promos, no narration** — `SyrelPromo` / `SyrelTeaser` / vertical cuts, beat-locked to an original synthesized track, for the landing hero and social. Discuss decides which style each docs/landing slot uses.
+**Logo chosen, insertion deferred (operator 2026-10-04):** #1 "Iris agent" — assets in `docs/brand/` (animated, lockup, mark). Placeholders stay until the operator says insert; when it happens it is one pass across landing, app, favicon, docs and `video/` `LogoPlaceholder`. Discuss decides whether 276 does that pass.
+**Flags**: Third-party API keys, webhooks and rate limits are **out of scope** (SEED-013 → v4.6 Open Platform; SEED-345). Content is drafted from the NotebookLM notebook "Syrel — Knowledge & Videos" and fact-checked against `docs/history/`; the first release writes about 30 core pages, and the rest ship as tracked stubs. **DOCS-04 reverses a recorded decision** (`backend/app/main.py`: "`GET /docs` deliberately keeps returning 200"), now approved by the operator on 2026-10-04; record it in CONTEXT `<decisions>`. Remotion is free only for companies of up to 3 people; recheck before the company grows. **G-2 satisfied** by sketch 276 (winner B). **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/landing/*` (Navigation, LandingFooter, CompareSection), `frontend/vercel.json`, `frontend/vite.config.ts`, `backend/app/main.py` (FIRES, 61 phases). Inputs: `.planning/research/docs-coverage-inventory.md`, `docs-information-architecture.md`, `docs/public/api/openapi.snapshot.json`.
+**UI hint**: yes
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 270. The Document as an Object | 0/TBD | Not started | - |
+| 271. Find the Document | 0/TBD | Not started | - |
+| 272. Close Means Wrong | 5/5 | Complete (prod migrations 200+201 owed) | 2026-10-03 |
+| 273. Agent-Authored Artifacts | 6/6 | Complete — 1 UAT row OWED (live STRUCTURED-path holdback check; run it first) | 2026-10-04 |
+| 274. Thread-Scoped Attachments | 5/5 | Complete (prod migrations 202→203 + get_advisors owed) | 2026-10-05 |
+| 275. Retention & Legal Hold | 0/TBD | Not started | - |
+| 276. Public Docs, API Reference & Video Library | 7/7 | Complete    | 2026-10-05 |
 
 ---
 
@@ -44,8 +359,7 @@ Owed v4.3 verification driven live (265) · per-org Expert install that copies a
 the installing org (266; closes `PACK-05`) · an Expert only ADDS scope and states every cost (267) ·
 per-Expert spend + mid-thread folder-scope change (268) · a five-Expert starter library, each with a
 live grounded conversation (269). ⭐ **The closed core held** (no commits to phase_types / emitters /
-programmatic). ⚠ **Verification mode is `self-verified` for 265-269** (Gemini out). ⛔ **Deploy checklist:**
-migrations 194-198 + `464ec8354` (`266-PROD-PARITY.md`, `269-PROD-PARITY.md`); starter library visible to
+programmatic). ⚠ **Verification mode is `self-verified` for 265-269** (Gemini out). ✅ **Deployed 2026-09-29** (migrations 194-198 + `464ec8354` in production); starter library visible to
 enterprise-tier orgs only (D-269-P1, SEED-325). Open follow-ups: SEED-319/322-328.
 
 ---

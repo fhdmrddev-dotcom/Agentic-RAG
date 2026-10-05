@@ -369,7 +369,7 @@ def test_an_absent_field_is_not_a_write():
 
 import asyncpg  # noqa: E402
 
-import app.services.retrieval_service as rs  # noqa: E402
+import app.services.retrieval_rpc as rrpc  # noqa: E402  (272-01: the RPC adapter moved here)
 
 
 def _tuning():
@@ -674,10 +674,12 @@ async def test_ef_search_is_coerced_through_int_before_it_is_bound():
 
 # ── The landing on the G-5 hot file ──────────────────────────────────────────
 
+# 272-01: the cap now reads ``retrieval_rpc.py`` — the logic home `_call_as_user` / `_vector_search`
+# moved to verbatim. The count there measured 11 after the move, the same as before it.
 def _hnsw_lines_in_retrieval_service() -> list[str]:
     return [
         line.strip()
-        for line in inspect.getsource(rs).splitlines()
+        for line in inspect.getsource(rrpc).splitlines()
         if ("hnsw" in line.lower() or "retrieval_tuning" in line)
         and not line.strip().startswith("#")
     ]
@@ -697,13 +699,20 @@ def test_the_landing_on_the_hot_file_is_a_call_and_its_arguments():
     slack, which is deliberately tight. Driven RED against a real plant — threading the knobs
     through `_keyword_search` as well took it to 13 and this case failed by name alongside
     `test_keyword_search_carries_no_hnsw_argument`.
+
+    ⚠ RE-DRIVEN DELIBERATELY BY 272-03 (SEED-177: retire or move a fence on purpose, never trip it
+    by surprise): 272-03 adds the filtered-only iterative_scan constant + one filtered call — D-14.
+    The filtered ``match_document_chunks`` call carries the same two keyword arguments as the
+    unfiltered one (the ef_search expression, and ``FILTERED_ITERATIVE_SCAN`` instead of the
+    setting), so the count MEASURED after the change is **13** (was 11): exactly +2, no logic. The
+    cap is set to that measured 13 — zero slack — and the keyword arm still carries nothing.
     """
     lines = _hnsw_lines_in_retrieval_service()
     assert lines, (
         "POSITIVE CONTROL FAILED — no hnsw / retrieval_tuning line found in "
         "retrieval_service.py, so the cap below would pass vacuously."
     )
-    assert len(lines) <= 12, (
+    assert len(lines) <= 13, (
         f"the D-11 landing has grown to {len(lines)} non-comment lines:\n"
         + "\n".join(lines)
         + "\n⛔ G-5: put the logic in retrieval_tuning.py. This file's extraction is still OWED."
@@ -714,7 +723,7 @@ def test_keyword_search_carries_no_hnsw_argument():
     """HNSW is irrelevant to ``keyword_search_chunks`` — it is a tsquery, not a vector scan.
     Threading the knobs through it would spend the cost with none of the benefit, and would
     make the seam look like a general-purpose one."""
-    src = inspect.getsource(rs._keyword_search)
+    src = inspect.getsource(rrpc._keyword_search)
     assert "keyword_search_chunks" in src, (
         "POSITIVE CONTROL FAILED — this is not the function the fence thinks it is."
     )
@@ -722,12 +731,23 @@ def test_keyword_search_carries_no_hnsw_argument():
 
 
 def test_the_G5_sentence_is_written_into_the_hot_file_itself():
-    """⛔ A future reader must not be able to mistake this landing for a discharge — and the
-    place they will be reading is the FILE, not this test and not a SUMMARY."""
-    src = inspect.getsource(rs).lower()
-    assert "owed" in src and "g-5" in src, (
-        "the G-5 sentence is missing from retrieval_service.py: the second landing must say, "
-        "in the file, that the extraction is still owed and that a third must propose it first"
+    """⛔ A future reader must be able to tell, from the FILE, where the G-5 obligation stands —
+    not from this test and not from a SUMMARY.
+
+    ⚠ RE-DRIVEN DELIBERATELY BY 272-01 (SEED-177: *retire a fence deliberately, never trip it by
+    surprise*). This case used to assert the sentence *"extraction still OWED since Phase 231"*
+    in ``retrieval_service.py``. That obligation was DISCHARGED by 272-01, which moved
+    ``_call_as_user`` and the two RPC arms verbatim into ``retrieval_rpc.py``. Asserting the old
+    sentence now would pin a false claim, so the case asserts the discharge instead, in the
+    module the code now lives in — and that no "OWED since Phase 231" still reads as open.
+    """
+    src = inspect.getsource(rrpc)
+    assert "g-5" in src.lower(), "the G-5 paragraph is missing from retrieval_rpc.py"
+    assert "discharged" in src.lower() and "272-01" in src, (
+        "retrieval_rpc.py must say, in the file, that 272-01 discharged the extraction"
+    )
+    assert "OWED since Phase 231" not in src, (
+        "retrieval_rpc.py still reads the extraction as an OPEN obligation — it was discharged"
     )
 
 
@@ -742,14 +762,14 @@ async def test_vector_search_passes_the_resolved_knobs_and_keyword_search_does_n
         seen.append({"sql": fn_sql, "kwargs": kwargs})
         return []
 
-    monkeypatch.setattr(rs, "_call_as_user", _fake_call_as_user)
-    monkeypatch.setattr(rs, "embed_texts", lambda *a, **k: [[0.1, 0.2, 0.3]])
+    monkeypatch.setattr(rrpc, "_call_as_user", _fake_call_as_user)
+    monkeypatch.setattr(rrpc, "embed_texts", lambda *a, **k: [[0.1, 0.2, 0.3]])
 
     s = _build_settings_from_row({"hnsw_ef_search": 400, "hnsw_iterative_scan": "strict_order"})
-    await rs._vector_search("q", "u1", MagicMock(), None, 5, 0.3, s)
+    await rrpc._vector_search("q", "u1", MagicMock(), None, 5, 0.3, s)
     assert seen[-1]["kwargs"] == {"hnsw_ef_search": 400, "hnsw_iterative_scan": "strict_order"}
 
-    await rs._keyword_search("q", "u1", MagicMock(), None, 5)
+    await rrpc._keyword_search("q", "u1", MagicMock(), None, 5)
     assert seen[-1]["kwargs"] == {}
 
 
@@ -769,8 +789,8 @@ async def test_call_as_user_applies_the_knobs_INSIDE_the_existing_transaction(mo
     async def _fake_conn(request, current_user):
         yield conn
 
-    monkeypatch.setattr(rs, "get_user_pg_connection", _fake_conn)
-    await rs._call_as_user(
+    monkeypatch.setattr(rrpc, "get_user_pg_connection", _fake_conn)
+    await rrpc._call_as_user(
         "u1", "SELECT 1", hnsw_ef_search=400, hnsw_iterative_scan="strict_order"
     )
 
@@ -787,6 +807,6 @@ async def test_call_as_user_applies_the_knobs_INSIDE_the_existing_transaction(mo
     async def _fake_plain(request, current_user):
         yield plain
 
-    monkeypatch.setattr(rs, "get_user_pg_connection", _fake_plain)
-    await rs._call_as_user("u1", "SELECT 1")
+    monkeypatch.setattr(rrpc, "get_user_pg_connection", _fake_plain)
+    await rrpc._call_as_user("u1", "SELECT 1")
     assert [s for s, _ in plain.calls] == ["SELECT 1"]

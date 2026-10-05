@@ -1,0 +1,295 @@
+[
+  {
+    "id": "get-started",
+    "title": "Get started",
+    "purpose": "What Syrel is, how to sign in, and your first cited answer in five minutes.",
+    "slugs": [
+      "get-started/overview",
+      "get-started/quickstart",
+      "get-started/sign-in",
+      "get-started/workspaces-and-orgs",
+      "get-started/navigating-syrel",
+      "get-started/key-concepts"
+    ]
+  },
+  {
+    "id": "use",
+    "title": "Use Syrel",
+    "purpose": "Chat with the agent, work with its tools and workspace, and manage your Library.",
+    "groups": [
+      {
+        "title": "Using Syrel",
+        "slugs": [
+          "use/chat",
+          "use/chat-modes",
+          "use/chat-scope",
+          "use/attachments",
+          "use/choosing-a-model",
+          "use/workspace-panel",
+          "use/agent-tools",
+          "use/memory",
+          "use/web-search",
+          "use/code-execution",
+          "use/artifacts"
+        ]
+      },
+      {
+        "title": "Library",
+        "slugs": [
+          "use/library/documents",
+          "use/library/find",
+          "use/library/views",
+          "use/library/ingestion",
+          "use/library/indexing",
+          "use/library/health",
+          "use/library/filing-rules",
+          "use/library/document-detail",
+          "use/library/takeoff"
+        ]
+      }
+    ],
+    "slugs": [
+      "use/chat",
+      "use/chat-modes",
+      "use/chat-scope",
+      "use/attachments",
+      "use/choosing-a-model",
+      "use/workspace-panel",
+      "use/agent-tools",
+      "use/memory",
+      "use/web-search",
+      "use/code-execution",
+      "use/artifacts",
+      "use/library/documents",
+      "use/library/find",
+      "use/library/views",
+      "use/library/ingestion",
+      "use/library/indexing",
+      "use/library/health",
+      "use/library/filing-rules",
+      "use/library/document-detail",
+      "use/library/takeoff"
+    ]
+  },
+  {
+    "id": "automate",
+    "title": "Automate",
+    "purpose": "Build, publish, run and schedule workflows, and teach Syrel skills that persist.",
+    "groups": [
+      {
+        "title": "Workflows",
+        "slugs": [
+          "automate/workflows/overview",
+          "automate/workflows/library",
+          "automate/workflows/builder",
+          "automate/workflows/step-types",
+          "automate/workflows/checks",
+          "automate/workflows/grounding",
+          "automate/workflows/deliverables",
+          "automate/workflows/publish",
+          "automate/workflows/running",
+          "automate/workflows/runs",
+          "automate/workflows/schedules"
+        ]
+      },
+      {
+        "title": "Skills",
+        "slugs": [
+          "automate/skills/overview",
+          "automate/skills/create-from-chat",
+          "automate/skills/evals",
+          "automate/skills/triggering",
+          "automate/skills/versions"
+        ]
+      }
+    ],
+    "slugs": [
+      "automate/workflows/overview",
+      "automate/workflows/library",
+      "automate/workflows/builder",
+      "automate/workflows/step-types",
+      "automate/workflows/checks",
+      "automate/workflows/grounding",
+      "automate/workflows/deliverables",
+      "automate/workflows/publish",
+      "automate/workflows/running",
+      "automate/workflows/runs",
+      "automate/workflows/schedules",
+      "automate/skills/overview",
+      "automate/skills/create-from-chat",
+      "automate/skills/evals",
+      "automate/skills/triggering",
+      "automate/skills/versions"
+    ]
+  },
+  {
+    "id": "connect",
+    "title": "Connect",
+    "purpose": "Connect outside services and MCP servers, grant each tool, and keep folders in sync.",
+    "slugs": [
+      "connect/overview",
+      "connect/oauth-apps",
+      "connect/google-workspace",
+      "connect/microsoft-365",
+      "connect/slack",
+      "connect/jira",
+      "connect/email-smtp",
+      "connect/custom-mcp",
+      "connect/mcp-catalog",
+      "connect/tool-grants",
+      "connect/live-sending",
+      "connect/folder-watches",
+      "connect/mail-sources"
+    ]
+  },
+  {
+    "id": "experts",
+    "title": "Experts",
+    "purpose": "Installable bundles of skills, knowledge and connections that only ever add to a chat.",
+    "slugs": [
+      "experts/what-are-experts",
+      "experts/catalog",
+      "experts/using-experts",
+      "experts/authoring"
+    ]
+  },
+  {
+    "id": "administer",
+    "title": "Administer",
+    "purpose": "Run your organisation, its settings and models, and the operator Control Room.",
+    "groups": [
+      {
+        "title": "Your organisation",
+        "slugs": [
+          "administer/org/members",
+          "administer/org/invitations",
+          "administer/org/sso",
+          "administer/org/audit",
+          "administer/org/settings",
+          "administer/org/plans-and-tiers",
+          "administer/org/retention"
+        ]
+      },
+      {
+        "title": "Settings",
+        "slugs": [
+          "administer/settings/ai-model",
+          "administer/settings/search",
+          "administer/settings/integrations"
+        ]
+      },
+      {
+        "title": "Models",
+        "slugs": ["administer/models/providers"]
+      },
+      {
+        "title": "Control Room",
+        "slugs": [
+          "administer/control-room/control-plane",
+          "administer/control-room/users-and-access",
+          "administer/control-room/feature-visibility",
+          "administer/control-room/kill-switches",
+          "administer/control-room/model-registry",
+          "administer/control-room/audit",
+          "administer/control-room/spend"
+        ]
+      }
+    ],
+    "slugs": [
+      "administer/org/members",
+      "administer/org/invitations",
+      "administer/org/sso",
+      "administer/org/audit",
+      "administer/org/settings",
+      "administer/org/plans-and-tiers",
+      "administer/org/retention",
+      "administer/settings/ai-model",
+      "administer/settings/search",
+      "administer/settings/integrations",
+      "administer/models/providers",
+      "administer/control-room/control-plane",
+      "administer/control-room/users-and-access",
+      "administer/control-room/feature-visibility",
+      "administer/control-room/kill-switches",
+      "administer/control-room/model-registry",
+      "administer/control-room/audit",
+      "administer/control-room/spend"
+    ]
+  },
+  {
+    "id": "deploy",
+    "title": "Deploy & operate",
+    "purpose": "Install Syrel on your own infrastructure, configure it, and keep it healthy.",
+    "slugs": [
+      "deploy/choose-a-home",
+      "deploy/one-box",
+      "deploy/environment-variables",
+      "deploy/database",
+      "deploy/redis",
+      "deploy/setup-wizard",
+      "deploy/background-processes",
+      "deploy/sandbox",
+      "deploy/local-models",
+      "deploy/domains",
+      "deploy/observability",
+      "deploy/verify",
+      "deploy/upgrading"
+    ]
+  },
+  {
+    "id": "extend",
+    "title": "Extend Syrel",
+    "purpose": "Extend Syrel with data, external processes and sandboxed code, never engine code.",
+    "slugs": [
+      "extend/extension-contract",
+      "extend/skill-packages",
+      "extend/workflows-as-data",
+      "extend/templates-and-schemas",
+      "extend/expert-bundles",
+      "extend/mcp-servers",
+      "extend/sandbox-compute"
+    ]
+  },
+  {
+    "id": "api",
+    "title": "API reference",
+    "purpose": "The HTTP API the app itself uses: concepts, guides and the generated reference.",
+    "slugs": [
+      "api/overview",
+      "api/concepts/authentication",
+      "api/concepts/orgs-and-rls",
+      "api/concepts/streaming",
+      "api/concepts/errors",
+      "api/concepts/limits-and-spend",
+      "api/concepts/pagination",
+      "api/concepts/webhooks",
+      "api/concepts/feature-gates",
+      "api/guides/chat-from-a-script",
+      "api/guides/upload-and-search",
+      "api/guides/navigate-the-knowledge-base",
+      "api/guides/run-a-workflow",
+      "api/reference/operator",
+      "api/internal-endpoints",
+      "api/roadmap-open-platform"
+    ]
+  },
+  {
+    "id": "security",
+    "title": "Security & trust",
+    "purpose": "How your data is isolated, what Syrel can reach, and what is recorded.",
+    "slugs": [
+      "security/data-isolation",
+      "security/secrets",
+      "security/egress-controls",
+      "security/sandbox-isolation",
+      "security/audit-trails",
+      "security/prompt-injection"
+    ]
+  },
+  {
+    "id": "changelog",
+    "title": "Changelog",
+    "purpose": "Every release, shipped, not promised. Generated from the release history.",
+    "slugs": []
+  }
+]

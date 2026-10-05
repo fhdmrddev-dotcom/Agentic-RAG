@@ -1,0 +1,27 @@
+[
+  {
+    "id": "get-started",
+    "title": "Get started",
+    "purpose": "Fixture section.",
+    "slugs": ["get-started/quickstart"]
+  },
+  {
+    "id": "use",
+    "title": "Use Syrel",
+    "purpose": "Fixture section with two pages.",
+    "groups": [{ "title": "Using Syrel", "slugs": ["use/chat", "use/chat-modes"] }],
+    "slugs": ["use/chat", "use/chat-modes"]
+  },
+  {
+    "id": "api",
+    "title": "API reference",
+    "purpose": "Fixture section whose landing is api/overview.",
+    "slugs": ["api/overview"]
+  },
+  {
+    "id": "changelog",
+    "title": "Changelog",
+    "purpose": "Generated from docs/history.",
+    "slugs": []
+  }
+]

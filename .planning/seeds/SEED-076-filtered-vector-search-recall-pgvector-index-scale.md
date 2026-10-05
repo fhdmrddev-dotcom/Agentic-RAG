@@ -287,3 +287,23 @@ rows than its own subset is impossible under one execution plan, so the narrowed
 the HNSW path at all — the planner drops the index once a selective predicate is present. **The
 dangerous query is the broad one**, which is the reverse of the intuition this seed was written
 against.
+
+---
+
+## Phase 272 (272-05, 2026-10-03) — a sixth lever shipped; lever 4 still deferred
+
+**What 272 shipped (FIND-07, D-14):** a filtered chat search no longer asks HNSW to find a small
+document set inside a large graph. The filter is resolved to a document-id set under the caller's
+RLS first, then that set is ranked **exactly** (migration 200's exact branch, the
+`idx_document_chunks_document_id` btree) when it holds ≤ `FILTERED_EXACT_MAX_CHUNKS = 2000` chunks;
+above that the index branch runs with `hnsw.iterative_scan = relaxed_order` for the filtered call
+only. Measured on `recall_bench` (100k chunks): **recall 1.000 at every filtered size to 15,000
+chunks**, and the custom planner chose the btree, never HNSW, for every one of them
+(`272-VALIDATION.md` §2). Migration 201 pins both RPCs to custom plans after the generic-plan leg
+of the ladder found a whole-table plan (`evidence/plancache-diagnosis.txt`).
+
+**Lever 4 (per-tenant partial indexes / partitioning) stays DEFERRED; its trigger did not fire.**
+The filtered path's residual is latency (p95 ~108 ms at 5,000 chunks, ~221 ms at 15,000), not
+recall. The UNFILTERED small-tenant curve is unchanged by 272 (global knobs untouched, D-14) and is
+tracked in SEED-273.
+

@@ -5,7 +5,7 @@ created: 2026-09-24
 surface: Agentic-RAG
 status: planted
 partial: false
-status_note:
+status_note: "Phase 270 (2026-09-30) touched the trigger path and left this open: the phase adds a download route and a file-facts write, and changes neither upload org-stamping nor versioning."
 trigger_when: Any phase touching backend/app/api/documents.py upload, the autofill_org_id trigger, or multi-org membership.
 trigger_paths: ["backend/app/api/documents.py", "backend/app/dependencies.py", "supabase/migrations/*autofill*"]
 trigger_surfaces: []

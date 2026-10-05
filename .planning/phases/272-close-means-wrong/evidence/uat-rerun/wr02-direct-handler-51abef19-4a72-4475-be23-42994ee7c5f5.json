@@ -1,0 +1,230 @@
+{
+  "proof_kind": "DIRECT HANDLER CALL (not a model run): app.services.search_documents_tool.handle_search_documents imported from the working tree at HEAD, ToolContext built by hand with empty_filter_fields_in_run=set() as agent_loop wires it, user-JWT supabase client against the LIVE local DB (RLS enforced). It proves the rule's code on live data; it does not prove the restarted uvicorn process.",
+  "run_id": "51abef19-4a72-4475-be23-42994ee7c5f5",
+  "steps": [
+    {
+      "step": "1 filtered, July 2026 Acme (expect no_documents_matched \u2192 lock)",
+      "filters": [
+        {
+          "field": "date",
+          "op": "between",
+          "value": "2026-07-01",
+          "value2": "2026-07-31"
+        },
+        {
+          "field": "legal_entity",
+          "op": "eq",
+          "value": "Acme GmbH"
+        }
+      ],
+      "result": {
+        "status": "no_documents_matched",
+        "reason": "zero_documents",
+        "filter": "document date 1\u201331 Jul 2026 \u00b7 legal entity = Acme GmbH",
+        "matched_documents": 0,
+        "undated_excluded": 0,
+        "nearby": [
+          {
+            "value": "2026-03",
+            "label": "March 2026",
+            "documents": 1
+          },
+          {
+            "value": "2025-10",
+            "label": "October 2025",
+            "documents": 1
+          },
+          {
+            "value": "2025-09",
+            "label": "September 2025",
+            "documents": 1
+          }
+        ],
+        "message": "No documents matched document date 1\u201331 Jul 2026 \u00b7 legal entity = Acme GmbH. Nearby values that do have documents: March 2026 (1 document), October 2025 (1 document), September 2025 (1 document).",
+        "instruction": "Tell the person that no documents matched document date 1\u201331 Jul 2026 \u00b7 legal entity = Acme GmbH, and state the filter you used. Cite nothing. Do not search again without this filter, and do not use grep, query_documents, read_document or analyze_document to answer from outside it. If nearby values are listed, you may offer them and ask whether to use one."
+      },
+      "lock_after": [
+        "date",
+        "legal_entity"
+      ]
+    },
+    {
+      "step": "2 wide retry: open-ended date after 2026-06-30 (expect refused_retry)",
+      "filters": [
+        {
+          "field": "date",
+          "op": "after",
+          "value": "2026-06-30"
+        },
+        {
+          "field": "legal_entity",
+          "op": "eq",
+          "value": "Acme GmbH"
+        }
+      ],
+      "result": {
+        "error": "refused_retry",
+        "locked_fields": [
+          "date",
+          "legal_entity"
+        ],
+        "violated_fields": [
+          "date"
+        ],
+        "message": "A filtered search on date, legal_entity already matched no documents in this turn, so a search that drops or widens date is refused: it would answer from outside what was asked. After a filter matches nothing, a later search may change a locked field only to a different value (eq / one_of), or to a range that does not contain the one that matched nothing. Dropping the field, is_empty, or a wider condition that still includes what was asked (a longer period around it, an open-ended before/after, contains on part of the value) is refused.",
+        "instruction": "Tell the person nothing matched the filter. You may search again with a different value on the same field(s) (for example another month), but not without them."
+      },
+      "lock_after": [
+        "date",
+        "legal_entity"
+      ]
+    },
+    {
+      "step": "3 wide retry: containing range = whole year 2026 (expect refused_retry)",
+      "filters": [
+        {
+          "field": "date",
+          "op": "between",
+          "value": "2026-01-01",
+          "value2": "2026-12-31"
+        },
+        {
+          "field": "legal_entity",
+          "op": "eq",
+          "value": "Acme GmbH"
+        }
+      ],
+      "result": {
+        "error": "refused_retry",
+        "locked_fields": [
+          "date",
+          "legal_entity"
+        ],
+        "violated_fields": [
+          "date"
+        ],
+        "message": "A filtered search on date, legal_entity already matched no documents in this turn, so a search that drops or widens date is refused: it would answer from outside what was asked. After a filter matches nothing, a later search may change a locked field only to a different value (eq / one_of), or to a range that does not contain the one that matched nothing. Dropping the field, is_empty, or a wider condition that still includes what was asked (a longer period around it, an open-ended before/after, contains on part of the value) is refused.",
+        "instruction": "Tell the person nothing matched the filter. You may search again with a different value on the same field(s) (for example another month), but not without them."
+      },
+      "lock_after": [
+        "date",
+        "legal_entity"
+      ]
+    },
+    {
+      "step": "4 wide retry: date dropped, entity kept (expect refused_retry)",
+      "filters": [
+        {
+          "field": "legal_entity",
+          "op": "eq",
+          "value": "Acme GmbH"
+        }
+      ],
+      "result": {
+        "error": "refused_retry",
+        "locked_fields": [
+          "date",
+          "legal_entity"
+        ],
+        "violated_fields": [
+          "date"
+        ],
+        "message": "A filtered search on date, legal_entity already matched no documents in this turn, so a search that drops or widens date is refused: it would answer from outside what was asked. After a filter matches nothing, a later search may change a locked field only to a different value (eq / one_of), or to a range that does not contain the one that matched nothing. Dropping the field, is_empty, or a wider condition that still includes what was asked (a longer period around it, an open-ended before/after, contains on part of the value) is refused.",
+        "instruction": "Tell the person nothing matched the filter. You may search again with a different value on the same field(s) (for example another month), but not without them."
+      },
+      "lock_after": [
+        "date",
+        "legal_entity"
+      ]
+    },
+    {
+      "step": "5 disjoint retry: July 2025 Acme (expect ALLOWED \u2192 searched, here no_documents_matched)",
+      "filters": [
+        {
+          "field": "date",
+          "op": "between",
+          "value": "2025-07-01",
+          "value2": "2025-07-31"
+        },
+        {
+          "field": "legal_entity",
+          "op": "eq",
+          "value": "Acme GmbH"
+        }
+      ],
+      "result": {
+        "status": "no_documents_matched",
+        "reason": "zero_documents",
+        "filter": "document date 1\u201331 Jul 2025 \u00b7 legal entity = Acme GmbH",
+        "matched_documents": 0,
+        "undated_excluded": 0,
+        "nearby": [
+          {
+            "value": "2025-09",
+            "label": "September 2025",
+            "documents": 1
+          },
+          {
+            "value": "2025-10",
+            "label": "October 2025",
+            "documents": 1
+          },
+          {
+            "value": "2026-03",
+            "label": "March 2026",
+            "documents": 1
+          }
+        ],
+        "message": "No documents matched document date 1\u201331 Jul 2025 \u00b7 legal entity = Acme GmbH. Nearby values that do have documents: September 2025 (1 document), October 2025 (1 document), March 2026 (1 document).",
+        "instruction": "Tell the person that no documents matched document date 1\u201331 Jul 2025 \u00b7 legal entity = Acme GmbH, and state the filter you used. Cite nothing. Do not search again without this filter, and do not use grep, query_documents, read_document or analyze_document to answer from outside it. If nearby values are listed, you may offer them and ask whether to use one."
+      },
+      "lock_after": [
+        "date",
+        "legal_entity"
+      ]
+    },
+    {
+      "step": "6 different value: July 2026 Beta Ltd (expect ALLOWED \u2192 searched)",
+      "filters": [
+        {
+          "field": "date",
+          "op": "between",
+          "value": "2026-07-01",
+          "value2": "2026-07-31"
+        },
+        {
+          "field": "legal_entity",
+          "op": "eq",
+          "value": "Beta Ltd"
+        }
+      ],
+      "result": {
+        "status": "no_documents_matched",
+        "reason": "zero_documents",
+        "filter": "document date 1\u201331 Jul 2026 \u00b7 legal entity = Beta Ltd",
+        "matched_documents": 0,
+        "undated_excluded": 0,
+        "nearby": [
+          {
+            "value": "2026-03",
+            "label": "March 2026",
+            "documents": 1
+          },
+          {
+            "value": "2025-10",
+            "label": "October 2025",
+            "documents": 1
+          }
+        ],
+        "message": "No documents matched document date 1\u201331 Jul 2026 \u00b7 legal entity = Beta Ltd. Nearby values that do have documents: March 2026 (1 document), October 2025 (1 document).",
+        "instruction": "Tell the person that no documents matched document date 1\u201331 Jul 2026 \u00b7 legal entity = Beta Ltd, and state the filter you used. Cite nothing. Do not search again without this filter, and do not use grep, query_documents, read_document or analyze_document to answer from outside it. If nearby values are listed, you may offer them and ask whether to use one."
+      },
+      "lock_after": [
+        "date",
+        "legal_entity"
+      ]
+    }
+  ],
+  "audits": [],
+  "audit_note": "No search.query rows exist for this run_id: each audit write was rejected by audit_log RLS (42501) because this harness used the dev user JWT client, while the live agent loop writes with the service-role client. The handler swallows audit failures by design, so the results above are unaffected. The audited proof of WR-02 is the real model run 27e7f5b8-aef2-4437-8f35-73c73f37df47."
+}

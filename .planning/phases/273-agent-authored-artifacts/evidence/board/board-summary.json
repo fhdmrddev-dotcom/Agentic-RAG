@@ -1,0 +1,323 @@
+[
+  {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "required": true,
+    "calling_mode": "NATIVE (native SDK adapter)",
+    "thread_id": "7d368657-c9ba-47eb-a5d6-5c57c609d44a",
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "PASS",
+    "refused_calls": [
+      0,
+      0
+    ],
+    "empty_answer": [
+      false,
+      false
+    ],
+    "fallback_answer": [
+      false,
+      false
+    ],
+    "leak": [
+      "none"
+    ],
+    "b_tool_calls": [
+      "show_artifact"
+    ],
+    "b_forbidden": [],
+    "b_parent_ids": [
+      "a_njt2ih47n8"
+    ],
+    "first_artifact": "a_njt2ih47n8",
+    "artifact_rows": 2,
+    "reload_records": 2,
+    "reload_missing": 0
+  },
+  {
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "4cad1a72-a247-46e6-ac27-68a5178dc520",
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "FAIL",
+    "refused_calls": [
+      0,
+      1
+    ],
+    "empty_answer": [
+      false,
+      false
+    ],
+    "fallback_answer": [
+      false,
+      false
+    ],
+    "leak": [
+      "none"
+    ],
+    "b_tool_calls": [
+      "show_artifact",
+      "show_artifact"
+    ],
+    "b_forbidden": [],
+    "b_parent_ids": [
+      null
+    ],
+    "first_artifact": "a_v99qzkgrki",
+    "artifact_rows": 2,
+    "reload_records": 2,
+    "reload_missing": 0
+  },
+  {
+    "provider": "google",
+    "model": "gemini-3.8-flash",
+    "required": true,
+    "calling_mode": "NATIVE (native SDK adapter)",
+    "thread_id": "f64563b6-8ad4-49ce-a70f-52c9e06cdf69",
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "PASS",
+    "refused_calls": [
+      0,
+      0
+    ],
+    "empty_answer": [
+      false,
+      false
+    ],
+    "fallback_answer": [
+      false,
+      false
+    ],
+    "leak": [
+      "none"
+    ],
+    "b_tool_calls": [
+      "show_artifact"
+    ],
+    "b_forbidden": [],
+    "b_parent_ids": [
+      "a_j625o7tpsj"
+    ],
+    "first_artifact": "a_j625o7tpsj",
+    "artifact_rows": 2,
+    "reload_records": 2,
+    "reload_missing": 0
+  },
+  {
+    "provider": "lmstudio",
+    "model": "qwen-agentworld-35b-a3b",
+    "required": false,
+    "calling_mode": "NATIVE",
+    "thread_id": "e613a7d7-4e51-4bed-a12a-6ca650d3aa14",
+    "v1": "FAIL",
+    "v2_board": "FAIL",
+    "v3": "FAIL",
+    "refused_calls": [
+      0,
+      0
+    ],
+    "empty_answer": [
+      false,
+      false
+    ],
+    "fallback_answer": [
+      false,
+      false
+    ],
+    "leak": [
+      "none"
+    ],
+    "b_tool_calls": [],
+    "b_forbidden": [],
+    "b_parent_ids": [],
+    "first_artifact": null,
+    "artifact_rows": 0,
+    "reload_records": 0,
+    "reload_missing": 0
+  },
+  {
+    "provider": "minimax",
+    "model": "MiniMax-M3",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "2cc80d64-ba37-47fa-ab9a-1a672553c5c8",
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "PASS",
+    "refused_calls": [
+      0,
+      0
+    ],
+    "empty_answer": [
+      false,
+      false
+    ],
+    "fallback_answer": [
+      false,
+      false
+    ],
+    "leak": [
+      "none"
+    ],
+    "b_tool_calls": [
+      "show_artifact"
+    ],
+    "b_forbidden": [],
+    "b_parent_ids": [
+      "a_mtvvkas08f"
+    ],
+    "first_artifact": "a_mtvvkas08f",
+    "artifact_rows": 2,
+    "reload_records": 2,
+    "reload_missing": 0
+  },
+  {
+    "provider": "moonshot",
+    "model": "kimi-k3",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "61146467-36d4-4d1d-be31-e4215c53aa76",
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "PASS",
+    "refused_calls": [
+      0,
+      0
+    ],
+    "empty_answer": [
+      false,
+      false
+    ],
+    "fallback_answer": [
+      false,
+      false
+    ],
+    "leak": [
+      "none"
+    ],
+    "b_tool_calls": [
+      "show_artifact"
+    ],
+    "b_forbidden": [],
+    "b_parent_ids": [
+      "a_dof9x4xt2l"
+    ],
+    "first_artifact": "a_dof9x4xt2l",
+    "artifact_rows": 2,
+    "reload_records": 2,
+    "reload_missing": 0
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "605a8ca1-cd14-462d-a78d-d65356c5b6a5",
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "PASS",
+    "refused_calls": [
+      0,
+      0
+    ],
+    "empty_answer": [
+      false,
+      false
+    ],
+    "fallback_answer": [
+      false,
+      false
+    ],
+    "leak": [
+      "none"
+    ],
+    "b_tool_calls": [
+      "show_artifact"
+    ],
+    "b_forbidden": [],
+    "b_parent_ids": [
+      "a_gjbgqvcu6r"
+    ],
+    "first_artifact": "a_gjbgqvcu6r",
+    "artifact_rows": 2,
+    "reload_records": 2,
+    "reload_missing": 0
+  },
+  {
+    "provider": "openrouter",
+    "model": "z-ai/glm-5.3-flash",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "6b4a1162-c5bc-4869-a49b-52abb3290fca",
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "PASS",
+    "refused_calls": [
+      0,
+      0
+    ],
+    "empty_answer": [
+      false,
+      false
+    ],
+    "fallback_answer": [
+      false,
+      false
+    ],
+    "leak": [
+      "none"
+    ],
+    "b_tool_calls": [
+      "show_artifact"
+    ],
+    "b_forbidden": [],
+    "b_parent_ids": [
+      "a_dys9ly59mj"
+    ],
+    "first_artifact": "a_dys9ly59mj",
+    "artifact_rows": 2,
+    "reload_records": 2,
+    "reload_missing": 0
+  },
+  {
+    "provider": "zhipu",
+    "model": "glm-5.3-flash",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "808bede7-b2ad-4d34-8497-aa1d089fe7f2",
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "PASS",
+    "refused_calls": [
+      0,
+      0
+    ],
+    "empty_answer": [
+      false,
+      false
+    ],
+    "fallback_answer": [
+      false,
+      false
+    ],
+    "leak": [
+      "none"
+    ],
+    "b_tool_calls": [
+      "show_artifact"
+    ],
+    "b_forbidden": [],
+    "b_parent_ids": [
+      "a_yy79vsfy4r"
+    ],
+    "first_artifact": "a_yy79vsfy4r",
+    "artifact_rows": 2,
+    "reload_records": 2,
+    "reload_missing": 0
+  }
+]

@@ -78,6 +78,39 @@ describe("one row, and everything in it", () => {
   })
 })
 
+describe("Phase 271 (D-08/D-09) — the Filing rules link: a secondary door, never a sixth tab", () => {
+  it("renders a 'Filing rules' button in the right cluster, BEFORE the queue pill", () => {
+    renderBar({ onOpenFilingRules: vi.fn() })
+    const link = screen.getByRole("button", { name: "Filing rules" })
+    const pill = screen.getByTestId("library-queue-pill")
+    // Same right cluster: the link and the pill share one parent, and the link comes first.
+    expect(link.closest("[data-testid='library-headerbar'] > div:not([role='tablist'])")).toBe(
+      pill.parentElement,
+    )
+    expect(link.compareDocumentPosition(pill) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("⛔ is NOT a tab — the tablist still holds exactly five", () => {
+    renderBar({ onOpenFilingRules: vi.fn() })
+    expect(screen.getByRole("button", { name: "Filing rules" })).not.toHaveAttribute("role", "tab")
+    expect(screen.queryByRole("tab", { name: /filing rules/i })).not.toBeInTheDocument()
+    expect(screen.getAllByRole("tab")).toHaveLength(5)
+  })
+
+  it("calls onOpenFilingRules once on click", async () => {
+    const onOpenFilingRules = vi.fn()
+    const user = userEvent.setup()
+    renderBar({ onOpenFilingRules })
+    await user.click(screen.getByRole("button", { name: "Filing rules" }))
+    expect(onOpenFilingRules).toHaveBeenCalledTimes(1)
+  })
+
+  it("renders NO link without the prop — the resting header is unchanged", () => {
+    renderBar()
+    expect(screen.queryByRole("button", { name: /filing rules/i })).not.toBeInTheDocument()
+  })
+})
+
 describe("⭐ the reclaimed corner does a job", () => {
   it("at rest it states the corpus rather than sitting empty", () => {
     renderBar({ inFlight: 0, totalDocuments: 103 })

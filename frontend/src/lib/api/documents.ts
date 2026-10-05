@@ -14,8 +14,11 @@ import type {
   Document,
   DocumentChunkRow,
   DocumentContentResponse,
+  DocumentDownloadUrl,
   DocumentImageRow,
   DocumentQueryRow,
+  DocumentSearchRequest,
+  DocumentSearchResponse,
   ConversationResponse,
   DocumentTableRow,
   Folder,
@@ -53,14 +56,21 @@ export async function uploadDocument(file: File, folderId?: string | null): Prom
 // NO-Content-Type detail is load-bearing so the browser sets the multipart
 // boundary itself. The server is the real gate (validate_ooxml magic-byte
 // check, Plan 100-04); the panel reconciles by upserting the returned row.
+//
+// Phase 274 (D-05 / D-21): `lifetime` is an OPT-IN. Only the chat composer passes
+// "thread" (the file then lives with its thread, `expires_at: null`). The panel's
+// TemplateUpload and the workflow-launch door pass nothing, so their requests stay
+// byte-identical — no query string, the 24h TTL kept.
 export async function uploadWorkspaceTemplate(
   threadId: string,
   file: File,
+  lifetime: "template" | "thread" = "template",
 ): Promise<WorkspaceFile> {
   const token = await getAuthToken()
   const formData = new FormData()
   formData.append("file", file)
-  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files`, {
+  const qs = lifetime === "thread" ? "?lifetime=thread" : ""
+  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files${qs}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },  // NO Content-Type — browser sets the boundary
     body: formData,
@@ -95,10 +105,12 @@ export async function attachConnectionFileToThread(
   connectionId: string,
   fileId: string,
 ): Promise<WorkspaceFile> {
-  const token = await getAuthToken()
+  // Phase 274 (SC#1): the shared auth header builder, so the request carries X-Org-Id. It sent only
+  // a bearer, and `get_active_org_id` answers 400 to a caller in two orgs with no X-Org-Id.
+  const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files/from-connection`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ connection_id: connectionId, file_id: fileId }),
   })
   if (!res.ok) {
@@ -132,6 +144,65 @@ export class DownloadError extends Error {
     this.status = status
     this.name = "DownloadError"
   }
+}
+
+/**
+ * Phase 270 — mint a short-lived signed download URL for a document's original file.
+ * The URL is a bearer token: the caller (`startDocumentDownload`) uses it once and never keeps it.
+ * 404/403 = invisible, 409 = not stored, 410 = file missing; all surface as DownloadError(status).
+ */
+export async function getDocumentDownloadUrl(documentId: string): Promise<DocumentDownloadUrl> {
+  const headers = await getAuthHeaders()
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/documents/${documentId}/download-url`, {
+      method: "POST",
+      headers,
+      cache: "no-store",
+    })
+  } catch {
+    throw new DownloadError("network", "Download failed.")
+  }
+  if (!res.ok) throw new DownloadError(res.status, "Download failed.")
+  return res.json() as Promise<DocumentDownloadUrl>
+}
+
+/**
+ * Phase 271 (FIND-01) — the Find failure, carrying the HTTP status (the `DownloadError` shape)
+ * so a 422 (a condition the server refused) can be told apart from a network failure.
+ */
+export class DocumentSearchError extends Error {
+  readonly status: number | "network"
+  constructor(status: number | "network", message: string) {
+    super(message)
+    this.status = status
+    this.name = "DocumentSearchError"
+  }
+}
+
+/**
+ * Phase 271 (FIND-01 / FIND-03 / D-03) — `POST /document-search`: exact field matching over
+ * the caller's visible documents, no embedding and no ranking.
+ *
+ * ⚠ Consumers import this from `@/lib/api/documents`, never from the `@/lib/api` barrel:
+ * every suite that mocks the barrel with a factory lacking this export would throw at mount
+ * (the 196-08 lesson). The barrel still re-exports it, because `apiBarrel.test.ts` requires
+ * every runtime export of this module there (D-207-06).
+ */
+export async function searchDocuments(body: DocumentSearchRequest): Promise<DocumentSearchResponse> {
+  const headers = await getAuthHeaders()
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/document-search`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new DocumentSearchError("network", "Couldn't run this search.")
+  }
+  if (!res.ok) throw new DocumentSearchError(res.status, "Couldn't run this search.")
+  return res.json() as Promise<DocumentSearchResponse>
 }
 
 export async function downloadSandboxOutput(

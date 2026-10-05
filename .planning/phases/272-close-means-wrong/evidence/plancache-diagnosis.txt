@@ -1,0 +1,42 @@
+Phase 272-05 — PL/pgSQL generic-plan regression found by the SEED-273 ladder (2026-10-03)
+=========================================================================================
+
+How it was found. The first ladder run (ladder-run1-aborted.txt) printed, for the UNFILTERED
+control at the global knobs, a body-statement CUSTOM plan of
+  Index Scan[document_chunks_embedding_idx] · Index Scan[documents_pkey]   shared read 259
+but a GENERIC plan of
+  Seq Scan · Bitmap Heap Scan · Bitmap Index Scan[idx_document_chunks_document_id]   shared read 100,396
+and a measured function-call p50 of 1,586.7 ms (p95 1,866.0). The 500-chunk set's INDEX branch read
+p50 445.7 ms while its EXACT branch read 12.8 ms. The run was stopped and the cause isolated.
+
+Method. recall_bench (100,000 chunks, pgvector 0.8.0), caller 7fcfb80e-… (69,805 chunks, its own
+org). 12 sequential calls on ONE session (a pooled backend connection is one session), each in a
+savepoint with SET LOCAL ROLE authenticated + both claim GUCs. Every DDL change (drop function,
+recreate migration 170's body, drop the btree, ALTER … SET) is inside a transaction that was
+ROLLED BACK. Scripts: plancache_diag_vector.py, plancache_diag_keyword.py (this directory).
+
+Vector arm (match_document_chunks), ms per call, verbatim:
+A unfiltered | mig200 fn + btree (as applied)          [48.0, 84.6, 12.9, 13.5, 32.0, 578.4, 1557.3, 1302.2, 488.0, 1371.9, 1473.8, 1459.8]
+B unfiltered | mig200 fn, btree dropped                [33.7, 4.2, 4.2, 4.2, 5.5, 28.6, 13.3, 30.2, 16.8, 13.6, 13.7, 17.9]
+C unfiltered | mig170 fn + btree                       [16.2, 4.6, 3.2, 4.9, 7.1, 503.0, 1024.3, 1026.5, 452.0, 1012.4, 998.4, 1007.6]
+D unfiltered | mig170 fn, no btree (PRE-272)           [21.8, 3.4, 3.2, 3.8, 3.5, 3.7, 3.2, 5.8, 3.7, 3.7, 7.9, 4.0]
+E unfiltered | mig200 fn + btree + force_custom_plan   [24.4, 5.7, 3.6, 5.2, 4.7, 3.9, 6.4, 3.5, 3.1, 5.3, 3.6, 2.5]
+F set500 index relaxed ef40 | mig200 as applied        [74.8, 8.4, 7.6, 8.2, 7.4, 468.1, 495.9, 444.6, 445.6, 438.7, 465.5, 439.6]
+G set500 index relaxed ef40 | + force_custom_plan      [26.4, 8.3, 7.9, 8.4, 7.9, 17.5, 7.8, 10.2, 19.5, 9.5, 8.7, 9.6]
+
+Keyword arm (keyword_search_chunks), queries cycle over bench terms; ms per call, verbatim:
+KA kw unfiltered | mig200 + btree (as applied)    [305.2, 144.8, 3.4, 3.1, 309.8, 15852.7, 30974.5, 11697.8, 45.1, 175.1, 15864.2, 15828.1] rows=[20, 20, 0, 0, 20, 20, 20, 20, 0, 0, 20, 20]
+KD kw unfiltered | mig170 no btree (PRE-272)      [289.0, 132.0, 1.6, 2.8, 294.4, 741.0, 687.6, 511.3, 0.8, 0.9, 920.0, 800.4] rows=[20, 20, 0, 0, 20, 20, 20, 20, 0, 0, 20, 20]
+KC kw unfiltered | mig170 + btree                 [299.0, 131.4, 2.5, 1.4, 320.8, 16214.9, 32072.4, 12058.3, 50.2, 170.1, 16610.1, 17668.4] rows=[20, 20, 0, 0, 20, 20, 20, 20, 0, 0, 20, 20]
+KE kw unfiltered | mig200 + btree + force_custom  [412.8, 162.4, 2.3, 1.7, 420.2, 408.0, 336.2, 159.5, 4.9, 4.6, 349.9, 403.0] rows=[20, 20, 0, 0, 20, 20, 20, 20, 0, 0, 20, 20]
+
+Reading.
+- Calls 1-5 are custom plans in every scenario; from call 6 PL/pgSQL may switch to its one generic plan.
+- C vs D: the 170 body is UNCHANGED between them; only the btree differs. The btree alone makes the
+  generic plan a whole-table document_id join (vector: 3-8 ms -> 0.45-1.0 s; keyword: 0.5-0.9 s ->
+  12-32 s). So migration 200, as applied, regresses UNFILTERED search on every pooled connection
+  after its fifth retrieval call, and makes the filtered index branch ~50x slower.
+- E / G / KE: `SET plan_cache_mode = force_custom_plan` on the function removes it on both arms
+  (at or below the pre-272 figures).
+- Fix shipped as migration 201 (ALTER FUNCTION … SET plan_cache_mode = force_custom_plan, both RPCs).
+  The btree stays: the exact branch needs it.

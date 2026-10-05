@@ -1328,7 +1328,11 @@ async def start_mcp_oauth(
         registered = await register_client(
             probe.registration_endpoint,
             redirect_uri=f"{settings.backend_public_url.rstrip('/')}/connectors/mcp/oauth/callback",
-            client_name="Agentic RAG",
+            client_name="Syrel",
+            # 276-07 (D-27): only NEW registrations carry the new name. A connection that already
+            # stores `custom_client_id` skips this whole block, so its existing vendor application
+            # keeps the name it was registered with; nothing re-registers or renames it.
+            # (test_276_oauth_client_name.py arm B.)
         )
         client_id = registered.client_id
         client_secret = registered.client_secret

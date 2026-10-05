@@ -100,9 +100,17 @@ Then edit `./.env` and fill in:
   **Configuration** below — get this one right or the backend can't reach the DB).
 - **One provider key** — e.g. `OPENAI_API_KEY`.
 - **`OPERATOR_EMAILS`** — your own email, so you're bootstrapped as the operator on first
-  boot. This is what unlocks `/admin` — **not** `ENVIRONMENT` (as of Phase 146, `ENVIRONMENT`
-  is only a deploy marker; the operator gate is `OPERATOR_EMAILS` + the `operator_users`
+  boot. This is what unlocks `/admin` — **not** `ENVIRONMENT` (as of Phase 146, ~~`ENVIRONMENT`
+  is only a deploy marker;~~ the operator gate is `OPERATOR_EMAILS` + the `operator_users`
   table).
+- **`ENVIRONMENT=production`** — keep it (the example already sets it). **CORRECTED
+  2026-10-04:** `ENVIRONMENT=production` now ALSO gates `/docs`, `/redoc`, `/openapi.json`
+  (Phase 276, DOCS-04): signed-out callers get 401. Left unset, the live API explorer is open to
+  anyone — the backend boot log says `API docs: OPEN` instead of `API docs: GATED`.
+  **CORRECTED 2026-10-05 (276-REVIEW A-WR-01):** the gate is fail-closed. The explorer is open
+  only when `ENVIRONMENT` is unset or `local` / `development` / `dev` / `test` (any case); every
+  other value — `production`, `staging`, anything else — is gated. An open explorer under
+  `dev` / `development` / `test` logs `API docs: OPEN` at **WARNING**.
 - **`SECRETS_ENCRYPTION_KEY`** — generate a Fernet key so provider keys are encrypted at rest:
   ```bash
   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -296,11 +304,13 @@ SQL editor, in order:
    gone stale. `backend/tests/unit/test_214_flag_cold_default.py` is what fails when a governed
    feature is added or a default changes without this table following in the same commit.
 
-> Migrations currently run to **198** (re-derived 2026-09-29 at Phase 269; ⚠ ~~this line read
-> **124** until then~~ and had been stale for seventy-four migrations — it read `102` until
+> Migrations currently run to **199** (re-derived 2026-09-30 at Phase 270; ⚠ ~~this line read
+> **198**~~ until then, and **124** before Phase 269 had stale for seventy-four migrations — it read `102` until
 > 2026-08-24 before that. Re-derive it with `ls supabase/migrations | tail -1` rather than
-> trusting it). The newest, migration **198** (Phase 269), is the starter-Expert-library seed
-> and is row 14 of the table above. The paragraph that follows describes migration **124** and is
+> trusting it). Migration **199** (Phase 270) is DDL only — four nullable file-fact columns on
+> `documents` and `app_settings.document_download_url_ttl_seconds` (default 60 seconds, bounded 10-900 by
+> a CHECK) — so it is schema, not a seed, and has no Step-3 entry. The newest seed, migration **198**
+> (Phase 269), is the starter-Expert-library seed and is row 14 of the table above. The paragraph that follows describes migration **124** and is
 > kept as the worked example of the filename trap: migration **124** (Phase 204, SCHED-01), creates the
 > `workflow_schedules` table with owner-scoped RLS — **schema, not a seed**, so like 102 it is
 > deliberately absent from the table above and needs no separate paste on a fresh box:

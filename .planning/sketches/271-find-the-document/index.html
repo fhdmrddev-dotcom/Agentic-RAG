@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>271 · Find the Document</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:hsl(216 45% 4%);--elev:hsl(220 40% 5%);--card:hsl(220 30% 7%);--pop:hsl(220 30% 9%);
+  --muted:hsl(220 30% 11%);--accent:hsl(220 25% 14%);
+  --text:hsl(226 60% 97%);--text-m:hsl(220 16% 65%);--text-d:hsl(220 16% 52%);
+  --border:hsl(220 20% 16%);--primary:hsl(239 100% 82%);
+  --v-bg:hsl(258 90% 66% / .12);--v-bd:hsl(258 90% 66% / .35);--v-tx:hsl(258 95% 85%);
+  --amber:hsl(38 92% 60%);--a-bg:hsl(38 92% 60% / .10);--a-bd:hsl(38 92% 60% / .30);--a-tx:hsl(38 92% 72%);
+  --green:hsl(142 71% 55%);
+  --i-bg:hsl(239 84% 67% / .18);--i-bd:hsl(239 84% 67% / .4);--i-tx:hsl(239 100% 85%);
+  --sans:'Inter',system-ui,sans-serif;--head:'Manrope','Inter',sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--sans)}
+header.top{position:sticky;top:0;z-index:30;background:hsl(216 45% 4% / .94);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+header.top h1{font:700 15px var(--head);margin:0}
+.grp{display:flex;gap:4px;align-items:center;font-size:11px;color:var(--text-d)}
+.tab{background:var(--muted);border:1px solid var(--border);color:var(--text-m);padding:5px 11px;border-radius:8px;cursor:pointer;font:500 12px var(--sans)}
+.tab:hover{color:var(--text)}
+.tab[aria-selected=true]{background:var(--v-bg);border-color:var(--v-bd);color:var(--v-tx)}
+.sep{width:1px;height:22px;background:var(--border)}
+main{max-width:1280px;margin:0 auto;padding:20px 24px 60px}
+.q{color:var(--text-m);font-size:13px;margin:0 0 14px;max-width:900px}
+.q b{color:var(--text)}
+.app{display:grid;grid-template-columns:64px 1fr;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--elev);min-height:560px}
+.rail{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0}
+.rail div{width:44px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:10px;color:var(--text-d);text-align:center;line-height:1.1}
+.rail div.on{background:var(--i-bg);color:var(--i-tx)}
+.lib{min-width:0;display:flex;flex-direction:column}
+.lhead{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.lhead h2{font:700 17px var(--head);margin:0}
+.seg{display:inline-flex;background:var(--muted);border:1px solid var(--border);border-radius:9px;padding:2px}
+.seg button{background:none;border:0;color:var(--text-m);padding:4px 11px;border-radius:7px;font:500 12px var(--sans);cursor:pointer}
+.seg button.on{background:var(--accent);color:var(--text)}
+.seg.mode button.on{background:var(--i-bg);color:var(--i-tx)}
+.spacer{flex:1}
+.lnk{background:none;border:1px solid transparent;color:var(--text-m);font:500 12px var(--sans);padding:5px 9px;border-radius:8px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.lnk:hover{color:var(--text);border-color:var(--border)}
+.menu{position:relative}
+.menu .pop{right:0;left:auto}
+.body{padding:14px 18px;display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
+.body.split{grid-template-columns:minmax(0,1fr) 340px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search{flex:1;min-width:240px;display:flex;align-items:center;gap:8px;background:var(--muted);border:1px solid var(--border);border-radius:10px;padding:7px 10px}
+.search input{flex:1;background:none;border:0;outline:0;color:var(--text);font:13px var(--sans)}
+.search .pill{background:var(--i-bg);border:1px solid var(--i-bd);color:var(--i-tx);font:600 11px var(--sans);border-radius:999px;padding:3px 9px;cursor:pointer}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;position:relative}
+.where{color:var(--text-d);font-size:12px}
+.chip{background:var(--card);border:1px solid var(--border);border-radius:999px;color:var(--text-m);padding:4px 10px;font:500 12px var(--sans);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chip b{color:var(--text);font-weight:600}
+.chip.set{border-color:var(--i-bd);background:var(--i-bg);color:var(--i-tx)}
+.chip.add{border-style:dashed}
+.chip .x{opacity:.6;margin-left:2px}
+.cw{position:relative}
+.pop{position:absolute;z-index:15;top:calc(100% + 6px);left:0;min-width:250px;background:var(--pop);border:1px solid var(--border);border-radius:12px;padding:8px;box-shadow:0 12px 32px #0008}
+.pop h4{margin:4px 6px 6px;font:600 11px var(--sans);color:var(--text-d);text-transform:uppercase;letter-spacing:.06em}
+.pop .opt{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:7px;cursor:pointer;color:var(--text-m);font-size:13px}
+.pop .opt:hover{background:var(--muted);color:var(--text)}
+.pop .opt.on{color:var(--i-tx);background:var(--i-bg)}
+.pop .opt .dot{width:10px;height:10px;border-radius:50%;border:1px solid var(--text-d);flex:none}
+.pop .opt.on .dot{background:var(--primary);border-color:var(--primary)}
+.pop input[type=text]{width:100%;background:var(--muted);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font:13px var(--sans);outline:0}
+.hint{color:var(--text-d);font-size:11px;margin:6px}
+.meta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--text-m)}
+.count{color:var(--text);font-weight:600}.count.zero{color:var(--amber)}
+.noai{color:var(--text-d);display:inline-flex;gap:5px;align-items:center}
+.noai::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green)}
+select.s{background:var(--muted);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 8px;font:12px var(--sans)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font:600 11px var(--sans);color:var(--text-d);text-transform:uppercase;letter-spacing:.05em;padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid hsl(220 20% 12%);color:var(--text-m)}
+td.n{color:var(--text);font-weight:500}
+tr.row{cursor:pointer}tr.row:hover td{background:var(--card)}
+tr.row.sel td{background:var(--i-bg)}
+.tag{font:600 10px var(--sans);border-radius:6px;padding:2px 6px;border:1px solid var(--border);color:var(--text-m);white-space:nowrap}
+.tag.old{border-color:var(--a-bd);color:var(--a-tx);background:var(--a-bg)}
+.tag.has{border-color:var(--v-bd);color:var(--v-tx);background:var(--v-bg)}
+.empty{padding:28px;text-align:center;color:var(--a-tx);background:var(--a-bg);border:1px dashed var(--a-bd);border-radius:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px}
+.ask{display:grid;gap:10px;padding:22px;text-align:left}
+.btn{background:var(--i-bg);border:1px solid var(--i-bd);color:var(--i-tx);border-radius:9px;padding:7px 12px;font:600 12px var(--sans);cursor:pointer}
+.panel h3{font:700 14px var(--head);margin:0 0 8px}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:12px}.facts dt{color:var(--text-d)}.facts dd{margin:0;color:var(--text)}
+.rows .r{display:grid;grid-template-columns:160px 170px 1fr 24px;gap:8px;align-items:center;margin-bottom:6px}
+.rows .r .lbl{color:var(--text-d);font-size:12px}
+.rows input[type=text]{background:var(--muted);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:5px 8px;font:12px var(--sans);width:100%}
+.readout{color:var(--i-tx);font-size:12px;background:var(--i-bg);border:1px solid var(--i-bd);border-radius:8px;padding:5px 9px}
+.rule{display:grid;grid-template-columns:1fr auto;gap:6px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card);margin-bottom:8px}
+.rule b{font-size:13px}.rule span{color:var(--text-m);font-size:12px}
+.crumb{font-size:12px;color:var(--text-d)}.crumb b{color:var(--text)}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>271 · Find the Document</h1>
+  <div class="grp">Screen
+    <button class="tab" data-s="1" aria-selected="true">1 Find | Ask</button>
+    <button class="tab" data-s="2">2 Structure filters</button>
+    <button class="tab" data-s="3">3 Filing rules home</button>
+  </div>
+  <div class="sep"></div>
+  <div class="grp">Variant
+    <button class="tab" data-v="A" aria-selected="true">A</button>
+    <button class="tab" data-v="B">B</button>
+  </div>
+</header>
+<main>
+  <p class="q" id="qtext"></p>
+  <div id="stage"></div>
+</main>
+
+<script>
+// Synthetic corpus. Every count in this sketch is computed from it, not faked.
+const ID={};
+const D=[
+ ["d1","Acme MSA 2019 (v1)","Contract","Amira","2019-11-02","2019-03-14","Acme Ltd","/Contracts/2019",false,2,"v1"],
+ ["d2","Acme MSA 2019","Contract","Amira","2024-02-10","2019-03-14","Acme Ltd","/Contracts/2019",true,2,"v2"],
+ ["d3","Acme MSA Amendment 1","Contract","Amira","2024-05-21","2024-05-01","Acme Ltd","/Contracts/Active",true,1,"v1"],
+ ["d4","Acme MSA 2025 Renewal","Contract","Jonas","2025-01-17","2025-01-09","Acme Ltd","/Contracts/Active",true,1,"v1"],
+ ["d5","Northwind Supply Agreement","Contract","Amira","2025-03-02","2024-12-12","Northwind","/Contracts/Active",true,3,"v3"],
+ ["d6","Northwind Supply Agreement (v2)","Contract","Amira","2024-12-20","2024-12-12","Northwind","/Contracts/Active",false,3,"v2"],
+ ["d7","Globex NDA","Contract","Lena","2023-07-08","2023-07-01","Globex","/Contracts/2023",true,1,"v1"],
+ ["d8","Invoice INV-1042","Invoice","Jonas","2025-04-01","2025-03-30","Acme Ltd","/Finance/Invoices",true,1,"v1"],
+ ["d9","Invoice INV-1043","Invoice","Jonas","2025-04-09","2025-04-08","Northwind","/Finance/Invoices",true,1,"v1"],
+ ["d10","Invoice INV-0877","Invoice","Jonas","2019-09-12","2019-09-10","Acme Ltd","/Finance/Invoices/Archive",true,1,"v1"],
+ ["d11","Remote Work Policy","Policy","Lena","2024-08-30","2024-08-01","Globex","/HR/Policies",true,2,"v2"],
+ ["d12","Remote Work Policy (v1)","Policy","Lena","2023-02-11","2023-02-01","Globex","/HR/Policies",false,2,"v1"],
+ ["d13","Travel Policy","Policy","Lena","2022-06-03","2022-05-20","Globex","/HR/Policies",true,1,"v1"],
+ ["d14","Q3 2025 Revenue Report","Report","Amira","2025-10-04","2025-10-01","Acme Ltd","/Finance/Reports",true,1,"v1"],
+ ["d15","Q3 2024 Revenue Report","Report","Amira","2024-10-05","2024-10-02","Acme Ltd","/Finance/Reports",true,1,"v1"],
+ ["d16","Audit Findings 2024","Report","Jonas","2025-02-14","2025-02-10","Northwind","/Finance/Reports",true,1,"v1"],
+ ["d17","Acme Pricing Schedule","Contract","Jonas","2024-03-01","2024-02-27","Acme Ltd","/Contracts/Active",true,1,"v1"],
+ ["d18","Signed Scan - Acme MSA 2019","Contract","Amira","2019-04-02","2019-03-20","Acme Ltd","/Contracts/2019",true,1,"v1"]
+];
+const DOCS=D.map(r=>({id:r[0],name:r[1],type:r[2],owner:r[3],mod:r[4],created:r[5],entity:r[6],folder:r[7],latest:r[8],versions:r[9],v:r[10]}));
+DOCS.forEach(d=>{ID[d.id]=d;});
+// Stored direction: source -> target
+const REL=[
+ ["d4","d2","supersedes"],["d3","d2","amends"],["d2","d1","supersedes"],
+ ["d5","d6","supersedes"],["d8","d4","references"],["d9","d5","references"],
+ ["d18","d2","attached_to"],["d17","d2","references"],["d11","d12","supersedes"],["d14","d15","references"]
+];
+const has=(a,b,t)=>REL.some(r=>r[0]===a.id&&r[1]===b.id&&r[2]===t);
+// The RESULT document is the subject of the phrase: "<result> <verb> <picked doc>".
+const VERBS=[
+ ["supersedes","Supersedes",(d,x)=>has(d,x,"supersedes")],
+ ["superseded_by","Is superseded by",(d,x)=>has(x,d,"supersedes")],
+ ["amends","Amends",(d,x)=>has(d,x,"amends")],
+ ["amended_by","Is amended by",(d,x)=>has(x,d,"amends")],
+ ["references","References",(d,x)=>has(d,x,"references")],
+ ["referenced_by","Is referenced by",(d,x)=>has(x,d,"references")],
+ ["attached_to","Is attached to",(d,x)=>has(d,x,"attached_to")],
+ ["has_attachment","Has attachment",(d,x)=>has(x,d,"attached_to")]
+];
+const FOLDERS=["/Contracts","/Contracts/2019","/Contracts/Active","/Contracts/2023","/Finance","/Finance/Invoices","/Finance/Reports","/HR/Policies"];
+const VERSION=[["latest","Latest versions","Default. One row per document."],["earlier","Has earlier versions","Latest rows that have a history."],["superseded","Superseded (older versions)","Shows the older version rows themselves."]];
+const SORTL={mod:"Modified (newest)",name:"Name (A to Z)",owner:"Owner, then newest"};
+const BLANK=()=>({type:null,owner:null,year:null,entity:null,folder:null,sub:true,relVerb:"supersedes",relDoc:null,version:"latest"});
+
+const S={screen:"1",variant:"A",mode:"find",q:"",panel:false,sel:null,sort:"mod",f:BLANK(),open:null,lib3:"home",menu:false,relQuery:""};
+const get=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const uniq=k=>[...new Set(DOCS.map(d=>d[k]))].sort();
+
+function match(d){
+  const f=S.f;
+  if(f.type&&d.type!==f.type)return false;
+  if(f.owner&&d.owner!==f.owner)return false;
+  if(f.year&&d.mod.slice(0,4)!==f.year)return false;
+  if(f.entity&&d.entity!==f.entity)return false;
+  if(f.folder){const ok=f.sub?(d.folder===f.folder||d.folder.startsWith(f.folder+"/")):d.folder===f.folder;if(!ok)return false;}
+  if(f.relDoc){const v=VERBS.find(v=>v[0]===f.relVerb);if(!v[2](d,ID[f.relDoc]))return false;}
+  if(f.version==="latest"&&!d.latest)return false;
+  if(f.version==="earlier"&&!(d.latest&&d.versions>1))return false;
+  if(f.version==="superseded"&&d.latest)return false;
+  if(S.q&&!d.name.toLowerCase().includes(S.q.toLowerCase()))return false;
+  return true;
+}
+function results(){
+  const r=DOCS.filter(match),k=S.sort;
+  r.sort((a,b)=>k==="name"?a.name.localeCompare(b.name):k==="owner"?a.owner.localeCompare(b.owner)||b.mod.localeCompare(a.mod):b.mod.localeCompare(a.mod));
+  return r;
+}
+
+function chip(key,label,valText,body){
+  const set=valText!=null;
+  return '<span class="cw"><button class="chip '+(set?"set":"add")+'" data-chip="'+key+'">'+(set?label+' <b>'+esc(valText)+'</b><span class="x" data-clear="'+key+'">✕</span>':'＋ '+label)+'</button>'+(S.open===key?'<div class="pop">'+body+'</div>':'')+'</span>';
+}
+function radioList(key,vals,cur){
+  return vals.map(v=>'<div class="opt '+(cur===v?"on":"")+'" data-set="'+key+'" data-val="'+esc(v)+'"><span class="dot"></span>'+esc(v)+'</div>').join("");
+}
+function relPicks(){return DOCS.filter(d=>d.latest&&(!S.relQuery||d.name.toLowerCase().includes(S.relQuery.toLowerCase()))).slice(0,6);}
+function relBody(){
+  const f=S.f;
+  return '<h4>Documents that…</h4>'+VERBS.map(v=>'<div class="opt '+(f.relVerb===v[0]?"on":"")+'" data-relverb="'+v[0]+'"><span class="dot"></span>'+v[1]+'</div>').join("")+
+   '<h4>…this document</h4><input type="text" id="relq" placeholder="Type a document name" value="'+esc(S.relQuery)+'">'+
+   relPicks().map(d=>'<div class="opt '+(f.relDoc===d.id?"on":"")+'" data-reldoc="'+d.id+'">'+esc(d.name)+'</div>').join("")+
+   '<div class="hint">Both directions are separate verbs. Picker reuses the 035 typeahead.</div>';
+}
+function folderBody(){
+  return '<h4>Folder</h4>'+FOLDERS.map(p=>'<div class="opt '+(S.f.folder===p?"on":"")+'" data-set="folder" data-val="'+p+'"><span class="dot"></span>'+p+'</div>').join("")+
+   '<div class="opt" data-togglesub="1"><span class="dot" style="border-radius:3px;'+(S.f.sub?"background:var(--primary)":"")+'"></span>Include subfolders</div>';
+}
+function versionBody(){
+  return '<h4>Version state</h4>'+VERSION.map(v=>'<div class="opt '+(S.f.version===v[0]?"on":"")+'" data-set="version" data-val="'+v[0]+'"><span class="dot"></span><span>'+v[1]+'<div class="hint" style="margin:0">'+v[2]+'</div></span></div>').join("");
+}
+function chipStrip(){
+  const f=S.f,rv=VERBS.find(v=>v[0]===f.relVerb),ver=VERSION.find(v=>v[0]===f.version);
+  return '<div class="chips"><span class="where">Where</span>'+
+   chip("type","Type",f.type,radioList("type",uniq("type"),f.type))+
+   chip("owner","Owner",f.owner,radioList("owner",uniq("owner"),f.owner))+
+   chip("year","Modified",f.year,radioList("year",["2019","2022","2023","2024","2025"],f.year))+
+   chip("entity","Entity",f.entity,radioList("entity",uniq("entity"),f.entity))+
+   chip("folder","Folder",f.folder?f.folder+(f.sub?" + sub":""):null,folderBody())+
+   chip("rel","Relationship",f.relDoc?rv[1].toLowerCase()+" "+ID[f.relDoc].name:null,relBody())+
+   chip("version","Version",f.version!=="latest"?ver[1]:null,versionBody())+'</div>';
+}
+function opts(k,arr,cur){return '<select class="s" data-sel="'+k+'"><option value="">Any</option>'+arr.map(v=>'<option '+(cur===v?"selected":"")+'>'+v+'</option>').join("")+'</select>';}
+function rowsPanel(){
+  const f=S.f;
+  return '<div class="card rows">'+
+   '<div class="r"><span class="lbl">Type</span>'+opts("type",uniq("type"),f.type)+'<span></span><span></span></div>'+
+   '<div class="r"><span class="lbl">Owner</span>'+opts("owner",uniq("owner"),f.owner)+'<span></span><span></span></div>'+
+   '<div class="r"><span class="lbl">Modified year</span>'+opts("year",["2019","2022","2023","2024","2025"],f.year)+'<span></span><span></span></div>'+
+   '<div class="r"><span class="lbl">Entity (custom field)</span>'+opts("entity",uniq("entity"),f.entity)+'<span></span><span></span></div>'+
+   '<div class="r"><span class="lbl">Folder</span>'+opts("folder",FOLDERS,f.folder)+'<label style="font-size:12px;color:var(--text-m)"><input type="checkbox" data-sub="1" '+(f.sub?"checked":"")+'> Include subfolders</label><span></span></div>'+
+   '<div class="r"><span class="lbl">Relationship</span><select class="s" data-relverbsel="1">'+VERBS.map(v=>'<option value="'+v[0]+'" '+(f.relVerb===v[0]?"selected":"")+'>'+v[1]+'</option>').join("")+'</select>'+
+     '<div style="position:relative"><input type="text" id="relq2" placeholder="Pick a document…" value="'+(f.relDoc?esc(ID[f.relDoc].name):esc(S.relQuery))+'">'+
+     (S.open==="rel2"?'<div class="pop" style="top:34px;min-width:100%">'+relPicks().slice(0,5).map(d=>'<div class="opt" data-reldoc="'+d.id+'">'+esc(d.name)+'</div>').join("")+'</div>':'')+'</div>'+
+     '<span data-clear="rel" style="cursor:pointer;color:var(--text-d)">✕</span></div>'+
+   '<div class="r"><span class="lbl">Version state</span><select class="s" data-sel="version">'+VERSION.map(v=>'<option value="'+v[0]+'" '+(f.version===v[0]?"selected":"")+'>'+v[1]+'</option>').join("")+'</select><span></span><span></span></div>'+
+   (f.relDoc?'<div class="readout">→ documents that '+VERBS.find(v=>v[0]===f.relVerb)[1].toLowerCase()+' “'+esc(ID[f.relDoc].name)+'”</div>':'')+'</div>';
+}
+
+function hiddenOlder(){
+  if(S.f.version!=="latest")return 0;
+  const keep=S.f.version;S.f.version="superseded";const n=DOCS.filter(match).length;S.f.version=keep;return n;
+}
+function resultsBlock(){
+  const r=results(),z=r.length===0,h=hiddenOlder();
+  const olderHint=h?'<div class="empty" style="padding:10px;margin-top:2px">'+h+' more match'+(h===1?"es":"")+' in older (superseded) versions. <button class="lnk" id="showolder">Show them</button></div>':"";
+  const head='<div class="meta"><span class="count '+(z?"zero":"")+'">'+r.length+' document'+(r.length===1?"":"s")+'</span>'+
+   '<span>Sorted by: <select class="s" id="sortsel">'+Object.keys(SORTL).map(k=>'<option value="'+k+'" '+(S.sort===k?"selected":"")+'>'+SORTL[k]+'</option>').join("")+'</select></span>'+
+   '<span class="noai">Exact match on fields. No AI ranking.</span><span class="spacer"></span><button class="lnk" id="panelbtn">'+(S.panel?"Close":"Open")+' detail panel</button></div>';
+  if(z)return head+'<div class="empty">No documents match these filters. Nothing is shown from outside them.<br><button class="lnk" id="resetf" style="margin-top:8px">Clear filters</button></div>'+olderHint;
+  const hide=S.panel?"display:none":"";
+  return head+'<table><thead><tr><th>Name</th><th>Type</th><th>Owner</th><th>Modified</th><th style="'+hide+'">Folder</th><th style="'+hide+'">Version</th></tr></thead><tbody>'+
+   r.map(d=>'<tr class="row '+(S.sel===d.id?"sel":"")+'" data-row="'+d.id+'"><td class="n">'+esc(d.name)+'</td><td>'+d.type+'</td><td>'+d.owner+'</td><td>'+d.mod+'</td><td style="'+hide+'">'+d.folder+'</td><td style="'+hide+'">'+
+    (d.latest?(d.versions>1?'<span class="tag has">'+d.v+' · '+d.versions+' versions</span>':'<span class="tag">'+d.v+'</span>'):'<span class="tag old">'+d.v+' · superseded</span>')+'</td></tr>').join("")+'</tbody></table>'+olderHint;
+}
+function detail(){
+  const d=ID[S.sel]||results()[0];
+  if(!d)return '<div class="card panel"><h3>No document</h3></div>';
+  return '<div class="card panel"><h3>'+esc(d.name)+'</h3><dl class="facts"><dt>Type</dt><dd>'+d.type+'</dd><dt>Owner</dt><dd>'+d.owner+'</dd>'+
+   '<dt>Created in source file</dt><dd>'+d.created+'</dd><dt>Added to this system</dt><dd>'+d.mod+'</dd><dt>Folder</dt><dd>'+d.folder+'</dd><dt>Entity</dt><dd>'+d.entity+'</dd>'+
+   '<dt>Version</dt><dd>'+(d.latest?"Latest":"Superseded")+' ('+d.v+' of '+d.versions+')</dd></dl><div class="hint" style="margin:10px 0 0">Phase 270 panel. File facts are the same searchable fields.</div></div>';
+}
+
+const RAIL=["Chat","Library","Flows","Links","Experts"];
+const rail=a=>'<div class="rail">'+RAIL.map(r=>'<div class="'+(r===a?"on":"")+'">'+r+'</div>').join("")+'</div>';
+function libHead(extra){
+  return '<div class="lhead"><h2>Library</h2><div class="seg"><button class="on">Documents</button><button>Views</button><button>Ingestion</button><button>Indexing</button><button>Health</button></div><span class="spacer"></span>'+(extra||"")+'</div>';
+}
+function modeSwitchA(){return '<div class="seg mode"><button data-mode="find" class="'+(S.mode==="find"?"on":"")+'">Find documents</button><button data-mode="ask" class="'+(S.mode==="ask"?"on":"")+'">Ask</button></div>';}
+function searchBar(){
+  const ph=S.mode==="find"?"Filter by name… or use the filters below":"Ask a question about your documents";
+  if(S.variant==="B"&&S.screen==="1"){
+    return '<div class="search"><button class="pill" data-mode="'+(S.mode==="find"?"ask":"find")+'" title="Switch mode">'+(S.mode==="find"?"Find ▾":"Ask ▾")+'</button><input id="q" placeholder="'+ph+'" value="'+esc(S.q)+'"></div>';
+  }
+  return modeSwitchA()+'<div class="search"><input id="q" placeholder="'+ph+'" value="'+esc(S.q)+'"></div>';
+}
+function askBody(){
+  return '<div class="card ask"><b style="font:700 15px var(--head)">Ask is answered in chat</b><span style="color:var(--text-m)">Ask searches the meaning of your documents and answers with cited passages. It does not list documents here.</span>'+
+   '<span style="color:var(--text-d);font-size:12px">Your question: “'+(esc(S.q)||"…")+'”</span><div><button class="btn">Open in chat →</button></div></div>';
+}
+function libraryFind(kind){
+  const main=S.mode==="ask"?askBody():(kind==="rows"?rowsPanel():chipStrip())+resultsBlock();
+  const split=S.panel&&S.mode==="find";
+  return '<div class="app">'+rail("Library")+'<div class="lib">'+libHead('<button class="lnk" data-go="rules">Filing rules ›</button>')+
+   '<div class="body '+(split?"split":"")+'"><div style="display:grid;gap:12px;min-width:0"><div class="bar">'+searchBar()+'</div>'+main+'</div>'+(split?detail():"")+'</div></div></div>';
+}
+function screen3(){
+  if(S.lib3==="rules"){
+    return '<div class="app">'+rail("Library")+'<div class="lib"><div class="lhead"><button class="lnk" data-go="home">‹ Library</button><span class="crumb">Library › <b>Filing rules</b></span></div>'+
+     '<div class="body"><div><h2 style="font:700 17px var(--head);margin:0 0 4px">Filing rules</h2><p style="color:var(--text-m);margin:0 0 12px;font-size:13px">Rules decide a new document\'s type, folder and fields when it arrives. Existing rules keep applying to new uploads.</p>'+
+     '<div class="rule"><div><b>Signed contracts → /Contracts/Active</b><br><span>When Type is Contract and Entity is set</span></div><span class="tag">On</span></div>'+
+     '<div class="rule"><div><b>Invoices → /Finance/Invoices</b><br><span>When filename starts with INV-</span></div><span class="tag">On</span></div>'+
+     '<div class="rule"><div><b>HR policies → /HR/Policies</b><br><span>When Type is Policy</span></div><span class="tag">Paused</span></div><button class="btn">＋ New rule</button></div></div></div></div>';
+  }
+  const extra=S.variant==="A"?'<button class="lnk" data-go="rules">Filing rules ›</button>':
+   '<span class="menu"><button class="lnk" id="menubtn">⋯</button>'+(S.menu?'<div class="pop"><div class="opt" data-go="rules">Filing rules</div><div class="opt">Library settings</div></div>':"")+'</span>';
+  return '<div class="app">'+rail("Library")+'<div class="lib">'+libHead(extra)+'<div class="body"><div class="card"><b>Documents tab</b><p style="color:var(--text-m);margin:6px 0 0;font-size:13px">The old rail entry “Classification” is gone. '+
+   (S.variant==="A"?"The link sits in the header, always visible.":"The entry sits in the ⋯ menu: one tap less visible, calmer header.")+'</p></div></div></div></div>';
+}
+
+const QTXT={
+ "1":"<b>Do the two modes read as two different searches?</b> A = segmented control beside the bar. B = a mode pill inside the bar. Try Ask: nothing is listed, it hands off to chat. Find shows the stated sort and “no AI ranking”.",
+ "2":"<b>Do folder path, relationship and version state fit the filter strip?</b> A = chips with popovers. B = stacked rows. Try: Relationship → “Is superseded by” → Acme MSA 2019, then Version → Superseded. Open the detail panel to feel the width crunch.",
+ "3":"<b>Is Filing rules findable with no rail entry?</b> The rail shows Chat, Library, Flows, Links, Experts. A = a link in the Library header. B = a ⋯ menu entry. Click through; the back path returns to Documents."
+};
+function clearKey(k){if(k==="rel"){S.f.relDoc=null;S.relQuery="";}else if(k==="version")S.f.version="latest";else S.f[k]=null;S.open=null;render();}
+function keepFocus(id,fn){const el=get(id),p=el.selectionStart;fn();const n=get(id);n.focus();n.setSelectionRange(p,p);}
+
+function render(){
+  document.querySelectorAll("[data-s]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.s===S.screen)));
+  document.querySelectorAll("[data-v]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.v===S.variant)));
+  get("qtext").innerHTML=QTXT[S.screen];
+  get("stage").innerHTML=S.screen==="1"?libraryFind("chips"):S.screen==="2"?libraryFind(S.variant==="A"?"chips":"rows"):screen3();
+  bind();
+}
+function bind(){
+  const st=get("stage");
+  st.querySelectorAll("[data-mode]").forEach(b=>{b.onclick=()=>{S.mode=b.dataset.mode;render();};});
+  st.querySelectorAll("[data-go]").forEach(b=>{b.onclick=()=>{S.lib3=b.dataset.go;S.menu=false;S.screen="3";render();};});
+  const mb=get("menubtn");if(mb)mb.onclick=()=>{S.menu=!S.menu;render();};
+  const q=get("q");if(q)q.oninput=()=>{S.q=q.value;keepFocus("q",()=>{S.q=q.value;render();});};
+  st.querySelectorAll("[data-chip]").forEach(b=>{b.onclick=e=>{if(e.target.dataset.clear){clearKey(e.target.dataset.clear);return;}S.open=S.open===b.dataset.chip?null:b.dataset.chip;render();};});
+  st.querySelectorAll("[data-set]").forEach(o=>{o.onclick=()=>{const k=o.dataset.set,v=o.dataset.val;S.f[k]=(k!=="version"&&S.f[k]===v)?null:v;S.open=k==="folder"?"folder":null;render();};});
+  st.querySelectorAll("[data-togglesub]").forEach(o=>{o.onclick=()=>{S.f.sub=!S.f.sub;render();};});
+  st.querySelectorAll("[data-relverb]").forEach(o=>{o.onclick=()=>{S.f.relVerb=o.dataset.relverb;render();};});
+  st.querySelectorAll("[data-reldoc]").forEach(o=>{o.onclick=()=>{S.f.relDoc=o.dataset.reldoc;S.open=null;S.relQuery="";render();};});
+  const rq=get("relq");if(rq)rq.oninput=()=>{keepFocus("relq",()=>{S.relQuery=rq.value;render();});};
+  const rq2=get("relq2");if(rq2){
+    rq2.onfocus=()=>{if(S.open!=="rel2"){S.open="rel2";S.f.relDoc=null;render();get("relq2").focus();}};
+    rq2.oninput=()=>{keepFocus("relq2",()=>{S.relQuery=rq2.value;S.open="rel2";render();});};
+  }
+  st.querySelectorAll("[data-sel]").forEach(s=>{s.onchange=()=>{const k=s.dataset.sel;S.f[k]=s.value||(k==="version"?"latest":null);render();};});
+  st.querySelectorAll("[data-relverbsel]").forEach(s=>{s.onchange=()=>{S.f.relVerb=s.value;render();};});
+  st.querySelectorAll("[data-sub]").forEach(c=>{c.onchange=()=>{S.f.sub=c.checked;render();};});
+  st.querySelectorAll("[data-clear]").forEach(x=>{if(!x.closest("[data-chip]"))x.onclick=()=>clearKey(x.dataset.clear);});
+  const ss=get("sortsel");if(ss)ss.onchange=()=>{S.sort=ss.value;render();};
+  const pb=get("panelbtn");if(pb)pb.onclick=()=>{S.panel=!S.panel;if(!S.sel){const f=results()[0];S.sel=f?f.id:null;}render();};
+  const so=get("showolder");if(so)so.onclick=()=>{S.f.version="superseded";render();};
+  const rf=get("resetf");if(rf)rf.onclick=()=>{S.f=BLANK();S.q="";render();};
+  st.querySelectorAll("[data-row]").forEach(r=>{r.onclick=()=>{S.sel=r.dataset.row;S.panel=true;render();};});
+}
+document.querySelectorAll("[data-s]").forEach(b=>{b.onclick=()=>{S.screen=b.dataset.s;S.open=null;S.lib3="home";S.menu=false;render();};});
+document.querySelectorAll("[data-v]").forEach(b=>{b.onclick=()=>{S.variant=b.dataset.v;S.open=null;render();};});
+document.addEventListener("click",e=>{if(S.open&&!e.target.closest(".cw")&&!e.target.closest(".r")){S.open=null;render();}});
+render();
+</script>
+</body>
+</html>

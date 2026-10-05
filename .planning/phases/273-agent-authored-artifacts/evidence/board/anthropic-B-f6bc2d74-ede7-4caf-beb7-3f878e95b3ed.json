@@ -1,0 +1,525 @@
+{
+  "provider": "anthropic",
+  "model": "claude-opus-5-5",
+  "turn": "B",
+  "thread_id": "7d368657-c9ba-47eb-a5d6-5c57c609d44a",
+  "prompt": "Make it a bar chart and show only Q3.",
+  "calling_mode_predicted": "NATIVE (native SDK adapter)",
+  "verdicts": {
+    "v1": "PASS",
+    "v2_board": "PASS",
+    "v3": "PASS"
+  },
+  "turn_data": {
+    "run_id": "f6bc2d74-ede7-4caf-beb7-3f878e95b3ed",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "claude-opus-5-5",
+      "provider": "anthropic",
+      "error": null,
+      "started_at": "2026-10-03 19:26:41.416783+00:00",
+      "completed_at": "2026-10-03 19:26:55.247263+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "6d57c445-f0ce-4c67-8a7f-17efb2abc53f",
+        "content": "Here's Q3 as a bar chart, with one bar per region. **East** was highest at $1,459K, followed by North ($1,342K) and West ($1,203K), with South lowest at $1,076K. Total Q3 revenue was **$5.08M**, and East accounted for about 29% of it.",
+        "tool_calls": [
+          {
+            "args": {
+              "chart": {
+                "x": "quarter",
+                "y": [
+                  "North",
+                  "South",
+                  "East",
+                  "West"
+                ],
+                "kind": "bar"
+              },
+              "title": "FY25 Q3 Revenue by Region",
+              "component": "chart",
+              "transform": {
+                "filter": [
+                  {
+                    "op": "eq",
+                    "value": "Q3",
+                    "column": "quarter"
+                  }
+                ]
+              },
+              "from_artifact": "chart 1"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_zb0kgyyrh5\", \"label\": \"chart 2\", \"component\": \"chart\", \"kind\": \"bar\", \"stacked\": false, \"series_count\": 4, \"row_count\": 1, \"from_label\": \"chart 1\", \"same_rows\": false, \"operations\": [{\"op\": \"filter_eq\", \"column\": \"quarter\", \"value\": \"Q3\"}], \"columns\": [{\"name\": \"quarter\", \"type\": \"string\"}, {\"name\": \"North\", \"type\": \"number\"}, {\"name\": \"South\", \"type\": \"number\"}, {\"name\": \"East\", \"type\": \"number\"}, {\"name\": \"West\", \"type\": \"number\"}], \"values\": {\"quarter\": [\"Q3\"]}, \"note\": \"Shown to the user below your answer as chart 2. Now write one or two sentences about what it shows; do not repeat its numbers as a table. To change, filter, sort or redraw it later, call show_artifact again with from_artifact=\\\"a_zb0kgyyrh5\\\" (or \\\"chart 2\\\") and NO columns or rows.\"}",
+            "status": "done",
+            "tool_call_id": "toolu_01UaXHDNJ2Rjeewb5kFSqxdE"
+          }
+        ]
+      }
+    ],
+    "tool_call_names": [
+      "show_artifact"
+    ],
+    "show_artifact_calls": 1,
+    "refused_calls": 0,
+    "artifact_ids_from_results": [
+      "a_zb0kgyyrh5"
+    ],
+    "final_answer_empty": false,
+    "final_answer_is_fallback": false,
+    "persisted_json_fence": false,
+    "redis": {
+      "present": true,
+      "ttl": 600,
+      "event_types": {
+        "iteration_start": 2,
+        "tool_preparing": 1,
+        "tool_start": 1,
+        "artifact": 1,
+        "tool_end": 1,
+        "planning": 1,
+        "delta": 18,
+        "suggestions": 1,
+        "stream_end": 1,
+        "done": 1
+      },
+      "delta_count": 18,
+      "delta_text": "Here's Q3 as a bar chart, with one bar per region. **East** was highest at $1,459K, followed by North ($1,342K) and West ($1,203K), with South lowest at $1,076K. Total Q3 revenue was **$5.08M**, and East accounted for about 29% of it.",
+      "artifact_events": 1
+    }
+  },
+  "message_artifacts": [
+    {
+      "id": "a_njt2ih47n8",
+      "label": "chart 1",
+      "component": "chart",
+      "parent_id": null,
+      "run_id": "ada27569-0e7f-42d9-81cf-00ad8e93ef92",
+      "tool_call_id": "toolu_01YFv3rU9KaqN8y2HBQeLLaH",
+      "row_count": 4,
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 4,
+        "source_count": 0
+      },
+      "at": "2026-10-03 19:26:28.99235+00"
+    },
+    {
+      "id": "a_zb0kgyyrh5",
+      "label": "chart 2",
+      "component": "chart",
+      "parent_id": "a_njt2ih47n8",
+      "run_id": "f6bc2d74-ede7-4caf-beb7-3f878e95b3ed",
+      "tool_call_id": "toolu_01UaXHDNJ2Rjeewb5kFSqxdE",
+      "row_count": 1,
+      "caption": {
+        "lineage": {
+          "same_rows": false,
+          "operations": [
+            {
+              "op": "filter_eq",
+              "value": "Q3",
+              "column": "quarter"
+            }
+          ],
+          "parent_label": "chart 1",
+          "parent_row_count": 4
+        },
+        "sources": [],
+        "row_count": 1,
+        "source_count": 0
+      },
+      "at": "2026-10-03 19:26:47.690471+00"
+    }
+  ],
+  "reload_http": 200,
+  "reload_artifacts": [
+    {
+      "id": "a_njt2ih47n8",
+      "thread_id": "7d368657-c9ba-47eb-a5d6-5c57c609d44a",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "ada27569-0e7f-42d9-81cf-00ad8e93ef92",
+      "tool_call_id": "toolu_01YFv3rU9KaqN8y2HBQeLLaH",
+      "parent_id": null,
+      "label": "chart 1",
+      "component": "chart",
+      "spec": {
+        "rows": [
+          [
+            "Q1",
+            1210,
+            980,
+            1335,
+            1104
+          ],
+          [
+            "Q2",
+            1268,
+            1017,
+            1392,
+            1151
+          ],
+          [
+            "Q3",
+            1342,
+            1076,
+            1459,
+            1203
+          ],
+          [
+            "Q4",
+            1415,
+            1129,
+            1532,
+            1288
+          ]
+        ],
+        "chart": {
+          "x": "quarter",
+          "y": [
+            "North",
+            "South",
+            "East",
+            "West"
+          ],
+          "kind": "line",
+          "slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "stacked": false
+        },
+        "title": "FY25 Revenue by Region and Quarter",
+        "metric": null,
+        "columns": [
+          {
+            "name": "quarter",
+            "type": "string",
+            "unit": null
+          },
+          {
+            "name": "North",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "South",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "East",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "West",
+            "type": "number",
+            "unit": "$K"
+          }
+        ]
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 4,
+        "source_count": 0
+      },
+      "row_count": 4,
+      "spec_version": 1,
+      "created_at": "2026-10-03T19:26:28.99235+00:00"
+    },
+    {
+      "id": "a_zb0kgyyrh5",
+      "thread_id": "7d368657-c9ba-47eb-a5d6-5c57c609d44a",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "f6bc2d74-ede7-4caf-beb7-3f878e95b3ed",
+      "tool_call_id": "toolu_01UaXHDNJ2Rjeewb5kFSqxdE",
+      "parent_id": "a_njt2ih47n8",
+      "label": "chart 2",
+      "component": "chart",
+      "spec": {
+        "rows": [
+          [
+            "Q3",
+            1342,
+            1076,
+            1459,
+            1203
+          ]
+        ],
+        "chart": {
+          "x": "quarter",
+          "y": [
+            "North",
+            "South",
+            "East",
+            "West"
+          ],
+          "kind": "bar",
+          "slots": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "stacked": false
+        },
+        "title": "FY25 Q3 Revenue by Region",
+        "metric": null,
+        "columns": [
+          {
+            "name": "quarter",
+            "type": "string",
+            "unit": null
+          },
+          {
+            "name": "North",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "South",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "East",
+            "type": "number",
+            "unit": "$K"
+          },
+          {
+            "name": "West",
+            "type": "number",
+            "unit": "$K"
+          }
+        ]
+      },
+      "caption": {
+        "lineage": {
+          "same_rows": false,
+          "operations": [
+            {
+              "op": "filter_eq",
+              "value": "Q3",
+              "column": "quarter"
+            }
+          ],
+          "parent_label": "chart 1",
+          "parent_row_count": 4
+        },
+        "sources": [],
+        "row_count": 1,
+        "source_count": 0
+      },
+      "row_count": 1,
+      "spec_version": 1,
+      "created_at": "2026-10-03T19:26:47.690471+00:00"
+    }
+  ],
+  "reload_by_message": [
+    {
+      "message_id": "7bf30e53-f283-426a-aeb1-46494426af7b",
+      "artifacts": [
+        {
+          "id": "a_njt2ih47n8",
+          "thread_id": "7d368657-c9ba-47eb-a5d6-5c57c609d44a",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "ada27569-0e7f-42d9-81cf-00ad8e93ef92",
+          "tool_call_id": "toolu_01YFv3rU9KaqN8y2HBQeLLaH",
+          "parent_id": null,
+          "label": "chart 1",
+          "component": "chart",
+          "spec": {
+            "rows": [
+              [
+                "Q1",
+                1210,
+                980,
+                1335,
+                1104
+              ],
+              [
+                "Q2",
+                1268,
+                1017,
+                1392,
+                1151
+              ],
+              [
+                "Q3",
+                1342,
+                1076,
+                1459,
+                1203
+              ],
+              [
+                "Q4",
+                1415,
+                1129,
+                1532,
+                1288
+              ]
+            ],
+            "chart": {
+              "x": "quarter",
+              "y": [
+                "North",
+                "South",
+                "East",
+                "West"
+              ],
+              "kind": "line",
+              "slots": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "stacked": false
+            },
+            "title": "FY25 Revenue by Region and Quarter",
+            "metric": null,
+            "columns": [
+              {
+                "name": "quarter",
+                "type": "string",
+                "unit": null
+              },
+              {
+                "name": "North",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "South",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "East",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "West",
+                "type": "number",
+                "unit": "$K"
+              }
+            ]
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [],
+            "row_count": 4,
+            "source_count": 0
+          },
+          "row_count": 4,
+          "spec_version": 1,
+          "created_at": "2026-10-03T19:26:28.99235+00:00"
+        }
+      ]
+    },
+    {
+      "message_id": "6d57c445-f0ce-4c67-8a7f-17efb2abc53f",
+      "artifacts": [
+        {
+          "id": "a_zb0kgyyrh5",
+          "thread_id": "7d368657-c9ba-47eb-a5d6-5c57c609d44a",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "f6bc2d74-ede7-4caf-beb7-3f878e95b3ed",
+          "tool_call_id": "toolu_01UaXHDNJ2Rjeewb5kFSqxdE",
+          "parent_id": "a_njt2ih47n8",
+          "label": "chart 2",
+          "component": "chart",
+          "spec": {
+            "rows": [
+              [
+                "Q3",
+                1342,
+                1076,
+                1459,
+                1203
+              ]
+            ],
+            "chart": {
+              "x": "quarter",
+              "y": [
+                "North",
+                "South",
+                "East",
+                "West"
+              ],
+              "kind": "bar",
+              "slots": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "stacked": false
+            },
+            "title": "FY25 Q3 Revenue by Region",
+            "metric": null,
+            "columns": [
+              {
+                "name": "quarter",
+                "type": "string",
+                "unit": null
+              },
+              {
+                "name": "North",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "South",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "East",
+                "type": "number",
+                "unit": "$K"
+              },
+              {
+                "name": "West",
+                "type": "number",
+                "unit": "$K"
+              }
+            ]
+          },
+          "caption": {
+            "lineage": {
+              "same_rows": false,
+              "operations": [
+                {
+                  "op": "filter_eq",
+                  "value": "Q3",
+                  "column": "quarter"
+                }
+              ],
+              "parent_label": "chart 1",
+              "parent_row_count": 4
+            },
+            "sources": [],
+            "row_count": 1,
+            "source_count": 0
+          },
+          "row_count": 1,
+          "spec_version": 1,
+          "created_at": "2026-10-03T19:26:47.690471+00:00"
+        }
+      ]
+    }
+  ]
+}

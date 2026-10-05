@@ -230,7 +230,7 @@ const BASELINE = {
   // ⬆ RAISED 27 → 44 at 267-03 (the gate's own printed count): CONNECTION_COPY's pinned
   //   literals, connectionGate's arms (exactly one of action/ask), gate order install →
   //   connection, the ledger columns, and the backend's OWN overlay row read via `?raw`.
-  "expertCatalog.test.ts": 49, // 267-REVIEW WR-06 +2, IN-06 +1; gate printed 49, so the pin lagged by 2
+  "expertCatalog.test.ts": 53, // 267-REVIEW WR-06 +2, IN-06 +1; gate printed 49, so the pin lagged by 2 · 276-07 +4 (decodeEntities)
   // ⬆ RAISED 8 → 13 at 266-04 (the file carried 9 at base — the 262-UAT 3.6 case sat above the
   //   pin): the card's control swap with no dead button, install → re-read → fresh modal state,
   //   the fetch poll that STOPS once nothing is installing (driven RED against a leaked
@@ -319,9 +319,11 @@ const BASELINE = {
   "ModelDiscoveryPanel.a11y.test.tsx": 9,
   "ModelRegistryTab.a11y.test.tsx": 13,
   // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
-  "ClassificationRulesPage.test.tsx": 8,
+  // ⬆ RAISED 8 → 11 and 8 → 9 at 271-04, recording 271-02's Filing-rules cases (measured
+  //   `11` and `9` on the wave-1 gate run at ff4b98f01, the gate's own `actual` column).
+  "ClassificationRulesPage.test.tsx": 11,
   "ClassificationSection.test.tsx": 13,
-  "RuleBuilderPanel.test.tsx": 8,
+  "RuleBuilderPanel.test.tsx": 9,
   // ── 196-05 (AUTH-04 / D-04 … D-15) — THREE NEW FILES, each pinned in the SAME COMMIT ──
   // ── that creates it, because a `BASELINE` key naming a path that does not yet exist ──
   // ── makes this gate ERROR (exit 2) rather than fail. ──────────────────────────────────
@@ -419,6 +421,34 @@ const BASELINE = {
   "cssClasses.test.ts": 1,
   "scenes.test.tsx": 9,
   "LandingPage.test.tsx": 7,
+  // Phase 276 — src/docs + new landing suites. Read from the gate's own printed `— N new` column on
+  // the 276-05 wave-3 run (2026-10-04), never a local vitest tail. Both directories were already in
+  // TARGETS (276-02 added "src/docs"), so these suites RAN and guarded nothing until now — TARGETS
+  // decides what runs, BASELINE what is guarded. Every docs suite is listed (completeness is
+  // DERIVED by globbing src/docs/__tests__, see 276-05-SUMMARY), plus the four landing suites
+  // Phase 276 added. LandingPage.test.tsx did not grow (7), so its pin above is unchanged.
+  "publicOpenapi.test.ts": 11,
+  "devRouting.test.ts": 7,
+  "docsVercelRouting.test.ts": 8,
+  "docsContent.test.ts": 14,
+  "changelog.test.ts": 8,
+  "search.test.ts": 6, // 276-07 +1: the Build Story search doc
+  "router.test.ts": 8, // 276-07 +1: build-story resolved before the version lookup
+  "Stub.test.tsx": 5,
+  "Article.test.tsx": 5,
+  "SearchBox.test.tsx": 5,
+  "ChangelogPage.test.tsx": 8, // 276-07 +1: links the Build Story
+  "ApiReference.test.tsx": 3,
+  "DocsApp.test.tsx": 5, // 276-07 +2: home links the Build Story; route + title
+  "BuildStory.test.tsx": 7, // 276-07 (D-26): new suite
+  "VideoSlot.test.tsx": 11,
+  "docsBundleFence.test.ts": 3,
+  "docsCoverageGate.test.ts": 8,
+  "landingBrand.test.ts": 4, // 276-07 +2: app-wide scan of src/components + src/pages, and its planted case
+  "brandAssets.test.ts": 13, // 276-07 (D-27): new suite — raster dims, manifest, head tags, brandMeta, leftovers
+  "Navigation.test.tsx": 5,
+  "landingFirstPaintFence.test.ts": 2,
+  "HeroPromo.test.tsx": 3,
   "MessageInput.connectors.test.tsx": 5,
   // SEED-235 (2026-09-01): 15 -> 19. Four cases for the SECOND approval in one run —
   // three for the defect (a stale decision rendered the next question as already answered
@@ -752,7 +782,10 @@ const BASELINE = {
   //     that was never at risk, and the mitigation would be ceremony.
   //   • COVERAGE as a SET DIFFERENCE against the 28 ids `get_tools(None)` offers — so a tool
   //     added server-side fails HERE rather than reaching a business user as a schema token.
-  "toolNames.test.ts": 10,
+  // RAISED 10 → 11 at 273-05 (RESEARCH OQ3, RESOLVED): the key-set case now reads offered (28)
+  // ∪ the chat-only set parsed from `openai_service.py`'s CHAT_ONLY_TOOLS via `?raw`, and one
+  // new case pins that parse as non-vacuous and disjoint from the offer.
+  "toolNames.test.ts": 11,
   // 193.1-09 (AUTH-03 / SC#3) — TWO NEW FILES, pinned in the SAME COMMIT that creates them,
   // because a `BASELINE` key naming a path that does not yet exist makes this gate ERROR
   // (exit 2) rather than fail.
@@ -1510,7 +1543,9 @@ const BASELINE = {
   // 22 is read from THIS SCRIPT'S OWN printed `actual` column
   // (`FilesSection.test.tsx  11  22  +11`), never hand-counted from `it(`
   // literals.
-  "FilesSection.test.tsx": 22,
+  // RAISED 22 → 33 at 274-04 (measured): the base already read 28 (the pin lagged), +5 for the
+  // panel row's Save to Library slot, its tabIndex -1 trigger and the Shift+F10 / ContextMenu arm.
+  "FilesSection.test.tsx": 33,
   // 195-03 task 1 GREW this file 11 → 41: the widening's own coverage (ribbon /
   // tone / className / mimeType / the nine added extensions / the own-property
   // guard), ADDITIONS ONLY — `git diff` showed zero removed lines and all 11
@@ -3628,13 +3663,18 @@ const BASELINE = {
   "ChatAreaBanner.test.tsx": 9,
   "ChatAreaMode.test.tsx": 5,
   "RunCard.characterization.test.tsx": 8,
-  "MessageItem.test.tsx": 24,
+  "MessageItem.test.tsx": 26, // RAISED 24 → 26 at 276-06 (+Test 8 pre-token thinking, +Test 9 cap-pause on the last row)
   "MessageItem.clamp.test.tsx": 5,
   "MessageItem.fallbackNotice.test.tsx": 3,
   "MessageItem.memo.test.tsx": 3,
   "MessageItem.sticky.test.tsx": 4,
   "RunCard.logo.test.tsx": 6,
-  "ToolCallPanel.test.tsx": 16,
+  // Phase 276-06 (D-24/D-27) — the Iris avatar: the precedence table + the rendering contract
+  // and the index.css seamless-loop fence. Counts as the gate printed them (`— N new`).
+  "irisState.test.ts": 21,
+  "IrisAvatar.test.tsx": 28,
+  "irisMotion.test.ts": 5,
+  "ToolCallPanel.test.tsx": 20, // RAISED 16 → 20 at 272-02 (D-08 filter line ×4)
   "MessageList.test.tsx": 30,
   "MessageList.dedup.test.tsx": 7,
   "MessageList.runline.baseline.test.tsx": 8,
@@ -3672,7 +3712,9 @@ const BASELINE = {
   // recurses into nothing — so without its own TARGETS line this file would never have been
   // EXECUTED, and a BASELINE key naming an unexecuted file makes this gate ERROR (exit 2)
   // rather than fail. Phase 214's `WorkflowScheduleModal` finding, avoided by looking.
-  "LibraryHeaderBar.test.tsx": 9,
+  // ⬆ RAISED 9 → 13 at 271-04, recording 271-02's Filing-rules header-link cases (measured `13`
+  //   on the wave-1 gate run at ff4b98f01).
+  "LibraryHeaderBar.test.tsx": 13,
   // 22 → 30: per-file selection (operator: "how can I select individual files") and the
   // two-column body that puts the folder tree inside the card it feeds.
   "SourcePreviewPanel.test.tsx": 30,
@@ -3917,7 +3959,9 @@ const BASELINE = {
   // ⚠ Case 5a is COMMENT-STRIPPED on purpose. The chip's docblock EXPLAINS that it holds no copy,
   // so an unstripped grep measures the explanation — the first draft asserted its own
   // `grep -c ... is 0` while containing the sentence, making the claim false by stating it.
-  "ChatAttachmentChip.states.test.tsx": 10,
+  // RAISED 10 → 15 at 274-04 (measured): cases 1 and 4b retired DELIBERATELY under D-07 and
+  // rewritten; +4c (the TTL word kept on TTL rows), +7, +8, +9, +9b (the ⋯ and the In Library mark).
+  "ChatAttachmentChip.states.test.tsx": 15,
   // -- Phase 244 (244-05 T2+T3 / SHELL-04 / D-244-26 / D-244-27) — the ordered-block fence -----
   // BOTH KNOBS, SAME COMMIT. `src/components/chat` has no bare-directory TARGETS entry.
   //
@@ -3953,7 +3997,10 @@ const BASELINE = {
   //     cases 12b, 12c and 12d red, each on its own removed condition
   // `MessageItem.tsx` and `ChatAttachmentChip.tsx` were restored md5-identical after every plant
   // (`bab2a9868f07b37d2e29766d95574eed`, `0b092b18f2cf83756f1d2213c9f36306`).
-  "ComposerAttach.composition.test.tsx": 19,
+  // ⚠ RAISED 19 → 22 at 274-03. Measured: the suite held 21 cases at 274's base `75cd7378`
+  // (the +2 predates this phase and is folded in here only because this commit edits the suite),
+  // and 274-03 adds case `10c` — the composer posts `uploadWorkspaceTemplate(threadId, f, "thread")`.
+  "ComposerAttach.composition.test.tsx": 22,
   // ── Phase 244 (244-06 T3 / SHELL-04 / D-244-05 / D-244-27) — the cloud modal ────────────
   // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/chat` still has NO bare-directory TARGETS entry.
   //
@@ -4061,6 +4108,93 @@ const BASELINE = {
   // ⬆ RAISED 18 → 20 at `262-05`: the Experts entry renders from the SHIPPED NAV_ITEMS and
   //   clicking it navigates. The leg `activeViewReachability` structurally cannot see.
   "NavPanel.test.tsx": 20,
+  // ── Phase 270 plan 03 (FIND-04/05) — the download label/mint, button and file facts. BOTH KNOBS, SAME COMMIT. ──
+  "documentDownload.test.ts": 8, // 270-03 (2026-10-02)
+  "DocumentDownloadButton.test.tsx": 13, // 270-03
+  "DocumentFileFacts.test.tsx": 9, // 270-03
+  "DocumentDetailPanel.file270.test.tsx": 6, // 270-04
+  "DocumentRow.download270.test.tsx": 4, // 270-04
+  // ── Phase 271-03 — adopted BEFORE the combobox extraction so a regression is visible (they
+  // were in neither knob; SEED-280). Measured at PHASE_BASE 20050816d: 8 / 11 / 6 passed. ──
+  "CreateLinkDialog.test.tsx": 8, // 271-03
+  "RelationshipsSection.test.tsx": 11, // 271-03
+  "RelationshipsSection.a11y.test.tsx": 6, // 271-03
+  // ── Phase 271-03 — every suite this plan CREATED, at its measured passing count. BOTH KNOBS, SAME COMMIT. ──
+  "findState.test.ts": 49, // 271-03 (2026-10-03)
+  "documents.search271.test.ts": 3, // 271-03
+  "useDocumentFind.test.tsx": 11, // 271-03
+  "relationshipLabels.test.ts": 5, // 271-03
+  "LinkTargetCombobox.test.tsx": 9, // 271-03
+  "documentAddedBy.test.ts": 6, // 271-03
+  "DocumentRow.find271.test.tsx": 19, // 271-03 · RAISED 17 → 19 at 271-REVIEW-FIX (F-2: older-row actions)
+  // ── Phase 271-04 — ADOPTED, not raised: in NEITHER knob before (RESEARCH Wave 0). Measured
+  // 10 passed on the merged wave-1 tree (ff4b98f01) BEFORE 271-04 touched ConditionPopover. ──
+  // ⬆ RAISED 10 → 13 at 271-04 Task 1: three excludeFieldKeys cases (P-06). The 10 shipped cases
+  //   are byte-unchanged.
+  "ConditionPopover.test.tsx": 13, // 271-04 (2026-10-03)
+  // ── Phase 271-04 Task 1 — every suite it CREATED, at its measured passing count. BOTH KNOBS. ──
+  "FilterBar.find271.test.tsx": 11, // 271-04 (3 are the Views-tab DOM snapshot pins)
+  "StructurePopovers.test.tsx": 22, // 271-04
+  "FindQuickAdd.test.tsx": 18, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03)
+  // ── Phase 271-04 Task 2 — the Find results surface and the exact pager. BOTH KNOBS. ──
+  "DocumentsFindBody.test.tsx": 26, // 271-04
+  "DocumentsPager.exact271.test.tsx": 3, // 271-04
+  // ── Phase 271-04 Task 3 — the page wiring and the older-version panel. BOTH KNOBS. ──
+  "LibraryPage.find271.test.tsx": 18, // 271-04 · RAISED 13 → 18 at 271-REVIEW-FIX (CR-01 ×2, CR-02 ×2, WR-01)
+  "DocumentDetailPanel.olderVersion271.test.tsx": 3, // 271-04
+  // ── Phase 271-02's suites, OWED to this plan (271-02 could not edit this file in wave 1).
+  // Measured passing on the wave-2 tree. ──
+  "askInChat.test.ts": 5, // 271-02 (adopted 271-04)
+  "FindModeSwitch.test.tsx": 7, // 271-02 (adopted 271-04)
+  "FindMetaLine.test.tsx": 10, // 271-02 (adopted 271-04)
+  "AskHandoffCard.test.tsx": 7, // 271-02 (adopted 271-04) · RAISED 5 → 7 at 271-REVIEW-FIX (WR-01)
+  "LibraryPage.filingRules271.test.tsx": 2, // 271-02 (adopted 271-04)
+  // ── Phase 272-02 (D-08) — ADOPTED: in NEITHER knob before (272-RESEARCH, measured). Pinned
+  // at the gate's own printed `— 27 new` (20 shipped banner cases + 7 searchFilterLine). ──
+  "toolMeta.test.ts": 27, // 272-02 (2026-10-03)
+  // ── Phase 272-05 (F-3, operator ruling 2026-10-03) — NEW suite, BOTH KNOBS, SAME COMMIT. The
+  // search card named every non-passage result "0 results"; 9 cases, 6 RED on the shipped tree. ──
+  "SearchDocumentsBody.test.ts": 9, // 272-05 (2026-10-03)
+  // ── Phase 273-02 (ART-01/02/04/05) — SEVEN NEW suites for the agent-authored artifact surface,
+  // BOTH KNOBS, SAME COMMIT. `src/components/chat` has NO bare-directory TARGETS entry, so each is
+  // adopted by FILE path below. Pinned at the measured passing counts (94 cases, 0 failing). ──
+  "artifactSpec.test.ts": 28, // 273-02 (2026-10-03) — guard + closed catalogue + seeded never-throws
+  "captionModel.test.ts": 12, // 273-02 — server-fact caption wording
+  "chartModel.test.ts": 20, // 273-02 — slots, visible domain, tooltip rows, a11y names; RAISED 19 → 20 at 273-REVIEW WR-04
+  "TableArtifact.test.tsx": 7, // 273-02 — aria-sort, empties last, sticky + 512px; RAISED 6 → 7 at 273-REVIEW WR-04
+  "MetricArtifact.test.tsx": 7, // 273-02 — glyph + percent delta, zero comparison; RAISED 6 → 7 at 273-REVIEW WR-04
+  "ArtifactBlock.test.tsx": 8, // 273-02 — registry closed to 3, notices, boundary, busy frame
+  "ChartArtifact.test.tsx": 18, // 273-02 — legend toggles, hide, slots, no animation, tooltip; RAISED 15 → 18 at 273-REVIEW WR-05 (stackOffset=sign)
+  // ── Phase 273-05 (D-16 · I-1 · I-2 · SC#2) — SIX NEW suites, BOTH KNOBS, SAME COMMIT. None of
+  // their directories has a bare TARGETS entry (`src/components/chat`, `src/lib/api`,
+  // `src/providers` — the last sits in NEITHER knob), so each is adopted by FILE path below.
+  // Pinned at the measured passing counts (56 cases, 0 failing). ──
+  "threads.artifact.test.ts": 6, // 273-05 (2026-10-03) — artifact SSE branch + reload mapper
+  "streamsProviderArtifact.test.tsx": 5, // 273-05 — the ONE handler: append + replace-by-id
+  "MessageItem.artifacts.test.tsx": 5, // 273-05 — the ONE mount: placement + live == reload DOM
+  "artifactParity.fence.test.ts": 10, // 273-05 — backend Literals/fixture vs frontend registry (I-1); RAISED 7 → 10 at 273-REVIEW CR-01 (+3: the shared bad-spec parity fixture)
+  "ShowArtifactBody.test.tsx": 17, // 273-05 — rail essence + body, never the spec or model text
+  "ToolCallPanel.showArtifact.test.tsx": 16, // 273-05 — L-1..L-4, refused node, phrases
+  // ── Phase 274-03 (D-05 · D-10 · D-12..D-15 · D-27 · SC#1) — FIVE NEW suites, BOTH KNOBS, SAME
+  // COMMIT. `src/components/attachments` is a NEW directory and is adopted as a directory entry;
+  // `src/lib` has no bare-directory entry, so the two `src/lib/__tests__` suites go by FILE path.
+  // Pinned at the measured passing counts (55 cases, 0 failing), each RED before its module existed.
+  "attachmentLifetime.test.ts": 11, // 274-03 — prefix strip (D-27) + thread-life rule (D-05), one home
+  "attachmentsApi.test.ts": 14, // 274-03 — ?lifetime=thread only for the composer (D-21), X-Org-Id on cloud attach, promote wire
+  "saveToLibraryCopy.test.ts": 7, // 274-03 — ?raw port fence vs sketch 274 COPY.js + ingest_splice.py
+  "FolderPathListbox.test.tsx": 12, // 274-03 — no Root, full sorted paths, APG combobox/listbox + keyboard; RAISED 11 → 12 at 274-04 (the sketch's › separator + /-tolerant search)
+  "SaveToLibraryDialog.test.tsx": 12, // 274-03 — disabled until picked, latest-wins preview, already screen, verbatim 403
+  // ── Phase 274-04 (D-09 · D-11 · D-15 · D-18 · D-22..D-25) — FOUR NEW suites, all under the
+  // `src/components/attachments` DIRECTORY entry 274-03 already put in TARGETS, so only BASELINE
+  // changes. Pinned at the measured passing counts (32 cases, 0 failing), each RED before its module.
+  "useLibraryLinks.test.tsx": 8, // 274-04 — one fetch per thread, 4 s poll only while indexing, stops on completed AND failed
+  "AttachmentActionsMenu.test.tsx": 14, // 274-04 — always-visible ⋯, chip/panel items, disabled verb + reason, segment states
+  "AttachmentRowTrailing.test.tsx": 6, // 274-04 — panel slot: thread-life vs TTL byte-identical, full path visible, tabIndex -1
+  "composerNoLibraryDoor.test.ts": 4, // 274-04 — D-18 comment-stripped ?raw negative proof over every composer door
+  // ── Phase 274-05 (D-27 / the 274-02 ↔ 274-03 contract) — ONE NEW suite under the same
+  // `src/components/attachments` DIRECTORY entry, so only BASELINE changes. Pinned at its measured
+  // passing count on the merged tree (6 cases, 0 failing); its NEGATIVE case proves it can fire.
+  "promoteContract.fence.test.ts": 6, // 274-05 — ?raw backend models/route vs attachments.ts keys, saved/already literal, prefix regex lockstep
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4434,6 +4568,8 @@ const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0)
 const TARGETS = [
   // Phase 226 (merge commit) — the public landing page: fence, facts, CSS-class lint, scenes, page.
   "src/landing",
+  // Phase 276 (276-02) — the public docs entry: routing, content pipeline, search, router. BASELINE pins land in 276-05's close pass.
+  "src/docs",
   "src/components/workflows",
   "src/pages/WorkflowBuilderPage.test.tsx",
   "src/pages/WorkflowBuilderPage.canvas.test.tsx",
@@ -4521,6 +4657,10 @@ const TARGETS = [
   "src/components/chat/__tests__/scopeCopy.test.ts",
   "src/components/chat/__tests__/ScopeChip.test.tsx",
   "src/components/chat/__tests__/ScopePicker.test.tsx",
+  // Phase 276-06 (D-24/D-27) — the Iris avatar. Named FILE-LEVEL (no bare src/components/chat entry), pinned in BASELINE beside MessageItem.test.tsx, same commit.
+  "src/components/chat/__tests__/irisState.test.ts",
+  "src/components/chat/__tests__/IrisAvatar.test.tsx",
+  "src/components/chat/__tests__/irisMotion.test.ts",
   "src/components/chat/__tests__/ChatArea.scopeChange.test.tsx",
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,
@@ -5916,6 +6056,72 @@ const TARGETS = [
   // pinned in BASELINE in that commit too: a suite in TARGETS and not in BASELINE RUNS and
   // guards nothing, which is the trap this array's own comment at :184 records firing.
   "src/lib/__tests__/activeViewReachability.test.ts",
+  // Phase 270 plan 03 (2026-10-02) — FILE-LEVEL, never the `src/components/metadata` directory.
+  "src/lib/__tests__/documentDownload.test.ts",
+  "src/components/metadata/__tests__/DocumentDownloadButton.test.tsx",
+  "src/components/metadata/__tests__/DocumentFileFacts.test.tsx",
+  // Phase 270 plan 04 — FILE-LEVEL.
+  "src/components/metadata/__tests__/DocumentDetailPanel.file270.test.tsx",
+  "src/components/ingestion/__tests__/DocumentRow.download270.test.tsx",
+  // Phase 271-03 — adopted BEFORE the combobox extraction so a regression is visible (they
+  // were in neither knob; SEED-280). FILE-LEVEL, never the directory.
+  "src/components/relationships/CreateLinkDialog.test.tsx",
+  "src/components/relationships/RelationshipsSection.test.tsx",
+  "src/components/relationships/RelationshipsSection.a11y.test.tsx",
+  // Phase 271-03 — every suite this plan created. FILE-LEVEL.
+  "src/pages/__tests__/findState.test.ts",
+  "src/lib/api/__tests__/documents.search271.test.ts",
+  "src/hooks/__tests__/useDocumentFind.test.tsx",
+  "src/components/relationships/relationshipLabels.test.ts",
+  "src/components/relationships/LinkTargetCombobox.test.tsx",
+  "src/lib/__tests__/documentAddedBy.test.ts",
+  "src/components/ingestion/__tests__/DocumentRow.find271.test.tsx",
+  // Phase 271-04 — adopted before ConditionPopover gains excludeFieldKeys. FILE-LEVEL.
+  "src/components/ingestion/ConditionPopover.test.tsx",
+  // Phase 271-04 Task 1 — FILE-LEVEL, never the directory.
+  "src/components/ingestion/FilterBar.find271.test.tsx",
+  "src/components/library/find/__tests__/StructurePopovers.test.tsx",
+  "src/components/library/find/__tests__/FindQuickAdd.test.tsx",
+  // Phase 271-04 Task 2 — FILE-LEVEL.
+  "src/components/library/find/__tests__/DocumentsFindBody.test.tsx",
+  "src/components/library/__tests__/DocumentsPager.exact271.test.tsx",
+  // Phase 271-04 Task 3 + 271-02's owed suites — FILE-LEVEL (`src/pages` and
+  // `src/components/library` are reached by named files only).
+  "src/pages/__tests__/LibraryPage.find271.test.tsx",
+  "src/components/metadata/__tests__/DocumentDetailPanel.olderVersion271.test.tsx",
+  "src/components/library/find/__tests__/askInChat.test.ts",
+  "src/components/library/find/__tests__/FindModeSwitch.test.tsx",
+  "src/components/library/find/__tests__/FindMetaLine.test.tsx",
+  "src/components/library/find/__tests__/AskHandoffCard.test.tsx",
+  "src/pages/__tests__/LibraryPage.filingRules271.test.tsx",
+  // Phase 272-02 (D-08) — ADOPTED: `toolMeta.test.ts` was in NEITHER knob (272-RESEARCH,
+  // measured), so its D-14 banner pins and the new searchFilterLine pins were guarded by
+  // nothing. FILE-LEVEL — there is no `src/lib/__tests__` directory entry.
+  "src/lib/__tests__/toolMeta.test.ts",
+  // Phase 272-05 (F-3) — FILE-LEVEL: `src/components/chat` has NO bare-directory entry.
+  "src/components/chat/tool-bodies/SearchDocumentsBody.test.ts",
+  // Phase 273-02 — the seven artifact suites. FILE-LEVEL: `src/components/chat` has NO
+  // bare-directory entry, so a directory entry here would be the first and is not this plan's call.
+  "src/components/chat/artifacts/__tests__/artifactSpec.test.ts",
+  "src/components/chat/artifacts/__tests__/captionModel.test.ts",
+  "src/components/chat/artifacts/__tests__/chartModel.test.ts",
+  "src/components/chat/artifacts/__tests__/TableArtifact.test.tsx",
+  "src/components/chat/artifacts/__tests__/MetricArtifact.test.tsx",
+  "src/components/chat/artifacts/__tests__/ArtifactBlock.test.tsx",
+  "src/components/chat/artifacts/__tests__/ChartArtifact.test.tsx",
+  // Phase 273-05 — six new suites. FILE-LEVEL: none of `src/components/chat`, `src/lib/api` or
+  // `src/providers` has a bare-directory entry (`src/providers` is in NEITHER knob).
+  "src/lib/api/__tests__/threads.artifact.test.ts",
+  "src/providers/__tests__/streamsProviderArtifact.test.tsx",
+  "src/components/chat/__tests__/MessageItem.artifacts.test.tsx",
+  "src/components/chat/__tests__/artifactParity.fence.test.ts",
+  "src/components/chat/tool-bodies/ShowArtifactBody.test.tsx",
+  "src/components/chat/__tests__/ToolCallPanel.showArtifact.test.tsx",
+  // Phase 274-03 — `src/components/attachments` is new and adopted as a DIRECTORY (its three suites
+  // and any later one); the two `src/lib/__tests__` suites go by FILE path (no `src/lib` entry).
+  "src/components/attachments",
+  "src/lib/__tests__/attachmentLifetime.test.ts",
+  "src/lib/__tests__/attachmentsApi.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

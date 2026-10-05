@@ -50,6 +50,16 @@ export const WATCH_FIELDS: FilterField[] = [
   { field_key: "source_connection_id", field_type: "string" },
 ]
 
+/**
+ * Phase 271-04 (P-06 / RESEARCH Pitfall 1) — the fields Find's ＋ condition must NOT offer.
+ * These three WATCH_FIELDS are arrival facts that rules can read, but they are NOT in the
+ * resolver's whitelist (`_METADATA_BUILTINS ∪ _SOURCE_FACT_FIELDS`), so a Find chip on any of
+ * them would be answered with a 422 — a chip the server silently refuses. Pinned by
+ * `backend/tests/unit/test_271_find_offered_fields.py`, which reads this literal and checks
+ * every offered key IS whitelisted and every excluded key is NOT.
+ */
+export const FIND_EXCLUDED_FIELD_KEYS = ["name", "type", "size"] as const
+
 /** Type-aware operator vocabulary (114-RESEARCH mapping table + sketch 030).
  *  `enum` mirrors `string` minus free-text `contains`; `date` carries the
  *  direction-encoding relative operators.
@@ -104,6 +114,9 @@ export interface ConditionPopoverProps {
   initial?: ViewCondition
   onApply: (condition: ViewCondition) => void
   onCancel: () => void
+  /** Phase 271-04 (P-06): field keys to leave out of the NON-watch field list (Find passes
+   *  `FIND_EXCLUDED_FIELD_KEYS`). The watch scope is never filtered. Absent → unchanged. */
+  excludeFieldKeys?: readonly string[]
 }
 
 export function ConditionPopover({
@@ -112,6 +125,7 @@ export function ConditionPopover({
   initial,
   onApply,
   onCancel,
+  excludeFieldKeys,
 }: ConditionPopoverProps) {
   // The filterable-field set: when ruleScope === 'watch', strictly arrival fields (SC#3).
   // Otherwise built-ins ∪ source facts ∪ enabled custom defs (deduped).
@@ -122,16 +136,21 @@ export function ConditionPopover({
     const custom = customFields
       .filter((d) => d.enabled)
       .map((d) => ({ field_key: d.field_key, field_type: d.field_type, options: d.options }))
+    // Phase 271-04: the exclusion applies to the built-in + arrival-fact lists only; an org's
+    // enabled custom field is whitelisted server-side by construction, so it is never hidden.
+    const excluded = new Set<string>(excludeFieldKeys ?? [])
+    const shipped = [...BUILTIN_FIELDS, ...WATCH_FIELDS].filter((f) => !excluded.has(f.field_key))
     const seen = new Set<string>()
     const result: FilterField[] = []
-    for (const f of [...BUILTIN_FIELDS, ...WATCH_FIELDS, ...custom]) {
+    for (const f of [...shipped, ...custom]) {
       if (!seen.has(f.field_key)) {
         seen.add(f.field_key)
         result.push(f)
       }
     }
     return result
-  }, [customFields, ruleScope])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customFields, ruleScope, (excludeFieldKeys ?? []).join("\u0000")])
 
   const [field, setField] = useState<string>(() => {
     if (initial?.field && fields.some((f) => f.field_key === initial.field)) {

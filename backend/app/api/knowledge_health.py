@@ -392,6 +392,10 @@ def _fetch_retrieval_trend(supabase: Client, user_id: str, days: int) -> list[di
         # "provider_error"` write) is EXCLUDED from retrieval_count, so a provider outage can
         # never make the shipped Coverage Trend chart RISE. It increments its own
         # `could_not_search` series instead.
+        # Phase 272 (D-24): an invalid filter / a lock refusal is a refusal, not a search — it never
+        # reads as "found nothing". Kind 2 (no_documents_matched) still counts.
+        if meta.get("result_kind") in ("invalid_filter", "refused_retry"):
+            continue
         is_error = meta.get("retrieval_status") == "provider_error"
         if is_error:
             daily[date_str]["could_not_search"] += 1

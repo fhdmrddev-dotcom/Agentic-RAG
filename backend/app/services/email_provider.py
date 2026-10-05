@@ -13,6 +13,11 @@ The invite LINK is always composed server-side from the EXISTING ``settings.fron
 (no new APP_BASE_URL env var — RESEARCH Open-Question 3). The raw token lives ONLY in that
 link (T-161-04); nothing here ever logs a bare token.
 
+Phase 276-07 (D-27): the Resend invite carries the Syrel lockup as a hosted PNG
+(the email lockup under ``/brand/``) built from the SAME primary origin — still no new env var, no
+third-party image host, no query string or per-recipient token (T-276-41). PNG, never SVG: many
+mail clients block SVG.
+
 Precedent: the ``SANDBOX_IMAGE`` env-switch-with-fallback (``sandbox_service.py``) — an unset /
 unknown value falls back to the safe default provider.
 """
@@ -71,13 +76,18 @@ class ResendProvider:
         # not HTML, so it is left un-escaped (escaping it would surface literal entities).
         safe_org = html.escape(org_name)
         safe_link = html.escape(link, quote=True)
+        # 276-07 (D-27): the logo URL is escaped too — FRONTEND_URL is operator config, but every
+        # interpolated value is escaped at this boundary, not only the tenant-controlled ones.
+        safe_logo = html.escape(f"{primary_frontend_origin()}/brand/syrel-lockup-email.png", quote=True)
         resend.Emails.send(
             {
                 "from": settings.invite_from_email,
                 "to": to,
-                "subject": f"You're invited to {org_name}",
+                "subject": f"You're invited to {org_name} on Syrel",
                 "html": (
-                    f'<p>You have been invited to join <strong>{safe_org}</strong>.</p>'
+                    f'<p><img src="{safe_logo}" alt="Syrel" width="160" height="80" '
+                    f'style="display:block;border:0"></p>'
+                    f'<p>You have been invited to join <strong>{safe_org}</strong> on Syrel.</p>'
                     f'<p><a href="{safe_link}">Accept your invitation</a></p>'
                 ),
             }

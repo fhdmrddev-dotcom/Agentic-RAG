@@ -1,0 +1,35 @@
+# CI backstop for the public "Syrel API" spec (Phase 276, DOCS-03).
+#
+# The PRIMARY guard is the backend unit test
+# backend/tests/unit/test_276_openapi_snapshot_fresh.py, which fails the mandatory local backend
+# gate the moment the API in code differs from docs/public/api/openapi.snapshot.json
+# (regenerate with: backend/venv/Scripts/python scripts/export-openapi.py).
+#
+# This workflow checks the second link: that docs/public/api/openapi.public.json is what
+# scripts/build-public-openapi.cjs produces from the committed snapshot and docs/history. It needs
+# no Python and no database, so it can run on every push.
+
+name: public-openapi
+
+on:
+  push:
+    paths:
+      - "docs/public/api/**"
+      - "docs/history/**"
+      - "scripts/build-public-openapi.cjs"
+      - ".github/workflows/public-openapi.yml"
+  pull_request:
+    paths:
+      - "docs/public/api/**"
+      - "docs/history/**"
+      - "scripts/build-public-openapi.cjs"
+      - ".github/workflows/public-openapi.yml"
+
+jobs:
+  check-public-openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Public OpenAPI spec matches the snapshot
+        run: node scripts/build-public-openapi.cjs --check

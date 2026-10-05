@@ -353,6 +353,9 @@ class UserEffectiveSettings(BaseModel):
     # Hours a kind='template_input' workspace file lives before the gated read-path
     # hides it and the in-process janitor deletes it. Safe default 24 when absent/NULL.
     template_ttl_hours: int = 24
+    # Phase 270 D-05: lifetime of a document download link. Migration 199 column, bounded
+    # 10..900 by a CHECK and again by the route's clamp. app_settings only (no env var).
+    document_download_url_ttl_seconds: int = 60
 
     # OpenRouter tool calling strategy
     openrouter_tool_strategy: OpenRouterToolStrategy = OpenRouterToolStrategy.QUALITY
@@ -1226,6 +1229,7 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         sub_agent_model=str(_val(row, "sub_agent_model", "sub_agent_model", "")),
         llm_max_output_tokens=int(_val(row, "llm_max_output_tokens", "llm_max_output_tokens", 8192)),
         template_ttl_hours=int(_val(row, "template_ttl_hours", "template_ttl_hours", 24)),
+        document_download_url_ttl_seconds=int(_val(row, "document_download_url_ttl_seconds", None, 60)),
         openrouter_tool_strategy=OpenRouterToolStrategy(
             str(_val(row, "openrouter_tool_strategy", None, OpenRouterToolStrategy.QUALITY.value))
         ),

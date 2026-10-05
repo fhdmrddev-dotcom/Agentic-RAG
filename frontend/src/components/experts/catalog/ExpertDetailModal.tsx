@@ -95,6 +95,7 @@ import {
   INSTALL_COPY,
   START_COPY,
   connectionPills,
+  decodeEntities,
   installView,
   resolveFolderNames,
 } from "./expertCatalog"
@@ -263,7 +264,7 @@ export function ExpertDetailModal({
                 </span>
               </div>
               <p className="mt-0.5 text-[11px] font-medium text-primary">
-                {expert.category?.trim() || "Uncategorised"}
+                {decodeEntities(expert.category?.trim() || "Uncategorised")}
                 {" · "}
                 {expert.is_system ? "System Template" : "Org Custom"}
               </p>

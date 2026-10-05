@@ -1,7 +1,14 @@
 ---
 seed_id: SEED-027
 title: Tables-in-retrieval + multimodal chat injection — close the "table content extracted but invisible to RAG" gap, and add vision-block injection for image-page chunks
-status: planted
+status: partially-answered
+partial: true
+status_note: |
+  Moved `planted` -> `partially-answered` on 2026-10-04 (release-history audit). Original line: `status: planted`.
+  AXIS SETTLED: Track A for NEW ingests — v3.8 Phase 202 (TAB-02, commit bbe73a917) embeds extracted tables
+  as document_chunks. AXIS OPEN: the backfill — `backfill_document_table_chunks` exists and has no caller, so
+  tables in documents ingested before Phase 202 are still invisible to search. Track B (vision injection) was
+  not re-measured in this audit.
 planted: 2026-05-18
 phase_origin: 074-seed-009-seed-011-polish-bundle (user-flagged 2026-05-18 between phases — "we have images tables and tables table that are stored during ingestion, how is it actually injected into the context? are they being included in the chunks retrieved or is it being already stored as chunks?")
 related_seeds: [SEED-006, SEED-020, SEED-021, SEED-059, SEED-060]
@@ -28,10 +35,30 @@ suggested_phase: |
   1. **Quick win — fold into Phase 075 or new Phase 076.5** — track A only: add a `tables_to_chunks` step at ingestion time that renders each `document_tables` row as a structured markdown block (`Table p.X t.Y: headers | rows...` or LLM-generated 1-2 sentence summary + headers) and inserts it as a `document_chunks` row. Mirrors the existing `[Image p.X]: {description}` pattern that already works. Low-risk lift, big retrieval-quality win for content already in the DB. Estimated 1 plan.
   2. **Full lift — dedicated v2.7 phase** — track B: multimodal chat injection. When chat is on a vision-capable model AND retrieved chunks reference image pages (via the `[Image p.X]:` prefix), look up the corresponding `document_images` row, fetch/regenerate the b64_png, and attach as an `{type: "image_url"}` content block. Requires: (a) decide whether to re-store b64_png or regenerate from source PDF on-demand, (b) cost-control for token usage on vision blocks, (c) per-model capability gate (similar to Phase 074's `max_output_tokens` registry — add a `vision: bool` field). Estimated 2-3 plans.
 surface: Agentic-RAG
-trigger_when: unset
+trigger_when: "Any phase whose files_modified names multimodal_service.py or the re-ingest / re-embed path; OR a re-embedding pass or embedding-model change is scheduled (fold the table backfill into it); OR a user asks about a table figure in a document uploaded before Phase 202 and the answer misses it."
+trigger_paths: ["backend/app/services/multimodal_service.py", "backend/app/services/ingest_splice.py", "backend/app/api/documents.py", "backend/app/api/admin.py"]
+trigger_surfaces: ["ingestion", "retrieval"]
 ---
 
 # SEED-027 — Tables-in-retrieval + multimodal chat injection
+
+## ⚠ CORRECTED 2026-10-04 — Track A shipped for new documents; the backfill was never run
+
+Release-history audit (`docs/history/v3.8-document-intelligence-automations-connectors.md`). Measured
+2026-10-04:
+
+- **Shipped:** v3.8 Phase 202 (TAB-02, `bbe73a917`, 2026-08-24) — `embed_and_store_table_chunks`
+  (`backend/app/services/multimodal_service.py:353`) turns extracted tables into searchable chunks at ingest.
+- **Not shipped:** `backfill_document_table_chunks` (`multimodal_service.py:444`) is defined and **called by
+  nothing** in `backend/app`. The v3.8 close says it plainly: *"TAB-02 covers newly ingested documents only —
+  no backfill was run."* So every table in a document ingested before 2026-08-24 is still reachable only
+  through the `query_tables` tool, exactly the gap this seed describes.
+- This seed's own "Backfill question" (options a/b/c below) is therefore still the open decision. The
+  helper makes option (c), an operator-driven backfill endpoint or Control Room action, a small job.
+- Track B (vision-block injection for image pages) was not re-measured here.
+
+`SEED-087` priority 1 ("embed PDF/DOCX tables as chunks") is the same shipped work; this seed holds the
+backfill.
 
 ## What this seed exists to close
 

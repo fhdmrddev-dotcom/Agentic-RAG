@@ -1,0 +1,369 @@
+{
+  "prompt": "What was revenue for Acme GmbH?",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "verdict": "FAIL",
+  "notes": [
+    "legal_entity=Acme GmbH filter: True",
+    "citations 5 all Acme GmbH: False"
+  ],
+  "tool_calls_inspected": [
+    "search_documents({\"query\": \"revenue\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}]})",
+    "query_documents({\"query\": \"SELECT filename, metadata->>'title' AS title, metadata->>'date' AS date FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH' ORDER BY date DE)",
+    "query_documents({\"query\": \"SELECT id FROM documents WHERE filename = '272-board-acme-2025-09.md'\"})",
+    "read_document({\"document_id\": \"1aaae022-55ab-4f61-b6fa-d2e21f50fd06\"})",
+    "query_documents({\"query\": \"SELECT filename, metadata->>'title' AS title, metadata->>'legal_entity' AS legal_entity FROM documents WHERE filename ILIKE '%acme%'\"})",
+    "query_documents({\"query\": \"SELECT filename, metadata->>'title' AS title, metadata->>'legal_entity' AS legal_entity FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH'\")",
+    "search_documents({\"query\": \"\\\"Acme GmbH\\\"\"})",
+    "search_documents({\"query\": \"revenue\", \"filters\": [{\"op\": \"eq\", \"field\": \"title\", \"value\": \"ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\"}]})"
+  ],
+  "audit_ids": [
+    "6eafc0bd-c6f4-45ff-885c-e8abd5bc2590",
+    "da13c30c-54df-4d81-8745-8b0109654b4e",
+    "b315a808-dfc5-40ff-a2e5-c61856baade4"
+  ],
+  "audit_kinds": [
+    "passages",
+    "passages",
+    "passages"
+  ],
+  "audit_filters": [
+    [
+      {
+        "op": "eq",
+        "field": "legal_entity",
+        "value": "Acme GmbH"
+      }
+    ],
+    [],
+    [
+      {
+        "op": "eq",
+        "field": "title",
+        "value": "ACME Corporation - Q3 2026 Financial Results and Form 10-K Report"
+      }
+    ]
+  ],
+  "cited": {
+    "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657": {
+      "id": "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+      "filename": "272-board-acme-2026-03.md",
+      "d": "2026-03-15",
+      "ent": "Acme GmbH"
+    },
+    "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+      "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+      "filename": "272-board-acme-2025-10.md",
+      "d": "2025-10-15",
+      "ent": "Acme GmbH"
+    },
+    "cce3e713-1f18-498a-87a6-cac8552fdfb1": {
+      "id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+      "filename": "acme_q3_2026_financial_report.md",
+      "d": "2026-09-30",
+      "ent": null
+    },
+    "1aaae022-55ab-4f61-b6fa-d2e21f50fd06": {
+      "id": "1aaae022-55ab-4f61-b6fa-d2e21f50fd06",
+      "filename": "272-board-acme-2025-09.md",
+      "d": "2025-09-15",
+      "ent": "Acme GmbH"
+    },
+    "a15ddea3-fa90-4462-833a-d0edfaddd71a": {
+      "id": "a15ddea3-fa90-4462-833a-d0edfaddd71a",
+      "filename": "acme_contract_renewal_schedule_2026.md",
+      "d": null,
+      "ent": null
+    }
+  },
+  "answer_excerpt": "Based on the financial records in your library, there are distinct documents for **Acme GmbH** (reporting in EUR) and **ACME Corporation** (reporting in USD). \n\n### Acme GmbH (Monthly Revenue)\nFor the entity **Acme GmbH**, monthly financial reports are available for three specific periods:\n*   **March 2026**: Total revenue was **EUR 1,410,000** [1].\n*   **October 2025**: Total revenue was **EUR 1,240,000** [2].\n*   **September 2025**: Total revenue was **EUR 1,180,000** [3].\n\n---\n\n### ACME Corporation (Quarterly Revenue)\nIf you are instead looking for the parent or larger entity **ACME Corpora",
+  "thread_id": "66c008e4-aeae-4604-ae0f-7133c06f95c5",
+  "run_id": "d79bb11b-e930-482d-adc8-c3ef2bfcd44f",
+  "run_status": "completed",
+  "effective": {
+    "status": "completed",
+    "model": "gemini-3.5-flash",
+    "provider": "google",
+    "error": null
+  },
+  "raw": {
+    "audits": [
+      {
+        "id": "6eafc0bd-c6f4-45ff-885c-e8abd5bc2590",
+        "at": "2026-10-03 08:07:17.178425+00",
+        "metadata": {
+          "run_id": "d79bb11b-e930-482d-adc8-c3ef2bfcd44f",
+          "filters": [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            }
+          ],
+          "thread_id": "66c008e4-aeae-4604-ae0f-7133c06f95c5",
+          "folder_ids": [],
+          "query_text": "revenue",
+          "result_kind": "passages",
+          "document_ids": [
+            "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657"
+          ],
+          "similarities": {
+            "7b0af230-1ef4-46e5-b316-11888ce84ffb": 0.016,
+            "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657": 0.301
+          },
+          "parent_run_id": null,
+          "matched_document_count": 3
+        }
+      },
+      {
+        "id": "da13c30c-54df-4d81-8745-8b0109654b4e",
+        "at": "2026-10-03 08:07:43.483778+00",
+        "metadata": {
+          "run_id": "d79bb11b-e930-482d-adc8-c3ef2bfcd44f",
+          "filters": [],
+          "thread_id": "66c008e4-aeae-4604-ae0f-7133c06f95c5",
+          "folder_ids": [],
+          "query_text": "\"Acme GmbH\"",
+          "result_kind": "passages",
+          "document_ids": [
+            "a15ddea3-fa90-4462-833a-d0edfaddd71a",
+            "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+            "1aaae022-55ab-4f61-b6fa-d2e21f50fd06",
+            "cce3e713-1f18-498a-87a6-cac8552fdfb1"
+          ],
+          "similarities": {
+            "1aaae022-55ab-4f61-b6fa-d2e21f50fd06": 0.567,
+            "a15ddea3-fa90-4462-833a-d0edfaddd71a": 0.016,
+            "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657": 0.551,
+            "cce3e713-1f18-498a-87a6-cac8552fdfb1": 0.464
+          },
+          "parent_run_id": null
+        }
+      },
+      {
+        "id": "b315a808-dfc5-40ff-a2e5-c61856baade4",
+        "at": "2026-10-03 08:07:48.630854+00",
+        "metadata": {
+          "run_id": "d79bb11b-e930-482d-adc8-c3ef2bfcd44f",
+          "filters": [
+            {
+              "op": "eq",
+              "field": "title",
+              "value": "ACME Corporation - Q3 2026 Financial Results and Form 10-K Report"
+            }
+          ],
+          "thread_id": "66c008e4-aeae-4604-ae0f-7133c06f95c5",
+          "folder_ids": [],
+          "query_text": "revenue",
+          "result_kind": "passages",
+          "document_ids": [
+            "cce3e713-1f18-498a-87a6-cac8552fdfb1"
+          ],
+          "similarities": {
+            "cce3e713-1f18-498a-87a6-cac8552fdfb1": 0.245
+          },
+          "parent_run_id": null,
+          "matched_document_count": 1
+        }
+      }
+    ],
+    "messages": [
+      {
+        "id": "b44c46f2-442d-44da-82c1-bf1f5f6b64b0",
+        "role": "user",
+        "content": "What was revenue for Acme GmbH?",
+        "tool_calls": null,
+        "source_refs": null,
+        "at": "2026-10-03 08:07:11.848259+00"
+      },
+      {
+        "id": "b69fead0-2e4d-4ea7-aee9-ab08a24107f3",
+        "role": "assistant",
+        "content": "Based on the financial records in your library, there are distinct documents for **Acme GmbH** (reporting in EUR) and **ACME Corporation** (reporting in USD). \n\n### Acme GmbH (Monthly Revenue)\nFor the entity **Acme GmbH**, monthly financial reports are available for three specific periods:\n*   **March 2026**: Total revenue was **EUR 1,410,000** [1].\n*   **October 2025**: Total revenue was **EUR 1,240,000** [2].\n*   **September 2025**: Total revenue was **EUR 1,180,000** [3].\n\n---\n\n### ACME Corporation (Quarterly Revenue)\nIf you are instead looking for the parent or larger entity **ACME Corporation**, its Q3 financial results report the following:\n*   **Q3 2026 (Quarter ended September 30, 2026)**: Total revenue was **$124.5 million** [7].\n*   **Q3 2025 (Quarter ended September 30, 2025)**: Total revenue was **$105.3 million** [7].",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "revenue",
+              "filters": [
+                {
+                  "op": "eq",
+                  "field": "legal_entity",
+                  "value": "Acme GmbH"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Acme GmbH \\u2014 monthly financial report, March 2026\\n\\nReporting entity: Acme GmbH.\\nReporting period: March 2026.\\n\\nTotal revenue for the period: EUR 1,410,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"bcdd9e20-790c-4b9e-a849-6f1f1f6c5657\", \"filename\": \"272-board-acme-2026-03.md\", \"chunk_index\": 0, \"similarity\": 0.3010845120902471, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-03-15\", \"title\": \"Acme GmbH \\u2014 monthly financial report, March 2026\", \"topics\": [\"financial report\", \"revenue\", \"operating costs\"], \"_source\": {\"date\": \"user\", \"legal_entity\": \"user\"}, \"summary\": \"Monthly financial report for Acme GmbH covering March 2026. Reports total revenue of EUR 1,410,000, driven by recurring service contracts and one-off project work, with operating costs in line with budget.\", \"language\": \"en\", \"_confidence\": {\"title\": 0.99, \"author\": 0.2, \"topics\": 0.88, \"summary\": 0.96, \"language\": 0.99, \"document_type\": 0.98}, \"legal_entity\": \"Acme GmbH\", \"document_type\": \"monthly financial report\"}}, {\"content\": \"# Acme GmbH \\u2014 monthly financial report, October 2025\\n\\nReporting entity: Acme GmbH.\\nReporting period: October 2025.\\n\\nTotal revenue for the period: EUR 1,240,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"7b0af230-1ef4-46e5-b316-11888ce84ffb\", \"filename\": \"272-board-acme-2025-10.md\", \"chunk_index\": 0, \"similarity\": 0.01639344262295082, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2025-10-15\", \"title\": \"Acme GmbH \\u2014 monthly financial report, October 2025\", \"topics\": [\"finance\", \"monthly reporting\", \"revenue\", \"operating costs\"], \"_source\": {\"date\": \"u",
+            "status": "done",
+            "tool_call_id": "call_1052201",
+            "thought_signature": "Ev4GCvsGAWkUfROI69L2P7O8HKs0aDlU3JiLzl76kK8llCTiyXvpw4CyE8mv4Pove6KwZLXrBrzukCgVJRXVsSZC4aBs+w5tHx+4OIXMo0z4uqdkbr5ialLTuI8EnE4KU22Pjz4Ami11Jn80eU85r7iPUTAzkI7uJvbvtpJuieoDo9fDiKA09WvTvjTznOMhetaODIxztOBRutj45iZ4yUd2HWI61QLt6hGU85yfZpC+kfjRMZWDKeE+NbmLZbIVEm1u8xhsVRbO2z6chVlvDeqQs5HXIWPoECG4g+iIItTJ5Xz5f9GjJZFt88LMLMeFWmd0eO8tns8Xxg0LAXziYxHKxzpXLRFuL2Cw/teUE/rwvq465VuF3+GHOS3x3j23kTgVQZmHS7UOG4TOuPB5WGxQFNuSNS0JZa4X/zPmBTqZEzcHwTDwHiIy925qTsNZQJvOhsaJHQXC+s35bl7AxDYI5iVfNoCW9Tt4HW9Uk5PLGyHk+/5EjRfSGDFnDKMftp+QG7SDBs8eFDmzaC6cymBqh5pqvRQBfGc5SX7oTRY0z+rUSWgBUaTuZUiIJnG7AYhdj1kKtXLu+YvGD80fZSNWgnU9sjNF8dSJA+3VY1u1ClvOX4FpHlLmOSsSjNqBGOQ8c8aB2TsQQ0Sn3ZWhNJTXC2hcCRvwHKUj/k4g97T1cey2rloUI4wjBXFlB+uz2hX0sgA4ZnAMhNwg3EM0HPkxQrX7VPNrBU1z3EjxUAw7OvNJYPV4M7IEqhRUSEFcUBK8NKADKVuE6bD7agXy+w5R14EVa4ZnN7apLKs+aYZFDvVNAf3V9GgtqckJ8mYK79l0qNGCYdaeIBfIZGR9VBfBv9SehVKN4FINFMn/T8C5/OZc3aKTL7DH1SByvg2VI//anegNQhxfzKRWlyD3+pWVO8Gt9/ksVB84O+lQA25UQ+jQ/eraLR4dhMv6brc0NS4NgDZcMmXRyWkazmLdQI5vL/r7vJ+BwKpUbq6FT8po9dTbBaNbKw9CdHHJXC9R2FBwFXaOU3No/QBxM2RPlTOPumFzCMIJsMs8SKGFRWkEWGLZNBKX8c2jSfx92v3PlVm1pz6VW/Oc9RwZ6vMwu0GE1N5aPRwzaKSvo/GffkZ2hiq7fkjr1oVe5rYKVF5Xh5LWD1ZzcHHEyEYvuORWMJeMu3nN4+NTJrGhX6Wjxeli"
+          },
+          {
+            "args": {
+              "query": "SELECT filename, metadata->>'title' AS title, metadata->>'date' AS date FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH' ORDER BY date DESC"
+            },
+            "name": "query_documents",
+            "result": "date | title | filename\n--- | --- | ---\n2026-03-15 | Acme GmbH \u2014 monthly financial report, March 2026 | 272-board-acme-2026-03.md\n2025-10-15 | Acme GmbH \u2014 monthly financial report, October 2025 | 272-board-acme-2025-10.md\n2025-09-15 | Acme GmbH \u2014 monthly financial report, September 2025 | 272-board-acme-2025-09.md",
+            "status": "done",
+            "tool_call_id": "call_1005009",
+            "thought_signature": "EtUECtIEAWkUfRMeBRCzMbhQ4TJtmdPNW5KeE7qHaXdApj4wJcJwEy4PJ3sOQqAFHSks4zOQn5jh0Tp+Msmg2j4APmsIEc6pY2KjGj4g1MsTctz8TkqCUqPLizqJNkuSJ9WEBqH/TnZMTKXGJfg8TXYHmWcixM2bE9tXgMs7oxoqroWO/Glb8nVOUkabs3xd8dv+SE3vfNju/sY7MtgrC1gcNTZZ1OG1IUDcCekQ4BsGTCttB9E6ZWVMUBIx6jOPusHm0rgB8kGzL7EMmaRuImw2ql0qmXvo8vAO4TTJyMpFnVTt5nbn0SlkPSBvRbcF9gQ4e2rygGIQF9Ro70nB1OTQX1HNa0bItQcxsCPv5ooKjDaZrY/pyeaT3ruj85RhfDZJCOPS2BHhPeePv1QIEMW3chATeHGfXFSnAMVCsqoxO/upIiswPx47aksN7/wgpuMaQGZZ/BBxVyXO8zlddKpp4/JdtASRHclNFZ3Zvf9siLS8qsf4GjWN2rcCBNTWT41prh8wl8iYBD6UakzfIjp6JnYtucLiQEMnuk/Lon2faOdlHWRL/L3eOxi/si4uBmmMdyFqs5Xj1INVSbfm9scXcxvSwvb9ZWYrWZHQjhMfFDJmpRj5xgMoOzKVTVlWzsVrvApxsHVYZ4AjLosG1nPfwN6W3XdA8Q8Nj7R3lrbYCiGfkjoNlMz8fbTde06g3rqg032yJxtTov5LFKdhZP7N9UolMW6KG/z0mQRYZzKfAPrf83lT1CTI6wyQ9XCOSmSOSjJEaTxdJ9/lIKmKkU/kwDeTj+sh"
+          },
+          {
+            "args": {
+              "query": "SELECT id FROM documents WHERE filename = '272-board-acme-2025-09.md'"
+            },
+            "name": "query_documents",
+            "result": "id\n---\n1aaae022-55ab-4f61-b6fa-d2e21f50fd06",
+            "status": "done",
+            "tool_call_id": "call_842322",
+            "thought_signature": "EsgFCsUFAWkUfRNs2XJpu7KvmS3QSHYXw/Yy2Ee0chQLY5/Wk5ZEBUrK0akkMyreLzwoxwpJWa1o948/lGlz5M6YJAtqW88hIgsb04HL5tKqZRpEiB+FmgsVQ8M2UJAnTkty1VsK9hn4W0YdOi4yJcp9veCS1SXswwMI8f1OCwK+FI8TKoA0zVaTBFn1+G3s99JKUMXoa39riRzyQX6kvWtU0stP98W4Mcux/wL38tX+zLyF6APyXBpLfxCLytB8K7TS2W7bc80HIXiHSkC57m0d1ixq4PLNG5w4vu7I9bLSEiPRf9zvQnCt4osaLRi8bZIoH/yOFEmiGp0cmB7hHUze3fA0NwDD/ivZ6Ghgp09xnzRO1Od8hh56nuM5rNDjXLuiJWjHWbWOnIlcVegiD2fpEWpOfQYV4BOusANMpVeoPSS38P7kW9T3vyXiGPWlOs7xb3Z29aZMa/twNIHA09x5NACsj7o1+4rNAUBTikIBH7I8yKgjd6jO1NSPF8JcIRuRAa4qJmbQIQKAz2brodVRy6rm7Y21JoiaJIiEVGiihNBqKVYFFNPL1YmEgOgtoQBwksNBzJ3g8eiPBGiZ8SKASmvDHP8YYwfqI0DF28sgf3eghzzopclVwk6aisHUFrN+aXVG75kVy8CfY0rjiJ5THilS13omB75/kbNvoOczM4DVNJ5YSFc1pqxv6c1YzD95Sq8kquXb9uNt/CUhAEBjFeBLhlo0Ow01ScPR+mJhUQzifwUA86tfqIBAz8UeXeZMJ5pHJyB3xLE0JBakS/eC2EAyUcrV9uRpHy//yzCCYlWaQ4FQ+PKoPMZsHOm3+LyPZZ2RkzNiod6IPaRiQHASrszBaa1PbvbOVH6E6FxAUWs7mWvnwHJmq5pmoyAgCp9kgEEFSM4VPFtM/HxnRONHkUYU812aPGBV/JkvjFR/Wwy0jmy3WAkNdg=="
+          },
+          {
+            "args": {
+              "document_id": "1aaae022-55ab-4f61-b6fa-d2e21f50fd06"
+            },
+            "name": "read_document",
+            "result": "{\"document_id\": \"1aaae022-55ab-4f61-b6fa-d2e21f50fd06\", \"filename\": \"272-board-acme-2025-09.md\", \"total_lines\": 8, \"content\": \"# Acme GmbH \\u2014 monthly financial report, September 2025\\n\\nReporting entity: Acme GmbH.\\nReporting period: September 2025.\\n\\nTotal revenue for the period: EUR 1,180,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\\n\"}",
+            "status": "done",
+            "tool_call_id": "call_697323",
+            "thought_signature": "Eq0BCqoBAWkUfRMjxaQfqKfar8Vw9qHLnH1XRcdjarxComheV6XJo35G0QZBJrbEM+fqFtKTLBYotcC+4kQsOcEPN4CFjCaOmpW4NErEqhv0QPWKMC/M3GQI+sDBy86v4tKiNly9zS18iaieKscHc6D2rtreiVgXui2n8AVuA2Ho0Y159l8J5WS+5x9rIjkjQoiACEmw+8ZZi6CMwQD6bYkO7PnYNvqwkjc2W4A11T4="
+          },
+          {
+            "args": {
+              "query": "SELECT filename, metadata->>'title' AS title, metadata->>'legal_entity' AS legal_entity FROM documents WHERE filename ILIKE '%acme%'"
+            },
+            "name": "query_documents",
+            "result": "[\n  {\n    \"title\": \"ACME Q3 Statement of Work (Q3 Contracts)\",\n    \"filename\": \"ACME_Q3_SOW_Contract.md\",\n    \"legal_entity\": null\n  },\n  {\n    \"title\": \"ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\",\n    \"filename\": \"acme_q3_2026_financial_report.md\",\n    \"legal_entity\": null\n  },\n  {\n    \"title\": \"ACME Master Services Agreement 2026\",\n    \"filename\": \"ACME_MSA_2026.md\",\n    \"legal_entity\": null\n  },\n  {\n    \"title\": \"Acme GmbH \\u2014 monthly financial report, September 2025\",\n    \"filename\": \"272-board-acme-2025-09.md\",\n    \"legal_entity\": \"Acme GmbH\"\n  },\n  {\n    \"title\": \"Acme GmbH \\u2014 monthly financial report, October 2025\",\n    \"filename\": \"272-board-acme-2025-10.md\",\n    \"legal_entity\": \"Acme GmbH\"\n  },\n  {\n    \"title\": \"Acme GmbH \\u2014 monthly financial report, March 2026\",\n    \"filename\": \"272-board-acme-2026-03.md\",\n    \"legal_entity\": \"Acme GmbH\"\n  },\n  {\n    \"title\": \"ACME Corporation - Contract Renewal and Termination Schedule 2026\",\n    \"filename\": \"acme_contract_renewal_schedule_2026.md\",\n    \"legal_entity\": null\n  },\n  {\n    \"title\": \"Master Services Agreement - ACME Corporation and Kestrel Freight Partners Ltd.\",\n    \"filename\": \"acme_msa_kestrel_freight_2026.md\",\n    \"legal_entity\": null\n  },\n  {\n    \"title\": \"ACME Corporation - Fulfilment and Inventory Report, Q3 2026\",\n    \"filename\": \"acme_fulfilment_and_inventory_q3_2026.md\",\n    \"legal_entity\": null\n  },\n  {\n    \"title\": \"ACME Corporation - Tier-1 Supplier Scorecard, Q3 2026\",\n    \"filename\": \"acme_supplier_scorecard_q3_2026.md\",\n    \"legal_entity\": null\n  },\n  {\n    \"title\": \"ACME Corporation - Employee Handbook 2026\",\n    \"filename\": \"acme_employee_handbook_2026.md\",\n    \"legal_entity\": null\n  },\n  {\n    \"title\": \"ACME Corporation - Learning, Development and Expense Policy 2026\",\n    \"filename\": \"acme_learning_and_expense_policy_2026.md\",\n    \"legal_entity\": null\n  },\n  {\n    \"title\": \"ACME Corporation - Security Incident Response Policy 2026\",\n    \"filename\": \"acme_",
+            "status": "done",
+            "tool_call_id": "call_742050",
+            "thought_signature": "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"
+          },
+          {
+            "args": {
+              "query": "SELECT filename, metadata->>'title' AS title, metadata->>'legal_entity' AS legal_entity FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH'"
+            },
+            "name": "query_documents",
+            "result": "title | filename | legal_entity\n--- | --- | ---\nAcme GmbH \u2014 monthly financial report, September 2025 | 272-board-acme-2025-09.md | Acme GmbH\nAcme GmbH \u2014 monthly financial report, October 2025 | 272-board-acme-2025-10.md | Acme GmbH\nAcme GmbH \u2014 monthly financial report, March 2026 | 272-board-acme-2026-03.md | Acme GmbH",
+            "status": "done",
+            "tool_call_id": "call_725194",
+            "thought_signature": "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"
+          },
+          {
+            "args": {
+              "query": "\"Acme GmbH\""
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Acme GmbH \\u2014 monthly financial report, September 2025\\n\\nReporting entity: Acme GmbH.\\nReporting period: September 2025.\\n\\nTotal revenue for the period: EUR 1,180,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"1aaae022-55ab-4f61-b6fa-d2e21f50fd06\", \"filename\": \"272-board-acme-2025-09.md\", \"chunk_index\": 0, \"similarity\": 0.5669112994842868, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2025-09-15\", \"title\": \"Acme GmbH \\u2014 monthly financial report, September 2025\", \"topics\": [\"financial report\", \"revenue\", \"operating costs\", \"monthly reporting\"], \"_source\": {\"date\": \"user\", \"legal_entity\": \"user\"}, \"summary\": \"Monthly financial report for Acme GmbH covering September 2025. The report states total revenue of EUR 1,180,000, driven by recurring service contracts and one-off project work, with operating costs in line with budget.\", \"language\": \"en\", \"_confidence\": {\"title\": 0.99, \"author\": 0.3, \"topics\": 0.93, \"summary\": 0.96, \"language\": 0.99, \"document_type\": 0.98}, \"legal_entity\": \"Acme GmbH\", \"document_type\": \"monthly financial report\"}}, {\"content\": \"# Acme GmbH \\u2014 monthly financial report, March 2026\\n\\nReporting entity: Acme GmbH.\\nReporting period: March 2026.\\n\\nTotal revenue for the period: EUR 1,410,000.\\n\\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.\", \"document_id\": \"bcdd9e20-790c-4b9e-a849-6f1f1f6c5657\", \"filename\": \"272-board-acme-2026-03.md\", \"chunk_index\": 0, \"similarity\": 0.5507277002663932, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-03-15\", \"title\": \"Acme GmbH \\u2014 monthly financial report, March 2026\", \"topics\": [\"financial report\", \"revenue\", \"operating cos",
+            "status": "done",
+            "tool_call_id": "call_773235",
+            "thought_signature": "Eq8ICqwIAWkUfRMgq7XoT4fvAFbIWwkGk5ndlRaMK5/2ohxjWMnXPIDJ5ZYW5DX1w/uzvF951lzGFfvqAyNJiEYiMvKWBzQ4ilsy00zy76/xoLlAXU1ufiZLU+ydgD1me4rUJUV7GOj85npSiZTEK1HPP5nLoyvp8w32P7QhBNwvu/YKZb8L5ulVeXqySGBO958kYY0tRI+F5nEaNiVe8BQ5xXUiLqgcRyPxKkVNEZbQKGShTkt0vspt8RUGPdHIWH2TqWz4z1BVIzabOzPRK7sds4t/cJGhx+/aNBfYo6UUX44H9oPc5+/qjVdOCkEcVuF9H14A15cWYTNlPZrOiqoXnsrv7uY/Ty0a1axY+R0dPAqVzuBJkKisjyXPAWAa1E2JZrSBxX48v2+l0wsSwKl0//aE98K3/T1IAUcz5tWHT04xf13FDezuP9rAzg3Q/eilk5yhDRlZGmYyfbpob8bWeaAIR2VzuQ++CpS9gFb4AXILlDt04+7T4kbuGwmxuYe35a0bA91K1Wfv38HdnRlgP3G1WAny7lllJ/83JX0pT2Mci1q7OhgMCL72Uh0CY7HX3Qj1VnTcsMO/CldUUIGb3afn+s5OdQEMKDckKfK0QxZrrROUiCMmQH+JiKQJdhPBGszYBUw172nrDGgyL+ibzCSkGN3LQHFrAQhGBWC+CSRdOJXQe3lqu2VPlQ1Yr5QwuygS+ly0U1oRQwDm+aylwq1EmZ9tmvloaIp4klMXfgOQa705C6hQc4AC6UgiyGESYXnAqTYH16/G72um6O1iWTgYcnCeAG2Slyd/NKxWc6AMf0V1bSyuQAfz50GvKbEqrmdh+B6ufkmXdxpuCOQEjxX8eQSAFG2y59Hsf2hTcsgenkZtl9VyuYkAq/q7Mm5rvHzp6ODZ9tbvE2ItJpI6rVqa+JmWFmuME5br7irPveDKyoM3jv4Z+RRUUiKJPlfsbsO+OLa9iZYGV/Ycnv9Rv3eZBfz2CAHYgGnOgzVC+sCvEhhfqv/WowPTZi33IpKq3bLYIwRZ9IU4MS+jtrjluZv6MkmOZscJnamCVxbbSRZ4Y3YsLOZxDMUmH/tt/ovnIy/EeSsD3aY7LDTfKxYC+d3UXpsh8FPJ8lO/HBSIudmE1aAtAZeJ9+qno9jCBlT/ia0hxxgMHQFBJvL1f2zC48m/BPA8YchATtEu4dIMNO1VOYkQba8tFnhfabtIkiRuCcIVyG7mE5SbDzNa/pBo92U4nc8A0rJ8KVPNfTsOtqSRMtPv71Mo96ck7Lv4BuoSYzg0fUjKU0FndQHdXDv12ZabYnJEjXOLdrZnqYpdnqb2GGCWhCYw/PaB4x23IMF/90LpOJuwv4RQG2G+bl8eQgW77LdYRjiG9/joKTqZ81T90RS9XTTDUyBOrAvu92lquT8SX5tiobmg+PBB2tIQ"
+          },
+          {
+            "args": {
+              "query": "revenue",
+              "filters": [
+                {
+                  "op": "eq",
+                  "field": "title",
+                  "value": "ACME Corporation - Q3 2026 Financial Results and Form 10-K Report"
+                }
+              ]
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\\n\\n## Condensed Consolidated Statement of Operations (Unaudited)\\n*Quarter Ended September 30, 2026*\\n\\n| Financial Metric | Q3 2026 ($M) | Q3 2025 ($M) | YoY Change (%) |\\n| :--- | :--- | :--- | :--- |\\n| **Total Revenue** | **$124.5** | $105.3 | **+18.2%** |\\n| Cost of Goods Sold (COGS) | $44.6 | $39.5 | +12.9% |\\n| **Gross Profit** | **$79.9** | $65.8 | **+21.4%** |\\n| Gross Margin (%) | **64.2%** | 62.5% | +170 bps |\\n| Research & Development | $23.1 | $20.4 | +13.2% |\\n| Sales & Marketing | $16.3 | $14.8 | +10.1% |\\n| General & Administrative | $8.8 | $8.1 | +8.6% |\\n| **Operating Income (EBIT)** | **$31.7** | $22.5 | **+40.9%** |\\n| Depreciation & Amortization | $6.7 | $5.9 | +13.6% |\\n| **EBITDA** | **$38.4** | $28.4 | **+35.2%** |\\n| EBITDA Margin (%) | **30.8%** | 27.0% | +380 bps |\\n| Net Income | $24.8 | $17.6 | +40.9% |\\n| **Operating Cash Flow** | **$29.1** | $21.3 | **+36.6%** |\", \"document_id\": \"cce3e713-1f18-498a-87a6-cac8552fdfb1\", \"filename\": \"acme_q3_2026_financial_report.md\", \"chunk_index\": 0, \"similarity\": 0.24536700334293715, \"version_number\": 1, \"folder_id\": \"07abbbbf-8f55-4fca-8ed3-6f27df7d0200\", \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2026-09-30\", \"title\": \"ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\", \"author\": \"ACME Corporation\", \"topics\": [\"financial results\", \"income statement\", \"balance sheet\", \"cash flow\", \"risk factors\", \"supply chain\", \"foreign currency\", \"data privacy\"], \"summary\": \"Quarterly financial results for ACME Corporation for Q3 2026, including revenue growth, profitability, cash flow, balance sheet liquidity, and principal risk factors related to supply chain concentration, foreign currency volatility, and regulatory compliance.\", \"language\": \"en\", \"_confidence\": {\"date\": 0.93, \"title\": 0.99, \"author\": 0.84, \"topics\": 0.92, \"summary\": 0.97, \"language\": 0.99, \"document_type\": 0.",
+            "status": "done",
+            "tool_call_id": "call_644523",
+            "thought_signature": "Es0ICsoIAWkUfRNMXkQ/sYWTqMUfPAYyf+sQyP38mlOs5tbgWLOK2QQmenraRv4kluCwPUczdZwyTIksQGDwIG+KhcEwbIUNyrtR8rqI1WUvVGUsFxm2IORVXv7xVFpXHWJyQ6VEC3wfLqiswBH3gpV+rh+3Xkvhow1V568/73UDxQg6f8a9/EXuVHW7VLuo2k1YdaZ7WpoBLD+x0/kQASkjHfDXaOIJSXjkRbr0nZjf+MprvWkK08RZbl9ppo2VGUpXXixC1V7yFpyUdkyTNZeSR7qOSx/WVj+wXscGFc1AJclQdPcMLFW3KdxiS3PmgjqOAt1+EbPM+W0arsnsNiN6hg7l69MQ4twhDl7GZQlFdY2lmpAjhYg5akzQiUZCvWAir1XAw9HmtSh/FNTRHXi/0ks9W7goTwMdriaoWyvv27Wslk7Y8FyrOtOkzqVG5DLhyVWEi9DFiCwUF99TgdRuSf5b9+rAttIwa2pMnCqgErQTmaCznXb/JEhpAB6v4r/l3rgfaz9PqrlorZ/eQOPUT8tDl5YgUb4BKR4pLQlB3VVJPxwEWfxf5BUxepfB6JRPZGEKQHUVCoF5QkSJItHSHfjGWg+lDZAkH0ue2ebF8uJ9UU5/rsEhlUQ7iwzF2pH75LOoCYCa4+r4P9t6iXZCDo2cu7AQPZYCA3KD8mgMRrv7U9scrioz8fxiAqWC60hSPM/sJzMi6seRFIzHA3RNlQyUh4/NVG0vY9WczBezd3xuD5UNNSAg7r2593jtL1fe638HH9jDhXa2PRtLHLZ5k6L+q2BSLHMH203FBPrOTnMgVeRlGqUxrwpGuvzwkqoJNsUThhjB/xSbF6k990TVA3wNmzVSGjcIMID2ICH1UWH4RGHh5ObCUfMf95CbKvVbP7LTc1MTHAVo+cKGeq3wiMjAOrGTdHmhVh3akg46lr9s2iH6aeNVAeGAJ3XyiygsL4X3fWtgaVahOq/4IlyEtI2Si1amtt8+e7LhZAACVV7ynv0NOY7n0NQd8Wjaf7gFkw9pOGToETPtPo0AT1ZKsOprC5QTOHe2cD6M7KP7RL5pjc0n88L8rE7xGLKxzZGTXL+EbFwZP4euSCHCeC0zKamZOsHwetAPzFTc2PHDMC0yPAKEaqf6qTafVyow3oz4eROAV5dIWE+IE8T9ONFGxbsz+P71oLB9A8kbvrU5aQXL0VKAeECfkHfDX4lPdjj3q+HP7bL5hg0ZYI41Xen+acSn05jAZkFjI94gRcW4w5MmTitdjy8E1PY6uvqwF5g78sNfCRU9cJeLuA1F5c4CkUlvQ5eWFAG8Ta4kYrFtfRe+JW0BJbDw/fD3DDXL1H+Oi0O62yM2cfS4R7caJMHdug8+sZ75W86HIWEArhur+J6pctBiAMrUGuyrSRMiLE5ongy8r0/bcCft4Letz/W+ygbgoBWV2a/TKBaExwSko2H3ow6YBgcpxSOvogLx"
+          }
+        ],
+        "source_refs": [
+          {
+            "passage": "# Acme GmbH \u2014 monthly financial report, March 2026\n\nReporting entity: Acme GmbH.\nReporting period: March 2026.\n\nTotal revenue for the period: EUR 1,410,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-acme-2026-03.md",
+            "similarity": 0.3010845120902471,
+            "chunk_index": 0,
+            "document_id": "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# Acme GmbH \u2014 monthly financial report, October 2025\n\nReporting entity: Acme GmbH.\nReporting period: October 2025.\n\nTotal revenue for the period: EUR 1,240,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-acme-2025-10.md",
+            "similarity": 0.01639344262295082,
+            "chunk_index": 0,
+            "document_id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# Acme GmbH \u2014 monthly financial report, September 2025\n\nReporting entity: Acme GmbH.\nReporting period: September 2025.\n\nTotal revenue for the period: EUR 1,180,000.\n\nRevenue was driven by recurring service contracts and one-off project work. Operating costs were in line with the budget for the period.",
+            "filename": "272-board-acme-2025-09.md",
+            "similarity": 0.5669112994842868,
+            "chunk_index": 0,
+            "document_id": "1aaae022-55ab-4f61-b6fa-d2e21f50fd06",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "**EBITDA** | **$38.4** | $28.4 | **+35.2%** |\n| EBITDA Margin (%) | **30.8%** | 27.0% | +380 bps |\n| Net Income | $24.8 | $17.6 | +40.9% |\n| **Operating Cash Flow** | **$29.1** | $21.3 | **+36.6%** |\n\n## Balance Sheet & Capital Resources\nAs of September 30, 2026, ACME Corporation maintained total cash, cash equivalents, and short-term investments of $54.2 million compared to $46.8 million at December 31, 2025. Total outstanding term debt stood at $18.5 million, reflecting a net cash position of $35.7 million. Free cash flow for the quarter was $22.4 million after capital expenditures of $6.7 million.",
+            "filename": "acme_q3_2026_financial_report.md",
+            "similarity": 0.46395073894559113,
+            "chunk_index": 1,
+            "document_id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "d Termination Schedule 2026\n\nThis schedule is maintained by ACME Legal Operations and lists the active commercial agreements that renew or expire during calendar year 2026 and the first half of 2027.\n\n## Renewal Schedule\n\n| Agreement | Counterparty | Type | Renewal date | Auto-renews | Notice window | Annual contract value |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| MSA-2026-KFP-007 | Kestrel Freight Partners Ltd. | Supplier - logistics | 2029-02-01 | No | See MSA | $3.9M |\n| SUB-2024-NOR-112 | Northwind Analytics GmbH | Supplier - software | 2026-11-15 | Yes, 12 months | 60 days | $412K |\n| DIST-2025-PAC-031 | Pacifica Components Distribution Pty Ltd | Customer - distribution | 2027-03-31 | Yes, 24 months | 120 days | $6.4M revenue |\n| LEASE-2023-HQ-001 | Ridgeline Property Trust | Facilities - office lease | 2027-06-30 | No | 180 days | $1.14M |\n| SVC-2025-CLR-044 | Clearwater Facilities Services LLC | Supplier - facilities | 2026-12-31 | Yes, 12 months | 45 days | $286K |\n| OEM-2024-VRT-019 | Vertex Medical Imaging Inc. | Customer - OEM supply | 2026-10-01 | Yes, 36 months | 90 days | $9.25M revenue |",
+            "filename": "acme_contract_renewal_schedule_2026.md",
+            "similarity": 0.015625,
+            "chunk_index": 1,
+            "document_id": "a15ddea3-fa90-4462-833a-d0edfaddd71a",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "2025. Total outstanding term debt stood at $18.5 million, reflecting a net cash position of $35.7 million. Free cash flow for the quarter was $22.4 million after capital expenditures of $6.7 million.\n\n## Item 1A. Quantitative and Qualitative Disclosures About Risk Factors\nThe following represent the principal risk factors disclosed in the quarterly filing:\n1. **Supply Chain Concentration**: The Company relies on three primary Tier-1 suppliers in Southeast Asia for specialized semiconductor packaging and optical sub-assemblies. Any disruption from geopolitical tensions, natural disasters, or export restrictions could materially impair production schedules.\n2. **Foreign Currency Volatility**: With approximately 42% of revenue generated internationally (primarily APAC and EMEA), fluctuations in the US Dollar relative to the Euro and Japanese Yen introduce margin sensitivity and transaction exposure.\n3. **Regulatory Compliance and Data Privacy**: Expanding data governance regulations, including cross-border data transfer restrictions and sovereign AI compliance mandates, require substantial ongoing operational investments and pose exposure to potential penalties for non-compliance.",
+            "filename": "acme_q3_2026_financial_report.md",
+            "similarity": 0.4509631006234629,
+            "chunk_index": 2,
+            "document_id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          },
+          {
+            "passage": "# ACME Corporation - Q3 2026 Financial Results and Form 10-K Report\n\n## Condensed Consolidated Statement of Operations (Unaudited)\n*Quarter Ended September 30, 2026*\n\n| Financial Metric | Q3 2026 ($M) | Q3 2025 ($M) | YoY Change (%) |\n| :--- | :--- | :--- | :--- |\n| **Total Revenue** | **$124.5** | $105.3 | **+18.2%** |\n| Cost of Goods Sold (COGS) | $44.6 | $39.5 | +12.9% |\n| **Gross Profit** | **$79.9** | $65.8 | **+21.4%** |\n| Gross Margin (%) | **64.2%** | 62.5% | +170 bps |\n| Research & Development | $23.1 | $20.4 | +13.2% |\n| Sales & Marketing | $16.3 | $14.8 | +10.1% |\n| General & Administrative | $8.8 | $8.1 | +8.6% |\n| **Operating Income (EBIT)** | **$31.7** | $22.5 | **+40.9%** |\n| Depreciation & Amortization | $6.7 | $5.9 | +13.6% |\n| **EBITDA** | **$38.4** | $28.4 | **+35.2%** |\n| EBITDA Margin (%) | **30.8%** | 27.0% | +380 bps |\n| Net Income | $24.8 | $17.6 | +40.9% |\n| **Operating Cash Flow** | **$29.1** | $21.3 | **+36.6%** |",
+            "filename": "acme_q3_2026_financial_report.md",
+            "similarity": 0.24536700334293715,
+            "chunk_index": 0,
+            "document_id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+            "is_full_doc": false,
+            "version_number": 1,
+            "source_connection_id": null,
+            "source_connection_name": null
+          }
+        ],
+        "at": "2026-10-03 08:08:02.326917+00"
+      }
+    ],
+    "run": {
+      "status": "completed",
+      "model": "gemini-3.5-flash",
+      "provider": "google",
+      "error": null
+    }
+  }
+}

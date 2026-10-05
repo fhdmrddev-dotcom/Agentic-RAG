@@ -1,0 +1,68 @@
+dev user d8a54002-6a29-4b88-b918-cff2aa4a06d5 · single org 22f9c615-0eec-440a-8804-ed4784d6f57f (asserted from org_members)
+model_capability_unknown model_id=claude-sonnet-5-5 inferred_provider=anthropic native_tools=True
+model_capability_unknown model_id=claude-opus-5 inferred_provider=anthropic native_tools=True
+model_capability_unknown model_id=claude-opus-5-5 inferred_provider=anthropic native_tools=True
+model_capability_unknown model_id=glm-5.3 inferred_provider=zhipu native_tools=True
+model_capability_unknown model_id=gemini-3.8-flash inferred_provider=google native_tools=True
+model_capability_unknown model_id=gemini-3.6-flash inferred_provider=google native_tools=True
+model_capability_unknown model_id=kimi-k3 inferred_provider=moonshot native_tools=True
+model_capability_unknown model_id=glm-5.3-flash inferred_provider=zhipu native_tools=True
+model_capability_unknown model_id=gemini-3.7-flash inferred_provider=google native_tools=True
+ROSTER overlay rows read by load_all_model_overrides: 49 · direct SQL (removed=false): 49
+ROSTER seed ids (MODEL_CAPABILITIES): 61 · union rows: 80
+ROSTER eligible (enabled, not deprecated, not removed): 77
+ROSTER openrouter_tool_strategy (app settings) = <OpenRouterToolStrategy.QUALITY: 'quality'>
+ROSTER groups=9 (required 8, extra 1)
+ROSTER REQUIRED provider=anthropic  newest=claude-opus-5-5 source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE (native SDK adapter) ids_in_group=10 tied_with=['claude-sonnet-5-5', 'claude-opus-5-5']
+ROSTER REQUIRED provider=deepseek   newest=deepseek-v4-pro source=seed + overlay native_tools=True emit_tier=force predicted_calling_mode=NATIVE ids_in_group=2 tied_with=['deepseek-v4-flash', 'deepseek-v4-pro']
+ROSTER REQUIRED provider=google     newest=gemini-3.8-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE (native SDK adapter) ids_in_group=10
+ROSTER EXTRA    provider=lmstudio   newest=qwen-agentworld-35b-a3b source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=6
+ROSTER REQUIRED provider=minimax    newest=MiniMax-M3 source=seed native_tools=True emit_tier=force predicted_calling_mode=NATIVE ids_in_group=8
+ROSTER REQUIRED provider=moonshot   newest=kimi-k3 source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=4
+ROSTER REQUIRED provider=openai     newest=gpt-5.6-luna source=seed native_tools=True emit_tier=force_strict predicted_calling_mode=NATIVE ids_in_group=12 tied_with=['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
+ROSTER REQUIRED provider=openrouter newest=z-ai/glm-5.3-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=15
+ROSTER REQUIRED provider=zhipu      newest=glm-5.3-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=10 tied_with=['glm-5.3', 'glm-5.3-flash']
+ROSTER rows predicted STRUCTURED: NONE
+ROSTER ⚠ no derived row is predicted STRUCTURED — the live SC#2 holdback check needs a STRUCTURED row; see 273-UAT-LOG.md (the plan assumed OpenRouter is STRUCTURED).
+ROSTER STRUCTURED-routing candidates (keyed, enabled, any group): ['lmstudio:nvidia_nvidia-nemotron-nano-9b-v2']
+
+SC10_KEY baseline active_provider=deepseek saved_llm_model='deepseek-v4-flash' (⚠ the saved llm_model — NOT any --model you pass — is what reaches a phase)
+SC10_KEY provider=anthropic api_key=present request_model=claude-haiku-4-5-20251001 predicted_effective_model=claude-haiku-4-5-20251001
+SC10_KEY provider=deepseek api_key=present request_model=deepseek-v4-flash predicted_effective_model=deepseek-v4-flash
+SC10_KEY provider=google api_key=present request_model=gemini-3.5-flash predicted_effective_model=gemini-3.5-flash
+sub_agent_model='deepseek-v4-flash' is not in active provider='lmstudio''s model list (active_models=['gemma-4-26B-A4B-it-QAT-GGUF', 'qwen3.8-27b', 'glm-4.7-flash', 'nvidia_nvidia-nemotron-nano-9b-v2', 'openai/gpt-oss-20b', 'qwen-agentworld-35b-a3b', 'qwen3.5-9b-mtp', 'qwen3.6-35b-a3b-mtp']); falling back to provider default '' to avoid cross-provider call.
+No _SUB_AGENT_MODEL_DEFAULTS entry for provider='lmstudio'; returning candidate='deepseek-v4-flash' as best-effort.
+SC10_KEY provider=lmstudio api_key=present request_model=qwen-agentworld-35b-a3b predicted_effective_model=deepseek-v4-flash ⚠ _SUB_AGENT_MODEL_DEFAULTS['lmstudio'] is empty and 'lmstudio' is a flexible provider — the saved llm_model passes through UNSLASHED (predicted 404); pin phase.config.model via --openrouter-definition-slug to drive it
+SC10_KEY provider=minimax api_key=present request_model=MiniMax-M2.7-highspeed predicted_effective_model=MiniMax-M2.7-highspeed
+SC10_KEY provider=moonshot api_key=present request_model=kimi-k2.6 predicted_effective_model=kimi-k2.6
+SC10_KEY provider=openai api_key=present request_model=gpt-5.4-mini predicted_effective_model=gpt-5.4-mini
+sub_agent_model='deepseek-v4-flash' is not in active provider='openrouter''s model list (active_models=['nvidia/nemotron-3-ultra-550b-a55b', 'meta-llama/llama-3.3-70b-instruct', 'nvidia/nemotron-3-super-120b-a12b:free', 'google/gemma-4-26b-a4b-it', 'google/gemma-4-31b-it:free', 'qwen/qwen3.8-max', 'qwen/qwen3.8-27b', 'qwen/qwen3.8-flash', 'stealth/ox-alpha', 'deepseek/deepseek-chat', 'deepseek/deepseek-r1', 'deepseek/deepseek-v4-pro', 'minimax/minimax-01', 'minimax/minimax-m2.7', 'moonshotai/kimi-k2.5', 'moonshotai/kimi-k2.6', 'z-ai/glm-5.1', 'z-ai/glm-5.2', 'meta/muse-spark-1.3', 'deepseek/deepseek-v4.1-flash', 'z-ai/glm-5.3-flash']); falling back to provider default '' to avoid cross-provider call.
+No _SUB_AGENT_MODEL_DEFAULTS entry for provider='openrouter'; returning candidate='deepseek-v4-flash' as best-effort.
+SC10_KEY provider=openrouter api_key=present request_model=z-ai/glm-5.3-flash predicted_effective_model=deepseek-v4-flash ⚠ _SUB_AGENT_MODEL_DEFAULTS['openrouter'] is empty and 'openrouter' is a flexible provider — the saved llm_model passes through UNSLASHED (predicted 404); pin phase.config.model via --openrouter-definition-slug to drive it
+SC10_KEY provider=zhipu api_key=present request_model=glm-5-turbo predicted_effective_model=glm-5-turbo
+
+BOARD documents(user) before = 185 · connector_watches(user) before = 3
+BOARD anthropic claude-opus-5-5 D05=PASS ANSWER=PASS SECOND=PASS SEARCH=PASS(total=0) DB=PASS A=completed tools=['workspace_read', 'execute_code'] B=completed threads=88923833-74ff-4833-94cc-d4113727a823,3c6a0ca2-5207-44c4-89dd-281a5e38e431
+BOARD deepseek deepseek-v4-pro D05=PASS ANSWER=PASS SECOND=PASS SEARCH=PASS(total=0) DB=PASS A=completed tools=['workspace_read', 'execute_code'] B=completed threads=1343ef32-3288-470e-8a10-0827c390793a,cee7ea14-5a62-445e-9cc9-39c60e865d6c
+BOARD google gemini-3.8-flash D05=PASS ANSWER=PASS SECOND=PASS SEARCH=PASS(total=0) DB=PASS A=completed tools=['workspace_list', 'workspace_read'] B=completed threads=ab60c716-6c23-40d8-8cf0-cb068c009b31,bc475a55-5188-4692-935a-156aa34c5350
+BOARD lmstudio ⛔ extra (self-hosted) group — not one of the required 8; not driven unless named in --providers
+BOARD minimax MiniMax-M3 D05=PASS ANSWER=PASS SECOND=PASS SEARCH=PASS(total=0) DB=PASS A=completed tools=['execute_code'] B=completed threads=4439fca2-500a-4f8a-808d-132c06d4f8a3,fc20197f-9255-488a-a934-d9c77f8c2a87
+BOARD moonshot kimi-k3 D05=PASS ANSWER=PASS SECOND=PASS SEARCH=PASS(total=0) DB=PASS A=completed tools=['workspace_read', 'workspace_list', 'workspace_list', 'workspace_read'] B=completed threads=edd20fa4-53db-4c59-9756-bc07e7d50a50,60a1d669-a1cb-4821-bf5c-0d2ffba468cc
+BOARD openai gpt-5.6-luna D05=PASS ANSWER=PASS SECOND=PASS SEARCH=PASS(total=0) DB=PASS A=completed tools=['execute_code'] B=completed threads=0e5324e2-2943-443c-80a2-75d477b50ed8,6cb89123-8a66-4ff9-8c12-9bba0be19cb8
+BOARD openrouter z-ai/glm-5.3-flash D05=PASS ANSWER=PASS SECOND=PASS SEARCH=PASS(total=0) DB=PASS A=completed tools=['workspace_read', 'execute_code', 'execute_code'] B=completed threads=5f8c6fff-6e34-45df-9a24-91a29352e588,d650e5a5-1845-4780-9306-b00f960a98f8
+BOARD zhipu glm-5.3-flash D05=PASS ANSWER=PASS SECOND=PASS SEARCH=PASS(total=0) DB=PASS A=completed tools=['workspace_read', 'execute_code'] B=completed threads=57dc0f47-3ab2-4eba-b96a-ffd02c231ada,adad837c-36e2-4438-8c64-ef8ae95bb261
+BOARD documents(user) after = 185 (delta 0) · connector_watches(user) after = 3 (delta 0)
+
+BOARD_TABLE
+| Provider | Model (derived) | Mode (predicted) | D-05 row | Planted fact answered | 2nd-thread negative | document-search negative | DB negative | Tools (thread A) |
+|---|---|---|---|---|---|---|---|---|
+| anthropic | claude-opus-5-5 | NATIVE (native SDK adapter) | PASS | PASS | PASS | PASS | PASS | workspace_read, execute_code |
+| deepseek | deepseek-v4-pro | NATIVE | PASS | PASS | PASS | PASS | PASS | workspace_read, execute_code |
+| google | gemini-3.8-flash | NATIVE (native SDK adapter) | PASS | PASS | PASS | PASS | PASS | workspace_list, workspace_read |
+| lmstudio | qwen-agentworld-35b-a3b | NATIVE | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | extra (self-hosted) group — not one of the required 8; not driven unless named in --providers |
+| minimax | MiniMax-M3 | NATIVE | PASS | PASS | PASS | PASS | PASS | execute_code |
+| moonshot | kimi-k3 | NATIVE | PASS | PASS | PASS | PASS | PASS | workspace_read, workspace_list, workspace_list, workspace_read |
+| openai | gpt-5.6-luna | NATIVE | PASS | PASS | PASS | PASS | PASS | execute_code |
+| openrouter | z-ai/glm-5.3-flash | NATIVE | PASS | PASS | PASS | PASS | PASS | workspace_read, execute_code, execute_code |
+| zhipu | glm-5.3-flash | NATIVE | PASS | PASS | PASS | PASS | PASS | workspace_read, execute_code |
+Binary file board/board-run.log matches

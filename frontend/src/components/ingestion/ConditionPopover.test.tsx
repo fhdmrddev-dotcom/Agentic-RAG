@@ -149,3 +149,49 @@ describe("ConditionPopover", () => {
     expect(screen.queryByText(/operator.*matrix/i)).toBeNull()
   })
 })
+
+describe("ConditionPopover — Find's excluded fields (Phase 271-04, P-06)", () => {
+  function fieldOptions(): string[] {
+    return Array.from((screen.getByLabelText("Field") as HTMLSelectElement).options).map(
+      (o) => o.value,
+    )
+  }
+
+  it("excludeFieldKeys={FIND_EXCLUDED_FIELD_KEYS} offers none of name / type / size", async () => {
+    const mod = await import("@/components/ingestion/ConditionPopover")
+    const keys = (mod as Record<string, unknown>).FIND_EXCLUDED_FIELD_KEYS as readonly string[]
+    expect([...keys]).toEqual(["name", "type", "size"])
+    render(<ConditionPopover onApply={vi.fn()} onCancel={vi.fn()} {...{ excludeFieldKeys: keys }} />)
+    const opts = fieldOptions()
+    for (const k of ["name", "type", "size"]) expect(opts).not.toContain(k)
+    for (const k of ["title", "document_type", "date", "path", "source_system"]) {
+      expect(opts).toContain(k)
+    }
+  })
+
+  it("without the prop the shipped field list is unchanged (name / type / size still offered)", () => {
+    render(<ConditionPopover onApply={vi.fn()} onCancel={vi.fn()} />)
+    const opts = fieldOptions()
+    for (const k of ["name", "type", "size", "title", "path"]) expect(opts).toContain(k)
+  })
+
+  it("ruleScope='watch' still returns WATCH_FIELDS untouched, even with the prop", () => {
+    render(
+      <ConditionPopover
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+        ruleScope="watch"
+        {...{ excludeFieldKeys: ["name", "type", "size"] }}
+      />,
+    )
+    expect(fieldOptions()).toEqual([
+      "name",
+      "path",
+      "type",
+      "size",
+      "date",
+      "source_system",
+      "source_connection_id",
+    ])
+  })
+})

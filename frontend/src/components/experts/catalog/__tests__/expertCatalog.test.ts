@@ -26,7 +26,7 @@ vi.mock("@/lib/api/_core", async (importOriginal) => {
 })
 
 import type { ExpertBundle } from "@/types"
-import { filterExperts, categoriesOf, resolveFolderNames } from "../expertCatalog"
+import { filterExperts, categoriesOf, resolveFolderNames, decodeEntities } from "../expertCatalog"
 import { INSTALL_COPY, installView, inviteGate, provenanceByFolder } from "../expertCatalog"
 import {
   CONNECTION_COPY,
@@ -135,6 +135,35 @@ describe("expertCatalog · categoriesOf", () => {
     // phase from shipping a SIXTH hardcoded demo artefact in the same phase that retired five
     // (RESEARCH R-7). A category nobody authored must not appear.
     expect(categoriesOf([GAMMA])).toEqual([])
+  })
+})
+
+// 276-07 (276-04 issue 2): a stored category "Research &amp; Academic Methods" rendered the entity
+// literally. React already escapes text, so decoding is DISPLAY-only and never touches filtering.
+describe("expertCatalog · decodeEntities (276-07)", () => {
+  it("decodes &amp; in a stored category", () => {
+    expect(decodeEntities("Research &amp; Academic Methods")).toBe("Research & Academic Methods")
+  })
+
+  it("decodes the five named entities and nothing else", () => {
+    expect(decodeEntities("&lt;b&gt; &quot;x&quot; &#39;y&#39;")).toBe(`<b> "x" 'y'`)
+    expect(decodeEntities("A & B")).toBe("A & B")
+    expect(decodeEntities("Plain text")).toBe("Plain text")
+    expect(decodeEntities("&copy; &#x26;")).toBe("&copy; &#x26;")
+  })
+
+  it("is single-pass: &amp;lt; becomes &lt;, never <", () => {
+    expect(decodeEntities("&amp;lt;")).toBe("&lt;")
+  })
+
+  it("filtering keeps the RAW value: a pill made from an encoded category still selects its row", () => {
+    const encoded = expert({ name: "Scholar", category: "Research &amp; Academic Methods" })
+    const pills = categoriesOf([encoded, ALPHA])
+    expect(pills).toContain("Research &amp; Academic Methods")
+    const pill = pills.find((p) => decodeEntities(p) === "Research & Academic Methods")!
+    expect(filterExperts([encoded, ALPHA], { query: "", category: pill }).map((e) => e.name)).toEqual([
+      "Scholar",
+    ])
   })
 })
 

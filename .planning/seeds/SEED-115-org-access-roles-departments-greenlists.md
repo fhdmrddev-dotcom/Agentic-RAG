@@ -1,7 +1,14 @@
 ---
 seed_id: SEED-115
 title: Org access control — user types/roles, departments/groups, group-based feature greenlists, and permission-aware document access (Glean reference model)
-status: open
+status: partially-answered
+partial: true
+status_note: |
+  Moved `open` -> `partially-answered` on 2026-10-04 (release-history audit). Original line: `status: open`.
+  Its re_open_trigger (v3.4 new-milestone) fired and v3.4 answered roles, invitations, "By role" feature
+  greenlists and membership RLS (Phases 163-167). AXIS OPEN: departments/groups (dept_id schema-only; STRETCH
+  169 dept-admin shell and 173 dept-targeted skills + group rollout gating, deferred) and permission-aware
+  document access at citation time (STRETCH 171, now SEED-343).
 planted: 2026-07-11
 phase_origin: "Operator, while picking the Phase 148 sketch winners (067/068/069 all A): 'for user access and considering the future plans I think this deals with part of the user access control because you might define different types of users or maybe different departments in the organisation… also competitors like Glean and Beam AI — so we should consider.'"
 category: access control / org-RBAC — v3.4 one-way-door territory; 148 ships forward-compatible shapes only
@@ -15,10 +22,26 @@ related_phases:
 related_memories: [project_org_level_deferred, project_v33_milestone_started, project_target_scale]
 priority: high
 surface: Agentic-RAG
-trigger_when: unset
+trigger_when: "A real or prospective customer org has two or more departments that need delegated administration, per-department skills, or staged per-group feature rollout; OR the skills visibility/RLS layer is reworked for another reason (fold 173 in then); OR any phase makes the 'dept' visibility live."
+trigger_paths: ["supabase/migrations/104_org_dept_role_schema.sql", "backend/app/api/org.py", "backend/app/utils/skill_visibility.py", "backend/app/api/skills.py", "frontend/src/lib/api/org.ts"]
+trigger_surfaces: ["admin", "auth", "skills"]
 ---
 
 # SEED-115 — org access control: roles · departments · greenlists · doc-level permissions
+
+## ⚠ CORRECTED 2026-10-04 — partially answered by v3.4; departments are still schema-only
+
+Release-history audit. This seed read `open` with `trigger_when: unset`; its own trigger (the v3.4
+milestone) fired long ago. v3.4 shipped user roles, invitations, "By role" feature visibility (167) and
+membership-based RLS (163/164). Measured 2026-10-04: greenlist / `current_user_has_permission` code is live in
+`backend/app/dependencies.py`, `api/org.py`, `api/admin.py`, `api/connectors.py`.
+
+**Not built, and held here:** departments/groups. `dept_id` exists only in migration 104 and nothing in
+`backend/app` reads it. The v3.4 STRETCH carry-forward (`.planning/v3.4-STRETCH-CARRYFORWARD.md`, a file no
+sweep reads) deferred **169 Dept-Admin Shell** (trigger: a customer org with ≥ 2 departments needing
+delegated admin) and **173 Dept-targeted skills + group rollout gating** (trigger: skills visibility rework,
+or a customer needing it). Both now fire through this seed's `trigger_paths`. Item 3 below (permission-aware
+document access) moved to SEED-343; OIDC SSO to SEED-344.
 
 ## The ask (operator, 2026-07-11)
 

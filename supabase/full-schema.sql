@@ -326,16 +326,22 @@ $$;
 
 
 --
--- Name: keyword_search_chunks(text, uuid, integer, jsonb, uuid[]); Type: FUNCTION; Schema: public; Owner: -
+-- Name: keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.keyword_search_chunks(search_query text, match_user_id uuid, match_count integer DEFAULT 20, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[]) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, rank double precision)
+CREATE FUNCTION public.keyword_search_chunks(search_query text, match_user_id uuid, match_count integer DEFAULT 20, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_document_ids uuid[] DEFAULT NULL::uuid[]) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, rank double precision)
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
+    SET plan_cache_mode TO 'force_custom_plan'
     AS $$
 DECLARE
   tsq tsquery;
 BEGIN
+  -- D-18: an EMPTY set means "the filter matched nothing" — zero rows, never "all".
+  IF p_document_ids IS NOT NULL AND cardinality(p_document_ids) = 0 THEN
+    RETURN;
+  END IF;
+
   tsq := plainto_tsquery('english', search_query);
   RETURN QUERY
   SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
@@ -353,6 +359,7 @@ BEGIN
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
     AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
+    AND (p_document_ids IS NULL OR dc.document_id = ANY (p_document_ids))     -- Phase 272 D-14
   ORDER BY rank DESC
   LIMIT match_count;
 END;
@@ -360,14 +367,62 @@ $$;
 
 
 --
--- Name: match_document_chunks(public.vector, uuid, integer, double precision, jsonb, uuid[], text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: match_document_chunks(public.vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_embedding_model text DEFAULT NULL::text) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
+CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_embedding_model text DEFAULT NULL::text, p_document_ids uuid[] DEFAULT NULL::uuid[], p_exact_max_chunks integer DEFAULT NULL::integer) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
+    SET plan_cache_mode TO 'force_custom_plan'
     AS $$
+DECLARE
+  n_chunks integer;
 BEGIN
+  -- D-18: an EMPTY set means "the filter matched nothing" — zero rows, never "all".
+  IF p_document_ids IS NOT NULL AND cardinality(p_document_ids) = 0 THEN
+    RETURN;
+  END IF;
+
+  -- Size the set (bounded: stops counting one past the threshold). Branch choice only — the
+  -- number is never returned, so counting through the DEFINER owner discloses nothing.
+  IF p_document_ids IS NOT NULL AND p_exact_max_chunks IS NOT NULL THEN
+    SELECT count(*) INTO n_chunks
+    FROM (
+      SELECT 1 FROM public.document_chunks c
+      WHERE c.document_id = ANY (p_document_ids)
+      LIMIT p_exact_max_chunks + 1
+    ) bounded;
+  END IF;
+
+  IF n_chunks IS NOT NULL AND n_chunks <= p_exact_max_chunks THEN
+    -- EXACT branch (SC#3): the ORDER BY is an expression (`+ 0`), so the HNSW index cannot serve
+    -- it and the set is ranked exactly. Every predicate below is today's, verbatim, plus the set.
+    -- ⚠ backend/tests/integration/test_272_rpc_document_scope.py holds this statement verbatim
+    --   (EXACT_BRANCH_SQL) and fails if the two drift.
+    RETURN QUERY
+    SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
+           1 - (dc.embedding OPERATOR(public.<=>) query_embedding) AS similarity
+    FROM public.document_chunks dc
+    JOIN public.documents d ON d.id = dc.document_id
+    WHERE dc.document_id = ANY (p_document_ids)
+      AND dc.org_id = ANY (SELECT public.current_user_org_ids())
+      AND (
+        dc.user_id = auth.uid()
+        OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
+        OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility)
+      )
+      AND (d.source_state IS NULL OR d.source_state != 'source_disconnected')
+      AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
+      AND d.is_latest = true
+      AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
+      AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
+      AND (p_embedding_model IS NULL OR dc.embedding_model = p_embedding_model)
+    ORDER BY (dc.embedding OPERATOR(public.<=>) query_embedding) + 0
+    LIMIT match_count;
+    RETURN;
+  END IF;
+
+  -- INDEX branch: migration 170's body verbatim + the set restriction (NULL = unrestricted).
   RETURN QUERY
   SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
          1 - (dc.embedding OPERATOR(public.<=>) query_embedding) AS similarity
@@ -385,6 +440,7 @@ BEGIN
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
     AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
     AND (p_embedding_model IS NULL OR dc.embedding_model = p_embedding_model)  -- D-10 stale-model filter
+    AND (p_document_ids IS NULL OR dc.document_id = ANY (p_document_ids))     -- Phase 272 D-14
   ORDER BY dc.embedding OPERATOR(public.<=>) query_embedding
   LIMIT match_count;
 END;
@@ -424,6 +480,28 @@ $$;
 --
 
 COMMENT ON FUNCTION public.match_skills(query_embedding public.vector, match_user_id uuid, p_embedding_model text) IS 'Cosine ranking of the owner+global enabled skill set against a query vector (TRIG-02, Phase 140). Mirrors match_document_chunks (mig 073). LEFT JOIN → NULL similarity for a skill with no current-model vector (fail-open keep, NULLS LAST). WHERE clause is the byte-exact clone of agent_loop.py:1207-1208; as a SECURITY DEFINER body it is the ONLY cross-user gate (T-140-01) — never widen it.';
+
+
+--
+-- Name: message_artifacts_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.message_artifacts_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+BEGIN
+    -- The ONLY permitted change: referential upkeep nulling run_id and/or parent_id.
+    IF (to_jsonb(NEW) - 'run_id' - 'parent_id') = (to_jsonb(OLD) - 'run_id' - 'parent_id')
+       AND (NEW.run_id IS NULL OR NEW.run_id IS NOT DISTINCT FROM OLD.run_id)
+       AND (NEW.parent_id IS NULL OR NEW.parent_id IS NOT DISTINCT FROM OLD.parent_id)
+    THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'message_artifacts rows are immutable once shown (D-08)'
+        USING ERRCODE = 'insufficient_privilege';
+END;
+$$;
 
 
 --
@@ -729,6 +807,8 @@ CREATE TABLE public.app_settings (
     lmstudio_api_key text,
     custom_base_url text DEFAULT ''::text,
     custom_api_key text,
+    document_download_url_ttl_seconds integer DEFAULT 60 NOT NULL,
+    CONSTRAINT app_settings_download_ttl_bounds CHECK (((document_download_url_ttl_seconds >= 10) AND (document_download_url_ttl_seconds <= 900))),
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
     CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
@@ -820,6 +900,13 @@ COMMENT ON COLUMN public.app_settings.custom_base_url IS 'Generic OpenAI-compati
 --
 
 COMMENT ON COLUMN public.app_settings.custom_api_key IS 'Bearer token for custom_base_url. Encrypted at rest via SECRET_COLUMNS when SECRETS_ENCRYPTION_KEY is configured.';
+
+
+--
+-- Name: COLUMN app_settings.document_download_url_ttl_seconds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.document_download_url_ttl_seconds IS 'Lifetime in seconds of a minted document download link. Default 60; bounded 10-900 by app_settings_download_ttl_bounds.';
 
 
 --
@@ -1529,7 +1616,12 @@ CREATE TABLE public.documents (
     ingest_visibility text DEFAULT 'private'::text NOT NULL,
     source_state text,
     thread_key text,
+    page_count integer,
+    source_created_at timestamp with time zone,
+    source_modified_at timestamp with time zone,
+    source_author text,
     CONSTRAINT documents_ingest_visibility_check CHECK ((ingest_visibility = ANY (ARRAY['private'::text, 'org'::text, 'dept'::text]))),
+    CONSTRAINT documents_page_count_positive CHECK (((page_count IS NULL) OR (page_count > 0))),
     CONSTRAINT documents_source_state_check CHECK (((source_state IS NULL) OR (source_state = ANY (ARRAY['live'::text, 'missing_at_source'::text, 'unauthorized_at_source'::text, 'source_disconnected'::text])))),
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
@@ -1568,6 +1660,34 @@ COMMENT ON COLUMN public.documents.source_state IS 'Phase 234 (VIS-03 / VIS-04 /
 --
 
 COMMENT ON COLUMN public.documents.thread_key IS 'Phase 240 (D-3): the conversation a mail document belongs to, derived from its own RFC 5322 headers (References[0] -> In-Reply-To -> Message-ID), normalised and capped at 512 chars. NULL means "not mail" or "mail with no usable headers" — deliberately not distinguished by a sentinel. Never derived from Subject.';
+
+
+--
+-- Name: COLUMN documents.page_count; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.page_count IS 'Pages in the file, read from the PDF or DOCX at ingest. NULL = not recorded (non-paged format, unreadable file, or ingested before Phase 270). Never 0.';
+
+
+--
+-- Name: COLUMN documents.source_created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.source_created_at IS 'The date the FILE claims it was created (PDF CreationDate / DOCX core created), UTC. NULL = not recorded. Never the upload date, that is created_at.';
+
+
+--
+-- Name: COLUMN documents.source_modified_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.source_modified_at IS 'The date the FILE claims it was last modified (PDF ModDate / DOCX core modified), UTC. NULL = not recorded. Never the upload date.';
+
+
+--
+-- Name: COLUMN documents.source_author; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.source_author IS 'The author the FILE names (PDF Author / DOCX core author), trimmed and capped at 512 chars. NULL = not recorded.';
 
 
 --
@@ -2143,6 +2263,138 @@ COMMENT ON COLUMN public.ingestion_jobs.progress IS 'Checkpoint JSONB containing
 --
 
 COMMENT ON COLUMN public.ingestion_jobs.claimed_at IS 'Timestamp when worker claimed row via FOR UPDATE SKIP LOCKED. Read by reclaim_stale_ingestion_claims to rescue stranded jobs (G-1 / SC#1).';
+
+
+--
+-- Name: message_artifacts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.message_artifacts (
+    id text NOT NULL,
+    thread_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    org_id uuid NOT NULL,
+    run_id uuid,
+    tool_call_id text,
+    parent_id text,
+    label text NOT NULL,
+    component text NOT NULL,
+    spec jsonb NOT NULL,
+    caption jsonb NOT NULL,
+    row_count integer NOT NULL,
+    spec_version smallint DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT message_artifacts_component_check CHECK ((component = ANY (ARRAY['chart'::text, 'table'::text, 'metric'::text]))),
+    CONSTRAINT message_artifacts_id_check CHECK ((id ~ '^a_[0-9a-z]{10}$'::text)),
+    CONSTRAINT message_artifacts_label_check CHECK ((label ~ '^(chart|table|metric) [1-9][0-9]*$'::text)),
+    CONSTRAINT message_artifacts_row_count_check CHECK (((row_count >= 1) AND (row_count <= 500))),
+    CONSTRAINT message_artifacts_spec_size CHECK ((octet_length((spec)::text) <= 262144))
+);
+
+
+--
+-- Name: TABLE message_artifacts; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.message_artifacts IS 'Agent-authored artifacts (chart | table | metric) shown under an assistant answer (Phase 273, ART-01..05). One immutable row per show_artifact emission. Visibility mirrors public.messages; written only by the backend pool.';
+
+
+--
+-- Name: COLUMN message_artifacts.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.id IS 'Server-generated id a_ + 10 chars of [0-9a-z]. The FIRST key of the tool result, so a persisted result maps back to its row on reload.';
+
+
+--
+-- Name: COLUMN message_artifacts.thread_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.thread_id IS 'The thread the artifact was shown in. ON DELETE CASCADE: a thread delete removes its artifacts.';
+
+
+--
+-- Name: COLUMN message_artifacts.user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.user_id IS 'The thread owner. Part of the RLS predicate (auth.uid() = user_id), as on messages.';
+
+
+--
+-- Name: COLUMN message_artifacts.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.org_id IS 'The tenancy boundary. Passed explicitly from the validated active org when known; otherwise stamped by the autofill trigger, exactly as messages.';
+
+
+--
+-- Name: COLUMN message_artifacts.run_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.run_id IS 'The run that emitted it. ON DELETE SET NULL — the one column (with parent_id) the immutability trigger lets referential upkeep null.';
+
+
+--
+-- Name: COLUMN message_artifacts.tool_call_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.tool_call_id IS 'The provider tool-call id, for audit only. NOT a join key: Gemini repeats call_{idx} across turns.';
+
+
+--
+-- Name: COLUMN message_artifacts.parent_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.parent_id IS 'The artifact a by-reference emission (from_artifact) was derived from. ON DELETE SET NULL.';
+
+
+--
+-- Name: COLUMN message_artifacts.label; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.label IS 'chart N / table N / metric N — assigned at INSERT per component per thread under an advisory lock, never recomputed (UI-D-03). A from_artifact alias.';
+
+
+--
+-- Name: COLUMN message_artifacts.component; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.component IS 'The closed component set (I-1). Must equal ARTIFACT_COMPONENTS in backend/app/models/artifact.py.';
+
+
+--
+-- Name: COLUMN message_artifacts.spec; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.spec IS 'The validated spec (spec_version 1): title, columns, rows, chart | metric encoding. Never a free props bag (D-02).';
+
+
+--
+-- Name: COLUMN message_artifacts.caption; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.caption IS 'Server-derived caption: row_count, sources, source_count, lineage (D-04). Never model-written.';
+
+
+--
+-- Name: COLUMN message_artifacts.row_count; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.row_count IS 'Rows in spec.rows. 1..500; above the cap the call is refused, never truncated (D-09).';
+
+
+--
+-- Name: COLUMN message_artifacts.spec_version; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.spec_version IS 'Wire-contract version of spec. 1.';
+
+
+--
+-- Name: COLUMN message_artifacts.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_artifacts.created_at IS 'Emission time. Orders a thread''s artifacts.';
 
 
 --
@@ -3390,7 +3642,10 @@ CREATE TABLE public.workspace_files (
     expires_at timestamp with time zone,
     run_claim text,
     org_id uuid NOT NULL,
+    library_document_id uuid,
+    library_link text,
     CONSTRAINT workspace_files_kind_check CHECK (((kind IS NULL) OR (kind = ANY (ARRAY['template_input'::text, 'agent'::text])))),
+    CONSTRAINT workspace_files_library_link_check CHECK (((library_link IS NULL) OR (library_link = ANY (ARRAY['saved'::text, 'already'::text])))),
     CONSTRAINT workspace_files_path_length CHECK ((char_length(path) <= 500)),
     CONSTRAINT workspace_files_size_limit CHECK ((size_bytes <= 10485760))
 );
@@ -3407,7 +3662,7 @@ COMMENT ON COLUMN public.workspace_files.kind IS 'Phase 100 TMPL-01. NULL/''agen
 -- Name: COLUMN workspace_files.expires_at; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.workspace_files.expires_at IS 'Phase 100 TMPL-01. NULL = never expires (agent files). Non-NULL = read-path filter excludes the row once now() passes it (D-06); the lifespan sweep GCs row + Storage bytes (D-07); kickoff run-pin extends it to cover the run (D-09).';
+COMMENT ON COLUMN public.workspace_files.expires_at IS 'Phase 100 TMPL-01; Phase 274 D-05/D-06. NULL = lives with the thread (agent files, and chat attachments from Phase 274 on — removed with their bytes when the thread is deleted). Non-NULL = TTL (workflow template inputs): the read-path filter excludes the row once now() passes it, the lifespan sweep GCs row + Storage bytes, and the kickoff run-pin extends it.';
 
 
 --
@@ -3422,6 +3677,20 @@ COMMENT ON COLUMN public.workspace_files.run_claim IS 'Phase 141 (COLL-02). Run-
 --
 
 COMMENT ON COLUMN public.workspace_files.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
+-- Name: COLUMN workspace_files.library_document_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.library_document_id IS 'Phase 274 (ATT-03 / D-28). The Library document this chat attachment was saved as, or the identical document that already existed. ON DELETE SET NULL: a promoted document stays deletable, and the attachment then reads "not in the Library".';
+
+
+--
+-- Name: COLUMN workspace_files.library_link; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.library_link IS 'Phase 274 (ATT-03 / D-28). saved = this attachment was saved to the Library; already = an identical document already existed. Meaningful ONLY when library_document_id is non-null (no pairing CHECK: SET NULL nulls only the FK column).';
 
 
 --
@@ -3662,6 +3931,22 @@ ALTER TABLE ONLY public.harness_audit
 
 ALTER TABLE ONLY public.ingestion_jobs
     ADD CONSTRAINT ingestion_jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: message_artifacts message_artifacts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: message_artifacts message_artifacts_thread_label_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_thread_label_key UNIQUE (thread_id, label);
 
 
 --
@@ -4365,6 +4650,13 @@ CREATE INDEX idx_dept_members_user_id ON public.dept_members USING btree (user_i
 
 
 --
+-- Name: idx_document_chunks_document_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_chunks_document_id ON public.document_chunks USING btree (document_id);
+
+
+--
 -- Name: idx_document_chunks_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4628,6 +4920,34 @@ CREATE INDEX idx_ingestion_jobs_stale ON public.ingestion_jobs USING btree (stat
 --
 
 CREATE INDEX idx_ingestion_jobs_user_id ON public.ingestion_jobs USING btree (user_id);
+
+
+--
+-- Name: idx_message_artifacts_org; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_artifacts_org ON public.message_artifacts USING btree (org_id);
+
+
+--
+-- Name: idx_message_artifacts_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_artifacts_parent ON public.message_artifacts USING btree (parent_id);
+
+
+--
+-- Name: idx_message_artifacts_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_artifacts_run ON public.message_artifacts USING btree (run_id);
+
+
+--
+-- Name: idx_message_artifacts_thread; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_artifacts_thread ON public.message_artifacts USING btree (thread_id, created_at);
 
 
 --
@@ -5030,6 +5350,13 @@ CREATE INDEX idx_workspace_files_expires_at ON public.workspace_files USING btre
 
 
 --
+-- Name: idx_workspace_files_library_document_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_files_library_document_id ON public.workspace_files USING btree (library_document_id) WHERE (library_document_id IS NOT NULL);
+
+
+--
 -- Name: idx_workspace_files_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5300,6 +5627,20 @@ CREATE TRIGGER folders_set_updated_at BEFORE UPDATE ON public.folders FOR EACH R
 --
 
 CREATE TRIGGER harness_audit_autofill_org_id BEFORE INSERT ON public.harness_audit FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: message_artifacts message_artifacts_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_artifacts_autofill_org_id BEFORE INSERT ON public.message_artifacts FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: message_artifacts message_artifacts_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_artifacts_immutable BEFORE UPDATE ON public.message_artifacts FOR EACH ROW EXECUTE FUNCTION public.message_artifacts_immutable();
 
 
 --
@@ -6070,6 +6411,38 @@ ALTER TABLE ONLY public.ingestion_jobs
 
 
 --
+-- Name: message_artifacts message_artifacts_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.message_artifacts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: message_artifacts message_artifacts_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.runs(run_id) ON DELETE SET NULL;
+
+
+--
+-- Name: message_artifacts message_artifacts_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_artifacts message_artifacts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_artifacts
+    ADD CONSTRAINT message_artifacts_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: message_feedback message_feedback_message_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6539,6 +6912,14 @@ ALTER TABLE ONLY public.workflow_schedules
 
 ALTER TABLE ONLY public.workspace_file_versions
     ADD CONSTRAINT workspace_file_versions_workspace_file_id_fkey FOREIGN KEY (workspace_file_id) REFERENCES public.workspace_files(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workspace_files workspace_files_library_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_files
+    ADD CONSTRAINT workspace_files_library_document_id_fkey FOREIGN KEY (library_document_id) REFERENCES public.documents(id) ON DELETE SET NULL;
 
 
 --
@@ -7074,6 +7455,13 @@ CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SE
 
 
 --
+-- Name: message_artifacts Users can view their own message artifacts; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view their own message artifacts" ON public.message_artifacts FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
 -- Name: messages Users can view their own messages; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -7521,6 +7909,12 @@ ALTER TABLE public.harness_audit ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.ingestion_jobs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: message_artifacts; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.message_artifacts ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: message_feedback; Type: ROW SECURITY; Schema: public; Owner: -
@@ -8654,6 +9048,15 @@ REVOKE ALL ON TABLE public.expert_installs FROM authenticated;
 GRANT SELECT ON TABLE public.expert_installs TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_installs TO service_role;
 
+-- migration 202 — message_artifacts: owners READ (the messages predicate); only the backend writes.
+-- No UPDATE to ANY role, service_role included (D-08: an artifact is immutable once shown).
+REVOKE ALL ON TABLE public.message_artifacts FROM PUBLIC;
+REVOKE ALL ON TABLE public.message_artifacts FROM anon;
+REVOKE ALL ON TABLE public.message_artifacts FROM authenticated;
+REVOKE ALL ON TABLE public.message_artifacts FROM service_role;
+GRANT SELECT ON TABLE public.message_artifacts TO authenticated;
+GRANT SELECT, INSERT, DELETE ON TABLE public.message_artifacts TO service_role;
+
 
 -- ============================================================
 -- 6. Function EXECUTE privileges (migration 181 / Phase 248, CRED-03)
@@ -8779,15 +9182,19 @@ GRANT EXECUTE ON FUNCTION public.folder_is_org_shared(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.folder_is_org_shared(uuid) TO service_role;
 
 -- App search RPCs
-REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) FROM anon;
-GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) TO service_role;
+-- Phase 272 (migration 200): both signatures gained trailing params (p_document_ids; the vector
+-- RPC also p_exact_max_chunks) and the OLD ones were DROPPED, so the ACLs below name the NEW
+-- signatures. Mirrored from migration 200 verbatim -- an old signature here would ERROR on a
+-- greenfield database, where the dump no longer contains that function.
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) TO service_role;
 
-REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) FROM anon;
-GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) FROM anon;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) TO service_role;
 
 REVOKE EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) FROM anon;
@@ -8834,3 +9241,9 @@ GRANT EXECUTE ON FUNCTION public.resize_embedding_column(integer) TO service_rol
 
 -- migration 012 — schema-qualified here; the migration relies on search_path.
 GRANT EXECUTE ON FUNCTION public.query_user_documents(text) TO authenticated;
+
+-- migration 202 — message_artifacts' immutability trigger function (Group A shape: trigger-only).
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.message_artifacts_immutable() TO service_role;

@@ -1,0 +1,208 @@
+---
+sketch: 276-iris-avatar
+name: iris-avatar
+question: "How does the Iris mark behave as the chat assistant avatar: moving while the agent works, settling to the static mark when idle or done, honest about the waiting, error and cancelled states?"
+winner: "D Orbit + wave (operator, 2026-10-04), with the recommended layout; seamless-loop fix applied and measured"
+tags: [phase-276, D-24, iris, avatar, motion, run-state, g2-sketch-gate]
+---
+
+# Sketch 276: Iris assistant avatar
+
+The G-2 sketch for D-24 (`276-CONTEXT.md`). The operator wants the chat assistant avatar to be the Iris
+mark, animated in the manner of Claude.ai's assistant mark. It moves while the agent works, settles to the
+static mark when idle or done, and stays static under `prefers-reduced-motion`. Input study:
+`.planning/phases/276-public-docs-api-reference-video-library/276-LOGO-INVENTORY.md` §A.
+
+## How to view
+
+Run `python -m http.server 8276` from `.planning/sketches/`, then open
+`http://127.0.0.1:8276/276-iris-avatar/index.html`. Opening the file directly also works.
+
+Top bar: **Variant** (A / B / C / D) × **State** (7) · **▶ Play a turn** (thinking → tool → streaming → done) ·
+**Layout** (Recommended / Today) · **Theme** · **Chip** · **Motion** (Full / Reduced).
+
+The page has five parts. **Judge the motion at 32px in the transcript first.**
+
+1. A realistic transcript: a finished assistant row, then a live row whose content follows the state. The readout on the right shows the derivation predicate.
+2. The lab: sizes 96, 48, 32 and 20px, plus a board with every state side by side. Both follow the Variant control, so pick D to see D everywhere, including Play a turn. Below them, a fixed B vs D comparison.
+3. Decision 1: one avatar or two.
+4. Decision 5: before and after for the indicators.
+5. Decision 4 (light theme), then Decisions 2 and 3.
+
+## Variants (working states only; every variant settles to the same static mark)
+
+| | Motion | Elements | Loop |
+|---|---|---|---|
+| **A · Breathe** | Petals open and close together (translate out 3 units + scaleY 1.08), the core swells, a soft glow breathes behind | `.pt`, `.core`, `.glow` | 1.6 s sine ease-in-out; keyframe 0% = rest |
+| **B · Orbit** | The petal ring turns 120° per cycle, with the glow breathing | `.spin`, `.glow` | 1.6 s linear; 120° is the mark's own symmetry (gradients alternate A/B), so the loop is seamless |
+| **C · Petal wave** | A light travels round the petals: each petal brightens and extends in turn, staggered by 1/6 cycle (the Claude spark-shimmer idea) | `.pt` (staggered), `.glow` | 1.6 s; the wave starts at the top petal, because the delays are positive and the keyframe's 0% equals rest |
+| **D · Orbit + wave** (**chosen**) | B's ring rotation and a travelling highlight running together. The ring (`.spin`) carries both the base petals (`.base`, dimmed to 0.7 while working) and an overlay highlight layer (`.wave` > `.wv` ×6), so the two loops compose | `.spin`, `.wv` ×6, `.glow` | ring **360° per 4.8 s, linear** (= 3 wave periods, the same 75°/s as B); wave `irisWaveBump` 1.6 s with negative delays spaced by period/6; glow `irisGlowSoft` 1.6 s |
+
+**Animation count per avatar:** A 8 · **B 2** (`irisOrbit`, `irisGlow`) · C 7 (6 × `irisWave` + `irisGlowSoft`) ·
+**D 8** (`irisOrbitTurn` + 6 × `irisWaveBump` + `irisGlowSoft`), plus two opacity *transitions* on `.base` and `.wave`
+for the fade in and out. In D, one `playbackRate` drives all eight, so tool running speeds up the orbit and the wave
+together (×1.45) and streaming slows both (×0.8). They stay phase-locked: the measured orbit-minus-wave `currentTime`
+stayed at 0 ms across state changes.
+
+**D's settle:** the orbit coasts forward to the next 120° stop (identical to rest for the base gradients), as in B.
+At the same time `data-motion` becomes `fade`: the wave keeps animating while its layer fades to 0 in 0.45 s,
+the base petals return to full opacity, and the glow eases out. After about 520 ms the avatar is at rest.
+
+### D's loop seam — the cause and the fix (measured in Chrome, 2026-10-04)
+
+The operator reported: *"when the loop reaches the end point and starts again you feel it lagging a little"*.
+
+**How it was measured.** The live avatar's animations were paused and stepped through `currentTime` one
+60 fps frame at a time, across two orbit wraps with ±30 frames around each, in all three working states. At
+each step the harness read the ring's computed `transform`, every wave petal's opacity and the glow. From
+those it computed the **light position**: the brightness-weighted circular mean of the petals' on-screen
+angles, i.e. where the eye sees the highlight. It reports the largest frame-to-frame step at a wrap against
+the largest step mid-cycle (≥ 8 frames from any wrap).
+
+**Cause.** Rotation was already `linear`, and each petal's wave keyframes were continuous (one petal's opacity
+step at the wrap was 0.001). The defect was **the orbit's 0→120° loop**. 120° is the symmetry of the two
+alternating gradients but **not of the wave**, because each petal carries its own wave phase. At every 1.6 s
+wrap the ring snapped from 120° back to 0°, each petal suddenly sat where the petal two places before it had
+been, and the highlight teleported about 115°.
+
+| Light-position step per frame | at the wrap, **before** | at the wrap, **after** | mid-cycle (both) |
+|---|---|---|---|
+| thinking ×1.0 | **115.0°** | 5.0° | 5.4° |
+| tool ×1.45 | **112.8°** | 7.2° | 7.9° |
+| streaming ×0.8 | **116.0°** | 4.0° | 4.3° |
+
+**After the fix:**
+- The ring steps at a constant 1.25° / 1.81° / 1.00° per frame, with **zero** acceleration at the wrap. Before, the ring's matrix jumped 118–119° at the wrap.
+- One petal's opacity and the glow have a step of about 0.000 at the wrap.
+- A live, unpaused per-frame sample in a visible tab agreed: light speed at the wrap 5.00 vs 5.42 mid-cycle, ring 1.25 vs 1.25, largest frame gap 17–18 ms (no dropped frames).
+- A real-time `currentTime` recording over 5 wave cycles (1.67 turns), switching thinking → tool → streaming → thinking, showed 0 restarts, 0 backwards steps, orbit and wave `currentTime` identical throughout, and the rates tweened together.
+
+**What changed (D only; A, B and C are untouched):**
+1. **Orbit:** a new `irisOrbitTurn` turns 0→360° in 4.8 s, linear. That is an exact multiple of the wave period (3 × 1.6 s), so the combined pattern repeats seamlessly, and at 360° every petal maps to itself. The angular speed is unchanged.
+2. **Wave:** a new `irisWaveBump` is a smooth bump on a flat floor (0/30/70/100% = floor, 50% = peak, sine easing `cubic-bezier(.37,0,.63,1)`). The wrap falls in the flat zone. The old `irisWave` had keyframes at 16% and 42% that forced a mid-motion stop on every petal.
+3. **Offsets:** each petal gets a **negative** delay, evenly spaced: `calc((var(--i) - 6) * 1.6s / 6)`. Every petal is already mid-cycle at t = 0, and the highlight travels in the same direction as the ring.
+4. **No pop on entry or exit:** the highlight is now an overlay layer (`.wave` > `.wv`, own unique gradient `<uid>-w`) above the base petals. The layer's container fades in and out by CSS **transition**, so starting work and settling never jump, even though negative delays start each petal mid-cycle.
+5. **Glow:** `irisGlowSoft` (0/50/100%, sine easing, a 1.6 s period that divides 4.8 s) was already seamless; measured step at the wrap ≈ 0.000.
+6. **Frames:** only transform and opacity animate. There are no filter or box-shadow animations, and `will-change: transform` is set on the ring only, and only while it is working.
+
+Known edge (unchanged): re-entering work *during* a settle restarts the ring from its coast pose to 0°. Play a
+turn never does this, and the real component can skip it by not starting a settle shorter than its debounce.
+
+All variants use transform and opacity only. Keyframes are new: `irisBreathe`, `irisCore`, `irisGlow`,
+`irisGlowSoft`, `irisOrbit`, `irisWave`, `irisOrbitTurn`, `irisWaveBump`. The sketch never uses `brandPulse`.
+
+**Transitions never snap:**
+- **Spin-up:** entering a working state tweens `playbackRate` from 0.2 to the target over about 0.5 s.
+- **Working state to working state** (thinking → tool → streaming) only changes speed: `playbackRate` is tweened, the animation keeps its position, and nothing restarts.
+- **Settle** (to idle, waiting, error or cancelled): the code captures the live pose (computed `transform`/`opacity`), drops the loop, and runs a WAAPI animation from that pose to rest in 560 ms with `cubic-bezier(.2,0,0,1)`.
+  - Orbit settles differently: it decelerates *forward* to the next 120° multiple. That pose looks identical to rest by symmetry, so it never rewinds. The starting slope matches the current spin speed.
+- **Colour changes** (amber, red, dim) transition `stop-color` and `fill`, never an animated property. That way a tone change and a settle can run at the same time ("settles and turns amber").
+
+## Recommendation
+
+> **Operator verdict (2026-10-04): D · Orbit + wave.** D is what gets built, with the seamless-loop fix above. The
+> analysis below is kept as written, because it records why B was the first recommendation and what D trades
+> for its richness.
+
+**B · Orbit, with the recommended layout.** This is provisional: I verified the motion runs, but judging
+motion feel is the operator's call and I could only check it through still screenshots.
+
+- **It is the only variant that clearly reads at 32px.** A moves its petals about 1.2 screen px at 32px with the chip, so its signal is mostly the glow. C's contrast swing (0.38 → 1) is legible, but it is the busiest of the three in a column of text. The sketch-findings rule applies here: "if the operator can't feel the difference, don't ship the mechanism" (049-B).
+- **It matches the brief.** Claude.ai's mark turns and twinkles while working; a rotating Iris is the direct translation. It also reuses the animated lockup's own vocabulary (`a_sp`, the spin).
+- **The settle is the most satisfying.** The ring visibly slows to a stop, which reads as "done" by itself.
+- **It costs the least.** It animates two elements (`.spin`, `.glow`), against eight for A and seven for C. That matters in a non-virtualised, `React.memo` message list.
+- **The fallback is cheap.** If the operator finds B too spinner-like, A is the calm fallback and its settle is trivial (0% = rest).
+
+### B vs D at 32px (an honest comparison)
+
+Use **Lab · B vs D side by side** to compare them. Those tiles are locked to B or D, ignore the Variant
+control, and show each pair at 32px and 48px in thinking, tool running and streaming.
+
+- **What D adds:** at 48px and above, D reads richer than B. The ring turns *and* a highlight runs round it, which is closer to Claude's twinkle. At 32px with the chip, the mark is about 27px across and the petals are about 5–6px wide. The wave's brightness swing (0.38 → 1) is still visible there, but it is fighting the rotation for the eye.
+- **Two motions, one meaning:** the wave runs at 1/6-cycle stagger while the ring turns 120° per cycle. So the highlight moves round the ring *relative to petals that are themselves moving*, and its apparent speed is the sum of the two. That makes D feel noticeably faster and busier than B at the same `playbackRate`. Tool running (×1.45) pushes it closest to "busy spinner".
+- **Cost:** D runs 8 animations per avatar against B's 2. That only matters for the live row (finished rows are static), but it is 4× the compositor work for the same meaning.
+- **Settle:** both settle cleanly. B's is a single motion coming to rest; D's is two things stopping at once (coast plus fade). D's settle reads slightly less like "done" than B's.
+- **Verdict:** **B stays the recommendation for the 32px chat avatar.** If the operator likes D's richness, the strongest place for it is the larger, one-off marks where the inventory already wants the Iris animated: the empty-chat hero (64px) and the boot splash. There, D's extra layer reads clearly and nothing competes with it. Another option is D with the orbit slowed (e.g. ×0.6 of B's speed), so the wave leads and the rotation becomes ambient. That is a one-line change worth trying if D is preferred.
+
+## State → motion
+
+| State | Derivation (from `message` alone) | Avatar |
+|---|---|---|
+| idle / done | `runStatus === "completed"` or `undefined` (historic rows) | static mark, full colour |
+| thinking | `runStatus === "streaming"`, no `content`, no `tool_calls` (or `isPlanning`, or reasoning only) | working motion ×1.0 (1.6 s) |
+| tool running | streaming and a `tool_calls[].status` is `running` or `preparing` | working motion ×1.45 (≈1.1 s) |
+| streaming text | streaming, has `content`, no running tool, not planning | working motion ×0.8 (≈2 s); calmer because the text is moving |
+| waiting on user | `hasPendingAsk(message)` or `toolApproval` without `decision`, or `lock?.capPaused` (the lock is already read at `MessageItem.tsx:283`) | settle → **amber**, still (`pending-question.md` D2) |
+| error | `runStatus` `failed` / `timed_out` | settle → grey petals, **red core**; the red framed notice carries the reason |
+| cancelled | `runStatus` `cancelled` / `stopped` | settle → grey, 50% opacity (the dim tier, `run-state-honesty.md` D1) |
+| reduced motion | any working state | no movement; a **steady lit core** (glow 0.5) marks "working"; the colour states are unchanged |
+
+Precedence when several match: error > cancelled > waiting > tool > thinking > streaming > idle. Waiting
+must beat tool, because `ask_user` *is* a tool whose status is `running`.
+
+## Open decisions (inventory §"Decisions for the avatar sketch"), with recommended answers
+
+1. **One avatar or two on tool turns → one live avatar.** The Iris in the MessageItem gutter animates. The RunCard header keeps the provider logo (sketch 048), **static**: its `animate-brandPulse` is removed. "Iris in both places" is rejected because it loses model attribution.
+2. **RunCard `Bot` fallback (`:350`, `:450`) → keep `Bot`.** The RunCard avatar answers "which model?" and the Iris answers "who is talking?". An Iris in the unknown-provider slot would read as "Syrel" where it means "unknown model". The collapsed-run `Bot` (`:450`) stays too, because the gutter Iris already sits beside it.
+3. **Keyframe → new `iris*` names.** Delete the dead `brandPulse` at `index.css:501` (the later one at :973 wins today, so the live avatar currently *shrinks and dims*; the sketch shows both side by side). Keep :973 for its remaining users, the "every action recorded" dots in `OrgBand.tsx:93` and `OperatorBand.tsx:70`, where shrink-and-dim suits a dot.
+4. **Light theme → a dark backing chip (`#0A0E18`, 1px ring), in both themes.**
+   - On white, the bare mark loses its `#F2F4FE` core and its petals wash out (shown in the sketch).
+   - The chip means no second artwork to maintain. It matches how the favicon and PWA icons are planned (mark on `#06090F`), and the avatar becomes the same object in both themes. In dark mode the chip is nearly invisible.
+   - The mark sits at 84% of the chip, so petal tips clear the edge even at Breathe's maximum stretch.
+   - Fallback option: a darker light-theme variant (also shown), but it is new brand art.
+5. **Indicators to remove:**
+   - the pre-first-token `Loader2` and the three `dotBounce` dots (`MessageItem.tsx:891-921`);
+   - the `✦ Working` badge (`WorkingBadge.tsx`; its planning-gap window is exactly the avatar's *thinking* state);
+   - the RunCard header `Loader2` (`RunCard.tsx:433-435`);
+   - the RunCard avatar's pulse.
+
+   **Keep:**
+   - the activity words (`outerBannerLabel`, Phase 174 STATE-03);
+   - the timer anchored to `started_at`;
+   - the `.tool-progress-bar` shimmer, newly gated by reduced motion;
+   - the streaming caret;
+   - the `Loader2` + tool label at `:971-983`.
+
+   ⚠ Why the RunCard keeps its liveness: on a long turn the gutter avatar scrolls out of view while the RunCard header stays sticky. The header still has a ticking timer and the shimmer bar, so the run never looks dead with the header `Loader2` gone.
+
+## Mapping to an implementation
+
+A pure presentational component, fed from the `message` prop that `MessageItem` already holds. **No new
+store subscriptions**: no `usePhases`, `useAskUserPrompt` or `useWorkspaceFiles` (cost constraint,
+`MessageItem.tsx:215-224`).
+
+```tsx
+// src/components/chat/irisState.ts — pure, unit-testable, the ONE home of the precedence order
+export type IrisState = "idle" | "thinking" | "tool" | "streaming" | "waiting" | "error" | "cancelled"
+export function irisStateFor(m: Message, capPaused?: boolean): IrisState {
+  if (m.runStatus === "failed" || m.runStatus === "timed_out") return "error"
+  if (m.runStatus === "cancelled" || m.runStatus === "stopped") return "cancelled"
+  if (hasPendingAsk(m) || (m.toolApproval && !m.toolApproval.decision) || capPaused) return "waiting"
+  if (m.runStatus !== "streaming") return "idle"
+  if (m.tool_calls?.some(t => t.status === "running" || t.status === "preparing")) return "tool"
+  if (!m.content || m.isPlanning) return "thinking"
+  return "streaming"
+}
+
+// src/components/brand/IrisAvatar.tsx
+export const IrisAvatar = React.memo(function IrisAvatar({ state, size = 32 }: { state: IrisState; size?: number }) {
+  const uid = React.useId().replace(/:/g, "")   // unique gradient ids per instance (brand SVGs share g/h)
+  const ref = React.useRef<HTMLSpanElement>(null)
+  // useLayoutEffect on [state]: (1) tween playbackRate between working states, (2) on leaving a working
+  // state, capture the live pose and run the WAAPI settle (the sketch's Iris.settle, ~30 lines),
+  // (3) skip all of it when matchMedia("(prefers-reduced-motion: reduce)") matches.
+  return <span ref={ref} className="iris chip" data-state={state} data-motion={…} aria-hidden="true">…svg…</span>
+})
+
+// MessageItem.tsx:476-481 — replace the gradient + Sparkles div, KEEP data-testid="assistant-bot-icon"
+<div data-testid="assistant-bot-icon" data-iris-state={irisState} className="flex-shrink-0 mt-0.5">
+  <IrisAvatar state={irisStateFor(message, workflowLock?.capPaused)} />
+</div>
+```
+
+- **CSS:** the `.iris` block and `@keyframes iris*` go in `index.css`, with a `@media (prefers-reduced-motion: reduce)` reset. Keep them out of `tailwind.config.js` `extend.keyframes`: the selectors are attribute-driven, not utility classes.
+- **The tests move with the code.** `MessageItem.test.tsx:141-217` pins the test id and `animate-brandPulse` iff streaming. That becomes `data-iris-state` assertions plus a pure `irisStateFor` table test. `RunCard.logo.test.tsx` and `RunCard.test.tsx` lose the pulse-on-avatar expectation.
+- **G-5:** `MessageItem.tsx` (35 phases) and `RunCard.tsx` are firing hot files. The change is one import plus one element swap in each, and the state logic lives in the new pure module.
+- **Accessibility:** the avatar is `aria-hidden`, because the activity words carry the state for screen readers.
+- **Building D:** the SVG needs the base group plus the six-ellipse highlight layer and its third gradient (`<uid>-w`). Copy the D CSS block and the two keyframes `irisOrbitTurn` / `irisWaveBump` verbatim, and port `Iris.settle`'s `fade` branch. Re-run the sketch's seam harness (pause, then step `currentTime` frame by frame across a wrap) as a manual check if the timings are ever touched: **the orbit period must stay an integer multiple of the wave period, and the orbit sweep must stay 360°.**
+- **Out of scope here:** the other D-24 placements (empty-chat hero, boot splash, SetupWizard) can reuse `<IrisAvatar state="idle">` or `"thinking"` later.

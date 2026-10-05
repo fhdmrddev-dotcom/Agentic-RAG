@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { AlertTriangle, Lock } from "lucide-react"
+// Phase 276-06 (D-24 / D-27): the boot splash is the moving Iris (a real wait).
+import { IrisAvatar } from "./components/chat/IrisAvatar"
 import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
@@ -124,7 +126,9 @@ import { visibleNavItems } from "@/lib/nav-items"
 //      branchless member compiled and shipped green. `lib/activeViewReachability.ts`
 //      (Phase 262 plan 01) is that sentence's executable half, and it is what makes the
 //      claim provable for the member below rather than merely intended.
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "classification-rules" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run" | "admin-spend" | "experts"
+// Phase 271 (D-09): the rules-authoring home left this union, its ChatLayout branch and the rail in ONE
+// commit — it now opens inside the Library as "Filing rules", a Library-local sub-view, not a view.
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run" | "admin-spend" | "experts"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
@@ -295,7 +299,11 @@ function App() {
   if (loading || setupStatus === null) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        {/* Phase 276-06: the Iris in its thinking state replaces the generic spin ring; under
+            reduced motion it is the static mark with the lit core. */}
+        <div role="status" aria-label="Loading Syrel">
+          <IrisAvatar state="thinking" size={56} />
+        </div>
       </div>
     )
   }

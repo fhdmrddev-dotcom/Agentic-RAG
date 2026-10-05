@@ -1,0 +1,59 @@
+[
+  {
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "results": {
+      "b": {
+        "verdict": "PASS",
+        "notes": [
+          "legal_entity=Acme GmbH filter: True",
+          "citations 2 all Acme GmbH: True",
+          "filtered call returned 2/3 matched docs",
+          "Sep 2025 cited: False \u00b7 EUR 1,180,000 in answer: False"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"revenue\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}]})"
+        ],
+        "audit_ids": [
+          "6c74ddef-6116-4f24-b340-6726ff32d35b"
+        ],
+        "audit_kinds": [
+          "passages"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            }
+          ]
+        ],
+        "cited": {
+          "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657": {
+            "id": "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+            "filename": "272-board-acme-2026-03.md",
+            "d": "2026-03-15",
+            "ent": "Acme GmbH"
+          },
+          "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+            "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "filename": "272-board-acme-2025-10.md",
+            "d": "2025-10-15",
+            "ent": "Acme GmbH"
+          }
+        },
+        "answer_excerpt": "Acme GmbH's revenue varies by reporting period. In your documents, I found two monthly financial reports for Acme GmbH:\n\n- **October 2025** \u2014 total revenue of **EUR 1,240,000** [1]\n- **March 2026** \u2014 total revenue of **EUR 1,410,000** [2]\n\nIn both periods, revenue was driven by recurring service contracts and one-off project work, with operating costs in line with budget. If you're looking for a specific month or quarter, let me know and I'll pull that figure.",
+        "thread_id": "0a38c231-1619-449e-9480-05d1d72d70bc",
+        "run_id": "7a7234da-fa03-4a61-af03-4a94aeab8c9a",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "deepseek-v4-pro",
+          "provider": "deepseek",
+          "error": null
+        }
+      }
+    }
+  }
+]

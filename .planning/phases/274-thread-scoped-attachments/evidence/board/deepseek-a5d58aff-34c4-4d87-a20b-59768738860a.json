@@ -1,0 +1,126 @@
+{
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "calling_mode_predicted": "NATIVE",
+  "file": {
+    "name": "meridian-clearance-deepseek.md",
+    "body": "# Meridian supplier note\n\nThe Meridian freight-cap clearance code is ATT274-deepseek-d590df23.\n"
+  },
+  "question": "What is the Meridian freight-cap clearance code in the file I attached?",
+  "verdicts": {
+    "d05": "PASS",
+    "answer": "PASS",
+    "second_thread": "PASS",
+    "search_neg": "PASS",
+    "db_neg": "PASS"
+  },
+  "row": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "token": "ATT274-deepseek-d590df23",
+    "thread_a": "1343ef32-3288-470e-8a10-0827c390793a",
+    "thread_b": "cee7ea14-5a62-445e-9cc9-39c60e865d6c",
+    "upload_http": 200,
+    "d05": "PASS",
+    "ws_row": {
+      "id": "1aab1b3b-6731-422f-a4a8-526d8565d71c",
+      "path": "/25ece407-meridian-clearance-deepseek.md",
+      "kind": "template_input",
+      "expires_at": null,
+      "size_bytes": "95",
+      "content_storage_path": null,
+      "library_document_id": null,
+      "library_link": null
+    },
+    "answer": "PASS",
+    "run_a_status": "completed",
+    "a_tools": [
+      "workspace_read",
+      "execute_code"
+    ],
+    "a_final": "The Meridian freight-cap clearance code is **`ATT274-deepseek-d590df23`**.\n\nThis comes from the attached file **25ece407-meridian-clearance-deepseek.md** (the \"Meridian supplier note\").",
+    "second_thread": "PASS",
+    "run_b_status": "completed",
+    "b_tools": [
+      "search_documents",
+      "grep",
+      "search_documents",
+      "grep",
+      "grep",
+      "grep",
+      "grep",
+      "grep"
+    ],
+    "b_final": "I searched your document library thoroughly and I could not find a \"Meridian freight-cap clearance code\" anywhere. The term does not exist in any of your files.\n\nHere's what I found when I broke the phrase into its parts:\n\n- **\"Meridian\"** appears only in your *Project Meridian* documents (status reports, the risk log/register, meeting notes, the project charter, and sprint task log) \u2014 none of whi",
+    "search_http": 200,
+    "search_total": 0,
+    "search_neg": "PASS",
+    "library_rows_with_token": 0,
+    "db_neg": "PASS"
+  },
+  "turn_a": {
+    "run_id": "a5d58aff-34c4-4d87-a20b-59768738860a",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "error": null,
+      "started_at": "2026-10-05 14:31:18.771050+00:00",
+      "completed_at": "2026-10-05 14:31:55.435621+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "ce9a07e6-ae04-4dda-a9e2-eeda9b897820",
+        "content": "The Meridian freight-cap clearance code is **`ATT274-deepseek-d590df23`**.\n\nThis comes from the attached file **25ece407-meridian-clearance-deepseek.md** (the \"Meridian supplier note\")."
+      }
+    ],
+    "tool_call_names": [
+      "workspace_read",
+      "execute_code"
+    ],
+    "final": "The Meridian freight-cap clearance code is **`ATT274-deepseek-d590df23`**.\n\nThis comes from the attached file **25ece407-meridian-clearance-deepseek.md** (the \"Meridian supplier note\")."
+  },
+  "turn_b": {
+    "run_id": "e968bb7c-d908-4e20-9f8c-3e51ac6a4205",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "error": null,
+      "started_at": "2026-10-05 14:31:57.030271+00:00",
+      "completed_at": "2026-10-05 14:32:58.869914+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "70a8a4db-b715-4a53-b836-62781bfba3d8",
+        "content": "I searched your document library thoroughly and I could not find a \"Meridian freight-cap clearance code\" anywhere. The term does not exist in any of your files.\n\nHere's what I found when I broke the phrase into its parts:\n\n- **\"Meridian\"** appears only in your *Project Meridian* documents (status reports, the risk log/register, meeting notes, the project charter, and sprint task log) \u2014 none of which mention freight or clearance codes.\n- **\"freight\"** appears in exactly one document: the **ACME\u2013Kestrel Freight Partners Master Services Agreement**.\n- **\"clearance\"** appears in only two places: the **ACME\u2013Kestrel MSA** (where it's \"customs clearance,\" a service level) and **Fahed Mrad's dissertation** (`FMrad_FT_Approved_06062026.docx`).\n\nNone of these documents combine \"Meridian,\" \"freight,\" and \"clearance code\" together \u2014 a targeted search for \"Meridian freight-cap clearance code\" and for \"Meridian\" co-occurring with \"freight\" or \"clearance\" returned zero matches.\n\nSo I have nothing to cite for this: it's possible the file you intended to attach didn't come through, or the code has a different name. If you can tell me which file you attached (or the exact wording of the code as it appears), I'll pull it up for you."
+      }
+    ],
+    "tool_call_names": [
+      "search_documents",
+      "grep",
+      "search_documents",
+      "grep",
+      "grep",
+      "grep",
+      "grep",
+      "grep"
+    ],
+    "final": "I searched your document library thoroughly and I could not find a \"Meridian freight-cap clearance code\" anywhere. The term does not exist in any of your files.\n\nHere's what I found when I broke the phrase into its parts:\n\n- **\"Meridian\"** appears only in your *Project Meridian* documents (status reports, the risk log/register, meeting notes, the project charter, and sprint task log) \u2014 none of which mention freight or clearance codes.\n- **\"freight\"** appears in exactly one document: the **ACME\u2013Kestrel Freight Partners Master Services Agreement**.\n- **\"clearance\"** appears in only two places: the **ACME\u2013Kestrel MSA** (where it's \"customs clearance,\" a service level) and **Fahed Mrad's dissertation** (`FMrad_FT_Approved_06062026.docx`).\n\nNone of these documents combine \"Meridian,\" \"freight,\" and \"clearance code\" together \u2014 a targeted search for \"Meridian freight-cap clearance code\" and for \"Meridian\" co-occurring with \"freight\" or \"clearance\" returned zero matches.\n\nSo I have nothing to cite for this: it's possible the file you intended to attach didn't come through, or the code has a different name. If you can tell me which file you attached (or the exact wording of the code as it appears), I'll pull it up for you."
+  },
+  "upload_response": {
+    "file_id": "1aab1b3b-6731-422f-a4a8-526d8565d71c",
+    "path": "/25ece407-meridian-clearance-deepseek.md",
+    "version": 1,
+    "size_bytes": 95,
+    "mime_type": "text/markdown",
+    "kind": "template_input",
+    "expires_at": null,
+    "is_new": true,
+    "warning": null
+  }
+}

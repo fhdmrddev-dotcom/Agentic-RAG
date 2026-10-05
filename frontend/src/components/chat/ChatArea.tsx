@@ -30,7 +30,9 @@ import { ExpertSpotlightCard } from "./ExpertSpotlightCard"
 import { ScopeChip } from "./ScopeChip"
 import { SCOPE_COPY, ScopeConflictError, chipLabel } from "./scopeCopy"
 import type { Folder, Thread, ExpertBundle } from "@/types"
-import { Clock, Menu, Sparkles, PanelLeftOpen } from "lucide-react"
+import { Clock, Menu, PanelLeftOpen } from "lucide-react"
+// Phase 276-06 (D-24 / D-27): the empty-chat hero is the static Iris (idle: nothing is working).
+import { IrisAvatar } from "./IrisAvatar"
 
 interface Props {
   thread: Thread | null
@@ -951,9 +953,8 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
           ) : (
             <div className="text-center space-y-5 max-w-md px-6 animate-fadeSlideUp">
               <div className="flex justify-center">
-                <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/20">
-                  <Sparkles className="w-8 h-8 text-white" />
-                </div>
+                {/* Phase 276-06 (D-24): idle means static; a moving hero would claim work that is not happening. */}
+                <IrisAvatar state="idle" size={64} />
               </div>
               <div className="space-y-2">
                 <h2 className="font-headline font-bold text-xl text-foreground">How can I help you?</h2>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react"
 import { Plus, X } from "lucide-react"
 import { EMPTY_FILTER } from "@/types"
 import type { MetadataFieldDef, SavedView, ViewCondition, ViewFilter } from "@/types"
@@ -56,6 +56,80 @@ export interface FilterBarProps {
   matchCount?: number | null
   /** Debounce window for the live count (ms). Default 300 (RESEARCH). */
   debounceMs?: number
+
+  // ── Phase 271-04 (D-114-1: ONE builder) — the four Find-only props. ─────────────────
+  // ⛔ FIND ONLY. The Views tab passes NONE of them, and with none of them this bar renders
+  // byte-identically to before (pinned by `FilterBar.find271.test.tsx`'s DOM snapshot). They
+  // exist so Find can reuse this bar instead of forking a second builder.
+
+  /** Find only: the quick-add structure chips (Document type, Added by, Date, Folder,
+   *  Relationship, Version). Rendered after the metadata chips, before ＋ condition. */
+  quickAdd?: ReactNode
+  /** Find only: hide the "N documents match" span AND skip the count request. Find's meta
+   *  line carries the ONE count on screen (the server's exact total), so a second count here
+   *  could only disagree with it. */
+  suppressCount?: boolean
+  /** Find only: when the search holds something a saved view cannot store (a name, folder,
+   *  added-by, file date, relationship or non-latest version — Pitfall 9), this muted line
+   *  replaces Save as view, so the bar never offers to save a DIFFERENT search. */
+  saveDisabledReason?: string
+  /** Find only: field keys ＋ condition must not offer (P-06 — the server rejects them).
+   *  Passed straight to ConditionPopover. */
+  excludeFieldKeys?: readonly string[]
+}
+
+/**
+ * Phase 271-04 — the shipped condition chip, EXPORTED so Find's structure chips are the same
+ * markup as the metadata chips (one builder, one chip). Summary button + a SEPARATE,
+ * keyboard-reachable ✕ (never hover-only — the 117 audit lock). With no `onRemove` there is
+ * no ✕ (the always-visible Version default). `expanded` is set only by callers whose summary
+ * opens a popover; the shipped metadata chips pass nothing, so their DOM is unchanged.
+ */
+export function FilterChip({
+  summary,
+  removeLabel,
+  onEdit,
+  onRemove,
+  expanded,
+  editRef,
+}: {
+  summary: ReactNode
+  removeLabel?: string
+  onEdit: () => void
+  onRemove?: () => void
+  expanded?: boolean
+  editRef?: Ref<HTMLButtonElement>
+}) {
+  return (
+    <span
+      className={
+        onRemove
+          ? "inline-flex items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-1.5 py-1"
+          : "inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1"
+      }
+    >
+      <button
+        ref={editRef}
+        type="button"
+        className="font-medium hover:text-primary"
+        aria-haspopup={expanded === undefined ? undefined : "dialog"}
+        aria-expanded={expanded}
+        onClick={onEdit}
+      >
+        {summary}
+      </button>
+      {onRemove && (
+        <button
+          type="button"
+          aria-label={removeLabel}
+          className="text-muted-foreground hover:text-destructive"
+          onClick={onRemove}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </span>
+  )
 }
 
 export function FilterBar({
@@ -67,6 +141,10 @@ export function FilterBar({
   editingView,
   matchCount,
   debounceMs = 300,
+  quickAdd,
+  suppressCount = false,
+  saveDisabledReason,
+  excludeFieldKeys,
 }: FilterBarProps) {
   // When the host page supplies a match count (it already resolves the filter into
   // the list), the bar reuses it and SKIPS its own count round-trip (114 CR-01 —
@@ -100,7 +178,8 @@ export function FilterBar({
   useEffect(() => {
     // When the host page supplies the count (it resolves the filter itself), the
     // bar does NOT self-count — it just mirrors the page's number (CR-01).
-    if (externalCount) return
+    // Phase 271-04: Find suppresses the count entirely — no span, and no request.
+    if (externalCount || suppressCount) return
     if (timerRef.current) clearTimeout(timerRef.current)
     // No conditions = "no narrowing" — nothing to count. Clear and skip the trip.
     if (conditions.length === 0) {
@@ -128,7 +207,7 @@ export function FilterBar({
     }
     // Re-run when the conditions list changes (deep — via JSON).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(conditions), debounceMs, externalCount])
+  }, [JSON.stringify(conditions), debounceMs, externalCount, suppressCount])
 
   // ── Save-as-view ──────────────────────────────────────────────────────────
   const [naming, setNaming] = useState(false)
@@ -205,27 +284,17 @@ export function FilterBar({
 
         {/* Condition chips */}
         {conditions.map((c, i) => (
-          <span
+          <FilterChip
             key={i}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-1.5 py-1"
-          >
-            <button
-              type="button"
-              className="font-medium hover:text-primary"
-              onClick={() => setEditing(i)}
-            >
-              {chipSummary(c)}
-            </button>
-            <button
-              type="button"
-              aria-label={`Remove condition ${i + 1}`}
-              className="text-muted-foreground hover:text-destructive"
-              onClick={() => removeCondition(i)}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </span>
+            summary={chipSummary(c)}
+            removeLabel={`Remove condition ${i + 1}`}
+            onEdit={() => setEditing(i)}
+            onRemove={() => removeCondition(i)}
+          />
         ))}
+
+        {/* Phase 271-04 — Find's quick-add structure chips (absent on the Views tab). */}
+        {quickAdd}
 
         {/* + condition */}
         <button
@@ -238,7 +307,7 @@ export function FilterBar({
 
         <div className="ml-auto flex items-center gap-3">
           {/* Live "N documents match" — amber at zero (D-114-2). */}
-          {conditions.length > 0 && (
+          {conditions.length > 0 && !suppressCount && (
             <span
               className={cn(
                 "text-xs tabular-nums",
@@ -255,8 +324,14 @@ export function FilterBar({
             </span>
           )}
 
+          {/* Phase 271-04 (Pitfall 9) — a Find search a view cannot store says so instead. */}
+          {saveDisabledReason !== undefined && (
+            <span className="text-xs text-muted-foreground">{saveDisabledReason}</span>
+          )}
+
           {/* Save as view */}
           {conditions.length > 0 &&
+            saveDisabledReason === undefined &&
             (naming ? (
               <span className="inline-flex items-center gap-1.5">
                 <input
@@ -303,6 +378,7 @@ export function FilterBar({
             initial={editingCondition}
             onApply={applyCondition}
             onCancel={() => setEditing(null)}
+            excludeFieldKeys={excludeFieldKeys}
           />
         </div>
       )}

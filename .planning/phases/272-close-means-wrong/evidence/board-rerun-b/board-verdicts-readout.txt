@@ -1,0 +1,40 @@
+anthropic  (b) PASS req=claude-sonnet-5 eff=anthropic/claude-sonnet-5 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['1695b252-0adf-4c0d-9a68-f0942a29d6fd']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    notes: legal_entity=Acme GmbH filter: True · citations 3 all Acme GmbH: True · filtered call returned 3/3 matched docs · Sep 2025 cited: True · EUR 1,180,000 in answer: True
+    answer: I found monthly revenue figures for Acme GmbH across three reporting periods:  - **September 2025:** EUR 1,180,000 [3] - **October 2025:** EUR 1,240,000 [1] - **March 2026:** EUR 1,410,000 [2]  In each period, revenue was driven by recurring service contracts 
+deepseek   (b) PASS req=deepseek-v4-pro eff=deepseek/deepseek-v4-pro audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['2a334c03-dca9-45df-9f82-5dc67bd1bf12']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    notes: legal_entity=Acme GmbH filter: True · citations 3 all Acme GmbH: True · filtered call returned 3/3 matched docs · Sep 2025 cited: True · EUR 1,180,000 in answer: True
+    answer: Revenue for Acme GmbH appears in three monthly financial reports in your library. Since you didn't specify a period, here are all of them:  | Period | Revenue | |--------|---------| | September 2025 | EUR 1,180,000 [1] | | October 2025 | EUR 1,240,000 [2] | | 
+google     (b) FAIL req=gemini-3.5-flash eff=google/gemini-3.5-flash audits=3 kinds=['passages', 'passages', 'passages'] tools=['search_documents', 'query_documents', 'search_documents', 'search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2025-10.md', '272-board-acme-2026-03.md', 'acme_contract_renewal_schedule_2026.md', 'acme_q3_2026_financial_report.md']
+    audit ids: ['6732f57d-f55c-4e78-b06f-474f4ccb5f29', '2efc5cec-78e3-4cfd-a0b1-ebc6f51b3a23', '0b0889e6-f83e-49f7-9a3c-29b543afde8d']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}], [], [{"op": "eq", "field": "title", "value": "ACME Corporation - Q3 2026 Financial Results and Form 10-K Report"}]]
+    notes: legal_entity=Acme GmbH filter: True · citations 5 all Acme GmbH: False · filtered call returned 3/3 matched docs · Sep 2025 cited: True · EUR 1,180,000 in answer: True
+    answer: The financial documents in your library contain revenue information for both **Acme GmbH** and **ACME Corporation**:  ### 1. Acme GmbH (Monthly Reports) For the entity specifically designated as **Acme GmbH**, monthly financial reports disclose the following t
+minimax    (b) PASS req=MiniMax-M3 eff=minimax/MiniMax-M3 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['bcd9d124-bca9-48fd-a291-64b85244c072']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    notes: legal_entity=Acme GmbH filter: True · citations 3 all Acme GmbH: True · filtered call returned 3/3 matched docs · Sep 2025 cited: True · EUR 1,180,000 in answer: True
+    answer:   Acme GmbH's revenue figures, by reporting period:  - **September 2025:** EUR 1,180,000 [1] - **October 2025:** EUR 1,240,000 [2] - **March 2026:** EUR 1,410,000 [3]  In all three months, revenue was driven by recurring service contracts and one-off project w
+moonshot   (b) PASS req=kimi-k2.6 eff=moonshot/kimi-k2.6 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['ac880a74-43ed-444f-9c05-ff2766a6fe48']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    notes: legal_entity=Acme GmbH filter: True · citations 3 all Acme GmbH: True · filtered call returned 3/3 matched docs · Sep 2025 cited: True · EUR 1,180,000 in answer: True
+    answer: Your library contains three monthly financial reports for **Acme GmbH** with the following revenue figures:  | Period | Revenue | |---|---| | September 2025 | EUR 1,180,000 | | October 2025 | EUR 1,240,000 | | March 2026 | EUR 1,410,000 |  **272-board-acme-202
+openai     (b) PASS req=gpt-5.6-luna eff=openai/gpt-5.6-luna audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['49aea8b8-5de9-49af-a30e-6eb1df316fef']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    notes: legal_entity=Acme GmbH filter: True · citations 3 all Acme GmbH: True · filtered call returned 3/3 matched docs · Sep 2025 cited: True · EUR 1,180,000 in answer: True
+    answer: Acme GmbH’s reported revenue was:  - **September 2025:** EUR 1,180,000 [1] - **October 2025:** EUR 1,240,000 [2] - **March 2026:** EUR 1,410,000 [3]  **Combined revenue across these reports: EUR 3,830,000.**
+openrouter (b) PASS req=z-ai/glm-5.2 eff=openrouter/z-ai/glm-5.2 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['df9802b0-d19f-4c79-a732-ea860e2f2828']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    notes: legal_entity=Acme GmbH filter: True · citations 3 all Acme GmbH: True · filtered call returned 3/3 matched docs · Sep 2025 cited: True · EUR 1,180,000 in answer: True
+    answer: I found three monthly financial reports for Acme GmbH in your documents. Here's the revenue for each reported period:  | Period | Total Revenue | |---|---| | **September 2025** | EUR 1,180,000 [3] | | **October 2025** | EUR 1,240,000 [1] | | **March 2026** | E
+zhipu      (b) PASS req=glm-5.2 eff=zhipu/glm-5.2 audits=1 kinds=['passages'] tools=['search_documents'] cited=['272-board-acme-2025-09.md', '272-board-acme-2025-10.md', '272-board-acme-2026-03.md']
+    audit ids: ['b43f6325-0d8e-4867-87d3-9df7d04ccca1']
+    filters: [[{"op": "eq", "field": "legal_entity", "value": "Acme GmbH"}]]
+    notes: legal_entity=Acme GmbH filter: True · citations 3 all Acme GmbH: True · filtered call returned 3/3 matched docs · Sep 2025 cited: True · EUR 1,180,000 in answer: True
+    answer: Acme GmbH's revenue across the three monthly financial reports in your documents is:  | Period | Total Revenue | |---|---| | September 2025 | EUR 1,180,000 [3] | | October 2025 | EUR 1,240,000 [1] | | March 2026 | EUR 1,410,000 [2] |  In all three periods, rev

@@ -167,29 +167,13 @@ async def _build_whitelist(user_id: str, supabase: Client) -> set[str]:
     return whitelist
 
 
-async def resolve_filter(
-    *,
-    caller: str,
-    flt: ViewFilter,
-    folder_scope: str | None,
-    count_only: bool,
-    supabase: Client,
-):
-    """The SHARED, leak-safe resolve core (114 CR-01; extracted in 115) — used by BOTH
-    the route module's ``resolve_view`` / ``resolve_adhoc`` endpoints AND the Phase 115
-    agent tool ``query_documents_by_view`` handler.
+async def validate_and_compile(caller: str, flt: ViewFilter, supabase: Client) -> list:
+    """The SHARED validation + compile, extracted in Phase 271 so the document-search core
+    reuses it (D-115-6: a fork re-opens the leak). Moved VERBATIM out of ``resolve_filter``.
 
-    Caller MUST have already done any readability gate (a saved view's 404-not-403);
-    this core never reads a view owner — every documents query leg is scoped from
-    ``caller`` (the VIEW-06 invariant). It performs NO DB write and NO audit entry, so
-    it is safe to call on every keystroke. Returns ``{"total": N}`` when ``count_only``
-    else ``{"documents": [...], "total": N}`` (the plain-dict, no-response_model shape
-    so rows round-trip the exact metadata blob — the 112 CR-01 lesson).
-
-    On a validation failure (a bad/`_`-prefixed/deleted filter field) this raises a
-    plain :class:`ResolveError` (NOT ``HTTPException`` — that lived in the route, which
-    re-wraps; the agent handler maps it to a calm string). This is the ONLY behavioral
-    change vs. the shipped route logic — every other line is byte-identical.
+    Returns the ordered ``list[Fragment]`` (``[]`` when the filter is empty). Raises a plain
+    :class:`ResolveError` (422) on a ``_``-prefixed / non-whitelisted / retyped field or a
+    leg that is not valid.
     """
     # Re-validate fields + operands against the LIVE field metadata at resolve (not
     # just at save) — a field could have been deleted/disabled or retyped since save
@@ -226,6 +210,108 @@ async def resolve_filter(
             raise ResolveError(
                 detail=f"filter leg {frag.leg!r} is not valid",
             )
+    return fragments
+
+
+def apply_fragments(q, fragments, subtree=None):
+    """The SHARED fragment walk, extracted in Phase 271 so the document-search core reuses
+    it (D-115-6: a fork re-opens the leak). Moved VERBATIM out of ``resolve_filter``'s
+    ``_apply`` closure; ``resolve_filter`` now calls this.
+
+    Walk the ordered list[Fragment] + subtree scope onto a documents query leg.
+
+    Two legs, one dispatch (R-114-A / RESEARCH §"Two-leg split"):
+      * ``leg="typed"``       → the CONSTANT promoted column name
+        (`document_type_norm` / `date_typed` / `source_connection_id` / ...);
+        builder call straight on the column.
+      * ``leg="custom"``      → a `metadata->>'field'` or nested source selector;
+        ``field`` is a WHITELISTED key (re-validated in ``validate_and_compile``),
+        never raw input.
+      * ``leg="containment"`` → the surviving `metadata @> {field: value}` `@>`
+        fast path (boolean/number eq).
+
+    Every value rides as a bound PostgREST param. AND across conditions is the
+    chained builder calls (PostgREST ANDs filters), preserving the flat-AND AST.
+    """
+    for frag in fragments:
+        if frag.leg == "containment":
+            # boolean/number eq — the @> fast path (case-sensitive exact is correct)
+            q = q.contains("metadata", {frag.field: frag.value})
+            continue
+
+        # Column selector: a CONSTANT typed column name, or a metadata selector
+        if frag.leg == "typed":
+            col = frag.field
+        elif frag.field == "source_system":
+            col = "metadata->source->>system"
+        elif frag.field in ("path", "file_path"):
+            col = "file_path"
+        else:
+            col = f"metadata->>{frag.field}"
+
+        if frag.builder in ("within_next", "older_than"):
+            # Relative-date window from the SERVER CLOCK at resolve time (D-114-16).
+            # value = N, value2 = unit.
+            #   within_next → .gte(today).lte(today+N) — inclusive both ends; the
+            #     .gte(today) lower bound EXCLUDES overdue (D-114-5);
+            #   older_than  → .lt(today-N) — STRICT upper bound (WR-03: D-114-4 is
+            #     "date < today-N", so a doc dated EXACTLY today-N is NOT "older
+            #     than N"; the code now matches that contract, no off-by-one).
+            low, high = _relative_window(frag.builder, frag.value, frag.value2)
+            if low is not None:
+                q = q.gte(col, low)
+            if high is not None:
+                q = q.lt(col, high) if frag.builder == "older_than" else q.lte(col, high)
+        elif frag.builder == "or_":
+            # one_of — membership over one field. Bind the list via .in_
+            # (PostgREST QUOTES each member → SC#4-safe), never an interpolated
+            # .or_ grammar string built from user values (T-114-02-03).
+            q = q.in_(col, frag.values or [])
+        elif frag.builder == "is_empty":
+            # is_empty — absent OR ''/'[]' on custom, or is.null on typed column
+            if frag.leg == "typed":
+                q = q.is_(col, "null")
+            else:
+                q = q.or_(f"{col}.is.null,{col}.eq.,{col}.eq.[]")
+        else:
+            # eq / gte / lte / ilike — direct builder on the column; the value is
+            # a bound param. between carries value2 → chain a .lte upper bound.
+            q = getattr(q, frag.builder)(col, frag.value)
+            if frag.value2 is not None:
+                q = q.lte(col, frag.value2)
+
+    if subtree:  # VIEW-05 — narrow to the subtree LIST (never a set — Pitfall 1)
+        q = q.in_("folder_id", subtree)  # → folder_id = ANY($n)
+    return q
+
+
+async def resolve_filter(
+    *,
+    caller: str,
+    flt: ViewFilter,
+    folder_scope: str | None,
+    count_only: bool,
+    supabase: Client,
+):
+    """The SHARED, leak-safe resolve core (114 CR-01; extracted in 115) — used by BOTH
+    the route module's ``resolve_view`` / ``resolve_adhoc`` endpoints AND the Phase 115
+    agent tool ``query_documents_by_view`` handler.
+
+    Caller MUST have already done any readability gate (a saved view's 404-not-403);
+    this core never reads a view owner — every documents query leg is scoped from
+    ``caller`` (the VIEW-06 invariant). It performs NO DB write and NO audit entry, so
+    it is safe to call on every keystroke. Returns ``{"total": N}`` when ``count_only``
+    else ``{"documents": [...], "total": N}`` (the plain-dict, no-response_model shape
+    so rows round-trip the exact metadata blob — the 112 CR-01 lesson).
+
+    On a validation failure (a bad/`_`-prefixed/deleted filter field) this raises a
+    plain :class:`ResolveError` (NOT ``HTTPException`` — that lived in the route, which
+    re-wraps; the agent handler maps it to a calm string). This is the ONLY behavioral
+    change vs. the shipped route logic — every other line is byte-identical.
+    """
+    # Validate + compile through the SHARED module-level core (extracted in Phase 271 so
+    # the document-search core reuses it — behaviour byte-identical, see its docstring).
+    fragments = await validate_and_compile(caller, flt, supabase)
 
     # Resolve folder_scope → a subtree LIST (never a set — Pitfall 1); an unreachable
     # scope contributes no narrowing (D-113-5). Owner-scoped to the CALLER, so a
@@ -252,70 +338,8 @@ async def resolve_filter(
             subtree = reachable or None
 
     def _apply(q):
-        """Walk the ordered list[Fragment] + subtree scope onto a documents query leg.
-
-        Two legs, one dispatch (R-114-A / RESEARCH §"Two-leg split"):
-          * ``leg="typed"``       → the CONSTANT promoted column name
-            (`document_type_norm` / `date_typed` / `source_connection_id` / ...);
-            builder call straight on the column.
-          * ``leg="custom"``      → a `metadata->>'field'` or nested source selector;
-            ``field`` is a WHITELISTED key (re-validated above), never raw input.
-          * ``leg="containment"`` → the surviving `metadata @> {field: value}` `@>`
-            fast path (boolean/number eq).
-
-        Every value rides as a bound PostgREST param. AND across conditions is the
-        chained builder calls (PostgREST ANDs filters), preserving the flat-AND AST.
-        """
-        for frag in fragments:
-            if frag.leg == "containment":
-                # boolean/number eq — the @> fast path (case-sensitive exact is correct)
-                q = q.contains("metadata", {frag.field: frag.value})
-                continue
-
-            # Column selector: a CONSTANT typed column name, or a metadata selector
-            if frag.leg == "typed":
-                col = frag.field
-            elif frag.field == "source_system":
-                col = "metadata->source->>system"
-            elif frag.field in ("path", "file_path"):
-                col = "file_path"
-            else:
-                col = f"metadata->>{frag.field}"
-
-            if frag.builder in ("within_next", "older_than"):
-                # Relative-date window from the SERVER CLOCK at resolve time (D-114-16).
-                # value = N, value2 = unit.
-                #   within_next → .gte(today).lte(today+N) — inclusive both ends; the
-                #     .gte(today) lower bound EXCLUDES overdue (D-114-5);
-                #   older_than  → .lt(today-N) — STRICT upper bound (WR-03: D-114-4 is
-                #     "date < today-N", so a doc dated EXACTLY today-N is NOT "older
-                #     than N"; the code now matches that contract, no off-by-one).
-                low, high = _relative_window(frag.builder, frag.value, frag.value2)
-                if low is not None:
-                    q = q.gte(col, low)
-                if high is not None:
-                    q = q.lt(col, high) if frag.builder == "older_than" else q.lte(col, high)
-            elif frag.builder == "or_":
-                # one_of — membership over one field. Bind the list via .in_
-                # (PostgREST QUOTES each member → SC#4-safe), never an interpolated
-                # .or_ grammar string built from user values (T-114-02-03).
-                q = q.in_(col, frag.values or [])
-            elif frag.builder == "is_empty":
-                # is_empty — absent OR ''/'[]' on custom, or is.null on typed column
-                if frag.leg == "typed":
-                    q = q.is_(col, "null")
-                else:
-                    q = q.or_(f"{col}.is.null,{col}.eq.,{col}.eq.[]")
-            else:
-                # eq / gte / lte / ilike — direct builder on the column; the value is
-                # a bound param. between carries value2 → chain a .lte upper bound.
-                q = getattr(q, frag.builder)(col, frag.value)
-                if frag.value2 is not None:
-                    q = q.lte(col, frag.value2)
-
-        if subtree:  # VIEW-05 — narrow to the subtree LIST (never a set — Pitfall 1)
-            q = q.in_("folder_id", subtree)  # → folder_id = ANY($n)
-        return q
+        """The shared fragment walk + subtree scope (``apply_fragments``, Phase 271)."""
+        return apply_fragments(q, fragments, subtree)
 
     global_folder_ids = await get_globally_visible_folder_ids(supabase, caller)
 

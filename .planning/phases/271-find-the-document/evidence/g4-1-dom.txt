@@ -1,0 +1,72 @@
+{
+  "steps": [
+    {
+      "label": "Document type = Contract",
+      "meta": "4 documents · Sorted by Added to Agentic RAG (newest) · Exact match on fields. No AI ranking. · Searching every folder you can see. Clear search",
+      "rows": [
+        "Delta Contract 2019.pdf Not in a folder",
+        "Gamma NDA 2019.pdf /Contracts",
+        "Beta Services Agreement 2020.pdf /Contracts",
+        "Acme MSA 2019.pdf /Contracts"
+      ]
+    },
+    {
+      "label": "+ Added by = You",
+      "meta": "3 documents · Sorted by Added to Agentic RAG (newest) · Exact match on fields. No AI ranking. · Searching every folder you can see. Clear search",
+      "rows": [
+        "Gamma NDA 2019.pdf /Contracts",
+        "Beta Services Agreement 2020.pdf /Contracts",
+        "Acme MSA 2019.pdf /Contracts"
+      ]
+    },
+    {
+      "label": "+ Date in the document between 2019-01-01 and 2019-12-31",
+      "meta": "2 documents · Sorted by Added to Agentic RAG (newest) · Exact match on fields. No AI ranking. · Searching every folder you can see. Clear search",
+      "rows": [
+        "Gamma NDA 2019.pdf /Contracts",
+        "Acme MSA 2019.pdf /Contracts"
+      ]
+    },
+    {
+      "label": "+ matter is ACME-7",
+      "meta": "1 document · Sorted by Added to Agentic RAG (newest) · Exact match on fields. No AI ranking. · Searching every folder you can see. Clear search",
+      "rows": [
+        "Acme MSA 2019.pdf /Contracts"
+      ]
+    },
+    {
+      "label": "sorted by Date in the document (newest)",
+      "meta": "1 document · Sorted by Date in the document (newest) · Exact match on fields. No AI ranking. · Searching every folder you can see. Clear search",
+      "rows": [
+        "Acme MSA 2019.pdf /Contracts"
+      ]
+    }
+  ],
+  "chips": [
+    {
+      "label": "Remove condition 1",
+      "text": "document_type is Contract"
+    },
+    {
+      "label": "Remove condition 2",
+      "text": "date between 2019-01-01 – 2019-12-31"
+    },
+    {
+      "label": "Remove condition 3",
+      "text": "matter is ACME-7"
+    },
+    {
+      "label": "Remove Added by condition",
+      "text": "Added by You"
+    }
+  ],
+  "headers": [
+    "",
+    "Name",
+    "Document type",
+    "Added by",
+    "Date in the document",
+    "Status",
+    "Actions"
+  ]
+}

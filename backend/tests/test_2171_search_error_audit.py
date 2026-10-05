@@ -32,18 +32,18 @@ def _run_search(monkeypatch, *, error=False, hits=None, avg_sim=0.0):
     import app.services.tool_dispatcher as td
 
     write_audit_entry = AsyncMock()
-    monkeypatch.setattr(td, "write_audit_entry", write_audit_entry)
+    monkeypatch.setattr("app.services.search_documents_tool.write_audit_entry", write_audit_entry)
 
     if error:
         async def _boom(*a, **k):
             raise RuntimeError("quota exhausted")
 
-        monkeypatch.setattr(td, "search_documents", _boom)
+        monkeypatch.setattr("app.services.search_documents_tool.search_documents", _boom)
     else:
         async def _ok(*a, **k):
             return (hits or []), avg_sim
 
-        monkeypatch.setattr(td, "search_documents", _ok)
+        monkeypatch.setattr("app.services.search_documents_tool.search_documents", _ok)
 
     ctx = _ctx()
     # `ctx.spawn(<coro>)` is a fire-and-forget scheduler in production — the handler never
@@ -135,9 +135,15 @@ def test_written_metadata_is_a_dict_not_a_string_scalar():
     # The audit fn's metadata param is untyped-or-dict in signature; the payload we build
     # in the handler is a plain dict. Assert the handler's literal shape, which is the
     # contract the JSONB column relies on.
-    import app.services.tool_dispatcher as td
-    src = inspect.getsource(td._handle_search_documents)
-    assert "metadata={" in src, "the success write must build a dict metadata literal"
-    assert '"retrieval_status": "provider_error"' in src, (
+    # Re-driven by 272-04 (D-12): the audit write moved out of the handler into ONE writer,
+    # `search_documents_tool._write_search_audit`, which every result kind uses. The contract is
+    # unchanged — a dict literal handed to `metadata=`, and the classified provider_error literal —
+    # so the source assertions now read the writer and the module that passes the literal.
+    import app.services.search_documents_tool as sdt
+    writer = inspect.getsource(sdt._write_search_audit)
+    assert "metadata: dict = {" in writer and "metadata=metadata" in writer, (
+        "the write must build a dict metadata literal"
+    )
+    assert 'retrieval_status="provider_error"' in inspect.getsource(sdt), (
         "the error write must persist the classified provider_error literal"
     )

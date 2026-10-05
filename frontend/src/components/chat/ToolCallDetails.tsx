@@ -13,12 +13,15 @@ import {
 } from "lucide-react"
 import type { ToolCall, SubAgentState } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
-import { TOOL_BODIES, GenericBody, summarizeToolCall } from "./tool-bodies"
+import { TOOL_BODIES, GenericBody, summarizeToolCall, ARGS_HIDDEN } from "./tool-bodies"
 
 // ---- Full args expandable ----
 
 export function ToolArgsBlock({ tc }: { tc: ToolCall }) {
   const [open, setOpen] = useState(false)
+  // Phase 273-05 (L-2, OV-273-04): show_artifact's args ARE the spec (up to 500 rows live, the
+  // rows placeholder on reload) — no parameters block. After the hook, so hook order is fixed.
+  if (ARGS_HIDDEN.paramsBlock.has(tc.name)) return null
   const entries = Object.entries(tc.args).filter(([, v]) => v !== undefined && v !== "")
   if (entries.length === 0) return null
 
@@ -63,8 +66,13 @@ export function ToolResultBlock({ tc, defaultOpen = false }: { tc: ToolCall; def
     // result is not JSON — that's ok for query_documents, web_search, etc.
   }
 
+  // Phase 273-05 (L-3 / L-4, OV-273-04): show_artifact dispatches BEFORE the error arm, so a
+  // refusal (or a future payload that grew an `error` key) can never reach the italic renderer
+  // or GenericBody; ShowArtifactBody reads the people-facing reason only.
+  const isShowArtifact = tc.name === "show_artifact"
+
   // Check for JSON error
-  if (parsed?.error) {
+  if (!isShowArtifact && parsed?.error) {
     return (
       <div className="mt-1.5 ml-8 text-xs text-destructive italic">{parsed.error}</div>
     )
@@ -73,7 +81,9 @@ export function ToolResultBlock({ tc, defaultOpen = false }: { tc: ToolCall; def
   const summary = tc.result ? (summarizeToolCall(tc) || "View results") : null
 
   let content: React.ReactNode = null
-  if (tc.name === "ls" && parsed) {
+  if (isShowArtifact) {
+    content = <TOOL_BODIES.show_artifact parsed={parsed} />
+  } else if (tc.name === "ls" && parsed) {
     content = <TOOL_BODIES.ls parsed={parsed} />
   } else if (tc.name === "tree" && parsed) {
     content = <TOOL_BODIES.tree parsed={parsed} />

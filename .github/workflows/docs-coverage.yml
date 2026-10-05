@@ -1,0 +1,53 @@
+# CI backstop for the public docs coverage gate (Phase 276 / DOCS-02).
+#
+# Every shipped capability — nav item, app view, agent tool, workflow step type, validator, API
+# router, Settings tab, and every row of the coverage inventory — must have a page under
+# docs/public/ that names it in `covers:`. The scan set is derived from code by
+# scripts/lib/docs-content.cjs; the gate exits 2 if a source parses below its floor.
+#
+# The primary guard is the local PostToolUse hook .claude/hooks/docs-coverage-guard.js, which
+# fires in the turn an agent edits one of these files. ~~— once the operator registers it in
+# .claude/settings.json (an approval-gated config edit; the exact entry is in the hook's header).
+# Until then this workflow is the only automatic run;~~ CORRECTED 2026-10-05 (276-REVIEW A-IN-03):
+# the hook IS registered in .claude/settings.json. This workflow is the backstop; it is always the
+# final gate on shared branches.
+
+name: docs-coverage
+
+on:
+  push:
+    branches: [master, main, develop, production, "release/**", "phase-**"]
+    paths:
+      - "docs/public/**"
+      - "scripts/lib/**"
+      - "scripts/check-docs-coverage.cjs"
+      - ".planning/research/docs-coverage-inventory.md"
+      - "backend/app/services/tool_dispatcher.py"
+      - "backend/app/services/harness/**"
+      - "backend/app/main.py"
+      - "frontend/src/lib/nav-items.ts"
+      - "frontend/src/App.tsx"
+      - "frontend/src/pages/SettingsPage.tsx"
+      - ".github/workflows/docs-coverage.yml"
+  pull_request:
+    paths:
+      - "docs/public/**"
+      - "scripts/lib/**"
+      - "scripts/check-docs-coverage.cjs"
+      - ".planning/research/docs-coverage-inventory.md"
+      - "backend/app/services/tool_dispatcher.py"
+      - "backend/app/services/harness/**"
+      - "backend/app/main.py"
+      - "frontend/src/lib/nav-items.ts"
+      - "frontend/src/App.tsx"
+      - "frontend/src/pages/SettingsPage.tsx"
+      - ".github/workflows/docs-coverage.yml"
+
+jobs:
+  check-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check every shipped capability has a docs page
+        run: node scripts/check-docs-coverage.cjs

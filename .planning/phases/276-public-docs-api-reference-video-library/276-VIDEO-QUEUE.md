@@ -1,0 +1,68 @@
+# Phase 276 — video queue (handoff)
+
+Written 2026-10-04 so any session can finish pending video work. Notebook: **"Syrel — Knowledge & Videos"** `78d31d07-3e5a-4f6b-ab95-024b2fbbeef0` (account fhdmrd.automation@gmail.com, NotebookLM Pro).
+
+## NotebookLM — status
+
+| Artifact | Status | Note |
+|---|---|---|
+| Explainer: "Syrel: Workflows You Can Trust" `3d6fbe95-…` | ✅ done (9:16) — ⚠ its prompt said "8-stage gauntlet"; the code has **10** today. Regenerate before public use, or keep it as an internal draft. | downloaded to `~/Downloads/gemini-notebook/Syrel/explainer-workflows-you-can-trust.mp4` |
+| Documentary ep. 1 (cinematic) `9b0b14b0-…` "Syrel Chapter 1: The Friction of Progress" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep1-a-document-chat-you-can-trust.mp4` |
+| Documentary eps. 2–5 (cinematic) | ⛔ first attempt FAILED (all 4, 2026-10-04 06:48 UTC, no media, no quota used) | Re-creating strictly one at a time — see protocol below. |
+| Ep. 2 `6f07613e-f8ad-4602-8109-a377ce73ee40` "Syrel: Anatomy of an Agent (The Architecture of Persistence)" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep2-an-agent-that-keeps-working.mp4` |
+| Ep. 3 `070798c0-c57d-479e-b189-a73df2ad1678` "Syrel Chapter 3: The Human Layer" | ✅ done | downloaded to `~/Downloads/gemini-notebook/Syrel/build-story-ep3-workflows-anyone-can-author.mp4`; poster `posters/build-story-ep3-poster.png` (30%, not hand-picked); BrandedEpisode render OWED |
+| Ep. 4 `94dc500b-89ab-4db6-9c8c-0b150456e458` "Scaling the Boundaries: Orgs, Automations, and the Outside World" | ✅ done (5:22) | downloaded 2026-10-05 06:23 UTC to `~/Downloads/gemini-notebook/Syrel/build-story-ep4-organisations-and-connections.mp4` (+ copy in `video/public/notebooklm/`); poster `posters/build-story-ep4-poster.png` (45% — tables → emails sketch); BrandedEpisode render OWED |
+| Ep. 5 `54b20085-c00a-4572-84e0-2eec97ab4a18` "Syrel: From Prototype to SKU" | ✅ done (5:21) — queued 07:31 UTC, created 07:57 UTC (~30 min, not 3 h) | downloaded 2026-10-05 10:37 UTC to `~/Downloads/gemini-notebook/Syrel/build-story-ep5-a-product-you-can-sell.mp4` (+ copy in `video/public/notebooklm/`); poster `posters/build-story-ep5-poster.png`; BrandedEpisode render OWED. ⚠ **Watch it through before public use:** at ~30% it shows a wall of "EXPERT SOFTWARE" cards with **€75–€149 price tags** — the sources set no per-Expert prices, so this implies a fact we don't claim. ~88% is garbled AI text. |
+
+**All five NotebookLM episodes are done (2026-10-05).** Remaining owed work: BrandedEpisode renders for eps 3–5; a watch-through of ep. 5 (price-tag frame); the explainer's "8-stage gauntlet" error (see first row).
+
+**Leftover failed artifacts:** the four 2026-10-04 06:48 UTC failures (`3e272465`, `9b81ef42`, `a833b0e8`, `fea6288e`) were DELETED 2026-10-05 07:31 UTC, before the ep. 5 create. The notebook now holds only completed artifacts + ep. 5.
+
+**ROOT CAUSE (measured 2026-10-04 08:20 UTC):** one cinematic video consumes ~50% of the **rolling** usage window (ep. 2 alone → 54%). Any cinematic create while the rolling window is ~50%+ used is rate-limited — even with nothing running — and leaves 4 ghosts. **Rule: one documentary per rolling window.** Check `usage_get` → create only when the rolling window is near 0% (it resets every ~5 h). Ghosts from the 08:19 attempt: `e0f44cd0`, `07ab8351`, `f0854e85`, `ec2d7657` (operator previously approved deleting ghosts; delete them before the next create). Next window reset: 2026-10-04 11:24 UTC.
+
+**PROTOCOL (measured 2026-10-04):** this account runs **one cinematic generation at a time**. Creating a second while one is queued/in progress returns "Rate limited (code 8)" AND still leaves ~4 ghost copies that sit `in_progress` for hours then fail (no media, no quota). So: (1) `studio_status` — if any real episode is queued/in_progress, STOP; (2) create the next episode once; (3) on any error, never retry — check `studio_status`. Ep. 1 took ~3 h.
+
+Rate limit facts: ~2% of the weekly quota per video; the short rolling window throttles after ~3 videos ("Rate limited — code 8"). Check `usage_get` first.
+
+## Eps. 2–5 — exact create calls (`studio_create`, artifact_type=video, video_format=cinematic, language=en, confirm=true)
+
+Every call also includes the index source `fa8f1b50-c3c3-4847-9755-8e0e8015b65c`.
+
+- **Ep. 2 — "An agent that keeps working" (v2.5–v2.8)** sources: `f879c366-5eef-46f0-98c4-b78dc59e6c5f`, `47beaf14-738f-4e60-95ac-cd8a74b518fe`, `362efdce-945d-4516-b0cd-c080fd036674`, `3fe8c992-b49b-4585-98aa-c3036288733c`. Focus: answers survive refresh/closed tab; multi-worker server; nine providers with live "show your work"; the agent's workspace (files, to-dos, helper agents, questions to the user); strict workflow mode (ordered, checked, audited). Tease Chapter 3.
+- **Ep. 3 — "Workflows anyone can author" (v2.9–v3.3)** sources: `326ebf05-5cc5-4fa7-b696-0240a7e97fef`, `98df8fd4-2ba8-49be-818c-f17995bf266a`, `93355808-3112-4cc6-ae4e-bdaa9989e3b5`, `1d08ffce-cb04-47bc-a296-831a201abb57`, `78a83b46-9434-4c66-a29f-93c6b44e6292`. Focus: plain-English workflows → cited Word deliverable; publish gauntlet; managed library (metadata, views, links, suggested classification); skill eval studio; Control Room, model registry, encrypted keys, install wizard. Word/PDF are downloaded, not previewed in-app. Tease Chapter 4.
+- **Ep. 4 — "Organisations and connections" (v3.4–v4.2)** sources: `f638a7c8-f0b5-420e-a21f-bfd8c51e9bf4`, `c1c073b8-27c1-4d45-90b2-cdfd8f21f8f5`, `cadd3de3-8305-4b4a-a966-a9b6ef64d7c7`, `f3ae0305-f487-4d50-a904-276a089196f5`, `106241b7-554b-4674-b719-ae5e48fd200f`, `0fc01b12-4ba7-4634-b045-4cc13291e41b`, `bebe812e-7c16-4cb4-8542-d3553f00de9c`, `734796ff-6c4a-48f4-801f-2cb9ae79e829`, `e163129d-f5c7-4b14-ba33-77e14db93609`. Focus: isolated orgs; drag-and-drop canvas; workflows end to end; tables + email, scheduled runs under a spend cap; connections with per-tool Allow/Ask/Deny and an audit receipt per call; watched sources (OFF by default — operator enables); credentials never at rest readable. Tease Chapter 5.
+- **Ep. 5 — "A product you can sell" (v4.3–v4.5)** sources: `a0367ba4-1b38-4f05-832d-759f06d7c02d`, `174cb251-552f-48c0-a6a1-940ca46d1e82`, `e893f230-8e72-47ee-be1e-8a44a653ad85`. Focus: every token priced, tiers enforced; Experts as installable bundles copied into your org; Experts only add; spend per Expert; five starter Experts (Financial Analyzer, Contract Reviewer, HR Policy Advisor, Operations Analyst, Security & Compliance). v4.5 "Find It, Show It" is IN PROGRESS / NOT RELEASED — upcoming only. Close: "answers from your knowledge, with receipts."
+
+Each focus prompt opens: `Documentary episode N of "Syrel: The Build Story" — Chapter N, "<title>" (releases …). The product is Syrel (formerly Agentic RAG). … Only state what the sources mark as shipped; note where later releases changed things.`
+
+## Posters (for the docs page, D-26) — outside the repo
+
+| Episode | Poster (1280×720 PNG) | Frame |
+|---|---|---|
+| 1 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep1-poster.png` | 30% in — the sealed sandbox cube |
+| 2 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep2-poster.png` | 45% in — the 3D wall of agent cards |
+| 3 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep3-poster.png` | 30% in (not hand-picked) |
+| 4 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep4-poster.png` | 45% in — spreadsheets flowing into emails (18% had a clipped label; 30% was a plain diagram) |
+| 5 | `~/Downloads/gemini-notebook/Syrel/posters/build-story-ep5-poster.png` | 55% in — an Expert Bundle copied into an isolated client organisation. Rejected: 18% (near-empty), 30% (unsourced € price tags), 45% (garbled text). `ep5-cand-55.png` kept beside the others |
+
+Candidates kept beside them (`epN-cand-18/30/45.png`). Style note: NotebookLM cinematic renders as **sketchbook / paper illustration**, not Syrel's dark UI — the BrandedEpisode intro/outro carries the brand.
+
+## Branded (Remotion BrandedEpisode) — ready for YouTube upload (operator)
+
+| Episode | File | Length |
+|---|---|---|
+| 1 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep1.mp4` | 5:25 (1080p) |
+| 2 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep2.mp4` | 5:31 (1080p) |
+| 3 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep3.mp4` | 4:12 (1080p) — rendered 2026-10-05 |
+| 4 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep4.mp4` | 5:28 (1080p) — rendered 2026-10-05 |
+| 5 | `~/Downloads/gemini-notebook/Syrel/branded/build-story-ep5.mp4` | 5:27 (1080p) — rendered 2026-10-05; ⚠ operator watch-through of the € price-tag scene (~1:36 raw / ~1:39 branded) before upload |
+
+**Watermark decision (operator, 2026-10-05): A — keep the "Gemini Notebook" watermark; upload as-is.** Eps 3–5 intro/outro checked by stills.
+
+**Docs wiring (owed after upload):** 276 is closed; videos.ts is this lane's. Posters are staged (uncommitted) at `frontend/public/docs-assets/posters/chapter-1..5.jpg`. Once the operator pastes the five YouTube ids: set `youtubeId` + `poster` per `changelog.chapter-N` in `frontend/src/docs/video/videos.ts`, relax BuildStory.test.tsx's all-null case so documentary wording is allowed only for chapters that have an id, run `GSD_VITEST_MAX_WORKERS=2 npx vitest run src/docs` + `node scripts/check-docs-coverage.cjs`, commit by path. Never commit MP4s; never embed the 8-stage explainer (D-25).
+
+Intro card + lower-third + outro checked by stills. The NotebookLM source carries a faint "Gemini Notebook" watermark bottom-right for the whole video. Render needs network (SFX from remotion.media).
+
+## After download
+
+Wrap each in Remotion `BrandedEpisode` (`video/`, see `video/README.md` → Video library) and store raw downloads in `video/public/notebooklm/` (gitignored).

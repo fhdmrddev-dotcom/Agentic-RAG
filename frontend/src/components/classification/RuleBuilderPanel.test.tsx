@@ -118,6 +118,14 @@ describe("RuleBuilderPanel", () => {
     expect(screen.getByText(/7/)).toBeInTheDocument()
   })
 
+  it("Phase 271 (D-08): names a new rule a FILING rule and the scope option 'After extraction'", () => {
+    render(<RuleBuilderPanel folders={folders} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.getByText("New filing rule")).toBeInTheDocument()
+    expect(screen.queryByText(/new classification rule/i)).not.toBeInTheDocument()
+    expect(screen.getByText("After extraction")).toBeInTheDocument()
+    expect(screen.queryByText(/after extraction \(classification\)/i)).not.toBeInTheDocument()
+  })
+
   it("renders the forward-only honesty line", () => {
     render(<RuleBuilderPanel folders={folders} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(

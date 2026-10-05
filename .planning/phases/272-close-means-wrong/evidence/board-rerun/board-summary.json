@@ -1,0 +1,887 @@
+[
+  {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "results": {
+      "a": {
+        "verdict": "PASS",
+        "notes": [
+          "date filter in Oct 2025: True",
+          "range in answer: True",
+          "citations 2 all October: True"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"October revenue\", \"filters\": [{\"op\": \"between\", \"field\": \"date\", \"value\": \"2025-10-01\", \"value2\": \"2025-10-31\"}]})"
+        ],
+        "audit_ids": [
+          "844e08ea-54be-4c9e-b247-6ab7f441b87c"
+        ],
+        "audit_kinds": [
+          "passages"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2025-10-01",
+              "value2": "2025-10-31"
+            }
+          ]
+        ],
+        "cited": {
+          "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+            "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "filename": "272-board-acme-2025-10.md",
+            "d": "2025-10-15",
+            "ent": "Acme GmbH"
+          },
+          "d66d6436-f53f-4c50-b0b0-b2695dd36822": {
+            "id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "filename": "272-board-beta-2025-10.md",
+            "d": "2025-10-20",
+            "ent": "Beta Ltd"
+          }
+        },
+        "answer_excerpt": "There are two entities reporting October 2025 revenue:\n\n- **Acme GmbH**: EUR 1,240,000 [1]\n- **Beta Ltd**: GBP 860,000 [2]\n\nBoth reports note revenue was driven by recurring service contracts and one-off project work, with operating costs in line with budget for the period [1][2]. Let me know if you'd like these combined/converted to a single currency or a breakdown by entity.",
+        "thread_id": "f39386dd-0362-4732-818e-860c5eb02d6c",
+        "run_id": "7326da8c-9694-4f00-b3f1-dda5f3b754dd",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "claude-sonnet-5",
+          "provider": "anthropic",
+          "error": null
+        }
+      },
+      "c": {
+        "verdict": "PASS",
+        "notes": [
+          "filtered call returned no_documents_matched: True",
+          "answer says nothing matched: True",
+          "citations: 0",
+          "later retrieval outside the filter: none"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"revenue\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}, {\"op\": \"between\", \"field\": \"date\", \"value\": \"2026-07-01\", \"value2\")"
+        ],
+        "audit_ids": [
+          "a4ecc3fe-c7b7-4803-adaf-0e913439bd91"
+        ],
+        "audit_kinds": [
+          "no_documents_matched"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2026-07-01",
+              "value2": "2026-07-31"
+            }
+          ]
+        ],
+        "cited": {},
+        "answer_excerpt": "No documents matched **legal entity = Acme GmbH, document date between 1\u201331 Jul 2026** (the most recent completed July before today's date of 2026-10-03). I found no Acme GmbH report for that month.\n\nThe closest available Acme GmbH monthly financial reports in your documents are:\n- **March 2026** (1 document)\n- **October 2025** (1 document)\n- **September 2025** (1 document)\n\nWould you like me to pull revenue from one of these instead, or did you mean July of a different year?",
+        "thread_id": "c9bb2b84-c9f6-4b2c-a87a-0a9dea574ae4",
+        "run_id": "a57201c1-4863-4557-8137-4402a35bc3e6",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "claude-sonnet-5",
+          "provider": "anthropic",
+          "error": null
+        }
+      }
+    }
+  },
+  {
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "results": {
+      "a": {
+        "verdict": "PASS",
+        "notes": [
+          "date filter in Oct 2025: True",
+          "range in answer: True",
+          "citations 2 all October: True"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"October revenue\", \"filters\": [{\"op\": \"between\", \"field\": \"date\", \"value\": \"2025-10-01\", \"value2\": \"2025-10-31\"}]})"
+        ],
+        "audit_ids": [
+          "62e494e2-d76e-4f0a-a3ea-ef3953917348"
+        ],
+        "audit_kinds": [
+          "passages"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2025-10-01",
+              "value2": "2025-10-31"
+            }
+          ]
+        ],
+        "cited": {
+          "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+            "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "filename": "272-board-acme-2025-10.md",
+            "d": "2025-10-15",
+            "ent": "Acme GmbH"
+          },
+          "d66d6436-f53f-4c50-b0b0-b2695dd36822": {
+            "id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "filename": "272-board-beta-2025-10.md",
+            "d": "2025-10-20",
+            "ent": "Beta Ltd"
+          }
+        },
+        "answer_excerpt": "October revenue (I've interpreted this as the most recent completed October \u2014 **October 2025**) is:\n\n- **Acme GmbH** \u2014 **EUR 1,240,000** [1]\n- **Beta Ltd** \u2014 **GBP 860,000** [2]\n\nBoth reports note that revenue was driven by recurring service contracts and one-off project work, with operating costs in line with budget for the period.",
+        "thread_id": "def19e75-03ea-4266-afc3-97d33350e25c",
+        "run_id": "889437d0-f941-41fc-9b2e-414672a4f7d7",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "deepseek-v4-pro",
+          "provider": "deepseek",
+          "error": null
+        }
+      },
+      "c": {
+        "verdict": "PASS",
+        "notes": [
+          "filtered call returned no_documents_matched: True",
+          "answer says nothing matched: True",
+          "citations: 0",
+          "later retrieval outside the filter: none"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"revenue for Acme GmbH\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}, {\"op\": \"between\", \"field\": \"date\", \"value\": \"2026-07)"
+        ],
+        "audit_ids": [
+          "25e9572f-2129-4fca-9f49-5257091d8825"
+        ],
+        "audit_kinds": [
+          "no_documents_matched"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2026-07-01",
+              "value2": "2026-07-31"
+            }
+          ]
+        ],
+        "cited": {},
+        "answer_excerpt": "I couldn't find any revenue data for Acme GmbH dated in July 2026 \u2014 no documents matched the filter I used (legal entity = **Acme GmbH**, document date **1\u201331 July 2026**).\n\nFor context, here are the nearby months that do have documents for Acme GmbH:\n- **March 2026** (1 document)\n- **October 2025** (1 document)\n- **September 2025** (1 document)\n\nWould you like me to pull revenue from one of those months instead \u2014 or did you mean a different July/year?",
+        "thread_id": "393d4f24-3be9-44b3-8455-4f54a479585a",
+        "run_id": "efcac385-55e7-4a72-9dcb-931b681f279d",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "deepseek-v4-pro",
+          "provider": "deepseek",
+          "error": null
+        }
+      }
+    }
+  },
+  {
+    "provider": "google",
+    "model": "gemini-3.5-flash",
+    "results": {
+      "a": {
+        "verdict": "FAIL",
+        "notes": [
+          "date filter in Oct 2025: False",
+          "range in answer: True",
+          "citations 5 all October: False"
+        ],
+        "tool_calls_inspected": [
+          "query_documents({\"query\": \"SELECT id, filename, created_at, metadata FROM documents\"})",
+          "search_documents({\"query\": \"October revenue\"})",
+          "query_documents({\"query\": \"SELECT id, filename, metadata FROM documents WHERE filename LIKE '%board%' OR filename LIKE '%2025-10%'\"})",
+          "query_documents({\"query\": \"SELECT filename, metadata->>'title' AS title, metadata->>'legal_entity' AS legal_entity FROM documents WHERE metadata->>'document_type' = 'monthly fi)"
+        ],
+        "audit_ids": [
+          "ad59c881-e45b-43d9-bc2f-ca911b4343b4"
+        ],
+        "audit_kinds": [
+          "passages"
+        ],
+        "audit_filters": [
+          []
+        ],
+        "cited": {
+          "d66d6436-f53f-4c50-b0b0-b2695dd36822": {
+            "id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "filename": "272-board-beta-2025-10.md",
+            "d": "2025-10-20",
+            "ent": "Beta Ltd"
+          },
+          "1ef08790-c1bb-44c1-b5ad-1e3156c21926": {
+            "id": "1ef08790-c1bb-44c1-b5ad-1e3156c21926",
+            "filename": "northwind-commercials-renewal.md",
+            "d": "2026-10-02",
+            "ent": null
+          },
+          "2346c5c2-944c-4de3-81ed-8fe4ee8778d6": {
+            "id": "2346c5c2-944c-4de3-81ed-8fe4ee8778d6",
+            "filename": "sample.pdf",
+            "d": null,
+            "ent": null
+          },
+          "24831013-90de-43db-b627-b61bfe9026c7": {
+            "id": "24831013-90de-43db-b627-b61bfe9026c7",
+            "filename": "nulfix.txt",
+            "d": null,
+            "ent": null
+          },
+          "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+            "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "filename": "272-board-acme-2025-10.md",
+            "d": "2025-10-15",
+            "ent": "Acme GmbH"
+          }
+        },
+        "answer_excerpt": "Based on the current date of October 3, 2026, the most recently completed October is **October 2025** (October 1, 2025 \u2013 October 31, 2025). \n\nThe financial records for this period show the following revenue details by reporting entity:\n\n* **Acme GmbH**: **EUR 1,240,000** [1]\n  * *Note*: Revenue was driven by a combination of recurring service contracts and one-off project work, and operating costs remained in line with the period's budget [1].\n* **Beta Ltd**: **GBP 860,000** [2]\n  * *Note*: Similar to Acme, revenue was driven by recurring service contracts and one-off project work, with operat",
+        "thread_id": "51aababc-03f5-484a-a91b-f82cffd342c7",
+        "run_id": "d6ab50f9-fd69-4413-ba86-e583c74b1bcf",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "gemini-3.5-flash",
+          "provider": "google",
+          "error": null
+        }
+      },
+      "c": {
+        "verdict": "FAIL",
+        "notes": [
+          "filtered call returned no_documents_matched: False",
+          "answer says nothing matched: False",
+          "citations: 4",
+          "later retrieval outside the filter: none"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"July revenue\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}]})",
+          "query_documents({\"query\": \"SELECT filename, metadata->>'title' AS title, metadata->>'date' AS date FROM documents WHERE metadata->>'legal_entity' = 'Acme GmbH'\"})",
+          "query_documents({\"query\": \"SELECT filename, metadata->>'title' AS title, metadata->>'date' AS date, metadata->>'legal_entity' AS legal_entity FROM documents\"})",
+          "query_documents({\"query\": \"SELECT filename, metadata->>'title' AS title, metadata->>'date' AS date, metadata->>'legal_entity' AS legal_entity FROM documents WHERE filename ILIK)",
+          "query_documents({\"query\": \"SELECT filename, metadata->>'title' AS title, metadata->>'date' AS date, metadata->>'legal_entity' AS legal_entity FROM documents WHERE filename ILIK)",
+          "query_documents({\"query\": \"SELECT filename, metadata->>'title' AS title, metadata->>'date' AS date FROM documents WHERE filename LIKE '272-board-%'\"})",
+          "search_documents({\"query\": \"July revenue Acme\"})",
+          "grep({\"pattern\": \"[Jj]uly\"})",
+          "query_documents({\"query\": \"SELECT d.filename, f.name AS folder, d.folder_id FROM documents d LEFT JOIN folders f ON d.folder_id = f.id WHERE d.filename LIKE '%272%'\"})",
+          "read_document({\"document_id\": \"cce3e713-1f18-498a-87a6-cac8552fdfb1\"})",
+          "query_tables({\"document_name\": \"Pipeline-Awarded Projects- Budget 2026 (clean) (1).xlsx\"})",
+          "grep({\"pattern\": \"[Gg]mbH\"})",
+          "read_document({\"document_id\": \"a15ddea3-fa90-4462-833a-d0edfaddd71a\"})",
+          "grep({\"pattern\": \"EUR\"})"
+        ],
+        "audit_ids": [
+          "21dbdc55-55d8-4cab-a915-fc28392e4f4b",
+          "92f54a2a-8231-4c3d-a90d-8c473b507581"
+        ],
+        "audit_kinds": [
+          "passages",
+          "passages"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            }
+          ],
+          []
+        ],
+        "cited": {
+          "cce3e713-1f18-498a-87a6-cac8552fdfb1": {
+            "id": "cce3e713-1f18-498a-87a6-cac8552fdfb1",
+            "filename": "acme_q3_2026_financial_report.md",
+            "d": "2026-09-30",
+            "ent": null
+          },
+          "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+            "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "filename": "272-board-acme-2025-10.md",
+            "d": "2025-10-15",
+            "ent": "Acme GmbH"
+          },
+          "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657": {
+            "id": "bcdd9e20-790c-4b9e-a849-6f1f1f6c5657",
+            "filename": "272-board-acme-2026-03.md",
+            "d": "2026-03-15",
+            "ent": "Acme GmbH"
+          },
+          "1aaae022-55ab-4f61-b6fa-d2e21f50fd06": {
+            "id": "1aaae022-55ab-4f61-b6fa-d2e21f50fd06",
+            "filename": "272-board-acme-2025-09.md",
+            "d": "2025-09-15",
+            "ent": "Acme GmbH"
+          }
+        },
+        "answer_excerpt": "*The model produced 14 tool call(s) over 15 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+        "thread_id": "a6d04eb5-0abc-400d-bd7e-4cdcec6c0de8",
+        "run_id": "5835720e-6f35-4f95-9f4a-e1ebd5c57ac2",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "gemini-3.5-flash",
+          "provider": "google",
+          "error": null
+        }
+      }
+    }
+  },
+  {
+    "provider": "minimax",
+    "model": "MiniMax-M3",
+    "results": {
+      "a": {
+        "verdict": "FAIL",
+        "notes": [
+          "date filter in Oct 2025: False",
+          "range in answer: True",
+          "citations 5 all October: False"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"October revenue\"})",
+          "query_documents({\"query\": \"SELECT d.filename, d.metadata->>'title' AS title, d.metadata->>'date' AS date, d.metadata->>'document_type' AS document_type FROM documents d WHERE d)"
+        ],
+        "audit_ids": [
+          "8f69c46f-16ab-4e34-bbf8-6e253c0b7c0d"
+        ],
+        "audit_kinds": [
+          "passages"
+        ],
+        "audit_filters": [
+          []
+        ],
+        "cited": {
+          "d66d6436-f53f-4c50-b0b0-b2695dd36822": {
+            "id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "filename": "272-board-beta-2025-10.md",
+            "d": "2025-10-20",
+            "ent": "Beta Ltd"
+          },
+          "1ef08790-c1bb-44c1-b5ad-1e3156c21926": {
+            "id": "1ef08790-c1bb-44c1-b5ad-1e3156c21926",
+            "filename": "northwind-commercials-renewal.md",
+            "d": "2026-10-02",
+            "ent": null
+          },
+          "2346c5c2-944c-4de3-81ed-8fe4ee8778d6": {
+            "id": "2346c5c2-944c-4de3-81ed-8fe4ee8778d6",
+            "filename": "sample.pdf",
+            "d": null,
+            "ent": null
+          },
+          "24831013-90de-43db-b627-b61bfe9026c7": {
+            "id": "24831013-90de-43db-b627-b61bfe9026c7",
+            "filename": "nulfix.txt",
+            "d": null,
+            "ent": null
+          },
+          "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+            "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "filename": "272-board-acme-2025-10.md",
+            "d": "2025-10-15",
+            "ent": "Acme GmbH"
+          }
+        },
+        "answer_excerpt": "\n\nOctober 2025 revenue (the most recent completed October \u2014 October 2026 just started, so no report is available yet):\n\n- **Acme GmbH:** EUR 1,240,000 [1]\n- **Beta Ltd:** GBP 860,000 [2]\n\nBoth reports note that revenue was driven by recurring service contracts and one-off project work, with operating costs in line with budget. Let me know if you'd like a deeper breakdown or a specific entity.",
+        "thread_id": "5087d1fa-785c-4346-946b-1118e73fb7fc",
+        "run_id": "cb275a0c-b284-44c4-9e28-3d056503817f",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "MiniMax-M3",
+          "provider": "minimax",
+          "error": null
+        }
+      },
+      "c": {
+        "verdict": "PASS",
+        "notes": [
+          "filtered call returned no_documents_matched: True",
+          "answer says nothing matched: True",
+          "citations: 0",
+          "later retrieval outside the filter: none"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"revenue Acme GmbH July\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}, {\"op\": \"between\", \"field\": \"date\", \"value\": \"2026-0)",
+          "search_documents({\"query\": \"revenue Acme GmbH\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}, {\"op\": \"between\", \"field\": \"date\", \"value\": \"2025-07-01\")"
+        ],
+        "audit_ids": [
+          "33e17fd7-95e2-4e45-9c9d-d57588c61a66",
+          "7c45dbef-6a83-4c07-8dba-ed7c7a1a4a41"
+        ],
+        "audit_kinds": [
+          "no_documents_matched",
+          "no_documents_matched"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2026-07-01",
+              "value2": "2026-07-31"
+            }
+          ],
+          [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2025-07-01",
+              "value2": "2025-07-31"
+            }
+          ]
+        ],
+        "cited": {},
+        "answer_excerpt": "\n\nI couldn't find revenue data for Acme GmbH in July. I searched for Acme GmbH documents dated within **1\u201331 July 2026** and **1\u201331 July 2025** \u2014 neither range has any matching documents in your library.\n\nThe closest Acme GmbH documents available are for:\n- **March 2026**\n- **October 2025**\n- **September 2025**\n\nWould you like me to pull revenue from one of these months instead? If you're looking for a different July year or a different entity (e.g., Beta Ltd), let me know.",
+        "thread_id": "c181f78f-27af-487d-9dd5-326b1637408c",
+        "run_id": "63051a8b-e237-43ef-b479-997b2bf7418b",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "MiniMax-M3",
+          "provider": "minimax",
+          "error": null
+        }
+      }
+    }
+  },
+  {
+    "provider": "moonshot",
+    "model": "kimi-k2.6",
+    "results": {
+      "a": {
+        "verdict": "PASS",
+        "notes": [
+          "date filter in Oct 2025: True",
+          "range in answer: True",
+          "citations 2 all October: True"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"October revenue\", \"filters\": [{\"op\": \"between\", \"field\": \"date\", \"value\": \"2025-10-01\", \"value2\": \"2025-10-31\"}]})"
+        ],
+        "audit_ids": [
+          "190fb081-07ef-4c7f-96a1-c1f4fe6b9620"
+        ],
+        "audit_kinds": [
+          "passages"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2025-10-01",
+              "value2": "2025-10-31"
+            }
+          ]
+        ],
+        "cited": {
+          "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+            "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "filename": "272-board-acme-2025-10.md",
+            "d": "2025-10-15",
+            "ent": "Acme GmbH"
+          },
+          "d66d6436-f53f-4c50-b0b0-b2695dd36822": {
+            "id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "filename": "272-board-beta-2025-10.md",
+            "d": "2025-10-20",
+            "ent": "Beta Ltd"
+          }
+        },
+        "answer_excerpt": "For **October 2025**, the monthly financial reports show:\n\n- **Acme GmbH**: EUR **1,240,000** [1]\n- **Beta Ltd**: GBP **860,000** [2]\n\nBoth revenue figures were driven by recurring service contracts and one-off project work, with operating costs in line with budget for the period.\n\nIf you were asking about a specific entity, let me know and I can focus on that one.",
+        "thread_id": "0fcc4fd2-f6da-4970-a22e-0b3190a4249d",
+        "run_id": "af964975-4f23-479f-b19c-ebd1f1b23318",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "kimi-k2.6",
+          "provider": "moonshot",
+          "error": null
+        }
+      },
+      "c": {
+        "verdict": "PASS",
+        "notes": [
+          "filtered call returned no_documents_matched: True",
+          "answer says nothing matched: True",
+          "citations: 0",
+          "later retrieval outside the filter: none"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"revenue\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}, {\"op\": \"between\", \"field\": \"date\", \"value\": \"2026-07-01\", \"value2\")"
+        ],
+        "audit_ids": [
+          "b49979e3-3f90-4ca2-bd48-85be93c0fd03"
+        ],
+        "audit_kinds": [
+          "no_documents_matched"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2026-07-01",
+              "value2": "2026-07-31"
+            }
+          ]
+        ],
+        "cited": {},
+        "answer_excerpt": "I couldn't find any documents matching **Acme GmbH** with a document date in **July 2026** (the most recent completed July before today).\n\nThe nearest months that do have documents for Acme GmbH are:\n- **March 2026**\n- **October 2025**\n- **September 2025**\n\nWould you like me to check revenue for one of these months instead, or did you mean a different July?",
+        "thread_id": "fb40e7ad-2958-414e-86fc-d3b41d3921d4",
+        "run_id": "d1ff8796-712b-40cc-9886-3928d396472c",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "kimi-k2.6",
+          "provider": "moonshot",
+          "error": null
+        }
+      }
+    }
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "results": {
+      "a": {
+        "verdict": "PASS",
+        "notes": [
+          "date filter in Oct 2025: True",
+          "range in answer: True",
+          "citations 2 all October: True"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"October revenue total revenue sales revenue amount\", \"filters\": [{\"op\": \"between\", \"field\": \"date\", \"value\": \"2025-10-01\", \"value2\": \"2025-10-31\"}]})"
+        ],
+        "audit_ids": [
+          "f545e4b6-21c8-44d5-98ee-0965d9c9a56a"
+        ],
+        "audit_kinds": [
+          "passages"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2025-10-01",
+              "value2": "2025-10-31"
+            }
+          ]
+        ],
+        "cited": {
+          "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+            "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "filename": "272-board-acme-2025-10.md",
+            "d": "2025-10-15",
+            "ent": "Acme GmbH"
+          },
+          "d66d6436-f53f-4c50-b0b0-b2695dd36822": {
+            "id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "filename": "272-board-beta-2025-10.md",
+            "d": "2025-10-20",
+            "ent": "Beta Ltd"
+          }
+        },
+        "answer_excerpt": "October 2025 revenue was:\n\n- **Acme GmbH:** **EUR 1,240,000** [1]\n- **Beta Ltd:** **GBP 860,000** [2]\n\nThe figures are in different currencies, so they should not be added without an exchange rate.",
+        "thread_id": "0f320d60-10a9-4739-ac13-f023c740ee16",
+        "run_id": "dbee42f8-7207-4cd0-aa12-3a3abbc233c3",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "gpt-5.6-luna",
+          "provider": "openai",
+          "error": null
+        }
+      },
+      "c": {
+        "verdict": "PASS",
+        "notes": [
+          "filtered call returned no_documents_matched: True",
+          "answer says nothing matched: True",
+          "citations: 0",
+          "later retrieval outside the filter: none"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"revenue for Acme GmbH in July 2026\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}, {\"op\": \"between\", \"field\": \"date\", \"val)"
+        ],
+        "audit_ids": [
+          "b187a655-1d7c-4925-b257-1fa287c3e0ce"
+        ],
+        "audit_kinds": [
+          "no_documents_matched"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2026-07-01",
+              "value2": "2026-07-31"
+            }
+          ]
+        ],
+        "cited": {},
+        "answer_excerpt": "No documents matched **Acme GmbH** with a document date in **July 2026**, so I couldn\u2019t determine the revenue. Nearby available periods are **March 2026, October 2025, and September 2025**.",
+        "thread_id": "8e27e9df-d215-45db-8191-08493bf3e010",
+        "run_id": "73dcdf27-2efa-4d33-ac79-7d8055e59973",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "gpt-5.6-luna",
+          "provider": "openai",
+          "error": null
+        }
+      }
+    }
+  },
+  {
+    "provider": "openrouter",
+    "model": "z-ai/glm-5.2",
+    "results": {
+      "a": {
+        "verdict": "PASS",
+        "notes": [
+          "date filter in Oct 2025: True",
+          "range in answer: True",
+          "citations 2 all October: True"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"October revenue\", \"filters\": [{\"op\": \"between\", \"field\": \"date\", \"value\": \"2025-10-01\", \"value2\": \"2025-10-31\"}]})"
+        ],
+        "audit_ids": [
+          "310d7bd4-51b7-4c37-bf17-dcd2e1f43301"
+        ],
+        "audit_kinds": [
+          "passages"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2025-10-01",
+              "value2": "2025-10-31"
+            }
+          ]
+        ],
+        "cited": {
+          "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+            "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "filename": "272-board-acme-2025-10.md",
+            "d": "2025-10-15",
+            "ent": "Acme GmbH"
+          },
+          "d66d6436-f53f-4c50-b0b0-b2695dd36822": {
+            "id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "filename": "272-board-beta-2025-10.md",
+            "d": "2025-10-20",
+            "ent": "Beta Ltd"
+          }
+        },
+        "answer_excerpt": "October 2025 revenue for each entity:\n\n- **Acme GmbH**: EUR 1,240,000 [1]\n- **Beta Ltd**: GBP 860,000 [2]\n\nIn both cases revenue was driven by recurring service contracts and one-off project work, with operating costs in line with budget.",
+        "thread_id": "2a027426-39ec-49e8-86de-e3d06d5990bb",
+        "run_id": "48cad518-493a-48b2-8126-418071fff971",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "z-ai/glm-5.2",
+          "provider": "openrouter",
+          "error": null
+        }
+      },
+      "c": {
+        "verdict": "PASS",
+        "notes": [
+          "filtered call returned no_documents_matched: True",
+          "answer says nothing matched: True",
+          "citations: 0",
+          "later retrieval outside the filter: none"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"revenue for Acme GmbH in July\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}, {\"op\": \"between\", \"field\": \"date\", \"value\": )"
+        ],
+        "audit_ids": [
+          "c457479d-9ef9-480b-88d6-6518c5965a66"
+        ],
+        "audit_kinds": [
+          "no_documents_matched"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2026-07-01",
+              "value2": "2026-07-31"
+            }
+          ]
+        ],
+        "cited": {},
+        "answer_excerpt": "No documents matched my search for **Acme GmbH** with a document date in **July 2026** (1\u201331 July 2026).\n\nThe nearest months that do have Acme GmbH documents are:\n- **March 2026** (1 document)\n- **October 2025** (1 document)\n- **September 2025** (1 document)\n\nWould you like me to check revenue for any of those months instead?",
+        "thread_id": "cdeeb932-d4fd-438d-9073-4734c2d3a232",
+        "run_id": "2dbd5d4c-7845-40b5-81ab-1e4612541dcd",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "z-ai/glm-5.2",
+          "provider": "openrouter",
+          "error": null
+        }
+      }
+    }
+  },
+  {
+    "provider": "zhipu",
+    "model": "glm-5.2",
+    "results": {
+      "a": {
+        "verdict": "PASS",
+        "notes": [
+          "date filter in Oct 2025: True",
+          "range in answer: True",
+          "citations 2 all October: True"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"October revenue\", \"filters\": [{\"op\": \"between\", \"field\": \"date\", \"value\": \"2025-10-01\", \"value2\": \"2025-10-31\"}]})"
+        ],
+        "audit_ids": [
+          "a4dbdf03-239c-43fc-aa88-f36d54da77a1"
+        ],
+        "audit_kinds": [
+          "passages"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2025-10-01",
+              "value2": "2025-10-31"
+            }
+          ]
+        ],
+        "cited": {
+          "7b0af230-1ef4-46e5-b316-11888ce84ffb": {
+            "id": "7b0af230-1ef4-46e5-b316-11888ce84ffb",
+            "filename": "272-board-acme-2025-10.md",
+            "d": "2025-10-15",
+            "ent": "Acme GmbH"
+          },
+          "d66d6436-f53f-4c50-b0b0-b2695dd36822": {
+            "id": "d66d6436-f53f-4c50-b0b0-b2695dd36822",
+            "filename": "272-board-beta-2025-10.md",
+            "d": "2025-10-20",
+            "ent": "Beta Ltd"
+          }
+        },
+        "answer_excerpt": "For **October 2025** (the most recent completed October), two monthly financial reports are on file:\n\n- **Acme GmbH** \u2014 Total revenue: **EUR 1,240,000** [1]\n- **Beta Ltd** \u2014 Total revenue: **GBP 860,000** [2]\n\nBoth entities reported revenue driven by recurring service contracts and one-off project work, with operating costs in line with budget.",
+        "thread_id": "a18f9db8-a1f5-415d-ab65-27e31268bf55",
+        "run_id": "61cd11e4-e8f2-46a1-9614-92ee9fb902a4",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "glm-5.2",
+          "provider": "zhipu",
+          "error": null
+        }
+      },
+      "c": {
+        "verdict": "PASS",
+        "notes": [
+          "filtered call returned no_documents_matched: True",
+          "answer says nothing matched: True",
+          "citations: 0",
+          "later retrieval outside the filter: none"
+        ],
+        "tool_calls_inspected": [
+          "search_documents({\"query\": \"revenue for Acme GmbH in July\", \"filters\": [{\"op\": \"eq\", \"field\": \"legal_entity\", \"value\": \"Acme GmbH\"}, {\"op\": \"between\", \"field\": \"date\", \"value\": )"
+        ],
+        "audit_ids": [
+          "545dd5e1-8884-45d9-8084-bb6e5c1cdcd8"
+        ],
+        "audit_kinds": [
+          "no_documents_matched"
+        ],
+        "audit_filters": [
+          [
+            {
+              "op": "eq",
+              "field": "legal_entity",
+              "value": "Acme GmbH"
+            },
+            {
+              "op": "between",
+              "field": "date",
+              "value": "2026-07-01",
+              "value2": "2026-07-31"
+            }
+          ]
+        ],
+        "cited": {},
+        "answer_excerpt": "I couldn't find any documents for **Acme GmbH** dated in July 2026 (the most recent completed July before today). I searched using the filter: legal entity = Acme GmbH \u00b7 document date 1\u201331 July 2026, and nothing matched.\n\nFor Acme GmbH, documents do exist in these nearby months:\n- **March 2026** (1 document)\n- **October 2025** (1 document)\n- **September 2025** (1 document)\n\nWould you like me to check revenue for Acme GmbH in one of these months instead? Or if you meant a different July, let me know the year.",
+        "thread_id": "a77c94c0-9f12-459a-b2fa-53494b6041a6",
+        "run_id": "91f22d9a-bf10-4a08-997a-c5297d3da4e9",
+        "run_status": "completed",
+        "effective": {
+          "status": "completed",
+          "model": "glm-5.2",
+          "provider": "zhipu",
+          "error": null
+        }
+      }
+    }
+  }
+]

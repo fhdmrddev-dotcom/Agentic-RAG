@@ -1,0 +1,238 @@
+{
+  "about": "Phase 273 CR-01 parity fixture. Every `bad` spec must be REFUSED by BOTH backend validate_args (test_273_review_fixes.py) AND the frontend guard parseArtifactRecord (artifactParity.fence.test.ts); every `good` spec must be ACCEPTED by both. Each spec is written the way the model sends it to show_artifact (no server slots); the frontend test lifts it into a stored ArtifactRecord (slots = series index, stacked defaulted, caption built). A JSON object {\"$repeat\": s, \"times\": n} anywhere inside a case stands for s repeated n times; both loaders expand it identically. The large numbers are raw JSON literals on purpose: JSON.parse turns them into Infinity, Python into an unbounded int / inf.",
+  "bad": [
+    {
+      "name": "scatter with a text x column",
+      "component": "chart",
+      "title": "Deals by region",
+      "columns": [{"name": "region", "type": "string"}, {"name": "deals", "type": "number"}],
+      "rows": [["EMEA", 12], ["APAC", 7]],
+      "chart": {"kind": "scatter", "x": "region", "y": ["deals"]}
+    },
+    {
+      "name": "x column also listed as a y series",
+      "component": "chart",
+      "title": "Revenue vs spend",
+      "columns": [{"name": "r", "type": "number"}, {"name": "s", "type": "number"}],
+      "rows": [[1, 2], [3, 4]],
+      "chart": {"kind": "bar", "x": "r", "y": ["r", "s"]}
+    },
+    {
+      "name": "integer cell beyond the float64 range",
+      "component": "table",
+      "title": "Big number",
+      "columns": [{"name": "k", "type": "string"}, {"name": "v", "type": "number"}],
+      "rows": [["a", 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]]
+    },
+    {
+      "name": "float cell beyond the float64 range",
+      "component": "table",
+      "title": "Overflow",
+      "columns": [{"name": "k", "type": "string"}, {"name": "v", "type": "number"}],
+      "rows": [["a", 1e999]]
+    },
+    {
+      "name": "numeric string that overflows to infinity",
+      "component": "table",
+      "title": "Overflow string",
+      "columns": [{"name": "k", "type": "string"}, {"name": "v", "type": "number"}],
+      "rows": [["a", "10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.5"]]
+    },
+    {
+      "name": "title over 120 UTF-16 units (70 emoji)",
+      "component": "table",
+      "title": {"$repeat": "😀", "times": 70},
+      "columns": [{"name": "k", "type": "string"}],
+      "rows": [["a"]]
+    },
+    {
+      "name": "column name over 64 UTF-16 units (40 emoji)",
+      "component": "table",
+      "title": "Wide name",
+      "columns": [{"name": {"$repeat": "😀", "times": 40}, "type": "string"}],
+      "rows": [["a"]]
+    },
+    {
+      "name": "metric label over 120 UTF-16 units (61 emoji)",
+      "component": "metric",
+      "title": "Revenue",
+      "columns": [{"name": "rev", "type": "number"}],
+      "rows": [[120]],
+      "metric": {"value_column": "rev", "label": {"$repeat": "😀", "times": 61}}
+    },
+    {
+      "name": "pie is not a chart kind",
+      "component": "chart",
+      "title": "Share",
+      "columns": [{"name": "k", "type": "string"}, {"name": "v", "type": "number"}],
+      "rows": [["a", 1]],
+      "chart": {"kind": "pie", "x": "k", "y": ["v"]}
+    },
+    {
+      "name": "a component outside the three",
+      "component": "map",
+      "title": "Sites",
+      "columns": [{"name": "k", "type": "string"}],
+      "rows": [["a"]]
+    },
+    {
+      "name": "five series on a bar chart",
+      "component": "chart",
+      "title": "Regions",
+      "columns": [
+        {"name": "m", "type": "string"},
+        {"name": "a", "type": "number"},
+        {"name": "b", "type": "number"},
+        {"name": "c", "type": "number"},
+        {"name": "d", "type": "number"},
+        {"name": "e", "type": "number"}
+      ],
+      "rows": [["Jan", 1, 2, 3, 4, 5]],
+      "chart": {"kind": "bar", "x": "m", "y": ["a", "b", "c", "d", "e"]}
+    },
+    {
+      "name": "four series on a scatter chart",
+      "component": "chart",
+      "title": "Points",
+      "columns": [
+        {"name": "x", "type": "number"},
+        {"name": "a", "type": "number"},
+        {"name": "b", "type": "number"},
+        {"name": "c", "type": "number"},
+        {"name": "d", "type": "number"}
+      ],
+      "rows": [[1, 1, 2, 3, 4]],
+      "chart": {"kind": "scatter", "x": "x", "y": ["a", "b", "c", "d"]}
+    },
+    {
+      "name": "a text column as a y series",
+      "component": "chart",
+      "title": "Text series",
+      "columns": [{"name": "k", "type": "string"}, {"name": "v", "type": "string"}],
+      "rows": [["a", "b"]],
+      "chart": {"kind": "line", "x": "k", "y": ["v"]}
+    },
+    {
+      "name": "x names a column that does not exist",
+      "component": "chart",
+      "title": "Missing x",
+      "columns": [{"name": "k", "type": "string"}, {"name": "v", "type": "number"}],
+      "rows": [["a", 1]],
+      "chart": {"kind": "line", "x": "quarter", "y": ["v"]}
+    },
+    {
+      "name": "a series listed twice",
+      "component": "chart",
+      "title": "Twice",
+      "columns": [{"name": "k", "type": "string"}, {"name": "v", "type": "number"}],
+      "rows": [["a", 1]],
+      "chart": {"kind": "line", "x": "k", "y": ["v", "v"]}
+    },
+    {
+      "name": "a ragged row",
+      "component": "table",
+      "title": "Ragged",
+      "columns": [{"name": "k", "type": "string"}, {"name": "v", "type": "number"}],
+      "rows": [["a", 1], ["b"]]
+    },
+    {
+      "name": "no rows",
+      "component": "table",
+      "title": "Empty",
+      "columns": [{"name": "k", "type": "string"}],
+      "rows": []
+    },
+    {
+      "name": "no columns",
+      "component": "table",
+      "title": "No columns",
+      "columns": [],
+      "rows": [[]]
+    },
+    {
+      "name": "two columns share a name",
+      "component": "table",
+      "title": "Duplicate",
+      "columns": [{"name": "k", "type": "string"}, {"name": "k", "type": "number"}],
+      "rows": [["a", 1]]
+    },
+    {
+      "name": "text in a number column",
+      "component": "table",
+      "title": "Text number",
+      "columns": [{"name": "v", "type": "number"}],
+      "rows": [["abc"]]
+    },
+    {
+      "name": "boolean in a number column",
+      "component": "table",
+      "title": "Bool number",
+      "columns": [{"name": "v", "type": "number"}],
+      "rows": [[true]]
+    },
+    {
+      "name": "a metric with two rows",
+      "component": "metric",
+      "title": "Revenue",
+      "columns": [{"name": "rev", "type": "number"}],
+      "rows": [[1], [2]],
+      "metric": {"value_column": "rev"}
+    },
+    {
+      "name": "a metric on a text column",
+      "component": "metric",
+      "title": "Region",
+      "columns": [{"name": "region", "type": "string"}],
+      "rows": [["EMEA"]],
+      "metric": {"value_column": "region"}
+    }
+  ],
+  "good": [
+    {
+      "name": "grouped bar chart",
+      "component": "chart",
+      "title": "Revenue by quarter",
+      "columns": [{"name": "quarter", "type": "string"}, {"name": "Americas", "type": "number", "unit": "$K"}, {"name": "EMEA", "type": "number", "unit": "$K"}],
+      "rows": [["Q1", 1240, 860.5], ["Q2", 1315.5, 902], ["Q3", null, 948.25]],
+      "chart": {"kind": "bar", "x": "quarter", "y": ["Americas", "EMEA"]}
+    },
+    {
+      "name": "scatter with a number x",
+      "component": "chart",
+      "title": "Spend vs revenue",
+      "columns": [{"name": "spend", "type": "number"}, {"name": "revenue", "type": "number"}],
+      "rows": [[1, 10], [2, 18.5], [3, -4]],
+      "chart": {"kind": "scatter", "x": "spend", "y": ["revenue"]}
+    },
+    {
+      "name": "stacked area with a negative value",
+      "component": "chart",
+      "title": "Profit and loss",
+      "columns": [{"name": "m", "type": "string"}, {"name": "a", "type": "number"}, {"name": "b", "type": "number"}],
+      "rows": [["Jan", 5, -3], ["Feb", 4, 2]],
+      "chart": {"kind": "area", "x": "m", "y": ["a", "b"]}
+    },
+    {
+      "name": "title of exactly 120 UTF-16 units (60 emoji)",
+      "component": "table",
+      "title": {"$repeat": "😀", "times": 60},
+      "columns": [{"name": "k", "type": "string"}],
+      "rows": [["a"]]
+    },
+    {
+      "name": "table with large but finite numbers",
+      "component": "table",
+      "title": "Large values",
+      "columns": [{"name": "k", "type": "string"}, {"name": "v", "type": "number"}],
+      "rows": [["safe int", 9007199254740991], ["big float", 1.5e300], ["tiny", 0.0045], ["gap", null]]
+    },
+    {
+      "name": "metric with a comparison",
+      "component": "metric",
+      "title": "Q4 revenue",
+      "columns": [{"name": "rev", "type": "number", "unit": "$M"}, {"name": "prev", "type": "number"}],
+      "rows": [[1.66, 1.53]],
+      "metric": {"value_column": "rev", "compare_column": "prev", "label": "Revenue", "compare_label": "vs Q3"}
+    }
+  ]
+}

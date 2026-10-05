@@ -94,12 +94,13 @@ describe("RunCard — CTC-01 tool-card header provider logo", () => {
     expect(avatar.querySelector(".lucide-bot")).not.toBeNull()
   })
 
-  it("Test 3 — animate-brandPulse is present on the avatar while streaming", () => {
+  it("Test 3 — animate-brandPulse is ABSENT while streaming (D-27: one live avatar)", () => {
     const { getByTestId } = renderWithTooltip(
       <RunCard message={makeRunMessage({ provider: "google", runStatus: "streaming" })} />,
     )
     const avatar = getByTestId("run-card-avatar")
-    expect(avatar.className).toContain("animate-brandPulse")
+    // ~~present while streaming~~ — reversed at 276-06: the gutter Iris is the one moving mark.
+    expect(avatar.className).not.toContain("animate-brandPulse")
     // CTC-01 contrast fix: a mapped provider's mark sits on the white chip.
     expect(avatar.className).toContain("bg-white")
   })

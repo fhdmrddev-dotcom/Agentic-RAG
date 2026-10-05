@@ -31,6 +31,27 @@ def _loop_source() -> str:
     return inspect.getsource(agent_loop)
 
 
+_EMIT_SITE = re.compile(r"_emit\(\s*redis,\s*run_id,\s*['\"]turn_boundary['\"]")
+
+
+def _emit_sites(src: str) -> list[int]:
+    return [m.start() for m in _EMIT_SITE.finditer(src)]
+
+
+def _native_site(src: str) -> int:
+    """The tool-round fold — the LAST emit site in the file.
+
+    ⚠ Phase 273 (SC#2, OV-273-04) added a SECOND emit site, earlier in the file: the STRUCTURED
+    parse, where the streamed preamble must fold before `full_content` is cleared (Pitfall 2). These
+    cases used to locate "the" site with `src.index("turn_boundary")`, which silently moved to the
+    new site. They now anchor the native site explicitly, and `TestEverySiteIsGuarded` holds the
+    same two properties at EVERY site — a stronger fence than the single-site one it replaces.
+    """
+    sites = _emit_sites(src)
+    assert sites, "no turn_boundary emit site"
+    return sites[-1]
+
+
 class TestTheBoundaryIsAnnounced:
     def test_a_turn_boundary_event_is_emitted(self):
         """⛔ RED before the fix: the string `turn_boundary` did not exist in this file.
@@ -57,7 +78,7 @@ class TestTheBoundaryIsAnnounced:
         default-inert rule), so a model that never narrates sees byte-identical behaviour.
         """
         src = _loop_source()
-        idx = src.index("turn_boundary")
+        idx = _native_site(src)
         window = src[max(0, idx - 400) : idx]
         assert re.search(r"if\s+full_content\s*:", window), (
             "turn_boundary must be emitted only when full_content is non-empty"
@@ -69,7 +90,7 @@ class TestTheResetIsStillTheThingThatFollows:
 
     def test_full_content_is_still_reset_after_the_boundary(self):
         src = _loop_source()
-        idx = src.index("turn_boundary")
+        idx = _native_site(src)
         after = src[idx : idx + 600]
         assert re.search(r'full_content\s*=\s*""', after), (
             "the accumulator reset must still follow the boundary; without it iteration 2 "
@@ -85,6 +106,32 @@ class TestTheResetIsStillTheThingThatFollows:
         Pinning the order now costs nothing and removes that trap.
         """
         src = _loop_source()
-        emit_at = src.index("turn_boundary")
+        emit_at = _native_site(src)
         reset_at = src.index('full_content = ""', emit_at)
         assert emit_at < reset_at
+
+
+class TestEverySiteIsGuarded:
+    """Phase 273 (SC#2, OV-273-04): the same two properties at EVERY emit site, not just the first."""
+
+    def test_there_are_exactly_two_sites(self):
+        assert len(_emit_sites(_loop_source())) == 2, (
+            "turn_boundary is emitted at the native tool round and at the STRUCTURED parse — a third "
+            "site needs its own reason and its own guard"
+        )
+
+    def test_every_site_is_guarded_on_something_to_fold(self):
+        src = _loop_source()
+        for idx in _emit_sites(src):
+            window = src[max(0, idx - 400) : idx]
+            assert re.search(r"if\s+full_content\s*:|\.released_text\b", window), (
+                f"turn_boundary at offset {idx} is not guarded on there being streamed text to fold"
+            )
+
+    def test_every_site_precedes_a_full_content_reset(self):
+        src = _loop_source()
+        for idx in _emit_sites(src):
+            reset_at = src.find('full_content = ""', idx)
+            assert reset_at != -1 and reset_at - idx < 2000, (
+                f"turn_boundary at offset {idx} is not followed by the accumulator reset"
+            )

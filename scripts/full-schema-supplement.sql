@@ -508,6 +508,15 @@ REVOKE ALL ON TABLE public.expert_installs FROM authenticated;
 GRANT SELECT ON TABLE public.expert_installs TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_installs TO service_role;
 
+-- migration 202 — message_artifacts: owners READ (the messages predicate); only the backend writes.
+-- No UPDATE to ANY role, service_role included (D-08: an artifact is immutable once shown).
+REVOKE ALL ON TABLE public.message_artifacts FROM PUBLIC;
+REVOKE ALL ON TABLE public.message_artifacts FROM anon;
+REVOKE ALL ON TABLE public.message_artifacts FROM authenticated;
+REVOKE ALL ON TABLE public.message_artifacts FROM service_role;
+GRANT SELECT ON TABLE public.message_artifacts TO authenticated;
+GRANT SELECT, INSERT, DELETE ON TABLE public.message_artifacts TO service_role;
+
 
 -- ============================================================
 -- 6. Function EXECUTE privileges (migration 181 / Phase 248, CRED-03)
@@ -633,15 +642,19 @@ GRANT EXECUTE ON FUNCTION public.folder_is_org_shared(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.folder_is_org_shared(uuid) TO service_role;
 
 -- App search RPCs
-REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) FROM anon;
-GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) TO service_role;
+-- Phase 272 (migration 200): both signatures gained trailing params (p_document_ids; the vector
+-- RPC also p_exact_max_chunks) and the OLD ones were DROPPED, so the ACLs below name the NEW
+-- signatures. Mirrored from migration 200 verbatim -- an old signature here would ERROR on a
+-- greenfield database, where the dump no longer contains that function.
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) TO service_role;
 
-REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) FROM anon;
-GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) FROM anon;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) TO service_role;
 
 REVOKE EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) FROM anon;
@@ -688,3 +701,9 @@ GRANT EXECUTE ON FUNCTION public.resize_embedding_column(integer) TO service_rol
 
 -- migration 012 — schema-qualified here; the migration relies on search_path.
 GRANT EXECUTE ON FUNCTION public.query_user_documents(text) TO authenticated;
+
+-- migration 202 — message_artifacts' immutability trigger function (Group A shape: trigger-only).
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.message_artifacts_immutable() TO service_role;

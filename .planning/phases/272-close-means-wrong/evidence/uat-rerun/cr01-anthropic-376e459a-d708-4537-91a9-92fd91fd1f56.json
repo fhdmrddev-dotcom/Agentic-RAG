@@ -1,0 +1,81 @@
+{
+  "label": "cr01",
+  "prompt": "Which documents are tagged tax? Use the topics filter.",
+  "model": "claude-sonnet-5",
+  "provider": "anthropic",
+  "thread_id": "4a30be31-4bd2-483c-9800-1d0b246612d9",
+  "run_id": "376e459a-d708-4537-91a9-92fd91fd1f56",
+  "run_status": "completed",
+  "run": {
+    "status": "completed",
+    "model": "claude-sonnet-5",
+    "provider": "anthropic",
+    "error": null
+  },
+  "search_query_audits": [],
+  "tool_calls": [
+    {
+      "name": "query_documents_by_view",
+      "args": {
+        "filter": {
+          "op": "and",
+          "conditions": [
+            {
+              "op": "eq",
+              "field": "topics",
+              "value": "tax"
+            }
+          ]
+        }
+      },
+      "result_head": "{\"mode\": \"results\", \"total\": 0, \"shown\": 0, \"truncated\": false, \"note\": \"0 match.\", \"documents\": [], \"source_refs\": []}"
+    }
+  ],
+  "answer": "No documents are tagged with the topic **\"tax\"** in your knowledge base.",
+  "raw": {
+    "audits": [],
+    "messages": [
+      {
+        "id": "2bd158c9-30d9-4483-8f4a-7881c95c45c8",
+        "role": "user",
+        "content": "Which documents are tagged tax? Use the topics filter.",
+        "tool_calls": null,
+        "source_refs": null,
+        "at": "2026-10-03 13:03:42.550141+00"
+      },
+      {
+        "id": "370e8f20-4fcf-421f-a9d2-4a1875f09a15",
+        "role": "assistant",
+        "content": "No documents are tagged with the topic **\"tax\"** in your knowledge base.",
+        "tool_calls": [
+          {
+            "args": {
+              "filter": {
+                "op": "and",
+                "conditions": [
+                  {
+                    "op": "eq",
+                    "field": "topics",
+                    "value": "tax"
+                  }
+                ]
+              }
+            },
+            "name": "query_documents_by_view",
+            "result": "{\"mode\": \"results\", \"total\": 0, \"shown\": 0, \"truncated\": false, \"note\": \"0 match.\", \"documents\": [], \"source_refs\": []}",
+            "status": "done",
+            "tool_call_id": "toolu_01N7eDzwSfqV2kzXnLvAwrgL"
+          }
+        ],
+        "source_refs": null,
+        "at": "2026-10-03 13:03:47.180709+00"
+      }
+    ],
+    "run": {
+      "status": "completed",
+      "model": "claude-sonnet-5",
+      "provider": "anthropic",
+      "error": null
+    }
+  }
+}
