@@ -1,7 +1,9 @@
 ---
 seed_id: SEED-247
 title: A file attached in chat should belong to the THREAD, not the Library — the data model cannot express "temporary" at all
-status: planted
+status: folded
+status_note: "Folded into Phase 274 at discuss (2026-10-05). Q4 (promote-to-Library) = ATT-03, decided in 274-CONTEXT.md D-09..D-14 (copy via the shipped minter, MoveToFolderDialog, link-on-same-bytes, version-on-same-name). Q1-Q3/Q5/Q6 stay as routed at Phase 244; Q2 chunking re-affirmed OUT (274 D-01)."
+folded_into: 274
 planted: 2026-09-05
 planted_by: Operator, 2026-09-05 at Phase 229 close — "anything in the chat should stay temporarily in that thread, not in the library itself … it should be ingested or scoped to that thread, not in the library"
 surface: Agentic-RAG
