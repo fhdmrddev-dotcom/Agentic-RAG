@@ -3659,7 +3659,7 @@ const BASELINE = {
   "ChatAreaBanner.test.tsx": 9,
   "ChatAreaMode.test.tsx": 5,
   "RunCard.characterization.test.tsx": 8,
-  "MessageItem.test.tsx": 24,
+  "MessageItem.test.tsx": 26, // RAISED 24 → 26 at 276-06 (+Test 8 pre-token thinking, +Test 9 cap-pause on the last row)
   "MessageItem.clamp.test.tsx": 5,
   "MessageItem.fallbackNotice.test.tsx": 3,
   "MessageItem.memo.test.tsx": 3,

@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react"
-import { Bot, ChevronDown, Loader2 } from "lucide-react"
+import { Bot, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { providerLogo } from "@/lib/providerLogo"
 import type { Message, ToolCall } from "@/types"
@@ -50,7 +50,9 @@ interface RunCardProps {
  *   BOTTOM stickyLabelRef indicator at MessageItem.tsx:105-120 verbatim.
  *   Two independent sticky surfaces at opposite ends of the message.
  * Per CONTEXT D-07 + SPEC out-of-scope #6: NO new keyframes — reuse
- *   animate-brandPulse, animate-fadeSlideUp, tool-progress-bar, animate-pulseGlow.
+ *   ~~the brand-pulse class~~, animate-fadeSlideUp, tool-progress-bar, animate-pulseGlow.
+ *   (The brand pulse is no longer used here — 276-06, D-27: one live avatar per turn;
+ *   the gutter Iris moves and this card's provider logo is static.)
  * Per RESEARCH §6: message.content (final assistant answer) renders OUTSIDE
  *   RunCard in MessageItem so the deferred Anthropic terminal-frame bug
  *   (BUG-260514-02) remains re-litigable.
@@ -322,12 +324,15 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           !isStreamingNow && "cursor-pointer hover:bg-popover/98 transition-colors",
         )}
       >
-        {/* Brand-pulse avatar — mirrors MessageItem.tsx:137 predicate verbatim.
-            Phase 128 Plan 04 (CTC-01): the inner glyph is now the per-provider
-            @lobehub mark (HeaderMark) at ~18px inside the 32px (w-8 h-8) backing,
-            or the Bot fallback when providerLogo() returns null. The
-            gradient-primary backing + the isStreamingNow animate-brandPulse ring
-            are UNCHANGED (D-01: the pulse stays while streaming in every case). */}
+        {/* Provider avatar. Phase 128 Plan 04 (CTC-01): the inner glyph is the
+            per-provider @lobehub mark (HeaderMark) at ~18px inside the 32px
+            (w-8 h-8) backing, or the Bot fallback when providerLogo() returns null.
+            ~~the isStreamingNow brand-pulse ring … D-01: the pulse stays while
+            streaming in every case~~ — reversed at 276-06 (D-27): one live avatar
+            per turn; the gutter Iris moves, the provider logo is static; the
+            sticky header keeps liveness through the anchored timer and the
+            shimmer bar. ⛔ Bot stays the unknown-provider fallback: an Iris here
+            would read as "Syrel" where it means "unknown model". */}
         <div
           data-testid="run-card-avatar"
           className={cn(
@@ -341,7 +346,6 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
             HeaderMark
               ? "bg-white text-zinc-900 ring-1 ring-black/10"
               : "gradient-primary text-white shadow-primary/20",
-            isStreamingNow && "animate-brandPulse",
           )}
         >
           {HeaderMark ? (
@@ -425,10 +429,8 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           </span>
         )}
 
-        {/* Loader spinner during streaming */}
-        {isStreamingNow && (
-          <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
-        )}
+        {/* ~~Loader spinner during streaming~~ — removed at 276-06 (D-27, sketch
+            decision 5): the timer and the shimmer bar below carry the liveness. */}
       </header>
 
       {/* Progress shimmer band — existing class from index.css:246-265.

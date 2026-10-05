@@ -10787,7 +10787,7 @@ cells rot within days.
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
-| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 78 / 36 / 1030 (was `77 / 35 / 1027`) | ⚠ **FIRES** | **273-05**: ONE ArtifactBlock mount (D-16), after the answer, before the run status. Hooks unchanged |
+| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 79 / 37 / 1029 (was `78 / 36 / 1030`) | ⚠ **FIRES** | **276-06**: the Iris avatar = ONE element swap + one plain expression, no hook; pre-token spinner+dots gone; `hasPendingAsk` moved to irisState.ts |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 264 / 89 / 2456 (was `261 / 88 / 2434`) | ⚠ **FIRES** | **273-04**: ONE `attach_artifacts` call on GET /messages and ONE on /snapshot. ⛔ 0 new send-path branches |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 106 / 40 / 4982 (was `104 / 38 / 4948`) | ⚠ **FIRES** | **273-05**: ONE onArtifact handler (D-16) — append or replace-by-id, text untouched. ⛔ `onTurnBoundary` still FLUSHES before moving |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
@@ -10825,8 +10825,8 @@ cells rot within days.
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 9 / 5 / 756 (was `8 / 4 / 748`) | **FIRES** | ⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id`/`expert_id` (+8 lines). ⛔ NOT the shape to copy (C-5) |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 41 / 19 / 1750 | **FIRES** | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 60 / 23 / 3297 | **FIRES** | ⚠ STALE (`58/21/3290`). **268-REVIEW WR-06**: the resume shell carries its run's org — the org read MOVED above the INSERT, one kwarg |
-| [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
-| [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 2 / 1 / 56 | no (1 phase) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse go (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
+| [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
+| [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
 | [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |
 | [`frontend/src/components/chat/IrisAvatar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisavatartsx) | 1 / 1 / 310 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. Sketch 276 variant D (D-27). ⛔ orbit period = 3 × wave period, sweep 360°; gradient ids from useId, sanitised; aria-hidden |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 6 / 2 / 320 | no (2 phases) | ⚠ row STALE (`4/1/283`; CLAUDE.md read `4/1/313`). NOT modified by 253 — re-derived under CR-08. Still ONE reasoning renderer; no duration derived from length |
@@ -14451,9 +14451,13 @@ against the unfixed guard.
 not rendering" by naming *that thing's only input* silently rots the day a second input is added.
 Both renderers now read both inputs; nothing executable binds them, which is the residual risk.
 
+### `frontend/src/components/chat/RunCard.tsx` — Phase 276
+
+**`31 / 16 / 729`** at 276-06 (was `29 / 14 / 723` at BUG-260912-01). G-5: ⚠ **FIRES**, honoured by construction: two deletions (the avatar's streaming pulse class and the header spinner) plus comment corrections; `useState` and props unchanged. D-27: one live avatar per turn, so the gutter Iris moves and this card's provider logo is static; the header keeps liveness through the anchored timer and the shimmer bar. ⛔ `Bot` stays the unknown-provider fallback (an Iris here would read as "Syrel" where it means "unknown model").
+
 ### `frontend/src/components/chat/WorkingBadge.tsx`
 
-**`2 / 1 / 56`** at 276 planning. Absent from the scan list for its whole life; the row was added at 276-06 planning because 276-06 modifies it. 276-06 removes the `✦` glyph and the `animate-brandPulse` class (sketch 276-iris-avatar decision 5: its planning-gap window is exactly the avatar's *thinking* state). The word "Working" stays: activity words are kept. 276-06 re-derives the triple at close.
+**`3 / 2 / 50`** at 276-06 (was **`2 / 1 / 56`** at 276 planning). Absent from the scan list for its whole life; the row was added at 276-06 planning because 276-06 modifies it. 276-06 removes the `✦` glyph and the `animate-brandPulse` class (sketch 276-iris-avatar decision 5: its planning-gap window is exactly the avatar's *thinking* state). The word "Working" stays: activity words are kept. Done at 276-06: the wrapper, `aria-hidden` logic, label and the `(visible, label)` memo equality are unchanged; the docblock's reuse claim is struck through beside its reason.
 
 ### `frontend/src/components/chat/irisState.ts`
 
@@ -18128,6 +18132,10 @@ Every triple below was re-derived with the CLAUDE.md recipe AFTER the phase's la
 ### `frontend/src/components/chat/MessageItem.tsx` — Phase 273 close
 
 **`78 / 36 / 1030`** at 273 close (was `77 / 35 / 1027`). G-5: ⚠ **FIRES**. **273-05**: ONE ArtifactBlock mount (D-16), after the answer, before the run status. Hooks unchanged.
+
+### `frontend/src/components/chat/MessageItem.tsx` — Phase 276
+
+**`79 / 37 / 1029`** at 276-06 (was `78 / 36 / 1030`). G-5: ⚠ **FIRES**, honoured by construction: one import pair, one element swap (`<IrisAvatar>` inside the unchanged `assistant-bot-icon` test id) and one plain expression `irisStateFor(message, isLastAssistant ? workflowLock?.capPaused : false)`; hook call sites 6 → 6, no new store read. `hasPendingAsk` moved to `irisState.ts` (one home). The pre-first-token spinner and three dots are gone; the activity words stay (Phase 174 STATE-03).
 
 ### `frontend/src/components/chat/StepRow.tsx` — Phase 273 close
 
