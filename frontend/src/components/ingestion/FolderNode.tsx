@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   ChevronRight,
   Folder as FolderIcon,
@@ -90,6 +90,9 @@ export function FolderNode({
   const isDeleting = deletingId === node.id
   // Phase 275 (S10 / D-15): the server's hold refusal for this folder's delete, if any.
   const [refusal, setRefusal] = useState<ApiRefusal | null>(null)
+  // 275-REVIEW IN-04: the confirm stays open while the request runs — never a second DELETE.
+  const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
   // A refusal belongs to ONE confirm: when the confirm closes (Close, or another folder's delete
   // starting), it is cleared, so a later confirm never opens on a stale sentence.
   useEffect(() => {
@@ -97,10 +100,16 @@ export function FolderNode({
   }, [isDeleting])
 
   async function confirmDelete() {
+    if (busyRef.current) return
+    busyRef.current = true
+    setBusy(true)
     try {
       await onConfirmDelete(node.id)
     } catch (err) {
       if (err instanceof ApiRefusal && err.status === 409) setRefusal(err)
+    } finally {
+      busyRef.current = false
+      setBusy(false)
     }
   }
   const hasChildren = node.children.length > 0
@@ -243,6 +252,7 @@ export function FolderNode({
               variant="destructive"
               size="sm"
               className="h-6 text-xs px-2.5"
+              disabled={busy}
               onClick={() => void confirmDelete()}
             >
               Delete
@@ -251,6 +261,7 @@ export function FolderNode({
               variant="ghost"
               size="sm"
               className="h-6 text-xs px-2.5"
+              disabled={busy}
               onClick={onCancelDelete}
             >
               Cancel

@@ -210,6 +210,23 @@ describe("DocumentList — the delete dialog shows the refusal", () => {
   })
 })
 
+describe("275-REVIEW IN-03 — the refusal never sits under a stale error or an 'undone' warning", () => {
+  it("a retry that is refused clears the earlier 'Delete failed.' and drops 'cannot be undone'", async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response("boom", { status: 500 }))
+      .mockResolvedValueOnce(holdResponse(MEMBER_DOC))
+    renderList((id, scope) => deleteDocument(id, scope))
+    fireEvent.click(screen.getByRole("button", { name: "Delete document" }))
+    const dialog = await screen.findByRole("dialog")
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }))
+    await waitFor(() => expect(dialog).toHaveTextContent("Delete failed. Please try again."))
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }))
+    await within(dialog).findByRole("alert")
+    expect(dialog).not.toHaveTextContent("Delete failed. Please try again.")
+    expect(dialog).not.toHaveTextContent("This action cannot be undone.")
+  })
+})
+
 // ── the folder inline confirm ────────────────────────────────────────────────────────────
 
 function makeNode(): FolderNodeType {
@@ -271,6 +288,23 @@ describe("FolderNode — the inline confirm shows the refusal", () => {
     fireEvent.click(within(notice).getByRole("button", { name: "Close" }))
     expect(onCancelDelete).toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull())
+  })
+})
+
+describe("275-REVIEW IN-04 — the folder confirm cannot send two DELETEs", () => {
+  it("while the delete is in flight both buttons are disabled and a second click sends nothing", async () => {
+    const onConfirmDelete = vi.fn(() => new Promise<void>(() => {}))
+    render(
+      <TooltipProvider>
+        <FolderNode node={makeNode()} {...nodeProps} deletingId="f1" onConfirmDelete={onConfirmDelete} onCancelDelete={vi.fn()} />
+      </TooltipProvider>,
+    )
+    const del = screen.getByRole("button", { name: "Delete" })
+    fireEvent.click(del)
+    fireEvent.click(del)
+    expect(onConfirmDelete).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled())
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled()
   })
 })
 

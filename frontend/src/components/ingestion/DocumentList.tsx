@@ -125,6 +125,8 @@ export function DocumentList({
   const requestDelete = (doc: Document) => {
     const state = retention?.documents[doc.id]
     setDeleteTarget(doc)
+    setDeleteError(null) // 275-REVIEW IN-03: a new dialog never opens on the last one's error
+    setRefusal(null)
     if (state?.held) {
       const r = holdRefusalFor(state.hold_names, retention?.canManage ?? false)
       setRefusal(new ApiRefusal(409, r.title, r.message))
@@ -149,6 +151,7 @@ export function DocumentList({
       setDeleteError(null)
     } catch (err) {
       if (err instanceof ApiRefusal && err.status === 409) {
+        setDeleteError(null)
         setRefusal(err)
       } else {
         setDeleteError(RETENTION_COPY.contract.deleteFailed)
@@ -254,7 +257,10 @@ export function DocumentList({
           <DialogHeader>
             <DialogTitle>Delete document?</DialogTitle>
             <DialogDescription>
-              {deleteTarget && hasVersions(deleteTarget) ? (
+              {refusal ? (
+                // 275-REVIEW IN-03: refusal mode deletes nothing — no "cannot be undone" warning.
+                <span className="font-medium text-foreground">{deleteTarget?.filename}</span>
+              ) : deleteTarget && hasVersions(deleteTarget) ? (
                 <>
                   This document has {deleteTarget.version_number} versions.{" "}
                   <span className="font-medium text-foreground">
@@ -283,6 +289,7 @@ export function DocumentList({
               onClose={() => {
                 setDeleteTarget(null)
                 setRefusal(null)
+                setDeleteError(null)
                 setActiveScope(null)
               }}
             />
