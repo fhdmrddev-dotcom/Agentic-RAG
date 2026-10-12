@@ -50,6 +50,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Sequence
 
 from app.dependencies import get_user_pg_connection
+from app.services.document_vocabulary import LIST_FIELD_NAMES, TIMESTAMP_DATE_COLUMNS
 from app.utils.folder_utils import _resolve_caller_org_ids
 
 if TYPE_CHECKING:
@@ -136,14 +137,10 @@ class ScopeResult:
 
 # Find's three timestamptz dates resolve through ``FindDate`` (Pitfall 14: BEFORE the compiler, so
 # a custom key spelled ``added`` can never shadow them). ``date`` — the document's own date — is NOT
-# here: it is the compiler's ``date_typed`` field (D-05). Mirrors document_search_service._DATE_COLUMN.
-_DATE_WORDS = ("added", "source_created", "source_modified")
-_DATE_FIELD_COLUMN = {
-    "added": "created_at",
-    "source_created": "source_created_at",
-    "source_modified": "source_modified_at",
-    "date": "date_typed",
-}
+# here: it is the compiler's ``date_typed`` field (D-05). The word → column map lives in ONE home,
+# ``document_vocabulary.TIMESTAMP_DATE_COLUMNS`` (DEBT-09); ``date`` is this module's named extension.
+_DATE_WORDS = tuple(TIMESTAMP_DATE_COLUMNS)
+_DATE_FIELD_COLUMN = {**TIMESTAMP_DATE_COLUMNS, "date": "date_typed"}
 # The D-11 month read, one CONSTANT statement per column (the column name is a closed choice, so it
 # lives in the SQL text rather than being spliced in).
 _MONTH_SQL = {
@@ -179,7 +176,9 @@ _ISO_DATE_OPS = ("eq", "gte", "lte", "before", "after", "between")
 # the compiler as a case-insensitive match on the JSON-quoted ELEMENT (`%"tax"%` matches `"Tax"`
 # inside the array text and never `"taxation"`); `contains` / `is_empty` already work on the text;
 # every other op is refused. ⛔ Tests pin this tuple to the list-typed DocumentMetadata fields.
-LIST_FIELDS: tuple[str, ...] = ("topics",)
+# DEBT-09 (278): the value now lives in ``document_vocabulary.LIST_FIELD_NAMES``; the name stays
+# because ``search_documents_tool`` imports it.
+LIST_FIELDS: tuple[str, ...] = LIST_FIELD_NAMES
 LIST_FIELD_OPS: tuple[str, ...] = ("eq", "contains", "is_empty")
 
 
