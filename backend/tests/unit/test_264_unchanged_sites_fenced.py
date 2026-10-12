@@ -43,6 +43,8 @@ from uuid import uuid4
 import pytest
 
 import app.services.tool_dispatcher as td
+from app.services.tools import sandbox as td_sandbox
+from app.services.tools import skills as td_skills
 from app.services.tool_dispatcher import ToolContext
 from app.utils.skill_visibility import build_skill_visibility_or
 
@@ -63,7 +65,7 @@ _APP = Path(inspect.getsourcefile(td)).parents[1]  # backend/app
 # Phase 278 (D-07 / D-08): the handler sources the is_enabled fence reads, as a TUPLE. After the
 # dispatcher split `_handle_read_skill_file` lives in tools/skills.py and `_handle_execute_code` in
 # tools/sandbox.py — the move edits THIS line, never the fence.
-_HANDLER_SRC_FILES = (Path(inspect.getsourcefile(td)),)
+_HANDLER_SRC_FILES = (Path(inspect.getsourcefile(td_skills)), Path(inspect.getsourcefile(td_sandbox)))
 _GROUNDING = _APP / "services" / "harness" / "grounding.py"
 _PHASE_TYPES = _APP / "services" / "harness" / "phase_types.py"
 
@@ -334,10 +336,10 @@ class _FakeSession:
 async def _drive_injection(monkeypatch, sb, *, bundle) -> str:
     session = _FakeSession()
     monkeypatch.setattr(
-        td, "sandbox_manager", SimpleNamespace(get_or_create=lambda _tid: session)
+        td_sandbox, "sandbox_manager", SimpleNamespace(get_or_create=lambda _tid: session)
     )
-    monkeypatch.setattr(td, "snapshot_output_baseline", lambda _s: {})
-    monkeypatch.setattr(td, "_hydrate_thread_attachments", AsyncMock(return_value=[]))
+    monkeypatch.setattr(td_sandbox, "snapshot_output_baseline", lambda _s: {})
+    monkeypatch.setattr(td_sandbox, "_hydrate_thread_attachments", AsyncMock(return_value=[]))
 
     ctx = _make_ctx(sb, caller=_COLLEAGUE, bundle=bundle)
     await td._handle_execute_code(

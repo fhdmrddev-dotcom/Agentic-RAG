@@ -127,7 +127,7 @@ def test_written_metadata_is_a_dict_not_a_string_scalar():
     reads back as JSON text instead of an object. supabase-py + a dict type signature
     makes it structurally unlikely here, but assert rather than assume.
     """
-    from app.services.tool_dispatcher import write_audit_entry
+    from app.services.audit_service import write_audit_entry
 
     import inspect
     sig = inspect.signature(write_audit_entry)

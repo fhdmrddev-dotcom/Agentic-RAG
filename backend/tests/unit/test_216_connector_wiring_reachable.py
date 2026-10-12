@@ -28,7 +28,7 @@ AGENT_LOOP = Path(__file__).resolve().parents[2] / "app" / "services" / "agent_l
 WIRING_CALL = "build_chat_tools_for_connectors"
 # Phase 278 (D-07 / D-08): the file holding the connector chat tool's list_connections call,
 # hoisted so the dispatcher split edits THIS line and never an assert.
-_CONNECTOR_TOOL_FILE = AGENT_LOOP.parent / "tool_dispatcher.py"
+_CONNECTOR_TOOL_FILE = AGENT_LOOP.parent / "tools" / "connector.py"
 
 
 def _parents(tree: ast.AST) -> dict[ast.AST, ast.AST]:

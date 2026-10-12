@@ -133,7 +133,7 @@ def test_the_approval_event_names_the_CONNECTION_not_only_the_service():
     from pathlib import Path
 
     src = (
-        Path(__file__).resolve().parents[2] / "app" / "services" / "tool_dispatcher.py"
+        Path(__file__).resolve().parents[2] / "app" / "services" / "tools" / "connector.py"
     ).read_text(encoding="utf-8")
     emit = src[src.index('"tool_approval_required"'):]
     emit = emit[: emit.index(")")]

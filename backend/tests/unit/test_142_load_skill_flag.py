@@ -32,7 +32,7 @@ from uuid import uuid4
 
 import pytest
 
-import app.services.tool_dispatcher as td
+import app.services.tools.skills as td
 from app.services.tool_dispatcher import SCRIPT_EXTS, ToolContext, _handle_load_skill
 
 SKILL_NAME = "deck-builder"

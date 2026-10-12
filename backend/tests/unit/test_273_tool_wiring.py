@@ -80,7 +80,7 @@ def test_not_offered_to_the_explorer():
 
 
 def test_excluded_from_sub_agents():
-    from app.services.tool_dispatcher import _SUB_AGENT_EXCLUDED
+    from app.services.tools.agent_control import _SUB_AGENT_EXCLUDED
 
     assert "show_artifact" in _SUB_AGENT_EXCLUDED
 

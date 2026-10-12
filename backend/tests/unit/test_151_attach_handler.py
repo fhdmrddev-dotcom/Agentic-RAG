@@ -94,9 +94,9 @@ async def test_source_workspace_uploads_and_creates(make_tool_context):
     sb = _sb(_OWNED, existing_file_row=None)
     ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
     file_row = {"mime_type": "text/x-python", "content_inline": b"print('hi')"}
-    with patch("app.services.tool_dispatcher.get_file_by_path",
+    with patch("app.services.tools.skills.get_file_by_path",
                AsyncMock(return_value=file_row)), \
-         patch("app.services.tool_dispatcher._get_file_content",
+         patch("app.services.tools.skills._get_file_content",
                AsyncMock(return_value=b"print('hi')")):
         result = await handler({
             "target_skill_name": "My Skill", "filename": "helper.py",
@@ -126,7 +126,7 @@ async def test_source_sandbox_output_harvests_and_creates(make_tool_context):
         with open(os.path.join(dest_dir, "chart.png"), "wb") as f:
             f.write(b"PNG-OUTPUT-BYTES")
 
-    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+    with patch("app.services.tools.skills.sandbox_manager") as sm:
         session = sm.get_or_create.return_value
         session.copy_from_runtime.side_effect = _copy
         result = await handler({
@@ -145,7 +145,7 @@ async def test_source_sandbox_output_oversized_refused(make_tool_context, monkey
     """WR-02 — a huge sandbox artifact is refused BEFORE the Storage upload. The
     least-trustworthy source must be capped like inline/kb (no unbounded write)."""
     handler = _handler()
-    from app.services import tool_dispatcher as td
+    from app.services.tools import skills as td
     monkeypatch.setattr(td, "_ATTACH_INLINE_MAX_BYTES", 8)  # tiny cap for the test
     sb = _sb(_OWNED, existing_file_row=None)
     ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
@@ -154,7 +154,7 @@ async def test_source_sandbox_output_oversized_refused(make_tool_context, monkey
         with open(os.path.join(dest_dir, "big.bin"), "wb") as f:
             f.write(b"0123456789")  # 10 bytes > 8-byte cap
 
-    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+    with patch("app.services.tools.skills.sandbox_manager") as sm:
         session = sm.get_or_create.return_value
         session.copy_from_runtime.side_effect = _copy
         result = await handler({
@@ -175,7 +175,7 @@ async def test_source_sandbox_output_missing_file_errors(make_tool_context):
     def _copy_empty(container_dir, dest_dir):
         pass  # nothing harvested
 
-    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+    with patch("app.services.tools.skills.sandbox_manager") as sm:
         session = sm.get_or_create.return_value
         session.copy_from_runtime.side_effect = _copy_empty
         result = await handler({
@@ -219,7 +219,7 @@ async def test_source_inline_empty_content_errors(make_tool_context):
 @pytest.mark.asyncio
 async def test_source_inline_oversized_content_errors(make_tool_context):
     handler = _handler()
-    from app.services import tool_dispatcher as td
+    from app.services.tools import skills as td
     sb = _sb(_OWNED, existing_file_row=None)
     ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
     huge = "x" * (td._ATTACH_INLINE_MAX_BYTES + 1)
@@ -239,7 +239,7 @@ async def test_source_kb_document_reuses_resolver(make_tool_context):
     handler = _handler()
     sb = _sb(_OWNED, existing_file_row=None)
     ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
-    with patch("app.services.tool_dispatcher._fetch_owned_document_bytes",
+    with patch("app.services.tools.skills._fetch_owned_document_bytes",
                AsyncMock(return_value=("orig.docx", b"DOCX-BYTES", "application/msword"))):
         result = await handler({
             "target_skill_name": "My Skill", "filename": "template.docx",
@@ -256,7 +256,7 @@ async def test_source_kb_document_resolver_error_propagates(make_tool_context):
     sb = _sb(_OWNED, existing_file_row=None)
     ctx = make_tool_context(supabase=sb, current_user={"id": "attacker-9"})
     # T-03 — resolver refuses cross-user doc; its {"error"} dict must propagate honestly.
-    with patch("app.services.tool_dispatcher._fetch_owned_document_bytes",
+    with patch("app.services.tools.skills._fetch_owned_document_bytes",
                AsyncMock(return_value={"error": "Document 'doc-x' not found or access denied."})):
         result = await handler({
             "target_skill_name": "My Skill", "filename": "steal.docx",

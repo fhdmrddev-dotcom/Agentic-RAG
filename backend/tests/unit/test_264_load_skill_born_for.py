@@ -35,7 +35,10 @@ from uuid import uuid4
 import pytest
 
 import app.services.tool_dispatcher as td
-from app.services.tool_dispatcher import ToolContext, _resolve_skill_visibility_or
+from app.services.tools import sandbox as td_sandbox
+from app.services.tools import skills as td_skills
+from app.services.tool_dispatcher import ToolContext
+from app.services.tools.skills import _resolve_skill_visibility_or
 from app.utils.skill_visibility import build_skill_visibility_or
 
 # The grammar-only PostgREST evaluator 264-02 built. IMPORTED, never re-implemented.
@@ -68,7 +71,7 @@ _WIDENED_PREDICATE = (
 # dispatcher split puts the resolver + load/save/read_skill_file in tools/skills.py and the
 # execute_code injection in tools/sandbox.py — so these fences span TWO files after the move, and a
 # single-file repoint would count half the code (4 resolver calls -> 3). The move edits THIS line.
-_HANDLER_SRCS = (Path(inspect.getsourcefile(td)),)
+_HANDLER_SRCS = (Path(inspect.getsourcefile(td_skills)), Path(inspect.getsourcefile(td_sandbox)))
 
 
 def _handler_texts(srcs: tuple[Path, ...]) -> list[str]:
@@ -699,13 +702,13 @@ async def test_the_handler_resolves_the_filter_exactly_ONCE_per_invocation(monke
     round-trip per miss — and, worse, could resolve a DIFFERENT string.
     """
     calls: list[bool] = []
-    real = td._resolve_skill_visibility_or
+    real = td_skills._resolve_skill_visibility_or
 
     async def _counting(ctx, *, born_for=False):
         calls.append(born_for)
         return await real(ctx, born_for=born_for)
 
-    monkeypatch.setattr(td, "_resolve_skill_visibility_or", _counting)
+    monkeypatch.setattr(td_skills, "_resolve_skill_visibility_or", _counting)
 
     sb = _two_skill_supabase()
     await td._handle_load_skill(

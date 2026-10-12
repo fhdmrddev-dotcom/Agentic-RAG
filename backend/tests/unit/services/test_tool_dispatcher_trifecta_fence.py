@@ -63,7 +63,7 @@ def mock_setup(monkeypatch):
         AsyncMock(return_value=[conn]),
     )
     monkeypatch.setattr(
-        "app.services.tool_dispatcher.write_audit_entry",
+        "app.services.tools.connector.write_audit_entry",
         AsyncMock(),
     )
     monkeypatch.setattr(

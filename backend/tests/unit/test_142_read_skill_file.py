@@ -30,9 +30,9 @@ from types import SimpleNamespace
 
 from app.services.tool_dispatcher import (
     SCRIPT_EXTS,
-    _decode_skill_file_bytes,
     _handle_read_skill_file,
 )
+from app.services.tools.skills import _decode_skill_file_bytes
 
 JS_SOURCE = "const greet = (name) => console.log(`hi ${name}`);\nexport default greet;\n"
 SH_SOURCE = "#!/usr/bin/env bash\nset -euo pipefail\necho \"packaging deck\"\n"

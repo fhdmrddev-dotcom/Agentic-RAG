@@ -425,8 +425,8 @@ def _no_retrieval_patches():
     return [
         patch("app.services.retrieval_service.search_documents", new=boom),
         patch("app.services.retrieval_service.fetch_full_document", new=boom),
-        patch("app.services.tool_dispatcher.search_documents", new=boom),
-        patch("app.services.tool_dispatcher.query_documents", new=boom),
+        patch("app.services.search_documents_tool.search_documents", new=boom),
+        patch("app.services.tools.documents.query_documents", new=boom),
         patch("app.services.tool_dispatcher._handle_execute_code", new=boom),
         patch("app.services.tool_dispatcher._handle_query_tables", new=boom),
         patch("app.services.search_documents_tool.handle_search_documents", new=boom),
