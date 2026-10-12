@@ -296,8 +296,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 275-02-PLAN.md — W2: five delete paths guard-first + rows-before-bytes + no swallowed refusals; agent document-read wall + ls/tree/glob filter; typed refusals rendered at every delete door; Find "Include archived"
-- [ ] 275-03-PLAN.md — W2: pure evaluator, fail-closed loader, disposition (archive/queue/confirm/unarchive), sweep claimant + daemon behind RETENTION_SWEEP_ENABLED (4 deploy artifacts), /retention router, Find include_archived, OpenAPI + docs coverage
+- [x] 275-02-PLAN.md — W2: five delete paths guard-first + rows-before-bytes + no swallowed refusals; agent document-read wall + ls/tree/glob filter; typed refusals rendered at every delete door; Find "Include archived"
+- [x] 275-03-PLAN.md — W2: pure evaluator, fail-closed loader, disposition (archive/queue/confirm/unarchive), sweep claimant + daemon behind RETENTION_SWEEP_ENABLED (4 deploy artifacts), /retention router, Find include_archived, OpenAPI + docs coverage
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
