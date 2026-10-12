@@ -57,7 +57,7 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: **277** (Registers Back Inside the Band) — ✅ COMPLETE 2026-10-12 · verification `passed` 4/4 · next **278** (One Home for Tools and Filters); next migration **207**
 Plan: 2/2 (277-01 REG-04 split, 277-02 REG-05 archive repair)
-Status: Phase 277 complete — ready to discuss 278
+Status: Phase 278 context gathered 2026-10-13 (`.planning/phases/278-one-home-for-tools-and-filters/278-CONTEXT.md`) — ready to plan 278
 Last activity: 2026-10-12 — 277 closed by hand. CLAUDE.md 121,650 → **89,171** chars (gate OK, no WARN). Review 277-REVIEW.md: 0 critical / **8 warning** / 5 info, all guard-hardening beyond the SCs (verifier). **WR-01 + WR-08 FIXED 2026-10-12 (quick 261012-x1l)**; WR-02..07 + IN-01..05 untriaged. ⚠ `state.begin-phase` was run at 277 start despite the rule above and wrote `total_phases: 14` (false; corrected to 7 by hand) — the ninth false-record occurrence.
 
 ### Quick Tasks Completed
