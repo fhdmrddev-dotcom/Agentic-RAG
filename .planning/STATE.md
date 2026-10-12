@@ -11,7 +11,7 @@ progress:
   total_plans: 38
   completed_plans: 38
   percent: 100
-stopped_at: v4.5 CLOSED (tag v4.5, 25/25, audit tech_debt). 275 not deployed. Next — /gsd:new-milestone, or "deploy 275"
+stopped_at: v4.5 CLOSED (tag v4.5, 25/25, audit tech_debt). 275 DEPLOYED 2026-10-12 (prod 784647e2d). Next — /gsd:new-milestone
 ---
 
 # Project State
@@ -64,7 +64,7 @@ Last activity: 2026-10-12
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | **Deploy 275** | Production migrations **204 → 205 → 206** (one approved write each, VERIFY rows PASS) BEFORE the backend · `get_advisors(security)` · read prod `source_state` distribution · backend before/with frontend · `RETENTION_SWEEP_ENABLED=false` until an admin reads a dry run · edit `docs/public/administer/org/retention.md` ("has not shipped yet") in the same deploy |
+| 1 | ~~Deploy 275~~ **DONE 2026-10-12** | prod `784647e2d` (master `8764137fe`, tag `v4.5` pushed). Migrations 204 → 205 → 206 applied via MCP, one approved write each, every VERIFY row PASS (205 first attempt failed with an MCP transport error before reaching the DB; retried). Backend live 18:32 (`/retention/summary` 404→403), `/docs` 401, frontend bundle carries the retention UI. Advisors 0 ERROR (+3 expected: `retention_sweeps` no-policy INFO; `document_is_retrievable`, `storage_object_backs_document` callable by authenticated — the policies need it). `source_state` all NULL (178 docs, all retrievable). 0 deletes during the 206→backend window. ⚠ Still verify Coolify does NOT set `RETENTION_SWEEP_ENABLED=true` |
 | 2 | 275 hands-on UAT | `.planning/milestones/v4.5-phases/275-retention-legal-hold/275-UAT.md` — 18 rows, pending |
 | 3 | 273 live STRUCTURED-path drive (run first of the re-checks) + WR-04/05 visual | `273-HUMAN-UAT.md` |
 | 4 | 271 G-4 sign-off (G4-1..G4-6) + P-01 / P-03 decisions | `271-UAT.md` |

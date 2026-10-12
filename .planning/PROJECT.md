@@ -21,7 +21,7 @@ answers can be interactive charts, tables and metrics from a closed registry (27
 in their thread (274); an admin sets retention with legal hold and audited disposition (275); and the
 product has public docs (276).
 ⚠ All seven phases closed `self-verified`; 271/272/273 owe operator sign-offs. ✅ 270-274 + 276 **LIVE
-2026-10-05** (prod `bd9e126c3`). ⛔ **275 NOT deployed** — production migrations 204 → 205 → 206 first.
+2026-10-05** (prod `bd9e126c3`). ✅ **275 DEPLOYED 2026-10-12** (prod `784647e2d`, migrations 204-206).
 
 ---
 
@@ -1135,7 +1135,7 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 - ✓ Structured date/dimension filters in agent retrieval, empty filter fails closed — FIND-07, v4.5 (272; SC#4 6/8 providers by decision)
 - ✓ Interactive chart / table / metric artifacts from a closed registry, reload-identical, every provider — ART-01..05, v4.5 (273)
 - ✓ Chat attachments thread-scoped, explicit promote to the Library — ATT-01..03, v4.5 (274)
-- ✓ Retention policies, legal hold, scheduled audited disposition, archived out of retrieval but findable — RET-01..04, v4.5 (275; NOT deployed)
+- ✓ Retention policies, legal hold, scheduled audited disposition, archived out of retrieval but findable — RET-01..04, v4.5 (275; deployed 2026-10-12)
 - ✓ Public /docs, Syrel API reference, coverage gate, changelog, videos — DOCS-01..06, v4.5 (276)
 
 ### Validated (v4.4 — Experts That Actually Work)
@@ -1161,7 +1161,7 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 
 ### Active (current milestone)
 
-*None — v4.5 shipped 2026-10-12. The next milestone is defined by `/gsd:new-milestone` (phases resume at **277**, migrations at **207**). Carried candidates: deploy 275, the v4.5 audit warnings W-1..W-5, BUG-261004-02 / BUG-261005-01 / BUG-261012-01 / BUG-261012-02, SEED-354, SEED-334, the CLAUDE.md split.*
+*None — v4.5 shipped 2026-10-12. The next milestone is defined by `/gsd:new-milestone` (phases resume at **277**, migrations at **207**). Carried candidates: the v4.5 audit warnings W-1..W-5, BUG-261004-02 / BUG-261005-01 / BUG-261012-01 / BUG-261012-02, SEED-354, SEED-334, the CLAUDE.md split.*
 
 <details>
 <summary>Superseded Active note (v4.3-close, preserved)</summary>
@@ -1437,3 +1437,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-03 — **Phase 272 Close Means Wrong COMPLETE** (FIND-07; 5 plans + review fixes; self-verified, human_needed: production migrations 200 STEP 1 → STEP 2 → 201 owed).*
 
 *Last updated: 2026-10-12 — **milestone v4.5 Find It, Show It COMPLETED** (git tag `v4.5`; 7 phases, 38 plans, 25/25 requirements; 275 not deployed — production migrations 204 → 205 → 206 owed). STATE.md and the archives were done by hand, not via `milestone.complete`.*
+
+*Last updated: 2026-10-12 — **Phase 275 DEPLOYED** (prod `784647e2d`; migrations 204 → 205 → 206 applied, advisors 0 ERROR). All of v4.5 is live.*
