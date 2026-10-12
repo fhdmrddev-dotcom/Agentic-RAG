@@ -305,7 +305,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 275-05-PLAN.md — W4: merged-tree gates, SC + failure-criteria + threat matrix, ledger close, G-4 HOLD / LIFECYCLE / MEMBER Chrome drives with DB evidence, docs page, SEED-250 / SEED-345 / BUG-261004-01 routing, D-35 seed, watch-purge bug, owed deploy rows
+- [x] 275-05-PLAN.md — W4: merged-tree gates, SC + failure-criteria + threat matrix, ledger close, G-4 HOLD / LIFECYCLE / MEMBER Chrome drives with DB evidence, docs page, SEED-250 / SEED-345 / BUG-261004-01 routing, D-35 seed, watch-purge bug, owed deploy rows
 **Flags**: ⛔ **This deletes customer data on a timer. It is the most dangerous feature in the milestone** (`SEED-250`). Ship it with the `SRC-06` fail-closed discipline: dry run before any real sweep; ambiguous means nothing is deleted; hold blocks **every** deletion path. **Migration(s)** at the next free number: `retention_policies`, the hold, the archive state, and new `audit_log` action types (extending migration 170's constrained list). **RLS on every new table**, plus `get_advisors(security)`. ⚠ Postgres grants function `EXECUTE` to `PUBLIC` by default, so revoke from `PUBLIC` rather than role by role. **security_enforcement**. The sweep is another claimant on `scheduler_service.py` (FIRES), not new machinery. **G-2 FIRES** (policy editor, hold control, disposition log). The renamed rules surface from 271 is a candidate home, decided at discuss. **G-4** scenarios at scope time. **G-5 audit at discuss:** `backend/app/services/scheduler_service.py` (FIRES), `backend/app/api/documents.py`, `backend/app/services/retrieval_service.py` (rides 272's extracted seam as a default predicate, never a new branch), `backend/app/api/document_governance.py`. "Document class" means the classification type (`document_type_norm`). **Deploy parity**: migrations to production before the backend, and no sweep enabled in production until the operator has read a dry run.
 **UI hint**: yes
 
@@ -360,7 +360,7 @@ Plans:
 | 272. Close Means Wrong | 5/5 | Complete (prod migrations 200+201 owed) | 2026-10-03 |
 | 273. Agent-Authored Artifacts | 6/6 | Complete — 1 UAT row OWED (live STRUCTURED-path holdback check; run it first) | 2026-10-04 |
 | 274. Thread-Scoped Attachments | 5/5 | Complete (prod migrations 202→203 + get_advisors owed) | 2026-10-05 |
-| 275. Retention & Legal Hold | 0/TBD | Not started | - |
+| 275. Retention & Legal Hold | 5/5 | Executed — code review + verification next (prod migrations 204→205 + get_advisors owed; sweep stays off) | - |
 | 276. Public Docs, API Reference & Video Library | 7/7 | Complete    | 2026-10-05 |
 
 ---
