@@ -24,6 +24,7 @@ const m = vi.hoisted(() => ({
   addHoldCoverage: vi.fn(),
   releaseHold: vi.fn(),
   countHoldCoverage: vi.fn(),
+  getDocumentStates: vi.fn(),
   listDocuments: vi.fn(),
   useFolders: vi.fn(),
 }))
@@ -37,6 +38,7 @@ vi.mock("@/lib/api/retention", async (importOriginal) => {
     addHoldCoverage: m.addHoldCoverage,
     releaseHold: m.releaseHold,
     countHoldCoverage: m.countHoldCoverage,
+    getDocumentStates: m.getDocumentStates,
   }
 })
 
@@ -86,6 +88,12 @@ beforeEach(() => {
   m.listHolds.mockResolvedValue({ active: [ACTIVE], released: [RELEASED] } satisfies HoldList)
   m.countHoldCoverage.mockResolvedValue({ count: 7 })
   m.listDocuments.mockResolvedValue(DOCS)
+  // The active-org filter (275-REVIEW F-WR-02): document-states answers only for active-org ids.
+  m.getDocumentStates.mockImplementation(async (body: { document_ids: string[] }) => ({
+    documents: body.document_ids.filter((id) => id !== "d-other").map((id) => ({ document_id: id })),
+    folders: [],
+    can_manage: true,
+  }))
   m.useFolders.mockReturnValue({ folders: FOLDERS })
 })
 
@@ -213,7 +221,7 @@ describe("LegalHoldDialog — place a hold (D-05 / D-35)", () => {
   })
 
   it("failure keeps every field and says nothing is held yet", async () => {
-    m.createHold.mockRejectedValue(new ApiRefusal(422, "", "x"))
+    m.createHold.mockRejectedValue(new Error("network"))
     const dialog = await openNew()
     await userEvent.type(within(dialog).getByLabelText("Matter name"), "Kessler dispute")
     await userEvent.type(within(dialog).getByLabelText("Reason"), "Counsel asked.")
@@ -223,6 +231,67 @@ describe("LegalHoldDialog — place a hold (D-05 / D-35)", () => {
     expect(within(dialog).getByLabelText("Matter name")).toHaveValue("Kessler dispute")
     expect(within(dialog).getByLabelText("Reason")).toHaveValue("Counsel asked.")
     expect(within(dialog).getByRole("checkbox", { name: "Finance" })).toBeChecked()
+  })
+
+  it("275-REVIEW F-WR-02: the typeahead offers only the ACTIVE org's documents", async () => {
+    m.listDocuments.mockResolvedValue([
+      ...DOCS,
+      { id: "d-other", filename: "Kessler Other Org Lease.pdf" },
+    ] as Document[])
+    const dialog = await openNew()
+    await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalled())
+    await userEvent.type(within(dialog).getByLabelText("Documents"), "kess")
+    expect(await within(dialog).findByRole("button", { name: "Kessler Services Agreement.pdf" })).toBeInTheDocument()
+    expect(within(dialog).queryByRole("button", { name: "Kessler Other Org Lease.pdf" })).toBeNull()
+    expect(m.getDocumentStates).toHaveBeenCalledWith({ document_ids: ["d1", "d2", "d-other"], folder_ids: [] })
+  })
+
+  it("275-REVIEW F-WR-02: asks in chunks of at most 500 ids (the server's cap)", async () => {
+    m.listDocuments.mockResolvedValue(
+      Array.from({ length: 501 }, (_, i) => ({ id: `x${i}`, filename: `Doc ${i}.pdf` })) as Document[],
+    )
+    await openNew()
+    await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalledTimes(2))
+    expect(m.getDocumentStates.mock.calls[0][0].document_ids).toHaveLength(500)
+    expect(m.getDocumentStates.mock.calls[1][0].document_ids).toHaveLength(1)
+  })
+
+  it("275-REVIEW F-WR-02: when the org check fails the typeahead offers nothing rather than a guess", async () => {
+    m.getDocumentStates.mockRejectedValue(new Error("down"))
+    const dialog = await openNew()
+    await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalled())
+    await userEvent.type(within(dialog).getByLabelText("Documents"), "kess")
+    expect(within(dialog).queryByRole("button", { name: "Kessler Services Agreement.pdf" })).toBeNull()
+  })
+
+  it("275-REVIEW F-WR-02: the server's 422 refusal is RENDERED, never swallowed", async () => {
+    const refused =
+      "Some of the picked documents or folders are not in this organization or not visible to you. Nothing was held."
+    m.createHold.mockRejectedValue(new ApiRefusal(422, "", refused))
+    const dialog = await openNew()
+    await userEvent.type(within(dialog).getByLabelText("Matter name"), "Kessler dispute")
+    await userEvent.type(within(dialog).getByLabelText("Reason"), "Counsel asked.")
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Finance" }))
+    await userEvent.click(within(dialog).getByRole("button", { name: "Place hold" }))
+    const alert = await within(dialog).findByRole("alert")
+    expect(alert).toHaveTextContent(refused)
+    expect(alert).not.toHaveTextContent("Couldn't place the hold.")
+  })
+
+  it("275-REVIEW F-WR-02: adding to a hold released meanwhile (409) says so and re-reads the list", async () => {
+    m.addHoldCoverage.mockRejectedValue(new ApiRefusal(409, "", "This hold has been released. Place a new hold instead."))
+    const onRecorded = vi.fn()
+    render(<LegalHoldsList onRecorded={onRecorded} />)
+    const card = (await screen.findAllByTestId("hold-card"))[0]
+    await userEvent.click(within(card).getByRole("button", { name: "Add documents…" }))
+    const dialog = await screen.findByRole("dialog")
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Invoices" }))
+    await userEvent.click(within(dialog).getByRole("button", { name: "Add to hold" }))
+    const alert = await within(dialog).findByRole("alert")
+    expect(alert).toHaveTextContent("This hold has been released. Place a new hold instead.")
+    expect(alert).not.toHaveTextContent("The hold still covers what it did before.")
+    await waitFor(() => expect(m.listHolds).toHaveBeenCalledTimes(2))
+    expect(onRecorded).not.toHaveBeenCalled()
   })
 
   it("Add mode: titled 'Add to “{matter}”', primary 'Add to hold', failure keeps the old coverage sentence", async () => {

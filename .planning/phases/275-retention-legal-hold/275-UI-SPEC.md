@@ -552,6 +552,7 @@ Never a disabled Delete button with the reason in a tooltip: the refusal is a vi
 |---|---|---|
 | F-CR-02 | Remove a policy that another admin already removed (server 404) | `This policy was already removed. Nothing changed.` + the `Back to policies` button, which re-reads the list (no band pulse: nothing was recorded) |
 | F-CR-02 | Release a hold that is already released (server 409) | the server's own sentence (`This hold is already released.`); the list re-reads and the sheet offers only `Close` |
+| F-WR-02 | Place hold / Add to hold refused by the server (4xx: a pick not in this org, or the hold released meanwhile) | the server's own sentence above the dialog buttons; a 409 also re-reads the hold list. The `Couldn't place / add …` contract copy stays for a failure where the server said nothing. The document typeahead lists only the active org's documents |
 | F-WR-01 | Batch confirm refused BEFORE any write (4xx, or the 503 incomplete read) | the server's sentence, then `Nothing was deleted, archived or kept.` (omitted when the server's sentence already says nothing was changed), + `Reload`. The confirm-failure copy (`…Some documents may already be deleted…`) stays for a failure where the server said nothing (network, 5xx) |
 
 ---

@@ -27,7 +27,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { listDocuments } from "@/lib/api"
-import { addHoldCoverage, countHoldCoverage, createHold, type LegalHold } from "@/lib/api/retention"
+import { ApiRefusal } from "@/lib/api/refusal"
+import {
+  addHoldCoverage,
+  countHoldCoverage,
+  createHold,
+  getDocumentStates,
+  type LegalHold,
+} from "@/lib/api/retention"
 import { useFolders } from "@/hooks/useFolders"
 import type { Document, Folder } from "@/types"
 import { AMBER_TEXT_CLASS } from "./RetentionChip"
@@ -35,6 +42,26 @@ import { RETENTION_COPY, fillCopy } from "./retentionCopy"
 
 const C = RETENTION_COPY
 const MAX_SUGGESTIONS = 8
+/** `POST /retention/document-states` caps a request at 500 document ids. */
+const STATE_CHUNK = 500
+
+/**
+ * 275-REVIEW F-WR-02 — keep only the documents in the ACTIVE org.
+ *
+ * `GET /documents` is scoped by owner, not by org, so an admin in two orgs gets the other org's
+ * documents too — and every one of them would be refused (422) by the hold write. No org-scoped
+ * document list exists, and the document rows carry no `org_id`; `document-states` reads the
+ * requested ids through RLS **filtered to the active org** (`X-Org-Id`), so the ids it answers for
+ * are exactly the ones a hold may cover. Asked in chunks of the server's cap.
+ */
+async function inActiveOrg(docs: readonly Document[]): Promise<Document[]> {
+  const ids = docs.map((d) => d.id)
+  const chunks: string[][] = []
+  for (let i = 0; i < ids.length; i += STATE_CHUNK) chunks.push(ids.slice(i, i + STATE_CHUNK))
+  const answers = await Promise.all(chunks.map((c) => getDocumentStates({ document_ids: c, folder_ids: [] })))
+  const inOrg = new Set(answers.flatMap((a) => (a.documents ?? []).map((d) => d.document_id)))
+  return docs.filter((d) => inOrg.has(d.id))
+}
 
 interface LegalHoldDialogProps {
   open: boolean
@@ -43,6 +70,8 @@ interface LegalHoldDialogProps {
   onClose: () => void
   /** The write landed: re-read the list and pulse the band. */
   onDone: () => void
+  /** 275-REVIEW F-WR-02: the server refused because the list is stale (409) — re-read, record nothing. */
+  onStale?: () => void
 }
 
 interface FolderRow {
@@ -73,7 +102,7 @@ function flattenFolders(folders: readonly Folder[]): FolderRow[] {
   return out
 }
 
-export function LegalHoldDialog({ open, hold, onClose, onDone }: LegalHoldDialogProps) {
+export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalHoldDialogProps) {
   const isAdd = Boolean(hold)
   const { folders } = useFolders()
   const [name, setName] = useState("")
@@ -86,7 +115,11 @@ export function LegalHoldDialog({ open, hold, onClose, onDone }: LegalHoldDialog
   const [errors, setErrors] = useState<{ name?: string; reason?: string }>({})
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
+  // A 4xx refusal: the server's own sentence (which pick it refused, or that the hold is released).
+  const [refused, setRefused] = useState<string | null>(null)
   const alive = useRef(true)
+  // Each open is a generation: a read started for an earlier open never lands in this one.
+  const openGen = useRef(0)
 
   useEffect(() => {
     alive.current = true
@@ -106,12 +139,16 @@ export function LegalHoldDialog({ open, hold, onClose, onDone }: LegalHoldDialog
     setCount(null)
     setErrors({})
     setFailed(false)
+    setRefused(null)
+    setAllDocs([])
+    const gen = ++openGen.current
     listDocuments()
+      .then(inActiveOrg)
       .then((docs) => {
-        if (alive.current) setAllDocs(docs)
+        if (alive.current && gen === openGen.current) setAllDocs(docs)
       })
       .catch(() => {
-        /* the typeahead offers nothing rather than a guess */
+        /* the typeahead offers nothing rather than a guess (never another org's documents) */
       })
   }, [open])
 
@@ -162,6 +199,7 @@ export function LegalHoldDialog({ open, hold, onClose, onDone }: LegalHoldDialog
     }
     setBusy(true)
     setFailed(false)
+    setRefused(null)
     try {
       if (hold) {
         await addHoldCoverage(hold.id, { document_ids: docIds, folder_ids: folderIds })
@@ -171,8 +209,16 @@ export function LegalHoldDialog({ open, hold, onClose, onDone }: LegalHoldDialog
       if (!alive.current) return
       onDone()
       onClose()
-    } catch {
-      if (alive.current) setFailed(true)
+    } catch (err) {
+      if (!alive.current) return
+      // 275-REVIEW F-WR-02: a 4xx is the server's sentence (e.g. a pick that is not in this org,
+      // or a hold released meanwhile) — render it. The contract copy is for a silent failure.
+      if (err instanceof ApiRefusal && err.status >= 400 && err.status < 500) {
+        setRefused(err.message)
+        if (err.status === 409) onStale?.()
+      } else {
+        setFailed(true)
+      }
     } finally {
       if (alive.current) setBusy(false)
     }
@@ -279,9 +325,9 @@ export function LegalHoldDialog({ open, hold, onClose, onDone }: LegalHoldDialog
                   : ""}
           </p>
 
-          {failed && (
+          {(failed || refused !== null) && (
             <p role="alert" className={`text-sm ${AMBER_TEXT_CLASS}`}>
-              {isAdd ? C.contract.addFailed : C.contract.placeFailed}
+              {refused ?? (isAdd ? C.contract.addFailed : C.contract.placeFailed)}
             </p>
           )}
         </div>
