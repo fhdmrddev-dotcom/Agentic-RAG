@@ -435,3 +435,43 @@ Neighbouring live suites (110 drift guard, 163 documents/platform/asyncpg leak, 
 failure, `test_110_audit_drift_guard.py::test_valid_action_types_is_exactly_19`, is INHERITED: it pins 19
 types and has read `extra=['connector.call', 'connector.grant']` since Phase 223; `audit_service.py` was
 not yet modified when it ran.
+
+## Task 3 — hold_guard, the audit sync, the RETRIEVABLE_COLUMN swap, ledger rows
+
+Targeted: `pytest tests/unit/test_275_hold_guard.py tests/unit/test_272_scope_seam.py
+tests/unit/test_272_scope_resolver.py tests/unit/test_267_scope_preview.py -q` → **56 passed**.
+Wider seam neighbours (267 expert_changed_event / handoff, 268 scope_effect / scope_patch, 272 review fixes)
+→ 215 passed. Live re-run after the swap (272 scope RLS through real PostgREST, 110 drift guard, 266, 268
+race, the three 275 suites, 272 RPC) → **76 passed**, no skips — PostgREST resolves `retrievable`.
+
+`grep -v '^\s*#' backend/app/services/retrieval_scope.py backend/app/services/expert_scope.py | grep -c
+source_disconnected` → **0**. `git diff --stat b41d51d6b -- backend/app/services/retrieval_service.py` →
+**empty** (D-33).
+
+`node scripts/check-claude-md-size.cjs` → exit 0, `OK WITH WARNINGS` — **120,402 chars, past the 120,000
+warn band** (this commit adds 819 chars; the plan's three mandated rows alone would also have crossed it).
+`node scripts/check-hot-file-ledger.cjs --files <the nine planned files>` → `ledger gate OK` (exit 0).
+
+### Final backend unit baseline (local-DB lock held)
+
+```
+71 failed, 6973 passed, 1 skipped, 2 xfailed, 2 xpassed, 48 warnings in 348.79s (0:05:48)
+[GATE PASSED] Backend unit baseline satisfied (failed: 71 <= 71, errors: 0).
+```
+
+**Set diff against the base FAILED SET: EMPTY** — the same 71 ids. (A raw `comm` shows one id on both
+sides because a `RuntimeWarning` was interleaved onto the line in this run's output; normalised to the
+test id, it is the same test.) Passed rose 6932 → 6973: +41 = the 16 `test_275_hold_guard` cases and the
+25 migration shape cases this plan adds.
+
+## OWED (recorded, NOT performed by 275-01)
+
+1. **Production apply of 204, then 205**, by operator-approved SQL-editor writes, BEFORE the backend
+   deploy (D-29). The Supabase MCP points at production and every write needs per-action approval.
+2. **`get_advisors(security)`** on production after that apply (D-27, T-275-08).
+3. **A production read of the `source_state` distribution** before deploy (RESEARCH Runtime State
+   Inventory) — a free read; any non-live row leaves agent retrieval the moment 205 lands.
+4. **The local-Postgres crash on a refused function call** (see Task 2 and `deferred-items.md`) — needs
+   `docker logs` to narrow, and an explicit operator decision before any production probe.
+5. **CLAUDE.md is past the 120k warn band** — the split is now scheduled (CLAUDE.md's own rule), not
+   urgent (hard limit 150k).

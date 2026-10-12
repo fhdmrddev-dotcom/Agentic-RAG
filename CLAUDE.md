@@ -890,6 +890,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/document.py` | 11 / 8 / 207 | ⚠ STALE (`10/7/183`). **270-02**: 4 optional file-fact fields + `source_connection_name` + the download-response model, additive. ⛔ optional fields only: a required one 500s five non-upload paths |
 | `frontend/src/components/ingestion/DocumentRow.tsx` | 8 / 4 / 564 (was `7 / 3 / 476`) | ⚠ STALE (`7/3/476`). **271-03**: Find cells 3-5 + name-cell 2nd line (folder · version tag). ⚠ 271-05 F-2: Re-ingest on an older row is a silent no-op |
 | `frontend/src/lib/api/documents.ts` | 7 / 7 / 499 (was `6 / 6 / 490`) | **274-03**: `uploadWorkspaceTemplate(…, lifetime)` — only `"thread"` appends the query; cloud attach sends X-Org-Id via getAuthHeaders. ⛔ panel/workflow doors byte-unchanged |
+| `backend/app/api/folders.py` | 11 / 7 / 233 | ⚠ absent its ENTIRE LIFE — row added 275-01. 275-02: ONE hold_guard call, rows before bytes, folder.delete audit. ⛔ no new branch |
+| `backend/app/api/kb.py` | 13 / 8 / 504 | ⚠ absent its ENTIRE LIFE — row added 275-01. grep is covered by mig 205's GUC policies with no edit |
+| `backend/app/services/audit_service.py` | 8 / 8 / 96 | ⚠ absent its ENTIRE LIFE — row added 275-01. **275-01**: +3 connector.watch.*, +10 retention types. ⛔ ⊆ live CHECK |
+| `backend/app/services/expert_scope.py` | 6 / 3 / 632 | ⚠ crossed G-5 on 275-01: names RETRIEVABLE_COLUMN (the `.or_` copy deleted). Next phase: extraction FIRST |
+| `backend/app/services/document_relationship_service.py` | 5 / 3 / 457 | ⚠ absent its ENTIRE LIFE at 3 phases — row added 275-01; 275-02 edits it (B-2) |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
