@@ -504,7 +504,17 @@ async def extend_hold(
         docs, folders = await _readable_ids(conn, org, body.document_ids, body.folder_ids)
         if docs != {str(d) for d in body.document_ids} or folders != {str(f) for f in body.folder_ids}:
             raise HTTPException(status_code=422, detail=HOLD_IDS_REFUSED)
-        await _write_coverage(conn, org, hold_id, body.document_ids, body.folder_ids, user=current_user)
+        try:
+            await _write_coverage(conn, org, hold_id, body.document_ids, body.folder_ids, user=current_user)
+        except asyncpg.exceptions.CheckViolationError as exc:
+            # 275-REVIEW B-IN-05: the D-35 trigger refused the write. When the hold was released
+            # between the read above and this write, say so (409), never a 500.
+            now_hold = await rdb.get_hold(pool, org, hold_id)
+            if now_hold is not None and now_hold.get("released_at") is not None:
+                raise HTTPException(
+                    status_code=409, detail="This hold has been released. Place a new hold instead.",
+                ) from exc
+            raise
     await rdb.insert_receipt(
         pool, org, "hold_extended", hold_id=hold_id, hold_name=hold["name"], actor_id=current_user["id"],
         actor_name=_actor_name(current_user),

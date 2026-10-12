@@ -389,6 +389,10 @@ async def get_related_documents(
         )
     if subject is None:
         return None
+    # 275-REVIEW B-IN-04 (D-18): the agent's read never resolves an archived / source-gone SUBJECT
+    # either — the row was read ``select("*")``, so this is its own column, not a second query.
+    if retrievable_only and subject.get(RETRIEVABLE_COLUMN) is False:
+        return None
 
     subject_id = subject["id"]
     client = _client(supabase)
