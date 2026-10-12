@@ -148,31 +148,12 @@ process.stdin.on('end', () => {
   const chars = text.length;
   if (chars < WARN_LIMIT && structural.length === 0) process.exit(0);
 
-  if (structural.length) {
-    process.stdout.write(
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'PostToolUse',
-          additionalContext: [
-            `HOT-FILE LEDGER — ${structural.length} structural problem(s) in ${filePath}:`,
-            ...structural,
-            '',
-            'The table is the AUDIT SCAN LIST: it keeps the VERDICT, nothing more. Every',
-            "reason, invariant, correction and named seam goes in that file's own section",
-            'in docs/HOT-FILE-LEDGER.md, in the SAME COMMIT. A row without a section is',
-            'drift -- and so is a paragraph in a cell. This one column reaching 45% of',
-            'CLAUDE.md is what caused BOTH 150k trips.',
-            'Verify with: node scripts/check-claude-md-size.cjs',
-          ].join('\n'),
-          claude_md_chars: chars,
-          ledger_structural_problems: structural.length,
-          file_path: filePath,
-        },
-      })
-    );
-    process.exit(0);
-  }
-
+  // ~~if (structural.length) { write the ledger block ALONE; process.exit(0); }~~
+  // ⚠ SUPERSEDED 2026-10-12 (261012-x1l / WR-01), kept beside the original: that early
+  // return HID THE STOP. A CLAUDE.md over 150k with one 81-char cell got a cell-length
+  // nit and no "WILL NOT LOAD" -- the one condition that silently drops every
+  // instruction. Now ONE combined context: the size verdict LEADS whenever
+  // chars >= WARN_LIMIT, then the ledger block, then a single Verify line.
   const over = chars >= HARD_LIMIT;
   const pct = Math.round((chars / HARD_LIMIT) * 1000) / 10;
 
@@ -197,18 +178,40 @@ process.stdin.on('end', () => {
       .join('\n');
   })();
 
+  const sizeLines =
+    chars >= WARN_LIMIT
+      ? [
+          over
+            ? `STOP — ${filePath} is ${chars} chars, at or over the ${HARD_LIMIT} limit. It WILL NOT LOAD.`
+            : `WARNING — ${filePath} is ${chars} chars (${pct}% of the ${HARD_LIMIT} limit, headroom ${HARD_LIMIT - chars}).`,
+          over
+            ? 'Every session and every subagent is silently losing these instructions. Split it before doing anything else.'
+            : 'Split it now, on schedule, rather than at the ceiling.',
+          'Biggest sections:',
+          biggest,
+          'Split by FUNCTION, never by deletion: CLAUDE.md keeps the verdict / index /',
+          'audit-scan-list; the narrative moves to docs/<TOPIC>.md under a same-commit',
+          'sync rule. Precedents: docs/HOT-FILE-LEDGER.md, docs/SANDBOX-PACKAGES.md.',
+        ]
+      : [];
+
+  const ledgerLines = structural.length
+    ? [
+        `HOT-FILE LEDGER — ${structural.length} structural problem(s) in ${filePath}:`,
+        ...structural,
+        '',
+        'The table is the AUDIT SCAN LIST: it keeps the VERDICT, nothing more. Every',
+        "reason, invariant, correction and named seam goes in that file's own section",
+        'in docs/HOT-FILE-LEDGER.md, in the SAME COMMIT. A row without a section is',
+        'drift -- and so is a paragraph in a cell. This one column reaching 45% of',
+        'CLAUDE.md is what caused BOTH 150k trips.',
+      ]
+    : [];
+
   const additionalContext = [
-    over
-      ? `STOP — ${filePath} is ${chars} chars, at or over the ${HARD_LIMIT} limit. It WILL NOT LOAD.`
-      : `WARNING — ${filePath} is ${chars} chars (${pct}% of the ${HARD_LIMIT} limit, headroom ${HARD_LIMIT - chars}).`,
-    over
-      ? 'Every session and every subagent is silently losing these instructions. Split it before doing anything else.'
-      : 'Split it now, on schedule, rather than at the ceiling.',
-    'Biggest sections:',
-    biggest,
-    'Split by FUNCTION, never by deletion: CLAUDE.md keeps the verdict / index /',
-    'audit-scan-list; the narrative moves to docs/<TOPIC>.md under a same-commit',
-    'sync rule. Precedents: docs/HOT-FILE-LEDGER.md, docs/SANDBOX-PACKAGES.md.',
+    ...sizeLines,
+    ...(sizeLines.length && ledgerLines.length ? [''] : []),
+    ...ledgerLines,
     'Verify with: node scripts/check-claude-md-size.cjs',
   ].join('\n');
 
@@ -219,6 +222,7 @@ process.stdin.on('end', () => {
         additionalContext,
         claude_md_chars: chars,
         claude_md_over_limit: over,
+        ledger_structural_problems: structural.length,
         file_path: filePath,
       },
     })
