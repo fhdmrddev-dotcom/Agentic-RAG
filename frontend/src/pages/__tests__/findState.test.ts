@@ -58,6 +58,8 @@ describe("initialFindState", () => {
       sort: "added_desc",
       offset: 0,
       limit: 25,
+      // 275-02 (D-04): Include archived is OFF until the person clicks it.
+      include_archived: false,
     })
   })
 
@@ -423,5 +425,38 @@ describe("findState.ts is a strict leaf", () => {
     for (const excluded of ["result", "total", "older_matches", "request id"]) {
       expect(findStateSource).toContain(excluded)
     }
+  })
+})
+
+// ── 275-02: Include archived (S9 / D-04) ─────────────────────────────────────────────
+
+describe("Include archived (275-02, D-04)", () => {
+  it("is off by default, toggles on SET_INCLUDE_ARCHIVED, and returns to the first page", () => {
+    expect(initialFindState.include_archived).toBe(false)
+    const on = findReducer({ ...initialFindState, offset: 50 }, { type: "SET_INCLUDE_ARCHIVED", include_archived: true })
+    expect(on.include_archived).toBe(true)
+    expect(on.offset).toBe(0)
+    const off = findReducer(on, { type: "SET_INCLUDE_ARCHIVED", include_archived: false })
+    expect(off.include_archived).toBe(false)
+  })
+
+  it("never changes on its own: Clear search keeps the person's choice", () => {
+    const on = run({ type: "SET_INCLUDE_ARCHIVED", include_archived: true }, { type: "SET_NAME", name: "acme" })
+    expect(findReducer(on, { type: "CLEAR_SEARCH" }).include_archived).toBe(true)
+  })
+
+  it("toSearchRequest omits the key when off (an older backend never receives it)", () => {
+    const body = toSearchRequest(initialFindState, typeFilter)
+    expect(body).not.toBeNull()
+    expect(Object.keys(body!)).not.toContain("include_archived")
+  })
+
+  it("toSearchRequest sends include_archived: true only when on", () => {
+    const s = run({ type: "SET_INCLUDE_ARCHIVED", include_archived: true })
+    expect(toSearchRequest(s, typeFilter)).toMatchObject({ include_archived: true, version: "latest" })
+  })
+
+  it("alone it is not a search: the resting tab stays browse", () => {
+    expect(toSearchRequest(run({ type: "SET_INCLUDE_ARCHIVED", include_archived: true }), EMPTY_FILTER)).toBeNull()
   })
 })
