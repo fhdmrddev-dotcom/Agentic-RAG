@@ -10761,9 +10761,9 @@ cells rot within days.
 | [`frontend/src/components/library/find/FindMetaLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmetalinetsx) | 1 / 1 / 101 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ the ONLY count in Find; the client never re-sorts. **271-05 G4-6 live**: the header follows the sort, nulls last |
 | [`frontend/src/components/library/find/AskHandoffCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindaskhandoffcardtsx) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ no I/O, no list. **271-05 G4-4 live**: Enter opened a NEW thread with the question unsent; no list rendered in the Library |
 | [`frontend/src/components/library/find/askInChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindaskinchatts) | 1 / 1 / 53 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ create thread → prefill → navigate; never sends. **271-05 G4-4 live**: POST /threads once, 0 message sends, prefill held 3 s |
-| [`frontend/src/components/library/find/DocumentsFindBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfinddocumentsfindbodytsx) | 1 / 1 / 262 (was `0 / 0 / 0`) | no (1 phase) | young (271-04). ⛔ owns the Find render; an error keeps the chips. **271-05 live**: zero box + `1 more match…` hint (9.39:1 on its wash) |
+| [`frontend/src/components/library/find/DocumentsFindBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfinddocumentsfindbodytsx) | 2 / 2 / 262 (was `1 / 1 / 262`) | no (2 phases) | **275-04**: `FindListProps` Pick gains `"retention"` (one token) so Find rows carry the chips. ⛔ owns the Find render; an error keeps the chips |
 | [`backend/app/models/document.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocumentpy) | 11 / 8 / 207 | ⚠ **FIRES — 8 phases** | ⚠ STALE (`10/7/183`). **270-02**: 4 optional file-fact fields + `source_connection_name` + the download-response model, additive. ⛔ optional fields only: a required one 500s five non-upload paths |
-| [`frontend/src/components/ingestion/DocumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentrowtsx) | 8 / 4 / 564 (was `7 / 3 / 476`) | ⚠ **FIRES** | ⚠ STALE (`7/3/476`). **271-03**: Find cells 3-5 + name-cell 2nd line (folder · version tag). ⚠ 271-05 F-2: Re-ingest on an older row is a silent no-op |
+| [`frontend/src/components/ingestion/DocumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentrowtsx) | 10 / 5 / 583 (was `8 / 4 / 564`) | ⚠ **FIRES** | **275-04**: ONE optional `retention` prop + ONE `<RetentionRowChips>` after ClassificationRowChip. Still seven `<td>`. ⛔ no fetch here |
 | [`backend/app/services/file_facts.py`](docs/HOT-FILE-LEDGER.md#backendappservicesfile_factspy) | 1 / 1 / 163 | no (1 phase) | young (created 270-01). ⛔ `read_file_facts` NEVER raises; a fact it cannot read is `None`, never `0` and never a substituted date. Re-measured `1/1/163` at 270 close |
 | [`frontend/src/lib/documentDownload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentdownloadts) | 2 / 1 / 63 | no (1 phase) | young (created 270-03). ⛔ the ONLY place the download label is derived and the request made. 270-04 names an older v1 row too (`Download v1 (viewed, not latest)`) |
 | [`frontend/src/components/metadata/DocumentDownloadButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdownloadbuttontsx) | 1 / 1 / 146 | no (1 phase) | young (created 270-03). ⛔ no `href`, no stored URL: the link is minted on click. The live drive found no signed URL in the DOM |
@@ -10772,7 +10772,7 @@ cells rot within days.
 | [`backend/app/services/skill_body_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesskill_body_authoringpy) | 2 / 1 / 373 | no (new) | young (created 263). Row added AT CREATION — an absent row is invisible to G-5 at any count. ⛔ The ONE home of the borrowed craft doctrine; doctrine inlined here makes it an ENGINE (D-263-13). |
 | [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 6 / 3 / 1550 (was `3 / 2 / 1475`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`3/2/1475`), now FIRES. honoured by construction (**267-03**): 2 removals + ONE re-keyed connection picker. ⛔ no new section; extraction OWED before a 4th phase |
 | [`frontend/src/components/experts/ProposedSkillCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsproposedskillcardtsx) | 1 / 1 / 86 | no (new) | young (created 263-04). Row added AT CREATION. ⛔ The ONE home of the "does not exist" mark — dashed+violet, never red (D-263-01); a second styling makes a proposal read as an error. |
-| [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 3 / 5 / 442 | no | young (created Phase 166). The org-admin shell hosting live tabs (members, audit, settings, invitations, sso, experts). |
+| [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 7 / 5 / 454 (was `3 / 5 / 442`) | ⚠ **FIRES** | ⚠ STALE (`3/5/442`, read `no`). **275-04**: Retention live — ONE render branch + ONE `recordingPulse` (1.6 s) to OrgBand. ⛔ extraction FIRST next touch |
 | [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 2 / 2 / 324 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 347`. honoured by construction (**262-02**): its `ICON_MAP` + `renderExpertIcon` MOVED OUT verbatim — a PURE move; its pinned suite is byte-unchanged and green |
 | [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 9 / 5 / 418 (was `7 / 4 / 367`) | ⛔ **FIRES — 5 phases** | ⚠ row STALE (`7/4/367`). honoured by construction (**267-03**): `ExpertConnectionState`, `ExpertScopePreview` and ONE `getExpertScopePreview`. ⛔ one client function per route |
 | [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 5 / 4 / 749 | ⚠ **FIRES — 4 phases** | ⚠ row STALE at `4/3/567`. honoured by construction (**266-01**): SIX install queries ADDED (guarded-upsert claim). ⛔ no existing query touched |
@@ -10841,14 +10841,14 @@ cells rot within days.
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ **FIRES** | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 97 / 76 / 1533 (was `96 / 75 / 1532`) | ⚠ **FIRES** | **274-03**: `WorkspaceFile.expires_at?: string \| null` (null = thread-life), additive. Seam OWED |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 98 / 78 / 1542 (was `97 / 76 / 1533`) | ⚠ **FIRES** | **275-04**: `Document` gains optional archived_at / archived_policy_id / archived_policy_name / retrievable / source_state, additive. Seam OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 87 / 63 / 978 (was `86 / 62 / 977`) | ⚠ **FIRES** | **274-02**: ONE `include_router(workspace_promote.router)` beside `workspace.router` + 1 import name. 0 new branches |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 90 / 52 / 1698 (was `87 / 50 / 1593`) | ⚠ **FIRES** | ⚠ STALE (`87/50/1593`). **272-05**: the stale ef_search 'raised to 200' comment corrected; value 40 unchanged. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 91 / 35 / 2518 (was `87 / 34 / 2414`) | ⚠ **FIRES** | ⚠ STALE (`87/34/2414`). **270-02**: +1 route (`POST /{id}/download-url`) outside the 217 region + 1 batched read. ⛔ RLS read BEFORE service sign; 404 not 403; no `ingestion_step` literal |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 288 / 64 / 6404 (was `272 / 61 / 6293`) | ⚠ **FIRES** | **274-03/04/05**: `src/components/attachments` adopted as a TARGETS directory; 10 suites pinned in BASELINE, incl. 274-05's promote contract fence |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 290 / 68 / 6428 (was `288 / 64 / 6404`) | ⚠ **FIRES** | **275-02/04**: `src/components/retention` DIRECTORY + 9 retention suites pinned; `OrgAdminShell.test.tsx` adopted by FILE path (11). ⛔ `scripts/` is gate-EXEMPT |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
@@ -10972,13 +10972,13 @@ cells rot within days.
 | [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 6 / 4 / 748 | ⚠ **FIRES** | ⛔ row was STALE at `4/2/715` reading `no (2 phases)` — re-derived 263 planning. Holds `FullAppSettings`, not only skills. D-263-03 reuses its `POST /skills` caller, adds no endpoint. |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
-| [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 28 / 14 / 332 (was `24 / 13 / 294`) | ⚠ **FIRES** | ⚠ STALE (`24/13/294`). **271-03**: `columns="find"` ignores `folderId` and renders nothing on zero (the Find body owns S7). ⛔ still seven `<td>` |
-| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 53 / 18 / 1218 (was `50 / 17 / 994`) | ⚠ **FIRES** | ⚠ STALE (`50/17/994`). **271-02/04**: Filing rules sub-view + a SECOND `useReducer` for Find; `documentSurface(lead, findSlots?)`. ⛔ Views path byte-unchanged |
+| [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 16 / 372 (was `28 / 14 / 332`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<th>` unchanged |
+| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 57 / 21 / 1297 (was `53 / 18 / 1218`) | ⚠ **FIRES** | **275-04**: `useRetentionStates` (ONE batched read), folder line under FolderDetail, `splitArchived` + hidden line on Find's include_archived. Extraction OWED |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 23 / 12 / 174 (was `22 / 12 / 172`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01). **272-05 D-27**: coverage cut + rerank; filtered dedup same-document only; unfiltered unchanged |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
-| [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 15 / 10 / 654 (was `14 / 9 / 614`) | ⚠ **FIRES** | ⚠ STALE (`14/9/614`). **271-04**: `is_latest === false` → read-only notice, values as text, `handleCommit` returns early. 271-05 G4-5: 0 edits vs 8 on latest |
+| [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 16 / 11 / 666 (was `15 / 10 / 654`) | ⚠ **FIRES** | **275-04**: ONE optional `retention` prop → `<PanelSection title="Retention">` directly after File; no prop = no section. ⛔ the section reads nothing |
 | [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
 | [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 7 / 7 / 499 (was `6 / 6 / 490`) | ⚠ **FIRES** | **274-03**: `uploadWorkspaceTemplate(…, lifetime)` — only `"thread"` appends the query; cloud attach sends X-Org-Id via getAuthHeaders. ⛔ panel/workflow doors byte-unchanged |
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
@@ -11198,9 +11198,26 @@ cells rot within days.
 | [`backend/app/db/retention.py`](docs/HOT-FILE-LEDGER.md#backendappdbretentionpy) | 0 / 0 / 0 | no (young) | young (created 275-03). Sweep claim: SKIP LOCKED + lease. Row added AT PLANNING (275-01) — an absent row is invisible to G-5 at any count. |
 | [`backend/app/models/retention.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsretentionpy) | 0 / 0 / 0 | no (young) | young (created 275-03). Pydantic models, extra=forbid. Row added AT PLANNING (275-01) — an absent row is invisible to G-5 at any count. |
 | [`backend/app/api/retention.py`](docs/HOT-FILE-LEDGER.md#backendappapiretentionpy) | 0 / 0 / 0 | no (young) | young (created 275-03). /retention router; org:manage on every write. Row added AT PLANNING (275-01) — an absent row is invisible to G-5 at any count. |
-| [`frontend/src/components/retention/retentionCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentioncopyts) | 0 / 0 / 0 | no (young) | young (created 275). Sketch 275 copy port, ?raw-fenced (D-07). Row added AT PLANNING (275-01) — an absent row is invisible to G-5 at any count. |
+| [`frontend/src/components/retention/retentionCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentioncopyts) | 4 / 1 / 433 (was `0 / 0 / 0`) | no (young) | young (275). ⛔ EVERY retention string; 7 groups, each fenced against its OWN source (sketch / UI-SPEC / CONTEXT / hold_guard / models) with exact counts (D-07) |
 | [`frontend/src/components/retention/HoldRefusalNotice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionholdrefusalnoticetsx) | 0 / 0 / 0 | no (young) | young (created 275). The S10 amber refusal box. Row added AT PLANNING (275-01) — an absent row is invisible to G-5 at any count. |
 | [`frontend/src/lib/api/refusal.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirefusalts) | 0 / 0 / 0 | no (young) | young (created 275). The typed 409 legal_hold refusal. Row added AT PLANNING (275-01) — an absent row is invisible to G-5 at any count. |
+| [`frontend/src/lib/api/retention.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiretentionts) | 1 / 1 / 425 | no (young) | young (275-04). Row added AT CREATION. Typed client for all 18 `/retention` routes; ApiRefusal on non-2xx. ⛔ never re-exported from `lib/api.ts` |
+| [`frontend/src/components/retention/useRetentionStates.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionuseretentionstatests) | 1 / 1 / 86 | no (young) | young (275-04). Row added AT CREATION. ⛔ THE one batched document-states read (flag 2); last-known on error; the leaves never fetch |
+| [`frontend/src/components/retention/RetentionChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionchiptsx) | 1 / 1 / 129 | no (young) | young (275-04). Row added AT CREATION. Chip + tones + action meta; BASE_CLASSES copied once from StatusChip.tsx:42 (not edited). ⛔ server chip value only (D-21) |
+| [`frontend/src/components/retention/RetentionFolderLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionfolderlinetsx) | 1 / 1 / 65 | no (young) | young (275-04). Row added AT CREATION. S7 line; a member never sees a matter (D-17). ⛔ pure function of props |
+| [`frontend/src/components/retention/RetentionSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionsectiontsx) | 1 / 1 / 179 | no (young) | young (275-04). Row added AT CREATION. S8 sentence per state + the Un-archive WRITE (D-19); member line EXACTLY D-17. ⛔ no read |
+| [`frontend/src/components/retention/ArchivedHiddenLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionarchivedhiddenlinetsx) | 1 / 1 / 53 | no (young) | young (275-04). Row added AT CREATION. S9 line + `splitArchived`; ONE include-archived state shared with Find (D-04) |
+| [`frontend/src/components/retention/LegalHoldsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionlegalholdslisttsx) | 1 / 1 / 185 | no (young) | young (275-04). Row added AT CREATION. S3 hold cards, released under <details>; self-fetching, last-known on error |
+| [`frontend/src/components/retention/LegalHoldDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionlegalholddialogtsx) | 1 / 1 / 306 | no (young) | young (275-04). Row added AT CREATION. S3 place/add, direct (protective); server count, never a fake 0 (D-35); failure keeps fields |
+| [`frontend/src/components/retention/ReleaseHoldDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionreleaseholddialogtsx) | 1 / 1 / 115 | no (young) | young (275-04). Row added AT CREATION. 066 victim-naming release; Keep hold focused; outline amber, never red |
+| [`frontend/src/components/retention/WaitingForYou.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionwaitingforyoutsx) | 1 / 1 / 89 | no (young) | young (275-04). Row added AT CREATION. S4 list, newest sweep first; cards inline, no banner (D-01) |
+| [`frontend/src/components/retention/DeleteBatchCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentiondeletebatchcardtsx) | 1 / 1 / 306 | no (young) | young (275-04). Row added AT CREATION. ⛔ type-the-count (D-03): untick CLEARS the count; exports the shared batch pieces |
+| [`frontend/src/components/retention/ReviewBatchCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionreviewbatchcardtsx) | 1 / 1 / 122 | no (young) | young (275-04). Row added AT CREATION. D-10 per-row Keep/Archive/Delete, none pre-selected; typed count over deletes only |
+| [`frontend/src/components/retention/RetentionTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentiontabtsx) | 1 / 1 / 222 | no (young) | young (275-04). Row added AT CREATION. S1 posture + roving sub-tabs; Waiting pill red ONLY at N > 0 (D-01); self-fetching |
+| [`frontend/src/components/retention/RetentionPolicies.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionpoliciestsx) | 1 / 1 / 200 | no (young) | young (275-04). Row added AT CREATION. S1 table of server text; sub-line time from `sweep_hour_utc`, never a constant |
+| [`frontend/src/components/retention/RetentionPolicyEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionpolicyeditortsx) | 1 / 1 / 532 | no (young) | young (275-04). Row added AT CREATION. ⛔ the D-02 gate: aria-disabled + on-screen reason, stale re-lock, 409 rendered; one folder OR one type |
+| [`frontend/src/components/retention/RetentionPreview.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionpreviewtsx) | 1 / 1 / 209 | no (young) | young (275-04). Row added AT CREATION. Server buckets in <details>; the server's `why` as-is; D-34 private count |
+| [`frontend/src/components/retention/RetentionHistory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionhistorytsx) | 1 / 1 / 178 | no (young) | young (275-04). Row added AT CREATION. S5 receipts; ✎ only on writes; stored names never linked (D-12/D-13) |
 
 
 
@@ -18909,6 +18926,106 @@ Row added at 275-01 for 275-04: the S10 amber refusal box that replaces a door's
 
 Row added at 275-01 for 275-04: the typed `409 legal_hold` refusal the delete doors read instead of a
 generic failure.
+
+### `frontend/src/lib/api/retention.ts`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. The typed client for every route in 275-03-SUMMARY.md's route table. `getAuthHeaders()` carries `X-Org-Id` (re-validated by the server); a non-2xx becomes `ApiRefusal` with the server's sentence (a pydantic 422 list is unwrapped to its `msg`). ⛔ It is imported directly, never re-exported from `lib/api.ts` — `apiBarrel.test.ts` would otherwise widen the public surface.
+
+### `frontend/src/components/retention/useRetentionStates.ts`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. Planning flag 2's single owner of `POST /retention/document-states` for the Library. Keyed on the order-independent id set + folder, so a re-render re-asks nothing. A failed read KEEPS the last-known states (alive ref). ⛔ The chips, the folder line and the Retention section receive this as props and must never fetch on their own.
+
+### `frontend/src/components/retention/RetentionChip.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. `RetentionChip`, `RetentionRowChips` (at most one retention chip + one source chip), the action-tag meta and `RichCopy`. `BASE_CLASSES` is copied ONCE from `components/org/StatusChip.tsx:42` (module-private there; StatusChip.tsx is deliberately not edited, planning flag 6). ⛔ The chip shown is the server's `chip` value — never a client re-statement of the predicate (D-21).
+
+### `frontend/src/components/retention/RetentionFolderLine.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S7: renders only for an own/inherited policy or a hold. An admin's hold line names the matter; a member's is exactly `Everything in this folder is on legal hold.` (D-17). Pure function of props.
+
+### `frontend/src/components/retention/RetentionSection.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S8 body: one sentence per server section kind, a source-state sentence below it, and the admin-only Un-archive (D-19) with a `✎ Un-archived · recorded` receipt inside the success branch. ⛔ The member branch never reads `hold_names` and renders exactly the D-17 lines.
+
+### `frontend/src/components/retention/ArchivedHiddenLine.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S9 browse line and `splitArchived`. The toggle dispatches Find's `SET_INCLUDE_ARCHIVED`, so browse and Find's chip are ONE state (D-04).
+
+### `frontend/src/components/retention/LegalHoldsList.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S3 list: active cards, released cards dimmed under `<details>` with no buttons, the empty state. Owns `listHolds` with the honest-degrade rule; `onRecorded` pulses the band.
+
+### `frontend/src/components/retention/LegalHoldDialog.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S3 place / add coverage. Protective, so no confirm (066). Folder checkboxes from `useFolders`, document typeahead from `listDocuments`. The live line is the SERVER's count; a failed count reads `Couldn't count the documents yet.` — never 0 (D-35).
+
+### `frontend/src/components/retention/ReleaseHoldDialog.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. 066 victim-naming release. ⚠ `HoldOut` carries folder paths and counts, not document names, so the list names the coverage the admin chose (max 8 + `and N more`). Failure keeps the sheet open.
+
+### `frontend/src/components/retention/WaitingForYou.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S4 list: one card per policy, newest sweep first, rendered inline (D-01: no banner). Reload remounts the cards from server rows.
+
+### `frontend/src/components/retention/DeleteBatchCard.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S4 delete batch. ⛔ Every row starts ticked; an untick CLEARS the typed count; the destructive button needs typed == N > 0; all-unticked becomes `Keep N documents` with no count. The server re-checks everything (T-275-31). Exports the shared table / notes / type-the-count / result banner pieces.
+
+### `frontend/src/components/retention/ReviewBatchCard.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S4 review batch (D-10): per-row radios, nothing pre-selected; deletes need the typed count over the delete subset only.
+
+### `frontend/src/components/retention/RetentionTab.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S1: posture line (healthy / sweeps off / never run / not finished) + role=tablist sub-tabs with roving focus. The Waiting pill is red only at N > 0 and is the ONLY attention signal (D-01).
+
+### `frontend/src/components/retention/RetentionPolicies.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S1 Policies: server-text table, empty state, editor in place. The sub line's time is `sweep_hour_utc` from the summary — never hard-coded.
+
+### `frontend/src/components/retention/RetentionPolicyEditor.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S2 editor. ⛔ The D-02 gate is the friendly half of the server's wall: Save is `aria-disabled` with a visible reason until a fresh Preview of the identical draft; an edit re-locks it; a server 409 is rendered and re-locks; a save failure keeps the preview. One folder OR one document type (275-03 deviation 4). ⚠ Native `<select>` (not Radix Select) — recorded in 275-04-SUMMARY.
+
+### `frontend/src/components/retention/RetentionPreview.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S2 preview column: the server's buckets with their ported labels, the server's `why` text as-is, the undecidable notes, and D-34's private count.
+
+### `frontend/src/components/retention/RetentionHistory.tsx`
+
+Young (created 275-04). **Row added AT CREATION** — an absent row is invisible to G-5 at any count. S5 ledger: `receiptSentence` per action, ✎ only when `written`, stored names (never links), the server's actor (`a former member` when gone), 50-row pager.
+
+### `frontend/src/components/org/OrgAdminShell.tsx` — Phase 275-04
+
+**`7 / 5 / 454` after 275-04 (was `3 / 5 / 442`, reading `no` — present and WRONG).** ⚠ FIRES. 275-04 flips Retention to `locked: false`, adds ONE `activeTab === "retention"` branch and ONE `recordingPulse` state (1.6 s timeout) passed to the existing `OrgBand` prop. The locked-Retention fence in `OrgAdminShell.test.tsx` was retired DELIBERATELY with its reason in the test (D-01, SEED-177). ⛔ The next phase that touches this file proposes an extraction FIRST.
+
+### `frontend/src/components/ingestion/DocumentRow.tsx` — Phase 275-04
+
+**`10 / 5 / 583` after 275-04.** ONE optional `retention` prop and ONE `<RetentionRowChips state={retention} />` mount after `ClassificationRowChip`, in both column sets. The seven-`<td>` shed invariant is untouched.
+
+### `frontend/src/components/ingestion/DocumentList.tsx` — Phase 275-04
+
+**`31 / 16 / 372` after 275-04.** 275-02 added the 409 refusal state; 275-04 adds ONE `retention` prop (states + canManage) threaded to each row, and `requestDelete`, which opens a HELD row's dialog straight into the same `HoldRefusalNotice` (S10 / D-14), using `holdRefusalFor` (a member never gets a matter name).
+
+### `frontend/src/components/metadata/DocumentDetailPanel.tsx` — Phase 275-04
+
+**`16 / 11 / 666` after 275-04.** ONE optional `retention` prop; when present, `<PanelSection title="Retention" defaultOpen>` directly after File. Absent (every other mount) → no section, byte-identical behaviour.
+
+### `frontend/src/pages/LibraryPage.tsx` — Phase 275-04
+
+**`57 / 21 / 1297` after 275-04 (measured with `--follow`).** Calls `useRetentionStates` once (visible browse page + Find page + open document + selected folder), mounts `RetentionFolderLine` under `FolderDetail` and `ArchivedHiddenLine` under the list, filters browse through `splitArchived` on Find's `include_archived` (one state, D-04), and threads states to DocumentList / Find / the panel. ⛔ Extraction OWED before the next feature touch.
+
+### `frontend/src/types/index.ts` — Phase 275-04
+
+**`98 / 78 / 1542` after 275-04.** `Document` gains five OPTIONAL fields (archived_at, archived_policy_id, archived_policy_name, retrievable, source_state) — the 270 precedent; Realtime and narrow-select routes may omit them.
+
+### `frontend/src/components/library/find/DocumentsFindBody.tsx` — Phase 275-04
+
+**`2 / 2 / 262` after 275-04.** One token: `FindListProps`'s `Pick<>` gains `"retention"` so Find's DocumentList carries the chips and the pre-open refusal (275-04 deviation, Rule 3).
+
+### `scripts/vitest-count-gate.cjs` — Phase 275-04
+
+**`290 / 68 / 6428` after 275-04.** BASELINE pins the seven new retention suites, re-pins `retentionCopy.test.ts` 5 → 16, and adopts `src/components/org/OrgAdminShell.test.tsx` by FILE path in TARGETS (pinned 11).
 
 ### `backend/app/services/retrieval_scope.py` — Phase 275
 
