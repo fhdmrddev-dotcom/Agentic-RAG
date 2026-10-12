@@ -603,6 +603,21 @@ async def lifespan(app_instance):
             _watch_service = None
     app_instance.state.watch_service = _watch_service
 
+    # Phase 275 (RET-03 / D-29 / D-31) — the nightly retention sweep. Off by default
+    # (RETENTION_SWEEP_ENABLED); multi-worker safe through its own claim + lease. It archives and
+    # queues; it never deletes. scheduler_service is not involved.
+    _retention_sweep = None
+    if not _setup_mode and getattr(settings, "retention_sweep_enabled", False):
+        try:
+            from app.services.retention.sweep_service import RetentionSweepService
+
+            _retention_sweep = RetentionSweepService(pool=await get_pg_pool(), settings=settings)
+            _retention_sweep.start()
+        except Exception:
+            logger.exception("Retention sweep service failed to start (app continues)")
+            _retention_sweep = None
+    app_instance.state.retention_sweep_service = _retention_sweep
+
     # BUG-260902-06 — the cross-worker settings/model-registry cache invalidator.
     #
     # ⚠ IT RUNS IN EVERY WORKER ON PURPOSE, and unlike the scheduler above that is the whole
@@ -671,6 +686,14 @@ async def lifespan(app_instance):
             _ws.stop()
     except Exception:  # noqa: BLE001
         logger.exception("Watch service stop failed at lifespan shutdown")
+
+    # Phase 275 — stop the retention sweep
+    try:
+        _rs = getattr(app_instance.state, "retention_sweep_service", None)
+        if _rs is not None:
+            _rs.stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("Retention sweep stop failed at lifespan shutdown")
 
     # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
     # down as the FIRST shutdown step — before the ask_user sentinel broadcast and
@@ -877,7 +900,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, retention, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -892,6 +915,7 @@ app.include_router(feedback.router)
 app.include_router(sandbox_outputs.router)
 app.include_router(workspace.router)
 app.include_router(workspace_promote.router)  # Phase 274 ATT-03 — promote a thread attachment into the Library; own module, never workspace.py (its 244 fence)
+app.include_router(retention.router)  # Phase 275 (RET-01..04) — retention policies, legal holds, the delete queue, document-states
 app.include_router(admin.router)
 app.include_router(panel.router)  # Phase 085 D-085-23 — thread-scoped panel data endpoints
 app.include_router(workflows.router)  # Phase 092 MODE-01 — published-workflows picker feed

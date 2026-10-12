@@ -61,6 +61,9 @@
       "name": "knowledge-health"
     },
     {
+      "name": "retention"
+    },
+    {
       "name": "workflows"
     },
     {
@@ -141,7 +144,8 @@
         "kb",
         "checked-queries",
         "library",
-        "knowledge-health"
+        "knowledge-health",
+        "retention"
       ]
     },
     {
@@ -4936,6 +4940,780 @@
             }
           }
         }
+      }
+    },
+    "/retention/summary": {
+      "get": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Get Summary",
+        "operationId": "get_summary_retention_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/retention/policies": {
+      "get": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "List Policies",
+        "operationId": "list_policies_retention_policies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Create Policy",
+        "operationId": "create_policy_retention_policies_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/retention/policies/preview": {
+      "post": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Preview Policy",
+        "operationId": "preview_policy_retention_policies_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/retention/policies/{policy_id}": {
+      "put": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Update Policy",
+        "operationId": "update_policy_retention_policies__policy_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Policy Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Delete Policy",
+        "operationId": "delete_policy_retention_policies__policy_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Policy Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyDeletedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/retention/document-types": {
+      "get": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "List Document Types",
+        "operationId": "list_document_types_retention_document_types_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentTypeOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Document Types Retention Document Types Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/retention/holds": {
+      "get": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "List Holds",
+        "operationId": "list_holds_retention_holds_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Create Hold",
+        "operationId": "create_hold_retention_holds_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/retention/holds/{hold_id}/coverage": {
+      "post": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Extend Hold",
+        "operationId": "extend_hold_retention_holds__hold_id__coverage_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hold_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Hold Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldCoverageAdd"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/retention/holds/{hold_id}/release": {
+      "post": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Release Hold",
+        "operationId": "release_hold_retention_holds__hold_id__release_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hold_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Hold Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldRelease"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/retention/holds/count": {
+      "post": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Count Hold",
+        "operationId": "count_hold_retention_holds_count_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldCount"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldCountOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/retention/queue": {
+      "get": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Get Queue",
+        "operationId": "get_queue_retention_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/retention/queue/{policy_id}/confirm": {
+      "post": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Confirm Queue",
+        "operationId": "confirm_queue_retention_queue__policy_id__confirm_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Policy Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmBatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/retention/documents/{document_id}/unarchive": {
+      "post": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Unarchive Document",
+        "operationId": "unarchive_document_retention_documents__document_id__unarchive_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnarchiveOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/retention/history": {
+      "get": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Get History",
+        "operationId": "get_history_retention_history_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/retention/sweep/run": {
+      "post": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Run Sweep Now",
+        "operationId": "run_sweep_now_retention_sweep_run_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepRunOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/retention/document-states": {
+      "post": {
+        "tags": [
+          "retention"
+        ],
+        "summary": "Document States",
+        "description": "Any member of the active org.",
+        "operationId": "document_states_retention_document_states_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentStatesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentStatesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/threads/{thread_id}/todos": {
@@ -12872,6 +13650,110 @@
         "type": "object",
         "title": "CheckedQueryUpdate"
       },
+      "ConfirmBatch": {
+        "properties": {
+          "delete_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Delete Ids"
+          },
+          "keep_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Keep Ids"
+          },
+          "archive_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Archive Ids"
+          },
+          "typed_count": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Typed Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "typed_count"
+        ],
+        "title": "ConfirmBatch"
+      },
+      "ConfirmOut": {
+        "properties": {
+          "deleted": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Deleted"
+          },
+          "did_not_delete": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Did Not Delete"
+          },
+          "kept": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Kept"
+          },
+          "archived": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Archived"
+          },
+          "not_found": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Not Found"
+          },
+          "skipped": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted",
+          "did_not_delete",
+          "kept",
+          "archived",
+          "not_found",
+          "skipped"
+        ],
+        "title": "ConfirmOut"
+      },
       "ConnectionFileImportRequest": {
         "properties": {
           "folder_id": {
@@ -14248,6 +15130,52 @@
             ],
             "title": "Source Connection Name"
           },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "archived_policy_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived Policy Id"
+          },
+          "archived_policy_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived Policy Name"
+          },
+          "retrievable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrievable"
+          },
           "tables_stage_applies": {
             "type": "boolean",
             "title": "Tables Stage Applies",
@@ -14345,6 +15273,11 @@
             "title": "Version",
             "default": "latest"
           },
+          "include_archived": {
+            "type": "boolean",
+            "title": "Include Archived",
+            "default": false
+          },
           "sort": {
             "type": "string",
             "enum": [
@@ -14376,6 +15309,246 @@
         "type": "object",
         "title": "DocumentSearchRequest",
         "description": "The ``POST /document-search`` body (THE WIRE CONTRACT in 271-01-PLAN.md)."
+      },
+      "DocumentSection": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hold",
+              "archived",
+              "delete_pending",
+              "archives_tonight",
+              "in_review",
+              "no_date",
+              "disagree",
+              "kept",
+              "unarchived",
+              "not_due",
+              "none"
+            ],
+            "title": "Kind"
+          },
+          "policy_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Name"
+          },
+          "other_policy_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Policy Name"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "kept_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kept By"
+          },
+          "kept_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kept At"
+          },
+          "rule_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "DocumentSection"
+      },
+      "DocumentState": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "chip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip"
+          },
+          "source_chip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Chip"
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "hold_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Line"
+          },
+          "hold_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Names"
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived"
+          },
+          "can_unarchive": {
+            "type": "boolean",
+            "title": "Can Unarchive"
+          },
+          "section": {
+            "$ref": "#/components/schemas/DocumentSection"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "held",
+          "archived",
+          "can_unarchive",
+          "section"
+        ],
+        "title": "DocumentState"
+      },
+      "DocumentStatesOut": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentState"
+            },
+            "type": "array",
+            "title": "Documents"
+          },
+          "folders": {
+            "items": {
+              "$ref": "#/components/schemas/FolderState"
+            },
+            "type": "array",
+            "title": "Folders"
+          },
+          "can_manage": {
+            "type": "boolean",
+            "title": "Can Manage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents",
+          "folders",
+          "can_manage"
+        ],
+        "title": "DocumentStatesOut"
+      },
+      "DocumentStatesRequest": {
+        "properties": {
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Document Ids"
+          },
+          "folder_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Folder Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DocumentStatesRequest"
       },
       "DocumentTableRow": {
         "properties": {
@@ -14436,6 +15609,24 @@
           "table_index"
         ],
         "title": "DocumentTableRow"
+      },
+      "DocumentTypeOut": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "count"
+        ],
+        "title": "DocumentTypeOut"
       },
       "DraftCreateResponse": {
         "properties": {
@@ -15733,6 +16924,60 @@
         ],
         "title": "FolderMoveRequest"
       },
+      "FolderPolicyLine": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "own",
+              "inherited"
+            ],
+            "title": "Kind"
+          },
+          "policy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Policy Id"
+          },
+          "policy_name": {
+            "type": "string",
+            "title": "Policy Name"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "kept_for_text": {
+            "type": "string",
+            "title": "Kept For Text"
+          },
+          "rule_text": {
+            "type": "string",
+            "title": "Rule Text"
+          },
+          "from_folder_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Folder Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "policy_id",
+          "policy_name",
+          "action",
+          "kept_for_text",
+          "rule_text"
+        ],
+        "title": "FolderPolicyLine"
+      },
       "FolderResponse": {
         "properties": {
           "id": {
@@ -15794,6 +17039,49 @@
           "updated_at"
         ],
         "title": "FolderResponse"
+      },
+      "FolderState": {
+        "properties": {
+          "folder_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Folder Id"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FolderPolicyLine"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "hold_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Names"
+          }
+        },
+        "type": "object",
+        "required": [
+          "folder_id",
+          "held"
+        ],
+        "title": "FolderState"
       },
       "FolderUpdate": {
         "properties": {
@@ -16394,6 +17682,385 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HistoryPage": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "offset",
+          "has_more"
+        ],
+        "title": "HistoryPage"
+      },
+      "HistoryRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "written": {
+            "type": "boolean",
+            "title": "Written"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "document_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Name"
+          },
+          "policy_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Name"
+          },
+          "hold_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Name"
+          },
+          "actor_name": {
+            "type": "string",
+            "title": "Actor Name"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Detail"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "written",
+          "actor_name",
+          "created_at"
+        ],
+        "title": "HistoryRow"
+      },
+      "HoldCount": {
+        "properties": {
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Document Ids"
+          },
+          "folder_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Folder Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HoldCount"
+      },
+      "HoldCountOut": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count"
+        ],
+        "title": "HoldCountOut"
+      },
+      "HoldCoverageAdd": {
+        "properties": {
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Document Ids"
+          },
+          "folder_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Folder Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HoldCoverageAdd"
+      },
+      "HoldCreate": {
+        "properties": {
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Document Ids"
+          },
+          "folder_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Folder Ids"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "reason"
+        ],
+        "title": "HoldCreate"
+      },
+      "HoldList": {
+        "properties": {
+          "active": {
+            "items": {
+              "$ref": "#/components/schemas/HoldOut"
+            },
+            "type": "array",
+            "title": "Active"
+          },
+          "released": {
+            "items": {
+              "$ref": "#/components/schemas/HoldOut"
+            },
+            "type": "array",
+            "title": "Released"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active",
+          "released"
+        ],
+        "title": "HoldList"
+      },
+      "HoldOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "released_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released By Name"
+          },
+          "release_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Note"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "document_count": {
+            "type": "integer",
+            "title": "Document Count",
+            "default": 0
+          },
+          "folder_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Folder Ids"
+          },
+          "folder_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Folder Paths"
+          },
+          "held_today": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held Today"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "active"
+        ],
+        "title": "HoldOut"
+      },
+      "HoldRelease": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HoldRelease"
       },
       "IndexSummary": {
         "properties": {
@@ -18256,6 +19923,389 @@
         ],
         "title": "PhaseSpec"
       },
+      "PolicyDeletedOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "PolicyDeletedOut"
+      },
+      "PolicyDraft": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name"
+          },
+          "document_type_norm": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Type Norm"
+          },
+          "folder_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Id"
+          },
+          "include_subfolders": {
+            "type": "boolean",
+            "title": "Include Subfolders",
+            "default": true
+          },
+          "clock": {
+            "type": "string",
+            "enum": [
+              "document_date",
+              "date_added"
+            ],
+            "title": "Clock"
+          },
+          "stage1_value": {
+            "type": "integer",
+            "maximum": 10000,
+            "minimum": 1,
+            "title": "Stage1 Value"
+          },
+          "stage1_unit": {
+            "type": "string",
+            "enum": [
+              "days",
+              "months",
+              "years"
+            ],
+            "title": "Stage1 Unit"
+          },
+          "stage1_action": {
+            "type": "string",
+            "enum": [
+              "archive",
+              "delete",
+              "review"
+            ],
+            "title": "Stage1 Action"
+          },
+          "stage2_value": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage2 Value"
+          },
+          "stage2_unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "days",
+                  "months",
+                  "years"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage2 Unit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "clock",
+          "stage1_value",
+          "stage1_unit",
+          "stage1_action"
+        ],
+        "title": "PolicyDraft",
+        "description": "What the editor submits for Preview and for Save."
+      },
+      "PolicyList": {
+        "properties": {
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyOut"
+            },
+            "type": "array",
+            "title": "Policies"
+          },
+          "evaluation_incomplete": {
+            "type": "boolean",
+            "title": "Evaluation Incomplete",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "policies"
+        ],
+        "title": "PolicyList"
+      },
+      "PolicyOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "scope_kind": {
+            "type": "string",
+            "title": "Scope Kind"
+          },
+          "folder_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Id"
+          },
+          "folder_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Path"
+          },
+          "include_subfolders": {
+            "type": "boolean",
+            "title": "Include Subfolders",
+            "default": true
+          },
+          "document_type_norm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Type Norm"
+          },
+          "clock": {
+            "type": "string",
+            "title": "Clock"
+          },
+          "stage1_value": {
+            "type": "integer",
+            "title": "Stage1 Value"
+          },
+          "stage1_unit": {
+            "type": "string",
+            "title": "Stage1 Unit"
+          },
+          "stage1_action": {
+            "type": "string",
+            "title": "Stage1 Action"
+          },
+          "stage2_value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage2 Value"
+          },
+          "stage2_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage2 Unit"
+          },
+          "stage2_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage2 Action"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "previewed_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previewed Revision"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "updated_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By Name"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "scope_text": {
+            "type": "string",
+            "title": "Scope Text"
+          },
+          "kept_for_text": {
+            "type": "string",
+            "title": "Kept For Text"
+          },
+          "rule_text": {
+            "type": "string",
+            "title": "Rule Text"
+          },
+          "tonight": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicyTonight"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "scope_kind",
+          "clock",
+          "stage1_value",
+          "stage1_unit",
+          "stage1_action",
+          "revision",
+          "scope_text",
+          "kept_for_text",
+          "rule_text"
+        ],
+        "title": "PolicyOut"
+      },
+      "PolicyTonight": {
+        "properties": {
+          "due_now": {
+            "type": "integer",
+            "title": "Due Now"
+          },
+          "undecidable": {
+            "type": "integer",
+            "title": "Undecidable"
+          },
+          "next_due": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due"
+          }
+        },
+        "type": "object",
+        "required": [
+          "due_now",
+          "undecidable"
+        ],
+        "title": "PolicyTonight"
+      },
       "PostMessageConfig": {
         "properties": {
           "default_channel": {
@@ -18271,6 +20321,244 @@
         ],
         "title": "PostMessageConfig",
         "description": "⚠ There is deliberately no ``base_url`` / ``host`` / ``webhook_url`` field."
+      },
+      "PreviewBuckets": {
+        "properties": {
+          "act": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "type": "array",
+            "title": "Act"
+          },
+          "hold": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "type": "array",
+            "title": "Hold"
+          },
+          "undecidable": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "type": "array",
+            "title": "Undecidable"
+          },
+          "kept": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "type": "array",
+            "title": "Kept"
+          },
+          "not_yet": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "type": "array",
+            "title": "Not Yet"
+          },
+          "already": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "type": "array",
+            "title": "Already"
+          }
+        },
+        "type": "object",
+        "required": [
+          "act",
+          "hold",
+          "undecidable",
+          "kept",
+          "not_yet",
+          "already"
+        ],
+        "title": "PreviewBuckets"
+      },
+      "PreviewOut": {
+        "properties": {
+          "draft_hash": {
+            "type": "string",
+            "title": "Draft Hash"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "has_stage2": {
+            "type": "boolean",
+            "title": "Has Stage2"
+          },
+          "buckets": {
+            "$ref": "#/components/schemas/PreviewBuckets"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "private_not_covered": {
+            "type": "integer",
+            "title": "Private Not Covered"
+          }
+        },
+        "type": "object",
+        "required": [
+          "draft_hash",
+          "action",
+          "has_stage2",
+          "buckets",
+          "counts",
+          "private_not_covered"
+        ],
+        "title": "PreviewOut"
+      },
+      "PreviewRequest": {
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/PolicyDraft"
+          },
+          "policy_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "draft"
+        ],
+        "title": "PreviewRequest"
+      },
+      "PreviewRow": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "folder_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Path"
+          },
+          "document_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Date"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "why": {
+            "type": "string",
+            "title": "Why",
+            "default": ""
+          },
+          "other_policy_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Policy Name"
+          },
+          "hold_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hold Names"
+          },
+          "kept_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kept By"
+          },
+          "kept_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kept At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "name",
+          "kind"
+        ],
+        "title": "PreviewRow"
       },
       "ProgrammaticPhaseConfig": {
         "properties": {
@@ -18888,6 +21176,172 @@
         "title": "PublishedWorkflow",
         "description": "A picker row — the minimum the Deep/Harness toggle needs to list and start a workflow (id to kick off via MessageCreate.workflow_definition_id; name + slug for display).\n\nIt is optional so the pre-103 picker callers (the composer Harness dropdown) keep validating against the id/slug/name shape unchanged.\n\nThey exist so the Workflows-page *Yours* and *Starters* chips filter client-side with honest SIMULTANEOUS counts instead of a ``?scope=mine`` server round-trip.\n\nBINDING RULE — ``is_mine`` IS COMPUTED SERVER-SIDE FROM THE AUTHENTICATED CALLER, AND A RAW ``created_by`` IS DELIBERATELY NOT PROJECTED ONTO THIS MODEL. A raw ``created_by`` is safe under TODAY's predicate (the sole non-caller rows are migration-seeded globals) and starts emitting other users' identifiers the moment a later phase widens it — and v3.4's co-tenant ``org_id`` / ``is_org_shared`` model is exactly that widening, with no code change here and no review. ``is_mine`` CANNOT widen: it discloses one bit about the caller themselves. ``is_system_global`` describes the ROW, never a person.\n\nIt feeds the library identity line's recency half (\"changed 2 months ago\").\n\nIT PASSES THE BINDING RULE ABOVE, FOR THE RULE'S OWN STATED REASON — it \"describes the ROW, never a person\", exactly as ``is_system_global`` does. It discloses WHEN a row the caller can ALREADY see last changed, and it can never begin emitting a second user's identifier however the predicate later widens.\n\nTYPED ``str``, NEVER ``datetime``, AND THE REASON IS THE ONE ``DraftCreateResponse.token`` ALREADY BANKED (:184-188): a ``datetime``-typed field re-serializes through Pydantic and DROPS the fractional part when microseconds are 0, so the wire string's width would vary with the clock. Typing it ``str`` and calling ``.isoformat()`` in the builder makes the wire value exactly what the database returned.\n\n``workflow_definitions_block_published`` (``full-schema.sql:3764``) makes a published row immutable, so its ``updated_at`` is frozen at the publish flip — which IS the last time it changed. Do NOT add a second field to \"fix\" this.\n\n⚠ THESE ARE **NOT** ``updated_at``, AND THE PARAGRAPH DIRECTLY ABOVE IS WHY THAT MATTERS. On a published row ``updated_at`` is the PUBLISH time, deliberately. ``last_run_at`` is a RUN's own ``created_at``, from a different table. A surface that showed one as the other would be lying about the exact fact this field exists to tell the truth about. None of the three may render blank, a fabricated time, or a green tick.\n\n⚠ ``last_run_status`` IS A PLAIN NULLABLE ``str``, NEVER AN ENUM, AND THAT IS BINDING.\n\n⚠ ``last_run_at`` IS TYPED ``str`` FOR THE REASON ``updated_at`` IS, four paragraphs up: a ``datetime``-typed field re-serializes through Pydantic and DROPS the fractional part when microseconds are 0, so the wire string's width would vary with the clock. The plan for this phase wrote ``datetime | None`` in one sentence and *\"matching the ``updated_at`` precedent exactly\"* in the next; the precedent wins, because it is the one backed by a measurement.\n\nTHEY PASS THIS MODEL'S BINDING RULE FOR THE RULE'S OWN STATED REASON — they \"describe the ROW, never a person\". ⚠ And the join behind them is OWNER-SCOPED (``r.user_id = $1``), so on a world-readable ``is_system_global`` row a caller sees THEIR run of it and never another tenant's; the raw ``user_id`` is never projected onto this model at all.\n\n**What it is:** whether ANY run of this definition exists, by ANYBODY. A ROW-LEVEL fact.\n\n⚠ **What it is NOT, and the pair is the whole point of the field.** It is not ``last_run_at`` / ``last_run_status``, which are OWNER-SCOPED and answer *did MY last run of this work?*. A caller-scoped fact rendered as a row-level one is FALSE, not merely unhelpful.\n\n⚠ **The disclosure budget is EXISTENCE ONLY** — no count, no timestamp, no user id, no org id, no status.\n\nCoercing that absence to ``False`` would manufacture the affirmative claim *\"nobody has run this\"* out of nothing, which is the shape of this very bug one layer down. The serializers use ``r.get(\"has_any_run\")``, never ``bool(...)``.\n\n⚠ **THE ``response_model`` TRAP, verbatim from ``192.2-03``'s finding:** these routes declare ``response_model``, which DROPS UNDECLARED KEYS SILENTLY — a green backend test beside an unchanged UI. The model and the builders move together or the column never reaches the client."
       },
+      "QueueBatch": {
+        "properties": {
+          "policy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Policy Id"
+          },
+          "policy_name": {
+            "type": "string",
+            "title": "Policy Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "delete",
+              "review"
+            ],
+            "title": "Kind"
+          },
+          "scope_text": {
+            "type": "string",
+            "title": "Scope Text"
+          },
+          "kept_for_text": {
+            "type": "string",
+            "title": "Kept For Text"
+          },
+          "found_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found At"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/QueueRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "held": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedNote"
+            },
+            "type": "array",
+            "title": "Held"
+          },
+          "undecidable": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedNote"
+            },
+            "type": "array",
+            "title": "Undecidable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "policy_id",
+          "policy_name",
+          "kind",
+          "scope_text",
+          "kept_for_text",
+          "rows",
+          "held",
+          "undecidable"
+        ],
+        "title": "QueueBatch"
+      },
+      "QueueList": {
+        "properties": {
+          "batches": {
+            "items": {
+              "$ref": "#/components/schemas/QueueBatch"
+            },
+            "type": "array",
+            "title": "Batches"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "batches",
+          "total"
+        ],
+        "title": "QueueList"
+      },
+      "QueueRow": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "folder_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Path"
+          },
+          "document_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Date"
+          },
+          "due_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Since"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "found_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "name",
+          "kind"
+        ],
+        "title": "QueueRow"
+      },
       "RateResultBody": {
         "properties": {
           "rating": {
@@ -19248,6 +21702,78 @@
           "org_id"
         ],
         "title": "ResolvedExpertBundle"
+      },
+      "RetentionSummary": {
+        "properties": {
+          "sweep_enabled": {
+            "type": "boolean",
+            "title": "Sweep Enabled"
+          },
+          "sweep_hour_utc": {
+            "type": "integer",
+            "title": "Sweep Hour Utc"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sweep_enabled",
+          "sweep_hour_utc",
+          "counts"
+        ],
+        "title": "RetentionSummary"
       },
       "RuleCreate": {
         "properties": {
@@ -20671,6 +23197,24 @@
         ],
         "title": "SkillVersionResponse"
       },
+      "SkippedNote": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "why": {
+            "type": "string",
+            "title": "Why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "why"
+        ],
+        "title": "SkippedNote"
+      },
       "SourceConfirmOutcome": {
         "properties": {
           "external_id": {
@@ -21201,6 +23745,37 @@
         ],
         "title": "SuggestedNewSkill",
         "description": "Mirrors ``DraftPromptSuggestion``'s reasoning, not just its shape: this is a DRAFT-only model, deliberately NOT a persisted read shape."
+      },
+      "SweepRunOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SweepRunOut"
       },
       "SyncRunResponse": {
         "properties": {
@@ -22260,6 +24835,35 @@
         ],
         "title": "TunerTarget",
         "description": "One benchmark target column (a provider + its representative model)."
+      },
+      "UnarchiveOut": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "policy_name": {
+            "type": "string",
+            "title": "Policy Name"
+          },
+          "skip_written": {
+            "type": "boolean",
+            "title": "Skip Written"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "name",
+          "policy_name",
+          "skip_written"
+        ],
+        "title": "UnarchiveOut"
       },
       "ValidateResponse": {
         "properties": {
