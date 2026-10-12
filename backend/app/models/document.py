@@ -87,6 +87,15 @@ class DocumentResponse(BaseModel):
     # `connector_connections` read; absence renders "a connected source".
     source_connection_name: str | None = None
 
+    # Phase 275 (RET-04 / D-19 / D-21; B-NEW-1) — the archive state, so the Library can show
+    # "Archived" / hide archived rows and "Deleted at source". DEFAULTED for the 217 reason (five
+    # routes build this from a narrow select). `archived_policy_name` is the snapshot that survives
+    # the policy's removal; `retrievable` is migration 205's generated column.
+    archived_at: datetime | None = None
+    archived_policy_id: UUID | None = None
+    archived_policy_name: str | None = None
+    retrievable: bool | None = None
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def tables_stage_applies(self) -> bool:

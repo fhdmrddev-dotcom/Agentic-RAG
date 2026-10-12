@@ -157,6 +157,9 @@ class DocumentSearchRequest(BaseModel):
     dates: list[FindDate] = Field(default_factory=list, max_length=3)
     relationship: FindRelationship | None = None
     version: VersionState = "latest"
+    # Phase 275 (RET-04 / D-18) — archived documents are hidden unless asked for. extra="forbid"
+    # stays, so the backend must ship before a frontend that sends this key (Pitfall 13).
+    include_archived: bool = False
     sort: SortKey = "added_desc"
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=25, ge=1, le=100)

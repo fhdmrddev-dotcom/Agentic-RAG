@@ -111,6 +111,7 @@ const TAG_GROUPS = [
       "checked-queries",
       "library",
       "knowledge-health",
+      "retention",
     ],
   },
   {
