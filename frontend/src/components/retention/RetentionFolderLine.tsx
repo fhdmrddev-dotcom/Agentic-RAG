@@ -11,11 +11,23 @@
  */
 import { Pause } from "lucide-react"
 
-import type { RetentionFolderState } from "@/lib/api/retention"
+import type { RetentionFolderPolicyLine, RetentionFolderState } from "@/lib/api/retention"
 import { RETENTION_ACTION_META, RetentionChip, RichCopy } from "./RetentionChip"
 import { RETENTION_COPY, fillCopy } from "./retentionCopy"
 
 const C = RETENTION_COPY
+
+/**
+ * 275-05 (G-4 FAIL-2): `kept_for_text` already ends with a stage-2 `, delete after N`, so filling
+ * the template with it read "…, delete after 2 days, then archived" — the archive AFTER the delete.
+ * The server's `rule_text` (`Kept {period}, then {then}[; queued for deletion …].`) is the ONE ordered
+ * sentence; split it into the template's two slots. Any other shape keeps the old fill. A `?raw`
+ * fence in libraryRetention.test.tsx pins `evaluate.rule_text`'s shape.
+ */
+function policySlots(p: RetentionFolderPolicyLine, then: string): { kept_for: string; then: string } {
+  const m = /^Kept (.+?), then (.+)\.$/.exec(p.rule_text ?? "")
+  return m ? { kept_for: m[1], then: m[2] } : { kept_for: p.kept_for_text, then }
+}
 
 export function RetentionFolderLine({
   state,
@@ -41,7 +53,7 @@ export function RetentionFolderLine({
             {tag.label}
           </RetentionChip>
           <span>
-            <RichCopy text={fillCopy(C.sketchTemplates.folderPolicy, { kept_for: policy.kept_for_text, then: tag.then })} />
+            <RichCopy text={fillCopy(C.sketchTemplates.folderPolicy, policySlots(policy, tag.then))} />
             {policy.kind === "inherited" &&
               fillCopy(C.specTemplates.folderInherited, {
                 policy: policy.policy_name,
