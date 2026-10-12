@@ -475,3 +475,164 @@ test id, it is the same test.) Passed rose 6932 → 6973: +41 = the 16 `test_275
    `docker logs` to narrow, and an explicit operator decision before any production probe.
 5. **CLAUDE.md is past the 120k warn band** — the split is now scheduled (CLAUDE.md's own rule), not
    urgent (hard limit 150k).
+
+## 275-05 Task 1 — merged-tree gates (2026-10-12, `develop` @ `71c61a6f0`, 275-01..04 merged)
+
+Main working tree, no sibling agent. Local-DB lock held for the backend baseline, the live suites and the
+EXPLAIN probe, then released. One vitest count-gate run (the phase's only full one, revision W-5).
+
+### Backend unit baseline
+
+Command: `node scripts/check-backend-unit-baseline.cjs -- tests/unit -q --continue-on-collection-errors -rf -p no:cacheprovider`
+
+```
+71 failed, 7146 passed, 1 skipped, 2 xfailed, 2 xpassed, 46 warnings in 358.44s (0:05:58)
+[GATE PASSED] Backend unit baseline satisfied (failed: 71 <= 71, errors: 0).
+```
+
+**FAILED SET diff against the base set above: EMPTY** (71 ids on both sides). The one raw `comm` line was the
+same interleaved-warning artifact 275-01/02/03 recorded:
+`test_explorer_agent.py::TestSendMessageAgentModeBranching::test_send_message_explorer_mode_uses_explorer_prompt`
+with a `...\_pytest\unraisableexception.py:33:` path glued onto the line; normalised to the test id, it is the
+same base id. Passed: 6932 (base) → 7146 (+214, the phase's new unit cases).
+
+### Live suites
+
+Command: `pytest tests/integration/test_275_hold_triggers.py tests/integration/test_275_policy_rls.py tests/integration/test_275_retrievable.py tests/integration/test_275_disposition.py tests/integration/test_272_rpc_document_scope.py tests/integration/test_272_scope_rls.py -q`
+
+```
+71 passed, 19 warnings in 19.94s
+```
+
+No skips, no failures.
+
+### OpenAPI snapshot
+
+`pytest tests/unit/test_276_openapi_snapshot_fresh.py -q` →
+
+```
+2 passed, 1 warning in 0.39s
+```
+
+### Vitest count gate
+
+Command: `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` (repo root). Verdict (verbatim):
+
+```
+  total                                      9344   10131    +787
+  total 10131  ·  failed 0  ·  pinned total 9344
+count gate OK — 434/434 pinned files present, no per-file decrease, 0 failing.
+```
+
+Green on the first run; the cap stayed at 2 and was neither adjusted nor needed.
+Arithmetic against base (`9983 · 9196 · 424/424`): pinned +148 = 275-02 (+24) + 275-04 (seven new suites
+12+18+16+13+11+16+16 = 102, the `retentionCopy` re-pin 5→16 = +11, `OrgAdminShell.test.tsx` adopted at 11).
+Files 424 → 434 = 275-02 (+2) + 275-04 (+7 suites, +1 adopted). **No residual.** The grand total rose by the
+same +148. All nine suites under `frontend/src/components/retention/__tests__/` are pinned by basename in
+BASELINE (holdRefusals 10, retentionCopy 16, libraryRetention 12, RetentionSection 18, LegalHolds 16,
+WaitingForYou 13, RetentionTab 11, RetentionPolicyEditor 16, RetentionHistory 16), and the directory is a
+TARGETS entry. The five suites the gate prints as `new` (PromptVariableChips, RunHero, automationFacts,
+nodeEffectBanner, toolReadOnlyMap) were added in phases 200.2-209: inherited unpinned suites, not 275's.
+
+### Frontend typecheck (full set diff — the phase's only full tsc run, revision W-5)
+
+Command: `cd frontend && npx tsc -p tsconfig.app.json --noEmit` → exit 2, **66 errors = base count.**
+
+Set diff against the base set above:
+
+```
+only at HEAD: src/pages/LibraryPage.tsx:62:TS6133  (x2)
+only at base: src/pages/LibraryPage.tsx:58:TS6133  (x2)
+```
+
+The same two errors (`TabsList`, `TabsTrigger` declared but never read; the import line is byte-identical at base
+and HEAD) moved from line 58 to 62 because 275-04 added four import lines above them. **No new error in any
+275-touched file.**
+
+### Deploy drift
+
+`bash scripts/check-deploy-drift.sh` → exit 0:
+
+```
+RESULT: PASS — the one-box deploy artifacts are in sync.
+```
+
+with two non-blocking WARNs, verbatim:
+`migration(s) above #198 carry seed-like INSERT/UPDATE — review whether the OPERATOR.md Step-3 list needs them: 204_retention_and_legal_hold.sql`
+and `docker compose unavailable/denied here — CI (ubuntu-latest) runs the authoritative parse; using a structural fallback`.
+The 204 WARN was read: its only `INSERT INTO` statements (`:397`, `:428`) are inside the sticky-coverage trigger
+functions, not seed rows, so the Step-3 seed list needs nothing for 204.
+
+### Docs coverage
+
+`node scripts/check-docs-coverage.cjs` → exit 0:
+
+```
+112 code keys · 261 inventory IDs · 119 pages (32 written / 87 stubs)
+docs coverage OK — every code key and inventory ID has a page (excluded by decision: I20).
+```
+
+### M-1 regression check — EXPLAIN of the vector body
+
+The INDEX-branch body of `match_document_chunks` (mig 205: org gate, the three visibility arms, `d.retrievable`,
+`is_latest`, threshold 0.0, LIMIT 20) as `authenticated` with both claim GUCs and a STORED embedding as the
+query. `has_function_privilege('authenticated', …)` was checked first for every function the body calls (the
+275-01 finding: a refused call crashes the local backend). recall_bench got 205's column DDL + ANALYZE inside a
+ROLLED-BACK transaction (275-01's method). Subplan and filter detail lines are elided:
+
+```
+=== local dev DB (carries 204/205)
+indexes: ['document_chunks_embedding_idx']
+ authenticated EXECUTE current_user_org_ids() True
+ authenticated EXECUTE folder_is_org_shared(uuid) True
+ authenticated EXECUTE connection_doc_is_visible(uuid,text) True
+ retrievable column: 1
+ caller owns 8747/8844 chunks; dims=1536
+   Limit (actual rows=20 loops=1)
+     ->  Nested Loop Semi Join (actual rows=20 loops=1)
+           Join Filter: (dc.org_id = (current_user_org_ids()))
+           ->  Nested Loop (actual rows=20 loops=1)
+                 ->  Index Scan using document_chunks_embedding_idx on document_chunks dc (actual rows=21 loops=1)
+                       Order By: (embedding <=> '<stored embedding>'::vector)
+                       Filter: (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR document_is_retrievable(document_id)) 
+                               Filter: (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id 
+                 ->  Index Scan using documents_pkey on documents d (actual rows=1 loops=21)
+                       Index Cond: (id = dc.document_id)
+                       Filter: (retrievable AND is_latest AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrieva
+   Planning Time: 0.979 ms
+   Execution Time: 35.296 ms
+=== recall_bench (205 column DDL + ANALYZE in a ROLLED-BACK TX)
+indexes: ['document_chunks_embedding_idx']
+ authenticated EXECUTE current_user_org_ids() True
+ authenticated EXECUTE folder_is_org_shared(uuid) True
+ authenticated EXECUTE connection_doc_is_visible(uuid,text) True
+ retrievable column: 1
+ caller owns 69805/100000 chunks; dims=1536
+   Limit (actual rows=20 loops=1)
+     ->  Nested Loop Semi Join (actual rows=20 loops=1)
+           Join Filter: (dc.org_id = (current_user_org_ids()))
+           ->  Nested Loop (actual rows=20 loops=1)
+                 ->  Index Scan using document_chunks_embedding_idx on document_chunks dc (actual rows=21 loops=1)
+                       Order By: (embedding <=> '<stored embedding>'::vector)
+                 ->  Index Scan using documents_pkey on documents d (actual rows=1 loops=21)
+                       Index Cond: (id = dc.document_id)
+   Planning Time: 0.687 ms
+   Execution Time: 12.051 ms
+```
+
+**Both use `document_chunks_embedding_idx`.** No regression. (275-01's local EXPLAIN showed a top-N heapsort,
+identical before and after the swap; that probe's script is not in the tree, so the cause of the plan difference
+is not measured. The claim here is only that the index is chosen on the merged tree.)
+
+### Ledger and CLAUDE.md size (after the ledger close)
+
+```
+hot-file ledger — .planning/phases/275-retention-legal-hold
+  scan list: 505 rows · subject: 110 files · watched: 58
+ledger gate OK — every watched file has a row.
+
+  CLAUDE.md                                  121650 chars   81.1% of limit  headroom   28350  [WARN]
+claude-md size gate OK WITH WARNINGS — 1 file(s) past 120000 chars. Schedule the split now, not at 150k.
+```
+
+Both exit 0.

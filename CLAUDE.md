@@ -754,14 +754,14 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | `frontend/src/lib/api.ts` | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
-| `frontend/src/types/index.ts` | 98 / 78 / 1542 (was `97 / 76 / 1533`) | **275-04**: `Document` +5 optional retention fields, additive. Seam OWED |
-| `backend/app/main.py` | 87 / 63 / 978 (was `86 / 62 / 977`) | **274-02**: ONE `include_router(workspace_promote.router)` beside `workspace.router` + 1 import name. 0 new branches |
-| `backend/app/config.py` | 88 / 51 / 1695 | ⚠ STALE a 14th time (`87/50/1593`). **262**: `api_surface` + `API_SURFACES` + `provider_hint`. ⛔ `MODEL_CAPABILITIES` seam STILL OWED — 12 of 15 fields are now DB-settable, the dict is not |
+| `frontend/src/types/index.ts` | 98 / 77 / 1542 (was `98 / 78 / 1542`) | **275-04**: `Document` +5 optional retention fields, additive. Seam OWED |
+| `backend/app/main.py` | 89 / 64 / 1002 (was `87 / 63 / 978`) | **275-03**: one flag-guarded RetentionSweepService start + stop, one `include_router(retention.router)`. ⛔ scheduler_service untouched |
+| `backend/app/config.py` | 91 / 53 / 1705 (was `90 / 52 / 1698`) | ⚠ STALE (`88/51/1695`). **275-03**: ONE flag `retention_sweep_enabled` (default False); hour/poll/lease stay constants (D-37). ⛔ `MODEL_CAPABILITIES` seam OWED |
 | `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `backend/app/api/documents.py` | 91 / 35 / 2518 (was `87 / 34 / 2414`) | ⚠ STALE (`87/34/2414`). **270-02**: +1 route (`POST /{id}/download-url`) outside the 217 region + 1 batched read. ⛔ RLS read BEFORE service sign; 404 not 403; no `ingestion_step` literal |
-| `scripts/vitest-count-gate.cjs` | 290 / 68 / 6428 (was `288 / 64 / 6404`) | **275-02/04**: retention dir + 9 suites pinned; `OrgAdminShell.test.tsx` adopted (11) |
+| `backend/app/api/documents.py` | 92 / 36 / 2532 (was `91 / 35 / 2518`) | **275-02**: 2 `assert_none_held` calls + `map_hold_refusal` + storage moved below the row delete (D-38). 0 new `if` (AST-pinned vs PHASE_BASE). `Request` param only |
+| `scripts/vitest-count-gate.cjs` | 290 / 65 / 6428 (was `290 / 68 / 6428`) | **275-02/04**: retention dir + 9 suites pinned; `OrgAdminShell.test.tsx` adopted (11) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 at 256-03's head |
 | `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ **NOW FIRES at 3 phases, and its detail row still read `no (2 phases)` — present and WRONG, which stops an audit harder than absent.** Promoted here by 256-04; **256-03** closed its `None` finalize |
 | `frontend/src/components/panel/PhaseCard.tsx` | 17 / 11 / 788 | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253. honoured by construction (200 / **214**) |
@@ -812,8 +812,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
-| `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 16 / 372 (was `28 / 14 / 332`) | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a held row opens into the refusal |
-| `frontend/src/pages/LibraryPage.tsx` | 57 / 21 / 1297 (was `53 / 18 / 1218`) | **275-04**: ONE batched retention read, folder line, hidden line on Find's include_archived. Extraction OWED |
+| `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a held row opens into the refusal |
+| `frontend/src/pages/LibraryPage.tsx` | 57 / 19 / 1297 (was `57 / 21 / 1297`) | **275-04**: `useRetentionStates` (ONE batched read), folder line under FolderDetail, `splitArchived` + hidden line on Find's include_archived. Extraction OWED |
 | `backend/app/services/retrieval_service.py` | 19 / 11 / 456 | ⛔ **extraction still OWED (SEED-224, since 231).** 241 is the SECOND landing, 11 lines; a THIRD must propose the extraction FIRST |
 | `backend/app/services/recall_eval.py` | 4 / 3 / 1070 | ⚠ **FIRES (3 phases).** Offline eval harness; safe as-is (Blocker B / D-246-12), additive plan inspection & latency p50/p95 |
 | `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 16 / 11 / 666 (was `15 / 10 / 654`) | **275-04**: ONE optional `retention` prop → Retention section after File |
@@ -821,7 +821,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
 | `backend/app/services/agent_loop.py` | 65 / 31 / 3651 (was `57 / 28 / 3580`) | **274-01**: ONE literal — attachments stay with the conversation (D-26); `_ATTACHMENT_KIND` unchanged. ⛔ prompt-assembly seam OWED (OV-273-03) |
-| `backend/app/services/tool_dispatcher.py` | 93 / 40 / 5234 | ⚠ STALE (`92/39/5221`). **268-03**: +4 audit keys in the 2 existing `search.query` dicts. ⛔ registry/handler split OWED |
+| `backend/app/services/tool_dispatcher.py` | 98 / 43 / 5068 (was `97 / 42 / 5057`) | ⚠ STALE (`93/40/5234`). **275-02**: 1 import + 3 `unretrievable` walls + `retrievable_only=True` on 3 calls. ⛔ registry/handler split OWED |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |
@@ -884,18 +884,23 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 6 / 4 / 531 | ⚠ STALE (`4/3/530`). **276-07**: category text via `decodeEntities` |
 | `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
 | `backend/app/services/ingest_splice.py` | 19 / 7 / 930 (was `15 / 6 / 877`) | ⚠ STALE (`15/6/877`). **270-01**: ONE best-effort UPDATE after the splice writes the file facts; skipped when every fact is None. ⛔ a failed facts write logs and never fails ingest |
-| `frontend/src/components/ingestion/FolderTree.tsx` | 12 / 7 / 207 | ⚠ absent its ENTIRE LIFE — row added 266. **266-04**: ONE optional prop threaded. ⛔ no fetch here |
-| `frontend/src/components/ingestion/FolderNode.tsx` | 12 / 6 / 272 | ⚠ absent its ENTIRE LIFE — row added 266. The note is NavRow's `caption` now; tooltip-only was invisible (UI-3) |
+| `frontend/src/components/ingestion/FolderTree.tsx` | 13 / 8 / 213 (was `12 / 7 / 207`) | **275-02**: confirm stays open until the delete answers; rethrows ONLY a 409 `ApiRefusal` to FolderNode. ⛔ no fetch here |
+| `frontend/src/components/ingestion/FolderNode.tsx` | 13 / 7 / 303 (was `12 / 6 / 272`) | **275-02**: one `refusal` state (cleared when the confirm closes); a 409 swaps Delete+Cancel for the notice. ⛔ no fetch here |
 | `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05. ONE optional `caption`; ⛔ deliverable words never tooltip-only |
-| `backend/app/models/document.py` | 11 / 8 / 207 | ⚠ STALE (`10/7/183`). **270-02**: 4 optional file-fact fields + `source_connection_name` + the download-response model, additive. ⛔ optional fields only: a required one 500s five non-upload paths |
+| `backend/app/models/document.py` | 12 / 9 / 216 (was `11 / 8 / 207`) | **275-03**: 4 defaulted fields (archived_at, archived_policy_id, archived_policy_name, retrievable). ⛔ optional only (217 precedent) |
 | `frontend/src/components/ingestion/DocumentRow.tsx` | 10 / 5 / 583 (was `8 / 4 / 564`) | **275-04**: ONE `retention` prop + ONE `<RetentionRowChips>`; still seven `<td>` |
 | `frontend/src/components/org/OrgAdminShell.tsx` | 7 / 5 / 454 (was `3 / 5 / 442`) | ⚠ now FIRES. **275-04**: Retention live — 1 branch + `recordingPulse`. ⛔ extraction FIRST next |
-| `frontend/src/lib/api/documents.ts` | 7 / 7 / 499 (was `6 / 6 / 490`) | **274-03**: `uploadWorkspaceTemplate(…, lifetime)` — only `"thread"` appends the query; cloud attach sends X-Org-Id via getAuthHeaders. ⛔ panel/workflow doors byte-unchanged |
-| `backend/app/api/folders.py` | 11 / 7 / 233 | ⚠ absent its ENTIRE LIFE — row added 275-01. 275-02: ONE hold_guard call, rows before bytes, folder.delete audit. ⛔ no new branch |
-| `backend/app/api/kb.py` | 13 / 8 / 504 | ⚠ absent its ENTIRE LIFE — row added 275-01. grep is covered by mig 205's GUC policies with no edit |
+| `frontend/src/lib/api/documents.ts` | 8 / 8 / 503 (was `7 / 7 / 499`) | **275-02**: deleteDocument / deleteFolder `throw await refusalOf(...)`; imports refusal.ts, exports nothing new (barrel contract) |
+| `backend/app/api/folders.py` | 12 / 8 / 277 (was `11 / 7 / 233`) | **275-02**: guard over subtree docs + folder ids (B-1) before any delete; rows → folder → bytes; one `folder.delete` audit on the folder's org |
+| `backend/app/api/kb.py` | 14 / 9 / 515 (was `13 / 8 / 504`) | **275-02**: ls/tree/glob's 7 document reads gain `.eq(RETRIEVABLE_COLUMN, True)`. ⛔ `read_path` untouched (Library GET content shares it) |
 | `backend/app/services/audit_service.py` | 8 / 8 / 96 | ⚠ absent its ENTIRE LIFE — row added 275-01. **275-01**: +3 connector.watch.*, +10 retention types. ⛔ ⊆ live CHECK |
 | `backend/app/services/expert_scope.py` | 6 / 3 / 632 | ⚠ crossed G-5 on 275-01: names RETRIEVABLE_COLUMN (the `.or_` copy deleted). Next phase: extraction FIRST |
-| `backend/app/services/document_relationship_service.py` | 5 / 3 / 457 | ⚠ absent its ENTIRE LIFE at 3 phases — row added 275-01; 275-02 edits it (B-2) |
+| `backend/app/services/document_relationship_service.py` | 6 / 4 / 465 (was `5 / 3 / 457`) | honoured by construction — one default-False kwarg + one `.eq` per read leg, Library callers unchanged, source fence (row column, not a 2nd query) |
+| `backend/app/api/sources.py` | 9 / 3 / 706 (was `8 / 2 / 693`) | ⚠ now FIRES (`8/2/693` read `no`). **275-02**: both purge doors guard first; the swallow is GONE (PT409 → 409). ⛔ bytes still orphaned (deferred bug) |
+| `backend/app/models/document_search.py` | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ now FIRES (`2/2/171` read `no`). **275-03**: `include_archived: bool = False`. ⛔ `extra="forbid"` kept — backend ships BEFORE frontend (Pitfall 13) |
+| `backend/app/services/document_view_resolver.py` | 5 / 5 / 412 (was `4 / 4 / 403`) | ⚠ FIRES since 271 and ABSENT from this table — row added 275-05. **275-02**: one default-False kwarg + one `.eq` per read leg; Library callers unchanged |
+| `backend/app/services/retrieval_documents.py` | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ now FIRES (`1/1/174` read young). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on the 3 agent readers; 272 pins retired by name (D-18) |
+| `frontend/src/pages/findState.ts` | 3 / 3 / 374 (was `2 / 2 / 361`) | ⚠ now FIRES (`2/2/361` read `no`). **275-02**: `include_archived` + `SET_INCLUDE_ARCHIVED`; key sent only when true. ⛔ STRICT LEAF: zero imports, no I/O |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
