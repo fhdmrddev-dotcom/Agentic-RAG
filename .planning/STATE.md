@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: executing
-last_updated: "2026-10-12T18:55:09.443Z"
-last_activity: 2026-10-12 -- Phase 277 execution started
+status: in_progress
+last_updated: "2026-10-12T21:30:00.000Z"
+last_activity: 2026-10-12 -- Phase 277 complete (verified passed 4/4)
 progress:
-  total_phases: 14
-  completed_phases: 0
+  total_phases: 7
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 2
+  percent: 14
 ---
 
 # Project State
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 277 — registers-back-inside-the-band
+**Current focus:** v4.6 Pay It Down — 277 closed; next Phase 278 (One Home for Tools and Filters)
 
 ---
 
@@ -55,10 +55,10 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ## Current Position
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: 277 (registers-back-inside-the-band) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 277
-Last activity: 2026-10-12 -- Phase 277 execution started
+Phase: **277** (Registers Back Inside the Band) — ✅ COMPLETE 2026-10-12 · verification `passed` 4/4 · next **278** (One Home for Tools and Filters); next migration **207**
+Plan: 2/2 (277-01 REG-04 split, 277-02 REG-05 archive repair)
+Status: Phase 277 complete — ready to discuss 278
+Last activity: 2026-10-12 — 277 closed by hand. CLAUDE.md 121,650 → **89,171** chars (gate OK, no WARN). Review 277-REVIEW.md: 0 critical / **8 warning** / 5 info, all guard-hardening beyond the SCs (verifier) — **untriaged**. ⚠ `state.begin-phase` was run at 277 start despite the rule above and wrote `total_phases: 14` (false; corrected to 7 by hand) — the ninth false-record occurrence.
 
 ### Owed to the operator (carried from v4.5)
 
@@ -80,7 +80,7 @@ Last activity: 2026-10-12 -- Phase 277 execution started
 - SEED-354 (hold private documents), SEED-334 (272 SC#4 providers), SEED-224 (`retrieval_service.py`
   extraction), OV-273-02 (`tool_dispatcher.py` registry split), `expert_scope.py` extraction first.
 
-- CLAUDE.md past the 120k warn band — split scheduled.
+- ~~CLAUDE.md past the 120k warn band — split scheduled.~~ **DONE in 277** (89,171 chars).
 
 ---
 

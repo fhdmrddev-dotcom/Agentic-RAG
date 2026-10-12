@@ -39,8 +39,8 @@ Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not excee
 
 ### Register hygiene (REG)
 
-- [ ] **REG-04**: `CLAUDE.md` measures below the 120,000-char warn band (`node scripts/check-claude-md-size.cjs` exit 0 with no warning), split by function into `docs/` under the same-commit sync rule — nothing deleted.
-- [ ] **REG-05**: The v4.5 bookkeeping drift is repaired — archived REQUIREMENTS FIND-01/02/03/06 status, ROADMAP 270/271 progress rows, and the missing SUMMARY requirement fields.
+- [x] **REG-04**: `CLAUDE.md` measures below the 120,000-char warn band (`node scripts/check-claude-md-size.cjs` exit 0 with no warning), split by function into `docs/` under the same-commit sync rule — nothing deleted.
+- [x] **REG-05**: The v4.5 bookkeeping drift is repaired — archived REQUIREMENTS FIND-01/02/03/06 status, ROADMAP 270/271 progress rows, and the missing SUMMARY requirement fields.
 
 ## Future Requirements (deferred)
 
@@ -78,8 +78,8 @@ Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not excee
 | SEAM-01 | Phase 279 | Pending |
 | SEAM-02 | Phase 278 | Pending |
 | SEAM-03 | Phase 278 | Pending |
-| REG-04 | Phase 277 | Pending |
-| REG-05 | Phase 277 | Pending |
+| REG-04 | Phase 277 | Complete |
+| REG-05 | Phase 277 | Complete |
 
 **Coverage:** 20 v4.6 requirements · 20 mapped · 0 orphans · 0 duplicates (roadmap created 2026-10-12).
 

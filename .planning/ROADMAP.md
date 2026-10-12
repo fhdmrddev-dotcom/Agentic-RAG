@@ -123,7 +123,7 @@ and are stated so a phase can run early when its files are free:
 
 ### Phase Checklist
 
-- [ ] **Phase 277: Registers Back Inside the Band**: split CLAUDE.md by function into `docs/` below 120k with nothing deleted; repair the v4.5 bookkeeping drift (REG-04, REG-05)
+- [x] **Phase 277: Registers Back Inside the Band** (completed 2026-10-12): split CLAUDE.md by function into `docs/` below 120k with nothing deleted; repair the v4.5 bookkeeping drift (REG-04, REG-05)
 - [ ] **Phase 278: One Home for Tools and Filters**: `tool_dispatcher.py` registry/handler split pinned at 30 tools; `retrieval_service.py` seam measured and closed; one home for the filter vocabulary (SEAM-02, SEAM-03, DEBT-09)
 - [ ] **Phase 279: The Expert Scope Seam**: `expert_scope.py` extracted along its named seam; every `SEED-328` item fixed or recorded with a reason (SEAM-01)
 - [ ] **Phase 280: In Once, Out Clean**: same-bytes upload never retires the in-flight copy; Graph adapter pages, encodes and decodes honestly; purge and delete remove bytes and answer 404; a recorded decision for artifact rows on disposal (FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11)
@@ -260,7 +260,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 277. Registers Back Inside the Band | 0/TBD | Not started | - |
+| 277. Registers Back Inside the Band | 2/2 | Complete | 2026-10-12 |
 | 278. One Home for Tools and Filters | 0/TBD | Not started | - |
 | 279. The Expert Scope Seam | 0/TBD | Not started | - |
 | 280. In Once, Out Clean | 0/TBD | Not started | - |
