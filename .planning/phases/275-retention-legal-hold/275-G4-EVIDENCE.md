@@ -201,12 +201,12 @@ screenshot alone.
 
 | Id | What | Evidence / reproduction | Severity · routing |
 |---|---|---|---|
-| FAIL-1 | **History renders a `delete_refused` receipt as the raw action key `delete_refused`.** UI-SPEC S5 (`275-UI-SPEC.md:363`) requires `Refused to delete **{doc}**: on legal hold`. `RetentionHistory.tsx:94-95` falls to `default: return r.action`. There is no `delete_refused` case and no such template in `retentionCopy.ts` (the fence cannot see an absent string). | Place a hold on a folder, try to delete a document in it, then open Org admin → Retention → History. The row reads `✎ delete_refused`. Screenshot `g4-life-05-history-raw-delete-refused.png`. The receipts themselves are correct (`document_name`, `hold_name`, actor). | Copy defect, user-visible. G-3-sized (1 file, ≤ 10 lines + 1 copy key and its fence entry) → `/gsd:fast` candidate for verification |
-| FAIL-2 | **The folder line reads backwards for a two-stage policy**: `This folder: kept 1 day after added to the Library, delete after 2 days, then archived.` `RetentionFolderLine.tsx:44` fills `folderPolicy` (`kept {kept_for}, then {then}`) with `kept_for_text`. For a stage-2 policy that text already ends `, delete after 2 days` (`evaluate.py:224-230`), so the sentence claims archive happens after the delete. | Any archive + "Then queue it for deletion" policy on a folder → Library → that folder. Screenshot `g4-life-02-archived-hidden.png`. | Misleading copy (the Policies table and Waiting card are correct). Small fix; route to verification |
-| OBS-1 | **`DELETE /documents/{id}` answers 500 instead of 404 when the caller owns no such row.** The member deleting the admin's document fails, and so does the ADMIN deleting a non-existent id (both `curl` 500 / browser `ERR_FAILED`). Cause, by reading: `documents.py:1825-1833` calls `.maybe_single().execute()` and then reads `doc_resp.data`, which fails when postgrest returns `None` for zero rows. | `curl -X DELETE -H "Authorization: Bearer <any user>" -H "X-Org-Id: <org>" :8000/documents/00000000-0000-0000-0000-000000000001` → `500` | **Pre-existing**: the lines date from `7eb983acb` / `b1d676bb7` (2026-04), and the D-32 fence pins that 275 added no `if` there. Not a hold bypass (nothing is deleted). Out of 275's scope → candidate bug report |
-| OBS-2 | A folder whose every document is archived shows the empty state `No documents in this folder · Upload files above to add them here.` directly above `3 archived documents hidden · Show`. | LIFECYCLE-7 | Cosmetic contradiction; note for UI review |
-| OBS-3 | The posture count reads `1 policies` (template `{P} policies`, no `(s)`). | LIFECYCLE-3 | Cosmetic; spec-faithful wording |
-| OBS-4 | A `did_not_delete` receipt carries `hold_name = NULL`. Only `detail.held_since` names the hold time, so History cannot say which matter blocked the delete. | LIFECYCLE-12 SQL | Acceptable per the plan ("with the hold time"); recorded |
+| FAIL-1 | **History renders a `delete_refused` receipt as the raw action key `delete_refused`.** UI-SPEC S5 (`275-UI-SPEC.md:363`) requires `Refused to delete **{doc}**: on legal hold`. `RetentionHistory.tsx:94-95` falls to `default: return r.action`. There is no `delete_refused` case and no such template in `retentionCopy.ts` (the fence cannot see an absent string). | Place a hold on a folder, try to delete a document in it, then open Org admin → Retention → History. The row reads `✎ delete_refused`. Screenshot `g4-life-05-history-raw-delete-refused.png`. The receipts themselves are correct (`document_name`, `hold_name`, actor). | Copy defect, user-visible. **FIXED in `13e962d8b`** (test-first, RED `f62e19200`) — see §6.1. ⚠ Needs its own re-look at the operator's next UAT |
+| FAIL-2 | **The folder line reads backwards for a two-stage policy**: `This folder: kept 1 day after added to the Library, delete after 2 days, then archived.` `RetentionFolderLine.tsx:44` fills `folderPolicy` (`kept {kept_for}, then {then}`) with `kept_for_text`. For a stage-2 policy that text already ends `, delete after 2 days` (`evaluate.py:224-230`), so the sentence claims archive happens after the delete. | Any archive + "Then queue it for deletion" policy on a folder → Library → that folder. Screenshot `g4-life-02-archived-hidden.png`. | Misleading copy (the Policies table and Waiting card are correct). **FIXED in `88aec8e6f`** (RED `f62e19200`) — see §6.1. ⚠ Needs a re-look at the next UAT |
+| OBS-1 | **`DELETE /documents/{id}` answers 500 instead of 404 when the caller owns no such row.** The member deleting the admin's document fails, and so does the ADMIN deleting a non-existent id (both `curl` 500 / browser `ERR_FAILED`). Cause, by reading: `documents.py:1825-1833` calls `.maybe_single().execute()` and then reads `doc_resp.data`, which fails when postgrest returns `None` for zero rows. | `curl -X DELETE -H "Authorization: Bearer <any user>" -H "X-Org-Id: <org>" :8000/documents/00000000-0000-0000-0000-000000000001` → `500` | **Pre-existing**: the lines date from `7eb983acb` / `b1d676bb7` (2026-04), and the D-32 fence pins that 275 added no `if` there. Not a hold bypass (nothing is deleted). Out of 275's scope → **filed as BUG-261012-02** (§6.3), NOT fixed (`documents.py` is FIRING; D-32 guard-calls-only) |
+| OBS-2 | A folder whose every document is archived shows the empty state `No documents in this folder · Upload files above to add them here.` directly above `3 archived documents hidden · Show`. | LIFECYCLE-7 | Cosmetic contradiction. **FIXED in `86e29ccc0`** (RED `f62e19200`) — see §6.1. ⚠ Needs a re-look at the next UAT |
+| OBS-3 | The posture count reads `1 policies` (template `{P} policies`, no `(s)`). | LIFECYCLE-3 | Cosmetic. **FIXED in `443b29e8b`** (RED `f62e19200`) — see §6.1. ⚠ Needs a re-look at the next UAT |
+| OBS-4 | A `did_not_delete` receipt carries `hold_name = NULL`. Only `detail.held_since` names the hold time, so History cannot say which matter blocked the delete. | LIFECYCLE-12 SQL | **NULL is correct by decision** — see §6.1 (no code change) |
 
 ### 5.5 Cleanup (T-275-38) — done, recorded
 
@@ -221,3 +221,77 @@ screenshot alone.
 ## §6 — Known limits, registers, owed operator rows
 
 *Appended by 275-05 Task 3.*
+
+### 6.1 G-4 findings — the G-3 fast-fixes (2026-10-12, after the drive)
+
+Each was ≤ 1 source file / ~10 lines with no schema or API surface (G-3), so it was fixed inline,
+**test-first**: one RED commit `f62e19200` added a failing case per fix (4 failed, the rest green), then one
+fix commit each. Copy is ported verbatim from `275-UI-SPEC.md` and fenced by `retentionCopy.test.ts`.
+
+| Finding | Fix | Commit | Pin |
+|---|---|---|---|
+| FAIL-1 `delete_refused` rendered as the raw key | `receiptSentence` gains the S5 row `Refused to delete **{doc}**: on legal hold` (`specTemplates.historyDeleteRefused`, segments fenced vs the UI-SPEC, spec-template count 35→36) | `13e962d8b` | `RetentionHistory.test.tsx` 16→17 |
+| FAIL-2 folder line read the delete BEFORE the archive | `RetentionFolderLine` fills the S7 template's two slots from the server's ordered `rule_text` (`Kept {period}, then {then}[; queued for deletion …].`) instead of `kept_for_text` (which already ends `, delete after N`). The line now reads *"This folder: **kept 1 day after added to the Library**, then archived; queued for deletion 2 days after added to the Library."* Any other shape keeps the old fill. A `?raw` fence on `evaluate.py` pins `rule_text`'s two f-strings. Fixed on the CLIENT: `rule_text` is already the one ordered sentence (S8's home), so no API field was added | `88aec8e6f` | `libraryRetention.test.tsx` 12→15 (with OBS-2) |
+| OBS-3 `1 policies` | `postureCounts` takes the noun as `{policies}`; ported `wordPolicy` / `wordPolicies` (both verbatim in the sketch; ported count 71→73) | `443b29e8b` | `RetentionTab.test.tsx` 11→12 |
+| OBS-2 `No documents in this folder` above `3 archived documents hidden · Show` | `LibraryPage` does not mount `DocumentList` (whose empty state makes the claim) when every browse row is hidden as archived; the S9 hidden line carries the truth. One condition around the existing mount | `86e29ccc0` | in `libraryRetention.test.tsx` |
+| OBS-4 `did_not_delete` carries `hold_name = NULL` | **No change — NULL is correct, by decision.** (1) The spec's sentence names the TIME, not the matter: UI-SPEC S5 `Did not delete **{doc}**: put on legal hold after the sweep (on hold since {time})`; CONTEXT specifics "did not delete — on legal hold since <time>". (2) The receipt's subject is the DISPOSITION, so mig 204's CHECK requires `policy_name`, not a hold. (3) A document can be held by several matters at once; one `hold_name` column would pick one arbitrarily. (4) The matter is already on record: the hold's own `hold_placed` / `hold_extended` receipt names it, and `detail.held_since` dates the drop against it. (5) Populating it would add a name lookup inside the confirm transaction (`retention_held_documents` returns no names) for no reader the spec defines. Re-open if an auditor asks History to name the blocking matter | — | — |
+
+Gates after the fixes: the 9 retention suites `133 passed`; the 11 other suites that mount `LibraryPage`
+`192 passed | 1 skipped`; the count gate re-run is in §6.5. Count-gate BASELINE re-pinned for the three grown
+suites (non-decreasing). No backend file changed.
+
+⚠ **Fixes found by UAT need their own UAT.** All four are verified by rendered-word tests only. The
+operator's next UAT should re-look at: History after a refused delete; a two-stage folder's line; the
+posture line with one policy; a fully archived folder.
+
+### 6.2 Known limits (written here AND in `docs/public/administer/org/retention.md`)
+
+| Limit | Why | Routed |
+|---|---|---|
+| **Private documents cannot be held or covered by a policy this phase** (D-34 / D-35) | A policy reaches only org-visible documents; a hold covers only what an org admin can pick. Preview counts the private documents a policy does not reach and never names them (T-275-25) | **SEED-354** (org-wide matter by custodian), planted 2026-10-12 |
+| Re-uploading an archived file returns the archived row as a duplicate (Pitfall 10) | `documents_dedup_idx` is org-scoped; `ingest_splice.py:224-239` | documented; un-archive instead |
+| A watched source can bring a disposed file back (Pitfall 11) | disposition NULLs `connector_watch_items.document_id`; a later source change can re-mint | SEED-210 |
+| Mass archival can under-fill a vector search (Pitfall 8) | HNSW filters after the index walk (the `is_latest=false` mechanism already did this) | remedy: the existing `hnsw_iterative_scan` setting |
+| `message_artifacts` copies (mig 202) are not reached by a disposition | a chat artifact copied from a document is its own row; retention covers Library documents only (and the sweep never touches `workspace_files`, F6) | **SEED-072**'s data-protection review |
+| Watch purge leaves file bytes in storage | pre-existing (Phase 234); 275-02 added the guard only | **BUG-261012-01** |
+
+### 6.3 Registers
+
+| Register | Change | Evidence |
+|---|---|---|
+| SEED-250 | `folded` → **`answered`** by Phase 275 (plan list in `status_note`; not deployed) | this file §1-§5 |
+| SEED-345 | stays **`partially-answered`**; `status_note` now says the documents half SHIPPED in 275; chat/message retention and per-org rate limits remain; trigger unchanged | — |
+| BUG-261004-01 | `folded` → **`closed`**, `verified_closed_by: "275"` | Automated: `test_275_retrievable.py` (each source state × every arm, live, green in Task 1). **Live local read 2026-10-12**, run as the owner: both pre-existing `missing_at_source` documents (`43f0900b…` 132 chunks, `c8b51229…` 1 chunk) return **0** chunks on vector unscoped top-50, vector scoped index, vector scoped exact, keyword unscoped and keyword scoped. A rolled-back control (`source_state` NULL) returns them (31/50 · 50 · 50 · 3/3 · 3, and 1/50 · 1 · 1 · 1 · 1). Table in the bug file |
+| SEED-354 | **planted**: org-wide legal hold by custodian, reaching private documents. `trigger_when` = SEED-345's remainder gets a phase, OR a customer asks to hold a named person's documents, OR a phase changes admin visibility | D-35 |
+| BUG-261012-01 | **filed** (open, minor): both watch purge paths (`sources.py:328-344`, `:474-489`) delete rows, never storage bytes. 275-02 did NOT fix it (its SUMMARY `:194`) | code reading |
+| BUG-261012-02 | **filed** (open, minor): `DELETE /documents/{id}` → 500 instead of 404 for a row the caller does not own (OBS-1). Not fixed here: `documents.py` is FIRING and D-32 allowed guard calls only | G-4 MEMBER-7 |
+
+`node scripts/check-seeds-register.cjs` → `seeds register gate OK — 361/361 parsed, 0 duplicate ids, 361/361
+carry all 5 required keys.` Next free ids re-derived before writing: SEED max was 353 → 354; no
+`BUG-261012-*` existed → `-01`, `-02`.
+
+### 6.4 Owed operator rows (recorded, NOT performed — production is operator-gated)
+
+| # | Owed step | Notes |
+|---|---|---|
+| 1 | **Production DB: apply `204_retention_and_legal_hold.sql`, then `205_retrievable_predicate.sql`**, one operator-approved SQL-editor write at a time, each followed by its VERIFY rows reading PASS, **BEFORE the backend deploy** (D-29) | 205 reads 204's columns; the new backend reads `retrievable`, which only 205 creates |
+| 2 | `get_advisors(security)` on production after both migrations, compared with the last recorded baseline (0 ERROR) | T-275-08's production half (REVOKE … FROM PUBLIC before every GRANT) |
+| 3 | A production read of `SELECT source_state, count(*) FROM documents GROUP BY 1` (a free read): every non-NULL row leaves retrieval the moment 205 lands; list them in the deploy note | BUG-261004-01's production exposure; the 2026-10-04 read was all NULL |
+| 4 | Deploy the **backend before (or with) the frontend** (Pitfall 13) | Find's `include_archived` 422s on an old backend (`extra="forbid"`) |
+| 5 | **`RETENTION_SWEEP_ENABLED` stays `false` in Coolify** until an org admin has read a dry run (Preview) on production | D-29 / D-37 / T-275-28; the code default is false in all 4 deploy artifacts (drift PASS) |
+| 6 | G-4 rows marked OWED in §5 | **None**: HOLD, LIFECYCLE and MEMBER all ran (§5.1-§5.3). Owed instead: the operator's re-look at the four §6.1 fixes at the next UAT |
+
+`check-deploy-drift.sh` WARN (read, non-blocking): *"migration(s) above #198 carry seed-like INSERT/UPDATE —
+204_retention_and_legal_hold.sql"*. Measured: the two `INSERT INTO` statements (`:397`, `:428`) sit inside
+the sticky-coverage trigger functions, not seeds, so `docs/OPERATOR.md`'s Step-3 seed list needs nothing for 204.
+
+### 6.5 Count gate after the fast-fixes (re-run once, main working tree, `GSD_VITEST_MAX_WORKERS=2`, from the repo root)
+
+```
+  total 10136  ·  failed 0  ·  pinned total 9349
+count gate OK — 434/434 pinned files present, no per-file decrease, 0 failing.
+```
+
+`+5` total and `+5` pinned against Task 1's `10131 / 9344`: exactly the five new cases
+(`RetentionHistory.test.tsx` 16→17, `RetentionTab.test.tsx` 11→12, `libraryRetention.test.tsx` 12→15), all
+re-pinned. Green on the first run; the cap was neither adjusted nor needed.

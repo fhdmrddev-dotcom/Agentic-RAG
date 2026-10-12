@@ -4203,13 +4203,13 @@ const BASELINE = {
   // ── Phase 275-04 (S1-S9, RET-01..04) — every new suite under the `src/components/retention`
   // DIRECTORY entry (already in TARGETS since 275-02), pinned at its measured passing count on this
   // plan's tree (0 failing), each RED before its module existed. What each proves:
-  "libraryRetention.test.tsx": 12, // 275-04 — S6 one chip + one source chip, S7 admin vs member line (D-17), ONE batched document-states read (flag 2), hidden line = Find's include-archived state (D-04), S10 pre-open refusal
+  "libraryRetention.test.tsx": 15, // RE-PINNED 12 → 15 at 275-05 (G-4 fast-fixes: two-stage folder line + its rule_text ?raw fence, fully-archived list not claimed empty) · 275-04 — S6 one chip + one source chip, S7 admin vs member line (D-17), ONE batched document-states read (flag 2), hidden line = Find's include-archived state (D-04), S10 pre-open refusal
   "RetentionSection.test.tsx": 18, // 275-04 — every S8 sentence, member payload with no hold_names renders no matter (D-17), B-NEW-1 snapshot name, Un-archive receipt/failure (D-19), placed after File
   "LegalHolds.test.tsx": 16, // 275-04 — S3 card anatomy, Place hold held back with a visible reason, server count / "Couldn't count the documents yet." never 0 (D-05/D-35), release victim-naming not red
   "WaitingForYou.test.tsx": 13, // 275-04 — S4 type-the-count (D-03 / T-275-31): ticked start, untick clears the count, Enter only when enabled, late-hold drop named; review undecided by default (D-10)
-  "RetentionTab.test.tsx": 11, // 275-04 — S1 posture incl. sweeps-off (D-29), Waiting pill red only at N > 0 (D-01), roving tabs, sweep time from sweep_hour_utc, editor in place
+  "RetentionTab.test.tsx": 12, // RE-PINNED 11 → 12 at 275-05 ("1 policy") · 275-04 — S1 posture incl. sweeps-off (D-29), Waiting pill red only at N > 0 (D-01), roving tabs, sweep time from sweep_hour_utc, editor in place
   "RetentionPolicyEditor.test.tsx": 16, // 275-04 — S2 Preview gate (D-02 / T-275-32): aria-disabled + on-screen reason, stale re-lock, 409 rendered, save failure keeps preview; two clocks (D-22); stage 2 (D-20)
-  "RetentionHistory.test.tsx": 16, // 275-04 — S5 receipt sentences, ✎ only on writes, no links (D-12/D-13), Show older pages by 50
+  "RetentionHistory.test.tsx": 17, // RE-PINNED 16 → 17 at 275-05 (delete_refused sentence, G-4 FAIL-1) · 275-04 — S5 receipt sentences, ✎ only on writes, no links (D-12/D-13), Show older pages by 50
   // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
   // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
   "OrgAdminShell.test.tsx": 11,
