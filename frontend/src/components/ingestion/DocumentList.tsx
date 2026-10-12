@@ -12,7 +12,8 @@ import { reingestDocument } from "@/lib/api"
 import { MoveToFolderDialog } from "@/components/health/MoveToFolderDialog"
 import { ApiRefusal } from "@/lib/api/refusal"
 import { HoldRefusalNotice } from "@/components/retention/HoldRefusalNotice"
-import { RETENTION_COPY } from "@/components/retention/retentionCopy"
+import { RETENTION_COPY, holdRefusalFor } from "@/components/retention/retentionCopy"
+import type { RetentionStates } from "@/components/retention/useRetentionStates"
 import { DocumentRow, hasVersions, type DocumentColumns, type FindDateColumn } from "./DocumentRow"
 import type { Document, Folder } from "@/types"
 
@@ -36,6 +37,8 @@ interface Props {
   columns?: DocumentColumns
   /** Phase 271-03 — the Find Date column (header + row field). Default: Added. */
   findDateColumn?: FindDateColumn
+  /** Phase 275 (S6 / S10) — the server retention states from LibraryPage's ONE batched read. */
+  retention?: Pick<RetentionStates, "documents" | "canManage">
 }
 
 const DEFAULT_FIND_DATE_COLUMN: FindDateColumn = { label: "Added", field: "created_at" }
@@ -69,6 +72,7 @@ export function DocumentList({
   folders,
   columns = "browse",
   findDateColumn = DEFAULT_FIND_DATE_COLUMN,
+  retention,
 }: Props) {
   const isFind = columns === "find"
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -115,6 +119,17 @@ export function DocumentList({
       : folderId === null
         ? documents.filter((d) => d.folder_id == null)  // == catches null AND undefined (pre-migration docs)
         : documents.filter((d) => d.folder_id === folderId)
+
+  // Phase 275 (S10 / D-14): a document the server already says is HELD opens the delete dialog
+  // straight into the refusal — the same box a server-refused race shows, with one Close.
+  const requestDelete = (doc: Document) => {
+    const state = retention?.documents[doc.id]
+    setDeleteTarget(doc)
+    if (state?.held) {
+      const r = holdRefusalFor(state.hold_names, retention?.canManage ?? false)
+      setRefusal(new ApiRefusal(409, r.title, r.message))
+    }
+  }
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -211,11 +226,12 @@ export function DocumentList({
                 reingesting={reingestingId === doc.id}
                 onReingest={handleReingest}
                 onMove={setMoveTarget}
-                onDeleteRequest={setDeleteTarget}
+                onDeleteRequest={requestDelete}
                 onRefresh={onRefresh}
                 currentUserId={currentUserId}
                 columns={columns}
                 findDateColumn={findDateColumn}
+                retention={retention?.documents[doc.id]}
               />
             ))}
           </tbody>
