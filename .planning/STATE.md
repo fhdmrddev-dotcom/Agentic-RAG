@@ -8,10 +8,10 @@ last_activity: 2026-10-12
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
   percent: 0
-stopped_at: Phase 277 context gathered — next /gsd:plan-phase 277
+stopped_at: Phase 277 planned (2 plans, wave 1) — next /gsd:execute-phase 277
 ---
 
 # Project State
@@ -57,9 +57,9 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: **277** (Registers Back Inside the Band) — not started · 7 phases in the milestone (277-283); next migration **207** (re-run `ls supabase/migrations` at discuss)
-Plan: —
-Status: Ready to plan — context gathered (`277-CONTEXT.md`)
-Last activity: 2026-10-12 — Phase 277 discussed (target ≤ 90k; short verdict cells; cell cap 200→80; archive fixed in place)
+Plan: 2 plans (277-01 REG-04 split, 277-02 REG-05 archive repair), wave 1, parallel
+Status: Ready to execute
+Last activity: 2026-10-12 — Phase 277 planned; checker PASSED at iteration 3/3; decision coverage 14/14. ⚠ At 277 close the ORCHESTRATOR hand-edits: ROADMAP plan checkboxes, REG-04/05 traceability, STATE, and `v4.5-ROADMAP.md:3` (editing 277-02's single note in place, not adding a second — D-15)
 
 ### Owed to the operator (carried from v4.5)
 
