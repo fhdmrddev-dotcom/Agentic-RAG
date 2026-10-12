@@ -17,10 +17,9 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { ApiRefusal } from "@/lib/api/refusal"
 import {
-  CONFIRM_FALLBACK,
   confirmBatch,
+  isPreWriteRefusal,
   type ConfirmBatchBody,
   type ConfirmResult,
   type QueueBatch,
@@ -168,17 +167,12 @@ export function TypeTheCount({
  * committed delete could not remove. The green `Done` renders only when something was done.
  * `names` (the card's rows) names an item the server returned by id only.
  */
-export function BatchResultBanner({
-  result,
-  names = {},
-}: {
-  result: ConfirmResult
-  names?: Record<string, string>
-}) {
+export function BatchResultBanner({ result, rows = [] }: { result: ConfirmResult; rows?: QueueRow[] }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     ref.current?.focus()
   }, [])
+  const names: Record<string, string> = Object.fromEntries(rows.map((r) => [r.document_id, r.name]))
   const nameOf = (d: { document_id: string; name?: string | null }) => d.name ?? names[d.document_id] ?? d.document_id
   const list = (items: Array<{ document_id: string; name?: string | null }>) => items.map(nameOf).join(", ")
   // Dropped at confirm: from a delete (`did_not_delete`) or a review's archive (`skipped`).
@@ -246,34 +240,29 @@ export function BatchResultBanner({
 }
 
 /**
- * 275-REVIEW F-WR-01 — what a failed confirm may honestly say.
- *
- * The server refuses BEFORE any write with a 4xx (`Type 4 to confirm.`, `A document can have only
- * one decision.`, `Nothing was chosen.`, `That policy no longer exists.`) or a 503 (the org read was
- * incomplete; "…Nothing was changed."). Those render the server's sentence plus the fact that
- * nothing was written. Only a failure where the server said nothing it chose (network, 5xx) keeps
- * the contract copy — "Some documents may already be deleted" — because partial work is possible.
+ * 275-REVIEW F-WR-01 — what a failed confirm may honestly say. A refusal made before any write
+ * renders the server's sentence plus the fact that nothing was written. Only a failure where the
+ * server said nothing it chose keeps the contract copy ("Some documents may already be deleted"),
+ * because partial work is possible there.
  */
-export function confirmFailureMessage(err: unknown, keepOnly: boolean): string {
-  if (err instanceof ApiRefusal) {
-    const preWrite =
-      (err.status >= 400 && err.status < 500) || (err.status === 503 && err.message !== CONFIRM_FALLBACK)
-    if (preWrite) {
-      return /Nothing was (changed|deleted)/.test(err.message)
-        ? err.message
-        : `${err.message} ${C.contract.confirmRefusedNothing}`
-    }
+function confirmFailureMessage(err: unknown, keepOnly: boolean): string {
+  if (isPreWriteRefusal(err)) {
+    return /Nothing was (changed|deleted)/.test(err.message)
+      ? err.message
+      : `${err.message} ${C.contract.confirmRefusedNothing}`
   }
   return keepOnly ? C.contract.decisionsFailed : C.contract.confirmFailed
 }
 
-/** The card's own row names, so the banner can name an item the server returned by id only. */
-export function batchNames(batch: QueueBatch): Record<string, string> {
-  return Object.fromEntries(batch.rows.map((r) => [r.document_id, r.name]))
+/** What a card keeps about a failed confirm: the error, and whether only keeps/archives were sent. */
+export interface BatchFailureState {
+  error: unknown
+  keepOnly: boolean
 }
 
 /** An inline failure + Reload (the rows stay as the person left them). */
-export function BatchFailure({ message, onReload }: { message: string; onReload: () => void }) {
+export function BatchFailure({ failure, onReload }: { failure: BatchFailureState; onReload: () => void }) {
+  const message = confirmFailureMessage(failure.error, failure.keepOnly)
   return (
     <p role="alert" className={`flex flex-wrap items-center gap-2 text-sm ${AMBER_TEXT_CLASS}`}>
       {message}
@@ -299,7 +288,7 @@ export function DeleteBatchCard({
   const [unticked, setUnticked] = useState<Record<string, true>>({})
   const [typed, setTyped] = useState("")
   const [busy, setBusy] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<BatchFailureState | null>(null)
   const [result, setResult] = useState<ConfirmResult | null>(null)
 
   // A changed row set changes what N means: the typed count must be re-typed against it.
@@ -324,14 +313,14 @@ export function DeleteBatchCard({
       const res = await confirmBatch(batch.policy_id, body)
       setResult(res)
       onRecorded?.()
-    } catch (err) {
-      setFailure(confirmFailureMessage(err, keepOnly))
+    } catch (error) {
+      setFailure({ error, keepOnly })
     } finally {
       setBusy(false)
     }
   }
 
-  if (result) return <BatchResultBanner result={result} names={batchNames(batch)} />
+  if (result) return <BatchResultBanner result={result} rows={batch.rows} />
 
   return (
     <article className="grid gap-4 rounded-[10px] border border-border bg-card p-4" data-testid="delete-batch">
@@ -385,7 +374,7 @@ export function DeleteBatchCard({
           onConfirm={() => submit({ delete_ids: deleteIds, keep_ids: keepIds, archive_ids: [], typed_count: n }, false)}
         />
       )}
-      {failure && <BatchFailure message={failure} onReload={onReload} />}
+      {failure && <BatchFailure failure={failure} onReload={onReload} />}
     </article>
   )
 }

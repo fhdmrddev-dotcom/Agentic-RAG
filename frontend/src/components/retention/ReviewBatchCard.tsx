@@ -16,8 +16,7 @@ import {
   BatchResultBanner,
   BatchTable,
   TypeTheCount,
-  batchNames,
-  confirmFailureMessage,
+  type BatchFailureState,
 } from "./DeleteBatchCard"
 import { RETENTION_COPY, fillCopy } from "./retentionCopy"
 
@@ -43,7 +42,7 @@ export function ReviewBatchCard({
   const [decisions, setDecisions] = useState<Record<string, Decision | undefined>>({})
   const [typed, setTyped] = useState("")
   const [busy, setBusy] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
+  const [failure, setFailure] = useState<BatchFailureState | null>(null)
   const [result, setResult] = useState<ConfirmResult | null>(null)
 
   const ids = (d: Decision) => batch.rows.filter((r) => decisions[r.document_id] === d).map((r) => r.document_id)
@@ -65,16 +64,16 @@ export function ReviewBatchCard({
       })
       setResult(res)
       onRecorded?.()
-    } catch (err) {
+    } catch (error) {
       // With deletes, some may already have run: the honest confirm-failure copy — unless the
       // server refused before writing anything (275-REVIEW F-WR-01), when its sentence is shown.
-      setFailure(confirmFailureMessage(err, c === 0))
+      setFailure({ error, keepOnly: c === 0 })
     } finally {
       setBusy(false)
     }
   }
 
-  if (result) return <BatchResultBanner result={result} names={batchNames(batch)} />
+  if (result) return <BatchResultBanner result={result} rows={batch.rows} />
 
   return (
     <article className="grid gap-4 rounded-[10px] border border-border bg-card p-4" data-testid="review-batch">
@@ -126,7 +125,7 @@ export function ReviewBatchCard({
           </Button>
         </div>
       )}
-      {failure && <BatchFailure message={failure} onReload={onReload} />}
+      {failure && <BatchFailure failure={failure} onReload={onReload} />}
     </article>
   )
 }

@@ -413,7 +413,20 @@ export function listQueue(): Promise<QueueList> {
 }
 
 /** The sentence a confirm refusal carries when the server sent none of its own (275-REVIEW F-WR-01). */
-export const CONFIRM_FALLBACK = "Couldn't confirm the batch."
+const CONFIRM_FALLBACK = "Couldn't confirm the batch."
+
+/**
+ * 275-REVIEW F-WR-01 — did the server refuse a confirm BEFORE writing anything?
+ *
+ * `confirm_batch` refuses with a 4xx (`Type 4 to confirm.`, one decision per document, nothing
+ * chosen, the policy is gone) or a 503 whose sentence is its own (the org read was incomplete;
+ * "…Nothing was changed.") — all before any write. Any other failure (network, 5xx, a 503 with no
+ * sentence of the server's) may follow partial work.
+ */
+export function isPreWriteRefusal(err: unknown): err is ApiRefusal {
+  if (!(err instanceof ApiRefusal)) return false
+  return (err.status >= 400 && err.status < 500) || (err.status === 503 && err.message !== CONFIRM_FALLBACK)
+}
 
 export function confirmBatch(policyId: string, body: ConfirmBatchBody): Promise<ConfirmResult> {
   return call(`/queue/${encodeURIComponent(policyId)}/confirm`, post(body), CONFIRM_FALLBACK)
