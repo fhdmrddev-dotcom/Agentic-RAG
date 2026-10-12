@@ -4120,7 +4120,7 @@ const BASELINE = {
   "RelationshipsSection.test.tsx": 11, // 271-03
   "RelationshipsSection.a11y.test.tsx": 6, // 271-03
   // ── Phase 271-03 — every suite this plan CREATED, at its measured passing count. BOTH KNOBS, SAME COMMIT. ──
-  "findState.test.ts": 49, // 271-03 (2026-10-03)
+  "findState.test.ts": 54, // 271-03 (2026-10-03) · RE-PINNED 49 → 54 at 275-02 (+5 Include archived cases, D-04)
   "documents.search271.test.ts": 3, // 271-03
   "useDocumentFind.test.tsx": 11, // 271-03
   "relationshipLabels.test.ts": 5, // 271-03
@@ -4135,7 +4135,7 @@ const BASELINE = {
   // ── Phase 271-04 Task 1 — every suite it CREATED, at its measured passing count. BOTH KNOBS. ──
   "FilterBar.find271.test.tsx": 11, // 271-04 (3 are the Views-tab DOM snapshot pins)
   "StructurePopovers.test.tsx": 22, // 271-04
-  "FindQuickAdd.test.tsx": 18, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03)
+  "FindQuickAdd.test.tsx": 22, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03) · RE-PINNED 18 → 22 at 275-02 (+4 Include archived chip cases)
   // ── Phase 271-04 Task 2 — the Find results surface and the exact pager. BOTH KNOBS. ──
   "DocumentsFindBody.test.tsx": 26, // 271-04
   "DocumentsPager.exact271.test.tsx": 3, // 271-04
@@ -4195,6 +4195,11 @@ const BASELINE = {
   // `src/components/attachments` DIRECTORY entry, so only BASELINE changes. Pinned at its measured
   // passing count on the merged tree (6 cases, 0 failing); its NEGATIVE case proves it can fire.
   "promoteContract.fence.test.ts": 6, // 274-05 — ?raw backend models/route vs attachments.ts keys, saved/already literal, prefix regex lockstep
+  // ── Phase 275-02 (S9 / S10) — `src/components/retention` is NEW and adopted as a DIRECTORY in
+  // TARGETS (275-04 adds more suites under it). Pinned at the measured passing counts (15 cases,
+  // 0 failing), each RED before its module existed.
+  "retentionCopy.test.ts": 5, // 275-02 — ported strings vs sketch 275 (?raw), contract strings vs 275-UI-SPEC, title vs hold_guard.py
+  "holdRefusals.test.tsx": 10, // 275-02 — real delete clients vs a stubbed 409 → ApiRefusal → DocumentList / FolderNode / FolderTree / WatchedFoldersSection
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6122,6 +6127,9 @@ const TARGETS = [
   "src/components/attachments",
   "src/lib/__tests__/attachmentLifetime.test.ts",
   "src/lib/__tests__/attachmentsApi.test.ts",
+  // Phase 275-02 — `src/components/retention` is new and adopted as a DIRECTORY (its two suites
+  // here and every later 275-04 suite under it).
+  "src/components/retention",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

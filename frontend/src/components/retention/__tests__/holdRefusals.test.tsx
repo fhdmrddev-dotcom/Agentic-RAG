@@ -311,19 +311,19 @@ describe("FolderTree — keeps the confirm open so the refusal can be read", () 
 describe("WatchedFoldersSection — a refused purge shows the server's sentence", () => {
   it("the section's existing error line carries the 409 sentence, never the generic failure", async () => {
     const WATCH = {
-        id: "watch-1",
-        user_id: "user-1",
-        connection_id: "conn-1",
-        connection_name: "Google Drive (Finance)",
-        service_id: "google",
-        source_folder_id: "gdrive-fld-1",
-        source_folder_name: "Q3 Vendor Bills",
-        library_folder_id: "lib-folder-1",
-        interval_minutes: 30,
-        is_active: true,
-        last_run_at: new Date(Date.now() - 4 * 60_000).toISOString(),
-        last_status: "success",
-        item_count: 14,
+      id: "watch-1",
+      user_id: "user-1",
+      connection_id: "conn-1",
+      connection_name: "Google Drive (Finance)",
+      service_id: "google",
+      source_folder_id: "gdrive-fld-1",
+      source_folder_name: "Q3 Vendor Bills",
+      library_folder_id: "lib-folder-1",
+      interval_minutes: 30,
+      is_active: true,
+      last_run_at: new Date(Date.now() - 4 * 60_000).toISOString(),
+      last_status: "success",
+      item_count: 14,
     }
     vi.mocked(sourcesApi.listWatches).mockResolvedValue([WATCH] as never)
     vi.mocked(sourcesApi.getWatch).mockResolvedValue({ ...WATCH, items: [] } as never)

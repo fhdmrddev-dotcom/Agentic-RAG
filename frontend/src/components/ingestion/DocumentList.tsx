@@ -10,6 +10,9 @@ import {
 } from "@/components/ui/dialog"
 import { reingestDocument } from "@/lib/api"
 import { MoveToFolderDialog } from "@/components/health/MoveToFolderDialog"
+import { ApiRefusal } from "@/lib/api/refusal"
+import { HoldRefusalNotice } from "@/components/retention/HoldRefusalNotice"
+import { RETENTION_COPY } from "@/components/retention/retentionCopy"
 import { DocumentRow, hasVersions, type DocumentColumns, type FindDateColumn } from "./DocumentRow"
 import type { Document, Folder } from "@/types"
 
@@ -72,6 +75,9 @@ export function DocumentList({
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // Phase 275 (S10 / D-14): a 409 legal-hold refusal — the server's title + sentence, shown in
+  // place of the Delete buttons. Never "try again": a hold does not clear on a retry.
+  const [refusal, setRefusal] = useState<ApiRefusal | null>(null)
   const [activeScope, setActiveScope] = useState<"version" | "all" | null>(null)
   const [reingestingId, setReingestingId] = useState<string | null>(null)
   // Phase 114 (D-114-14): the Move-to-folder document-row action. A single dialog
@@ -126,9 +132,13 @@ export function DocumentList({
       await onDelete(deleteTarget.id, scope)
       setDeleteTarget(null)
       setDeleteError(null)
-    } catch {
-      setDeleteError("Delete failed. Please try again.")
-      // Do NOT close dialog — let user retry or cancel
+    } catch (err) {
+      if (err instanceof ApiRefusal && err.status === 409) {
+        setRefusal(err)
+      } else {
+        setDeleteError(RETENTION_COPY.contract.deleteFailed)
+      }
+      // Do NOT close dialog — let user retry or cancel (or, on a hold, read why and Close)
     } finally {
       setDeleting(false)
       setActiveScope(null)
@@ -219,6 +229,7 @@ export function DocumentList({
           if (!open) {
             setDeleteTarget(null)
             setDeleteError(null)
+            setRefusal(null)
             setActiveScope(null)
           }
         }}
@@ -249,6 +260,17 @@ export function DocumentList({
             <p className="text-sm text-destructive px-1">{deleteError}</p>
           )}
 
+          {refusal ? (
+            <HoldRefusalNotice
+              title={refusal.title}
+              message={refusal.message}
+              onClose={() => {
+                setDeleteTarget(null)
+                setRefusal(null)
+                setActiveScope(null)
+              }}
+            />
+          ) : (
           <DialogFooter>
             <Button
               variant="outline"
@@ -310,6 +332,7 @@ export function DocumentList({
               </Button>
             )}
           </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 
