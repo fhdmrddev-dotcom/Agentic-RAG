@@ -62,6 +62,51 @@ const ported = {
   done: "Done",
   auditTail:
     "One audit record per document names the document, the policy, the action, who approved it and when.",
+  /** S1 — the Retention tab (1B). */
+  tabRetention: "Retention",
+  tabPolicies: "Policies",
+  tabWaiting: "Waiting for you",
+  tabHistory: "History",
+  newPolicy: "+ New policy",
+  colName: "Name",
+  colAppliesTo: "Applies to",
+  colKeptFor: "Kept for",
+  colThen: "Then",
+  colTonight: "Tonight",
+  nothingElseDue: "nothing else due",
+  /** S2 — the policy editor (2B). */
+  policiesCrumb: "Retention › Policies ›",
+  newPolicyTitle: "New policy",
+  labelDocumentType: "Document type",
+  labelKeepFor: "Keep for",
+  labelCountedFrom: "Counted from",
+  anyType: "Any type",
+  anyFolder: "Any folder",
+  subfolders: "subfolders",
+  clockDocumentDate: "the document date",
+  clockDateAdded: "the day it was added to the Library",
+  actionArchive: "archive it",
+  actionDelete: "delete it",
+  actionReview: "ask a person to decide",
+  noteArchive:
+    "Archived documents stop appearing in chat answers. They stay in the Library, findable with “Include archived”, and open and download as normal.",
+  noteDelete:
+    "Deletes never run on their own. Tonight's sweep lists what is due, and an org admin confirms each document by name.",
+  noteReview: "Due documents are listed for a person. Nothing is changed automatically.",
+  previewButton: "1 · Preview what this would do",
+  saveButton: "2 · Save policy",
+  staleBanner: "You changed the policy after the preview. Preview again before saving.",
+  previewTitle: "Preview · what tonight's sweep would do",
+  nothingPreviewed: "Nothing previewed yet.",
+  cantSaveYet: "A policy can't be saved until you've seen what it would do.",
+  noteNoDate: "Give these a document date, or count from “added to the Library” instead.",
+  noteCollision: "A document under two policies that disagree is never touched: change one of them.",
+  notYet: "not due yet",
+  alreadyArchived: "already archived",
+  /** S5 — History (dry-run verbs + the late-hold tail). */
+  verbDeleted: "deleted",
+  verbReviewed: "reviewed",
+  lateHoldTail: ": put on legal hold after the sweep",
 } as const
 
 /** UI-SPEC contract copy (no sketch source, or changed by a locked decision). */
@@ -130,6 +175,40 @@ const contract = {
   tryAgain: "Try again",
   /** S5 — an actor whose account no longer exists (never blank). */
   formerMember: "a former member",
+  /** S1 — posture states (D-29 / D-06). */
+  loading: "Loading retention…",
+  sweepsOff: "Scheduled sweeps are off. Nothing is archived or queued until they are turned on. Preview still works.",
+  neverRun: "No sweep has run yet. Preview a policy to see what the first one would do.",
+  policiesEmptyTitle: "No retention policies yet",
+  policiesEmptyBody:
+    "Nothing in the Library is archived or deleted until a policy says so. Create one and preview it before it can run.",
+  /** S2 — the editor. */
+  backToPolicies: "Back to policies",
+  unitDays: "days",
+  unitMonths: "months",
+  unitYears: "years",
+  later: "Later",
+  thenQueue: "Then queue it for deletion",
+  after: "after",
+  stage2Helper: "Counted from the same date. Deletion still waits for an org admin to confirm.",
+  nameRequired: "Give the policy a name.",
+  scopeRequired: "A policy needs a document type, a folder, or both.",
+  stage2After: "The delete step must come after the archive step.",
+  previewFirst: "Preview first. A policy can't be saved until you've seen what it would do.",
+  previewFailed: "Preview couldn't finish, so this policy can't be saved yet. Nothing was changed.",
+  saveFailed: "Couldn't save the policy. Nothing changed. Your preview is still here.",
+  removePolicyEllipsis: "Remove policy…",
+  removeBody:
+    "No documents are deleted. Documents it already archived stay archived, and anything it queued leaves “Waiting for you”.",
+  keepPolicy: "Keep policy",
+  removePolicy: "Remove policy",
+  removeFailed: "Couldn't remove the policy. It is still active.",
+  bucketKept: "kept by an admin — skipped until this policy or the document changes",
+  /** S5 — History. */
+  historyEmpty: "No retention actions yet. Every archive, delete, hold and policy change will be listed here.",
+  showOlder: "Show older",
+  whatDeletion: "deletion",
+  whatReview: "review",
 } as const
 
 /** Sentences the sketch builds; their literal segments are fenced against the sketch. */
@@ -165,6 +244,30 @@ const sketchTemplates = {
   deletePermanently: "Delete {N} document(s) permanently",
   deletedResult: "**Deleted {N} document(s).**",
   lateHold: "Kept {M}: {names} went on legal hold after the sweep, so it was dropped at confirm.",
+  /** S1 — the posture line and the Policies table. */
+  postureHealthy: "Last sweep **{date}** finished, nothing failed",
+  postureNext: "Next sweep **{date}**",
+  postureCounts: "{P} policies · {H} legal hold(s)",
+  policiesSub: "Checked every night at {time}. Archive happens on its own. Delete always waits for a person.",
+  dueNow: "**{N}** due now",
+  undecidableCount: "{N} undecidable",
+  nextDue: "next: {date}",
+  /** S2 — the editor title and the Preview buckets. */
+  editTitle: "Edit “{name}”",
+  bucketActDelete: "would be **queued for you to approve** deletion",
+  bucketActArchive: "would be **archived**",
+  bucketActReview: "would be **listed for a person to decide**",
+  bucketHold: "skipped — **on legal hold**",
+  bucketUndecidable: "**can't be decided — nothing will happen to them**",
+  rowDue: "{doc} · due {date}",
+  notYetNext: " · next: {doc}, {date}",
+  /** S5 — receipts the sketch writes. */
+  historyArchived: "Archived **{doc}** under “{policy}”",
+  historyDeleted: "Deleted **{doc}** under “{policy}”, approved by {name}",
+  historyDidNotDelete: "Did not delete **{doc}**",
+  historyHoldPlaced: "Placed legal hold **{matter}** on {docs} and {folders}",
+  historyPolicySaved: "Saved policy **{name}**",
+  historyDryRun: "Ran a dry run of **{policy}**: {act} would be {verb}, {hold} held, {undecidable} undecidable",
 } as const
 
 /** UI-SPEC sentences with placeholders; their literal segments are fenced against the UI-SPEC. */
@@ -199,6 +302,30 @@ const specTemplates = {
   reviewFooter: "{a} to keep · {b} to archive · {c} to delete · {d} undecided",
   applyDecisions: "Apply {N} decision(s)",
   applyAndDelete: "Apply decisions and delete {c} permanently",
+  /** S1 — posture + the Waiting tab's accessible name. */
+  postureNotFinished:
+    "Last sweep {date time} did not finish. It changed nothing for the policies it could not complete.",
+  waitingAria: "Waiting for you, {N} waiting",
+  /** S2 — remove + the kept bucket's rows. */
+  removeTitle: "Remove “{name}”?",
+  keptRow: "{doc} · kept by {name} on {date}",
+  /** S5 — receipts the UI-SPEC writes. */
+  historyOnHoldSince: " (on hold since {time})",
+  historyQueued: "Queued **{doc}** for {what} under “{policy}”",
+  historyKept: "Kept **{doc}** under “{policy}”, kept by {name}",
+  historyReviewArchived: "Archived **{doc}** under “{policy}”, decided by {name}",
+  historyUnarchived: "Un-archived **{doc}**. “{policy}” skips it until the policy or the document changes",
+  historyHoldExtended: "Added {docs} and {folders} to legal hold **{matter}**",
+  historyHoldReleased: "Released legal hold **{matter}** ({N} document(s) no longer held)",
+  historyPolicyRemoved: "Removed policy **{name}**",
+  countDocuments: "{N} document(s)",
+  countFolders: "{N} folder(s)",
+} as const
+
+/** CONTEXT decision copy with no UI-SPEC home; segments fenced against `275-CONTEXT.md`. */
+const decisionTemplates = {
+  /** D-34 — Preview counts the private documents a policy does not reach. */
+  privateNotCovered: "{N} private documents are not covered",
 } as const
 
 /** The client's copies of `backend/app/services/retention/hold_guard.py`'s document sentences. */
@@ -208,7 +335,20 @@ const server = {
   documentMember: "This document is on legal hold. Ask an org admin if you think it should be released.",
 } as const
 
-export const RETENTION_COPY = { ported, contract, sketchTemplates, specTemplates, server } as const
+/** The client's copy of `backend/app/models/retention.py`'s scope refusal (275-03 deviation 4). */
+const serverModels = {
+  scopeOneOnly: "A policy covers one folder or one document type. Make a second policy for the other.",
+} as const
+
+export const RETENTION_COPY = {
+  ported,
+  contract,
+  sketchTemplates,
+  specTemplates,
+  decisionTemplates,
+  server,
+  serverModels,
+} as const
 
 // ── helpers ─────────────────────────────────────────────────────────────────────────────────
 

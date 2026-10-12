@@ -55,6 +55,7 @@ import { OrgSettingsTab } from "./OrgSettingsTab"
 import { InvitationsTab } from "./InvitationsTab"
 import { SsoTab } from "./SsoTab"
 import { OrgExpertsTab } from "./OrgExpertsTab"
+import { RetentionTab } from "@/components/retention/RetentionTab"
 
 interface OrgAdminShellProps {
   /** Return to the ordinary app surface (navigates to "chat"). */
@@ -101,12 +102,10 @@ const TABS: readonly TabDef[] = [
     locked: true,
     lockedDescription: "Plan and billing management is coming soon.",
   },
-  {
-    id: "retention",
-    label: "Retention",
-    locked: true,
-    lockedDescription: "Data-retention controls are coming soon.",
-  },
+  // Phase 275 (D-01 / RET-01..04): the Retention home is LIVE — its leaf is self-contained
+  // (it owns its fetches, like OrgExpertsTab); the shell gains only this flip, one render branch
+  // and the recording pulse.
+  { id: "retention", label: "Retention", locked: false },
 ]
 
 // Read-only member roster page size (068-A shape). The server clamps <= 100; one modest
@@ -124,6 +123,17 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
   const { showTechnical, toggle: toggleTechnical } = useTechnicalNames()
 
   const [activeTab, setActiveTab] = useState<OrgAdminTab>("members")
+  // Phase 275 (062-A): a recorded retention write pulses the band's marker for 1.6 s.
+  const [recordingPulse, setRecordingPulse] = useState(false)
+  const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pulse = useCallback(() => {
+    if (pulseTimer.current) clearTimeout(pulseTimer.current)
+    setRecordingPulse(true)
+    pulseTimer.current = setTimeout(() => setRecordingPulse(false), 1600)
+  }, [])
+  useEffect(() => () => {
+    if (pulseTimer.current) clearTimeout(pulseTimer.current)
+  }, [])
 
   // 068-A roster: `null` until the Members tab is first opened (lazy — no roster read on
   // a Settings-only visit); the shell owns the fetch + the search state, OrgMembersTab is
@@ -345,6 +355,7 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
         orgName={orgName}
         role={role}
         onBack={onBack}
+        recordingPulse={recordingPulse}
         showTechnical={showTechnical}
         onToggleTechnical={toggleTechnical}
       />
@@ -422,6 +433,8 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
           />
         ) : activeTab === "settings" ? (
           <OrgSettingsTab orgName={orgName} />
+        ) : activeTab === "retention" ? (
+          <RetentionTab onRecorded={pulse} />
         ) : activeTab === "sso" ? (
           // Phase 168 (D-168-01 / SSO-01): the live SSO home. The shell owns the fetch +
           // create/remove; SsoTab is a pure leaf. canManageSso is the render-only gate
