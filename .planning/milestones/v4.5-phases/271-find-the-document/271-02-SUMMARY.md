@@ -1,6 +1,8 @@
 ---
 phase: 271-find-the-document
 plan: 02
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 271-02-PLAN.md frontmatter requirements
+requirements-completed: [FIND-06, FIND-02]
 subsystem: frontend / Library
 tags: [library, filing-rules, ask-handoff, find, navigation, a11y]
 requires: []

@@ -1,6 +1,8 @@
 ---
 phase: 271-find-the-document
 plan: 01
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 271-01-PLAN.md frontmatter requirements
+requirements-completed: [FIND-01, FIND-02, FIND-03]
 subsystem: backend / document search
 tags: [find, search, postgrest, rls, relationships, versions, tdd]
 requires:

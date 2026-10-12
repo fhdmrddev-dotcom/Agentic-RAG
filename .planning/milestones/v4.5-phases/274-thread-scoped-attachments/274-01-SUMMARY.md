@@ -1,6 +1,8 @@
 ---
 phase: 274-thread-scoped-attachments
 plan: 01
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 274-01-PLAN.md frontmatter requirements
+requirements-completed: [ATT-01]
 subsystem: backend (workspace attachments, thread lifecycle, schema)
 tags: [attachments, workspace_files, thread-delete, storage, migration-203, ATT-01]
 requires: []

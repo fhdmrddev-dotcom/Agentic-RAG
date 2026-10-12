@@ -1,6 +1,8 @@
 ---
 phase: 273-agent-authored-artifacts
 plan: 05
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 273-05-PLAN.md frontmatter requirements
+requirements-completed: [ART-01, ART-02, ART-03, ART-05]
 subsystem: frontend / chat artifacts wiring + tool rail
 tags: [artifacts, sse, reload, streams-provider, message-item, tool-rail, parity-fence, count-gate]
 requires:

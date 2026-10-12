@@ -67,7 +67,8 @@ key-decisions:
 patterns-established:
   - "A held delete is a sentence in the door that was used, with one Close — never 'Delete failed. Please try again.'"
 
-requirements-completed: []
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed was [] and is replaced with the list copied verbatim from 275-02-PLAN.md frontmatter requirements (D-15)
+requirements-completed: [RET-02, RET-04]
 
 duration: 50min
 completed: 2026-10-12

@@ -1,6 +1,8 @@
 ---
 phase: 272-close-means-wrong
 plan: 05
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 272-05-PLAN.md frontmatter requirements
+requirements-completed: [FIND-07]
 subsystem: retrieval / cross-provider UAT / chat tool card
 tags: [FIND-07, SC#3, SC#4, SC#10-board, G-4, recall-ladder, plan-cache, D-27, F-3, seeds]
 requires:

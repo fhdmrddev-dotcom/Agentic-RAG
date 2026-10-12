@@ -1,6 +1,8 @@
 ---
 phase: 274-thread-scoped-attachments
 plan: 02
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 274-02-PLAN.md frontmatter requirements
+requirements-completed: [ATT-03, ATT-02]
 subsystem: backend (Library promote of thread attachments)
 tags: [attachments, promote, library, minter, ingest, workspace_files, ATT-03, ATT-02, D-18]
 requires:

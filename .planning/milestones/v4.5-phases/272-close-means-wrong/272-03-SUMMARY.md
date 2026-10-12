@@ -1,6 +1,8 @@
 ---
 phase: 272-close-means-wrong
 plan: 03
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 272-03-PLAN.md frontmatter requirements
+requirements-completed: [FIND-07]
 subsystem: retrieval / database
 tags: [retrieval, rpc, migration, rls, pgvector, hnsw, filtered-search, resolver]
 requires:
