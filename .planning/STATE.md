@@ -57,7 +57,7 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: **277** (Registers Back Inside the Band) — ✅ COMPLETE 2026-10-12 · verification `passed` 4/4 · next **278** (One Home for Tools and Filters); next migration **207**
 Plan: 2/2 (277-01 REG-04 split, 277-02 REG-05 archive repair)
-Status: Phase 278 PLANNED 2026-10-13 — 4 plans / 3 waves (278-01 ∥ 278-02 → 278-03 → 278-04 operator checkpoint for the Anthropic live smoke); plan-check passed after 1 revision (3 warnings fixed, `8cdc9f284`); reqs 3/3, CONTEXT decisions 13/13, ledger gate OK — ready to execute 278
+Status: Phase 278 EXECUTING — wave 1/3 done 2026-10-13 (278-01 pins + fence hardening, pre-move base `5642c0dd9`; 278-02 DEBT-09 one home `document_vocabulary.py`); merged `4caabc863`, merged-tree targeted 765 passed / 28 xfailed (move pins) / 0 failed; base gate 71 failed (`278-base-failed.txt`). Next: wave 2 (278-03 the split). — Planned 2026-10-13 — 4 plans / 3 waves (278-01 ∥ 278-02 → 278-03 → 278-04 operator checkpoint for the Anthropic live smoke); plan-check passed after 1 revision (3 warnings fixed, `8cdc9f284`); reqs 3/3, CONTEXT decisions 13/13, ledger gate OK — ready to execute 278
 Last activity: 2026-10-12 — 277 closed by hand. CLAUDE.md 121,650 → **89,171** chars (gate OK, no WARN). Review 277-REVIEW.md: 0 critical / **8 warning** / 5 info, all guard-hardening beyond the SCs (verifier). **WR-01 + WR-08 FIXED 2026-10-12 (quick 261012-x1l)**; WR-02..07 + IN-01..05 untriaged. ⚠ `state.begin-phase` was run at 277 start despite the rule above and wrote `total_phases: 14` (false; corrected to 7 by hand) — the ninth false-record occurrence.
 
 ### Quick Tasks Completed

@@ -170,8 +170,8 @@ Plans:
 **Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 278-01-PLAN.md — wave 1: pins first — base failing set, registry pin (names/order/bindings/static literal/schema sha256), AST pure-move pin (xfail strict), D-07 retarget-only checker, ten fences anchored/tupled (SEAM-03)
-- [ ] 278-02-PLAN.md — wave 1 (TDD): one home for the filter vocabulary (`document_vocabulary.py`), three import swaps with base-pinned values, divergence fence driven RED (DEBT-09)
+- [x] 278-01-PLAN.md — wave 1: pins first — base failing set, registry pin (names/order/bindings/static literal/schema sha256), AST pure-move pin (xfail strict), D-07 retarget-only checker, ten fences anchored/tupled (SEAM-03)
+- [x] 278-02-PLAN.md — wave 1 (TDD): one home for the filter vocabulary (`document_vocabulary.py`), three import swaps with base-pinned values, divergence fence driven RED (DEBT-09)
 - [ ] 278-03-PLAN.md — wave 2: the split — `tool_dispatcher.py` → registry + `services/tools/` families in ONE retarget-only commit, extension-contract guards extended, full unit gate set-diffed (SEAM-03)
 - [ ] 278-04-PLAN.md — wave 3 (operator checkpoint): SEAM-02 measured + stale records corrected beside originals, merged-tree gates, Anthropic two-tool live smoke, ledger cells written last, SEED-224 → partially-answered (SEAM-02, SEAM-03, DEBT-09)
 **Flags**: ⛔ **G-5 extraction phase, behaviour-preserving** — pure moves verified AST-identical against PHASE_BASE where possible, with **TDD pin-first** (pins land RED-proof before the move). `tool_dispatcher.py` FIRES (98/43/5068), with the split deferred twice (OV-273-02). The Extension Contract applies: the registry stays closed and statically declared, **never dynamically registered**. `search_documents_tool.py` (1,163 lines) sits beside the split and must not gain logic. SC#10: a pure move whose registry pin is identical does not change provider behaviour, so one live multi-tool row is the proportionate check; discuss records that decision. Seeds: `SEED-224` (extraction half only; the five-tab redesign stays out of scope).
