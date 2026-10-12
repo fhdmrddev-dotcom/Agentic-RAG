@@ -92,6 +92,14 @@ describe("RetentionTab — the posture line (S1 / D-29)", () => {
     expect(posture).toHaveTextContent("3 policies · 1 legal hold")
   })
 
+  it("one policy reads `1 policy`, never `1 policies` (275-05 G-4)", async () => {
+    m.getRetentionSummary.mockResolvedValue({ ...HEALTHY, counts: { policies: 1, active_holds: 2, waiting: 0 } })
+    render(<RetentionTab />)
+    const posture = await screen.findByTestId("posture")
+    expect(posture).toHaveTextContent("1 policy · 2 legal holds")
+    expect(posture.textContent).not.toContain("1 policies")
+  })
+
   it("sweeps switched off: the amber sentence REPLACES both sweep items", async () => {
     m.getRetentionSummary.mockResolvedValue({ ...HEALTHY, sweep_enabled: false })
     render(<RetentionTab />)

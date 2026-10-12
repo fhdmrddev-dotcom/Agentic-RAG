@@ -105,6 +105,8 @@ vi.mock("@/lib/supabase", () => ({
   },
 }))
 
+import evaluateSource from "../../../../../backend/app/services/retention/evaluate.py?raw"
+
 import { LibraryPage } from "@/pages/LibraryPage"
 import { RetentionRowChips } from "../RetentionChip"
 import { RetentionFolderLine } from "../RetentionFolderLine"
@@ -266,6 +268,38 @@ describe("RetentionFolderLine — the selected folder's policy and hold (S7 / D-
     )
   })
 
+  // 275-05 G-4 FAIL-2: a two-stage policy read "kept 1 day …, delete after 2 days, then archived" —
+  // the archive step AFTER the delete. The line now reads the server's ordered rule sentence.
+  it("a two-stage policy reads in order: archived first, then queued for deletion", () => {
+    render(
+      <RetentionFolderLine
+        canManage
+        state={{
+          folder_id: "f", held: false,
+          policy: {
+            kind: "own", policy_id: "p", policy_name: "275 G4 lifecycle", action: "archive",
+            kept_for_text: "1 day after added to the Library, delete after 2 days",
+            rule_text: "Kept 1 day after added to the Library, then archived; queued for deletion 2 days after added to the Library.",
+          },
+        }}
+      />,
+    )
+    const line = screen.getByTestId("retention-folder-line")
+    expect(line).toHaveTextContent(
+      "This folder: kept 1 day after added to the Library, then archived; queued for deletion 2 days after added to the Library.",
+    )
+    expect(line.textContent).not.toContain("delete after 2 days, then archived")
+    // The stage-1 period stays the bold run, as in the single-stage S7 sentence.
+    expect(line.querySelector("strong")?.textContent).toBe("kept 1 day after added to the Library")
+  })
+
+  it("the line's parse matches the server's rule sentence shape (evaluate.rule_text)", () => {
+    expect(evaluateSource).toContain(
+      'f"Kept {_unit_word(p.stage1.value, p.stage1.unit)} after {clock}, then {then_text(p.stage1.action)}"',
+    )
+    expect(evaluateSource).toContain('f"; queued for deletion {_unit_word(p.stage2.value, p.stage2.unit)} after {clock}"')
+  })
+
   it("renders nothing for a folder with no policy and no hold", () => {
     const { container } = render(<RetentionFolderLine state={{ folder_id: "f", held: false }} canManage />)
     expect(container).toBeEmptyDOMElement()
@@ -302,6 +336,26 @@ describe("LibraryPage — retention in browse (S9 / S10 / planning flag 2)", () 
     await userEvent.click(within(screen.getByTestId("archived-hidden-line")).getByRole("button", { name: "Hide" }))
     expect(screen.queryByText("Invoice INV-0412.pdf")).toBeNull()
     expect(screen.getByRole("button", { name: "Include archived" })).toBeInTheDocument()
+  })
+
+  // 275-05 G-4 OBS-2: a fully archived folder read "No documents in this folder" directly above
+  // "3 archived documents hidden · Show". The empty state must not claim emptiness (S9).
+  it("a list whose every document is archived does not claim to be empty; the hidden line carries it", async () => {
+    mockUseDocuments.mockReturnValue({
+      documents: [ARCHIVED],
+      uploading: false,
+      uploadingCount: 0,
+      upload: vi.fn().mockResolvedValue({ isDuplicate: false }),
+      deleteDoc: vi.fn().mockResolvedValue(undefined),
+      loadDocuments: vi.fn().mockResolvedValue(undefined),
+    })
+    renderPage()
+    expect(screen.getByTestId("archived-hidden-line")).toHaveTextContent("1 archived document hidden · Show")
+    expect(screen.queryByText("No root documents yet.")).toBeNull()
+    expect(screen.queryByText("No documents in this folder")).toBeNull()
+    expect(screen.queryByText("Upload files above to add them here.")).toBeNull()
+    await userEvent.click(within(screen.getByTestId("archived-hidden-line")).getByRole("button", { name: "Show" }))
+    expect(screen.getByText("Invoice INV-0412.pdf")).toBeInTheDocument()
   })
 
   it("a held document's Delete opens straight into the refusal — the member sentence, one Close, no Delete", async () => {

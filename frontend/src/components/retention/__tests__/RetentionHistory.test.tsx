@@ -60,6 +60,9 @@ describe("receiptSentence — one plain sentence per event (S5 table)", () => {
     ["policy removed", { action: "policy_deleted", policy_name: "Old rule" }, "Removed policy **Old rule**"],
     ["dry run", { action: "dry_run", written: false, policy_name: "Expired contracts", detail: { action: "delete", counts: { act: 4, hold: 2, undecidable: 1 } } },
       "Ran a dry run of **Expired contracts**: 4 would be deleted, 2 held, 1 undecidable"],
+    // 275-05 G-4 FAIL-1: this row rendered as the raw key `delete_refused`.
+    ["delete refused by hold", { action: "delete_refused", document_name: "g4-hold-1.txt", hold_name: "275 G4 matter" },
+      "Refused to delete **g4-hold-1.txt**: on legal hold"],
   ]
   for (const [label, over, sentence] of cases) {
     it(label, () => {
