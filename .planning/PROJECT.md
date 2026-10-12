@@ -1464,3 +1464,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-12 — **Phase 275 DEPLOYED** (prod `784647e2d`; migrations 204 → 205 → 206 applied, advisors 0 ERROR). All of v4.5 is live.*
 
 *Last updated: 2026-10-12 — **milestone v4.6 Pay It Down STARTED** (8 major bugs + v4.5 tech debt + three G-5 extractions; phases from 277, migrations from 207).*
+
+*Last updated: 2026-10-12 — **Phase 277 complete** (REG-04, REG-05 → Validated): CLAUDE.md split by function 121,650 → 89,171 chars, nothing lost (mechanical proof), FIRING-table cell cap bound at 80; v4.5 archive repaired by hand. Verification passed 4/4; review 0 critical / 8 warning (guard hardening, untriaged).*
