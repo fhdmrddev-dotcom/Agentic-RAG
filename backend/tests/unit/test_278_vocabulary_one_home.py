@@ -57,11 +57,6 @@ PINNED_BINDINGS = [
     ("app.services.view_filter_compiler", "LIST_VALUE_FIELDS"),
 ]
 
-_RED_REASON = (
-    "RED until 278-02 Task 2 creates document_vocabulary.py and deletes the copies (DEBT-09)"
-)
-
-
 def _blob_at_base(rel_path: str, sha: str = PHASE_BASE_SHA) -> str:
     """A tracked file's contents at PHASE_BASE."""
     # ⚠ `encoding` IS LOAD-BEARING ON WINDOWS (the test_214 / test_272_pure_move precedent): with
@@ -136,7 +131,6 @@ def test_values_equal_phase_base():
 # ── Source anchor ────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason=_RED_REASON)
 def test_named_modules_import_the_home():
     missing = []
     for module_name, rel_path in NAMED_MODULES.items():
@@ -154,7 +148,6 @@ def test_named_modules_import_the_home():
 # ── Layer 1: runtime identity ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason=_RED_REASON)
 def test_runtime_identity():
     vocab = _vocab()
     dss = importlib.import_module("app.services.document_search_service")
@@ -256,7 +249,6 @@ def _violations_in(tree: ast.AST, rel: str) -> list[str]:
     return found
 
 
-@pytest.mark.xfail(strict=True, reason=_RED_REASON)
 def test_no_literal_copy_outside_the_home():
     violations: list[str] = []
     if not (APP_DIR / HOME_REL).is_file():
@@ -290,7 +282,6 @@ def test_no_literal_copy_outside_the_home():
 # ── Allowlisted word lists (deliberately not edited: D-05, hot model file) ────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason=_RED_REASON)
 def test_allowlisted_word_lists_match():
     vocab = _vocab()
     tool = importlib.import_module("app.services.search_documents_tool")

@@ -55,6 +55,7 @@ from app.services.document_relationship_service import (
     _resolve_readable_latest,
     _subject_version_ids,
 )
+from app.services.document_vocabulary import TIMESTAMP_DATE_COLUMNS as _DATE_COLUMN
 from app.services.document_view_resolver import (
     ResolveError,
     _relative_window,
@@ -94,11 +95,7 @@ def _pg_in_list(values: list[str]) -> str:
 
 # The three timestamptz dates (P-10). "Date in the document" is NOT here: it is the
 # shipped compiler's ``date`` field on ``date_typed`` (a ``date``), via ``filter_expr``.
-_DATE_COLUMN = {
-    "added": "created_at",
-    "source_created": "source_created_at",
-    "source_modified": "source_modified_at",
-}
+# ``_DATE_COLUMN`` is imported from its ONE home, ``document_vocabulary`` (DEBT-09, Phase 278).
 
 # Sort key → (column, descending). P-01: the default is ``added_desc``.
 _SORT = {

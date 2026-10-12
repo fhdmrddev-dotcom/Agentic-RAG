@@ -48,6 +48,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from app.models.document_view import ViewFilter
+from app.services.document_vocabulary import LIST_FIELD_NAMES
 
 __all__ = [
     "Fragment",
@@ -97,8 +98,9 @@ NORMALIZED_LOWER_FIELDS: frozenset[str] = frozenset({
 FREE_TEXT_FIELDS: frozenset[str] = frozenset({"title", "author", "summary"})
 
 # 272 G-1: built-in fields stored as a JSON ARRAY (DocumentMetadata.topics: list[str]).
-# `eq` on these matches one element (see _op_eq); mirrors retrieval_scope.LIST_FIELDS.
-LIST_VALUE_FIELDS: frozenset[str] = frozenset({"topics"})
+# `eq` on these matches one element (see _op_eq). The value lives in its ONE home,
+# ``document_vocabulary.LIST_FIELD_NAMES`` (DEBT-09, Phase 278).
+LIST_VALUE_FIELDS: frozenset[str] = frozenset(LIST_FIELD_NAMES)
 
 
 # ── WHERE-fragment descriptor (the widened compiler output, R-114-A) ───────────
