@@ -559,6 +559,7 @@ Never a disabled Delete button with the reason in a tooltip: the refusal is a vi
 | F-WR-05 | Release sheet when the server could not count what the hold holds today (`held_today` null) | `Couldn't count the documents yet. Every document this hold covers will no longer be protected. Policies can archive them or queue them for deletion at the next sweep. Documents still covered by another hold stay held.` Never a number substituted from the direct-pick count, never 0 |
 | F-WR-08 | Policy editor: the stored document type or folder has no option in the live list (still loading, a failed load, outside the top 50, no current documents, a folder the list lacks) | the stored value renders as its own option (the type capitalised; the folder as the policy's `folder_path`), so the select never displays `Any type` / `Any folder` over a hidden scope |
 | F-WR-09 | Policy editor: `Keep for` or the second stage's number is blank, 0, negative, a decimal, an exponent (`1e2`) or above the server's 10000 | inline under the field, Preview blocked: `Enter a whole number from 1 to 10000.` Never coerced to 1 |
+| G-4 re-look OBS-R2a | History: a dropped delete whose reason is not a late hold, or whose document name was never recorded (moved before confirm, then gone) | changed: `Did not delete **{doc}**: changed since the sweep` · no longer waiting: `Did not delete **{doc}**: no longer waiting` · no name: `{doc}` reads `a document that no longer exists`, never `not recorded` |
 
 ---
 

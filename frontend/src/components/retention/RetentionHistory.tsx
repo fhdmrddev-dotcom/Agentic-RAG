@@ -45,7 +45,10 @@ export function receiptSentence(r: HistoryRow): string {
     case "deleted":
       return fillCopy(C.sketchTemplates.historyDeleted, { doc, policy, name: r.actor_name })
     case "did_not_delete": {
-      const base = fillCopy(C.sketchTemplates.historyDidNotDelete, { doc })
+      // OBS-R2a: a drop names its document and its reason; a gone row is never "not recorded".
+      const base = fillCopy(C.sketchTemplates.historyDidNotDelete, { doc: r.document_name ?? C.contract.unnamedDocument })
+      if (d.reason === "changed") return `${base}${C.contract.changedTail}`
+      if (d.reason === "not_found") return `${base}${C.contract.noLongerWaitingTail}`
       if (d.reason !== "held") return base
       const since =
         typeof d.held_since === "string"

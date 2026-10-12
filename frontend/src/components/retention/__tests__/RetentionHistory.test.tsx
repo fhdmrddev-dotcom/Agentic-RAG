@@ -76,6 +76,24 @@ describe("receiptSentence — one plain sentence per event (S5 table)", () => {
     )
     expect(s).toBe(`Did not delete **Kessler Services Agreement**: put on legal hold after the sweep (on hold since ${dt("2026-10-12T10:42:00Z")})`)
   })
+
+  // 275 G-4 re-look OBS-R2a: a document moved before confirm rendered "Did not delete not recorded"
+  // — no name and no reason. Every recorded reason gets its own words; a nameless row never reads as a date.
+  it("a drop because the document changed says so", () => {
+    expect(receiptSentence(row({ action: "did_not_delete", document_name: "rl-life-b.txt", detail: { reason: "changed" } })))
+      .toBe("Did not delete **rl-life-b.txt**: changed since the sweep")
+  })
+
+  it("a drop because the document is no longer waiting says so", () => {
+    expect(receiptSentence(row({ action: "did_not_delete", document_name: "rl-life-b.txt", detail: { reason: "not_found" } })))
+      .toBe("Did not delete **rl-life-b.txt**: no longer waiting")
+  })
+
+  it("a drop with no recorded name never reads 'not recorded'", () => {
+    const s = receiptSentence(row({ action: "did_not_delete", document_name: null, detail: { reason: "changed" } }))
+    expect(s).toBe("Did not delete **a document that no longer exists**: changed since the sweep")
+    expect(s).not.toContain("not recorded")
+  })
 })
 
 describe("RetentionHistory — the ledger (062-A)", () => {

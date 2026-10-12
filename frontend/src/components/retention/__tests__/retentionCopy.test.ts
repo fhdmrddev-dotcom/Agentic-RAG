@@ -57,7 +57,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       expect(uiSpecSource).toContain(value)
       checked++
     }
-    expect(checked).toBe(84) // 275-REVIEW: +policyAlreadyRemoved (F-CR-02), +confirmRefusedNothing (F-WR-01), +resultNothingDone (F-WR-03), +postureNotReported (F-WR-04), +releaseBodyUncounted (F-WR-05), +wholeNumber (F-WR-09)
+    expect(checked).toBe(87) // 275-REVIEW: +policyAlreadyRemoved (F-CR-02), +confirmRefusedNothing (F-WR-01), +resultNothingDone (F-WR-03), +postureNotReported (F-WR-04), +releaseBodyUncounted (F-WR-05), +wholeNumber (F-WR-09); G-4 re-look OBS-R2a: +changedTail, +noLongerWaitingTail, +unnamedDocument
   })
 
   it("every SKETCH TEMPLATE's literal segments sit verbatim in the sketch", () => {

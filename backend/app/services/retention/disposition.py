@@ -650,6 +650,10 @@ async def _did_not_delete(pool, org, p, qrow, name, reason, since, actor_id, act
 
 
 async def _receipt_did_not_delete(con, org, p, qrow, name, reason, since, actor_id, actor_name, *, detail=None) -> None:
+    # OBS-R2a: a family MOVED since the sweep is not in the snapshot under its queued key, but its
+    # row still exists — name it from that row, never a blank receipt. A gone row stays NULL.
+    if name is None:
+        name = await con.fetchval("SELECT filename FROM public.documents WHERE id = $1", qrow["latest_document_id"])
     await rdb.insert_receipt(
         con, org, "did_not_delete", document_id=qrow["latest_document_id"], document_name=name,
         policy_id=p.id, policy_name=p.name, actor_id=actor_id, actor_name=actor_name,

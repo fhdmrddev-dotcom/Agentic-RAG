@@ -217,6 +217,10 @@ const contract = {
   keepPolicy: "Keep policy",
   removePolicy: "Remove policy",
   removeFailed: "Couldn't remove the policy. It is still active.",
+  /** 275 G-4 re-look OBS-R2a (UI-SPEC §Review fix pass) — History's drop reasons beyond a late hold. */
+  changedTail: ": changed since the sweep",
+  noLongerWaitingTail: ": no longer waiting",
+  unnamedDocument: "a document that no longer exists",
   /** 275-REVIEW F-CR-02 (UI-SPEC §Review fix pass) — a remove the server 404s: it is already gone. */
   policyAlreadyRemoved: "This policy was already removed. Nothing changed.",
   bucketKept: "kept by an admin — skipped until this policy or the document changes",

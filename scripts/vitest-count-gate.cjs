@@ -4209,7 +4209,7 @@ const BASELINE = {
   "WaitingForYou.test.tsx": 22, // RE-PINNED 13 → 22 at 275-REVIEW frontend fix pass · 275-04 — S4 type-the-count (D-03 / T-275-31): ticked start, untick clears the count, Enter only when enabled, late-hold drop named; review undecided by default (D-10)
   "RetentionTab.test.tsx": 18, // RE-PINNED 12 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 11 → 12 at 275-05 ("1 policy") · 275-04 — S1 posture incl. sweeps-off (D-29), Waiting pill red only at N > 0 (D-01), roving tabs, sweep time from sweep_hour_utc, editor in place
   "RetentionPolicyEditor.test.tsx": 28, // RE-PINNED 16 → 28 at 275-REVIEW frontend fix pass · 275-04 — S2 Preview gate (D-02 / T-275-32): aria-disabled + on-screen reason, stale re-lock, 409 rendered, save failure keeps preview; two clocks (D-22); stage 2 (D-20)
-  "RetentionHistory.test.tsx": 18, // RE-PINNED 17 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 16 → 17 at 275-05 (delete_refused sentence, G-4 FAIL-1) · 275-04 — S5 receipt sentences, ✎ only on writes, no links (D-12/D-13), Show older pages by 50
+  "RetentionHistory.test.tsx": 21, // RE-PINNED 18 → 21 at 275 G-4 re-look (OBS-R2a drop reasons) · RE-PINNED 17 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 16 → 17 at 275-05 (delete_refused sentence, G-4 FAIL-1) · 275-04 — S5 receipt sentences, ✎ only on writes, no links (D-12/D-13), Show older pages by 50
   // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
   // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
   "OrgAdminShell.test.tsx": 12, // RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
