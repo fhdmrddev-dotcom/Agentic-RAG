@@ -3,7 +3,9 @@ seed_id: SEED-250
 title: "Retention and archival is the ONE absent capability on the enterprise DMS list — zero retention/archival/legal-hold code exists, and it is the capability regulated buyers ask about first"
 created: 2026-09-06
 planted_during: "2026-09-06 packaging analysis — assessing an 11-point enterprise DMS capability list against the code"
-status: planted
+status: folded
+status_note: "Folded into Phase 275 (Retention & Legal Hold) at discuss-phase 2026-10-12 — see 275-CONTEXT.md D-01..D-33. Delete always waits for an admin confirm (D-08); hold enforced by the database on every path (D-14)."
+folded_into: 275
 surface: Agentic-RAG
 severity: high
 category: dms / compliance / lifecycle

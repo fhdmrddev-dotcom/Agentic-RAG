@@ -4,9 +4,9 @@ title: Search keeps serving documents that were deleted or unshared at their sou
 reported: 2026-10-04
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [RAG/retrieval, backend/connectors, backend/watch, security/visibility, supabase/rpc]
-folded_into: null
+folded_into: 275
 verified_closed_by: null
 related_seeds: [SEED-210, SEED-343, SEED-341]
 re_open_trigger: null
