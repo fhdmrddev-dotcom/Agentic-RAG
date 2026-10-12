@@ -1,6 +1,8 @@
 ---
 phase: 272-close-means-wrong
 plan: 04
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 272-04-PLAN.md frontmatter requirements
+requirements-completed: [FIND-07]
 subsystem: retrieval tool / agent loop
 tags: [FIND-07, search_documents, filters, result-kinds, retry-lock, audit, prompt, vocabulary]
 requires:

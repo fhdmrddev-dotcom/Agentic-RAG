@@ -1,6 +1,8 @@
 ---
 phase: 272-close-means-wrong
 plan: 02
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 272-02-PLAN.md frontmatter requirements
+requirements-completed: [FIND-07]
 subsystem: retrieval tool contract + chat tool card
 tags: [FIND-07, search_documents, tool-schema, cross-provider, tool-card, D-02, D-03, D-04, D-05, D-08]
 requires: []

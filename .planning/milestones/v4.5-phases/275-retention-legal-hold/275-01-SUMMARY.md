@@ -66,7 +66,8 @@ patterns-established:
   - "Integration cleanup releases holds FIRST, then deletes hold rows, then documents and folders"
   - "Never call a revoked function as a JWT role against the shared local database; assert the privilege instead"
 
-requirements-completed: []
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed was [] and is replaced with the list copied verbatim from 275-01-PLAN.md frontmatter requirements (D-15)
+requirements-completed: [RET-01, RET-02, RET-03, RET-04]
 
 duration: 43min
 completed: 2026-10-12

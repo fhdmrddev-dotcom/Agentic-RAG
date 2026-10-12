@@ -1,6 +1,8 @@
 ---
 phase: 271-find-the-document
 plan: 04
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 271-04-PLAN.md frontmatter requirements
+requirements-completed: [FIND-01, FIND-02, FIND-03]
 subsystem: frontend (Library Documents tab: Find + Ask)
 tags: [find, library, documents, filter-builder, ask, detail-panel, vitest-gate]
 requires:
