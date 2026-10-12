@@ -9,11 +9,15 @@ caller disposes NOTHING for the org:
   * a row count that disagrees with the rows read (planning flag 8 — there is no "missing count,
     return what we have" branch here, unlike the Find reader this is modelled on);
   * a folder whose parent is outside the org's folder set, or a parent cycle;
-  * a document whose folder is outside the org's folder set;
-  * a folder policy whose folder is missing;
   * a hold row that names a hold the org does not have;
   * any exception while reading.
 It never returns partial data.
+
+NOT incomplete (275-REVIEW B-WR-01 — one member must never be able to stop the org's retention):
+  * a document whose folder is outside the org's folder set → THAT family is ``unreadable`` and
+    the evaluator decides "can't be decided" for it alone;
+  * a folder policy whose folder is outside the org → that policy governs nothing here and is
+    recorded in ``OrgSnapshot.unreadable_policies``.
 
 ⛔ EVERY STATEMENT BINDS ``org_id = $1``. The pool is the service role (BYPASSRLS); the explicit org
 predicate is the only wall between two orgs here (T-275-20).
@@ -80,6 +84,8 @@ class OrgSnapshot:
     family_latest: dict[str, dict]
     queue_rows: list[dict] = field(default_factory=list)
     skip_rows: list[dict] = field(default_factory=list)
+    #: policy id → why it governs nothing in this org (its folder left the org; B-WR-01).
+    unreadable_policies: dict[str, str] = field(default_factory=dict)
 
     def family(self, key: str) -> Optional[FamilyFacts]:
         return self._by_key().get(key)
@@ -194,11 +200,14 @@ async def _load(con, org: UUID) -> OrgSnapshot:
     _expect_count(await con.fetchval(_DOCS_COUNT_SQL, org), len(doc_rows), "documents")
     grouped: dict[str, list[dict]] = {}
     doc_family: dict[str, str] = {}
+    stray_families: set[str] = set()
     for r in doc_rows:
         fid = str(r["folder_id"]) if r.get("folder_id") else None
-        if fid is not None and fid not in folders:
-            raise IncompleteEvaluation(f"document {r['id']} sits in a folder outside the organization")
         key = family_key_of(r["user_id"], fid, r["filename"])
+        if fid is not None and fid not in folders:
+            # 275-REVIEW B-WR-01: ONE document in another org's folder is that family's "can't be
+            # decided" — never a reason to dispose nothing for the whole org, indefinitely.
+            stray_families.add(key)
         grouped.setdefault(key, []).append(r)
         doc_family[str(r["id"])] = key
 
@@ -207,10 +216,17 @@ async def _load(con, org: UUID) -> OrgSnapshot:
     policies = {pid: policy_facts(r) for pid, r in policy_rows.items()}
     folder_policies: dict[str, PolicyFacts] = {}
     class_policies: dict[str, PolicyFacts] = {}
+    unreadable_policies: dict[str, str] = {}
     for p in policies.values():
         if p.scope_kind == "folder":
             if not p.folder_id or p.folder_id not in folders:
-                raise IncompleteEvaluation(f"policy “{p.name}” names a folder that is missing")
+                # 275-REVIEW B-WR-01: a folder policy whose folder left the org governs nothing
+                # here (no document of this org can be in that folder and be decided), so it is
+                # that POLICY's problem, recorded, never the whole org's. Migration 206 refuses
+                # writing such a policy; a folder that moves org later is how one can still occur.
+                unreadable_policies[p.id] = "its folder is outside the organization"
+                logger.warning("retention: policy %s names a folder outside org %s", p.id, org_id)
+                continue
             folder_policies[p.folder_id] = p
         elif p.scope_kind == "class" and p.document_type_norm:
             class_policies[p.document_type_norm] = p
@@ -227,14 +243,17 @@ async def _load(con, org: UUID) -> OrgSnapshot:
     if holds and doc_family:
         for r in await con.fetch(_HELD_SQL, [UUID(d) for d in doc_family]):
             hid = str(r["hold_id"])
-            if hid not in holds:
-                raise IncompleteEvaluation("a hold row names a hold outside the organization")
             key = doc_family.get(str(r["document_id"]))
             if key is None:
                 raise IncompleteEvaluation("a held document is outside the organization")
             since = r["held_since"]
             prev = held_since.get(key)
             held_since[key] = since if prev is None or (since is not None and since < prev) else prev
+            if hid not in holds:
+                # Migration 206 matches a hold to its coverage row's org, so a document sitting in
+                # ANOTHER org's held folder is held by that org's matter. Fail closed: the family is
+                # held (nothing happens to it) and the foreign matter is never named here (D-17).
+                continue
             hl = family_holds.setdefault(key, [])
             if hid not in hl:
                 hl.append(hid)
@@ -276,12 +295,17 @@ async def _load(con, org: UUID) -> OrgSnapshot:
             document_type_norm=latest.get("document_type_norm"),
             date_typed=latest.get("date_typed"),
             created_at=latest.get("created_at"),
-            archived_at=latest.get("archived_at") or (archived_row or {}).get("archived_at"),
+            # 275-REVIEW B-WR-02: the LATEST row decides. A family whose newest version is not
+            # archived reads as not archived, so the sweep archives the rest of it (D-25) instead
+            # of reporting "Archived" while that version is still served to agents. Migration 206
+            # makes a new version inherit the archive on insert; this heals rows from before it.
+            archived_at=latest.get("archived_at"),
             org_visible=visible,
             name=str(latest.get("filename") or ""),
             archived_policy_id=str(archived_row["archived_policy_id"]) if archived_row and archived_row.get("archived_policy_id") else None,
             archived_policy_name=(archived_row or {}).get("archived_policy_name"),
             source_state=latest.get("source_state"),
+            unreadable="its folder is outside the organization" if key in stray_families else None,
         ))
 
     ctx = EvalContext(
@@ -307,6 +331,7 @@ async def _load(con, org: UUID) -> OrgSnapshot:
         family_latest=family_latest,
         queue_rows=queue_rows,
         skip_rows=skip_rows,
+        unreadable_policies=unreadable_policies,
     )
 
 

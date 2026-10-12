@@ -9,12 +9,14 @@ SC#3's "exactly" would be a hope rather than a property.
 
  1. not org-visible            → ``private``      (D-34: a member's private document is never covered)
  2. on legal hold              → ``held``         (D-06: the sweep skips it entirely)
+ 2b. a family the loader could → ``not_previewed`` (its folder is outside the org: that family
+     not read                     only, never the org — 275-REVIEW B-WR-01)
  3. no folder or class policy  → ``no_policy``
  4. folder + class rules differ→ ``collision``    (D-24: nothing happens; never "longest keep wins")
  5. a policy not previewed at  → ``not_previewed`` (D-02 defence: revision != previewed_revision)
     this revision, or a rule that cannot be read
  6. the chosen clock date is   → ``no_date``      (D-22: NO fallback between the two clocks)
-    missing
+    missing — or cannot carry the period (year 9999 + 1 year; B-WR-01)
  7. a skip marker for the same → ``kept`` / ``unarchived`` (D-11 / D-19)
     (policy revision, fingerprint)
  8. past the stage-2 date      → ``archive_and_queue_delete`` / ``queue_delete`` (D-20)
@@ -147,6 +149,9 @@ class FamilyFacts:
     archived_policy_id: Optional[str] = None
     archived_policy_name: Optional[str] = None
     source_state: Optional[str] = None
+    #: Set by the loader when ONE family cannot be read (its folder is outside the org). That
+    #: family is undecidable; the rest of the org is evaluated normally (275-REVIEW B-WR-01).
+    unreadable: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -336,6 +341,10 @@ def evaluate(family: FamilyFacts, ctx: EvalContext, now: datetime | date) -> Dec
     if family.family_key in ctx.held:
         return decide("held", held_since=ctx.held.get(family.family_key), why="on legal hold")
 
+    # 2b. a family the loader could not read is THIS family's "can't be decided" (B-WR-01)
+    if family.unreadable:
+        return decide("not_previewed", why=family.unreadable)
+
     # 3. no policy
     if not applying:
         return decide("no_policy")
@@ -370,8 +379,13 @@ def evaluate(family: FamilyFacts, ctx: EvalContext, now: datetime | date) -> Dec
         kind: DecisionKind = "unarchived" if marker.reason == "unarchived" else "kept"
         return decide(kind, skip=marker, **common)
 
-    due1 = add_period(clock, p.stage1.value, p.stage1.unit)
-    due2 = add_period(clock, p.stage2.value, p.stage2.unit) if p.stage2 is not None else None
+    # A date that cannot carry the period (year 9999 + 1 year overflows) is this document's
+    # "can't be decided" — never an exception that stops the whole org (275-REVIEW B-WR-01).
+    try:
+        due1 = add_period(clock, p.stage1.value, p.stage1.unit)
+        due2 = add_period(clock, p.stage2.value, p.stage2.unit) if p.stage2 is not None else None
+    except (ValueError, OverflowError):
+        return decide("no_date", rule_text=text, policy_revision=p.revision, why="the date can't be used")
     archived = family.archived_at is not None
 
     def queued(qkind: str) -> bool:
