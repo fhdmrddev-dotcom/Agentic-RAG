@@ -724,16 +724,16 @@ Why 5: plan 01 must be alone, because both migrations and every live test mutate
 | A6 | Holds can be added to but coverage rows are not removed individually; ending a hold is a whole-hold release. | Pattern 3 | Low. A UX limit, not a safety issue. |
 | A7 | The listing-only agent tools (`query_documents_by_view`, `get_related_documents`) may still name an archived document; every content read refuses it. Recorded as a limit. | Q2 | Medium. Operator reading of "every agent path" may include listings; `ls`/`tree`/`glob` are filtered to narrow the gap. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Do policies reach members' private documents?**
+1. **Do policies reach members' private documents?** — RESOLVED: no, CONTEXT D-34.
    - What we know: admins cannot read other members' private docs under RLS (full-schema.sql:7403). The sketch's examples are all shared folders.
    - What's unclear: whether "a class policy" should dispose documents only their owner can see.
    - Recommendation: no (A1). Fail closed, and say so in Preview. Revisit with SEED-345's remainder.
-2. **Should legal holds reach private documents?**
+2. **Should legal holds reach private documents?** — RESOLVED: known limit + seed, CONTEXT D-35.
    - What we know: an admin can only pick what they can see, so private documents cannot be held this phase.
    - Recommendation: record it as a limit in VERIFICATION and the docs page. A future "org-wide matter by custodian" is a seed, not this phase.
-3. **The UI-SPEC step.** `ui_phase: true` in config. The sketch already fixed the layout, so run `/gsd:ui-phase 275` only if the planner needs the wording for the two other source states ("Unshared at source", "Source disconnected"). D-21 allows the UI-SPEC to decide.
+3. **The UI-SPEC step.** — RESOLVED: 275-UI-SPEC.md approved (wording for both source states decided there). `ui_phase: true` in config. The sketch already fixed the layout, so run `/gsd:ui-phase 275` only if the planner needs the wording for the two other source states ("Unshared at source", "Source disconnected"). D-21 allows the UI-SPEC to decide.
 
 ## Environment Availability
 

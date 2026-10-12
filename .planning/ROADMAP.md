@@ -287,7 +287,25 @@ Plans:
   4. An archived document no longer appears in default chat retrieval, but document search with an archive filter still finds it, and it can be opened and downloaded (RET-04).
 
 **How we'd know this failed**: the hold is checked by the sweep but not by `DELETE /documents/{id}` (so it is decorative); the first real sweep runs before a dry run exists; an audit record omits the policy; the archived exclusion applies to one retrieval arm only; a policy reaches another org's documents; the sweep touches `workspace_files`; a service-role delete path bypasses the hold.
-**Plans**: TBD
+**Plans**: 5 plans in 4 waves (G-8: 5 — the database plan must run alone because every migration and live test mutates the local DB; 02 and 03 are disjoint and parallel)
+
+Plans:
+**Wave 1**
+
+- [ ] 275-01-PLAN.md — W1: migrations 204 (policies, previews, holds, queue, skips, receipts, sweeps, hold triggers incl. cascades + TRUNCATE, audit CHECK, RLS) + 205 (`retrievable` column, both RPC arms, GUC agent-read policies) applied locally; hold_guard.py; RETRIEVABLE_COLUMN swap; missing ledger rows
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 275-02-PLAN.md — W2: five delete paths guard-first + rows-before-bytes + no swallowed refusals; agent document-read wall + ls/tree/glob filter; typed refusals rendered at every delete door; Find "Include archived"
+- [ ] 275-03-PLAN.md — W2: pure evaluator, fail-closed loader, disposition (archive/queue/confirm/unarchive), sweep claimant + daemon behind RETENTION_SWEEP_ENABLED (4 deploy artifacts), /retention router, Find include_archived, OpenAPI + docs coverage
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 275-04-PLAN.md — W3: Library chips / folder line / Retention section / archived-hidden line; Legal holds + Waiting for you (type-the-count); Org admin Retention tab with the Preview gate + History
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 275-05-PLAN.md — W4: merged-tree gates, SC + failure-criteria + threat matrix, ledger close, G-4 HOLD / LIFECYCLE / MEMBER Chrome drives with DB evidence, docs page, SEED-250 / SEED-345 / BUG-261004-01 routing, D-35 seed, watch-purge bug, owed deploy rows
 **Flags**: ⛔ **This deletes customer data on a timer. It is the most dangerous feature in the milestone** (`SEED-250`). Ship it with the `SRC-06` fail-closed discipline: dry run before any real sweep; ambiguous means nothing is deleted; hold blocks **every** deletion path. **Migration(s)** at the next free number: `retention_policies`, the hold, the archive state, and new `audit_log` action types (extending migration 170's constrained list). **RLS on every new table**, plus `get_advisors(security)`. ⚠ Postgres grants function `EXECUTE` to `PUBLIC` by default, so revoke from `PUBLIC` rather than role by role. **security_enforcement**. The sweep is another claimant on `scheduler_service.py` (FIRES), not new machinery. **G-2 FIRES** (policy editor, hold control, disposition log). The renamed rules surface from 271 is a candidate home, decided at discuss. **G-4** scenarios at scope time. **G-5 audit at discuss:** `backend/app/services/scheduler_service.py` (FIRES), `backend/app/api/documents.py`, `backend/app/services/retrieval_service.py` (rides 272's extracted seam as a default predicate, never a new branch), `backend/app/api/document_governance.py`. "Document class" means the classification type (`document_type_norm`). **Deploy parity**: migrations to production before the backend, and no sweep enabled in production until the operator has read a dry run.
 **UI hint**: yes
 

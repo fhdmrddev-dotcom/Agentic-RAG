@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: Find It, Show It — 🚧 IN PROGRESS
-status: ready_to_plan
-last_updated: 2026-10-05T17:10:08.932Z
-last_activity: 2026-10-05
+status: executing
+last_updated: "2026-10-12T05:10:51.351Z"
+last_activity: 2026-10-12
 progress:
   total_phases: 14
-  completed_phases: 5
-  total_plans: 33
+  completed_phases: 6
+  total_plans: 38
   completed_plans: 33
-  percent: 36
-stopped_at: Phase 274 complete (5/5, verified passed) — next unstarted v4.5 phase is 275 (Retention & Legal Hold)
+  percent: 43
 ---
 
 # Project State
@@ -57,12 +56,12 @@ genuinely reviewed.
 
 Phase: 275 (Retention & Legal Hold) — not started
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Prior: DEPLOYED 2026-10-05 — production 9850e5604 (master 6a0bf5842) ships v4.5 phases 270-274 + 276. Cloud DB migrations 199, 200 (STEP 1 CONCURRENTLY index + STEP 2), 201, 202, 203 applied one approved write at a time, every VERIFY PASS; get_advisors(security) before = after (0 ERROR, 16 WARN, 3 INFO). Live: Vercel READY; api /docs /redoc /openapi.json 401; /health 200; library-links 403 (new route live). Owed: a logged-in smoke test (login, chat stream, doc ingest, code execution in a NEW chat), 271 G-4 sign-off, 273 live STRUCTURED check.
 Prior: Phase 274 COMPLETE (2026-10-05) — verification passed 4/4, security 31/31 (threats_open 0), operator approved G-4 #1-#4. 5 plans + review fixes (CR-01 cross-org folder D-29, CR-02 in-flight duplicate, WR-01/03/04/05/07, T-274-04). BUG-260905-01 closed, SEED-247 answered, BUG-261005-01 filed (shared minter race). Final gates: backend 71 = ceiling (6932 passed), vitest 9983 · 0 failed · 424/424, tsc 66 = base. OWED (operator): production migrations 202 → 203 before the backend deploy, then get_advisors(security). Deferred with triggers: F-1 residual (FileRow sub-line), F-2, F-3, WR-02, WR-06, IN-01..06. Next: /gsd:discuss-phase 275.
 Prior: Phase 272 COMPLETE (2026-10-03) — verification human_needed, self-verified. FIND-07 done. Review: 2 CR + 8 WR all fixed; HUMAN-UAT 2/3 (live re-drive pass; rules accepted); G-1 (topics eq in the shared compiler) fixed. Final backend gate 71 = baseline, 6474 passed. OWED (operator): production — migration 200 STEP 1 (CREATE INDEX CONCURRENTLY) alone → STEP 2 → 201 immediately → both VERIFY → get_advisors(security), each write approved; then backend+frontend deploy (271 also undeployed). Seeds: 333, 334, 335, 336. Owed to 273: D-15/D-16 seams. Next: /gsd:discuss-phase 273.
 Prior: Phase 271 EXECUTED — verification human_needed (2026-10-03). Owed to operator: sign-off on G-4 rows G4-1..G4-6 (driven in Playwright, not Chrome MCP), review of P-01 (default sort added_desc) and P-03 (Older versions = own rows only), deploy (no migration; backend+frontend together; then read-only probe of /document-search + security advisors), CLAUDE.md split (119,524 chars, 476 under the 120k band). Deferred: SEED-331, SEED-332, F-1, F-4. Next: /gsd:discuss-phase 272.
-Last activity: 2026-10-05
+Last activity: 2026-10-12
 
 ### Roadmap Evolution
 
@@ -111,7 +110,7 @@ Status: Phase 269 closed — verification `passed`; nothing deployed; ~~next: op
 - **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
-Resume file: None
+Resume file: .planning/phases/275-retention-legal-hold/275-CONTEXT.md
 Last activity: 2026-09-29 -- Phase 269 closed
 
 ---
