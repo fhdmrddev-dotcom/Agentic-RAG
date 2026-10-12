@@ -105,7 +105,7 @@ data-thread branch/compare half of `SEED-193`, the hardening/testing milestone, 
 - [x] **Phase 272: Close Means Wrong** (completed 2026-10-03 — self-verified, human_needed: prod parity owed): the agent passes date and dimension filters into retrieval, and an empty filter fails closed (FIND-07)
 - [x] **Phase 273: Agent-Authored Artifacts**: a closed component registry (chart, table, metric), validated specs, rows attached for re-encoding, identical on reload, full provider roster (ART-01..05)
 - [x] **Phase 274: Thread-Scoped Attachments** (completed 2026-10-05 — verified passed 4/4, security 31/31, operator-approved G-4; prod migrations 202→203 owed): chat attachments scoped to the thread, Library ingestion only from Documents, explicit promote-to-Library (ATT-01..03)
-- [ ] **Phase 275: Retention & Legal Hold**: policies per class or folder, legal hold, scheduled audited disposition with dry-run, archived documents out of default retrieval but findable (RET-01..04)
+- [x] **Phase 275: Retention & Legal Hold** (completed 2026-10-12 — verified passed 8/8, security 44/44, live re-look R1-R5 PASS; prod migrations 204→205→206 owed): policies per class or folder, legal hold, scheduled audited disposition with dry-run, archived documents out of default retrieval but findable (RET-01..04)
 - [ ] **Phase 276: Public Docs, API Reference & Video Library**: `/docs` in the landing look covering every surface, a Syrel API reference from OpenAPI, a coverage gate, a generated changelog, and Syrel videos (DOCS-01..06)
 
 ### Phase Details
@@ -360,7 +360,7 @@ Plans:
 | 272. Close Means Wrong | 5/5 | Complete (prod migrations 200+201 owed) | 2026-10-03 |
 | 273. Agent-Authored Artifacts | 6/6 | Complete — 1 UAT row OWED (live STRUCTURED-path holdback check; run it first) | 2026-10-04 |
 | 274. Thread-Scoped Attachments | 5/5 | Complete (prod migrations 202→203 + get_advisors owed) | 2026-10-05 |
-| 275. Retention & Legal Hold | 5/5 | Executed — code review + verification next (prod migrations 204→205 + get_advisors owed; sweep stays off) | - |
+| 275. Retention & Legal Hold | 5/5 | Complete — verified passed 8/8, security 44/44 (prod migrations 204→205→206 + get_advisors owed; sweep stays off) | 2026-10-12 |
 | 276. Public Docs, API Reference & Video Library | 7/7 | Complete    | 2026-10-05 |
 
 ---

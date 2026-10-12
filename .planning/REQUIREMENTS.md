@@ -27,10 +27,10 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 
 ### Retention (RET) - SEED-250
 
-- [ ] **RET-01**: Admin can set a retention policy per document class or folder (period and action).
-- [ ] **RET-02**: A legal hold blocks disposition.
-- [ ] **RET-03**: Disposition runs on a schedule and writes an audit record.
-- [ ] **RET-04**: Archived documents drop out of default retrieval but stay findable.
+- [x] **RET-01**: Admin can set a retention policy per document class or folder (period and action).
+- [x] **RET-02**: A legal hold blocks disposition.
+- [x] **RET-03**: Disposition runs on a schedule and writes an audit record.
+- [x] **RET-04**: Archived documents drop out of default retrieval but stay findable.
 
 ### Thread attachments (ATT) - SEED-247
 
@@ -69,10 +69,10 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 | ART-03 | Phase 273 | Complete |
 | ART-04 | Phase 273 | Complete |
 | ART-05 | Phase 273 | Complete |
-| RET-01 | Phase 275 | Pending |
-| RET-02 | Phase 275 | Pending |
-| RET-03 | Phase 275 | Pending |
-| RET-04 | Phase 275 | Pending |
+| RET-01 | Phase 275 | Complete |
+| RET-02 | Phase 275 | Complete |
+| RET-03 | Phase 275 | Complete |
+| RET-04 | Phase 275 | Complete |
 | ATT-01 | Phase 274 | Complete |
 | ATT-02 | Phase 274 | Complete |
 | ATT-03 | Phase 274 | Complete |

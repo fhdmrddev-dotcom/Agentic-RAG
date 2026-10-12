@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: Find It, Show It — 🚧 IN PROGRESS
-status: executing
-last_updated: "2026-10-12T08:45:00.000Z"
+status: ready_to_plan
+last_updated: 2026-10-12T10:57:37.129Z
 last_activity: 2026-10-12
 progress:
   total_phases: 14
   completed_phases: 6
   total_plans: 38
-  completed_plans: 35
+  completed_plans: 38
   percent: 43
+stopped_at: Phase 275 CLOSED (5/5, verification passed) — every v4.5 phase (270-276) now complete; next is the milestone audit/close and the operator-gated 275 deploy
 ---
 
 # Project State
@@ -32,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 275 — retention-legal-hold
+**Current focus:** v4.5 close — every phase 270-276 complete; 275 is the only one not deployed
 
 ---
 
@@ -54,9 +55,10 @@ genuinely reviewed.
 
 ## Current Position (v4.5)
 
-Phase: 275 (Retention & Legal Hold) — executing (all plans done; review + verification next)
-Plan: 5 of 5 complete (275-01..05 done 2026-10-12)
-Status: Phase 275 plans complete — next: `/gsd:code-review 275`, then verification
+Phase: 275 (Retention & Legal Hold) — CLOSED 2026-10-12
+Plan: 5 of 5
+Status: Verification PASSED (self-verified, 8/8); security 44/44 closed; review 5 critical + 19 warning all fixed (migration 206 + 19 frontend commits); live re-look R1-R5 PASS + OBS-R2a fixed and re-looked. RET-01..04 marked complete. Next: `/gsd:audit-milestone` → `/gsd:complete-milestone` for v4.5; deploy of 275 is operator-gated.
+Prior: Phase 275 CLOSED (2026-10-12). OWED (operator, production, each write approved): migrations 204 → 205 → 206 BEFORE the backend deploy (folders.py needs 206's `delete_folder_tree`; without 206 the three hold bypasses the review found are open); get_advisors(security); read the prod `source_state` distribution; backend before or with the frontend; keep `RETENTION_SWEEP_ENABLED=false` until an org admin reads a dry run. Open: OBS-R2b (cosmetic plural), skipped review info items B-IN-01/02/03/06 + F-IN-02 + partial F-IN-06/07/08, BUG-261012-01/02, SEED-354, local Postgres crash finding (deferred-items.md), dead `dry_run_org`, CLAUDE.md past the 120k warn band (split due).
 Prior: 275-05 COMPLETE (2026-10-12) — the close. Merged-tree gates recorded verbatim (backend 71 = base FAILED SET, 7146 passed; live suites 71 passed; count gate 10131 · 0 failed · 434/434; tsc 66 = base; drift/docs/OpenAPI/M-1 green); SC#1-4 + 7 failure criteria + 44 threat ids mapped to evidence (275-G4-EVIDENCE §1-§4). G-4 HOLD / LIFECYCLE / MEMBER all PASS in Chrome with SQL behind each step (§5; cross-provider board N/A by decision, DeepSeek only). Four G-4 defects fixed test-first (RED f62e19200; 13e962d8b History delete_refused, 443b29e8b "1 policy", 88aec8e6f two-stage folder line, 86e29ccc0 fully-archived empty state) — ⚠ OWED: operator re-look at the next UAT (UAT fixes need their own UAT). did_not_delete hold_name stays NULL by decision. Docs page written; SEED-250 answered; SEED-345 partially-answered; BUG-261004-01 CLOSED (live as-owner read, every arm 0, rolled-back control returns them); SEED-354 planted (custodian hold, D-35); BUG-261012-01 (watch purge orphans bytes) + BUG-261012-02 (DELETE /documents 500 not 404) filed. OWED (operator): prod 204 → 205 BEFORE the backend, get_advisors(security), prod source_state read, backend before frontend, RETENTION_SWEEP_ENABLED=false until a dry run is read (§6.4). RET-01..04 NOT marked — phase close does that.
 Prior: 275-04 COMPLETE (2026-10-12) — the retention UI. Org admin → Retention unlocked (posture + Policies · Legal holds · Waiting for you · History; the Waiting pill is the ONLY signal, red only at N > 0); the policy editor's D-02 Preview gate (aria-disabled + on-screen reason, stale re-lock, server 409 rendered); hold dialogs (server count, never 0); type-the-count batches (untick clears the count) + review decisions; 062-A receipts. Library: row chips, folder line, Retention section after File (member line exactly D-17), archived-hidden line sharing Find's include-archived state, a held row's Delete opening straight into the refusal — all from ONE batched document-states read. 3 RED/GREEN task pairs + a ledger commit; targeted suites 83 files / 1135 passed; tsc 66 = base; 9 retention suites + OrgAdminShell.test pinned. 10 recorded deviations (275-04-SUMMARY.md). OWED to 275-05: full count gate + tsc set diff on the merged tree, G-4 drives.
 Prior: 275-01 COMPLETE (2026-10-12) — the database half. Migrations 204 (retention tables, holds refused IN THE DATABASE on every delete path incl. auth.users + folder cascades + TRUNCATE, PT409, sticky coverage, archive/protected-column guards, receipts outliving actor + document, audit CHECK +10) and 205 (`documents.retrievable` generated column on both RPC arms + query_user_documents GUC + 4 RESTRICTIVE agent-read policies) applied to the LOCAL DB only, every VERIFY PASS; full-schema.sql regenerated, ACLs mirrored into the supplement (323/323). `hold_guard.py` (folders first, member never sees a matter, one 409) and `RETRIEVABLE_COLUMN` (no source_disconnected left in either seam; retrieval_service.py untouched). Backend 71 = base FAILED SET (6973 passed). Decisions: one CYCLE-bounded folder walk; column guards are INVOKER; query_user_documents also refuses query_to_xml/ts_stat/ts_rewrite and scopes the GUC to the call; RET-01..04 NOT marked complete until the phase close. ⚠ FINDING: a refused function call (missing EXECUTE) CRASHES the local Postgres backend — pre-existing `resize_embedding_column` reproduces it (deferred-items.md); production unmeasured. ⚠ CLAUDE.md now 120,402 chars (past the 120k warn band — split scheduled). OWED (operator): production 204 → 205 before the backend deploy, then get_advisors(security), plus a prod read of the source_state distribution. Evidence: `275-BASELINES.md`, `275-01-SUMMARY.md`.
