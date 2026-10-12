@@ -146,7 +146,11 @@ and are stated so a phase can run early when its files are free:
   4. The archived v4.5 records match the phase directories, re-derived from those directories and never from a summary line: FIND-01/02/03/06 carry their real status in `milestones/v4.5-REQUIREMENTS.md`, the 270/271 progress rows match their VERIFICATION frontmatter, and every v4.5 SUMMARY carries its `requirements` field (REG-05).
 
 **How we'd know this failed**: the size drops because prose was deleted, not moved; a hot-file row leaves the scan table, so its guardrail can never fire again; the split lands at 119,9xx and Phase 278's first ledger edit puts it back over; a pointer names a `docs/` file that does not exist; an archived artifact's body text changes beyond the named fields; REG-05 ticks a requirement because a summary says so.
-**Plans**: TBD (likely 2, both inline under `inline_plan_threshold`)
+**Plans**: 2 plans (wave 1, both inline under `inline_plan_threshold`)
+
+Plans:
+- [ ] 277-01-PLAN.md — split CLAUDE.md by function to <= 90k (verdict cells <= 80 + vitest history to docs/VITEST-COUNT-GATE.md + D-03 moves only if needed), bind the cell cap to the FIRING table at 80, no-loss proof, guards driven RED (REG-04)
+- [ ] 277-02-PLAN.md — repair the v4.5 archive in place: REQUIREMENTS line 9 + 19 SUMMARY requirements fields from their PLANs, re-verify 270/271 rows (REG-05)
 **Flags**: Docs-only; no source file is touched, so G-5 cannot fire. Split by **function** (the precedents are `docs/HOT-FILE-LEDGER.md` and `docs/SANDBOX-PACKAGES.md`). The gate names the biggest sections: Workflow guardrails 55,145 and Parallel execution 24,125, of which the vitest-gate correction history is narrative. The verdicts, index and scan list stay in CLAUDE.md. ⚠ The vendored GSD framework wiring table (G-7, REG-02) stays in CLAUDE.md, because it is the list used to re-apply the guardrails after a framework update. **REG-05 must not use `milestone.complete` or `state.*` SDK verbs** (STATE.md records eight false-record occurrences); hand-edit only. Re-measure the gate at **every later phase close**, so the band holds through the milestone and not just at 277.
 
 #### Phase 278: One Home for Tools and Filters
