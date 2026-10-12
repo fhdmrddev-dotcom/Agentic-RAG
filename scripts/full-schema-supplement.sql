@@ -110,9 +110,13 @@ CREATE POLICY "Users can read own documents" ON storage.objects FOR SELECT TO au
 DROP POLICY IF EXISTS "Users can upload to own documents folder" ON storage.objects;
 CREATE POLICY "Users can upload to own documents folder" ON storage.objects FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'documents' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+-- migration 206 (Phase 275 B-CR-02): a file that still backs a documents row is not deletable by
+-- a user JWT — the bytes of a held document can only go after its (hold-refused) row.
 DROP POLICY IF EXISTS "Users can delete own documents" ON storage.objects;
 CREATE POLICY "Users can delete own documents" ON storage.objects FOR DELETE TO authenticated
-  USING (bucket_id = 'documents' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+  USING (bucket_id = 'documents'
+         AND (storage.foldername(name))[1] = (select auth.uid()::text)
+         AND NOT public.storage_object_backs_document(name));
 
 -- sandbox-outputs policies
 DROP POLICY IF EXISTS "Users can read own sandbox outputs" ON storage.objects;
@@ -808,3 +812,19 @@ REVOKE EXECUTE ON FUNCTION public.document_is_retrievable(uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.document_is_retrievable(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.document_is_retrievable(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.document_is_retrievable(uuid) TO service_role;
+
+-- migration 206 — Phase 275 fix pass: the storage-backing helper the documents DELETE policy calls,
+-- the one-transaction folder delete (SECURITY INVOKER, user-callable), and four trigger-only
+-- functions. Copied, not retyped.
+REVOKE EXECUTE ON FUNCTION public.storage_object_backs_document(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.storage_object_backs_document(text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.storage_object_backs_document(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.storage_object_backs_document(text) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.delete_folder_tree(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.delete_folder_tree(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.delete_folder_tree(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_folder_tree(uuid) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.documents_hold_identity_guard() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.folders_hold_identity_guard() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.retention_policies_folder_same_org() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.documents_inherit_family_archive() FROM PUBLIC, anon, authenticated;
