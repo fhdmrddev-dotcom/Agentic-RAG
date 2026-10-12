@@ -13,7 +13,10 @@ Four verbs, each built on the ONE rule (``evaluate``) over the ONE fail-closed r
   re-checked inside its own transaction — row lock, ``retention_held_documents``, policy revision and
   fingerprint — and a family that became held, moved or changed is DROPPED with a ``did_not_delete``
   receipt, never deleted. Every version row goes (chunks, tables and images cascade); the file bytes
-  are removed AFTER the commit and a storage failure is logged (D-12, D-38).
+  are removed right AFTER that family's commit and a storage failure is logged (D-12, D-38). A
+  family missing from the snapshot is dropped, never deleted unseen (275-REVIEW B-WR-05); a family
+  that fails is reported under ``failed`` while the batch continues (B-WR-04); Archive on a review
+  row runs the same in-transaction re-check as Delete (B-WR-07).
 * ``unarchive_family`` — an admin brings a family back (D-19, revision B-NEW-1).
 
 ⛔ EVERY STATEMENT BINDS ``org_id``. The pool is the service role; the explicit predicate is the wall
@@ -429,6 +432,12 @@ async def confirm_batch(
 
     Ids are the ``latest_document_id`` of queue rows. ``typed_count`` must equal ``len(delete_ids)``
     or NOTHING is written (D-03). Each family is re-checked in its own transaction.
+
+    275-REVIEW B-WR-04: a family that fails with a non-hold error is reported under ``failed`` (it
+    rolled back; its queue row stays for a retry) and the batch CONTINUES — never a bare 500 after
+    other families were already deleted. Each deleted family's bytes are removed right after its
+    own commit, and its ``deleted`` receipt names the file paths so a failed removal can be found
+    and retried (``bytes_not_removed``).
     """
     delete_ids = [str(x) for x in delete_ids]
     keep_ids = [str(x) for x in keep_ids]
@@ -448,126 +457,203 @@ async def confirm_batch(
         raise NotFound("That policy no longer exists.")
     queue = {str(r["latest_document_id"]): r for r in snap.queue_rows if str(r["policy_id"]) == p.id}
 
-    out: dict[str, list] = {"deleted": [], "did_not_delete": [], "kept": [], "archived": [], "not_found": [], "skipped": []}
-    paths: list[str] = []
+    out: dict[str, list] = {
+        "deleted": [], "did_not_delete": [], "kept": [], "archived": [], "not_found": [], "skipped": [],
+        "failed": [],
+    }
+    removed: list[str] = []
+    not_removed: list[str] = []
+
+    who = dict(actor_id=actor_id, actor_name=actor_name)
 
     for doc_id in delete_ids:
         row = queue.get(doc_id)
         if row is None:
             out["not_found"].append({"document_id": doc_id})
             continue
-        await _confirm_delete(pool, snap, p, row, at=at, actor_id=actor_id, actor_name=actor_name, out=out, paths=paths)
+        try:
+            paths = await _confirm_delete(pool, snap, p, row, at=at, out=out, **who)
+        except Exception as exc:  # B-WR-04: reported, never a silent partial 500
+            await _record_failure(pool, snap, p, row, "delete", exc, out=out, **who)
+            continue
+        # D-12 / D-38: this family's bytes right after ITS commit; a storage failure is logged.
+        await _remove_bytes(storage, paths, removed, not_removed)
 
     for doc_id in keep_ids:
         row = queue.get(doc_id)
         if row is None:
             out["not_found"].append({"document_id": doc_id})
             continue
-        await _confirm_keep(pool, snap, p, row, actor_id=actor_id, actor_name=actor_name, out=out)
+        try:
+            await _confirm_keep(pool, snap, p, row, out=out, **who)
+        except Exception as exc:
+            await _record_failure(pool, snap, p, row, "keep", exc, out=out, **who)
 
     for doc_id in archive_ids:
         row = queue.get(doc_id)
         if row is None or str(row["kind"]) != "review":
             out["not_found"].append({"document_id": doc_id})
             continue
-        await _confirm_archive(pool, snap, p, row, at=at, actor_id=actor_id, actor_name=actor_name, out=out)
-
-    # D-12 / D-38: bytes LAST, after every row commit; a storage failure is logged, never raised.
-    if paths and storage is not None:
         try:
-            await run_in_threadpool(lambda: storage.storage.from_(STORAGE_BUCKET).remove(paths))
-        except Exception:
-            logger.exception("retention: removing %d file(s) after a confirmed delete failed", len(paths))
-    out["removed_paths"] = paths
+            await _confirm_archive(pool, snap, p, row, at=at, out=out, **who)
+        except Exception as exc:
+            await _record_failure(pool, snap, p, row, "archive", exc, out=out, **who)
+
+    out["removed_paths"] = removed
+    out["bytes_not_removed"] = not_removed
     return out
 
 
-async def _confirm_delete(pool, snap, p: PolicyFacts, qrow: dict, *, at, actor_id, actor_name, out, paths) -> None:
+async def _remove_bytes(storage, paths: list[str], removed: list[str], not_removed: list[str]) -> None:
+    if not paths or storage is None:
+        return
+    try:
+        await run_in_threadpool(lambda: storage.storage.from_(STORAGE_BUCKET).remove(paths))
+        removed.extend(paths)
+    except Exception:
+        logger.exception("retention: removing %d file(s) after a confirmed delete failed", len(paths))
+        not_removed.extend(paths)
+
+
+async def _record_failure(pool, snap, p: PolicyFacts, qrow: dict, decision: str, exc: Exception, *,
+                          actor_id, actor_name, out) -> None:
+    """A family that failed for a reason other than a hold: nothing of it was committed (its
+    transaction rolled back) and its queue row stays for a retry. Reported, and receipted
+    best-effort — a second failure here is logged, never raised over the batch."""
     org = _u(snap.org_id)
     fam = snap.family(str(qrow["family_key"]))
     name = fam.name if fam else None
+    logger.error("retention: confirm %s failed for %s: %r", decision, qrow.get("latest_document_id"), exc)
+    out["failed"].append({
+        "document_id": str(qrow["latest_document_id"]), "name": name, "decision": decision,
+        "error": type(exc).__name__,
+    })
+    try:
+        await rdb.insert_receipt(
+            pool, org, "did_not_delete", document_id=qrow["latest_document_id"], document_name=name,
+            policy_id=p.id, policy_name=p.name, actor_id=actor_id, actor_name=actor_name,
+            detail={"reason": "error", "decision": decision, "error": type(exc).__name__},
+        )
+    except Exception:
+        logger.exception("retention: the failure receipt for %s could not be written", qrow.get("latest_document_id"))
+
+
+@dataclass
+class _Recheck:
+    """What one family looks like INSIDE the confirm transaction (rows locked FOR UPDATE)."""
+
+    status: str  # "ok" | "not_found" | "held" | "changed"
+    q: Optional[Any] = None
+    rows: list = field(default_factory=list)
+    ids: list = field(default_factory=list)
+    name: Optional[str] = None
+    since: Optional[datetime] = None
+
+
+async def _recheck_in_tx(con, org: UUID, p: PolicyFacts, qrow: dict, fam, name: Optional[str]) -> _Recheck:
+    """The ONE in-transaction re-check Delete and Archive both run (D-03; B-WR-05, B-WR-07): the
+    queue row still exists, nothing in the family is held, the policy is at the queued revision,
+    the latest row still has the queued fingerprint, and the family is still EXACTLY the rows the
+    snapshot evaluated — a rename that merged another family into this key is "changed"."""
+    q = await con.fetchrow(
+        "SELECT id, family_key, latest_document_id, kind, policy_revision, fingerprint "
+        "FROM public.retention_queue WHERE id = $1 AND org_id = $2 AND policy_id = $3 FOR UPDATE",
+        _u(qrow["id"]), org, _u(p.id),
+    )
+    head = await con.fetchrow(
+        "SELECT user_id, filename, folder_id FROM public.documents WHERE id = $1 AND org_id = $2",
+        _u(qrow["latest_document_id"]), org,
+    )
+    if q is None or head is None:
+        return _Recheck("not_found", name=name)
+    rows = [dict(r) for r in await con.fetch(_FAMILY_ROWS_SQL, org, head["user_id"], head["filename"], head["folder_id"])]
+    pol = await con.fetchrow(
+        "SELECT revision, clock FROM public.retention_policies WHERE id = $1 AND org_id = $2 FOR SHARE",
+        _u(p.id), org,
+    )
+    ids = [r["id"] for r in rows]
+    latest = _latest_row(rows)
+    name = str(latest["filename"]) if latest else name
+    held = await con.fetch("SELECT document_id, held_since FROM public.retention_held_documents($1::uuid[])", ids)
+    if held:
+        since = min((h["held_since"] for h in held if h["held_since"] is not None), default=None)
+        return _Recheck("held", q=q, rows=rows, ids=ids, name=name, since=since)
+    fp_now = None
+    if latest is not None and pol is not None:
+        clock = latest["date_typed"] if pol["clock"] == "document_date" else _day(latest["created_at"])
+        fp_now = fingerprint(str(latest["id"]), clock, str(latest["folder_id"]) if latest["folder_id"] else None, latest["document_type_norm"])
+    same_family = fam is not None and {str(i) for i in ids} == set(fam.row_ids)
+    if (pol is None or int(pol["revision"]) != int(q["policy_revision"]) or fp_now != str(q["fingerprint"])
+            or not same_family):
+        return _Recheck("changed", q=q, rows=rows, ids=ids, name=name)
+    return _Recheck("ok", q=q, rows=rows, ids=ids, name=name)
+
+
+async def _confirm_delete(pool, snap, p: PolicyFacts, qrow: dict, *, at, actor_id, actor_name, out) -> list[str]:
+    """Delete one family, or drop it with a receipt. Returns the file paths of a COMMITTED delete."""
+    org = _u(snap.org_id)
+    fam = snap.family(str(qrow["family_key"]))
+    name = fam.name if fam else None
+    # B-WR-05: a family missing from the snapshot was never evaluated — it is DROPPED, never
+    # deleted unseen (it may now share its key with a family nobody proposed).
+    if fam is None:
+        await _did_not_delete(pool, org, p, qrow, name, "changed", None, actor_id, actor_name, out)
+        return []
     # The rule, again (D-09): only a family the evaluator still says is waiting under THIS policy.
-    if fam is not None:
-        d = evaluate(fam, snap.ctx, at)
-        if d.kind == "held":
-            await _did_not_delete(pool, org, p, qrow, name, "held", d.held_since, actor_id, actor_name, out)
-            return
-        if not (d.kind == "pending" and d.policy_id == p.id and d.queue_kind == str(qrow["kind"])):
-            await _did_not_delete(pool, org, p, qrow, name, "changed", None, actor_id, actor_name, out)
-            return
+    d = evaluate(fam, snap.ctx, at)
+    if d.kind == "held":
+        await _did_not_delete(pool, org, p, qrow, name, "held", d.held_since, actor_id, actor_name, out)
+        return []
+    if not (d.kind == "pending" and d.policy_id == p.id and d.queue_kind == str(qrow["kind"])):
+        await _did_not_delete(pool, org, p, qrow, name, "changed", None, actor_id, actor_name, out)
+        return []
 
     try:
         async with pool.acquire() as con:
             async with con.transaction():
-                q = await con.fetchrow(
-                    "SELECT id, family_key, latest_document_id, kind, policy_revision, fingerprint "
-                    "FROM public.retention_queue WHERE id = $1 AND org_id = $2 AND policy_id = $3 FOR UPDATE",
-                    _u(qrow["id"]), org, _u(p.id),
-                )
-                head = await con.fetchrow(
-                    "SELECT user_id, filename, folder_id FROM public.documents WHERE id = $1 AND org_id = $2",
-                    _u(qrow["latest_document_id"]), org,
-                )
-                if q is None or head is None:
+                rc = await _recheck_in_tx(con, org, p, qrow, fam, name)
+                name = rc.name
+                if rc.status == "not_found":
                     out["not_found"].append({"document_id": str(qrow["latest_document_id"]), "name": name})
-                    return
-                rows = [dict(r) for r in await con.fetch(_FAMILY_ROWS_SQL, org, head["user_id"], head["filename"], head["folder_id"])]
-                pol = await con.fetchrow(
-                    "SELECT revision, clock FROM public.retention_policies WHERE id = $1 AND org_id = $2 FOR SHARE",
-                    _u(p.id), org,
-                )
-                ids = [r["id"] for r in rows]
-                held = await con.fetch(
-                    "SELECT document_id, held_since FROM public.retention_held_documents($1::uuid[])", ids,
-                )
-                latest = _latest_row(rows)
-                name = str(latest["filename"]) if latest else name
-                if held:
-                    since = min((h["held_since"] for h in held if h["held_since"] is not None), default=None)
-                    await con.execute("DELETE FROM public.retention_queue WHERE id = $1 AND org_id = $2", q["id"], org)
-                    await _receipt_did_not_delete(con, org, p, qrow, name, "held", since, actor_id, actor_name)
-                    out["did_not_delete"].append(_dnd(qrow, name, "held", since))
-                    return
-                fp_now = None
-                if latest is not None and pol is not None:
-                    clock = latest["date_typed"] if pol["clock"] == "document_date" else _day(latest["created_at"])
-                    fp_now = fingerprint(str(latest["id"]), clock, str(latest["folder_id"]) if latest["folder_id"] else None, latest["document_type_norm"])
-                if pol is None or int(pol["revision"]) != int(q["policy_revision"]) or fp_now != str(q["fingerprint"]):
-                    await con.execute("DELETE FROM public.retention_queue WHERE id = $1 AND org_id = $2", q["id"], org)
-                    await _receipt_did_not_delete(con, org, p, qrow, name, "changed", None, actor_id, actor_name)
-                    out["did_not_delete"].append(_dnd(qrow, name, "changed", None))
-                    return
+                    return []
+                if rc.status in ("held", "changed"):
+                    await con.execute("DELETE FROM public.retention_queue WHERE id = $1 AND org_id = $2", rc.q["id"], org)
+                    await _receipt_did_not_delete(con, org, p, qrow, name, rc.status, rc.since, actor_id, actor_name)
+                    out["did_not_delete"].append(_dnd(qrow, name, rc.status, rc.since))
+                    return []
+                paths = [str(r["file_path"]) for r in rc.rows if r.get("file_path")]
                 # ⛔ THE ONE DELETE (D-08). Every version row; chunks/tables/images cascade (D-12).
                 await con.execute(
-                    "DELETE FROM public.documents WHERE org_id = $1 AND id = ANY($2::uuid[])", org, ids,
+                    "DELETE FROM public.documents WHERE org_id = $1 AND id = ANY($2::uuid[])", org, rc.ids,
                 )
+                latest = _latest_row(rc.rows)
                 await rdb.insert_receipt(
                     con, org, "deleted", document_id=latest["id"], document_name=name,
                     policy_id=p.id, policy_name=p.name, actor_id=actor_id, actor_name=actor_name,
-                    detail={"rows": len(ids), "approved_at": at.isoformat()},
+                    detail={"rows": len(rc.ids), "approved_at": at.isoformat(), "file_paths": paths},
                 )
-        out["deleted"].append({"document_id": str(qrow["latest_document_id"]), "name": name, "rows": len(ids)})
-        paths.extend(str(r["file_path"]) for r in rows if r.get("file_path"))
+        out["deleted"].append({"document_id": str(qrow["latest_document_id"]), "name": name, "rows": len(rc.ids)})
+        return paths
     except Exception as exc:
         if getattr(exc, "sqlstate", None) == "PT409":  # a hold raced past the check — the DB refused
             await _did_not_delete(pool, org, p, qrow, name, "held", None, actor_id, actor_name, out)
-            return
+            return []
         raise
 
 
-async def _did_not_delete(pool, org, p, qrow, name, reason, since, actor_id, actor_name, out) -> None:
+async def _did_not_delete(pool, org, p, qrow, name, reason, since, actor_id, actor_name, out, *, detail=None) -> None:
     async with pool.acquire() as con:
         async with con.transaction():
             await con.execute("DELETE FROM public.retention_queue WHERE id = $1 AND org_id = $2", _u(qrow["id"]), org)
-            await _receipt_did_not_delete(con, org, p, qrow, name, reason, since, actor_id, actor_name)
+            await _receipt_did_not_delete(con, org, p, qrow, name, reason, since, actor_id, actor_name, detail=detail)
     out["did_not_delete"].append(_dnd(qrow, name, reason, since))
 
 
-async def _receipt_did_not_delete(con, org, p, qrow, name, reason, since, actor_id, actor_name) -> None:
+async def _receipt_did_not_delete(con, org, p, qrow, name, reason, since, actor_id, actor_name, *, detail=None) -> None:
     await rdb.insert_receipt(
         con, org, "did_not_delete", document_id=qrow["latest_document_id"], document_name=name,
         policy_id=p.id, policy_name=p.name, actor_id=actor_id, actor_name=actor_name,
-        detail={"reason": reason, "held_since": since.isoformat() if since else None},
+        detail={"reason": reason, "held_since": since.isoformat() if since else None, **(detail or {})},
     )
 
 
@@ -604,23 +690,56 @@ async def _confirm_keep(pool, snap, p: PolicyFacts, qrow: dict, *, actor_id, act
 
 
 async def _confirm_archive(pool, snap, p: PolicyFacts, qrow: dict, *, at, actor_id, actor_name, out) -> None:
-    """D-10: a review decided "archive" by a person. A held family is skipped (held = untouched)."""
+    """D-10: a review decided "archive" by a person. A held family is skipped (held = untouched).
+
+    275-REVIEW B-WR-07: the same re-check as Delete — the evaluator must still say this family is
+    waiting for review under THIS policy, and in-transaction the revision, fingerprint and family
+    membership must still match. Otherwise nothing is archived; the stale row is dropped with a
+    ``did_not_delete`` receipt (``decision: archive``) and reported as skipped / ``changed``.
+    """
     org = _u(snap.org_id)
     fam = snap.family(str(qrow["family_key"]))
+    name = fam.name if fam else None
+
+    def _skip(reason: str, shown: Optional[str]) -> None:
+        out["skipped"].append({"document_id": str(qrow["latest_document_id"]), "name": shown, "reason": reason})
+
+    async def _changed() -> None:
+        await _did_not_delete(pool, org, p, qrow, name, "changed", None, actor_id, actor_name, {"did_not_delete": []},
+                              detail={"decision": "archive"})
+        _skip("changed", name)
+
     if fam is None:
-        out["not_found"].append({"document_id": str(qrow["latest_document_id"])})
+        await _changed()
         return
-    if fam.family_key in snap.ctx.held:
-        out["skipped"].append({"document_id": fam.latest_id, "name": fam.name, "reason": "held"})
+    d = evaluate(fam, snap.ctx, at)
+    if d.kind == "held":
+        _skip("held", fam.name)
+        return
+    if not (d.kind == "pending" and d.policy_id == p.id and d.queue_kind == "review"):
+        await _changed()
         return
     async with pool.acquire() as con:
         async with con.transaction():
+            rc = await _recheck_in_tx(con, org, p, qrow, fam, name)
+            if rc.status == "not_found":
+                out["not_found"].append({"document_id": str(qrow["latest_document_id"]), "name": rc.name})
+                return
+            if rc.status == "held":
+                _skip("held", rc.name)
+                return
+            if rc.status == "changed":
+                await con.execute("DELETE FROM public.retention_queue WHERE id = $1 AND org_id = $2", rc.q["id"], org)
+                await _receipt_did_not_delete(con, org, p, qrow, rc.name, "changed", None, actor_id, actor_name,
+                                              detail={"decision": "archive"})
+                _skip("changed", rc.name)
+                return
             await con.execute(
                 "UPDATE public.documents SET archived_at = $3, archived_policy_id = $4, archived_policy_name = $5 "
                 "WHERE org_id = $1 AND id = ANY($2::uuid[]) AND archived_at IS NULL",
-                org, [_u(x) for x in fam.row_ids], at, _u(p.id), p.name,
+                org, rc.ids, at, _u(p.id), p.name,
             )
-            await con.execute("DELETE FROM public.retention_queue WHERE id = $1 AND org_id = $2", _u(qrow["id"]), org)
+            await con.execute("DELETE FROM public.retention_queue WHERE id = $1 AND org_id = $2", rc.q["id"], org)
             await rdb.insert_receipt(
                 con, org, "archived", document_id=fam.latest_id, document_name=fam.name,
                 policy_id=p.id, policy_name=p.name, actor_id=actor_id, actor_name=actor_name,

@@ -343,6 +343,11 @@ class ConfirmOut(BaseModel):
     archived: list[dict[str, Any]]
     not_found: list[dict[str, Any]]
     skipped: list[dict[str, Any]]
+    #: 275-REVIEW B-WR-04: families that failed for a non-hold reason (nothing of them was
+    #: committed; their queue row stays). The batch continues past them.
+    failed: list[dict[str, Any]] = Field(default_factory=list)
+    #: Paths of committed deletes whose bytes could not be removed (also on the deleted receipt).
+    bytes_not_removed: list[str] = Field(default_factory=list)
 
 
 class HistoryRow(BaseModel):

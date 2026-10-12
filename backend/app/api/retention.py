@@ -638,13 +638,15 @@ async def confirm_queue(
         raise HTTPException(status_code=503, detail=LOAD_INCOMPLETE)
     except disposition.DispositionError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message)
-    counts = {k: len(out.get(k) or []) for k in ("deleted", "did_not_delete", "kept", "archived", "not_found", "skipped")}
+    counts = {k: len(out.get(k) or []) for k in ("deleted", "did_not_delete", "kept", "archived", "not_found", "skipped", "failed")}
     await _audit(current_user, "retention.disposition.confirm",
                  {"event": "retention.disposition.confirm", "policy_id": str(policy_id), **counts}, supabase, org)
     if counts["kept"] and not counts["deleted"] and not counts["archived"]:
         await _audit(current_user, "retention.document.keep",
                      {"event": "retention.document.keep", "policy_id": str(policy_id), "kept": counts["kept"]}, supabase, org)
-    return ConfirmOut(**{k: out.get(k) or [] for k in ("deleted", "did_not_delete", "kept", "archived", "not_found", "skipped")})
+    return ConfirmOut(**{k: out.get(k) or [] for k in (
+        "deleted", "did_not_delete", "kept", "archived", "not_found", "skipped", "failed", "bytes_not_removed",
+    )})
 
 
 @router.post("/documents/{document_id}/unarchive", response_model=UnarchiveOut)

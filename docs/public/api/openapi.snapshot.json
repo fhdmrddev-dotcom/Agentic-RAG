@@ -16261,6 +16261,21 @@
       },
       "type": "array",
       "title": "Skipped"
+     },
+     "failed": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Failed"
+     },
+     "bytes_not_removed": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Bytes Not Removed"
      }
     },
     "type": "object",
