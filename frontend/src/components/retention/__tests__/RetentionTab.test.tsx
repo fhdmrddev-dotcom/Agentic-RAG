@@ -219,6 +219,30 @@ describe("RetentionTab — the Policies table (S1)", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Finance invoices" })).toHaveFocus())
   })
 
+  it("275-REVIEW IN-08: Space on a policy row opens it too (it is role=button)", async () => {
+    render(<RetentionTab />)
+    const row = await screen.findByRole("button", { name: "Finance invoices" })
+    fireEvent.keyDown(row, { key: " " })
+    expect(await screen.findByText("Edit “Finance invoices”")).toBeInTheDocument()
+  })
+
+  it("275-REVIEW IN-08: a tab's aria-controls never points at a panel that does not exist", async () => {
+    render(<RetentionTab />)
+    await screen.findByTestId("posture")
+    for (const tab of screen.getAllByRole("tab")) {
+      const id = tab.getAttribute("aria-controls")
+      if (id !== null) expect(document.getElementById(id)).not.toBeNull()
+    }
+  })
+
+  it("275-REVIEW IN-06: the Policies sub line never reads 'Checked every night at —' before the cadence is known", async () => {
+    m.getRetentionSummary.mockImplementation(() => new Promise(() => {}))
+    render(<RetentionTab />)
+    await screen.findByRole("button", { name: "Finance invoices" })
+    expect(screen.queryByTestId("policies-sub")).toBeNull()
+    expect(document.body.textContent).not.toContain("Checked every night at —")
+  })
+
   it("a saved policy pulses the band (onRecorded) and re-reads the posture", async () => {
     m.previewPolicy.mockResolvedValue({
       draft_hash: "h", action: "archive", has_stage2: false, counts: {}, private_not_covered: 0,

@@ -95,11 +95,15 @@ export function RetentionPolicies({
     }
   }, [load])
 
-  // Return focus to the row (or button) that opened the editor.
+  // Return focus to the row (or button) that opened the editor — ONCE. 275-REVIEW IN-09: the target
+  // is cleared after it is restored, so a later list reload ("Try again", a post-save re-read)
+  // never yanks focus back after the person has moved on.
   useEffect(() => {
     if (editing || !returnFocus.current) return
     const el = document.querySelector<HTMLElement>(`[data-return-focus="${returnFocus.current}"]`)
-    el?.focus()
+    if (!el) return
+    el.focus()
+    returnFocus.current = null
   }, [editing, list])
 
   const open = (policy: RetentionPolicy | null) => {
@@ -137,9 +141,12 @@ export function RetentionPolicies({
           {C.ported.newPolicy}
         </Button>
       </header>
-      <p className="text-xs text-muted-foreground" data-testid="policies-sub">
-        {fillCopy(C.sketchTemplates.policiesSub, { time: sweepTimeText(sweepHourUtc) })}
-      </p>
+      {/* 275-REVIEW IN-06: the line states the configured cadence, so it waits for it — never "at —". */}
+      {sweepHourUtc !== null && sweepHourUtc !== undefined && (
+        <p className="text-xs text-muted-foreground" data-testid="policies-sub">
+          {fillCopy(C.sketchTemplates.policiesSub, { time: sweepTimeText(sweepHourUtc) })}
+        </p>
+      )}
 
       {loadError && (
         <p role="alert" className={`text-sm ${AMBER_TEXT_CLASS}`}>
@@ -181,7 +188,11 @@ export function RetentionPolicies({
                   className="cursor-pointer border-b border-border/60 align-top hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   onClick={() => open(p)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") open(p)
+                    // 275-REVIEW IN-08: a role=button answers Space as well as Enter.
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      open(p)
+                    }
                   }}
                 >
                   <td className="px-2 py-2 font-semibold text-foreground">{p.name}</td>

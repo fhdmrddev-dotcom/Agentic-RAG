@@ -194,7 +194,8 @@ export function RetentionTab({ onRecorded }: { onRecorded?: () => void }) {
               role="tab"
               id={`retention-tab-${t.id}`}
               aria-selected={selected}
-              aria-controls={`retention-panel-${t.id}`}
+              // 275-REVIEW IN-08: only the selected tab's panel is rendered, so only it is named.
+              aria-controls={selected ? `retention-panel-${t.id}` : undefined}
               aria-label={t.aria}
               tabIndex={selected ? 0 : -1}
               onClick={() => setTab(t.id)}

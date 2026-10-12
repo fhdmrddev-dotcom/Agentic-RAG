@@ -61,14 +61,15 @@ function sentenceFor(state: RetentionDocumentState, doc: Document): string {
     case "disagree":
       return fillCopy(C.specTemplates.sectionDisagree, { A: policy, B: s.other_policy_name ?? "—" })
     case "kept":
+      // 275-REVIEW IN-06: an actor who is gone reads "a former member" (S5), never "not recorded".
       return fillCopy(C.specTemplates.sectionKept, {
-        name: s.kept_by ?? NOT_RECORDED_DATE,
+        name: s.kept_by ?? C.contract.formerMember,
         date: formatRetentionDate(s.kept_at),
         policy,
       })
     case "unarchived":
       return fillCopy(C.specTemplates.sectionUnarchived, {
-        name: s.kept_by ?? NOT_RECORDED_DATE,
+        name: s.kept_by ?? C.contract.formerMember,
         date: formatRetentionDate(s.kept_at),
         policy,
       })
@@ -147,7 +148,9 @@ export function RetentionSection({ doc, state, canManage, onUnarchived }: Retent
     <div className="grid gap-2 px-4 py-3 text-sm leading-relaxed text-panel-muted-foreground" data-testid="retention-section">
       {held &&
         (canManage ? (
-          <p className={AMBER_TEXT_CLASS}>{state.hold_line ?? C.contract.memberHoldLine}</p>
+          // 275-REVIEW IN-06: an admin without the server's line gets the ADMIN sentence (it says
+          // what to do), never the member's "Ask an org admin." — they ARE the org admin.
+          <p className={AMBER_TEXT_CLASS}>{state.hold_line ?? C.server.documentAdminNoMatter}</p>
         ) : (
           <>
             <p className={AMBER_TEXT_CLASS}>{C.contract.memberHoldLine}</p>

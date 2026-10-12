@@ -180,6 +180,22 @@ describe("RetentionSection — archived, and Un-archive (B-NEW-1 / D-19)", () =>
   })
 })
 
+describe("275-REVIEW IN-06 — copy edges in the section", () => {
+  it("a keep whose actor is unknown reads 'a former member', never 'Kept by not recorded'", () => {
+    render(<RetentionSection doc={DOC} state={state({ section: { kind: "kept", policy_name: "Expired contracts", kept_at: "2026-10-12T10:00:00Z" } })} canManage />)
+    const section = screen.getByTestId("retention-section")
+    expect(section).toHaveTextContent("Kept by a former member on")
+    expect(section).not.toHaveTextContent("Kept by not recorded")
+  })
+
+  it("an admin whose hold line did not arrive gets the admin sentence, not the member's 'Ask an org admin.'", () => {
+    render(<RetentionSection doc={DOC} state={state({ held: true, section: { kind: "hold" } })} canManage />)
+    const section = screen.getByTestId("retention-section")
+    expect(section).toHaveTextContent("This document is on legal hold. Release the hold in Org admin → Retention first.")
+    expect(section).not.toHaveTextContent("Ask an org admin.")
+  })
+})
+
 describe("275-REVIEW F-WR-06 — an un-archive in flight never lands on another document", () => {
   const archivedA = state({
     archived: true, chip: "archived", can_unarchive: true,

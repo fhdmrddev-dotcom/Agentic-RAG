@@ -380,15 +380,18 @@ export type CopyVars = Record<string, string | number | null | undefined>
 /**
  * Fill `{key}` placeholders and resolve `(s)` against `count` (default `vars.N`). A missing value
  * leaves its placeholder visible rather than inventing one.
+ *
+ * 275-REVIEW IN-07: `(s)` is resolved on the TEMPLATE before the values go in, so a document or
+ * matter name that itself contains `(s)` (`Invoice(s).pdf`) is printed exactly as written.
  */
 export function fillCopy(template: string, vars: CopyVars = {}, count?: number): string {
   const n = count ?? (typeof vars.N === "number" ? vars.N : undefined)
   return template
+    .replace(/\(s\)/g, n === 1 ? "" : "s")
     .replace(/\{([^}]+)\}/g, (whole, key: string) => {
       const v = vars[key]
       return v === null || v === undefined ? whole : String(v)
     })
-    .replace(/\(s\)/g, n === 1 ? "" : "s")
 }
 
 export interface RichPart {

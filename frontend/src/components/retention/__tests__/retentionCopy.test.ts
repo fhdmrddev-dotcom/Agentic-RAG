@@ -163,6 +163,12 @@ describe("retentionCopy — every string is fenced against its own source", () =
     ])
   })
 
+  it("275-REVIEW IN-07: (s) is resolved on the TEMPLATE, so a name containing '(s)' is printed as written", () => {
+    const out = fillCopy(RETENTION_COPY.sketchTemplates.lateHold, { M: 1, names: "Invoice(s).pdf" }, 1)
+    expect(out).toContain("Invoice(s).pdf")
+    expect(fillCopy(RETENTION_COPY.sketchTemplates.archivedHidden, { N: 2 })).toBe("2 archived documents hidden")
+  })
+
   it("holdRefusalFor: a member never gets a matter name, an admin gets the first one", () => {
     expect(holdRefusalFor(undefined, false).message).toBe(RETENTION_COPY.server.documentMember)
     // A member payload has no names — but even if one leaked in, the member branch ignores it.
