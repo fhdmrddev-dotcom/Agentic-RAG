@@ -301,7 +301,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 275-04-PLAN.md — W3: Library chips / folder line / Retention section / archived-hidden line; Legal holds + Waiting for you (type-the-count); Org admin Retention tab with the Preview gate + History
+- [x] 275-04-PLAN.md — W3: Library chips / folder line / Retention section / archived-hidden line; Legal holds + Waiting for you (type-the-count); Org admin Retention tab with the Preview gate + History
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
