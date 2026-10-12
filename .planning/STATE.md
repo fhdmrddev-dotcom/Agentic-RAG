@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: Find It, Show It — 🚧 IN PROGRESS
 status: executing
-last_updated: "2026-10-12T05:11:31.227Z"
+last_updated: "2026-10-12T05:58:00.000Z"
 last_activity: 2026-10-12
 progress:
   total_phases: 14
   completed_phases: 6
   total_plans: 38
-  completed_plans: 33
+  completed_plans: 34
   percent: 43
 ---
 
@@ -54,9 +54,10 @@ genuinely reviewed.
 
 ## Current Position (v4.5)
 
-Phase: 275 (Retention & Legal Hold) — not started
-Plan: Not started
+Phase: 275 (Retention & Legal Hold) — executing
+Plan: 1 of 5 complete (275-01 done 2026-10-12; next 275-02 ∥ 275-03, wave 2)
 Status: Executing Phase 275
+Prior: 275-01 COMPLETE (2026-10-12) — the database half. Migrations 204 (retention tables, holds refused IN THE DATABASE on every delete path incl. auth.users + folder cascades + TRUNCATE, PT409, sticky coverage, archive/protected-column guards, receipts outliving actor + document, audit CHECK +10) and 205 (`documents.retrievable` generated column on both RPC arms + query_user_documents GUC + 4 RESTRICTIVE agent-read policies) applied to the LOCAL DB only, every VERIFY PASS; full-schema.sql regenerated, ACLs mirrored into the supplement (323/323). `hold_guard.py` (folders first, member never sees a matter, one 409) and `RETRIEVABLE_COLUMN` (no source_disconnected left in either seam; retrieval_service.py untouched). Backend 71 = base FAILED SET (6973 passed). Decisions: one CYCLE-bounded folder walk; column guards are INVOKER; query_user_documents also refuses query_to_xml/ts_stat/ts_rewrite and scopes the GUC to the call; RET-01..04 NOT marked complete until the phase close. ⚠ FINDING: a refused function call (missing EXECUTE) CRASHES the local Postgres backend — pre-existing `resize_embedding_column` reproduces it (deferred-items.md); production unmeasured. ⚠ CLAUDE.md now 120,402 chars (past the 120k warn band — split scheduled). OWED (operator): production 204 → 205 before the backend deploy, then get_advisors(security), plus a prod read of the source_state distribution. Evidence: `275-BASELINES.md`, `275-01-SUMMARY.md`.
 Prior: DEPLOYED 2026-10-05 — production 9850e5604 (master 6a0bf5842) ships v4.5 phases 270-274 + 276. Cloud DB migrations 199, 200 (STEP 1 CONCURRENTLY index + STEP 2), 201, 202, 203 applied one approved write at a time, every VERIFY PASS; get_advisors(security) before = after (0 ERROR, 16 WARN, 3 INFO). Live: Vercel READY; api /docs /redoc /openapi.json 401; /health 200; library-links 403 (new route live). Owed: a logged-in smoke test (login, chat stream, doc ingest, code execution in a NEW chat), 271 G-4 sign-off, 273 live STRUCTURED check.
 Prior: Phase 274 COMPLETE (2026-10-05) — verification passed 4/4, security 31/31 (threats_open 0), operator approved G-4 #1-#4. 5 plans + review fixes (CR-01 cross-org folder D-29, CR-02 in-flight duplicate, WR-01/03/04/05/07, T-274-04). BUG-260905-01 closed, SEED-247 answered, BUG-261005-01 filed (shared minter race). Final gates: backend 71 = ceiling (6932 passed), vitest 9983 · 0 failed · 424/424, tsc 66 = base. OWED (operator): production migrations 202 → 203 before the backend deploy, then get_advisors(security). Deferred with triggers: F-1 residual (FileRow sub-line), F-2, F-3, WR-02, WR-06, IN-01..06. Next: /gsd:discuss-phase 275.
 Prior: Phase 272 COMPLETE (2026-10-03) — verification human_needed, self-verified. FIND-07 done. Review: 2 CR + 8 WR all fixed; HUMAN-UAT 2/3 (live re-drive pass; rules accepted); G-1 (topics eq in the shared compiler) fixed. Final backend gate 71 = baseline, 6474 passed. OWED (operator): production — migration 200 STEP 1 (CREATE INDEX CONCURRENTLY) alone → STEP 2 → 201 immediately → both VERIFY → get_advisors(security), each write approved; then backend+frontend deploy (271 also undeployed). Seeds: 333, 334, 335, 336. Owed to 273: D-15/D-16 seams. Next: /gsd:discuss-phase 273.
@@ -110,7 +111,7 @@ Status: Phase 269 closed — verification `passed`; nothing deployed; ~~next: op
 - **2026-09-29, G-4 ×3 PASS** (driven in Chrome by the orchestrator, light + dark; operator "approved") — `268-UAT-LOG.md`.
 - **2026-09-29, code review** 3 iterations → `all_fixed` (CR-01 second-Continue replay for two-org users + 7 warnings; D-268-27/28 operator rulings; SEED-322 planted; IN-01/02 accepted). Verifier re-ran gates: backend 71 = base, vitest 9102 / 0 failed.
 
-Resume file: .planning/phases/275-retention-legal-hold/275-CONTEXT.md
+Resume file: .planning/phases/275-retention-legal-hold/275-02-PLAN.md (and 275-03-PLAN.md, wave 2)
 Last activity: 2026-09-29 -- Phase 269 closed
 
 ---

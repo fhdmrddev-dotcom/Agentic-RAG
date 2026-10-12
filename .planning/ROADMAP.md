@@ -292,7 +292,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 275-01-PLAN.md — W1: migrations 204 (policies, previews, holds, queue, skips, receipts, sweeps, hold triggers incl. cascades + TRUNCATE, audit CHECK, RLS) + 205 (`retrievable` column, both RPC arms, GUC agent-read policies) applied locally; hold_guard.py; RETRIEVABLE_COLUMN swap; missing ledger rows
+- [x] 275-01-PLAN.md — W1: migrations 204 (policies, previews, holds, queue, skips, receipts, sweeps, hold triggers incl. cascades + TRUNCATE, audit CHECK, RLS) + 205 (`retrievable` column, both RPC arms, GUC agent-read policies) applied locally; hold_guard.py; RETRIEVABLE_COLUMN swap; missing ledger rows
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
