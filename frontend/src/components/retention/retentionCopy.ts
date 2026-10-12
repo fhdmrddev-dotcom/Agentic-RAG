@@ -43,6 +43,25 @@ const ported = {
   tagArchive: "Archive",
   tagDelete: "Delete · needs approval",
   tagReview: "Review",
+  /** S3 — Legal holds (1B hold card). */
+  holdsTitle: "Legal holds",
+  holdsSub:
+    "A held document cannot be deleted by anyone, through any door, and every policy skips it until the hold is released.",
+  newHold: "+ New hold",
+  holding: "Holding",
+  addDocuments: "Add documents…",
+  releaseHoldEllipsis: "Release hold…",
+  /** S4 — Waiting for you (3A). */
+  waitingCrumb: "Retention › Waiting for you",
+  waitingEmpty: "Nothing is waiting for approval.",
+  colDocument: "Document",
+  colFolder: "Folder",
+  colDocumentDate: "Document date",
+  colDueSince: "Due since",
+  undone: "This can't be undone.",
+  done: "Done",
+  auditTail:
+    "One audit record per document names the document, the policy, the action, who approved it and when.",
 } as const
 
 /** UI-SPEC contract copy (no sketch source, or changed by a locked decision). */
@@ -76,6 +95,41 @@ const contract = {
   unarchiveFailed: "Couldn't un-archive. Nothing changed.",
   /** S9 — the archived-hidden line once shown. */
   hide: "Hide",
+  /** S3 — holds (Claude's discretion in the UI-SPEC). */
+  holdsEmptyTitle: "No legal holds",
+  holdsEmptyBody: "Place a hold to stop any document or folder from being deleted, by a person or by a policy.",
+  newHoldTitle: "New hold",
+  matterName: "Matter name",
+  reason: "Reason",
+  covers: "Covers",
+  folders: "Folders",
+  documents: "Documents",
+  nameMatter: "Name the matter.",
+  sayWhy: "Say why it is held.",
+  pickOne: "Pick at least one folder or document.",
+  countFailed: "Couldn't count the documents yet.",
+  placeHold: "Place hold",
+  addToHold: "Add to hold",
+  placeFailed: "Couldn't place the hold. Nothing changed. Nothing is held yet.",
+  addFailed: "Couldn't add to the hold. Nothing changed. The hold still covers what it did before.",
+  keepHold: "Keep hold",
+  releaseHold: "Release hold",
+  releaseFailed: "Couldn't release the hold. It is still in force.",
+  /** S4 — the D-11 deviation (changed from the sketch). */
+  untickedNote: "Unticked documents are kept. They are not proposed again unless the policy is edited or the document changes.",
+  confirmFailed:
+    "Couldn't confirm the batch. Some documents may already be deleted. History shows exactly which. Reload this list before trying again.",
+  decisionsFailed: "Couldn't record your decisions. Nothing was archived or kept. Reload this list before trying again.",
+  reload: "Reload",
+  decision: "Decision",
+  decisionKeep: "Keep",
+  decisionArchive: "Archive",
+  decisionDelete: "Delete",
+  /** S1 — the load error (reused by every self-fetching retention body). */
+  loadFailed: "Couldn't load retention. Try again.",
+  tryAgain: "Try again",
+  /** S5 — an actor whose account no longer exists (never blank). */
+  formerMember: "a former member",
 } as const
 
 /** Sentences the sketch builds; their literal segments are fenced against the sketch. */
@@ -94,6 +148,23 @@ const sketchTemplates = {
   sectionDue: "**Due {date}** (“{policy}”).",
   /** S9 — browse hides archived rows behind this line. */
   archivedHidden: "{N} archived document(s) hidden",
+  /** S3 — the hold card. */
+  activeCount: "{N} active",
+  releasedCount: "{N} released hold(s)",
+  holdPlaced: "Placed by {name} on {date}",
+  holdCovers: "covers {N} document(s)",
+  holdCoversFolders: " + {folders} (and anything added to it later)",
+  heldToday: "**{N} document(s) held today**",
+  /** S4 — the batch card. */
+  batchSub: "{scope} · kept {kept_for} · found by the sweep on {date}",
+  skippedNote:
+    "Not in this list: {held} on legal hold ({held_names}) · {undecidable} that can't be decided ({undecidable_list}). Those are never deleted.",
+  recheck:
+    "Every document is **checked again at the moment you confirm**. Anything put on hold, moved or edited since the sweep is dropped, not deleted.",
+  typeToConfirm: "Type **{N}** to confirm.",
+  deletePermanently: "Delete {N} document(s) permanently",
+  deletedResult: "**Deleted {N} document(s).**",
+  lateHold: "Kept {M}: {names} went on legal hold after the sweep, so it was dropped at confirm.",
 } as const
 
 /** UI-SPEC sentences with placeholders; their literal segments are fenced against the UI-SPEC. */
@@ -111,6 +182,23 @@ const specTemplates = {
   unarchiveDone: "Un-archived by you just now. “{policy}” skips it until the policy or the document changes.",
   /** S9 — the shown state of the hidden line. */
   showingArchived: "Showing {N} archived document(s)",
+  /** S3 — dialogs. */
+  holdCountLine: "{N} document(s) will be held today. Anything added to these folders later is held too.",
+  addTitle: "Add to “{matter}”",
+  releaseTitle: "Release “{matter}”?",
+  releaseBody:
+    "{N} document(s) will no longer be protected. Policies can archive them or queue them for deletion at the next sweep. Documents still covered by another hold stay held.",
+  andMore: "and {N} more",
+  releasedOn: "Released {date}",
+  removeDocAria: "Remove {doc} from the hold",
+  /** S4 — type-the-count and decisions. */
+  typeAria: "Type {N} to confirm",
+  keepAll: "Keep {N} document(s)",
+  keptResult: "Kept {N} document(s).",
+  archivedResult: "Archived {N} document(s).",
+  reviewFooter: "{a} to keep · {b} to archive · {c} to delete · {d} undecided",
+  applyDecisions: "Apply {N} decision(s)",
+  applyAndDelete: "Apply decisions and delete {c} permanently",
 } as const
 
 /** The client's copies of `backend/app/services/retention/hold_guard.py`'s document sentences. */
