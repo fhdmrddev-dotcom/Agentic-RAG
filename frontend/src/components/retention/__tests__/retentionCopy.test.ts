@@ -17,10 +17,10 @@ import { describe, it, expect } from "vitest"
 import { RETENTION_COPY, fillCopy, holdRefusalFor, richParts } from "../retentionCopy"
 
 import sketchSource from "../../../../../.planning/sketches/275-retention-legal-hold/index.html?raw"
-import uiSpecSource from "../../../../../.planning/phases/275-retention-legal-hold/275-UI-SPEC.md?raw"
+import uiSpecSource from "../../../../../.planning/milestones/v4.5-phases/275-retention-legal-hold/275-UI-SPEC.md?raw"
 import holdGuardSource from "../../../../../backend/app/services/retention/hold_guard.py?raw"
 import retentionModelsSource from "../../../../../backend/app/models/retention.py?raw"
-import contextSource from "../../../../../.planning/phases/275-retention-legal-hold/275-CONTEXT.md?raw"
+import contextSource from "../../../../../.planning/milestones/v4.5-phases/275-retention-legal-hold/275-CONTEXT.md?raw"
 
 /** The literal runs of a template: split on placeholders, bold markers and `(s)`; ≥ 3 chars. */
 function segments(template: string): string[] {

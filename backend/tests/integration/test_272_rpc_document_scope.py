@@ -208,7 +208,7 @@ async def test_both_rpcs_pin_custom_plans(pg_pool, sig):
     """272-05 / migration 201: the btree above makes PL/pgSQL's GENERIC plan a whole-table
     document_id join. A pooled connection switches to that plan after five calls, so without this
     pin UNFILTERED search on recall_bench went 3-8 ms -> 0.45-1.56 s (vector) and 0.5-0.9 s ->
-    12-32 s (keyword). Evidence: .planning/phases/272-close-means-wrong/evidence/plancache-diagnosis.txt.
+    12-32 s (keyword). Evidence: .planning/milestones/v4.5-phases/272-close-means-wrong/evidence/plancache-diagnosis.txt.
     """
     cfg = await pg_pool.fetchval("SELECT proconfig FROM pg_proc WHERE oid = $1::regprocedure", sig)
     assert cfg is not None and "plan_cache_mode=force_custom_plan" in cfg, cfg
