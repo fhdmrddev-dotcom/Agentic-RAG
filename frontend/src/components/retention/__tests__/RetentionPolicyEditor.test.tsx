@@ -311,6 +311,18 @@ describe("RetentionPolicyEditor — the Preview gate (D-02 / T-275-32)", () => {
     expect(save()).toHaveAttribute("aria-disabled", "false")
   })
 
+  it("275-REVIEW IN-01: the locked Save LOOKS locked, and the 'Preview first' reason is not shown while saving", async () => {
+    render(<RetentionPolicyEditor policy={null} onBack={vi.fn()} onSaved={vi.fn()} />)
+    expect(save().className).toContain("aria-disabled:opacity-50")
+    m.createPolicy.mockImplementation(() => new Promise(() => {}))
+    await fillValidNew()
+    await userEvent.click(preview())
+    await waitFor(() => expect(save()).toHaveAttribute("aria-disabled", "false"))
+    await userEvent.click(save())
+    await waitFor(() => expect(save()).toHaveAttribute("aria-disabled", "true"))
+    expect(screen.queryByText("Preview first. A policy can't be saved until you've seen what it would do.")).toBeNull()
+  })
+
   it("the server's 409 'Preview again before saving.' is RENDERED and re-locks Save", async () => {
     m.createPolicy.mockRejectedValue(new ApiRefusal(409, "", "Preview again before saving."))
     render(<RetentionPolicyEditor policy={null} onBack={vi.fn()} onSaved={vi.fn()} />)
@@ -372,6 +384,17 @@ describe("RetentionPolicyEditor — edit and remove", () => {
     await userEvent.click(within(sheet).getByRole("button", { name: "Back to policies" }))
     expect(onGone).toHaveBeenCalledTimes(1) // the list re-reads; no band pulse — nothing was recorded
     expect(onSaved).not.toHaveBeenCalled()
+  })
+
+  it("275-REVIEW IN-10: Remove policy has a busy guard — a double click sends one DELETE", async () => {
+    m.removePolicy.mockImplementation(() => new Promise(() => {}))
+    render(<RetentionPolicyEditor policy={POLICY} onBack={vi.fn()} onSaved={vi.fn()} />)
+    await userEvent.click(screen.getByRole("button", { name: "Remove policy…" }))
+    const remove = within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove policy" })
+    fireEvent.click(remove)
+    fireEvent.click(remove)
+    expect(m.removePolicy).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(remove).toBeDisabled())
   })
 
   it("a removed policy reports the write", async () => {

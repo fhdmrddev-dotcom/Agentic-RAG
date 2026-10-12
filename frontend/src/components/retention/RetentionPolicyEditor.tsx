@@ -194,6 +194,9 @@ export function RetentionPolicyEditor({
   const [removeOpen, setRemoveOpen] = useState(false)
   const [removeFailed, setRemoveFailed] = useState(false)
   const [removeRefused, setRemoveRefused] = useState<string | null>(null)
+  // 275-REVIEW IN-10: one DELETE per confirm.
+  const [removing, setRemoving] = useState(false)
+  const removingRef = useRef(false)
   const nameRef = useRef<HTMLInputElement>(null)
   const alive = useRef(true)
   const reasonId = useId()
@@ -218,6 +221,9 @@ export function RetentionPolicyEditor({
   const draftKey = useMemo(() => JSON.stringify(draft), [draft])
   const stale = preview !== null && preview.key !== draftKey
   const canSave = preview !== null && !stale && !saving
+  // 275-REVIEW IN-01: the "Preview first" reason is only the reason when the preview is missing or
+  // stale — never while a save is simply in flight.
+  const needsPreview = preview === null || stale
 
   const folderOptions = useMemo(
     () =>
@@ -277,7 +283,9 @@ export function RetentionPolicyEditor({
   }
 
   async function remove() {
-    if (!policy) return
+    if (!policy || removingRef.current) return
+    removingRef.current = true
+    setRemoving(true)
     setRemoveFailed(false)
     setRemoveRefused(null)
     try {
@@ -293,6 +301,9 @@ export function RetentionPolicyEditor({
       if (err instanceof ApiRefusal && err.status === 404) setRemoveRefused(C.contract.policyAlreadyRemoved)
       else if (err instanceof ApiRefusal && err.status >= 400 && err.status < 500) setRemoveRefused(err.message)
       else setRemoveFailed(true)
+    } finally {
+      removingRef.current = false
+      if (alive.current) setRemoving(false)
     }
   }
 
@@ -532,14 +543,14 @@ export function RetentionPolicyEditor({
             </Button>
             <Button
               type="button"
-              className="font-semibold"
+              className="font-semibold aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
               aria-disabled={!canSave}
-              aria-describedby={!canSave ? reasonId : undefined}
+              aria-describedby={needsPreview ? reasonId : undefined}
               onClick={save}
             >
               {C.ported.saveButton}
             </Button>
-            {!canSave && (
+            {needsPreview && (
               <span id={reasonId} className="basis-full text-right text-xs text-muted-foreground">
                 {C.contract.previewFirst}
               </span>
@@ -587,7 +598,13 @@ export function RetentionPolicyEditor({
             ) : (
               <>
                 <AlertDialogCancel className="font-semibold">{C.contract.keepPolicy}</AlertDialogCancel>
-                <Button type="button" variant="outline" className="border-border bg-transparent font-semibold" onClick={remove}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-border bg-transparent font-semibold"
+                  disabled={removing}
+                  onClick={remove}
+                >
                   {C.contract.removePolicy}
                 </Button>
               </>
