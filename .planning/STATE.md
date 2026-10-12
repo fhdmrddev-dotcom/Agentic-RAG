@@ -11,7 +11,7 @@ progress:
   total_plans: 0
   completed_plans: 0
   percent: 0
-stopped_at: v4.6 Pay It Down STARTED — defining requirements
+stopped_at: Phase 277 context gathered — next /gsd:plan-phase 277
 ---
 
 # Project State
@@ -58,8 +58,8 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: **277** (Registers Back Inside the Band) — not started · 7 phases in the milestone (277-283); next migration **207** (re-run `ls supabase/migrations` at discuss)
 Plan: —
-Status: Ready to plan
-Last activity: 2026-10-12 — Roadmap created (7 phases, 20/20 requirements mapped)
+Status: Ready to plan — context gathered (`277-CONTEXT.md`)
+Last activity: 2026-10-12 — Phase 277 discussed (target ≤ 90k; short verdict cells; cell cap 200→80; archive fixed in place)
 
 ### Owed to the operator (carried from v4.5)
 
