@@ -620,7 +620,8 @@ def test_delete_document_gained_no_if_branch_d32():
 def test_every_storage_remove_in_delete_document_follows_its_row_delete():
     node = _function_node(DOCUMENTS_PATH.read_text(encoding="utf-8"), "delete_document")
     removes, deletes = [], []
-    for n in ast.walk(node):
+    body_nodes = [n for stmt in node.body for n in ast.walk(stmt)]  # never the @router.delete decorator
+    for n in body_nodes:
         if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
             if n.func.attr == "remove":
                 removes.append(n.lineno)

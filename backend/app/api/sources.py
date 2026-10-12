@@ -46,6 +46,7 @@ from app.db.watches import (
 from app.dependencies import (
     get_current_user,
     get_pg_pool,
+    get_supabase,
     get_user_supabase_client,
     resolve_active_org_or_none,
 )
@@ -61,6 +62,7 @@ from app.models.source import (
     WatchSyncResponse,
     WatchUpdateRequest,
 )
+from app.services.retention import hold_guard  # Phase 275 (D-38): the one hold check
 from app.services.sources.failure_cause import SOFT_FAILURE_THRESHOLD
 from app.services.sources.health_verdict import verdict_for_runs
 
@@ -307,9 +309,11 @@ async def update_folder_watch(
 )
 async def delete_folder_watch(
     watch_id: UUID,
+    request: Request,
     purge_documents: bool = Query(default=False),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
+    service_supabase: Client = Depends(get_supabase),  # Phase 275: hold predicates are service-role only
     pool=Depends(get_pg_pool),
 ):
     """Delete a folder watch and optionally purge its ingested documents."""
@@ -325,15 +329,18 @@ async def delete_folder_watch(
         items = await get_watch_items(pool, watch_id)
         doc_ids = [str(it["document_id"]) for it in items if it.get("document_id")]
         if doc_ids:
-            try:
+            # Phase 275 (D-14 / D-38): check the hold first; a database refusal is the same 409 and
+            # any other error PROPAGATES — the watch is deleted only after its documents were.
+            await hold_guard.assert_none_held(
+                request, current_user, doc_ids, kind="watch_delete", service_supabase=service_supabase,
+            )
+            with hold_guard.map_hold_refusal(kind="watch_delete"):
                 await run_in_threadpool(
                     lambda: supabase.table("documents")
                     .delete()
                     .in_("id", doc_ids)
                     .execute()
                 )
-            except Exception as err:
-                logger.warning("Error purging documents for watch %s: %s", watch_id, err)
 
     deleted = await delete_watch(pool, watch_id, user_id=user_id)
     if not deleted:
@@ -434,8 +441,10 @@ async def trigger_watch_sync(
 )
 async def purge_missing_watch_documents(
     watch_id: UUID,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
+    service_supabase: Client = Depends(get_supabase),  # Phase 275: hold predicates are service-role only
     pool=Depends(get_pg_pool),
 ):
     """VIS-05 / SC#3: Explicitly purge files that are missing at source or disconnected."""
@@ -464,16 +473,20 @@ async def purge_missing_watch_documents(
 
     purged_count = 0
     if doc_ids:
-        try:
-            del_res = await run_in_threadpool(
+        # Phase 275 (D-14 / D-38): check the hold first; a database refusal is the same 409 and any
+        # other error PROPAGATES — nothing is counted as purged and no watch item is deleted
+        # unless the document delete succeeded.
+        await hold_guard.assert_none_held(
+            request, current_user, doc_ids, kind="watch_purge", service_supabase=service_supabase,
+        )
+        with hold_guard.map_hold_refusal(kind="watch_purge"):
+            await run_in_threadpool(
                 lambda: supabase.table("documents")
                 .delete()
                 .in_("id", doc_ids)
                 .execute()
             )
-            purged_count = len(doc_ids)
-        except Exception as err:
-            logger.warning("Failed to delete documents during purge for watch %s: %s", watch_id, err)
+        purged_count = len(doc_ids)
 
     if item_ids:
         async with pool.acquire() as con:

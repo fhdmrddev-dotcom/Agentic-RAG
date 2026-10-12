@@ -1,9 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from supabase import Client
 
-from app.dependencies import get_current_user, get_user_supabase_client
+from app.dependencies import get_current_user, get_supabase, get_user_supabase_client
 from app.models.folder import FolderCreate, FolderMoveRequest, FolderUpdate, FolderResponse
+from app.services.audit_service import write_audit_entry
+from app.services.retention import hold_guard  # Phase 275 (D-15): the one hold check
 from app.utils.folder_utils import fetch_visible_folders, _null_foreign_global_owner
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
@@ -133,8 +139,11 @@ async def rename_folder(
 @router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_folder(
     folder_id: str,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
+    # Phase 275: the hold predicates and the audit writer are service-role only (W-5b / D-05).
+    service_supabase: Client = Depends(get_supabase),
 ):
     """Delete a folder and all documents inside it (storage + DB + chunks)."""
     # 1. Collect this folder and all descendant folder IDs (BFS)
@@ -147,6 +156,16 @@ async def delete_folder(
             all_folder_ids.append(child["id"])
             queue.append(child["id"])
 
+    # The folder's own row — its name and org for the audit row (Phase 275).
+    folder_resp = (
+        supabase.table("folders")
+        .select("id, name, org_id")
+        .eq("id", folder_id)
+        .maybe_single()
+        .execute()
+    )
+    folder_row = (getattr(folder_resp, "data", None) or {}) if folder_resp is not None else {}
+
     # 2. Find all documents in these folders
     docs_result = (
         supabase.table("documents")
@@ -154,19 +173,44 @@ async def delete_folder(
         .in_("folder_id", all_folder_ids)
         .execute()
     )
+    docs = docs_result.data or []
+    doc_ids = [d["id"] for d in docs]
 
-    # 3. Delete each document from storage, then DB (chunks cascade via FK)
-    for doc in docs_result.data:
-        try:
-            supabase.storage.from_("documents").remove([doc["file_path"]])
-        except Exception:
-            pass
-    if docs_result.data:
-        doc_ids = [d["id"] for d in docs_result.data]
-        supabase.table("documents").delete().in_("id", doc_ids).execute()
+    # 3. Phase 275 (D-15, revision B-1): refuse the WHOLE delete when anything in the subtree is
+    #    held — every document AND every folder (a held empty subfolder, or another owner's held
+    #    document, is invisible to the caller's own id list). Nothing is touched before this.
+    await hold_guard.assert_none_held(
+        request, current_user, doc_ids, kind="folder", folder_ids=all_folder_ids,
+        service_supabase=service_supabase,
+    )
 
-    # 4. Delete the folder (DB cascade handles descendant folders)
-    supabase.table("folders").delete().eq("id", folder_id).eq("user_id", current_user["id"]).execute()
+    # 4. Rows first (chunks cascade via FK), then the folder (DB cascade handles descendants)
+    if doc_ids:
+        with hold_guard.map_hold_refusal(kind="folder"):
+            supabase.table("documents").delete().in_("id", doc_ids).execute()
+    with hold_guard.map_hold_refusal(kind="folder"):
+        supabase.table("folders").delete().eq("id", folder_id).eq("user_id", current_user["id"]).execute()
+
+    # 5. Bytes AFTER the rows (D-38); a failure is logged, never blocks the delete
+    for doc in docs:
+        if doc.get("file_path"):
+            try:
+                supabase.storage.from_("documents").remove([doc["file_path"]])
+            except Exception as exc:
+                log.warning("delete_folder: storage remove failed for %s: %s", doc["file_path"], exc)
+
+    # 6. One audit row, on the folder's OWN org (explicit — never the trigger's guess)
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type="folder.delete",
+        metadata={
+            "folder_id": folder_id,
+            "name": folder_row.get("name"),
+            "documents_deleted": len(doc_ids),
+        },
+        supabase=service_supabase,
+        org_id=folder_row.get("org_id"),
+    )
 
 
 @router.patch("/{folder_id}/toggle-global", response_model=FolderResponse)
