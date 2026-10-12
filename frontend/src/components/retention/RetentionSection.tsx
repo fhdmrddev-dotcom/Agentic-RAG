@@ -15,7 +15,7 @@
  * ⛔ NO READ here (planning flag 2): the state arrives as a prop from `LibraryPage`'s one batched
  * read. The only call this component makes is the un-archive WRITE.
  */
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { unarchiveDocument, type RetentionDocumentState } from "@/lib/api/retention"
@@ -84,21 +84,37 @@ export function RetentionSection({ doc, state, canManage, onUnarchived }: Retent
   const row = doc
   const [phase, setPhase] = useState<"idle" | "busy" | "failed">("idle")
   const [done, setDone] = useState<string | null>(null)
+  // 275-REVIEW F-WR-06: the panel reuses this instance across documents, so a reply is only shown
+  // if it is still about the document on screen.
+  const currentId = useRef(doc.id)
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   // A different document is a different section: drop the last one's receipt or error.
   useEffect(() => {
+    currentId.current = doc.id
     setPhase("idle")
     setDone(null)
   }, [doc.id])
 
   async function handleUnarchive() {
+    const id = doc.id
     setPhase("busy")
     try {
-      const res = await unarchiveDocument(doc.id)
+      const res = await unarchiveDocument(id)
+      // The un-archive DID happen: the page re-reads either way. The receipt belongs to `id` only.
+      onUnarchived?.()
+      if (!mounted.current || currentId.current !== id) return
       setDone(res.policy_name)
       setPhase("idle")
-      onUnarchived?.()
     } catch {
+      if (!mounted.current || currentId.current !== id) return
       setPhase("failed")
     }
   }
@@ -125,25 +141,39 @@ export function RetentionSection({ doc, state, canManage, onUnarchived }: Retent
   }
 
   const source = state.source_chip ? SOURCE_SENTENCE[state.source_chip] : undefined
+  const held = state.section.kind === "hold" || state.held
 
   return (
     <div className="grid gap-2 px-4 py-3 text-sm leading-relaxed text-panel-muted-foreground" data-testid="retention-section">
-      {state.section.kind === "hold" || state.held ? (
-        canManage ? (
+      {held &&
+        (canManage ? (
           <p className={AMBER_TEXT_CLASS}>{state.hold_line ?? C.contract.memberHoldLine}</p>
         ) : (
           <>
             <p className={AMBER_TEXT_CLASS}>{C.contract.memberHoldLine}</p>
             <p>{C.contract.memberHoldSecond}</p>
           </>
-        )
-      ) : done !== null ? (
+        ))}
+      {done !== null ? (
         <>
           <p>{fillCopy(C.specTemplates.unarchiveDone, { policy: done })}</p>
           <p role="status" className="text-xs text-muted-foreground">
             {C.contract.unarchiveReceipt}
           </p>
         </>
+      ) : held ? (
+        // 275-REVIEW F-WR-07: a hold stops deletion only (D-16). An archived document that is also
+        // held still says it is archived — and chat still does not answer from it.
+        state.archived && (
+          <p>
+            <RichCopy
+              text={fillCopy(C.sketchTemplates.sectionArchived, {
+                date: formatRetentionDate(row.archived_at),
+                policy: row.archived_policy_name ?? "—",
+              })}
+            />
+          </p>
+        )
       ) : (
         <p>
           <RichCopy text={sentenceFor(state, row)} />
@@ -156,7 +186,8 @@ export function RetentionSection({ doc, state, canManage, onUnarchived }: Retent
         </p>
       )}
 
-      {state.can_unarchive && done === null && !state.held && (
+      {/* The server's `can_unarchive` decides (it allows a held, archived document — D-16). */}
+      {state.can_unarchive && done === null && (
         <div>
           <Button
             type="button"

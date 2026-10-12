@@ -180,6 +180,66 @@ describe("RetentionSection — archived, and Un-archive (B-NEW-1 / D-19)", () =>
   })
 })
 
+describe("275-REVIEW F-WR-06 — an un-archive in flight never lands on another document", () => {
+  const archivedA = state({
+    archived: true, chip: "archived", can_unarchive: true,
+    section: { kind: "archived", policy_name: "Finance invoices", archived_at: "2026-09-14T02:00:00Z" },
+  })
+  const DOC_B = { ...DOC, id: "doc-2", filename: "Brightwater Office Lease.pdf" } as Document
+  const stateB = state({ document_id: "doc-2", section: { kind: "none" } })
+
+  it("success after switching to B: B shows no receipt; the page is still told to re-read", async () => {
+    let resolve: (v: unknown) => void = () => {}
+    mockUnarchive.mockImplementation(() => new Promise((r) => { resolve = r }))
+    const onUnarchived = vi.fn()
+    const { rerender } = render(<RetentionSection doc={DOC} state={archivedA} canManage onUnarchived={onUnarchived} />)
+    await userEvent.click(screen.getByRole("button", { name: "Un-archive" }))
+    rerender(<RetentionSection doc={DOC_B} state={stateB} canManage onUnarchived={onUnarchived} />)
+    resolve({ document_id: "doc-1", name: "x", policy_name: "Finance invoices", skip_written: true })
+    await waitFor(() => expect(onUnarchived).toHaveBeenCalledTimes(1)) // A WAS un-archived: re-read
+    expect(screen.queryByText(/Un-archived by you just now/)).toBeNull()
+    expect(screen.queryByRole("status")).toBeNull()
+    expect(screen.getByTestId("retention-section")).toHaveTextContent("No retention policy applies.")
+  })
+
+  it("failure after switching to B: B shows no alert", async () => {
+    let reject: (e: unknown) => void = () => {}
+    mockUnarchive.mockImplementation(() => new Promise((_, r) => { reject = r }))
+    const { rerender } = render(<RetentionSection doc={DOC} state={archivedA} canManage />)
+    await userEvent.click(screen.getByRole("button", { name: "Un-archive" }))
+    rerender(<RetentionSection doc={DOC_B} state={stateB} canManage />)
+    reject(new Error("x"))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+})
+
+describe("275-REVIEW F-WR-07 — a held document that is also archived says both", () => {
+  const ARCHIVED_DOC = {
+    ...DOC, archived_at: "2026-09-14T02:00:00Z", archived_policy_name: "Finance invoices",
+  } as Document
+  const heldArchived = (over: Partial<RetentionDocumentState> = {}) =>
+    state({ held: true, archived: true, chip: "on_hold", can_unarchive: true, section: { kind: "hold" }, ...over })
+  const archivedSentence = `Archived ${fmt("2026-09-14T02:00:00Z")} by the “Finance invoices” policy. Chat no longer answers from it. It still opens, downloads and shows up with “Include archived”.`
+
+  it("admin: the hold line, then the archived sentence beneath it, and Un-archive is offered", () => {
+    const line = "On legal hold — “Halvorsen v. Halden & Co.”, placed by Amira Sato on 3 Aug 2026. It can't be deleted or disposed of until the hold is released."
+    render(<RetentionSection doc={ARCHIVED_DOC} state={heldArchived({ hold_line: line })} canManage />)
+    const text = screen.getByTestId("retention-section").textContent ?? ""
+    expect(text.indexOf(line)).toBeGreaterThanOrEqual(0)
+    expect(text.indexOf(archivedSentence)).toBeGreaterThan(text.indexOf(line))
+    expect(screen.getByRole("button", { name: "Un-archive" })).toBeInTheDocument()
+  })
+
+  it("member: the exact member lines, then the archived sentence; no button", () => {
+    render(<RetentionSection doc={ARCHIVED_DOC} state={heldArchived({ can_unarchive: false })} canManage={false} />)
+    const section = screen.getByTestId("retention-section")
+    expect(section).toHaveTextContent("On legal hold. Ask an org admin.")
+    expect(section).toHaveTextContent(archivedSentence)
+    expect(screen.queryByRole("button", { name: "Un-archive" })).toBeNull()
+  })
+})
+
 describe("DocumentDetailPanel — the Retention section sits directly after File and reads no state itself", () => {
   it("renders 'Retention' right after 'File', from the prop, without calling document-states", async () => {
     render(
