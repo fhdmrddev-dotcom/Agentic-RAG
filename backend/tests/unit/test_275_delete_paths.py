@@ -112,6 +112,20 @@ class _FakeSupabase:
     def table(self, name):
         return _Query(self, name)
 
+    def rpc(self, name, params):
+        """275-REVIEW B-WR-03: the folder door's one transactional call (``delete_folder_tree``)."""
+        sb = self
+
+        class _Call:
+            def execute(self_inner):
+                sb.log.append(("rpc", name, dict(params)))
+                exc = sb.raises.get(("rpc", name))
+                if exc is not None:
+                    raise exc
+                return _Resp(sb.answers.get(("rpc", name), []))
+
+        return _Call()
+
     def answer(self, table, verb, calls):
         single = any(c[0] in ("maybe_single", "single") for c in calls)
         key = (table, verb, "single") if single else (table, verb)
@@ -163,6 +177,8 @@ def _kinds(log):
             out.append("storage.remove")
         elif entry[0] == "audit":
             out.append(f"audit:{entry[1]}")
+        elif entry[0] == "rpc":
+            out.append(f"rpc:{entry[1]}")
         elif entry[1] in ("delete", "update"):
             out.append(f"{entry[0]}.{entry[1]}")
     return out
@@ -310,6 +326,7 @@ def _folder_supabase(log, *, docs, raises=None):
             ("documents", "select"): docs,
             ("folders", "delete"): [{"id": FOLDER}],
             ("documents", "delete"): docs,
+            ("rpc", "delete_folder_tree"): [{"document_id": d["id"], "file_path": d["file_path"]} for d in docs],
         },
         raises=raises,
     )
@@ -383,9 +400,9 @@ def test_folder_unheld_runs_guard_rows_bytes_then_one_audit_row_with_the_folders
     docs = [{"id": DOC, "file_path": f"{USER}/a.pdf"}, {"id": SIB, "file_path": f"{USER}/b.pdf"}]
     sb = _folder_supabase(log, docs=docs)
     _run(_delete_folder(sb))
+    # 275-REVIEW B-WR-03: rows and folder in ONE transactional call, then bytes, then the audit row
     assert _kinds(log) == [
-        "guard", "documents.delete", "folders.delete", "storage.remove", "storage.remove",
-        "audit:folder.delete",
+        "guard", "rpc:delete_folder_tree", "storage.remove", "storage.remove", "audit:folder.delete",
     ]
     audits = [e for e in log if e[0] == "audit"]
     assert len(audits) == 1
@@ -402,7 +419,7 @@ def test_a_pt409_race_on_the_folder_document_delete_removes_no_byte(monkeypatch)
     monkeypatch.setattr(folders, "write_audit_entry", _audit_recorder(log))
     monkeypatch.setattr(hold_guard, "assert_none_held", _guard(log))
     docs = [{"id": DOC, "file_path": f"{USER}/a.pdf"}]
-    sb = _folder_supabase(log, docs=docs, raises={("documents", "delete"): _pt409()})
+    sb = _folder_supabase(log, docs=docs, raises={("rpc", "delete_folder_tree"): _pt409()})
     with pytest.raises(HTTPException) as exc:
         _run(_delete_folder(sb))
     assert exc.value.status_code == 409
@@ -639,7 +656,10 @@ def test_folder_guard_names_the_subtree_before_any_delete_or_remove():
     lines = src.splitlines()
     body = range(node.lineno, node.end_lineno + 1)
     guard_line = next(i for i in body if "folder_ids=" in lines[i - 1])
-    action_lines = [i for i in body if ".delete()" in lines[i - 1] or ".remove(" in lines[i - 1]]
+    action_lines = [
+        i for i in body
+        if ".delete()" in lines[i - 1] or ".remove(" in lines[i - 1] or "rpc(\"delete_folder_tree\"" in lines[i - 1]
+    ]
     assert action_lines, "vacuous: no delete/remove found in delete_folder"
     assert all(guard_line < a for a in action_lines)
 

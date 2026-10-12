@@ -1821,13 +1821,12 @@ async def delete_document(
     # RLS-enforced `supabase`.
     service_supabase: Client = Depends(get_supabase),
 ):
-    doc_resp = (
+    doc_resp = await aexec(
         supabase.table("documents")
         .select("*")
         .eq("id", document_id)
         .eq("user_id", current_user["id"])
         .maybe_single()
-        .execute()
     )
     if not doc_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
@@ -1846,7 +1845,7 @@ async def delete_document(
             siblings_q = siblings_q.is_("folder_id", "null")
         else:
             siblings_q = siblings_q.eq("folder_id", folder_id)
-        siblings = siblings_q.execute().data or []
+        siblings = (await aexec(siblings_q)).data or []
         sibling_ids = [s["id"] for s in siblings]
 
         # Phase 275 (D-14 / D-38): check the hold FIRST, then rows, then bytes — a refusal
@@ -1859,13 +1858,13 @@ async def delete_document(
         # user_id guard redundant (sibling_ids from user-scoped SELECT) but added for defence-in-depth
         if sibling_ids:
             with hold_guard.map_hold_refusal(kind="document"):
-                supabase.table("documents").delete().eq("user_id", current_user["id"]).in_("id", sibling_ids).execute()
+                await aexec(supabase.table("documents").delete().eq("user_id", current_user["id"]).in_("id", sibling_ids))
 
         # D-10 / D-38: storage files AFTER the rows; a failure is logged, never blocks the delete
         for sibling in siblings:
             if sibling.get("file_path"):
                 try:
-                    supabase.storage.from_("documents").remove([sibling["file_path"]])
+                    await run_in_threadpool(lambda p=sibling["file_path"]: supabase.storage.from_("documents").remove([p]))
                 except Exception as exc:
                     log.warning("delete_document: storage remove failed for %s: %s", sibling["file_path"], exc)
 
@@ -1876,11 +1875,11 @@ async def delete_document(
         )
 
         with hold_guard.map_hold_refusal(kind="document"):
-            supabase.table("documents").delete().eq("id", document_id).eq("user_id", current_user["id"]).execute()
+            await aexec(supabase.table("documents").delete().eq("id", document_id).eq("user_id", current_user["id"]))
 
         # D-10 / D-38: storage file AFTER the row; a failure is logged, never blocks the delete
         try:
-            supabase.storage.from_("documents").remove([target["file_path"]])
+            await run_in_threadpool(lambda: supabase.storage.from_("documents").remove([target["file_path"]]))
         except Exception as exc:
             log.warning("delete_document: storage remove failed for %s: %s", target.get("file_path"), exc)
 
@@ -1897,13 +1896,13 @@ async def delete_document(
                 siblings_q = siblings_q.is_("folder_id", "null")
             else:
                 siblings_q = siblings_q.eq("folder_id", folder_id)
-            siblings = siblings_q.execute().data or []
+            siblings = (await aexec(siblings_q)).data or []
 
             if siblings:
                 # Sort descending by version_number; promote the highest
                 siblings.sort(key=lambda s: s.get("version_number") or 0, reverse=True)
                 next_latest_id = siblings[0]["id"]
-                supabase.table("documents").update({"is_latest": True}).eq("id", next_latest_id).execute()
+                await aexec(supabase.table("documents").update({"is_latest": True}).eq("id", next_latest_id))
 
     # D-11: audit log for both paths — include scope in metadata
     background_tasks.add_task(
