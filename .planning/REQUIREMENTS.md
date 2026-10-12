@@ -60,6 +60,28 @@ Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not excee
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| FIX-01 | Phase 283 | Pending |
+| FIX-02 | Phase 280 | Pending |
+| FIX-03 | Phase 280 | Pending |
+| FIX-04 | Phase 280 | Pending |
+| FIX-05 | Phase 280 | Pending |
+| FIX-06 | Phase 282 | Pending |
+| FIX-07 | Phase 282 | Pending |
+| FIX-08 | Phase 283 | Pending |
+| FIX-09 | Phase 281 | Pending |
+| FIX-10 | Phase 281 | Pending |
+| DEBT-07 | Phase 281 | Pending |
+| DEBT-08 | Phase 280 | Pending |
+| DEBT-09 | Phase 278 | Pending |
+| DEBT-10 | Phase 280 | Pending |
+| DEBT-11 | Phase 280 | Pending |
+| SEAM-01 | Phase 279 | Pending |
+| SEAM-02 | Phase 278 | Pending |
+| SEAM-03 | Phase 278 | Pending |
+| REG-04 | Phase 277 | Pending |
+| REG-05 | Phase 277 | Pending |
+
+**Coverage:** 20 v4.6 requirements · 20 mapped · 0 orphans · 0 duplicates (roadmap created 2026-10-12).
 
 ---
 *Requirements defined: 2026-10-12*

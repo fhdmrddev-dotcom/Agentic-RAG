@@ -6,7 +6,7 @@ status: planning
 last_updated: 2026-10-12T19:00:00.000Z
 last_activity: 2026-10-12
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -56,10 +56,10 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ## Current Position
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: Not started (defining requirements) — first phase **277**; next migration **207** (re-run `ls supabase/migrations` at discuss)
+Phase: **277** (Registers Back Inside the Band) — not started · 7 phases in the milestone (277-283); next migration **207** (re-run `ls supabase/migrations` at discuss)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-12 — Milestone v4.6 started
+Status: Ready to plan
+Last activity: 2026-10-12 — Roadmap created (7 phases, 20/20 requirements mapped)
 
 ### Owed to the operator (carried from v4.5)
 
