@@ -498,7 +498,7 @@ def test_render_template_rejects_uncited_before_render(monkeypatch):
     template or touching the sandbox. We poison resolve_template_source + the sandbox
     manager so a reject is the ONLY way the test can pass — if the gate let the call
     through, these would raise."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.render_template as td
 
     def _boom_resolve(*args, **kwargs):
         raise AssertionError("resolve_template_source must NOT be called before the citation gate")
@@ -539,7 +539,7 @@ def test_render_template_integrity_fail_preserves_field_map(monkeypatch):
     opened=False, the handler returns status=failed, PRESERVES the cited field-map as
     fallback output, and does NOT call ws_write_file (a corrupt file is NEVER
     delivered — SC#4 #3)."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.render_template as td
 
     # A clean, fully-cited field-map so the BEFORE gate passes.
     field_map = {
@@ -604,7 +604,7 @@ def test_render_driver_is_self_contained():
     """The sandbox render driver (_RENDER_DRIVER_SRC) is syntactically valid Python and
     is dependency-free w.r.t. the backend package — the container has no `app` on its
     path, so the driver must NOT import `app.*`."""
-    from app.services.tool_dispatcher import _RENDER_DRIVER_SRC
+    from app.services.tools.render_template import _RENDER_DRIVER_SRC
 
     # Compiles without SyntaxError — it is valid, shippable Python.
     compile(_RENDER_DRIVER_SRC, "<render_driver>", "exec")
@@ -815,7 +815,7 @@ def test_render_template_success_path_persists_with_leading_slash(monkeypatch):
     validate_path requires a leading '/' → PathValidationError → persist_failed, silently
     dropping a deliverable that passed both gates. This asserts ws_write_file IS called
     with a leading-slash path and the handler returns ok."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.render_template as td
 
     field_map = {
         "scalars": {"project_name": {"value": "Meridian", "source_chunk_id": "chunk-1"}},
@@ -896,7 +896,7 @@ def test_render_template_malicious_out_filename_sanitized(monkeypatch):
     We capture the command string passed to session.execute_command and assert the
     injection payload never appears in it (the basename is sanitized to deliverable.docx
     and every token is shlex-quoted)."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.render_template as td
 
     field_map = {
         "scalars": {"project_name": {"value": "Meridian", "source_chunk_id": "chunk-1"}},
@@ -986,7 +986,7 @@ def test_render_template_residual_tokens_not_delivered(monkeypatch):
     NOT delivered: status=failed, reason=residual_tokens, residual_tags surfaced, and
     ws_write_file is never called (a half-filled file with surviving {{tokens}} is a
     silent non-fill the gate must block)."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.render_template as td
 
     field_map = {
         "scalars": {"project_name": {"value": "Meridian", "source_chunk_id": "chunk-1"}},
@@ -1057,7 +1057,7 @@ def test_driver_replace_coalesces_matched_token_equal_to_original():
     `touched = matched or (blanked_text != replaced_text)` so it coalesces and clears the
     stray run. We exec the driver source and exercise its helper directly against the
     same case the audited production helper handles."""
-    from app.services.tool_dispatcher import _RENDER_DRIVER_SRC
+    from app.services.tools.render_template import _RENDER_DRIVER_SRC
     from app.services.template_render_service import (
         _replace_in_paragraph as prod_replace,
     )

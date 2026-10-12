@@ -428,6 +428,15 @@ _DSL_OPERAND = re.compile(re.escape(_COLUMN) + r"\.(eq|neq|is|in|gt|lt|gte|lte|l
 _MUST_BE_SILENT = (
     "services/expert_service.py",
     "services/tool_dispatcher.py",
+    "services/tools/documents.py",
+    "services/tools/skills.py",
+    "services/tools/sandbox.py",
+    "services/tools/runtime_gap.py",
+    "services/tools/render_template.py",
+    "services/tools/workspace.py",
+    "services/tools/memory.py",
+    "services/tools/agent_control.py",
+    "services/tools/connector.py",
     "services/agent_loop.py",
     "services/harness/grounding.py",
 )

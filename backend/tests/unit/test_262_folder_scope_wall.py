@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.services import tool_dispatcher as td
+from app.services.tools import documents as td
 
 IN = "folder-in"
 OUT = "folder-out"

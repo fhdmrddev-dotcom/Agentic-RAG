@@ -48,7 +48,7 @@ def _make_ctx(user_id="user-456", org_id="org-123"):
 @pytest.mark.asyncio
 async def test_policy_denial_audited(monkeypatch):
     """Exit 1: posture == 'deny' audits connector.call with outcome='policy_denial'."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.connector as td
 
     conn_id = uuid4()
     conn = _MockConn(conn_id)
@@ -101,7 +101,7 @@ async def test_policy_denial_audited(monkeypatch):
 @pytest.mark.asyncio
 async def test_user_rejected_audited_and_copy(monkeypatch):
     """Exit 2: User rejection audits outcome='user_rejected' with actionable recovery string."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.connector as td
 
     conn_id = uuid4()
     conn = _MockConn(conn_id)
@@ -162,7 +162,7 @@ async def test_user_rejected_audited_and_copy(monkeypatch):
 @pytest.mark.asyncio
 async def test_timeout_audited_and_truthful_copy(monkeypatch):
     """Exit 3: Timeout audits outcome='timeout' with truthful text omitting health claim."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.connector as td
 
     conn_id = uuid4()
     conn = _MockConn(conn_id)
@@ -224,7 +224,7 @@ async def test_timeout_audited_and_truthful_copy(monkeypatch):
 @pytest.mark.asyncio
 async def test_execution_failure_audited(monkeypatch):
     """Exit 4: Execution failure audits outcome='execution_failure'."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.connector as td
     from app.services.connectors.service_tools import ServiceToolError
 
     conn_id = uuid4()
@@ -284,7 +284,7 @@ async def test_execution_failure_audited(monkeypatch):
 @pytest.mark.asyncio
 async def test_success_audited(monkeypatch):
     """Exit 5: Successful tool execution audits outcome='success'."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.connector as td
 
     conn_id = uuid4()
     conn = _MockConn(conn_id)
@@ -344,7 +344,7 @@ async def test_success_audited(monkeypatch):
 @pytest.mark.asyncio
 async def test_missing_user_id_does_not_crash():
     """Precondition: missing user_id returns error without attempting unauditable DB write."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.connector as td
 
     ctx = MagicMock()
     ctx.current_user = None

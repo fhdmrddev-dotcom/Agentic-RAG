@@ -28,11 +28,11 @@ the proof that the split moves code and rewrites none of it:
    ``symtable`` — a missing import inside a moved body only fails at CALL time, so an import probe
    cannot see it; no linter exists in the venv).
 
-⚠ GATE-NEUTRAL BY CONSTRUCTION. ``app/services/tools/`` does not exist at PHASE_BASE, so every test
-that reads it is ``xfail(strict=True)`` — PER TEST and PER PARAMETRIZE ID, never at module level,
-because the tests that pass at base (1, 2 and the ``tool_dispatcher`` params of 7) would turn into
-strict XPASS failures. The backend gate has ZERO headroom (71 failed at base); a plain failing test
-must never be committed. 278-03 removes the markers in the move commit.
+⚠ LANDED PIN-FIRST (278-01), GATE-NEUTRAL BY CONSTRUCTION. ``app/services/tools/`` did not exist at
+PHASE_BASE, so every test that reads it was marked as a strict expected failure PER TEST and PER
+PARAMETRIZE ID (never module level: tests 1, 2 and the ``tool_dispatcher`` params of 7 passed at
+base). 278-03 removed those markers IN the move commit, so every test here now runs plain — the
+backend gate has ZERO headroom (71 failed at base), and a plain failing test is never committed.
 
 ⚠ Structured like ``test_272_pure_move.py`` so a later phase can retire ONE case BY NAME, with the
 reason as the dict value (SEED-177: retire a fence deliberately, never trip it by surprise).
@@ -57,9 +57,6 @@ BACKEND_DIR = REPO_ROOT / "backend"
 
 _BASE_REL = "backend/app/services/tool_dispatcher.py"
 _TOOLS_REL = "backend/app/services/tools"
-
-_TO_MOVE = "RED until the 278-03 move creates app/services/tools/"
-_xfail_until_move = pytest.mark.xfail(strict=True, reason=_TO_MOVE)
 
 # name → the module it lives in after the move (relative to the repo root). 99 names.
 MOVE_MAP: dict[str, str] = {
@@ -286,7 +283,7 @@ def _module_params():
     params = [pytest.param("app.services.tool_dispatcher", id="tool_dispatcher")]
     for mod in _TOOLS_MODULES:
         params.append(pytest.param(mod, id=mod.rsplit(".", 1)[-1] if mod != "app.services.tools"
-                                   else "tools_init", marks=_xfail_until_move))
+                                   else "tools_init"))
     return params
 
 
@@ -339,7 +336,6 @@ def test_unmoved_bindings_are_ast_identical():
 # ── 3. AST equality of every moved binding ───────────────────────────────────────────────────
 
 
-@_xfail_until_move
 def test_moved_bindings_are_ast_identical():
     _tools_files()
     base = _bindings(_blob_at_base(_BASE_REL))
@@ -362,7 +358,6 @@ def test_moved_bindings_are_ast_identical():
 # ── 4. one home per name ─────────────────────────────────────────────────────────────────────
 
 
-@_xfail_until_move
 def test_each_name_has_exactly_one_home():
     files = {f"{_TOOLS_REL}/{name}": path for name, path in _tools_files().items()}
     files[_BASE_REL] = REPO_ROOT / _BASE_REL
@@ -392,7 +387,6 @@ def _has_future_annotations(tree: ast.Module) -> bool:
     )
 
 
-@_xfail_until_move
 def test_tools_modules_use_future_annotations():
     missing = []
     for name, path in _tools_files().items():
@@ -415,7 +409,6 @@ def _module_level_statements(body: list[ast.stmt]):
             yield from _module_level_statements(handler.body)
 
 
-@_xfail_until_move
 def test_no_tools_module_imports_tool_dispatcher_at_module_level():
     offenders = []
     for name, path in _tools_files().items():
@@ -433,7 +426,6 @@ def test_no_tools_module_imports_tool_dispatcher_at_module_level():
     assert offenders == [], f"module-level import of tool_dispatcher (cycle surface): {offenders}"
 
 
-@_xfail_until_move
 def test_tools_init_is_docstring_only():
     tree = ast.parse(_tools_files()["__init__.py"].read_text(encoding="utf-8"))
     assert len(tree.body) == 1, f"tools/__init__.py holds {len(tree.body)} statements, expected 1"
@@ -446,7 +438,6 @@ def test_tools_init_is_docstring_only():
 # ── 6. back-compat re-exports are the same objects (D-04) ───────────────────────────────────
 
 
-@_xfail_until_move
 def test_back_compat_reexports_are_the_same_objects():
     td = importlib.import_module("app.services.tool_dispatcher")
     checked = 0

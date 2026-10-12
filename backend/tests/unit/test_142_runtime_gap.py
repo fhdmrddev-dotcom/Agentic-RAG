@@ -18,7 +18,7 @@ proven by ``test_non_gap_passthrough`` below.
 """
 from __future__ import annotations
 
-from app.services.tool_dispatcher import (
+from app.services.tools.runtime_gap import (
     _classify_runtime_gap,
     KNOWN_MISSING_BINARIES,
     KNOWN_MISSING_MODULES,

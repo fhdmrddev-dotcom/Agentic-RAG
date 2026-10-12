@@ -114,12 +114,12 @@ def test_every_mcp_call_site_forwards_the_scheme():
     import inspect
 
     from app.services import connector_service
-    from app.services import tool_dispatcher as td
+    from app.services.tools import connector as td_connector
     from app.services.harness import phase_types
 
     # Phase 278 (D-07): the dispatcher module rides the `td` alias so the split retargets the
     # import line (td -> td_connector) and never this loop or its asserts.
-    for mod in (connector_service, td, phase_types):
+    for mod in (connector_service, td_connector, phase_types):
         src = inspect.getsource(mod)
         tree = ast.parse(src)
         calls = [

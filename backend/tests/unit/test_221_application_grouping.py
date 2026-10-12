@@ -327,7 +327,7 @@ def test_tool_facet_cannot_read_the_cache_because_it_is_never_handed_one():
 @pytest.mark.parametrize(
     "module_path,symbol",
     [
-        ("app.services.tool_dispatcher", "tool_facet"),
+        ("app.services.tools.connector", "tool_facet"),
         ("app.services.harness.phase_types", "tool_facet"),
         ("app.services.workflow_authoring", "tool_facet"),
     ],

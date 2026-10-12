@@ -206,7 +206,7 @@ async def test_expired_tool_read_errors():
         scoped_folder_path=None, emit=AsyncMock(), spawn=lambda c: None,
     )
     with patch(
-        "app.services.tool_dispatcher.ws_read_file",
+        "app.services.tools.workspace.ws_read_file",
         side_effect=_fake_read_expired,
     ):
         result = await _handle_workspace_read({"path": "/template.docx"}, ctx)

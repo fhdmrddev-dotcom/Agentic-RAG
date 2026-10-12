@@ -236,6 +236,15 @@ _NO_BRANCH_FILES = (
     "services/run_producer.py",
     "services/agent_loop.py",
     "services/tool_dispatcher.py",
+    "services/tools/documents.py",
+    "services/tools/skills.py",
+    "services/tools/sandbox.py",
+    "services/tools/runtime_gap.py",
+    "services/tools/render_template.py",
+    "services/tools/workspace.py",
+    "services/tools/memory.py",
+    "services/tools/agent_control.py",
+    "services/tools/connector.py",
     "services/task_service.py",
 )
 

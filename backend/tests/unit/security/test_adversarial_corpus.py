@@ -111,7 +111,7 @@ def tool_dispatcher_setup(monkeypatch):
 
     monkeypatch.setattr("app.services.connectors.org_scope.resolve_connector_org", AsyncMock(return_value=mock_scope))
     monkeypatch.setattr("app.services.connector_service.list_connections", AsyncMock(return_value=[conn]))
-    monkeypatch.setattr("app.services.tool_dispatcher.write_audit_entry", AsyncMock())
+    monkeypatch.setattr("app.services.tools.connector.write_audit_entry", AsyncMock())
     monkeypatch.setattr("app.services.connector_service.resolve_connection", AsyncMock(return_value=MagicMock(secret="sec", config={}, auth_scheme="bearer", mcp_server_url=None)))
     monkeypatch.setattr("app.services.connectors.service_tools.spec_for", MagicMock(return_value=MagicMock()))
     return conn

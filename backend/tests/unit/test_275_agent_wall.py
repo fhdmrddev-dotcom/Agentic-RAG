@@ -44,13 +44,16 @@ APP = BACKEND / "app"
 # the dispatcher split edits constant lines only — never an assert.
 # The callers of `_fetch_owned_document_bytes` (fetch_document_file + the attach_skill_file source
 # resolver) — documents.py + skills.py after the split.
-_FETCH_CALLER_FILES = (APP / "services" / "tool_dispatcher.py",)
+_FETCH_CALLER_FILES = (
+    APP / "services" / "tools" / "documents.py",
+    APP / "services" / "tools" / "skills.py",
+)
 # The one file that passes `retrievable_only=True` (2 resolve_filter legs + 1 relationships).
-_AGENT_WALL_FILE = "services/tool_dispatcher.py"
+_AGENT_WALL_FILE = "services/tools/documents.py"
 # (file, anchor it must hold) for the never-retype-the-column fence.
 _COLUMN_FENCE_FILES = (
     ("services/retention/agent_wall.py", "RETRIEVABLE_COLUMN"),
-    ("services/tool_dispatcher.py", "unretrievable"),
+    ("services/tools/documents.py", "unretrievable"),
     ("api/kb.py", "RETRIEVABLE_COLUMN"),
 )
 
@@ -186,7 +189,7 @@ def test_the_refusal_is_readable_and_typed():
 # ── the id doors ─────────────────────────────────────────────────────────────────────────────
 
 def test_read_document_refuses_a_non_retrievable_id_and_never_reads_it(monkeypatch):
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     reads: list = []
 
@@ -209,7 +212,7 @@ def test_read_document_refuses_a_non_retrievable_id_and_never_reads_it(monkeypat
 
 
 def test_the_byte_path_behind_fetch_document_file_and_attach_skill_file_refuses(monkeypatch):
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     sb = _SimSupabase({"documents": [_doc(LIVE, retrievable=True), _doc(GONE, retrievable=False)]})
     out = _run(td._fetch_owned_document_bytes(_ctx(sb), GONE))
@@ -244,7 +247,7 @@ def test_both_byte_tools_reach_the_walled_resolver():
 
 
 def test_analyze_document_refuses_a_non_retrievable_resolved_id(monkeypatch):
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     fetched: list = []
 
@@ -324,7 +327,7 @@ def _two_docs(folder_id=None):
 
 
 def test_ls_omits_a_non_retrievable_document(monkeypatch):
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     _patch_kb_folders(monkeypatch, [])
     res = json.loads(_run(td._handle_ls({"path": "/"}, _ctx(_SimSupabase(_two_docs())))).result)
@@ -332,7 +335,7 @@ def test_ls_omits_a_non_retrievable_document(monkeypatch):
 
 
 def test_ls_in_a_folder_omits_a_non_retrievable_document(monkeypatch):
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     folder = {"id": FOLDER, "name": "Reports", "parent_id": None, "is_org_shared": False, "user_id": USER}
     _patch_kb_folders(monkeypatch, [folder])
@@ -342,7 +345,7 @@ def test_ls_in_a_folder_omits_a_non_retrievable_document(monkeypatch):
 
 
 def test_tree_omits_a_non_retrievable_document(monkeypatch):
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     folder = {"id": FOLDER, "name": "Reports", "parent_id": None, "is_org_shared": False, "user_id": USER}
     _patch_kb_folders(monkeypatch, [folder])
@@ -352,7 +355,7 @@ def test_tree_omits_a_non_retrievable_document(monkeypatch):
 
 
 def test_glob_omits_a_non_retrievable_document(monkeypatch):
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     _patch_kb_folders(monkeypatch, [])
     res = json.loads(_run(td._handle_glob({"pattern": "*.pdf"}, _ctx(_SimSupabase(_two_docs())))).result)
@@ -372,7 +375,7 @@ def test_read_path_is_untouched_so_the_library_still_opens_an_archived_document(
 
 def _patch_resolver(monkeypatch):
     from app.services import document_view_resolver as dvr
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     async def _compile(caller, flt, supabase):
         return []
@@ -390,7 +393,7 @@ def _patch_resolver(monkeypatch):
 def test_query_documents_by_view_inline_filters_rows_and_counts_the_filtered_set(
     monkeypatch, gone_retrievable, expected,
 ):
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     _patch_resolver(monkeypatch)
     sb = _SimSupabase({"documents": [_doc(LIVE, retrievable=True), _doc(GONE, retrievable=gone_retrievable)]})
@@ -403,7 +406,7 @@ def test_query_documents_by_view_inline_filters_rows_and_counts_the_filtered_set
 
 def test_query_documents_by_view_saved_view_is_filtered_the_same_way(monkeypatch):
     from app.services import document_view_service
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     _patch_resolver(monkeypatch)
 
@@ -457,7 +460,7 @@ def _patch_relationships(monkeypatch, *, gone_retrievable: bool):
 
 @pytest.mark.parametrize("gone_retrievable, expected", [(False, ["live.pdf"]), (True, ["live.pdf", "gone.pdf"])])
 def test_get_related_documents_tool_omits_a_source_gone_endpoint(monkeypatch, gone_retrievable, expected):
-    from app.services import tool_dispatcher as td
+    from app.services.tools import documents as td
 
     _, sb = _patch_relationships(monkeypatch, gone_retrievable=gone_retrievable)
     res = json.loads(_run(td._handle_get_related_documents({"document_id": SUBJECT}, _ctx(sb))).result)

@@ -14,7 +14,18 @@ APP_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "app"
 
 # Phase 278 (D-07 / D-08): every file that holds tool handlers, as a TUPLE. The dispatcher split
 # moves the handlers into app/services/tools/*.py and edits THIS constant, never the asserts below.
-_HANDLER_FILES = (APP_DIR / "services" / "tool_dispatcher.py",)
+_HANDLER_FILES = (
+    APP_DIR / "services" / "tools" / "documents.py",
+    APP_DIR / "services" / "tools" / "skills.py",
+    APP_DIR / "services" / "tools" / "sandbox.py",
+    APP_DIR / "services" / "tools" / "render_template.py",
+    APP_DIR / "services" / "tools" / "workspace.py",
+    APP_DIR / "services" / "tools" / "memory.py",
+    APP_DIR / "services" / "tools" / "agent_control.py",
+    APP_DIR / "services" / "tools" / "connector.py",
+    APP_DIR / "services" / "search_documents_tool.py",
+    APP_DIR / "services" / "show_artifact_tool.py",
+)
 
 
 def _anchored_handler_trees() -> list[tuple[pathlib.Path, ast.Module]]:

@@ -183,7 +183,7 @@ async def test_paused_handler_receives_shutdown_sentinel_end_to_end(redis_client
     bcast_task = asyncio.create_task(_broadcaster())
 
     with patch(
-        "app.services.tool_dispatcher.aexec",
+        "app.services.tools.agent_control.aexec",
         AsyncMock(return_value=MagicMock(data=[])),
     ):
         try:

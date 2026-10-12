@@ -41,7 +41,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services import tool_dispatcher
+# Phase 278 (SEAM-03): the hydration + execute_code code now lives in tools/sandbox.py, so the
+# module alias the patches and source reads below use is THAT module (patch-where-used).
+from app.services.tools import sandbox as tool_dispatcher
 from app.services.tool_dispatcher import _handle_execute_code
 
 
