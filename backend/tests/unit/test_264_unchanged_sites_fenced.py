@@ -60,6 +60,10 @@ from tests.unit.test_264_load_skill_born_for import (  # noqa: F401
 )
 
 _APP = Path(inspect.getsourcefile(td)).parents[1]  # backend/app
+# Phase 278 (D-07 / D-08): the handler sources the is_enabled fence reads, as a TUPLE. After the
+# dispatcher split `_handle_read_skill_file` lives in tools/skills.py and `_handle_execute_code` in
+# tools/sandbox.py — the move edits THIS line, never the fence.
+_HANDLER_SRC_FILES = (Path(inspect.getsourcefile(td)),)
 _GROUNDING = _APP / "services" / "harness" / "grounding.py"
 _PHASE_TYPES = _APP / "services" / "harness" / "phase_types.py"
 
@@ -248,13 +252,21 @@ def test_neither_widened_handler_filters_is_enabled_itself():
     If either handler ever grew its own `.eq("is_enabled", True)`, the refusals driven below
     would pass for a second reason and stop testing the born-for disjunct's own term.
     """
-    tree = ast.parse(Path(inspect.getsourcefile(td)).read_text(encoding="utf-8"))
+    trees = [ast.parse(p.read_text(encoding="utf-8")) for p in _HANDLER_SRC_FILES]
+    assert trees and len(trees) == len(_HANDLER_SRC_FILES)
     for fn_name in ("_handle_read_skill_file", "_handle_execute_code"):
-        fn = next(
+        found = [
             n
+            for tree in trees
             for n in ast.walk(tree)
             if isinstance(n, ast.AsyncFunctionDef) and n.name == fn_name
+        ]
+        # Phase 278 (D-08) ANCHOR — each target handler exactly once across the tuple.
+        assert len(found) == 1, (
+            f"ANCHOR: {fn_name} found {len(found)} times across "
+            f"{[p.name for p in _HANDLER_SRC_FILES]} (expected 1) — repoint _HANDLER_SRC_FILES"
         )
+        fn = found[0]
         enablement_filters = [
             n
             for n in ast.walk(fn)

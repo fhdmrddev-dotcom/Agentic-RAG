@@ -245,6 +245,13 @@ def test_persisted_tool_calls_carry_sub_agent_model_when_sub_agent_record_presen
     threads_src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     threads_text = threads_src.read_text(encoding="utf-8")
 
+    # Phase 278 (D-08) ANCHOR — the construction site lives in _handle_analyze_document. If the
+    # scanned file no longer holds that handler, the regex below is testing the wrong file.
+    assert "_handle_analyze_document" in dispatcher_text, (
+        f"ANCHOR: {dispatcher_src.name} no longer holds _handle_analyze_document — repoint "
+        "dispatcher_src at the file the handler now lives in"
+    )
+
     # Construction site must include effective_model (now in tool_dispatcher.py)
     assert re.search(
         r'sub_agent_record\s*=\s*\{[^}]*"effective_model"\s*:',

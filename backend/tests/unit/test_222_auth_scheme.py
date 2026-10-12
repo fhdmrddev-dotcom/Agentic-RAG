@@ -113,19 +113,29 @@ def test_every_mcp_call_site_forwards_the_scheme():
     import ast
     import inspect
 
-    from app.services import connector_service, tool_dispatcher
+    from app.services import connector_service
+    from app.services import tool_dispatcher as td
     from app.services.harness import phase_types
 
-    for mod in (connector_service, tool_dispatcher, phase_types):
+    # Phase 278 (D-07): the dispatcher module rides the `td` alias so the split retargets the
+    # import line (td -> td_connector) and never this loop or its asserts.
+    for mod in (connector_service, td, phase_types):
         src = inspect.getsource(mod)
         tree = ast.parse(src)
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            fn = node.func
-            name = getattr(fn, "attr", None)
-            if name not in {"list_tools", "call_tool"}:
-                continue
+        calls = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and getattr(node.func, "attr", None) in {"list_tools", "call_tool"}
+        ]
+        # Phase 278 (D-08) ANCHOR — a module with no MCP call site would pass the check below
+        # vacuously; each scanned module must still hold at least one.
+        calls_seen = len(calls)
+        assert calls_seen >= 1, (
+            f"ANCHOR: {mod.__name__} has no list_tools/call_tool call site — the MCP call moved; "
+            "scan the module that now holds it"
+        )
+        for node in calls:
+            name = node.func.attr
             kwargs = {k.arg for k in node.keywords}
             assert "auth_scheme" in kwargs, (
                 f"{mod.__name__} calls {name}() without auth_scheme at line {node.lineno} — "
