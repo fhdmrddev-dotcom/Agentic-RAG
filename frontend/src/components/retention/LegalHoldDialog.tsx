@@ -120,6 +120,10 @@ export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalH
   const alive = useRef(true)
   // Each open is a generation: a read started for an earlier open never lands in this one.
   const openGen = useRef(0)
+  const openRef = useRef(open)
+  useEffect(() => {
+    openRef.current = open
+  }, [open])
 
   useEffect(() => {
     alive.current = true
@@ -157,10 +161,10 @@ export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalH
 
   // The live, server-derived count of what the picks would hold today.
   useEffect(() => {
-    if (!open || !hasPick) {
-      setCount(null)
-      return
-    }
+    // 275-REVIEW IN-05: a recount clears the last number first — the line never shows the
+    // PREVIOUS selection's count while this one is being counted.
+    setCount(null)
+    if (!open || !hasPick) return
     let current = true
     countHoldCoverage({ document_ids: docIds, folder_ids: folderIds })
       .then((res) => {
@@ -200,6 +204,7 @@ export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalH
     setBusy(true)
     setFailed(false)
     setRefused(null)
+    const gen = openGen.current
     try {
       if (hold) {
         await addHoldCoverage(hold.id, { document_ids: docIds, folder_ids: folderIds })
@@ -207,10 +212,11 @@ export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalH
         await createHold({ name: name.trim(), reason: reason.trim(), document_ids: docIds, folder_ids: folderIds })
       }
       if (!alive.current) return
-      onDone()
-      onClose()
+      onDone() // the write landed: re-read and pulse, whichever dialog is open now
+      // 275-REVIEW IN-05: only close the dialog THIS submit came from — never one reopened since.
+      if (gen === openGen.current && openRef.current) onClose()
     } catch (err) {
-      if (!alive.current) return
+      if (!alive.current || gen !== openGen.current) return
       // 275-REVIEW F-WR-02: a 4xx is the server's sentence (e.g. a pick that is not in this org,
       // or a hold released meanwhile) — render it. The contract copy is for a silent failure.
       if (err instanceof ApiRefusal && err.status >= 400 && err.status < 500) {
@@ -220,7 +226,7 @@ export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalH
         setFailed(true)
       }
     } finally {
-      if (alive.current) setBusy(false)
+      if (alive.current && gen === openGen.current) setBusy(false)
     }
   }
 

@@ -294,6 +294,35 @@ describe("LegalHoldDialog — place a hold (D-05 / D-35)", () => {
     expect(onRecorded).not.toHaveBeenCalled()
   })
 
+  it("275-REVIEW IN-05: while a recount is in flight the line never shows the previous selection's number", async () => {
+    m.countHoldCoverage
+      .mockResolvedValueOnce({ count: 7 })
+      .mockImplementationOnce(() => new Promise(() => {}))
+    const dialog = await openNew()
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Invoices" }))
+    await waitFor(() => expect(within(dialog).getByTestId("hold-count-line")).toHaveTextContent("7 documents will be held today."))
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Finance" }))
+    await waitFor(() => expect(m.countHoldCoverage).toHaveBeenCalledTimes(2))
+    expect(within(dialog).getByTestId("hold-count-line")).not.toHaveTextContent("7 documents")
+  })
+
+  it("275-REVIEW IN-05: a submit from an earlier open never closes the dialog opened after it", async () => {
+    let resolveCreate: (h: LegalHold) => void = () => {}
+    m.createHold.mockImplementationOnce(() => new Promise<LegalHold>((r) => { resolveCreate = r }))
+    const dialog = await openNew()
+    await userEvent.type(within(dialog).getByLabelText("Matter name"), "Kessler dispute")
+    await userEvent.type(within(dialog).getByLabelText("Reason"), "Counsel asked.")
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Finance" }))
+    await userEvent.click(within(dialog).getByRole("button", { name: "Place hold" }))
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    await userEvent.click(screen.getByRole("button", { name: "+ New hold" }))
+    await screen.findByRole("dialog")
+    resolveCreate({ ...ACTIVE, id: "h9" })
+    await waitFor(() => expect(m.listHolds).toHaveBeenCalledTimes(2)) // the write landed: re-read
+    expect(screen.getByRole("dialog")).toBeInTheDocument() // …but the NEW dialog stays open
+  })
+
   it("Add mode: titled 'Add to “{matter}”', primary 'Add to hold', failure keeps the old coverage sentence", async () => {
     m.addHoldCoverage.mockRejectedValue(new Error("x"))
     render(<LegalHoldsList />)
