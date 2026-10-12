@@ -42,6 +42,7 @@ from app.models.document import DocumentMetadata
 from app.models.document_view import ViewFilter
 from app.services import metadata_field_service, view_filter_compiler
 from app.services.harness.scope import resolve_project_subtree
+from app.services.retrieval_scope import RETRIEVABLE_COLUMN
 from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders, get_globally_visible_folder_ids
 
@@ -292,6 +293,7 @@ async def resolve_filter(
     folder_scope: str | None,
     count_only: bool,
     supabase: Client,
+    retrievable_only: bool = False,
 ):
     """The SHARED, leak-safe resolve core (114 CR-01; extracted in 115) — used by BOTH
     the route module's ``resolve_view`` / ``resolve_adhoc`` endpoints AND the Phase 115
@@ -338,8 +340,15 @@ async def resolve_filter(
             subtree = reachable or None
 
     def _apply(q):
-        """The shared fragment walk + subtree scope (``apply_fragments``, Phase 271)."""
-        return apply_fragments(q, fragments, subtree)
+        """The shared fragment walk + subtree scope (``apply_fragments``, Phase 271).
+
+        Phase 275 (D-36, revision B-2): ``retrievable_only`` (the AGENT handler only) adds ONE
+        ``.eq(RETRIEVABLE_COLUMN, True)`` to every leg this closure builds — the two row legs AND
+        the two count legs — so the reported total counts the filtered set. The Library's view
+        routes keep the default and still list archived / source-gone documents.
+        """
+        q = apply_fragments(q, fragments, subtree)
+        return q.eq(RETRIEVABLE_COLUMN, True) if retrievable_only else q
 
     global_folder_ids = await get_globally_visible_folder_ids(supabase, caller)
 
