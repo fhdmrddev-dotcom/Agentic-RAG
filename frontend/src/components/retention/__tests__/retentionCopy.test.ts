@@ -19,6 +19,8 @@ import { RETENTION_COPY, fillCopy, holdRefusalFor, richParts } from "../retentio
 import sketchSource from "../../../../../.planning/sketches/275-retention-legal-hold/index.html?raw"
 import uiSpecSource from "../../../../../.planning/phases/275-retention-legal-hold/275-UI-SPEC.md?raw"
 import holdGuardSource from "../../../../../backend/app/services/retention/hold_guard.py?raw"
+import retentionModelsSource from "../../../../../backend/app/models/retention.py?raw"
+import contextSource from "../../../../../.planning/phases/275-retention-legal-hold/275-CONTEXT.md?raw"
 
 /** The literal runs of a template: split on placeholders, bold markers and `(s)`; ≥ 3 chars. */
 function segments(template: string): string[] {
@@ -45,7 +47,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       checked++
     }
     // Non-vacuity: an empty `ported` group would pass the loop above for free.
-    expect(checked).toBe(31)
+    expect(checked).toBe(71)
   })
 
   it("every CONTRACT string sits verbatim in the UI-SPEC", () => {
@@ -55,7 +57,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       expect(uiSpecSource).toContain(value)
       checked++
     }
-    expect(checked).toBe(49)
+    expect(checked).toBe(78)
   })
 
   it("every SKETCH TEMPLATE's literal segments sit verbatim in the sketch", () => {
@@ -66,7 +68,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       for (const seg of segs) expect(sketchSource, `${key}: "${seg}"`).toContain(seg)
       checked++
     }
-    expect(checked).toBe(21)
+    expect(checked).toBe(42)
   })
 
   it("every SPEC TEMPLATE's literal segments sit verbatim in the UI-SPEC", () => {
@@ -77,7 +79,37 @@ describe("retentionCopy — every string is fenced against its own source", () =
       for (const seg of segs) expect(uiSpecSource, `${key}: "${seg}"`).toContain(seg)
       checked++
     }
-    expect(checked).toBe(21)
+    expect(checked).toBe(35)
+  })
+
+  it("every DECISION template's literal segments sit verbatim in 275-CONTEXT.md (D-34)", () => {
+    let checked = 0
+    for (const [key, value] of Object.entries(RETENTION_COPY.decisionTemplates)) {
+      const segs = segments(value)
+      expect(segs.length, `${key} has no literal segment to fence`).toBeGreaterThan(0)
+      for (const seg of segs) expect(contextSource, `${key}: "${seg}"`).toContain(seg)
+      checked++
+    }
+    expect(checked).toBe(1)
+  })
+
+  it("every SERVER-MODEL sentence is backend/app/models/retention.py's own (275-03 deviation 4)", () => {
+    let checked = 0
+    for (const value of Object.values(RETENTION_COPY.serverModels)) {
+      expect(retentionModelsSource).toContain(`"${value}"`)
+      checked++
+    }
+    expect(checked).toBe(1)
+    // The editor's validation copy is the server's too, so an inline error and a 422 read the same.
+    for (const v of [RETENTION_COPY.contract.nameRequired, RETENTION_COPY.contract.scopeRequired, RETENTION_COPY.contract.stage2After]) {
+      expect(retentionModelsSource).toContain(`"${v}"`)
+    }
+  })
+
+  it("D-22: exactly two clocks are offered, and the sketch's third ('last modified') is not", () => {
+    expect(RETENTION_COPY.ported.clockDocumentDate).toBe("the document date")
+    expect(RETENTION_COPY.ported.clockDateAdded).toBe("the day it was added to the Library")
+    expect(JSON.stringify(RETENTION_COPY)).not.toContain("the day the file was last modified")
   })
 
   it("every SERVER sentence is hold_guard.py's own", () => {

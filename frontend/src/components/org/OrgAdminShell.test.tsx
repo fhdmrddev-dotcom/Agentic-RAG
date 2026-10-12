@@ -18,7 +18,7 @@
  * it via useTechnicalNames and threads it to OrgBand + OrgAuditTab).
  */
 import { describe, it, expect, beforeEach, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { OrgAdminShell } from "./OrgAdminShell"
@@ -53,6 +53,18 @@ vi.mock("@/providers/OrgProvider", () => ({
   useOrg: vi.fn(),
 }))
 
+// Phase 275-04: the Retention leaf owns its own fetches (its suites live under
+// components/retention); here it is a stub that proves the shell mounts it and wires the pulse.
+vi.mock("@/components/retention/RetentionTab", () => ({
+  RetentionTab: ({ onRecorded }: { onRecorded?: () => void }) => (
+    <div data-testid="retention-tab-stub">
+      <button type="button" onClick={() => onRecorded?.()}>
+        record a retention write
+      </button>
+    </div>
+  ),
+}))
+
 const MEMBERS_PAGE: OrgMembersPage = {
   members: [
     { user_id: "u1", email: "alice@example.com", role: "org-admin", joined_at: "2026-01-01T00:00:00Z" },
@@ -83,12 +95,16 @@ const OWN_PAGE: OrgAuditPage = {
   scope: "own",
 }
 
-/** The 2 remaining locked tabs and their exact phase-number-free copy (T-146-10 / T-166-13).
+/** The remaining locked tab and its exact phase-number-free copy (T-146-10 / T-166-13).
  *  Phase 167 flipped "Invitations & Roles" LIVE and Phase 168 flipped "SSO" LIVE, so both
- *  left this list. */
+ *  left this list.
+ *  ⚠ RETIRED DELIBERATELY at 275-04 (D-01, SEED-177 — retire a fence on purpose, never trip it by
+ *  surprise): the locked `Retention` entry (its "Data-retention controls are …" placeholder copy)
+ *  is GONE because Phase 275 ships the Retention home. Its locked assertions are REPLACED, not
+ *  deleted: the "Retention is LIVE" cases below assert the unlocked tab mounts the retention leaf and
+ *  that no locked placeholder renders for it — so the suite's case count rises rather than falls. */
 const LOCKED_TABS: ReadonlyArray<{ tab: string; description: string }> = [
   { tab: "Subscription", description: "Plan and billing management is coming soon." },
-  { tab: "Retention", description: "Data-retention controls are coming soon." },
 ]
 
 /** A pending + accepted pair the shell threads into the live InvitationsTab. */
@@ -190,7 +206,7 @@ describe("OrgAdminShell — live tabs mount their leaves (ADMIN-01 / D-166-01)",
 })
 
 describe("OrgAdminShell — locked tabs render LockedTab (T-146-10 / T-166-13)", () => {
-  it("each of the 3 locked tabs renders LockedTab with its title + phase-number-free copy", async () => {
+  it("the 1 remaining locked tab renders LockedTab with its title + phase-number-free copy", async () => {
     renderShell()
     for (const { tab, description } of LOCKED_TABS) {
       await userEvent.click(screen.getByRole("tab", { name: tab }))
@@ -207,6 +223,37 @@ describe("OrgAdminShell — locked tabs render LockedTab (T-146-10 / T-166-13)",
       await userEvent.click(screen.getByRole("tab", { name: tab }))
       const el = await screen.findByText(description)
       expect(el.textContent ?? "").not.toMatch(PHASE_NUMBER)
+    }
+  })
+})
+
+describe("OrgAdminShell — Retention is LIVE (275-04 / D-01; replaces the retired locked-Retention fence)", () => {
+  it("Retention is unlocked: no lock glyph, it mounts the retention leaf, and no locked placeholder renders", async () => {
+    renderShell()
+    const tab = screen.getByRole("tab", { name: "Retention" })
+    expect(tab.querySelector("svg")).toBeNull() // the Lock glyph rides only on locked tabs
+    await userEvent.click(tab)
+    expect(await screen.findByTestId("retention-tab-stub")).toBeInTheDocument()
+    expect(screen.queryByText(/not built yet — coming soon/i)).toBeNull()
+    expect(screen.queryByText(/Data-retention controls are/)).toBeNull()
+    expect(tab).toHaveAttribute("aria-selected", "true")
+  })
+
+  it("a recorded retention write pulses the band's marker for 1.6 s (062-A), then it settles", async () => {
+    renderShell()
+    await userEvent.click(screen.getByRole("tab", { name: "Retention" }))
+    const marker = screen.getByText("every action recorded")
+    expect(marker.className).not.toContain("bg-success/15")
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "record a retention write" }))
+      expect(screen.getByText("every action recorded").className).toContain("bg-success/15")
+      act(() => {
+        vi.advanceTimersByTime(1600)
+      })
+      expect(screen.getByText("every action recorded").className).not.toContain("bg-success/15")
+    } finally {
+      vi.useRealTimers()
     }
   })
 })
