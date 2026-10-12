@@ -124,6 +124,20 @@ describe("RetentionTab — the posture line (S1 / D-29)", () => {
     )
   })
 
+  it.each([
+    ["running", "2026-10-11T02:00:00Z"], // claimed: last_run_at still holds the PREVIOUS run's time
+    ["running", null], // the very first sweep, still running (or crashed)
+    ["some_future_status", "2026-10-11T02:00:00Z"], // unknown → never the healthy branch
+  ])("275-REVIEW F-WR-04: last_status %s never reads 'finished, nothing failed'", async (status, lastRun) => {
+    m.getRetentionSummary.mockResolvedValue({ ...HEALTHY, last_status: status, last_run_at: lastRun })
+    render(<RetentionTab />)
+    const posture = await screen.findByTestId("posture")
+    expect(posture).toHaveTextContent("The latest sweep has not finished, so there is no result for it yet.")
+    expect(posture.textContent).not.toContain("finished, nothing failed")
+    expect(posture.textContent).not.toContain("No sweep has run yet")
+    expect(posture.querySelector(".bg-success")).toBeNull()
+  })
+
   it("a load error says so with Try again, and a retry renders the posture", async () => {
     m.getRetentionSummary.mockRejectedValueOnce(new Error("down"))
     render(<RetentionTab />)

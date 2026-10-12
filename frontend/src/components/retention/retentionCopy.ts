@@ -186,6 +186,8 @@ const contract = {
   loading: "Loading retention…",
   sweepsOff: "Scheduled sweeps are off. Nothing is archived or queued until they are turned on. Preview still works.",
   neverRun: "No sweep has run yet. Preview a policy to see what the first one would do.",
+  /** 275-REVIEW F-WR-04 (UI-SPEC §Review fix pass) — `running`, a crashed sweep, or an unknown status. */
+  postureNotReported: "The latest sweep has not finished, so there is no result for it yet.",
   policiesEmptyTitle: "No retention policies yet",
   policiesEmptyBody:
     "Nothing in the Library is archived or deleted until a policy says so. Create one and preview it before it can run.",

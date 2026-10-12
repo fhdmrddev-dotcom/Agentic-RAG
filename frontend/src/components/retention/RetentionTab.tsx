@@ -53,14 +53,25 @@ function Posture({ summary }: { summary: RetentionSummary }) {
       </div>
     )
   }
+  // 275-REVIEW F-WR-04: ONLY `ok` is healthy. `running` (claimed — `last_run_at` still holds the
+  // PREVIOUS run's time, whose outcome is already overwritten; a crashed worker leaves it there)
+  // and any status this client does not know read as "not finished", in amber — never a claim.
   let lead
-  if (!summary.last_run_at) {
+  const status = summary.last_status ?? null
+  if (!summary.last_run_at && status === null) {
     lead = <span>{C.contract.neverRun}</span>
-  } else if (summary.last_status && FAILED_STATUSES.has(summary.last_status)) {
+  } else if (status !== null && FAILED_STATUSES.has(status) && summary.last_run_at) {
     lead = (
       <span className={cn("inline-flex items-center gap-2", AMBER_TEXT_CLASS)}>
         <ShieldAlert className="h-4 w-4 flex-none" aria-hidden="true" />
         {fillCopy(C.specTemplates.postureNotFinished, { "date time": formatRetentionDateTime(summary.last_run_at) })}
+      </span>
+    )
+  } else if (status !== "ok" || !summary.last_run_at) {
+    lead = (
+      <span className={cn("inline-flex items-center gap-2", AMBER_TEXT_CLASS)}>
+        <ShieldAlert className="h-4 w-4 flex-none" aria-hidden="true" />
+        {C.contract.postureNotReported}
       </span>
     )
   } else {
