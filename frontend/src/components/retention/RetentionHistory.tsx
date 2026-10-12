@@ -103,6 +103,11 @@ export function RetentionHistory() {
   const [hasMore, setHasMore] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  // 275-REVIEW F-WR-12: the server pages by offset over a newest-first list that GROWS AT THE TOP
+  // (a sweep, another admin, another tab). The cursor advances by what the server RETURNED — never
+  // by the rows shown — and a row already shown is dropped by id, so a receipt can never appear
+  // twice (which would read as two deletes of one document) and nothing older is skipped.
+  const [nextOffset, setNextOffset] = useState(0)
   const alive = useRef(true)
 
   const load = useCallback(async (offset: number) => {
@@ -110,7 +115,12 @@ export function RetentionHistory() {
     try {
       const page = await listHistory(offset, PAGE)
       if (!alive.current) return
-      setRows((prev) => (offset === 0 ? page.rows : [...(prev ?? []), ...page.rows]))
+      setRows((prev) => {
+        if (offset === 0) return page.rows
+        const seen = new Set((prev ?? []).map((r) => r.id))
+        return [...(prev ?? []), ...page.rows.filter((r) => !seen.has(r.id))]
+      })
+      setNextOffset(offset + page.rows.length)
       setHasMore(page.has_more)
       setLoadError(false)
     } catch {
@@ -133,7 +143,7 @@ export function RetentionHistory() {
       {loadError && (
         <p role="alert" className={`text-sm ${AMBER_TEXT_CLASS}`}>
           {C.contract.loadFailed}{" "}
-          <button type="button" className="underline" onClick={() => void load(rows ? rows.length : 0)}>
+          <button type="button" className="underline" onClick={() => void load(rows ? nextOffset : 0)}>
             {C.contract.tryAgain}
           </button>
         </p>
@@ -169,7 +179,7 @@ export function RetentionHistory() {
             size="sm"
             className="h-7 text-xs font-semibold"
             disabled={loadingMore}
-            onClick={() => void load(rows?.length ?? 0)}
+            onClick={() => void load(nextOffset)}
           >
             {C.contract.showOlder}
           </Button>

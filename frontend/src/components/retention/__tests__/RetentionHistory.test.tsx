@@ -111,6 +111,30 @@ describe("RetentionHistory — the ledger (062-A)", () => {
     expect(screen.queryByRole("button", { name: "Show older" })).toBeNull()
   })
 
+  it("275-REVIEW F-WR-12: receipts written meanwhile never show a row twice, and the next page continues past them", async () => {
+    const a = row({ document_name: "A", policy_name: "P" })
+    const b = row({ document_name: "B", policy_name: "P" })
+    const c = row({ document_name: "C", policy_name: "P" })
+    const d = row({ document_name: "D", policy_name: "P" })
+    // Page 1 = [A, B]. Then ONE new receipt lands at the top, so offset 2 now starts at B again.
+    m.listHistory
+      .mockResolvedValueOnce({ offset: 0, has_more: true, rows: [a, b] })
+      .mockResolvedValueOnce({ offset: 2, has_more: true, rows: [b, c] })
+      .mockResolvedValueOnce({ offset: 4, has_more: false, rows: [d] })
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {})
+    render(<RetentionHistory />)
+    await screen.findByText("A")
+    await userEvent.click(screen.getByRole("button", { name: "Show older" }))
+    await waitFor(() => expect(screen.getAllByTestId("history-row")).toHaveLength(3))
+    expect(screen.getAllByText("B")).toHaveLength(1)
+    await userEvent.click(screen.getByRole("button", { name: "Show older" }))
+    await waitFor(() => expect(screen.getAllByTestId("history-row")).toHaveLength(4))
+    // The cursor advances by what the SERVER returned (2 + 2), never by the de-duplicated count.
+    expect(m.listHistory).toHaveBeenLastCalledWith(4, 50)
+    expect(errors.mock.calls.flat().join(" ")).not.toMatch(/same key/)
+    errors.mockRestore()
+  })
+
   it("the empty ledger", async () => {
     m.listHistory.mockResolvedValue({ offset: 0, has_more: false, rows: [] })
     render(<RetentionHistory />)
