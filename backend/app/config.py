@@ -1428,6 +1428,13 @@ class Settings(BaseSettings):
     # bound, it moves to `app_settings` — recorded as SEED-250.
     watch_run_history_retention: int = 200
 
+    # ── Phase 275 (RET-03 / D-29 / D-37) — the nightly retention sweep ──────────────────────
+    # OFF BY DEFAULT, matching watch_process_enabled. The sweep ARCHIVES documents on its own and
+    # QUEUES deletes for an org admin to confirm (it never deletes). Turn it on only after an org
+    # admin has read a dry run in Org admin → Retention. The 02:00 UTC hour, the poll interval and
+    # the lease are code constants in app/db/retention.py — one env var ships (D-37).
+    retention_sweep_enabled: bool = False
+
 
     @model_validator(mode="after")
     def _validate_run_stale_sweep_bounds(self) -> "Settings":

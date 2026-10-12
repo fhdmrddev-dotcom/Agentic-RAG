@@ -603,6 +603,21 @@ async def lifespan(app_instance):
             _watch_service = None
     app_instance.state.watch_service = _watch_service
 
+    # Phase 275 (RET-03 / D-29 / D-31) — the nightly retention sweep. Off by default
+    # (RETENTION_SWEEP_ENABLED); multi-worker safe through its own claim + lease. It archives and
+    # queues; it never deletes. scheduler_service is not involved.
+    _retention_sweep = None
+    if not _setup_mode and getattr(settings, "retention_sweep_enabled", False):
+        try:
+            from app.services.retention.sweep_service import RetentionSweepService
+
+            _retention_sweep = RetentionSweepService(pool=await get_pg_pool(), settings=settings)
+            _retention_sweep.start()
+        except Exception:
+            logger.exception("Retention sweep service failed to start (app continues)")
+            _retention_sweep = None
+    app_instance.state.retention_sweep_service = _retention_sweep
+
     # BUG-260902-06 — the cross-worker settings/model-registry cache invalidator.
     #
     # ⚠ IT RUNS IN EVERY WORKER ON PURPOSE, and unlike the scheduler above that is the whole
@@ -671,6 +686,14 @@ async def lifespan(app_instance):
             _ws.stop()
     except Exception:  # noqa: BLE001
         logger.exception("Watch service stop failed at lifespan shutdown")
+
+    # Phase 275 — stop the retention sweep
+    try:
+        _rs = getattr(app_instance.state, "retention_sweep_service", None)
+        if _rs is not None:
+            _rs.stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("Retention sweep stop failed at lifespan shutdown")
 
     # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
     # down as the FIRST shutdown step — before the ask_user sentinel broadcast and
