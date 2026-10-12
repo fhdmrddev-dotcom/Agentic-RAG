@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.5
-milestone_name: Find It, Show It — ✅ SHIPPED 2026-10-12
-status: milestone_complete
-last_updated: 2026-10-12T14:30:00.000Z
+milestone: v4.6
+milestone_name: Pay It Down
+status: planning
+last_updated: 2026-10-12T19:00:00.000Z
 last_activity: 2026-10-12
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 38
-  completed_plans: 38
-  percent: 100
-stopped_at: v4.5 CLOSED (tag v4.5, 25/25, audit tech_debt). 275 DEPLOYED 2026-10-12 (prod 784647e2d). Next — /gsd:new-milestone
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+stopped_at: v4.6 Pay It Down STARTED — defining requirements
 ---
 
 # Project State
@@ -33,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** between milestones — v4.5 shipped; 275's production deploy is operator-gated
+**Current focus:** v4.6 Pay It Down — 8 major bugs + v4.5 tech debt + three G-5 extractions (repair only)
 
 ---
 
@@ -55,10 +55,11 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 
 ## Current Position
 
-Milestone: none active — v4.5 shipped 2026-10-12
-Phase: — (next phase number **277**; next migration **207**, re-run `ls supabase/migrations` at discuss)
-Status: Ready for `/gsd:new-milestone`
-Last activity: 2026-10-12
+Milestone: **v4.6 Pay It Down** (started 2026-10-12)
+Phase: Not started (defining requirements) — first phase **277**; next migration **207** (re-run `ls supabase/migrations` at discuss)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-10-12 — Milestone v4.6 started
 
 ### Owed to the operator (carried from v4.5)
 
@@ -71,7 +72,7 @@ Last activity: 2026-10-12
 | 5 | 272 live re-drive of the review fixes | `272-HUMAN-UAT.md` |
 | 6 | Logged-in production smoke test of v4.5 (270-274 + 276 live since 2026-10-05) | also owed from v4.4 |
 
-### Carry into the next milestone's scoping
+### Carry into the next milestone's scoping (✅ consumed by v4.6 intake 2026-10-12 — kept as the record)
 
 - Integration W-1 (`harness/freshness.py` counts archived docs), W-2 (artifact rows outlive retention
   disposition — needs a recorded decision), W-3 (filter vocabulary restated twice), W-5 / BUG-261012-01.
