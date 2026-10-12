@@ -170,6 +170,8 @@ const contract = {
   decisionsFailed: "Couldn't record your decisions. Nothing was archived or kept. Reload this list before trying again.",
   /** 275-REVIEW F-WR-01 (UI-SPEC §Review fix pass) — follows a server refusal made before any write. */
   confirmRefusedNothing: "Nothing was deleted, archived or kept.",
+  /** 275-REVIEW F-WR-03 — the result chip when every decided action was dropped (never a green Done). */
+  resultNothingDone: "Nothing done",
   reload: "Reload",
   decision: "Decision",
   decisionKeep: "Keep",
@@ -310,6 +312,11 @@ const specTemplates = {
   reviewFooter: "{a} to keep · {b} to archive · {c} to delete · {d} undecided",
   applyDecisions: "Apply {N} decision(s)",
   applyAndDelete: "Apply decisions and delete {c} permanently",
+  /** 275-REVIEW F-WR-03 (UI-SPEC §Review fix pass) — what the result banner says was NOT done. */
+  resultChanged: "Not done, changed since the sweep: {names}.",
+  resultNoLongerWaiting: "Not done, no longer waiting: {names}.",
+  resultFailed: "Couldn't finish, so these are still waiting: {names}. Nothing was changed for them.",
+  resultBytesNotRemoved: "{N} stored file(s) of the deleted documents could not be removed.",
   /** S1 — posture + the Waiting tab's accessible name. */
   postureNotFinished:
     "Last sweep {date time} did not finish. It changed nothing for the policies it could not complete.",

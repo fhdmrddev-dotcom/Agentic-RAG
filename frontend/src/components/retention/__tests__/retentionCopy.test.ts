@@ -57,7 +57,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       expect(uiSpecSource).toContain(value)
       checked++
     }
-    expect(checked).toBe(80) // 275-REVIEW: +policyAlreadyRemoved (F-CR-02), +confirmRefusedNothing (F-WR-01)
+    expect(checked).toBe(81) // 275-REVIEW: +policyAlreadyRemoved (F-CR-02), +confirmRefusedNothing (F-WR-01), +resultNothingDone (F-WR-03)
   })
 
   it("every SKETCH TEMPLATE's literal segments sit verbatim in the sketch", () => {
@@ -79,7 +79,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       for (const seg of segs) expect(uiSpecSource, `${key}: "${seg}"`).toContain(seg)
       checked++
     }
-    expect(checked).toBe(36) // 275-05: +historyDeleteRefused (G-4 FAIL-1)
+    expect(checked).toBe(40) // 275-05: +historyDeleteRefused (G-4 FAIL-1); 275-REVIEW F-WR-03: +4 result clauses
   })
 
   it("every DECISION template's literal segments sit verbatim in 275-CONTEXT.md (D-34)", () => {

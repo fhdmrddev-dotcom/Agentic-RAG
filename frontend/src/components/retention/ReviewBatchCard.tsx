@@ -16,6 +16,7 @@ import {
   BatchResultBanner,
   BatchTable,
   TypeTheCount,
+  batchNames,
   confirmFailureMessage,
 } from "./DeleteBatchCard"
 import { RETENTION_COPY, fillCopy } from "./retentionCopy"
@@ -73,7 +74,7 @@ export function ReviewBatchCard({
     }
   }
 
-  if (result) return <BatchResultBanner result={result} />
+  if (result) return <BatchResultBanner result={result} names={batchNames(batch)} />
 
   return (
     <article className="grid gap-4 rounded-[10px] border border-border bg-card p-4" data-testid="review-batch">

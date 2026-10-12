@@ -159,24 +159,53 @@ export function TypeTheCount({
   )
 }
 
-/** The green `role=status` banner that replaces a confirmed card; focus moves to it. */
-export function BatchResultBanner({ result }: { result: ConfirmResult }) {
+/**
+ * The `role=status` banner that replaces a confirmed card; focus moves to it.
+ *
+ * 275-REVIEW F-WR-03: it accounts for EVERY document the admin decided on — what was deleted,
+ * archived or kept, and, in amber, what was NOT done and why: a late hold, a change since the
+ * sweep, a row no longer waiting, a family that failed (still waiting), and stored files a
+ * committed delete could not remove. The green `Done` renders only when something was done.
+ * `names` (the card's rows) names an item the server returned by id only.
+ */
+export function BatchResultBanner({
+  result,
+  names = {},
+}: {
+  result: ConfirmResult
+  names?: Record<string, string>
+}) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     ref.current?.focus()
   }, [])
-  const lateHeld = result.did_not_delete.filter((d) => d.reason === "held")
+  const nameOf = (d: { document_id: string; name?: string | null }) => d.name ?? names[d.document_id] ?? d.document_id
+  const list = (items: Array<{ document_id: string; name?: string | null }>) => items.map(nameOf).join(", ")
+  // Dropped at confirm: from a delete (`did_not_delete`) or a review's archive (`skipped`).
+  const dropped = [...result.did_not_delete, ...result.skipped]
+  const lateHeld = dropped.filter((d) => d.reason === "held")
+  const changed = dropped.filter((d) => d.reason !== "held")
+  const failed = result.failed ?? []
+  const bytes = result.bytes_not_removed?.length ?? 0
+  const didSomething = result.deleted.length + result.archived.length + result.kept.length > 0
   return (
     <div
       ref={ref}
       role="status"
       tabIndex={-1}
       data-testid="batch-result"
-      className="flex flex-wrap items-start gap-2 rounded-[10px] border border-success/30 bg-success/10 p-4 text-sm outline-none"
+      className={cn(
+        "flex flex-wrap items-start gap-2 rounded-[10px] border p-4 text-sm outline-none",
+        didSomething ? "border-success/30 bg-success/10" : "border-warning/30 bg-warning/10",
+      )}
     >
-      <RetentionChip tone="done">{C.ported.done}</RetentionChip>
+      {didSomething ? (
+        <RetentionChip tone="done">{C.ported.done}</RetentionChip>
+      ) : (
+        <RetentionChip tone="undecidable">{C.contract.resultNothingDone}</RetentionChip>
+      )}
       <span className="flex-1">
-        {(result.deleted.length > 0 || (result.archived.length === 0 && result.kept.length === 0)) && (
+        {result.deleted.length > 0 && (
           <>
             <RichCopy text={fillCopy(C.sketchTemplates.deletedResult, { N: result.deleted.length })} />{" "}
           </>
@@ -193,12 +222,22 @@ export function BatchResultBanner({ result }: { result: ConfirmResult }) {
         )}
         {lateHeld.length > 0 && (
           <span className={AMBER_TEXT_CLASS}>
-            {fillCopy(
-              C.sketchTemplates.lateHold,
-              { M: lateHeld.length, names: lateHeld.map((d) => d.name ?? d.document_id).join(", ") },
-              lateHeld.length,
-            )}{" "}
+            {fillCopy(C.sketchTemplates.lateHold, { M: lateHeld.length, names: list(lateHeld) }, lateHeld.length)}{" "}
           </span>
+        )}
+        {changed.length > 0 && (
+          <span className={AMBER_TEXT_CLASS}>{fillCopy(C.specTemplates.resultChanged, { names: list(changed) })} </span>
+        )}
+        {result.not_found.length > 0 && (
+          <span className={AMBER_TEXT_CLASS}>
+            {fillCopy(C.specTemplates.resultNoLongerWaiting, { names: list(result.not_found) })}{" "}
+          </span>
+        )}
+        {failed.length > 0 && (
+          <span className={AMBER_TEXT_CLASS}>{fillCopy(C.specTemplates.resultFailed, { names: list(failed) })} </span>
+        )}
+        {bytes > 0 && (
+          <span className={AMBER_TEXT_CLASS}>{fillCopy(C.specTemplates.resultBytesNotRemoved, { N: bytes })} </span>
         )}
         {C.ported.auditTail}
       </span>
@@ -226,6 +265,11 @@ export function confirmFailureMessage(err: unknown, keepOnly: boolean): string {
     }
   }
   return keepOnly ? C.contract.decisionsFailed : C.contract.confirmFailed
+}
+
+/** The card's own row names, so the banner can name an item the server returned by id only. */
+export function batchNames(batch: QueueBatch): Record<string, string> {
+  return Object.fromEntries(batch.rows.map((r) => [r.document_id, r.name]))
 }
 
 /** An inline failure + Reload (the rows stay as the person left them). */
@@ -287,7 +331,7 @@ export function DeleteBatchCard({
     }
   }
 
-  if (result) return <BatchResultBanner result={result} />
+  if (result) return <BatchResultBanner result={result} names={batchNames(batch)} />
 
   return (
     <article className="grid gap-4 rounded-[10px] border border-border bg-card p-4" data-testid="delete-batch">

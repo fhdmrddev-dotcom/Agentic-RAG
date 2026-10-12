@@ -191,9 +191,12 @@ export interface ConfirmBatchBody {
 
 export interface ConfirmItem {
   document_id: string
-  name?: string
+  name?: string | null
   reason?: string
   held_since?: string | null
+  /** `failed` rows only: which decision failed (`delete` / `keep` / `archive`). */
+  decision?: string
+  error?: string
 }
 
 export interface ConfirmResult {
@@ -203,6 +206,11 @@ export interface ConfirmResult {
   archived: ConfirmItem[]
   not_found: ConfirmItem[]
   skipped: ConfirmItem[]
+  /** 275-REVIEW B-WR-04: families that failed for a non-hold reason — nothing of them was
+   *  committed and they are still waiting. Optional: an older server omits it. */
+  failed?: ConfirmItem[]
+  /** Storage paths of committed deletes whose stored file could not be removed. */
+  bytes_not_removed?: string[]
 }
 
 export interface UnarchiveResult {

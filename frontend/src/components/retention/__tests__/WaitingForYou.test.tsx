@@ -170,6 +170,52 @@ describe("DeleteBatchCard — type the count (D-03 / T-275-31)", () => {
     )
   })
 
+  it("275-REVIEW F-WR-03: the banner accounts for EVERY approved document — changed, gone, failed, and unremoved files", async () => {
+    m.confirmBatch.mockResolvedValue({
+      ...EMPTY_RESULT,
+      deleted: [{ document_id: "c1", name: "Brightwater Office Lease" }],
+      did_not_delete: [{ document_id: "c2", name: "Kessler Services Agreement", reason: "changed", held_since: null }],
+      not_found: [{ document_id: "c3" }], // the server sends no name here: the card's row names it
+      failed: [{ document_id: "c4", name: "Nordic Freight Contract", decision: "delete", error: "PostgresError" }],
+      bytes_not_removed: ["org/u/brightwater.pdf"],
+    })
+    render(<WaitingForYou />)
+    const card = await deleteCard()
+    await userEvent.type(within(card).getByRole("textbox", { name: "Type 3 to confirm" }), "3")
+    await userEvent.click(within(card).getByRole("button", { name: "Delete 3 documents permanently" }))
+    const banner = await screen.findByRole("status")
+    expect(within(banner).getByText("Done")).toBeInTheDocument()
+    expect(banner).toHaveTextContent("Deleted 1 document.")
+    expect(banner).toHaveTextContent("Not done, changed since the sweep: Kessler Services Agreement.")
+    expect(banner).toHaveTextContent("Not done, no longer waiting: Olsen Consulting SOW.")
+    expect(banner).toHaveTextContent(
+      "Couldn't finish, so these are still waiting: Nordic Freight Contract. Nothing was changed for them.",
+    )
+    expect(banner).toHaveTextContent("1 stored file of the deleted documents could not be removed.")
+  })
+
+  it("275-REVIEW F-WR-03: when every approved action was dropped there is no green Done and no 'Deleted 0'", async () => {
+    m.confirmBatch.mockResolvedValue({
+      ...EMPTY_RESULT,
+      did_not_delete: [
+        { document_id: "c1", name: "Brightwater Office Lease", reason: "changed", held_since: null },
+        { document_id: "c2", name: "Kessler Services Agreement", reason: "changed", held_since: null },
+        { document_id: "c3", name: "Olsen Consulting SOW", reason: "held", held_since: "2026-10-12T10:42:00Z" },
+      ],
+    })
+    render(<WaitingForYou />)
+    const card = await deleteCard()
+    await userEvent.type(within(card).getByRole("textbox", { name: "Type 3 to confirm" }), "3")
+    await userEvent.click(within(card).getByRole("button", { name: "Delete 3 documents permanently" }))
+    const banner = await screen.findByRole("status")
+    expect(within(banner).queryByText("Done")).toBeNull()
+    expect(within(banner).getByText("Nothing done")).toBeInTheDocument()
+    expect(banner).not.toHaveTextContent("Deleted 0")
+    expect(banner.className).not.toContain("bg-success")
+    expect(banner).toHaveTextContent("Not done, changed since the sweep: Brightwater Office Lease, Kessler Services Agreement.")
+    expect(banner).toHaveTextContent("Kept 1: Olsen Consulting SOW went on legal hold after the sweep, so it was dropped at confirm.")
+  })
+
   it("every row unticked → 'Keep 3 documents' (outline), no count needed; keeps all", async () => {
     m.confirmBatch.mockResolvedValue({ ...EMPTY_RESULT, kept: [{ document_id: "c1" }, { document_id: "c2" }, { document_id: "c3" }] })
     render(<WaitingForYou />)
