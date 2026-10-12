@@ -89,6 +89,8 @@ export function receiptSentence(r: HistoryRow): string {
         undecidable: num(counts.undecidable),
       })
     }
+    case "delete_refused":
+      return fillCopy(C.specTemplates.historyDeleteRefused, { doc })
     case "sweep_incomplete":
       return fillCopy(C.specTemplates.postureNotFinished, { "date time": formatRetentionDateTime(r.created_at) })
     default:

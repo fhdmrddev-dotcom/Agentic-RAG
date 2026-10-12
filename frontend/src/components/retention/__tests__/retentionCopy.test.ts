@@ -79,7 +79,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       for (const seg of segs) expect(uiSpecSource, `${key}: "${seg}"`).toContain(seg)
       checked++
     }
-    expect(checked).toBe(35)
+    expect(checked).toBe(36) // 275-05: +historyDeleteRefused (G-4 FAIL-1)
   })
 
   it("every DECISION template's literal segments sit verbatim in 275-CONTEXT.md (D-34)", () => {

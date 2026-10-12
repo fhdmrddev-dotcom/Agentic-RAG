@@ -318,6 +318,7 @@ const specTemplates = {
   historyHoldExtended: "Added {docs} and {folders} to legal hold **{matter}**",
   historyHoldReleased: "Released legal hold **{matter}** ({N} document(s) no longer held)",
   historyPolicyRemoved: "Removed policy **{name}**",
+  historyDeleteRefused: "Refused to delete **{doc}**: on legal hold",
   countDocuments: "{N} document(s)",
   countFolders: "{N} folder(s)",
 } as const
