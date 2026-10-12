@@ -434,7 +434,9 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
         ) : activeTab === "settings" ? (
           <OrgSettingsTab orgName={orgName} />
         ) : activeTab === "retention" ? (
-          <RetentionTab onRecorded={pulse} />
+          // 275-REVIEW F-WR-10: keyed on the active org, so a switch remounts it (fresh reads)
+          // instead of showing the previous org's posture/policies/holds over writes sent as the new one.
+          <RetentionTab key={activeOrgId ?? "none"} onRecorded={pulse} />
         ) : activeTab === "sso" ? (
           // Phase 168 (D-168-01 / SSO-01): the live SSO home. The shell owns the fetch +
           // create/remove; SsoTab is a pure leaf. canManageSso is the render-only gate

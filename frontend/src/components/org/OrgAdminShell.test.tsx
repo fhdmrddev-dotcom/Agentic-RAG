@@ -55,15 +55,23 @@ vi.mock("@/providers/OrgProvider", () => ({
 
 // Phase 275-04: the Retention leaf owns its own fetches (its suites live under
 // components/retention); here it is a stub that proves the shell mounts it and wires the pulse.
-vi.mock("@/components/retention/RetentionTab", () => ({
-  RetentionTab: ({ onRecorded }: { onRecorded?: () => void }) => (
-    <div data-testid="retention-tab-stub">
-      <button type="button" onClick={() => onRecorded?.()}>
-        record a retention write
-      </button>
-    </div>
-  ),
-}))
+// 275-REVIEW F-WR-10: the stub numbers each MOUNT, so an org switch can be seen to remount it.
+const retentionMounts = vi.hoisted(() => ({ n: 0 }))
+vi.mock("@/components/retention/RetentionTab", async () => {
+  const React = await vi.importActual<typeof import("react")>("react")
+  return {
+    RetentionTab: ({ onRecorded }: { onRecorded?: () => void }) => {
+      const [mount] = React.useState(() => ++retentionMounts.n)
+      return (
+        <div data-testid="retention-tab-stub" data-mount={mount}>
+          <button type="button" onClick={() => onRecorded?.()}>
+            record a retention write
+          </button>
+        </div>
+      )
+    },
+  }
+})
 
 const MEMBERS_PAGE: OrgMembersPage = {
   members: [
@@ -237,6 +245,20 @@ describe("OrgAdminShell — Retention is LIVE (275-04 / D-01; replaces the retir
     expect(screen.queryByText(/not built yet — coming soon/i)).toBeNull()
     expect(screen.queryByText(/Data-retention controls are/)).toBeNull()
     expect(tab).toHaveAttribute("aria-selected", "true")
+  })
+
+  it("275-REVIEW F-WR-10: an org switch REMOUNTS the Retention tab, so it never shows the previous org's data", async () => {
+    const view = renderShell()
+    await userEvent.click(screen.getByRole("tab", { name: "Retention" }))
+    const first = (await screen.findByTestId("retention-tab-stub")).getAttribute("data-mount")
+    mockOrg({ activeOrgId: "o2", orgs: [{ org_id: "o2", name: "Beta GmbH", role: "org-admin" }] })
+    view.rerender(
+      <TechnicalNamesProvider>
+        <OrgAdminShell onBack={vi.fn()} />
+      </TechnicalNamesProvider>,
+    )
+    const second = screen.getByTestId("retention-tab-stub").getAttribute("data-mount")
+    expect(Number(second)).toBeGreaterThan(Number(first))
   })
 
   it("a recorded retention write pulses the band's marker for 1.6 s (062-A), then it settles", async () => {
