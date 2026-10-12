@@ -168,6 +168,8 @@ const contract = {
   confirmFailed:
     "Couldn't confirm the batch. Some documents may already be deleted. History shows exactly which. Reload this list before trying again.",
   decisionsFailed: "Couldn't record your decisions. Nothing was archived or kept. Reload this list before trying again.",
+  /** 275-REVIEW F-WR-01 (UI-SPEC §Review fix pass) — follows a server refusal made before any write. */
+  confirmRefusedNothing: "Nothing was deleted, archived or kept.",
   reload: "Reload",
   decision: "Decision",
   decisionKeep: "Keep",

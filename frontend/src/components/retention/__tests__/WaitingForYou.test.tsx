@@ -15,6 +15,7 @@ import { render, screen, waitFor, within, fireEvent } from "@testing-library/rea
 import userEvent from "@testing-library/user-event"
 
 import type { ConfirmResult, QueueBatch, QueueList } from "@/lib/api/retention"
+import { ApiRefusal } from "@/lib/api/refusal"
 
 const m = vi.hoisted(() => ({ listQueue: vi.fn(), confirmBatch: vi.fn() }))
 
@@ -200,6 +201,34 @@ describe("DeleteBatchCard — type the count (D-03 / T-275-31)", () => {
     await waitFor(() => expect(m.listQueue).toHaveBeenCalledTimes(2))
   })
 
+  it.each([
+    [422, "Type 3 to confirm.", "Type 3 to confirm. Nothing was deleted, archived or kept."],
+    [404, "That policy no longer exists.", "That policy no longer exists. Nothing was deleted, archived or kept."],
+    [
+      503,
+      "Couldn't read every document in this organization, so nothing can be decided right now. Nothing was changed.",
+      "Couldn't read every document in this organization, so nothing can be decided right now. Nothing was changed.",
+    ],
+  ])("275-REVIEW F-WR-01: a pre-write refusal (%i) renders the server's sentence — never 'may already be deleted'", async (status, sentence, shown) => {
+    m.confirmBatch.mockRejectedValue(new ApiRefusal(status, "", sentence))
+    render(<WaitingForYou />)
+    const card = await deleteCard()
+    await userEvent.type(within(card).getByRole("textbox", { name: "Type 3 to confirm" }), "3")
+    await userEvent.click(within(card).getByRole("button", { name: "Delete 3 documents permanently" }))
+    const alert = await within(card).findByRole("alert")
+    expect(alert.textContent).toBe(`${shown}Reload`)
+    expect(alert).not.toHaveTextContent("Some documents may already be deleted")
+  })
+
+  it("275-REVIEW F-WR-01: a 5xx where the server said nothing keeps the honest partial-work copy", async () => {
+    m.confirmBatch.mockRejectedValue(new ApiRefusal(500, "", "Couldn't confirm the batch."))
+    render(<WaitingForYou />)
+    const card = await deleteCard()
+    await userEvent.type(within(card).getByRole("textbox", { name: "Type 3 to confirm" }), "3")
+    await userEvent.click(within(card).getByRole("button", { name: "Delete 3 documents permanently" }))
+    expect(await within(card).findByRole("alert")).toHaveTextContent("Some documents may already be deleted.")
+  })
+
   it("keep failure keeps the rows unticked and says nothing was kept", async () => {
     m.confirmBatch.mockRejectedValue(new Error("x"))
     render(<WaitingForYou />)
@@ -320,6 +349,19 @@ describe("ReviewBatchCard — a person decides each row (D-10)", () => {
         delete_ids: ["h1"], keep_ids: ["h3"], archive_ids: [], typed_count: 1,
       }),
     )
+  })
+
+  it("275-REVIEW F-WR-01: a review refusal with deletes chosen renders the server's sentence, not 'may already be deleted'", async () => {
+    m.confirmBatch.mockRejectedValue(new ApiRefusal(422, "", "A document can have only one decision."))
+    render(<WaitingForYou />)
+    const card = await reviewCard()
+    const lind = within(card).getByRole("radiogroup", { name: "Personnel file — E. Lindqvist" })
+    await userEvent.click(within(lind).getByRole("radio", { name: "Delete" }))
+    fireEvent.change(within(card).getByRole("textbox", { name: "Type 1 to confirm" }), { target: { value: "1" } })
+    await userEvent.click(within(card).getByRole("button", { name: "Apply decisions and delete 1 permanently" }))
+    const alert = await within(card).findByRole("alert")
+    expect(alert).toHaveTextContent("A document can have only one decision. Nothing was deleted, archived or kept.")
+    expect(alert).not.toHaveTextContent("may already be deleted")
   })
 
   it("a decisions-only failure keeps the choices and uses the decisions copy", async () => {

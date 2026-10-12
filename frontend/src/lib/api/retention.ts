@@ -404,8 +404,11 @@ export function listQueue(): Promise<QueueList> {
   return call("/queue", { method: "GET" }, "Couldn't load what is waiting.")
 }
 
+/** The sentence a confirm refusal carries when the server sent none of its own (275-REVIEW F-WR-01). */
+export const CONFIRM_FALLBACK = "Couldn't confirm the batch."
+
 export function confirmBatch(policyId: string, body: ConfirmBatchBody): Promise<ConfirmResult> {
-  return call(`/queue/${encodeURIComponent(policyId)}/confirm`, post(body), "Couldn't confirm the batch.")
+  return call(`/queue/${encodeURIComponent(policyId)}/confirm`, post(body), CONFIRM_FALLBACK)
 }
 
 export function unarchiveDocument(documentId: string): Promise<UnarchiveResult> {

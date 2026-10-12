@@ -9,7 +9,15 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { confirmBatch, type ConfirmResult, type QueueBatch } from "@/lib/api/retention"
-import { BatchFailure, BatchHeader, BatchNotes, BatchResultBanner, BatchTable, TypeTheCount } from "./DeleteBatchCard"
+import {
+  BatchFailure,
+  BatchHeader,
+  BatchNotes,
+  BatchResultBanner,
+  BatchTable,
+  TypeTheCount,
+  confirmFailureMessage,
+} from "./DeleteBatchCard"
 import { RETENTION_COPY, fillCopy } from "./retentionCopy"
 
 const C = RETENTION_COPY
@@ -56,9 +64,10 @@ export function ReviewBatchCard({
       })
       setResult(res)
       onRecorded?.()
-    } catch {
-      // With deletes, some may already have run: the honest confirm-failure copy.
-      setFailure(c > 0 ? C.contract.confirmFailed : C.contract.decisionsFailed)
+    } catch (err) {
+      // With deletes, some may already have run: the honest confirm-failure copy — unless the
+      // server refused before writing anything (275-REVIEW F-WR-01), when its sentence is shown.
+      setFailure(confirmFailureMessage(err, c === 0))
     } finally {
       setBusy(false)
     }

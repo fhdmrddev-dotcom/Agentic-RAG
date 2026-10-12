@@ -17,7 +17,9 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { ApiRefusal } from "@/lib/api/refusal"
 import {
+  CONFIRM_FALLBACK,
   confirmBatch,
   type ConfirmBatchBody,
   type ConfirmResult,
@@ -204,6 +206,28 @@ export function BatchResultBanner({ result }: { result: ConfirmResult }) {
   )
 }
 
+/**
+ * 275-REVIEW F-WR-01 — what a failed confirm may honestly say.
+ *
+ * The server refuses BEFORE any write with a 4xx (`Type 4 to confirm.`, `A document can have only
+ * one decision.`, `Nothing was chosen.`, `That policy no longer exists.`) or a 503 (the org read was
+ * incomplete; "…Nothing was changed."). Those render the server's sentence plus the fact that
+ * nothing was written. Only a failure where the server said nothing it chose (network, 5xx) keeps
+ * the contract copy — "Some documents may already be deleted" — because partial work is possible.
+ */
+export function confirmFailureMessage(err: unknown, keepOnly: boolean): string {
+  if (err instanceof ApiRefusal) {
+    const preWrite =
+      (err.status >= 400 && err.status < 500) || (err.status === 503 && err.message !== CONFIRM_FALLBACK)
+    if (preWrite) {
+      return /Nothing was (changed|deleted)/.test(err.message)
+        ? err.message
+        : `${err.message} ${C.contract.confirmRefusedNothing}`
+    }
+  }
+  return keepOnly ? C.contract.decisionsFailed : C.contract.confirmFailed
+}
+
 /** An inline failure + Reload (the rows stay as the person left them). */
 export function BatchFailure({ message, onReload }: { message: string; onReload: () => void }) {
   return (
@@ -256,8 +280,8 @@ export function DeleteBatchCard({
       const res = await confirmBatch(batch.policy_id, body)
       setResult(res)
       onRecorded?.()
-    } catch {
-      setFailure(keepOnly ? C.contract.decisionsFailed : C.contract.confirmFailed)
+    } catch (err) {
+      setFailure(confirmFailureMessage(err, keepOnly))
     } finally {
       setBusy(false)
     }
