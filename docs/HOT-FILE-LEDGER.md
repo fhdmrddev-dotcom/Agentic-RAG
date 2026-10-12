@@ -11502,6 +11502,18 @@ cells rot within days.
 | [`frontend/src/lib/api/admin.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiadmints) | 7 / 4 / 1099 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 262 |
 | [`frontend/src/components/admin/CapabilityGrid.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadmincapabilitygridtsx) | 3 / 3 / 264 | ⚠ **FIRES** | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 |
 | [`frontend/src/components/admin/ModelAdvancedCapabilities.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodeladvancedcapabilitiestsx) | 1 / 1 / 290 | no (1 phase) | young (created 262) |
+| [`backend/app/services/tools/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicestools__init__py) | 0 / 0 / 0 | no (young) | young (created 278-03). Package marker: docstring ONLY. ⛔ no imports, no re-exports, no side effects, so import order can never matter |
+| [`backend/app/services/tools/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsbasepy) | 0 / 0 / 0 | no (young) | young (created 278-03). `ToolContext` + `ToolResult` moved verbatim (AST-pinned). ⛔ leaf: stdlib + TYPE_CHECKING only; re-exported from tool_dispatcher.py (D-04) |
+| [`backend/app/services/tools/documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsdocumentspy) | 0 / 0 / 0 | no (young) | young (created 278-03). KB browse/query/relationships/web_search/analyze + folder and retention walls. ⛔ walls AST-pinned; no module-level tool_dispatcher import |
+| [`backend/app/services/tools/skills.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsskillspy) | 0 / 0 / 0 | no (young) | young (created 278-03). load/save/read_skill_file/attach + `_resolve_skill_visibility_or` (SEED-125 org gate). ⛔ one resolver; patch where used |
+| [`backend/app/services/tools/sandbox.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolssandboxpy) | 0 / 0 / 0 | no (young) | young (created 278-03). execute_code, bounded sandbox, hydration, autoheal. ⛔ largest family; no module-level tool_dispatcher import |
+| [`backend/app/services/tools/runtime_gap.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsruntime_gappy) | 0 / 0 / 0 | no (young) | young (created 278-03). Phase-142 pure classifier, allowlists, `SCRIPT_EXTS`, repeat-guard result. ⛔ no I/O; keeps `import re as _re_filename` |
+| [`backend/app/services/tools/render_template.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsrender_templatepy) | 0 / 0 / 0 | no (young) | young (created 278-03). `_RENDER_DRIVER_SRC` + filename guard + handler. ⛔ SandboxedEnvironment(autoescape=True); emitters read the handler via tool_dispatcher |
+| [`backend/app/services/tools/workspace.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsworkspacepy) | 0 / 0 / 0 | no (young) | young (created 278-03). The 5 workspace handlers + `_normalize_optional*`. ⛔ moved verbatim (AST-pinned) |
+| [`backend/app/services/tools/memory.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsmemorypy) | 0 / 0 / 0 | no (young) | young (created 278-03). remember, recall, query_tables. ⛔ moved verbatim (AST-pinned) |
+| [`backend/app/services/tools/agent_control.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsagent_controlpy) | 0 / 0 / 0 | no (young) | young (created 278-03). task, write_todos, ask_user + sub-agent sets. ⛔ task_service stays a LAZY import (it imports tool_dispatcher) |
+| [`backend/app/services/tools/connector.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsconnectorpy) | 0 / 0 / 0 | no (young) | young (created 278-03). Connector chat tool + approval timeout. ⛔ trifecta/approval/audit AST-pinned; dispatch_tool resolves it as a tool_dispatcher global |
+| [`backend/app/services/document_vocabulary.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_vocabularypy) | 0 / 0 / 0 | no (young) | young (created 278-02). DEBT-09 ONE home: 3 timestamptz date words → column + the list-field set. ⛔ leaf, no app imports; a copy elsewhere fails the 278 fence |
 
 
 
@@ -19820,3 +19832,55 @@ Crossed the G-5 threshold on 275-02's touch (271, 276, 275).
 **`5 / 2 / 465`.** **275-03**: `retention` tag in the Documents group (one line). ⛔ `scripts/` is gate-exempt
 
 No row existed. 275-03 edited it under Rule 3 (`[ungrouped-tag] retention` refused to build). Row added at 275-05 so the next touch is visible.
+
+## Phase 278 rows — added AT PLANNING (2026-10-13)
+
+The G-5 gate (`node scripts/check-hot-file-ledger.cjs 278`, over every file the four 278 plans name) needs a row for every module this phase CREATES, because the gate has no existence check (precedent: 273's planning commit `f76473497`). Twelve modules are new: the eleven files of the `backend/app/services/tools/` package (SEAM-03, the `tool_dispatcher.py` registry/handler split, 278-03) and `backend/app/services/document_vocabulary.py` (DEBT-09, 278-02). Every row reads `0 / 0 / 0` at planning; 278-04 re-derives the triples on the merged tree with the CLAUDE.md recipe. The existing files 278 modifies (`tool_dispatcher.py`, `retrieval_scope.py`, `document_search_service.py`, `view_filter_compiler.py`, `retrieval_service.py`) already have rows; their cells are written LAST, in 278-04, so no two wave-1 worktrees edit this file.
+
+### `backend/app/services/tools/__init__.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. The package marker for the tool handler families. ⛔ docstring ONLY: an import here would make the registry's load order depend on package import order, which D-05 (Extension Contract) forbids.
+
+### `backend/app/services/tools/base.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. `ToolContext` and `ToolResult` (and the `TYPE_CHECKING` block) moved verbatim from `tool_dispatcher.py`, AST-pinned by `test_278_pure_move.py`. ⛔ a leaf: stdlib and `TYPE_CHECKING` imports only, `from __future__ import annotations` mandatory (the field annotations name TYPE_CHECKING-only types). Re-exported from `tool_dispatcher.py` so every existing importer keeps working (D-04).
+
+### `backend/app/services/tools/documents.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. ls, tree, grep, glob, read_document, fetch_document_file, query_documents, query_documents_by_view, get_related_documents, web_search, analyze_document, plus the 262 folder wall, the 275 retention wall and the lazy view-resolver sentinels (`_ensure_resolver` binds THIS module's globals). ⛔ every wall is AST-pinned; no module-level import of `app.services.tool_dispatcher`; `document_view_resolver` stays a lazy import.
+
+### `backend/app/services/tools/skills.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. load_skill, save_skill, read_skill_file, attach_skill_file and `_resolve_skill_visibility_or` (the SEED-125 org gate, also called by the sandbox family). ⛔ the resolver has ONE home; the sandbox family imports it by name, so a test patches it where it is USED.
+
+### `backend/app/services/tools/sandbox.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. execute_code, the bounded sandbox runner, 244 attachment hydration and the Phase-142 autoheal. The largest family (about 1,185 lines), so the next phase that touches it measures it first. ⛔ no module-level import of `app.services.tool_dispatcher`; `app.api.threads.drain_step` stays a lazy import.
+
+### `backend/app/services/tools/runtime_gap.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. The Phase-142 pure runtime-gap classifier, its allowlists and messages, `SCRIPT_EXTS` (re-exported from `tool_dispatcher.py` for `app/api/skills.py`) and the repeat-guard result builder. ⛔ no I/O; keeps the `import re as _re_filename` alias the moved regexes reference.
+
+### `backend/app/services/tools/render_template.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. `_RENDER_DRIVER_SRC`, the output-filename guard and `_handle_render_template`. ⛔ the driver must construct `SandboxedEnvironment(autoescape=True)` (`test_190_ssti_fence.py`); `harness/emitters.py` reads the handler through `tool_dispatcher` at call time, so tests patch it THERE, not here.
+
+### `backend/app/services/tools/workspace.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. The five workspace handlers and `_normalize_optional` / `_normalize_optional_int` (also imported by the documents family). ⛔ moved verbatim, AST-pinned.
+
+### `backend/app/services/tools/memory.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. remember, recall, query_tables. ⛔ moved verbatim, AST-pinned.
+
+### `backend/app/services/tools/agent_control.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. task, write_todos, ask_user and the sub-agent read-only / excluded sets. ⛔ `task_service` stays a LAZY import inside `_handle_task`, because it imports `tool_dispatcher` at module level.
+
+### `backend/app/services/tools/connector.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. `_handle_connector_chat_tool` and `_APPROVAL_TIMEOUT_SECONDS`. ⛔ the trifecta, approval and audit writes are AST-pinned; `dispatch_tool` resolves the handler as a `tool_dispatcher` module global, so `tool_dispatcher.py` imports it by name.
+
+### `backend/app/services/document_vocabulary.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-02. DEBT-09's ONE home of the document-filter vocabulary: `TIMESTAMP_DATE_COLUMNS` (added, source_created, source_modified → their timestamptz columns) and `LIST_FIELD_NAMES` (`("topics",)`), imported by `retrieval_scope.py`, `document_search_service.py` and `view_filter_compiler.py`. ⛔ a leaf with no app imports; a literal copy anywhere else in `backend/app` fails `test_278_vocabulary_one_home.py`. `retrieval_scope.py` keeps `date → date_typed` as a named extension of the imported map (D-12).

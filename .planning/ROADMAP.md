@@ -167,7 +167,13 @@ Plans:
   5. A live chat turn that uses two tools (`search_documents` + `execute_code`) completes on one native provider after the split, with the same audit rows (`search.query` carrying `run_id`) as before (SEAM-03).
 
 **How we'd know this failed**: the registry gains or loses a tool, or a schema string changes by a byte; a moved handler changes behaviour and a test edited in the same commit hides it; the "one home" is a fourth copy, with the old three left in place; the divergence test passes against a planted divergence; SEAM-02 is ticked by re-reading the 272 record instead of measuring the file; the split is done but the registry is still built by mutation at import time, so its order depends on import order.
-**Plans**: TBD (target 3-4: registry pin + split · retrieval seam measure/close · vocabulary home + divergence fence · merged-tree gates + live smoke)
+**Plans**: 4 plans in 3 waves
+
+Plans:
+- [ ] 278-01-PLAN.md — wave 1: pins first — base failing set, registry pin (names/order/bindings/static literal/schema sha256), AST pure-move pin (xfail strict), D-07 retarget-only checker, ten fences anchored/tupled (SEAM-03)
+- [ ] 278-02-PLAN.md — wave 1 (TDD): one home for the filter vocabulary (`document_vocabulary.py`), three import swaps with base-pinned values, divergence fence driven RED (DEBT-09)
+- [ ] 278-03-PLAN.md — wave 2: the split — `tool_dispatcher.py` → registry + `services/tools/` families in ONE retarget-only commit, extension-contract guards extended, full unit gate set-diffed (SEAM-03)
+- [ ] 278-04-PLAN.md — wave 3 (operator checkpoint): SEAM-02 measured + stale records corrected beside originals, merged-tree gates, Anthropic two-tool live smoke, ledger cells written last, SEED-224 → partially-answered (SEAM-02, SEAM-03, DEBT-09)
 **Flags**: ⛔ **G-5 extraction phase, behaviour-preserving** — pure moves verified AST-identical against PHASE_BASE where possible, with **TDD pin-first** (pins land RED-proof before the move). `tool_dispatcher.py` FIRES (98/43/5068), with the split deferred twice (OV-273-02). The Extension Contract applies: the registry stays closed and statically declared, **never dynamically registered**. `search_documents_tool.py` (1,163 lines) sits beside the split and must not gain logic. SC#10: a pure move whose registry pin is identical does not change provider behaviour, so one live multi-tool row is the proportionate check; discuss records that decision. Seeds: `SEED-224` (extraction half only; the five-tab redesign stays out of scope).
 
 #### Phase 279: The Expert Scope Seam
