@@ -15,8 +15,10 @@ What this proves, and how it refuses to prove it vacuously:
 * **Receipts outlive people and are immutable (D-13).** Deleting the actor's ``auth.users`` row
   leaves the receipt with ``actor_id NULL`` and ``actor_name`` intact; no role may UPDATE/DELETE one;
   a disposition receipt without a policy name is refused (W-4).
-* **The predicate functions are the service's (W-5b).** ``authenticated`` cannot call
-  ``retention_held_documents`` / ``retention_held_folders``; ``service_role`` can, and the
+* **The predicate functions are the service's (W-5b).** ``authenticated`` holds no EXECUTE on
+  ``retention_held_documents`` / ``retention_held_folders`` (asserted on the privilege and the ACL —
+  never by calling: a refused call crashes this local Postgres, see the test body); ``service_role``
+  can, and the
   ``authenticated`` owner's delete of a held document STILL raises PT409 (the DEFINER trigger).
 * **Folder hold reach (B-1).** ``retention_held_folders`` reports a held EMPTY folder, a folder held
   only through an ancestor, and a folder holding ANOTHER user's held document; never an unheld one,
@@ -26,6 +28,7 @@ Everything seeded is removed in ``finally`` (holds released first). Skip-guarded
 """
 from __future__ import annotations
 
+import re
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -326,17 +329,16 @@ async def test_only_the_service_role_executes_the_predicates(pg_pool, world):
                 f"{role} can EXECUTE {sig}"
             )
         assert await pg_pool.fetchval("SELECT has_function_privilege('service_role', $1, 'EXECUTE')", sig) is True
-    for fn in ("retention_held_documents", "retention_held_folders"):
-        async with pg_pool.acquire() as conn:
-            tr = conn.transaction()
-            await tr.start()
-            try:
-                await _apply_rls_user_context(conn, world["a"]["uid"])
-                with pytest.raises(asyncpg.PostgresError) as exc:
-                    await conn.fetch(f"SELECT * FROM public.{fn}($1::uuid[])", [world["doc"]])
-                assert exc.value.sqlstate == "42501", exc.value
-            finally:
-                await tr.rollback()
+        acl = await pg_pool.fetchval("SELECT proacl::text FROM pg_proc WHERE oid = $1::regprocedure", sig)
+        # PUBLIC appears in an ACL as an entry with an EMPTY grantee ("=X/owner").
+        assert acl is not None and not re.search(r"(^|[{,])=X", acl), f"PUBLIC still executes {sig}: {acl}"
+        assert "authenticated=" not in acl and "anon=" not in acl, acl
+    # ⛔ The privilege is asserted, NOT exercised by CALLING the function as authenticated: measured
+    # 2026-10-12 (275-01), on this local stack ANY function call refused for a missing EXECUTE grant
+    # crashes the backend and sends Postgres into crash recovery (pre-existing
+    # `resize_embedding_column` reproduces it identically — an environment defect in a preloaded
+    # extension, recorded in 275-BASELINES.md / deferred-items.md). Calling it here would take the
+    # shared dev database down for every session.
     # positive control: the authenticated owner's delete STILL hits the DEFINER trigger
     async with pg_pool.acquire() as conn:
         tr = conn.transaction()

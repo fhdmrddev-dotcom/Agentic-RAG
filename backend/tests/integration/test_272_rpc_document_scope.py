@@ -48,9 +48,13 @@ VECTOR_REGPROC = (
 )
 KEYWORD_REGPROC = "public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[])"
 
-# The EXACT branch's statement, verbatim from migration 200 (whitespace-normalised before the
+# The EXACT branch's statement, verbatim from the LIVE definition (whitespace-normalised before the
 # containment check). If the migration body changes, this constant must change with it — the
 # containment assertion below fails otherwise, so the EXPLAIN can never test a stale copy.
+# SEED-177 — retired ON PURPOSE by 275-01: migration 205 moved the source-state clause
+# `(d.source_state IS NULL OR d.source_state != 'source_disconnected')` into the generated column
+# `documents.retrievable` (D-36, one home for archived + every source state), so the mirror now
+# reads `AND d.retrievable`. Everything else in the statement is migration 200's, unchanged.
 EXACT_BRANCH_SQL = """
     SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
            1 - (dc.embedding OPERATOR(public.<=>) query_embedding) AS similarity
@@ -63,7 +67,7 @@ EXACT_BRANCH_SQL = """
         OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
         OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility)
       )
-      AND (d.source_state IS NULL OR d.source_state != 'source_disconnected')
+      AND d.retrievable
       AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
       AND d.is_latest = true
       AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
@@ -285,7 +289,7 @@ async def test_the_exact_branch_mirror_is_the_migration_body(pg_pool):
     )
     assert _norm(EXACT_BRANCH_SQL) in _norm(body), (
         "the EXACT branch in match_document_chunks no longer matches this test's mirror — "
-        "update EXACT_BRANCH_SQL from migration 200 before trusting the EXPLAIN below"
+        "update EXACT_BRANCH_SQL from the latest migration (205) before trusting the EXPLAIN below"
     )
 
 

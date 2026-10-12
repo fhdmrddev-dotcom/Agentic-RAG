@@ -139,7 +139,8 @@ async def test_the_retrievable_column_is_the_one_predicate(pg_pool, world):
         got = await pg_pool.fetchval("SELECT retrievable FROM public.documents WHERE id = $1", doc)
         assert got is want, f"source_state={state!r}: retrievable={got!r}"
     gen = await pg_pool.fetchval(
-        "SELECT attgenerated FROM pg_attribute WHERE attrelid = 'public.documents'::regclass AND attname = 'retrievable'"
+        "SELECT attgenerated::text FROM pg_attribute "
+        "WHERE attrelid = 'public.documents'::regclass AND attname = 'retrievable'"
     )
     assert gen == "s", "retrievable must be a STORED generated column"
 
@@ -217,8 +218,10 @@ async def test_text_that_could_switch_the_guc_is_refused_before_it_runs(pg_pool,
 
 
 async def test_ordinary_ampersand_text_is_not_refused(pg_pool, world):
-    rows = await _qud(pg_pool, world["a"]["uid"], "SELECT 'you&me' AS t")
-    assert rows == [{"t": "you&me"}]
+    # (alias `v`, not `t`: query_user_documents wraps the text as `… FROM (<q>) t`, and a column
+    # named `t` would shadow the row alias inside jsonb_agg(t).)
+    rows = await _qud(pg_pool, world["a"]["uid"], "SELECT 'you&me' AS v")
+    assert rows == [{"v": "you&me"}]
 
 
 # ── the plan pin and the ACL survived the redefinition ──────────────────────────────────────

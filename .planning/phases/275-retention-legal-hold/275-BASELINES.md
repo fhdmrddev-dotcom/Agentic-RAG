@@ -265,3 +265,173 @@ FAILED tests/integration/test_275_retrievable.py::test_both_rpcs_keep_the_plan_p
 FAILED tests/integration/test_275_retrievable.py::test_both_rpcs_keep_the_plan_pin_and_search_path[keyword_search_chunks]
 FAILED tests/integration/test_275_retrievable.py::test_query_user_documents_is_not_public
 ```
+
+
+## Task 2 — migrations 204 + 205 applied to the LOCAL database
+
+Applied by executing each file with asyncpg against `postgresql://postgres:postgres@127.0.0.1:54322/postgres`
+(equivalent to pasting it into the SQL editor; never `supabase db push` / `db reset`), local-DB lock held.
+Each file's commented VERIFY block was then executed. 205 was applied first, then 204 was RE-APPLIED on top
+(idempotency proof: both re-apply cleanly). Final output, verbatim:
+
+```
+APPLIED ../supabase/migrations/205_retrievable_predicate.sql
+        PASS  retrievable is a STORED generated column
+        PASS  exactly one match_document_chunks and one keyword_search_chunks
+        PASS  both RPCs read d.retrievable and never source_disconnected
+        PASS  both RPCs keep the plan pin and search_path
+        PASS  anon cannot EXECUTE either RPC or query_user_documents
+        PASS  authenticated can EXECUTE query_user_documents
+        PASS  query_user_documents switches the agent-read GUC and refuses set_config text
+        PASS  four RESTRICTIVE agent-read policies
+        PASS  anon cannot EXECUTE document_is_retrievable
+VERIFY: 9/9 PASS
+APPLIED ../supabase/migrations/204_retention_and_legal_hold.sql
+        PASS  RLS enabled on every new table
+        PASS  anon holds no privilege on any new table
+        PASS  authenticated cannot write retention_policies
+        PASS  authenticated cannot UPDATE/DELETE legal_holds
+        PASS  no role can UPDATE/DELETE retention_receipts
+        PASS  authenticated lacks TRUNCATE on documents/folders
+        PASS  every hold/guard trigger present
+        PASS  anon/authenticated cannot EXECUTE the hold predicates
+        PASS  service_role can EXECUTE the hold predicates
+        PASS  the audit CHECK carries folder.delete and the retention types
+        PASS  the receipts policy_name CHECK exists
+        PASS  documents carries the three archive columns
+VERIFY: 12/12 PASS
+```
+
+⚠ The first 205 apply printed `*** FAIL ***  both RPCs keep the plan pin and search_path`. The pin WAS
+present (`{"search_path=\"\"",plan_cache_mode=force_custom_plan}`); the VERIFY row itself compared the
+array's TEXT form with `like '%search_path=""%'`, which the escaped quotes never match. The row now tests
+array membership (`'search_path=""' = any (proconfig)`). The defect was in the check, not the schema.
+
+`bash scripts/regenerate-full-schema.sh` (no `--reset`) → 10451 lines; `grep -c retrievable` = 22,
+`grep -c retention_held_documents` = 8. The diff is additive apart from pg_dump re-sorting four existing
+triggers (each still present exactly once). `node scripts/check-schema-acl-parity.cjs` →
+`schema ACL parity OK — 323/323 mirrored` after mirroring 204/205's ACLs into
+`scripts/full-schema-supplement.sql` (see the SUMMARY deviation: pg_dump runs `--no-privileges`).
+
+### Plants driven against the shape fences (files restored md5-identical)
+
+```
+RED  PT409 -> P0001: 1 failed, 17 passed, 1 warning in 0.66s ['test_the_hold_refusal_maps_to_http_409']
+RED  a RAISE interpolates h.name: 1 failed, 17 passed, 1 warning in 0.59s ['test_no_raise_interpolates_a_matter_name']
+RED  drop the CYCLE clause: 1 failed, 17 passed, 1 warning in 0.75s ['test_every_recursive_walk_is_cycle_bounded']
+RED  drop one REVOKE FROM PUBLIC: 2 failed, 16 passed, 1 warning in 0.64s ['test_public_is_revoked_before_every_execute_grant', 'test_the_two_predicates_are_the_service_roles_only']
+RED  receipts actor ON DELETE CASCADE: 1 failed, 17 passed, 1 warning in 0.74s ['test_receipts_outlive_their_actor_and_their_document']
+RED  add an auto_delete column: 1 failed, 17 passed, 1 warning in 0.61s ['test_no_automatic_delete_exists_anywhere']
+RED  grant authenticated INSERT on policies: 1 failed, 17 passed, 1 warning in 0.87s ['test_policies_and_hold_updates_have_no_jwt_write_grant']
+RED  ANALYZE above the column add: 1 failed, 6 passed, 1 warning in 0.59s ['test_analyze_follows_the_column_add']
+RED  drop plan_cache_mode from keyword header: 1 failed, 6 passed, 1 warning in 0.51s ['test_both_rpcs_use_the_column_in_every_branch']
+RED  restore the source_disconnected clause in keyword: 1 failed, 6 passed, 1 warning in 0.57s ['test_both_rpcs_use_the_column_in_every_branch']
+RED  refusal after EXECUTE: 1 failed, 6 passed, 1 warning in 0.53s ['test_query_user_documents_refuses_guc_text_before_it_executes']
+restored md5-identical
+```
+
+### EXPLAIN of the vector body (RESEARCH Pitfall 1)
+
+**recall_bench** (100,000 chunks / 3,850 documents) — the 204/205 column DDL + `ANALYZE` applied inside a
+transaction that was ROLLED BACK (the research method; recall_bench carries no 204/205 afterwards):
+
+```
+recall_bench: 100000 chunks, 3850 documents
+hnsw: ['document_chunks_embedding_idx']
+archive columns present before the probe: 0
+Limit  (cost=2754.51..4255.89 rows=20 width=48) (actual rows=20 loops=1)
+  ->  Nested Loop Semi Join  (cost=2754.51..1005380.39 rows=13356 width=48) (actual rows=20 loops=1)
+        Join Filter: (dc.org_id = (current_user_org_ids()))
+        Rows Removed by Join Filter: 2
+        ->  Nested Loop  (cost=2754.51..768507.00 rows=26712 width=66) (actual rows=22 loops=1)
+              ->  Index Scan using document_chunks_embedding_idx on document_chunks dc  (cost=2754.23..739836.00 rows=33333 width=82) (actual rows=31 loops=1)
+              ->  Index Scan using documents_pkey on documents d  (cost=0.28..0.85 rows=1 width=54) (actual rows=1 loops=31)
+Planning Time: 0.588 ms
+Execution Time: 13.774 ms
+archive columns present after rollback: 0
+```
+
+**The local dev DB** (8,842 chunks), where the caller owns 8,256 of them (93%). A top-N heapsort is the
+correct plan for a caller who can read nearly the whole table, and the plan is IDENTICAL before and after
+the swap (`d.retrievable` vs migration 200's source_state clause), ~62-66 ms either way — no regression:
+
+```
+indexes: ['document_chunks_embedding_idx']
+=== mig 205: AND d.retrievable | enable_seqscan=on
+Limit  (cost=1830.40..1830.45 rows=20 width=48) (actual rows=20 loops=1)
+  ->  Sort  (cost=1830.40..1833.84 rows=1375 width=48) (actual rows=20 loops=1)
+        Sort Key: ((dc.embedding <=> '<vec>'))
+        Sort Method: top-N heapsort  Memory: 27kB
+        ->  Hash Join  (cost=54.11..1793.81 rows=1375 width=48) (actual rows=7275 loops=1)
+              Join Filter: ((dc.user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jw
+              ->  Hash Join  (cost=12.27..1734.12 rows=1440 width=66) (actual rows=8166 loops=1)
+                    ->  Seq Scan on document_chunks dc  (cost=0.00..1698.27 rows=2881 width=82) (actual rows=8256 loops=1)
+                    ->  Seq Scan on documents d  (cost=0.00..39.21 rows=211 width=56) (actual rows=211 loops=1)
+Planning Time: 0.978 ms
+Execution Time: 65.836 ms
+=== mig 205: AND d.retrievable | enable_seqscan=off
+Limit  (cost=1991.73..1991.78 rows=20 width=48) (actual rows=20 loops=1)
+  ->  Sort  (cost=1991.73..1995.17 rows=1375 width=48) (actual rows=20 loops=1)
+        Sort Key: ((dc.embedding <=> '<vec>'))
+        Sort Method: top-N heapsort  Memory: 27kB
+        ->  Hash Join  (cost=91.71..1955.14 rows=1375 width=48) (actual rows=7275 loops=1)
+              Join Filter: ((dc.user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jw
+              ->  Hash Join  (cost=12.55..1858.14 rows=1440 width=66) (actual rows=8166 loops=1)
+                    ->  Index Scan using idx_document_chunks_org_id on document_chunks dc  (cost=0.29..1822.30 rows=2881 width=82) (actual rows=8256 loops=1)
+                    ->  Bitmap Heap Scan on documents d  (cost=37.39..76.52 rows=211 width=56) (actual rows=211 loops=1)
+                          ->  Bitmap Index Scan on documents_latest_idx  (cost=0.00..37.34 rows=213 width=0) (actual rows=213 loops=1)
+Planning Time: 0.324 ms
+Execution Time: 62.160 ms
+=== mig 200 (before): source_state clause | enable_seqscan=on
+Limit  (cost=1830.95..1831.00 rows=20 width=48) (actual rows=20 loops=1)
+  ->  Sort  (cost=1830.95..1834.39 rows=1375 width=48) (actual rows=20 loops=1)
+        Sort Key: ((dc.embedding <=> '<vec>'))
+        Sort Method: top-N heapsort  Memory: 27kB
+        ->  Hash Join  (cost=54.67..1794.36 rows=1375 width=48) (actual rows=7399 loops=1)
+              Join Filter: ((dc.user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jw
+              ->  Hash Join  (cost=12.27..1734.12 rows=1440 width=66) (actual rows=8166 loops=1)
+                    ->  Seq Scan on document_chunks dc  (cost=0.00..1698.27 rows=2881 width=82) (actual rows=8256 loops=1)
+                    ->  Seq Scan on documents d  (cost=0.00..39.76 rows=211 width=56) (actual rows=213 loops=1)
+Planning Time: 0.324 ms
+Execution Time: 62.068 ms
+=== mig 200 (before): source_state clause | enable_seqscan=off
+Limit  (cost=1992.27..1992.32 rows=20 width=48) (actual rows=20 loops=1)
+  ->  Sort  (cost=1992.27..1995.70 rows=1375 width=48) (actual rows=20 loops=1)
+        Sort Key: ((dc.embedding <=> '<vec>'))
+        Sort Method: top-N heapsort  Memory: 27kB
+        ->  Hash Join  (cost=92.24..1955.68 rows=1375 width=48) (actual rows=7399 loops=1)
+              Join Filter: ((dc.user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jw
+              ->  Hash Join  (cost=12.55..1858.14 rows=1440 width=66) (actual rows=8166 loops=1)
+                    ->  Index Scan using idx_document_chunks_org_id on document_chunks dc  (cost=0.29..1822.30 rows=2881 width=82) (actual rows=8256 loops=1)
+                    ->  Bitmap Heap Scan on documents d  (cost=37.39..77.05 rows=211 width=56) (actual rows=213 loops=1)
+                          ->  Bitmap Index Scan on documents_latest_idx  (cost=0.00..37.34 rows=213 width=0) (actual rows=213 loops=1)
+Planning Time: 0.378 ms
+Execution Time: 64.732 ms
+```
+
+### ⛔ Environment finding (measured during Task 2): a refused function call CRASHES the local backend
+
+Calling ANY function as `authenticated` without EXECUTE kills the backend process and sends the local
+Postgres into crash recovery (`the database system is in recovery mode`; `pg_postmaster_start_time()`
+unchanged at 03:16:39, so it is a backend crash, not a restart). Reproduced three times, one probe per
+connection: `retention_held_documents`, `retention_folder_ancestors`, and the PRE-EXISTING
+`resize_embedding_column(integer)` (migration 177) all crash identically — so it is not 204/205 SQL.
+Preloaded: `pg_stat_statements, pgaudit, plpgsql, plpgsql_check, pg_cron, pg_net, pgsodium, auto_explain,
+pg_tle, plan_filter, supabase_vault` + session `supautils`. A table-privilege refusal (42501 on
+`retention_policies`) does NOT crash. Consequence for this suite: W-5b is asserted on the privilege and the
+ACL, never by calling the function. Rows leaked by the crashed run were removed by hand (3 test users,
+their 2 orgs, 1 hold). Recorded in `deferred-items.md`; whether production behaves the same is UNMEASURED
+(probing it would mean crashing a production backend — not done).
+
+### Task 2 verify
+
+`pytest tests/unit/test_275_migration_204_shape.py tests/unit/test_275_migration_205_shape.py
+tests/integration/test_275_hold_triggers.py tests/integration/test_275_policy_rls.py
+tests/integration/test_275_retrievable.py tests/integration/test_272_rpc_document_scope.py
+tests/integration/test_272_scope_rls.py tests/unit/test_272_review_fixes.py -q` → **163 passed**, no skips.
+
+Neighbouring live suites (110 drift guard, 163 documents/platform/asyncpg leak, 266, 267, 268 scope race,
+271 search + fence, kb, v3.4 isolation, 113, 116 tool leak, 119 leak) → `1 failed, 114 passed`. The one
+failure, `test_110_audit_drift_guard.py::test_valid_action_types_is_exactly_19`, is INHERITED: it pins 19
+types and has read `extra=['connector.call', 'connector.grant']` since Phase 223; `audit_service.py` was
+not yet modified when it ran.
