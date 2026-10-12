@@ -1,4 +1,4 @@
-# Requirements: Milestone v4.5 Find It, Show It
+| FIND-06 | Phase 271 | Complete (operator G-4 sign-off owed) || FIND-03 | Phase 271 | Complete (operator G-4 sign-off owed) || FIND-02 | Phase 271 | Complete (operator G-4 sign-off owed) || FIND-01 | Phase 271 | Complete (operator G-4 sign-off owed) |# Requirements: Milestone v4.5 Find It, Show It
 
 **Defined:** 2026-09-29 (operator intake; research skipped, seeds hold the analysis)
 **Core value:** Find documents by what they ARE, get the file back out, and let the agent answer with interactive artifacts.
@@ -9,12 +9,12 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 
 ### Find the document (FIND) - SEED-243, SEED-153, SEED-224
 
-- [ ] **FIND-01**: User can search for documents by type, owner, dates, custom fields, folder path, relationships and version state, and gets documents back rather than passages.
-- [ ] **FIND-02**: Document search is its own mode beside RAG search; the two never share a ranking.
-- [ ] **FIND-03**: Folder path, relationships and version lineage are filterable dimensions.
+- [x] **FIND-01**: User can search for documents by type, owner, dates, custom fields, folder path, relationships and version state, and gets documents back rather than passages.
+- [x] **FIND-02**: Document search is its own mode beside RAG search; the two never share a ranking.
+- [x] **FIND-03**: Folder path, relationships and version lineage are filterable dimensions.
 - [x] **FIND-04**: User can download the original file of any document they can access; the UI states latest vs viewed version; the URL is short-lived and minted only after an org authorization check.
 - [x] **FIND-05**: Document detail shows rich file facts: created, modified, pages, size, type, uploader.
-- [ ] **FIND-06**: The Classification page is renamed for what people do there and mounted inside the Library.
+- [x] **FIND-06**: The Classification page is renamed for what people do there and mounted inside the Library.
 - [x] **FIND-07**: The agent can pass date and dimension filters into retrieval, so "October revenue" cannot return March.
 
 ### Agent-authored artifacts (ART) - SEED-193 (SEED-194 rides the same rail later)
@@ -57,12 +57,12 @@ Postponed by operator: hardening/testing milestone, plugins/ecosystem work. Out 
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIND-01 | Phase 271 | Pending |
-| FIND-02 | Phase 271 | Pending |
-| FIND-03 | Phase 271 | Pending |
+| FIND-01 | Phase 271 | Complete (operator G-4 sign-off owed) |
+| FIND-02 | Phase 271 | Complete (operator G-4 sign-off owed) |
+| FIND-03 | Phase 271 | Complete (operator G-4 sign-off owed) |
 | FIND-04 | Phase 270 | Complete |
 | FIND-05 | Phase 270 | Complete |
-| FIND-06 | Phase 271 | Pending |
+| FIND-06 | Phase 271 | Complete (operator G-4 sign-off owed) |
 | FIND-07 | Phase 272 | Complete (SC#4 6/8 by decision) |
 | ART-01 | Phase 273 | Complete |
 | ART-02 | Phase 273 | Complete |
