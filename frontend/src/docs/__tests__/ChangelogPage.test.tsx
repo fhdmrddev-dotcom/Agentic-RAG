@@ -1,7 +1,8 @@
 // Phase 276-03 (DOCS-05, D-04, G4-3) — the changelog renders the REAL generated release list
-// (parseHistory over docs/history, not a fixture): newest first, v4.5 dated "—" and badged
-// "Not yet released", chapters filter via ?chapter=n, and no documentary column while the
-// episode slots are empty.
+// (parseHistory over docs/history, not a fixture): newest first, chapters filter via ?chapter=n,
+// and no documentary column while the episode slots are empty. ~~v4.5 dated "—" and badged
+// "Not yet released"~~ — v4.5 shipped 2026-10-12; the unreleased arm is now driven by flipping the
+// real v4.5 row to unreleased (`unreleasedData`), so the badge and callout stay pinned.
 import { fireEvent, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 import docsContent from "../../../../scripts/lib/docs-content.cjs"
@@ -14,6 +15,10 @@ const repoRoot = docsContent.findRepoRoot()
 const changelog = docsContent.parseHistory(`${repoRoot}/docs/history`) as Release[]
 const chapters = docsContent.parseChapters(`${repoRoot}/docs/history`) as Chapter[]
 const data = fixtureData([], {}, { changelog, chapters })
+const unreleasedData = fixtureData([], {}, {
+  changelog: changelog.map((r) => (r.version === "v4.5" ? { ...r, released: false, date: null } : r)),
+  chapters,
+})
 
 afterEach(() => {
   window.history.replaceState(null, "", "/")
@@ -42,8 +47,15 @@ describe("Changelog page (P5)", () => {
     expect(link.getAttribute("href")).toBe("/docs/changelog/build-story")
   })
 
-  it("dates v4.5 '—' and badges it Not yet released; a shipped row shows its date", () => {
+  it("dates v4.5 2026-10-12 and badges no real release Not yet released", () => {
     renderWithDocs(<Changelog />, data)
+    const v45 = releaseLinks().find((a) => a.getAttribute("href") === "/docs/changelog/v4.5")!
+    expect(within(v45).getAllByText("2026-10-12").length).toBeGreaterThan(0)
+    expect(screen.queryByText("Not yet released")).toBeNull()
+  })
+
+  it("dates an unreleased release '—' and badges it Not yet released; a shipped row shows its date", () => {
+    renderWithDocs(<Changelog />, unreleasedData)
     const v45 = releaseLinks().find((a) => a.getAttribute("href") === "/docs/changelog/v4.5")!
     expect(within(v45).getByText("—")).toBeInTheDocument()
     expect(within(v45).getByText("Not yet released")).toBeInTheDocument()
@@ -95,8 +107,14 @@ describe("Changelog version page", () => {
     expect(screen.queryByText("Not yet released")).toBeNull()
   })
 
-  it("v4.5 renders Not yet released and the exact callout", () => {
+  it("v4.5 renders its release date and no Not yet released callout", () => {
     renderWithDocs(<ChangelogVersion version="v4.5" />, data)
+    expect(screen.getByText("Released 2026-10-12")).toBeInTheDocument()
+    expect(screen.queryByText("Not yet released")).toBeNull()
+  })
+
+  it("an unreleased release renders Not yet released and the exact callout", () => {
+    renderWithDocs(<ChangelogVersion version="v4.5" />, unreleasedData)
     expect(screen.getByText("Not yet released")).toBeInTheDocument()
     expect(
       screen.getByText(

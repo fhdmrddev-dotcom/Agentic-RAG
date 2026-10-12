@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Syrel API",
-    "version": "4.4",
+    "version": "4.5",
     "description": "The HTTP API behind Syrel's own interface.\n\n**Authentication.** Syrel has no API keys, personal access tokens or service accounts today. A script authenticates as a signed-in user and sends that user's token (`Authorization: Bearer <token>`). The planned answer is SEED-013 (Open Platform).\n\n**Organizations.** Requests that act inside an organization send its id in the `X-Org-Id` header.\n\nOperator (`/admin`) endpoints are not listed here; they answer 404 to anyone who is not an operator.\n\n**Live schema.** Each deployment also serves its full live schema at `/openapi.json` (and an explorer at `/docs`). In production both require a signed-in caller (`Authorization: Bearer <token>`), so they are meant for scripts and `curl`, not a browser. In a browser, use this public reference at `/docs/api/reference`."
   },
   "tags": [
@@ -1338,7 +1338,7 @@
           "documents"
         ],
         "summary": "Create Document Download Url",
-        "description": "**Not yet released.** Part of v4.5, which has not shipped.\n\nMint a short-lived signed URL for a document's original file.",
+        "description": "Mint a short-lived signed URL for a document's original file.",
         "operationId": "create_document_download_url_documents__document_id__download_url_post",
         "security": [
           {
@@ -1377,14 +1377,7 @@
               }
             }
           }
-        },
-        "x-badges": [
-          {
-            "name": "Not yet released",
-            "position": "after",
-            "color": "#F7B23B"
-          }
-        ]
+        }
       }
     },
     "/documents/{document_id}/content": {
@@ -7271,7 +7264,7 @@
           "document-search"
         ],
         "summary": "Search",
-        "description": "**Not yet released.** Part of v4.5, which has not shipped.\n\nFind documents by structured fields — exact match, server order, exact total.",
+        "description": "Find documents by structured fields — exact match, server order, exact total.",
         "operationId": "search_document_search_post",
         "requestBody": {
           "content": {
@@ -7306,13 +7299,6 @@
         "security": [
           {
             "HTTPBearer": []
-          }
-        ],
-        "x-badges": [
-          {
-            "name": "Not yet released",
-            "position": "after",
-            "color": "#F7B23B"
           }
         ]
       }

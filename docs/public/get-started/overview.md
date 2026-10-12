@@ -46,4 +46,4 @@ Word and PDF files are downloaded, not previewed inside Syrel.
 
 ## What is not here yet
 
-These docs describe Syrel as released (v4.4). Pages marked **Not yet released** describe v4.5, which is still being built. Pages marked **Full guide coming** are short summaries of features that ship today. Third-party API access (API keys, webhooks, rate limits) is not part of Syrel yet. Not available today. [See what's planned](/docs/api/roadmap-open-platform).
+These docs describe Syrel as released (v4.5). Pages marked **Not yet released** describe features that are still being built. Pages marked **Full guide coming** are short summaries of features that ship today. Third-party API access (API keys, webhooks, rate limits) is not part of Syrel yet. Not available today. [See what's planned](/docs/api/roadmap-open-platform).

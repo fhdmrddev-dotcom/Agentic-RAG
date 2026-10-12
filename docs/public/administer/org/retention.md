@@ -4,16 +4,16 @@ slug: administer/org/retention
 section: administer
 audience: admin
 status: written
-release: v4.5
+release: shipped
+updated: v4.5
 covers: [A46, E23, router:retention]
 summary: >-
-  v4.5 adds retention policies and legal holds to org admin: archive or delete documents on a
-  schedule you preview first, and stop chosen documents from being deleted at all. It has not
-  shipped yet.
+  Retention policies and legal holds in org admin: archive or delete documents on a schedule you
+  preview first, and stop chosen documents from being deleted at all.
 reviewed: 2026-10-12
 ---
 
-Retention is planned for v4.5. It is built and being verified, but it is not in any released version of Syrel. Until it ships, documents stay in the Library until someone deletes them.
+Retention arrived in v4.5. **Scheduled sweeps are off by default:** until your operator turns them on, no policy archives or queues anything, and documents stay in the Library until someone deletes them. Preview and legal holds work either way.
 
 ## What Retention is for
 
@@ -53,7 +53,7 @@ If you change the policy after the preview, Save locks again until you preview t
 
 ## The nightly sweep
 
-Once a night the sweep applies every saved policy:
+When scheduled sweeps are on, the sweep applies every saved policy once a night:
 
 - **Archive happens on its own.**
 - **Deletes never run on their own.** A document due for deletion is put in **Waiting for you**.
@@ -61,7 +61,7 @@ Once a night the sweep applies every saved policy:
 
 If the sweep cannot read everything it needs for a policy, it changes nothing for that policy and says so in the top line. A partial read never archives or queues anything.
 
-**The sweep is switched off until your operator turns it on.** While it is off, the top line reads *"Scheduled sweeps are off. Nothing is archived or queued until they are turned on. Preview still works."* Preview works either way, so you can see what the first sweep would do before it ever runs.
+**Scheduled sweeps are off until your operator turns them on.** While they are off, the top line reads *"Scheduled sweeps are off. Nothing is archived or queued until they are turned on. Preview still works."* Preview works either way, so you can see what the first sweep would do before it ever runs.
 
 ## Waiting for you
 

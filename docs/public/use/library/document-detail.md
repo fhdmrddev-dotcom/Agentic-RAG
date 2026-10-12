@@ -6,7 +6,7 @@ audience: user
 status: written
 release: shipped
 covers: [A18, A19, E11]
-unreleased: [A19]
+updated: v4.5
 summary: >-
   Select a document to open its panel: details with a confidence chip on each field, its text,
   tables and images, the questions that found it, its links and any filing suggestion.
@@ -48,9 +48,9 @@ When a rule matches a new upload, the Classification section shows one suggestio
 
 A document placed by a connected source, such as a watched Google Drive folder, says "Placed here by a connected source, not uploaded by a person."
 
-## Downloading and file facts (v4.5)
+## Downloading and file facts
 
-v4.5, which has not shipped, adds a **File** section with the file's own facts — created, modified, pages, size, type and uploader — and a button to download the original file. Until then you cannot download an uploaded document's original file from this panel.
+The **File** section shows the file's own facts — created, modified, pages, size, type and uploader — and the panel has a button to download the original file.
 
 Word and PDF files are downloaded, not previewed inside Syrel.
 

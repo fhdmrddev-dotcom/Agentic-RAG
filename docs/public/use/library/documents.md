@@ -6,7 +6,7 @@ audience: user
 status: written
 release: shipped
 covers: [A11, A12, view:documents]
-unreleased: [A12]
+updated: v4.5
 summary: >-
   The Library's Documents tab holds your folder tree and the documents in each folder, with
   sharing, versions and a detail panel for every document.
@@ -40,9 +40,9 @@ A document placed by a connected source (for example a watched Google Drive fold
 
 Syrel searches exactly the documents you can see — your own and those in folders shared with your organisation. A chat can be narrowed further to one folder; see [Limiting a chat to a folder](/docs/use/chat-scope).
 
-## Coming in v4.5
+## Finding documents
 
-The Documents tab gains a **Find documents | Ask** switch for finding documents by what they are (type, owner, dates, fields, links, version state). That is part of v4.5, which has not shipped. See [Finding a document](/docs/use/library/find).
+The Documents tab has a **Find documents | Ask** switch for finding documents by what they are (type, owner, dates, fields, links, version state). See [Finding a document](/docs/use/library/find).
 
 ## Related
 

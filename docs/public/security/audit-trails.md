@@ -5,6 +5,7 @@ section: security
 audience: user
 status: written
 release: shipped
+updated: v4.5
 covers: [A38, settings-tab:audit-log]
 summary: >-
   Syrel records what happens at three levels — your own activity, your organisation's, and the
@@ -40,9 +41,9 @@ Both can be filtered, and exporting a CSV is itself recorded.
 - **Expert and scope changes.** Swapping an Expert, handing off to another Expert, or changing a chat's folder scope writes a note into the chat that stays there after reload.
 - **Document corrections.** A person's correction to a document's details is recorded and marked as made by a person.
 
-## What is not available
+## Retention and legal hold
 
-Per-organisation retention and legal hold are not available today; the Retention tab in org admin is shown as coming soon.
+Per-organisation retention and legal hold live in **Org admin → Retention**. Every retention action, and every refused delete, writes a record to its **History** tab. See [Retention](/docs/administer/org/retention).
 
 ## Related
 

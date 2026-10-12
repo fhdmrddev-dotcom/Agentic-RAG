@@ -66,12 +66,12 @@ describe("search index (D-08)", () => {
     expect(stub.url).toBe("/docs/use/chat-modes")
   })
 
-  it("finds the v4.5 changelog entry, marked unreleased", () => {
+  it("finds the v4.5 changelog entry, marked shipped (released 2026-10-12)", () => {
     const { ms } = buildIndex()
     const loaded = MiniSearch.loadJSON(JSON.stringify(ms), SEARCH_OPTIONS)
     const hits = loaded.search("v4.5")
     expect(hits[0].id).toBe("changelog:v4.5")
     expect(hits[0].url).toBe("/docs/changelog/v4.5")
-    expect(hits[0].release).toBe("v4.5")
+    expect(hits[0].release).toBe("shipped")
   })
 })
