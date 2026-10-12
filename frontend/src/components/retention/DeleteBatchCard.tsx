@@ -225,16 +225,27 @@ export function DeleteBatchCard({
   onRecorded?: () => void
   onReload: () => void
 }) {
-  const [ticked, setTicked] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(batch.rows.map((r) => [r.document_id, true])),
-  )
+  // 275-REVIEW F-CR-01: only an EXPLICIT untick is a keep. A row this card has never seen (it
+  // arrived with a newer read) is ticked — "every row starts ticked" — and is never sent as a
+  // `keep_ids` decision nobody made.
+  const [unticked, setUnticked] = useState<Record<string, true>>({})
   const [typed, setTyped] = useState("")
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [result, setResult] = useState<ConfirmResult | null>(null)
 
-  const deleteIds = batch.rows.filter((r) => ticked[r.document_id]).map((r) => r.document_id)
-  const keepIds = batch.rows.filter((r) => !ticked[r.document_id]).map((r) => r.document_id)
+  // A changed row set changes what N means: the typed count must be re-typed against it.
+  const rowKey = batch.rows.map((r) => r.document_id).join(",")
+  const seenRowKey = useRef(rowKey)
+  useEffect(() => {
+    if (seenRowKey.current === rowKey) return
+    seenRowKey.current = rowKey
+    setTyped("")
+  }, [rowKey])
+
+  const isTicked = (id: string) => unticked[id] !== true
+  const deleteIds = batch.rows.filter((r) => isTicked(r.document_id)).map((r) => r.document_id)
+  const keepIds = batch.rows.filter((r) => !isTicked(r.document_id)).map((r) => r.document_id)
   const n = deleteIds.length
   const allKept = n === 0 && batch.rows.length > 0
 
@@ -259,16 +270,22 @@ export function DeleteBatchCard({
       <BatchHeader batch={batch} />
       <BatchTable
         rows={batch.rows}
-        rowClass={(r) => (ticked[r.document_id] ? "" : "line-through opacity-45")}
+        rowClass={(r) => (isTicked(r.document_id) ? "" : "line-through opacity-45")}
         lead={(r) => (
           <label className="flex h-8 w-8 cursor-pointer items-center justify-center">
             <input
               type="checkbox"
               className="accent-[hsl(var(--primary))]"
               aria-label={r.name}
-              checked={Boolean(ticked[r.document_id])}
+              checked={isTicked(r.document_id)}
               onChange={(e) => {
-                setTicked((prev) => ({ ...prev, [r.document_id]: e.target.checked }))
+                const keep = !e.target.checked
+                setUnticked((prev) => {
+                  const next = { ...prev }
+                  if (keep) next[r.document_id] = true
+                  else delete next[r.document_id]
+                  return next
+                })
                 setTyped("") // the count must be re-typed for the new N
               }}
             />

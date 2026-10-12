@@ -24,6 +24,7 @@ vi.mock("@/lib/api/retention", async (importOriginal) => {
 })
 
 import { WaitingForYou } from "../WaitingForYou"
+import { DeleteBatchCard } from "../DeleteBatchCard"
 
 const DELETE_BATCH: QueueBatch = {
   policy_id: "p-del", policy_name: "Expired contracts", kind: "delete",
@@ -209,6 +210,71 @@ describe("DeleteBatchCard — type the count (D-03 / T-275-31)", () => {
       "Couldn't record your decisions. Nothing was archived or kept. Reload this list before trying again.",
     )
     for (const cb of within(card).getAllByRole("checkbox")) expect(cb).not.toBeChecked()
+  })
+})
+
+describe("275-REVIEW F-CR-01 — Reload never pre-unticks a row the admin did not see", () => {
+  it("a row that appears on Reload starts TICKED and is never sent as keep_ids", async () => {
+    // First read: c1-c3. The confirm fails, the admin presses Reload, and the sweep has meanwhile
+    // replaced the list with ONE new row (c4). The second read is held open so the remount timing
+    // is observable.
+    let resolveSecond: (q: QueueList) => void = () => {}
+    m.listQueue
+      .mockResolvedValueOnce({ batches: [DELETE_BATCH], total: 3 } satisfies QueueList)
+      .mockImplementationOnce(() => new Promise<QueueList>((r) => { resolveSecond = r }))
+    m.confirmBatch.mockRejectedValueOnce(new Error("x"))
+    render(<WaitingForYou />)
+    const card = await deleteCard()
+    await userEvent.type(within(card).getByRole("textbox", { name: "Type 3 to confirm" }), "3")
+    await userEvent.click(within(card).getByRole("button", { name: "Delete 3 documents permanently" }))
+    await userEvent.click(within(await within(card).findByRole("alert")).getByRole("button", { name: "Reload" }))
+
+    resolveSecond({
+      batches: [{
+        ...DELETE_BATCH,
+        rows: [{ document_id: "c4", name: "Nordic Freight Contract", folder_path: "/Contracts/Expired", document_date: "2015-03-01", due_since: "2025-03-01", kind: "delete" }],
+      }],
+      total: 1,
+    })
+    const fresh = await screen.findByRole("checkbox", { name: "Nordic Freight Contract" })
+    expect(fresh).toBeChecked()
+    const card2 = await deleteCard()
+    // ⛔ The all-unticked keep path must never be offered for a row nobody unticked.
+    expect(within(card2).queryByRole("button", { name: /^Keep/ })).toBeNull()
+    expect(card2).not.toHaveTextContent("Unticked documents are kept.")
+    m.confirmBatch.mockResolvedValueOnce({ ...EMPTY_RESULT, deleted: [{ document_id: "c4", name: "Nordic Freight Contract" }] })
+    await userEvent.type(within(card2).getByRole("textbox", { name: "Type 1 to confirm" }), "1")
+    await userEvent.click(within(card2).getByRole("button", { name: "Delete 1 document permanently" }))
+    await waitFor(() =>
+      expect(m.confirmBatch).toHaveBeenLastCalledWith("p-del", {
+        delete_ids: ["c4"], keep_ids: [], archive_ids: [], typed_count: 1,
+      }),
+    )
+  })
+
+  it("DeleteBatchCard: a row added to the batch prop without a remount starts ticked and resets the count", async () => {
+    const { rerender } = render(<DeleteBatchCard batch={DELETE_BATCH} onReload={() => {}} />)
+    const card = screen.getByTestId("delete-batch")
+    await userEvent.click(within(card).getByRole("checkbox", { name: "Kessler Services Agreement" }))
+    await userEvent.type(within(card).getByRole("textbox", { name: "Type 2 to confirm" }), "2")
+    // c3 leaves, c4 arrives: N stays 2, so a stale typed "2" would arm a delete of an unseen row.
+    rerender(
+      <DeleteBatchCard
+        batch={{
+          ...DELETE_BATCH,
+          rows: [
+            DELETE_BATCH.rows[0],
+            DELETE_BATCH.rows[1],
+            { document_id: "c4", name: "Nordic Freight Contract", folder_path: "/Contracts/Expired", document_date: "2015-03-01", due_since: "2025-03-01", kind: "delete" },
+          ],
+        }}
+        onReload={() => {}}
+      />,
+    )
+    expect(within(card).getByRole("checkbox", { name: "Nordic Freight Contract" })).toBeChecked()
+    expect(within(card).getByRole("checkbox", { name: "Kessler Services Agreement" })).not.toBeChecked()
+    expect(within(card).getByRole("textbox", { name: "Type 2 to confirm" })).toHaveValue("")
+    expect(within(card).getByRole("button", { name: "Delete 2 documents permanently" })).toBeDisabled()
   })
 })
 

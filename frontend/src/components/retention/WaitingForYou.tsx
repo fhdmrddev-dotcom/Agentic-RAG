@@ -27,14 +27,18 @@ export function WaitingForYou({
   const [queue, setQueue] = useState<QueueList | null>(null)
   const [loadError, setLoadError] = useState(false)
   // Bumped by Reload so every card remounts from the server's rows (ticks reset honestly).
+  // 275-REVIEW F-CR-01: bumped in the SAME update that lands the new rows — never before the read
+  // resolves (that remounted the cards over the OLD rows, so a row that arrived after read as an
+  // untouched "keep"), and never after a failed read (that resurrected confirmed cards).
   const [generation, setGeneration] = useState(0)
   const alive = useRef(true)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (remount = false) => {
     try {
       const res = await listQueue()
       if (!alive.current) return
       setQueue(res)
+      if (remount) setGeneration((g) => g + 1)
       setLoadError(false)
     } catch {
       if (alive.current) setLoadError(true) // keep the last-known batches
@@ -54,8 +58,7 @@ export function WaitingForYou({
   }, [queue, onCountChange])
 
   const reload = () => {
-    setGeneration((g) => g + 1)
-    void load()
+    void load(true)
   }
 
   const batches = [...(queue?.batches ?? [])].sort((a, b) => (b.found_at ?? "").localeCompare(a.found_at ?? ""))
