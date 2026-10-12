@@ -31,7 +31,14 @@ def _scope():
 def test_default_predicates_are_the_three_the_rpcs_hardcode():
     m = _scope()
     names = {p.name for p in m.DEFAULT_PREDICATES}
-    assert names == {"latest_only", "not_source_disconnected", "caller_visibility"}
+    # SEED-177 — retired ON PURPOSE by 275-01: the predicate moved to the generated `retrievable`
+    # column (mig 205, D-36), which also excludes archived and every non-live source state. The
+    # middle entry is renamed `retrievable` and stays enforced_in_rpc=True (measured: no extra cost).
+    assert names == {"latest_only", "retrievable", "caller_visibility"}
+    assert m.RETRIEVABLE_COLUMN == "retrievable"
+    # The two SQL literals name the column (no f-string SQL here) — pinned to the constant's value.
+    for sql in (m._STORED_SPELLINGS_SQL, m._TOP_TYPES_SQL):
+        assert f"WHERE is_latest AND {m.RETRIEVABLE_COLUMN} " in sql and "source_state" not in sql
     assert len(m.DEFAULT_PREDICATES) == 3
     assert all(p.enforced_in_rpc is True for p in m.DEFAULT_PREDICATES)
     assert all(p.condition is None for p in m.DEFAULT_PREDICATES)

@@ -2958,3 +2958,9 @@ reuses 267-B's event-card shape.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 274 | save-to-library | How does a person keep a chat file, on purpose, and see that they did? (action on the chip · folder picker without Root · after-mark; dedup + version + refusal states) | — | phase-274, att-03, promote, library, folder-picker |
+
+## Sketch 275 — Retention & Legal Hold (Phase 275, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 275 | retention-legal-hold | Retention tab layout, policy editor + dry run, human-approved delete queue, Library visibility of retention/hold/archive | ★ 1B sub-tabs · 2B Preview-gated form · 3A batch + type-the-count · 4B chips + folder line (operator, 2026-10-12) | phase-275, retention, legal-hold, dry-run, org-admin |

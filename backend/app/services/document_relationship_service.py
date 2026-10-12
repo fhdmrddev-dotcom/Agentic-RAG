@@ -43,6 +43,7 @@ from uuid import UUID
 from supabase import Client
 
 from app.dependencies import get_supabase
+from app.services.retrieval_scope import RETRIEVABLE_COLUMN
 from app.utils.db import aexec
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
@@ -333,6 +334,7 @@ async def get_related_documents(
     document_id: str | None = None,
     filename: str | None = None,
     supabase: Client | None = None,
+    retrievable_only: bool = False,
 ) -> dict | None:
     """The SHARED, leak-safe outgoing+incoming relationship read traversal (Phase 117 / D-117-7).
 
@@ -387,6 +389,10 @@ async def get_related_documents(
         )
     if subject is None:
         return None
+    # 275-REVIEW B-IN-04 (D-18): the agent's read never resolves an archived / source-gone SUBJECT
+    # either — the row was read ``select("*")``, so this is its own column, not a second query.
+    if retrievable_only and subject.get(RETRIEVABLE_COLUMN) is False:
+        return None
 
     subject_id = subject["id"]
     client = _client(supabase)
@@ -423,6 +429,12 @@ async def get_related_documents(
             )
         except Exception:  # noqa: BLE001 — a readability hiccup masks (fail-closed), never raises
             other = None
+        # Phase 275 (D-36, revision B-2): the AGENT's read (``retrievable_only`` set) omits an
+        # archived / source-gone endpoint — the endpoint row was already read ``select("*")``, so
+        # this is the ``RETRIEVABLE_COLUMN`` of that read, not a second query. The Library's GET
+        # route keeps the default and still lists it.
+        if retrievable_only and other is not None and other.get(RETRIEVABLE_COLUMN) is False:
+            return
         if other is None:
             # Masked: existence shown, identity hidden. No citable ref for an unseeable doc.
             compact.append({

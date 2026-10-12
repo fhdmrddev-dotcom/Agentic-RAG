@@ -4120,7 +4120,7 @@ const BASELINE = {
   "RelationshipsSection.test.tsx": 11, // 271-03
   "RelationshipsSection.a11y.test.tsx": 6, // 271-03
   // ── Phase 271-03 — every suite this plan CREATED, at its measured passing count. BOTH KNOBS, SAME COMMIT. ──
-  "findState.test.ts": 49, // 271-03 (2026-10-03)
+  "findState.test.ts": 54, // 271-03 (2026-10-03) · RE-PINNED 49 → 54 at 275-02 (+5 Include archived cases, D-04)
   "documents.search271.test.ts": 3, // 271-03
   "useDocumentFind.test.tsx": 11, // 271-03
   "relationshipLabels.test.ts": 5, // 271-03
@@ -4135,7 +4135,7 @@ const BASELINE = {
   // ── Phase 271-04 Task 1 — every suite it CREATED, at its measured passing count. BOTH KNOBS. ──
   "FilterBar.find271.test.tsx": 11, // 271-04 (3 are the Views-tab DOM snapshot pins)
   "StructurePopovers.test.tsx": 22, // 271-04
-  "FindQuickAdd.test.tsx": 18, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03)
+  "FindQuickAdd.test.tsx": 22, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03) · RE-PINNED 18 → 22 at 275-02 (+4 Include archived chip cases)
   // ── Phase 271-04 Task 2 — the Find results surface and the exact pager. BOTH KNOBS. ──
   "DocumentsFindBody.test.tsx": 26, // 271-04
   "DocumentsPager.exact271.test.tsx": 3, // 271-04
@@ -4195,6 +4195,24 @@ const BASELINE = {
   // `src/components/attachments` DIRECTORY entry, so only BASELINE changes. Pinned at its measured
   // passing count on the merged tree (6 cases, 0 failing); its NEGATIVE case proves it can fire.
   "promoteContract.fence.test.ts": 6, // 274-05 — ?raw backend models/route vs attachments.ts keys, saved/already literal, prefix regex lockstep
+  // ── Phase 275-02 (S9 / S10) — `src/components/retention` is NEW and adopted as a DIRECTORY in
+  // TARGETS (275-04 adds more suites under it). Pinned at the measured passing counts (15 cases,
+  // 0 failing), each RED before its module existed.
+  "retentionCopy.test.ts": 17, // RE-PINNED 16 → 17 at 275-REVIEW frontend fix pass · 275-02 — ported strings vs sketch 275 (?raw), contract strings vs 275-UI-SPEC, title vs hold_guard.py · RE-PINNED 5 → 16 at 275-04 (sketch/spec/CONTEXT templates by literal segment, models/retention.py sentences, D-11 / D-22 / D-35 cases)
+  "holdRefusals.test.tsx": 12, // RE-PINNED 10 → 12 at 275-REVIEW frontend fix pass · 275-02 — real delete clients vs a stubbed 409 → ApiRefusal → DocumentList / FolderNode / FolderTree / WatchedFoldersSection
+  // ── Phase 275-04 (S1-S9, RET-01..04) — every new suite under the `src/components/retention`
+  // DIRECTORY entry (already in TARGETS since 275-02), pinned at its measured passing count on this
+  // plan's tree (0 failing), each RED before its module existed. What each proves:
+  "libraryRetention.test.tsx": 16, // RE-PINNED 15 → 16 at 275-REVIEW frontend fix pass · RE-PINNED 12 → 15 at 275-05 (G-4 fast-fixes: two-stage folder line + its rule_text ?raw fence, fully-archived list not claimed empty) · 275-04 — S6 one chip + one source chip, S7 admin vs member line (D-17), ONE batched document-states read (flag 2), hidden line = Find's include-archived state (D-04), S10 pre-open refusal
+  "RetentionSection.test.tsx": 24, // RE-PINNED 18 → 24 at 275-REVIEW frontend fix pass · 275-04 — every S8 sentence, member payload with no hold_names renders no matter (D-17), B-NEW-1 snapshot name, Un-archive receipt/failure (D-19), placed after File
+  "LegalHolds.test.tsx": 25, // RE-PINNED 16 → 25 at 275-REVIEW frontend fix pass · 275-04 — S3 card anatomy, Place hold held back with a visible reason, server count / "Couldn't count the documents yet." never 0 (D-05/D-35), release victim-naming not red
+  "WaitingForYou.test.tsx": 22, // RE-PINNED 13 → 22 at 275-REVIEW frontend fix pass · 275-04 — S4 type-the-count (D-03 / T-275-31): ticked start, untick clears the count, Enter only when enabled, late-hold drop named; review undecided by default (D-10)
+  "RetentionTab.test.tsx": 18, // RE-PINNED 12 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 11 → 12 at 275-05 ("1 policy") · 275-04 — S1 posture incl. sweeps-off (D-29), Waiting pill red only at N > 0 (D-01), roving tabs, sweep time from sweep_hour_utc, editor in place
+  "RetentionPolicyEditor.test.tsx": 28, // RE-PINNED 16 → 28 at 275-REVIEW frontend fix pass · 275-04 — S2 Preview gate (D-02 / T-275-32): aria-disabled + on-screen reason, stale re-lock, 409 rendered, save failure keeps preview; two clocks (D-22); stage 2 (D-20)
+  "RetentionHistory.test.tsx": 21, // RE-PINNED 18 → 21 at 275 G-4 re-look (OBS-R2a drop reasons) · RE-PINNED 17 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 16 → 17 at 275-05 (delete_refused sentence, G-4 FAIL-1) · 275-04 — S5 receipt sentences, ✎ only on writes, no links (D-12/D-13), Show older pages by 50
+  // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
+  // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
+  "OrgAdminShell.test.tsx": 12, // RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6122,6 +6140,12 @@ const TARGETS = [
   "src/components/attachments",
   "src/lib/__tests__/attachmentLifetime.test.ts",
   "src/lib/__tests__/attachmentsApi.test.ts",
+  // Phase 275-02 — `src/components/retention` is new and adopted as a DIRECTORY (its two suites
+  // here and every later 275-04 suite under it).
+  "src/components/retention",
+  // Phase 275-04 — the org shell's suite goes by FILE path (no `src/components/org` entry): it
+  // carries the deliberately retired locked-Retention fence and its replacement.
+  "src/components/org/OrgAdminShell.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

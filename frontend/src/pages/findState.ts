@@ -135,6 +135,10 @@ export interface FindState {
   readonly sort: FindSort
   readonly offset: number
   readonly limit: number
+  /** Phase 275 (S9 / D-04): include archived documents. Off by default; changes ONLY on the
+   *  person's click (never automatic), and Clear search keeps it — it is a preference shared
+   *  with browse, not a condition. Snake-case because it IS the wire key. */
+  readonly include_archived: boolean
 }
 
 export const DEFAULT_SORT: FindSort = "added_desc"
@@ -153,6 +157,7 @@ export const initialFindState: FindState = {
   sort: DEFAULT_SORT,
   offset: 0,
   limit: DEFAULT_LIMIT,
+  include_archived: false,
 }
 
 // ── THE ACTIONS ───────────────────────────────────────────────────────────────────────
@@ -169,6 +174,7 @@ export type FindAction =
   | { type: "SET_VERSION"; version: FindVersion }
   | { type: "SET_SORT"; sort: FindSort }
   | { type: "SET_PAGE"; offset: number; limit: number }
+  | { type: "SET_INCLUDE_ARCHIVED"; include_archived: boolean }
   | { type: "CLEAR_SEARCH" }
 
 // ── THE REDUCER ───────────────────────────────────────────────────────────────────────
@@ -208,6 +214,9 @@ export function findReducer(state: FindState, action: FindAction): FindState {
       return { ...state, version: action.version, offset: 0 }
     case "SET_SORT":
       return { ...state, sort: action.sort, offset: 0 }
+    // Widening or narrowing the result set returns to the first page, like any condition.
+    case "SET_INCLUDE_ARCHIVED":
+      return { ...state, include_archived: action.include_archived, offset: 0 }
 
     case "SET_PAGE":
       return { ...state, offset: action.offset, limit: action.limit }
@@ -286,6 +295,9 @@ export interface FindSearchRequest<F extends FindFilterLike = FindFilterLike> {
   sort: FindSort
   offset: number
   limit: number
+  /** Phase 275 (D-04 / Pitfall 13): present ONLY when true, so a backend that predates the key
+   *  (its model is `extra="forbid"`) never receives it from a default search. */
+  include_archived?: true
 }
 
 /**
@@ -322,6 +334,7 @@ export function toSearchRequest<F extends FindFilterLike>(
     sort: state.sort,
     offset: state.offset,
     limit: state.limit,
+    ...(state.include_archived ? { include_archived: true as const } : {}),
   }
 }
 

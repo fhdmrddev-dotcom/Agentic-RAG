@@ -3,8 +3,12 @@
 // Phase 276-02 (DOCS-05) — the changelog model is GENERATED from docs/history/v*.md and the
 // README's "arc in five chapters" table. The release count is derived with readdirSync, never
 // a constant (the IA's "25 files" was already stale at 27 when this phase was planned).
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import docsContent from "../../../../scripts/lib/docs-content.cjs"
+
+const nodeFs = await vi.importActual<any>("node:fs")
+const nodePath = await vi.importActual<any>("node:path")
+const nodeOs = await vi.importActual<any>("node:os")
 
 const repoRoot = docsContent.findRepoRoot()
 const HISTORY = `${repoRoot}/docs/history`
@@ -27,10 +31,12 @@ describe("parseHistory — the real docs/history", () => {
     }
   })
 
-  it("marks v4.5 unreleased with no date, and v4.4 released with a date", () => {
+  // ~~marks v4.5 unreleased with no date~~ — v4.5 shipped 2026-10-12. The unreleased arm is driven
+  // below against a temp copy whose Shipped line does not start with a date.
+  it("marks v4.5 released 2026-10-12, and v4.4 released with a date", () => {
     const v45 = releases.find((r) => r.version === "v4.5")!
-    expect(v45.released).toBe(false)
-    expect(v45.date).toBeNull()
+    expect(v45.released).toBe(true)
+    expect(v45.date).toBe("2026-10-12")
     expect(v45.name).toBe("Find It, Show It")
     const v44 = releases.find((r) => r.version === "v4.4")!
     expect(v44.released).toBe(true)
@@ -70,6 +76,22 @@ describe("parseHistory — the real docs/history", () => {
     expect(releases.find((r) => r.version === "v4.5")!.chapter.n).toBe(5)
     // a release's chapter carries the same summary as the README row
     expect(releases.find((r) => r.version === "v1.0")!.chapter.summary).toBe(chapters[0].summary)
+  })
+})
+
+describe("parseHistory — an unreleased release", () => {
+  it("marks a release whose Shipped line does not start with a date unreleased, with no date", () => {
+    const dir = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "history-"))
+    for (const f of nodeFs.readdirSync(HISTORY)) nodeFs.copyFileSync(`${HISTORY}/${f}`, nodePath.join(dir, f))
+    const file = nodePath.join(dir, "v4.5-find-it-show-it.md")
+    const before = nodeFs.readFileSync(file, "utf8")
+    const after = before.replace(/^> \*\*Shipped:\*\* 2026-10-12/m, "> **Shipped:** in progress")
+    expect(after).not.toBe(before)
+    nodeFs.writeFileSync(file, after)
+    const v45 = docsContent.parseHistory(dir).find((r: { version: string }) => r.version === "v4.5")!
+    expect(v45.released).toBe(false)
+    expect(v45.date).toBeNull()
+    nodeFs.rmSync(dir, { recursive: true, force: true })
   })
 })
 

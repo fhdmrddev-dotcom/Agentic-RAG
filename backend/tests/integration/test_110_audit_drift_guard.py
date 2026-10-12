@@ -57,8 +57,12 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-# The 19 expected action types (original 11 + the 8 D-110-1 strings).
-_EXPECTED_19 = frozenset({
+# The expected action types (original 11 + the 8 D-110-1 strings + the later lockstep additions).
+# SEED-177 — re-pinned ON PURPOSE by 275-01: this fence pinned exactly 19 and had been RED since
+# Phase 223 added `connector.call` / `connector.grant` (it read `extra=[...]` at the 275 base). 275-01
+# syncs the frozenset with the live CHECK (D-27: the three `connector.watch.*` types from migration 170,
+# and migration 204's ten retention/folder types), so the pin now names the whole set again.
+_EXPECTED = frozenset({
     "document.upload", "document.delete", "search.query",
     "code.execute", "skill.load", "thread.create",
     "thread.delete", "settings.update",
@@ -68,6 +72,12 @@ _EXPECTED_19 = frozenset({
     "relationship.create", "relationship.delete",
     "classification.apply", "classification.rule.create",
     "metadata.update", "metadata.field.create",
+    "connector.call", "connector.grant",                                   # 223 (migration 152)
+    "connector.watch.create", "connector.watch.delete", "connector.watch.sync",  # 234 (migration 170)
+    "retention.policy.create", "retention.policy.update", "retention.policy.delete",  # 275 (migration 204)
+    "retention.hold.create", "retention.hold.update", "retention.hold.release",
+    "retention.disposition.confirm", "retention.document.unarchive", "retention.document.keep",
+    "folder.delete",
 })
 
 
@@ -103,12 +113,12 @@ async def test_valid_action_types_subset_of_live_check(pg_pool):
     await assert_action_types_synced(pg_pool)  # raises RuntimeError on drift → RED
 
 
-def test_valid_action_types_is_exactly_19():
-    """The frozenset is exactly the 19 expected strings (no DB needed)."""
+def test_valid_action_types_is_exactly_the_expected_set():
+    """The frozenset is exactly the expected strings (no DB needed) — 34 at 275-01."""
     from app.services.audit_service import VALID_ACTION_TYPES
-    assert VALID_ACTION_TYPES == _EXPECTED_19, (
-        f"VALID_ACTION_TYPES != expected 19; "
-        f"missing={sorted(_EXPECTED_19 - VALID_ACTION_TYPES)}, "
-        f"extra={sorted(VALID_ACTION_TYPES - _EXPECTED_19)}"
+    assert VALID_ACTION_TYPES == _EXPECTED, (
+        f"VALID_ACTION_TYPES != expected; "
+        f"missing={sorted(_EXPECTED - VALID_ACTION_TYPES)}, "
+        f"extra={sorted(VALID_ACTION_TYPES - _EXPECTED)}"
     )
-    assert len(VALID_ACTION_TYPES) == 19
+    assert len(VALID_ACTION_TYPES) == 34

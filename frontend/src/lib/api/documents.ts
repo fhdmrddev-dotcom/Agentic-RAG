@@ -25,6 +25,8 @@ import type {
   WorkspaceFile,
 } from "../../types"
 import { API_BASE, getAuthHeaders, getAuthToken } from "./_core"
+// Phase 275 (S10): imported, never re-exported — the barrel contract (apiBarrel.test.ts).
+import { refusalOf } from "./refusal"
 export async function listDocuments(): Promise<Document[]> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/documents`, { headers })
@@ -328,7 +330,8 @@ export async function deleteDocument(id: string, scope?: "version" | "all"): Pro
     ? `${API_BASE}/documents/${id}?scope=${scope}`
     : `${API_BASE}/documents/${id}`
   const res = await fetch(url, { method: "DELETE", headers })
-  if (!res.ok) throw new Error("Failed to delete document")
+  // Phase 275 (S10): a legal hold answers 409 with the server's sentence; carry it to the door.
+  if (!res.ok) throw await refusalOf(res, "Failed to delete document")
 }
 
 export async function fetchDocumentVersions(documentId: string): Promise<Document[]> {
@@ -384,7 +387,8 @@ export async function deleteFolder(id: string): Promise<void> {
     method: "DELETE",
     headers,
   })
-  if (!res.ok) throw new Error("Failed to delete folder")
+  // Phase 275 (S10 / D-15): a held subtree answers 409 with the folder sentence.
+  if (!res.ok) throw await refusalOf(res, "Failed to delete folder")
 }
 
 export async function toggleFolderOrgShared(id: string): Promise<Folder> {

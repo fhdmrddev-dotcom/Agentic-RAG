@@ -667,6 +667,15 @@ export interface Document {
   source_modified_at?: string | null
   source_author?: string | null
   source_connection_name?: string | null
+  /** Phase 275 (D-04 / B-NEW-1) — set when a retention policy archived the document; the policy
+   *  name is a SNAPSHOT that survives the policy's removal. Optional (the 270 precedent). */
+  archived_at?: string | null
+  archived_policy_id?: string | null
+  archived_policy_name?: string | null
+  /** Phase 275 (D-18 / D-36) — mig 205's generated column: false when archived or gone at source. */
+  retrievable?: boolean | null
+  /** Phase 275 (D-21) — the source state, when a route carries it. Chips read `document-states`. */
+  source_state?: string | null
 }
 
 /** Phase 270 — response of `POST /documents/{id}/download-url`. `url` is a bearer token: use once, never store. */

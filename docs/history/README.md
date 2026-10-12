@@ -59,7 +59,7 @@ Every release file has the same sections:
 | [v4.2 Connected Knowledge You Can Run](v4.2-the-connected-knowledge-you-can-actually-run.md) | 2026-09-18 | 247–254 | Honest sources, safe credentials, register your own model from the UI. |
 | [v4.3 What You Can Actually Sell](v4.3-what-you-can-actually-sell.md) | 2026-09-23 | 255–264 | Every token priced, tiers enforced, Experts as installable bundles. |
 | [v4.4 Experts That Actually Work](v4.4-experts-that-actually-work.md) | 2026-09-29 | 265–269 | Per-org Expert install, additive-only scope, per-Expert spend, five starter Experts. |
-| [v4.5 Find It, Show It](v4.5-find-it-show-it.md) | *in progress* | 270–275 | Find documents by what they are, respect named periods, live charts in chat. *(Not yet deployed.)* |
+| [v4.5 Find It, Show It](v4.5-find-it-show-it.md) | 2026-10-12 | 270–276 | Find documents by what they are, respect named periods, live charts in chat, retention with legal hold. |
 
 ## Caveats that apply to every file
 

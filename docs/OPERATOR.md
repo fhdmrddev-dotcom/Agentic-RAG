@@ -170,6 +170,13 @@ Then edit `./.env` and fill in:
   transaction claiming (`FOR UPDATE SKIP LOCKED`). `WATCH_POLL_INTERVAL_SECONDS` (default `60`)
   controls how frequently the worker checks for due watches; `WATCH_LEASE_SECONDS` (default `600`)
   is the lease timeout for in-flight folder sync passes.
+- **Nightly Retention Sweep (Phase 275, RET-03 / D-29)** — `RETENTION_SWEEP_ENABLED` ships
+  **`false`**. Turn it on only after an org admin has read a dry run in **Org admin → Retention**
+  (Preview on each policy). The sweep runs at 02:00 UTC, archives due documents on its own and
+  queues deletes in "Waiting for you"; **deletes never run on their own** — an org admin confirms
+  each batch by typing its count. Safe across multiple uvicorn workers (`FOR UPDATE SKIP LOCKED`
+  claim + lease). While it is off, Preview still works and "Run a sweep now" answers 409.
+  ⚠ Apply migrations 204 and 205 to the database BEFORE deploying the backend that reads them.
 - **`VITE_*`** (bottom of the file) — the browser-facing Supabase URL + anon key. For a real
   deploy these equal `SUPABASE_URL` / `SUPABASE_ANON_KEY`. **These are baked at build time** —
   if you change one later you must rebuild the frontend (`--build`); a plain `up` won't pick

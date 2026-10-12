@@ -84,11 +84,13 @@ const FLAGGED_EXACT = new Set([
 const FLAGGED_PREFIXES = ["/knowledge-health/"]
 
 /**
- * v4.5 operations (not released). Confirmed against the snapshot 2026-10-04:
- * Phase 271 Find and Phase 270 original-file download. A listed op missing from the snapshot is
- * a finding — a stale list must never pass silently.
+ * Unreleased operations, badged "Not yet released". A listed op missing from the snapshot is a
+ * finding — a stale list must never pass silently.
+ * ~~v4.5 operations (not released): "post /document-search", "post /documents/{document_id}/download-url"~~
+ * EMPTIED 2026-10-12: v4.5 shipped, so neither is unreleased any more. The mechanism stays for the
+ * next unreleased release; `opts.unreleasedOperations` overrides this list (the suite drives it).
  */
-const V45_OPERATIONS = ["post /document-search", "post /documents/{document_id}/download-url"]
+const V45_OPERATIONS = []
 
 /** Untagged system routes get this tag so they can be grouped. */
 const SYSTEM_TAG = "system"
@@ -111,6 +113,7 @@ const TAG_GROUPS = [
       "checked-queries",
       "library",
       "knowledge-health",
+      "retention",
     ],
   },
   {
@@ -302,11 +305,12 @@ function prefixDescription(op, note) {
 
 /**
  * @param {object} snapshot the parsed openapi.snapshot.json (not mutated)
- * @param {{historyDir?: string}} [opts]
+ * @param {{historyDir?: string, unreleasedOperations?: string[]}} [opts]
  * @returns {{doc: object, findings: string[]}}
  */
 function buildPublicSpec(snapshot, opts = {}) {
   const historyDir = opts.historyDir || DEFAULT_HISTORY
+  const unreleasedOps = opts.unreleasedOperations || V45_OPERATIONS
   const src = JSON.parse(JSON.stringify(snapshot))
   const findings = []
 
@@ -324,7 +328,7 @@ function buildPublicSpec(snapshot, opts = {}) {
         badges.push({ ...BADGE_INTERNAL })
         prefixDescription(op, NOTE_INTERNAL)
       }
-      if (V45_OPERATIONS.includes(`${method} ${p}`)) {
+      if (unreleasedOps.includes(`${method} ${p}`)) {
         badges.push({ ...BADGE_UNRELEASED })
         prefixDescription(op, NOTE_UNRELEASED)
       }
@@ -333,7 +337,7 @@ function buildPublicSpec(snapshot, opts = {}) {
     paths[p] = item
   }
 
-  for (const key of V45_OPERATIONS) {
+  for (const key of unreleasedOps) {
     const [method, p] = key.split(" ")
     if (!paths[p] || !paths[p][method]) findings.push(`[missing-v45-op] ${key}`)
   }

@@ -321,19 +321,25 @@ class TestDeleteFolder:
         assert response.status_code == 204
 
     def test_delete_folder_calls_delete_on_supabase(self, client, auth_headers, mock_execute_result):
-        """DELETE /folders/{id} — supabase.table('folders').delete() is called."""
+        """DELETE /folders/{id} — the rows and the folder go in ONE transactional call
+        (``delete_folder_tree``, migration 206 / 275-REVIEW B-WR-03), never two statements."""
         mock_execute_result.data = []
+        _supabase.rpc.reset_mock()
         client.delete(f"/folders/{FOLDER_ID}", headers=auth_headers)
-        builder = _supabase.table.return_value
-        builder.delete.assert_called()
+        _supabase.rpc.assert_any_call("delete_folder_tree", {"p_folder_id": FOLDER_ID})
+        _supabase.table.return_value.delete.assert_not_called()
 
     def test_delete_folder_enforces_ownership(self, client, auth_headers, mock_execute_result):
-        """DELETE /folders/{id} — .eq('user_id', ...) filters to prevent deleting others' folders."""
-        mock_execute_result.data = []
-        client.delete(f"/folders/{FOLDER_ID}", headers=auth_headers)
-        builder = _supabase.table.return_value
-        eq_calls = [str(c) for c in builder.eq.call_args_list]
-        assert any("user_id" in c for c in eq_calls)
+        """DELETE /folders/{id} — ownership is enforced INSIDE delete_folder_tree, which runs as the
+        caller (SECURITY INVOKER, RLS) and deletes only the caller's documents and folder."""
+        from pathlib import Path
+
+        sql = (Path(__file__).resolve().parents[3] / "supabase" / "migrations"
+               / "206_retention_hold_hardening.sql").read_text(encoding="utf-8")
+        body = sql[sql.index("CREATE OR REPLACE FUNCTION public.delete_folder_tree"):]
+        body = body[:body.index("$$;")]
+        assert "SECURITY INVOKER" in body
+        assert "d.user_id = v_uid" in body and "f.user_id = v_uid" in body
 
     def test_delete_folder_filters_by_folder_id(self, client, auth_headers, mock_execute_result):
         """DELETE /folders/{id} — .eq('id', folder_id) is called."""

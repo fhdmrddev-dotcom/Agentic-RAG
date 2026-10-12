@@ -6,7 +6,7 @@ Run it with the backend virtualenv, from ``backend/`` (so ``app.config`` finds `
     venv/Scripts/python ../scripts/measure-filtered-recall.py \\
         --dsn postgresql://postgres:postgres@127.0.0.1:54322/recall_bench \\
         --user-id 7fcfb80e-d25c-4705-8916-a81f257deb17 --prepare-sets \\
-        --json-out ../.planning/phases/272-close-means-wrong/evidence/recall-ladder.json
+        --json-out ../.planning/milestones/v4.5-phases/272-close-means-wrong/evidence/recall-ladder.json
 
 What it measures, per filtered set size (500 / 1000 / 2000 / 5000 / 10000 chunks):
 

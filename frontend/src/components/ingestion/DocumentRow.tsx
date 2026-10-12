@@ -58,6 +58,8 @@ import { folderPathOf } from "@/components/chat/scopeCopy"
 import { NOT_RECORDED, addedBy } from "@/lib/documentAddedBy"
 import type { FindDateField } from "@/pages/findState"
 import type { Document, Folder } from "@/types"
+import { RetentionRowChips } from "@/components/retention/RetentionChip"
+import type { RetentionDocumentState } from "@/lib/api/retention"
 
 /** Phase 271-03 — which column set the row renders. */
 export type DocumentColumns = "browse" | "find"
@@ -104,6 +106,8 @@ export interface DocumentRowProps {
   columns?: DocumentColumns
   /** Phase 271-03 — the Find Date column's row field (Find only). Default: Added. */
   findDateColumn?: FindDateColumn
+  /** Phase 275 (S6) — this row's server retention state, from LibraryPage's ONE batched read. */
+  retention?: RetentionDocumentState | null
 }
 
 /** Phase 271-03 — a fact the row does not hold (270 D-09/D-10): italic, muted, never 0. */
@@ -377,6 +381,7 @@ export function DocumentRow({
   currentUserId,
   columns = "browse",
   findDateColumn,
+  retention,
 }: DocumentRowProps) {
   const isFind = columns === "find"
   // ── The folder tag pill (D-217.1-31): `Root` for `folder_id: null`, the resolved
@@ -444,6 +449,8 @@ export function DocumentRow({
             {/* Phase 118 (CLASS-03): one-glance suggestion chip — only when a
                 "suggested" _classification is present on this doc. */}
             <ClassificationRowChip doc={doc} onRefresh={onRefresh} />
+            {/* Phase 275 (S6 / D-04): at most one retention chip + one source chip; none when calm. */}
+            <RetentionRowChips state={retention} />
           </div>
           {isFind ? (
             // Phase 271-03: Find replaces the folder pill with the path + version line.

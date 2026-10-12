@@ -3,6 +3,8 @@
  */
 
 import { API_BASE, ApiError, getAuthHeaders } from "./_core"
+// Phase 275 (S10): the one typed refusal (status + title + the server sentence).
+import { refusalOf } from "./refusal"
 
 /**
  * ⭐ THE CAUSE UNION IS SINGLE-SOURCED (plan 13, gap-closure round 1). It used to be spelled
@@ -209,10 +211,9 @@ export async function purgeWatchFiles(id: string): Promise<WatchPurgeResponse> {
     method: "POST",
     headers,
   })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new ApiError(`Failed to purge files for watch ${id}: ${text}`, res.status)
-  }
+  // Phase 275 (S10 / D-38): a held missing file refuses the WHOLE purge with a 409 sentence,
+  // which WatchedFoldersSection renders as-is in its existing error line.
+  if (!res.ok) throw await refusalOf(res, `Failed to purge files for watch ${id}`)
   return (await res.json()) as WatchPurgeResponse
 }
 

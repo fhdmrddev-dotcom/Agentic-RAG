@@ -6,10 +6,10 @@ audience: developer
 status: stub
 release: shipped
 covers: [H6, H8]
-unreleased: [H8]
+updated: v4.5
 summary: >-
-  Upload a document, follow its ingestion status, then search your documents. Document search
-  beside chat (/document-search) is part of v4.5 and not yet released. Until the full guide is
-  written, start with Authentication.
+  Upload a document, follow its ingestion status, then search your documents, including document
+  search beside chat (/document-search). Until the full guide is written, start with
+  Authentication.
 nearest: api/concepts/authentication
 ---

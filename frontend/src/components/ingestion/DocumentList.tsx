@@ -10,6 +10,10 @@ import {
 } from "@/components/ui/dialog"
 import { reingestDocument } from "@/lib/api"
 import { MoveToFolderDialog } from "@/components/health/MoveToFolderDialog"
+import { ApiRefusal } from "@/lib/api/refusal"
+import { HoldRefusalNotice } from "@/components/retention/HoldRefusalNotice"
+import { RETENTION_COPY, holdRefusalFor } from "@/components/retention/retentionCopy"
+import type { RetentionStates } from "@/components/retention/useRetentionStates"
 import { DocumentRow, hasVersions, type DocumentColumns, type FindDateColumn } from "./DocumentRow"
 import type { Document, Folder } from "@/types"
 
@@ -33,6 +37,8 @@ interface Props {
   columns?: DocumentColumns
   /** Phase 271-03 — the Find Date column (header + row field). Default: Added. */
   findDateColumn?: FindDateColumn
+  /** Phase 275 (S6 / S10) — the server retention states from LibraryPage's ONE batched read. */
+  retention?: Pick<RetentionStates, "documents" | "canManage">
 }
 
 const DEFAULT_FIND_DATE_COLUMN: FindDateColumn = { label: "Added", field: "created_at" }
@@ -66,12 +72,16 @@ export function DocumentList({
   folders,
   columns = "browse",
   findDateColumn = DEFAULT_FIND_DATE_COLUMN,
+  retention,
 }: Props) {
   const isFind = columns === "find"
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // Phase 275 (S10 / D-14): a 409 legal-hold refusal — the server's title + sentence, shown in
+  // place of the Delete buttons. Never "try again": a hold does not clear on a retry.
+  const [refusal, setRefusal] = useState<ApiRefusal | null>(null)
   const [activeScope, setActiveScope] = useState<"version" | "all" | null>(null)
   const [reingestingId, setReingestingId] = useState<string | null>(null)
   // Phase 114 (D-114-14): the Move-to-folder document-row action. A single dialog
@@ -110,6 +120,19 @@ export function DocumentList({
         ? documents.filter((d) => d.folder_id == null)  // == catches null AND undefined (pre-migration docs)
         : documents.filter((d) => d.folder_id === folderId)
 
+  // Phase 275 (S10 / D-14): a document the server already says is HELD opens the delete dialog
+  // straight into the refusal — the same box a server-refused race shows, with one Close.
+  const requestDelete = (doc: Document) => {
+    const state = retention?.documents[doc.id]
+    setDeleteTarget(doc)
+    setDeleteError(null) // 275-REVIEW IN-03: a new dialog never opens on the last one's error
+    setRefusal(null)
+    if (state?.held) {
+      const r = holdRefusalFor(state.hold_names, retention?.canManage ?? false)
+      setRefusal(new ApiRefusal(409, r.title, r.message))
+    }
+  }
+
   const toggle = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev)
@@ -126,9 +149,14 @@ export function DocumentList({
       await onDelete(deleteTarget.id, scope)
       setDeleteTarget(null)
       setDeleteError(null)
-    } catch {
-      setDeleteError("Delete failed. Please try again.")
-      // Do NOT close dialog — let user retry or cancel
+    } catch (err) {
+      if (err instanceof ApiRefusal && err.status === 409) {
+        setDeleteError(null)
+        setRefusal(err)
+      } else {
+        setDeleteError(RETENTION_COPY.contract.deleteFailed)
+      }
+      // Do NOT close dialog — let user retry or cancel (or, on a hold, read why and Close)
     } finally {
       setDeleting(false)
       setActiveScope(null)
@@ -201,11 +229,12 @@ export function DocumentList({
                 reingesting={reingestingId === doc.id}
                 onReingest={handleReingest}
                 onMove={setMoveTarget}
-                onDeleteRequest={setDeleteTarget}
+                onDeleteRequest={requestDelete}
                 onRefresh={onRefresh}
                 currentUserId={currentUserId}
                 columns={columns}
                 findDateColumn={findDateColumn}
+                retention={retention?.documents[doc.id]}
               />
             ))}
           </tbody>
@@ -219,6 +248,7 @@ export function DocumentList({
           if (!open) {
             setDeleteTarget(null)
             setDeleteError(null)
+            setRefusal(null)
             setActiveScope(null)
           }
         }}
@@ -227,7 +257,10 @@ export function DocumentList({
           <DialogHeader>
             <DialogTitle>Delete document?</DialogTitle>
             <DialogDescription>
-              {deleteTarget && hasVersions(deleteTarget) ? (
+              {refusal ? (
+                // 275-REVIEW IN-03: refusal mode deletes nothing — no "cannot be undone" warning.
+                <span className="font-medium text-foreground">{deleteTarget?.filename}</span>
+              ) : deleteTarget && hasVersions(deleteTarget) ? (
                 <>
                   This document has {deleteTarget.version_number} versions.{" "}
                   <span className="font-medium text-foreground">
@@ -249,6 +282,18 @@ export function DocumentList({
             <p className="text-sm text-destructive px-1">{deleteError}</p>
           )}
 
+          {refusal ? (
+            <HoldRefusalNotice
+              title={refusal.title}
+              message={refusal.message}
+              onClose={() => {
+                setDeleteTarget(null)
+                setRefusal(null)
+                setDeleteError(null)
+                setActiveScope(null)
+              }}
+            />
+          ) : (
           <DialogFooter>
             <Button
               variant="outline"
@@ -310,6 +355,7 @@ export function DocumentList({
               </Button>
             )}
           </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 

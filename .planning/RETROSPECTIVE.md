@@ -1061,6 +1061,43 @@ code review, **254** was the review phase.
 
 ---
 
+## Milestone: v4.5 — Find It, Show It
+
+**Shipped:** 2026-10-12
+**Phases:** 7 | **Plans:** 38
+**Timeline:** 2026-09-29 → 2026-10-12 (14 days) | **Commits:** 553 since v4.4
+
+### What Was Built
+- Original-file download + labelled file facts (270); document-first Find beside RAG, Filing rules in the Library (271)
+- Structured date/dimension filters in agent retrieval, failing closed on an empty filter (272)
+- Interactive chart / table / metric artifacts from a closed registry (273); thread-scoped chat attachments with explicit promote (274)
+- Retention policies, legal hold enforced in the database, audited disposition with dry run and typed confirm (275); public docs + API reference + videos (276)
+
+### What Worked
+- Live re-looks after review fixes kept finding real defects: 275's re-look found OBS-R2a (a dropped delete recorded with no document name) after every gate was green.
+- Putting the hold refusal in BEFORE DELETE / TRUNCATE triggers made every future delete path safe by construction, rather than guarding routes one at a time.
+- Fail-closed rollout for a feature that deletes customer data: sweep flag off by default, no save without a fresh preview, typed-count confirm.
+- Plan counts stayed inside G-8 (5-7 per phase, 5.4 average).
+
+### What Was Inefficient
+- Code review again found criticals AFTER verification and live sign-off (273: 2; 275: 5 critical + 19 warning, which needed migration 206).
+- The `phase.complete` SDK verb reported a ROADMAP update it never made and pointed STATE at an already-shipped phase; REQUIREMENTS rows (FIND-01/02/03/06) and ROADMAP progress rows (270/271) stayed stale until the audit.
+- Deploy split: 270-274 + 276 went live 2026-10-05, 275 closed a week later and is undeployed at milestone close.
+
+### Patterns Established
+- The closed-core inventory is re-counted at close (7 / 1 / 30), and a new tool is recorded as a decision at discuss (273 D-01).
+- An owed operator UAT is written down as its own file (`275-UAT.md`) rather than left in the conversation.
+
+### Key Lessons
+- Run code review BEFORE the live G-4 sign-off, not after: twice this milestone the review changed code the operator had already approved.
+- A cross-phase rule kept equal only by a "Mirrors…" comment (272's filter vocabulary vs 271's) is drift waiting to happen; pin it with a test.
+
+### Cost Observations
+- Model mix: not measured this milestone
+- Notable: solo Claude build + review; integration check by a fresh-context agent ran 119 cross-phase tests.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -1088,6 +1125,10 @@ code review, **254** was the review phase.
 | **v3.9 Connections: Any Service, Any Tool** | **16** | **111** | **6.9** | **9 days** |
 | **v4.0 Connected Knowledge** | **14** | **62** | **4.4** | **6 days** |
 | **v4.1 Ship It & Feel It** | **5** | **25** | **5.0** | **3 days** |
+| v4.2 The Connected Knowledge You Can Actually Run | 8 | 31 | 3.9 | 6 days |
+| v4.3 What You Can Actually Sell | 10 | 39 | 3.9 | 6 days |
+| v4.4 Experts That Actually Work | 5 | 24 | 4.8 | 7 days |
+| v4.5 Find It, Show It | 7 | 38 | 5.4 | 14 days |
 
 > ⚠ The v3.4 and v3.5 rows were **missing** from this table and were added at the v3.6 close —
 > both milestones shipped without a trends row. **v3.6 is the project's largest milestone by plan

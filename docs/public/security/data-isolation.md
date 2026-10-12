@@ -5,6 +5,7 @@ section: security
 audience: user
 status: written
 release: shipped
+updated: v4.5
 covers: [H42]
 summary: >-
   Each organisation's data is kept apart by the database itself. Inside an organisation your work
@@ -45,7 +46,7 @@ Workflows are visible only to the person who built them, plus the built-in start
 
 - Departments exist in the data model but nothing reads them yet, so there is no department-level access today.
 - The code sandbox runs on the same host as the deployment; see [Sandbox isolation](/docs/security/sandbox-isolation) for why it suits single-tenant installs only.
-- Per-organisation retention and legal hold are not available today.
+- Retention policies and legal holds reach only documents shared with the organisation, not private documents. See [Retention](/docs/administer/org/retention).
 
 ## Related
 

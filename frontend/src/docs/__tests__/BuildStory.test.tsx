@@ -24,6 +24,12 @@ const repoRoot = docsContent.findRepoRoot()
 const changelog = docsContent.parseHistory(`${repoRoot}/docs/history`) as Release[]
 const chapters = docsContent.parseChapters(`${repoRoot}/docs/history`) as Chapter[]
 const data = fixtureData([], {}, { changelog, chapters })
+// v4.5 shipped 2026-10-12, so no real release is unreleased. The badge MECHANISM is still driven:
+// the same v4.5 row with released flipped off (the honesty copy names v4.5, so the row must too).
+const unreleasedData = fixtureData([], {}, {
+  changelog: changelog.map((r) => (r.version === "v4.5" ? { ...r, released: false, date: null } : r)),
+  chapters,
+})
 
 const ORIGINAL_CH1 = VIDEOS["changelog.chapter-1"]
 
@@ -75,8 +81,14 @@ describe("Build Story page (D-26)", () => {
     expect(total).toBe(changelog.length)
   })
 
-  it("badges v4.5 Not yet released and no shipped release", () => {
+  it("badges no shipped release Not yet released — v4.5 shipped 2026-10-12", () => {
+    expect(changelog.find((r) => r.version === "v4.5")).toMatchObject({ released: true, date: "2026-10-12" })
     renderWithDocs(<BuildStory />, data)
+    expect(screen.queryByText("Not yet released")).toBeNull()
+  })
+
+  it("badges an unreleased release Not yet released and no shipped release", () => {
+    renderWithDocs(<BuildStory />, unreleasedData)
     const v45 = screen.getAllByRole("link").find((a) => a.getAttribute("href") === "/docs/changelog/v4.5")!
     expect(within(v45).getByText("Not yet released")).toBeInTheDocument()
     const v44 = screen.getAllByRole("link").find((a) => a.getAttribute("href") === "/docs/changelog/v4.4")!

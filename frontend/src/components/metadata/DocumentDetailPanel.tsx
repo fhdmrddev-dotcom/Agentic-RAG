@@ -47,6 +47,8 @@ import { getFileIcon } from "@/lib/fileIcons"
 import { NOT_RECORDED } from "@/lib/documentAddedBy"
 import { cn } from "@/lib/utils"
 import type { Document, MetadataFieldDef } from "@/types"
+import { RetentionSection } from "@/components/retention/RetentionSection"
+import type { RetentionDocumentState } from "@/lib/api/retention"
 
 const MOBILE_BREAKPOINT = 768
 
@@ -146,6 +148,9 @@ export interface DocumentDetailPanelProps {
   /** Phase 270 (P-02) — the signed-in user's id. OPTIONAL: it only decides whether "Added by"
    *  reads "You". Absent → "name not available", never an email. Display only, never authorization. */
   currentUserId?: string
+  /** Phase 275 (S8) — the document's server retention state, from LibraryPage's ONE batched read
+   *  (the section makes no fetch). Absent → no Retention section (other mounts are unchanged). */
+  retention?: { state?: RetentionDocumentState | null; canManage: boolean; onUnarchived?: () => void }
 }
 
 export function DocumentDetailPanel({
@@ -154,6 +159,7 @@ export function DocumentDetailPanel({
   onReconcile,
   onOpenDocument,
   currentUserId,
+  retention,
 }: DocumentDetailPanelProps) {
   const isMobile = useIsMobile()
   const [customDefs, setCustomDefs] = useState<MetadataFieldDef[]>([])
@@ -333,6 +339,12 @@ export function DocumentDetailPanel({
         <PanelSection title="File" defaultOpen>
           <DocumentFileFacts doc={doc} currentUserId={currentUserId} />
         </PanelSection>
+        {/* Phase 275 (S8): directly after File — a held or archived state changes what the reader may do. */}
+        {retention && (
+          <PanelSection title="Retention" defaultOpen>
+            <RetentionSection doc={doc} {...retention} />
+          </PanelSection>
+        )}
         {/* SEED-227 — the images this document has that were never read. Rendered ONLY
             when the backend stamped `_images`, which it does only on truncation, so the
             quiet case stays quiet. ⚠ Says "were read", past tense, against the ceiling
