@@ -295,3 +295,83 @@ count gate OK — 434/434 pinned files present, no per-file decrease, 0 failing.
 `+5` total and `+5` pinned against Task 1's `10131 / 9344`: exactly the five new cases
 (`RetentionHistory.test.tsx` 16→17, `RetentionTab.test.tsx` 11→12, `libraryRetention.test.tsx` 12→15), all
 re-pinned. Green on the first run; the cap was neither adjusted nor needed.
+
+## §7 Review-fix re-look (2026-10-12)
+
+*Chrome agent, driven 2026-10-12 10:31–10:42 UTC (the UI prints local time, UTC+4), on `develop` at `6aa0c79e0`.*
+
+**Environment.**
+- Local DB with migrations 204, 205 and 206 applied.
+- The backend (`:8000`, `--reload`) and vite were already running. Neither was started, stopped or restarted.
+- The admin signed in through the app's login form.
+- Active org `22f9c615…`, proven three ways: `localStorage['active-org-id']`, the `X-Org-Id` header, and the Org admin band `fhdmrd@gmail.com's Organization`.
+- DB lock `agentic-rag-localdb.lock` taken 10:31:22Z, released 10:42:31Z.
+- Every SQL statement targeted `127.0.0.1:54322` through a local asyncpg script. No Supabase MCP call of any kind was made.
+- The tab was hidden, so every verdict below is read from DOM text, a network status or SQL, never from a screenshot.
+
+**Fixtures.**
+- Folders, created with the app's own `POST /folders`, all `is_org_shared=true`:
+  - `/275-RL` (`9429e52e…`)
+  - `/275-RL/Sub` (`9c391b7d…`)
+  - `/275-RL-Life` (`464ecd0b…`)
+  - `/275-RL-Life/Moved` (`f30be658…`)
+- Five `.txt` files, uploaded with `POST /documents/upload`. All reached `completed`, with 1 chunk each:
+  - `rl-parent.txt` in `/275-RL`
+  - `rl-sub.txt` in `/275-RL/Sub`
+  - `rl-life-{a,b,c}.txt` in `/275-RL-Life`
+- The sweep ran **in-process**, because the running backend has `sweep_enabled:false`. It made the same calls as `POST /retention/sweep/run` (`api/retention.py:721-731`), on the app's own `get_pg_pool()`:
+  1. `rdb.claim_org_sweep_now`
+  2. `disposition.run_org_sweep`
+  3. `rdb.release_retention_sweep`
+
+| Row | Verdict | Evidence |
+|---|---|---|
+| **R1** held subtree | **PASS** | **Hold, placed through the UI:** Org admin → Retention → Legal holds → `+ New hold`. Matter `275 RL subfolder hold`; document typeahead `rl-sub` → `rl-sub.txt`; `Place hold`. Dialog: `1 document will be held today. …`. Card: `Holding` · `275 RL subfolder hold` · `Placed by fhdmrd@gmail.com on 12 Oct 2026 · covers 1 document · 1 document held today`. The hold covers **only a document in the SUBFOLDER**; the unheld `rl-parent.txt` sits directly in `/275-RL`. **Drive (twice):** Library → `275-RL` → Folder options → `Delete` → inline `Delete 275-RL? This will permanently delete the folder and all documents inside it.` → `Delete`. **Network:** `DELETE /folders/9429e52e… → 409`. **`role="alert"` notice, verbatim:** `Can't delete. This folder has 1 document on legal hold. Nothing was deleted. Release the hold in Org admin → Retention first.` + `Close`. **DB, before → after**, over `/275-RL` + `/275-RL/Sub`: folders **2 → 2**, documents **2 → 2**, chunks **2 → 2**, `storage.objects` **2 → 2**. The unheld parent-folder document survived too, so the delete was all-or-nothing. **Receipts:** `delete_refused` ×2 (`rl-sub.txt`, `hold_name='275 RL subfolder hold'`, 10:35:44Z and 10:36:15Z). **Not driven:** the empty-held-subfolder variant. It stays covered live by `test_275_delete_paths.py::test_a_held_empty_subfolder_refuses_the_parent_with_zero_deletes_b1`. |
+| **R2** confirm result banner | **PASS** | **Setup:** one batch of 3 (`rl-life-a/b/c.txt`), all queued by the sweep. From a second tab:<br>• `275 RL late hold` placed on **a** and **c** through the UI. Dialog `2 documents will be held today.`; card `covers 2 documents · 2 documents held today`.<br>• **b** moved to `/275-RL-Life/Moved` with `PATCH /documents/{b}/move` → 200. This changes b's family key and fingerprint after the sweep.<br>**Drive:** back in the first tab, typed `3` → `Delete 3 documents permanently`.<br>**Network:** `POST /retention/queue/3ee99fb5…/confirm` → **200**. Response: `"deleted":[]`; `did_not_delete` = a `held`, b `changed`, c `held`; `kept`, `archived`, `not_found`, `skipped`, `failed` and `bytes_not_removed` all `[]`.<br>**`role="status"` banner, verbatim:** `Nothing done` `Kept 2: rl-life-a.txt, rl-life-c.txt went on legal hold after the sweep, so it was dropped at confirm. Not done, changed since the sweep: rl-life-b.txt. One audit record per document names the document, the policy, the action, who approved it and when.`<br>**Banner style:** the chip reads `Nothing done` in amber classes; the banner fill is amber (`border-warning/30 bg-warning/10`), not green.<br>**DOM checks:** `/Deleted 0/` → **false**; a span reading exactly `Done` → **false**; a success-filled status → **false**.<br>**DB:** all 3 documents still present and archived; `storage.objects` 3; `retention_queue` 0.<br>**Receipts:** `did_not_delete` ×3, each with `policy_name='275 RL lifecycle'` and the admin as actor. a and c carry `{"reason":"held","held_since":"…10:40:43Z"}`; b carries `{"reason":"changed"}`.<br>⚠ The `failed` and `bytes_not_removed` clauses had no natural trigger here; they stay covered by `WaitingForYou.test.tsx` only. ⚠ See OBS-R2a and OBS-R2b below. |
+| **R3** Reload never records "kept" | **PASS** | **Starting state:** the card showed 2 rows (a, b), both checkboxes `checked=true`, and `Type 2 to confirm`.<br>**New row:** c was uploaded, back-dated and queued by a second sweep. The server now held 3 rows while the card still showed 2.<br>**Reaching Reload:** Reload is offered only after a failed confirm (`BatchFailure`) or a failed load. So the first confirm was **cancelled in the browser and never sent**: a fetch wrapper threw a network `TypeError` for that one request.<br>• Captured unsent body: `{"delete_ids":[a,b],"keep_ids":[],"archive_ids":[],"typed_count":2}`.<br>• `role="alert"`: `Couldn't confirm the batch. Some documents may already be deleted. History shows exactly which. Reload this list before trying again.` + **`Reload`**. This is the correct copy for a network failure with no server sentence (F-WR-01).<br>**After `Reload`:** `GET /retention/queue → 200`. The card re-mounted with **3 rows, all ticked** (`rl-life-a.txt:true`, `rl-life-b.txt:true`, `rl-life-c.txt:true`). **0** rows with `line-through`. No unticked note. `Type 3 to confirm`, with the input emptied.<br>**The real confirm that followed (R2), request body:** **`{"delete_ids":["e99b8e76…","fdc13abf…","2fa31c04…"],"keep_ids":[],"archive_ids":[],"typed_count":3}`**. `keep_ids` is empty, and the row that arrived on Reload (c, `2fa31c04…`) is in `delete_ids`.<br>**No `kept` receipt was written.** Receipt actions since 10:30Z: archived 3, delete_refused 2, did_not_delete 3, dry_run 1, hold_placed 2, hold_released 2, policy_deleted 1, policy_saved 1, queued_delete 3. |
+| **R4** posture while a sweep runs | **PASS-with-planted-state** | **DB state — real, not an UPDATE:** `rdb.claim_org_sweep_now` (the run-now claim) was called and the run was held back. `retention_sweeps`: `last_status='running'`, `last_run_at=10:37:22Z` (the previous run), `leased_until=10:53:34Z`. `GET /retention/summary` → `"last_status":"running"` with **`"sweep_enabled":false`** (the operator's backend runs with the flag off).<br>**Unmodified, the tab shows the flag-off branch:** `Scheduled sweeps are off. Nothing is archived or queued until they are turned on. Preview still works.` · `1 policy · 1 legal hold`.<br>**Planted, in the browser only:** a fetch wrapper in that tab rewrote **only** `sweep_enabled` to `true` in the summary response; every other field is the server's own. The Retention tab was then re-mounted.<br>**Posture, verbatim:** **`The latest sweep has not finished, so there is no result for it yet.`** · `Next sweep 13 Oct 2026, 06:00` · `1 policy · 1 legal hold`. The lead span carries `text-[hsl(32_90%_30%)] dark:text-warning` (amber) and the `ShieldAlert` svg. `finished` / `nothing failed` are absent.<br>**Control:** after `run_org_sweep` + `release_retention_sweep` (`status ok`, `last_run_at=10:39:23Z`, lease NULL), the same wrapped tab re-mounted to `Last sweep 12 Oct 2026, 14:39 finished, nothing failed`.<br>**Restored:** the real release function closed the claim, so no SQL restore was needed. The fetch wrapper was removed. No `retention_sweeps` UPDATE was issued by hand. |
+| **R5a** History `delete_refused` | **PASS** | Retention → History: `✎ Refused to delete rl-sub.txt: on legal hold` (×2, from R1). The earlier drive's receipts render the same way: `Refused to delete g4-hold-1.txt: on legal hold`, `… g4-hold-2.txt …` (7 such rows on the page). `/delete_refused/.test(main.innerText)` → **false**. |
+| **R5b** two-stage folder line | **PASS** | Library → `275-RL-Life` (policy: archive 1 day after added, then queue for deletion after 2 days): **`This folder: kept 1 day after added to the Library, then archived; queued for deletion 2 days after added to the Library.`** The archive comes before the deletion queue. |
+| **R5c** posture `1 policy` | **PASS** | After `Save policy`: **`1 policy · 1 legal hold`**. After cleanup: `0 policies · 0 legal holds`. |
+| **R5d** fully archived folder | **PASS** | `275-RL-Life`, with both documents archived, showed the folder line and then only **`2 archived documents hidden · Show`**. `includes('No documents in this folder')` → **false**; `includes('Upload files above to add them here')` → **false**. |
+
+**Supporting reads for the lifecycle rows.**
+- **Policy, made through the UI:**
+  - Steps: `+ New policy` → Name `275 RL lifecycle` → Folder `/275-RL-Life` (+ subfolders) → Keep for `1` `days` → Counted from `date_added` → Then `archive` → `Then queue it for deletion` after `2` `days` → `1 · Preview` → `2 · Save policy`.
+  - Preview: `2 would be archived` · `rl-life-a.txt · due 11 Oct 2026` · `rl-life-b.txt · due 11 Oct 2026` · `0 skipped — on legal hold` … `0 not due yet`.
+  - Policies row after Save: `1 day after added to the Library, delete after 2 days` · `Archive` `Delete · needs approval` · `2 due now`.
+- **Sweep 1:** `archived 2, queued_delete 2, held 1` (the held document is the R1 hold).
+- **Sweep 2:** `archived 1, queued_delete 1, held 1`.
+
+**New findings (no code changed, per instruction).**
+
+| Id | What | Where | Severity |
+|---|---|---|---|
+| OBS-R2a | **History renders the `changed` drop as `Did not delete not recorded`, naming neither the document nor the reason.**<br>• **Backend:** the document was moved, and `family_key` embeds `folder_id`, so the queued family's key no longer resolves in the confirm-time snapshot. `_confirm_delete` then sets `name = fam.name if fam else None` and writes the `did_not_delete` receipt with `document_name = NULL`. The confirm response also carries `"name": null` for that row.<br>• **Frontend:** `RetentionHistory.tsx:47-55` renders only `Did not delete **{doc}**` for any reason other than `held`, and the null name becomes `not recorded`.<br>• The banner was right only because it fell back to the card's row name. | `backend/app/services/retention/disposition.py:596-601`; the same `fam is None` pattern sits at `:525`, `:671` and `:702-712`.<br>`frontend/src/components/retention/RetentionHistory.tsx:47-55`.<br>UI-SPEC S5 has no `changed` / `not_found` History sentence. | User-visible audit-ledger copy defect. The receipt still carries `document_id`, `policy_name` and `detail.reason="changed"`, so nothing is missing from the record; only the rendered sentence is wrong. **Open — not fixed here** |
+| OBS-R2b | The ported late-hold clause stays singular for a plural count: `Kept 2: rl-life-a.txt, rl-life-c.txt went on legal hold after the sweep, so **it was** dropped at confirm.` | `retentionCopy.ts` late-hold template (ported from the sketch) | Cosmetic grammar. Open |
+| OBS-R4 | With the scheduled-sweep flag off (the shipped default, D-29), a `running` status can never show: the flag-off branch wins (`RetentionTab.tsx:44-54`), so a run-now in flight reads only `Scheduled sweeps are off…`. That sentence is true, so this is not a defect. Recorded so the next look knows R4 needs the flag on. | `frontend/src/components/retention/RetentionTab.tsx:44` | Note |
+
+**Data created, removed, restored and kept.**
+
+- **Created, then removed:**
+  - Folders `/275-RL`, `/275-RL/Sub`, `/275-RL-Life`, `/275-RL-Life/Moved`.
+  - Documents `rl-parent.txt`, `rl-sub.txt`, `rl-life-a.txt`, `rl-life-b.txt`, `rl-life-c.txt`.
+  - Removed after the holds were released, with the admin's `DELETE /folders/{id}` → `204`, `204`.
+  - Final SQL: test folders **0**, `rl-*` documents **0**, their chunks **0**, their storage objects **0**, active holds **0**, policies **0**, queue **0**, archived documents **0**.
+- **Released through the UI** (Legal holds → `Release hold…`):
+  - `Release “275 RL late hold”?` · `2 documents will no longer be protected. …`
+  - `275 RL subfolder hold`: `1 document will no longer be protected. …`
+  - After both: `0 active` · `4 released holds`.
+- **Removed through the UI** (Policies → row → `Remove policy…` → `Remove policy`): policy `275 RL lifecycle`. Dialog: `Remove “275 RL lifecycle”?` · `No documents are deleted. …`. After: `0 policies · 0 legal holds`.
+- **Planted state, all restored:**
+  - Fixture back-dating:
+    - `UPDATE documents SET created_at = created_at - interval '3 days' WHERE folder_id='464ecd0b…'` (2 rows).
+    - The same UPDATE for `rl-life-c.txt` (`id='2fa31c04…'`, 1 row).
+    - The documents themselves were deleted afterwards.
+  - R4: the `running` sweep row came from the real claim and was closed by the real release (`last_status ok`, lease NULL).
+  - The browser fetch wrappers (R3 cancel-once, R4 `sweep_enabled`) lived only in two tabs, which were closed afterwards.
+- **Kept on purpose:**
+  - The 18 immutable `retention_receipts` this drive wrote (archived 3, delete_refused 2, did_not_delete 3, dry_run 1, hold_placed 2, hold_released 2, policy_deleted 1, policy_saved 1, queued_delete 3). They are this drive's audit trail (T-275-07).
+  - The 2 released `legal_holds` rows and their coverage rows.
+  - The preview rows.
+  - The org's `retention_sweeps` row (`last_status ok`, `last_run_at 10:39:23Z`).
