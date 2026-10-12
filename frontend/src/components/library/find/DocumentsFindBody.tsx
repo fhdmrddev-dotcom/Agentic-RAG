@@ -121,7 +121,7 @@ export function FindSearchRow({
 /** What DocumentList needs that Find does not decide: row actions, the reader, the selection. */
 export type FindListProps = Pick<
   ComponentProps<typeof DocumentList>,
-  "onDelete" | "onRefresh" | "currentUserId" | "onSelect" | "selectedDocId" | "folders"
+  "onDelete" | "onRefresh" | "currentUserId" | "onSelect" | "selectedDocId" | "folders" | "retention"
 >
 
 export interface DocumentsFindResultsProps {

@@ -517,6 +517,7 @@ class TestDeleteDocument:
     def test_returns_204_on_success(self, client, auth_headers, mock_builder):
         mock_builder.execute.side_effect = [
             _make_result(_doc_row()),  # select the document (ownership check)
+            _make_result([]),          # Phase 275: hold_guard's retention_held_documents RPC (nothing held)
             _make_result([]),          # delete
         ]
         response = client.delete(f"/documents/{DOC_ID}", headers=auth_headers)
@@ -531,6 +532,7 @@ class TestDeleteDocument:
     def test_delete_body_is_empty(self, client, auth_headers, mock_builder):
         mock_builder.execute.side_effect = [
             _make_result(_doc_row()),
+            _make_result([]),  # Phase 275: hold_guard's retention_held_documents RPC (nothing held)
             _make_result([]),
         ]
         response = client.delete(f"/documents/{DOC_ID}", headers=auth_headers)

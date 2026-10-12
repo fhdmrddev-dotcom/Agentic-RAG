@@ -110,9 +110,13 @@ CREATE POLICY "Users can read own documents" ON storage.objects FOR SELECT TO au
 DROP POLICY IF EXISTS "Users can upload to own documents folder" ON storage.objects;
 CREATE POLICY "Users can upload to own documents folder" ON storage.objects FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'documents' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+-- migration 206 (Phase 275 B-CR-02): a file that still backs a documents row is not deletable by
+-- a user JWT — the bytes of a held document can only go after its (hold-refused) row.
 DROP POLICY IF EXISTS "Users can delete own documents" ON storage.objects;
 CREATE POLICY "Users can delete own documents" ON storage.objects FOR DELETE TO authenticated
-  USING (bucket_id = 'documents' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+  USING (bucket_id = 'documents'
+         AND (storage.foldername(name))[1] = (select auth.uid()::text)
+         AND NOT public.storage_object_backs_document(name));
 
 -- sandbox-outputs policies
 DROP POLICY IF EXISTS "Users can read own sandbox outputs" ON storage.objects;
@@ -517,6 +521,65 @@ REVOKE ALL ON TABLE public.message_artifacts FROM service_role;
 GRANT SELECT ON TABLE public.message_artifacts TO authenticated;
 GRANT SELECT, INSERT, DELETE ON TABLE public.message_artifacts TO service_role;
 
+-- migration 204 — Phase 275 retention + legal hold: SELECT through org:manage RLS only; policies,
+-- releases, the queue, skips and previews are written by the backend's service pool (D-28, W-2b).
+-- Receipts are INSERT/SELECT for every role (D-13). Holds are released, never deleted. TRUNCATE is
+-- taken away from the JWT roles (D-14 — TRUNCATE skips the hold row triggers). Copied, not retyped.
+REVOKE TRUNCATE ON public.documents, public.folders FROM authenticated, anon;
+REVOKE ALL ON TABLE public.retention_policies FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_policies FROM anon;
+REVOKE ALL ON TABLE public.retention_policies FROM authenticated;
+REVOKE ALL ON TABLE public.retention_policies FROM service_role;
+GRANT SELECT ON TABLE public.retention_policies TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.retention_policies TO service_role;
+REVOKE ALL ON TABLE public.retention_previews FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_previews FROM anon;
+REVOKE ALL ON TABLE public.retention_previews FROM authenticated;
+REVOKE ALL ON TABLE public.retention_previews FROM service_role;
+GRANT SELECT ON TABLE public.retention_previews TO authenticated;
+GRANT SELECT, INSERT, DELETE ON TABLE public.retention_previews TO service_role;
+REVOKE ALL ON TABLE public.legal_holds FROM PUBLIC;
+REVOKE ALL ON TABLE public.legal_holds FROM anon;
+REVOKE ALL ON TABLE public.legal_holds FROM authenticated;
+REVOKE ALL ON TABLE public.legal_holds FROM service_role;
+GRANT SELECT, INSERT ON TABLE public.legal_holds TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON TABLE public.legal_holds TO service_role;
+REVOKE ALL ON TABLE public.legal_hold_documents FROM PUBLIC;
+REVOKE ALL ON TABLE public.legal_hold_documents FROM anon;
+REVOKE ALL ON TABLE public.legal_hold_documents FROM authenticated;
+REVOKE ALL ON TABLE public.legal_hold_documents FROM service_role;
+GRANT SELECT, INSERT ON TABLE public.legal_hold_documents TO authenticated;
+GRANT SELECT, INSERT ON TABLE public.legal_hold_documents TO service_role;
+REVOKE ALL ON TABLE public.legal_hold_folders FROM PUBLIC;
+REVOKE ALL ON TABLE public.legal_hold_folders FROM anon;
+REVOKE ALL ON TABLE public.legal_hold_folders FROM authenticated;
+REVOKE ALL ON TABLE public.legal_hold_folders FROM service_role;
+GRANT SELECT, INSERT ON TABLE public.legal_hold_folders TO authenticated;
+GRANT SELECT, INSERT ON TABLE public.legal_hold_folders TO service_role;
+REVOKE ALL ON TABLE public.retention_queue FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_queue FROM anon;
+REVOKE ALL ON TABLE public.retention_queue FROM authenticated;
+REVOKE ALL ON TABLE public.retention_queue FROM service_role;
+GRANT SELECT ON TABLE public.retention_queue TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.retention_queue TO service_role;
+REVOKE ALL ON TABLE public.retention_skips FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_skips FROM anon;
+REVOKE ALL ON TABLE public.retention_skips FROM authenticated;
+REVOKE ALL ON TABLE public.retention_skips FROM service_role;
+GRANT SELECT ON TABLE public.retention_skips TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.retention_skips TO service_role;
+REVOKE ALL ON TABLE public.retention_receipts FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_receipts FROM anon;
+REVOKE ALL ON TABLE public.retention_receipts FROM authenticated;
+REVOKE ALL ON TABLE public.retention_receipts FROM service_role;
+GRANT SELECT ON TABLE public.retention_receipts TO authenticated;
+GRANT SELECT, INSERT ON TABLE public.retention_receipts TO service_role;
+REVOKE ALL ON TABLE public.retention_sweeps FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_sweeps FROM anon;
+REVOKE ALL ON TABLE public.retention_sweeps FROM authenticated;
+REVOKE ALL ON TABLE public.retention_sweeps FROM service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.retention_sweeps TO service_role;
+
 
 -- ============================================================
 -- 6. Function EXECUTE privileges (migration 181 / Phase 248, CRED-03)
@@ -707,3 +770,61 @@ REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.message_artifacts_immutable() TO service_role;
+
+-- migration 204 — Phase 275: the hold predicates and the folder walk are service_role ONLY (W-5b);
+-- the trigger functions are trigger-only (Group A shape, no grant). Copied, not retyped.
+REVOKE EXECUTE ON FUNCTION public.retention_folder_ancestors(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.retention_folder_ancestors(uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.retention_folder_ancestors(uuid) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.retention_folder_ancestors(uuid) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.retention_held_documents(uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.retention_held_documents(uuid[]) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.retention_held_documents(uuid[]) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.retention_held_documents(uuid[]) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.retention_held_folders(uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.retention_held_folders(uuid[]) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.retention_held_folders(uuid[]) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.retention_held_folders(uuid[]) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.documents_refuse_held_delete() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.folders_refuse_held_delete() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.documents_sticky_hold_on_move() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.folders_sticky_hold_on_move() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.retention_refuse_truncate() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.documents_protect_archive_state() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.retention_policies_protect_columns() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.legal_holds_protect_columns() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.legal_hold_coverage_same_org() FROM PUBLIC, anon, authenticated;
+
+-- migration 205 — Phase 275: the two RPCs re-asserted, query_user_documents loses PUBLIC/anon, and
+-- the document_is_retrievable helper the RESTRICTIVE agent-read policies call (D-36).
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) FROM anon;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.query_user_documents(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.query_user_documents(text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.query_user_documents(text) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.document_is_retrievable(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.document_is_retrievable(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.document_is_retrievable(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.document_is_retrievable(uuid) TO service_role;
+
+-- migration 206 — Phase 275 fix pass: the storage-backing helper the documents DELETE policy calls,
+-- the one-transaction folder delete (SECURITY INVOKER, user-callable), and four trigger-only
+-- functions. Copied, not retyped.
+REVOKE EXECUTE ON FUNCTION public.storage_object_backs_document(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.storage_object_backs_document(text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.storage_object_backs_document(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.storage_object_backs_document(text) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.delete_folder_tree(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.delete_folder_tree(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.delete_folder_tree(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_folder_tree(uuid) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.documents_hold_identity_guard() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.folders_hold_identity_guard() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.retention_policies_folder_same_org() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.documents_inherit_family_archive() FROM PUBLIC, anon, authenticated;

@@ -1,5 +1,42 @@
 # Milestones
 
+## v4.5 Find It, Show It (Shipped: 2026-10-12)
+
+**Phases:** 7 (270-276) · **Plans:** 38 · **Commits:** 553 since `v4.4` · **Files:** 1,530
+(+268,038 / −2,102; largest shares: planning records 76.6k, `docs/public` 60.8k, frontend 33.4k) · **Migrations:** 199-206 ·
+**Timeline:** 2026-09-29 → 2026-10-12 (14 days)
+**Audit:** [`v4.5-MILESTONE-AUDIT.md`](milestones/v4.5-MILESTONE-AUDIT.md) — `tech_debt`, no blockers ·
+**25 / 25** satisfied · integration **8/8** · flows **3/3**.
+
+Find a document by what it IS, get the file back out, and let the agent answer with something you
+can interact with — plus the one absent DMS capability, retention with legal hold.
+
+**Key accomplishments:**
+
+- **The document as an object** (270). Download the original file through an org-checked,
+  short-lived signed URL; the detail panel states pages, size and every date labelled for what it means.
+- **Find the document, and close means wrong** (271, 272). A document-first Find beside RAG search
+  (type, owner, dates, fields, folder, relationships, versions); Filing rules moved into the Library.
+  The agent passes date and dimension filters into retrieval structurally and an empty filter fails
+  closed — "October revenue" cannot return March (SC#4 6/8 providers by decision).
+- **Agent-authored artifacts** (273). Interactive chart / table / metric from a closed registry via
+  `show_artifact` — the one deliberate tool added (closed core 7 / 1 / **30**); rows kept, reload-identical.
+- **Thread-scoped attachments** (274). What you drop into a chat stays in that chat; the Library grows
+  only by an explicit promote.
+- **Retention & legal hold** (275). Policies per type or folder that cannot be saved unpreviewed; a hold
+  refused in the database on every delete path; scheduled disposition with a dry run, a typed-count
+  confirm and one audit record per document; archived documents out of every agent read but findable.
+- **Public docs** (276). `/docs` in the landing look, a Syrel API reference from OpenAPI, a coverage
+  gate, a generated changelog and Syrel videos.
+
+⚠ Verification mode is `self-verified` for 270-276. 271/272/273 close `human_needed` (operator
+sign-offs owed, every ROADMAP SC verified).
+✅ 270-274 + 276 deployed 2026-10-05 (prod `bd9e126c3`, cloud DB at migration 203).
+⛔ **275 NOT deployed** — production migrations 204 → 205 → 206 before the backend; sweep flag stays off.
+Known deferred items at close: 47 (see STATE.md Deferred Items).
+
+---
+
 ## v4.4 Experts That Actually Work (Shipped: 2026-09-29)
 
 **Phases:** 5 (265-269) · **Plans:** 24 · **Commits:** 351 since `v4.3` · **Files:** 758

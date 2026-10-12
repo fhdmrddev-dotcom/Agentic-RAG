@@ -41,7 +41,7 @@ Its two readers are pure functions below it:
 So the preview, the event and the run all read one composition. ⛔ No LLM client, no agent loop.
 
 ⚠ THE DOCUMENT PREDICATE is written ONCE (``_count_kb_documents``) and is retrieval's own
-(``match_document_chunks``): ``is_latest = true`` and ``source_state`` not ``source_disconnected``,
+(``match_document_chunks``): ``is_latest = true`` and the ``retrievable`` column (migration 205),
 queried on the USER-JWT client so the ``documents`` SELECT RLS policy — the same visibility predicate
 retrieval applies — decides what is counted. Ingest status is NOT filtered: a document still ingesting
 is "one of this chat's documents that will not be used" all the same. The D-267-20 DB check (267-05)
@@ -66,6 +66,7 @@ from app.models.message import (
 )
 from app.models.thread import ExpertScopePreview, ScopeEffect, ScopePreviewFolder, ScopePreviewThreadFolder
 from app.services.expert_service import connection_states, get_expert_service, resolve_expert_bundle
+from app.services.retrieval_scope import RETRIEVABLE_COLUMN
 from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders
 
@@ -158,8 +159,6 @@ def compose_expert_scope(
 
 # ── Phase 267-02: the statement ──────────────────────────────────────────────────────────────────
 
-# Retrieval's source-state predicate (match_document_chunks), in PostgREST ``or_`` form.
-_NOT_SOURCE_DISCONNECTED = "source_state.is.null,source_state.neq.source_disconnected"
 _NAMED_LIMIT = 5
 
 # Shared plain-text vocabulary for ``event_sentence`` only. The UI renders from the payload through
@@ -177,7 +176,7 @@ def _mode(raw: object) -> str:
 async def _count_kb_documents(supabase, folder_ids) -> tuple[int, tuple[str, ...]]:
     """THE document predicate, written once: exact count + up to 5 filenames from ONE response.
 
-    Latest, not source-disconnected, any ingest status — under the caller's RLS (user-JWT client).
+    Latest, retrievable (mig 205), any ingest status — under the caller's RLS (user-JWT client).
     """
     ids = list(folder_ids)
     if not ids:
@@ -187,7 +186,7 @@ async def _count_kb_documents(supabase, folder_ids) -> tuple[int, tuple[str, ...
         .select("id, filename", count="exact")
         .in_("folder_id", ids)
         .eq("is_latest", True)
-        .or_(_NOT_SOURCE_DISCONNECTED)
+        .eq(RETRIEVABLE_COLUMN, True)  # Phase 275 D-36: retrieval's own predicate, by name
         .order("filename")
         .limit(_NAMED_LIMIT)
     )

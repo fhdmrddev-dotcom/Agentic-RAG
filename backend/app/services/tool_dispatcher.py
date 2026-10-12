@@ -45,6 +45,8 @@ from app.utils.folder_utils import get_globally_visible_folder_ids, _resolve_cal
 # to a shared import-light home so the grounding/canvas seam reuses it instead of copying it.
 from app.utils.skill_visibility import build_skill_visibility_or
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
+# Phase 275 (D-18 / D-36) — the archived / source-gone wall, one call beside each folder wall
+from app.services.retention.agent_wall import not_retrievable_result, unretrievable
 # Phase 272 (D-15) — handler moved to search_documents_tool.py; registry/handler split still OWED (→273)
 from app.services.search_documents_tool import handle_search_documents as _handle_search_documents
 # Phase 273 (D-14) — show_artifact handler in its own module; registry/handler split still OWED (OV-273-02)
@@ -358,6 +360,8 @@ async def _handle_read_document(args: dict, ctx: ToolContext) -> ToolResult:
             "error": f"Document {args['document_id']} {_OUT_OF_SCOPE}.",
             "error_kind": "out_of_scope",
         }))
+    if await unretrievable(ctx.supabase, [str(args["document_id"])]):
+        return ToolResult(result=json.dumps(not_retrievable_result(args["document_id"])))
     result = await read_path(
         args["document_id"],
         ctx.current_user["id"],
@@ -399,6 +403,8 @@ async def _fetch_owned_document_bytes(
             "error": f"Document {document_id} {_OUT_OF_SCOPE}.",
             "error_kind": "out_of_scope",
         }
+    if await unretrievable(ctx.supabase, [str(document_id)]):
+        return not_retrievable_result(document_id)
     uid = ctx.current_user["id"]
     _cols = "id, filename, file_path, file_size, mime_type"
 
@@ -910,13 +916,15 @@ async def _handle_query_documents_by_view(args: dict, ctx: ToolContext) -> ToolR
     limit = max(1, min(_norm_limit if _norm_limit is not None else 20, 50))  # default 20, hard cap 50 (D-115-3)
 
     try:
+        # Phase 275 (D-36, revision B-2): the agent's listing omits archived / source-gone
+        # documents AT THE QUERY, and the total counts the same filtered set (honest total).
         total = (await resolve_filter(
             caller=caller, flt=flt, folder_scope=folder_scope,
-            count_only=True, supabase=ctx.supabase,
+            count_only=True, supabase=ctx.supabase, retrievable_only=True,
         ))["total"]
         full = await resolve_filter(
             caller=caller, flt=flt, folder_scope=folder_scope,
-            count_only=False, supabase=ctx.supabase,
+            count_only=False, supabase=ctx.supabase, retrievable_only=True,
         )
     except ResolveError as e:  # the extracted core raises this, NOT HTTPException
         return ToolResult(result=json.dumps({
@@ -1026,6 +1034,7 @@ async def _handle_get_related_documents(args: dict, ctx: ToolContext) -> ToolRes
             document_id=doc_id or None,
             filename=filename or None,
             supabase=ctx.supabase,
+            retrievable_only=True,  # Phase 275 (D-36, B-2): omit archived / source-gone endpoints
         )
     except Exception as e:  # noqa: BLE001 — calm-string contract; never raise into the loop
         logger.exception("get_related_documents traversal failed for caller=%s", caller)
@@ -1076,6 +1085,8 @@ async def _handle_analyze_document(args: dict, ctx: ToolContext) -> ToolResult:
         return ToolResult(result=f"Document '{args['filename']}' not found.")
     if await _doc_out_of_scope(ctx, str(doc_id)):
         return ToolResult(result=f"Document '{args['filename']}' {_OUT_OF_SCOPE}.")
+    if await unretrievable(ctx.supabase, [str(doc_id)]):
+        return ToolResult(result=json.dumps(not_retrievable_result(doc_id)))
 
     doc = await fetch_full_document(doc_id, ctx.current_user["id"], ctx.supabase)
     if not doc:

@@ -25,6 +25,13 @@ VALID_ACTION_TYPES = frozenset({
     "metadata.field.create",                            # 111
     # Phase 223 (GRANT-05 / SC#1 / SC#1a / lockstep with migration 152 CHECK):
     "connector.call", "connector.grant",
+    # Phase 234 (LIB-08) — in the migration 170 CHECK since then, missing here until 275 (D-27):
+    "connector.watch.create", "connector.watch.delete", "connector.watch.sync",
+    # Phase 275 (D-27 / lockstep with migration 204 CHECK) — retention admin commands + folder delete:
+    "retention.policy.create", "retention.policy.update", "retention.policy.delete",
+    "retention.hold.create", "retention.hold.update", "retention.hold.release",
+    "retention.disposition.confirm", "retention.document.unarchive", "retention.document.keep",
+    "folder.delete",
 })
 
 

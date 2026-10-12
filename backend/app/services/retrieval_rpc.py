@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # ── Phase 272 (D-14 / D-10) — the FILTERED path's three constants ────────────────────────────
 # MEASURED by 272-05 on recall_bench (100k chunks), 2026-10-03 — the SEED-273 ladder with custom
-# AND generic body EXPLAIN at every point: .planning/phases/272-close-means-wrong/evidence/
+# AND generic body EXPLAIN at every point: .planning/milestones/v4.5-phases/272-close-means-wrong/evidence/
 # recall-ladder.json (+ recall-ladder-15000.json), table in 272-VALIDATION.md §2. Never an env var
 # (deploy-artifact parity: a value that ships in code needs no Coolify/Vercel twin to drift from).
 #

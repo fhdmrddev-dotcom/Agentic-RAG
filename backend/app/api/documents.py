@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 from storage3.exceptions import StorageApiError
@@ -35,6 +35,7 @@ from app.services.embedding_service import chunk_text, embed_chunks, extract_met
 from app.services.email_attachments import ingest_email_attachments
 from app.services.ingest_enrich import enrich_for_ingest
 from app.services.extraction_service import ExtractedDocument
+from app.services.retention import hold_guard  # Phase 275 (D-14 / D-32): the one hold check
 from app.utils.db import aexec
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
@@ -1809,6 +1810,7 @@ async def reextract_document(
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: str,
+    request: Request,
     background_tasks: BackgroundTasks,
     scope: str = Query(default="version", pattern="^(version|all)$"),
     current_user: dict = Depends(get_current_user),
@@ -1819,13 +1821,12 @@ async def delete_document(
     # RLS-enforced `supabase`.
     service_supabase: Client = Depends(get_supabase),
 ):
-    doc_resp = (
+    doc_resp = await aexec(
         supabase.table("documents")
         .select("*")
         .eq("id", document_id)
         .eq("user_id", current_user["id"])
         .maybe_single()
-        .execute()
     )
     if not doc_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
@@ -1844,31 +1845,43 @@ async def delete_document(
             siblings_q = siblings_q.is_("folder_id", "null")
         else:
             siblings_q = siblings_q.eq("folder_id", folder_id)
-        siblings = siblings_q.execute().data or []
+        siblings = (await aexec(siblings_q)).data or []
+        sibling_ids = [s["id"] for s in siblings]
 
-        # D-10: delete all storage files; failures silently swallowed
-        for sibling in siblings:
-            if sibling.get("file_path"):
-                try:
-                    supabase.storage.from_("documents").remove([sibling["file_path"]])
-                except Exception:
-                    pass
+        # Phase 275 (D-14 / D-38): check the hold FIRST, then rows, then bytes — a refusal
+        # (here, or a PT409 racing past it) never costs a file.
+        await hold_guard.assert_none_held(
+            request, current_user, sibling_ids, kind="document", service_supabase=service_supabase,
+        )
 
         # Delete all sibling rows; ON DELETE CASCADE handles chunks/tables/images (D-09)
         # user_id guard redundant (sibling_ids from user-scoped SELECT) but added for defence-in-depth
-        sibling_ids = [s["id"] for s in siblings]
         if sibling_ids:
-            supabase.table("documents").delete().eq("user_id", current_user["id"]).in_("id", sibling_ids).execute()
+            with hold_guard.map_hold_refusal(kind="document"):
+                await aexec(supabase.table("documents").delete().eq("user_id", current_user["id"]).in_("id", sibling_ids))
+
+        # D-10 / D-38: storage files AFTER the rows; a failure is logged, never blocks the delete
+        for sibling in siblings:
+            if sibling.get("file_path"):
+                try:
+                    await run_in_threadpool(lambda p=sibling["file_path"]: supabase.storage.from_("documents").remove([p]))
+                except Exception as exc:
+                    log.warning("delete_document: storage remove failed for %s: %s", sibling["file_path"], exc)
 
     else:
         # scope == "version" (default) — D-06: delete only the targeted row + storage file
-        # D-10: storage failure silently swallowed
-        try:
-            supabase.storage.from_("documents").remove([target["file_path"]])
-        except Exception:
-            pass
+        await hold_guard.assert_none_held(
+            request, current_user, [document_id], kind="document", service_supabase=service_supabase,
+        )
 
-        supabase.table("documents").delete().eq("id", document_id).eq("user_id", current_user["id"]).execute()
+        with hold_guard.map_hold_refusal(kind="document"):
+            await aexec(supabase.table("documents").delete().eq("id", document_id).eq("user_id", current_user["id"]))
+
+        # D-10 / D-38: storage file AFTER the row; a failure is logged, never blocks the delete
+        try:
+            await run_in_threadpool(lambda: supabase.storage.from_("documents").remove([target["file_path"]]))
+        except Exception as exc:
+            log.warning("delete_document: storage remove failed for %s: %s", target.get("file_path"), exc)
 
         # D-06: if deleted row was is_latest, promote next-highest sibling
         if target.get("is_latest"):
@@ -1883,13 +1896,13 @@ async def delete_document(
                 siblings_q = siblings_q.is_("folder_id", "null")
             else:
                 siblings_q = siblings_q.eq("folder_id", folder_id)
-            siblings = siblings_q.execute().data or []
+            siblings = (await aexec(siblings_q)).data or []
 
             if siblings:
                 # Sort descending by version_number; promote the highest
                 siblings.sort(key=lambda s: s.get("version_number") or 0, reverse=True)
                 next_latest_id = siblings[0]["id"]
-                supabase.table("documents").update({"is_latest": True}).eq("id", next_latest_id).execute()
+                await aexec(supabase.table("documents").update({"is_latest": True}).eq("id", next_latest_id))
 
     # D-11: audit log for both paths — include scope in metadata
     background_tasks.add_task(

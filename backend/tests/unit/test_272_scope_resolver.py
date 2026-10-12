@@ -143,7 +143,10 @@ async def test_step1_is_bounded_to_orgs_latest_connected_and_the_folder_scope(ha
     q = docs[0]
     assert ("org_id", sorted(ORGS)) in q.args_of("in_")
     assert ("is_latest", True) in q.args_of("eq")
-    assert ("source_state.is.null,source_state.neq.source_disconnected",) in q.args_of("or_")
+    # SEED-177 — retired ON PURPOSE by 275-01: predicate moved to the generated `retrievable` column,
+    # mig 205, D-36 (the old `.or_` named only source_disconnected — BUG-261004-01's drift).
+    assert ("retrievable", True) in q.args_of("eq")
+    assert not any("source_state" in str(a) for a in q.args_of("or_")), "the old clause is back"
     assert ("metadata", {"legal_entity": "Acme GmbH"}) in q.args_of("contains")
     assert ("folder_id", ["f1"]) in q.args_of("in_"), "D-19: the folder scope was dropped"
     assert res.document_ids == ("d1",)

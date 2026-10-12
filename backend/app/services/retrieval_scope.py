@@ -10,9 +10,14 @@ extraction 272-01 discharged. 272-01 laid the CONTRACTS; 272-03 adds the resolve
 ``DEFAULT_PREDICATES`` names the predicates the retrieval RPCs already hardcode. Each entry says
 whether the RPC enforces it (``enforced_in_rpc``) and, when it must be applied in Python instead,
 the ViewCondition-shaped ``condition`` the resolver applies. ``requires_resolved_scope`` reads the
-tuple and never a predicate's NAME — so Phase 275 appends ``not_archived`` with
-``enforced_in_rpc=False`` and every search then resolves a scope. **No branch is added.**
+tuple and never a predicate's NAME. **No branch is added.**
 (``tests/unit/test_272_scope_seam.py`` fences that the function body carries no string literal.)
+
+Phase 275 (D-36, measured): the archived + source-state exclusion is the generated column
+``documents.retrievable`` (migration 205), enforced INSIDE both RPCs — so it rides the middle entry
+as ``enforced_in_rpc=True`` and an unfiltered search still resolves no scope (the planned
+``not_archived`` with ``enforced_in_rpc=False`` would have cost every search an O(org documents)
+resolve). ``RETRIEVABLE_COLUMN`` is the one Python name for it; nothing restates the rule.
 
 ## "No filter" and "matched nothing" are different TYPES (D-18)
 
@@ -66,16 +71,21 @@ class RetrievalPredicate:
     enforced_in_rpc: bool
 
 
+# Phase 275 (D-36) — the ONE Python name for "may an agent read this document": migration 205's STORED
+# generated column `retrievable` = archived_at IS NULL AND (source_state IS NULL OR source_state =
+# 'live'). Every Python reader names this constant (expert_scope imports it); none restates the rule.
+RETRIEVABLE_COLUMN = "retrievable"
+
 # The predicates ``match_document_chunks`` / ``keyword_search_chunks`` hardcode today (migration
-# 170 bodies). Each is enforced in the RPC; the resolver applies it in step 1 for COUNT parity in
+# 205 bodies). Each is enforced in the RPC; the resolver applies it in step 1 for COUNT parity in
 # 272-03, so a scope's counts agree with what a search under it can actually return.
 DEFAULT_PREDICATES: tuple[RetrievalPredicate, ...] = (
     # mig 170:76 / :114 — `AND d.is_latest = true`. Enforced in the RPC; the resolver applies it
     # in step 1 for COUNT parity in 272-03.
     RetrievalPredicate("latest_only", None, True),
-    # mig 170:74 / :112 — `AND (d.source_state IS NULL OR d.source_state != 'source_disconnected')`.
-    # Enforced in the RPC; the resolver applies it in step 1 for COUNT parity in 272-03.
-    RetrievalPredicate("not_source_disconnected", None, True),
+    # mig 205 — `AND d.retrievable` in every branch of both RPCs (archived + every non-live source
+    # state, D-36). Enforced in the RPC; the resolver applies it in step 1 for COUNT parity in 272-03.
+    RetrievalPredicate("retrievable", None, True),
     # mig 170:68-72 / :106-110 — the org gate (`current_user_org_ids()`) AND owner-or-visible
     # (`dc.user_id = auth.uid() OR … OR connection_doc_is_visible(…)`). Enforced in the RPC; the
     # resolver applies it in step 1 for COUNT parity in 272-03.
@@ -145,16 +155,17 @@ _MONTH_SQL = {
 _RLS_INTERSECT_SQL = "SELECT id::text AS id FROM public.documents WHERE id = ANY($1::uuid[])"
 _DIMENSION_SQL = "SELECT metadata->>$2 AS v FROM public.documents WHERE id = ANY($1::uuid[])"
 # D-20 — the stored spellings of a metadata key equal to a value ignoring case. Field AND value are
-# bind params; parity predicates with retrieval (latest, not source-disconnected).
+# bind params; parity predicates with retrieval (latest, retrievable — mig 205). The column is named as a
+# literal here (test_no_f_string_sql: no f-string SQL in this module); it is RETRIEVABLE_COLUMN's value.
 _STORED_SPELLINGS_SQL = (
     "SELECT DISTINCT metadata->>$1 AS v FROM public.documents "
-    "WHERE is_latest AND (source_state IS NULL OR source_state <> 'source_disconnected') "
+    "WHERE is_latest AND retrievable "
     "AND lower(metadata->>$1) = lower($2) ORDER BY 1 LIMIT $3"
 )
 # D-23 — ``document_type_norm`` is migration 074's generated ``lower(metadata->>'document_type')``.
 _TOP_TYPES_SQL = (
     "SELECT document_type_norm AS v, count(*) AS n FROM public.documents "
-    "WHERE is_latest AND (source_state IS NULL OR source_state <> 'source_disconnected') "
+    "WHERE is_latest AND retrievable "
     "AND document_type_norm IS NOT NULL "
     "GROUP BY document_type_norm ORDER BY n DESC, v LIMIT $1"
 )
@@ -320,9 +331,7 @@ async def resolve_document_scope(
     def _builder(frags: list, dreq, null_column: str | None):
         def build(count: bool):
             q = supabase.table("documents").select("id", count="exact" if count else None)
-            q = q.in_("org_id", sorted(orgs)).eq("is_latest", True).or_(
-                "source_state.is.null,source_state.neq.source_disconnected"
-            )
+            q = q.in_("org_id", sorted(orgs)).eq("is_latest", True).eq(RETRIEVABLE_COLUMN, True)
             q = apply_fragments(q, frags)
             if dreq is not None:
                 q = _apply_dates(q, dreq)

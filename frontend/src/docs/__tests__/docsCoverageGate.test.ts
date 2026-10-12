@@ -191,7 +191,11 @@ describe("check-docs-coverage.cjs (DOCS-02)", { timeout: 60000 }, () => {
 
   it("a v4.5 row on a release: shipped page with no unreleased entry fails with [release-mismatch]", () => {
     const root = freshRoot()
-    edit(root, "docs/public/use/library/find.md", (s) => s.replace(/^release:\s*v4\.5\s*$/m, "release: shipped"))
+    // ~~flip find.md from release: v4.5 to shipped~~ — v4.5 shipped 2026-10-12, so find.md is already
+    // `release: shipped`; the plant now marks its inventory row (A12) v4.5 again instead.
+    edit(root, ".planning/research/docs-coverage-inventory.md", (s) =>
+      s.replace("| `findState.ts`, `/document-search` | shipped (v4.5 Phase 271) |", "| `findState.ts`, `/document-search` | v4.5 (271) |"),
+    )
     const { status, out } = runGate(root)
     expect(out).toMatch(/\[release-mismatch\] use\/library\/find: [A-I]\d+/)
     expect(status, out).toBe(1)

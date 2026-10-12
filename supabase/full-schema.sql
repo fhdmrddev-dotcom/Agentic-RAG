@@ -258,6 +258,193 @@ $$;
 
 
 --
+-- Name: delete_folder_tree(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.delete_folder_tree(p_folder_id uuid) RETURNS TABLE(document_id uuid, file_path text)
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+#variable_conflict use_column
+DECLARE
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'a signed-in user is required' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN QUERY
+  WITH RECURSIVE sub(id) AS (
+    SELECT f.id FROM public.folders f WHERE f.id = p_folder_id
+    UNION ALL
+    SELECT c.id FROM public.folders c JOIN sub s ON c.parent_id = s.id
+  ) CYCLE id SET is_cycle USING path,
+  gone AS (
+    DELETE FROM public.documents d
+     WHERE d.folder_id IN (SELECT s.id FROM sub s WHERE NOT s.is_cycle)
+       AND d.user_id = v_uid
+    RETURNING d.id AS gone_id, d.file_path AS gone_path
+  )
+  SELECT g.gone_id, g.gone_path FROM gone g;
+  DELETE FROM public.folders f WHERE f.id = p_folder_id AND f.user_id = v_uid;
+END;
+$$;
+
+
+--
+-- Name: document_is_retrievable(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.document_is_retrievable(p_document_id uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  SELECT COALESCE((SELECT d.retrievable FROM public.documents d WHERE d.id = p_document_id), false);
+$$;
+
+
+--
+-- Name: documents_hold_identity_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.documents_hold_identity_guard() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.legal_holds h WHERE h.released_at IS NULL) THEN
+    RETURN NEW;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.retention_held_documents(ARRAY[OLD.id])) THEN
+    RETURN NEW;
+  END IF;
+  -- Positive form: only a pure rename passes; any org or owner change falls to the refusal.
+  IF NEW.org_id IS NOT DISTINCT FROM OLD.org_id AND NEW.user_id IS NOT DISTINCT FROM OLD.user_id THEN
+    -- The hold follows the name: every hold covering the OLD version family through direct
+    -- coverage is written onto every row of that family (this row included), so the renamed row
+    -- and the versions it leaves behind all stay held.
+    INSERT INTO public.legal_hold_documents (hold_id, document_id, org_id, added_at)
+    SELECT DISTINCT lhd.hold_id, fam.id, OLD.org_id, now()
+    FROM public.documents src
+    JOIN public.legal_hold_documents lhd ON lhd.document_id = src.id
+    JOIN public.legal_holds h
+      ON h.id = lhd.hold_id AND h.org_id = lhd.org_id AND h.released_at IS NULL AND h.org_id = OLD.org_id
+    JOIN public.documents fam
+      ON fam.org_id = OLD.org_id AND fam.user_id = OLD.user_id AND fam.filename = OLD.filename
+    WHERE src.org_id = OLD.org_id AND src.user_id = OLD.user_id AND src.filename = OLD.filename
+    ON CONFLICT (hold_id, document_id) DO NOTHING;
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'document % is on legal hold', OLD.id USING ERRCODE = 'PT409';
+END;
+$$;
+
+
+--
+-- Name: documents_inherit_family_archive(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.documents_inherit_family_archive() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+DECLARE
+  fam record;
+BEGIN
+  IF NEW.archived_at IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  SELECT d.archived_at, d.archived_policy_id, d.archived_policy_name
+    INTO fam
+    FROM public.documents d
+   WHERE d.org_id = NEW.org_id AND d.user_id = NEW.user_id AND d.filename = NEW.filename
+     AND d.folder_id IS NOT DISTINCT FROM NEW.folder_id
+     AND d.archived_at IS NOT NULL
+   ORDER BY d.is_latest DESC, d.version_number DESC NULLS LAST, d.archived_at DESC
+   LIMIT 1;
+  IF FOUND THEN
+    NEW.archived_at := fam.archived_at;
+    NEW.archived_policy_id := fam.archived_policy_id;
+    NEW.archived_policy_name := fam.archived_policy_name;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: documents_protect_archive_state(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.documents_protect_archive_state() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.archived_at IS NOT DISTINCT FROM OLD.archived_at
+     AND NEW.archived_policy_id IS NOT DISTINCT FROM OLD.archived_policy_id
+     AND NEW.archived_policy_name IS NOT DISTINCT FROM OLD.archived_policy_name THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'archive state is changed by the service only' USING ERRCODE = 'insufficient_privilege';
+END;
+$$;
+
+
+--
+-- Name: documents_refuse_held_delete(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.documents_refuse_held_delete() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+  -- fast path: no active hold anywhere costs one partial-index probe per deleted row
+  IF NOT EXISTS (SELECT 1 FROM public.legal_holds h WHERE h.released_at IS NULL) THEN
+    RETURN OLD;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.retention_held_documents(ARRAY[OLD.id])) THEN
+    RETURN OLD;
+  END IF;
+  RAISE EXCEPTION 'document % is on legal hold', OLD.id USING ERRCODE = 'PT409';
+END;
+$$;
+
+
+--
+-- Name: documents_sticky_hold_on_move(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.documents_sticky_hold_on_move() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF OLD.folder_id IS NULL
+     OR NOT EXISTS (SELECT 1 FROM public.legal_holds h WHERE h.org_id = OLD.org_id AND h.released_at IS NULL) THEN
+    RETURN NEW;
+  END IF;
+  INSERT INTO public.legal_hold_documents (hold_id, document_id, org_id, added_at)
+  SELECT DISTINCT lhf.hold_id, OLD.id, OLD.org_id, now()
+  FROM public.retention_folder_ancestors(OLD.folder_id) a
+  JOIN public.legal_hold_folders lhf ON lhf.folder_id = a.folder_id
+  JOIN public.legal_holds h ON h.id = lhf.hold_id AND h.org_id = OLD.org_id AND h.released_at IS NULL
+  WHERE NEW.folder_id IS NULL
+     OR lhf.hold_id NOT IN (
+          SELECT lhf2.hold_id
+          FROM public.retention_folder_ancestors(NEW.folder_id) a2
+          JOIN public.legal_hold_folders lhf2 ON lhf2.folder_id = a2.folder_id
+        )
+  ON CONFLICT (hold_id, document_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: dummy_test_fn(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -286,6 +473,76 @@ CREATE FUNCTION public.folder_is_org_shared(p_folder_id uuid) RETURNS boolean
     INNER JOIN ancestors a ON f.id = a.parent_id
   )
   SELECT COALESCE(bool_or(is_org_shared), false) FROM ancestors;
+$$;
+
+
+--
+-- Name: folders_hold_identity_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.folders_hold_identity_guard() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.legal_holds h WHERE h.released_at IS NULL) THEN
+    RETURN NEW;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.retention_held_folders(ARRAY[OLD.id])) THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'folder % contains documents on legal hold', OLD.id USING ERRCODE = 'PT409';
+END;
+$$;
+
+
+--
+-- Name: folders_refuse_held_delete(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.folders_refuse_held_delete() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.legal_holds h WHERE h.released_at IS NULL) THEN
+    RETURN OLD;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.retention_held_folders(ARRAY[OLD.id])) THEN
+    RETURN OLD;
+  END IF;
+  RAISE EXCEPTION 'folder % contains documents on legal hold', OLD.id USING ERRCODE = 'PT409';
+END;
+$$;
+
+
+--
+-- Name: folders_sticky_hold_on_move(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.folders_sticky_hold_on_move() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF OLD.parent_id IS NULL
+     OR NOT EXISTS (SELECT 1 FROM public.legal_holds h WHERE h.org_id = OLD.org_id AND h.released_at IS NULL) THEN
+    RETURN NEW;
+  END IF;
+  INSERT INTO public.legal_hold_folders (hold_id, folder_id, org_id, added_at)
+  SELECT DISTINCT lhf.hold_id, OLD.id, OLD.org_id, now()
+  FROM public.retention_folder_ancestors(OLD.parent_id) a
+  JOIN public.legal_hold_folders lhf ON lhf.folder_id = a.folder_id
+  JOIN public.legal_holds h ON h.id = lhf.hold_id AND h.org_id = OLD.org_id AND h.released_at IS NULL
+  WHERE NEW.parent_id IS NULL
+     OR lhf.hold_id NOT IN (
+          SELECT lhf2.hold_id
+          FROM public.retention_folder_ancestors(NEW.parent_id) a2
+          JOIN public.legal_hold_folders lhf2 ON lhf2.folder_id = a2.folder_id
+        )
+  ON CONFLICT (hold_id, folder_id) DO NOTHING;
+  RETURN NEW;
+END;
 $$;
 
 
@@ -354,7 +611,7 @@ BEGIN
       OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
       OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility)  -- Phase 231 VIS-01
     )
-    AND (d.source_state IS NULL OR d.source_state != 'source_disconnected')  -- Phase 234 VIS-05
+    AND d.retrievable                                                   -- Phase 275 D-36 (archived + source state)
     AND dc.search_vector @@ tsq
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
@@ -362,6 +619,61 @@ BEGIN
     AND (p_document_ids IS NULL OR dc.document_id = ANY (p_document_ids))     -- Phase 272 D-14
   ORDER BY rank DESC
   LIMIT match_count;
+END;
+$$;
+
+
+--
+-- Name: legal_hold_coverage_same_org(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.legal_hold_coverage_same_org() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF TG_TABLE_NAME = 'legal_hold_documents' THEN
+    IF EXISTS (SELECT 1 FROM public.legal_holds h
+               WHERE h.id = NEW.hold_id AND h.org_id = NEW.org_id AND h.released_at IS NULL)
+       AND EXISTS (SELECT 1 FROM public.documents d WHERE d.id = NEW.document_id AND d.org_id = NEW.org_id) THEN
+      RETURN NEW;
+    END IF;
+  ELSIF TG_TABLE_NAME = 'legal_hold_folders' THEN
+    IF EXISTS (SELECT 1 FROM public.legal_holds h
+               WHERE h.id = NEW.hold_id AND h.org_id = NEW.org_id AND h.released_at IS NULL)
+       AND EXISTS (SELECT 1 FROM public.folders f WHERE f.id = NEW.folder_id AND f.org_id = NEW.org_id) THEN
+      RETURN NEW;
+    END IF;
+  END IF;
+  RAISE EXCEPTION 'legal hold coverage must stay inside the organization of an active hold' USING ERRCODE = 'check_violation';
+END;
+$$;
+
+
+--
+-- Name: legal_holds_protect_columns(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.legal_holds_protect_columns() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.released_at IS NULL AND NEW.released_by IS NULL
+       AND NEW.released_by_name IS NULL AND NEW.release_note IS NULL THEN
+      RETURN NEW;
+    END IF;
+  ELSIF NEW.released_at IS NOT DISTINCT FROM OLD.released_at
+        AND NEW.released_by IS NOT DISTINCT FROM OLD.released_by
+        AND NEW.released_by_name IS NOT DISTINCT FROM OLD.released_by_name
+        AND NEW.release_note IS NOT DISTINCT FROM OLD.release_note THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'a hold is released by the service only' USING ERRCODE = 'insufficient_privilege';
 END;
 $$;
 
@@ -396,7 +708,7 @@ BEGIN
 
   IF n_chunks IS NOT NULL AND n_chunks <= p_exact_max_chunks THEN
     -- EXACT branch (SC#3): the ORDER BY is an expression (`+ 0`), so the HNSW index cannot serve
-    -- it and the set is ranked exactly. Every predicate below is today's, verbatim, plus the set.
+    -- it and the set is ranked exactly.
     -- ⚠ backend/tests/integration/test_272_rpc_document_scope.py holds this statement verbatim
     --   (EXACT_BRANCH_SQL) and fails if the two drift.
     RETURN QUERY
@@ -411,7 +723,7 @@ BEGIN
         OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
         OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility)
       )
-      AND (d.source_state IS NULL OR d.source_state != 'source_disconnected')
+      AND d.retrievable
       AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
       AND d.is_latest = true
       AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
@@ -422,7 +734,7 @@ BEGIN
     RETURN;
   END IF;
 
-  -- INDEX branch: migration 170's body verbatim + the set restriction (NULL = unrestricted).
+  -- INDEX branch: migration 200's body + the retrievable column (NULL set = unrestricted).
   RETURN QUERY
   SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
          1 - (dc.embedding OPERATOR(public.<=>) query_embedding) AS similarity
@@ -434,7 +746,7 @@ BEGIN
       OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
       OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility)  -- Phase 231 VIS-01
     )
-    AND (d.source_state IS NULL OR d.source_state != 'source_disconnected')  -- Phase 234 VIS-05
+    AND d.retrievable                                                   -- Phase 275 D-36 (archived + source state)
     AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
@@ -514,6 +826,7 @@ CREATE FUNCTION public.query_user_documents(sql_query text) RETURNS jsonb
 DECLARE
   result jsonb;
   clean_query text;
+  prev_agent_read text;
 BEGIN
   clean_query := trim(sql_query);
 
@@ -525,8 +838,22 @@ BEGIN
     RAISE EXCEPTION 'Query must be a single statement (no semicolons)';
   END IF;
 
+  -- W-1 / W-1b: nothing in the text may read or switch a session setting, directly, through a
+  -- Unicode-escape spelling, or through a function that executes a SQL string. Before EXECUTE.
+  IF clean_query ~* '(set_config|current_setting|u&[''"]|query_to_xml|ts_stat|ts_rewrite)' THEN
+    RAISE EXCEPTION 'Query may not read or change session settings'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- D-36: while this flag is on, the RESTRICTIVE agent-read policies hide non-retrievable rows.
+  prev_agent_read := current_setting('app.agent_read', true);
+  PERFORM set_config('app.agent_read', 'on', true);
+
   EXECUTE format('SELECT jsonb_agg(t) FROM (%s) t', clean_query)
     INTO result;
+
+  -- Scope the flag to this call: the same transaction's Library reads see archived rows again.
+  PERFORM set_config('app.agent_read', COALESCE(NULLIF(prev_agent_read, ''), 'off'), true);
 
   RETURN COALESCE(result, '[]'::jsonb);
 END;
@@ -582,6 +909,149 @@ $$;
 --
 
 COMMENT ON FUNCTION public.resize_embedding_column(new_dim integer) IS 'Phase mig 167: resizes the vector column of BOTH tables fed by app_settings.embedding_dimensions — document_chunks (with HNSW drop/recreate) and skill_embeddings (no ANN index by design, mig 091). Called ONLY on a true dims change (backend/app/services/reembed_service.py gates on dims_changed). Every vector in both tables is NULLed by the ALTER: an old-width vector is meaningless in the new space. document_chunks.embedded_at and skill_embeddings.embedding_model/.embedding_dimensions are NULLed alongside so no row claims an index time or a model for a vector that no longer exists — and so skill rows become stale by the existing D-10 predicate and are picked up by the established skill_embedding_service backfill with no second staleness mechanism. ⚠ Before mig 167 this function covered document_chunks ONLY, so any non-1536 model silently broke skill-embedding writes with a pgvector dimension mismatch while document search recovered normally.';
+
+
+--
+-- Name: retention_folder_ancestors(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.retention_folder_ancestors(p_folder_id uuid) RETURNS TABLE(folder_id uuid, depth integer)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  WITH RECURSIVE walk(id, parent_id, depth) AS (
+    SELECT f.id, f.parent_id, 0 FROM public.folders f WHERE f.id = p_folder_id
+    UNION ALL
+    SELECT f.id, f.parent_id, w.depth + 1
+    FROM public.folders f
+    JOIN walk w ON f.id = w.parent_id
+  ) CYCLE id SET is_cycle USING path
+  SELECT w.id, w.depth FROM walk w WHERE NOT w.is_cycle;
+$$;
+
+
+--
+-- Name: retention_held_documents(uuid[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.retention_held_documents(p_document_ids uuid[]) RETURNS TABLE(document_id uuid, hold_id uuid, held_since timestamp with time zone)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  SELECT DISTINCT x.doc_id, x.hid, x.since
+  FROM (
+    -- (a) directly, by version family (D-16). The hold is matched to its COVERAGE ROW's org.
+    SELECT t.id AS doc_id, h.id AS hid, h.created_at AS since
+    FROM public.documents t
+    JOIN public.documents fam
+      ON fam.org_id = t.org_id AND fam.user_id = t.user_id AND fam.filename = t.filename
+    JOIN public.legal_hold_documents lhd ON lhd.document_id = fam.id
+    JOIN public.legal_holds h
+      ON h.id = lhd.hold_id AND h.org_id = lhd.org_id AND h.released_at IS NULL
+    WHERE t.id = ANY (p_document_ids)
+    UNION ALL
+    -- (b) by its folder or any ancestor, evaluated now (D-05), matched to the coverage row's org
+    SELECT t.id, h.id, h.created_at
+    FROM public.documents t
+    CROSS JOIN LATERAL public.retention_folder_ancestors(t.folder_id) a
+    JOIN public.legal_hold_folders lhf ON lhf.folder_id = a.folder_id
+    JOIN public.legal_holds h
+      ON h.id = lhf.hold_id AND h.org_id = lhf.org_id AND h.released_at IS NULL
+    WHERE t.id = ANY (p_document_ids)
+      AND t.folder_id IS NOT NULL
+      AND EXISTS (SELECT 1 FROM public.legal_holds ah WHERE ah.released_at IS NULL)
+  ) x;
+$$;
+
+
+--
+-- Name: retention_held_folders(uuid[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.retention_held_folders(p_folder_ids uuid[]) RETURNS TABLE(folder_id uuid)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  SELECT DISTINCT f.id
+  FROM public.folders f
+  WHERE f.id = ANY (p_folder_ids)
+    AND EXISTS (SELECT 1 FROM public.legal_holds ah WHERE ah.released_at IS NULL)
+    AND (
+      EXISTS (
+        SELECT 1
+        FROM public.retention_folder_ancestors(f.id) a
+        JOIN public.legal_hold_folders lhf ON lhf.folder_id = a.folder_id
+        JOIN public.legal_holds h
+          ON h.id = lhf.hold_id AND h.org_id = lhf.org_id AND h.released_at IS NULL
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM public.retention_held_documents(
+          ARRAY(SELECT d.id FROM public.documents d WHERE d.folder_id = f.id)
+        )
+      )
+    );
+$$;
+
+
+--
+-- Name: retention_policies_folder_same_org(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.retention_policies_folder_same_org() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF NEW.folder_id IS NULL
+     OR EXISTS (SELECT 1 FROM public.folders f WHERE f.id = NEW.folder_id AND f.org_id = NEW.org_id) THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'a retention policy can only name a folder of its own organization' USING ERRCODE = 'check_violation';
+END;
+$$;
+
+
+--
+-- Name: retention_policies_protect_columns(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.retention_policies_protect_columns() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.previewed_revision IS NULL AND NEW.revision = 1 THEN
+      RETURN NEW;
+    END IF;
+  ELSIF NEW.revision IS NOT DISTINCT FROM OLD.revision
+        AND NEW.previewed_revision IS NOT DISTINCT FROM OLD.previewed_revision THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'policy revision columns are written by the service only' USING ERRCODE = 'insufficient_privilege';
+END;
+$$;
+
+
+--
+-- Name: retention_refuse_truncate(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.retention_refuse_truncate() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.legal_holds h WHERE h.released_at IS NULL) THEN
+    RETURN NULL;
+  END IF;
+  RAISE EXCEPTION 'documents and folders cannot be truncated while a legal hold is active' USING ERRCODE = 'PT409';
+END;
+$$;
 
 
 --
@@ -647,6 +1117,18 @@ BEGIN
   DELETE FROM public.skill_embeddings WHERE skill_id = COALESCE(NEW.skill_id, OLD.skill_id);
   RETURN COALESCE(NEW, OLD);
 END;
+$$;
+
+
+--
+-- Name: storage_object_backs_document(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.storage_object_backs_document(p_name text) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  SELECT EXISTS (SELECT 1 FROM public.documents d WHERE d.file_path = p_name);
 $$;
 
 
@@ -920,7 +1402,7 @@ CREATE TABLE public.audit_log (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     org_id uuid NOT NULL,
-    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text, 'connector.watch.create'::text, 'connector.watch.delete'::text, 'connector.watch.sync'::text])))
+    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text, 'connector.watch.create'::text, 'connector.watch.delete'::text, 'connector.watch.sync'::text, 'retention.policy.create'::text, 'retention.policy.update'::text, 'retention.policy.delete'::text, 'retention.hold.create'::text, 'retention.hold.update'::text, 'retention.hold.release'::text, 'retention.disposition.confirm'::text, 'retention.document.unarchive'::text, 'retention.document.keep'::text, 'folder.delete'::text])))
 );
 
 
@@ -1620,6 +2102,10 @@ CREATE TABLE public.documents (
     source_created_at timestamp with time zone,
     source_modified_at timestamp with time zone,
     source_author text,
+    archived_at timestamp with time zone,
+    archived_policy_id uuid,
+    archived_policy_name text,
+    retrievable boolean GENERATED ALWAYS AS (((archived_at IS NULL) AND ((source_state IS NULL) OR (source_state = 'live'::text)))) STORED,
     CONSTRAINT documents_ingest_visibility_check CHECK ((ingest_visibility = ANY (ARRAY['private'::text, 'org'::text, 'dept'::text]))),
     CONSTRAINT documents_page_count_positive CHECK (((page_count IS NULL) OR (page_count > 0))),
     CONSTRAINT documents_source_state_check CHECK (((source_state IS NULL) OR (source_state = ANY (ARRAY['live'::text, 'missing_at_source'::text, 'unauthorized_at_source'::text, 'source_disconnected'::text])))),
@@ -2266,6 +2752,52 @@ COMMENT ON COLUMN public.ingestion_jobs.claimed_at IS 'Timestamp when worker cla
 
 
 --
+-- Name: legal_hold_documents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.legal_hold_documents (
+    hold_id uuid NOT NULL,
+    document_id uuid NOT NULL,
+    org_id uuid NOT NULL,
+    added_by uuid,
+    added_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: legal_hold_folders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.legal_hold_folders (
+    hold_id uuid NOT NULL,
+    folder_id uuid NOT NULL,
+    org_id uuid NOT NULL,
+    added_by uuid,
+    added_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: legal_holds; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.legal_holds (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    name text NOT NULL,
+    reason text,
+    created_by uuid,
+    created_by_name text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    released_at timestamp with time zone,
+    released_by uuid,
+    released_by_name text,
+    release_note text,
+    CONSTRAINT legal_holds_name_check CHECK (((length(btrim(name)) >= 1) AND (length(btrim(name)) <= 200)))
+);
+
+
+--
 -- Name: message_artifacts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2766,6 +3298,138 @@ CREATE TABLE public.profiles (
     avatar_url text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: retention_policies; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retention_policies (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    name text NOT NULL,
+    scope_kind text NOT NULL,
+    folder_id uuid,
+    include_subfolders boolean DEFAULT true NOT NULL,
+    document_type_norm text,
+    clock text NOT NULL,
+    stage1_value integer NOT NULL,
+    stage1_unit text NOT NULL,
+    stage1_action text NOT NULL,
+    stage2_value integer,
+    stage2_unit text,
+    stage2_action text,
+    revision integer DEFAULT 1 NOT NULL,
+    previewed_revision integer,
+    created_by uuid,
+    created_by_name text,
+    updated_by uuid,
+    updated_by_name text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retention_policies_clock_check CHECK ((clock = ANY (ARRAY['document_date'::text, 'date_added'::text]))),
+    CONSTRAINT retention_policies_name_check CHECK (((length(btrim(name)) >= 1) AND (length(btrim(name)) <= 200))),
+    CONSTRAINT retention_policies_revision_check CHECK ((revision >= 1)),
+    CONSTRAINT retention_policies_scope_kind_check CHECK ((scope_kind = ANY (ARRAY['folder'::text, 'class'::text]))),
+    CONSTRAINT retention_policies_scope_shape CHECK ((((scope_kind = 'folder'::text) AND (folder_id IS NOT NULL) AND (document_type_norm IS NULL)) OR ((scope_kind = 'class'::text) AND (folder_id IS NULL) AND (document_type_norm IS NOT NULL)))),
+    CONSTRAINT retention_policies_stage1_action_check CHECK ((stage1_action = ANY (ARRAY['archive'::text, 'delete'::text, 'review'::text]))),
+    CONSTRAINT retention_policies_stage1_unit_check CHECK ((stage1_unit = ANY (ARRAY['days'::text, 'months'::text, 'years'::text]))),
+    CONSTRAINT retention_policies_stage1_value_check CHECK ((stage1_value > 0)),
+    CONSTRAINT retention_policies_stage2_action_check CHECK ((stage2_action = 'delete'::text)),
+    CONSTRAINT retention_policies_stage2_shape CHECK ((((stage2_value IS NULL) AND (stage2_unit IS NULL) AND (stage2_action IS NULL)) OR ((stage2_value IS NOT NULL) AND (stage2_unit IS NOT NULL) AND (stage2_action IS NOT NULL) AND (stage1_action = 'archive'::text)))),
+    CONSTRAINT retention_policies_stage2_unit_check CHECK ((stage2_unit = ANY (ARRAY['days'::text, 'months'::text, 'years'::text]))),
+    CONSTRAINT retention_policies_stage2_value_check CHECK ((stage2_value > 0))
+);
+
+
+--
+-- Name: retention_previews; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retention_previews (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    policy_id uuid,
+    draft_hash text NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    counts jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
+-- Name: retention_queue; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retention_queue (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    policy_id uuid NOT NULL,
+    family_key text NOT NULL,
+    latest_document_id uuid NOT NULL,
+    kind text NOT NULL,
+    policy_revision integer NOT NULL,
+    fingerprint text NOT NULL,
+    found_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retention_queue_kind_check CHECK ((kind = ANY (ARRAY['delete'::text, 'review'::text])))
+);
+
+
+--
+-- Name: retention_receipts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retention_receipts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    action text NOT NULL,
+    document_id uuid,
+    document_name text,
+    policy_id uuid,
+    policy_name text,
+    hold_id uuid,
+    hold_name text,
+    actor_id uuid,
+    actor_name text,
+    detail jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retention_receipts_action_check CHECK ((action = ANY (ARRAY['archived'::text, 'unarchived'::text, 'queued_delete'::text, 'queued_review'::text, 'kept'::text, 'deleted'::text, 'did_not_delete'::text, 'delete_refused'::text, 'hold_placed'::text, 'hold_extended'::text, 'hold_released'::text, 'policy_saved'::text, 'policy_deleted'::text, 'dry_run'::text, 'sweep_incomplete'::text]))),
+    CONSTRAINT retention_receipts_disposition_names_policy CHECK (((action <> ALL (ARRAY['archived'::text, 'queued_delete'::text, 'queued_review'::text, 'deleted'::text, 'did_not_delete'::text, 'kept'::text, 'unarchived'::text])) OR (policy_name IS NOT NULL)))
+);
+
+
+--
+-- Name: retention_skips; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retention_skips (
+    org_id uuid NOT NULL,
+    policy_id uuid NOT NULL,
+    family_key text NOT NULL,
+    reason text NOT NULL,
+    policy_revision integer NOT NULL,
+    fingerprint text NOT NULL,
+    actor_id uuid,
+    actor_name text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT retention_skips_reason_check CHECK ((reason = ANY (ARRAY['kept'::text, 'unarchived'::text])))
+);
+
+
+--
+-- Name: retention_sweeps; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.retention_sweeps (
+    org_id uuid NOT NULL,
+    next_run_at timestamp with time zone DEFAULT now() NOT NULL,
+    leased_until timestamp with time zone,
+    last_run_at timestamp with time zone,
+    last_status text,
+    last_error text,
+    last_counts jsonb,
+    CONSTRAINT retention_sweeps_last_status_check CHECK ((last_status = ANY (ARRAY['ok'::text, 'incomplete'::text, 'failed'::text, 'running'::text])))
 );
 
 
@@ -3934,6 +4598,30 @@ ALTER TABLE ONLY public.ingestion_jobs
 
 
 --
+-- Name: legal_hold_documents legal_hold_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_hold_documents
+    ADD CONSTRAINT legal_hold_documents_pkey PRIMARY KEY (hold_id, document_id);
+
+
+--
+-- Name: legal_hold_folders legal_hold_folders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_hold_folders
+    ADD CONSTRAINT legal_hold_folders_pkey PRIMARY KEY (hold_id, folder_id);
+
+
+--
+-- Name: legal_holds legal_holds_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_holds
+    ADD CONSTRAINT legal_holds_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: message_artifacts message_artifacts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4067,6 +4755,62 @@ ALTER TABLE ONLY public.pdf_extraction_runs
 
 ALTER TABLE ONLY public.profiles
     ADD CONSTRAINT profiles_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retention_policies retention_policies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_policies
+    ADD CONSTRAINT retention_policies_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retention_previews retention_previews_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_previews
+    ADD CONSTRAINT retention_previews_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retention_queue retention_queue_once; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_queue
+    ADD CONSTRAINT retention_queue_once UNIQUE (policy_id, family_key, kind);
+
+
+--
+-- Name: retention_queue retention_queue_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_queue
+    ADD CONSTRAINT retention_queue_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retention_receipts retention_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_receipts
+    ADD CONSTRAINT retention_receipts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: retention_skips retention_skips_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_skips
+    ADD CONSTRAINT retention_skips_pkey PRIMARY KEY (policy_id, family_key);
+
+
+--
+-- Name: retention_sweeps retention_sweeps_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_sweeps
+    ADD CONSTRAINT retention_sweeps_pkey PRIMARY KEY (org_id);
 
 
 --
@@ -4398,6 +5142,13 @@ CREATE INDEX document_tables_document_idx ON public.document_tables USING btree 
 
 
 --
+-- Name: documents_archived_policy_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX documents_archived_policy_idx ON public.documents USING btree (archived_policy_id) WHERE (archived_policy_id IS NOT NULL);
+
+
+--
 -- Name: documents_completed_hash_unique_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4409,6 +5160,13 @@ CREATE UNIQUE INDEX documents_completed_hash_unique_idx ON public.documents USIN
 --
 
 CREATE UNIQUE INDEX documents_dedup_idx ON public.documents USING btree (org_id, user_id, content_hash, COALESCE(folder_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE (status <> 'failed'::text);
+
+
+--
+-- Name: documents_file_path_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX documents_file_path_idx ON public.documents USING btree (file_path);
 
 
 --
@@ -5378,6 +6136,27 @@ CREATE INDEX idx_workspace_versions_file ON public.workspace_file_versions USING
 
 
 --
+-- Name: legal_hold_documents_document_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX legal_hold_documents_document_idx ON public.legal_hold_documents USING btree (document_id);
+
+
+--
+-- Name: legal_hold_folders_folder_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX legal_hold_folders_folder_idx ON public.legal_hold_folders USING btree (folder_id);
+
+
+--
+-- Name: legal_holds_active_org_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX legal_holds_active_org_idx ON public.legal_holds USING btree (org_id) WHERE (released_at IS NULL);
+
+
+--
 -- Name: message_feedback_user_created_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5389,6 +6168,62 @@ CREATE INDEX message_feedback_user_created_idx ON public.message_feedback USING 
 --
 
 CREATE INDEX model_capabilities_overrides_removed_idx ON public.model_capabilities_overrides USING btree (model_id) WHERE (removed = true);
+
+
+--
+-- Name: retention_policies_org_class_uniq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX retention_policies_org_class_uniq ON public.retention_policies USING btree (org_id, document_type_norm) WHERE (scope_kind = 'class'::text);
+
+
+--
+-- Name: retention_policies_org_folder_uniq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX retention_policies_org_folder_uniq ON public.retention_policies USING btree (org_id, folder_id) WHERE (scope_kind = 'folder'::text);
+
+
+--
+-- Name: retention_policies_org_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retention_policies_org_idx ON public.retention_policies USING btree (org_id);
+
+
+--
+-- Name: retention_previews_lookup_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retention_previews_lookup_idx ON public.retention_previews USING btree (org_id, draft_hash, created_at);
+
+
+--
+-- Name: retention_queue_org_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retention_queue_org_idx ON public.retention_queue USING btree (org_id);
+
+
+--
+-- Name: retention_receipts_org_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retention_receipts_org_created_idx ON public.retention_receipts USING btree (org_id, created_at DESC);
+
+
+--
+-- Name: retention_skips_org_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retention_skips_org_idx ON public.retention_skips USING btree (org_id);
+
+
+--
+-- Name: retention_sweeps_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX retention_sweeps_due_idx ON public.retention_sweeps USING btree (next_run_at);
 
 
 --
@@ -5581,6 +6416,48 @@ CREATE TRIGGER documents_autofill_org_id BEFORE INSERT ON public.documents FOR E
 
 
 --
+-- Name: documents documents_hold_identity_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_hold_identity_guard BEFORE UPDATE OF org_id, user_id, filename ON public.documents FOR EACH ROW WHEN (((old.org_id IS DISTINCT FROM new.org_id) OR (old.user_id IS DISTINCT FROM new.user_id) OR (old.filename IS DISTINCT FROM new.filename))) EXECUTE FUNCTION public.documents_hold_identity_guard();
+
+
+--
+-- Name: documents documents_inherit_family_archive; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_inherit_family_archive BEFORE INSERT ON public.documents FOR EACH ROW EXECUTE FUNCTION public.documents_inherit_family_archive();
+
+
+--
+-- Name: documents documents_protect_archive_state; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_protect_archive_state BEFORE UPDATE OF archived_at, archived_policy_id, archived_policy_name ON public.documents FOR EACH ROW EXECUTE FUNCTION public.documents_protect_archive_state();
+
+
+--
+-- Name: documents documents_refuse_held_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_refuse_held_delete BEFORE DELETE ON public.documents FOR EACH ROW EXECUTE FUNCTION public.documents_refuse_held_delete();
+
+
+--
+-- Name: documents documents_refuse_truncate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_refuse_truncate BEFORE TRUNCATE ON public.documents FOR EACH STATEMENT EXECUTE FUNCTION public.retention_refuse_truncate();
+
+
+--
+-- Name: documents documents_sticky_hold_on_move; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_sticky_hold_on_move BEFORE UPDATE OF folder_id ON public.documents FOR EACH ROW WHEN ((old.folder_id IS DISTINCT FROM new.folder_id)) EXECUTE FUNCTION public.documents_sticky_hold_on_move();
+
+
+--
 -- Name: eval_ratings eval_ratings_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -5616,6 +6493,27 @@ CREATE TRIGGER folders_autofill_org_id BEFORE INSERT ON public.folders FOR EACH 
 
 
 --
+-- Name: folders folders_hold_identity_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER folders_hold_identity_guard BEFORE UPDATE OF org_id, user_id ON public.folders FOR EACH ROW WHEN (((old.org_id IS DISTINCT FROM new.org_id) OR (old.user_id IS DISTINCT FROM new.user_id))) EXECUTE FUNCTION public.folders_hold_identity_guard();
+
+
+--
+-- Name: folders folders_refuse_held_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER folders_refuse_held_delete BEFORE DELETE ON public.folders FOR EACH ROW EXECUTE FUNCTION public.folders_refuse_held_delete();
+
+
+--
+-- Name: folders folders_refuse_truncate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER folders_refuse_truncate BEFORE TRUNCATE ON public.folders FOR EACH STATEMENT EXECUTE FUNCTION public.retention_refuse_truncate();
+
+
+--
 -- Name: folders folders_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -5623,10 +6521,38 @@ CREATE TRIGGER folders_set_updated_at BEFORE UPDATE ON public.folders FOR EACH R
 
 
 --
+-- Name: folders folders_sticky_hold_on_move; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER folders_sticky_hold_on_move BEFORE UPDATE OF parent_id ON public.folders FOR EACH ROW WHEN ((old.parent_id IS DISTINCT FROM new.parent_id)) EXECUTE FUNCTION public.folders_sticky_hold_on_move();
+
+
+--
 -- Name: harness_audit harness_audit_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER harness_audit_autofill_org_id BEFORE INSERT ON public.harness_audit FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: legal_hold_documents legal_hold_documents_same_org; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER legal_hold_documents_same_org BEFORE INSERT OR UPDATE OF hold_id, document_id, org_id ON public.legal_hold_documents FOR EACH ROW EXECUTE FUNCTION public.legal_hold_coverage_same_org();
+
+
+--
+-- Name: legal_hold_folders legal_hold_folders_same_org; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER legal_hold_folders_same_org BEFORE INSERT OR UPDATE OF hold_id, folder_id, org_id ON public.legal_hold_folders FOR EACH ROW EXECUTE FUNCTION public.legal_hold_coverage_same_org();
+
+
+--
+-- Name: legal_holds legal_holds_protect_columns; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER legal_holds_protect_columns BEFORE INSERT OR UPDATE ON public.legal_holds FOR EACH ROW EXECUTE FUNCTION public.legal_holds_protect_columns();
 
 
 --
@@ -5669,6 +6595,20 @@ CREATE TRIGGER metadata_field_definitions_autofill_org_id BEFORE INSERT ON publi
 --
 
 CREATE TRIGGER pdf_extraction_runs_autofill_org_id BEFORE INSERT ON public.pdf_extraction_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: retention_policies retention_policies_folder_same_org; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER retention_policies_folder_same_org BEFORE INSERT OR UPDATE OF folder_id, org_id ON public.retention_policies FOR EACH ROW EXECUTE FUNCTION public.retention_policies_folder_same_org();
+
+
+--
+-- Name: retention_policies retention_policies_protect_columns; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER retention_policies_protect_columns BEFORE INSERT OR UPDATE ON public.retention_policies FOR EACH ROW EXECUTE FUNCTION public.retention_policies_protect_columns();
 
 
 --
@@ -6235,6 +7175,14 @@ ALTER TABLE ONLY public.document_views
 
 
 --
+-- Name: documents documents_archived_policy_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.documents
+    ADD CONSTRAINT documents_archived_policy_id_fkey FOREIGN KEY (archived_policy_id) REFERENCES public.retention_policies(id) ON DELETE SET NULL;
+
+
+--
 -- Name: documents documents_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6411,6 +7359,70 @@ ALTER TABLE ONLY public.ingestion_jobs
 
 
 --
+-- Name: legal_hold_documents legal_hold_documents_added_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_hold_documents
+    ADD CONSTRAINT legal_hold_documents_added_by_fkey FOREIGN KEY (added_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: legal_hold_documents legal_hold_documents_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_hold_documents
+    ADD CONSTRAINT legal_hold_documents_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.documents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: legal_hold_documents legal_hold_documents_hold_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_hold_documents
+    ADD CONSTRAINT legal_hold_documents_hold_id_fkey FOREIGN KEY (hold_id) REFERENCES public.legal_holds(id) ON DELETE CASCADE;
+
+
+--
+-- Name: legal_hold_folders legal_hold_folders_added_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_hold_folders
+    ADD CONSTRAINT legal_hold_folders_added_by_fkey FOREIGN KEY (added_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: legal_hold_folders legal_hold_folders_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_hold_folders
+    ADD CONSTRAINT legal_hold_folders_folder_id_fkey FOREIGN KEY (folder_id) REFERENCES public.folders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: legal_hold_folders legal_hold_folders_hold_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_hold_folders
+    ADD CONSTRAINT legal_hold_folders_hold_id_fkey FOREIGN KEY (hold_id) REFERENCES public.legal_holds(id) ON DELETE CASCADE;
+
+
+--
+-- Name: legal_holds legal_holds_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_holds
+    ADD CONSTRAINT legal_holds_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: legal_holds legal_holds_released_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legal_holds
+    ADD CONSTRAINT legal_holds_released_by_fkey FOREIGN KEY (released_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: message_artifacts message_artifacts_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6552,6 +7564,102 @@ ALTER TABLE ONLY public.pdf_extraction_runs
 
 ALTER TABLE ONLY public.profiles
     ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: retention_policies retention_policies_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_policies
+    ADD CONSTRAINT retention_policies_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retention_policies retention_policies_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_policies
+    ADD CONSTRAINT retention_policies_folder_id_fkey FOREIGN KEY (folder_id) REFERENCES public.folders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: retention_policies retention_policies_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_policies
+    ADD CONSTRAINT retention_policies_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retention_previews retention_previews_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_previews
+    ADD CONSTRAINT retention_previews_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retention_previews retention_previews_policy_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_previews
+    ADD CONSTRAINT retention_previews_policy_id_fkey FOREIGN KEY (policy_id) REFERENCES public.retention_policies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: retention_queue retention_queue_latest_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_queue
+    ADD CONSTRAINT retention_queue_latest_document_id_fkey FOREIGN KEY (latest_document_id) REFERENCES public.documents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: retention_queue retention_queue_policy_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_queue
+    ADD CONSTRAINT retention_queue_policy_id_fkey FOREIGN KEY (policy_id) REFERENCES public.retention_policies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: retention_receipts retention_receipts_actor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_receipts
+    ADD CONSTRAINT retention_receipts_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retention_receipts retention_receipts_hold_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_receipts
+    ADD CONSTRAINT retention_receipts_hold_id_fkey FOREIGN KEY (hold_id) REFERENCES public.legal_holds(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retention_receipts retention_receipts_policy_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_receipts
+    ADD CONSTRAINT retention_receipts_policy_id_fkey FOREIGN KEY (policy_id) REFERENCES public.retention_policies(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retention_skips retention_skips_actor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_skips
+    ADD CONSTRAINT retention_skips_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: retention_skips retention_skips_policy_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.retention_skips
+    ADD CONSTRAINT retention_skips_policy_id_fkey FOREIGN KEY (policy_id) REFERENCES public.retention_policies(id) ON DELETE CASCADE;
 
 
 --
@@ -7777,10 +8885,24 @@ CREATE POLICY dept_members_update ON public.dept_members FOR UPDATE TO authentic
 ALTER TABLE public.document_chunks ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: document_chunks document_chunks_agent_read_retrievable; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY document_chunks_agent_read_retrievable ON public.document_chunks AS RESTRICTIVE FOR SELECT TO authenticated USING (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR public.document_is_retrievable(document_id)));
+
+
+--
 -- Name: document_images; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.document_images ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_images document_images_agent_read_retrievable; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY document_images_agent_read_retrievable ON public.document_images AS RESTRICTIVE FOR SELECT TO authenticated USING (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR public.document_is_retrievable(document_id)));
+
 
 --
 -- Name: document_relationships; Type: ROW SECURITY; Schema: public; Owner: -
@@ -7795,6 +8917,13 @@ ALTER TABLE public.document_relationships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_tables ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: document_tables document_tables_agent_read_retrievable; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY document_tables_agent_read_retrievable ON public.document_tables AS RESTRICTIVE FOR SELECT TO authenticated USING (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR public.document_is_retrievable(document_id)));
+
+
+--
 -- Name: document_views; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -7805,6 +8934,13 @@ ALTER TABLE public.document_views ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: documents documents_agent_read_retrievable; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY documents_agent_read_retrievable ON public.documents AS RESTRICTIVE FOR SELECT TO authenticated USING (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable));
+
 
 --
 -- Name: eval_ratings; Type: ROW SECURITY; Schema: public; Owner: -
@@ -7909,6 +9045,73 @@ ALTER TABLE public.harness_audit ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.ingestion_jobs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: legal_hold_documents; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.legal_hold_documents ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: legal_hold_documents legal_hold_documents_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY legal_hold_documents_insert ON public.legal_hold_documents FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: legal_hold_documents legal_hold_documents_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY legal_hold_documents_select ON public.legal_hold_documents FOR SELECT TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: legal_hold_folders; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.legal_hold_folders ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: legal_hold_folders legal_hold_folders_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY legal_hold_folders_insert ON public.legal_hold_folders FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: legal_hold_folders legal_hold_folders_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY legal_hold_folders_select ON public.legal_hold_folders FOR SELECT TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: legal_holds; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.legal_holds ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: legal_holds legal_holds_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY legal_holds_insert ON public.legal_holds FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: legal_holds legal_holds_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY legal_holds_select ON public.legal_holds FOR SELECT TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: legal_holds legal_holds_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY legal_holds_update ON public.legal_holds FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
 
 --
 -- Name: message_artifacts; Type: ROW SECURITY; Schema: public; Owner: -
@@ -8096,6 +9299,91 @@ CREATE POLICY pdf_extraction_runs_select_own ON public.pdf_extraction_runs FOR S
 --
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: retention_policies; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.retention_policies ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: retention_policies retention_policies_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY retention_policies_insert ON public.retention_policies FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: retention_policies retention_policies_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY retention_policies_select ON public.retention_policies FOR SELECT TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: retention_policies retention_policies_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY retention_policies_update ON public.retention_policies FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: retention_previews; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.retention_previews ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: retention_previews retention_previews_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY retention_previews_select ON public.retention_previews FOR SELECT TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: retention_queue; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.retention_queue ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: retention_queue retention_queue_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY retention_queue_select ON public.retention_queue FOR SELECT TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: retention_receipts; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.retention_receipts ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: retention_receipts retention_receipts_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY retention_receipts_select ON public.retention_receipts FOR SELECT TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: retention_skips; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.retention_skips ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: retention_skips retention_skips_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY retention_skips_select ON public.retention_skips FOR SELECT TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: retention_sweeps; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.retention_sweeps ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: role_permissions; Type: ROW SECURITY; Schema: public; Owner: -
@@ -8650,9 +9938,13 @@ CREATE POLICY "Users can read own documents" ON storage.objects FOR SELECT TO au
 DROP POLICY IF EXISTS "Users can upload to own documents folder" ON storage.objects;
 CREATE POLICY "Users can upload to own documents folder" ON storage.objects FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'documents' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+-- migration 206 (Phase 275 B-CR-02): a file that still backs a documents row is not deletable by
+-- a user JWT — the bytes of a held document can only go after its (hold-refused) row.
 DROP POLICY IF EXISTS "Users can delete own documents" ON storage.objects;
 CREATE POLICY "Users can delete own documents" ON storage.objects FOR DELETE TO authenticated
-  USING (bucket_id = 'documents' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+  USING (bucket_id = 'documents'
+         AND (storage.foldername(name))[1] = (select auth.uid()::text)
+         AND NOT public.storage_object_backs_document(name));
 
 -- sandbox-outputs policies
 DROP POLICY IF EXISTS "Users can read own sandbox outputs" ON storage.objects;
@@ -9057,6 +10349,65 @@ REVOKE ALL ON TABLE public.message_artifacts FROM service_role;
 GRANT SELECT ON TABLE public.message_artifacts TO authenticated;
 GRANT SELECT, INSERT, DELETE ON TABLE public.message_artifacts TO service_role;
 
+-- migration 204 — Phase 275 retention + legal hold: SELECT through org:manage RLS only; policies,
+-- releases, the queue, skips and previews are written by the backend's service pool (D-28, W-2b).
+-- Receipts are INSERT/SELECT for every role (D-13). Holds are released, never deleted. TRUNCATE is
+-- taken away from the JWT roles (D-14 — TRUNCATE skips the hold row triggers). Copied, not retyped.
+REVOKE TRUNCATE ON public.documents, public.folders FROM authenticated, anon;
+REVOKE ALL ON TABLE public.retention_policies FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_policies FROM anon;
+REVOKE ALL ON TABLE public.retention_policies FROM authenticated;
+REVOKE ALL ON TABLE public.retention_policies FROM service_role;
+GRANT SELECT ON TABLE public.retention_policies TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.retention_policies TO service_role;
+REVOKE ALL ON TABLE public.retention_previews FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_previews FROM anon;
+REVOKE ALL ON TABLE public.retention_previews FROM authenticated;
+REVOKE ALL ON TABLE public.retention_previews FROM service_role;
+GRANT SELECT ON TABLE public.retention_previews TO authenticated;
+GRANT SELECT, INSERT, DELETE ON TABLE public.retention_previews TO service_role;
+REVOKE ALL ON TABLE public.legal_holds FROM PUBLIC;
+REVOKE ALL ON TABLE public.legal_holds FROM anon;
+REVOKE ALL ON TABLE public.legal_holds FROM authenticated;
+REVOKE ALL ON TABLE public.legal_holds FROM service_role;
+GRANT SELECT, INSERT ON TABLE public.legal_holds TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON TABLE public.legal_holds TO service_role;
+REVOKE ALL ON TABLE public.legal_hold_documents FROM PUBLIC;
+REVOKE ALL ON TABLE public.legal_hold_documents FROM anon;
+REVOKE ALL ON TABLE public.legal_hold_documents FROM authenticated;
+REVOKE ALL ON TABLE public.legal_hold_documents FROM service_role;
+GRANT SELECT, INSERT ON TABLE public.legal_hold_documents TO authenticated;
+GRANT SELECT, INSERT ON TABLE public.legal_hold_documents TO service_role;
+REVOKE ALL ON TABLE public.legal_hold_folders FROM PUBLIC;
+REVOKE ALL ON TABLE public.legal_hold_folders FROM anon;
+REVOKE ALL ON TABLE public.legal_hold_folders FROM authenticated;
+REVOKE ALL ON TABLE public.legal_hold_folders FROM service_role;
+GRANT SELECT, INSERT ON TABLE public.legal_hold_folders TO authenticated;
+GRANT SELECT, INSERT ON TABLE public.legal_hold_folders TO service_role;
+REVOKE ALL ON TABLE public.retention_queue FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_queue FROM anon;
+REVOKE ALL ON TABLE public.retention_queue FROM authenticated;
+REVOKE ALL ON TABLE public.retention_queue FROM service_role;
+GRANT SELECT ON TABLE public.retention_queue TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.retention_queue TO service_role;
+REVOKE ALL ON TABLE public.retention_skips FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_skips FROM anon;
+REVOKE ALL ON TABLE public.retention_skips FROM authenticated;
+REVOKE ALL ON TABLE public.retention_skips FROM service_role;
+GRANT SELECT ON TABLE public.retention_skips TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.retention_skips TO service_role;
+REVOKE ALL ON TABLE public.retention_receipts FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_receipts FROM anon;
+REVOKE ALL ON TABLE public.retention_receipts FROM authenticated;
+REVOKE ALL ON TABLE public.retention_receipts FROM service_role;
+GRANT SELECT ON TABLE public.retention_receipts TO authenticated;
+GRANT SELECT, INSERT ON TABLE public.retention_receipts TO service_role;
+REVOKE ALL ON TABLE public.retention_sweeps FROM PUBLIC;
+REVOKE ALL ON TABLE public.retention_sweeps FROM anon;
+REVOKE ALL ON TABLE public.retention_sweeps FROM authenticated;
+REVOKE ALL ON TABLE public.retention_sweeps FROM service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.retention_sweeps TO service_role;
+
 
 -- ============================================================
 -- 6. Function EXECUTE privileges (migration 181 / Phase 248, CRED-03)
@@ -9247,3 +10598,61 @@ REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.message_artifacts_immutable() TO service_role;
+
+-- migration 204 — Phase 275: the hold predicates and the folder walk are service_role ONLY (W-5b);
+-- the trigger functions are trigger-only (Group A shape, no grant). Copied, not retyped.
+REVOKE EXECUTE ON FUNCTION public.retention_folder_ancestors(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.retention_folder_ancestors(uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.retention_folder_ancestors(uuid) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.retention_folder_ancestors(uuid) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.retention_held_documents(uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.retention_held_documents(uuid[]) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.retention_held_documents(uuid[]) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.retention_held_documents(uuid[]) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.retention_held_folders(uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.retention_held_folders(uuid[]) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.retention_held_folders(uuid[]) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.retention_held_folders(uuid[]) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.documents_refuse_held_delete() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.folders_refuse_held_delete() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.documents_sticky_hold_on_move() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.folders_sticky_hold_on_move() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.retention_refuse_truncate() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.documents_protect_archive_state() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.retention_policies_protect_columns() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.legal_holds_protect_columns() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.legal_hold_coverage_same_org() FROM PUBLIC, anon, authenticated;
+
+-- migration 205 — Phase 275: the two RPCs re-asserted, query_user_documents loses PUBLIC/anon, and
+-- the document_is_retrievable helper the RESTRICTIVE agent-read policies call (D-36).
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) FROM anon;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text, uuid[], integer) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[], uuid[]) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.query_user_documents(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.query_user_documents(text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.query_user_documents(text) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.document_is_retrievable(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.document_is_retrievable(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.document_is_retrievable(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.document_is_retrievable(uuid) TO service_role;
+
+-- migration 206 — Phase 275 fix pass: the storage-backing helper the documents DELETE policy calls,
+-- the one-transaction folder delete (SECURITY INVOKER, user-callable), and four trigger-only
+-- functions. Copied, not retyped.
+REVOKE EXECUTE ON FUNCTION public.storage_object_backs_document(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.storage_object_backs_document(text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.storage_object_backs_document(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.storage_object_backs_document(text) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.delete_folder_tree(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.delete_folder_tree(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.delete_folder_tree(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_folder_tree(uuid) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.documents_hold_identity_guard() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.folders_hold_identity_guard() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.retention_policies_folder_same_org() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.documents_inherit_family_archive() FROM PUBLIC, anon, authenticated;

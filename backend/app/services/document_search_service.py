@@ -217,6 +217,12 @@ def _apply_version(q, version: str):
     return q.eq("is_latest", version != "older")
 
 
+def _apply_archived(q, include_archived: bool):
+    # Phase 275 (RET-04 / D-18) — Find hides archived documents unless the person asks for them.
+    # Open / download routes are NOT filtered: an archived document stays openable.
+    return q if include_archived else q.is_("archived_at", "null")
+
+
 def _apply_ids(q, id_allow):
     if id_allow is not None:
         q = q.in_("id", sorted(id_allow))
@@ -444,6 +450,7 @@ async def _candidates(
         q = _apply_added_by(q, req, caller)
         q = _apply_dates(q, req)
         q = _apply_version(q, version)
+        q = _apply_archived(q, req.include_archived)
         q = _apply_ids(q, id_allow)
         return q
 

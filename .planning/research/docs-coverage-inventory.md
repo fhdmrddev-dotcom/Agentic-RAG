@@ -8,8 +8,8 @@
 
 | Status | Meaning |
 |---|---|
-| `shipped` | Live in production v4.4 (present on `origin/production`) |
-| `v4.5` | Built on `develop` in v4.5 (Phases 270-273) and **not released**. The docs must say "not yet released". |
+| `shipped` | Live in production (present on `origin/production`). Rows that were `v4.5` became `shipped (v4.5 …)` when v4.5 shipped on 2026-10-12. |
+| `v4.5` | Built on `develop` in v4.5 (Phases 270-273) and **not released**. The docs must say "not yet released". ⚠ v4.5 shipped 2026-10-12: no row carries this status any more; it stays for the gate's mechanism. |
 | `flag-off` | Shipped, but off by default behind a feature or flag |
 | `gated` | Shipped, but visible only to an audience (operators, or org admins) |
 | `locked` | Shipped as a visible "coming soon" lock, with no capability behind it |
@@ -32,7 +32,7 @@
 - Setup steps: `pages/SetupWizard.tsx:240-300` `renderStep`
 - Pre-auth paths: `App.tsx:155,310,327` (`/admin/spend`, `/setup`, `/invite`). There is **no URL router**; these are literal pathname checks.
 
-Nav rail on `develop` (7): Chat · Workflows (`workflow_authoring`) · Library · Connections · Skills · Experts · Settings (`model_management`). Prod has an 8th entry, `classification-rules`, which v4.5 Phase 271 removes and replaces with Library → Filing rules.
+Nav rail on `develop` (7): Chat · Workflows (`workflow_authoring`) · Library · Connections · Skills · Experts · Settings (`model_management`). Before v4.5, prod had an 8th entry, `classification-rules`; v4.5 Phase 271 removed it and replaced it with Library → Filing rules.
 
 | ID | Surface | Where (component) | Status | Audience | Proposed doc page |
 |---|---|---|---|---|---|
@@ -47,14 +47,14 @@ Nav rail on `develop` (7): Chat · Workflows (`workflow_authoring`) · Library �
 | A9 | Thread handoff (summarise into a new thread) | `POST /threads/{id}/handoff` | shipped | user | `use/chat` |
 | A10 | Workspace panel: Files, Todos, Tasks/phase timeline, ask-user card, diffs, template upload | `components/panel/*` | shipped | user | `use/workspace-panel` |
 | A11 | Library → Documents tab (folders tree, table) | `LibraryPage` `documents` | shipped | user | `use/library/documents` |
-| A12 | Library → Documents → **Find** mode (document search) | `findState.ts`, `/document-search` | v4.5 (271) | user | `use/library/find` |
+| A12 | Library → Documents → **Find** mode (document search) | `findState.ts`, `/document-search` | shipped (v4.5 Phase 271) | user | `use/library/find` |
 | A13 | Library → Views tab (saved virtual folders) | `views` | shipped | user | `use/library/views` |
 | A14 | Library → Ingestion tab (upload, queue, cloud import) | `IngestionTab`, `LibraryCloudImport` | shipped | user | `use/library/ingestion` |
 | A15 | Library → Indexing tab (vector store, embedding model, folder cards) | `indexing`, `/library/index-summary` | shipped (requires `model_management`) | admin | `use/library/indexing` |
 | A16 | Library → Health tab (governance signals, checked queries) | `health`, `/document-governance`, `/checked-queries` | shipped (`governance_health`) | user | `use/library/health` |
-| A17 | Library → Filing rules sub-view (was the Classification page) | `ClassificationRulesPage`, `RuleBuilderPanel` | v4.5 (271); prod = `classification-rules` nav view | user | `use/library/filing-rules` |
+| A17 | Library → Filing rules sub-view (was the Classification page) | `ClassificationRulesPage`, `RuleBuilderPanel` | shipped (v4.5 Phase 271; replaced the `classification-rules` nav view) | user | `use/library/filing-rules` |
 | A18 | Document detail panel: metadata, confidence chips, relationships, versions, "questions that found it" | `metadata/DocumentDetailPanel.tsx` | shipped | user | `use/library/document-detail` |
-| A19 | Document detail: download original plus file facts | `POST /documents/{id}/download-url` | v4.5 (270) | user | `use/library/document-detail` |
+| A19 | Document detail: download original plus file facts | `POST /documents/{id}/download-url` | shipped (v4.5 Phase 270) | user | `use/library/document-detail` |
 | A20 | CAD takeoff / BOQ rate matching | `api/takeoff.py` | shipped | user | `use/library/takeoff` |
 | A21 | Workflows → Library (published, drafts, starters, run, schedule) | `WorkflowsPage` `library`, `RunModal`, `WorkflowScheduleModal` | shipped | user | `automate/workflows/library` |
 | A22 | Workflows → Builder (describe door, template door, canvas, step forms) | `WorkflowBuilderPage`, `WorkflowCanvas` | shipped (`workflow_authoring`, `visual_workflow_canvas` = everyone) | user | `automate/workflows/builder` |
@@ -81,7 +81,7 @@ Nav rail on `develop` (7): Chat · Workflows (`workflow_authoring`) · Library �
 | A43 | Org admin → Invitations & Roles | `invitations` | gated | admin | `administer/org/invitations` |
 | A44 | Org admin → SSO | `sso` | gated | admin | `administer/org/sso` |
 | A45 | Org admin → Subscription | `subscription` | locked; not built (no billing seed; tiers exist in `tier_capabilities`) | admin | `administer/org/plans-and-tiers` |
-| A46 | Org admin → Retention | `retention` | locked; v4.5 Phase 275 (not built) → SEED-250, SEED-345 | admin | `administer/org/retention` |
+| A46 | Org admin → Retention | `retention` | gated (v4.5 Phase 275; scheduled sweeps off by default) | admin | `administer/org/retention` |
 | A47 | Control Room → Control Plane (dependency health, active runs plus Kill, kill switches, maintenance, backpressure) | `ControlRoomPage` `control-plane` | gated (operator) | operator | `administer/control-room/control-plane` |
 | A48 | Control Room → Users & Access (roster, disable/enable, operator grant, feature-visibility map) | `users-access` | gated | operator | `administer/control-room/users-and-access` |
 | A49 | Control Room → Model Registry (capabilities, discovery, add by id, lock) | `model-registry` | gated | operator | `administer/control-room/model-registry` |
@@ -130,7 +130,7 @@ Nav rail on `develop` (7): Chat · Workflows (`workflow_authoring`) · Library �
 | B26 | `write_todos` | Publish a task list to the panel | shipped | user | same |
 | B27 | `task` | Spawn a bounded sub-agent | shipped | user | `use/agent-tools#delegation` |
 | B28 | `ask_user` | Pause and ask you a question | shipped | user | `use/workspace-panel` |
-| B29 | `show_artifact` | Render a chart, table or metric under the answer | v4.5 (273, in progress) | user | `use/artifacts` |
+| B29 | `show_artifact` | Render a chart, table or metric under the answer | shipped (v4.5 Phase 273) | user | `use/artifacts` |
 | B30 | `render_template` | Fill a DOCX template into a deliverable (workflow steps only) | shipped | user | `automate/workflows/deliverables` |
 | B31 | Connector service tools (Google 26, Slack 5, Jira 4) | First-party tools exposed when a connection is granted. `services/connectors/service_tools.py:86` `SERVICE_TOOL_SPECS` | shipped | user | `connect/tool-grants` |
 | B32 | MCP server tools (dynamic) | Tools discovered on a connected MCP server, with per-tool allow/ask/deny | shipped | user | `connect/custom-mcp` |
@@ -373,9 +373,9 @@ Auth codes:
 | H3 | panel | `panel.py` | `/threads/{id}/…` | 3 | JWT | user | public | todos, tasks, pending ask_user |
 | H4 | workspace | `workspace.py` | `/threads/{id}/workspace` | 7 | JWT, ORG | user | public | files, versions, diff, raw, attach-from-connection |
 | H5 | sandbox-outputs | `sandbox_outputs.py` | `/sandbox-outputs` | 1 | JWT | user | public | |
-| H6 | documents | `documents.py` + `document_queries.py` | `/documents` | 18 | JWT (RLS) | user | public | upload, list, content, chunks, tables, images, versions, metadata, move, reingest; `download-url` = v4.5 |
+| H6 | documents | `documents.py` + `document_queries.py` | `/documents` | 18 | JWT (RLS) | user | public | upload, list, content, chunks, tables, images, versions, metadata, move, reingest; `download-url` since v4.5 |
 | H7 | takeoff | `takeoff.py` | `/documents/{id}/takeoff` | 3 | JWT | user | public | CAD takeoff / BOQ |
-| H8 | document-search | `document_search.py` | `/document-search` | 1 | JWT | user | public (v4.5) | not on prod |
+| H8 | document-search | `document_search.py` | `/document-search` | 1 | JWT | user | public | since v4.5 |
 | H9 | document-views | `document_views.py` | `/document-views` | 6 | JWT | user | public | |
 | H10 | document-relationships | `document_relationships.py` | `/document-relationships` | 3 | JWT | user | public | |
 | H11 | document-governance | `document_governance.py` | `/document-governance` | 3 | JWT, VIS(governance_health) | user | public | |

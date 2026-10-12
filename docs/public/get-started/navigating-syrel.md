@@ -6,7 +6,7 @@ audience: user
 status: written
 release: shipped
 covers: [A17, nav:chat, nav:workflows, nav:documents, nav:connections, nav:skills, nav:experts, nav:settings, view:chat, view:documents, view:skills, view:settings, view:workflows, view:connections, view:skill-studio, view:control-room, view:org-admin, view:workflow-run, view:admin-spend, view:experts]
-unreleased: [A17]
+updated: v4.5
 summary: >-
   The rail on the left takes you to Chat, Workflows, Library, Connections, Skills, Experts and
   Settings; admins and operators see extra entries for their areas.
@@ -42,9 +42,9 @@ An operator can change who sees Workflows and Settings from the Control Room's f
 - **Skill Studio.** Opening a skill's studio from the Skills page shows its evaluations, triggering and versions. It is visible to platform operators by default.
 - **Document details.** Selecting a document in the Library opens its detail panel on the right.
 
-## Changes in the next release
+## Where Classification went
 
-In v4.4 the rail also has a **Classification** entry for classification rules. v4.5 removes it and moves the rules into the Library as **Filing rules**; v4.5 has not shipped yet.
+Before v4.5 the rail also had a **Classification** entry for classification rules. The rules now live in the Library as **Filing rules**, behind the **Filing rules** link in the Library's header. See [Filing rules](/docs/use/library/filing-rules).
 
 ## Plain words or technical names
 

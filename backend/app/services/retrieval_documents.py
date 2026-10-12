@@ -4,7 +4,12 @@ Part of discharging the ``retrieval_service.py`` extraction that had been owed s
 ``tests/unit/test_272_pure_move.py`` proves each function is AST-identical to its PHASE_BASE source.
 
 Hit enrichment (filename / version / folder / connection provenance), filename → document id
-resolution, and the full-document read ``analyze_document`` uses. ⛔ **What this module is NOT:**
+resolution, and the full-document read ``analyze_document`` uses.
+
+⚠ Phase 275-02 (D-18) changed ``resolve_document_id``, ``resolve_document`` and
+``fetch_full_document`` ON PURPOSE: each read gains ``.eq(RETRIEVABLE_COLUMN, True)``, so an agent
+can never resolve or read an archived or source-gone document. Their 272 pure-move pins are retired
+by name in ``test_272_pure_move.py`` (SEED-177), with the reason written there. ⛔ **What this module is NOT:**
 it does not search and it does not decide who may read what — the retrieval RPCs and RLS do that.
 The owner-scoped ``fetch_full_document`` FINDING (a fifth retrieval path, fail-closed) moved with
 it unchanged and is still routed to a reviewer, not silently taken.
@@ -13,6 +18,7 @@ from __future__ import annotations
 
 from supabase import Client
 
+from app.services.retrieval_scope import RETRIEVABLE_COLUMN
 from app.utils.db import aexec
 
 
@@ -81,6 +87,7 @@ async def resolve_document_id(filename: str, user_id: str, supabase: Client) -> 
         .select("id")
         .eq("user_id", user_id)
         .eq("is_latest", True)
+        .eq(RETRIEVABLE_COLUMN, True)  # Phase 275 (D-18): an agent never resolves an archived / source-gone file
         .ilike("filename", filename)
         .limit(1)
     )
@@ -92,6 +99,7 @@ async def resolve_document_id(filename: str, user_id: str, supabase: Client) -> 
         .select("id")
         .eq("user_id", user_id)
         .eq("is_latest", True)
+        .eq(RETRIEVABLE_COLUMN, True)  # Phase 275 (D-18)
         .ilike("filename", f"%{filename}%")
         .limit(1)
     )
@@ -114,6 +122,7 @@ async def resolve_document(filename: str, user_id: str, supabase: Client) -> dic
             .select("id, filename")
             .eq("user_id", user_id)
             .eq("is_latest", True)
+            .eq(RETRIEVABLE_COLUMN, True)  # Phase 275 (D-18): query_tables never names one either
             .ilike("filename", pattern)
             .limit(1)
         )
@@ -150,6 +159,7 @@ async def fetch_full_document(document_id: str, user_id: str, supabase: Client) 
         .select("id, filename, metadata, version_number, full_markdown, source_connection_id")
         .eq("id", document_id)
         .eq("user_id", user_id)
+        .eq(RETRIEVABLE_COLUMN, True)  # Phase 275 (D-18): analyze_document never reads one
         .single()
     )
     if not doc_result.data:

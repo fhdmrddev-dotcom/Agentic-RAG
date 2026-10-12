@@ -8,8 +8,8 @@ and ``connection_states``. The invite-dialog preview (``scope_preview``) and the
 
 "Excluded" = the thread-folder subtree minus the Expert's folders, only when restricted. Its count
 and its ≤5 names come from ONE documents query on the user-JWT client, whose RLS SELECT policy is
-retrieval's visibility predicate, with retrieval's own filters (``is_latest``, not
-``source_disconnected``).
+retrieval's visibility predicate, with retrieval's own filters (``is_latest``, and since 275-01 the
+generated ``retrievable`` column).
 
 The fakes below are shared with ``test_267_expert_changed_event.py`` (imported from here).
 """
@@ -56,7 +56,10 @@ CONNECTION_NAMES = {"slack": "Slack", "hubspot": "HubSpot"}
 ACME_DOCS = [
     {"filename": "ACME_MSA_2026.pdf", "folder_id": ACME_FOLDER, "is_latest": True, "source_state": None},
     {"filename": "ACME_SOW_03.docx", "folder_id": ACME_SUB, "is_latest": True, "source_state": None},
-    {"filename": "ACME_invoices_Q3.xlsx", "folder_id": ACME_FOLDER, "is_latest": True, "source_state": "synced"},
+    # 275-01: was "synced" — never a legal source_state (CHECK: NULL / live / missing_at_source /
+    # unauthorized_at_source / source_disconnected). Under the positive-form `retrievable` column an
+    # unknown value is excluded, so the fixture now says what it meant: a live synced file.
+    {"filename": "ACME_invoices_Q3.xlsx", "folder_id": ACME_FOLDER, "is_latest": True, "source_state": "live"},
     {"filename": "Board_deck_Q3.pptx", "folder_id": ACME_SUB, "is_latest": True, "source_state": None},
     # noise the predicate must drop
     {"filename": "ACME_MSA_2025.pdf", "folder_id": ACME_FOLDER, "is_latest": False, "source_state": None},
@@ -66,7 +69,14 @@ HR_DOCS = [
     {"filename": "Leave_policy.pdf", "folder_id": HR_FOLDER, "is_latest": True, "source_state": None},
 ]
 
-RETRIEVAL_OR = "source_state.is.null,source_state.neq.source_disconnected"
+# SEED-177 — retired ON PURPOSE by 275-01: the predicate moved to the generated `retrievable` column,
+# mig 205, D-36. The old PostgREST `or_` string (RETRIEVAL_OR) named only source_disconnected — the drift
+# behind BUG-261004-01. The fake computes the column exactly as migration 205 defines it.
+RETRIEVABLE = ("retrievable", True)
+
+
+def _retrievable(row: dict) -> bool:
+    return row.get("archived_at") is None and row.get("source_state") in (None, "live")
 
 
 class FakeQuery:
@@ -115,10 +125,10 @@ class FakeSupabase:
             if args[0] == "folder_id":
                 rows = [r for r in rows if r["folder_id"] in set(args[1])]
         for _, args, _kw in q.call("eq"):
-            rows = [r for r in rows if r.get(args[0]) == args[1]]
-        for _, args, _kw in q.call("or_"):
-            if args[0] == RETRIEVAL_OR:
-                rows = [r for r in rows if r.get("source_state") != "source_disconnected"]
+            if tuple(args) == RETRIEVABLE:
+                rows = [r for r in rows if _retrievable(r)]
+            else:
+                rows = [r for r in rows if r.get(args[0]) == args[1]]
         rows.sort(key=lambda r: r["filename"])
         count = len(rows)
         for _, args, _kw in q.call("limit"):
@@ -187,7 +197,7 @@ def _latest_acme_names():
     return sorted(
         d["filename"]
         for d in ACME_DOCS
-        if d["is_latest"] and d["source_state"] != "source_disconnected"
+        if d["is_latest"] and _retrievable(d)
     )
 
 
@@ -218,8 +228,8 @@ async def test_restricted_in_a_folder_states_the_excluded_documents_from_one_que
     q = docs[0]
     assert q.call("select") == [("select", ("id, filename",), {"count": "exact"})]
     assert q.call("in_") == [("in_", ("folder_id", sorted([ACME_FOLDER, ACME_SUB])), {})]
-    assert q.call("eq") == [("eq", ("is_latest", True), {})]
-    assert q.call("or_") == [("or_", (RETRIEVAL_OR,), {})]
+    assert q.call("eq") == [("eq", ("is_latest", True), {}), ("eq", RETRIEVABLE, {})]
+    assert q.call("or_") == [], "the retired source_state clause is back"
     assert q.call("order") == [("order", ("filename",), {})]
     assert q.call("limit") == [("limit", (5,), {})]
 

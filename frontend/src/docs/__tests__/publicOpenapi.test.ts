@@ -133,28 +133,39 @@ describe("public Syrel API spec (DOCS-03)", () => {
     }
   })
 
-  it("badges every V45 operation 'Not yet released'", () => {
-    expect(lib.V45_OPERATIONS.length).toBeGreaterThanOrEqual(2)
-    for (const key of lib.V45_OPERATIONS as string[]) {
+  // ~~V45_OPERATIONS.length >= 2, each badged in the committed spec~~ — v4.5 shipped 2026-10-12, so
+  // the list is EMPTY and the committed spec badges nothing "Not yet released". The mechanism is
+  // still driven, through `opts.unreleasedOperations`, against the real snapshot.
+  const UNRELEASED = ["post /document-search", "post /documents/{document_id}/download-url"]
+
+  it("badges nothing 'Not yet released' now that v4.5 has shipped", () => {
+    expect(lib.V45_OPERATIONS).toEqual([])
+    for (const o of ops(pub)) expect(badgeNames(o.op), `${o.method} ${o.path}`).not.toContain("Not yet released")
+    for (const key of UNRELEASED) {
       const [method, path] = key.split(" ")
-      const op = pub.paths[path]?.[method]
+      expect(pub.paths[path]?.[method], key).toBeDefined()
+    }
+  })
+
+  it("badges every listed unreleased operation 'Not yet released'", () => {
+    const { doc, findings } = lib.buildPublicSpec(readJson(SNAPSHOT), {
+      historyDir: HISTORY,
+      unreleasedOperations: UNRELEASED,
+    })
+    expect(findings).toEqual([])
+    for (const key of UNRELEASED) {
+      const [method, path] = key.split(" ")
+      const op = doc.paths[path]?.[method]
       expect(op, key).toBeDefined()
       expect(badgeNames(op), key).toContain("Not yet released")
     }
   })
 
-  it("exits 1 naming a V45 op the snapshot no longer has", () => {
+  it("names a listed unreleased op the snapshot no longer has", () => {
     const snap = readJson(SNAPSHOT)
     delete snap.paths["/document-search"]
-    const { findings } = lib.buildPublicSpec(snap, { historyDir: HISTORY })
+    const { findings } = lib.buildPublicSpec(snap, { historyDir: HISTORY, unreleasedOperations: UNRELEASED })
     expect(findings).toContain("[missing-v45-op] post /document-search")
-
-    const dir = tmpDir()
-    const snapPath = nodePath.join(dir, "snap.json")
-    nodeFs.writeFileSync(snapPath, JSON.stringify(snap))
-    const res = runCli(["--snapshot", snapPath, "--out", nodePath.join(dir, "out.json")])
-    expect(res.status).toBe(1)
-    expect(res.stdout + res.stderr).toContain("[missing-v45-op] post /document-search")
   })
 
   it("puts every used tag in exactly one x-tagGroups group, and refuses an ungrouped tag", () => {

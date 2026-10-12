@@ -53,6 +53,10 @@ import {
   updateView,
 } from "@/lib/api"
 import { listExpertInstalls } from "@/lib/api/experts"
+// Phase 275 (S7-S9): the ONE batched retention read + its leaves (no fetch in any of them).
+import { useRetentionStates } from "@/components/retention/useRetentionStates"
+import { RetentionFolderLine } from "@/components/retention/RetentionFolderLine"
+import { ArchivedHiddenLine, splitArchived } from "@/components/retention/ArchivedHiddenLine"
 import { provenanceByFolder } from "@/components/experts/catalog/expertCatalog"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -657,7 +661,12 @@ export function LibraryPage({
     return documents.filter((d) => d.folder_id === selectedFolderId)
   }, [filteredDocs, selectedFolderId, documents])
 
-  const listDocuments = folderScopedDocuments
+  // Phase 275 (S9 / D-04): browse hides archived rows unless the ONE include-archived state (Find's
+  // reducer, shared with its `Include archived` chip) is on. 275-REVIEW F-WR-11: a saved view or an
+  // ad-hoc filter honours the SAME state (its resolve has no archived predicate), so it can never
+  // disagree with Find over the same conditions.
+  const archived = splitArchived(folderScopedDocuments, find.include_archived)
+  const listDocuments = archived.shown
   const listFolderId = filteredDocs !== null ? undefined : selectedFolderId
 
   // Phase 217.1-06 (LIB-01) — the Documents tab's client-side pager state. The offset
@@ -674,6 +683,18 @@ export function LibraryPage({
   // here — a saved view's row count is its own resolve, not the pager's business.
   const pagedDocuments =
     filteredDocs !== null ? listDocuments : listDocuments.slice(pageOffset, pageOffset + pageSize)
+
+  // Phase 275 (planning flag 2): ONE `POST /retention/document-states` for what is on screen — the
+  // browse page, Find's page and the open document — plus the selected folder. Passed DOWN.
+  const retentionIds = useMemo(
+    () => [
+      ...pagedDocuments.map((d) => d.id),
+      ...findResult.rows.map((d) => d.id),
+      ...(selectedDocId ? [selectedDocId] : []),
+    ],
+    [pagedDocuments, findResult.rows, selectedDocId],
+  )
+  const retention = useRetentionStates(retentionIds, selectedFolderId)
 
   // Phase 114: the inline filter/view builder (D-114-1). Ad-hoc filtering and a
   // loaded saved view are the SAME surface. When the detail panel is open the bar
@@ -844,6 +865,7 @@ export function LibraryPage({
             onSelect: setSelectedDocId,
             selectedDocId,
             folders,
+            retention,
           }}
         />
       ) : null,
@@ -890,17 +912,28 @@ export function LibraryPage({
             {lead}
             {!findSlots && filterBarEl}
             <div data-testid="documents-doclist">
-              <DocumentList
-                documents={pagedDocuments}
-                onDelete={deleteDoc}
-                onRefresh={loadDocuments}
-                folderId={listFolderId}
-                currentUserId={user?.id ?? ""}
-                onSelect={setSelectedDocId}
-                selectedDocId={selectedDocId}
-                folders={folders}
-              />
+              {/* 275-05 (S9): every row hidden as archived → the hidden line below says so; the
+                  list's "No documents in this folder" would claim an emptiness that is not true. */}
+              {!(listDocuments.length === 0 && archived.archivedCount > 0) && (
+                <DocumentList
+                  documents={pagedDocuments}
+                  onDelete={deleteDoc}
+                  onRefresh={loadDocuments}
+                  folderId={listFolderId}
+                  currentUserId={user?.id ?? ""}
+                  onSelect={setSelectedDocId}
+                  selectedDocId={selectedDocId}
+                  folders={folders}
+                  retention={retention}
+                />
+              )}
             </div>
+            {/* 275-REVIEW F-WR-11: for a view / filter resolve too — one include-archived state. */}
+            <ArchivedHiddenLine
+              count={archived.archivedCount}
+              included={find.include_archived}
+              onChange={(include) => findDispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: include })}
+            />
             {/* Phase 217.1-06 — the client-side pager (the sketch's table footer). Shown on
                 the folder view only; a filter/view resolve carries its own server count. */}
             {filteredDocs === null && (
@@ -928,6 +961,14 @@ export function LibraryPage({
           onClose={() => setSelectedDocId(null)}
           onReconcile={loadDocuments}
           currentUserId={user?.id}
+          retention={{
+            state: retention.documents[selectedDoc.id],
+            canManage: retention.canManage,
+            onUnarchived: () => {
+              retention.refresh()
+              loadDocuments().catch(console.error)
+            },
+          }}
         />
       )}
     </div>
@@ -998,6 +1039,7 @@ export function LibraryPage({
                 subfolderCount={subfolderCount}
               />
             )}
+            <RetentionFolderLine state={retention.folders[selectedFolderId]} canManage={retention.canManage} />
           </>
         )}
       </div>

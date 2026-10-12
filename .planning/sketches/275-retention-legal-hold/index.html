@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>275 · Retention & Legal Hold</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:hsl(216 45% 4%);--elev:hsl(220 40% 5%);--card:hsl(220 30% 7%);--pop:hsl(220 30% 9%);
+  --muted:hsl(220 30% 11%);--accent:hsl(220 25% 14%);
+  --text:hsl(226 60% 97%);--text-m:hsl(220 16% 65%);--text-d:hsl(220 16% 52%);
+  --border:hsl(220 20% 16%);--primary:hsl(239 100% 82%);
+  --v-bg:hsl(258 90% 66% / .12);--v-bd:hsl(258 90% 66% / .35);--v-tx:hsl(258 95% 85%);
+  --amber:hsl(38 92% 60%);--a-bg:hsl(38 92% 60% / .10);--a-bd:hsl(38 92% 60% / .30);--a-tx:hsl(38 92% 72%);
+  --red:hsl(0 72% 60%);--r-bg:hsl(0 72% 51% / .10);--r-bd:hsl(0 72% 51% / .35);--r-tx:hsl(0 85% 78%);
+  --green:hsl(142 71% 55%);--g-bg:hsl(142 71% 45% / .12);--g-bd:hsl(142 71% 45% / .35);
+  --i-bg:hsl(239 84% 67% / .18);--i-bd:hsl(239 84% 67% / .4);--i-tx:hsl(239 100% 85%);
+  --sans:'Inter',system-ui,sans-serif;--head:'Manrope','Inter',sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--sans)}
+header.top{position:sticky;top:0;z-index:30;background:hsl(216 45% 4% / .94);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+header.top h1{font:700 15px var(--head);margin:0}
+.grp{display:flex;gap:4px;align-items:center;font-size:11px;color:var(--text-d);flex-wrap:wrap}
+.tab{background:var(--muted);border:1px solid var(--border);color:var(--text-m);padding:5px 11px;border-radius:8px;cursor:pointer;font:500 12px var(--sans)}
+.tab:hover{color:var(--text)}
+.tab[aria-selected=true]{background:var(--v-bg);border-color:var(--v-bd);color:var(--v-tx)}
+.sep{width:1px;height:22px;background:var(--border)}
+main{max-width:1320px;margin:0 auto;padding:20px 24px 60px}
+.q{color:var(--text-m);font-size:13px;margin:0 0 14px;max-width:960px}
+.q b{color:var(--text)}
+/* app frame */
+.app{display:grid;grid-template-columns:64px minmax(0,1fr);border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--elev);min-height:600px}
+.rail{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0}
+.rail div{width:44px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:10px;color:var(--text-d);text-align:center;line-height:1.1}
+.rail div.on{background:var(--i-bg);color:var(--i-tx)}
+.rail .grow{flex:1;height:auto}
+.rail .shield{border:1px solid var(--i-bd);color:var(--i-tx)}
+.content{min-width:0;display:flex;flex-direction:column}
+/* org band (080-A, indigo) */
+.band{background:linear-gradient(180deg,hsl(239 84% 67% / .08),transparent),var(--elev);border-bottom:1px solid hsl(239 84% 67% / .25);padding:12px 20px 0}
+.band .row1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.band .org{font:700 15px var(--head)}
+.chipm{font:600 10px var(--mono);letter-spacing:.12em;color:var(--i-tx);background:var(--i-bg);border:1px solid var(--i-bd);border-radius:5px;padding:2px 7px}
+.role{font-size:12px;color:var(--text-m)}
+.rec{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-d);border-radius:999px;padding:3px 10px;transition:all .3s}
+.rec i{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px hsl(142 71% 45% / .6)}
+.rec.flash{background:var(--i-bg);color:var(--i-tx)}
+.rec.flash i{background:var(--primary)}
+.band .back{margin-left:auto;color:var(--text-m);font-size:12px}
+.btabs{display:flex;gap:2px;margin-top:10px;overflow-x:auto}
+.btab{padding:8px 12px;color:var(--text-m);border-bottom:2px solid transparent;font-size:13px;white-space:nowrap}
+.btab.on{color:var(--primary);border-bottom-color:var(--primary)}
+.btab.lock{color:var(--text-d)}
+.pane{padding:18px 20px;display:grid;gap:14px;min-width:0}
+.pane.split{grid-template-columns:minmax(0,1fr) 360px;align-items:start}
+/* generic */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;min-width:0}
+.card h3{font:700 14px var(--head);margin:0 0 4px;display:flex;gap:8px;align-items:center}
+.card .sub{color:var(--text-d);font-size:12px;margin:0 0 10px}
+.posture{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--text-m)}
+.posture b{color:var(--text)}
+.dotg::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:6px}
+.btn{background:var(--i-bg);border:1px solid var(--i-bd);color:var(--i-tx);border-radius:9px;padding:7px 12px;font:600 12px var(--sans);cursor:pointer;white-space:nowrap}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:none;border-color:var(--border);color:var(--text-m)}
+.btn.ghost:hover{color:var(--text)}
+.btn.danger{background:var(--r-bg);border-color:var(--r-bd);color:var(--r-tx)}
+.btn.sm{padding:4px 9px;font-size:11px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font:600 11px var(--sans);color:var(--text-d);text-transform:uppercase;letter-spacing:.05em;padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid hsl(220 20% 12%);color:var(--text-m);vertical-align:top}
+td.n{color:var(--text);font-weight:500}
+tr.row{cursor:pointer}tr.row:hover td{background:var(--muted)}
+tr.row.sel td{background:var(--i-bg)}
+tr.off td{opacity:.45;text-decoration:line-through}
+.tag{font:600 10px var(--sans);border-radius:6px;padding:2px 6px;border:1px solid var(--border);color:var(--text-m);white-space:nowrap;display:inline-flex;gap:4px;align-items:center}
+.tag.del{border-color:var(--r-bd);color:var(--r-tx);background:var(--r-bg)}
+.tag.arc{border-color:var(--v-bd);color:var(--v-tx);background:var(--v-bg)}
+.tag.rev{border-color:var(--i-bd);color:var(--i-tx);background:var(--i-bg)}
+.tag.hold{border-color:var(--a-bd);color:var(--a-tx);background:var(--a-bg)}
+.tag.ok{border-color:var(--g-bd);color:var(--green);background:var(--g-bg)}
+.tag.dim{color:var(--text-d)}
+.mono{font-family:var(--mono);font-size:11px;color:var(--text-d)}
+.alert{border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.alert.r{background:var(--r-bg);border:1px solid var(--r-bd)}
+.alert.a{background:var(--a-bg);border:1px solid var(--a-bd);color:var(--a-tx)}
+.alert.i{background:var(--i-bg);border:1px solid var(--i-bd);color:var(--i-tx)}
+.alert.g{background:var(--g-bg);border:1px solid var(--g-bd)}
+.alert .grow{flex:1;min-width:200px}
+.alert b{color:var(--text)}
+.stabs{display:flex;gap:4px;border-bottom:1px solid var(--border)}
+.stab{background:none;border:0;border-bottom:2px solid transparent;color:var(--text-m);padding:8px 12px;font:500 13px var(--sans);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.stab.on{color:var(--text);border-bottom-color:var(--primary)}
+.cnt{font:600 10px var(--sans);background:var(--muted);border-radius:999px;padding:1px 7px;color:var(--text-m)}
+.cnt.r{background:var(--r-bg);color:var(--r-tx)}
+.holdcard{border:1px solid var(--a-bd);background:linear-gradient(180deg,var(--a-bg),transparent 70%),var(--card);border-radius:12px;padding:12px 14px;display:grid;gap:6px}
+.holdcard .t{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.holdcard .t b{font:700 14px var(--head)}
+.holdcard .why{color:var(--text-m);font-size:12px}
+.holdcard.rel{border-color:var(--border);background:var(--card);opacity:.7}
+.receipts{display:grid;gap:2px}
+.rc{display:grid;grid-template-columns:18px 1fr auto;gap:8px;font-size:12px;color:var(--text-m);padding:5px 4px;border-radius:6px}
+.rc.new{animation:slide .6s ease-out;background:var(--i-bg)}
+@keyframes slide{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
+.rc .w{color:var(--primary)}
+.rc b{color:var(--text);font-weight:500}
+/* editor */
+.sentence{font:500 17px/2.3 var(--head);color:var(--text-m)}
+.sentence select,.sentence input{font:600 15px var(--sans);background:var(--i-bg);border:1px solid var(--i-bd);color:var(--i-tx);border-radius:8px;padding:3px 6px;margin:0 2px}
+.sentence input{width:56px;text-align:center}
+.form{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px 14px;align-items:center;font-size:13px}
+.form label{color:var(--text-d)}
+.form select,.form input[type=text],.form input[type=number]{background:var(--muted);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font:13px var(--sans);width:100%}
+.form .inl{display:flex;gap:8px;align-items:center}
+.form .inl input{width:80px}
+.note{font-size:12px;color:var(--text-d)}
+.note.warn{color:var(--a-tx)}
+.dr{display:grid;gap:8px}
+.dr h4{margin:0;font:600 11px var(--sans);color:var(--text-d);text-transform:uppercase;letter-spacing:.06em}
+.bucket{border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.bucket summary{list-style:none;cursor:pointer;display:flex;gap:8px;align-items:center;padding:8px 10px;font-size:13px}
+.bucket summary::-webkit-details-marker{display:none}
+.bucket summary .num{font:700 16px var(--head);min-width:22px;text-align:right}
+.bucket summary .lbl{flex:1}
+.bucket summary::after{content:"›";color:var(--text-d);transition:transform .2s}
+.bucket[open] summary::after{transform:rotate(90deg)}
+.bucket ul{margin:0;padding:4px 10px 10px 40px;font-size:12px;color:var(--text-m);display:grid;gap:3px}
+.bucket ul li span{color:var(--text-d)}
+.bucket.act{border-color:var(--r-bd)}.bucket.act .num{color:var(--r-tx)}
+.bucket.act.archive{border-color:var(--v-bd)}.bucket.act.archive .num{color:var(--v-tx)}
+.bucket.act.review{border-color:var(--i-bd)}.bucket.act.review .num{color:var(--i-tx)}
+.bucket.hold .num{color:var(--a-tx)}
+.bucket.nope{border-color:var(--a-bd);background:var(--a-bg)}.bucket.nope .num{color:var(--a-tx)}
+.stale{background:var(--a-bg);border:1px solid var(--a-bd);color:var(--a-tx);border-radius:10px;padding:8px 10px;font-size:12px}
+.confirm{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px;margin-top:6px}
+.confirm input{width:70px;background:var(--muted);border:1px solid var(--r-bd);border-radius:8px;color:var(--text);padding:6px 8px;font:600 14px var(--mono);text-align:center}
+.onecard{max-width:620px;margin:0 auto;display:grid;gap:12px}
+.prog{height:4px;background:var(--muted);border-radius:4px;overflow:hidden}.prog i{display:block;height:100%;background:var(--primary);transition:width .3s}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:12px}.facts dt{color:var(--text-d)}.facts dd{margin:0;color:var(--text)}
+/* library */
+.lhead{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.lhead h2{font:700 17px var(--head);margin:0}
+.fchips{display:flex;gap:6px;flex-wrap:wrap}
+.fchip{background:var(--card);border:1px solid var(--border);border-radius:999px;color:var(--text-m);padding:4px 10px;font:500 12px var(--sans);cursor:pointer}
+.fchip.on{border-color:var(--i-bd);background:var(--i-bg);color:var(--i-tx)}
+.folderline{font-size:12px;color:var(--text-m);padding:8px 18px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.folderline b{color:var(--text)}
+.lbody{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+.lbody.split{grid-template-columns:minmax(0,1fr) 340px}
+.panel{border-left:1px solid var(--border);padding:16px;display:grid;gap:12px;align-content:start;background:var(--card)}
+.panel h3{font:700 15px var(--head);margin:0}
+.sec{border-top:1px solid var(--border);padding-top:10px;display:grid;gap:6px}
+.sec h4{margin:0;font:600 11px var(--sans);color:var(--text-d);text-transform:uppercase;letter-spacing:.06em}
+.ret{font-size:13px;color:var(--text-m);line-height:1.5}
+.ret b{color:var(--text)}
+.ret.hold{color:var(--a-tx)}
+.refuse{background:var(--a-bg);border:1px solid var(--a-bd);color:var(--a-tx);border-radius:10px;padding:10px;font-size:12px}
+.hidden-hint{font-size:12px;color:var(--text-d);padding:8px 18px}
+.hidden-hint a{color:var(--i-tx);cursor:pointer}
+.toggle{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--text-m);cursor:pointer}
+.empty{padding:22px;text-align:center;color:var(--text-d);border:1px dashed var(--border);border-radius:12px}
+@media (max-width:900px){.pane.split,.lbody.split{grid-template-columns:minmax(0,1fr)}.panel{border-left:0;border-top:1px solid var(--border)}.form{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>275 · Retention &amp; Legal Hold</h1>
+  <div class="grp">Screen
+    <button class="tab" data-s="1" aria-selected="true">1 Retention tab</button>
+    <button class="tab" data-s="2">2 Policy + dry run</button>
+    <button class="tab" data-s="3">3 Delete approval</button>
+    <button class="tab" data-s="4">4 Library view</button>
+  </div>
+  <div class="sep"></div>
+  <div class="grp">Variant
+    <button class="tab" data-v="A" aria-selected="true">A</button>
+    <button class="tab" data-v="B">B</button>
+  </div>
+  <div class="sep"></div>
+  <div class="grp" id="asgrp">View as
+    <button class="tab" data-as="admin" aria-selected="true">Org admin</button>
+    <button class="tab" data-as="member">Member</button>
+  </div>
+</header>
+<main>
+  <p class="q" id="qtext"></p>
+  <div id="stage"></div>
+</main>
+
+<script>
+// ── Synthetic org: Halden & Co. Today = 12 Oct 2026. Every count below is COMPUTED from this corpus.
+const TODAY = new Date("2026-10-12");
+const fmt = d => d ? new Date(d).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—";
+const addYears = (d,n) => { const x=new Date(d); x.setFullYear(x.getFullYear()+n); return x; };
+
+// id, name, type, folder, document date, added to Library, last modified in the file, archived on
+const DOCS = [
+ ["i1","Invoice INV-0412","Invoice","/Finance/Invoices","2016-05-03","2022-01-10","2016-05-03","2026-09-14"],
+ ["i2","Invoice INV-0598","Invoice","/Finance/Invoices","2017-11-20","2022-01-10","2017-11-21",null],
+ ["i3","Invoice INV-0611","Invoice","/Finance/Invoices","2018-02-07","2022-01-10","2018-02-07",null],
+ ["i4","Invoice INV-0733","Invoice","/Finance/Invoices","2018-12-14","2022-01-10","2018-12-15",null],
+ ["i5","Invoice INV-0877","Invoice","/Finance/Invoices","2019-09-10","2022-01-10","2019-09-10",null],
+ ["i6","Invoice INV-0902 (scan)","Invoice","/Finance/Invoices",null,"2022-01-10","2022-01-10",null],
+ ["i7","Invoice INV-1043","Invoice","/Finance/Invoices","2021-04-08","2022-01-10","2021-04-08",null],
+ ["i8","Invoice INV-1188","Invoice","/Finance/Invoices","2024-06-30","2024-07-02","2024-06-30",null],
+ ["i9","Invoice INV-1290","Invoice","/Finance/Invoices","2025-04-09","2025-04-10","2025-04-09",null],
+ ["c1","Halvorsen Supply Agreement","Contract","/Contracts/Expired","2014-03-02","2021-11-03","2014-03-04",null],
+ ["c2","Brightwater Office Lease","Contract","/Contracts/Expired","2013-06-18","2021-11-03","2013-06-20",null],
+ ["c3","Kessler Services Agreement","Contract","/Contracts/Expired","2014-09-30","2021-11-03","2014-10-01",null],
+ ["c4","Olsen Consulting SOW","Contract","/Contracts/Expired","2015-01-12","2021-11-03","2015-01-12",null],
+ ["c5","Meridian Mutual NDA","Contract","/Contracts/Expired","2015-08-04","2021-11-03","2015-08-04",null],
+ ["c6","Fjord Logistics MSA","Contract","/Contracts/Expired",null,"2021-11-03","2016-02-11",null],
+ ["c7","Halvorsen Amendment 1","Contract","/Contracts/Expired","2016-03-01","2021-11-03","2016-03-02",null],
+ ["c8","Ostrava Distribution Agreement","Contract","/Contracts/Expired","2017-05-22","2021-11-03","2017-05-22",null],
+ ["h1","Personnel file — E. Lindqvist","Personnel record","/HR/Personnel","2014-02-01","2021-06-01","2019-08-01",null],
+ ["h2","Personnel file — M. Kaur","Personnel record","/HR/Personnel","2018-09-01","2021-06-01","2023-01-15",null],
+ ["h3","Personnel file — T. Brandt","Personnel record","/HR/Personnel","2016-04-11","2021-06-01","2020-12-02",null],
+ ["a1","Halvorsen correspondence 2013–2016","Correspondence","/Projects/Atlas","2016-06-30","2023-03-12","2016-07-01",null],
+ ["a2","Atlas kickoff deck","Presentation","/Projects/Atlas","2023-03-01","2023-03-12","2023-03-08",null],
+ ["r1","Q3 2025 Revenue Report","Report","/Finance/Reports","2025-10-01","2025-10-04","2025-10-03",null],
+ ["p1","Remote Work Policy","Policy","/HR/Policies","2024-08-01","2024-08-30","2024-08-29",null],
+].map(([id,name,type,folder,docDate,added,modified,archived])=>({id,name,type,folder,docDate,added,modified,archived}));
+const byId = Object.fromEntries(DOCS.map(d=>[d.id,d]));
+const FOLDERS = ["/Contracts/Expired","/Finance","/Finance/Invoices","/Finance/Reports","/HR/Personnel","/HR/Policies","/Projects/Atlas"];
+const TYPES = ["Any type","Contract","Invoice","Personnel record","Correspondence","Report","Policy"];
+const FROM = {docDate:"the document date",added:"the day it was added to the Library",modified:"the day the file was last modified"};
+const ACTION = {archive:"archive it",delete:"delete it",review:"ask a person to decide"};
+
+let POLICIES = [
+ {id:"P1",name:"Finance invoices",folder:"/Finance/Invoices",sub:true,type:"Any type",years:7,from:"docDate",action:"archive",lastRun:"12 Oct 2026 02:00",dry:true},
+ {id:"P2",name:"Expired contracts",folder:"/Contracts/Expired",sub:true,type:"Contract",years:10,from:"docDate",action:"delete",lastRun:"12 Oct 2026 02:00",dry:true},
+ {id:"P3",name:"Personnel records",folder:null,sub:true,type:"Personnel record",years:6,from:"modified",action:"review",lastRun:"12 Oct 2026 02:00",dry:true},
+];
+const HOLDS = [
+ {id:"H1",name:"Halvorsen v. Halden & Co.",why:"Litigation — preserve everything about the Halvorsen supply relationship.",by:"Amira Sato",on:"3 Aug 2026",docs:["c1","c7"],folders:["/Projects/Atlas"],active:true},
+ {id:"H2",name:"2024 tax audit",why:"Tax authority audit of FY2024.",by:"Jonas Weber",on:"9 Jan 2026",released:"12 Mar 2026",docs:[],folders:["/Finance/Reports"],active:false},
+];
+let lateHold = false; // screen 3: "someone places a hold after the sweep"
+const holdsOf = d => HOLDS.filter(h=>h.active && (h.docs.includes(d.id) || h.folders.some(f=>d.folder===f||d.folder.startsWith(f+"/")))).concat(lateHold&&d.id==="c3"?[{name:"Kessler dispute (placed 10:42 today)",late:true}]:[]);
+const inScope = (p,d) => (!p.folder || d.folder===p.folder || (p.sub && d.folder.startsWith(p.folder+"/"))) && (p.type==="Any type" || d.type===p.type);
+const baseDate = (p,d) => p.from==="docDate"?d.docDate:p.from==="added"?d.added:d.modified;
+
+// Dry run: fail-closed evaluation. Anything ambiguous lands in "nothing happens".
+function evaluate(p, others=POLICIES){
+  const out={act:[],hold:[],unknown:[],conflict:[],notyet:[],already:[]};
+  for(const d of DOCS){
+    if(!inScope(p,d)) continue;
+    const clash = others.filter(o=>o.id!==p.id && inScope(o,d) && (o.action!==p.action||o.years!==p.years||o.from!==p.from));
+    if(d.archived && p.action==="archive"){out.already.push({d});continue;}
+    if(clash.length){out.conflict.push({d,why:"also under “"+clash[0].name+"”"});continue;}
+    const b=baseDate(p,d);
+    if(!b){out.unknown.push({d,why:"no "+(p.from==="docDate"?"document date":"date")});continue;}
+    const due=addYears(b,p.years);
+    if(due>TODAY){out.notyet.push({d,due});continue;}
+    const hs=holdsOf(d);
+    if(hs.length){out.hold.push({d,why:hs[0].name});continue;}
+    out.act.push({d,due});
+  }
+  out.notyet.sort((a,b)=>a.due-b.due);
+  return out;
+}
+const scopeText = p => (p.type==="Any type"?"All documents":p.type+"s")+(p.folder?" in "+p.folder+(p.sub?" (and subfolders)":""):" anywhere");
+const verb = a => a==="archive"?"archived":a==="delete"?"deleted":"reviewed";
+const actTag = a => `<span class="tag ${a==="archive"?"arc":a==="delete"?"del":"rev"}">${a==="archive"?"Archive":a==="delete"?"Delete · needs approval":"Review"}</span>`;
+
+// ── state
+const S={s:"1",v:"A",as:"admin",sub:"policies",ed:null,edDirty:false,previewed:false,picks:{},typed:"",done:null,one:0,oneLog:[],folder:"/Finance/Invoices",showArch:false,sel:null,refuse:false,receipts:[]};
+const RECEIPTS0=[
+ ["✎","Archived <b>Invoice INV-0412</b> under “Finance invoices”","14 Sep 2026 02:00 · sweep"],
+ ["✎","Placed legal hold <b>Halvorsen v. Halden & Co.</b> on 2 documents and 1 folder","3 Aug 2026 · Amira Sato"],
+ ["","Ran a dry run of <b>Expired contracts</b>: 4 would be deleted, 2 held, 1 undecidable","2 Aug 2026 · Amira Sato"],
+];
+function flash(){const m=document.getElementById("rec");if(!m)return;m.classList.remove("flash");void m.offsetWidth;m.classList.add("flash");setTimeout(()=>m.classList.remove("flash"),1600);}
+
+const Q={
+ "1":"<b>Where do policies, legal holds and the delete queue live inside Org admin → Retention?</b> A = one page, three stacked sections, the approval queue on top only when it has something. B = sub-tabs with counts.",
+ "2":"<b>How does an admin write a rule and see what it would do before it can ever run?</b> A = a sentence builder with a live dry run beside it (the preview IS the dry run). B = a plain form; Save stays locked until you press Preview, and any edit makes the preview stale again. Try: set the type to “Any type” and the folder to /Finance, and watch two policies collide (nothing happens to those documents). “Fjord Logistics MSA” has no document date, so it can't be decided either.",
+ "3":"<b>How does a person confirm deletes, with every document named?</b> A = one batch per policy, untick to keep, type the count to confirm. B = one document at a time. Press “Simulate a late hold” first: the list is re-checked at the moment you confirm.",
+ "4":"<b>How does the Library tell people what will happen to a document?</b> A = quiet: only the document panel says it. B = chips in rows + a folder line + the panel. Archived documents are hidden by default and come back with “Include archived”. Click a held contract and press Delete. Switch “View as” to Member: the hold's case name is hidden.",
+};
+
+function band(){return `
+ <div class="band"><div class="row1">
+  <span class="org">Halden &amp; Co.</span><span class="chipm">ORG ADMIN</span><span class="role">◆ Org-admin</span>
+  <span class="rec" id="rec"><i></i>every action recorded</span>
+  <span class="role">⌥ Technical names</span><span class="back">‹ Back to app</span></div>
+  <div class="btabs">${["Members","Experts","Audit","Settings","Invitations & Roles","SSO"].map(t=>`<span class="btab">${t}</span>`).join("")}<span class="btab lock">Subscription 🔒</span><span class="btab on">Retention</span></div>
+ </div>`;}
+function frame(inner,railOn="admin"){return `<div class="app"><div class="rail"><div ${railOn==="chat"?'class="on"':""}>Chat</div><div ${railOn==="lib"?'class="on"':""}>Library</div><div>Work&shy;flows</div><div class="grow"></div>${S.as==="admin"?`<div class="shield ${railOn==="admin"?"on":""}">Org</div>`:""}</div><div class="content">${inner}</div></div>`;}
+
+function pendingDeletes(){ return POLICIES.filter(p=>p.action==="delete").map(p=>({p,r:evaluate(p)})).filter(x=>x.r.act.length); }
+function policyRow(p){const r=evaluate(p);const nxt=r.notyet[0];return `<tr class="row" data-edit="${p.id}"><td class="n">${p.name}</td><td>${scopeText(p)}</td><td>${p.years} years after ${FROM[p.from].replace("the day it was ","").replace("the day the file was ","file ")}</td><td>${actTag(p.action)}</td><td>${r.act.length?`<b style="color:var(--text)">${r.act.length}</b> due now`:"—"}${r.unknown.length+r.conflict.length?` <span class="tag hold">${r.unknown.length+r.conflict.length} undecidable</span>`:""}<div class="mono">${nxt?"next: "+fmt(nxt.due):"nothing else due"}</div></td></tr>`;}
+function policiesCard(){return `<div class="card"><h3>Policies <span class="cnt">${POLICIES.length}</span><span style="flex:1"></span><button class="btn sm" data-new>+ New policy</button></h3><p class="sub">Checked every night at 02:00. Archive happens on its own. Delete always waits for a person.</p>
+ <table><tr><th>Name</th><th>Applies to</th><th>Kept for</th><th>Then</th><th>Tonight</th></tr>${POLICIES.map(policyRow).join("")}</table></div>`;}
+function holdCard(h){const n=DOCS.filter(d=>h.docs.includes(d.id)||h.folders.some(f=>d.folder===f||d.folder.startsWith(f+"/"))).length;
+ return `<div class="holdcard ${h.active?"":"rel"}"><div class="t"><span class="tag ${h.active?"hold":"dim"}">${h.active?"⏸ Holding":"Released "+h.released}</span><b>${h.name}</b><span style="flex:1"></span>${h.active?`<button class="btn sm ghost">Add documents…</button><button class="btn sm ghost">Release hold…</button>`:""}</div>
+ <div class="why">${h.why}</div><div class="note">Placed by ${h.by} on ${h.on} · covers ${h.docs.length} document${h.docs.length===1?"":"s"}${h.folders.length?" + "+h.folders.join(", ")+" (and anything added to it later)":""} · <b style="color:var(--text)">${n} documents held today</b></div></div>`;}
+function holdsCard(showReleased){const act=HOLDS.filter(h=>h.active),rel=HOLDS.filter(h=>!h.active);
+ return `<div class="card"><h3>Legal holds <span class="cnt">${act.length} active</span><span style="flex:1"></span><button class="btn sm">+ New hold</button></h3><p class="sub">A held document cannot be deleted by anyone, through any door, and every policy skips it until the hold is released.</p>
+ <div style="display:grid;gap:8px">${act.map(holdCard).join("")}${rel.length?(showReleased?rel.map(holdCard).join(""):`<details><summary class="note" style="cursor:pointer">${rel.length} released hold</summary><div style="margin-top:8px">${rel.map(holdCard).join("")}</div></details>`):""}</div></div>`;}
+function receiptsCard(){const all=[...S.receipts,...RECEIPTS0];return `<div class="card"><h3>Recent retention actions</h3><div class="receipts">${all.slice(0,8).map((r,i)=>`<div class="rc ${i<S.receipts.length?"new":""}"><span class="w">${r[0]}</span><span>${r[1]}</span><span class="mono">${r[2]}</span></div>`).join("")}</div></div>`;}
+function approvalBanner(){const pd=pendingDeletes();if(!pd.length)return "";const n=pd.reduce((a,x)=>a+x.r.act.length,0);
+ return `<div class="alert r"><span class="tag del">Waiting for you</span><span class="grow"><b>${n} documents are due for deletion</b> under “${pd.map(x=>x.p.name).join("”, “")}”. Nothing is deleted until you confirm each one by name.</span><button class="btn danger" data-go="3">Review and confirm</button></div>`;}
+
+function screen1(){
+ if(S.as==="member") return frame(`<div class="pane"><div class="empty">Members don't see Org admin at all — the door is absent, not disabled (079 D3).<br>Switch to <b>Library view</b> (screen 4) to see what a member sees.</div></div>`,"lib");
+ const posture=`<div class="posture"><span class="dotg">Last sweep <b>12 Oct 02:00</b> finished, nothing failed</span><span>Next sweep <b>tonight 02:00</b></span><span>${POLICIES.length} policies · ${HOLDS.filter(h=>h.active).length} legal hold</span></div>`;
+ if(S.v==="A") return frame(band()+`<div class="pane">${posture}${approvalBanner()}${policiesCard()}${holdsCard(false)}${receiptsCard()}</div>`);
+ const pd=pendingDeletes(),n=pd.reduce((a,x)=>a+x.r.act.length,0);
+ const tabs=[["policies","Policies",POLICIES.length,""],["holds","Legal holds",HOLDS.filter(h=>h.active).length,""],["approve","Waiting for you",n,"r"],["history","History",null,""]];
+ let body="";
+ if(S.sub==="policies")body=policiesCard();
+ if(S.sub==="holds")body=holdsCard(true);
+ if(S.sub==="approve")body=n?approvalBanner():`<div class="empty">Nothing is waiting for approval.</div>`;
+ if(S.sub==="history")body=receiptsCard();
+ return frame(band()+`<div class="pane">${posture}<div class="stabs">${tabs.map(([id,l,c,k])=>`<button class="stab ${S.sub===id?"on":""}" data-sub="${id}">${l}${c!==null?` <span class="cnt ${k&&c?"r":""}">${c}</span>`:""}</button>`).join("")}</div>${body}</div>`);
+}
+
+// ── screen 2
+function edPolicy(){ if(!S.ed) S.ed={...POLICIES[1]}; return S.ed; }
+function bucket(cls,num,label,items,open){return `<details class="bucket ${cls}" ${open?"open":""}><summary><span class="num">${num}</span><span class="lbl">${label}</span></summary>${items.length?`<ul>${items.join("")}</ul>`:""}</details>`;}
+function dryRun(p,title){
+ const r=evaluate(p), undec=[...r.unknown,...r.conflict];
+ const a=p.action, aw = a==="archive"?"archive":a==="delete"?"act":"review";
+ return `<div class="dr"><h4>${title}</h4>
+ ${bucket("act "+(a==="archive"?"archive":a==="review"?"review":""),r.act.length,a==="delete"?"would be <b>queued for you to approve</b> deletion":a==="archive"?"would be <b>archived</b>":"would be <b>listed for a person to decide</b>",r.act.map(x=>`<li>${x.d.name} <span>· due ${fmt(x.due)}</span></li>`),r.act.length>0)}
+ ${bucket("hold",r.hold.length,"skipped — <b>on legal hold</b>",r.hold.map(x=>`<li>${x.d.name} <span>· ${x.why}</span></li>`),false)}
+ ${bucket(undec.length?"nope":"",undec.length,"<b>can't be decided — nothing will happen to them</b>",undec.map(x=>`<li>${x.d.name} <span>· ${x.why}</span></li>`),undec.length>0)}
+ ${undec.length?`<div class="note warn">${r.unknown.length?"Give these a document date, or count from “added to the Library” instead. ":""}${r.conflict.length?"A document under two policies that disagree is never touched: change one of them.":""}</div>`:""}
+ ${bucket("",r.notyet.length,"not due yet"+(r.notyet[0]?` · next: ${r.notyet[0].d.name}, ${fmt(r.notyet[0].due)}`:""),r.notyet.map(x=>`<li>${x.d.name} <span>· ${fmt(x.due)}</span></li>`),false)}
+ ${r.already.length?bucket("",r.already.length,"already archived",r.already.map(x=>`<li>${x.d.name} <span>· ${fmt(x.d.archived)}</span></li>`),false):""}
+ </div>`;
+}
+const opt=(arr,val)=>arr.map(o=>{const [v,l]=Array.isArray(o)?o:[o,o];return `<option value="${v}" ${String(v)===String(val)?"selected":""}>${l}</option>`;}).join("");
+function actionNote(a){return a==="delete"?`<div class="note warn">Deletes never run on their own. Tonight's sweep lists what is due, and an org admin confirms each document by name.</div>`:a==="review"?`<div class="note">Due documents are listed for a person. Nothing is changed automatically.</div>`:`<div class="note">Archived documents stop appearing in chat answers. They stay in the Library, findable with “Include archived”, and open and download as normal.</div>`;}
+function screen2(){
+ if(S.as==="member") return screen1();
+ const p=edPolicy();
+ const head=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="note">Retention › Policies ›</span><b style="font:700 16px var(--head)">${p.id?"Edit “"+p.name+"”":"New policy"}</b><span style="flex:1"></span><button class="btn sm ghost" data-reset>Edit “Expired contracts”</button><button class="btn sm ghost" data-blank>Start a new one</button></div>`;
+ if(S.v==="A"){
+  const sentence=`<div class="sentence">Keep <select data-f="type">${opt(TYPES,p.type)}</select> in <select data-f="folder">${opt([["","any folder"],...FOLDERS],p.folder||"")}</select><br>for <input data-f="years" type="number" min="1" value="${p.years}"> years after <select data-f="from">${opt(Object.entries(FROM),p.from)}</select>,<br>then <select data-f="action">${opt(Object.entries(ACTION),p.action)}</select>.</div>`;
+  return frame(band()+`<div class="pane">${head}<div class="pane split" style="padding:0">
+   <div class="card" style="display:grid;gap:12px"><div class="form" style="grid-template-columns:110px 1fr"><label>Name</label><input type="text" data-f="name" value="${p.name}"></div>${sentence}<label class="toggle"><input type="checkbox" data-f="sub" ${p.sub?"checked":""}> include subfolders</label>${actionNote(p.action)}
+   <div class="confirm" style="border-color:var(--border)"><button class="btn" data-save>Save policy</button><span class="note">Takes effect at tonight's 02:00 sweep. The panel on the right is exactly what that sweep would do.</span></div></div>
+   <div class="card">${dryRun(p,"If this ran tonight · dry run")}</div></div></div>`);
+ }
+ const form=`<div class="form"><label>Name</label><input type="text" data-f="name" value="${p.name}">
+  <label>Document type</label><select data-f="type">${opt(TYPES,p.type)}</select>
+  <label>Folder</label><div class="inl"><select data-f="folder">${opt([["","Any folder"],...FOLDERS],p.folder||"")}</select><label class="toggle"><input type="checkbox" data-f="sub" ${p.sub?"checked":""}> subfolders</label></div>
+  <label>Keep for</label><div class="inl"><input data-f="years" type="number" min="1" value="${p.years}"> years</div>
+  <label>Counted from</label><select data-f="from">${opt(Object.entries(FROM),p.from)}</select>
+  <label>Then</label><select data-f="action">${opt(Object.entries(ACTION),p.action)}</select></div>${actionNote(p.action)}`;
+ const prev = S.previewed ? (S.edDirty?`<div class="stale">You changed the policy after the preview. Preview again before saving.</div>`:"")+dryRun(p,"Preview · what tonight's sweep would do") : `<div class="empty">Nothing previewed yet.<br>A policy can't be saved until you've seen what it would do.</div>`;
+ return frame(band()+`<div class="pane">${head}<div class="pane split" style="padding:0"><div class="card" style="display:grid;gap:12px">${form}
+  <div class="confirm" style="border-color:var(--border)"><button class="btn ghost" data-preview>1 · Preview what this would do</button><button class="btn" data-save ${S.previewed&&!S.edDirty?"":"disabled"}>2 · Save policy</button></div></div><div class="card">${prev}</div></div></div>`);
+}
+
+// ── screen 3
+function screen3(){
+ if(S.as==="member") return screen1();
+ const pd=pendingDeletes();
+ const sim=`<button class="btn sm ghost" data-late ${lateHold?"disabled":""}>${lateHold?"✓ Hold placed on Kessler at 10:42":"Simulate a late hold (someone holds Kessler at 10:42)"}</button>`;
+ if(S.done) return frame(band()+`<div class="pane">${S.done}<div><button class="btn ghost" data-undo3>↺ Reset sketch</button></div>${receiptsCard()}</div>`);
+ if(!pd.length) return frame(band()+`<div class="pane"><div class="empty">Nothing waiting.</div></div>`);
+ const {p} = pd[0]; const r0 = evaluate({...p}, POLICIES); // sweep snapshot (taken before the late hold)
+ const snap = (()=>{const keep=lateHold;lateHold=false;const s=evaluate(p);lateHold=keep;return s;})();
+ const list = snap.act;
+ if(!(p.id in S.picks)) S.picks[p.id]=Object.fromEntries(list.map(x=>[x.d.id,true]));
+ const picks=S.picks[p.id], n=list.filter(x=>picks[x.d.id]).length;
+ const skipped=`<div class="note">Not in this list: ${snap.hold.length} on legal hold (${snap.hold.map(x=>x.d.name).join(", ")}) · ${snap.unknown.length+snap.conflict.length} that can't be decided (${[...snap.unknown,...snap.conflict].map(x=>x.d.name+" — "+x.why).join("; ")}). Those are never deleted.</div>`;
+ const recheck=`<div class="note">Every document is <b style="color:var(--text)">checked again at the moment you confirm</b>. Anything put on hold, moved or edited since the sweep is dropped, not deleted.</div>`;
+ if(S.v==="A"){
+  return frame(band()+`<div class="pane"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="note">Retention › Waiting for you</span><span style="flex:1"></span>${sim}</div>
+   <div class="card"><h3>${actTag("delete")} ${p.name}</h3><p class="sub">${scopeText(p)} · kept ${p.years} years after ${FROM[p.from]} · found by the sweep on ${p.lastRun}</p>
+   <table><tr><th style="width:28px"></th><th>Document</th><th>Folder</th><th>Document date</th><th>Due since</th></tr>
+   ${list.map(x=>`<tr class="${picks[x.d.id]?"":"off"}"><td><input type="checkbox" data-pick="${x.d.id}" ${picks[x.d.id]?"checked":""}></td><td class="n">${x.d.name}</td><td>${x.d.folder}</td><td>${fmt(x.d.docDate)}</td><td>${fmt(x.due)}</td></tr>`).join("")}</table>
+   ${list.some(x=>!picks[x.d.id])?`<div class="note warn" style="margin-top:8px">Unticked documents are kept this time and come back at the next sweep, unless the policy changes or they're put on hold.</div>`:""}
+   <div style="margin-top:10px;display:grid;gap:6px">${skipped}${recheck}</div>
+   <div class="confirm"><span class="note">This can't be undone. Type <b style="color:var(--text)">${n}</b> to confirm.</span><input data-typed value="${S.typed}" inputmode="numeric"><button class="btn danger" data-confirm ${String(n)===S.typed&&n>0?"":"disabled"}>Delete ${n} document${n===1?"":"s"} permanently</button></div></div></div>`);
+ }
+ const i=S.one, x=list[i];
+ if(!x){ return finishOne(p); }
+ return frame(band()+`<div class="pane"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="note">Retention › Waiting for you › ${p.name}</span><span style="flex:1"></span>${sim}</div>
+  <div class="onecard"><div class="note">${i+1} of ${list.length} · ${S.oneLog.filter(l=>l==="del").length} to delete, ${S.oneLog.filter(l=>l==="keep").length} kept</div><div class="prog"><i style="width:${(i/list.length)*100}%"></i></div>
+  <div class="card" style="display:grid;gap:10px"><h3>${x.d.name}</h3><dl class="facts"><dt>Folder</dt><dd>${x.d.folder}</dd><dt>Type</dt><dd>${x.d.type}</dd><dt>Document date</dt><dd>${fmt(x.d.docDate)}</dd><dt>Added to the Library</dt><dd>${fmt(x.d.added)}</dd><dt>Due since</dt><dd>${fmt(x.due)} (${p.years} years after the document date)</dd><dt>Policy</dt><dd>${p.name}</dd></dl>
+  <div class="confirm"><button class="btn ghost" data-one="keep">Keep it</button><button class="btn danger" data-one="del">Delete this document</button><span class="note">Deletes happen together at the end, after one last check.</span></div></div>${skipped}${recheck}</div></div>`);
+}
+function runDeletes(p, ids){
+ const now="12 Oct 2026 10:44"; const done=[],kept=[];
+ for(const id of ids){const d=byId[id]; if(holdsOf(d).length){kept.push(d);continue;} done.push(d);}
+ S.receipts = [...done.map(d=>["✎",`Deleted <b>${d.name}</b> under “${p.name}”, approved by you`,now]), ...kept.map(d=>["",`Did not delete <b>${d.name}</b>: put on legal hold after the sweep`,now]), ...S.receipts];
+ S.done = `<div class="alert g"><span class="tag ok">Done</span><span class="grow"><b>Deleted ${done.length} document${done.length===1?"":"s"}.</b> ${kept.length?`<span style="color:var(--a-tx)">Kept ${kept.length}: ${kept.map(d=>d.name).join(", ")} went on legal hold after the sweep, so it was dropped at confirm.</span>`:""} One audit record per document names the document, the policy, the action, who approved it and when.</span></div>`;
+ flash();
+}
+function finishOne(p){
+ const snapList=(()=>{const k=lateHold;lateHold=false;const s=evaluate(p).act;lateHold=k;return s;})();
+ const del=snapList.filter((x,i)=>S.oneLog[i]==="del");
+ return frame(band()+`<div class="pane"><div class="onecard"><div class="card"><h3>Ready</h3><p class="sub">${del.length} to delete · ${S.oneLog.filter(l=>l==="keep").length} kept</p><div class="confirm"><button class="btn danger" data-finish ${del.length?"":"disabled"}>Delete ${del.length} document${del.length===1?"":"s"} permanently</button><button class="btn ghost" data-undo3>Start over</button></div></div></div></div>`);
+}
+
+// ── screen 4
+function retentionFor(d){
+ const p=POLICIES.find(p=>inScope(p,d)); const hs=holdsOf(d).filter(h=>!h.late);
+ const admin=S.as==="admin";
+ if(hs.length) return {k:"hold",chip:`<span class="tag hold">⏸ On hold</span>`,text:admin?`<b>On legal hold</b> — “${hs[0].name}”, placed by ${HOLDS.find(h=>h.name===hs[0].name).by} on ${HOLDS.find(h=>h.name===hs[0].name).on}. It can't be deleted or disposed of until the hold is released.`:`<b>On legal hold.</b> It can't be deleted or disposed of until an org admin releases the hold.`};
+ if(d.archived) return {k:"arc",chip:`<span class="tag arc">Archived</span>`,text:`<b>Archived ${fmt(d.archived)}</b> by the “${p?p.name:"—"}” policy. Chat no longer answers from it. It still opens, downloads and shows up with “Include archived”.`};
+ if(!p) return {k:"none",chip:"",text:`No retention policy applies. It is kept until someone deletes it.`};
+ const b=baseDate(p,d);
+ if(!b) return {k:"unk",chip:`<span class="tag hold">No date</span>`,text:`“${p.name}” counts from the document date, and this document has none, so <b>nothing will happen to it</b>. Set a document date to fix that.`};
+ const due=addYears(b,p.years);
+ if(due<=TODAY && p.action==="delete") return {k:"due",chip:`<span class="tag del">Delete pending</span>`,text:`Due for deletion under “${p.name}” since ${fmt(due)}. <b>Waiting for an org admin to approve.</b>`};
+ if(due<=TODAY) return {k:"due",chip:`<span class="tag ${p.action==="archive"?"arc":"rev"}">${p.action==="archive"?"Archives tonight":"In review"}</span>`,text:`Due under “${p.name}” since ${fmt(due)}: ${p.action==="archive"?"<b>archived at tonight's sweep</b>.":"<b>listed for a person to decide</b>."}`};
+ return {k:"ok",chip:"",text:`Kept ${p.years} years after ${FROM[p.from]}, then ${p.action==="delete"?"deleted after an admin approves":p.action==="archive"?"archived":"reviewed by a person"}. <b>Due ${fmt(due)}</b> (“${p.name}”).`};
+}
+function screen4(){
+ const docs=DOCS.filter(d=>d.folder===S.folder||d.folder.startsWith(S.folder+"/"));
+ const shown=docs.filter(d=>S.showArch||!d.archived), hid=docs.length-shown.length;
+ const fp=POLICIES.find(p=>p.folder===S.folder), fh=HOLDS.find(h=>h.active&&h.folders.includes(S.folder));
+ const folderLine = S.v==="B" && (fp||fh) ? `<div class="folderline">${fp?`<span>${actTag(fp.action)}</span><span>This folder: <b>kept ${fp.years} years after ${FROM[fp.from]}</b>, then ${fp.action==="archive"?"archived":fp.action==="delete"?"deleted after an admin approves":"reviewed by a person"}.</span>`:""}${fh?`<span class="tag hold">⏸ On hold</span><span>Everything in this folder is on legal hold${S.as==="admin"?" — "+fh.name:""}.</span>`:""}</div>`:"";
+ const sel=S.sel?byId[S.sel]:null;
+ const rows=shown.map(d=>{const r=retentionFor(d);return `<tr class="row ${S.sel===d.id?"sel":""}" data-sel="${d.id}"><td class="n">${d.name}${S.v==="B"&&r.chip?" "+r.chip:""}${d.archived&&S.v==="A"?` <span class="tag dim">archived</span>`:""}</td><td>${d.type}</td><td>${fmt(d.docDate)}</td><td>${fmt(d.added)}</td></tr>`;}).join("");
+ let panel="";
+ if(sel){const r=retentionFor(sel);
+  panel=`<div class="panel"><div style="display:flex;gap:8px;align-items:start"><h3 style="flex:1">${sel.name}</h3><button class="btn sm ghost" data-close>✕</button></div>
+  <dl class="facts"><dt>Type</dt><dd>${sel.type}</dd><dt>Folder</dt><dd>${sel.folder}</dd><dt>Document date</dt><dd>${fmt(sel.docDate)}</dd><dt>Added to the Library</dt><dd>${fmt(sel.added)}</dd><dt>Last modified in the file</dt><dd>${fmt(sel.modified)}</dd></dl>
+  <div class="sec"><h4>Retention</h4><div class="ret ${r.k==="hold"?"hold":""}">${r.text}</div></div>
+  <div class="sec" style="border:0;padding:0"><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm ghost">Open</button><button class="btn sm ghost">Download</button><button class="btn sm ghost" data-del>Delete…</button></div>
+  ${S.refuse?(r.k==="hold"?`<div class="refuse"><b>Can't delete.</b> This document is on legal hold${S.as==="admin"?" (“"+holdsOf(sel)[0].name+"”)":""}. ${S.as==="admin"?"Release the hold in Org admin → Retention first.":"Ask an org admin if you think it should be released."}</div>`:`<div class="note">(Normal delete confirm would open here.)</div>`):""}</div></div>`;}
+ return frame(`<div class="lhead"><h2>Library</h2><div class="fchips">${["/Finance/Invoices","/Contracts/Expired","/Projects/Atlas","/HR/Personnel"].map(f=>`<button class="fchip ${S.folder===f?"on":""}" data-folder="${f}">${f}</button>`).join("")}</div><span style="flex:1"></span><label class="toggle"><input type="checkbox" data-arch ${S.showArch?"checked":""}> Include archived</label></div>
+ ${folderLine}<div class="lbody ${sel?"split":""}"><div><table><tr><th>Name</th><th>Type</th><th>Document date</th><th>Added</th></tr>${rows}</table>${hid?`<div class="hidden-hint">${hid} archived document${hid===1?"":"s"} hidden · <a data-arch2>Show</a></div>`:""}</div>${panel}</div>`,"lib");
+}
+
+// Winners (operator, 2026-10-12): 1B · 2B · 3A · 4B
+const WIN={"1":"B","2":"B","3":"A","4":"B"};
+function render(){
+ document.querySelectorAll("[data-s]").forEach(b=>b.setAttribute("aria-selected",b.dataset.s===S.s));
+ document.querySelectorAll("[data-v]").forEach(b=>{b.setAttribute("aria-selected",b.dataset.v===S.v);b.textContent=b.dataset.v+(WIN[S.s]===b.dataset.v?" ★":"");});
+ document.querySelectorAll("[data-as]").forEach(b=>b.setAttribute("aria-selected",b.dataset.as===S.as));
+ document.getElementById("qtext").innerHTML=Q[S.s];
+ document.getElementById("stage").innerHTML=({"1":screen1,"2":screen2,"3":screen3,"4":screen4})[S.s]();
+}
+document.addEventListener("click",e=>{
+ const t=e.target.closest("button,[data-edit],[data-sel],a,input[type=checkbox]"); if(!t) return;
+ const ds=t.dataset;
+ if(ds.s){S.s=ds.s;S.refuse=false;render();return;}
+ if(ds.v){S.v=ds.v;S.one=0;S.oneLog=[];render();return;}
+ if(ds.as){S.as=ds.as;S.refuse=false;render();return;}
+ if(ds.sub){S.sub=ds.sub;render();return;}
+ if(ds.go){S.s=ds.go;render();return;}
+ if(ds.edit){S.ed={...POLICIES.find(p=>p.id===ds.edit)};S.previewed=false;S.edDirty=false;S.s="2";render();return;}
+ if("new" in ds||"blank" in ds){S.ed={id:null,name:"Untitled policy",folder:"/Finance",sub:true,type:"Any type",years:5,from:"docDate",action:"review"};S.previewed=false;S.edDirty=false;S.s="2";render();return;}
+ if("reset" in ds){S.ed={...POLICIES[1]};S.previewed=false;S.edDirty=false;render();return;}
+ if("preview" in ds){S.previewed=true;S.edDirty=false;flash();S.receipts=[["",`Ran a dry run of <b>${S.ed.name}</b>`,"12 Oct 2026 10:40 · you"],...S.receipts];render();return;}
+ if("save" in ds){const p=S.ed;if(p.id){POLICIES=POLICIES.map(x=>x.id===p.id?{...p}:x);}else{p.id="P"+(POLICIES.length+1);POLICIES=[...POLICIES,{...p,lastRun:"not yet"}];}
+   S.receipts=[["✎",`Saved policy <b>${p.name}</b>`,"12 Oct 2026 10:41 · you"],...S.receipts];S.s="1";S.picks={};render();flash();return;}
+ if(ds.pick){S.picks[Object.keys(S.picks)[0]][ds.pick]=t.checked;S.typed="";render();return;}
+ if("late" in ds){lateHold=true;render();return;}
+ if("confirm" in ds){const pid=Object.keys(S.picks)[0];const p=POLICIES.find(x=>x.id===pid);runDeletes(p,Object.entries(S.picks[pid]).filter(([,v])=>v).map(([k])=>k));render();return;}
+ if(ds.one){S.oneLog[S.one]=ds.one;S.one++;render();return;}
+ if("finish" in ds){const p=pendingDeletes()[0]?.p||POLICIES[1];const k=lateHold;lateHold=false;const list=evaluate(p).act;lateHold=k;runDeletes(p,list.filter((x,i)=>S.oneLog[i]==="del").map(x=>x.d.id));render();return;}
+ if("undo3" in ds){S.done=null;S.picks={};S.typed="";S.one=0;S.oneLog=[];lateHold=false;render();return;}
+ if(ds.folder){S.folder=ds.folder;S.sel=null;S.refuse=false;render();return;}
+ if("arch" in ds){S.showArch=t.checked;render();return;}
+ if("arch2" in ds){S.showArch=true;render();return;}
+ if(ds.sel){S.sel=ds.sel;S.refuse=false;render();return;}
+ if("close" in ds){S.sel=null;render();return;}
+ if("del" in ds){S.refuse=true;render();return;}
+});
+document.addEventListener("input",e=>{
+ const t=e.target;
+ if(t.dataset.typed!==undefined){S.typed=t.value.trim();const pos=t.selectionStart;render();const n=document.querySelector("[data-typed]");if(n){n.focus();n.setSelectionRange(pos,pos);}return;}
+ const f=t.dataset.f; if(!f||!S.ed) return;
+ if(t.type==="checkbox") return;
+ const val = f==="years"?Math.max(1,parseInt(t.value||"1",10)):f==="folder"?(t.value||null):t.value;
+ S.ed={...S.ed,[f]:val}; if(S.previewed) S.edDirty=true;
+ if(f==="name"||f==="years"){ // keep focus while typing
+   const pos=t.selectionStart; render(); const n=document.querySelector(`[data-f="${f}"]`); if(n){n.focus(); try{n.setSelectionRange(pos,pos);}catch(_){}} return; }
+ render();
+});
+document.addEventListener("change",e=>{
+ const t=e.target; if(t.dataset.f==="sub"&&S.ed){S.ed={...S.ed,sub:t.checked};if(S.previewed)S.edDirty=true;render();}
+});
+render();
+</script>
+</body>
+</html>

@@ -3,15 +3,15 @@ seed_id: SEED-345
 title: Per-org data retention and rate-limit settings do not exist — ENT-02 (v3.4 STRETCH Phase 170) was deferred; its ENT-01 half later shipped as the v4.3 tier gate
 created: 2026-10-04
 surface: Agentic-RAG
-status: planted
-partial: false
-status_note:
+status: partially-answered
+partial: true
+status_note: "Documents half SHIPPED in Phase 275 (built 2026-10-12, 275-01..05): per-folder/per-class document retention policies, archive, admin-confirmed delete, legal holds, receipts. Still OPEN: chat/message retention and per-org rate limits (trigger unchanged). Private-document coverage deferred to SEED-354."
 trigger_when: "A customer or a contract asks for an enforced retention period or per-org usage limits; OR a data-protection review (SEED-072) is scheduled; OR any phase adds a per-org setting to the org-admin shell or the entitlement service."
 trigger_paths: ["backend/app/api/org.py", "backend/app/services/entitlement_service.py", "backend/app/db/entitlements.py", "frontend/src/lib/api/org.ts"]
 trigger_surfaces: ["admin", "settings"]
 migration_note:
 relates_to: [".planning/v3.4-STRETCH-CARRYFORWARD.md § 170 (ENT-01, ENT-02)", "SEED-072 (data-subject rights)", "SEED-081 (provider rate-limit resilience)", "SEED-249", "docs/history/v3.4-multi-tenancy-and-org-access.md"]
-folded_into: null
+folded_into: 275
 renumbered_from: null
 renumbered_because: null
 ---

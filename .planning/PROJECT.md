@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A RAG-based AI agent platform where users organize documents into nested folders and interact with a customizable AI agent. The agent remembers preferences across threads, extracts tables and images from documents, shows confidence and citations, runs code in a sandbox, and can be taught new skills that persist. As of v2.7 the agent also keeps a per-thread workspace of versioned files, manages a todo list, can spawn sub-agents, and can pause to ask the user a question — all surfaced live in a collapsible right-side workspace panel. As of v2.8 the agent can also run inside a deterministic, locked workflow (Harness Mode) — ordered phases the model cannot escape, with per-phase tool whitelists, validation gates, and a live phase timeline — alongside today's free-form Deep Mode chat. The Deep Midnight visual design delivers a glassmorphic, mobile-responsive experience with knowledge health dashboards and user feedback loops. As of v3.0, documents are a first-class, metadata-driven surface: user-defined custom metadata with per-field confidence, metadata-driven saved views ("virtual folders"), typed document relationships, suggest-then-confirm auto-classification, a light governance-health view, and configurable multi-provider embeddings. As of v3.9 a **connection** is `{service identity, auth, discovered tools, per-tool grants}`, so adding a service adds rows rather than code. As of v4.0 the knowledge base **reads itself**: a source — Google Drive, OneDrive/SharePoint via Microsoft Graph, any MCP file server, or a mailbox — is connected once, previewed before it brings anything in, and then watched on the shipped scheduler, with one visibility per connection enforced in RLS and provenance riding every row.
+A RAG-based AI agent platform where users organize documents into nested folders and interact with a customizable AI agent. The agent remembers preferences across threads, extracts tables and images from documents, shows confidence and citations, runs code in a sandbox, and can be taught new skills that persist. As of v2.7 the agent also keeps a per-thread workspace of versioned files, manages a todo list, can spawn sub-agents, and can pause to ask the user a question — all surfaced live in a collapsible right-side workspace panel. As of v2.8 the agent can also run inside a deterministic, locked workflow (Harness Mode) — ordered phases the model cannot escape, with per-phase tool whitelists, validation gates, and a live phase timeline — alongside today's free-form Deep Mode chat. The Deep Midnight visual design delivers a glassmorphic, mobile-responsive experience with knowledge health dashboards and user feedback loops. As of v3.0, documents are a first-class, metadata-driven surface: user-defined custom metadata with per-field confidence, metadata-driven saved views ("virtual folders"), typed document relationships, suggest-then-confirm auto-classification, a light governance-health view, and configurable multi-provider embeddings. As of v3.9 a **connection** is `{service identity, auth, discovered tools, per-tool grants}`, so adding a service adds rows rather than code. As of v4.0 the knowledge base **reads itself**: a source — Google Drive, OneDrive/SharePoint via Microsoft Graph, any MCP file server, or a mailbox — is connected once, previewed before it brings anything in, and then watched on the shipped scheduler, with one visibility per connection enforced in RLS and provenance riding every row. As of v4.5 a document is an object you can find by what it is and download, the agent can answer with interactive artifacts from a closed component registry, chat attachments belong to their thread, and an org admin can set retention with legal hold.
 
 ## Core Value
 
@@ -10,26 +10,22 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: v4.5 Find It, Show It
+## Last Shipped: v4.5 Find It, Show It (2026-10-12)
 
-**Goal:** Find documents by what they ARE (type, owner, date, structure), get the file back out, and let the
-agent answer with interactive artifacts instead of dead images and prose.
+**Started:** 2026-09-29 · **Shipped:** 2026-10-12, git tag `v4.5` · 7 phases (270-276), 38 plans,
+migrations 199-206, 14 days. **25 / 25 requirements satisfied.** Integration 8/8, flows 3/3. Audit `tech_debt`.
 
-**Target features (operator intake 2026-09-29; hardening/testing milestone and plugins/ecosystem work POSTPONED by operator):**
-- **Find the DOCUMENT** (`SEED-243`, `SEED-153`, `SEED-224`) - document-first metadata search beside (never inside) RAG search; rename + re-home the Classification page; download the original file + rich file facts; structure (folder path, relationships, version lineage) as searchable fields.
-- **A2UI artifact rail** (`SEED-193`, later `SEED-194`) - the agent emits a validated spec from a CLOSED component registry (never free markup); chart-as-spec first, then table / metric / comparison.
-- **Retention & archival** (`SEED-250`) - the one absent DMS capability: policy, legal hold, disposition audit.
-- **Thread-scoped attachments** (`SEED-247`) - chat attachments belong to the thread, not the Library.
-
-Phase numbering resumes at **270**, migrations at **199**. Research skipped (seeds hold the analysis).
-Solo running: Claude builds and reviews; phases close `verification_mode: self-verified`.
-Carried: `SEED-013`, `SEED-294` (non-engineering), `SEED-325`, `SEED-327`, `SEED-328`.
-
-**Progress:** 270 ✓ · 271 executed (human_needed) · **272 Close Means Wrong ✓ 2026-10-03 — FIND-07 validated**: the agent's search carries structured date/dimension filters on both retrieval arms, an empty filter fails closed with a structural retry lock, and a small filtered set is searched exactly (recall 1.000, 500–15,000 chunks). SC#4 met on 6/8 providers by decision (Google unmet, MiniMax unstable → SEED-334). Migrations 200+201 local only — production owed.
+A person finds a document by what it IS and gets the original file back (270-271); the agent filters
+retrieval by date and dimension and refuses rather than answering from the nearest wrong document (272);
+answers can be interactive charts, tables and metrics from a closed registry (273); chat attachments stay
+in their thread (274); an admin sets retention with legal hold and audited disposition (275); and the
+product has public docs (276).
+⚠ All seven phases closed `self-verified`; 271/272/273 owe operator sign-offs. ✅ 270-274 + 276 **LIVE
+2026-10-05** (prod `bd9e126c3`). ⛔ **275 NOT deployed** — production migrations 204 → 205 → 206 first.
 
 ---
 
-## Last Shipped: v4.4 Experts That Actually Work (2026-09-29)
+## Previously Shipped: v4.4 Experts That Actually Work (2026-09-29)
 
 **Started:** 2026-09-23 · **Shipped:** 2026-09-29, git tag `v4.4` · 5 phases (265-269), 24 plans,
 migrations 194-198, 7 days. **17 / 17 requirements satisfied.** Integration 6/6. Audit `tech_debt`.
@@ -1132,6 +1128,16 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 - ✓ `BUS-171`'s operator queue is a decision list — REG-03, v4.2 (251)
 - ⛔ `DEBT-06` — **8 of 14 rows unmet** (239, 241, 242, 244, 245, 251, 252, 253). Accepted as documented debt at close by operator decision; `done` needs Gemini, `refused` needs an operator ruling (`REG-03`). **A refusal is not a pass.**
 
+### Validated (v4.5 — Find It, Show It)
+
+- ✓ Download the original file (org-checked, short-lived URL) and labelled file facts — FIND-04, FIND-05, v4.5 (270)
+- ✓ Document-first Find beside RAG search, structure as filters, Filing rules in the Library — FIND-01/02/03/06, v4.5 (271; operator G-4 sign-off owed)
+- ✓ Structured date/dimension filters in agent retrieval, empty filter fails closed — FIND-07, v4.5 (272; SC#4 6/8 providers by decision)
+- ✓ Interactive chart / table / metric artifacts from a closed registry, reload-identical, every provider — ART-01..05, v4.5 (273)
+- ✓ Chat attachments thread-scoped, explicit promote to the Library — ATT-01..03, v4.5 (274)
+- ✓ Retention policies, legal hold, scheduled audited disposition, archived out of retrieval but findable — RET-01..04, v4.5 (275; NOT deployed)
+- ✓ Public /docs, Syrel API reference, coverage gate, changelog, videos — DOCS-01..06, v4.5 (276)
+
 ### Validated (v4.4 — Experts That Actually Work)
 
 - ✓ Owed v4.3 UAT driven live and independently reviewed — VERIFY-01..05, v4.4 (265)
@@ -1155,7 +1161,7 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 
 ### Active (current milestone)
 
-*v4.4 Experts That Actually Work **STARTED 2026-09-23** via `/gsd:new-milestone`. Phase numbering resumes at **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`). Scope set by the operator at intake: owed v4.3 UAT + independent review as the FIRST phase; `SEED-304` (PACK-05) via **per-org provisioning**; the Expert-drafter field-cap bug (already fixed at `7a04e944e` — live-verify and close); `SEED-303` open arms (S3 two Experts, S6 additive tool floor, per-Expert spend; S8 stays deferred); `SEED-244` starter Expert library; `SEED-286` mid-thread scope change. Requirements: `.planning/REQUIREMENTS.md`.*
+*None — v4.5 shipped 2026-10-12. The next milestone is defined by `/gsd:new-milestone` (phases resume at **277**, migrations at **207**). Carried candidates: deploy 275, the v4.5 audit warnings W-1..W-5, BUG-261004-02 / BUG-261005-01 / BUG-261012-01 / BUG-261012-02, SEED-354, SEED-334, the CLAUDE.md split.*
 
 <details>
 <summary>Superseded Active note (v4.3-close, preserved)</summary>
@@ -1429,3 +1435,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-09-29 — **milestone v4.4 Experts That Actually Work COMPLETED** (git tag `v4.4`; 5 phases, 24 plans, 17/17 requirements; nothing deployed — migrations 194-198 + `464ec8354` owed to production). STATE.md and the archives were done by hand, not via `milestone.complete`.*
 
 *Last updated: 2026-10-03 — **Phase 272 Close Means Wrong COMPLETE** (FIND-07; 5 plans + review fixes; self-verified, human_needed: production migrations 200 STEP 1 → STEP 2 → 201 owed).*
+
+*Last updated: 2026-10-12 — **milestone v4.5 Find It, Show It COMPLETED** (git tag `v4.5`; 7 phases, 38 plans, 25/25 requirements; 275 not deployed — production migrations 204 → 205 → 206 owed). STATE.md and the archives were done by hand, not via `milestone.complete`.*
