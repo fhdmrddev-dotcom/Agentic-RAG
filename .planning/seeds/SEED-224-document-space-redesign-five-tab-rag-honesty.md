@@ -1,7 +1,10 @@
 ---
 seed_id: SEED-224
 title: Document space redesign — the Stitch "RAG Document Manager" journey as a five-tab Documents section, RAG-honesty first
-status: planted
+status: folded
+partial: true
+folded_into: "278"
+status_note: "Extraction half ONLY folded into Phase 278 (SEAM-02) at v4.6 intake; measured at 278 discuss (2026-10-13) as already discharged by 272-01 (retrieval_service.py 174 L, orchestrator only). Flip to partially-answered when 278 ships. The five-tab Documents redesign half stays open."
 planted: 2026-08-28
 planted_by: Claude, 2026-08-28, operator direction after reviewing Stitch project "RAG Document Manager V1" — "capture the requirements… same tone, same level of information, same level of user experience… keep it simple, do not deviate from the RAG"
 enriched: 2026-08-28 — the two load-bearing assumptions MEASURED rather than assumed, the host surface located, and the G-5 exposure derived from git (see "Measured at planting time")
