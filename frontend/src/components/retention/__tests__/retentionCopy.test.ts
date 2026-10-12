@@ -45,7 +45,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       checked++
     }
     // Non-vacuity: an empty `ported` group would pass the loop above for free.
-    expect(checked).toBe(16)
+    expect(checked).toBe(31)
   })
 
   it("every CONTRACT string sits verbatim in the UI-SPEC", () => {
@@ -55,7 +55,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       expect(uiSpecSource).toContain(value)
       checked++
     }
-    expect(checked).toBe(19)
+    expect(checked).toBe(49)
   })
 
   it("every SKETCH TEMPLATE's literal segments sit verbatim in the sketch", () => {
@@ -66,7 +66,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       for (const seg of segs) expect(sketchSource, `${key}: "${seg}"`).toContain(seg)
       checked++
     }
-    expect(checked).toBe(8)
+    expect(checked).toBe(21)
   })
 
   it("every SPEC TEMPLATE's literal segments sit verbatim in the UI-SPEC", () => {
@@ -77,7 +77,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       for (const seg of segs) expect(uiSpecSource, `${key}: "${seg}"`).toContain(seg)
       checked++
     }
-    expect(checked).toBe(7)
+    expect(checked).toBe(21)
   })
 
   it("every SERVER sentence is hold_guard.py's own", () => {
@@ -104,6 +104,21 @@ describe("retentionCopy — every string is fenced against its own source", () =
     expect(RETENTION_COPY.contract.memberHoldLine).toBe("On legal hold. Ask an org admin.")
     expect(holdGuardSource).toContain(`MEMBER_HOLD_LINE = "${RETENTION_COPY.contract.memberHoldLine}"`)
     expect(RETENTION_COPY.contract.memberHoldSecond).toBe("It can't be deleted until the hold is released.")
+  })
+
+  it("D-11: the unticked-row note is the UI-SPEC's, NOT the sketch's (which promised a return next sweep)", () => {
+    const note = RETENTION_COPY.contract.untickedNote
+    expect(note).toBe("Unticked documents are kept. They are not proposed again unless the policy is edited or the document changes.")
+    expect(sketchSource).not.toContain(note)
+    expect(sketchSource).toContain("come back at the next sweep")
+    // No retention string may carry the retired promise.
+    const all = JSON.stringify(RETENTION_COPY)
+    expect(all).not.toContain("come back at the next sweep")
+  })
+
+  it("D-05 / D-35: a count that cannot be computed reads as a sentence, never as 0", () => {
+    expect(RETENTION_COPY.contract.countFailed).toBe("Couldn't count the documents yet.")
+    expect(RETENTION_COPY.contract.countFailed).not.toMatch(/\d/)
   })
 
   it("fillCopy fills placeholders and resolves (s) against N; richParts splits bold runs", () => {
