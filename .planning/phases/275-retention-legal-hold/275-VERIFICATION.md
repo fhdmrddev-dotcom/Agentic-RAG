@@ -3,7 +3,7 @@ phase: 275-retention-legal-hold
 verified: 2026-10-12T10:27:23Z
 verification_mode: self-verified   # ⛔ OV-SOLO-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
 verified_at_head: 067f63711
-status: human_needed
+status: passed
 score: 8/8 must-haves verified (4 ROADMAP success criteria + RET-01..04)
 overrides_applied: 0
 independent_review: self
@@ -20,7 +20,7 @@ human_verification:
 
 **Phase Goal:** An admin can say how long a class of documents or a folder is kept and what happens after. A legal hold stops it, and disposition runs on its own schedule, writes an audit record, and never deletes what it cannot prove it should.
 **Verified:** 2026-10-12T10:27:23Z at `067f63711` (develop, after "docs(275): review index")
-**Status:** human_needed
+**Status:** passed *(was human_needed; the owed live re-look ran 2026-10-12 — see the addendum at the end)*
 **Re-verification:** No — initial verification
 
 Every verdict below was read from the code at HEAD and from test runs made by this verifier, not from SUMMARY claims.
@@ -146,3 +146,30 @@ None. Every ROADMAP success criterion and RET-01..04 is met in code at `067f6371
 
 _Verified: 2026-10-12T10:27:23Z_
 _Verifier: Claude (gsd-verifier)_
+
+## Addendum 2026-10-12: the owed re-look ran, so status is passed
+
+The live re-look this report owed was driven in Chrome (`275-G4-EVIDENCE.md` §7, commit `5115fd32e`). All five rows pass:
+- **R1:** a held subtree's folder delete returns 409 with every DB count unchanged.
+- **R2:** the confirm banner never shows a false "Done" and names every document that was not done.
+- **R3:** Reload ticks the new rows and the confirm sends `keep_ids:[]`.
+- **R4:** while a sweep runs the posture line reads the amber not-finished line. This row is PASS-with-planted-state, because the shipped flag is off.
+- **R5:** all four copy fixes render.
+
+The re-look found one new defect, OBS-R2a: History read "Did not delete not recorded" for a document moved before confirm. It was fixed under G-3 in one commit, RED first, and re-looked live (§7.1). No ROADMAP criterion was unmet, and no gap-closure round was opened.
+
+**Owed operator rows** (production; not verification gaps):
+1. Apply 204 → 205 → 206 in that order, each write approved, before the backend deploy.
+2. Run `get_advisors(security)`.
+3. Read the production `source_state` distribution.
+4. Deploy the backend before or with the frontend.
+5. Keep `RETENTION_SWEEP_ENABLED=false` until an org admin has read a dry run.
+
+**Known limits and deferrals:**
+- D-35 / SEED-354
+- OBS-R2b (cosmetic)
+- B-IN-01/02/03/06, F-IN-02, and the partial F-IN-06/07/08
+- BUG-261012-01, BUG-261012-02
+- the local Postgres crash finding (deferred-items.md)
+- dead `dry_run_org` (`disposition.py:267`)
+

@@ -274,7 +274,7 @@ carry all 5 required keys.` Next free ids re-derived before writing: SEED max wa
 
 | # | Owed step | Notes |
 |---|---|---|
-| 1 | **Production DB: apply `204_retention_and_legal_hold.sql`, then `205_retrievable_predicate.sql`**, one operator-approved SQL-editor write at a time, each followed by its VERIFY rows reading PASS, **BEFORE the backend deploy** (D-29) | 205 reads 204's columns; the new backend reads `retrievable`, which only 205 creates |
+| 1 | **Production DB: apply `204_retention_and_legal_hold.sql`, then `205_retrievable_predicate.sql`, then `206_retention_hold_hardening.sql`** *(206 added 2026-10-12 after the review fix pass — this row first read 204 → 205 only; `folders.py` calls `delete_folder_tree`, which only 206 creates, and the three hold bypasses stay open without it)*, one operator-approved SQL-editor write at a time, each followed by its VERIFY rows reading PASS, **BEFORE the backend deploy** (D-29) | 205 reads 204's columns; the new backend reads `retrievable`, which only 205 creates |
 | 2 | `get_advisors(security)` on production after both migrations, compared with the last recorded baseline (0 ERROR) | T-275-08's production half (REVOKE … FROM PUBLIC before every GRANT) |
 | 3 | A production read of `SELECT source_state, count(*) FROM documents GROUP BY 1` (a free read): every non-NULL row leaves retrieval the moment 205 lands; list them in the deploy note | BUG-261004-01's production exposure; the 2026-10-04 read was all NULL |
 | 4 | Deploy the **backend before (or with) the frontend** (Pitfall 13) | Find's `include_archived` 422s on an old backend (`extra="forbid"`) |
@@ -375,3 +375,11 @@ re-pinned. Green on the first run; the cap was neither adjusted nor needed.
   - The 2 released `legal_holds` rows and their coverage rows.
   - The preview rows.
   - The org's `retention_sweeps` row (`last_status ok`, `last_run_at 10:39:23Z`).
+
+### §7.1 OBS-R2a fixed and re-looked (2026-10-12)
+
+- **Fix:** commit `fix(275): OBS-R2a a dropped delete names its document and its reason`. The receipt falls back to the document's current filename (a gone row stays NULL). History says `changed since the sweep` / `no longer waiting`, and a nameless row reads `a document that no longer exists`. RED first: 1 backend + 3 vitest cases.
+- **Live re-look** (orchestrator, Chrome, Org admin → Retention → History, same org): the receipt that rendered `Did not delete not recorded` in R2 now renders, verbatim:
+  `Did not delete a document that no longer exists: changed since the sweep`. Its document (`rl-life-b.txt`) was deleted in this drive's cleanup, so the sentence is true. The other did_not_delete rows still read `…: put on legal hold after the sweep (on hold since 12 Oct 2026, 14:40)`.
+- **Still open, cosmetic:** OBS-R2b (`Kept 2: … so it was dropped` stays singular). The sentence is ported from the sketch and fenced against it.
+
