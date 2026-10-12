@@ -404,13 +404,14 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 
 **G-5-FIRING files (113 of 224) — the rows a phase is most likely to collide with.** Verdicts abbreviated; the full cell, the narrative, the named seam and the binding invariants are in the detail file, which is where a phase must read before planning.
 ⚠ **RE-DERIVED 2026-10-12 (Phase 277) — the figure above (113 / 224) is stale:** this table carries **202 rows** (172 at >= 3 phases by their own triple, 30 below); the scan list carries **516** (505 plus the 11 rows 277 added for paths it lacked).
+**Reading a cell (261012-x1l / WR-08):** every verdict 277 abbreviated keeps its full text, verbatim, under `CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)` in that file's section of `docs/HOT-FILE-LEDGER.md`. A trailing `· ⛔` means that text carries a hard constraint, so read it before touching the file. An unmarked cell is short, not complete.
 
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 80 / 37 / 1036 (was `79 / 37 / 1029`) | last touch 276-REVIEW B-WR-01 · see ledger |
-| `backend/app/api/threads.py` | 265 / 90 / 2459 (was `261 / 88 / 2434`) | last touch 274-01 · see ledger |
-| `frontend/src/providers/StreamsProvider.tsx` | 104 / 38 / 4948 | ⚠ row STALE (re-derived under CR-08) · see ledger |
+| `frontend/src/components/chat/MessageItem.tsx` | 80 / 37 / 1036 (was `79 / 37 / 1029`) | last touch 276-REVIEW B-WR-01 |
+| `backend/app/api/threads.py` | 265 / 90 / 2459 (was `261 / 88 / 2434`) | last touch 274-01 · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 104 / 38 / 4948 | ⚠ row STALE (re-derived under CR-08) · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -429,56 +430,56 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/workflow_runs.py` | 11 / 8 / 1089 | honoured by construction (200 / 200.1 / **214**) |
 | `backend/app/models/thread.py` | 21 / 14 / 537 | honoured by construction (268-03) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
-| `frontend/src/components/layout/ChatLayout.tsx` | 60 / 30 / 1134 (was `58 / 29 / 1124`) | ⚠ STALE · last touch 271-02 · see ledger |
+| `frontend/src/components/layout/ChatLayout.tsx` | 60 / 30 / 1134 (was `58 / 29 / 1124`) | ⚠ STALE · last touch 271-02 |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |
-| `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 |
+| `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 52 / 26 / 2724 | honoured by construction (256-05) |
-| `backend/app/services/harness/publish_service.py` | 29 / 13 / 1942 | ⚠ STALE · last touch 268-REVIEW WR-06 |
+| `backend/app/services/harness/publish_service.py` | 29 / 13 / 1942 | ⚠ STALE · last touch 268-REVIEW WR-06 · ⛔ |
 | `backend/app/services/workflow_authoring.py` | 15 / 9 / 989 | honoured by construction (193.2 / 197 / 214 / **214.1**) |
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 16 / 10 / 646 | honoured by construction (194 / 194.1) |
-| `backend/app/services/run_lifecycle.py` | 9 / 5 / 756 | ⚠ STALE · last touch 268-01 · see ledger |
-| `backend/app/db/runs.py` | 9 / 8 / 266 | ⚠ absent its ENTIRE LIFE — row added 268 |
-| `frontend/src/pages/admin/AdminSpendPage.tsx` | 9 / 3 / 974 | ⚠ NOW FIRES (crossed in 268) · extraction FIRST next |
+| `backend/app/services/run_lifecycle.py` | 9 / 5 / 756 | ⚠ STALE · last touch 268-01 · ⛔ |
+| `backend/app/db/runs.py` | 9 / 8 / 266 | ⚠ absent its ENTIRE LIFE — row added 268 · ⛔ |
+| `frontend/src/pages/admin/AdminSpendPage.tsx` | 9 / 3 / 974 | ⚠ NOW FIRES (crossed in 268) · extraction FIRST next · ⛔ |
 | `backend/app/services/run_producer.py` | 17 / 9 / 1029 | ⚠ STALE · last touch 268-01 |
 | `backend/app/services/task_service.py` | 20 / 11 / 970 | honoured by construction (264-01) |
-| `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02 (SEED-297) |
-| `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 |
+| `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02 (SEED-297) · ⛔ |
+| `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
 | `backend/app/api/runs.py` | 41 / 19 / 1750 | ⚠ STALE · last touch 268-REVIEW CR-01/WR-06 |
 | `backend/app/services/harness_engine.py` | 60 / 23 / 3297 | ⚠ STALE · last touch 268-REVIEW WR-06 |
-| `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE; does NOT fire yet |
-| `frontend/src/components/chat/RunCard.tsx` | 31 / 16 / 729 | last touch 276-06 (D-27) · see ledger |
-| `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE · last touch 268-03 |
+| `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE; does NOT fire yet · ⛔ |
+| `frontend/src/components/chat/RunCard.tsx` | 31 / 16 / 729 | last touch 276-06 (D-27) · ⛔ |
+| `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE · last touch 268-03 · ⛔ |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent its ENTIRE LIFE — row added 244-05 |
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
-| `frontend/src/components/chat/ChatArea.tsx` | 91 / 42 / 1171 | last touch 276-06 · see ledger |
-| `frontend/src/stores/streamsStore.ts` | 22 / 14 / 572 | ⚠ row STALE · last touch 244-15 |
-| `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 |
+| `frontend/src/components/chat/ChatArea.tsx` | 91 / 42 / 1171 | last touch 276-06 · ⛔ |
+| `frontend/src/stores/streamsStore.ts` | 22 / 14 / 572 | ⚠ row STALE · last touch 244-15 · ⛔ |
+| `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 15 / 8 / 836 | G-5 FIRES · honoured by construction (244-15) |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
-| `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 · see ledger |
+| `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
 | `frontend/src/lib/api.ts` | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ STALE · last touch 271-03 |
 | `frontend/src/types/index.ts` | 98 / 77 / 1542 (was `98 / 78 / 1542`) | **275-04**: `Document` +5 optional retention fields, additive. Seam OWED |
-| `backend/app/main.py` | 89 / 64 / 1002 (was `87 / 63 / 978`) | last touch 275-03 · see ledger |
-| `backend/app/config.py` | 91 / 53 / 1705 (was `90 / 52 / 1698`) | ⚠ STALE · last touch 275-03 · `MODEL_CAPABILITIES` seam OWED |
-| `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (249-01/03) |
-| `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (249-02/03) |
+| `backend/app/main.py` | 89 / 64 / 1002 (was `87 / 63 / 978`) | last touch 275-03 · ⛔ |
+| `backend/app/config.py` | 91 / 53 / 1705 (was `90 / 52 / 1698`) | ⚠ STALE · last touch 275-03 · `MODEL_CAPABILITIES` seam OWED · ⛔ |
+| `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (249-01/03) · ⛔ |
+| `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (249-02/03) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `backend/app/api/documents.py` | 92 / 36 / 2532 (was `91 / 35 / 2518`) | last touch 275-02 · see ledger |
-| `scripts/vitest-count-gate.cjs` | 290 / 65 / 6428 (was `290 / 68 / 6428`) | last touch 275-02/04 · see ledger |
+| `backend/app/api/documents.py` | 92 / 36 / 2532 (was `91 / 35 / 2518`) | last touch 275-02 |
+| `scripts/vitest-count-gate.cjs` | 290 / 65 / 6428 (was `290 / 68 / 6428`) | last touch 275-02/04 |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
 | `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ NOW FIRES at 3 phases · last touch 256-03 |
 | `frontend/src/components/panel/PhaseCard.tsx` | 17 / 11 / 788 | ⚠ row STALE · honoured by construction (200 / 214) |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 10 / 8 / 404 | ⚠ row STALE · honoured by construction (214) |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 4 / 4 / 291 | ⚠ row STALE · crossed the threshold (200) |
 | `backend/app/services/harness/validator_kinds.py` | 15 / 7 / 791 | ⚠ row STALE · honoured by construction (256-05) |
-| `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ FIRES · absent its ENTIRE LIFE — row added 255 |
-| `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 |
-| `frontend/src/components/admin/ModelRegistryTab.tsx` | 15 / 5 / 1640 | ⚠ FIRES · honoured by construction (249-01) · `AddModelForm` seam OWED |
+| `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ FIRES · absent its ENTIRE LIFE — row added 255 · ⛔ |
+| `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
+| `frontend/src/components/admin/ModelRegistryTab.tsx` | 15 / 5 / 1640 | ⚠ FIRES · honoured by construction (249-01) · `AddModelForm` seam OWED · ⛔ |
 | `frontend/src/components/workflows/soulData.ts` | 12 / 10 / 499 | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 p |
 | `frontend/src/components/workflows/PublishGauntlet.tsx` | 17 / 9 / 1289 | honoured by construction (214 / **BUG-260828-09**) |
 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 5 / 5 / 473 | honoured by construction (200) |
@@ -490,37 +491,37 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/RunSpine.tsx` | 5 / 3 / 426 | honoured by construction (**214**) |
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
-| `frontend/src/components/settings/ConnectionFormPanel.tsx` | 28 / 10 / 2477 | ⭐ NAMED SEAM TAKEN (239-08) · wider seam OWED |
+| `frontend/src/components/settings/ConnectionFormPanel.tsx` | 28 / 10 / 2477 | ⭐ NAMED SEAM TAKEN (239-08) · wider seam OWED · ⛔ |
 | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent its ENTIRE LIFE · THIRD wire-type drift (239) |
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row STALE · honoured by construction (BUG-260912-01) |
-| `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | seam named (239-05), RODE it (239-07) |
+| `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | seam named (239-05), RODE it (239-07) · ⛔ |
 | `frontend/src/pages/SettingsPage.tsx` | 47 / 24 / 1814 | ⚠ row STALE · honoured by construction (mig 180) · tab seam still OWED |
 | `frontend/src/pages/settingsSearchPayload.ts` | 2 / 2 / 116 | young (created 242) |
-| `frontend/src/components/settings/ModelPillRow.tsx` | 5 / 4 / 151 | ⚠ FIRES · honoured by construction (249-02) |
+| `frontend/src/components/settings/ModelPillRow.tsx` | 5 / 4 / 151 | ⚠ FIRES · honoured by construction (249-02) · ⛔ |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 16 / 6 / 990 | honoured by construction (206.2) |
 | `frontend/src/components/workflows/ConnectionPicker.tsx` | 7 / 5 / 888 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/ExternalActionSection.tsx` | 8 / 5 / 179 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/McpToolPicker.tsx` | 5 / 5 / 601 | honoured by construction (211 / **214**) |
 | `backend/app/models/connector.py` | 26 / 14 / 835 | ⚠ row STALE · honoured by construction (244-07) |
-| `backend/app/api/connectors.py` | 46 / 22 / 2166 | ⚠ STALE · last touch 276-07 · extraction OWED |
+| `backend/app/api/connectors.py` | 46 / 22 / 2166 | ⚠ STALE · last touch 276-07 · extraction OWED · ⛔ |
 | `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE · last touch 238-04 |
-| `backend/app/security/secret_cipher.py` | 4 / 2 / 256 | ⚠ absent its ENTIRE LIFE — row added mig 180 |
+| `backend/app/security/secret_cipher.py` | 4 / 2 / 256 | ⚠ absent its ENTIRE LIFE — row added mig 180 · ⛔ |
 | `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
 | `backend/app/services/connector_service.py` | 28 / 11 / 1858 | ⚠ row STALE · honoured by construction (239-06) |
 | `backend/app/services/sources/base.py` | 9 / 5 / 336 | ⚠ absent while FIRING · honoured by construction (239) |
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ absent while FIRING — row added 239-03 |
-| `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (SEED-258) · see ledger |
+| `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (SEED-258) |
 | `backend/app/models/message.py` | 21 / 13 / 278 | ⚠ STALE · last touch 268-03 |
-| `backend/app/models/user_settings.py` | 57 / 35 / 1742 (was `55 / 34 / 1723`) | ⚠ STALE · last touch 270-02 |
+| `backend/app/models/user_settings.py` | 57 / 35 / 1742 (was `55 / 34 / 1723`) | ⚠ STALE · last touch 270-02 · ⛔ |
 | `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
 | `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `frontend/src/lib/api/threads.ts` | 16 / 10 / 1935 | ⚠ STALE · last touch 268-03 |
-| `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (244-06) |
+| `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (244-06) · ⛔ |
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
-| `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 · see ledger |
+| `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
 | `frontend/src/pages/LibraryPage.tsx` | 57 / 19 / 1297 (was `57 / 21 / 1297`) | last touch 275-04 · Extraction OWED |
 | `backend/app/services/retrieval_service.py` | 19 / 11 / 456 | ⛔ extraction still OWED (SEED-224, since 231) |
 | `backend/app/services/recall_eval.py` | 4 / 3 / 1070 | ⚠ FIRES (3 phases) · safe as-is (D-246-12) |
@@ -528,8 +529,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 65 / 31 / 3651 (was `57 / 28 / 3580`) | last touch 274-01 · prompt-assembly seam OWED (OV-273-03) |
-| `backend/app/services/tool_dispatcher.py` | 98 / 43 / 5068 (was `97 / 42 / 5057`) | ⚠ STALE · last touch 275-02 · registry/handler split OWED |
+| `backend/app/services/agent_loop.py` | 65 / 31 / 3651 (was `57 / 28 / 3580`) | last touch 274-01 · prompt-assembly seam OWED (OV-273-03) · ⛔ |
+| `backend/app/services/tool_dispatcher.py` | 98 / 43 / 5068 (was `97 / 42 / 5057`) | ⚠ STALE · last touch 275-02 · registry/handler split OWED · ⛔ |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |
@@ -537,78 +538,78 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/verdictModel.ts` | 6 / 3 / 355 | ⚠ absent for its ENTIRE LIFE |
 | `frontend/src/components/library/IngestionTab.tsx` | 17 / 6 / 512 | ⚠ row was STALE at `13 / 4 / 456` |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
-| `frontend/src/components/layout/NavPanel.tsx` | 26 / 14 / 420 (was `25 / 14 / 416`) | last touch 276-01 / 276-06 (D-27) · see ledger |
-| `frontend/src/App.tsx` | 36 / 27 / 418 (was `35 / 26 / 412`) | last touch 276-06 · see ledger |
-| `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06) |
+| `frontend/src/components/layout/NavPanel.tsx` | 26 / 14 / 420 (was `25 / 14 / 416`) | last touch 276-01 / 276-06 (D-27) |
+| `frontend/src/App.tsx` | 36 / 27 / 418 (was `35 / 26 / 412`) | last touch 276-06 |
+| `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06) · ⛔ |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 4 / 3 / 249 (was `2 / 1 / 204`) | now FIRES (3 phases) · last touch 271-02 / 271-05 |
 | `frontend/src/lib/nav-items.ts` | 12 / 8 / 153 (was `10 / 7 / 141`) | ⚠ STALE · last touch 271-02 / 271-05 |
-| `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold · see ledger |
-| `frontend/src/components/classification/RuleBuilderPanel.tsx` | 6 / 5 / 501 (was `4 / 3 / 502`) | ⚠ STALE · last touch 271-02 |
-| `backend/app/api/workspace.py` | 16 / 8 / 848 (was `13 / 7 / 757`) | ⚠ STALE · last touch 274-01 |
+| `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold |
+| `frontend/src/components/classification/RuleBuilderPanel.tsx` | 6 / 5 / 501 (was `4 / 3 / 502`) | ⚠ STALE · last touch 271-02 · ⛔ |
+| `backend/app/api/workspace.py` | 16 / 8 / 848 (was `13 / 7 / 757`) | ⚠ STALE · last touch 274-01 · ⛔ |
 | `frontend/src/components/panel/TemplateUpload.tsx` | 2 / 2 / 91 | ⚠ absent its entire life — row added 244-02 |
-| `frontend/src/lib/stripComments.testutil.ts` | 1 / 1 / 28 | young (created 244-14 / IN-02) |
+| `frontend/src/lib/stripComments.testutil.ts` | 1 / 1 / 28 | young (created 244-14 / IN-02) · ⛔ |
 | `frontend/src/lib/workspaceAllowedExt.ts` | 1 / 1 / 54 | young (created 244-02) |
 | `frontend/src/components/chat/ChatAttachmentChip.tsx` | 1 / 1 / 144 | young (created 244-05) |
-| `frontend/src/components/chat/composerCopy.ts` | 2 / 1 / 103 | young (created 244-05) · last touch 244-06 |
+| `frontend/src/components/chat/composerCopy.ts` | 2 / 1 / 103 | young (created 244-05) · last touch 244-06 · ⛔ |
 | `frontend/src/components/chat/ConnectedFilePickerModal.tsx` | 3 / 2 / 336 | ⚠ absent its ENTIRE LIFE — row added 244-06 |
 | `frontend/src/components/chat/useComposerAttachments.ts` | 1 / 1 / 158 | young (created 244-06) · the seam 244-05 named |
 | `backend/app/services/oauth_refresh_service.py` | 5 / 3 / 362 | ⚠ absent its ENTIRE LIFE — row added BUG-260912-01 |
-| `frontend/src/components/sources/SourceFolderPicker.tsx` | 2 / 2 / 375 | ⚠ absent its entire life — row added BUG-260912-01 |
+| `frontend/src/components/sources/SourceFolderPicker.tsx` | 2 / 2 / 375 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE · G-5 fires (252-03) · Seam OWED |
-| `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 |
-| `scripts/full-schema-supplement.sql` | 15 / 10 / 690 | ⚠ row STALE · last touch 266-01 |
-| `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · see ledger |
-| `backend/app/services/forced_emit.py` | 10 / 6 / 705 | ⚠ FIRES · absent its ENTIRE LIFE — row added 256-04 |
+| `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
+| `scripts/full-schema-supplement.sql` | 15 / 10 / 690 | ⚠ row STALE · last touch 266-01 · ⛔ |
+| `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
+| `backend/app/services/forced_emit.py` | 10 / 6 / 705 | ⚠ FIRES · absent its ENTIRE LIFE — row added 256-04 · ⛔ |
 | `backend/app/services/template_asset_service.py` | 4 / 3 / 344 | ⚠ absent its ENTIRE LIFE — row added 274-REVIEW WR-01 |
 | `backend/app/db/entitlements.py` | 2 / 1 / 169 | young (created 258) |
 | `backend/app/services/entitlement_service.py` | 2 / 1 / 130 | young (created 258) |
-| `backend/app/db/experts.py` | 5 / 4 / 749 | ⚠ row STALE · last touch 266-01 |
+| `backend/app/db/experts.py` | 5 / 4 / 749 | ⚠ row STALE · last touch 266-01 · ⛔ |
 | `backend/app/models/expert.py` | 6 / 4 / 131 | ⚠ STALE · last touch 267-01 |
 | `frontend/src/lib/api/experts.ts` | 9 / 5 / 418 | ⚠ STALE · last touch 267-03 |
-| `backend/app/services/expert_service.py` | 11 / 7 / 619 | ⚠ STALE · last touch 267-01 |
+| `backend/app/services/expert_service.py` | 11 / 7 / 619 | ⚠ STALE · last touch 267-01 · ⛔ |
 | `backend/app/services/expert_authoring.py` | 7 / 3 / 393 | ⚠ now FIRES (`5/2/393`). **267-01**: one prompt line (tool floor has no effect) |
 | `frontend/src/components/experts/ExpertAuthoringStudio.tsx` | 6 / 3 / 1550 | ⚠ now FIRES · last touch 267-03 · Extraction OWED |
 | `backend/app/api/experts.py` | 14 / 6 / 822 | ⚠ STALE · last touch 267-01 · Extraction OWED |
 | `backend/app/dependencies.py` | 24 / 12 / 1147 | ⚠ absent here at 12 phases — row added 267-05 |
-| `backend/app/utils/skill_visibility.py` | 3 / 2 / 209 | ⚠ row STALE · last touch 264-02/04 |
+| `backend/app/utils/skill_visibility.py` | 3 / 2 / 209 | ⚠ row STALE · last touch 264-02/04 · ⛔ |
 | `frontend/src/components/chat/ActiveExpertChip.tsx` | 2 / 2 / 53 | ⚠ row read 0/0/0 · last touch 268-03 |
-| `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 2 / 2 / 205 | ⚠ row STALE · last touch 262-02 |
+| `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 2 / 2 / 205 | ⚠ row STALE · last touch 262-02 · ⛔ |
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 4 / 4 / 614 | ⚠ STALE · last touch 267-04 · seam TAKEN |
-| `frontend/src/components/skills/SkillFormDialog.tsx` | 13 / 9 / 657 | ⚠ row STALE · honoured by construction (263-04) |
+| `frontend/src/components/skills/SkillFormDialog.tsx` | 13 / 9 / 657 | ⚠ row STALE · honoured by construction (263-04) · ⛔ |
 | `backend/app/api/skills.py` | 19 / 10 / 858 | ⛔ FIRES · absent its ENTIRE LIFE — row added 263 PLANNING |
 | `frontend/src/lib/api/skills.ts` | 6 / 4 / 748 | ⛔ NOW FIRES at 4 phases · re-derived 263 planning |
 | `backend/app/services/openai_service.py` | 72 / 36 / 2268 | ⛔ FIRES at 36 phases · absent its ENTIRE LIFE — row added 262 |
-| `backend/app/services/provider_gateway/openai_compat.py` | 6 / 4 / 525 | ⚠ FIRES at 4 phases · absent its ENTIRE LIFE — row added 262 |
-| `backend/app/services/provider_gateway/dispatcher.py` | 6 / 2 / 153 | ⚠ absent its ENTIRE LIFE — row added 262, BELOW threshold |
-| `backend/app/services/provider_gateway/openai_responses.py` | 0 / 0 / 563 | young (created 262) |
-| `frontend/src/lib/api/admin.ts` | 5 / 2 / 1098 | ⚠ absent its ENTIRE LIFE — row added 262 |
-| `frontend/src/components/admin/CapabilityGrid.tsx` | 3 / 3 / 264 | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 |
-| `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) |
-| `frontend/src/lib/activeViewReachability.ts` | 1 / 1 / 159 | ⚠ row read 0/0/0 AT PLANNING · measured 262-01 |
-| `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ 0/0/0 AT PLANNING · measured 1/1/72 at 262-02 |
+| `backend/app/services/provider_gateway/openai_compat.py` | 6 / 4 / 525 | ⚠ FIRES at 4 phases · absent its ENTIRE LIFE — row added 262 · ⛔ |
+| `backend/app/services/provider_gateway/dispatcher.py` | 6 / 2 / 153 | ⚠ absent its ENTIRE LIFE — row added 262, BELOW threshold · ⛔ |
+| `backend/app/services/provider_gateway/openai_responses.py` | 0 / 0 / 563 | young (created 262) · ⛔ |
+| `frontend/src/lib/api/admin.ts` | 5 / 2 / 1098 | ⚠ absent its ENTIRE LIFE — row added 262 · ⛔ |
+| `frontend/src/components/admin/CapabilityGrid.tsx` | 3 / 3 / 264 | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 · ⛔ |
+| `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) · ⛔ |
+| `frontend/src/lib/activeViewReachability.ts` | 1 / 1 / 159 | ⚠ row read 0/0/0 AT PLANNING · measured 262-01 · ⛔ |
+| `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ 0/0/0 AT PLANNING · measured 1/1/72 at 262-02 · ⛔ |
 | `frontend/src/components/experts/catalog/expertCatalog.ts` | 13 / 4 / 489 | ⚠ STALE (`8/3/455`). **276-07**: `decodeEntities`, display-only |
 | `frontend/src/components/experts/catalog/ExpertCard.tsx` | 5 / 4 / 296 | ⚠ STALE (`3/3/295`). **276-07**: category text via `decodeEntities` |
 | `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 8 / 5 / 359 | ⚠ STALE (`7/4/359`). **276-07**: pill label decoded; filter stays raw |
 | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 6 / 4 / 531 | ⚠ STALE (`4/3/530`). **276-07**: category text via `decodeEntities` |
-| `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ 0/0/0 AT PLANNING · measured at 262-04 |
-| `backend/app/services/ingest_splice.py` | 19 / 7 / 930 (was `15 / 6 / 877`) | ⚠ STALE · last touch 270-01 |
-| `frontend/src/components/ingestion/FolderTree.tsx` | 13 / 8 / 213 (was `12 / 7 / 207`) | last touch 275-02 · see ledger |
-| `frontend/src/components/ingestion/FolderNode.tsx` | 13 / 7 / 303 (was `12 / 6 / 272`) | last touch 275-02 · see ledger |
-| `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05 |
-| `backend/app/models/document.py` | 12 / 9 / 216 (was `11 / 8 / 207`) | last touch 275-03 · see ledger |
+| `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ 0/0/0 AT PLANNING · measured at 262-04 · ⛔ |
+| `backend/app/services/ingest_splice.py` | 19 / 7 / 930 (was `15 / 6 / 877`) | ⚠ STALE · last touch 270-01 · ⛔ |
+| `frontend/src/components/ingestion/FolderTree.tsx` | 13 / 8 / 213 (was `12 / 7 / 207`) | last touch 275-02 · ⛔ |
+| `frontend/src/components/ingestion/FolderNode.tsx` | 13 / 7 / 303 (was `12 / 6 / 272`) | last touch 275-02 · ⛔ |
+| `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05 · ⛔ |
+| `backend/app/models/document.py` | 12 / 9 / 216 (was `11 / 8 / 207`) | last touch 275-03 · ⛔ |
 | `frontend/src/components/ingestion/DocumentRow.tsx` | 10 / 5 / 583 (was `8 / 4 / 564`) | **275-04**: ONE `retention` prop + ONE `<RetentionRowChips>`; still seven `<td>` |
-| `frontend/src/components/org/OrgAdminShell.tsx` | 7 / 5 / 454 (was `3 / 5 / 442`) | ⚠ now FIRES · last touch 275-04 · extraction FIRST next |
-| `frontend/src/lib/api/documents.ts` | 8 / 8 / 503 (was `7 / 7 / 499`) | last touch 275-02 · see ledger |
-| `backend/app/api/folders.py` | 12 / 8 / 277 (was `11 / 7 / 233`) | last touch 275-02 · see ledger |
-| `backend/app/api/kb.py` | 14 / 9 / 515 (was `13 / 8 / 504`) | last touch 275-02 · see ledger |
-| `backend/app/services/audit_service.py` | 8 / 8 / 96 | ⚠ absent its ENTIRE LIFE — row added 275-01 |
+| `frontend/src/components/org/OrgAdminShell.tsx` | 7 / 5 / 454 (was `3 / 5 / 442`) | ⚠ now FIRES · last touch 275-04 · extraction FIRST next · ⛔ |
+| `frontend/src/lib/api/documents.ts` | 8 / 8 / 503 (was `7 / 7 / 499`) | last touch 275-02 |
+| `backend/app/api/folders.py` | 12 / 8 / 277 (was `11 / 7 / 233`) | last touch 275-02 |
+| `backend/app/api/kb.py` | 14 / 9 / 515 (was `13 / 8 / 504`) | last touch 275-02 · ⛔ |
+| `backend/app/services/audit_service.py` | 8 / 8 / 96 | ⚠ absent its ENTIRE LIFE — row added 275-01 · ⛔ |
 | `backend/app/services/expert_scope.py` | 6 / 3 / 632 | ⚠ crossed G-5 on 275-01 · Next phase: extraction FIRST |
-| `backend/app/services/document_relationship_service.py` | 6 / 4 / 465 (was `5 / 3 / 457`) | honoured by construction · see ledger |
-| `backend/app/api/sources.py` | 9 / 3 / 706 (was `8 / 2 / 693`) | ⚠ now FIRES · last touch 275-02 |
-| `backend/app/models/document_search.py` | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ now FIRES · last touch 275-03 |
+| `backend/app/services/document_relationship_service.py` | 6 / 4 / 465 (was `5 / 3 / 457`) | honoured by construction |
+| `backend/app/api/sources.py` | 9 / 3 / 706 (was `8 / 2 / 693`) | ⚠ now FIRES · last touch 275-02 · ⛔ |
+| `backend/app/models/document_search.py` | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ now FIRES · last touch 275-03 · ⛔ |
 | `backend/app/services/document_view_resolver.py` | 5 / 5 / 412 (was `4 / 4 / 403`) | ⚠ FIRES since 271 — row added 275-05 · last touch 275-02 |
 | `backend/app/services/retrieval_documents.py` | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ now FIRES · last touch 275-02 |
-| `frontend/src/pages/findState.ts` | 3 / 3 / 374 (was `2 / 2 / 361`) | ⚠ now FIRES · last touch 275-02 · STRICT LEAF |
+| `frontend/src/pages/findState.ts` | 3 / 3 / 374 (was `2 / 2 / 361`) | ⚠ now FIRES · last touch 275-02 · STRICT LEAF · ⛔ |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
