@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: planning
-last_updated: 2026-10-12T19:00:00.000Z
-last_activity: 2026-10-12
+status: executing
+last_updated: "2026-10-12T18:55:09.443Z"
+last_activity: 2026-10-12 -- Phase 277 execution started
 progress:
-  total_phases: 7
+  total_phases: 14
   completed_phases: 0
   total_plans: 2
   completed_plans: 0
   percent: 0
-stopped_at: Phase 277 planned (2 plans, wave 1) — next /gsd:execute-phase 277
 ---
 
 # Project State
@@ -33,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.6 Pay It Down — 8 major bugs + v4.5 tech debt + three G-5 extractions (repair only)
+**Current focus:** Phase 277 — registers-back-inside-the-band
 
 ---
 
@@ -56,10 +55,10 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ## Current Position
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: **277** (Registers Back Inside the Band) — not started · 7 phases in the milestone (277-283); next migration **207** (re-run `ls supabase/migrations` at discuss)
-Plan: 2 plans (277-01 REG-04 split, 277-02 REG-05 archive repair), wave 1, parallel
-Status: Ready to execute
-Last activity: 2026-10-12 — Phase 277 planned; checker PASSED at iteration 3/3; decision coverage 14/14. ⚠ At 277 close the ORCHESTRATOR hand-edits: ROADMAP plan checkboxes, REG-04/05 traceability, STATE, and `v4.5-ROADMAP.md:3` (editing 277-02's single note in place, not adding a second — D-15)
+Phase: 277 (registers-back-inside-the-band) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 277
+Last activity: 2026-10-12 -- Phase 277 execution started
 
 ### Owed to the operator (carried from v4.5)
 
@@ -76,9 +75,11 @@ Last activity: 2026-10-12 — Phase 277 planned; checker PASSED at iteration 3/3
 
 - Integration W-1 (`harness/freshness.py` counts archived docs), W-2 (artifact rows outlive retention
   disposition — needs a recorded decision), W-3 (filter vocabulary restated twice), W-5 / BUG-261012-01.
+
 - Open bugs: BUG-261004-02, BUG-261005-01, BUG-261012-01, BUG-261012-02.
 - SEED-354 (hold private documents), SEED-334 (272 SC#4 providers), SEED-224 (`retrieval_service.py`
   extraction), OV-273-02 (`tool_dispatcher.py` registry split), `expert_scope.py` extraction first.
+
 - CLAUDE.md past the 120k warn band — split scheduled.
 
 ---
