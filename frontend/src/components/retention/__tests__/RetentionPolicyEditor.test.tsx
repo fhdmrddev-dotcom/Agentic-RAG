@@ -290,6 +290,23 @@ describe("RetentionPolicyEditor — edit and remove", () => {
     expect(screen.getByRole("alertdialog")).toBeInTheDocument()
   })
 
+  it("275-REVIEW F-CR-02: an already-removed policy (404) says so and goes back to a fresh list — never 'still active'", async () => {
+    m.removePolicy.mockRejectedValue(new ApiRefusal(404, "", "Policy not found."))
+    const onSaved = vi.fn()
+    const onGone = vi.fn()
+    render(<RetentionPolicyEditor policy={POLICY} onBack={vi.fn()} onSaved={onSaved} onGone={onGone} />)
+    await userEvent.click(screen.getByRole("button", { name: "Remove policy…" }))
+    const sheet = await screen.findByRole("alertdialog")
+    await userEvent.click(within(sheet).getByRole("button", { name: "Remove policy" }))
+    const alert = await within(sheet).findByRole("alert")
+    expect(alert).toHaveTextContent("This policy was already removed. Nothing changed.")
+    expect(sheet).not.toHaveTextContent("It is still active.")
+    expect(within(sheet).queryByRole("button", { name: "Remove policy" })).toBeNull()
+    await userEvent.click(within(sheet).getByRole("button", { name: "Back to policies" }))
+    expect(onGone).toHaveBeenCalledTimes(1) // the list re-reads; no band pulse — nothing was recorded
+    expect(onSaved).not.toHaveBeenCalled()
+  })
+
   it("a removed policy reports the write", async () => {
     m.removePolicy.mockResolvedValue({ id: "p2", name: "Expired contracts" })
     const onSaved = vi.fn()

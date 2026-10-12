@@ -280,6 +280,25 @@ describe("ReleaseHoldDialog — victim-naming, not red, Keep hold focused (066)"
     expect(screen.getByRole("alertdialog")).toBeInTheDocument()
   })
 
+  it("275-REVIEW F-CR-02: an already-released hold (409) says so, re-reads the list, and never claims it is in force", async () => {
+    m.releaseHold.mockRejectedValue(new ApiRefusal(409, "", "This hold is already released."))
+    const onRecorded = vi.fn()
+    render(<LegalHoldsList onRecorded={onRecorded} />)
+    const card = (await screen.findAllByTestId("hold-card"))[0]
+    await userEvent.click(within(card).getByRole("button", { name: "Release hold…" }))
+    const sheet = await screen.findByRole("alertdialog")
+    await userEvent.click(within(sheet).getByRole("button", { name: "Release hold" }))
+    const alert = await within(sheet).findByRole("alert")
+    expect(alert).toHaveTextContent("This hold is already released.")
+    expect(sheet).not.toHaveTextContent("It is still in force.")
+    await waitFor(() => expect(m.listHolds).toHaveBeenCalledTimes(2)) // the card stops saying "Holding"
+    expect(onRecorded).not.toHaveBeenCalled() // nothing was recorded by THIS person
+    // Nothing left to release: the sheet offers only Close.
+    expect(within(sheet).queryByRole("button", { name: "Release hold" })).toBeNull()
+    await userEvent.click(within(sheet).getByRole("button", { name: "Close" }))
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  })
+
   it("success releases, records and re-reads", async () => {
     m.releaseHold.mockResolvedValue({ ...ACTIVE, active: false })
     const onRecorded = vi.fn()

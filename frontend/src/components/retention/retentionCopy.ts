@@ -206,6 +206,8 @@ const contract = {
   keepPolicy: "Keep policy",
   removePolicy: "Remove policy",
   removeFailed: "Couldn't remove the policy. It is still active.",
+  /** 275-REVIEW F-CR-02 (UI-SPEC §Review fix pass) — a remove the server 404s: it is already gone. */
+  policyAlreadyRemoved: "This policy was already removed. Nothing changed.",
   bucketKept: "kept by an admin — skipped until this policy or the document changes",
   /** S5 — History. */
   historyEmpty: "No retention actions yet. Every archive, delete, hold and policy change will be listed here.",

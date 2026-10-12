@@ -179,7 +179,12 @@ export function LegalHoldsList({ onRecorded }: { onRecorded?: () => void }) {
         onClose={() => setDialog(null)}
         onDone={recorded}
       />
-      <ReleaseHoldDialog hold={releasing} onClose={() => setReleasing(null)} onDone={recorded} />
+      <ReleaseHoldDialog
+        hold={releasing}
+        onClose={() => setReleasing(null)}
+        onDone={recorded}
+        onStale={() => void load()}
+      />
     </section>
   )
 }

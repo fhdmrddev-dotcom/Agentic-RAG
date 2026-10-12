@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { ApiRefusal } from "@/lib/api/refusal"
 import { releaseHold, type LegalHold } from "@/lib/api/retention"
 import { AMBER_TEXT_CLASS } from "./RetentionChip"
 import { RETENTION_COPY, fillCopy } from "./retentionCopy"
@@ -32,13 +33,18 @@ export function ReleaseHoldDialog({
   hold,
   onClose,
   onDone,
+  onStale,
 }: {
   hold: LegalHold | null
   onClose: () => void
   onDone: () => void
+  /** 275-REVIEW F-CR-02: the server refused (e.g. already released) — re-read, but record nothing. */
+  onStale?: () => void
 }) {
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
+  // A 4xx refusal: the server's own sentence. Nothing is left to release, so only Close remains.
+  const [refused, setRefused] = useState<string | null>(null)
 
   const names = hold
     ? [
@@ -54,12 +60,21 @@ export function ReleaseHoldDialog({
     if (!hold || busy) return
     setBusy(true)
     setFailed(false)
+    setRefused(null)
     try {
       await releaseHold(hold.id)
       onDone()
       onClose()
-    } catch {
-      setFailed(true)
+    } catch (err) {
+      // 275-REVIEW F-CR-02: a 4xx is the server's decision ("This hold is already released.") —
+      // render it and re-read the list. "It is still in force." is only for a failure where the
+      // server said nothing (network, 5xx), when the hold genuinely is still in force.
+      if (err instanceof ApiRefusal && err.status >= 400 && err.status < 500) {
+        setRefused(err.message)
+        onStale?.()
+      } else {
+        setFailed(true)
+      }
     } finally {
       setBusy(false)
     }
@@ -71,6 +86,7 @@ export function ReleaseHoldDialog({
       onOpenChange={(o) => {
         if (!o) {
           setFailed(false)
+          setRefused(null)
           onClose()
         }
       }}
@@ -92,22 +108,26 @@ export function ReleaseHoldDialog({
             {more > 0 && <li className="text-muted-foreground">{fillCopy(C.specTemplates.andMore, { N: more })}</li>}
           </ul>
         )}
-        {failed && (
+        {(failed || refused !== null) && (
           <p role="alert" className={`text-sm ${AMBER_TEXT_CLASS}`}>
-            {C.contract.releaseFailed}
+            {refused ?? C.contract.releaseFailed}
           </p>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel className="font-semibold">{C.contract.keepHold}</AlertDialogCancel>
-          <Button
-            type="button"
-            variant="outline"
-            className={`border-border bg-transparent font-semibold ${AMBER_TEXT_CLASS}`}
-            onClick={handleRelease}
-            disabled={busy}
-          >
-            {C.contract.releaseHold}
-          </Button>
+          <AlertDialogCancel className="font-semibold">
+            {refused !== null ? C.contract.close : C.contract.keepHold}
+          </AlertDialogCancel>
+          {refused === null && (
+            <Button
+              type="button"
+              variant="outline"
+              className={`border-border bg-transparent font-semibold ${AMBER_TEXT_CLASS}`}
+              onClick={handleRelease}
+              disabled={busy}
+            >
+              {C.contract.releaseHold}
+            </Button>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -540,6 +540,21 @@ Never a disabled Delete button with the reason in a tooltip: the refusal is a vi
 
 ---
 
+## Review fix pass — copy the contract lacked (2026-10-12, `275-REVIEW-frontend.md`)
+
+> Added by the frontend review fix pass, fully autonomous. Each row below is a state the contract above
+> never named, found by the code review. Nothing above is re-worded. `retentionCopy.ts` fences every
+> string here exactly as it fences the rest of this file. **Rule for every row: a sentence the client
+> prints must never contradict what the server did.** Where the server sends its own sentence (a 4xx
+> refusal), the door renders THAT sentence; the rows below cover only what the server does not say.
+
+| Finding | State | Copy |
+|---|---|---|
+| F-CR-02 | Remove a policy that another admin already removed (server 404) | `This policy was already removed. Nothing changed.` + the `Back to policies` button, which re-reads the list (no band pulse: nothing was recorded) |
+| F-CR-02 | Release a hold that is already released (server 409) | the server's own sentence (`This hold is already released.`); the list re-reads and the sheet offers only `Close` |
+
+---
+
 ## Checker Sign-Off
 
 - [x] Dimension 1 Copywriting: FLAG (non-blocking)

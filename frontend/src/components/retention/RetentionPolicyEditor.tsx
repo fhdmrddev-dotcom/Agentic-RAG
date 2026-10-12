@@ -152,12 +152,15 @@ export function RetentionPolicyEditor({
   policy,
   onBack,
   onSaved,
+  onGone,
 }: {
   /** null → a new policy. */
   policy: RetentionPolicy | null
   onBack: () => void
   /** A write landed (save or remove): return to the list and pulse the band. */
   onSaved: () => void
+  /** 275-REVIEW F-CR-02: the policy is already gone — return to a RE-READ list, recording nothing. */
+  onGone?: () => void
 }) {
   const [form, setForm] = useState<FormState>(() => initialForm(policy))
   const [errors, setErrors] = useState<Errors>({})
@@ -169,6 +172,7 @@ export function RetentionPolicyEditor({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [removeOpen, setRemoveOpen] = useState(false)
   const [removeFailed, setRemoveFailed] = useState(false)
+  const [removeRefused, setRemoveRefused] = useState<string | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
   const alive = useRef(true)
   const reasonId = useId()
@@ -254,13 +258,20 @@ export function RetentionPolicyEditor({
   async function remove() {
     if (!policy) return
     setRemoveFailed(false)
+    setRemoveRefused(null)
     try {
       await removePolicy(policy.id)
       if (!alive.current) return
       setRemoveOpen(false)
       onSaved()
-    } catch {
-      if (alive.current) setRemoveFailed(true)
+    } catch (err) {
+      if (!alive.current) return
+      // 275-REVIEW F-CR-02: a 404 means it is ALREADY gone — never "It is still active.". Any other
+      // 4xx is the server's own sentence. Only a failure where the server said nothing keeps the
+      // contract's "still active".
+      if (err instanceof ApiRefusal && err.status === 404) setRemoveRefused(C.contract.policyAlreadyRemoved)
+      else if (err instanceof ApiRefusal && err.status >= 400 && err.status < 500) setRemoveRefused(err.message)
+      else setRemoveFailed(true)
     }
   }
 
@@ -469,6 +480,7 @@ export function RetentionPolicyEditor({
                 className="h-8 text-xs font-semibold"
                 onClick={() => {
                   setRemoveFailed(false)
+                  setRemoveRefused(null)
                   setRemoveOpen(true)
                 }}
               >
@@ -514,16 +526,33 @@ export function RetentionPolicyEditor({
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm">{C.contract.removeBody}</AlertDialogDescription>
           </AlertDialogHeader>
-          {removeFailed && (
+          {(removeFailed || removeRefused !== null) && (
             <p role="alert" className={cn("text-sm", AMBER_TEXT_CLASS)}>
-              {C.contract.removeFailed}
+              {removeRefused ?? C.contract.removeFailed}
             </p>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel className="font-semibold">{C.contract.keepPolicy}</AlertDialogCancel>
-            <Button type="button" variant="outline" className="border-border bg-transparent font-semibold" onClick={remove}>
-              {C.contract.removePolicy}
-            </Button>
+            {removeRefused !== null ? (
+              // Nothing is left to remove: the one way out re-reads the list (no band pulse).
+              <Button
+                type="button"
+                variant="outline"
+                className="font-semibold"
+                onClick={() => {
+                  setRemoveOpen(false)
+                  ;(onGone ?? onBack)()
+                }}
+              >
+                {C.contract.backToPolicies}
+              </Button>
+            ) : (
+              <>
+                <AlertDialogCancel className="font-semibold">{C.contract.keepPolicy}</AlertDialogCancel>
+                <Button type="button" variant="outline" className="border-border bg-transparent font-semibold" onClick={remove}>
+                  {C.contract.removePolicy}
+                </Button>
+              </>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

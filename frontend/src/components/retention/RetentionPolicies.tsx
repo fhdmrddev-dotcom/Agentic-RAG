@@ -117,6 +117,10 @@ export function RetentionPolicies({
           onRecorded?.()
           void load()
         }}
+        onGone={() => {
+          setEditing(null)
+          void load() // 275-REVIEW F-CR-02: already removed elsewhere — re-read, record nothing
+        }}
       />
     )
   }
