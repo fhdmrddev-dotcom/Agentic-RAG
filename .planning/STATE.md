@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: Find It, Show It — 🚧 IN PROGRESS
 status: executing
-last_updated: "2026-10-12T05:10:51.351Z"
+last_updated: "2026-10-12T05:11:31.227Z"
 last_activity: 2026-10-12
 progress:
   total_phases: 14
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 275 — Retention & Legal Hold (274 and 276 complete)
+**Current focus:** Phase 275 — retention-legal-hold
 
 ---
 
@@ -56,7 +56,7 @@ genuinely reviewed.
 
 Phase: 275 (Retention & Legal Hold) — not started
 Plan: Not started
-Status: Ready to execute
+Status: Executing Phase 275
 Prior: DEPLOYED 2026-10-05 — production 9850e5604 (master 6a0bf5842) ships v4.5 phases 270-274 + 276. Cloud DB migrations 199, 200 (STEP 1 CONCURRENTLY index + STEP 2), 201, 202, 203 applied one approved write at a time, every VERIFY PASS; get_advisors(security) before = after (0 ERROR, 16 WARN, 3 INFO). Live: Vercel READY; api /docs /redoc /openapi.json 401; /health 200; library-links 403 (new route live). Owed: a logged-in smoke test (login, chat stream, doc ingest, code execution in a NEW chat), 271 G-4 sign-off, 273 live STRUCTURED check.
 Prior: Phase 274 COMPLETE (2026-10-05) — verification passed 4/4, security 31/31 (threats_open 0), operator approved G-4 #1-#4. 5 plans + review fixes (CR-01 cross-org folder D-29, CR-02 in-flight duplicate, WR-01/03/04/05/07, T-274-04). BUG-260905-01 closed, SEED-247 answered, BUG-261005-01 filed (shared minter race). Final gates: backend 71 = ceiling (6932 passed), vitest 9983 · 0 failed · 424/424, tsc 66 = base. OWED (operator): production migrations 202 → 203 before the backend deploy, then get_advisors(security). Deferred with triggers: F-1 residual (FileRow sub-line), F-2, F-3, WR-02, WR-06, IN-01..06. Next: /gsd:discuss-phase 275.
 Prior: Phase 272 COMPLETE (2026-10-03) — verification human_needed, self-verified. FIND-07 done. Review: 2 CR + 8 WR all fixed; HUMAN-UAT 2/3 (live re-drive pass; rules accepted); G-1 (topics eq in the shared compiler) fixed. Final backend gate 71 = baseline, 6474 passed. OWED (operator): production — migration 200 STEP 1 (CREATE INDEX CONCURRENTLY) alone → STEP 2 → 201 immediately → both VERIFY → get_advisors(security), each write approved; then backend+frontend deploy (271 also undeployed). Seeds: 333, 334, 335, 336. Owed to 273: D-15/D-16 seams. Next: /gsd:discuss-phase 273.
