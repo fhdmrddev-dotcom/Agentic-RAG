@@ -332,6 +332,16 @@ describe("ReleaseHoldDialog — victim-naming, not red, Keep hold focused (066)"
     expect(release.className).toContain("dark:text-warning")
   })
 
+  it("275-REVIEW F-WR-05: an uncountable hold never states a number on the victim-naming sheet", async () => {
+    // A folder-only hold whose count failed: document_count is 0 (direct picks only), held_today null.
+    m.listHolds.mockResolvedValue({ active: [{ ...ACTIVE, document_count: 0, held_today: null }], released: [] })
+    const sheet = await openRelease()
+    expect(sheet).toHaveTextContent(
+      "Couldn't count the documents yet. Every document this hold covers will no longer be protected. Policies can archive them or queue them for deletion at the next sweep. Documents still covered by another hold stay held.",
+    )
+    expect(sheet.textContent).not.toMatch(/\b0 documents? will no longer be protected/)
+  })
+
   it("names at most 8, then 'and {N} more'", async () => {
     const paths = Array.from({ length: 11 }, (_, i) => `/Matter/F${i + 1}`)
     m.listHolds.mockResolvedValue({ active: [{ ...ACTIVE, folder_paths: paths, document_count: 0 }], released: [] })

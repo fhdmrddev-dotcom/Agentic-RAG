@@ -163,6 +163,9 @@ const contract = {
   keepHold: "Keep hold",
   releaseHold: "Release hold",
   releaseFailed: "Couldn't release the hold. It is still in force.",
+  /** 275-REVIEW F-WR-05 (UI-SPEC §Review fix pass) — the release sheet when the count is unknown. */
+  releaseBodyUncounted:
+    "Couldn't count the documents yet. Every document this hold covers will no longer be protected. Policies can archive them or queue them for deletion at the next sweep. Documents still covered by another hold stay held.",
   /** S4 — the D-11 deviation (changed from the sketch). */
   untickedNote: "Unticked documents are kept. They are not proposed again unless the policy is edited or the document changes.",
   confirmFailed:

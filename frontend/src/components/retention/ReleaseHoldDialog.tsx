@@ -54,7 +54,10 @@ export function ReleaseHoldDialog({
     : []
   const shown = names.slice(0, MAX_NAMES)
   const more = names.length - shown.length
-  const n = hold ? (hold.held_today ?? hold.document_count) : 0
+  // 275-REVIEW F-WR-05: `held_today` is null exactly when the server could not count, and
+  // `document_count` counts only directly picked documents (never folder coverage) — so an unknown
+  // count says so in words. Never a substituted number, never 0.
+  const n = typeof hold?.held_today === "number" ? hold.held_today : null
 
   async function handleRelease() {
     if (!hold || busy) return
@@ -97,7 +100,7 @@ export function ReleaseHoldDialog({
             {hold ? fillCopy(C.specTemplates.releaseTitle, { matter: hold.name }) : ""}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-sm">
-            {fillCopy(C.specTemplates.releaseBody, { N: n })}
+            {n === null ? C.contract.releaseBodyUncounted : fillCopy(C.specTemplates.releaseBody, { N: n })}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {shown.length > 0 && (
