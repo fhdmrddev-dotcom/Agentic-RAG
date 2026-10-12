@@ -93,6 +93,13 @@ Not in scope: chat/message retention, per-org rate limits (SEED-345's other half
   - `document_governance.py` (FIRES): touch only if the Retention section needs it; justify in the plan.
   - New rows are owed for `folders.py`, `sources.py`, `OrgAdminShell.tsx` and every new module. Run `node scripts/check-hot-file-ledger.cjs 275` at planning.
 
+### Resolved at planning (2026-10-12, Claude — operator delegated all decisions for this run; 275-RESEARCH Open Questions)
+- **D-34:** A policy reaches **only documents an org admin can see** (org-shared / org-visible under current RLS). Members' private documents are **not** evaluated, archived or queued. **Preview shows the count of documents the policy does not cover because they are private** ("N private documents are not covered"). Fail closed (SRC-06). Revisit with SEED-345's remainder.
+- **D-35:** A legal hold can only cover what an org admin can pick, so **private documents cannot be held this phase**. Recorded as a known limit in VERIFICATION and a new seed ("org-wide matter by custodian"). The database hold refusal (D-14) still applies to every covered document on every path.
+- **D-36:** The archived / source-state exclusion is enforced **in the two search RPCs via a stored generated column `documents.retrievable`** (`archived_at IS NULL AND (source_state IS NULL OR source_state = 'live')`), with `ANALYZE public.documents` in the migration (measured: without stats the vector arm went 25 ms → 943 ms). `query_documents` / `grep` (model-written SQL) are covered by restrictive RLS policies switched on by a transaction-local `app.agent_read` setting; service-role readers (`read_document`, `analyze_document`, `fetch_document_file`, `query_tables`) get a one-line check on the same column. The listing tools **`ls`, `tree`, `glob`** also filter non-retrievable documents (D-18 "every agent path").
+- **D-37:** The sweep enable flag is the env var **`RETENTION_SWEEP_ENABLED`** (default off), matching the watch/scheduler daemons; it lands in all four deploy-parity artifacts in one commit (D-29).
+- **D-38:** Every user delete path is reordered to **check hold → delete rows → remove file bytes** (today bytes are removed first, so a refused row would lose its file). The two watch-purge paths stop swallowing database errors (a refused delete must not report success).
+
 ### Claude's Discretion
 - **Where the archived/source-state exclusion is enforced for chat search:**
   - Inside the RPCs (`enforced_in_rpc=True`, a migration redefining `match_document_chunks` / `keyword_search_chunks` that keeps `SET plan_cache_mode TO 'force_custom_plan'`), **or**
