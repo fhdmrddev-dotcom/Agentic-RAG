@@ -23,6 +23,7 @@ import type { Document, Folder, ViewCondition, ViewFilter } from "@/types"
 import { FilterChip } from "@/components/ingestion/FilterBar"
 import { folderPathOf } from "@/components/chat/scopeCopy"
 import { RELATIONSHIP_FILTER_VERBS } from "@/components/relationships/relationshipLabels"
+import { RETENTION_COPY } from "@/components/retention/retentionCopy"
 import type {
   FindAction,
   FindDateCondition,
@@ -320,6 +321,27 @@ export function FindQuickAdd({
             : () => dispatch({ type: "SET_VERSION", version: "latest" })
         }
       />
+
+      {/* Phase 275 (S9 / D-04): immediately right of Version. A TOGGLE, not an editor: off it
+          reads "Include archived"; on it reads "Archived: included" (primary) with a labelled ✕.
+          It changes only on a click. */}
+      {find.include_archived ? (
+        <FilterChip
+          summary={
+            <span className="text-[hsl(239_70%_50%)] dark:text-primary">
+              {RETENTION_COPY.contract.archivedIncluded}
+            </span>
+          }
+          removeLabel={RETENTION_COPY.contract.stopIncludingArchived}
+          onEdit={() => dispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: false })}
+          onRemove={() => dispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: false })}
+        />
+      ) : (
+        <FilterChip
+          summary={RETENTION_COPY.ported.includeArchived}
+          onEdit={() => dispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: true })}
+        />
+      )}
 
       {editor && (
         <div className="absolute left-0 top-full z-20 mt-2 max-w-[calc(100vw-2rem)]">{editor}</div>

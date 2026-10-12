@@ -5,6 +5,10 @@ from supabase import Client
 
 from app.dependencies import get_current_user, get_user_supabase_client, get_user_pg_connection
 from app.models.kb import LsResponse, TreeResponse, GrepResponse, GlobResponse, ReadResponse
+# Phase 275 (D-36): ls / tree / glob list only retrievable documents — the agent's listing tools
+# call these cores (the /kb/* routes have no frontend caller). ⛔ ``read_path`` is NOT filtered:
+# it is shared with the Library's GET /documents/{id}/content, which always opens a document.
+from app.services.retrieval_scope import RETRIEVABLE_COLUMN
 from app.utils.folder_utils import (
     fetch_visible_folders as _fetch_all_visible_folders,
     get_globally_visible_folder_ids,
@@ -68,6 +72,7 @@ async def ls_path(path: str, user_id: str, supabase: Client) -> dict:
             .select("id, filename, status, created_at")
             .is_("folder_id", "null")
             .eq("user_id", user_id)
+            .eq(RETRIEVABLE_COLUMN, True)
         )
         return {"path": "/", "folders": folder_entries, "documents": doc_result.data}
 
@@ -85,6 +90,7 @@ async def ls_path(path: str, user_id: str, supabase: Client) -> dict:
         .select("id, filename, status, created_at")
         .eq("folder_id", target["id"])
         .eq("user_id", user_id)
+        .eq(RETRIEVABLE_COLUMN, True)
     )
     own_docs_in_folder = own_docs_resp.data or []
     global_folder_ids = await get_globally_visible_folder_ids(supabase, user_id)
@@ -94,6 +100,7 @@ async def ls_path(path: str, user_id: str, supabase: Client) -> dict:
             supabase.table("documents")
             .select("id, filename, status, created_at")
             .eq("folder_id", target["id"])
+            .eq(RETRIEVABLE_COLUMN, True)
         )
         global_docs_in_folder = _gd_resp.data or []
     # Merge, dedup
@@ -143,6 +150,7 @@ async def tree_path(path: str, depth: int | None, user_id: str, supabase: Client
             .select("id, filename, folder_id, status, created_at")
             .in_("folder_id", all_ids)
             .eq("user_id", user_id)
+            .eq(RETRIEVABLE_COLUMN, True)
         )
         own_docs = _own_resp.data or []
         # Fetch docs in globally visible folders within subtree
@@ -153,6 +161,7 @@ async def tree_path(path: str, depth: int | None, user_id: str, supabase: Client
                 supabase.table("documents")
                 .select("id, filename, folder_id, status, created_at")
                 .in_("folder_id", global_ids_in_subtree)
+                .eq(RETRIEVABLE_COLUMN, True)
             )
             global_docs = _glob_resp.data or []
         # Merge, dedup
@@ -342,6 +351,7 @@ async def glob_path(pattern: str, user_id: str, supabase: Client) -> dict:
         supabase.table("documents")
         .select("id, filename, folder_id")
         .eq("user_id", user_id)
+        .eq(RETRIEVABLE_COLUMN, True)
     )
     own_docs = _own_resp.data or []
     global_folder_ids_set = set(await get_globally_visible_folder_ids(supabase, user_id))
@@ -351,6 +361,7 @@ async def glob_path(pattern: str, user_id: str, supabase: Client) -> dict:
             supabase.table("documents")
             .select("id, filename, folder_id")
             .in_("folder_id", list(global_folder_ids_set))
+            .eq(RETRIEVABLE_COLUMN, True)
         )
         global_docs = _glob_resp.data or []
     seen_ids: set[str] = set()

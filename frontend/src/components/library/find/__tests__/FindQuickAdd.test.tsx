@@ -219,3 +219,37 @@ describe("FindQuickAdd — each editor dispatches exactly one condition", () => 
     expect(screen.getByRole("dialog", { name: "Added by" })).toBeInTheDocument()
   })
 })
+
+// ── 275-02: the Include archived toggle chip (S9 / D-04) ─────────────────────────────
+
+describe("FindQuickAdd — Include archived (275-02, D-04)", () => {
+  it("sits immediately right of the Version chip, off by default, and reads Include archived", () => {
+    renderQA()
+    const version = screen.getByRole("button", { name: "Version: Latest" })
+    const toggle = screen.getByRole("button", { name: "Include archived" })
+    // The toggle's chip is the Version chip's NEXT sibling chip.
+    expect(version.closest("span")?.nextElementSibling).toBe(toggle.closest("span"))
+    expect(screen.queryByRole("button", { name: "Stop including archived documents" })).toBeNull()
+  })
+
+  it("a click dispatches SET_INCLUDE_ARCHIVED true — and nothing else", () => {
+    const { dispatch } = renderQA()
+    fireEvent.click(screen.getByRole("button", { name: "Include archived" }))
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(dispatch).toHaveBeenCalledWith({ type: "SET_INCLUDE_ARCHIVED", include_archived: true })
+    expect(screen.queryByRole("dialog")).toBeNull()
+  })
+
+  it("on, it reads Archived: included with a labelled ✕ that turns it off", () => {
+    const { dispatch } = renderQA({ include_archived: true })
+    expect(screen.getByRole("button", { name: "Archived: included" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Include archived" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Stop including archived documents" }))
+    expect(dispatch).toHaveBeenCalledWith({ type: "SET_INCLUDE_ARCHIVED", include_archived: false })
+  })
+
+  it("never changes without a click: rendering and re-rendering dispatch nothing", () => {
+    const { dispatch } = renderQA({ include_archived: true })
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+})

@@ -70,10 +70,21 @@ _272_05_D27_REASON = (
 )
 D27_PRE_DEDUP_SHA = "c29ec8635465af823590c30d6f3c902a392b1673"
 
+# ⚠ RETIRED DELIBERATELY BY 275-02 (SEED-177). The two agent-only readers gain
+# ``.eq(RETRIEVABLE_COLUMN, True)`` on every read so an agent can never resolve or read an archived or
+# source-gone document (D-18). The pure move stays proven as history against PHASE_275_BASE_SHA.
+_275_02_D18_REASON = (
+    "275-02: archived/source-gone exclusion, D-18 — pure move proven at PHASE_275_BASE_SHA; each "
+    "read gains .eq(RETRIEVABLE_COLUMN, True) on purpose"
+)
+PHASE_275_BASE_SHA = "b41d51d6b2de26f70d97bd1b8f8c39a889b9b8c4"
+
 RETIRED: dict[str, str] = {
     "_vector_search": _272_03_REASON,
     "_keyword_search": _272_03_REASON,
     "_deduplicate_chunks": _272_05_D27_REASON,
+    "resolve_document_id": _275_02_D18_REASON,
+    "fetch_full_document": _275_02_D18_REASON,
 }
 
 # The ONE function whose docstring is compared out: 272-01 rewrites `_call_as_user`'s G-5
@@ -227,6 +238,45 @@ def test_272_05_dedup_retired_case_proven_and_changed_on_purpose():
         "same_document_only must default to False — the unfiltered behaviour"
     )
     assert "_deduplicate_chunks" in RETIRED, _272_05_D27_REASON
+
+
+def test_275_02_retired_readers_proven_and_changed_on_purpose():
+    """``resolve_document_id`` / ``fetch_full_document`` were a pure move up to PHASE_275_BASE_SHA,
+    and the live functions differ ONLY by the retrievable filter: removing every
+    ``.eq(RETRIEVABLE_COLUMN, True)`` call from the live AST gives back the base AST exactly."""
+
+    class _DropRetrievable(ast.NodeTransformer):
+        def visit_Call(self, node):
+            self.generic_visit(node)
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute) and func.attr == "eq"
+                and node.args and isinstance(node.args[0], ast.Name)
+                and node.args[0].id == "RETRIEVABLE_COLUMN"
+            ):
+                return func.value  # unwrap: `<q>.eq(RETRIEVABLE_COLUMN, True)` → `<q>`
+            return node
+
+    base_src = _blob_at_base(_BASE_REL)
+    for name in ("resolve_document_id", "fetch_full_document"):
+        assert RETIRED[name] == _275_02_D18_REASON
+        home = MOVE_MAP[name]
+        base_fn = _top_level_function(base_src, name)
+        at_275 = _top_level_function(_blob_at_base(home, PHASE_275_BASE_SHA), name)
+        live = _top_level_function(_module_source(home), name)
+        assert base_fn is not None and at_275 is not None and live is not None
+        assert ast.dump(at_275) == ast.dump(base_fn), f"{name}: the move was not pure before 275-02"
+        assert ast.dump(live) != ast.dump(base_fn), f"{name}: identical again — restore the AST pin"
+        filters = sum(
+            1 for n in ast.walk(live)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "eq"
+            and n.args and isinstance(n.args[0], ast.Name) and n.args[0].id == "RETRIEVABLE_COLUMN"
+        )
+        assert filters >= 1, f"{name}: no retrievable filter found"
+        stripped = _DropRetrievable().visit(live)
+        assert ast.dump(stripped) == ast.dump(base_fn), (
+            f"{name}: the live reader differs from its moved source by MORE than the retrievable filter"
+        )
 
 
 def test_back_compat_names():

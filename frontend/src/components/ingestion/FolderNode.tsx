@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import {
   ChevronRight,
   Folder as FolderIcon,
@@ -18,6 +19,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { ApiRefusal } from "@/lib/api/refusal"
+import { HoldRefusalNotice } from "@/components/retention/HoldRefusalNotice"
 import { NavRow } from "./NavRow"
 import { FolderCreateInput } from "./FolderCreateInput"
 import type { FolderNode as FolderNodeType } from "@/lib/folderTree"
@@ -47,7 +50,9 @@ interface FolderNodeProps {
   onCommitRename: (id: string, newName: string) => void
   onCancelRename: () => void
   onStartDelete: (id: string) => void
-  onConfirmDelete: (id: string) => void
+  /** Phase 275 (S10 / D-15): may return the delete's promise; a 409 refusal rejected from it is
+   *  shown IN PLACE of the confirm buttons, and the folder stays. */
+  onConfirmDelete: (id: string) => void | Promise<void>
   onCancelDelete: () => void
   onCreateSubfolder: (parentId: string) => void
   onCreateCommit: (name: string, isOrgShared: boolean) => void
@@ -83,6 +88,21 @@ export function FolderNode({
   const isExpanded = expandedIds.has(node.id)
   const isEditing = editingId === node.id
   const isDeleting = deletingId === node.id
+  // Phase 275 (S10 / D-15): the server's hold refusal for this folder's delete, if any.
+  const [refusal, setRefusal] = useState<ApiRefusal | null>(null)
+  // A refusal belongs to ONE confirm: when the confirm closes (Close, or another folder's delete
+  // starting), it is cleared, so a later confirm never opens on a stale sentence.
+  useEffect(() => {
+    if (!isDeleting) setRefusal(null)
+  }, [isDeleting])
+
+  async function confirmDelete() {
+    try {
+      await onConfirmDelete(node.id)
+    } catch (err) {
+      if (err instanceof ApiRefusal && err.status === 409) setRefusal(err)
+    }
+  }
   const hasChildren = node.children.length > 0
   const isOwner = node.user_id === currentUserId
   const count = folderDocumentCounts?.[node.id] ?? 0
@@ -202,7 +222,18 @@ export function FolderNode({
       />
 
       {/* Inline delete confirmation */}
-      {isDeleting && (
+      {isDeleting && refusal && (
+        <HoldRefusalNotice
+          className="ml-8 mt-1 text-xs"
+          title={refusal.title}
+          message={refusal.message}
+          onClose={() => {
+            setRefusal(null)
+            onCancelDelete()
+          }}
+        />
+      )}
+      {isDeleting && !refusal && (
         <div className="ml-8 py-2 px-2 text-xs text-muted-foreground flex items-center gap-2 flex-wrap bg-destructive/5 rounded-md mt-1">
           <span>
             Delete <strong>{node.name}</strong>? This will permanently delete the folder and all documents inside it.
@@ -212,7 +243,7 @@ export function FolderNode({
               variant="destructive"
               size="sm"
               className="h-6 text-xs px-2.5"
-              onClick={() => onConfirmDelete(node.id)}
+              onClick={() => void confirmDelete()}
             >
               Delete
             </Button>

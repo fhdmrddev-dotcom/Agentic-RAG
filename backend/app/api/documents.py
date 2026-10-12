@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 from storage3.exceptions import StorageApiError
@@ -35,6 +35,7 @@ from app.services.embedding_service import chunk_text, embed_chunks, extract_met
 from app.services.email_attachments import ingest_email_attachments
 from app.services.ingest_enrich import enrich_for_ingest
 from app.services.extraction_service import ExtractedDocument
+from app.services.retention import hold_guard  # Phase 275 (D-14 / D-32): the one hold check
 from app.utils.db import aexec
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
@@ -1809,6 +1810,7 @@ async def reextract_document(
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: str,
+    request: Request,
     background_tasks: BackgroundTasks,
     scope: str = Query(default="version", pattern="^(version|all)$"),
     current_user: dict = Depends(get_current_user),
@@ -1845,30 +1847,42 @@ async def delete_document(
         else:
             siblings_q = siblings_q.eq("folder_id", folder_id)
         siblings = siblings_q.execute().data or []
+        sibling_ids = [s["id"] for s in siblings]
 
-        # D-10: delete all storage files; failures silently swallowed
+        # Phase 275 (D-14 / D-38): check the hold FIRST, then rows, then bytes — a refusal
+        # (here, or a PT409 racing past it) never costs a file.
+        await hold_guard.assert_none_held(
+            request, current_user, sibling_ids, kind="document", service_supabase=service_supabase,
+        )
+
+        # Delete all sibling rows; ON DELETE CASCADE handles chunks/tables/images (D-09)
+        # user_id guard redundant (sibling_ids from user-scoped SELECT) but added for defence-in-depth
+        if sibling_ids:
+            with hold_guard.map_hold_refusal(kind="document"):
+                supabase.table("documents").delete().eq("user_id", current_user["id"]).in_("id", sibling_ids).execute()
+
+        # D-10 / D-38: storage files AFTER the rows; a failure is logged, never blocks the delete
         for sibling in siblings:
             if sibling.get("file_path"):
                 try:
                     supabase.storage.from_("documents").remove([sibling["file_path"]])
-                except Exception:
-                    pass
-
-        # Delete all sibling rows; ON DELETE CASCADE handles chunks/tables/images (D-09)
-        # user_id guard redundant (sibling_ids from user-scoped SELECT) but added for defence-in-depth
-        sibling_ids = [s["id"] for s in siblings]
-        if sibling_ids:
-            supabase.table("documents").delete().eq("user_id", current_user["id"]).in_("id", sibling_ids).execute()
+                except Exception as exc:
+                    log.warning("delete_document: storage remove failed for %s: %s", sibling["file_path"], exc)
 
     else:
         # scope == "version" (default) — D-06: delete only the targeted row + storage file
-        # D-10: storage failure silently swallowed
+        await hold_guard.assert_none_held(
+            request, current_user, [document_id], kind="document", service_supabase=service_supabase,
+        )
+
+        with hold_guard.map_hold_refusal(kind="document"):
+            supabase.table("documents").delete().eq("id", document_id).eq("user_id", current_user["id"]).execute()
+
+        # D-10 / D-38: storage file AFTER the row; a failure is logged, never blocks the delete
         try:
             supabase.storage.from_("documents").remove([target["file_path"]])
-        except Exception:
-            pass
-
-        supabase.table("documents").delete().eq("id", document_id).eq("user_id", current_user["id"]).execute()
+        except Exception as exc:
+            log.warning("delete_document: storage remove failed for %s: %s", target.get("file_path"), exc)
 
         # D-06: if deleted row was is_latest, promote next-highest sibling
         if target.get("is_latest"):

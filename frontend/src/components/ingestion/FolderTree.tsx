@@ -5,6 +5,7 @@ import { buildFolderTree } from "@/lib/folderTree"
 import { FolderNode } from "./FolderNode"
 import { NavRow } from "./NavRow"
 import { FolderCreateInput } from "./FolderCreateInput"
+import { ApiRefusal } from "@/lib/api/refusal"
 import type { Folder } from "@/types"
 
 interface FolderTreeProps {
@@ -85,11 +86,16 @@ export function FolderTree({
     setDeletingId(id)
   }
 
+  // Phase 275 (S10 / D-15): the confirm stays open until the delete answers, so a 409 hold
+  // refusal can be RETHROWN to the FolderNode that renders it in place of its buttons. Any other
+  // failure closes the confirm and logs, exactly as before.
   const handleConfirmDelete = async (id: string) => {
-    setDeletingId(null)
     try {
       await onDeleteFolder(id)
+      setDeletingId(null)
     } catch (err) {
+      if (err instanceof ApiRefusal && err.status === 409) throw err
+      setDeletingId(null)
       console.error("Could not delete folder:", err)
     }
   }
