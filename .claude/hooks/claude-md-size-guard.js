@@ -34,8 +34,19 @@ const path = require('path');
 const HARD_LIMIT = 150000;
 const WARN_LIMIT = 120000;
 // Phase 208 — the hot-file ledger's disposition cell carries the VERDICT only.
-// 200 is generous: the longest legitimate verdict at the split measured 115.
-const LEDGER_CELL_LIMIT = 200;
+// ~~200 is generous: the longest legitimate verdict at the split measured 115.~~
+// ⚠ SUPERSEDED 2026-10-12 (Phase 277), kept beside the original: this hook bound
+// `startsWith('| File | commits')`, a header CLAUDE.md has not carried since the
+// 2026-09-06 move, so it parsed ZERO rows of the table that stayed here while that
+// table's verdict cells regrew to 23,049 chars. It now binds the FIRING shortlist's
+// EXACT header at an 80-char cap -- the same table, cap, floor and truncation check
+// as scripts/check-claude-md-size.cjs. (The docs scan list's 200 cap lives in the
+// gate only; this hook runs on CLAUDE.md files alone.)
+const LEDGER_CELL_LIMIT = 80;
+const MIN_SHORTLIST_ROWS = 100;
+const SHORTLIST_HEADER = '| Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |';
+const SHORTLIST_CELLS = 5;
+const SHORTLIST_VERDICT = 3;
 
 let raw = '';
 process.stdin.on('data', (c) => (raw += c));
@@ -60,16 +71,51 @@ process.stdin.on('end', () => {
   // previous guard could not have caught either trip in the turn that caused it:
   // at 51k it said nothing at all, while the column that would grow to 60k was
   // being written a paragraph at a time.
+  // The ROOT CLAUDE.md is the one that must carry the table: its directory holds `.git`
+  // (a directory in the main checkout, a file in a worktree). A nested CLAUDE.md without
+  // the table is not a finding.
+  const isRoot = (() => {
+    try {
+      return fs.existsSync(path.join(path.dirname(path.resolve(filePath)), '.git'));
+    } catch {
+      return false;
+    }
+  })();
+  const splitCells = (l) => l.replace(/\\\|/g, '\u0000').split('|').map((c) => c.trim());
+
   const ledger = (() => {
     const rowLines = text.split('\n');
-    const start = rowLines.findIndex((l) => l.startsWith('| File | commits'));
-    if (start === -1) return null;
+    const start = rowLines.findIndex((l) => l.trim() === SHORTLIST_HEADER);
+    const missing = [];
+    if (start === -1) {
+      if (isRoot) {
+        missing.push(`${filePath}  0 rows parsed (floor ${MIN_SHORTLIST_ROWS}) — the cell cap would bind nothing`);
+        return { long: [], dupes: [], malformed: [], missing };
+      }
+      return null;
+    }
     const rows = [];
-    for (let i = start + 2; i < rowLines.length && rowLines[i].startsWith('|'); i++) {
+    let i = start + 2;
+    for (; i < rowLines.length && rowLines[i].startsWith('|'); i++) {
       // Split on UNESCAPED pipes -- cells legitimately contain an escaped one.
-      const cells = rowLines[i].replace(/\\\|/g, '\u0000').split('|').map((c) => c.trim());
+      const cells = splitCells(rowLines[i]);
       const m = /`([^`]+)`/.exec(cells[1] || '');
-      if (m) rows.push({ line: i + 1, path: m[1], cells: cells.length, d: cells[4] || '' });
+      if (m) rows.push({ line: i + 1, path: m[1], cells: cells.length, d: cells[SHORTLIST_VERDICT] || '' });
+    }
+    if (isRoot) {
+      if (rows.length < MIN_SHORTLIST_ROWS) {
+        missing.push(`${filePath}  ${rows.length} rows parsed (floor ${MIN_SHORTLIST_ROWS}) — the cell cap would bind nothing`);
+      }
+      // TRUNCATION, same as the gate: the floor alone misses a break after row 100.
+      let k = 0;
+      for (let j = i; j < rowLines.length && !rowLines[j].startsWith('## '); j++) {
+        if (rowLines[j].startsWith('| `') && splitCells(rowLines[j]).length === SHORTLIST_CELLS) k++;
+      }
+      if (k > 0) {
+        missing.push(
+          `${filePath}  table cut short at line ${i + 1}: ${rows.length} rows parsed, ${k} more FIRING-shaped rows follow before the next heading`
+        );
+      }
     }
     const seen = new Map();
     const dupes = [];
@@ -83,13 +129,15 @@ process.stdin.on('end', () => {
         .map((r) => `line ${r.line}  ${r.d.length} chars (cap ${LEDGER_CELL_LIMIT})  ${r.path}`),
       dupes,
       malformed: rows
-        .filter((r) => r.cells !== 6)
-        .map((r) => `line ${r.line}  ${r.cells} cells, expected 6  ${r.path}`),
+        .filter((r) => r.cells !== SHORTLIST_CELLS)
+        .map((r) => `line ${r.line}  ${r.cells} cells, expected ${SHORTLIST_CELLS}  ${r.path}`),
+      missing,
     };
   })();
 
   const structural = ledger
     ? [
+        ...ledger.missing.map((x) => `  [shortlist-missing] ${x}`),
         ...ledger.long.map((x) => `  [disposition-too-long] ${x}`),
         ...ledger.dupes.map((x) => `  [duplicate-row] ${x}`),
         ...ledger.malformed.map((x) => `  [malformed-row] ${x}`),
