@@ -57,7 +57,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       expect(uiSpecSource).toContain(value)
       checked++
     }
-    expect(checked).toBe(83) // 275-REVIEW: +policyAlreadyRemoved (F-CR-02), +confirmRefusedNothing (F-WR-01), +resultNothingDone (F-WR-03), +postureNotReported (F-WR-04), +releaseBodyUncounted (F-WR-05)
+    expect(checked).toBe(84) // 275-REVIEW: +policyAlreadyRemoved (F-CR-02), +confirmRefusedNothing (F-WR-01), +resultNothingDone (F-WR-03), +postureNotReported (F-WR-04), +releaseBodyUncounted (F-WR-05), +wholeNumber (F-WR-09)
   })
 
   it("every SKETCH TEMPLATE's literal segments sit verbatim in the sketch", () => {

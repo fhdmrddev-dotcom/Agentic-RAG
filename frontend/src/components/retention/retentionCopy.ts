@@ -206,6 +206,8 @@ const contract = {
   nameRequired: "Give the policy a name.",
   scopeRequired: "A policy needs a document type, a folder, or both.",
   stage2After: "The delete step must come after the archive step.",
+  /** 275-REVIEW F-WR-09 (UI-SPEC §Review fix pass) — Keep for / the second stage, never coerced. */
+  wholeNumber: "Enter a whole number from 1 to 10000.",
   previewFirst: "Preview first. A policy can't be saved until you've seen what it would do.",
   previewFailed: "Preview couldn't finish, so this policy can't be saved yet. Nothing was changed.",
   saveFailed: "Couldn't save the policy. Nothing changed. Your preview is still here.",

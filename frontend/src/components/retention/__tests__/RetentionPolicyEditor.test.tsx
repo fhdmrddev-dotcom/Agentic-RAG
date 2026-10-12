@@ -12,7 +12,7 @@
  * Assertions read RENDERED WORDS and the exact draft sent.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, waitFor, within } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import type { PolicyPreview, RetentionPolicy } from "@/lib/api/retention"
@@ -155,6 +155,73 @@ describe("RetentionPolicyEditor — the form (D-20 / D-22)", () => {
         null,
       ),
     )
+  })
+})
+
+describe("275-REVIEW F-WR-08 — the editor never shows 'Any type/folder' over a stored scope", () => {
+  it("a stored type missing from the live list (top 50, zero docs, or a failed load) is still shown", async () => {
+    m.listDocumentTypes.mockResolvedValue([{ value: "invoice", count: 9 }])
+    render(<RetentionPolicyEditor policy={POLICY} onBack={vi.fn()} onSaved={vi.fn()} />)
+    await screen.findByRole("option", { name: "Invoice (9)" })
+    const select = screen.getByLabelText("Document type") as HTMLSelectElement
+    expect(select).toHaveValue("contract")
+    expect(select.selectedOptions[0].textContent).toBe("Contract")
+  })
+
+  it("while the type list is still loading, the stored type is what the select shows", () => {
+    m.listDocumentTypes.mockImplementation(() => new Promise(() => {}))
+    render(<RetentionPolicyEditor policy={POLICY} onBack={vi.fn()} onSaved={vi.fn()} />)
+    const select = screen.getByLabelText("Document type") as HTMLSelectElement
+    expect(select).toHaveValue("contract")
+    expect(select.selectedOptions[0].textContent).not.toBe("Any type")
+  })
+
+  it("a stored folder absent from the folder list shows the policy's own folder path", async () => {
+    const folderPolicy: RetentionPolicy = {
+      ...POLICY, scope_kind: "folder", document_type_norm: null, folder_id: "f-gone", folder_path: "/Archive/Old",
+    }
+    render(<RetentionPolicyEditor policy={folderPolicy} onBack={vi.fn()} onSaved={vi.fn()} />)
+    const select = screen.getByLabelText("Folder") as HTMLSelectElement
+    expect(select).toHaveValue("f-gone")
+    expect(select.selectedOptions[0].textContent).toBe("/Archive/Old")
+  })
+})
+
+describe("275-REVIEW F-WR-09 — Keep for is a whole number, never silently coerced", () => {
+  it.each(["0", "1.5", "1e2", ""])("'%s' is refused inline and nothing is previewed", async (raw) => {
+    render(<RetentionPolicyEditor policy={null} onBack={vi.fn()} onSaved={vi.fn()} />)
+    await userEvent.type(screen.getByLabelText("Name"), "Lifecycle")
+    await userEvent.selectOptions(screen.getByLabelText("Folder"), "f-fin")
+    // Set the raw value as a browser would hold it (`type=number` accepts "1e2" and "1.5").
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Keep for" }), { target: { value: raw } })
+    expect(screen.getByRole("spinbutton", { name: "Keep for" })).toHaveValue(raw === "" ? null : Number(raw))
+    await userEvent.click(preview())
+    expect(screen.getByText("Enter a whole number from 1 to 10000.")).toBeInTheDocument()
+    expect(m.previewPolicy).not.toHaveBeenCalled()
+  })
+
+  it("the second stage's number is held to the same rule", async () => {
+    render(<RetentionPolicyEditor policy={null} onBack={vi.fn()} onSaved={vi.fn()} />)
+    await userEvent.type(screen.getByLabelText("Name"), "Lifecycle")
+    await userEvent.selectOptions(screen.getByLabelText("Folder"), "f-fin")
+    await userEvent.click(screen.getByLabelText("Then queue it for deletion"))
+    const later = screen.getByRole("spinbutton", { name: "Then queue it for deletion" })
+    await userEvent.clear(later)
+    await userEvent.type(later, "2.5")
+    await userEvent.click(preview())
+    expect(screen.getByText("Enter a whole number from 1 to 10000.")).toBeInTheDocument()
+    expect(m.previewPolicy).not.toHaveBeenCalled()
+  })
+
+  it("a whole number is sent exactly as typed", async () => {
+    render(<RetentionPolicyEditor policy={null} onBack={vi.fn()} onSaved={vi.fn()} />)
+    await userEvent.type(screen.getByLabelText("Name"), "Lifecycle")
+    await userEvent.selectOptions(screen.getByLabelText("Folder"), "f-fin")
+    const keep = screen.getByRole("spinbutton", { name: "Keep for" })
+    await userEvent.clear(keep)
+    await userEvent.type(keep, "12")
+    await userEvent.click(preview())
+    await waitFor(() => expect(m.previewPolicy).toHaveBeenCalledWith(expect.objectContaining({ stage1_value: 12 }), null))
   })
 })
 

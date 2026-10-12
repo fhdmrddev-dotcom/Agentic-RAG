@@ -82,6 +82,22 @@ const ACTION_NOTE: Record<RetentionAction, string> = {
 /** Approximate length in days, only to catch an obviously-wrong second stage before the server does. */
 const APPROX_DAYS: Record<RetentionUnit, number> = { days: 1, months: 30.44, years: 365.25 }
 
+/** The server's own range for a stage value (`models/retention.py`: `ge=1, le=10000`). */
+const MAX_STAGE_VALUE = 10000
+
+/**
+ * 275-REVIEW F-WR-09: a stage value is a WHOLE number typed as digits — never coerced. `""`, `0`,
+ * `-3`, `1.5` and `1e2` (which `type=number` accepts) are refused with a visible message instead of
+ * quietly becoming 1 while the field still shows what was typed. An invalid value maps to 0, which
+ * `validate` refuses, so it can never reach Preview or Save.
+ */
+function wholeNumber(raw: string): number {
+  const t = raw.trim()
+  if (!/^\d+$/.test(t)) return 0
+  const n = Number(t)
+  return n >= 1 && n <= MAX_STAGE_VALUE ? n : 0
+}
+
 interface FormState {
   name: string
   type: string
@@ -120,10 +136,10 @@ function draftOf(f: FormState): PolicyDraft {
     folder_id: f.folder || null,
     include_subfolders: f.subfolders,
     clock: f.clock,
-    stage1_value: Math.max(1, parseInt(f.value, 10) || 1),
+    stage1_value: wholeNumber(f.value),
     stage1_unit: f.unit,
     stage1_action: f.action,
-    stage2_value: later ? Math.max(1, parseInt(f.laterValue, 10) || 1) : null,
+    stage2_value: later ? wholeNumber(f.laterValue) : null,
     stage2_unit: later ? f.laterUnit : null,
   }
 }
@@ -131,6 +147,8 @@ function draftOf(f: FormState): PolicyDraft {
 interface Errors {
   name?: string
   scope?: string
+  value?: string
+  laterValue?: string
   later?: string
 }
 
@@ -138,7 +156,9 @@ function validate(d: PolicyDraft): Errors {
   const e: Errors = {}
   if (!d.name) e.name = C.contract.nameRequired
   if (!d.folder_id && !d.document_type_norm) e.scope = C.contract.scopeRequired
-  if (d.stage2_value != null && d.stage2_unit) {
+  if (d.stage1_value < 1) e.value = C.contract.wholeNumber
+  if (d.stage2_value != null && d.stage2_value < 1) e.laterValue = C.contract.wholeNumber
+  if (!e.value && !e.laterValue && d.stage2_value != null && d.stage2_unit) {
     const one = d.stage1_value * APPROX_DAYS[d.stage1_unit]
     const two = d.stage2_value * APPROX_DAYS[d.stage2_unit]
     if (two <= one) e.later = C.contract.stage2After
@@ -146,7 +166,8 @@ function validate(d: PolicyDraft): Errors {
   return e
 }
 
-const typeLabel = (t: DocumentTypeCount) => `${t.value.charAt(0).toUpperCase()}${t.value.slice(1)} (${t.count})`
+const typeName = (v: string) => `${v.charAt(0).toUpperCase()}${v.slice(1)}`
+const typeLabel = (t: DocumentTypeCount) => `${typeName(t.value)} (${t.count})`
 
 export function RetentionPolicyEditor({
   policy,
@@ -214,7 +235,7 @@ export function RetentionPolicyEditor({
   async function runPreview() {
     const e = validate(draft)
     setErrors(e)
-    if (e.name || e.scope || e.later) return
+    if (Object.values(e).some(Boolean)) return
     setPreviewing(true)
     setPreviewFailed(null)
     const key = draftKey
@@ -277,6 +298,14 @@ export function RetentionPolicyEditor({
 
   const typeDisabled = form.folder !== ""
   const folderDisabled = form.type !== ""
+  // 275-REVIEW F-WR-08: a stored value with no option in the live list (still loading, a failed
+  // load, a type outside the top 50 or with no current documents, a folder this list lacks) is
+  // still the policy's scope. It renders as its own option, so the select can never DISPLAY
+  // "Any type" / "Any folder" while Preview and Save carry the hidden value.
+  const storedTypeMissing = form.type !== "" && !types.some((t) => t.value === form.type)
+  const storedFolderMissing = form.folder !== "" && !folderOptions.some((f) => f.id === form.folder)
+  const storedFolderLabel =
+    policy && policy.folder_id === form.folder && policy.folder_path ? policy.folder_path : form.folder
 
   return (
     <div className="grid gap-4">
@@ -313,6 +342,7 @@ export function RetentionPolicyEditor({
               onChange={(e) => set("type", e.target.value)}
             >
               <option value="">{C.ported.anyType}</option>
+              {storedTypeMissing && <option value={form.type}>{typeName(form.type)}</option>}
               {types.map((t) => (
                 <option key={t.value} value={t.value}>
                   {typeLabel(t)}
@@ -333,6 +363,7 @@ export function RetentionPolicyEditor({
                   onChange={(e) => set("folder", e.target.value)}
                 >
                   <option value="">{C.ported.anyFolder}</option>
+                  {storedFolderMissing && <option value={form.folder}>{storedFolderLabel}</option>}
                   {folderOptions.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.path}
@@ -359,27 +390,31 @@ export function RetentionPolicyEditor({
             <Label htmlFor="rp-value" className="text-sm font-normal">
               {C.ported.labelKeepFor}
             </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="rp-value"
-                type="number"
-                min={1}
-                className="w-24"
-                value={form.value}
-                onChange={(e) => set("value", e.target.value)}
-              />
-              <select
-                aria-label={C.ported.labelKeepFor}
-                className={cn(SELECT_CLASS, "w-32")}
-                value={form.unit}
-                onChange={(e) => set("unit", e.target.value as RetentionUnit)}
-              >
-                {UNITS.map((u) => (
-                  <option key={u.value} value={u.value}>
-                    {u.label}
-                  </option>
-                ))}
-              </select>
+            <div className="grid gap-1">
+              <div className="flex items-center gap-2">
+                <Input
+                  id="rp-value"
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="w-24"
+                  value={form.value}
+                  onChange={(e) => set("value", e.target.value)}
+                />
+                <select
+                  aria-label={C.ported.labelKeepFor}
+                  className={cn(SELECT_CLASS, "w-32")}
+                  value={form.unit}
+                  onChange={(e) => set("unit", e.target.value as RetentionUnit)}
+                >
+                  {UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {errors.value && <p className={cn("text-xs", AMBER_TEXT_CLASS)}>{errors.value}</p>}
             </div>
 
             <Label htmlFor="rp-clock" className="text-sm font-normal">
@@ -433,6 +468,7 @@ export function RetentionPolicyEditor({
                         <Input
                           type="number"
                           min={1}
+                          step={1}
                           aria-label={C.contract.thenQueue}
                           className="w-24"
                           value={form.laterValue}
@@ -455,6 +491,9 @@ export function RetentionPolicyEditor({
                     )}
                   </div>
                   {form.later && <p className="text-xs text-muted-foreground">{C.contract.stage2Helper}</p>}
+                  {form.later && errors.laterValue && (
+                    <p className={cn("text-xs", AMBER_TEXT_CLASS)}>{errors.laterValue}</p>
+                  )}
                   {errors.later && <p className={cn("text-xs", AMBER_TEXT_CLASS)}>{errors.later}</p>}
                 </div>
               </>
