@@ -910,17 +910,21 @@ export function LibraryPage({
             {lead}
             {!findSlots && filterBarEl}
             <div data-testid="documents-doclist">
-              <DocumentList
-                documents={pagedDocuments}
-                onDelete={deleteDoc}
-                onRefresh={loadDocuments}
-                folderId={listFolderId}
-                currentUserId={user?.id ?? ""}
-                onSelect={setSelectedDocId}
-                selectedDocId={selectedDocId}
-                folders={folders}
-                retention={retention}
-              />
+              {/* 275-05 (S9): every row hidden as archived → the hidden line below says so; the
+                  list's "No documents in this folder" would claim an emptiness that is not true. */}
+              {!(filteredDocs === null && listDocuments.length === 0 && archived.archivedCount > 0) && (
+                <DocumentList
+                  documents={pagedDocuments}
+                  onDelete={deleteDoc}
+                  onRefresh={loadDocuments}
+                  folderId={listFolderId}
+                  currentUserId={user?.id ?? ""}
+                  onSelect={setSelectedDocId}
+                  selectedDocId={selectedDocId}
+                  folders={folders}
+                  retention={retention}
+                />
+              )}
             </div>
             {filteredDocs === null && (
               <ArchivedHiddenLine
