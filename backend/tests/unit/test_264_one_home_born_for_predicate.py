@@ -535,6 +535,14 @@ def test_the_one_home_carries_exactly_one_of_each_encoding():
 @pytest.mark.parametrize("rel", _MUST_BE_SILENT)
 def test_the_four_consumer_modules_encode_the_rule_nowhere(rel: str):
     """Named explicitly so a failure says WHICH consumer grew a second copy."""
+    # Phase 278 (D-08) ANCHOR — an absence check over a missing or empty file passes vacuously;
+    # each listed consumer must exist and still hold code.
+    path = APP_DIR / rel
+    assert path.is_file(), f"ANCHOR: {rel} does not exist — repoint _MUST_BE_SILENT"
+    assert any(
+        isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        for n in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+    ), f"ANCHOR: {rel} holds no function — repoint _MUST_BE_SILENT at the code it fences"
     dsl, rows = _encoding_sites(APP_DIR / rel)
     assert (dsl, rows) == (0, 0), (
         f"{rel} encodes the born-for rule (dsl={dsl}, row={rows}) — it must delegate "

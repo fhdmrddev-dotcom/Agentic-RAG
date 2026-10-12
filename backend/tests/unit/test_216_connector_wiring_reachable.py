@@ -26,6 +26,9 @@ import pytest
 
 AGENT_LOOP = Path(__file__).resolve().parents[2] / "app" / "services" / "agent_loop.py"
 WIRING_CALL = "build_chat_tools_for_connectors"
+# Phase 278 (D-07 / D-08): the file holding the connector chat tool's list_connections call,
+# hoisted so the dispatcher split edits THIS line and never an assert.
+_CONNECTOR_TOOL_FILE = AGENT_LOOP.parent / "tool_dispatcher.py"
 
 
 def _parents(tree: ast.AST) -> dict[ast.AST, ast.AST]:
@@ -143,9 +146,15 @@ def test_list_connections_call_site_matches_the_callee_signature():
 @pytest.mark.parametrize("dispatcher_call", ["list_connections"])
 def test_dispatcher_call_site_also_matches_the_signature(dispatcher_call):
     """The same agreement, on the execution half of the feature."""
-    dispatcher = AGENT_LOOP.parent / "tool_dispatcher.py"
+    dispatcher = _CONNECTOR_TOOL_FILE
     tree = ast.parse(dispatcher.read_text(encoding="utf-8"))
-    for site in _call_sites(tree, dispatcher_call):
+    sites = _call_sites(tree, dispatcher_call)
+    # Phase 278 (D-08) ANCHOR — an absence check over a file with NO call site passes vacuously.
+    assert sites, (
+        f"ANCHOR: no {dispatcher_call} call site in {dispatcher.name} — the connector chat tool "
+        "moved; repoint _CONNECTOR_TOOL_FILE at the file that now holds it"
+    )
+    for site in sites:
         kwargs = {kw.arg for kw in site.keywords}
         assert "user_id" not in kwargs, (
             f"{dispatcher.name}:{site.lineno} passes user_id to {dispatcher_call}, "

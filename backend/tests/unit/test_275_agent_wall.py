@@ -40,6 +40,20 @@ FOLDER = "66666666-6666-4666-8666-666666666666"
 BACKEND = Path(__file__).resolve().parents[2]
 APP = BACKEND / "app"
 
+# Phase 278 (D-07 / D-08): the source fences below name the files they scan in THESE constants, so
+# the dispatcher split edits constant lines only — never an assert.
+# The callers of `_fetch_owned_document_bytes` (fetch_document_file + the attach_skill_file source
+# resolver) — documents.py + skills.py after the split.
+_FETCH_CALLER_FILES = (APP / "services" / "tool_dispatcher.py",)
+# The one file that passes `retrievable_only=True` (2 resolve_filter legs + 1 relationships).
+_AGENT_WALL_FILE = "services/tool_dispatcher.py"
+# (file, anchor it must hold) for the never-retype-the-column fence.
+_COLUMN_FENCE_FILES = (
+    ("services/retention/agent_wall.py", "RETRIEVABLE_COLUMN"),
+    ("services/tool_dispatcher.py", "unretrievable"),
+    ("api/kb.py", "RETRIEVABLE_COLUMN"),
+)
+
 
 def _run(coro):
     return asyncio.run(coro)
@@ -209,14 +223,22 @@ def test_the_byte_path_behind_fetch_document_file_and_attach_skill_file_refuses(
 
 
 def test_both_byte_tools_reach_the_walled_resolver():
-    src = (APP / "services" / "tool_dispatcher.py").read_text(encoding="utf-8")
-    tree = ast.parse(src)
     callers = set()
-    for fn in ast.walk(tree):
-        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            for n in ast.walk(fn):
-                if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "_fetch_owned_document_bytes":
-                    callers.add(fn.name)
+    resolver_defs = 0
+    for path in _FETCH_CALLER_FILES:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        file_callers = set()
+        for fn in ast.walk(tree):
+            if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if fn.name == "_fetch_owned_document_bytes":
+                    resolver_defs += 1
+                for n in ast.walk(fn):
+                    if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "_fetch_owned_document_bytes":
+                        file_callers.add(fn.name)
+        # Phase 278 (D-08) ANCHOR — each listed file must hold at least one caller.
+        assert file_callers, f"ANCHOR: no _fetch_owned_document_bytes caller in {path.name}"
+        callers |= file_callers
+    assert resolver_defs == 1, f"ANCHOR: _fetch_owned_document_bytes defined {resolver_defs} times"
     assert "_handle_fetch_document_file" in callers
     assert len(callers) >= 2, callers  # fetch_document_file + the attach_skill_file source resolver
 
@@ -458,7 +480,7 @@ def test_retrievable_only_true_is_passed_by_the_agent_handlers_only():
         n = len(re.findall(r"retrievable_only\s*=\s*True", text))
         if n:
             hits[path.relative_to(APP).as_posix()] = n
-    assert hits == {"services/tool_dispatcher.py": 3}, hits  # 2 resolve_filter legs + 1 relationships
+    assert hits == {_AGENT_WALL_FILE: 3}, hits  # 2 resolve_filter legs + 1 relationships
 
 
 def test_the_library_routes_never_name_the_keyword():
@@ -480,5 +502,8 @@ def test_the_shared_cores_default_the_keyword_to_false():
 
 
 def test_the_column_name_is_imported_never_retyped():
-    for rel in ("services/retention/agent_wall.py", "services/tool_dispatcher.py", "api/kb.py"):
-        assert '"retrievable"' not in (APP / rel).read_text(encoding="utf-8"), rel
+    for rel, anchor in _COLUMN_FENCE_FILES:
+        text = (APP / rel).read_text(encoding="utf-8")
+        # Phase 278 (D-08) ANCHOR — an absence check over a file the wall code left passes vacuously.
+        assert anchor in text, f"ANCHOR: {rel} no longer holds {anchor!r} — repoint _COLUMN_FENCE_FILES"
+        assert '"retrievable"' not in text, rel
