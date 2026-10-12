@@ -43,6 +43,36 @@ findings:
   info: 10
   total: 24
 status: issues_found
+fix_pass:
+  fixed_at: 2026-10-12
+  fixer: Claude (gsd-code-fixer, frontend)
+  status: all_fixed  # 2/2 critical, 12/12 warning; info 6 fixed, 3 partially fixed, 1 recorded
+  base: 4ecaa3267
+fix_status:
+  CR-01: "fixed in ca9542133"
+  CR-02: "fixed in 221b6b494"
+  WR-01: "fixed in 57a9682c2 (+ c5a09edc2, lint-only refactor)"
+  WR-02: "fixed in 145892d12"
+  WR-03: "fixed in 01d80bfdc (+ c5a09edc2, lint-only refactor)"
+  WR-04: "fixed in 7985b72d8"
+  WR-05: "fixed in 307c3fcde"
+  WR-06: "fixed in 7c37dcad7"
+  WR-07: "fixed in 7c37dcad7"
+  WR-08: "fixed in 8a45eb45a"
+  WR-09: "fixed in 8a45eb45a"
+  WR-10: "fixed in c9c598381"
+  WR-11: "fixed in 4c687b0c9"
+  WR-12: "fixed in 42b814584 (cursor by server rows + de-dupe by id; a keyset cursor would need a backend change)"
+  IN-01: "fixed in 8e58a187c"
+  IN-02: "skipped: not trivial. refusal.ts deliberately does not subclass ApiError (its header records two suites going red at mount when it did), so merging the parsers and restoring the 401 latch touches every delete/purge client and their mocks. Recorded."
+  IN-03: "fixed in 62459d1a0"
+  IN-04: "fixed in 62459d1a0"
+  IN-05: "fixed in 90706571c"
+  IN-06: "partially fixed in 81a1254c3 (former member, admin hold sentence, sub line waits for the cadence); the '0 on legal hold ()' skipped-note case is recorded — it needs the sketch-fenced skippedNote sentence split into halves"
+  IN-07: "partially fixed in 81a1254c3 ((s) resolved on the template); escaping `**` inside values is recorded (RichCopy has no escape syntax today)"
+  IN-08: "partially fixed in 81a1254c3 (Space on policy rows; aria-controls only on the rendered panel); listbox arrow keys / aria-activedescendant and aria-describedby/aria-invalid on inline errors are recorded"
+  IN-09: "fixed in 81a1254c3"
+  IN-10: "fixed in 8e58a187c"
 ---
 
 # Phase 275: Code Review Report (frontend)
@@ -70,6 +100,8 @@ I traced the eight priority checks against the code and, where a finding depende
 ## Critical Issues
 
 ### CR-01: Reload re-mounts batch cards before the new queue arrives, so new rows start unticked and are submitted as "kept"
+
+**Fix status:** fixed in ca9542133
 
 **File:** `frontend/src/components/retention/WaitingForYou.tsx:56-59, 81-83`; `frontend/src/components/retention/DeleteBatchCard.tsx:228-239, 281-291`
 
@@ -105,6 +137,8 @@ const isTicked = (id: string) => ticked[id] !== false
 
 ### CR-02: Release and Remove failures replace the server's refusal with a sentence that contradicts it
 
+**Fix status:** fixed in 221b6b494
+
 **File:** `frontend/src/components/retention/ReleaseHoldDialog.tsx:53-66, 95-99`; `frontend/src/components/retention/RetentionPolicyEditor.tsx:254-265, 517-521`
 
 **Issue:** `releaseHold` returns **409 "This hold is already released."** when another admin released the hold first (`retention.py:544, 551`). The `catch {}` discards the `ApiRefusal` and shows `Couldn't release the hold. It is still in force.`
@@ -131,6 +165,8 @@ Priority check 3 requires refusals to be shown and never swallowed. Here they ar
 
 ### WR-01: Batch confirm swallows every refusal and claims deletes may have run when the server wrote nothing
 
+**Fix status:** fixed in 57a9682c2 (+ c5a09edc2, lint-only refactor)
+
 **File:** `frontend/src/components/retention/DeleteBatchCard.tsx:241-253`; `frontend/src/components/retention/ReviewBatchCard.tsx:47-65`
 
 **Issue:** `confirm_batch` refuses **before any write** in each of these cases:
@@ -145,6 +181,8 @@ All of them render `Couldn't confirm the batch. Some documents may already be de
 - Keep `confirmFailed` only for network errors or 5xx without a refusal, where partial work is genuinely possible.
 
 ### WR-02: The hold typeahead offers documents from other orgs, and the resulting 422 is swallowed
+
+**Fix status:** fixed in 145892d12
 
 **File:** `frontend/src/components/retention/LegalHoldDialog.tsx:109-115, 165-178`
 
@@ -162,6 +200,8 @@ The admin cannot tell which pick is wrong.
 
 ### WR-03: The result banner hides documents the admin approved that were not deleted
 
+**Fix status:** fixed in 01d80bfdc (+ c5a09edc2, lint-only refactor)
+
 **File:** `frontend/src/components/retention/DeleteBatchCard.tsx:161-205`
 
 **Issue:** `ConfirmResult` carries `did_not_delete` with `reason: "changed"` (`disposition.py:496, 538`), plus `not_found` and `skipped`. The banner reports only `deleted`, `archived`, `kept` and the `held` subset of `did_not_delete`.
@@ -171,6 +211,8 @@ Example: an admin types 5. Two documents were edited since the sweep. The banner
 **Fix:** Add a clause for `did_not_delete.filter(r => r.reason !== "held")`, `not_found` and `skipped`, for example "Not deleted: {names}: changed since the sweep." Do not render the green "Done" chip when every requested action was dropped.
 
 ### WR-04: The posture line says "finished, nothing failed" while a sweep is running or has crashed
+
+**Fix status:** fixed in 7985b72d8
 
 **File:** `frontend/src/components/retention/RetentionTab.tsx:31, 56-73`
 
@@ -185,6 +227,8 @@ if (summary.last_status !== "ok") { /* amber, not healthy */ }
 
 ### WR-05: The release confirm can understate how many documents lose protection
 
+**Fix status:** fixed in 307c3fcde
+
 **File:** `frontend/src/components/retention/ReleaseHoldDialog.tsx:51, 84`
 
 **Issue:** `n = hold.held_today ?? hold.document_count`. `held_today` is null exactly when the server could not count, and `document_count` counts only directly picked documents, not folder coverage. A folder-only hold whose count failed therefore reads **"0 documents will no longer be protected."** on the victim-naming confirm (066).
@@ -194,6 +238,8 @@ The UI-SPEC rule is "a count that cannot be computed reads `Couldn't count the d
 **Fix:** When `held_today` is null, render the countFailed sentence instead of a number. Never substitute `document_count`.
 
 ### WR-06: An Un-archive in flight writes its receipt onto whichever document is open when it resolves
+
+**Fix status:** fixed in 7c37dcad7
 
 **File:** `frontend/src/components/retention/RetentionSection.tsx:88-104`
 
@@ -215,6 +261,8 @@ Alternatively, key the section by `doc.id` in `DocumentDetailPanel`.
 
 ### WR-07: A held, archived document hides both its archived state and Un-archive, though the server allows it
 
+**Fix status:** fixed in 7c37dcad7
+
 **File:** `frontend/src/components/retention/RetentionSection.tsx:131-139, 159`
 
 **Issue:** The server returns `can_unarchive = can_manage and archived`, regardless of holds (`retention.py:787`), and `unarchive_family` does not refuse held documents. A hold stops **deletion only** (D-16).
@@ -226,6 +274,8 @@ The client adds `&& !state.held` and replaces the whole sentence with the hold l
 **Fix:** Drop `!state.held` from the button condition. When `state.archived`, render the archived sentence beneath the hold line.
 
 ### WR-08: The editor shows "Any type" / "Any folder" while the draft holds a specific scope
+
+**Fix status:** fixed in 8a45eb45a
 
 **File:** `frontend/src/components/retention/RetentionPolicyEditor.tsx:99-104, 297-330`
 
@@ -241,6 +291,8 @@ The visible scope of a policy that can queue deletions then differs from the sco
 
 ### WR-09: "Keep for" values are silently coerced to 1
 
+**Fix status:** fixed in 8a45eb45a
+
 **File:** `frontend/src/components/retention/RetentionPolicyEditor.tsx:123, 126`
 
 **Issue:** `Math.max(1, parseInt(f.value, 10) || 1)` turns `""`, `"0"` and `"-3"` into 1, `"1.5"` into 1, and `"1e2"` (which `type=number` accepts) into **1**, not 100. The field keeps showing what the admin typed, while Preview and Save run a different retention period. Nothing in Preview restates the period, so the mismatch is invisible.
@@ -248,6 +300,8 @@ The visible scope of a policy that can queue deletions then differs from the sco
 **Fix:** Validate in `validate()`: require `/^\d+$/` and a value of at least 1, with an inline error (e.g. "Enter a whole number of 1 or more."). Block Preview on it instead of coercing.
 
 ### WR-10: An org switch leaves the Retention tab showing the previous org's data while writes go to the new org
+
+**Fix status:** fixed in c9c598381
 
 **File:** `frontend/src/components/org/OrgAdminShell.tsx:436-437`; `frontend/src/components/retention/RetentionTab.tsx:105-111`
 
@@ -264,6 +318,8 @@ The server prevents any cross-org effect, but the screen is wrong and its failur
 
 ### WR-11: Saved views and ad-hoc filters always include archived documents, ignoring Include archived
 
+**Fix status:** fixed in 4c687b0c9
+
 **File:** `frontend/src/pages/LibraryPage.tsx:666`
 
 **Issue:** `splitArchived(folderScopedDocuments, filteredDocs !== null || find.include_archived)` forces `include=true` for any filter or view resolve. The view resolve does not filter `archived_at` server-side either (no archived predicate outside `document_search_service.py` / retention).
@@ -273,6 +329,8 @@ So with Include archived **off**, a saved view lists archived documents mixed in
 **Fix:** Apply the same split to `filteredDocs` (`splitArchived(filteredDocs, find.include_archived)`) and render `ArchivedHiddenLine` for views too. Alternatively, pass `include_archived` to the resolve.
 
 ### WR-12: History pages by offset over a list that grows at the top
+
+**Fix status:** fixed in 42b814584 (cursor by server rows + de-dupe by id; a keyset cursor would need a backend change)
 
 **File:** `frontend/src/components/retention/RetentionHistory.tsx:108-121, 172`
 
@@ -286,6 +344,8 @@ Duplicate `r.id` values hit `key={r.id}`. React warns, and the list can render o
 
 ### IN-01: The locked Save button looks enabled
 
+**Fix status:** fixed in 8e58a187c
+
 **File:** `frontend/src/components/retention/RetentionPolicyEditor.tsx:482-495`
 
 **Issue:** Save uses `aria-disabled` only, but the button's disabled styling is keyed to `disabled:` (`button.tsx:8`), so a locked Save looks active. Also, the "Preview first…" reason line renders while `saving` is true, which states the wrong reason.
@@ -293,6 +353,8 @@ Duplicate `r.id` values hit `key={r.id}`. React warns, and the list can render o
 **Fix:** Add `aria-disabled:opacity-50 aria-disabled:cursor-not-allowed`, and compute the reason line from `preview === null || stale` only.
 
 ### IN-02: Two copies of the refusal parser
+
+**Fix status:** skipped: not trivial. refusal.ts deliberately does not subclass ApiError (its header records two suites going red at mount when it did), so merging the parsers and restoring the 401 latch touches every delete/purge client and their mocks. Recorded.
 
 **File:** `frontend/src/lib/api/retention.ts:321-338` vs `frontend/src/lib/api/refusal.ts:37-50`
 
@@ -302,6 +364,8 @@ Duplicate `r.id` values hit `key={r.id}`. React warns, and the list can render o
 
 ### IN-03: DocumentList's delete dialog keeps a stale error and an unchanged title in refusal mode
 
+**Fix status:** fixed in 62459d1a0
+
 **File:** `frontend/src/components/ingestion/DocumentList.tsx:150-155, 275-288`
 
 **Issue:** A 409 refusal does not clear `deleteError`, so a retry after a network failure shows "Delete failed. Please try again." above the hold refusal. The refusal's Close closes the dialog through state rather than `onOpenChange`, so `deleteError` survives into the next delete dialog. In refusal mode, the dialog title and description still read "Permanently delete … This action cannot be undone."
@@ -309,6 +373,8 @@ Duplicate `r.id` values hit `key={r.id}`. React warns, and the list can render o
 **Fix:** Call `setDeleteError(null)` in both refusal paths, and swap the description when `refusal` is set.
 
 ### IN-04: The folder confirm has no busy state now that it stays open during the request
+
+**Fix status:** fixed in 62459d1a0
 
 **File:** `frontend/src/components/ingestion/FolderNode.tsx:99-106, 241-247`; `FolderTree.tsx:92-101`
 
@@ -318,6 +384,8 @@ Duplicate `r.id` values hit `key={r.id}`. React warns, and the list can render o
 
 ### IN-05: LegalHoldDialog shows a stale count and can be closed by an earlier request
 
+**Fix status:** fixed in 90706571c
+
 **File:** `frontend/src/components/retention/LegalHoldDialog.tsx:122-138, 171-173`
 
 **Issue:** While a recount is in flight, the line shows the **previous** selection's number, because `count` is not reset when the dependencies change. Separately, closing the dialog during a submit and reopening it lets the first request's `onClose()` close the new dialog.
@@ -325,6 +393,8 @@ Duplicate `r.id` values hit `key={r.id}`. React warns, and the list can render o
 **Fix:** Call `setCount(null)` at the top of the effect, and ignore the completion of a request whose open-generation is stale.
 
 ### IN-06: Copy edges
+
+**Fix status:** partially fixed in 81a1254c3 (former member, admin hold sentence, sub line waits for the cadence); the '0 on legal hold ()' skipped-note case is recorded — it needs the sketch-fenced skippedNote sentence split into halves
 
 **Files and fixes:**
 - `RetentionSection.tsx:65, 71` (`kept_by ?? "not recorded"`) renders "Kept by not recorded on…". Use `C.contract.formerMember`.
@@ -334,6 +404,8 @@ Duplicate `r.id` values hit `key={r.id}`. React warns, and the list can render o
 
 ### IN-07: `fillCopy` resolves `(s)` after substitution
 
+**Fix status:** partially fixed in 81a1254c3 ((s) resolved on the template); escaping `**` inside values is recorded (RichCopy has no escape syntax today)
+
 **File:** `frontend/src/components/retention/retentionCopy.ts:366-374`
 
 **Issue:** Because `(s)` is resolved after the values are substituted, a document or matter name containing `(s)` is rewritten (e.g. `Invoice(s).pdf` becomes `Invoices.pdf`). A name containing `**` is split into bold runs by `RichCopy`.
@@ -341,6 +413,8 @@ Duplicate `r.id` values hit `key={r.id}`. React warns, and the list can render o
 **Fix:** Resolve `(s)` on the template before substitution, and escape `**` in values.
 
 ### IN-08: Accessibility gaps
+
+**Fix status:** partially fixed in 81a1254c3 (Space on policy rows; aria-controls only on the rendered panel); listbox arrow keys / aria-activedescendant and aria-describedby/aria-invalid on inline errors are recorded
 
 **Issue:**
 - `aria-controls` on the inactive sub-tabs points at panel ids that do not exist (`RetentionTab.tsx:186, 213`).
@@ -352,6 +426,8 @@ Duplicate `r.id` values hit `key={r.id}`. React warns, and the list can render o
 
 ### IN-09: The focus-return effect steals focus
 
+**Fix status:** fixed in 81a1254c3
+
 **File:** `frontend/src/components/retention/RetentionPolicies.tsx:99-103`
 
 **Issue:** The effect depends on `list`, so every reload ("Try again", or a post-save reload) refocuses the last-opened row even after the person has moved on.
@@ -360,11 +436,101 @@ Duplicate `r.id` values hit `key={r.id}`. React warns, and the list can render o
 
 ### IN-10: Remove policy has no busy guard
 
+**Fix status:** fixed in 8e58a187c
+
 **File:** `frontend/src/components/retention/RetentionPolicyEditor.tsx:254-265, 524-526`
 
 **Issue:** A double click sends two DELETEs. The second 404s and is masked only because the editor unmounts first.
 
 **Fix:** Track `removing` and disable the button while it is set.
+
+
+## Fix pass (2026-10-12)
+
+Main working tree, `develop`, base `4ecaa3267` (the backend fixer's last commit). Every fix got a vitest
+case FIRST, shown red for the reviewer's reason, then green. Commits are by path; nothing outside the
+retention frontend, the four Library/Org mounts and the count-gate pins was touched. **No backend code
+changed.**
+
+| Finding | Outcome | Commit | Test (red → green) |
+|---|---|---|---|
+| F-CR-01 | fixed | `ca9542133` | `WaitingForYou.test.tsx` › `275-REVIEW F-CR-01` (2): a row arriving on Reload starts ticked and is never in `keep_ids`; a row-set change resets the count |
+| F-CR-02 | fixed | `221b6b494` | `LegalHolds.test.tsx` (409 release) · `RetentionPolicyEditor.test.tsx` (404 remove) |
+| F-WR-01 | fixed | `57a9682c2` | `WaitingForYou.test.tsx` › 422 / 404 / 503 (it.each), 5xx keeps partial-work copy, review-card refusal |
+| F-WR-02 | fixed | `145892d12` | `LegalHolds.test.tsx` › active-org filter, 500-id chunking, check failure offers nothing, 422 rendered, 409 re-reads |
+| F-WR-03 | fixed | `01d80bfdc` | `WaitingForYou.test.tsx` › every clause (changed, gone, failed, `bytes_not_removed`); no green Done / no "Deleted 0" when all dropped |
+| F-WR-04 | fixed | `7985b72d8` | `RetentionTab.test.tsx` › `running` (with / without a previous run) and an unknown status |
+| F-WR-05 | fixed | `307c3fcde` | `LegalHolds.test.tsx` › uncountable hold states no number |
+| F-WR-06 | fixed | `7c37dcad7` | `RetentionSection.test.tsx` › success / failure after switching documents |
+| F-WR-07 | fixed | `7c37dcad7` | `RetentionSection.test.tsx` › held + archived, admin and member |
+| F-WR-08 | fixed | `8a45eb45a` | `RetentionPolicyEditor.test.tsx` › type outside the list, type list loading, folder outside the list |
+| F-WR-09 | fixed | `8a45eb45a` | `RetentionPolicyEditor.test.tsx` › `0` / `1.5` / `1e2` / blank refused; second stage; whole number sent exactly |
+| F-WR-10 | fixed | `c9c598381` | `OrgAdminShell.test.tsx` › an org switch remounts the tab |
+| F-WR-11 | fixed | `4c687b0c9` | `libraryRetention.test.tsx` › a saved view hides its archived row with the same hidden line |
+| F-WR-12 | fixed | `42b814584` | `RetentionHistory.test.tsx` › a shifted window shows no duplicate and the cursor advances by server rows |
+| IN-01 / IN-10 | fixed | `8e58a187c` | `RetentionPolicyEditor.test.tsx` |
+| IN-03 / IN-04 | fixed | `62459d1a0` | `holdRefusals.test.tsx` |
+| IN-05 | fixed | `90706571c` | `LegalHolds.test.tsx` (proved red by swapping the committed component back in) |
+| IN-06 / IN-07 / IN-08 / IN-09 | partly fixed | `81a1254c3` | `RetentionTab.test.tsx`, `RetentionSection.test.tsx`, `retentionCopy.test.ts` |
+| IN-02 | recorded | — | — |
+| (lint) | refactor | `c5a09edc2` | the F-WR-01/03 helpers had made `DeleteBatchCard.tsx` export non-components (`react-refresh/only-export-components`); moved, no behaviour change |
+| (pins) | re-pinned | `604627199` | ten suites, each increase = cases added here; none decreased |
+
+**Decisions taken (recorded, not asked):**
+
+- **New copy has a fenced home.** The UI-SPEC had no words for six of these states. They were added to a
+  dated addendum, `275-UI-SPEC.md` › *Review fix pass — copy the contract lacked*, and `retentionCopy.ts`
+  fences them like every other string (contract 78 → 84, spec templates 36 → 40). Nothing above the
+  addendum was re-worded. Where the server sends its own sentence (any 4xx), the door renders **that**.
+- **F-CR-02 / F-WR-02: a refusal re-reads but never pulses the band.** `onStale` re-reads the list; only a
+  write this person made calls `onRecorded`. A 409 release leaves only `Close`; a 404 remove offers only
+  `Back to policies`.
+- **F-WR-01: what counts as "nothing was written".** Any 4xx, and a 503 that carries the server's own
+  sentence (`LOAD_INCOMPLETE`). The rule lives in the API client (`isPreWriteRefusal`). A 5xx, a network
+  error, or a 503 with no server sentence keeps `…Some documents may already be deleted…`.
+- **F-WR-02: no backend change.** `GET /documents` is owner-scoped and `DocumentResponse` has no `org_id`.
+  `POST /retention/document-states` already reads the requested ids through RLS **filtered to the active
+  org**, so the picker keeps exactly the ids it answers for (chunks of the 500 cap, once per dialog open).
+  ⚠ That is one org snapshot per 500 documents per open — acceptable for an admin dialog; if an org's
+  document count makes it slow, an `org_id` on `DocumentResponse` is the cheaper route (additive, but it
+  changes the public OpenAPI schema).
+- **F-WR-03: `failed` and `bytes_not_removed` are now rendered** (the backend's B-WR-04 owed UI). Both are
+  optional on the type so an older server still parses.
+- **F-WR-04: no crash detection without a backend field.** The summary carries no lease, so a crashed
+  `running` cannot be told from a live one. Both read `The latest sweep has not finished, so there is no
+  result for it yet.` in amber — true in either case — instead of guessing.
+- **F-WR-09:** the range is the server's own (`1..10000`), so the inline message and a 422 agree.
+- **F-WR-12:** dedupe + server-row cursor, not a keyset cursor (that needs a `before=` parameter on
+  `GET /retention/history`).
+- **Worked in the main tree, not a dedicated worktree** — the orchestrator's instruction for this run.
+  Commits were made by path only; the operator's unrelated uncommitted files were never staged.
+
+**Gates (verbatim):**
+
+```
+Targeted (retention + library + pages + org + ingestion), GSD_VITEST_MAX_WORKERS=2:
+ Test Files  84 passed (84)
+      Tests  1736 passed | 1 skipped (1737)
+
+GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs   (repo root, after the re-pin)
+  total 10184  ·  failed 0  ·  pinned total 9397
+count gate OK — 434/434 pinned files present, no per-file decrease, 0 failing.
+
+cd frontend && npx tsc -p tsconfig.app.json --noEmit  → exit 2, 66 errors = 275-BASELINES base count
+  set diff vs the base set (file:code, line-agnostic): EMPTY
+  touched-file entries: src/pages/LibraryPage.tsx:62:TS6133 (x2) — the known pre-existing pair
+
+node scripts/check-hot-file-ledger.cjs .planning/phases/275-retention-legal-hold
+  scan list: 505 rows · subject: 110 files · watched: 58
+ledger gate OK — every watched file has a row.
+  (and --files over the 28 files this pass touched: watched 17 — ledger gate OK)
+
+node scripts/check-claude-md-size.cjs
+claude-md size gate OK WITH WARNINGS — 1 file(s) past 120000 chars. Schedule the split now, not at 150k.
+```
+
+**Observed, not this pass's (left alone):** the PostToolUse landing-drift hook reports
+`BUILTIN_TOOL_COUNT: tool_dispatcher.py 30 vs facts.ts 29`. No file it names was touched here.
 
 ---
 
