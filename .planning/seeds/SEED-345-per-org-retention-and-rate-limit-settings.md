@@ -5,7 +5,7 @@ created: 2026-10-04
 surface: Agentic-RAG
 status: partially-answered
 partial: true
-status_note: "Documents half folded into Phase 275 (2026-10-12): per-folder/per-class document retention, legal hold, archive. Still OPEN: chat/message retention and per-org rate limits."
+status_note: "Documents half SHIPPED in Phase 275 (built 2026-10-12, 275-01..05): per-folder/per-class document retention policies, archive, admin-confirmed delete, legal holds, receipts. Still OPEN: chat/message retention and per-org rate limits (trigger unchanged). Private-document coverage deferred to SEED-354."
 trigger_when: "A customer or a contract asks for an enforced retention period or per-org usage limits; OR a data-protection review (SEED-072) is scheduled; OR any phase adds a per-org setting to the org-admin shell or the entitlement service."
 trigger_paths: ["backend/app/api/org.py", "backend/app/services/entitlement_service.py", "backend/app/db/entitlements.py", "frontend/src/lib/api/org.ts"]
 trigger_surfaces: ["admin", "settings"]

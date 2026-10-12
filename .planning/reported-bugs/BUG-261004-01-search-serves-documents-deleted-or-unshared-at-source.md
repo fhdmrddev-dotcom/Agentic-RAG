@@ -4,10 +4,10 @@ title: Search keeps serving documents that were deleted or unshared at their sou
 reported: 2026-10-04
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [RAG/retrieval, backend/connectors, backend/watch, security/visibility, supabase/rpc]
 folded_into: 275
-verified_closed_by: null
+verified_closed_by: "275"
 related_seeds: [SEED-210, SEED-343, SEED-341]
 re_open_trigger: null
 reproduces_on:
@@ -17,6 +17,40 @@ reproduces_on:
 ---
 
 # BUG-261004-01: Search keeps serving documents that were deleted or unshared at their source
+
+## ✅ Closed 2026-10-12 by Phase 275 — with evidence, both arms, on the merged tree
+
+**Fix (275-01, migration 205):** one generated column `documents.retrievable` (false when archived OR
+`source_state` is any of `missing_at_source` / `unauthorized_at_source` / `source_disconnected`), read by
+BOTH branches of `match_document_chunks` and by `keyword_search_chunks`, and by the RESTRICTIVE agent-read
+policies. Python reads it by one name, `RETRIEVABLE_COLUMN` (`retrieval_scope.py:77`, `:334`;
+`expert_scope.py:69`, `:189`) — the three drifting copies this report named are now one predicate.
+`missing_at_source` was decided as **exclude** (the Library still shows the row with a `Deleted at source`
+chip, S6).
+
+**Automated (live, merged tree):** `backend/tests/integration/test_275_retrievable.py` — one case per
+source state × every RPC arm, plus `::test_the_retrievable_column_is_the_one_predicate`; green in 275-05's
+merged-tree run (`71 passed`, 275-BASELINES.md).
+
+**Live local read (275-05 Task 3, 2026-10-12 08:2x UTC, local DB only, as the OWNER: role `authenticated`
++ both JWT-claim GUCs, `auth.uid()` read back = owner).** The local DB carries exactly two pre-existing
+`missing_at_source` documents (`43f0900b…` `.docx`, 132 chunks; `c8b51229…` `.eml`, 1 chunk), both
+`retrievable = false`. Query vector = each document's OWN stored chunk embedding, threshold 0.0; keyword
+query = words from its own chunk:
+
+| Document | vector unscoped top-50 | vector scoped (index) | vector scoped (exact) | keyword unscoped | keyword scoped |
+|---|---|---|---|---|---|
+| `43f0900b` as-is | 0/50 | 0 | 0 | 0 | 0 |
+| `43f0900b` CONTROL (`source_state` NULL, rolled back) | 31/50 | 50 | 50 | 3/3 | 3 |
+| `c8b51229` as-is | 0/50 | 0 | 0 | 0 (7 single words) | 0 |
+| `c8b51229` CONTROL (rolled back) | 1/50 | 1 | 1 | 1 per word (`subject`, `fahed`, `attachments`, `backend`, `unicorn`, `commands`) | 1 |
+
+The control proves the probe can see each document, so the zeros are the exclusion, not a blind probe.
+After the run both documents still read `missing_at_source` (the controls were rolled back).
+
+⚠ **Production:** mig 205 is not applied in production yet (owed deploy row, 275-G4-EVIDENCE §6). Until it
+is, the bug's production exposure is what it was on 2026-10-04 (zero rows in either state then; re-read the
+distribution at deploy).
 
 ## What we observed
 

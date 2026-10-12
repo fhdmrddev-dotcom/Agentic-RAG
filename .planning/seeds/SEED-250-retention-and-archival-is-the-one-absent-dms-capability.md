@@ -3,8 +3,8 @@ seed_id: SEED-250
 title: "Retention and archival is the ONE absent capability on the enterprise DMS list — zero retention/archival/legal-hold code exists, and it is the capability regulated buyers ask about first"
 created: 2026-09-06
 planted_during: "2026-09-06 packaging analysis — assessing an 11-point enterprise DMS capability list against the code"
-status: folded
-status_note: "Folded into Phase 275 (Retention & Legal Hold) at discuss-phase 2026-10-12 — see 275-CONTEXT.md D-01..D-33. Delete always waits for an admin confirm (D-08); hold enforced by the database on every path (D-14)."
+status: answered
+status_note: "Answered by Phase 275 (Retention & Legal Hold), built 2026-10-12: 275-01 (mig 204 policies/holds/receipts + DB hold refusal; mig 205 retrievable column), 275-02 (hold guard on every delete door), 275-03 (evaluate/preview/sweep/disposition + /retention API), 275-04 (Org admin Retention tab + Library surfaces), 275-05 (merged-tree gates, G-4 drives, docs, registers). Delete always waits for an admin confirm (D-08); hold enforced by the database on every path (D-14). NOT deployed: prod migs 204/205 + RETENTION_SWEEP_ENABLED stay owed operator rows (275-G4-EVIDENCE §6). Private documents are out of reach (D-34/D-35) — SEED-354."
 folded_into: 275
 surface: Agentic-RAG
 severity: high
