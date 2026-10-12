@@ -107,6 +107,9 @@ const ported = {
   verbDeleted: "deleted",
   verbReviewed: "reviewed",
   lateHoldTail: ": put on legal hold after the sweep",
+  /** S1 — the posture count's noun, by count (the sketch's `${POLICIES.length} policies` never said 1). */
+  wordPolicy: "policy",
+  wordPolicies: "policies",
 } as const
 
 /** UI-SPEC contract copy (no sketch source, or changed by a locked decision). */
@@ -247,7 +250,8 @@ const sketchTemplates = {
   /** S1 — the posture line and the Policies table. */
   postureHealthy: "Last sweep **{date}** finished, nothing failed",
   postureNext: "Next sweep **{date}**",
-  postureCounts: "{P} policies · {H} legal hold(s)",
+  /** `{policies}` is `wordPolicy` / `wordPolicies` by P (275-05: "1 policies" read wrong). */
+  postureCounts: "{P} {policies} · {H} legal hold(s)",
   policiesSub: "Checked every night at {time}. Archive happens on its own. Delete always waits for a person.",
   dueNow: "**{N}** due now",
   undecidableCount: "{N} undecidable",

@@ -35,7 +35,11 @@ function Posture({ summary }: { summary: RetentionSummary }) {
   const holds = summary.counts.active_holds ?? 0
   const counts = (
     <span data-testid="posture-counts">
-      {fillCopy(C.sketchTemplates.postureCounts, { P: policies, H: holds }, holds)}
+      {fillCopy(
+        C.sketchTemplates.postureCounts,
+        { P: policies, policies: policies === 1 ? C.ported.wordPolicy : C.ported.wordPolicies, H: holds },
+        holds,
+      )}
     </span>
   )
   if (!summary.sweep_enabled) {

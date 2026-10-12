@@ -47,7 +47,7 @@ describe("retentionCopy — every string is fenced against its own source", () =
       checked++
     }
     // Non-vacuity: an empty `ported` group would pass the loop above for free.
-    expect(checked).toBe(71)
+    expect(checked).toBe(73) // 275-05: +wordPolicy, +wordPolicies (posture "1 policy")
   })
 
   it("every CONTRACT string sits verbatim in the UI-SPEC", () => {
