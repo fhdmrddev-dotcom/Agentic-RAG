@@ -662,8 +662,10 @@ export function LibraryPage({
   }, [filteredDocs, selectedFolderId, documents])
 
   // Phase 275 (S9 / D-04): browse hides archived rows unless the ONE include-archived state (Find's
-  // reducer, shared with its `Include archived` chip) is on. A view's server resolve is untouched.
-  const archived = splitArchived(folderScopedDocuments, filteredDocs !== null || find.include_archived)
+  // reducer, shared with its `Include archived` chip) is on. 275-REVIEW F-WR-11: a saved view or an
+  // ad-hoc filter honours the SAME state (its resolve has no archived predicate), so it can never
+  // disagree with Find over the same conditions.
+  const archived = splitArchived(folderScopedDocuments, find.include_archived)
   const listDocuments = archived.shown
   const listFolderId = filteredDocs !== null ? undefined : selectedFolderId
 
@@ -912,7 +914,7 @@ export function LibraryPage({
             <div data-testid="documents-doclist">
               {/* 275-05 (S9): every row hidden as archived → the hidden line below says so; the
                   list's "No documents in this folder" would claim an emptiness that is not true. */}
-              {!(filteredDocs === null && listDocuments.length === 0 && archived.archivedCount > 0) && (
+              {!(listDocuments.length === 0 && archived.archivedCount > 0) && (
                 <DocumentList
                   documents={pagedDocuments}
                   onDelete={deleteDoc}
@@ -926,13 +928,12 @@ export function LibraryPage({
                 />
               )}
             </div>
-            {filteredDocs === null && (
-              <ArchivedHiddenLine
-                count={archived.archivedCount}
-                included={find.include_archived}
-                onChange={(include) => findDispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: include })}
-              />
-            )}
+            {/* 275-REVIEW F-WR-11: for a view / filter resolve too — one include-archived state. */}
+            <ArchivedHiddenLine
+              count={archived.archivedCount}
+              included={find.include_archived}
+              onChange={(include) => findDispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: include })}
+            />
             {/* Phase 217.1-06 — the client-side pager (the sketch's table footer). Shown on
                 the folder view only; a filter/view resolve carries its own server count. */}
             {filteredDocs === null && (

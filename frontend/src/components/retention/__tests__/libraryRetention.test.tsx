@@ -11,7 +11,7 @@
  *   · a held document whose Delete opens the normal confirm and only fails after a click (S10).
  * Assertions read RENDERED WORDS — a presence assertion cannot see content drift.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, onTestFinished } from "vitest"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
@@ -108,6 +108,7 @@ vi.mock("@/lib/supabase", () => ({
 import evaluateSource from "../../../../../backend/app/services/retention/evaluate.py?raw"
 
 import { LibraryPage } from "@/pages/LibraryPage"
+import { listViews, resolveView } from "@/lib/api"
 import { RetentionRowChips } from "../RetentionChip"
 import { RetentionFolderLine } from "../RetentionFolderLine"
 
@@ -356,6 +357,34 @@ describe("LibraryPage — retention in browse (S9 / S10 / planning flag 2)", () 
     expect(screen.queryByText("Upload files above to add them here.")).toBeNull()
     await userEvent.click(within(screen.getByTestId("archived-hidden-line")).getByRole("button", { name: "Show" }))
     expect(screen.getByText("Invoice INV-0412.pdf")).toBeInTheDocument()
+  })
+
+  it("275-REVIEW F-WR-11: a saved view honours Include archived — hidden by default, with the same hidden line", async () => {
+    vi.mocked(listViews).mockResolvedValueOnce([
+      {
+        id: "view-inv", user_id: "user-1", name: "Invoices view", is_system_global: false,
+        filter_expr: { op: "and", conditions: [{ field: "document_type", op: "eq", value: "Invoice" }] },
+      },
+    ])
+    // Persistent for this case: the view's own count read calls resolveView too.
+    vi.mocked(resolveView).mockResolvedValue({ documents: [PLAIN, ARCHIVED], total: 2 })
+    onTestFinished(() => {
+      vi.mocked(resolveView).mockResolvedValue({ documents: [], total: 0 })
+    })
+    renderPage()
+    await userEvent.click(screen.getByRole("tab", { name: /^Views/ }))
+    await userEvent.click((await screen.findAllByText("Invoices view"))[0])
+    await waitFor(() => expect(resolveView).toHaveBeenCalledWith("view-inv"))
+    expect(await screen.findByText("Atlas kickoff deck.pdf")).toBeInTheDocument()
+    // Include archived is OFF: the view's archived row is hidden, exactly as Find would hide it.
+    expect(screen.queryByText("Invoice INV-0412.pdf")).toBeNull()
+    const line = screen.getByTestId("archived-hidden-line")
+    expect(line).toHaveTextContent("1 archived document hidden · Show")
+    await userEvent.click(within(line).getByRole("button", { name: "Show" }))
+    expect(screen.getByText("Invoice INV-0412.pdf")).toBeInTheDocument()
+    // ONE state: Find's chip, on the Documents tab, reads the same choice.
+    await userEvent.click(screen.getByRole("tab", { name: /^Documents/ }))
+    expect(await screen.findByText("Archived: included")).toBeInTheDocument()
   })
 
   it("a held document's Delete opens straight into the refusal — the member sentence, one Close, no Delete", async () => {
