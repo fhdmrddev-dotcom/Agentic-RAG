@@ -523,14 +523,17 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
 | `frontend/src/pages/LibraryPage.tsx` | 57 / 19 / 1297 (was `57 / 21 / 1297`) | last touch 275-04 · Extraction OWED |
-| `backend/app/services/retrieval_service.py` | 19 / 11 / 456 | ⛔ extraction still OWED (SEED-224, since 231) |
+| `backend/app/services/retrieval_service.py` | 24 / 13 / 176 (was `19 / 11 / 456`) | ~~⛔ extraction still OWED (SEED-224, since 231)~~ ✅ DISCHARGED 272-01 (278) |
+| `backend/app/services/retrieval_scope.py` | 5 / 3 / 463 (was `4 / 2 / 464`) | ⚠ now FIRES · 278-02 vocabulary import (one home) · ⛔ |
+| `backend/app/services/document_search_service.py` | 5 / 3 / 584 (was `4 / 2 / 587`) | ⚠ now FIRES · 278-02 vocabulary import (one home) · ⛔ |
+| `backend/app/services/view_filter_compiler.py` | 7 / 6 / 302 (was `6 / 5 / 300`) | ⚠ FIRES, absent here — row added 278-04 · 278-02 vocabulary import |
 | `backend/app/services/recall_eval.py` | 4 / 3 / 1070 | ⚠ FIRES (3 phases) · safe as-is (D-246-12) |
 | `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 16 / 11 / 666 (was `15 / 10 / 654`) | **275-04**: ONE optional `retention` prop → Retention section after File |
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
 | `backend/app/services/agent_loop.py` | 65 / 31 / 3651 (was `57 / 28 / 3580`) | last touch 274-01 · prompt-assembly seam OWED (OV-273-03) · ⛔ |
-| `backend/app/services/tool_dispatcher.py` | 98 / 43 / 5068 (was `97 / 42 / 5057`) | ⚠ STALE · last touch 275-02 · registry/handler split OWED · ⛔ |
+| `backend/app/services/tool_dispatcher.py` | 99 / 44 / 274 (was `98 / 43 / 5068`) | ✅ G-5 DISCHARGED (278-03): registry only; handlers in services/tools/ · ⛔ |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |

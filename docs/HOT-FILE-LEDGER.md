@@ -7962,6 +7962,19 @@ an auditor and a source file is read by the next author:
 **A third landing must propose the extraction FIRST.** Do not edit this row to say the obligation
 was met.
 
+⚠ **CORRECTED 2026-10-13 (Phase 278, SEAM-02). The "STILL OWED" paragraph above is kept, not edited, because it
+was true when written and the discharge happened somewhere else.** The extraction was **DISCHARGED by 272-01**:
+a pure move (AST-identical to PHASE_BASE, `test_272_pure_move.py`) into `retrieval_rpc.py`, `retrieval_rank.py`,
+`retrieval_documents.py` and `retrieval_scope.py`. See the subsections
+*"Phase 272"*, *"Phase 272 post-ruling"* and *"Phase 272 re-run (D-27 second cause)"* below. 278 did not
+re-read that record; it **measured** the discharge (D-09) on the merged tree at 278-04 Task 1: triple `23 / 12 / 174`
+before the comment commit, `ast` top-level defs `['search_documents']` (exactly one), and
+`pytest tests/unit/test_272_pure_move.py -q` → `9 passed`. 278-04's only edit here (`2757b9e51`) struck the
+stale importer line `tool_dispatcher.py:47` in the back-compat comment and named the real post-split importer,
+`tools/documents.py:43`. Its proof is a whole-module `ast.dump` identity against HEAD, which printed `True`.
+⛔ The 7 back-compat re-exports stay (D-10). Final-tree triple: **`24 / 13 / 176`** (the comment
+commit's `278-04` scope adds the 278 bucket).
+
 ⚠ **CORRECTION 2026-09-05 — THE PARAGRAPH BELOW WAS TRUE WHEN WRITTEN AND MY OWN NEXT COMMIT MADE
 IT FALSE. It is kept rather than overwritten, because the way it went stale is the finding.** At
 `11e7fd86c` this file genuinely was byte-unchanged by Phase 231 and the triple genuinely was
@@ -10990,7 +11003,7 @@ cells rot within days.
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on resolve_document_id / resolve_document / fetch_full_document; 272 pins retired by name |
-| [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 4 / 2 / 464 (was `2 / 1 / 416`) | no (2 phases) | **275-01**: `RETRIEVABLE_COLUMN` (mig 205); middle predicate renamed `retrievable`, still enforced_in_rpc — no branch. ⛔ ids/counts RLS-intersected (D-21) |
+| [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 5 / 3 / 463 (was `4 / 2 / 464`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). honoured by construction (278-02: vocabulary import, values pinned to base); `date → date_typed` stays a named extension (D-12). ⛔ ids/counts RLS-intersected (D-21) |
 | [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 4 / 1 / 1163 (was `0 / 0 / 0`) | no (young) | young (272-01 move; 272-04 kinds, D-09 lock, ONE audit writer, vocabulary). **272-REVIEW WR-01**: vocabulary values checked + JSON-quoted, note capped (2000). Split OWED → 273 |
 | [`frontend/src/components/chat/StepRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatsteprowtsx) | 3 / 2 / 253 (was `2 / 1 / 249`) | no (2 phases) | 273-05: `refused` node state (UI-D-02 amber pair). ⛔ derived from the result marker in toolStepDerivation, never from a tool name |
 | [`frontend/src/components/chat/ToolCallDetails.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcalldetailstsx) | 3 / 2 / 181 (was `2 / 1 / 171`) | no (2 phases) | 273-05: ToolArgsBlock hidden for show_artifact (L-2); dispatched BEFORE the `parsed.error` arm (L-3/L-4). ⛔ `detail` never rendered |
@@ -11015,7 +11028,7 @@ cells rot within days.
 | [`frontend/src/components/chat/artifacts/captionModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscaptionmodelts) | 1 / 1 / 73 (was `0 / 0 / 0`) | no (young) | young (273-02). Phrases the SERVER's caption facts (sources, lineage, counts) — never model text (D-04). Pure |
 | [`frontend/src/components/chat/artifacts/chartModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartmodelts) | 1 / 1 / 275 (was `0 / 0 / 0`) | no (young) | young (273-02). Pure chart derivations: slots, visible domain, tooltip rows, ticks, aria text. No React, no recharts |
 | [`frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesshowartifactbodytsx) | 1 / 1 / 192 (was `0 / 0 / 0`) | no (young) | young (273-05). Rail essence + expanded line for show_artifact. ⛔ reads `reason`, never `detail` or `values` (L-3/L-4) |
-| [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 4 / 2 / 587 (was `2 / 1 / 565`) | no (2 phases) | **275-03**: `_apply_archived(q, include_archived)` beside `_apply_version` + one line in `structure()`. ⛔ open/download not filtered |
+| [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 5 / 3 / 584 (was `4 / 2 / 587`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). honoured by construction (278-02: vocabulary import, values pinned to base); `_DATE_COLUMN` is an import alias. ⛔ open/download not filtered |
 | [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-03**: `include_archived: bool = False`; ⛔ `extra="forbid"` kept, so backend ships before frontend |
 | [`backend/app/api/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_searchpy) | 1 / 1 / 48 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ user-JWT client only; remaps `ResolveError`; no write. **271-05**: the fence calls THIS coroutine with a GoTrue token (P-04) |
 | [`frontend/src/pages/findState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesfindstatets) | 3 / 3 / 374 (was `2 / 2 / 361`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `include_archived` + `SET_INCLUDE_ARCHIVED` (offset 0); key sent only when true (Pitfall 13). ⛔ STRICT LEAF: zero imports |
@@ -11247,7 +11260,7 @@ cells rot within days.
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 15 / 372 (was `31 / 16 / 372`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<td>` kept |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 57 / 19 / 1297 (was `57 / 21 / 1297`) | ⚠ **FIRES** | **275-04**: `useRetentionStates` (ONE batched read), folder line under FolderDetail, `splitArchived` + hidden line on Find's include_archived. Extraction OWED |
-| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 23 / 12 / 174 (was `22 / 12 / 172`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01). **272-05 D-27**: coverage cut + rerank; filtered dedup same-document only; unfiltered unchanged |
+| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 24 / 13 / 176 (was `23 / 12 / 174`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01), MEASURED at 278-04 (SEAM-02): one top-level def, test_272_pure_move 9 passed; one comment line, AST-identical. ⛔ 7 re-exports stay (D-10) |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
@@ -11263,7 +11276,7 @@ cells rot within days.
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
 | [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
-| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 98 / 43 / 5068 (was `97 / 42 / 5057`) | ⚠ **FIRES** | **275-02**: 1 import + 3 `unretrievable` walls beside the folder walls + `retrievable_only=True` on 3 calls. ⛔ registry/handler split still OWED |
+| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 99 / 44 / 274 (was `98 / 43 / 5068`) | ⚠ **FIRES** | ✅ **G-5 DISCHARGED (278-03)**: registry only (30 tools); handlers moved verbatim to `services/tools/` (10 families). ⛔ registry + AST pins; re-exports stay (D-04) |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
 | [`frontend/src/components/ingestion/DocumentUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentuploadtsx) | 10 / 1 / 144 | no (1 phase) | young (056) — ⚠ absent for its entire life. ⛔ It reports NO byte progress (`onUploadProgress` absent), so any upload percentage is unknowable |
@@ -11318,7 +11331,7 @@ cells rot within days.
 | [`backend/app/models/classification_rule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsclassification_rulepy) | 2 / 2 / 56 | no (2 phases) | row added 237 below threshold. Adds rule_scope ('watch' or 'classification') to RuleCreate, RuleUpdate, RuleResponse. |
 | [`backend/app/services/classification_rule_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesclassification_rule_servicepy) | 3 / 2 / 166 | no (2 phases) | row added 237 below threshold. Persists and queries rule_scope across rule CRUD and uploader rule evaluation. |
 | [`backend/app/services/document_view_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_view_resolverpy) | 5 / 5 / 412 (was `4 / 4 / 403`) | ⚠ **FIRES** | honoured by construction — one default-False kwarg + one `.eq` per read leg, Library callers unchanged, source fence |
-| [`backend/app/services/view_filter_compiler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesview_filter_compilerpy) | 6 / 5 / 300 (was `4 / 3 / 288`) | ⚠ **FIRES** | ⚠ STALE (`4/3/288`). **272 G-1**: `eq` on a JSON-array field (`LIST_VALUE_FIELDS`) matches one element; no new leg, no new operator |
+| [`backend/app/services/view_filter_compiler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesview_filter_compilerpy) | 7 / 6 / 302 (was `6 / 5 / 300`) | ⚠ **FIRES** | honoured by construction (278-02: vocabulary import, values pinned to base); `LIST_VALUE_FIELDS = frozenset(LIST_FIELD_NAMES)`. **272 G-1** eq-on-list rule unchanged |
 | [`frontend/src/components/classification/ClassificationRulesPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationclassificationrulespagetsx) | 3 / 3 / 264 (was `1 / 1 / 250`) | ⚠ **FIRES** | now FIRES (3 phases). **271-02**: ONE shape (P-07): no outer padding; header Back · Filing rules · subtitle · New rule; mounted only inside the Library |
 | [`frontend/src/components/classification/RuleBuilderPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationrulebuilderpaneltsx) | 6 / 5 / 501 (was `4 / 3 / 502`) | ⚠ **FIRES** | ⚠ STALE (`4/3/502`). **271-02**: two strings (`New filing rule`, `After extraction`). ⛔ no logic change |
 | [`frontend/src/components/ingestion/ConditionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionconditionpopovertsx) | 6 / 4 / 429 (was `3 / 2 / 404`) | ⚠ **FIRES** | ⚠ now FIRES (row read `3/2/404`). **271-04**: `FIND_EXCLUDED_FIELD_KEYS` + optional `excludeFieldKeys`. ⚠ Esc after a mouse open does nothing (inherited, 271-05) |
@@ -11502,18 +11515,18 @@ cells rot within days.
 | [`frontend/src/lib/api/admin.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiadmints) | 7 / 4 / 1099 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 262 |
 | [`frontend/src/components/admin/CapabilityGrid.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadmincapabilitygridtsx) | 3 / 3 / 264 | ⚠ **FIRES** | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 |
 | [`frontend/src/components/admin/ModelAdvancedCapabilities.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodeladvancedcapabilitiestsx) | 1 / 1 / 290 | no (1 phase) | young (created 262) |
-| [`backend/app/services/tools/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicestools__init__py) | 0 / 0 / 0 | no (young) | young (created 278-03). Package marker: docstring ONLY. ⛔ no imports, no re-exports, no side effects, so import order can never matter |
-| [`backend/app/services/tools/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsbasepy) | 0 / 0 / 0 | no (young) | young (created 278-03). `ToolContext` + `ToolResult` moved verbatim (AST-pinned). ⛔ leaf: stdlib + TYPE_CHECKING only; re-exported from tool_dispatcher.py (D-04) |
-| [`backend/app/services/tools/documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsdocumentspy) | 0 / 0 / 0 | no (young) | young (created 278-03). KB browse/query/relationships/web_search/analyze + folder and retention walls. ⛔ walls AST-pinned; no module-level tool_dispatcher import |
-| [`backend/app/services/tools/skills.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsskillspy) | 0 / 0 / 0 | no (young) | young (created 278-03). load/save/read_skill_file/attach + `_resolve_skill_visibility_or` (SEED-125 org gate). ⛔ one resolver; patch where used |
-| [`backend/app/services/tools/sandbox.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolssandboxpy) | 0 / 0 / 0 | no (young) | young (created 278-03). execute_code, bounded sandbox, hydration, autoheal. ⛔ largest family; no module-level tool_dispatcher import |
-| [`backend/app/services/tools/runtime_gap.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsruntime_gappy) | 0 / 0 / 0 | no (young) | young (created 278-03). Phase-142 pure classifier, allowlists, `SCRIPT_EXTS`, repeat-guard result. ⛔ no I/O; keeps `import re as _re_filename` |
-| [`backend/app/services/tools/render_template.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsrender_templatepy) | 0 / 0 / 0 | no (young) | young (created 278-03). `_RENDER_DRIVER_SRC` + filename guard + handler. ⛔ SandboxedEnvironment(autoescape=True); emitters read the handler via tool_dispatcher |
-| [`backend/app/services/tools/workspace.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsworkspacepy) | 0 / 0 / 0 | no (young) | young (created 278-03). The 5 workspace handlers + `_normalize_optional*`. ⛔ moved verbatim (AST-pinned) |
-| [`backend/app/services/tools/memory.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsmemorypy) | 0 / 0 / 0 | no (young) | young (created 278-03). remember, recall, query_tables. ⛔ moved verbatim (AST-pinned) |
-| [`backend/app/services/tools/agent_control.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsagent_controlpy) | 0 / 0 / 0 | no (young) | young (created 278-03). task, write_todos, ask_user + sub-agent sets. ⛔ task_service stays a LAZY import (it imports tool_dispatcher) |
-| [`backend/app/services/tools/connector.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsconnectorpy) | 0 / 0 / 0 | no (young) | young (created 278-03). Connector chat tool + approval timeout. ⛔ trifecta/approval/audit AST-pinned; dispatch_tool resolves it as a tool_dispatcher global |
-| [`backend/app/services/document_vocabulary.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_vocabularypy) | 0 / 0 / 0 | no (young) | young (created 278-02). DEBT-09 ONE home: 3 timestamptz date words → column + the list-field set. ⛔ leaf, no app imports; a copy elsewhere fails the 278 fence |
+| [`backend/app/services/tools/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicestools__init__py) | 1 / 1 / 20 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Package marker: docstring ONLY. ⛔ no imports, no re-exports, no side effects, so import order can never matter |
+| [`backend/app/services/tools/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsbasepy) | 1 / 1 / 149 (was `0 / 0 / 0`) | no (young) | young (created 278-03). `ToolContext` + `ToolResult` moved verbatim (AST-pinned). ⛔ leaf: stdlib + TYPE_CHECKING only; re-exported from tool_dispatcher.py (D-04) |
+| [`backend/app/services/tools/documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsdocumentspy) | 1 / 1 / 762 (was `0 / 0 / 0`) | no (young) | young (created 278-03). KB browse/query/relationships/web_search/analyze + folder and retention walls. ⛔ walls AST-pinned; no module-level tool_dispatcher import |
+| [`backend/app/services/tools/skills.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsskillspy) | 1 / 1 / 759 (was `0 / 0 / 0`) | no (young) | young (created 278-03). load/save/read_skill_file/attach + `_resolve_skill_visibility_or` (SEED-125 org gate). ⛔ one resolver; patch where used |
+| [`backend/app/services/tools/sandbox.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolssandboxpy) | 1 / 1 / 1218 (was `0 / 0 / 0`) | no (young) | young (created 278-03). execute_code, bounded sandbox, hydration, autoheal. ⛔ largest family; no module-level tool_dispatcher import |
+| [`backend/app/services/tools/runtime_gap.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsruntime_gappy) | 1 / 1 / 310 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Phase-142 pure classifier, allowlists, `SCRIPT_EXTS`, repeat-guard result. ⛔ no I/O; keeps `import re as _re_filename` |
+| [`backend/app/services/tools/render_template.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsrender_templatepy) | 1 / 1 / 787 (was `0 / 0 / 0`) | no (young) | young (created 278-03). `_RENDER_DRIVER_SRC` + filename guard + handler. ⛔ SandboxedEnvironment(autoescape=True); emitters read the handler via tool_dispatcher |
+| [`backend/app/services/tools/workspace.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsworkspacepy) | 1 / 1 / 223 (was `0 / 0 / 0`) | no (young) | young (created 278-03). The 5 workspace handlers + `_normalize_optional*`. ⛔ moved verbatim (AST-pinned) |
+| [`backend/app/services/tools/memory.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsmemorypy) | 1 / 1 / 121 (was `0 / 0 / 0`) | no (young) | young (created 278-03). remember, recall, query_tables. ⛔ moved verbatim (AST-pinned) |
+| [`backend/app/services/tools/agent_control.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsagent_controlpy) | 1 / 1 / 478 (was `0 / 0 / 0`) | no (young) | young (created 278-03). task, write_todos, ask_user + sub-agent sets. ⛔ task_service stays a LAZY import (it imports tool_dispatcher) |
+| [`backend/app/services/tools/connector.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsconnectorpy) | 1 / 1 / 380 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Connector chat tool + approval timeout. ⛔ trifecta/approval/audit AST-pinned; dispatch_tool resolves it as a tool_dispatcher global |
+| [`backend/app/services/document_vocabulary.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_vocabularypy) | 1 / 1 / 38 (was `0 / 0 / 0`) | no (young) | young (created 278-02). DEBT-09 ONE home: 3 timestamptz date words → column + the list-field set. ⛔ leaf, no app imports; a copy elsewhere fails the 278 fence |
 
 
 
@@ -19841,46 +19854,109 @@ The G-5 gate (`node scripts/check-hot-file-ledger.cjs 278`, over every file the 
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. The package marker for the tool handler families. ⛔ docstring ONLY: an import here would make the registry's load order depend on package import order, which D-05 (Extension Contract) forbids.
 
+**Phase 278 close (278-04): `1 / 1 / 20` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
 ### `backend/app/services/tools/base.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. `ToolContext` and `ToolResult` (and the `TYPE_CHECKING` block) moved verbatim from `tool_dispatcher.py`, AST-pinned by `test_278_pure_move.py`. ⛔ a leaf: stdlib and `TYPE_CHECKING` imports only, `from __future__ import annotations` mandatory (the field annotations name TYPE_CHECKING-only types). Re-exported from `tool_dispatcher.py` so every existing importer keeps working (D-04).
+
+**Phase 278 close (278-04): `1 / 1 / 149` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
 
 ### `backend/app/services/tools/documents.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. ls, tree, grep, glob, read_document, fetch_document_file, query_documents, query_documents_by_view, get_related_documents, web_search, analyze_document, plus the 262 folder wall, the 275 retention wall and the lazy view-resolver sentinels (`_ensure_resolver` binds THIS module's globals). ⛔ every wall is AST-pinned; no module-level import of `app.services.tool_dispatcher`; `document_view_resolver` stays a lazy import.
 
+**Phase 278 close (278-04): `1 / 1 / 762` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
 ### `backend/app/services/tools/skills.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. load_skill, save_skill, read_skill_file, attach_skill_file and `_resolve_skill_visibility_or` (the SEED-125 org gate, also called by the sandbox family). ⛔ the resolver has ONE home; the sandbox family imports it by name, so a test patches it where it is USED.
+
+**Phase 278 close (278-04): `1 / 1 / 759` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
 
 ### `backend/app/services/tools/sandbox.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. execute_code, the bounded sandbox runner, 244 attachment hydration and the Phase-142 autoheal. The largest family (about 1,185 lines), so the next phase that touches it measures it first. ⛔ no module-level import of `app.services.tool_dispatcher`; `app.api.threads.drain_step` stays a lazy import.
 
+**Phase 278 close (278-04): `1 / 1 / 1218` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
 ### `backend/app/services/tools/runtime_gap.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. The Phase-142 pure runtime-gap classifier, its allowlists and messages, `SCRIPT_EXTS` (re-exported from `tool_dispatcher.py` for `app/api/skills.py`) and the repeat-guard result builder. ⛔ no I/O; keeps the `import re as _re_filename` alias the moved regexes reference.
+
+**Phase 278 close (278-04): `1 / 1 / 310` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
 
 ### `backend/app/services/tools/render_template.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. `_RENDER_DRIVER_SRC`, the output-filename guard and `_handle_render_template`. ⛔ the driver must construct `SandboxedEnvironment(autoescape=True)` (`test_190_ssti_fence.py`); `harness/emitters.py` reads the handler through `tool_dispatcher` at call time, so tests patch it THERE, not here.
 
+**Phase 278 close (278-04): `1 / 1 / 787` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
 ### `backend/app/services/tools/workspace.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. The five workspace handlers and `_normalize_optional` / `_normalize_optional_int` (also imported by the documents family). ⛔ moved verbatim, AST-pinned.
+
+**Phase 278 close (278-04): `1 / 1 / 223` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
 
 ### `backend/app/services/tools/memory.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. remember, recall, query_tables. ⛔ moved verbatim, AST-pinned.
 
+**Phase 278 close (278-04): `1 / 1 / 121` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
 ### `backend/app/services/tools/agent_control.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. task, write_todos, ask_user and the sub-agent read-only / excluded sets. ⛔ `task_service` stays a LAZY import inside `_handle_task`, because it imports `tool_dispatcher` at module level.
+
+**Phase 278 close (278-04): `1 / 1 / 478` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
 
 ### `backend/app/services/tools/connector.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. `_handle_connector_chat_tool` and `_APPROVAL_TIMEOUT_SECONDS`. ⛔ the trifecta, approval and audit writes are AST-pinned; `dispatch_tool` resolves the handler as a `tool_dispatcher` module global, so `tool_dispatcher.py` imports it by name.
 
+**Phase 278 close (278-04): `1 / 1 / 380` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
 ### `backend/app/services/document_vocabulary.py`
 
 **`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-02. DEBT-09's ONE home of the document-filter vocabulary: `TIMESTAMP_DATE_COLUMNS` (added, source_created, source_modified → their timestamptz columns) and `LIST_FIELD_NAMES` (`("topics",)`), imported by `retrieval_scope.py`, `document_search_service.py` and `view_filter_compiler.py`. ⛔ a leaf with no app imports; a literal copy anywhere else in `backend/app` fails `test_278_vocabulary_one_home.py`. `retrieval_scope.py` keeps `date → date_typed` as a named extension of the imported map (D-12).
+
+**Phase 278 close (278-04): `1 / 1 / 38` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-02; nothing has touched it since.
+
+## Phase 278 close (2026-10-13, 278-04)
+
+All triples below were re-derived on the merged tree after 278-01..03 and the 278-04 comment commit, using the CLAUDE.md recipe (six-digit quick-task buckets subtracted: `tool_dispatcher.py` drops `260529` and `260705`). They were written LAST, so no wave-1 or wave-2 worktree edited this file concurrently.
+
+### `backend/app/services/tool_dispatcher.py` — Phase 278 close
+
+**`99 / 44 / 274` (was `98 / 43 / 5068`).** ✅ **G-5 DISCHARGED (278-03)**: the registry/handler split owed since OV-273-02 was taken as ONE pure-move commit, `18abc1ed5`.
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 278-04):
+
+> ⚠ STALE · last touch 275-02 · registry/handler split OWED · ⛔
+
+The split record:
+
+- `tool_dispatcher.py` 5,068 → **274** lines. It is now the registry (`_TOOL_REGISTRY`, **30 tools** by `len`) plus `dispatch_tool`, and it re-exports `ToolContext`, `ToolResult`, `SCRIPT_EXTS` and `_attachment_container_path` (D-04).
+- Handlers moved verbatim into `services/tools/`: `documents.py` 762, `skills.py` 759, `sandbox.py` 1218, `runtime_gap.py` 310, `render_template.py` 787, `workspace.py` 223, `memory.py` 121, `agent_control.py` 478, `connector.py` 380. Shared types live in `base.py` 149, and `__init__.py` 20 is docstring only.
+- `test_278_registry_pin.py` (names, order, bindings, schema sha256) is identical to PHASE_BASE `25b4235c5`, and `test_278_pure_move.py` holds every moved binding AST-identical.
+- `check-test-retarget-only.py 18abc1ed5^ 18abc1ed5` and `--no-loss` both exit 0 (D-07), re-run on the merged history at 278-04.
+- ⚠ Handler log records are now named `app.services.tools.<family>` (each module has `logging.getLogger(__name__)`). `dispatch_tool`'s own records keep `app.services.tool_dispatcher`. Any log filter keyed on the old name needs widening.
+- The live Anthropic two-tool turn after the split wrote the same `search.query` / `code.execute` audit key sets as pre-278 rows of the same outcome (`278-VALIDATION.md`).
+
+Every earlier "split still OWED" sentence in this file's sections (244, 264, 267, 268, 272, 273, 275) stays as history; none is edited. ⛔ The next feature on a handler lands in its `tools/<family>.py`, never back in the registry module, and a new family needs a registry entry plus the AST pins updated in the same commit.
+
+### `backend/app/services/retrieval_service.py` — Phase 278 close
+
+**`24 / 13 / 176` (was `23 / 12 / 174`).** ✅ extraction DISCHARGED (272-01). SEAM-02 was MEASURED at 278-04: one top-level def (`search_documents`), `test_272_pure_move.py` 9 passed, and the comment-only commit `2757b9e51` is AST-identical. ⛔ 7 re-exports stay (D-10). Full record: the *"CORRECTED 2026-10-13"* paragraph in this file's main section. The CLAUDE.md row (`19 / 11 / 456`, *"extraction still OWED"*) is corrected in the same commit, with the original struck through beside the fix (D-11).
+
+### `backend/app/services/retrieval_scope.py` — Phase 278 close
+
+**`5 / 3 / 463` (was `4 / 2 / 464`).** ⚠ **now FIRES** (272, 275, 278). Honoured by construction (278-02): `_DATE_FIELD_COLUMN = {**TIMESTAMP_DATE_COLUMNS, "date": "date_typed"}` and `LIST_FIELDS = LIST_FIELD_NAMES`, both imported from `document_vocabulary.py` with values and key order pinned to base. `date → date_typed` stays this module's named extension, never in the home (D-12). A CLAUDE.md FIRING row was added in this commit. ⛔ ids/counts stay RLS-intersected (D-21). Next phase on this file: extraction FIRST.
+
+### `backend/app/services/document_search_service.py` — Phase 278 close
+
+**`5 / 3 / 584` (was `4 / 2 / 587`).** ⚠ **now FIRES** (271, 275, 278). Honoured by construction (278-02): `_DATE_COLUMN` is now `from app.services.document_vocabulary import TIMESTAMP_DATE_COLUMNS as _DATE_COLUMN`, and the literal copy was deleted. A CLAUDE.md FIRING row was added in this commit. ⛔ open/download stay unfiltered. Next phase on this file: extraction FIRST.
+
+### `backend/app/services/view_filter_compiler.py` — Phase 278 close
+
+**`7 / 6 / 302` (was `6 / 5 / 300`).** ⚠ FIRES (113, 114, 237, 240, 272, 278). It had fired since 272 with no CLAUDE.md row; the row was added by 278-04. Honoured by construction (278-02): `LIST_VALUE_FIELDS = frozenset(LIST_FIELD_NAMES)`, imported from the vocabulary home. The 272 G-1 eq-on-a-list-element rule is unchanged.
