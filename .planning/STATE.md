@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
 status: executing
-last_updated: "2026-10-13T14:54:41.612Z"
-last_activity: 2026-10-13 -- Phase 279 planning complete
+last_updated: "2026-10-13T15:15:53.102Z"
+last_activity: 2026-10-13 -- Phase 279 execution started
 progress:
   total_phases: 14
   completed_phases: 2
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.6 Pay It Down — 277 + 278 closed; Phase 279 context gathered 2026-10-13 → plan next
+**Current focus:** Phase 279 — the-expert-scope-seam
 
 ---
 
@@ -55,11 +55,11 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ## Current Position
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: **278** (One Home for Tools and Filters) — ✅ COMPLETE 2026-10-13 · verification `passed` 5/5 (self-verified) · next **279**; next migration **207**
+Phase: 279 (the-expert-scope-seam) — EXECUTING
 Next: **279** (The Expert Scope Seam) — context gathered 2026-10-13 (`79a0b9afe`, `279-CONTEXT.md` D-01..D-14): 3-part split of `expert_scope.py` (pure / statement / events, repoint, 278 pure-move kit); all 16 SEED-328 items measured still open — fix all small ones, IN-02 + CR-01 gateway test recorded not-fixed; WR-04 reworded to "Won't search", WR-05 quoted background; 4 G-4 Chrome scenarios + two-org CR-03(b) drive. Seeds: 328 folded; 327/320/067 deferred; 303 note. Resume: `/gsd:plan-phase 279`.
-Plan: 4/4 (278-01 pins, 278-02 DEBT-09 one home, 278-03 split, 278-04 SC#5 live smoke + records)
-Status: Ready to execute
-Last activity: 2026-10-13 -- Phase 279 planning complete
+Plan: 1 of 4
+Status: Executing Phase 279
+Last activity: 2026-10-13 -- Phase 279 execution started
 
 ### Quick Tasks Completed
 
