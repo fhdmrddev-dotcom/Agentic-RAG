@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
 status: executing
-last_updated: "2026-10-13T15:15:53.102Z"
-last_activity: 2026-10-13 -- Phase 279 execution started
+last_updated: "2026-10-13T16:25:00.000Z"
+last_activity: 2026-10-13 -- 279-02 complete (9 SEED-328 backend fixes)
 progress:
   total_phases: 14
   completed_phases: 2
   total_plans: 10
-  completed_plans: 6
+  completed_plans: 7
   percent: 14
 ---
 
@@ -57,9 +57,9 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: 279 (the-expert-scope-seam) — EXECUTING
 Next: **279** (The Expert Scope Seam) — context gathered 2026-10-13 (`79a0b9afe`, `279-CONTEXT.md` D-01..D-14): 3-part split of `expert_scope.py` (pure / statement / events, repoint, 278 pure-move kit); all 16 SEED-328 items measured still open — fix all small ones, IN-02 + CR-01 gateway test recorded not-fixed; WR-04 reworded to "Won't search", WR-05 quoted background; 4 G-4 Chrome scenarios + two-org CR-03(b) drive. Seeds: 328 folded; 327/320/067 deferred; 303 note. Resume: `/gsd:plan-phase 279`.
-Plan: 2 of 4 (279-01 COMPLETE 2026-10-13 — move commit `fa164ef3e`; next 279-02, then 279-03, then 279-04)
+Plan: 3 of 4 (279-01 COMPLETE — move `fa164ef3e`; 279-02 COMPLETE 2026-10-13 — `d55e0ef6a`..`11a73af35`; 279-03 running in parallel; then 279-04)
 Status: Executing Phase 279
-Last activity: 2026-10-13 -- 279-01 complete: pins `a90dde594`, checker `24ed4131a`, pure move `fa164ef3e`
+Last activity: 2026-10-13 -- 279-02 complete: 9 lettered commits A-I, backend gate SET == base (71), root-level SET equal (44/44)
 
 **279-01 (2026-10-13):** `expert_scope.py` split into pure (143 lines, no `app.` import) /
 `expert_scope_statement.py` / `expert_scope_events.py`, AST-identical to `a5a94ba67`, no shim, 0 fixture
@@ -67,6 +67,17 @@ bytes changed; checker CLEAR in both modes; root-level set equal (35/35); backen
 `279-base-failed.txt`. Measured surprise: model docstrings are OpenAPI descriptions, so the move commit
 also regenerated `docs/public/api/openapi.{snapshot,public}.json`. 279-02 owns: `RETIRED` entries
 (D-07, WR-08) and removing the 8 strict-xfail markers in `test_279_org_helper.py`.
+
+**279-02 (2026-10-13):** SEED-328 backend items fixed, each RED-first: `_require_thread_org` (1 def + 4
+door calls, send refuses before any write, no active org fails closed — D-18), WR-01 handoff-while-
+streaming 409, WR-02 conditional Expert UPDATE → `ExpertChangeConflict` 409, IN-05 clear stated in the
+thread's org (`_caller_role_in_org`, honoured by construction — **OV-279-01 NOT required**), WR-05
+quoted-background handoff (mitigation, not enforcement), IN-03 per-emitter directive (SEED-327 NOT
+fixed), GET /experts manager view, D-07 r→r exclusion (+ phase279 fixture), WR-08 multi-folder scope
+note (single-folder byte-identical). Gate 71 failed, SET == base. ⚠ Deviations: 2 mock rows in
+`test_267_scope_preview.py` (279-03's file — non-overlapping hunks, confirm the merge) and the
+`test_264_born_for_carrier.py` arity pin 5 → 6. ⚠ Owed to 279-03/04: the send-door 409 hits
+StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 not fetched (no tool).
 
 ### Quick Tasks Completed
 
