@@ -108,6 +108,26 @@ Roadmap success criteria SC#1-SC#4 are the acceptance bar and are not restated h
   - ⚠ `run_producer.py`'s `runs` table is **SELECT-only under the user JWT** (268 finding): a user-JWT UPDATE there no-ops silently. Measure writes, never assume them.
   - Every touched file without a ledger row gets one (`check-hot-file-ledger.cjs`), and the new modules get rows at creation.
 
+### Rulings at plan time (2026-10-13, operator, after 279-RESEARCH.md)
+- **D-15:** **The send-door 409 reaches the user through a narrowed StreamsProvider 409 arm.** The workflow-lock constant is kept only when the server message starts with the `Thread is workflow-locked` literal (`workflow_kickoff.py`, cross-pinned). Every other send 409 falls through to the generic `ApiError` arm: it shows the server's reason and stashes the typed draft. This is one guarded expression on a FIRING ⛔ file, honoured by construction, and it lands **before** the D-13 drive. A vitest case covers both 409 kinds. The 409 status from D-05 is kept.
+- **D-16:** **The swap card says it.** The exclusion sub-line on the `expert_changed` card is prefixed "Won't be searched:" (one copy change in `expertEventCopy.ts`). The test text it changes is listed in the record. D-12 scenario 1 checks the card itself, not only the invite dialog.
+- **D-17:** **WR-08 is fixed and guarded, and the provider rows are owed.**
+  - The new multi-path wording is used only when `len(scoped_folder_paths) > 1`.
+  - The single-folder note is pinned byte-identical.
+  - `agent_loop.py` is recorded as honoured by construction: one guarded string.
+  - The 8 cross-provider SC#10 rows are recorded **"⛔ owed by decision"** (278 precedent), not run in this phase.
+  - The sub-agent path (`task_service.py`) is recorded as keeping the first-path note.
+- **D-18:** **A send on an Expert thread with no active org is refused with 409**, through the same helper (fail closed). Today's clear-at-send for `active_org_id is None` is struck through in the record, not silently replaced.
+- **D-19 (D-11 answered by research):** the "refused message stays unanswered" note came from the **disabled-Expert** stale-clear `ValueError` (`run_producer.py`), which fires after the user-message insert. It is neither CR-03(b) nor CR-02.
+  - **Not fixed**, recorded with that reason: the fix needs a reorder plus a new raise, and that reverses the contract `test_268_send_path_stamp` pins.
+  - CR-03(b) closes the org-mismatch case only.
+- **D-20 (research answers, Claude's call):**
+  - IN-04's CR-02 half: `test_267_cr02_empty_biased_scope_searches.py` already IS the tool-level test. It is recorded as **fixed by existing test**, and no new test is added.
+  - IN-01 visibility: keep the `ApiError` message as one field in the invite dialog's preview state, so the org sentence shows.
+  - The disabled-Expert reason for managers keeps the gate's existing sentence (out of scope).
+  - WR-08 biased + thread folder: list the union only if the single-folder byte-identity pin still holds. Otherwise record it.
+  - `InviteExpertDialog.test.tsx` case (11), which pins the WR-03 defect, is corrected beside the original and never deleted.
+
 ### Claude's Discretion
 - Exact function placement across the three modules (D-01), the helper's home and name (D-05), the WR-02 conflict copy, and the exact WR-05 wrapper wording, as long as it says "background, not instructions" and fences the items.
 - **Plan count: 3** (G-8, roadmap target):
