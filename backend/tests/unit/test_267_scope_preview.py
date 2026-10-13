@@ -1,7 +1,7 @@
 """Phase 267 (D-267-17 / D-267-18 / D-267-19 / PACK-25) — a restricted Expert's cost, stated before
 the invite, from the SAME code the run uses.
 
-``describe_expert_scope`` (``app.services.expert_scope``) builds one ``ScopeStatement`` from
+``describe_expert_scope`` (``app.services.expert_scope_statement``) builds one ``ScopeStatement`` from
 ``resolve_expert_bundle`` (install-aware folders), ``fetch_visible_folders``, ``compose_expert_scope``
 and ``connection_states``. The invite-dialog preview (``scope_preview``) and the transcript event
 (``build_expert_changed_event``) both read that one statement — never a second derivation.
@@ -168,17 +168,17 @@ def scope_patches(*, bundles=None, visible=None):
         return table.get(str(bundle_id))
 
     return (
-        patch("app.services.expert_scope.resolve_expert_bundle", AsyncMock(side_effect=_resolve)),
-        patch("app.services.expert_scope.connection_states", AsyncMock(side_effect=_states)),
+        patch("app.services.expert_scope_statement.resolve_expert_bundle", AsyncMock(side_effect=_resolve)),
+        patch("app.services.expert_scope_statement.connection_states", AsyncMock(side_effect=_states)),
         patch(
-            "app.services.expert_scope.fetch_visible_folders",
+            "app.services.expert_scope_statement.fetch_visible_folders",
             AsyncMock(return_value=list(VISIBLE_FOLDERS if visible is None else visible)),
         ),
     )
 
 
 async def describe(sb, expert_id, thread_folder_id, **kw):
-    from app.services.expert_scope import describe_expert_scope
+    from app.services.expert_scope_statement import describe_expert_scope
 
     p1, p2, p3 = scope_patches(**kw)
     with p1, p2, p3:
@@ -206,7 +206,7 @@ def _latest_acme_names():
 
 @pytest.mark.asyncio
 async def test_restricted_in_a_folder_states_the_excluded_documents_from_one_query():
-    from app.services.expert_scope import scope_preview
+    from app.services.expert_scope_statement import scope_preview
 
     sb = FakeSupabase()
     preview = scope_preview(await describe(sb, HR_ID, ACME_FOLDER))
@@ -236,7 +236,7 @@ async def test_restricted_in_a_folder_states_the_excluded_documents_from_one_que
 
 @pytest.mark.asyncio
 async def test_seven_excluded_documents_report_seven_and_name_five():
-    from app.services.expert_scope import scope_preview
+    from app.services.expert_scope_statement import scope_preview
 
     many = [
         {"filename": f"Doc_{i:02d}.pdf", "folder_id": ACME_FOLDER, "is_latest": True, "source_state": None}
@@ -249,7 +249,7 @@ async def test_seven_excluded_documents_report_seven_and_name_five():
 
 @pytest.mark.asyncio
 async def test_a_biased_expert_excludes_nothing():
-    from app.services.expert_scope import scope_preview
+    from app.services.expert_scope_statement import scope_preview
 
     preview = scope_preview(await describe(FakeSupabase(), FA_ID, ACME_FOLDER))
     assert preview.mode == "biased"
@@ -260,7 +260,7 @@ async def test_a_biased_expert_excludes_nothing():
 
 @pytest.mark.asyncio
 async def test_no_thread_means_no_thread_folder_and_no_document_query():
-    from app.services.expert_scope import scope_preview
+    from app.services.expert_scope_statement import scope_preview
 
     sb = FakeSupabase()
     preview = scope_preview(await describe(sb, HR_ID, None))
@@ -272,7 +272,7 @@ async def test_no_thread_means_no_thread_folder_and_no_document_query():
 
 @pytest.mark.asyncio
 async def test_a_restricted_expert_with_zero_folders_states_the_gate_line_without_raising():
-    from app.services.expert_scope import scope_preview
+    from app.services.expert_scope_statement import scope_preview
 
     empty = resolved(HR_ID, "HR Advisor", "restricted", [])
     preview = scope_preview(await describe(FakeSupabase(), HR_ID, ACME_FOLDER, bundles={HR_ID: empty}))
@@ -282,7 +282,7 @@ async def test_a_restricted_expert_with_zero_folders_states_the_gate_line_withou
 
 @pytest.mark.asyncio
 async def test_an_unnameable_expert_folder_is_named_none():
-    from app.services.expert_scope import scope_preview
+    from app.services.expert_scope_statement import scope_preview
 
     hidden = resolved(HR_ID, "HR Advisor", "restricted", [HIDDEN_FOLDER])
     preview = scope_preview(await describe(FakeSupabase(), HR_ID, None, bundles={HR_ID: hidden}))
@@ -291,10 +291,10 @@ async def test_an_unnameable_expert_folder_is_named_none():
 
 @pytest.mark.asyncio
 async def test_an_expert_the_resolver_refuses_is_a_lookup_error():
-    from app.services.expert_scope import describe_expert_scope
+    from app.services.expert_scope_statement import describe_expert_scope
 
     p1, p2, p3 = scope_patches(bundles={})
-    with p1, p2, p3, patch("app.services.expert_scope.get_expert_service", AsyncMock(return_value=None)):
+    with p1, p2, p3, patch("app.services.expert_scope_statement.get_expert_service", AsyncMock(return_value=None)):
         with pytest.raises(LookupError):
             await describe_expert_scope(
                 supabase=FakeSupabase(), pool=MagicMock(), user_id=USER_ID, org_id=ORG_ID,
@@ -305,7 +305,7 @@ async def test_an_expert_the_resolver_refuses_is_a_lookup_error():
 @pytest.mark.asyncio
 async def test_the_scope_preview_fixture_is_the_real_builders_output():
     """The wire contract 267-04 renders (``fixtures/phase267/scope_preview.json``)."""
-    from app.services.expert_scope import scope_preview
+    from app.services.expert_scope_statement import scope_preview
 
     preview = scope_preview(await describe(FakeSupabase(), HR_ID, ACME_FOLDER))
     fixture = json.loads((FIXTURES / "scope_preview.json").read_text(encoding="utf-8"))
@@ -363,7 +363,7 @@ async def test_the_preview_route_gates_then_describes_the_threads_folder():
          patch.object(threads_mod, "describe_expert_scope", desc), \
          patch.object(threads_mod, "get_pg_pool", AsyncMock(return_value=MagicMock())), \
          patch("app.dependencies.resolve_caller_role", AsyncMock(return_value=("member", set()))), \
-         patch.object(threads_mod, "aexec", AsyncMock(return_value=MagicMock(data={"id": str(thread_id), "folder_id": ACME_FOLDER}))):
+         patch.object(threads_mod, "aexec", AsyncMock(return_value=MagicMock(data={"id": str(thread_id), "folder_id": ACME_FOLDER, "org_id": ORG_ID}))):
         out = await threads_mod.get_expert_scope_preview(
             request=MagicMock(),
             expert_id=UUID(HR_ID),
@@ -384,7 +384,7 @@ async def test_the_preview_route_gates_then_describes_the_threads_folder():
 #
 # Before the first message the dialog's context line reads "This chat · /Client ACME", but the preview
 # had no way to learn that folder (no thread yet, no folder parameter), so it described a chat with no
-# folder: no `Won't use`. The thread `handleSend` then creates DOES carry the folder, and the restricted
+# folder: no `Won't search`. The thread `handleSend` then creates DOES carry the folder, and the restricted
 # run excludes its documents — a cost stated as zero. `folder_id` is read ONLY when there is no thread,
 # and only for a folder the caller can see (404 otherwise, before the gate or any statement).
 
@@ -455,7 +455,7 @@ async def test_WR07_with_a_thread_the_threads_own_folder_wins_over_folder_id():
     thread_id = uuid4()
     p = _route_patches(gate, desc, VISIBLE_FOLDERS)
     with p[0], p[1], p[2], p[3], p[4], \
-         patch.object(threads_mod, "aexec", AsyncMock(return_value=MagicMock(data={"id": str(thread_id), "folder_id": None}))):
+         patch.object(threads_mod, "aexec", AsyncMock(return_value=MagicMock(data={"id": str(thread_id), "folder_id": None, "org_id": ORG_ID}))):
         await threads_mod.get_expert_scope_preview(
             request=MagicMock(),
             expert_id=UUID(HR_ID),

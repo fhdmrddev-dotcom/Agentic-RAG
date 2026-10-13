@@ -281,7 +281,7 @@ export function ExpertDetailModal({
             <SectionTitle>Knowledge Composition</SectionTitle>
             <p className="rounded-lg border border-border/60 bg-muted/25 p-3 text-xs leading-relaxed text-foreground/90">
               {isRestricted
-                ? "Strict isolation — this Expert reads only the knowledge folders bound below. Documents in your chat's own folder will not be used."
+                ? "Strict isolation — this Expert reads only the knowledge folders bound below. Documents in your chat's own folder will not be searched."
                 : "Union scope — this Expert adds the knowledge folders bound below to whatever your chat already reads. Both sets of documents are searched together."}
             </p>
           </section>

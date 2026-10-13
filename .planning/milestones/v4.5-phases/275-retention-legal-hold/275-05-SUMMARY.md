@@ -63,7 +63,8 @@ key-decisions:
 patterns-established:
   - "UAT-found fixes are recorded with their commits AND an owed re-look at the next UAT"
 
-requirements-completed: []
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed was [] and is replaced with the list copied verbatim from 275-05-PLAN.md frontmatter requirements (D-15)
+requirements-completed: [RET-01, RET-02, RET-03, RET-04]
 
 duration: ~1.7h (Task 1 + Task 2 by earlier agents; this executor ~25 min)
 completed: 2026-10-12

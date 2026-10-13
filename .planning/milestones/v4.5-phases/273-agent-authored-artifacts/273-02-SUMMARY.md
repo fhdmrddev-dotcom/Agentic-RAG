@@ -1,6 +1,8 @@
 ---
 phase: 273-agent-authored-artifacts
 plan: 02
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 273-02-PLAN.md frontmatter requirements
+requirements-completed: [ART-01, ART-02, ART-04, ART-05]
 subsystem: frontend / chat artifacts
 tags: [artifacts, recharts, closed-registry, error-boundary, a11y, count-gate]
 requires: []

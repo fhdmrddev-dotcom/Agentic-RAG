@@ -58,6 +58,8 @@ export const EVENT_COPY = {
   threadFolder: (name: string, n: number | null): string =>
     n === null || n === undefined ? `/${name}` : `/${name} (${n})`,
   attachmentsReadable: "Chat attachments stay readable.",
+  /** 279-03 D-16: the exclusion sub-line says what its names ARE before it lists them. */
+  wontBeSearched: "Won't be searched:",
   handoffHeader: (expert: string): string => `${expert} · new chat`,
   stays: (expert: string): string => `${expert} stays`,
   open: (title: string): string => `${title} →`,
@@ -150,7 +152,7 @@ function excludedSubline(excluded: ExpertChangedEvent["excluded"]): string | nul
   const parts = [...names]
   if (k > 0) parts.push(EVENT_COPY.more(k))
   parts.push(EVENT_COPY.attachmentsReadable)
-  return parts.join(" · ")
+  return `${EVENT_COPY.wontBeSearched} ${parts.join(" · ")}`
 }
 
 export function eventCardModel(event: ExpertChangedEvent): EventCardModel {

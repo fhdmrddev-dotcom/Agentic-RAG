@@ -13,6 +13,8 @@
  * zero exceptions.
  *
  * This mechanical guard inspects the six trigger files named in SEED-291 and asserts that:
+ * (Phase 278, SEAM-03: plus the eleven `tools/*.py` modules the tool handlers moved into — the
+ * scanned set follows the CODE, so it is now seventeen files, each named explicitly below.)
  *   1. No dynamic code execution primitives exist (importlib, eval, exec, __import__).
  *   2. Registries remain closed dictionaries and are never populated from dynamic data/DB/inputs.
  *   3. No dynamic callable dispatch (e.g. getattr callable invocation) exists.
@@ -26,6 +28,18 @@
  *   4. backend/app/services/harness/programmatic.py
  *   5. backend/app/services/tool_dispatcher.py
  *   6. backend/app/services/agent_loop.py
+ *   Phase 278 (D-05) — the tool handler families split out of tool_dispatcher.py:
+ *   7. backend/app/services/tools/__init__.py
+ *   8. backend/app/services/tools/base.py
+ *   9. backend/app/services/tools/documents.py
+ *   10. backend/app/services/tools/skills.py
+ *   11. backend/app/services/tools/sandbox.py
+ *   12. backend/app/services/tools/runtime_gap.py
+ *   13. backend/app/services/tools/render_template.py
+ *   14. backend/app/services/tools/workspace.py
+ *   15. backend/app/services/tools/memory.py
+ *   16. backend/app/services/tools/agent_control.py
+ *   17. backend/app/services/tools/connector.py
  *
  * EXIT
  *   0 = clean (closed core intact)
@@ -45,6 +59,19 @@ const TRIGGER_PATHS = [
   'backend/app/services/harness/programmatic.py',
   'backend/app/services/tool_dispatcher.py',
   'backend/app/services/agent_loop.py',
+  // Phase 278 (SEAM-03 / D-05): the handlers left tool_dispatcher.py for these modules. A
+  // closed list, never a glob — a new tools/ module is added here BY NAME, deliberately.
+  'backend/app/services/tools/__init__.py',
+  'backend/app/services/tools/base.py',
+  'backend/app/services/tools/documents.py',
+  'backend/app/services/tools/skills.py',
+  'backend/app/services/tools/sandbox.py',
+  'backend/app/services/tools/runtime_gap.py',
+  'backend/app/services/tools/render_template.py',
+  'backend/app/services/tools/workspace.py',
+  'backend/app/services/tools/memory.py',
+  'backend/app/services/tools/agent_control.py',
+  'backend/app/services/tools/connector.py',
 ];
 
 // Explicitly approved registry assignment sites (file-relative canonical lines):

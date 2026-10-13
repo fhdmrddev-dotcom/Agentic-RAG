@@ -470,7 +470,10 @@ async def list_experts(
         caller_roles=caller_roles,
         include_system=include_system,
         # R265-262-07 / PACK-11: only the management arm may list disabled Experts.
-        enabled_only=True,
+        # 279-02 (SEED-328 drive note): …or a caller holding experts:manage who asks for them. The
+        # permission is asked ONLY when enabled_only=false (short-circuit); a member stays forced True.
+        enabled_only=enabled_only
+        or not await _has_org_permission(request, current_user, active_org, "experts:manage"),
     )
     rows = await _overlay_install_state_for_caller(request, current_user, active_org, pool, rows, org_id)
     return await _overlay_connection_state_for_caller(request, current_user, active_org, pool, rows, org_id)

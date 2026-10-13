@@ -312,7 +312,7 @@ def test_both_branch2_resolve_sites_pass_own_claim():
     the tool-call/emit re-dispatch site (tool_dispatcher.py, via own_claim_for_ctx) AND the
     harness emit pre-resolve (phase_types.py, via str(ctx.run_id)). Editing only
     _handle_render_template would ship the fix green-but-broken on the emit phase."""
-    td = (_BACKEND / "app" / "services" / "tool_dispatcher.py").read_text(encoding="utf-8")
+    td = (_BACKEND / "app" / "services" / "tools" / "render_template.py").read_text(encoding="utf-8")
     pt = (_BACKEND / "app" / "services" / "harness" / "phase_types.py").read_text(encoding="utf-8")
     assert "own_claim_for_ctx" in td, "tool_dispatcher must derive own-claim via the helper (Plan 02)"
     assert "own_claim" in pt, "the harness emit pre-resolve must pass an own-claim (Plan 02)"

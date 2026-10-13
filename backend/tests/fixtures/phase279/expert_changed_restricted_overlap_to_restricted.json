@@ -1,0 +1,47 @@
+{
+  "kind": "expert_changed",
+  "at": "2026-09-25T14:32:00Z",
+  "before": {
+    "id": "e5000000-0000-4000-8000-0000000000e5",
+    "name": "ACME Specialist",
+    "scope_mode": "restricted"
+  },
+  "after": {
+    "id": "e2000000-0000-4000-8000-0000000000b2",
+    "name": "HR Advisor",
+    "scope_mode": "restricted"
+  },
+  "now": {
+    "folders": [
+      {
+        "id": "f2000000-0000-4000-8000-000000000002",
+        "name": "HR Policies",
+        "doc_count": null
+      }
+    ],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+  },
+  "dropped": {
+    "folders": [
+      {
+        "id": "f3000000-0000-4000-8000-000000000003",
+        "name": "Client ACME",
+        "doc_count": null
+      }
+    ],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+  },
+  "excluded": {
+    "count": 4,
+    "names": [
+      "ACME_MSA_2026.pdf",
+      "ACME_SOW_03.docx",
+      "ACME_invoices_Q3.xlsx",
+      "Board_deck_Q3.pptx"
+    ]
+  }
+}

@@ -3,7 +3,7 @@
  * D-267-19 / D-267-27 · UI-SPEC §5.2-5.3, §6.3, §7) — the invite dialog's R1-R10 row matrix.
  *
  * ⛔ THE COST IS STATED BEFORE IT CAN BE ACCEPTED. A restricted row fetches its preview on open and
- * offers NO invite control until the preview answers; the "Won't use · N" heading reads the server's
+ * offers NO invite control until the preview answers; the "Won't search · N" heading reads the server's
  * `excluded_count`, never the list's length (the list is capped at five names).
  *
  * ⛔ CONTENT, NOT PRESENCE, AND AT REST. Every asserted string is rendered text, checked visible
@@ -232,13 +232,14 @@ describe("R4 / R5 / R6 — the restricted-cost preview", () => {
     await within(r).findByTestId("invite-expert-btn-hr-advisor")
   })
 
-  it("(9) resolved (the backend fixture): 'Will use' + 'Won't use · 4', names at rest", async () => {
+  it("(9) resolved (the backend fixture): 'Will use' + 'Won't search · 4', names at rest", async () => {
     await open()
     const r = row("hr-advisor")
     await within(r).findByText("Will use")
     atRest(within(r).getByText("HR Policies"))
     atRest(within(r).getByText("Chat attachments"))
-    atRest(within(r).getByText("Won't use · 4"))
+    // 279-03 WR-04 (D-09/D-16): was atRest(within(r).getByText("Won't use · 4"))
+    atRest(within(r).getByText("Won't search · 4"))
     for (const name of preview.excluded_names as string[]) atRest(within(r).getByText(name))
     atRest(within(r).getByTestId("invite-expert-btn-hr-advisor"))
   })
@@ -251,17 +252,56 @@ describe("R4 / R5 / R6 — the restricted-cost preview", () => {
     })
     await open()
     const r = row("hr-advisor")
-    atRest(await within(r).findByText("Won't use · 7"))
+    // 279-03 WR-04 (D-09/D-16): was atRest(await within(r).findByText("Won't use · 7"))
+    atRest(await within(r).findByText("Won't search · 7"))
     atRest(within(r).getByText("and 2 more"))
   })
 
-  it("(11) nothing excluded → 'Will use' alone, never a 'Won't use · 0' box", async () => {
+  it("(11) nothing excluded → 'Will use' alone, never a 'Won't search · 0' box", async () => {
     mockGetExpertScopePreview.mockResolvedValue({ ...preview, excluded_count: 0, excluded_names: [], thread_folder: null })
     await open()
     const r = row("hr-advisor")
     await within(r).findByText("Will use")
-    expect(within(r).queryByText(/Won't use/)).toBeNull()
+    // 279-03 WR-03: the original (11) asserted NO "Won't" column here — that pinned the defect (SEED-328 WR-03)
+    // 279-03 WR-04 (D-09/D-16): was expect(within(r).queryByText(/Won't use/)).toBeNull()
+    // 279-03 WR-03: was expect(within(r).queryByText(/Won't search/)).toBeNull()
+    // 279-03 WR-03: was expect(within(r).queryByTestId("scope-ledger-col-no")).toBeNull()
+    // On an EXISTING thread with no folder a restricted Expert searches only its own folders, so
+    // "All your documents" is what it will not search — stated before the invite, never a "· 0" box.
+    const wont = within(r).getByTestId("scope-ledger-col-no")
+    atRest(within(wont).getByText("Won't search"))
+    atRest(within(wont).getByText("All your documents"))
+    expect(within(r).queryByText(/Won't search · 0/)).toBeNull()
+    atRest(within(r).getByTestId("invite-expert-btn-hr-advisor"))
+  })
+
+  it("(11b) 279-03 WR-03: a brand-new chat (no thread yet) keeps 'Will use' alone", async () => {
+    mockGetExpertScopePreview.mockResolvedValue({ ...preview, excluded_count: 0, excluded_names: [], thread_folder: null })
+    await open({ threadId: null })
+    const r = row("hr-advisor")
+    await within(r).findByText("Will use")
+    expect(within(r).queryByText(/Won't search/)).toBeNull()
     expect(within(r).queryByTestId("scope-ledger-col-no")).toBeNull()
+  })
+
+  it("(11c) 279-03 IN-01 (D-20): a preview refusal shows the server's sentence, not the generic copy", async () => {
+    const { ApiError } = await import("@/lib/api/_core")
+    mockGetExpertScopePreview.mockRejectedValue(
+      new ApiError("Switch to this chat's organization to preview an Expert.", 409),
+    )
+    await open()
+    const alert = await within(row("hr-advisor")).findByTestId("scope-preview-error")
+    expect(alert.textContent).toContain("Switch to this chat's organization to preview an Expert.")
+    expect(alert.textContent).not.toContain("Couldn't check which documents")
+    atRest(within(alert).getByText("Switch to this chat's organization to preview an Expert."))
+  })
+
+  it("(11d) 279-03 IN-01: a network failure (TypeError) keeps the generic copy", async () => {
+    mockGetExpertScopePreview.mockRejectedValue(new TypeError("Failed to fetch"))
+    await open()
+    const alert = await within(row("hr-advisor")).findByTestId("scope-preview-error")
+    expect(alert.textContent).toContain("Couldn't check which documents HR Advisor will skip.")
+    expect(alert.textContent).not.toContain("Failed to fetch")
   })
 
   it("(12) a restricted Expert with no folders says it cannot answer from documents, and has no invite", async () => {
@@ -292,7 +332,8 @@ describe("R4 / R5 / R6 — the restricted-cost preview", () => {
     expect(callsFor("e-hr2")).toBe(1)
     mockGetExpertScopePreview.mockImplementation(() => Promise.resolve(preview))
     await user.click(within(r).getByRole("button", { name: "Try again" }))
-    await within(r).findByText("Won't use · 4")
+    // 279-03 WR-04 (D-09/D-16): was await within(r).findByText("Won't use · 4")
+    await within(r).findByText("Won't search · 4")
     expect(callsFor(HR.id)).toBe(2)
     expect(callsFor("e-hr2")).toBe(1)
   })
@@ -307,7 +348,8 @@ describe("R4 / R5 / R6 — the restricted-cost preview", () => {
   it("(15) R1: the active restricted row keeps its ledger at rest beside the Active pill", async () => {
     await open({ currentExpertId: HR.id, currentExpertName: "HR Advisor", hasMessages: true })
     const r = row("hr-advisor")
-    atRest(await within(r).findByText("Won't use · 4"))
+    // 279-03 WR-04 (D-09/D-16): was atRest(await within(r).findByText("Won't use · 4"))
+    atRest(await within(r).findByText("Won't search · 4"))
     atRest(within(r).getByText("Active"))
     expect(within(r).queryByText(/is active here/)).toBeNull()
   })
@@ -412,7 +454,7 @@ describe("WR-06 — the biased narrowing is stated before the invite", () => {
     excluded_names: [],
   }
 
-  it("(W6) a biased row on a chat with no folder shows Will use / Won't use · All your documents at rest", async () => {
+  it("(W6) a biased row on a chat with no folder shows Will use / Won't search · All your documents at rest", async () => {
     mockGetExpertScopePreview.mockImplementation((id: string) =>
       Promise.resolve(id === FA.id ? narrowing : preview),
     )
@@ -420,7 +462,8 @@ describe("WR-06 — the biased narrowing is stated before the invite", () => {
     expect(mockGetExpertScopePreview).toHaveBeenCalledWith(FA.id, "t-1")
     const r = row("financial-analyzer")
     const wont = await within(r).findByTestId("scope-ledger-col-no")
-    expect(wont.textContent).toContain("Won't use")
+    // 279-03 WR-04 (D-09/D-16): was expect(wont.textContent).toContain("Won't use")
+    expect(wont.textContent).toContain("Won't search")
     atRest(within(wont).getByText("All your documents"))
     atRest(within(r).getByText("Financial Reports"))
     // the statement never blocks the invite
@@ -446,7 +489,7 @@ describe("IN-02 — the Active pill does nothing", () => {
 })
 
 // 267-UI-REVIEW top fix #3 — the list viewport was the pre-ledger `max-h-[380px]`; a restricted row
-// with its Will use / Won't use ledger is ~360px, so the dialog showed ONE Expert and the R7
+// with its Will use / Won't search ledger is ~360px, so the dialog showed ONE Expert and the R7
 // Replace / New chat decision sat below the fold. The cap is now viewport-relative.
 describe("UI-REVIEW #3 — the list viewport is sized for ledger rows", () => {
   it("(U3) the scrolling list is capped relative to the viewport, never at the pre-ledger 380px", async () => {

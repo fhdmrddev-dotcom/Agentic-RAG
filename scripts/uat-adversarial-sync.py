@@ -153,7 +153,7 @@ async def run_adversarial_sync_uat() -> bool:
 
     with patch("app.services.connectors.org_scope.resolve_connector_org", AsyncMock(return_value=MagicMock(ok=True, org_id=org_id))), \
          patch("app.services.connector_service.list_connections", AsyncMock(return_value=[mock_conn])), \
-         patch("app.services.tool_dispatcher.write_audit_entry", AsyncMock()), \
+         patch("app.services.tools.connector.write_audit_entry", AsyncMock()), \
          patch("app.services.connectors.service_tools.tool_facet", MagicMock(return_value=("google", True))):
 
         # Attempt to dispatch the coerced action: send_email to exfil@attacker.com

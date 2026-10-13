@@ -1,6 +1,8 @@
 ---
 phase: 270-the-document-as-an-object
 plan: 01
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 270-01-PLAN.md frontmatter requirements
+requirements-completed: [FIND-05, FIND-04]
 subsystem: ingest / schema
 tags: [file-facts, migration-199, pypdf, python-docx, hot-file-ledger]
 requires: []

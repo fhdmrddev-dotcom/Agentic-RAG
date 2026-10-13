@@ -193,28 +193,28 @@ async def test_dispatch_routes_to_correct_handler():
 
 
 def test_normalize_optional_treats_null_string_as_none() -> None:
-    from app.services.tool_dispatcher import _normalize_optional
+    from app.services.tools.workspace import _normalize_optional
     assert _normalize_optional("null") is None
     assert _normalize_optional("None") is None
     assert _normalize_optional("") is None
 
 
 def test_normalize_optional_passes_through_real_values() -> None:
-    from app.services.tool_dispatcher import _normalize_optional
+    from app.services.tools.workspace import _normalize_optional
     assert _normalize_optional("docs/") == "docs/"
     assert _normalize_optional(None) is None
     assert _normalize_optional(42) == 42
 
 
 def test_normalize_optional_int_coerces_string_integers() -> None:
-    from app.services.tool_dispatcher import _normalize_optional_int
+    from app.services.tools.workspace import _normalize_optional_int
     assert _normalize_optional_int("1") == 1
     assert _normalize_optional_int("  42  ") == 42
     assert _normalize_optional_int(7) == 7
 
 
 def test_normalize_optional_int_null_strings_become_none() -> None:
-    from app.services.tool_dispatcher import _normalize_optional_int
+    from app.services.tools.workspace import _normalize_optional_int
     assert _normalize_optional_int("null") is None
     assert _normalize_optional_int("None") is None
     assert _normalize_optional_int("") is None
@@ -224,7 +224,7 @@ def test_normalize_optional_int_null_strings_become_none() -> None:
 def test_normalize_optional_int_uncoercible_becomes_none() -> None:
     """Defensive: weird strings shouldn't raise -- the downstream code
     handles None gracefully and treats it as 'no optional given'."""
-    from app.services.tool_dispatcher import _normalize_optional_int
+    from app.services.tools.workspace import _normalize_optional_int
     assert _normalize_optional_int("not-a-number") is None
     assert _normalize_optional_int([]) is None
 
@@ -258,7 +258,7 @@ async def test_workspace_list_normalizes_str_null_prefix() -> None:
         scoped_folder_path=None, emit=AsyncMock(), spawn=lambda c: None,
     )
     with patch(
-        "app.services.tool_dispatcher.ws_list_files",
+        "app.services.tools.workspace.ws_list_files",
         side_effect=_fake_list,
     ):
         result = await _handle_workspace_list({"prefix": "null"}, ctx)
@@ -293,7 +293,7 @@ async def test_workspace_read_coerces_str_int_line_args() -> None:
         scoped_folder_path=None, emit=AsyncMock(), spawn=lambda c: None,
     )
     with patch(
-        "app.services.tool_dispatcher.ws_read_file",
+        "app.services.tools.workspace.ws_read_file",
         side_effect=_fake_read,
     ):
         result = await _handle_workspace_read(
@@ -326,7 +326,7 @@ def test_pip_install_uses_system_interpreter_no_stream_callbacks():
     """_pip_install must issue `python -m pip install` via session.execute_command
     with NO on_stdout/on_stderr stream callbacks (non-stream => reliable exit_code),
     targeting the SAME interpreter as `python -u` (Defect B)."""
-    from app.services.tool_dispatcher import _pip_install
+    from app.services.tools.sandbox import _pip_install
 
     session = MagicMock()
     session.execute_command.return_value = _FakeConsole(exit_code=0)
@@ -346,7 +346,7 @@ def test_pip_install_uses_system_interpreter_no_stream_callbacks():
 async def test_declared_install_retries_once_and_surfaces_stderr():
     """A declared install returning a non-zero exit code is retried EXACTLY once,
     and on persistent failure the pip stderr is surfaced (NOT swallowed)."""
-    from app.services.tool_dispatcher import _install_declared_libraries
+    from app.services.tools.sandbox import _install_declared_libraries
 
     session = MagicMock()
     session.execute_command.return_value = _FakeConsole(
@@ -363,7 +363,7 @@ async def test_declared_install_retries_once_and_surfaces_stderr():
 @pytest.mark.asyncio
 async def test_declared_install_retry_success_returns_empty():
     """A transient failure that succeeds on the single retry surfaces NO error."""
-    from app.services.tool_dispatcher import _install_declared_libraries
+    from app.services.tools.sandbox import _install_declared_libraries
 
     session = MagicMock()
     session.execute_command.side_effect = [
@@ -380,7 +380,7 @@ async def test_declared_install_retry_success_returns_empty():
 @pytest.mark.asyncio
 async def test_declared_install_success_first_try_single_call():
     """A clean install proceeds with a single call and no surfaced error."""
-    from app.services.tool_dispatcher import _install_declared_libraries
+    from app.services.tools.sandbox import _install_declared_libraries
 
     session = MagicMock()
     session.execute_command.return_value = _FakeConsole(exit_code=0)
@@ -406,7 +406,7 @@ class _FakeCtx:
 
 
 def test_extract_missing_module_reads_stderr_and_stdout():
-    from app.services.tool_dispatcher import _extract_missing_module
+    from app.services.tools.sandbox import _extract_missing_module
 
     assert _extract_missing_module(
         "", "ModuleNotFoundError: No module named 'fpdf2'"
@@ -419,7 +419,7 @@ def test_extract_missing_module_reads_stderr_and_stdout():
 
 
 def test_install_failed_detail_shape():
-    from app.services.tool_dispatcher import _install_failed_detail
+    from app.services.tools.sandbox import _install_failed_detail
 
     detail = _install_failed_detail("badpkg", "ERROR: " + "x" * 500)
     assert detail["module"] == "badpkg"
@@ -434,7 +434,7 @@ def test_install_failed_detail_shape():
 async def test_autoheal_installs_and_reruns_once():
     """(b) An undeclared ModuleNotFoundError installs X via `python -m pip install`
     then re-runs the code exactly once (threadpool-wrapped) and adopts the result."""
-    from app.services.tool_dispatcher import _autoheal_missing_module
+    from app.services.tools.sandbox import _autoheal_missing_module
 
     session = MagicMock()
     session.execute_command.side_effect = [
@@ -461,7 +461,7 @@ async def test_autoheal_installs_and_reruns_once():
 async def test_autoheal_run_scoped_bound_second_miss_no_reinstall():
     """(c) A module already heal-attempted THIS run (per-run Redis set says so) goes
     straight to the honest result — the run-scoped store is consulted, no re-install."""
-    from app.services.tool_dispatcher import _autoheal_missing_module
+    from app.services.tools.sandbox import _autoheal_missing_module
 
     session = MagicMock()
     redis = MagicMock()
@@ -488,7 +488,7 @@ async def test_autoheal_run_scoped_bound_second_miss_no_reinstall():
 async def test_autoheal_redis_unavailable_falls_back_to_call_local():
     """(d) Redis raising on the bound check/record must NOT break execute_code —
     the heal falls back to the call-local set and still proceeds/bounds once."""
-    from app.services.tool_dispatcher import _autoheal_missing_module
+    from app.services.tools.sandbox import _autoheal_missing_module
 
     session = MagicMock()
     session.execute_command.side_effect = [
@@ -518,7 +518,7 @@ async def test_autoheal_redis_unavailable_falls_back_to_call_local():
 async def test_autoheal_install_failure_returns_honest_result():
     """A genuine bad package: install fails → honest install_failed with pip stderr,
     NO re-run."""
-    from app.services.tool_dispatcher import _autoheal_missing_module
+    from app.services.tools.sandbox import _autoheal_missing_module
 
     session = MagicMock()
     session.execute_command.return_value = _FakeConsole(
@@ -547,7 +547,7 @@ async def test_autoheal_install_failure_returns_honest_result():
 async def test_autoheal_known_missing_module_not_healed():
     """A KNOWN_MISSING permanent gap (markitdown) is left to _classify_runtime_gap —
     the auto-heal passes through (None), never installs."""
-    from app.services.tool_dispatcher import _autoheal_missing_module
+    from app.services.tools.sandbox import _autoheal_missing_module
 
     session = MagicMock()
     ctx = _FakeCtx(redis=None, run_id=None)
@@ -566,7 +566,7 @@ async def test_autoheal_known_missing_module_not_healed():
 async def test_autoheal_declared_failure_no_module_surfaces_honestly():
     """(a) A persistent declared-install failure with no ModuleNotFound in output
     still surfaces an honest result (not swallowed)."""
-    from app.services.tool_dispatcher import _autoheal_missing_module
+    from app.services.tools.sandbox import _autoheal_missing_module
 
     session = MagicMock()
     ctx = _FakeCtx(redis=None, run_id=None)
@@ -596,7 +596,7 @@ async def test_run_bounded_sandbox_timeout_kills_container_and_raises(monkeypatc
     """A blocking sandbox call that overruns the wall-clock ceiling KILLS the
     container (the only way to free an uncancellable thread) and raises
     _SandboxCommandTimeout — mirroring the primary run's 096/SEED-063 abort."""
-    from app.services import tool_dispatcher as td
+    from app.services.tools import sandbox as td
 
     killed: dict = {}
     monkeypatch.setattr(
@@ -625,7 +625,7 @@ async def test_run_bounded_sandbox_timeout_kills_container_and_raises(monkeypatc
 async def test_run_bounded_sandbox_disabled_ceiling_runs_unbounded(monkeypatch):
     """timeout_s in {None, 0, <0} disables the cap (operator escape hatch) — the call
     completes and kill_session is NEVER touched."""
-    from app.services import tool_dispatcher as td
+    from app.services.tools import sandbox as td
 
     killed: dict = {}
     monkeypatch.setattr(
@@ -646,7 +646,7 @@ async def test_autoheal_rerun_timeout_surfaces_honest_and_no_exec_result(monkeyp
     """CR-01: when the healed RE-RUN overruns the ceiling, the auto-heal returns an
     honest `install_failed` (installed-but-aborted) and adopts NO exec_result — so the
     run is a clean, honest failure instead of a wedged zombie."""
-    from app.services import tool_dispatcher as td
+    from app.services.tools import sandbox as td
 
     async def _fake_bounded(func, *args, thread_id, timeout_s):
         # pip install (func is _pip_install) succeeds; the `python -u` re-run overruns.
@@ -676,7 +676,7 @@ async def test_autoheal_rerun_timeout_surfaces_honest_and_no_exec_result(monkeyp
 async def test_declared_install_pip_timeout_surfaces_honest_reason(monkeypatch):
     """CR-01: a hung `pip install` (network stall) that overruns the ceiling surfaces
     an honest aborted reason (never silently swallowed, never a wedged run)."""
-    from app.services import tool_dispatcher as td
+    from app.services.tools import sandbox as td
 
     async def _fake_bounded(func, *args, thread_id, timeout_s):
         raise td._SandboxCommandTimeout(timeout_s)

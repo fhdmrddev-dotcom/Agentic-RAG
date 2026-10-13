@@ -222,6 +222,10 @@ carries the verdict — **extraction due** — and this is the cell it carried b
 
 > extraction due — ⚠ row read `satisfied (075.7)` for ~29 phases
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**276-REVIEW B-WR-01**: avatar cap-pause arg also needs a Continue left. No hook, no store read
+
 ## `backend/app/api/threads.py`
 
 **Re-derived 2026-08-17 (extraction):** `233 commits / 76 phases / 1322 L` · quick-task buckets excluded: `260328`, `260405` · **G-5 FIRES** (76 phases vs threshold 3) — extraction due — **hottest file in the repo**; row read `9+`.
@@ -313,6 +317,10 @@ carries the verdict — ****extraction TAKEN 2026-08-17**** — and this is the 
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `234 / 76 / 1273` → `238 / 78 / 1408`.** 214-16 added `launch_inputs` to the existing request model and changed no transport. The SSE-transport discharge is untouched. Phase buckets gain `214`.
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**274-01**: delete_thread collects paths BEFORE the row delete, removes bytes AFTER it — 1 import, 0 new branches (AST-pinned). ⛔ 0 new send-path branches
+
 ## `frontend/src/providers/StreamsProvider.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `84 commits / 33 phases / 4119 L` · quick-task buckets excluded: `260529` · **G-5 FIRES** (33 phases vs threshold 3) — honoured by construction (194.1) — largest file in the frontend tree.
@@ -345,6 +353,10 @@ carries the verdict — **honoured by construction (194.1)** — and this is the
 **The cost, stated rather than left for a later reader to discover:** a run that ends on `error` / `cancelled` / `timed_out` **without** a `done` never reaches the raw `onDone`, so a burst still open at that moment is not written and the label carries no number. ⚠ **That is unchanged from 243-04** (which did not close the span there either) and it is the honest fallback, not a regression — recorded here because it is the one shape where thinking really happened and the label stays silent.
 
 **Per G-5 the next phase adding a genuinely second concern here still owes a refactor recommendation FIRST, and the named seam is unchanged** — the per-surface message buckets, the SSE subscription lifecycle, the mount/derive reconcile, `sendMessage`'s kickoff path and the run-liveness slices are five concerns in one 4,435-line provider.
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE an 8th time (`102/37/4880`). NOT modified by 253 — re-derived under CR-08. ⛔ `onTurnBoundary` FLUSHES before moving, or a turn's tail leaks into the next body
 
 ## `frontend/src/hooks/useMessages.ts`
 
@@ -724,6 +736,10 @@ The duplicate row's own cell is preserved verbatim rather than deleted (G-5 ⚠ 
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `47 / 21 / 2664` → `50 / 23 / 2809`.** 214-01 re-pointed this file at the argument leaf (`backend/app/services/connectors/args.py`) for BOTH shapes, so the resolution logic left. ⚠ **An `upstream` argument source is INERT on native capability rows here** — see `SEED-217`. Phase buckets gain `214`.
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row was STALE at `53/26/2937` and **256-05 does NOT modify it** — re-derived as an observation. extraction TAKEN (200-03). Its `:1586` recording is the shape 256-05 mirrored
+
 ## `frontend/src/pages/WorkflowsPage.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `34 commits / 12 phases / 1176 L` · **G-5 FIRES** (12 phases vs threshold 3) — satisfied (192 / 192.1).
@@ -983,6 +999,10 @@ carries the verdict — **honoured by construction (200.1)** — and this is the
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `14 / 9 / 319` → `16 / 10 / 438`.** 214-16 carried the launch inputs; the read-side lockstep rule and its one recorded exception are unchanged. Phase buckets gain `214`.
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+honoured by construction (**268-03**: `folder_id`/`clear_folder` on `ThreadUpdate` + `ScopeEffect`, additive; both pairs in one body = 422)
+
 ## `backend/app/api/workflows.py`
 
 **Re-derived 2026-08-17 (extraction):** `35 commits / 17 phases / 1962 L` · quick-task buckets excluded: `260814` · **G-5 FIRES** (17 phases vs threshold 3) — extraction due — not taken in q5r (no 2nd concern).
@@ -1073,6 +1093,10 @@ What it gains in `258-03`: exactly two route-level dependency bindings `Depends(
 - Total file delta is strictly compositional (approx. 4 lines: 1 import + 2 decorator dependency arguments).
 ⚠ **The extraction remains OWED and the named seam is unchanged** (modular decomposition across definition CRUD, validate/lint, grounding palette, publish gauntlet, run launcher, and template door). Taking that five-way refactor inside an entitlement enforcement phase would smuggle an architectural rewrite into a commercial security boundary; the change honours G-5 by adding only pure dependency wiring while leaving the owed extraction unobstructed.
 
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **extraction still OWED** · honoured by construction (258-03: 2 Depends, no branch)
 
 ## `backend/app/services/harness/grounding.py`
 
@@ -1429,6 +1453,10 @@ carries the verdict — **honoured by construction (193.2 / 194 / 192.2 / **200.
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `43 / 21 / 2194` → `48 / 25 / 2585`.** 214 read and wrote the same rows through the same accessors; no second persistence concern entered. Phase buckets gain `214`.
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row was STALE at `48/25/2585`. honoured by construction (**256-05**): **COMMENT-ONLY** — `persist_run_usage`'s body and `TOKEN_COVERAGE_LEGS` byte-unchanged; 3 stale pins corrected beside originals
+
 ## `backend/app/services/harness/publish_service.py`
 
 ### ⚠ Re-derived 2026-09-19 (Phase 256 gap-closure round 1, plan `256-05`) — the row was STALE a FOURTH time
@@ -1569,6 +1597,10 @@ The duplicate row's own cell is preserved verbatim rather than deleted (G-5 ⚠ 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `22 / 9 / 1223` → `23 / 10 / 1567`.** The five new lint codes are minted through the same `LintError(` seam the file already owned. ⚠ `test_182`'s drift detector was structurally blind to expression-minted codes — `SEED-220`. Phase buckets gain `214`.
 
 **268-REVIEW (2026-09-29) — `29 / 13 / 1942`, first 268 touch. Honoured by construction.** WR-06: the golden-run producer shell was inserted with no `org_id`, so for a two-org owner it (and, via `insert_run`'s parent copy, every golden-run sub-agent) took the mig-106 trigger's `LIMIT 1` org and its spend showed in the other org's `/admin/spend`. It now carries `_golden_run_org_id` — the definition's org `_resolve_publish_supabase` already returns and scopes the client by. **One kwarg, no branch.** ⛔ The validation ctx still withholds `org_id` (the Phase 190 fence at step 4 is unchanged). Named, not fixed: the ephemeral validation thread and the golden `workflow_runs` row still take the trigger.
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`28/12/1939`). **268-REVIEW WR-06**: the golden shell carries the definition's org — one kwarg. ⛔ ctx still withholds org
 
 ## `backend/app/services/workflow_authoring.py`
 
@@ -1717,6 +1749,10 @@ carries the verdict — **honoured by construction (194) — at threshold** — 
 
 > at threshold — honoured by construction (194)
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id` + `expert_id`, nothing else. ⛔ NOT the shape to copy (C-5)
+
 ## `backend/app/api/runs.py`
 
 **Re-derived 2026-08-17 (extraction):** `35 commits / 16 phases / 1430 L` · **G-5 FIRES** (16 phases vs threshold 3) — honoured by construction (194).
@@ -1743,6 +1779,10 @@ expression at the existing call: the run's own `org_id` (the value the carrier l
 carries the verdict — **honoured by construction (194)** — and this is the cell it carried before the split:
 
 > honoured by construction (194)
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches
 
 ## `backend/app/services/harness_engine.py`
 
@@ -1809,6 +1849,10 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `46 / 16 / 2567` → `54 / 20 / 3135`.** The approval composer takes the service it cannot know as a parameter; a failing connection lookup can no longer kill the pause. Phase buckets gain `214`.
 
 **268-REVIEW (2026-09-29) — `60 / 23 / 3297`, first 268 touch. Honoured by construction.** WR-06: `_build_resume_context` minted the resume producer shell with no `org_id`; for a two-org owner the shell and every re-driven sub-agent under it (parent copy) took the trigger's `LIMIT 1` org (driven RED on real Postgres, `test_268_shell_org.py`). The run's own org — which this builder already resolved to scope its service-role client — is now resolved ABOVE the INSERT and passed as `org_id`. **The org read MOVED, not added; one kwarg, no branch.**
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`58/21/3290`). **268-REVIEW WR-06**: the resume shell carries its run's org — the org read MOVED above the INSERT, one kwarg
 
 ## `frontend/src/components/chat/ThinkingBlock.tsx`
 
@@ -1885,6 +1929,10 @@ first thing to leave should be the clamp — there are now three of them in this
 home, which is `SEED-284`'s shape one concern over.
 
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE (`4/1/313`) and it does NOT fire yet — 2 phases, not 1. NOT modified by 253. ⛔ the ONE renderer of the model's process prose, now from TWO sources
+
 ## `frontend/src/components/chat/RunCard.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `21 commits / 9 phases / 608 L` · **G-5 FIRES** (9 phases vs threshold 3) — honoured by construction (194).
@@ -1918,6 +1966,10 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 
 **The three seams this row names — the run-identity header, the status/terminal vocabulary (`statusGlyph` / `statusWord` / `categorizeError`), and the elapsed-timer machinery — ALL REMAIN**, and the elapsed machinery is now the one with the strongest claim on the next extraction, because state 2 is the only thing still holding it in a card. **The next phase adding a genuinely new concern here still owes a refactor recommendation FIRST. It inherits `28 / 14 / 710`.**
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**276-06**: provider logo static, header spinner gone (D-27). ⛔ Bot stays the unknown-provider fallback
+
 ## `frontend/src/components/chat/MessageInput.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `25 commits / 13 phases / 478 L` · **G-5 FIRES** (13 phases vs threshold 3) — honoured by construction (194.1).
@@ -1938,6 +1990,10 @@ carries the verdict — **honoured by construction (194.1)** — and this is the
 
 > honoured by construction (194.1)
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`38/19/977`). **268-03**: +2 optional ReactNode slots; hooks unchanged. ⛔ 0 new top-level controls
+
 ## `frontend/src/components/chat/MessageList.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `19 commits / 8 phases / 267 L` · **G-5 FIRES** (8 phases vs threshold 3) — honoured by construction (194.1).
@@ -1957,6 +2013,10 @@ carries the verdict — **honoured by construction (194.1)** — and this is the
 carries the verdict — **honoured by construction (194.1)** — and this is the cell it carried before the split:
 
 > honoured by construction (194.1)
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`23/10/366`). **267-04**: the turn index skips system rows; no prop added
 
 ## `frontend/src/components/chat/ChatArea.tsx`
 
@@ -2036,6 +2096,10 @@ carries the verdict — **honoured by construction (194.1)** — and this is the
 
 > honoured by construction (194.1) — **strongest FE extraction case**
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**276-06**: hero tile → static Iris (`idle`): 1 import + 1 swap, hooks unchanged. ⛔ no scope branch in send
+
 ## `frontend/src/components/panel/PendingAskCard.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `10 commits / 5 phases / 629 L` · **G-5 FIRES** (5 phases vs threshold 3) — honoured by construction (194.1).
@@ -2058,6 +2122,10 @@ carries the verdict — **honoured by construction (194.1)** — and this is the
 
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `10 / 5 / 629` → `13 / 7 / 736`.** ⚠ **A shipped vocabulary with no consumer.** 214-11 measured `ASK_PAUSED` count `0` in this file. Recorded as an open finding, not as a mitigation. Phase buckets gain `214`.
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row was STALE at `14/7/765`; G-5 FIRES at 8 phases. honoured by construction (**244-15**): ONE optional prop, ONE composed callback in the STACK, `useState` 9→9 — no new state on a 3-home shell
 
 ## `frontend/src/pages/WorkflowRunPage.tsx`
 
@@ -2211,6 +2279,10 @@ carries the verdict — **honoured by construction (195)** — and this is the c
 
 > honoured by construction (195) — ⚠ **was ABSENT at three (exactly at threshold)**; its own *"keep byte-for-byte identical"* copy-confession is now deleted
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical
+
 ## Phase 196 — ELEVEN files that were ABSENT from this ledger, and every one of them fires G-5
 
 *(Added 2026-08-18 by plan `196-09`, discharging `196-CONTEXT.md` D-22 / D-23 for the subset Phase 196
@@ -2229,6 +2301,10 @@ forty-two, and `frontend/src/lib/api.ts` for ninety-seven.**
 ---
 
 ### `frontend/src/lib/api.ts`
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else
 
 ### ✅ 2026-08-25 (Phase 207) — THE SPLIT IS TAKEN. The trigger is RETIRED, not re-declined.
 
@@ -2423,6 +2499,10 @@ carries the verdict — **honoured by construction (204) — seam named: `MODEL_
 
 > ⚠ **was ABSENT at FORTY-TWO phases** (196) — **the D-22 headline**; seam named: `MODEL_CAPABILITIES` + its readers out, with a same-commit re-export ⚠ honoured by construction (**204**) — 3 appended settings, all default-safe. ⚠ the file was NOT in 204-03's `files_modified` and was edited anyway (declared deviation): reading `os.environ` in the service instead would have added a 4th config mechanism AND hidden the new var from `check-deploy-drift.sh`'s `.env.example` census.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`88/51/1695`). **275-03**: ONE flag `retention_sweep_enabled` (default False); hour/poll/lease stay constants (D-37). ⛔ `MODEL_CAPABILITIES` seam OWED
+
 ### `frontend/src/types/index.ts`
 
 **Re-derived 2026-08-18 (plan `196-09`): `70 commits / 56 phases / 1154 L`** · quick-task bucket excluded:
@@ -2597,6 +2677,10 @@ carries the verdict — **⚠ absent at 16 phases (196) — the file that ENFORC
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `118 / 21 / 3909` → `124 / 24 / 4045`.** This phase's close added twelve BASELINE keys taken from the gate's OWN printed `— N new` figures, never hand-derived. Phase buckets gain `214`.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-02/04**: retention dir + 9 suites pinned; `OrgAdminShell.test.tsx` adopted (11)
+
 ### `backend/app/main.py`
 
 **Re-derived 2026-08-18 (plan `196-09`): `72 commits / 53 phases / 783 L`** · six-digit dated quick-task
@@ -2632,6 +2716,10 @@ started to hold logic.**
 carries the verdict — **honoured by construction (204)** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT at FIFTY-THREE phases** (196) — no seam proposed; a registration file doing one thing 40× ⚠ honoured by construction (**204**) — 2 router registrations + one lifespan start/stop behind a default-OFF flag. ⚠ the scheduler is STOPPED FIRST among run-touching shutdown steps (it is the only lifespan component that STARTS work), and it runs in EVERY worker with NO leader: exactly-once belongs to the claiming transaction, and a leader's failure mode is that NOTHING fires, silently.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-03**: one flag-guarded RetentionSweepService start + stop, one `include_router(retention.router)`. ⛔ scheduler_service untouched
 
 ### `backend/app/api/admin.py`
 
@@ -2686,6 +2774,10 @@ concern here owes a refactor recommendation FIRST.**
 carries the verdict — **⚠ absent at 12 phases (added 196)** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT at TWELVE phases** (196) — ⚠ `_MODEL_CAP_COLUMNS` is the SQLi boundary and MUST stay in this module
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged
 
 ### `backend/app/api/settings.py`
 
@@ -2780,6 +2872,10 @@ carries the verdict — **⚠ absent at 16 phases (added 196)** — and this is 
 
 > ⚠ **was ABSENT at SIXTEEN phases** (196) — SC#3's scope fence lives here (`verified_models` untouched)
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged
+
 ### `backend/app/services/multimodal_service.py`
 
 **Re-derived 2026-08-28 (SEED-227): `14 commits / 7 phases / 984 L`** · six-digit dated quick-task buckets:
@@ -2866,6 +2962,10 @@ chunk INSERT (`:2296-2308`) — ONE of the four BE-1 write sites (`multimodal_se
 
 ---
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-02**: 2 `assert_none_held` calls + `map_hold_refusal` + storage moved below the row delete (D-38). 0 new `if` (AST-pinned vs PHASE_BASE). `Request` param only
+
 ### `backend/app/services/harness/validator_kinds.py`
 
 #### ⚠ Re-derived 2026-09-19 (Phase 256 gap-closure round 1, plan `256-05`) — STALE in BOTH registers, at DIFFERENT values
@@ -2948,6 +3048,10 @@ carries the verdict — **⚠ absent at 5 phases (added 196)** — and this is t
 
 > ⚠ **was ABSENT at FIVE phases** (196) — ⚠ fix the ARGUMENT, never `resolve_judge_model`'s body; latent D-122-04 drift → `SEED-175`
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE a 2nd time (`14/6/762`, and `12/5/749` before). honoured by construction (**256-05**): ONE function-local import + ONE call above the failure arm; branches 0 new; registries untouched
+
 ### `backend/app/services/eval_runner_service.py`
 
 **Re-derived 2026-08-18 (plan `196-09`): `12 commits / 7 phases / 959 L`** · six-digit dated quick-task
@@ -2985,6 +3089,10 @@ carries the verdict — **⚠ absent at 7 phases (added 196)** — and this is t
 
 > ⚠ **was ABSENT at SEVEN phases** (196) — judge consumers 1 + 2, rewired off the env singleton
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 at 256-03's head
+
 ### `frontend/src/components/admin/CapabilityGrid.tsx`
 
 **Derived 2026-09-22 (263-REVIEW.md WR-07): `3 commits / 3 phases / 264 L`** · six-digit dated quick-task
@@ -3013,6 +3121,10 @@ self_improve_disabled`, then a manual `POST /skills` returned **201**. The flag 
 **Named seam for the next refactor:** `CAPABILITIES` is a 4-entry literal whose copy is the deliverable and
 whose truth lives in backend guards. The seam is a **copy module `?raw`-fenced against the backend's gate
 map**, so a flag that starts or stops gating a door cannot leave this card's sentence behind.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **FIRES at 3 phases, absent from BOTH registers since 147 — row added 263-REVIEW WR-07.** ⛔ every consequence line names its SUBJECT; this one claimed people were blocked and UAT measured it FALSE
 
 ### `frontend/src/components/admin/ModelRegistryTab.tsx`
 
@@ -3053,6 +3165,10 @@ carries the verdict — **⚠ absent at 4 phases (added 196)** — and this is t
 
 > ⚠ **was ABSENT at FOUR phases** (196) — ⚠ `null` renders as `coerce`, never blank
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **FIRES**. honoured by construction (**249-01**): roster widened 8→11 + words on 2 EXISTING controls. ⛔ `deprecated` semantics unchanged (D-149-04); `AddModelForm` seam OWED
+
 ### `frontend/src/components/panel/PhaseCard.tsx`
 
 **Re-derived 2026-08-18 (plan `196-09`): `11 commits / 7 phases / 522 L`** · six-digit dated quick-task
@@ -3083,6 +3199,10 @@ next phase adding a genuinely second concern owes a refactor recommendation FIRS
 carries the verdict — **honoured by construction (**200**)** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT at SEVEN phases** (196); row read `12 / 8 / 543`. honoured by construction (**200**) — ⚠ `SUBSTEP_META` must stay TOTAL over `EmitSubStep`. ⚠ **Its suite pins the status atom's children POSITIONALLY across all nine statuses, so `200-07` sited the new reading in the IDENTITY COLUMN and the pin passed UNEDITED** — a characterization pin answered by moving the new thing (199-03), asserted rather than assumed
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253. honoured by construction (200 / **214**)
 
 ## Phase 196 — the phase's GUARDRAIL RECORD (G-1 / G-2 / G-3 / G-4 / G-5 / G-7)
 
@@ -4372,6 +4492,10 @@ carries the verdict — **⚠ absent from BOTH for its ENTIRE LIFE (added 200)**
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `8 / 6 / 370` → `9 / 7 / 385`.** 214-11 asserted invariant #4 here per surface with runtime-assembled needles rather than literals. Phase buckets gain `214`.
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253. honoured by construction (**214**)
+
 ## `frontend/src/components/panel/phaseStatusMeta.ts`
 
 **ADDED 2026-08-20 by plan `200-07` (X-16), and listed BELOW the G-5 threshold ON PURPOSE** — the
@@ -4436,6 +4560,10 @@ DERIVATION in this module rather than a word.*
 carries the verdict — **⚠ absent; crossed the threshold in the commit that added its row (200)** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT, and it CROSSED the threshold in the commit that added its row** (added 200, X-16 — §6.6 measured `2 / 2 / 206` and classified it `no`); the `FlowEdge.tsx` state one wave earlier in this same phase. ⚠ **`statusMeta()` must stay TOTAL over the nine members and must NEVER become a coalesced bracket read** — an inherited key is never nullish, so the fallback provably never fires and hands back a FUNCTION (`200-04` found the EIGHTH live sink; React REFUSED the child and the label rendered as NOTHING AT ALL). ⚠ It holds WORDS and NO derivation — D-06's nine arms live in `phaseDuration.ts`, SHARED with the run page, which is what stops the two halves contradicting each other. **It shipped UNPINNED for its entire life**
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253. It crossed the threshold in the commit that added its row (200)
 
 ## Phase 200-07 — the triples RE-DERIVED at the phase's close
 
@@ -4570,6 +4698,10 @@ the `ActiveView` mount switch, which is ~150 lines of branch and owns none of th
 carries the verdict — **⚠ absent from BOTH at 21 phases (added 200)** — and this is the cell it carried before the split:
 
 > ⚠ **WAS ABSENT FROM BOTH DOCUMENTS AT TWENTY-ONE PHASES — invisible to its own guardrail for the project's entire life**, which is the `config.py` headline repeated at the frontend's own junction box. It owns `openRunSurface` (the ONLY door to `WorkflowRunPage` before SEED-190), `doRun`, the panel state machine, the thread singleton and the whole `ActiveView` mount switch. ⚠ **THE MOUNT SWITCH'S TRAILING ELEMENT IS A POSITIONAL FALLBACK, NOT A `default:` THAT THROWS** — an `ActiveView` member with no branch of its own silently renders Knowledge Health, which is the Phase-118 built-but-unreachable lesson with a live mechanism. ⚠ **A CHANGE HERE LANDS IN CHAT FIRST**: it is the sole production mount of `WorkspacePanel` and of `PanelEmpty`, so UAT on a workflow surface alone will miss it. No seam proposed yet — the honest first step is a row, which is what this is
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`58/29/1124`). **271-02**: `classification-rules` branch retired; `handleAskInChat` (new thread → prefill → navigate) on the ONE LibraryPage mount
 
 ## Phase 200.1 wave 2 (`200.1-02`, RUN-04) — the triples RE-DERIVED for every file the phase touched
 
@@ -5272,6 +5404,10 @@ DENY-LIST because a person chose the value and the product's headline claim is *
 server. The residual risk — a destructive tool whose name carries no mutation word, bound by
 hand — is named rather than hidden.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253. honoured by construction (**239-06**)
+
 ## `backend/app/services/connector_service.py` — Phase 206, honoured by construction
 
 **Measured 2026-08-25: `15 commits / 6 phases / 1000+ L`**.
@@ -5422,6 +5558,10 @@ carries the verdict — **honoured by construction (206.1)** — and this is the
 
 > ⚠ **was ABSENT FROM BOTH for its entire life** (added 206.1-03) — it measured `3 / 2 / 1584` at this phase's base, so G-5 could never have fired on it at any count. honoured by construction (206.1) — **next seam NAMED:** the now-**FOUR** per-shape field blocks (`:899-1130`) → `ConnectionShapeFields.tsx`, exactly the seam `PhaseFormPanel.tsx`'s row already names for its seven per-type blocks. ⚠ **206.1-03 ADDED THE FOURTH BLOCK, WHICH IS THE MOMENT TO NAME IT.** ⚠ Invariants a future editor is bound by: the panel authors **NO sentence of its own** (source fence) and imports **NOTHING** from `PhaseFormPanel` (source fence — ⚠ **IMPORT-SCOPED, because this file's own header NAMES `PhaseFormPanel` eight times; a bare whole-file grep expecting `0` is UNSATISFIABLE AT ITS OWN BASE**, the 187-24 trap, measured here as this plan's eleventh recorded firing). ⚠ **TWO SIMULTANEOUSLY-RENDERED DISABLED-SAVE REASON NODES MUST CARRY DISTINCT IDS** — `aria-describedby` is resolved with `querySelector`, which returns the FIRST match, so a shared id breaks the shipped cipher assertion SILENTLY. ⚠ ZERO `title=` in this source, and THAT one IS satisfiable (measured `0` before and after)
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⭐ **NAMED SEAM TAKEN (239-08)** — `SourceToolsCard.tsx` extracted, `2807 → 2477`, a pure move. ⛔ the WIDER `ConnectionShapeFields.tsx` seam stays OWED
+
 ## `frontend/src/components/settings/connectionsCopy.ts`
 
 **Re-derived at `206.1-03`'s own commit (2026-08-25): `4 commits / 3 phases / 541 L` · ⚠ G-5 FIRES,
@@ -5466,6 +5606,10 @@ one. That is the cost this row removes.
 carries the verdict — **no seam proposed — a vocabulary doing one thing many times is the right shape** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT FROM BOTH for its entire life** (added 206.1-03). **No seam proposed** — the `libraryVocabulary.ts` verdict: a vocabulary doing one thing many times is the right shape, and **the value of the row is that the audit can ASK**. ⚠ **INVARIANT: `destinationFactsOf`'s arms are EXPLICIT and its tail is NEUTRAL.** That is the `147f3c57` repair, made after a positional trailing `return` had every MCP row claim it sends to Slack's API host — **seen on screen in live UAT**. ⚠ `credentialLabel` is the ONLY reader of a timestamp here, and 206.1-03 left its body **byte-identical (md5-equal, file `+40 / -0`)**; `credentialReadingOf` is a ROUTER above it, which is what keeps every pinned unit call AND the wide row's byte-identity capture intact. ⚠ Its MCP arm is UNCONDITIONAL and ignores `last_checked_at` on purpose: *nobody has checked it* and *it CANNOT be checked* are two facts, and folding them is the `runFacts.ts` CR-01 defect a fifth time
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row was STALE at `15/8/784`. honoured by construction (**BUG-260912-01**): ONE arm MOVED above the oauth_byo block — `failed` was unreachable for the one shape OAuth breaks
 
 ## `frontend/src/components/settings/connectionFormCopy.ts`
 
@@ -5514,6 +5658,10 @@ this phase's base it measured `2 / 2 / 531`.
 carries the verdict — **no seam proposed — the same verdict as its sibling** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT FROM BOTH for its entire life** (added 206.1-03); it measured `2 / 2 / 531` at this phase's base. **No seam proposed**, the same verdict as its sibling. ⚠ **INVARIANT: ALL FOUR LADDERS END WITH A NEUTRAL TERMINAL RETURN AND EVERY ARM NAMES ITS OWN CONDITION** — 206.1-03 rewrote two here (`configFromDraft`, `destinationFooterOf`) and two in the panel (`typedHost`, `secretLabel`), each armed against a synthetic FIFTH shape **plus** the prototype-key set. ⚠ **`stringsOfModule()` WALKS `connectionRefusalCopy` ONLY**, so the nine-banned-terms and absolute-verb fences NEVER covered this module — 206.1-03 **EXTENDED the sweep**, with a non-vacuity control naming its seven new identifiers by identity. **Never let a future reader infer inherited coverage.** ⚠ `CAPABILITY_CHOICE_MCP_LABEL` is declared ABOVE `CAPABILITY_CHOICES` because a `const` is NOT hoisted for initialisation — reading it from the array literal first is a temporal-dead-zone `ReferenceError` at module load, which no type checker reports
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⛔ 239-05 named the seam: `configFromDraft`'s arm set. 239-07 RODE it — one serializer both arms call
 
 ## `frontend/src/lib/connectionMark.tsx`
 **Measured at `206.1-03`'s commit (2026-08-25): `1 commit / 1 phase / 232 L` · G-5 does not fire
@@ -6502,6 +6650,10 @@ service shape appears (Phase 212's catalog, or Phase 215's OAuth rows).
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE for the 2nd close at `25/14/800`, and its own cell repeated the CLAIM that was false. honoured by construction (**244-07**): `folder_id` typed, not branched
+
 ## `backend/app/services/mcp_client.py`
 
 **Re-derived at `211-05`'s own commit (2026-08-27): `3 commits / 3 phases / 400 L` · ⚠ G-5
@@ -6538,6 +6690,10 @@ with the transport; it is the natural leaf, and the phase that adds a third MCP 
 take it.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`) — a row present and WRONG stops the audit. **SEED-258: the body cap is DERIVED; no envelope knob exists to disagree**
 
 ## `backend/app/api/connectors.py`
 
@@ -6646,6 +6802,10 @@ predicted would change and which did not.** ⚠ `_NEVER_OFFERED_SOURCE_FAMILIES`
 `{"mock_source"}` and was confirmed to be the intended exclusion set.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`45/21/2162`). **276-07**: DCR `client_name` → Syrel; stored ids not re-registered. ⛔ extraction OWED
 
 ## `backend/app/services/connector_service.py`
 
@@ -7160,6 +7320,10 @@ in CI (only `lint:a11y` is), so nothing in the pipeline would have caught it.
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 242). Row added AT CREATION, not at the third phase — an absent row is invisible to G-5 at any count
+
 ## frontend/src/pages/SettingsPage.tsx
 
 **⚠ RE-DERIVED 2026-09-11 (plan `242-02`): `46 commits / 24 phases / 1858 L`** — the row read
@@ -7278,6 +7442,10 @@ Measured at `239-10` when a test case's premise — *"the page opens on tab 0"* 
 `localStorage` for a whole file, so a case mounts on whichever tab an earlier case opened. **Real
 product behaviour, not leakage.** Any suite asserting tab-scoped absence must clear it first.
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row was STALE at `47/24/1773`. honoured by construction (**mig 180**): `isOllama` → `meta.selfHosted`; the card gained a 2nd FIELD, not a 2nd branch. tab seam still OWED
+
 ## frontend/src/components/settings/SourceFileCeilingCard.tsx
 
 **Created by `239-10` (SEED-258). `1 / 1 / 117`.** ⚠ A row minted in the commit that CREATES a file
@@ -7365,11 +7533,19 @@ caller that `SkillFormDialog` uses. The proposal flow REUSES that caller. **No n
 second client function** — a second write path here is the second authoring engine `PACK-15` refuses,
 one register down.
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⛔ **NOW FIRES at 4 phases and the row read `4/2/715` / `no`** — re-derived 263 planning. It already carries the `POST /skills` caller D-263-03 reuses; ⛔ no new endpoint, no second client function
+
 ## frontend/src/components/settings/ModelPillRow.tsx
 
 **Added 2026-08-27, same pass, same reason.** Measured **4 commits / 3 phases / 141 lines** — fires
 G-5 exactly at threshold. The D-22 pair to `SettingsPage.tsx` above; the same "claimed but not
 written" note applies.
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **FIRES**. honoured by construction (**249-02**): its local `_tooltipFor` DELETED for the shared module. ⛔ it had claimed `timeout=90s` against a real 300
 
 ## frontend/src/components/settings/servicesCatalog.ts
 
@@ -7403,11 +7579,19 @@ Refusal vocabulary for the connections surface.
 
 On every chat send. Invisible to its own guardrail since the project began — the `config.py` (42 phases) and `ChatLayout.tsx` (21 phases) finding for the fourth time. 214-16 added one launch-inputs field.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`20/12/236`). **268-03**: `scope_changed` joins the allowlist; scope payload models additive, `path` on a SUBCLASS only
+
 ### `backend/app/models/user_settings.py`
 
 **Triple at Phase 214's close (2026-08-28): `46 / 30 / 1352` — G-5: ⚠ **FIRES**.** ⚠ **RE-DERIVED at Phase 241's close (2026-09-10, `241-04`): `50 / 32 / 1561`** — the FOURTH consecutive close to find this row stale. Honoured by construction at 241: two model fields, two `_val` calls, and the `HNSW_EF_SEARCH_FLOOR/_CEILING` + `HNSW_ITERATIVE_SCAN_VALUES` constants in the SEED-258 home, re-exported by `api/settings.py` so a service never imports an API module. ⚠ absent from BOTH for its ENTIRE LIFE at **30 phases** — row added 214; honoured by construction (214-14)
 
 **The largest absence this ledger has recorded after `api.ts`.** 30 phases, 1352 lines, and `grep -c` in CLAUDE.md returned 0. 214-14 read the governed-feature defaults here and flipped `visual_workflow_canvas` to `everyone` at its COLD default while `live_connectors` stayed `off`.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`55/34/1723`). **270-02**: ONE field (`document_download_url_ttl_seconds`, default 60), clamped 10..900 in code. ⛔ the unreachable-DB arm is byte-identical
 
 ### `backend/app/services/connectors/args.py`
 
@@ -7543,6 +7727,10 @@ One of the twelve domain modules the 207 split created. The barrel re-exports it
 
 **1600 lines and no row for its entire life.** The 207 split moved the code and left the guardrail behind on the barrel.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`15/9/1859`). **268-03**: `setThreadFolder` + `getScopeEffect` + 4 wire types, additive
+
 ### `frontend/src/lib/api/connectors.ts`
 
 ⚠ **RE-DERIVED 2026-09-12 (`244-06`): `17 / 11 / 740`** — the row read `16 / 10 / 718`.
@@ -7561,6 +7749,10 @@ It now reads `readConnectorFailure`, so `S-4` (*the refusal is the server's word
 on this path. The ids are also `encodeURIComponent`-wrapped, matching `postPreview`.
 
 ---
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component
 
 ### Prior entries
 
@@ -7655,6 +7847,10 @@ order is still load-bearing and still enforced from `LibraryPage.tsx` by `nth-ch
 
 ---
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a held row opens into the refusal
+
 ### `frontend/src/pages/LibraryPage.tsx`
 
 ⚠ **RE-DERIVED AT `244-06` (2026-09-12): `46 / 15 / 970`** (`--follow`, as the rename note below
@@ -7679,6 +7875,10 @@ is not an occurrence count**, and this file is where that was paid for.
 **Phase 266 (2026-09-25) — re-derived `48 / 16 / 993` with `--follow`** (the file was renamed from `IngestionPage.tsx` at `dbd9b8c0b`, and without `--follow` the recipe reads `22 / 7`). The row read `46 / 15 / 970`. **266-04** added ONE state and ONE effect: `listExpertInstalls()` → `provenanceByFolder` → `folderProvenance`, forwarded to FolderTree. A refusal or any failure becomes an empty map, so the tree renders exactly as before. ⚠ **That REFUTES 244-06's "the page gained no effect" as a standing description.** `useEffect(` sites went 6 → 7 (measured at `522e7b4fc` vs HEAD). The `.folder_id` count held at 5, because the provenance map is built in `expertCatalog.ts`, not here.
 
 ---
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-04**: `useRetentionStates` (ONE batched read), folder line under FolderDetail, `splitArchived` + hidden line on Find's include_archived. Extraction OWED
 
 ### Prior entries
 
@@ -7762,6 +7962,19 @@ an auditor and a source file is read by the next author:
 **A third landing must propose the extraction FIRST.** Do not edit this row to say the obligation
 was met.
 
+⚠ **CORRECTED 2026-10-13 (Phase 278, SEAM-02). The "STILL OWED" paragraph above is kept, not edited, because it
+was true when written and the discharge happened somewhere else.** The extraction was **DISCHARGED by 272-01**:
+a pure move (AST-identical to PHASE_BASE, `test_272_pure_move.py`) into `retrieval_rpc.py`, `retrieval_rank.py`,
+`retrieval_documents.py` and `retrieval_scope.py`. See the subsections
+*"Phase 272"*, *"Phase 272 post-ruling"* and *"Phase 272 re-run (D-27 second cause)"* below. 278 did not
+re-read that record; it **measured** the discharge (D-09) on the merged tree at 278-04 Task 1: triple `23 / 12 / 174`
+before the comment commit, `ast` top-level defs `['search_documents']` (exactly one), and
+`pytest tests/unit/test_272_pure_move.py -q` → `9 passed`. 278-04's only edit here (`2757b9e51`) struck the
+stale importer line `tool_dispatcher.py:47` in the back-compat comment and named the real post-split importer,
+`tools/documents.py:43`. Its proof is a whole-module `ast.dump` identity against HEAD, which printed `True`.
+⛔ The 7 back-compat re-exports stay (D-10). Final-tree triple: **`24 / 13 / 176`** (the comment
+commit's `278-04` scope adds the 278 bucket).
+
 ⚠ **CORRECTION 2026-09-05 — THE PARAGRAPH BELOW WAS TRUE WHEN WRITTEN AND MY OWN NEXT COMMIT MADE
 IT FALSE. It is kept rather than overwritten, because the way it went stale is the finding.** At
 `11e7fd86c` this file genuinely was byte-unchanged by Phase 231 and the triple genuinely was
@@ -7791,6 +8004,10 @@ both 231 and 241).
 
 
 ---
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⛔ **extraction still OWED (SEED-224, since 231).** 241 is the SECOND landing, 11 lines; a THIRD must propose the extraction FIRST
 
 ### `backend/app/services/recall_eval.py`
 
@@ -7842,6 +8059,10 @@ this file belongs in `backend/tests/unit/`.
 
 
 ---
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **FIRES (3 phases).** Offline eval harness; safe as-is (Blocker B / D-246-12), additive plan inspection & latency p50/p95
 
 ### `backend/app/services/retrieval_tuning.py`
 
@@ -8069,6 +8290,10 @@ chat continues without the line, logged loudly rather than silently.
 
 ---
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**274-01**: ONE literal — attachments stay with the conversation (D-26); `_ATTACHMENT_KIND` unchanged. ⛔ prompt-assembly seam OWED (OV-273-03)
+
 ### `backend/app/services/tool_dispatcher.py`
 
 **Triple re-derived 2026-09-11 (`244-02`): `80 / 34 / 4868` — G-5: ⚠ FIRES.**
@@ -8219,6 +8444,10 @@ no new SSE event, no migration:
 
 ---
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`93/40/5234`). **275-02**: 1 import + 3 `unretrievable` walls + `retrievable_only=True` on 3 calls. ⛔ registry/handler split OWED
+
 ### `backend/app/api/document_governance.py`
 
 **Triple re-derived 2026-08-28: `5 / 3 / 416` — G-5: ⚠ FIRES, exactly at threshold.** ⚠ Absent at three phases.
@@ -8363,6 +8592,10 @@ sends invites a component to render it.
 the whole of D-221-07.
 
 ---
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent for its ENTIRE LIFE at 4 phases; row then STALE at `6 / 4 / 562`. ⚠ **THIRD wire-type drift in this ONE file** (239: `auth_type: "mcp"`)
 
 ### `backend/app/services/connectors/service_tools.py`
 
@@ -8644,6 +8877,10 @@ one ordered walk**, never a second classifier — the whole design claim of this
 exactly one.
 
 ---
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE TWICE; the 2nd read “238: comment-only” while 238 re-opened SEED-282 here. **238-04: display ≠ stored; the walk no longer mutates `SourceFile.path`**
 
 ### `backend/app/services/sources/import_service.py`
 
@@ -8960,6 +9197,10 @@ The split is **cadence claiming** (DB layer `db/schedules.py`, `db/watches.py`) 
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **NOW FIRES at 3 phases, and its detail row still read `no (2 phases)` — present and WRONG, which stops an audit harder than absent.** Promoted here by 256-04; **256-03** closed its `None` finalize
+
 ## `backend/app/db/schedules.py`
 
 **`1 / 1 / 359`** (derived 2026-09-06). ⚠ **Absent from this ledger and from CLAUDE.md's scan list for
@@ -9141,6 +9382,10 @@ become a false statement about live behaviour the moment the fix landed — the 
 a docblock over the code. A test greps the live module source to keep it gone.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ now FIRES (`8/2/693` read `no`). **275-02**: both purge doors guard first; the swallow is GONE (PT409 → 409). ⛔ bytes still orphaned (deferred bug)
 
 ## frontend/src/components/sources/WatchedFoldersSection.tsx
 
@@ -9333,6 +9578,10 @@ nav rendering; extract `NavAttentionBadge` before a second producer is ever regi
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**276-01**: Iris mark `<img>`; **276-06** (D-27): on the dark chip, classes only. 244-14's `overflow-x-hidden` stands
+
 ## frontend/src/lib/nav-items.ts
 
 **8 / 6 / 95** · ⚠ **FIRES** · the shared `NAV_ITEMS` list and the `NavItem` / `ActiveView` types.
@@ -9383,6 +9632,10 @@ refusal sentence rather than vanishing its own door.
 count grew, the shape did not.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`9/6/118`). **271-02**: the Classification entry REMOVED (7 entries); `Wand2` moved to the Filing rules link. 271-05 G4-3: the rail has none
 
 ## frontend/src/App.tsx
 
@@ -9468,6 +9721,10 @@ correction appended as a new paragraph, so the fence keeps its needle and the re
 that "three homes" names the WORKFLOW concern triad rather than a count of rail entries.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**276-06**: boot splash spin ring → moving Iris (`thinking`) in a `role=status`; no hook. Reachability fence green
 
 ## frontend/src/components/library/HealthTab.tsx
 
@@ -9606,6 +9863,10 @@ matcher input, **so no failure classified before this phase became unclassified 
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent for its entire life — row added **BUG-260912-01**. ⛔ its `Cause` union must stay ONE plain-text line: a frontend suite binds it by `?raw` and a computed union is invisible to that fence
+
 ## backend/app/services/sources/health_verdict.py
 
 **1 / 1 / 149** · no (1 phase) · **the ONE place that decides whether a source is STOPPED.**
@@ -9679,6 +9940,10 @@ renders it rather than guessing, and `last_error` is never rendered on any of th
 (T-235-38).
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⛔ row STALE (`6/3/560`) AND ITS OWN PREDICTION CAME TRUE UNRECORDED: it said G-5 fires on the next touch, and **252-03 WAS that touch**. Seam OWED
 
 ## frontend/src/components/sources/runHistoryFold.ts
 
@@ -9948,6 +10213,10 @@ Phase 237 introduced `rule_scope` ("watch" | "classification") and validation re
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules.
+
 ## backend/app/models/classification_rule.py
 
 **2 / 2 / 56** · no (2 phases: 118, 165) · Pydantic models for classification rules.
@@ -9977,6 +10246,10 @@ Phase 237 closed the SC#2 whitelist bypass seam (ROADMAP named failure mode) by 
 **Invariants:** Every filter fragment must pass field-metadata whitelist validation; no typed column escapes the whitelist.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ FIRES since 271 and ABSENT from this table — row added 275-05. **275-02**: one default-False kwarg + one `.eq` per read leg; Library callers unchanged
 
 ## backend/app/services/view_filter_compiler.py
 
@@ -10009,6 +10282,10 @@ Phase 237 unified the rule builder for arrival watch and post-extraction classif
 **Invariants:** Switching scope to "watch" warns and strips invalid metadata conditions to prevent SC#3 refusal errors.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`4/3/502`). **271-02**: two strings (`New filing rule`, `After extraction`). ⛔ no logic change
 
 ## frontend/src/components/ingestion/ConditionPopover.tsx
 
@@ -10235,6 +10512,10 @@ an `elif`, this file has repeated the mistake it documents.
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **absent while FIRING at 5 phases — row added 239-03.** honoured by construction (239): protocol resolution stayed DATA (two dicts), never a branch
+
 ## backend/app/services/sources/__init__.py
 
 **5 / 3 / 40** · ⚠ **FIRES — EXACTLY AT THRESHOLD** (239, 238, 232) · the eager-import site.
@@ -10252,6 +10533,10 @@ for a perfectly good connection and `api/connectors.py` answers an empty browse.
 adapter set from the REGISTRY rather than from a hand-maintained list.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing
 
 ## backend/app/models/connector.py — Phase 239
 
@@ -10718,7 +11003,7 @@ cells rot within days.
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on resolve_document_id / resolve_document / fetch_full_document; 272 pins retired by name |
-| [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 4 / 2 / 464 (was `2 / 1 / 416`) | no (2 phases) | **275-01**: `RETRIEVABLE_COLUMN` (mig 205); middle predicate renamed `retrievable`, still enforced_in_rpc — no branch. ⛔ ids/counts RLS-intersected (D-21) |
+| [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 6 / 4 / 463 (was `5 / 3 / 463`) | ⚠ **FIRES** | **279-01**: ONE comment repoint to `expert_scope_statement` (no code). Honoured by construction (278-02 vocabulary import). ⛔ ids/counts RLS-intersected (D-21) |
 | [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 4 / 1 / 1163 (was `0 / 0 / 0`) | no (young) | young (272-01 move; 272-04 kinds, D-09 lock, ONE audit writer, vocabulary). **272-REVIEW WR-01**: vocabulary values checked + JSON-quoted, note capped (2000). Split OWED → 273 |
 | [`frontend/src/components/chat/StepRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatsteprowtsx) | 3 / 2 / 253 (was `2 / 1 / 249`) | no (2 phases) | 273-05: `refused` node state (UI-D-02 amber pair). ⛔ derived from the result marker in toolStepDerivation, never from a tool name |
 | [`frontend/src/components/chat/ToolCallDetails.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcalldetailstsx) | 3 / 2 / 181 (was `2 / 1 / 171`) | no (2 phases) | 273-05: ToolArgsBlock hidden for show_artifact (L-2); dispatched BEFORE the `parsed.error` arm (L-3/L-4). ⛔ `detail` never rendered |
@@ -10743,7 +11028,7 @@ cells rot within days.
 | [`frontend/src/components/chat/artifacts/captionModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscaptionmodelts) | 1 / 1 / 73 (was `0 / 0 / 0`) | no (young) | young (273-02). Phrases the SERVER's caption facts (sources, lineage, counts) — never model text (D-04). Pure |
 | [`frontend/src/components/chat/artifacts/chartModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartmodelts) | 1 / 1 / 275 (was `0 / 0 / 0`) | no (young) | young (273-02). Pure chart derivations: slots, visible domain, tooltip rows, ticks, aria text. No React, no recharts |
 | [`frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesshowartifactbodytsx) | 1 / 1 / 192 (was `0 / 0 / 0`) | no (young) | young (273-05). Rail essence + expanded line for show_artifact. ⛔ reads `reason`, never `detail` or `values` (L-3/L-4) |
-| [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 4 / 2 / 587 (was `2 / 1 / 565`) | no (2 phases) | **275-03**: `_apply_archived(q, include_archived)` beside `_apply_version` + one line in `structure()`. ⛔ open/download not filtered |
+| [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 5 / 3 / 584 (was `4 / 2 / 587`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). honoured by construction (278-02: vocabulary import, values pinned to base); `_DATE_COLUMN` is an import alias. ⛔ open/download not filtered |
 | [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-03**: `include_archived: bool = False`; ⛔ `extra="forbid"` kept, so backend ships before frontend |
 | [`backend/app/api/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_searchpy) | 1 / 1 / 48 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ user-JWT client only; remaps `ResolveError`; no write. **271-05**: the fence calls THIS coroutine with a GoTrue token (P-04) |
 | [`frontend/src/pages/findState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesfindstatets) | 3 / 3 / 374 (was `2 / 2 / 361`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `include_archived` + `SET_INCLUDE_ARCHIVED` (offset 0); key sent only when true (Pitfall 13). ⛔ STRICT LEAF: zero imports |
@@ -10774,22 +11059,22 @@ cells rot within days.
 | [`frontend/src/components/experts/ProposedSkillCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsproposedskillcardtsx) | 1 / 1 / 86 | no (new) | young (created 263-04). Row added AT CREATION. ⛔ The ONE home of the "does not exist" mark — dashed+violet, never red (D-263-01); a second styling makes a proposal read as an error. |
 | [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 7 / 5 / 454 (was `3 / 5 / 442`) | ⚠ **FIRES** | ⚠ STALE (`3/5/442`, read `no`). **275-04**: Retention live — ONE render branch + ONE `recordingPulse` (1.6 s) to OrgBand. ⛔ extraction FIRST next touch |
 | [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 2 / 2 / 324 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 347`. honoured by construction (**262-02**): its `ICON_MAP` + `renderExpertIcon` MOVED OUT verbatim — a PURE move; its pinned suite is byte-unchanged and green |
-| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 9 / 5 / 418 (was `7 / 4 / 367`) | ⛔ **FIRES — 5 phases** | ⚠ row STALE (`7/4/367`). honoured by construction (**267-03**): `ExpertConnectionState`, `ExpertScopePreview` and ONE `getExpertScopePreview`. ⛔ one client function per route |
+| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 12 / 6 / 422 (was `9 / 5 / 418`) | ⛔ **FIRES — 6 phases** | honoured by construction (**279-03**): one comment word ("Won't search"). ⛔ one client function per route |
 | [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 5 / 4 / 749 | ⚠ **FIRES — 4 phases** | ⚠ row STALE at `4/3/567`. honoured by construction (**266-01**): SIX install queries ADDED (guarded-upsert claim). ⛔ no existing query touched |
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 6 / 4 / 131 (was `3 / 3 / 93`) | ⚠ **FIRES — 4 phases** | ⚠ row STALE (`3/3/93`). honoured by construction (**267-01**): `tool_floor_enabled` kept for compatibility, described as unread (D-267-02). ⛔ no field removed — the PATCH round-trip stays |
 | [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 11 / 7 / 619 (was `9 / 6 / 575`) | ⛔ **FIRES — 7 phases** | ⚠ row STALE (`9/6/575`). honoured by construction (**267-01**): `connection_states` is THE one 'is it connected' rule; the resolver strips by it. ⛔ pure data — no LLM import, no `while` |
-| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 14 / 6 / 822 (was `13 / 5 / 764`) | ⛔ **FIRES — 6 phases** | ⚠ row STALE (`13/5/764`). honoured by construction (**267-01**): ONE overlay adds `connection_state` + `can_connect` to every row. ⛔ org ONLY from the active-org dep; extraction OWED |
+| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 16 / 7 / 833 (was `14 / 6 / 822`) | ⛔ **FIRES — 7 phases** | honoured by construction (**279-02 G**): ONE `enabled_only` expression; `false` honoured only for `experts:manage`. ⛔ org ONLY from the active-org dep; extraction OWED |
 | [`backend/app/utils/skill_visibility.py`](docs/HOT-FILE-LEDGER.md#backendapputilsskill_visibilitypy) | 3 / 2 / 209 | no (2 phases) | ⚠ the row added at 264 PLANNING read `1/1/83` and was stale by that phase's own close. **264-02/04**: optional `expert_bundle_id` on both encodings; ⛔ the default arm is pinned byte-identical by `==` |
 | [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 2 / 2 / 53 (was `0 / 0 / 0`) | no (2 phases) | ⚠ row read `0/0/0`. **268-03**: paired with the scope chip (legible `· Restricted` beside a held scope). Not firing yet |
-| [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 2 / 2 / 205 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 0`. **262-02**: FOUR demo-Expert hardcodes retired as rewrites. ⛔ no fallback here may inspect `slug` or `name` — that match IS the retired artefact |
-| [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 4 / 4 / 614 (was `3 / 3 / 231`) | ⚠ **FIRES — 4 phases** | ⚠ row STALE (`3/3/231`). **267-04**: R1-R10 rows + the Will/Won't ledger; the per-row action area is ONE `ExpertRowActions` (the named seam, TAKEN). ⛔ the body stays a list |
+| [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 5 / 4 / 269 (was `2 / 2 / 205`) | ⚠ **NOW FIRES — 4 phases** | ⚠ now FIRES. honoured by construction (**279-03 E**): restricted branch inside the ONE existing effect, no new hook. ⛔ no fallback may inspect `slug`/`name` |
+| [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 10 / 5 / 648 (was `4 / 4 / 614`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03**): ONE `message` field on the error state + ONE `onThread` prop; copy "Won't search". ⛔ the body stays a list |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 80 / 37 / 1036 (was `79 / 37 / 1029`) | ⚠ **FIRES** | **276-REVIEW B-WR-01**: the avatar's cap-pause argument also requires a Continue left (`!continueExhausted && continuesRemaining > 0`). No hook, no store read |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 265 / 90 / 2459 (was `264 / 89 / 2456`) | ⚠ **FIRES** | **274-01**: delete_thread collects paths BEFORE the row delete, removes bytes AFTER it — 1 import, 0 new branches (AST-pinned). ⛔ 0 new send-path branches |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 106 / 40 / 4982 (was `104 / 38 / 4948`) | ⚠ **FIRES** | **273-05**: ONE onArtifact handler (D-16) — append or replace-by-id, text untouched. ⛔ `onTurnBoundary` still FLUSHES before moving |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 271 / 91 / 2544 (was `265 / 90 / 2459`) | ⚠ **FIRES** | honoured by construction (**279-02**): ONE `_require_thread_org` at 4 doors; send stays 11 `if`s (pinned); OV-279-01 not required. ⛔ 0 new send-path branches |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 107 / 41 / 4991 (was `106 / 40 / 4982`) | ⚠ **FIRES** | honoured by construction (**279-03 C**, D-15): ONE constant + ONE widened 409 condition (`startsWith` lock prefix). ⛔ `onTurnBoundary` still FLUSHES before moving |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
@@ -10805,7 +11090,7 @@ cells rot within days.
 | [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 56 / 21 / 2977 | **FIRES** | honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214.1**) — 214.1 added one import + one gated node, zero `useState` |
 | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 43 / 23 / 2261 | **FIRES** | honoured by construction (192.2 / **258-03**: two route dependencies, no new branch/handler; ⚠ extraction still OWED) |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
-| [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 21 / 14 / 537 (was `20 / 13 / 510`) | ⚠ **FIRES** | ⚠ STALE (`20/13/510`). **268-03**: `folder_id`/`clear_folder` on `ThreadUpdate` + `ScopeEffect`, additive only. ⛔ a body touching both pairs is a 422 |
+| [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 22 / 15 / 537 (was `21 / 14 / 537`) | ⚠ **FIRES** | **279-01**: docstring repoints to the new expert_scope homes only (OpenAPI regen). ⛔ a body touching both pairs is a 422 |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
 | [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 60 / 30 / 1134 (was `58 / 29 / 1124`) | ⚠ **FIRES** | ⚠ STALE (`58/29/1124`). **271-02**: `classification-rules` branch retired; `handleAskInChat` (new thread → prefill → navigate) on the ONE LibraryPage mount |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
@@ -10835,7 +11120,7 @@ cells rot within days.
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 24 / 11 / 376 (was `21 / 9 / 307`) | **FIRES** | ⚠ row STALE (`21/9/307`). honoured by construction (**267-04**): the turn index skips system rows via ONE module-level helper; no prop added |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
-| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 91 / 42 / 1171 (was `87 / 41 / 1106`) | **FIRES** | **276-06**: hero tile → static Iris (`idle`, 64px): 1 import + 1 element swap; hook call sites 36 → 36. ⛔ no scope branch in send |
+| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 93 / 43 / 1186 (was `91 / 42 / 1171`) | **FIRES** | honoured by construction (**279-03 D/E**): ONE functional setActiveExpert + guarded catch; `&& !isStreaming`; 2 props. Zero new hooks. ⛔ no scope branch in send |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 15 / 8 / 836 | **FIRES** | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
@@ -10939,7 +11224,7 @@ cells rot within days.
 | [`frontend/src/components/settings/AvailabilityLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsavailabilitylinetsx) | 0 / 0 / 74 | no (new) | young (221-02) — a `ready` application renders `null`, never an empty element |
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 28 / 11 / 1858 | ⚠ **FIRES** | ⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**239-06**) |
-| [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 22 / 14 / 285 (was `21 / 13 / 278`) | ⚠ **FIRES** | **273-04**: `MessageResponse.artifacts` (optional, additive). ⛔ deleting it makes reload render no artifacts, silently |
+| [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 23 / 15 / 285 (was `22 / 14 / 285`) | ⚠ **FIRES** | **279-01**: one comment repoint (no code). ⛔ deleting `artifacts` makes reload render no artifacts, silently |
 | [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 57 / 35 / 1742 (was `55 / 34 / 1723`) | ⚠ **FIRES** | ⚠ STALE (`55/34/1723`). **270-02**: ONE field (`document_download_url_ttl_seconds`, default 60), clamped 10..900 in code. ⛔ the unreachable-DB arm is byte-identical |
 | [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 7 / 2 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
 | [`backend/app/services/setup_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessetup_servicepy) | 4 / 2 / 514 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. Same deliberate non-catch as `api/setup.py`; its bool cannot express *the database refused the value* |
@@ -10975,7 +11260,7 @@ cells rot within days.
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 15 / 372 (was `31 / 16 / 372`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<td>` kept |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 57 / 19 / 1297 (was `57 / 21 / 1297`) | ⚠ **FIRES** | **275-04**: `useRetentionStates` (ONE batched read), folder line under FolderDetail, `splitArchived` + hidden line on Find's include_archived. Extraction OWED |
-| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 23 / 12 / 174 (was `22 / 12 / 172`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01). **272-05 D-27**: coverage cut + rerank; filtered dedup same-document only; unfiltered unchanged |
+| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 24 / 13 / 176 (was `23 / 12 / 174`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01), MEASURED at 278-04 (SEAM-02): one top-level def, test_272_pure_move 9 passed; one comment line, AST-identical. ⛔ 7 re-exports stay (D-10) |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
@@ -10985,13 +11270,13 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 14 / 7 / 991 (was `11 / 6 / 737`) | ⚠ **FIRES** | ⚠ STALE (`11/6/737`). **272-04**: the trend skips `invalid_filter` / `refused_retry` rows (4 lines, D-24); kind 2 still counts |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 65 / 31 / 3651 (was `61 / 30 / 3635`) | ⚠ **FIRES** | **274-01**: ONE literal — attachments stay with the conversation (D-26); `_ATTACHMENT_KIND` unchanged. ⛔ prompt-assembly seam OWED (OV-273-03) |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 66 / 32 / 3675 (was `65 / 31 / 3651`) | ⚠ **FIRES** | honoured by construction (**279-02 I**, WR-08): ONE guarded `_folder_scope_note` + ONE call; single-folder note byte-identical. ⛔ prompt-assembly seam OWED (OV-273-03) |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
-| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 17 / 9 / 1029 (was `16 / 8 / 967`) | ⚠ **FIRES** | ⚠ STALE (`16/8/967`). **268-01**: takes the send path's `scoping`/`scoping_error` (resolve once); Continue SUMS segment tokens (D-268-20) |
+| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 21 / 10 / 1117 (was `17 / 9 / 1029`) | ⚠ **FIRES** | honoured by construction (**279-01/02**): 2 lazy imports repointed; ONE defaulted `scoped_folder_paths` field (WR-08). ⛔ runs is SELECT-only under the user JWT |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
 | [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
-| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 98 / 43 / 5068 (was `97 / 42 / 5057`) | ⚠ **FIRES** | **275-02**: 1 import + 3 `unretrievable` walls beside the folder walls + `retrievable_only=True` on 3 calls. ⛔ registry/handler split still OWED |
+| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 99 / 44 / 274 (was `98 / 43 / 5068`) | ⚠ **FIRES** | ✅ **G-5 DISCHARGED (278-03)**: registry only (30 tools); handlers moved verbatim to `services/tools/` (10 families). ⛔ registry + AST pins; re-exports stay (D-04) |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
 | [`frontend/src/components/ingestion/DocumentUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentuploadtsx) | 10 / 1 / 144 | no (1 phase) | young (056) — ⚠ absent for its entire life. ⛔ It reports NO byte progress (`onUploadProgress` absent), so any upload percentage is unknowable |
@@ -11046,7 +11331,7 @@ cells rot within days.
 | [`backend/app/models/classification_rule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsclassification_rulepy) | 2 / 2 / 56 | no (2 phases) | row added 237 below threshold. Adds rule_scope ('watch' or 'classification') to RuleCreate, RuleUpdate, RuleResponse. |
 | [`backend/app/services/classification_rule_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesclassification_rule_servicepy) | 3 / 2 / 166 | no (2 phases) | row added 237 below threshold. Persists and queries rule_scope across rule CRUD and uploader rule evaluation. |
 | [`backend/app/services/document_view_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_view_resolverpy) | 5 / 5 / 412 (was `4 / 4 / 403`) | ⚠ **FIRES** | honoured by construction — one default-False kwarg + one `.eq` per read leg, Library callers unchanged, source fence |
-| [`backend/app/services/view_filter_compiler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesview_filter_compilerpy) | 6 / 5 / 300 (was `4 / 3 / 288`) | ⚠ **FIRES** | ⚠ STALE (`4/3/288`). **272 G-1**: `eq` on a JSON-array field (`LIST_VALUE_FIELDS`) matches one element; no new leg, no new operator |
+| [`backend/app/services/view_filter_compiler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesview_filter_compilerpy) | 7 / 6 / 302 (was `6 / 5 / 300`) | ⚠ **FIRES** | honoured by construction (278-02: vocabulary import, values pinned to base); `LIST_VALUE_FIELDS = frozenset(LIST_FIELD_NAMES)`. **272 G-1** eq-on-list rule unchanged |
 | [`frontend/src/components/classification/ClassificationRulesPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationclassificationrulespagetsx) | 3 / 3 / 264 (was `1 / 1 / 250`) | ⚠ **FIRES** | now FIRES (3 phases). **271-02**: ONE shape (P-07): no outer padding; header Back · Filing rules · subtitle · New rule; mounted only inside the Library |
 | [`frontend/src/components/classification/RuleBuilderPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationrulebuilderpaneltsx) | 6 / 5 / 501 (was `4 / 3 / 502`) | ⚠ **FIRES** | ⚠ STALE (`4/3/502`). **271-02**: two strings (`New filing rule`, `After extraction`). ⛔ no logic change |
 | [`frontend/src/components/ingestion/ConditionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionconditionpopovertsx) | 6 / 4 / 429 (was `3 / 2 / 404`) | ⚠ **FIRES** | ⚠ now FIRES (row read `3/2/404`). **271-04**: `FIND_EXCLUDED_FIELD_KEYS` + optional `excludeFieldKeys`. ⚠ Esc after a mouse open does nothing (inherited, 271-05) |
@@ -11081,7 +11366,7 @@ cells rot within days.
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
 | [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 21 / 12 / 973 (was `20 / 11 / 970`) | ⚠ **FIRES** | ⚠ STALE (`20/11/970`). **272-04**: D-09 lock shared BY REFERENCE, never a copy. **272-REVIEW WR-08**: sub-agent reads llm_content; date + vocabulary when it can search |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
-| [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 10 / 6 / 705 | ⚠ **FIRES** | ⚠ **FIRES at 5 phases, absent from BOTH registers its ENTIRE LIFE — row added 256-04, in its FIRST edit's commit (O-6).** honoured by construction. ⛔ accumulators init `None` never `0`, above the loop |
+| [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 11 / 7 / 716 (was `10 / 6 / 705`) | ⚠ **FIRES** | honoured by construction (**279-02 F**, IN-03): ONE constant + ONE IfExp; field-map path byte-identical; SEED-327 NOT fixed. ⛔ accumulators init `None` never `0` |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 2 / 1 / 103 | no (new) | young (created 257-01). The single home of token-to-USD conversion (METER-02 / D-257-13). CostResult with Decimal arithmetic and None on unrated. |
 | [`backend/app/db/rates.py`](docs/HOT-FILE-LEDGER.md#backendappdbratespy) | 9 / 2 / 898 (was `2 / 1 / 507`) | no (2 phases) | **268-02**: ONE `per_root` CTE feeds every spend query; root-only predicate appears ONCE. ⛔ never register a rate for model `unknown` (shell USD would double-count) |
 | [`backend/app/api/admin_spend.py`](docs/HOT-FILE-LEDGER.md#backendappapiadmin_spendpy) | 4 / 2 / 247 (was `1 / 1 / 202`) | no (2 phases) | honoured by construction (**268-02**): ONE validated `expert` Query on both routes (422 before the rates layer); 4 additive summary keys, every 257 key unchanged |
@@ -11097,10 +11382,10 @@ cells rot within days.
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
 | [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 1 / 1 / 159 | no (created 262-01) | ⚠ the AT-PLANNING row read `0/0/0`; measured in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse |
 | [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 1 / 1 / 72 | no (new) | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
-| [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 13 / 4 / 489 (was `8 / 3 / 455`) | ⚠ **FIRES — 4 phases** | **276-07**: `decodeEntities` (5 named entities, single pass, no DOM). Display-only; filters keep the raw value |
+| [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 15 / 5 / 508 (was `13 / 4 / 489`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03 A/B**): `wontUse` → `wontSearch` + ONE `{ onThread }` option on `previewLedgerColumns`. ⛔ words only from here |
 | [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 5 / 4 / 296 (was `3 / 3 / 295`) | ⚠ **FIRES — 4 phases** | **276-07**: honoured by construction, the category text wrapped in `decodeEntities`. ⛔ words only from `expertCatalog.ts` |
-| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 8 / 5 / 359 (was `7 / 4 / 359`) | ⚠ **FIRES — 5 phases** | **276-07**: honoured by construction, the pill LABEL decoded; pill key and filter keep the raw value |
-| [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 6 / 4 / 531 (was `4 / 3 / 530`) | ⚠ **FIRES — 4 phases** | **276-07**: honoured by construction, the category text wrapped in `decodeEntities` |
+| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 9 / 6 / 372 (was `8 / 5 / 359`) | ⚠ **FIRES — 6 phases** | honoured by construction (**279-03 F**, WR-07): ONE reason expression (network sentence only for TypeError); `listExperts(true, false)` ×3 |
+| [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 7 / 5 / 531 (was `6 / 4 / 531`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03 A**): ONE copy change ("will not be searched"). ⚠ no test pins that copy (review note) |
 | [`frontend/src/components/experts/catalog/startScopedChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogstartscopedchatts) | 1 / 1 / 70 | no (new) | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
 | [`backend/app/services/expert_install_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_install_servicepy) | 3 / 1 / 648 | no (1 phase) | planning triple `0/0/0`. **266-05 F-1**: Retry hands on a STRING id (an asyncpg UUID crashed live). ⛔ org only from the active-org dep; never a SYSTEM_USER_ID row |
 | [`backend/app/services/expert_corpus.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_corpuspy) | 1 / 1 / 174 | no (1 phase) | planning triple `0/0/0`. First-party corpora are DATA: slug `fullmatch` + path containment, CRLF→LF before any hash. ⛔ nothing is imported from the corpus dir |
@@ -11108,13 +11393,13 @@ cells rot within days.
 | [`frontend/src/components/ingestion/FolderNode.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldernodetsx) | 13 / 7 / 303 (was `12 / 6 / 272`) | ⚠ **FIRES** | **275-02**: one `refusal` state (cleared when the confirm closes); a 409 swaps Delete+Cancel for the notice. ⛔ no fetch here |
 | [`frontend/src/components/ingestion/NavRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionnavrowtsx) | 6 / 4 / 269 | ⚠ **FIRES — 4 phases** | ⚠ absent its ENTIRE LIFE — row added 266-05. **UI-3**: ONE optional `caption` (omitted → row unchanged). ⛔ words that are the deliverable render at rest, never tooltip-only |
 | [`backend/app/dependencies.py`](docs/HOT-FILE-LEDGER.md#backendappdependenciespy) | 24 / 12 / 1147 (was `23 / 12 / 1139`) | ⚠ **FIRES — 12 phases** | **267-01**: `feature_visible` factored out of `require_visible`. **267-05 F-1** (`cdb173609`): it awaits `ensure_settings_fresh()` first — a cold worker read `off`. ⛔ 403 text unchanged |
-| [`backend/app/services/expert_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scopepy) | 6 / 3 / 632 (was `3 / 2 / 610`) | ⚠ **FIRES** | ⚠ STALE (`3/2/610`); crossed G-5 on 275-01's touch. `_count_kb_documents` names RETRIEVABLE_COLUMN (the `.or_` copy deleted). Next phase: extraction FIRST |
+| [`backend/app/services/expert_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scopepy) | 8 / 4 / 159 (was `6 / 3 / 632`) | ✅ **DISCHARGED** | ✅ **G-5 DISCHARGED (279-01, `fa164ef3e`)**: pure leaf (no `app.` import) + `expert_scope_statement.py` + `expert_scope_events.py`, AST-pinned. ⛔ stays pure |
 | [`backend/app/services/scope_note.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscope_notepy) | 1 / 1 / 83 | no (new) | young (created 268-04, D-268-26). Row added AT CREATION. ⛔ the ONE home of the MODEL-facing scope note; reads the payload, never its `expert` key; held = no note |
-| [`backend/app/services/thread_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesthread_handoffpy) | 1 / 1 / 250 (was `0 / 0 / 0`) | no (young) | young (created 267-02). ⛔ a failed summary REFUSES the handoff (502, nothing written — seen live, F-4); 3 rows in ONE txn with the SOURCE org; a service, not a tool |
-| [`frontend/src/components/experts/ScopeLedger.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsscopeledgertsx) | 4 / 2 / 126 (was `1 / 1 / 102`) | no (2 phases) | **268-03**: `held` tone + optional `tag`/`muted` item fields, additive. ⛔ Will/Won't render from ONE server payload, visible at rest |
+| [`backend/app/services/thread_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesthread_handoffpy) | 2 / 2 / 263 (was `1 / 1 / 250`) | no (2 phases) | **279-02 E** (WR-05): marker content framed as quoted background, items fenced; role stays `user` (mitigation, TRUST-03). ⛔ a failed summary REFUSES (502) |
+| [`frontend/src/components/experts/ScopeLedger.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsscopeledgertsx) | 6 / 3 / 126 (was `4 / 2 / 126`) | ⚠ **NOW FIRES — 3 phases** | ⚠ now FIRES (267, 268, 279). **279-03 A**: one comment word. ⛔ Will/Won't render from ONE server payload, visible at rest. Extraction FIRST next |
 | [`frontend/src/components/chat/ExpertEventCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcardtsx) | 4 / 2 / 278 (was `1 / 1 / 197`) | no (2 phases) | **268-03**: `ScopeChangedCard` via the tone lookup (normal / held / during-run). ⛔ words from `expertEventCopy.ts`, never `content` |
 | [`frontend/src/components/chat/HandoffCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschathandoffcardtsx) | 1 / 1 / 40 (was `0 / 0 / 0`) | no (young) | young (created 267-04). Renders the handoff user row as a card, never a user bubble. Live G4-3: the new thread opens on it, naming the source thread's facts |
-| [`frontend/src/components/chat/expertEventCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcopyts) | 4 / 2 / 313 (was `1 / 1 / 241`) | no (2 phases) | **268-03**: `SCOPE_EVENT_COPY` + `scopeEventModel` beside 267's words. ⛔ the kind list is cross-pinned to `TRANSCRIPT_EVENT_KINDS` by `?raw` |
+| [`frontend/src/components/chat/expertEventCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcopyts) | 5 / 3 / 315 (was `4 / 2 / 313`) | ⚠ **NOW FIRES — 3 phases** | ⚠ now FIRES (267, 268, 279). **279-03 A** (D-16): sub-line prefixed "Won't be searched:". ⛔ kind list cross-pinned to `TRANSCRIPT_EVENT_KINDS` by `?raw` |
 | [`frontend/src/components/chat/threadNavigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadnavigationtsx) | 1 / 1 / 45 (was `0 / 0 / 0`) | no (young) | young (created 267-04). The pointer's `Open →` door; no router exists, so it selects the thread. Live G4-3: Open lands on the new thread |
 | [`backend/app/db/runs.py`](docs/HOT-FILE-LEDGER.md#backendappdbrunspy) | 9 / 8 / 266 | ⚠ **FIRES — 8 phases** | ⚠ absent its ENTIRE LIFE — row added at 268 PLANNING. **268-01**: `insert_run` gains org + Expert with a SQL parent copy. ⛔ `finalize_run` untouched (SEED-297) |
 | [`frontend/src/components/admin/spend/ExpertFilterPills.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertfilterpillstsx) | 1 / 1 / 179 (was `0 / 0 / 0`) | no (new) | young (created 268-02). ⛔ ONE `expert` filter that every card follows (D-268-08); owns `filterPillClass` for all 3 ribbon groups |
@@ -11219,6 +11504,31 @@ cells rot within days.
 | [`frontend/src/components/retention/RetentionPolicyEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionpolicyeditortsx) | 1 / 1 / 532 | no (young) | young (275-04). Row added AT CREATION. ⛔ the D-02 gate: aria-disabled + on-screen reason, stale re-lock, 409 rendered; one folder OR one type |
 | [`frontend/src/components/retention/RetentionPreview.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionpreviewtsx) | 1 / 1 / 209 | no (young) | young (275-04). Row added AT CREATION. Server buckets in <details>; the server's `why` as-is; D-34 private count |
 | [`frontend/src/components/retention/RetentionHistory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionhistorytsx) | 1 / 1 / 178 | no (young) | young (275-04). Row added AT CREATION. S5 receipts; ✎ only on writes; stored names never linked (D-12/D-13) |
+| [`backend/app/services/harness/programmatic.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessprogrammaticpy) | 3 / 3 / 137 | ⚠ **FIRES** | ⚠ FIRES · absent its ENTIRE LIFE — row added 255 |
+| [`backend/app/services/harness/emitters.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessemitterspy) | 4 / 2 / 188 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 255 |
+| [`backend/app/security/secret_cipher.py`](docs/HOT-FILE-LEDGER.md#backendappsecuritysecret_cipherpy) | 5 / 2 / 256 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added mig 180 |
+| [`backend/app/services/oauth_refresh_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesoauth_refresh_servicepy) | 5 / 2 / 362 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added BUG-260912-01 |
+| [`frontend/src/components/sources/SourceFolderPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcefolderpickertsx) | 2 / 1 / 375 | no (1 phase) | ⚠ absent its entire life — row added BUG-260912-01 |
+| [`backend/app/services/provider_gateway/openai_compat.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_compatpy) | 6 / 4 / 525 | ⚠ **FIRES** | ⚠ FIRES at 4 phases · absent its ENTIRE LIFE — row added 262 |
+| [`backend/app/services/provider_gateway/dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaydispatcherpy) | 8 / 3 / 196 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 262, BELOW threshold |
+| [`backend/app/services/provider_gateway/openai_responses.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_responsespy) | 1 / 1 / 563 | no (1 phase) | young (created 262) |
+| [`frontend/src/lib/api/admin.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiadmints) | 7 / 4 / 1099 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 262 |
+| [`frontend/src/components/admin/CapabilityGrid.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadmincapabilitygridtsx) | 3 / 3 / 264 | ⚠ **FIRES** | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 |
+| [`frontend/src/components/admin/ModelAdvancedCapabilities.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodeladvancedcapabilitiestsx) | 1 / 1 / 290 | no (1 phase) | young (created 262) |
+| [`backend/app/services/tools/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicestools__init__py) | 1 / 1 / 20 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Package marker: docstring ONLY. ⛔ no imports, no re-exports, no side effects, so import order can never matter |
+| [`backend/app/services/tools/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsbasepy) | 1 / 1 / 149 (was `0 / 0 / 0`) | no (young) | young (created 278-03). `ToolContext` + `ToolResult` moved verbatim (AST-pinned). ⛔ leaf: stdlib + TYPE_CHECKING only; re-exported from tool_dispatcher.py (D-04) |
+| [`backend/app/services/tools/documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsdocumentspy) | 1 / 1 / 762 (was `0 / 0 / 0`) | no (young) | young (created 278-03). KB browse/query/relationships/web_search/analyze + folder and retention walls. ⛔ walls AST-pinned; no module-level tool_dispatcher import |
+| [`backend/app/services/tools/skills.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsskillspy) | 1 / 1 / 759 (was `0 / 0 / 0`) | no (young) | young (created 278-03). load/save/read_skill_file/attach + `_resolve_skill_visibility_or` (SEED-125 org gate). ⛔ one resolver; patch where used |
+| [`backend/app/services/tools/sandbox.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolssandboxpy) | 1 / 1 / 1218 (was `0 / 0 / 0`) | no (young) | young (created 278-03). execute_code, bounded sandbox, hydration, autoheal. ⛔ largest family; no module-level tool_dispatcher import |
+| [`backend/app/services/tools/runtime_gap.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsruntime_gappy) | 1 / 1 / 310 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Phase-142 pure classifier, allowlists, `SCRIPT_EXTS`, repeat-guard result. ⛔ no I/O; keeps `import re as _re_filename` |
+| [`backend/app/services/tools/render_template.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsrender_templatepy) | 1 / 1 / 787 (was `0 / 0 / 0`) | no (young) | young (created 278-03). `_RENDER_DRIVER_SRC` + filename guard + handler. ⛔ SandboxedEnvironment(autoescape=True); emitters read the handler via tool_dispatcher |
+| [`backend/app/services/tools/workspace.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsworkspacepy) | 1 / 1 / 223 (was `0 / 0 / 0`) | no (young) | young (created 278-03). The 5 workspace handlers + `_normalize_optional*`. ⛔ moved verbatim (AST-pinned) |
+| [`backend/app/services/tools/memory.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsmemorypy) | 1 / 1 / 121 (was `0 / 0 / 0`) | no (young) | young (created 278-03). remember, recall, query_tables. ⛔ moved verbatim (AST-pinned) |
+| [`backend/app/services/tools/agent_control.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsagent_controlpy) | 1 / 1 / 478 (was `0 / 0 / 0`) | no (young) | young (created 278-03). task, write_todos, ask_user + sub-agent sets. ⛔ task_service stays a LAZY import (it imports tool_dispatcher) |
+| [`backend/app/services/tools/connector.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsconnectorpy) | 1 / 1 / 380 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Connector chat tool + approval timeout. ⛔ trifecta/approval/audit AST-pinned; dispatch_tool resolves it as a tool_dispatcher global |
+| [`backend/app/services/document_vocabulary.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_vocabularypy) | 1 / 1 / 38 (was `0 / 0 / 0`) | no (young) | young (created 278-02). DEBT-09 ONE home: 3 timestamptz date words → column + the list-field set. ⛔ leaf, no app imports; a copy elsewhere fails the 278 fence |
+| [`backend/app/services/expert_scope_statement.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scope_statementpy) | 2 / 1 / 315 (was `0 / 0 / 0`) | no (young) | young (created 279-01, row added AT PLANNING). Async scope statement, moved verbatim (AST-pinned); 279-03 docstring word. ⛔ never imports expert_scope_events |
+| [`backend/app/services/expert_scope_events.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scope_eventspy) | 2 / 1 / 228 (was `0 / 0 / 0`) | no (young) | young (created 279-01). Transcript wording + its ONE writer; **279-02 H** D-07 r→r `excluded` fix. ⛔ imports statement, never the reverse |
 
 
 
@@ -11273,6 +11583,10 @@ path run step N" stops being a question a comment answers.
 
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`15/6/877`). **270-01**: ONE best-effort UPDATE after the splice writes the file facts; skipped when every fact is None. ⛔ a failed facts write logs and never fails ingest
 
 ## frontend/src/components/sources/watchProductMark.ts
 
@@ -11373,6 +11687,10 @@ both in the same edit.
 
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-02**: deleteDocument / deleteFolder `throw await refusalOf(...)`; imports refusal.ts, exports nothing new (barrel contract)
 
 ## backend/app/services/email_attachments.py
 
@@ -12307,6 +12625,10 @@ SEED-064 running dot, the "Filter this list…" box, and the date/folder group-m
 
 **Seam:** not proposed. At two phases and 513 lines the honest first step is the row.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase (the `settingsSearchPayload.ts` precedent); D-244-20 claimed a row existed and the gate refuted it
+
 ### `frontend/src/hooks/useThreads.ts` — row added `244-01`
 
 **`4 / 2 / 64` at this plan's base** (phase buckets: `08`, `166`). ⚠ **ABSENT FROM BOTH REGISTERS FOR
@@ -12325,6 +12647,10 @@ stale thread). Narrowing it back to `Thread` re-opens a cross-org selection leak
 **Seam:** not proposed. 64 lines, one concern.
 
 ---
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ now FIRES (`4/2/64`). **267-04**: `newThread` takes an optional Expert id (D-267-21). ⛔ `selectThread` a bare setState
 
 ## Phase 244 plan 02 (`SHELL-04`)
 
@@ -12425,6 +12751,10 @@ than a fifth branch. ⛔ Not taken at 244 — the phase's charter was `SHELL-04`
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`13/7/757`). **274-01**: `?lifetime=thread` (fails closed to the TTL) + a REQUIRED `lifetime` kwarg on the ONE writer. ⛔ no minter reach (promote is its own module)
+
 ## `frontend/src/components/panel/TemplateUpload.tsx`
 
 **`2 / 2 / 91`** (re-derived 2026-09-11, `244-02`). Phases: 100 · 151.
@@ -12450,6 +12780,10 @@ asserts `not.toMatch(/accept="\.[a-z]/)` on this file's source, so a re-introduc
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent for its entire life — row added 244-02 at the SECOND phase. **244**: the `accept=` literal is GONE; it reads the fenced constant
+
 ## `frontend/src/lib/workspaceAllowedExt.ts`
 
 **`1 / 1 / 54`** — created by `244-02` T1. Row added **at creation**.
@@ -12474,6 +12808,10 @@ entry, so an unnamed suite here runs in no gate at all.
 from this file: three of its six cases went red (`expected [ … ](12) to deeply equal [ … ](13)`), and
 the file was restored **md5-identical** (`5a63ea3e3adca51608f084de66ec8219`).
 
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 244-02). Row added AT CREATION — an absent row is invisible to G-5 at any count
 
 ### `frontend/src/components/chat/ChatArea.tsx` — `244-03`
 
@@ -12796,6 +13134,10 @@ mark was invented.
 the second-control defect above. Folder context or any other per-tab affordance goes **inside this
 row**, never above it and never as a parallel strip.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+now FIRES (3 phases). **271-02**: optional `onOpenFilingRules`; link + pill in ONE right cluster, never a tab. 271-05 G4-3: Back returns to Ingestion
+
 ### `frontend/src/components/layout/attentionConditions.ts` — `244-04` Task 2 addendum
 
 `attentionCountByTab` lands here rather than in the page, and the placement IS the argument: it is a
@@ -12874,6 +13216,10 @@ extraction is `chatAttachment.ts` beside it, and the render stays here.
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 244-05). Row added AT CREATION. ONE chip, THREE states; `sent` carrying `this chat only` is D-244-22's build obligation, `expired` is D-244-25's
+
 ## `frontend/src/components/chat/composerCopy.ts`
 
 ⚠ **RE-DERIVED 2026-09-12 at `244-07`: `3 / 1 / 111`.** Still young (created `244-05`).
@@ -12943,6 +13289,10 @@ reader can see nobody approved it.
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, `?raw`-fenced. ⛔ `COPY.b` NOT ported (D-244-23). **244-06**: `cloudSub` ported by SHAPE
+
 ## `frontend/src/components/chat/ActiveConnectorChips.tsx`
 
 **`2 / 2 / 82`** — re-derived at `244-05` T2. ⚠ **Absent from the scan list for its ENTIRE LIFE**
@@ -12987,6 +13337,10 @@ of its own. If a third chip kind joins the row, the right shape is a `ComposerCh
 chip children — a container extracted from `MessageInput`, **not** a slot pushed back into here.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26)
 
 ### `frontend/src/components/chat/MessageInput.tsx` — `244-05`
 
@@ -13234,6 +13588,10 @@ the measurement rather than re-deriving it.**
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger GATE is what found it (C-8's last `[no-row]`).** REBUILT: select-then-confirm; the commit is the PARENT's
+
 ## `frontend/src/components/chat/useComposerAttachments.ts`
 
 ⚠ **RE-DERIVED 2026-09-12 at `244-07`: `2 / 1 / 183`.** Still young (created `244-06`).
@@ -13301,6 +13659,10 @@ nothing itself.
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state + verbs; it CANNOT reach `setValue`
+
 ## `frontend/src/components/library/LibraryCloudImport.tsx`
 
 **`1 / 1 / 194`** — created by `244-06` T2. Row added **at creation**.
@@ -13346,6 +13708,10 @@ permanent KB document. Two consequences must not share one word. Case 5 fences i
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write
+
 ## BUG-260912-01 — four rows added, two corrected (2026-09-12)
 
 A user reported that the Library's Ingestion tab said **"No subfolders"** for a freshly
@@ -13375,6 +13741,10 @@ Every `except OAuthRevokedError` already in the tree says *"reconnect it once"*.
 would have silently re-acquired that wrong sentence at each of them — the exact defect being
 closed. ⚠ It also carries **no provider body**: the token endpoint is the one request whose
 body holds a refresh token, so the error names the fact and the detail stays in the log.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent for its ENTIRE LIFE — row added **BUG-260912-01**. The ONE token-renewal seam; `invalid_client` now raises its own named error, NEVER a subclass of the revoked one
 
 ### `backend/app/services/sources/failure_cause.py` — 3 / 2 / 227 (row added at this fix)
 
@@ -13437,6 +13807,10 @@ through only on **positive proof of plainness**, so the worst case is the honest
 rather than a leak. ⚠ A legacy case pinned that raw pass-through (the words `Network
 connection dropped` appearing verbatim); it was **changed deliberately**, and a new case drives
 the other half — the backend's own authored, punctuated prose still survives intact.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent for its entire life — row added **BUG-260912-01** at its SECOND touch. ⛔ a failed child load renders a REASON; "No subfolders" is a claim about the drive and needs an answer to make it
 
 ### `frontend/src/components/settings/connectionsCopy.ts` — 16 / 9 / 804 (row corrected; was `15 / 8 / 784`)
 
@@ -13740,6 +14114,10 @@ the file.**
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253. **244-15**: ONE action type + ONE bare no-op stub; ⛔ `void`, never `Promise<void>`
+
 ## `frontend/src/lib/toolMeta.ts`
 
 ⚠ **ADDED 2026-09-12 BY `244-13`, WHICH DOES NOT MODIFY THIS FILE — and that is deliberate
@@ -13788,6 +14166,10 @@ machine and `harnessBannerProgress`'s phase arithmetic are three concerns in one
 third is the only one that is not a lookup table. **It inherits `10 / 6 / 218`.**
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string; a literal copied elsewhere makes its pin vacuous
 
 ### `frontend/src/providers/StreamsProvider.tsx` — `244-14` (fix round: CR-01, WR-02, WR-04)
 
@@ -13972,6 +14354,10 @@ naming it; case 6c stayed **GREEN**. With `stripComments` it goes red. `MessageL
 **md5-identical** (`ad87aa8abc5fa53bba038f5f85b0124c`).
 
 ---
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 244-14 / IN-02). Row added AT CREATION. ⛔ The ONE home of *a `?raw` fence cannot tell code from a comment*; 3 consumers. Never apply it to a class-list or string-CONTENT assertion
 
 ## `frontend/src/providers/StreamsProvider.tsx` — `244-15`
 
@@ -14345,6 +14731,10 @@ the `*_api_key` columns that actually exist. `lmstudio_api_key` and `custom_api_
 same commit as the migration that created them, which is the only reason they are not that case.
 
 ---
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent for its ENTIRE LIFE — row added at **mig 180**, its SECOND phase. ⛔ `SECRET_COLUMNS` is the ONE encrypt-on-write set: a provider key column absent from it is stored PLAINTEXT and nothing says so
 
 ### `frontend/src/pages/SettingsPage.tsx` — mig 180, honoured by construction
 
@@ -14923,6 +15313,10 @@ module; a phase adding a third should take that seam first.
 
 ---
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`16/8/967`). **268-01**: takes the send path's `scoping` (resolve once); Continue SUMS segment tokens
+
 ### `backend/app/services/todos_service.py` — Phase 250, row added; file BYTE-UNCHANGED
 
 **Measured 2026-09-15: `4 commits / 3 phases / 187 L`.** ⚠ **G-5 FIRES and there was no row for
@@ -15215,6 +15609,10 @@ affecting every phase** and is outside Phase 253's fixed scope. **Re-open trigge
 whose `files_modified` names a `scripts/` file.**
 
 **Phase 266 (2026-09-25) — re-derived `15 / 10 / 690`** (the row read `11 / 6 / 653`). **266-01:** migration 195's `expert_installs` ACL is mirrored: REVOKE ALL from PUBLIC, anon and authenticated; GRANT SELECT to authenticated; full DML to service_role (D-266-08: members read, only the backend writes). The 5e header now names migrations 186-195. ⛔ `scripts/` is EXEMPT from `check-hot-file-ledger.cjs`, so no gate would have demanded this row. It is kept by hand.
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE (`11/6/653`). **266-01**: mig 195's `expert_installs` ACL mirrored. ⛔ `scripts/` is gate-EXEMPT
 
 ## scripts/check-schema-acl-parity.cjs
 
@@ -15529,6 +15927,10 @@ second cause without a human noticing it. ⛔ Deferred at 253-03 by the operator
 lock, not by judgement; **trigger: the next hook whose registration is found narrower than its
 code, or the next `.claude/hooks/` file added without a matching entry.**
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`9/4/202`). **276** (operator-approved): docs-coverage-guard registered beside landing-drift-guard. ⛔ The ONE hook table; a dropped entry fires NEVER
+
 ## `backend/app/services/harness/programmatic.py`
 
 **`3 commits / 3 phases / 137 L`** — re-derived 2026-09-18 at Phase 255.
@@ -15559,6 +15961,10 @@ promise — today the contract is prose in a module header and nothing executabl
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **FIRES, and absent from BOTH registers its ENTIRE LIFE — row added 255.** ⛔ The closed `PROGRAMMATIC_PHASE_REGISTRY` (2 fns). Its idempotency contract is load-bearing: a crashed phase re-runs from the top
+
 ## `backend/app/services/harness/emitters.py`
 
 **`4 commits / 2 phases / 188 L`** — re-derived 2026-09-18 at Phase 255.
@@ -15581,6 +15987,10 @@ for a period; it was removed before any commit, and the file is byte-unchanged a
 every emitter inherits them silently.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent its ENTIRE LIFE — row added 255 AT 2 PHASES, before it fires, deliberately. ⛔ The closed `EMITTER_REGISTRY`; `llm_emit` is the ONLY path producing a typed deliverable
 
 ## `backend/app/services/circuit_breaker.py` — row added 2026-09-18 (Phase 256, plan `256-02`)
 
@@ -15621,6 +16031,10 @@ branches **1 → 1**, new state fields **0**, return type `None → tuple[int, i
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box SUBTRACTS real spend
+
 ## `backend/app/services/task_service.py` — row added 2026-09-18 (Phase 256, plan `256-02`)
 
 **Re-derived 2026-09-18 at `902701e89`: `19 commits / 10 phases / 958 L`.**
@@ -15655,6 +16069,10 @@ accumulating `int | None` so that a stream which never surfaced usage yields `No
    that `backend/tests/unit/test_256_token_sum_narrowing.py` fences (D-256-02).
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ the row was ACCURATE at 264 research (`19/10/958`) and **264-01 made it stale inside the same phase**. honoured by construction: ONE `sub_ctx` kwarg, read from `parent_ctx`, never re-derived
 
 ## `backend/app/services/run_reconciler.py` — row added 2026-09-18 (Phase 256, plan `256-02`)
 
@@ -15703,6 +16121,10 @@ D-256-05's posture of leaving `finish_run` byte-unchanged. A named hole beats a 
    knowable, which is that seed's `trigger_when`.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297`
 
 ## `backend/app/services/forced_emit.py` — row added 2026-09-19 (Phase 256, plan `256-04`)
 
@@ -15823,6 +16245,10 @@ lost.
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 5 phases — row added 256-04, in its FIRST edit's commit.** ⛔ accumulators init `None` never `0`, ABOVE the rung loop so a FAILED rung counts
+
 ## ⚠ CROSS-PLAN RE-DERIVATION 2026-09-19 — FOUR ROWS PLAN `256-03` COULD NOT UPDATE
 
 Plan `256-03` ran in a parallel worktree in the same wave as `256-04`. It modified four files and
@@ -15887,6 +16313,10 @@ What it owns. The database access layer for commercial capability matrix queries
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 258). Row added AT CREATION — an absent row is invisible to G-5 at any count
+
 ## `backend/app/services/entitlement_service.py`
 
 **`1 / 1 / 130`** — created by Phase 258 (`258-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count. This module is about to become the single canonical home for every commercial boundary in the product (TIER-01) — the worst possible file to have invisible to G-5.
@@ -15894,6 +16324,10 @@ What it owns. The database access layer for commercial capability matrix queries
 What it owns. The single canonical service home for entitlement evaluation across the product. Exposes `check_entitlement()`, `require_capability()`, and `EntitlementDeniedException` (HTTP 403 Forbidden with structured refusal JSON naming required tier, current tier, capability, and upgrade hint per TIER-03). Guarded by an AST single-home fence (`test_258_single_entitlement_home.py`, TIER-04). Fails closed on unreadable tiers or database blips (TIER-05).
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 258). Row added AT CREATION. Single commercial boundary home (TIER-01/04)
 
 ## `backend/app/db/experts.py`
 
@@ -15933,6 +16367,10 @@ de-facto skills DAL, and the extraction seam would then be *skills writes* — n
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE (`4/3/567`). **266-01**: SIX install queries ADDED. ⛔ no existing query touched
+
 ## `backend/app/models/expert.py`
 
 **`1 / 1 / 52`** — created by Phase 259 (`259-01`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
@@ -15966,6 +16404,10 @@ envelope is the moment to split them into `models/expert.py` and `models/expert_
 than the moment to add a fourth.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`4/3/131`). **267-01**: `tool_floor_enabled` kept, documented unread (D-267-02)
 
 ## `backend/app/services/expert_service.py`
 
@@ -16039,6 +16481,10 @@ landing before that extraction is the trigger.
 **Phase 266 (2026-09-25) — re-derived `9 / 6 / 575`** (the row read `8 / 5 / 551`). **266-01:** in `resolve_expert_bundle`, an `is_system` (first-party) bundle now reads its folder ids ONLY from the caller org's `expert_installs` row (D-266-09). No install means no folders, and the bundle's global `knowledge_folder_ids` is ignored. The `is_system_folder` SYSTEM_USER_ID bypass is **RETIRED DELIBERATELY** (D-266-10 / SEED-304, under rule SEED-177 / D-206-07), and the retired line is quoted verbatim in a comment. ⛔ **The strict caller-org loop is the boundary, not the install lookup.** The install-sourced id still runs through it. The 266-05 fence's plant, an install row pointing at org B, is stripped with `EXPERT_MEMBER_CROSS_ORG_STRIPPED`, and the base resolver fails 3 of the 6 fence cases (`266-05-SUMMARY.md`). Org-authored bundles behave exactly as before.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`9/6/575`). **267-01**: `connection_states`, THE one connected rule. ⛔ pure data
 
 ## 263-REVIEW.md WR-01 … WR-09 — seven claims the Expert surfaces were making that were not true
 
@@ -16260,6 +16706,10 @@ authoring route is the trigger to extract `api/expert_authoring_routes.py` with 
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`13/5/764`). **267-01**: ONE overlay adds `connection_state`/`can_connect`. Extraction OWED
+
 ## `frontend/src/components/chat/ActiveExpertChip.tsx`
 
 **`0 / 0 / 0`** — created by Phase 260 (`260-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
@@ -16267,6 +16717,10 @@ authoring route is the trigger to extract `api/expert_authoring_routes.py` with 
 What it owns. Leaf component for rendering the active consultant chip inside the composer's existing `Using:` chips row container (`data-testid="active-connector-chips"`). Sibling to file attachment chips and `ActiveConnectorChips`.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row read `0/0/0`. **268-03**: paired with the scope chip (legible `· Restricted` beside a held scope)
 
 ## `frontend/src/components/chat/ExpertSpotlightCard.tsx`
 
@@ -16296,6 +16750,10 @@ What it owns. Leaf component for rendering the hero visual spotlight card and 3 
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row was STALE at `0 / 0 / 0`. **262-02**: FOUR demo-Expert hardcodes retired as rewrites. ⛔ no fallback here may inspect `slug` or `name` — that match IS the retired artefact
+
 ## `frontend/src/components/chat/InviteExpertDialog.tsx`
 
 **`0 / 0 / 0`** — created by Phase 260 (`260-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
@@ -16313,6 +16771,10 @@ What it owns. Leaf component modal dialog for browsing available domain expert b
 **Phase 266 (2026-09-25) — re-derived `3 / 3 / 231`, and G-5 NOW FIRES** (the row read `2 / 2 / 218`). Honoured by construction (**266-04**, D-266-01): each row makes ONE `inviteGate(expert)` read. `null` invites as before. A string is the REASON the Expert cannot join yet, and it renders in place of the invite button. The button itself is byte-unchanged. ⚠ **Never checked live:** UI-2 was left out of the operator's simplified browser steps, so this gate is proven by unit tests only (`ComposerExpert.test.tsx`), and the live row is OWED. **Named seam before a 4th phase:** the per-row action block (gate + invite) as one component.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`3/3/231`). **267-04**: R1-R10 + Will/Won't ledger; seam `ExpertRowActions` TAKEN
 
 ## `backend/app/services/skill_body_authoring.py`
 
@@ -16380,6 +16842,10 @@ What it owns. Leaf component for expert authoring studio, providing AI brainstor
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ now FIRES (`3/2/1550`). **267-03**: 2 removals + 1 re-keyed picker. Extraction OWED
+
 ## `frontend/src/components/experts/ProposedSkillCard.tsx`
 
 **`1 / 1 / 86`** — created by Phase 263 (`263-04`). **Row added AT CREATION**, in the same commit that creates the file. Precedent in `CLAUDE.md` is explicit: an absent row is invisible to G-5 at any count, forever, silently — and this file was the ledger gate's LAST remaining `[no-row]` finding for Phase 263.
@@ -16401,6 +16867,10 @@ What it owns. The dashed `⬡` card for one capability the draft named that the 
 What it owns. The user-side org-admin shell reachable via the indigo shield, hosting live tabs (`members`, `audit`, `settings`, `invitations`, `sso`, and Phase 261 `experts`).
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ now FIRES. **275-04**: Retention live — 1 branch + `recordingPulse`. ⛔ extraction FIRST next
 
 ## `frontend/src/components/org/OrgExpertsTab.tsx`
 
@@ -16461,6 +16931,10 @@ extracted — do NOT keep adding `if (res.status === N)` blocks to individual fu
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ STALE (`7/4/367`). **267-03**: connection-state + preview wire types, ONE preview call
+
 ## `frontend/src/components/skills/SkillFormDialog.tsx`
 
 **`12 / 8 / 635`** — re-derived 2026-09-21 at Phase 263 **planning**, not at a plan's close. ⛔ **Absent
@@ -16512,6 +16986,10 @@ over it, because the *rate* is the finding and this file has now rotted inside a
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ row STALE at `12/8/635` ONE PLAN after 263 planning wrote it. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep entry; ⛔ callers pass a STABLE reference or the reset wipes typing
+
 ## `backend/app/api/skills.py`
 
 **`19 / 10 / 858`** — re-derived 2026-09-21 at Phase 263 **planning**. ⛔ **Absent from BOTH registers
@@ -16546,6 +17024,10 @@ here at all** (D-263-03) — it is a pure caller.
 
 ---
 
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⛔ **FIRES, absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING.** ⛔ `is_org_shared` is HARD-SET False at `:250` and `toggle-global` 409s on the publish gate: D-263-06/07 route AROUND both by provenance, never through
 
 ## `backend/app/services/openai_service.py`
 
@@ -16599,6 +17081,10 @@ predicate.
 
 ---
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⛔ **FIRES at 36 phases and absent from BOTH registers its ENTIRE LIFE — row added 262, which DOES modify it.** ⛔ `resolve_calling_mode` is the ONE routing decision; its gate ORDER is the contract
+
 ## `backend/app/services/provider_gateway/openai_compat.py`
 
 **Measured 2026-09-21 (Phase 262): `6 commits / 4 phases / 525 lines`. NOT modified by 262 —
@@ -16617,6 +17103,10 @@ stream visibly differently from the other for the same model family. Its module 
 *"NO while-I'm-in-here cleanup"* warning stands unchanged.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ **FIRES at 4 phases, absent from BOTH its ENTIRE LIFE — row added 262, which does NOT modify it.** ⛔ the entangled unit (D-04); its 5KB `emit_sse` cadence is what `openai_responses.py` mirrors
 
 ## `backend/app/services/provider_gateway/dispatcher.py`
 
@@ -16637,6 +17127,10 @@ branch order matters: the Responses check runs BEFORE the compat adapter, and a 
 no `api_surface` row falls through byte-identically (D-14).
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent its ENTIRE LIFE — row added 262 at 2 phases, BELOW threshold. The ONE provider→adapter fork; ⛔ `calling_mode` rides ALONGSIDE the stream, never as an event
 
 ## `backend/app/services/provider_gateway/openai_responses.py`
 
@@ -16680,6 +17174,10 @@ on the forced-emission path. **A row reading `emit_tier: "force_strict"` may the
 served `force` here** — a deliberate, measured downgrade, never an assumed guarantee.
 
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 262). Row added AT CREATION. ⛔ emits `call_id`, NEVER `item.id` — the other id does not round-trip and round 2 of every multi-tool turn fails
+
 ## `frontend/src/lib/api/admin.ts`
 
 **Measured 2026-09-21 (Phase 262): `5 commits / 2 phases / 1098 lines`.**
@@ -16705,6 +17203,10 @@ decides"*. A consumer that renders it as "off" states something about the model 
 established.
 
 ---
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent from BOTH registers its ENTIRE LIFE — row added 262 at its 2nd phase. ⛔ `ModelRegistryRow` is OPERATOR-only; the author row is a STANDALONE interface, never a `Pick<>` of it, or an operator field travels to every author
 
 ## `frontend/src/components/admin/ModelAdvancedCapabilities.tsx`
 
@@ -16734,6 +17236,10 @@ field, what the system will do anyway.
 ⚠ `advancedSetCount` counts ASSERTED values, not truthy ones. An explicit `false` is an
 assertion and must count, or a deliberately-disabled capability looks untouched from outside.
 
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+young (created 262). Row added AT CREATION. ⛔ every control is 3-state: `null` means NOT ASSERTED, never `false` — rendering null as off states a fact nobody measured
 
 ## `backend/app/utils/skill_visibility.py`
 
@@ -16817,6 +17323,10 @@ from visibility and only some call sites filter on it. Measured — `_handle_loa
 enablement term at all**. Any arm added here that has no such compensation at its call sites
 must carry its own enablement term, or a disabled skill's files become readable.
 
+
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ the row added at 264 PLANNING read `1/1/83` and was stale by that phase's own close. **264-02/04**: optional `expert_bundle_id` on both encodings; ⛔ the default arm is pinned byte-identical by `==`
 
 ## ⚠ PHASE 264 CLOSE (`264-04`) — SIX TRIPLES RE-DERIVED AFTER THE LAST MERGE, FIVE OF THEM STALE
 
@@ -16995,6 +17505,10 @@ inherited. Copying the neighbouring line's shape would have been exactly wrong.
 
 ---
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ the AT-PLANNING row read `0/0/0`; measured 262-01 in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout fence — AST, never grep; it THROWS on a vacuous parse
+
 ### `frontend/src/components/experts/expertIcon.tsx`
 
 **Row added AT PLANNING, 2026-09-22 (Phase 262).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe.
@@ -17031,6 +17545,10 @@ TARGETS entry).
 
 
 ---
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact
 
 ### `frontend/src/components/experts/catalog/expertCatalog.ts`
 
@@ -17147,6 +17665,10 @@ TARGETS entry).
 
 ---
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate
+
 ### `frontend/src/lib/activeViewReachability.ts` — the `262-01` build detail
 
 **Its scan-list row and its own section already existed, added AT PLANNING with `0 / 0 / 0`.** Measured in its creating commit: **`1 commit / 1 phase / 159 L`**. ⭐ **The duplicate row this plan first wrote was caught by `check-claude-md-size.cjs` in the same turn it was authored** — `[duplicate-row] lines 10875 + 10949` — which is exactly the "fires in the turn the prose is written" property CLAUDE.md claims for that hook, observed working.
@@ -17227,6 +17749,10 @@ Re-derived 2026-09-22 at `e996d3248` with the CLAUDE.md three-command recipe (si
 
 ---
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-02**: confirm stays open until the delete answers; rethrows ONLY a 409 `ApiRefusal` to FolderNode. ⛔ no fetch here
+
 ### `frontend/src/components/ingestion/FolderNode.tsx`
 
 **Derived 2026-09-24 at `a29949402` (Phase 266 planning):** `9 commits / 5 phases / 259 L` (buckets `03 08 114 155 165`). ⚠ **FIRES G-5 and had NO row for its entire life** (266-RESEARCH C-9).
@@ -17237,11 +17763,19 @@ Re-derived 2026-09-22 at `e996d3248` with the CLAUDE.md three-command recipe (si
 
 ---
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-02**: one `refusal` state (cleared when the confirm closes); a 409 swaps Delete+Cancel for the notice. ⛔ no fetch here
+
 ### `frontend/src/components/ingestion/NavRow.tsx`
 
 **Row added 2026-09-25 by 266-05. Measured `6 commits / 4 phases / 269 L`** (buckets `114 155 165 266`; one untagged `style(library)` commit is not a phase). Before the UI-3 fix it measured `5 / 3 / 250`, so **the fix is the commit that took it over the G-5 threshold.** ⚠ **It had NO row in either register for its entire life**, although it is the shared row primitive under `FolderTree`, `FolderNode`, `ViewsGroup` and `AutomationGroup` (extracted in `114-04`). ⚠ **And no gate could have asked for one:** no 266 PLAN named it in `files_modified`, because the fix was an unplanned UAT deviation, and `check-hot-file-ledger.cjs` reads only `files_modified`. A file edited by a deviation is invisible to that gate.
 
 **Phase 266 (266-05, UI-3), honoured by construction:** ONE optional `caption` prop adds a small grey second line under the name (`data-testid="navrow-caption"`) that is visible at rest. Omit it and the row renders exactly as before. The change is a third arm of the name ternary (editing / caption / plain), and the plain arm is byte-unchanged. ⛔ **Binding invariant:** words a user must see render at rest, never tooltip-only. The `G` pill's `sharedLabel` tooltip is an affordance, not a place for information. **Named seam before a 5th phase:** the caption arm repeats the plain arm's name-and-tooltip block verbatim, so extract a `NavRowName` component that both arms render.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent its ENTIRE LIFE — row added 266-05. ONE optional `caption`; ⛔ deliverable words never tooltip-only
 
 ## Phase 267 rows — added AT PLANNING (2026-09-25)
 
@@ -17253,11 +17787,19 @@ The G-5 gate (`scripts/check-hot-file-ledger.cjs`) found **8 files with no row**
 
 **Re-derived 267-01 (before its edit): `22 / 11 / 1125`** — unchanged from planning. **After 267-01's edit, measured in that commit: `23 / 12 / 1139`** (+14 lines: the factored function and its docstring; `_dep` shrank to one call). Phase buckets `061 073 146 148 163 166 167 168 181 182 184`. **Phase 267 (267-01), honoured by construction:** the body of `require_visible(feature)._dep` is factored into ONE non-raising `feature_visible(request, current_user, feature) -> bool`; `_dep` calls it and raises the same `HTTPException(403, "This feature is available to administrators only.")`. The new reader is the Expert overlay's `can_connect` in `api/experts.py`, which must ask the SAME question `POST /connections` asks (`require_org_manage` + `require_visible("live_connectors")`), never re-encode it. ⛔ **Binding invariants:** the 403 detail string is byte-unchanged; operator → visible, `everyone` audience → visible, `role` audience → `resolve_feature_access`, anything else → not visible (fail-closed). **Named seam before a 12th phase:** the file holds five unrelated concerns (auth, pg pools, org resolution, permission checks, visibility gates) — split the visibility/permission gates into `app/security/access.py` and leave `dependencies.py` as FastAPI wiring only.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent here at 12 phases — row added 267-05. `feature_visible` (267-01); F-1 fix `cdb173609`
+
 ### `backend/app/services/expert_scope.py`
 
 **`0 / 0 / 0`** at 267 planning. young (created 267-01). Row added AT PLANNING. ⛔ the ONE composition of an Expert's knowledge scope — the run and the statement both read it, so they cannot disagree
 
 **Measured 267-01, in its creating commit: `1 / 1 / 116`.** `compose_expert_scope(*, scope_mode, thread_folder_id, expert_folder_ids, visible_folders) -> ExpertScope{effective_folder_ids, scoped_folder_path, excluded_folder_ids}` — the body MOVED byte-for-byte from `run_producer.py:480-516`; `tests/unit/test_267_expert_scope.py` keeps a verbatim copy of the old branch and compares 11 cases against it. The one new output, `excluded_folder_ids`, is the thread subtree minus the Expert's folders for a `restricted` Expert on a folder-scoped thread, `()` otherwise. ⛔ **Binding invariants:** pure (no I/O, no `supabase`/`asyncpg`/LLM import, not async — AST-fenced); never raises (`ExpertScopeUnavailable` stays in `run_producer`); the caller fetches `visible_folders` so SEED-124's visibility rule keeps its one home. ⚠ **Characterization carried, not endorsed (D-267-35):** a BIASED Expert on a folderless thread narrows to its own folders — stated as `Dropped: All your documents`, routed to SEED-303. 267-02 adds the one async statement helper beside the pure function.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ crossed G-5 on 275-01: names RETRIEVABLE_COLUMN (the `.or_` copy deleted). Next phase: extraction FIRST
 
 ### `backend/app/services/thread_handoff.py`
 
@@ -17450,6 +17992,10 @@ The G-5 gate (`scripts/check-hot-file-ledger.cjs`) found **8 files with no row**
 
 **Phase 268 (268-01), 2026-09-28 — re-derived `9 / 8 / 266` in the commit that makes the first edit** (the planning figure `8 / 7 / 226` is kept above, not overwritten; buckets now `073 076.1 079 085 092 120 163 268`). **Honoured by construction:** two keyword-only kwargs on `insert_run` (`org_id`, `expert_id`, both default `None`), one `INSERT … SELECT … FROM (SELECT 1) one LEFT JOIN public.runs p ON p.run_id = $8::uuid` replacing the `VALUES` form, one kwarg on `insert_assistant_message` (`org_id` as `$11`), and the module docblock's *"OMIT org_id"* claim struck through with a `CORRECTED 268` note beside it. `finalize_run` and `load_cap_paused_tool_calls` are byte-unchanged. ⛔ **Binding invariant:** the sub-agent copy of `org_id` / `expert_id` / `expert_attributed` is SQL inside the ONE writer — `task_service.py`'s call passes neither kwarg, and the disposition fence fails if it ever does (a second source that can disagree with the parent). Every select-list parameter carries an explicit `::uuid` / `::text` cast. ⚠ That is belt-and-braces, NOT load-bearing — the executor first reasoned that `INSERT … SELECT` would resolve an untyped select-list parameter as `text`, then MEASURED it on a temp table (`INSERT INTO probe (id uuid, s text) SELECT $1, $2` → OK) and the reasoning was false. Recorded so nobody "fixes" a cast believing it prevents an error. The fence was driven RED by a planted fourth `await insert_run(` in `api/evals.py` (`appeared (needs a disposition): ['api/evals.py:4']`) and the file restored (`git diff --quiet HEAD` held). The three `test_db_runs.py` shape tests stay in the inherited 71 (same names, no 4th).
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent its ENTIRE LIFE — row added 268. **268-01**: `insert_run` stamps org + Expert; sub-agent copy in SQL. ⛔ `finalize_run` untouched (SEED-297)
+
 ### `frontend/src/components/admin/spend/ExpertFilterPills.tsx`
 
 **`0 / 0 / 0`** at 268 planning. young (created 268-02). Row added AT PLANNING. The Expert pill group between Time and Coverage and the exported `filterPillClass(on)` all three ribbon groups use (light/dark pair, UI-SPEC §9-D8). ⛔ one `expert` value reaches BOTH `getSpendSummary` and `getSpendRuns` (D-268-08, the 257 "two dialects" lesson).
@@ -17604,6 +18150,10 @@ Re-derived at `268-04` (after waves 1-2 merged) with the CLAUDE.md recipe (6-dig
 
 **`9 / 3 / 974`** (was `2 / 1 / 567`). **Crossed the G-5 threshold in 268** (`2 / 1 / 567` → `9 / 3 / 974`, +407 lines). 268-02 added the Expert pills, the statement line, KPI 1 naming, the Spend by Expert card mount, the ledger Expert column and sub-agent tag. Its shipped classes are dark-only (§9-D9, seeded at 268-04). ⛔ The next phase that edits it proposes an extraction first — the ledger table and the KPI ribbon are the natural seams.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ NOW FIRES (crossed in 268). **268-02**: Expert pills, statement line, Spend by Expert, ledger column. ⛔ next phase proposes extraction FIRST
+
 ### `frontend/src/types/spend.ts` — Phase 268
 
 **`3 / 2 / 115`** (was `1 / 1 / 70`). 268-02 added `ExpertSpendLine` and the new optional/required summary and run fields.
@@ -17624,6 +18174,10 @@ The G-5 gate found 6 files with no row when the 270 plans were written: two EXIS
 ### `backend/app/models/document.py`
 
 **`10 / 7 / 183`** at 270 planning (phase buckets `02 036 112 217 231 240 28`; the `Module 2/3/4` commits are not phases). FIRES G-5 and had NO row for its entire life. **270-02 (planned):** five optional response fields (`page_count`, `source_created_at`, `source_modified_at`, `source_author`, plus the download response model), additive. ⛔ **Binding invariant:** additive OPTIONAL fields only. A required field makes five narrow-select routes that build `DocumentResponse` from a partial row return HTTP 500.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-03**: 4 defaulted fields (archived_at, archived_policy_id, archived_policy_name, retrievable). ⛔ optional only (217 precedent)
 
 ### `frontend/src/components/ingestion/DocumentRow.tsx`
 
@@ -17722,6 +18276,10 @@ The G-5 gate (`node scripts/check-hot-file-ledger.cjs --files …`, run over eve
 
 **`0 / 0 / 0`** at 271 planning. Young (created 271-01). The `POST /document-search` request model. ⛔ **Binding invariants:** `model_config = ConfigDict(extra="forbid")` on every model; verbs, sorts, versions, date `which`, date ops and added-by kinds are closed `Literal`s; every id is a `UUID`; `name` is capped at 200 chars and `limit` at 1..100. The eight relationship verbs are pinned equal to `document_relationship_service._INVERSE_LABEL` keys plus values by a test, so the vocabulary has one home.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ now FIRES (`2/2/171` read `no`). **275-03**: `include_archived: bool = False`. ⛔ `extra="forbid"` kept — backend ships BEFORE frontend (Pitfall 13)
+
 ### `backend/app/api/document_search.py`
 
 **`0 / 0 / 0`** at 271 planning. Young (created 271-01). Its own route module, deliberately NOT in the hot `api/documents.py` (the `library.py` precedent). ⛔ **Binding invariants:** `Depends(get_user_supabase_client)` only, so RLS is in force; the core raises `ResolveError` and the route remaps it to `HTTPException`; no DB write and no audit row.
@@ -17729,6 +18287,10 @@ The G-5 gate (`node scripts/check-hot-file-ledger.cjs --files …`, run over eve
 ### `frontend/src/pages/findState.ts`
 
 **`0 / 0 / 0`** at 271 planning. Young (created 271-03). The pure reducer leaf for Find, composed at the `LibraryPage` boundary beside `librarySelection` (a SECOND `useReducer`, never new actions in `librarySelection.ts`, whose suite pins six). ⛔ **Binding invariants:** zero import statements, no React, no fetch, no storage (a `?raw` fence pins it); the async result, total, `older_matches` and request id are NOT in it; `canSaveAsView` is false whenever a condition the `ViewFilter` cannot store is set.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ now FIRES (`2/2/361` read `no`). **275-02**: `include_archived` + `SET_INCLUDE_ARCHIVED`; key sent only when true. ⛔ STRICT LEAF: zero imports, no I/O
 
 ### `frontend/src/hooks/useDocumentFind.ts`
 
@@ -17983,6 +18545,10 @@ The G-5 gate (`node scripts/check-hot-file-ledger.cjs 272`, run over every file 
 ### `backend/app/services/retrieval_documents.py`
 
 **`0 / 0 / 0`** at 272 planning. Young (created 272-01). Document readers moved verbatim (D-13); still re-exported from `retrieval_service` for the measured importers (`tool_dispatcher`, `multimodal_service`, `checked_query_service`, `scripts/spike-097`).
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ now FIRES (`1/1/174` read young). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on the 3 agent readers; 272 pins retired by name (D-18)
 
 ### `backend/app/services/retrieval_scope.py`
 
@@ -18821,6 +19387,10 @@ branches; Branch 1 (library assets) untouched.
 `test_274_template_resolver_thread_life.py`). The three reads must keep the SAME gate — a probe
 without it reports a live chat file as "expired" or "belongs to a different run".
 
+### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent its ENTIRE LIFE — row added 274-REVIEW WR-01. ONE claim-keyed gate on 3 reads: a workflow never resolves a thread-life chat row
+
 ### `backend/app/api/folders.py`
 
 **Measured at 275-01: `11 / 7 / 233`** (6-digit dated buckets excluded; three of the seven buckets are bare
@@ -18830,12 +19400,20 @@ folder delete (`:133-169`) gains ONE `hold_guard.assert_none_held(..., kind="fol
 call, the existing statements are reordered to rows → bytes (D-38), and a `folder.delete` audit row is
 added. ⛔ No new branching logic; the guard owns the decision and the database trigger is the backstop.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-02**: guard over subtree docs + folder ids (B-1) before any delete; rows → folder → bytes; one `folder.delete` audit on the folder's org
+
 ### `backend/app/api/kb.py`
 
 **Measured at 275-01: `13 / 8 / 504`** — FIRES, and absent from the ledger its entire life. `grep_path`
 reaches documents through `query_user_documents`, so migration 205's RESTRICTIVE agent-read policies
 already hide archived and source-gone rows from it with NO edit here. 275-02 may filter `ls` / `tree` /
 `glob` on `retrievable` (D-36's "every agent path"); that is the one sanctioned change.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+**275-02**: ls/tree/glob's 7 document reads gain `.eq(RETRIEVABLE_COLUMN, True)`. ⛔ `read_path` untouched (Library GET content shares it)
 
 ### `backend/app/services/audit_service.py`
 
@@ -18847,11 +19425,19 @@ migration 170 added to the CHECK in Phase 234 and nobody added here, plus migrat
 missing from the DB would drop audit rows silently. The integration pin (`test_110_audit_drift_guard.py`)
 had been RED since 223 at "exactly 19"; 275-01 re-pinned it to the whole set (34), the reason in its body.
 
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+⚠ absent its ENTIRE LIFE — row added 275-01. **275-01**: +3 connector.watch.*, +10 retention types. ⛔ ⊆ live CHECK
+
 ### `backend/app/services/document_relationship_service.py`
 
 **Measured at 275-01: `5 / 3 / 457`** (phases 116, 117, 165) — FIRES, and absent its entire life. Phase
 275-02 edits it for revision B-2; the row exists before that edit so G-5 can see it. Honour by
 construction: one call, no new branch.
+
+#### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
+
+honoured by construction — one default-False kwarg + one `.eq` per read leg, Library callers unchanged, source fence (row column, not a 2nd query)
 
 ### `backend/app/services/retention/__init__.py`
 
@@ -19261,3 +19847,378 @@ Crossed the G-5 threshold on 275-02's touch (271, 276, 275).
 **`5 / 2 / 465`.** **275-03**: `retention` tag in the Documents group (one line). ⛔ `scripts/` is gate-exempt
 
 No row existed. 275-03 edited it under Rule 3 (`[ungrouped-tag] retention` refused to build). Row added at 275-05 so the next touch is visible.
+
+## Phase 278 rows — added AT PLANNING (2026-10-13)
+
+The G-5 gate (`node scripts/check-hot-file-ledger.cjs 278`, over every file the four 278 plans name) needs a row for every module this phase CREATES, because the gate has no existence check (precedent: 273's planning commit `f76473497`). Twelve modules are new: the eleven files of the `backend/app/services/tools/` package (SEAM-03, the `tool_dispatcher.py` registry/handler split, 278-03) and `backend/app/services/document_vocabulary.py` (DEBT-09, 278-02). Every row reads `0 / 0 / 0` at planning; 278-04 re-derives the triples on the merged tree with the CLAUDE.md recipe. The existing files 278 modifies (`tool_dispatcher.py`, `retrieval_scope.py`, `document_search_service.py`, `view_filter_compiler.py`, `retrieval_service.py`) already have rows; their cells are written LAST, in 278-04, so no two wave-1 worktrees edit this file.
+
+### `backend/app/services/tools/__init__.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. The package marker for the tool handler families. ⛔ docstring ONLY: an import here would make the registry's load order depend on package import order, which D-05 (Extension Contract) forbids.
+
+**Phase 278 close (278-04): `1 / 1 / 20` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/tools/base.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. `ToolContext` and `ToolResult` (and the `TYPE_CHECKING` block) moved verbatim from `tool_dispatcher.py`, AST-pinned by `test_278_pure_move.py`. ⛔ a leaf: stdlib and `TYPE_CHECKING` imports only, `from __future__ import annotations` mandatory (the field annotations name TYPE_CHECKING-only types). Re-exported from `tool_dispatcher.py` so every existing importer keeps working (D-04).
+
+**Phase 278 close (278-04): `1 / 1 / 149` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/tools/documents.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. ls, tree, grep, glob, read_document, fetch_document_file, query_documents, query_documents_by_view, get_related_documents, web_search, analyze_document, plus the 262 folder wall, the 275 retention wall and the lazy view-resolver sentinels (`_ensure_resolver` binds THIS module's globals). ⛔ every wall is AST-pinned; no module-level import of `app.services.tool_dispatcher`; `document_view_resolver` stays a lazy import.
+
+**Phase 278 close (278-04): `1 / 1 / 762` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/tools/skills.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. load_skill, save_skill, read_skill_file, attach_skill_file and `_resolve_skill_visibility_or` (the SEED-125 org gate, also called by the sandbox family). ⛔ the resolver has ONE home; the sandbox family imports it by name, so a test patches it where it is USED.
+
+**Phase 278 close (278-04): `1 / 1 / 759` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/tools/sandbox.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. execute_code, the bounded sandbox runner, 244 attachment hydration and the Phase-142 autoheal. The largest family (about 1,185 lines), so the next phase that touches it measures it first. ⛔ no module-level import of `app.services.tool_dispatcher`; `app.api.threads.drain_step` stays a lazy import.
+
+**Phase 278 close (278-04): `1 / 1 / 1218` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/tools/runtime_gap.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. The Phase-142 pure runtime-gap classifier, its allowlists and messages, `SCRIPT_EXTS` (re-exported from `tool_dispatcher.py` for `app/api/skills.py`) and the repeat-guard result builder. ⛔ no I/O; keeps the `import re as _re_filename` alias the moved regexes reference.
+
+**Phase 278 close (278-04): `1 / 1 / 310` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/tools/render_template.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. `_RENDER_DRIVER_SRC`, the output-filename guard and `_handle_render_template`. ⛔ the driver must construct `SandboxedEnvironment(autoescape=True)` (`test_190_ssti_fence.py`); `harness/emitters.py` reads the handler through `tool_dispatcher` at call time, so tests patch it THERE, not here.
+
+**Phase 278 close (278-04): `1 / 1 / 787` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/tools/workspace.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. The five workspace handlers and `_normalize_optional` / `_normalize_optional_int` (also imported by the documents family). ⛔ moved verbatim, AST-pinned.
+
+**Phase 278 close (278-04): `1 / 1 / 223` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/tools/memory.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. remember, recall, query_tables. ⛔ moved verbatim, AST-pinned.
+
+**Phase 278 close (278-04): `1 / 1 / 121` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/tools/agent_control.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. task, write_todos, ask_user and the sub-agent read-only / excluded sets. ⛔ `task_service` stays a LAZY import inside `_handle_task`, because it imports `tool_dispatcher` at module level.
+
+**Phase 278 close (278-04): `1 / 1 / 478` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/tools/connector.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-03. `_handle_connector_chat_tool` and `_APPROVAL_TIMEOUT_SECONDS`. ⛔ the trifecta, approval and audit writes are AST-pinned; `dispatch_tool` resolves the handler as a `tool_dispatcher` module global, so `tool_dispatcher.py` imports it by name.
+
+**Phase 278 close (278-04): `1 / 1 / 380` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-03; nothing has touched it since.
+
+### `backend/app/services/document_vocabulary.py`
+
+**`0 / 0 / 0`** at 278 planning. Young; row added AT PLANNING. 278-02. DEBT-09's ONE home of the document-filter vocabulary: `TIMESTAMP_DATE_COLUMNS` (added, source_created, source_modified → their timestamptz columns) and `LIST_FIELD_NAMES` (`("topics",)`), imported by `retrieval_scope.py`, `document_search_service.py` and `view_filter_compiler.py`. ⛔ a leaf with no app imports; a literal copy anywhere else in `backend/app` fails `test_278_vocabulary_one_home.py`. `retrieval_scope.py` keeps `date → date_typed` as a named extension of the imported map (D-12).
+
+**Phase 278 close (278-04): `1 / 1 / 38` (was `0 / 0 / 0`).** Re-derived on the merged tree with the CLAUDE.md recipe. One commit, created by 278-02; nothing has touched it since.
+
+## Phase 278 close (2026-10-13, 278-04)
+
+All triples below were re-derived on the merged tree after 278-01..03 and the 278-04 comment commit, using the CLAUDE.md recipe (six-digit quick-task buckets subtracted: `tool_dispatcher.py` drops `260529` and `260705`). They were written LAST, so no wave-1 or wave-2 worktree edited this file concurrently.
+
+### `backend/app/services/tool_dispatcher.py` — Phase 278 close
+
+**`99 / 44 / 274` (was `98 / 43 / 5068`).** ✅ **G-5 DISCHARGED (278-03)**: the registry/handler split owed since OV-273-02 was taken as ONE pure-move commit, `18abc1ed5`.
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 278-04):
+
+> ⚠ STALE · last touch 275-02 · registry/handler split OWED · ⛔
+
+The split record:
+
+- `tool_dispatcher.py` 5,068 → **274** lines. It is now the registry (`_TOOL_REGISTRY`, **30 tools** by `len`) plus `dispatch_tool`, and it re-exports `ToolContext`, `ToolResult`, `SCRIPT_EXTS` and `_attachment_container_path` (D-04).
+- Handlers moved verbatim into `services/tools/`: `documents.py` 762, `skills.py` 759, `sandbox.py` 1218, `runtime_gap.py` 310, `render_template.py` 787, `workspace.py` 223, `memory.py` 121, `agent_control.py` 478, `connector.py` 380. Shared types live in `base.py` 149, and `__init__.py` 20 is docstring only.
+- `test_278_registry_pin.py` (names, order, bindings, schema sha256) is identical to PHASE_BASE `25b4235c5`, and `test_278_pure_move.py` holds every moved binding AST-identical.
+- `check-test-retarget-only.py 18abc1ed5^ 18abc1ed5` and `--no-loss` both exit 0 (D-07), re-run on the merged history at 278-04.
+- ⚠ Handler log records are now named `app.services.tools.<family>` (each module has `logging.getLogger(__name__)`). `dispatch_tool`'s own records keep `app.services.tool_dispatcher`. Any log filter keyed on the old name needs widening.
+- The live Anthropic two-tool turn after the split wrote the same `search.query` / `code.execute` audit key sets as pre-278 rows of the same outcome (`278-VALIDATION.md`).
+
+Every earlier "split still OWED" sentence in this file's sections (244, 264, 267, 268, 272, 273, 275) stays as history; none is edited. ⛔ The next feature on a handler lands in its `tools/<family>.py`, never back in the registry module, and a new family needs a registry entry plus the AST pins updated in the same commit.
+
+### `backend/app/services/retrieval_service.py` — Phase 278 close
+
+**`24 / 13 / 176` (was `23 / 12 / 174`).** ✅ extraction DISCHARGED (272-01). SEAM-02 was MEASURED at 278-04: one top-level def (`search_documents`), `test_272_pure_move.py` 9 passed, and the comment-only commit `2757b9e51` is AST-identical. ⛔ 7 re-exports stay (D-10). Full record: the *"CORRECTED 2026-10-13"* paragraph in this file's main section. The CLAUDE.md row (`19 / 11 / 456`, *"extraction still OWED"*) is corrected in the same commit, with the original struck through beside the fix (D-11).
+
+### `backend/app/services/retrieval_scope.py` — Phase 278 close
+
+**`5 / 3 / 463` (was `4 / 2 / 464`).** ⚠ **now FIRES** (272, 275, 278). Honoured by construction (278-02): `_DATE_FIELD_COLUMN = {**TIMESTAMP_DATE_COLUMNS, "date": "date_typed"}` and `LIST_FIELDS = LIST_FIELD_NAMES`, both imported from `document_vocabulary.py` with values and key order pinned to base. `date → date_typed` stays this module's named extension, never in the home (D-12). A CLAUDE.md FIRING row was added in this commit. ⛔ ids/counts stay RLS-intersected (D-21). Next phase on this file: extraction FIRST.
+
+### `backend/app/services/document_search_service.py` — Phase 278 close
+
+**`5 / 3 / 584` (was `4 / 2 / 587`).** ⚠ **now FIRES** (271, 275, 278). Honoured by construction (278-02): `_DATE_COLUMN` is now `from app.services.document_vocabulary import TIMESTAMP_DATE_COLUMNS as _DATE_COLUMN`, and the literal copy was deleted. A CLAUDE.md FIRING row was added in this commit. ⛔ open/download stay unfiltered. Next phase on this file: extraction FIRST.
+
+### `backend/app/services/view_filter_compiler.py` — Phase 278 close
+
+**`7 / 6 / 302` (was `6 / 5 / 300`).** ⚠ FIRES (113, 114, 237, 240, 272, 278). It had fired since 272 with no CLAUDE.md row; the row was added by 278-04. Honoured by construction (278-02): `LIST_VALUE_FIELDS = frozenset(LIST_FIELD_NAMES)`, imported from the vocabulary home. The 272 G-1 eq-on-a-list-element rule is unchanged.
+
+## Phase 279 rows — added AT PLANNING (2026-10-13)
+
+The G-5 gate (`node scripts/check-hot-file-ledger.cjs 279`, over every file the four 279 plans name) needs a row for every module this phase CREATES, because the gate has no existence check (precedent: the 278 and 273 planning rows). Two modules are new, both created by 279-01's single pure-move commit that splits `backend/app/services/expert_scope.py` (6 / 3 / 632, FIRING since 275-01) along its ledger seam (SEAM-01, D-01): `expert_scope.py` keeps only the pure `ExpertScope`, `compose_expert_scope` and `folder_path`. Both rows read `0 / 0 / 0` at planning; 279-04 re-derives every triple on the merged tree with the CLAUDE.md recipe and writes the touched files' cells LAST, so no wave-2 worktree edits this file.
+
+### `backend/app/services/expert_scope_statement.py`
+
+**`0 / 0 / 0`** at 279 planning. Young; row added AT PLANNING. 279-01. The async half of the scope statement, moved verbatim (AST-pinned by `test_279_pure_move.py` against PHASE_BASE `a5a94ba67`): `_NAMED_LIMIT`, `_mode`, `_count_kb_documents` (one RLS documents query per folder set, through `RETRIEVABLE_COLUMN`), `ScopeStatement`, `describe_expert_scope`, `_scope_ref`, `describe_scope_change`, `scope_preview`. ⛔ Binding invariants: never imports `expert_scope_events` (the only legal import direction is events → statement, D-01); the caller-side visibility rule (`fetch_visible_folders`, SEED-124) keeps its one home; tests patch `resolve_expert_bundle` / `get_expert_service` / `fetch_visible_folders` / `connection_states` HERE, where they are used (no re-export shim, D-02). 279-03 rewords its docstring only (WR-04, "will not be searched").
+
+### `backend/app/services/expert_scope_events.py`
+
+**`0 / 0 / 0`** at 279 planning. Young; row added AT PLANNING. 279-01. The transcript wording plus its ONE writer, moved verbatim (AST-pinned): the label constants, `_dropped_line` (shared by 267's `expert_changed` and 268's `stops` — one wording for Dropped), `build_expert_changed_event`, `insert_expert_changed_row` (async DB write — it sits beside `event_sentence` so the statement module never has to import this one), `_line_items`, `event_sentence`, `_scope_line`, `build_scope_effect`, `build_scope_changed_event`, `_folder_label`, `scope_event_sentence`. Not pure, and says so in its docstring. ⛔ Binding invariants: imports `ScopeStatement` and `_scope_ref` from the statement module, never the reverse; the UI scope words have their other home in `scopeCopy.ts`, and the MODEL-facing words stay in `scope_history_note.py` (a separate register). 279-02 changes `build_expert_changed_event`'s `excluded` condition for restricted → restricted swaps (D-07) in its own commit, after the byte-equal move.
+
+## Phase 279 close (2026-10-13, 279-04)
+
+All triples below were re-derived on the merged tree at `aef68af4a` (279-01..03 merged) with the CLAUDE.md recipe, six-digit quick-task buckets subtracted. The set is every non-test source file the phase changed since PHASE_BASE `a5a94ba67` (`scripts/check-test-retarget-only.py` is gate-exempt under `scripts/` and has no row). Each section quotes the scan-list cell it replaced and, where the file has one, the CLAUDE.md FIRING verdict cell it replaced, verbatim, so no wording is lost. ⚠ **Three files crossed G-5 inside the phase** (`ExpertSpotlightCard.tsx`, `expertEventCopy.ts`, `ScopeLedger.tsx`); the last two had no CLAUDE.md FIRING row and got one in this commit. Full per-item record: `.planning/phases/279-the-expert-scope-seam/279-SEED-328-RECORD.md`.
+
+### `backend/app/services/expert_scope.py` — Phase 279 close
+
+**`8 / 4 / 159` (was `6 / 3 / 632`).** ✅ **G-5 DISCHARGED (279-01)**. The seam this file's 267/268/275 sections named was taken as ONE pure-move commit, `fa164ef3e`: the pure part (`ExpertScope`, `compose_expert_scope`, `folder_path`) stays here with no `app.` import; the async reads moved to `expert_scope_statement.py` and the transcript wording plus its one writer to `expert_scope_events.py`. Every moved binding is AST-identical to PHASE_BASE `a5a94ba67` (`test_279_pure_move.py`), there is no re-export shim, and `check-test-retarget-only.py` read CLEAR in both modes. 279-02 then changed `ExpertScope` / `compose_expert_scope` BY NAME (WR-08 `scoped_folder_paths`, retired in `RETIRED` with a reason). ⛔ `compose_expert_scope` stays pure: no I/O, not async, never raises; the caller fetches `visible_folders` (SEED-124).
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> ⚠ STALE (`3/2/610`); crossed G-5 on 275-01's touch. `_count_kb_documents` names RETRIEVABLE_COLUMN (the `.or_` copy deleted). Next phase: extraction FIRST
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ crossed G-5 on 275-01 · Next phase: extraction FIRST
+
+### `backend/app/services/expert_scope_statement.py` — Phase 279 close
+
+**`2 / 1 / 315` (was `0 / 0 / 0`).** Created by 279-01 (`fa164ef3e`); 279-03 reworded one docstring word ("will not be searched"). ⛔ never imports `expert_scope_events`.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> young (created 279-01, row added AT PLANNING). The async scope statement moved verbatim from expert_scope.py (AST-pinned). ⛔ never imports expert_scope_events
+
+### `backend/app/services/expert_scope_events.py` — Phase 279 close
+
+**`2 / 1 / 228` (was `0 / 0 / 0`).** Created by 279-01 (`fa164ef3e`). 279-02 Commit H (`ce45c7e15`, D-07): `build_expert_changed_event` computes `excluded` against the previous side's effective scope for restricted → restricted only, with ONE new fixture (`fixtures/phase279/expert_changed_restricted_to_restricted.json`) and zero 267/268 fixture lines changed. ⛔ imports the statement module, never the reverse.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> young (created 279-01, row added AT PLANNING). Transcript wording + its ONE writer (insert_expert_changed_row), moved verbatim (AST-pinned). ⛔ imports statement, never the reverse
+
+### `backend/app/api/threads.py` — Phase 279 close
+
+**`271 / 91 / 2544` (was `265 / 90 / 2459`).** Honoured by construction (279-02). CR-03(b) / IN-01 / D-18: ONE `_require_thread_org` (1 def + 4 calls: PATCH, handoff, preview, send); the two inline org compares were REPLACED, not kept beside it; `send_message` stays at 11 `if`s (pinned by `test_279_org_helper.py`, RED-driven with a planted `if True: pass`). WR-01: the handoff door's freed `if` carries the existing `_thread_has_active_run`. WR-02: `_write_expert_change` mirrors `_write_scope_change`'s rowcount → conflict shape (`ExpertChangeConflict` → 409, `except` above `except Exception`). IN-05: `_caller_role_in_org` (1 def + 1 call), routed through the existing `elif update_data:` arm — OV-279-01 NOT required. ⛔ 0 new send-path branches.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> **274-01**: delete_thread collects paths BEFORE the row delete, removes bytes AFTER it — 1 import, 0 new branches (AST-pinned). ⛔ 0 new send-path branches
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> last touch 274-01 · ⛔
+
+### `backend/app/services/run_producer.py` — Phase 279 close
+
+**`21 / 10 / 1117` (was `17 / 9 / 1029`).** Honoured by construction. 279-01 repointed its two lazy imports; 279-02 Commit I (WR-08) added ONE defaulted `ThreadScoping` field (`scoped_folder_paths`, defaulted LAST so the 5-positional construction holds) plus one `IfExp` and forwarded kwargs. D-19: the disabled-Expert stale-clear `ValueError` still fires after the user-message INSERT — recorded not fixed (`test_268_send_path_stamp` unchanged). ⛔ runs is SELECT-only under the user JWT.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> ⚠ STALE (`16/8/967`). **268-01**: takes the send path's `scoping`/`scoping_error` (resolve once); Continue SUMS segment tokens (D-268-20)
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ STALE · last touch 268-01
+
+### `backend/app/services/agent_loop.py` — Phase 279 close
+
+**`66 / 32 / 3675` (was `65 / 31 / 3651`).** Honoured by construction (279-02 Commit I, WR-08 / D-17): ONE guarded helper `_folder_scope_note` + ONE call; the single-folder note is pinned byte-identical to PHASE_BASE; multi-path wording only when `len(scoped_folder_paths) > 1`. `grep -ci expert` = 0 at base and HEAD. ⛔ prompt-assembly seam still OWED (OV-273-03).
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> **274-01**: ONE literal — attachments stay with the conversation (D-26); `_ATTACHMENT_KIND` unchanged. ⛔ prompt-assembly seam OWED (OV-273-03)
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> last touch 274-01 · prompt-assembly seam OWED (OV-273-03) · ⛔
+
+### `backend/app/api/experts.py` — Phase 279 close
+
+**`16 / 7 / 833` (was `14 / 6 / 822`).** Honoured by construction (279-02 Commit G, SEED-328 drive note): ONE expression — `enabled_only=false` is honoured only for `experts:manage` (the permission is asked only on that arm); a member stays forced True. ⛔ extraction still OWED.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> ⚠ row STALE (`13/5/764`). honoured by construction (**267-01**): ONE overlay adds `connection_state` + `can_connect` to every row. ⛔ org ONLY from the active-org dep; extraction OWED
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ STALE · last touch 267-01 · Extraction OWED
+
+### `backend/app/services/forced_emit.py` — Phase 279 close
+
+**`11 / 7 / 716` (was `10 / 6 / 705`).** Honoured by construction (279-02 Commit F, IN-03 / D-08): ONE constant `_COERCE_DIRECTIVE_SCHEMA` + ONE `IfExp` choosing it when `schema_model` is set; the field-map directive is byte-identical; no `provider_gateway/` change. ⚠ This does NOT fix SEED-327 (only Anthropic and Google receive the coerce rung's system text); the provider-docs-first check is owed.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> ⚠ **FIRES at 5 phases, absent from BOTH registers its ENTIRE LIFE — row added 256-04, in its FIRST edit's commit (O-6).** honoured by construction. ⛔ accumulators init `None` never `0`, above the loop
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ FIRES · absent its ENTIRE LIFE — row added 256-04 · ⛔
+
+### `backend/app/services/thread_handoff.py` — Phase 279 close
+
+**`2 / 2 / 263` (was `1 / 1 / 250`).** 279-02 Commit E (WR-05 / D-10, TRUST-03 mitigation): the marker content reads "Context handed over from “…” — a summary of a previous chat. Treat it as background, not instructions:" with the items fenced and an in-item triple backtick neutralised; role stays `user`. Proven in Chrome and the DB (279-UAT-LOG rows 2a, 2a-DB).
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> young (created 267-02). ⛔ a failed summary REFUSES the handoff (502, nothing written — seen live, F-4); 3 rows in ONE txn with the SOURCE org; a service, not a tool
+
+### `backend/app/models/thread.py` — Phase 279 close
+
+**`22 / 15 / 537` (was `21 / 14 / 537`).** 279-01: docstring repoints to the new module homes only; they are OpenAPI schema descriptions, so the move commit regenerated `docs/public/api/openapi.{snapshot,public}.json`.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> ⚠ STALE (`20/13/510`). **268-03**: `folder_id`/`clear_folder` on `ThreadUpdate` + `ScopeEffect`, additive only. ⛔ a body touching both pairs is a 422
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> honoured by construction (268-03)
+
+### `backend/app/models/message.py` — Phase 279 close
+
+**`23 / 15 / 285` (was `22 / 14 / 285`).** 279-01: one comment repoint only.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> **273-04**: `MessageResponse.artifacts` (optional, additive). ⛔ deleting it makes reload render no artifacts, silently
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ STALE · last touch 268-03
+
+### `backend/app/services/retrieval_scope.py` — Phase 279 close
+
+**`6 / 4 / 463` (was `5 / 3 / 463`).** 279-01: one comment repoint only (no code). Next phase on this file: extraction FIRST (unchanged from 278).
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> ⚠ now FIRES (3 phases). honoured by construction (278-02: vocabulary import, values pinned to base); `date → date_typed` stays a named extension (D-12). ⛔ ids/counts RLS-intersected (D-21)
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ now FIRES · 278-02 vocabulary import (one home) · ⛔
+
+### `frontend/src/providers/StreamsProvider.tsx` — Phase 279 close
+
+**`107 / 41 / 4991` (was `106 / 40 / 4982`).** Honoured by construction (279-03 Commit C, D-15): ONE module constant `WORKFLOW_LOCK_DETAIL_PREFIX` (cross-pinned to `workflow_kickoff.py` by `?raw`) + ONE widened condition `err instanceof ApiError && err.status === 409 && err.message.startsWith(WORKFLOW_LOCK_DETAIL_PREFIX)`. No new arm, hook or state. ⚠ Review note: `StreamsProvider.stopping.test.ts:1018` and `streamsProvider_state01b_403.test.tsx:171` now exercise the GENERIC 409 arm, so their "lock arm" titles claim more than they check.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> **273-05**: ONE onArtifact handler (D-16) — append or replace-by-id, text untouched. ⛔ `onTurnBoundary` still FLUSHES before moving
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ row STALE (re-derived under CR-08) · ⛔
+
+### `frontend/src/components/chat/ChatArea.tsx` — Phase 279 close
+
+**`93 / 43 / 1186` (was `91 / 42 / 1171`).** Honoured by construction (279-03 Commits D/E): ONE functional `setActiveExpert(prev => prev?.id === expertId ? prev : null)` at effect start + a guarded catch body (`setActiveExpert(null)` + "This chat's Expert could not be loaded.") (WR-06); `onExpertHandoff` gains `&& !isStreaming` (WR-01); the two spotlight mounts gain one prop expression each (WR-03). Zero new hooks. ⚠ Review note: the org-mismatch 409 still renders under `data-testid="workflow-lock-error-banner"` (words correct, testid name stale).
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> **276-06**: hero tile → static Iris (`idle`, 64px): 1 import + 1 element swap; hook call sites 36 → 36. ⛔ no scope branch in send
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> last touch 276-06 · ⛔
+
+### `frontend/src/components/chat/InviteExpertDialog.tsx` — Phase 279 close
+
+**`10 / 5 / 648` (was `4 / 4 / 614`).** Honoured by construction (279-03 Commits A/B): ONE optional `message` field on the preview error state (IN-01 / D-20) and ONE `onThread` prop into `previewLedgerColumns` (WR-03); copy "Won't search".
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> ⚠ row STALE (`3/3/231`). **267-04**: R1-R10 rows + the Will/Won't ledger; the per-row action area is ONE `ExpertRowActions` (the named seam, TAKEN). ⛔ the body stays a list
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ STALE · last touch 267-04 · seam TAKEN
+
+### `frontend/src/components/chat/ExpertSpotlightCard.tsx` — Phase 279 close
+
+**`5 / 4 / 269` (was `2 / 2 / 205`).** ⚠ **Crossed G-5 in 279** (260, 262, 267, 279). Honoured by construction (279-03 Commit E, WR-03): a restricted branch inside the ONE existing `useEffect` (no new hook) with `folderId` / `threadId` props. ⛔ Next phase on this file: extraction FIRST.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> ⚠ row was STALE at `0 / 0 / 0`. **262-02**: FOUR demo-Expert hardcodes retired as rewrites. ⛔ no fallback here may inspect `slug` or `name` — that match IS the retired artefact
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ row STALE · last touch 262-02 · ⛔
+
+### `frontend/src/components/chat/expertEventCopy.ts` — Phase 279 close
+
+**`5 / 3 / 315` (was `4 / 2 / 313`).** ⚠ **Crossed G-5 in 279** (267, 268, 279). 279-03 Commit A (D-16): the exclusion sub-line is prefixed "Won't be searched:" — one copy change. A CLAUDE.md FIRING row was added in this commit. ⛔ Next phase on this file: extraction FIRST.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> **268-03**: `SCOPE_EVENT_COPY` + `scopeEventModel` beside 267's words. ⛔ the kind list is cross-pinned to `TRANSCRIPT_EVENT_KINDS` by `?raw`
+
+### `frontend/src/components/experts/ScopeLedger.tsx` — Phase 279 close
+
+**`6 / 3 / 126` (was `4 / 2 / 126`).** ⚠ **Crossed G-5 in 279** (267, 268, 279). 279-03 Commit A: one comment word. A CLAUDE.md FIRING row was added in this commit. ⛔ Next phase on this file: extraction FIRST.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> **268-03**: `held` tone + optional `tag`/`muted` item fields, additive. ⛔ Will/Won't render from ONE server payload, visible at rest
+
+### `frontend/src/components/experts/catalog/expertCatalog.ts` — Phase 279 close
+
+**`15 / 5 / 508` (was `13 / 4 / 489`).** Honoured by construction (279-03 Commits A/B): `wontUse` → `wontSearch` keys and ONE `{ onThread }` option on `previewLedgerColumns` (the no-folder-thread column is driven by a client fact; `compose_expert_scope` unchanged).
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> **276-07**: `decodeEntities` (5 named entities, single pass, no DOM). Display-only; filters keep the raw value
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ STALE (`8/3/455`). **276-07**: `decodeEntities`, display-only
+
+### `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` — Phase 279 close
+
+**`9 / 6 / 372` (was `8 / 5 / 359`).** Honoured by construction (279-03 Commit F, WR-07): ONE reason expression in the Start Chat catch (the network sentence only for `TypeError`), and `listExperts(true, false)` ×3 so a manager sees disabled Experts.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> **276-07**: honoured by construction, the pill LABEL decoded; pill key and filter keep the raw value
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ STALE (`7/4/359`). **276-07**: pill label decoded; filter stays raw
+
+### `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` — Phase 279 close
+
+**`7 / 5 / 531` (was `6 / 4 / 531`).** Honoured by construction (279-03 Commit A): ONE copy change ("will not be searched"). ⚠ Review note: no test pins that copy.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> **276-07**: honoured by construction, the category text wrapped in `decodeEntities`
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ STALE (`4/3/530`). **276-07**: category text via `decodeEntities`
+
+### `frontend/src/lib/api/experts.ts` — Phase 279 close
+
+**`12 / 6 / 422` (was `9 / 5 / 418`).** 279-03 Commit A: one comment word.
+
+Scan-list disposition cell before 279-04 (replaced):
+
+> ⚠ row STALE (`7/4/367`). honoured by construction (**267-03**): `ExpertConnectionState`, `ExpertScopePreview` and ONE `getExpertScopePreview`. ⛔ one client function per route
+
+CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
+
+> ⚠ STALE · last touch 267-03

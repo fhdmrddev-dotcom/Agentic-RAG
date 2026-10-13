@@ -41,7 +41,7 @@ FIXTURES = pathlib.Path(__file__).resolve().parent.parent / "fixtures" / "phase2
 
 
 async def change(expert_id, from_folder, to_folder, **kw):
-    from app.services.expert_scope import describe_scope_change
+    from app.services.expert_scope_statement import describe_scope_change
 
     p1, p2, p3 = scope_patches(**kw)
     with p1, p2, p3:
@@ -58,14 +58,14 @@ async def change(expert_id, from_folder, to_folder, **kw):
 
 
 async def effect(expert_id, from_folder, to_folder, **kw):
-    from app.services.expert_scope import build_scope_effect
+    from app.services.expert_scope_events import build_scope_effect
 
     before, after, from_ref, to_ref = await change(expert_id, from_folder, to_folder, **kw)
     return build_scope_effect(before, after, from_ref=from_ref, to_ref=to_ref)
 
 
 async def event(expert_id, from_folder, to_folder, *, during_run=False, **kw):
-    from app.services.expert_scope import build_scope_changed_event
+    from app.services.expert_scope_events import build_scope_changed_event
 
     before, after, from_ref, to_ref = await change(expert_id, from_folder, to_folder, **kw)
     return build_scope_changed_event(
@@ -172,7 +172,7 @@ async def test_at_rest_restricted_is_held_and_saved_is_the_current_folder():
 @pytest.mark.asyncio
 async def test_an_unresolvable_expert_falls_back_to_the_thread_alone_rather_than_blocking():
     """A folder change is never blocked by an Expert that no longer exists at all (LookupError)."""
-    with patch("app.services.expert_scope.get_expert_service", AsyncMock(return_value=None)):
+    with patch("app.services.expert_scope_statement.get_expert_service", AsyncMock(return_value=None)):
         eff = await effect(HR_ID, ACME_FOLDER, ACME_SUB, bundles={})
     assert eff.expert is None
     assert eff.held is False
@@ -235,7 +235,7 @@ async def test_the_fixtures_are_the_real_builders_output(name, expert_id, from_f
 
 @pytest.mark.asyncio
 async def test_the_sentence_is_plain_text_from_the_same_payload():
-    from app.services.expert_scope import scope_event_sentence
+    from app.services.expert_scope_events import scope_event_sentence
 
     assert scope_event_sentence(await event(None, ACME_FOLDER, ACME_SUB)) == (
         "Scope /Client ACME → /Client ACME/Contracts. "

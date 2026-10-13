@@ -30,8 +30,11 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from app.services import tool_dispatcher
-from app.services.tool_dispatcher import _handle_execute_code, GAP_MESSAGES
+# Phase 278 (SEAM-03): `_handle_execute_code` now resolves its collaborators from tools/sandbox.py,
+# so the module alias the patches below use is THAT module (patch-where-used).
+from app.services.tools import sandbox as tool_dispatcher
+from app.services.tool_dispatcher import _handle_execute_code
+from app.services.tools.runtime_gap import GAP_MESSAGES
 
 # The exact BUG-260707-02 shape: a pptx→soffice shell-out that fails because
 # LibreOffice is not installed in the Python-only sandbox.

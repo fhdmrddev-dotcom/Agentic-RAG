@@ -166,7 +166,7 @@ async def test_turn2_ratio_calculation_skill(expert_tool_ctx):
     expert_tool_ctx.supabase.table.return_value.select.return_value.eq.return_value.or_.return_value.limit.return_value = mock_query
 
     # Load skill
-    with patch("app.services.tool_dispatcher.aexec", new_callable=AsyncMock) as mock_aexec:
+    with patch("app.services.tools.skills.aexec", new_callable=AsyncMock) as mock_aexec:
         mock_aexec.side_effect = [
             MagicMock(data=[{
                 "id": "00000000-0000-0000-0000-000000000264",

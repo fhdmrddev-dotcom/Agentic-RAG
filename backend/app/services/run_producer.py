@@ -393,11 +393,19 @@ class ThreadScoping(NamedTuple):
     scoped_folder_path: str | None
     born_for_bundle_id: UUID | None
     scoped_connection_keys: tuple[str, ...] | None
+    # 279-02 WR-08 (D-17): EVERY folder path the scope reads (the note names them all when 2+).
+    # Defaulted LAST so the positional 5-field ``ThreadScoping(None, None, None, bundle, None)`` holds.
+    scoped_folder_paths: tuple[str, ...] | None = None
 
 
 class ExpertScopeUnavailable(ValueError):
     """Phase 266 CR-01: a RESTRICTED Expert resolved to zero folders. The run is refused, because an
     empty scope reaches retrieval as "no folder filter" and would search every org the user is in."""
+
+
+class ExpertThreadOrgMismatch(ValueError):
+    """279-REVIEW WR-02: the thread row this run acts on carries an Expert, and its org is not the
+    caller's org. Refused (fail closed), never resolved in the wrong org and never cleared."""
 
 
 async def _state_expert_removed(
@@ -427,11 +435,11 @@ async def _state_expert_removed(
         logger.warning("expert cleared on thread %s: the thread has no org; no event", thread_id)
         return
     try:
-        from app.services.expert_scope import (  # noqa: PLC0415
+        from app.services.expert_scope_events import (  # noqa: PLC0415
             build_expert_changed_event,
-            describe_expert_scope,
             insert_expert_changed_row,
         )
+        from app.services.expert_scope_statement import describe_expert_scope  # noqa: PLC0415
 
         common = dict(
             supabase=supabase,
@@ -494,6 +502,13 @@ async def _resolve_thread_scoping(
         thread_org_id = t_resp.data.get("org_id") if (t_resp and t_resp.data) else None
         if not active_expert_id:
             return ThreadScoping(None, None, None, None, None)
+        # 279-REVIEW WR-02: THIS re-read is the row the run acts on, so the send door's org check is
+        # only the fast path. A bind landing between the two reads (two tabs, two X-Org-Id) used to
+        # resolve the Expert in the caller's org — clearing it (D-18's struck clear-at-send) or
+        # reading the wrong org's folders. Refused before any resolve or clear (D-19: the message
+        # already saved stays unanswered — accepted).
+        if thread_org_id and str(thread_org_id) != str(current_user.get("org_id") or ""):
+            raise ExpertThreadOrgMismatch("Switch to this chat's organization to keep chatting with its Expert.")
 
         from app.services.expert_service import resolve_expert_bundle  # noqa: PLC0415
         caller_user_id = UUID(str(current_user["id"]))
@@ -588,6 +603,7 @@ async def _resolve_thread_scoping(
         # every non-empty composition is handed on verbatim.
         effective_folder_ids = _scope.effective_folder_ids or None
         scoped_folder_path = _scope.scoped_folder_path if effective_folder_ids else None
+        scoped_folder_paths = _scope.scoped_folder_paths if effective_folder_ids else None  # 279-02 WR-08
 
         # Phase 267 (D-267-01 / D-267-02): NO tool list. The Expert thread keeps the plain
         # thread's tools; the tool-floor flag is kept on the row for compatibility and read by
@@ -626,6 +642,7 @@ async def _resolve_thread_scoping(
             scoped_folder_path,
             resolved.bundle_id,
             scoped_connection_keys,
+            scoped_folder_paths,
         )
     except Exception as exc:
         logger.error(
@@ -819,6 +836,7 @@ async def run_producer(
                     resolved_provider=resolved_provider,
                     effective_folder_ids=_scoping.effective_folder_ids,
                     scoped_folder_path=_scoping.scoped_folder_path,
+                    scoped_folder_paths=_scoping.scoped_folder_paths,  # 279-02 WR-08
                     # Phase 267 (D-267-29 / D-267-32) — the Expert ADDS: its approved
                     # connections and member skills, as neutrally named data. Paired with
                     # the continuation build below. None on a plain run => byte-identical.
@@ -1036,6 +1054,7 @@ async def spawn_continuation_run(
                 dropped_tool_calls=tuple(dropped_tool_calls),
                 effective_folder_ids=_scoping.effective_folder_ids,
                 scoped_folder_path=_scoping.scoped_folder_path,
+                scoped_folder_paths=_scoping.scoped_folder_paths,  # 279-02 WR-08
                 # Phase 267 (D-267-29 / D-267-32) — same additive Expert data as the
                 # Deep build above; a resumed run is the same run and adds the same.
                 scoped_connection_keys=_scoping.scoped_connection_keys,

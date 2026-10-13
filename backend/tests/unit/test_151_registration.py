@@ -62,7 +62,7 @@ def test_fetch_document_file_absent_when_sandbox_off():
 
 def test_reusable_resolver_symbol_exported_for_file01():
     """Plan 04 (FILE-01 source #4) imports this resolver — lock the symbol name now."""
-    from app.services.tool_dispatcher import _fetch_owned_document_bytes  # noqa: F401
+    from app.services.tools.documents import _fetch_owned_document_bytes  # noqa: F401
 
     assert callable(_fetch_owned_document_bytes)
 

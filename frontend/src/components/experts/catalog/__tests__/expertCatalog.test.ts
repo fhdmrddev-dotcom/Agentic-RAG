@@ -674,7 +674,7 @@ describe("267-REVIEW WR-06 — narrowingLedgerColumns", () => {
     excluded_names: [],
   } as const
 
-  it("biased, no thread folder, with folders → Will use its folders (+ attachments); Won't use All your documents", async () => {
+  it("biased, no thread folder, with folders → Will use its folders (+ attachments); Won't search All your documents", async () => {
     const { narrowingLedgerColumns } = await import("../expertCatalog")
     const cols = narrowingLedgerColumns({ ...base, expert_folders: [...base.expert_folders], excluded_names: [] })
     expect(cols).not.toBeNull()
@@ -683,7 +683,8 @@ describe("267-REVIEW WR-06 — narrowingLedgerColumns", () => {
     expect(will.heading).toBe("Will use")
     expect(new Set(will.items.map((i) => i.label))).toEqual(new Set(["Financial Reports", "Chat attachments"]))
     expect(wont.tone).toBe("no")
-    expect(wont.heading).toBe("Won't use")
+    // 279-03 WR-04 (D-09/D-16): was expect(wont.heading).toBe("Won't use")
+    expect(wont.heading).toBe("Won't search")
     expect(wont.items.map((i) => i.label)).toEqual(["All your documents"])
   })
 
@@ -696,6 +697,63 @@ describe("267-REVIEW WR-06 — narrowingLedgerColumns", () => {
   })
 })
 
+// 279-03 WR-04 (D-09) — the ledger's "no" heading names SEARCH, the one thing an excluded document
+// is denied (the chat's own attachments stay readable). The old export names must not survive.
+describe("279-03 WR-04 — LEDGER_COPY says Won't search", () => {
+  it("279-03: wontSearch(n) / wontSearchAll, and neither retired key remains", () => {
+    const copy = LEDGER_COPY as unknown as Record<string, unknown>
+    expect((copy.wontSearch as (n: number) => string)?.(7)).toBe("Won't search · 7")
+    expect(copy.wontSearchAll).toBe("Won't search")
+    const retired = ["wontUse", "wontUseAll"] // 279-03 D-09: the pre-279 key names
+    for (const key of retired) expect(key in copy).toBe(false)
+  })
+})
+
+// 279-03 WR-03 (SEED-328) — a RESTRICTED Expert on an existing thread with NO folder searches only its
+// own folders, but the server computes exclusions only against a thread folder, so the ledger said
+// nothing was lost. The selector states it from one client fact (`onThread`); the server is unchanged.
+describe("279-03 WR-03 — previewLedgerColumns(preview, { onThread })", () => {
+  const restricted = {
+    expert_id: "e-hr",
+    expert_name: "HR Advisor",
+    mode: "restricted",
+    expert_folders: [{ id: "f2", name: "HR Policies" }],
+    thread_folder: null,
+    excluded_count: 0,
+    excluded_names: [],
+  } as const
+  const p = () => ({ ...restricted, expert_folders: [...restricted.expert_folders], excluded_names: [] })
+
+  it("restricted + no thread folder + onThread → a 'Won't search' column holding All your documents", async () => {
+    const { previewLedgerColumns } = await import("../expertCatalog")
+    const cols = previewLedgerColumns(p(), { onThread: true })
+    expect(cols).toHaveLength(2)
+    expect(cols[0].heading).toBe("Will use")
+    expect(cols[1]).toEqual({ tone: "no", heading: "Won't search", items: [{ label: "All your documents" }] })
+  })
+
+  it("unchanged without onThread, for a biased preview, or with a thread folder", async () => {
+    const { previewLedgerColumns } = await import("../expertCatalog")
+    const without = previewLedgerColumns(p())
+    expect(without.map((c) => c.tone)).toEqual(["yes"])
+    expect(previewLedgerColumns(p(), { onThread: false })).toEqual(without)
+    expect(previewLedgerColumns({ ...p(), mode: "biased" }, { onThread: true })).toEqual(
+      previewLedgerColumns({ ...p(), mode: "biased" }),
+    )
+    const withFolder = { ...p(), thread_folder: { id: "t", name: "Client ACME", doc_count: 4 } }
+    expect(previewLedgerColumns(withFolder, { onThread: true })).toEqual(previewLedgerColumns(withFolder))
+  })
+
+  it("narrowingLedgerColumns output is unchanged by the option", async () => {
+    const { narrowingLedgerColumns } = await import("../expertCatalog")
+    const biased = { ...p(), mode: "biased" as const }
+    expect(narrowingLedgerColumns(biased)).toEqual([
+      { tone: "yes", heading: "Will use", items: [{ label: "HR Policies" }, { label: "Chat attachments", pinned: true }] },
+      { tone: "no", heading: "Won't search", items: [{ label: "All your documents" }] },
+    ])
+  })
+})
+
 // 267-REVIEW IN-06 — the server's `ScopePreviewThreadFolder.name` is `str | None` (a folder the caller
 // cannot name), but the TS wire type claimed `string`. A type mismatch has no runtime symptom, so this
 // fence reads both sources.
@@ -705,5 +763,33 @@ describe("IN-06 — the preview's thread_folder.name admits null on both sides",
     expect(py).toMatch(/class ScopePreviewThreadFolder\(BaseModel\):[\s\S]*?name: str \| None/)
     const ts = (await import("../../../../lib/api/experts.ts?raw")).default as string
     expect(ts).toMatch(/thread_folder: \{ id: string; name: string \| null; doc_count: number \} \| null/)
+  })
+})
+
+// 279-REVIEW WR-05 — a DISABLED Expert (only a manager is sent one) is a status, never a Start control.
+describe("279-REVIEW WR-05 — a disabled Expert is a status, not a Start Chat", () => {
+  it("pins the words", async () => {
+    const { DISABLED_COPY } = await import("../expertCatalog")
+    expect(DISABLED_COPY.tag).toBe("Disabled")
+    expect(DISABLED_COPY.line).toBe(
+      "Disabled for this organization — enable it in Organization admin → Experts to chat with it.",
+    )
+  })
+
+  it("is_enabled false → status (before any install or connection fact); the card line is the tag", async () => {
+    const { DISABLED_COPY, installCardLine } = await import("../expertCatalog")
+    const line = { kind: "status", line: DISABLED_COPY.line }
+    expect(installView({ ...ALPHA, is_enabled: false })).toEqual(line)
+    expect(installView({ ...firstParty(install("ready")), is_enabled: false })).toEqual(line)
+    expect(installView({ ...firstParty(install("not_installed")), is_enabled: false })).toEqual(line)
+    expect(installCardLine({ ...ALPHA, is_enabled: false })).toBe("Disabled")
+  })
+
+  it("enabled, or a row without the key, is unchanged", async () => {
+    const { installCardLine } = await import("../expertCatalog")
+    expect(installView(ALPHA)).toEqual({ kind: "legacy" })
+    const { is_enabled: _drop, ...noKey } = ALPHA
+    expect(installView(noKey as ExpertBundle)).toEqual({ kind: "legacy" })
+    expect(installCardLine(ALPHA)).toBeNull()
   })
 })

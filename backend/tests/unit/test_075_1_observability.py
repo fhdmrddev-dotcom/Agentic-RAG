@@ -235,8 +235,8 @@ def test_persisted_tool_calls_carry_sub_agent_model_when_sub_agent_record_presen
     tool_dispatcher.py during the G-5 mandated extraction."""
     from pathlib import Path
 
-    # Phase 083: sub_agent_record construction is now in tool_dispatcher.py
-    dispatcher_src = Path(__file__).parent.parent.parent / "app" / "services" / "tool_dispatcher.py"
+    # Phase 083: sub_agent_record construction is now in tool_dispatcher.py (Phase 278: tools/documents.py)
+    dispatcher_src = Path(__file__).parent.parent.parent / "app" / "services" / "tools" / "documents.py"
     dispatcher_text = dispatcher_src.read_text(encoding="utf-8")
 
     # Phase 089-03 (G-5 verbatim move): the persisted_tool_calls.append site
@@ -244,6 +244,13 @@ def test_persisted_tool_calls_carry_sub_agent_model_when_sub_agent_record_presen
     # agent_loop.py::run_agent_loop — grep the spread there.
     threads_src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     threads_text = threads_src.read_text(encoding="utf-8")
+
+    # Phase 278 (D-08) ANCHOR — the construction site lives in _handle_analyze_document. If the
+    # scanned file no longer holds that handler, the regex below is testing the wrong file.
+    assert "_handle_analyze_document" in dispatcher_text, (
+        f"ANCHOR: {dispatcher_src.name} no longer holds _handle_analyze_document — repoint "
+        "dispatcher_src at the file the handler now lives in"
+    )
 
     # Construction site must include effective_model (now in tool_dispatcher.py)
     assert re.search(

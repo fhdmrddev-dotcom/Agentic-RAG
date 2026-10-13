@@ -70,7 +70,8 @@ patterns-established:
   - "jsonb parameters on the codec-registered pool are passed as Python objects (encoding them first stores a JSON string)"
   - "A retention module never names the thread-attachment table or the scheduler; a source fence enforces it"
 
-requirements-completed: []
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed was [] and is replaced with the list copied verbatim from 275-03-PLAN.md frontmatter requirements (D-15)
+requirements-completed: [RET-01, RET-02, RET-03, RET-04]
 
 duration: ~60min
 completed: 2026-10-12

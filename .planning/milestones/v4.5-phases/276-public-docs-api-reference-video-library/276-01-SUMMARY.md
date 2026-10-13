@@ -1,6 +1,8 @@
 ---
 phase: 276-public-docs-api-reference-video-library
 plan: 01
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 276-01-PLAN.md frontmatter requirements
+requirements-completed: [DOCS-04, DOCS-03, DOCS-06]
 subsystem: api-docs, brand
 tags: [docs-04, docs-03, docs-06, openapi, fastapi, brand, logo]
 requires: []

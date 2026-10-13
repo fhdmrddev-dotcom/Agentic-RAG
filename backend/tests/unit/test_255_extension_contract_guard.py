@@ -34,7 +34,23 @@ TRIGGER_FILES = [
     Path("app/services/harness/programmatic.py"),
     Path("app/services/tool_dispatcher.py"),
     Path("app/services/agent_loop.py"),
+    # Phase 278 (SEAM-03 / D-05): the tool handlers moved out of tool_dispatcher.py into these
+    # modules, so the closed-core scan follows them. Named explicitly — never a glob.
+    Path("app/services/tools/__init__.py"),
+    Path("app/services/tools/base.py"),
+    Path("app/services/tools/documents.py"),
+    Path("app/services/tools/skills.py"),
+    Path("app/services/tools/sandbox.py"),
+    Path("app/services/tools/runtime_gap.py"),
+    Path("app/services/tools/render_template.py"),
+    Path("app/services/tools/workspace.py"),
+    Path("app/services/tools/memory.py"),
+    Path("app/services/tools/agent_control.py"),
+    Path("app/services/tools/connector.py"),
 ]
+# Non-vacuity: 6 SEED-291 trigger files + the 11 tools/*.py modules. A dropped path fails HERE
+# instead of silently shrinking the scanned set (the scan below reports a missing file too).
+assert len(TRIGGER_FILES) == 17, f"TRIGGER_FILES holds {len(TRIGGER_FILES)} paths, expected 17"
 
 
 def test_phase_type_registry_is_closed():
@@ -122,7 +138,8 @@ def test_validator_registries_are_closed():
 
 
 def test_no_dynamic_code_execution_in_trigger_paths():
-    """EXT-02: Zero occurrences of importlib, eval, or exec in the six trigger paths."""
+    """EXT-02: Zero occurrences of importlib, eval, or exec in the trigger paths (six SEED-291 files
+    plus, since Phase 278, the eleven tools/*.py handler modules)."""
     backend_app_dir = Path(__file__).resolve().parent.parent.parent / "app"
 
     forbidden_re = re.compile(r"\b(importlib|eval\s*\(|(?<!a)exec\s*\(|__import__\s*\()")

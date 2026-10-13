@@ -65,7 +65,7 @@ async def test_bad_inline_filter_returns_calm_string_not_raise(make_tool_context
 @pytest.mark.asyncio
 async def test_well_formed_inline_filter_routes_to_resolve(make_tool_context, monkeypatch):
     """A well-formed inline `filter` routes through `resolve_filter` (resolve mode)."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.documents as td
     from app.services.tool_dispatcher import ToolResult, _handle_query_documents_by_view
 
     called = {}
@@ -92,7 +92,7 @@ async def test_bad_limit_string_does_not_raise_into_loop(make_tool_context, monk
     """WR-01: a non-numeric `limit` (e.g. {"limit": "twenty"}) must NOT raise into the agent
     loop. _normalize_optional_int coerces or returns None → the handler falls back to the
     default and still returns a calm ToolResult (T-115-02-05 — errors never escape)."""
-    import app.services.tool_dispatcher as td
+    import app.services.tools.documents as td
     from app.services.tool_dispatcher import ToolResult, _handle_query_documents_by_view
 
     async def _spy_resolve(*, caller, flt, folder_scope, count_only, supabase, retrievable_only=False):  # 275-02: the agent handler passes retrievable_only=True (D-36)

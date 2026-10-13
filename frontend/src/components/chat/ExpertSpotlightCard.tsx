@@ -32,7 +32,7 @@ import { X, ArrowRight, Folder, Wrench } from "lucide-react"
 import type { ExpertBundle } from "@/types"
 import { ExpertIcon } from "@/components/experts/expertIcon"
 import { ScopeLedger, type LedgerColumn } from "@/components/experts/ScopeLedger"
-import { narrowingLedgerColumns } from "@/components/experts/catalog/expertCatalog"
+import { narrowingLedgerColumns, previewLedgerColumns } from "@/components/experts/catalog/expertCatalog"
 import { getExpertScopePreview } from "@/lib/api/experts"
 import { cn } from "@/lib/utils"
 
@@ -45,6 +45,11 @@ interface ExpertSpotlightCardProps {
    *  while it is empty, D-267-12). A biased Expert here reads only its own folders, so the card
    *  states that from the server's preview. Absent on every other mount: nothing is fetched. */
   unscopedChat?: boolean
+  /** 279-03 WR-03 (SEED-328): the folder this chat is (or will be) scoped to. A RESTRICTED Expert
+   *  with a folder states what it will and will not search, from the server's preview for it. */
+  folderId?: string | null
+  /** 279-03 WR-03: the thread the preview is computed against — absent on a brand-new chat. */
+  threadId?: string | null
 }
 
 interface ActionTile {
@@ -94,6 +99,8 @@ export function ExpertSpotlightCard({
   onDismiss,
   className,
   unscopedChat = false,
+  folderId = null,
+  threadId = null,
 }: ExpertSpotlightCardProps) {
   const isRestricted = expert.scope_mode === "restricted"
 
@@ -102,17 +109,30 @@ export function ExpertSpotlightCard({
   const [narrowing, setNarrowing] = useState<LedgerColumn[] | null>(null)
   useEffect(() => {
     setNarrowing(null)
-    if (!unscopedChat || isRestricted) return
     let cancelled = false
-    getExpertScopePreview(expert.id, null)
-      .then((preview) => {
-        if (!cancelled) setNarrowing(narrowingLedgerColumns(preview))
-      })
-      .catch(() => {})
+    if (isRestricted) {
+      // 279-03 WR-03 (SEED-328): this arm returned early, so a restricted Expert's spotlight never
+      // said what it would not search. With a picked folder it now asks the server about THAT folder
+      // (re-asked when it changes); no folder → no fetch, as before. Same cancelled / failure-states-
+      // nothing pattern as the biased arm below.
+      if (!folderId) return
+      getExpertScopePreview(expert.id, threadId ?? null, folderId)
+        .then((preview) => {
+          if (!cancelled) setNarrowing(previewLedgerColumns(preview, { onThread: !!threadId }))
+        })
+        .catch(() => {})
+    } else {
+      if (!unscopedChat) return
+      getExpertScopePreview(expert.id, null)
+        .then((preview) => {
+          if (!cancelled) setNarrowing(narrowingLedgerColumns(preview))
+        })
+        .catch(() => {})
+    }
     return () => {
       cancelled = true
     }
-  }, [unscopedChat, isRestricted, expert.id])
+  }, [unscopedChat, isRestricted, expert.id, folderId, threadId])
   const tiles = getTilesForExpert(expert)
 
   // Domain badge names.

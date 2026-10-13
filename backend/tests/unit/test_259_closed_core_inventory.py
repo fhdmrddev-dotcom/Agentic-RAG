@@ -11,6 +11,21 @@ from app.services.tool_dispatcher import _TOOL_REGISTRY
 
 APP_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "app"
 
+# Phase 278 (D-07 / D-08): every file that holds tool handlers, as a TUPLE. The dispatcher split
+# moves the handlers into app/services/tools/*.py and edits THIS constant, never the asserts below.
+_HANDLER_FILES = (
+    APP_DIR / "services" / "tools" / "documents.py",
+    APP_DIR / "services" / "tools" / "skills.py",
+    APP_DIR / "services" / "tools" / "sandbox.py",
+    APP_DIR / "services" / "tools" / "render_template.py",
+    APP_DIR / "services" / "tools" / "workspace.py",
+    APP_DIR / "services" / "tools" / "memory.py",
+    APP_DIR / "services" / "tools" / "agent_control.py",
+    APP_DIR / "services" / "tools" / "connector.py",
+    APP_DIR / "services" / "search_documents_tool.py",
+    APP_DIR / "services" / "show_artifact_tool.py",
+)
+
 
 def test_phase_type_registry_contains_zero_expert_executors():
     """PACK-01 / EXT-01 Red Line: PHASE_TYPE_REGISTRY_ENTRIES has strictly 7 executors.
@@ -45,12 +60,20 @@ def test_tool_dispatcher_contains_zero_expert_tools_or_dispatchers():
     for tool_name in _TOOL_REGISTRY:
         assert "expert" not in tool_name.lower(), f"Expert tool registered in _TOOL_REGISTRY: {tool_name}"
 
-    dispatcher_path = APP_DIR / "services" / "tool_dispatcher.py"
-    tree = ast.parse(dispatcher_path.read_text(encoding="utf-8"), filename=str(dispatcher_path))
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if node.name.startswith("_handle_expert"):
-                pytest.fail(f"Expert-specific tool handler found in tool_dispatcher: {node.name}")
+    seen = 0
+    for dispatcher_path in _HANDLER_FILES:
+        tree = ast.parse(dispatcher_path.read_text(encoding="utf-8"), filename=str(dispatcher_path))
+        defs = [n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+        # Phase 278 (D-08) ANCHOR — an absence check over a file with no handlers passes vacuously.
+        assert any(d.startswith(("_handle_", "handle_")) for d in defs), (
+            f"ANCHOR: no tool handler def in {dispatcher_path.name} — the handlers moved; "
+            "repoint _HANDLER_FILES at every file that now holds them"
+        )
+        seen += 1
+        for name in defs:
+            if name.startswith("_handle_expert"):
+                pytest.fail(f"Expert-specific tool handler found in {dispatcher_path.name}: {name}")
+    assert seen == len(_HANDLER_FILES)
 
 
 def test_no_expert_runtime_or_loop_modules_exist():

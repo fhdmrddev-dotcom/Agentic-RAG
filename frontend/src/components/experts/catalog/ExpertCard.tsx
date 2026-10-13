@@ -14,6 +14,12 @@
  * a paid door. D-262-02's ruling is that an Expert the caller may not use does not appear at all
  * — the vanish is the server's list arriving shorter, and a card that could render an Expert as
  * unavailable would be the brochure for a shut door the sketch names.
+ * ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-05): since 279-02 Commit G an `experts:manage` caller IS sent
+ * the org's DISABLED Experts (D-04, so a manager can find and re-enable them), and the card drew them
+ * with a Start Chat every chat door refuses — a dead control. `installView` now gives a disabled
+ * bundle its `status` arm: the footer shows the "Disabled" pill (full reason as its title) and no
+ * Start Chat. For a member nothing changed: a disabled Expert still never arrives. Still ONE
+ * variant, still at most two controls, and still never a dead one.
  *
  * ⛔ THE SKETCH'S FOOTER SHOWS A THIRD CONTROL — the one that copies a system template into a
  * tenant-editable row (`SEED-303 S8`, named in `262-03-SUMMARY.md` rather than spelled here,

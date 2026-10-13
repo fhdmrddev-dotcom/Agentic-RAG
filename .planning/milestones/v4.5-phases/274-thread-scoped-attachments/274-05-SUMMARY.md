@@ -1,6 +1,8 @@
 ---
 phase: 274-thread-scoped-attachments
 plan: 05
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 274-05-PLAN.md frontmatter requirements
+requirements-completed: [ATT-01, ATT-02, ATT-03]
 status: complete — Chrome halves driven by the orchestrator; operator approved 2026-10-05
 subsystem: verification (live stack) + registers
 tags: [attachments, uat, board, cross-provider, g-4, d-18, ledger, docs, att-01, att-02, att-03]

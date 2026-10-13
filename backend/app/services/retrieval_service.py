@@ -39,7 +39,9 @@ from app.services.retrieval_rpc import FILTERED_MATCH_FLOOR, _keyword_search, _v
 # ── Back-compat re-exports (Phase 272, D-13) ─────────────────────────────────────────────────
 # These names moved; every measured importer still reads them from HERE, so they stay importable
 # and are the SAME objects as in their new homes (pinned by test_272_pure_move::test_back_compat_names):
-#   tool_dispatcher.py:47            search_documents, resolve_document_id, fetch_full_document
+#   ~~tool_dispatcher.py:47            search_documents, resolve_document_id, fetch_full_document~~
+#   tools/documents.py:43            resolve_document_id, fetch_full_document  (278: the split moved
+#                                    this importer; nothing imports search_documents via tool_dispatcher)
 #   agent_loop.py:79                 _call_as_user, _vector_literal
 #   checked_query_service.py:22      search_documents
 #   multimodal_service.py:1011       resolve_document_id (lazy)

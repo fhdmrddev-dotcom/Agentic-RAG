@@ -63,6 +63,15 @@ _COERCE_DIRECTIVE = (
     "if the knowledge base does not support a value, set value to null. "
     "Never invent a value or a citation."
 )
+# 267-REVIEW-INDEPENDENT IN-03 (279-02, D-08): the directive for every emitter that is NOT the
+# EmitFieldMap one (a caller passing its own ``schema_model``). ``_COERCE_DIRECTIVE`` above stays
+# byte-identical for the field-map path. ⚠ SEED-327 is untouched: only Anthropic and Google receive
+# the coerce rung's system prompt at all today.
+_COERCE_DIRECTIVE_SCHEMA = (
+    "\n\nYou MUST call the `{emitter}` tool NOW. "
+    "Do not narrate the result as prose — emit it as a single tool call that matches the tool's schema. "
+    "Never invent a value."
+)
 
 
 def _coerce_schema_block(emitter: str, tools: list[dict]) -> str:
@@ -267,6 +276,7 @@ def _build_request(
     max_tokens: int | None,
     forced: bool,
     strict_schema: bool,
+    schema_model: type[BaseModel] | None = None,
 ) -> GatewayRequest:
     """Assemble the per-rung ``GatewayRequest`` — the EXISTING FORCE/COERCE request
     assembly (live ``:294-330``), parameterized by the rung. ``forced=True`` names the
@@ -293,7 +303,7 @@ def _build_request(
     # model (which never receives the tools param) still sees the schema it must emit.
     _system = (
         (system_prompt or "")
-        + _COERCE_DIRECTIVE.format(emitter=emitter)
+        + (_COERCE_DIRECTIVE if schema_model is None else _COERCE_DIRECTIVE_SCHEMA).format(emitter=emitter)
         + _coerce_schema_block(emitter, tools)
     )
     return GatewayRequest(
@@ -507,6 +517,7 @@ async def forced_emit(
             max_tokens=max_tokens,
             forced=forced,
             strict_schema=effective_strict,
+            schema_model=schema_model,
         )
 
         # Phase 101.1-07 (gap 1b / D-08 layer 6 — the substrate half): a provider call

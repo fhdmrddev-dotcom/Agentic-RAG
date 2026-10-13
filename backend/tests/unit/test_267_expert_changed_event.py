@@ -56,7 +56,7 @@ def _ref(folder_ref):
 
 @pytest.mark.asyncio
 async def test_swap_biased_to_restricted_states_now_dropped_and_the_exclusions():
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     before = await describe(FakeSupabase(), FA_ID, ACME_FOLDER)
     after = await describe(FakeSupabase(), HR_ID, ACME_FOLDER)
@@ -85,7 +85,7 @@ async def test_swap_biased_to_restricted_states_now_dropped_and_the_exclusions()
 async def test_join_on_a_plain_thread_states_the_measured_narrowing_honestly():
     """D-267-35: a biased Expert on a thread with NO folder narrows to its own folders — stated as
     ``Dropped: All your documents``, never hidden."""
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     before = await describe(FakeSupabase(), None, None)
     after = await describe(FakeSupabase(), FA_ID, None)
@@ -102,7 +102,7 @@ async def test_join_on_a_plain_thread_states_the_measured_narrowing_honestly():
 
 @pytest.mark.asyncio
 async def test_removal_in_a_folder_returns_to_the_thread_folder():
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     before = await describe(FakeSupabase(), FA_ID, ACME_FOLDER)
     after = await describe(FakeSupabase(), None, ACME_FOLDER)
@@ -119,7 +119,7 @@ async def test_removal_in_a_folder_returns_to_the_thread_folder():
 
 @pytest.mark.asyncio
 async def test_removal_on_a_plain_thread_returns_to_all_documents():
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     before = await describe(FakeSupabase(), FA_ID, None)
     after = await describe(FakeSupabase(), None, None)
@@ -132,7 +132,7 @@ async def test_removal_on_a_plain_thread_returns_to_all_documents():
 async def test_connections_now_are_the_new_experts_and_dropped_only_what_it_lacks():
     """D-267-29: ``now`` lists the after-Expert's CONNECTED names (the Brings statement); ``dropped``
     lists the before-Expert's connected names the after-Expert does not bring."""
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     both = resolved(FA_ID, "Financial Analyzer", "biased", [FIN_FOLDER], ["slack", "hubspot"])
     before = await describe(FakeSupabase(), FA_ID, None, bundles={FA_ID: both, CR_ID: CR})
@@ -144,7 +144,7 @@ async def test_connections_now_are_the_new_experts_and_dropped_only_what_it_lack
 
 @pytest.mark.asyncio
 async def test_an_empty_dropped_side_is_all_empty_and_not_all_documents():
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     st = await describe(FakeSupabase(), CR_ID, ACME_FOLDER)
     ev = build_expert_changed_event(st, st, at=AT)
@@ -156,7 +156,7 @@ async def test_an_empty_dropped_side_is_all_empty_and_not_all_documents():
 
 @pytest.mark.asyncio
 async def test_the_sentence_is_plain_text_from_the_same_payload():
-    from app.services.expert_scope import build_expert_changed_event, event_sentence
+    from app.services.expert_scope_events import build_expert_changed_event, event_sentence
 
     fa_acme = await describe(FakeSupabase(), FA_ID, ACME_FOLDER)
     hr_acme = await describe(FakeSupabase(), HR_ID, ACME_FOLDER)
@@ -181,7 +181,7 @@ async def test_the_sentence_is_plain_text_from_the_same_payload():
 @pytest.mark.asyncio
 async def test_the_expert_changed_fixture_is_the_real_builders_output():
     """The wire contract 267-04's ExpertEventCard renders (``fixtures/phase267/expert_changed.json``)."""
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     before = await describe(FakeSupabase(), FA_ID, ACME_FOLDER)
     after = await describe(FakeSupabase(), HR_ID, ACME_FOLDER)
@@ -227,9 +227,17 @@ class ThreadsDb:
 
 
 class FakeConn:
-    def __init__(self, fail_on: str | None = None):
+    def __init__(self, fail_on: str | None = None, role: str | None = "member"):
         self.fail_on = fail_on
         self.executed: list[tuple] = []
+        # 279-02 IN-05: the membership read (``_caller_role_in_org``) — recorded apart from
+        # ``executed`` so the UPDATE/INSERT indexes the cases above read stay where they were.
+        self.role = role
+        self.fetched: list[tuple] = []
+
+    async def fetchrow(self, sql, *args):
+        self.fetched.append((sql, args))
+        return {"role": self.role} if self.role else None
 
     async def execute(self, sql, *args):
         self.executed.append((sql, args))
@@ -374,7 +382,9 @@ async def test_a_removal_with_messages_writes_the_event():
     db = ThreadsDb(before_expert=FA_ID, after_expert=None)
     txn = FakeTxn(FakeConn())
     await _patch_thread(ThreadUpdate(clear_active_expert=True), db, txn)
-    assert txn.entered == 1 and txn.committed is True
+    # 279-02 IN-05 (D-04): was `assert txn.entered == 1 and txn.committed is True` — a clear now
+    # reads the caller's membership in the THREAD's org first, on its own user-JWT connection.
+    assert txn.entered == 2 and txn.committed is True
     tool_calls = txn.conn.executed[1][1][4]
     assert tool_calls[0]["after"] is None
     assert tool_calls[0]["before"]["name"] == "Financial Analyzer"
@@ -507,3 +517,97 @@ async def test_get_messages_returns_only_allowlisted_system_kinds():
         res = await threads_mod.get_messages(thread_id=THREAD_ID, current_user={"id": USER_ID}, supabase=FakeSupabase())
     assert [m["role"] for m in res] == ["user", "assistant", "system", "system"]
     assert seen[1].call("neq") == []
+
+
+# ── 267-REVIEW-INDEPENDENT WR-02 (279-02): two quick swaps must not record "A → C" ─────────────────
+#
+# The event's "before" is built from the row this PATCH read. If another PATCH changed the Expert (or
+# the folder) in between, the UPDATE must match 0 rows and the event INSERT must never run — the
+# 268 folder arm's ``ScopeChangeConflict`` shape, one arm over.
+
+
+class LostRaceConn(FakeConn):
+    """The UPDATE matches no row (another PATCH moved the thread first)."""
+
+    async def execute(self, sql, *args):
+        self.executed.append((sql, args))
+        return "UPDATE 0" if sql.lstrip().startswith("UPDATE") else "INSERT 0 1"
+
+
+@pytest.mark.asyncio
+async def test_WR02_the_expert_update_is_conditional_and_a_lost_race_writes_no_event():
+    from app.api import threads as threads_mod
+
+    conn = LostRaceConn()
+    with pytest.raises(threads_mod.ExpertChangeConflict):
+        await threads_mod._write_expert_change(
+            conn, thread_id=THREAD_ID, user_id=USER_ID, org_id=THREAD_ORG,
+            update_data={"active_expert_id": HR_ID}, event=MagicMock(),
+            expected_expert_id=FA_ID, expected_folder_id=ACME_FOLDER,
+        )
+    assert len(conn.executed) == 1, "the event INSERT ran after a lost race"
+    sql, args = conn.executed[0]
+    assert "active_expert_id IS NOT DISTINCT FROM $4::uuid" in sql
+    assert "folder_id IS NOT DISTINCT FROM $5::uuid" in sql
+    assert (str(args[3]), str(args[4])) == (FA_ID, ACME_FOLDER)
+
+
+@pytest.mark.asyncio
+async def test_WR02_rename_thread_maps_a_lost_race_to_409_not_500():
+    db = ThreadsDb(before_expert=FA_ID, after_expert=HR_ID)
+    txn = FakeTxn(LostRaceConn())
+    with pytest.raises(HTTPException) as exc:
+        await _patch_thread(ThreadUpdate(active_expert_id=UUID(HR_ID)), db, txn)
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "The Expert changed while you were choosing. Try again."
+    assert txn.entered == 1 and txn.committed is False
+    assert [s for s, _ in txn.conn.executed if "INSERT" in s] == []
+    upd_args = txn.conn.executed[0][1]
+    assert (str(upd_args[3]), str(upd_args[4])) == (FA_ID, ACME_FOLDER)  # the row this PATCH read
+
+
+# ── 267-REVIEW-INDEPENDENT IN-05 (279-02): a clear is stated in the THREAD's org ─────────────────
+#
+# A clear runs no gate, so it has no validated org. It used to be described in the caller's ACTIVE
+# org with the caller's active-org role, which for a two-org user names the other org's folders. It
+# is now described in the thread's own org with the caller's role THERE (one membership read); a
+# caller who is not a member of that org gets no event row, and the clear still goes through.
+
+
+@pytest.mark.asyncio
+async def test_IN05_a_clear_is_stated_in_the_threads_org_with_the_callers_role_there():
+    from app.api import threads as threads_mod
+
+    db = ThreadsDb(before_expert=FA_ID, after_expert=None)
+    txn = FakeTxn(FakeConn(role="admin"))
+    spy = AsyncMock(wraps=threads_mod.describe_expert_scope)
+    with patch.object(threads_mod, "describe_expert_scope", spy):
+        await _patch_thread(ThreadUpdate(clear_active_expert=True), db, txn)  # active org = ORG_ID
+    assert ORG_ID != THREAD_ORG
+    assert spy.await_count == 2
+    assert {c.kwargs["org_id"] for c in spy.await_args_list} == {THREAD_ORG}
+    assert [c.kwargs["caller_roles"] for c in spy.await_args_list] == [["admin"], ["admin"]]
+    (sql, args), = txn.conn.fetched
+    assert "org_members" in sql and "auth.uid()" in sql
+    assert str(args[0]) == THREAD_ORG
+    assert str(txn.conn.executed[1][1][2]) == THREAD_ORG  # the event row's org
+
+
+@pytest.mark.asyncio
+async def test_IN05_a_non_member_clear_writes_no_event_through_the_plain_update_arm():
+    """D-14: event=None is driven through rename_thread's REAL ``elif update_data:`` arm."""
+    from app.api import threads as threads_mod
+
+    db = ThreadsDb(before_expert=FA_ID, after_expert=None)
+    txn = FakeTxn(FakeConn(role=None))
+    write = AsyncMock(wraps=threads_mod._write_expert_change)
+    insert = AsyncMock()
+    with patch.object(threads_mod, "_write_expert_change", write),          patch.object(threads_mod, "insert_expert_changed_row", insert):
+        resp = await _patch_thread(ThreadUpdate(clear_active_expert=True), db, txn)
+    write.assert_not_awaited()
+    insert.assert_not_called()
+    assert txn.conn.executed == []
+    ups = db.updates()
+    assert len(ups) == 1
+    assert ups[0].call("update") == [("update", ({"active_expert_id": None},), {})]
+    assert resp["active_expert_id"] is None

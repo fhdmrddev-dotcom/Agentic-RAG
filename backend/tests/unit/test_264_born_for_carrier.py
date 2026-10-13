@@ -230,6 +230,25 @@ def test_agent_loop_closed_core_invariant_still_green_after_the_carrier():
             )
 
 
+# Phase 278 (D-07 / D-08): the modules the carrier crosses, hoisted to a module-level tuple so the
+# dispatcher split edits THIS constant (adding the tools/*.py homes) and never the fence below.
+_NO_BRANCH_FILES = (
+    "services/run_producer.py",
+    "services/agent_loop.py",
+    "services/tool_dispatcher.py",
+    "services/tools/documents.py",
+    "services/tools/skills.py",
+    "services/tools/sandbox.py",
+    "services/tools/runtime_gap.py",
+    "services/tools/render_template.py",
+    "services/tools/workspace.py",
+    "services/tools/memory.py",
+    "services/tools/agent_control.py",
+    "services/tools/connector.py",
+    "services/task_service.py",
+)
+
+
 def test_the_carrier_adds_no_branch_anywhere():
     """D-264-03 / the plan's red line: this plan wires a carrier and reads it NOWHERE.
 
@@ -237,14 +256,16 @@ def test_the_carrier_adds_no_branch_anywhere():
     `born_for_bundle_id`. A branch here would be behaviour, and 264-01 adds none.
     """
     offenders: list[str] = []
-    for rel in (
-        "services/run_producer.py",
-        "services/agent_loop.py",
-        "services/tool_dispatcher.py",
-        "services/task_service.py",
-    ):
+    seen = 0
+    for rel in _NO_BRANCH_FILES:
         path = APP_DIR / rel
+        # Phase 278 (D-08) ANCHOR — an absence check over a missing or empty file passes vacuously.
+        assert path.is_file(), f"ANCHOR: {rel} does not exist — repoint _NO_BRANCH_FILES"
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        assert any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) for n in ast.walk(tree)), (
+            f"ANCHOR: {rel} holds no function — repoint _NO_BRANCH_FILES at the code it fences"
+        )
+        seen += 1
         for node in ast.walk(tree):
             tests = []
             if isinstance(node, ast.If):
@@ -257,6 +278,7 @@ def test_the_carrier_adds_no_branch_anywhere():
                 if FIELD in ast.unparse(t):
                     offenders.append(f"{rel}:{node.lineno}: {ast.unparse(t)}")
 
+    assert seen == len(_NO_BRANCH_FILES)
     assert offenders == [], (
         "264-01 lays an INERT carrier; a consumer belongs in 264-03. Found: " + "; ".join(offenders)
     )
@@ -363,9 +385,13 @@ async def test_resolve_thread_scoping_no_expert_yields_a_none_fifth_element():
         current_user={"id": str(uuid4()), "org_id": str(uuid4())},
         pool=MagicMock(),
     )
-    assert len(result) == 5, f"expected a 5-tuple, got {len(result)}"
-    assert result == (None, None, None, None, None)
+    # 279-02 WR-08 (D-17): was `assert len(result) == 5, …` and `assert result == (None, None, None,
+    # None, None)`. ThreadScoping gained a DEFAULTED 6th field (`scoped_folder_paths`), so the
+    # no-consultant arm is six Nones; the five-positional construction it returns still holds.
+    assert len(result) == 6, f"expected a 6-tuple, got {len(result)}"
+    assert result == (None, None, None, None, None, None)
     assert result.born_for_bundle_id is None
+    assert result.scoped_folder_paths is None
 
 
 @pytest.mark.asyncio

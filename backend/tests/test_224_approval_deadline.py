@@ -14,7 +14,8 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 import pytest
 
-from app.services.tool_dispatcher import _APPROVAL_TIMEOUT_SECONDS, dispatch_tool, ToolContext
+from app.services.tool_dispatcher import dispatch_tool, ToolContext
+from app.services.tools.connector import _APPROVAL_TIMEOUT_SECONDS
 
 
 class _MockConn:
@@ -68,7 +69,7 @@ async def test_tool_approval_wire_deadline_and_timeout(monkeypatch):
     )
 
     audit_mock = AsyncMock()
-    monkeypatch.setattr("app.services.tool_dispatcher.write_audit_entry", audit_mock)
+    monkeypatch.setattr("app.services.tools.connector.write_audit_entry", audit_mock)
 
     ctx = _make_ctx()
 
@@ -163,7 +164,7 @@ async def test_tool_approval_timeout_uses_constant(monkeypatch):
     )
 
     audit_mock = AsyncMock()
-    monkeypatch.setattr("app.services.tool_dispatcher.write_audit_entry", audit_mock)
+    monkeypatch.setattr("app.services.tools.connector.write_audit_entry", audit_mock)
 
     ctx = _make_ctx()
 

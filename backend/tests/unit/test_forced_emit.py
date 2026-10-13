@@ -543,3 +543,60 @@ async def test_emit_tier_default_registry_miss_is_coerce(_patch_gateway, monkeyp
     assert len(_patch_gateway["requests"]) == 1
     assert _patch_gateway["requests"][0].strict_schema is not True
     assert _patch_gateway["requests"][0].force_tool_name is None
+
+
+# ── 267-REVIEW-INDEPENDENT IN-03 (279-02, D-08): the coerce directive is per emitter ─────────────
+#
+# ``_COERCE_DIRECTIVE`` speaks of a "field-map" and ``source_chunk_id`` — the render_template
+# EmitFieldMap contract. Every other forced-emit caller passes its own ``schema_model`` and was told
+# to emit a field-map it does not have. The field-map text stays byte-identical when no
+# ``schema_model`` is given; a generic directive is used otherwise. No provider_gateway change
+# (SEED-327: only Anthropic and Google receive the coerce rung's system prompt at all).
+
+
+def _coerce_req(**kw):
+    from app.services.forced_emit import _build_request
+
+    tools = [{"type": "function", "function": {"name": "emit_x", "parameters": {"type": "object"}}}]
+    base = dict(
+        messages=[{"role": "user", "content": "hi"}], model="m", provider="moonshot", emitter="emit_x",
+        tools=tools, user_settings=None, system_prompt="BASE", max_tokens=None, strict_schema=False,
+    )
+    base.update(kw)
+    return _build_request(**base), tools
+
+
+def test_IN03_without_a_schema_model_the_field_map_directive_is_byte_identical():
+    from app.services.forced_emit import _COERCE_DIRECTIVE, _coerce_schema_block
+
+    req, tools = _coerce_req(forced=False, schema_model=None)
+    assert req.system_prompt == (
+        "BASE" + _COERCE_DIRECTIVE.format(emitter="emit_x") + _coerce_schema_block("emit_x", tools)
+    )
+
+
+def test_IN03_with_a_schema_model_the_directive_is_generic():
+    from pydantic import BaseModel
+
+    from app.services.forced_emit import _COERCE_DIRECTIVE, _COERCE_DIRECTIVE_SCHEMA, _coerce_schema_block
+
+    class Summary(BaseModel):
+        items: list[str]
+
+    req, tools = _coerce_req(forced=False, schema_model=Summary)
+    assert req.system_prompt == (
+        "BASE" + _COERCE_DIRECTIVE_SCHEMA.format(emitter="emit_x") + _coerce_schema_block("emit_x", tools)
+    )
+    assert "field-map" not in req.system_prompt and "source_chunk_id" not in req.system_prompt
+    assert _COERCE_DIRECTIVE.format(emitter="emit_x") not in req.system_prompt
+
+
+def test_IN03_the_forced_rungs_are_unchanged_and_the_call_site_passes_the_model():
+    import inspect
+
+    import app.services.forced_emit as fe
+
+    req, _ = _coerce_req(forced=True, schema_model=object)
+    assert req.system_prompt == "BASE" and req.force_tool_name == "emit_x"
+    src = inspect.getsource(fe.forced_emit)
+    assert src.count("_build_request(") == 1 and "schema_model=schema_model" in src

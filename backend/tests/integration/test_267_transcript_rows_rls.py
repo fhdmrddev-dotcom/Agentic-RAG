@@ -187,6 +187,9 @@ async def test_expert_changed_row_lands_in_the_threads_org_not_the_triggers(pg_p
             org_id=str(s["org_b"]),
             update_data={"active_expert_id": None},
             event=_event(),
+            # 279-02 WR-02: the conditional UPDATE matches the seeded row (Expert FA, folder F).
+            expected_expert_id=FA_BUNDLE_ID,
+            expected_folder_id=s["folder_id"],
         )
 
     rows = await pg_pool.fetch(
@@ -336,6 +339,9 @@ async def test_rls_read_back_passes_the_event_and_drops_ask_user_prompt(pg_pool,
             org_id=str(s["org_b"]),
             update_data={"active_expert_id": None},
             event=_event(),
+            # 279-02 WR-02: the conditional UPDATE matches the seeded row (Expert FA, folder F).
+            expected_expert_id=FA_BUNDLE_ID,
+            expected_folder_id=s["folder_id"],
         )
     async with open_user_conn(pg_pool, s["uid"]) as conn:
         await assert_auth_uid(conn, s["uid"])

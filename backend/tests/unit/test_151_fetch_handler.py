@@ -36,7 +36,7 @@ def _handler():
 
 def _resolver():
     """The reusable owner-scope bytes resolver (FILE-01 source #4 contract)."""
-    from app.services.tool_dispatcher import _fetch_owned_document_bytes  # noqa: F401
+    from app.services.tools.documents import _fetch_owned_document_bytes  # noqa: F401
 
     return _fetch_owned_document_bytes
 
@@ -74,7 +74,7 @@ async def test_no_original_file_returns_honest_error(make_tool_context):
            "file_size": 10, "mime_type": "text/plain"}
     sb = _sb(row)
     ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
-    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+    with patch("app.services.tools.documents.sandbox_manager") as sm:
         session = sm.get_or_create.return_value
         result = await handler({"document_id": "d1"}, ctx)
     assert "No original" in result.result
@@ -93,7 +93,7 @@ async def test_over_cap_refused_before_download(make_tool_context):
            "file_size": big, "mime_type": "application/pdf"}
     sb = _sb(row)
     ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
-    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+    with patch("app.services.tools.documents.sandbox_manager") as sm:
         session = sm.get_or_create.return_value
         result = await handler({"document_id": "d2"}, ctx)
     assert "over" in result.result.lower()
@@ -113,7 +113,7 @@ async def test_null_or_zero_file_size_refused_before_download(make_tool_context,
            "file_size": bad_size, "mime_type": "application/octet-stream"}
     sb = _sb(row)
     ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
-    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+    with patch("app.services.tools.documents.sandbox_manager") as sm:
         session = sm.get_or_create.return_value
         result = await handler({"document_id": "d8"}, ctx)
     assert "error" in json.loads(result.result)
@@ -133,7 +133,7 @@ async def test_happy_path_ships_to_sandbox_input(make_tool_context):
                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
     sb = _sb(row)
     ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
-    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+    with patch("app.services.tools.documents.sandbox_manager") as sm:
         session = sm.get_or_create.return_value
         result = await handler({"document_id": "d3"}, ctx)
     parsed = json.loads(result.result)
@@ -156,7 +156,7 @@ async def test_path_traversal_filename_sanitized(make_tool_context):
            "file_size": 32, "mime_type": "text/plain"}
     sb = _sb(row)
     ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
-    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+    with patch("app.services.tools.documents.sandbox_manager") as sm:
         session = sm.get_or_create.return_value
         result = await handler({"document_id": "d4"}, ctx)
     landed = json.loads(result.result)["path"]
@@ -177,9 +177,9 @@ async def test_cross_user_not_found_never_reads_others_doc(make_tool_context):
     handler = _handler()
     sb = _sb(None)  # owner SELECT returns empty .data
     ctx = make_tool_context(supabase=sb, current_user={"id": "attacker-9"})
-    with patch("app.services.tool_dispatcher.get_globally_visible_folder_ids",
+    with patch("app.services.tools.documents.get_globally_visible_folder_ids",
                AsyncMock(return_value=[])), \
-         patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+         patch("app.services.tools.documents.sandbox_manager") as sm:
         session = sm.get_or_create.return_value
         result = await handler({"document_id": "someone-elses-doc"}, ctx)
     assert "not found or access denied" in result.result
@@ -253,7 +253,7 @@ async def test_handler_db_error_returns_honest_refusal(make_tool_context):
         .execute.side_effect
     ) = Exception("PGRST connection reset")
     ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
-    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+    with patch("app.services.tools.documents.sandbox_manager") as sm:
         session = sm.get_or_create.return_value
         result = await handler({"document_id": "not-a-uuid"}, ctx)
     assert "not found or access denied" in result.result

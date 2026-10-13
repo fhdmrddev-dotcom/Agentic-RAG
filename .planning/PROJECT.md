@@ -10,6 +10,22 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
+## Current Milestone: v4.6 Pay It Down
+
+**Started:** 2026-10-12 · phases resume at **277**, migrations at **207**.
+
+**Goal:** Every open **major** bug fixed and the v4.5 tech debt cleared — repair only, no new user capability.
+
+**Target features:**
+- **Major bugs (8):** BUG-261004-02 (Settings unreachable for ordinary users) · BUG-261005-01 (minter retires a still-indexing same-bytes copy) · OneDrive/Graph adapter (silent page-1 truncation, search-URL injection, unmatchable folder paths) · BUG-260916-01 (timeout > 600 s silently ineffective) · BUG-260918-01 (`ask_user` renders two disagreeing answer cards) · BUG-260908-01 (unbounded Chunks section) · BUG-260730-02 + BUG-260815-06 (emit/gauntlet refusals name the wrong or no cause), folded with SEED-221.
+- **v4.5 audit debt:** W-1 (`harness/freshness.py` counts archived docs) · W-2 (artifact rows outlive retention disposition — record a decision) · W-3 (filter vocabulary restated twice) · W-5 (BUG-261012-01 watch purge leaves storage bytes; BUG-261012-02 non-owned delete 500s). W-4 is already fixed.
+- **Owed G-5 extractions:** `expert_scope.py` (+ SEED-328) · `retrieval_service.py` (SEED-224) · `tool_dispatcher.py` registry split (OV-273-02).
+- **Register hygiene:** the CLAUDE.md split (past the 120k warn band) and the v4.5 bookkeeping drift.
+
+**Out of scope (decided at intake):** the owed operator UAT/sign-offs (stay in STATE.md "Owed") · any new capability · SEED-354 · Open Platform (SEED-013).
+
+---
+
 ## Last Shipped: v4.5 Find It, Show It (2026-10-12)
 
 **Started:** 2026-09-29 · **Shipped:** 2026-10-12, git tag `v4.5` · 7 phases (270-276), 38 plans,
@@ -21,7 +37,7 @@ answers can be interactive charts, tables and metrics from a closed registry (27
 in their thread (274); an admin sets retention with legal hold and audited disposition (275); and the
 product has public docs (276).
 ⚠ All seven phases closed `self-verified`; 271/272/273 owe operator sign-offs. ✅ 270-274 + 276 **LIVE
-2026-10-05** (prod `bd9e126c3`). ⛔ **275 NOT deployed** — production migrations 204 → 205 → 206 first.
+2026-10-05** (prod `bd9e126c3`). ✅ **275 DEPLOYED 2026-10-12** (prod `784647e2d`, migrations 204-206).
 
 ---
 
@@ -1135,7 +1151,7 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 - ✓ Structured date/dimension filters in agent retrieval, empty filter fails closed — FIND-07, v4.5 (272; SC#4 6/8 providers by decision)
 - ✓ Interactive chart / table / metric artifacts from a closed registry, reload-identical, every provider — ART-01..05, v4.5 (273)
 - ✓ Chat attachments thread-scoped, explicit promote to the Library — ATT-01..03, v4.5 (274)
-- ✓ Retention policies, legal hold, scheduled audited disposition, archived out of retrieval but findable — RET-01..04, v4.5 (275; NOT deployed)
+- ✓ Retention policies, legal hold, scheduled audited disposition, archived out of retrieval but findable — RET-01..04, v4.5 (275; deployed 2026-10-12)
 - ✓ Public /docs, Syrel API reference, coverage gate, changelog, videos — DOCS-01..06, v4.5 (276)
 
 ### Validated (v4.4 — Experts That Actually Work)
@@ -1161,7 +1177,14 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 
 ### Active (current milestone)
 
-*None — v4.5 shipped 2026-10-12. The next milestone is defined by `/gsd:new-milestone` (phases resume at **277**, migrations at **207**). Carried candidates: deploy 275, the v4.5 audit warnings W-1..W-5, BUG-261004-02 / BUG-261005-01 / BUG-261012-01 / BUG-261012-02, SEED-354, SEED-334, the CLAUDE.md split.*
+*v4.6 Pay It Down — STARTED 2026-10-12. Requirements live in `.planning/REQUIREMENTS.md`; scope summary under "Current Milestone" above.*
+
+<details>
+<summary>Superseded Active note (v4.5-close, preserved)</summary>
+
+*None — v4.5 shipped 2026-10-12. The next milestone is defined by `/gsd:new-milestone` (phases resume at **277**, migrations at **207**). Carried candidates: the v4.5 audit warnings W-1..W-5, BUG-261004-02 / BUG-261005-01 / BUG-261012-01 / BUG-261012-02, SEED-354, SEED-334, the CLAUDE.md split.*
+
+</details>
 
 <details>
 <summary>Superseded Active note (v4.3-close, preserved)</summary>
@@ -1437,3 +1460,9 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-03 — **Phase 272 Close Means Wrong COMPLETE** (FIND-07; 5 plans + review fixes; self-verified, human_needed: production migrations 200 STEP 1 → STEP 2 → 201 owed).*
 
 *Last updated: 2026-10-12 — **milestone v4.5 Find It, Show It COMPLETED** (git tag `v4.5`; 7 phases, 38 plans, 25/25 requirements; 275 not deployed — production migrations 204 → 205 → 206 owed). STATE.md and the archives were done by hand, not via `milestone.complete`.*
+
+*Last updated: 2026-10-12 — **Phase 275 DEPLOYED** (prod `784647e2d`; migrations 204 → 205 → 206 applied, advisors 0 ERROR). All of v4.5 is live.*
+
+*Last updated: 2026-10-12 — **milestone v4.6 Pay It Down STARTED** (8 major bugs + v4.5 tech debt + three G-5 extractions; phases from 277, migrations from 207).*
+
+*Last updated: 2026-10-12 — **Phase 277 complete** (REG-04, REG-05 → Validated): CLAUDE.md split by function 121,650 → 89,171 chars, nothing lost (mechanical proof), FIRING-table cell cap bound at 80; v4.5 archive repaired by hand. Verification passed 4/4; review 0 critical / 8 warning (guard hardening, untriaged).*

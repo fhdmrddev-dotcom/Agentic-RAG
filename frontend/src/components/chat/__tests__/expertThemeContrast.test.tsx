@@ -96,7 +96,8 @@ describe("(A) rendered — the review's named elements carry a light-safe step b
       <ScopeLedger
         columns={[
           { tone: "yes", heading: "Will use", items: [{ label: "HR Policies" }] },
-          { tone: "no", heading: "Won't use · 4", items: [{ label: "ACME_MSA_2026.pdf" }] },
+          // 279-03 WR-04 (D-09/D-16): was { tone: "no", heading: "Won't use · 4", items: [{ label: "ACME_MSA_2026.pdf" }] },
+          { tone: "no", heading: "Won't search · 4", items: [{ label: "ACME_MSA_2026.pdf" }] },
         ]}
       />,
     )

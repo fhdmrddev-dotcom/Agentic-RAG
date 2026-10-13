@@ -67,14 +67,16 @@ from app.models.thread import (
 )
 # Phase 267 (D-267-11 / D-267-17) — the ONE statement of what a thread reads with an Expert, which
 # the preview route and the rename_thread event writer both read (never a second derivation).
-from app.services.expert_scope import (
+from app.services.expert_scope_events import (
     build_expert_changed_event,
     build_scope_changed_event,
     build_scope_effect,
-    describe_expert_scope,
-    describe_scope_change,
     insert_expert_changed_row,
     scope_event_sentence,
+)
+from app.services.expert_scope_statement import (
+    describe_expert_scope,
+    describe_scope_change,
     scope_preview,
 )
 # Phase 267 (D-267-14 / PACK-24) — the handoff summary is a SERVICE (never a tool); see its docstring.
@@ -725,6 +727,23 @@ async def _caller_roles(request: Request, current_user: dict) -> list[str]:
     return [_role] if _role else []
 
 
+async def _caller_role_in_org(request: Request, current_user: dict, org_id: str | None) -> list[str] | None:
+    """267-REVIEW-INDEPENDENT IN-05 (279-02): the caller's role in ONE named org (the thread's), not
+    the active org. ``None`` when there is no org or the caller is not a member of it. The same
+    membership read ``resolve_active_org_or_none`` runs, on the caller's own RLS connection."""
+    if not org_id:
+        return None
+    async with get_user_pg_connection(request, current_user) as conn:
+        row = await conn.fetchrow(
+            "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = auth.uid()",
+            UUID(str(org_id)),
+        )
+    if row is None:
+        logger.info("expert clear on a thread: the caller is not a member of its org; no event")
+        return None
+    return [row["role"]] if row["role"] else []
+
+
 async def assert_expert_bindable(
     request: Request, current_user: dict, expert_id: UUID
 ) -> tuple[dict, str]:
@@ -758,6 +777,20 @@ async def assert_expert_bindable(
             detail="Expert bundle not found or access denied",
         )
     return bundle, str(active_org_id)
+
+
+def _require_thread_org(thread_row: dict | None, active_org_id: str | None, *, expert_id, detail: str) -> None:
+    """267-REVIEW-INDEPENDENT CR-03(b) / IN-01 / WR-03 (279-02, D-05 / D-18): an Expert in play on a
+    thread must be gated in the THREAD's own org. ONE helper, called once at each of the four doors
+    (PATCH, handoff, preview, send) — never a second inline compare beside it.
+
+    No-op without a thread row (a brand-new chat) or without an Expert: clearing is never gated.
+    With no active org the compare cannot match a thread org, so an Expert-thread send fails
+    CLOSED (D-18) instead of silently clearing the Expert at send."""
+    if thread_row is None or not expert_id:
+        return
+    if str(thread_row.get("org_id") or "") != str(active_org_id or ""):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
 
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
@@ -814,6 +847,7 @@ async def get_expert_scope_preview(
     supabase: Client = Depends(get_user_supabase_client),
 ):
     thread_folder_id = None
+    t_row = None  # 279-02 IN-01: the thread row (with its org) when a thread is named
     if thread_id is None and folder_id is not None:
         # 267-REVIEW WR-07: a brand-new chat has no thread yet but may already have its folder
         # picked, and the thread handleSend creates will carry it. Read ONLY without a thread (a
@@ -827,7 +861,7 @@ async def get_expert_scope_preview(
     if thread_id is not None:
         t_resp = await aexec(
             supabase.table("threads")
-            .select("id, folder_id")
+            .select("id, folder_id, org_id")
             .eq("id", str(thread_id))
             .eq("user_id", current_user["id"])
             .maybe_single()
@@ -838,6 +872,8 @@ async def get_expert_scope_preview(
         thread_folder_id = t_row.get("folder_id")
 
     _bundle, org_id = await assert_expert_bindable(request, current_user, expert_id)
+    _require_thread_org(t_row, org_id, expert_id=expert_id,
+                        detail="Switch to this chat's organization to preview an Expert.")
     try:
         statement = await describe_expert_scope(
             supabase=supabase,
@@ -914,14 +950,19 @@ async def _expert_changed_event(
     after_expert: str | None,
     folder_id: str | None,
     org_id: str | None,
+    caller_roles: list[str] | None = None,
 ):
-    """Both sides stated through the ONE statement helper, then the pure event builder."""
+    """Both sides stated through the ONE statement helper, then the pure event builder.
+
+    ``caller_roles`` (279-02 IN-05): the role in ``org_id`` when the caller already resolved it (a
+    clear, stated in the thread's org); otherwise the active org's role, which IS ``org_id`` for a
+    bind because the gate validated it."""
     common = dict(
         supabase=supabase,
         pool=await get_pg_pool(),
         user_id=current_user["id"],
         org_id=org_id,
-        caller_roles=await _caller_roles(request, current_user),
+        caller_roles=caller_roles if caller_roles is not None else await _caller_roles(request, current_user),
         thread_folder_id=folder_id,
     )
     try:
@@ -941,23 +982,42 @@ async def _expert_changed_event(
     return build_expert_changed_event(before, after, at=datetime.now(timezone.utc))
 
 
-async def _write_expert_change(conn, *, thread_id, user_id, org_id, update_data: dict, event) -> None:
+class ExpertChangeConflict(Exception):
+    """267-REVIEW-INDEPENDENT WR-02: the thread's Expert or folder moved after this PATCH read it."""
+
+
+async def _write_expert_change(conn, *, thread_id, user_id, org_id, update_data: dict, event,
+                               expected_expert_id, expected_folder_id) -> None:
     """The UPDATE and the event row, on ONE user-JWT (RLS-as-caller) connection inside its txn.
 
     D-267-34: ``org_id`` is the THREAD's own org, set explicitly — the messages autofill trigger
     takes ``org_members … LIMIT 1``, which is the wrong org for a two-org user. ``tool_calls`` is a
     plain list: the pool's jsonb codec encodes it (a pre-dumped string would be double-encoded).
+
+    267-REVIEW-INDEPENDENT WR-02 (279-02): the UPDATE is conditional on the Expert AND folder the
+    event's "before" was built from. If another PATCH moved either in between, 0 rows update and
+    ``ExpertChangeConflict`` is raised BEFORE the event INSERT, so the txn writes nothing and no
+    false "A → C" is recorded (``_write_scope_change``'s shape).
     """
     after = update_data.get("active_expert_id")
-    params: list = [UUID(str(thread_id)), UUID(str(user_id)), UUID(str(after)) if after else None]
+    params: list = [
+        UUID(str(thread_id)),
+        UUID(str(user_id)),
+        UUID(str(after)) if after else None,
+        UUID(str(expected_expert_id)) if expected_expert_id else None,
+        UUID(str(expected_folder_id)) if expected_folder_id else None,
+    ]
     sets = ["active_expert_id = $3::uuid"]
     if "title" in update_data:
         params.append(update_data["title"])
         sets.append(f"title = ${len(params)}")
-    await conn.execute(
-        f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid",
+    updated = await conn.execute(
+        f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid "
+        "AND active_expert_id IS NOT DISTINCT FROM $4::uuid AND folder_id IS NOT DISTINCT FROM $5::uuid",
         *params,
     )
+    if str(updated).split()[-1:] == ["0"]:
+        raise ExpertChangeConflict()
     # 267-REVIEW-INDEPENDENT CR-03: the row is written by the ONE writer the send-time clear also uses.
     await insert_expert_changed_row(conn, thread_id=thread_id, user_id=user_id, org_id=org_id, event=event)
 
@@ -1006,18 +1066,21 @@ class ScopeChangeConflict(Exception):
 
 
 async def _write_scope_change(conn, *, thread_id, user_id, org_id, folder_id, event, expected_folder_id,
-                              title=None) -> None:
+                              expected_expert_id=None, title=None) -> None:
     """The UPDATE and the event row on ONE user-JWT connection inside its txn (``_write_expert_change``'s
     shape). ``org_id`` is the THREAD's (D-267-34); ``tool_calls`` a plain list (the jsonb codec).
 
     268-REVIEW WR-02: the UPDATE is conditional on ``expected_folder_id`` — the folder the event's
     "from" was built from. If another PATCH moved it in between, 0 rows update and
-    ``ScopeChangeConflict`` is raised BEFORE the event INSERT, so the caller's txn writes nothing."""
+    ``ScopeChangeConflict`` is raised BEFORE the event INSERT, so the caller's txn writes nothing.
+    267-REVIEW-INDEPENDENT WR-02 (279-02): also conditional on ``expected_expert_id`` — the Expert the
+    event's statements were built under — so a concurrent Expert swap is a conflict too."""
     params: list = [
         UUID(str(thread_id)),
         UUID(str(user_id)),
         UUID(str(folder_id)) if folder_id else None,
         UUID(str(expected_folder_id)) if expected_folder_id else None,
+        UUID(str(expected_expert_id)) if expected_expert_id else None,
     ]
     sets = ["folder_id = $3::uuid"]
     if title is not None:
@@ -1025,7 +1088,7 @@ async def _write_scope_change(conn, *, thread_id, user_id, org_id, folder_id, ev
         sets.append(f"title = ${len(params)}")
     updated = await conn.execute(
         f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid "
-        "AND folder_id IS NOT DISTINCT FROM $4::uuid",
+        "AND folder_id IS NOT DISTINCT FROM $4::uuid AND active_expert_id IS NOT DISTINCT FROM $5::uuid",
         *params,
     )
     if str(updated).split()[-1:] == ["0"]:
@@ -1041,15 +1104,26 @@ async def _write_scope_change(conn, *, thread_id, user_id, org_id, folder_id, ev
     )
 
 
-async def _describe_thread_scope_change(request: Request, current_user: dict, supabase: Client, **kw):
-    """Pitfall 9 / T-268-25: stated with the producer's own inputs — the ACTIVE org (the run's
-    ``current_user["org_id"]``) and the caller's role — so the preview and the run cannot disagree."""
+async def _describe_thread_scope_change(request: Request, current_user: dict, supabase: Client, *,
+                                        thread_org_id, **kw):
+    """~~Pitfall 9 / T-268-25: stated with the producer's own inputs — the ACTIVE org (the run's
+    ``current_user["org_id"]``) and the caller's role — so the preview and the run cannot disagree.~~
+
+    ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-01): the active org was the WRONG org for an Expert thread.
+    With org B active on an org-A Expert thread, the Expert was named in B (or not at all), and the
+    folder PATCH persisted that false statement into the org-A thread. The Expert is now stated in
+    the THREAD's org with the caller's role THERE (``_caller_role_in_org``, the IN-05 pattern), the
+    rule the four doors gate by. Pitfall 9 still holds for every run that can happen: the send door
+    (``_require_thread_org``) and ``_resolve_thread_scoping`` refuse an Expert-thread run unless the
+    active org IS the thread's org. Without an Expert ``org_id`` / roles are never read, so no
+    membership read is made. This route stays read-only and never 409s (the composer chip reads it)."""
     return await describe_scope_change(
         supabase=supabase,
         pool=await get_pg_pool(),
         user_id=current_user["id"],
-        org_id=await resolve_active_org_or_none(request, current_user),
-        caller_roles=await _caller_roles(request, current_user),
+        org_id=thread_org_id,
+        caller_roles=(await _caller_role_in_org(request, current_user, thread_org_id) or [])
+        if kw.get("expert_id") else [],
         **kw,
     )
 
@@ -1072,6 +1146,7 @@ async def _apply_folder_change(thread_id: str, body: ThreadUpdate, request: Requ
                 request,
                 current_user,
                 supabase,
+                thread_org_id=row.get("org_id"),  # 279-REVIEW WR-01: the thread's org
                 expert_id=row.get("active_expert_id"),
                 from_folder_id=old_folder,
                 to_folder_id=new_folder,
@@ -1092,6 +1167,7 @@ async def _apply_folder_change(thread_id: str, body: ThreadUpdate, request: Requ
                     folder_id=new_folder,
                     event=event,
                     expected_folder_id=old_folder,
+                    expected_expert_id=row.get("active_expert_id"),
                     title=update_data.get("title"),
                 )
         except ScopeChangeConflict:
@@ -1141,6 +1217,7 @@ async def get_scope_effect(
         request,
         current_user,
         supabase,
+        thread_org_id=row.get("org_id"),  # 279-REVIEW WR-01: the thread's org
         expert_id=row.get("active_expert_id"),
         from_folder_id=current,
         to_folder_id=draft,
@@ -1200,11 +1277,9 @@ async def rename_thread(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
         # 267-REVIEW WR-03: the org the gate validated must be the thread's own org (the same rule
         # the handoff door enforces), or an Expert gated in one org is bound into another's thread.
-        if bound_org_id is not None and str(before_row.get("org_id") or "") != bound_org_id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Switch to this chat's organization to invite an Expert.",
-            )
+        # 279-02 (D-05): the inline compare became the ONE helper; a clear passes (no Expert).
+        _require_thread_org(before_row, bound_org_id, expert_id=update_data.get("active_expert_id"),
+                            detail="Switch to this chat's organization to invite an Expert.")
         before_expert = before_row.get("active_expert_id")
         after_expert = update_data["active_expert_id"]
         if str(before_expert or "") != str(after_expert or "") and await _thread_has_active_run(
@@ -1220,18 +1295,22 @@ async def rename_thread(
         if str(before_expert or "") != str(after_expert or "") and await _thread_has_messages(
             supabase, thread_id, current_user["id"]
         ):
-            event = await _expert_changed_event(
+            # 267-REVIEW-INDEPENDENT IN-05 (279-02): a bind is stated in the org the gate validated
+            # (= the thread's, by _require_thread_org). A clear has no gate (bound_org_id None), so it
+            # is stated in the THREAD's org with the caller's role THERE; a non-member gets no event
+            # and the clear proceeds through the plain update below (clearing is never gated).
+            _clear_roles = (
+                None if bound_org_id else await _caller_role_in_org(request, current_user, before_row.get("org_id"))
+            )
+            event = None if (bound_org_id is None and _clear_roles is None) else await _expert_changed_event(
                 request,
                 current_user,
                 supabase,
                 before_expert=before_expert,
                 after_expert=after_expert,
                 folder_id=before_row.get("folder_id"),
-                org_id=(
-                    bound_org_id
-                    or await resolve_active_org_or_none(request, current_user)
-                    or before_row.get("org_id")
-                ),
+                org_id=bound_org_id or before_row.get("org_id"),
+                caller_roles=_clear_roles,
             )
             thread_org_id = before_row.get("org_id")
 
@@ -1245,7 +1324,16 @@ async def rename_thread(
                     org_id=thread_org_id,
                     update_data=update_data,
                     event=event,
+                    expected_expert_id=before_expert,
+                    expected_folder_id=before_row.get("folder_id"),
                 )
+        except ExpertChangeConflict:
+            # 267-REVIEW-INDEPENDENT WR-02: the txn rolled back — no UPDATE, no event with a false
+            # "from". Caught ABOVE `except Exception`, or a lost race would read as a 500.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The Expert changed while you were choosing. Try again.",
+            )
         except Exception:
             # T-267-20: the literal only; the cause goes to the log. The exception left the
             # transaction, so asyncpg rolled back the UPDATE with the INSERT.
@@ -1322,10 +1410,15 @@ async def handoff_thread(
     # thread is written into the SOURCE thread's org (D-267-34). They must be one org, or an Expert
     # gated in B is bound inside an A thread (a tier bypass when A lacks `experts`). Refusing is the
     # smaller correct change: gating against the source org would need a second membership check.
-    if str(source.get("org_id") or "") != _org_id:
+    # 279-02 (D-05): the inline compare became the ONE helper.
+    _require_thread_org(source, _org_id, expert_id=body.expert_id,
+                        detail="Switch to this chat's organization to hand it off.")
+    # 267-REVIEW-INDEPENDENT WR-01 (279-02): the streaming answer is written only at run end, so a
+    # summary now would leave it out. Refused until the run finishes — the PATCH door's shape (WR-04).
+    if await _thread_has_active_run(supabase, str(thread_id), current_user["id"]):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Switch to this chat's organization to hand it off.",
+            detail="Wait for this answer to finish before handing off.",
         )
 
     rows_resp = await aexec(
@@ -1577,13 +1670,18 @@ async def send_message(
 
     thread_resp = await aexec(
         supabase.table("threads")
-        .select("id, active_workflow_run_id")
+        .select("id, active_workflow_run_id, org_id, active_expert_id")
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
         .single()
     )
     if not thread_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+    # 279-02 (CR-03(b) / D-05 / D-11 / D-18): an Expert thread is answered only in its OWN org —
+    # refused here, before the preflight, the user INSERT, the scoping resolve and the run row, so
+    # no orphan message is left behind. No active org on an Expert thread is refused too (fail closed).
+    _require_thread_org(thread_resp.data, active_org_id, expert_id=thread_resp.data.get("active_expert_id"),
+                        detail="Switch to this chat's organization to keep chatting with its Expert.")
 
     # ── Phase 092 MODE-01 / MODE-02 — server-side lock + workflow kickoff ──────
     # This is the AUTHORITATIVE workflow lock (the grayed client toggle is courtesy
