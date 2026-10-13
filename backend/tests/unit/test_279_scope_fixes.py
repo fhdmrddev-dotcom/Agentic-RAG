@@ -5,7 +5,8 @@
   A swap between two restricted Experts on a folder-scoped thread therefore said the thread folder's
   documents were newly lost, although the previous Expert never read them either. ``excluded`` is
   now computed against the PREVIOUS side's effective scope: it is set only when the previous side
-  read the thread folder (or everything). ``_dropped_line`` is untouched (268 shares it), and no
+  read the thread folder (or everything) — ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-03): or when the
+  previous side's effective folders overlap the new exclusion. ``_dropped_line`` is untouched (268 shares it), and no
   existing 267/268 fixture line changes. The new fixture is the real builder's output.
 * **WR-08 (D-17) — the folder-scope note names every folder** when a run is scoped to 2+, and the
   single-folder note stays byte-identical to the phase base (see the section below).
@@ -78,6 +79,51 @@ async def test_D07_the_restricted_to_restricted_fixture_is_the_real_builders_out
     )
     assert fixture == ev.model_dump(mode="json")
     assert fixture["excluded"] is None
+
+
+
+# ── 279-REVIEW WR-03: the exclusion is computed against the PREVIOUS side's effective scope ─────────
+#
+# The reviewer's probe: a restricted "ACME Specialist" bound to the thread folder (Client ACME),
+# swapped to the restricted HR Advisor on an ACME-scoped thread. The previous Expert DID read part of
+# what is now excluded, so the card must still say what won't be searched. Before the fix the D-07
+# switch saw only "previous side read no thread folder" and dropped the line (``excluded`` None).
+
+ACME_SPEC_ID = "e5000000-0000-4000-8000-0000000000e5"
+ACME_SPEC = resolved(ACME_SPEC_ID, "ACME Specialist", "restricted", [ACME_FOLDER])
+R2R_BUNDLES[ACME_SPEC_ID] = ACME_SPEC
+
+
+@pytest.mark.asyncio
+async def test_WR03_restricted_to_restricted_keeps_the_exclusion_when_the_previous_expert_read_it():
+    from app.services.expert_scope_events import event_sentence
+
+    ev, after = await _event(ACME_SPEC_ID, HR_ID)
+    assert after.excluded_count == 4
+    assert ev.excluded is not None, "the card lost its 'Won't be searched' line"
+    assert ev.excluded.count == 4
+    assert ev.excluded.names == [
+        "ACME_MSA_2026.pdf", "ACME_SOW_03.docx", "ACME_invoices_Q3.xlsx", "Board_deck_Q3.pptx",
+    ]
+    # Dropped was already right (``_dropped_line`` reads the previous side's folders) — unchanged.
+    assert event_sentence(ev) == "ACME Specialist → HR Advisor. Now: HR Policies. Dropped: Client ACME."
+
+
+@pytest.mark.asyncio
+async def test_WR03_the_overlap_fixture_is_the_real_builders_output():
+    ev, _after = await _event(ACME_SPEC_ID, HR_ID)
+    fixture = json.loads(
+        (FIXTURES_279 / "expert_changed_restricted_overlap_to_restricted.json").read_text(encoding="utf-8")
+    )
+    assert fixture == ev.model_dump(mode="json")
+    assert fixture["excluded"]["count"] == 4
+
+
+@pytest.mark.asyncio
+async def test_WR03_no_overlap_still_states_no_exclusion():
+    """D-07's case is unchanged: Legal Advisor (Financial Reports) never read the thread folder."""
+    ev, after = await _event(LEGAL_ID, HR_ID)
+    assert after.excluded_count > 0 and ev.excluded is None
 
 
 # ── WR-08 (D-17): the folder-scope note names every folder, only when there is more than one ─────

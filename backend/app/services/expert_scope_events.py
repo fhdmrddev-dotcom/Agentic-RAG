@@ -60,12 +60,21 @@ def build_expert_changed_event(before: ScopeStatement, after: ScopeStatement, *,
     # thread folder (or everything). Restricted → restricted on a folder-scoped thread used to state
     # the thread folder's documents as newly lost, though the previous Expert never read them either.
     # ``_dropped_line`` is unchanged (268's ``stops`` shares it).
+    # ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-03): that was a yes/no switch, not "computed against the
+    # previous side's effective scope". A previous RESTRICTED Expert never reports a thread folder, so
+    # every restricted → restricted swap lost the line — including one whose previous Expert DID read
+    # part of what is now excluded. The previous side's effective folders overlapping the new
+    # exclusion now keep it (pure set arithmetic on the two statements; no I/O).
     prev = before.used()
     if (
         after.expert is not None
         and after.expert.scope_mode == "restricted"
         and after.excluded_count > 0
-        and (prev.all_documents or prev.thread_folder is not None)
+        and (
+            prev.all_documents
+            or prev.thread_folder is not None
+            or bool(set(before.scope.effective_folder_ids) & set(after.scope.excluded_folder_ids))
+        )
     ):
         excluded = TranscriptExclusion(count=after.excluded_count, names=list(after.excluded_names))
     return ExpertChangedEvent(
