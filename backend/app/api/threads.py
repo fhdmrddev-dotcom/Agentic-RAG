@@ -1104,15 +1104,26 @@ async def _write_scope_change(conn, *, thread_id, user_id, org_id, folder_id, ev
     )
 
 
-async def _describe_thread_scope_change(request: Request, current_user: dict, supabase: Client, **kw):
-    """Pitfall 9 / T-268-25: stated with the producer's own inputs — the ACTIVE org (the run's
-    ``current_user["org_id"]``) and the caller's role — so the preview and the run cannot disagree."""
+async def _describe_thread_scope_change(request: Request, current_user: dict, supabase: Client, *,
+                                        thread_org_id, **kw):
+    """~~Pitfall 9 / T-268-25: stated with the producer's own inputs — the ACTIVE org (the run's
+    ``current_user["org_id"]``) and the caller's role — so the preview and the run cannot disagree.~~
+
+    ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-01): the active org was the WRONG org for an Expert thread.
+    With org B active on an org-A Expert thread, the Expert was named in B (or not at all), and the
+    folder PATCH persisted that false statement into the org-A thread. The Expert is now stated in
+    the THREAD's org with the caller's role THERE (``_caller_role_in_org``, the IN-05 pattern), the
+    rule the four doors gate by. Pitfall 9 still holds for every run that can happen: the send door
+    (``_require_thread_org``) and ``_resolve_thread_scoping`` refuse an Expert-thread run unless the
+    active org IS the thread's org. Without an Expert ``org_id`` / roles are never read, so no
+    membership read is made. This route stays read-only and never 409s (the composer chip reads it)."""
     return await describe_scope_change(
         supabase=supabase,
         pool=await get_pg_pool(),
         user_id=current_user["id"],
-        org_id=await resolve_active_org_or_none(request, current_user),
-        caller_roles=await _caller_roles(request, current_user),
+        org_id=thread_org_id,
+        caller_roles=(await _caller_role_in_org(request, current_user, thread_org_id) or [])
+        if kw.get("expert_id") else [],
         **kw,
     )
 
@@ -1135,6 +1146,7 @@ async def _apply_folder_change(thread_id: str, body: ThreadUpdate, request: Requ
                 request,
                 current_user,
                 supabase,
+                thread_org_id=row.get("org_id"),  # 279-REVIEW WR-01: the thread's org
                 expert_id=row.get("active_expert_id"),
                 from_folder_id=old_folder,
                 to_folder_id=new_folder,
@@ -1205,6 +1217,7 @@ async def get_scope_effect(
         request,
         current_user,
         supabase,
+        thread_org_id=row.get("org_id"),  # 279-REVIEW WR-01: the thread's org
         expert_id=row.get("active_expert_id"),
         from_folder_id=current,
         to_folder_id=draft,

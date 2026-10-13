@@ -37,8 +37,10 @@ class ScopeEffect(BaseModel):
     The ONE payload the composer chip (``held``), the picker ledger (``next`` / ``stops`` or
     ``saved``) and — snapshotted — the ``scope_changed`` card render from. Built by
     ``expert_scope_events.build_scope_effect`` from ``describe_expert_scope`` statements resolved with the
-    producer's own inputs (active org + caller role, Pitfall 9). ``stops`` is empty when the new scope
-    contains the old; ``saved`` is set only when ``held``.
+    ~~producer's own inputs (active org + caller role, Pitfall 9)~~ thread's own org and the caller's
+    role there (corrected 2026-10-14, 279-REVIEW WR-01; an Expert-thread run is refused in any other
+    org, so the two still agree). ``stops`` is empty when the new scope contains the old; ``saved`` is
+    set only when ``held``.
     """
 
     held: bool

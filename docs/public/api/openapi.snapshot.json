@@ -24916,7 +24916,7 @@
      "stops"
     ],
     "title": "ScopeEffect",
-    "description": "Phase 268 (D-268-12c / R1) \u2014 GET /threads/{id}/scope-effect: what the NEXT message searches.\n\nThe ONE payload the composer chip (``held``), the picker ledger (``next`` / ``stops`` or\n``saved``) and \u2014 snapshotted \u2014 the ``scope_changed`` card render from. Built by\n``expert_scope_events.build_scope_effect`` from ``describe_expert_scope`` statements resolved with the\nproducer's own inputs (active org + caller role, Pitfall 9). ``stops`` is empty when the new scope\ncontains the old; ``saved`` is set only when ``held``."
+    "description": "Phase 268 (D-268-12c / R1) \u2014 GET /threads/{id}/scope-effect: what the NEXT message searches.\n\nThe ONE payload the composer chip (``held``), the picker ledger (``next`` / ``stops`` or\n``saved``) and \u2014 snapshotted \u2014 the ``scope_changed`` card render from. Built by\n``expert_scope_events.build_scope_effect`` from ``describe_expert_scope`` statements resolved with the\n~~producer's own inputs (active org + caller role, Pitfall 9)~~ thread's own org and the caller's\nrole there (corrected 2026-10-14, 279-REVIEW WR-01; an Expert-thread run is refused in any other\norg, so the two still agree). ``stops`` is empty when the new scope contains the old; ``saved`` is\nset only when ``held``."
    },
    "ScopeFolderRef": {
     "properties": {
