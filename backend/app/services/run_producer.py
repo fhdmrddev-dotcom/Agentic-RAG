@@ -403,6 +403,11 @@ class ExpertScopeUnavailable(ValueError):
     empty scope reaches retrieval as "no folder filter" and would search every org the user is in."""
 
 
+class ExpertThreadOrgMismatch(ValueError):
+    """279-REVIEW WR-02: the thread row this run acts on carries an Expert, and its org is not the
+    caller's org. Refused (fail closed), never resolved in the wrong org and never cleared."""
+
+
 async def _state_expert_removed(
     supabase,
     pool,
@@ -497,6 +502,13 @@ async def _resolve_thread_scoping(
         thread_org_id = t_resp.data.get("org_id") if (t_resp and t_resp.data) else None
         if not active_expert_id:
             return ThreadScoping(None, None, None, None, None)
+        # 279-REVIEW WR-02: THIS re-read is the row the run acts on, so the send door's org check is
+        # only the fast path. A bind landing between the two reads (two tabs, two X-Org-Id) used to
+        # resolve the Expert in the caller's org — clearing it (D-18's struck clear-at-send) or
+        # reading the wrong org's folders. Refused before any resolve or clear (D-19: the message
+        # already saved stays unanswered — accepted).
+        if thread_org_id and str(thread_org_id) != str(current_user.get("org_id") or ""):
+            raise ExpertThreadOrgMismatch("Switch to this chat's organization to keep chatting with its Expert.")
 
         from app.services.expert_service import resolve_expert_bundle  # noqa: PLC0415
         caller_user_id = UUID(str(current_user["id"]))

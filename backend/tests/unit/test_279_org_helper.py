@@ -307,3 +307,69 @@ async def test_clearing_the_expert_on_a_thread_of_another_org_is_never_gated():
     assert txn.entered == 0
     assert len(db.updates()) == 1
     assert resp["active_expert_id"] is None
+
+
+# ── 279-REVIEW WR-02: the scoping RE-READ fails closed on an org mismatch ────────────────────────
+#
+# The send door checks the row it read; ``_resolve_thread_scoping`` re-reads the thread after the
+# preflight and the user INSERT, and THAT row is the one the run acts on. A bind landing between the
+# two reads (two tabs, two X-Org-Id) used to be resolved in the caller's org: cleared (D-18's struck
+# clear-at-send) when the Expert is not accessible there, or scoped to the wrong org's folders when it
+# is. D-19: the user message already saved stays unanswered in this race — accepted.
+
+_WR02_SENTENCE = "Switch to this chat's organization to keep chatting with its Expert."
+
+
+async def _scope_reread(thread_row: dict, caller_org: str | None):
+    aexec = AsyncMock(return_value=SimpleNamespace(data=dict(thread_row)))
+    resolve = AsyncMock(side_effect=AssertionError("resolve_expert_bundle must not run"))
+    pool = MagicMock()
+    pool.fetchval = AsyncMock(side_effect=AssertionError("the role read must not run"))
+    user = {"id": USER_ID, **({"org_id": caller_org} if caller_org else {})}
+    with patch("app.utils.db.aexec", aexec), \
+         patch("app.services.expert_service.resolve_expert_bundle", resolve):
+        try:
+            return await rp._resolve_thread_scoping(
+                supabase=MagicMock(), thread_id=THREAD_ID, current_user=user, pool=pool,
+            ), aexec, resolve
+        except Exception as exc:  # noqa: BLE001 — returned for the asserts
+            return exc, aexec, resolve
+
+
+@pytest.mark.asyncio
+async def test_WR02_an_expert_bound_in_the_race_window_is_refused_not_resolved_or_cleared():
+    row = {"active_expert_id": EXPERT_ID, "folder_id": None, "org_id": ORG_A}
+    out, aexec, resolve = await _scope_reread(row, ORG_B)
+    assert isinstance(out, rp.ExpertThreadOrgMismatch) and isinstance(out, ValueError)
+    assert str(out) == _WR02_SENTENCE  # the send door's own sentence
+    assert aexec.await_count == 1, "only the thread re-read ran — no clear UPDATE, no event"
+    resolve.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_WR02_no_caller_org_on_an_expert_thread_fails_closed():
+    row = {"active_expert_id": EXPERT_ID, "folder_id": None, "org_id": ORG_A}
+    out, aexec, resolve = await _scope_reread(row, None)
+    assert isinstance(out, rp.ExpertThreadOrgMismatch)
+    assert aexec.await_count == 1
+    resolve.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_WR02_a_plain_thread_in_another_org_is_not_refused_here():
+    row = {"active_expert_id": None, "folder_id": None, "org_id": ORG_A}
+    out, _aexec, resolve = await _scope_reread(row, ORG_B)
+    assert out == rp.ThreadScoping(None, None, None, None, None)
+    resolve.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_WR02_the_send_door_still_refuses_a_null_org_expert_thread():
+    """The re-read check compares only when the thread HAS an org (a bind on a null-org thread is a
+    409 at the PATCH door, so the race cannot create one); a legacy null-org Expert thread is refused
+    by the send door's strict helper, pinned here so the narrowing is never silent."""
+    h = _SendHarness(active_org=ORG_B, thread_row=_expert_thread(None), scoping=_scoping(uuid4()))
+    with pytest.raises(HTTPException) as exc:
+        await _send(h)
+    assert exc.value.status_code == 409
+    _assert_nothing_written(h)

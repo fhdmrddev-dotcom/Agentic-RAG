@@ -80,7 +80,11 @@ async def _stale_send(pool, aexec, *, get_expert=None, describe_error=None):
             await _resolve_thread_scoping(
                 supabase=MagicMock(),
                 thread_id=THREAD,
-                current_user={"id": USER, "org_id": ACTIVE_ORG},
+                # current_user={"id": USER, "org_id": ACTIVE_ORG},
+                # ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-02): an Expert thread whose org is not the
+                # caller's is now refused BEFORE any resolve or clear (ExpertThreadOrgMismatch), so
+                # the stale clear these (a) cases drive is reachable only in the thread's own org.
+                current_user={"id": USER, "org_id": THREAD_ORG},
                 pool=pool,
             )
     finally:
@@ -136,7 +140,8 @@ async def test_a_the_clear_is_conditional_on_the_expert_it_read():
         with pytest.raises(ValueError):
             await _resolve_thread_scoping(
                 supabase=supabase, thread_id=THREAD,
-                current_user={"id": USER, "org_id": ACTIVE_ORG}, pool=pool,
+                # current_user={"id": USER, "org_id": ACTIVE_ORG}, pool=pool,
+                current_user={"id": USER, "org_id": THREAD_ORG}, pool=pool,  # 279-REVIEW WR-02
             )
     table.update.assert_called_with({"active_expert_id": None})
     assert ("active_expert_id", EXPERT) in [c.args for c in table.eq.call_args_list]
