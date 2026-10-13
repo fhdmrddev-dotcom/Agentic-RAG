@@ -682,3 +682,89 @@ describe("(H) CR-03(c) — a server-side clear removes the chip", () => {
     expect(useStreamsStore.getState().expertReadingsByThread.has(T.id)).toBe(false)
   })
 })
+
+// 279-03 (SEED-328 WR-06 / WR-01). WR-06: the hydration effect only LOGGED a failed Expert load, so
+// switching to a thread whose Expert could not be read left the PREVIOUS thread's Expert on the chip —
+// a chip naming an Expert this chat does not have. WR-01 (client half): "New chat with …" was offered
+// while the answer streamed; the server refuses it (409), the hidden button is courtesy.
+describe("(I) 279-03 — the chip never names the wrong Expert; no handoff while streaming", () => {
+  it("(20) WR-06: switching to a thread whose Expert fails to load clears the chip and says so", async () => {
+    let rejectLoad: (e: unknown) => void = () => {}
+    const { rerender } = render(
+      shell(<ChatArea thread={{ ...THREAD, active_expert_id: FA.id } as Thread} onCreateThread={vi.fn()} folders={[]} />),
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId("active-expert-chip").textContent).toContain("Financial Analyzer"),
+    )
+    h.getExpert.mockImplementation(() => new Promise((_, reject) => (rejectLoad = reject)))
+    rerender(
+      shell(
+        <ChatArea
+          thread={{ ...THREAD, id: "thread-B", title: "Other", active_expert_id: CR.id } as Thread}
+          onCreateThread={vi.fn()}
+          folders={[]}
+        />,
+      ),
+    )
+    // While B's Expert is still loading, A's Expert is not on the chip.
+    await waitFor(() => expect(screen.queryByTestId("active-expert-chip")).toBeNull())
+    await act(async () => {
+      rejectLoad(new ApiError("Expert not found", 404))
+    })
+    const alert = await screen.findByTestId("expert-change-error")
+    expect(alert.textContent).toBe("This chat's Expert could not be loaded.")
+    expect(alert).toBeVisible()
+    expect(screen.queryByText(/Financial Analyzer/)).toBeNull()
+  })
+
+  it("(21) WR-06 Pitfall 4: a successful PATCH never blanks the chip while the thread catches up", async () => {
+    h.messages = TALK
+    const user = userEvent.setup()
+    const { rerender } = render(
+      shell(<ChatArea thread={{ ...THREAD, active_expert_id: FA.id } as Thread} onCreateThread={vi.fn()} folders={[]} />),
+    )
+    await screen.findByTestId("active-expert-chip")
+    await openInvite(user)
+    await user.click(await screen.findByTestId("expert-replace-btn-contract-reviewer"))
+    await waitFor(() => expect(h.setThreadActiveExpert).toHaveBeenCalledWith(THREAD.id, CR.id))
+    await waitFor(() =>
+      expect(screen.getByTestId("active-expert-chip").textContent).toContain("Contract Reviewer"),
+    )
+    // The list now hands back the PATCHed thread; its Expert load never answers — a blanking effect
+    // would leave the chip empty for good.
+    h.getExpert.mockImplementation(() => new Promise(() => {}))
+    rerender(
+      shell(<ChatArea thread={{ ...THREAD, active_expert_id: CR.id } as Thread} onCreateThread={vi.fn()} folders={[]} />),
+    )
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.getByTestId("active-expert-chip").textContent).toContain("Contract Reviewer")
+    expect(screen.queryByTestId("expert-change-error")).toBeNull()
+  })
+
+  it("(22) WR-01: 'New chat with …' is absent while THIS thread streams, and returns after", async () => {
+    h.messages = TALK
+    const nav: ThreadNavigation = {
+      findThread: () => null,
+      refreshThreads: vi.fn(async () => {}),
+      openThread: vi.fn(),
+    }
+    const user = userEvent.setup()
+    render(
+      shell(
+        <ChatArea thread={{ ...THREAD, active_expert_id: FA.id } as Thread} onCreateThread={vi.fn()} folders={[]} />,
+        nav,
+      ),
+    )
+    await screen.findByTestId("active-expert-chip")
+    act(() => {
+      useStreamsStore.setState({ streamingThreads: new Set([THREAD.id]) })
+    })
+    await openInvite(user)
+    await screen.findByTestId("expert-replace-btn-contract-reviewer")
+    expect(screen.queryByTestId("expert-handoff-btn-contract-reviewer")).toBeNull()
+    act(() => {
+      useStreamsStore.setState({ streamingThreads: new Set<string>() })
+    })
+    await screen.findByTestId("expert-handoff-btn-contract-reviewer")
+  })
+})
