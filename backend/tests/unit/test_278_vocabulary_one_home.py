@@ -257,6 +257,30 @@ def _assign_names(node: ast.AST) -> list[str]:
     return []
 
 
+def _is_topics_only_literal(node: ast.AST) -> bool:
+    """278-REVIEW WR-03 — a tuple/list/set literal whose elements are exactly ``{"topics"}``.
+
+    Matched WHATEVER the surrounding code is: an assignment under any name (``ARRAY_FIELDS``), the
+    argument of ``frozenset(...)`` / ``set(...)`` / ``tuple(...)``, or the right side of an inline
+    ``field in ("topics",)`` test. The walk visits every node, so the literal is found in all three.
+    """
+    return (
+        isinstance(node, (ast.Tuple, ast.List, ast.Set))
+        and bool(node.elts)
+        and all(isinstance(elt, ast.Constant) and elt.value == "topics" for elt in node.elts)
+    )
+
+
+def _is_date_map_call(node: ast.AST) -> bool:
+    """278-REVIEW WR-03 — ``dict(added="created_at", ...)``: the keyword-call spelling of a date map."""
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "dict"
+        and any(kw.arg in _DATE_WORD_KEYS and _is_column_value(kw.value) for kw in node.keywords)
+    )
+
+
 def _violations_in(tree: ast.AST, rel: str) -> list[str]:
     found = []
     parents: dict[ast.AST, ast.AST] = {}
@@ -265,19 +289,39 @@ def _violations_in(tree: ast.AST, rel: str) -> list[str]:
             parents[child] = parent
 
     for node in ast.walk(tree):
-        if isinstance(node, ast.Dict) and _is_date_map(node):
+        if (isinstance(node, ast.Dict) and _is_date_map(node)) or _is_date_map_call(node):
             owner = parents.get(node)
             names = _assign_names(owner) if owner is not None else []
             found.append(f"{rel}:{node.lineno} date-word->column map {names[0] if names else '<expr>'}")
+        elif _is_topics_only_literal(node):
+            # Name-independent (WR-03): the first fence matched only targets spelled ``*list*``, so
+            # ``ARRAY_FIELDS = frozenset({"topics"})`` and ``if field in ("topics",)`` passed it.
+            owner = parents.get(node)
+            if isinstance(owner, ast.Call):  # frozenset({...}) — name the assignment, not the call
+                owner = parents.get(owner)
+            names = _assign_names(owner) if owner is not None else []
+            found.append(f"{rel}:{node.lineno} list-field rule {names[0] if names else '<expr>'}")
         elif isinstance(node, (ast.Assign, ast.AnnAssign)):
             list_names = [n for n in _assign_names(node) if _LIST_NAME_RE.search(n)]
             if list_names and _contains_topics_collection(node.value):
                 found.append(f"{rel}:{node.lineno} list-field rule {list_names[0]}")
-    return found
+    # A ``LIST_*`` target holding a topics-only literal matches both rules; report it once.
+    return list(dict.fromkeys(found))
+
+
+# 278-REVIEW WR-03 — files allowed to spell the vocabulary literally, each with its reason. The widened
+# detector above ALSO runs over these files, and every entry must still produce at least one hit: an
+# entry that matches nothing is stale (the code moved or the detector went blind) and fails the test.
+# Measured when WR-03 landed: the widened detector's only hits in ``backend/app`` were in the home, so
+# nothing else is listed. ⛔ Never add an entry to silence a new hit — triage it: import the home.
+_LITERAL_ALLOWLIST: dict[str, str] = {
+    HOME_REL.as_posix(): "the home itself: TIMESTAMP_DATE_COLUMNS and LIST_FIELD_NAMES are defined here",
+}
 
 
 def test_no_literal_copy_outside_the_home():
     violations: list[str] = []
+    allowlisted_hits: dict[str, list[str]] = {rel: [] for rel in _LITERAL_ALLOWLIST}
     if not (APP_DIR / HOME_REL).is_file():
         violations.append(f"{HOME_REL.as_posix()} missing: there is no home to import")
     files_walked = 0
@@ -288,17 +332,28 @@ def test_no_literal_copy_outside_the_home():
             if not name.endswith(".py"):
                 continue
             path = Path(root) / name
-            rel = path.relative_to(APP_DIR)
-            if rel == HOME_REL:
-                continue
+            rel = path.relative_to(APP_DIR).as_posix()
             files_walked += 1
             # `utf-8-sig`: at least one module (email_extraction_service.py) starts with a BOM, which
             # plain `utf-8` hands to ast.parse as U+FEFF — a SyntaxError, i.e. a RED for the wrong reason.
             tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
-            violations.extend(_violations_in(tree, rel.as_posix()))
+            hits = _violations_in(tree, rel)
+            if rel in _LITERAL_ALLOWLIST:
+                allowlisted_hits[rel].extend(hits)
+            else:
+                violations.extend(hits)
 
     # Non-vacuity: a walk that saw nothing proves nothing.
     assert files_walked > 100, f"walked only {files_walked} files under {APP_DIR} — the walk is broken"
+    # Non-staleness, which is also the detector's self-test: the home's own definitions must be SEEN.
+    stale = [rel for rel, hits in allowlisted_hits.items() if not hits]
+    assert not stale, (
+        f"allowlist entries that no longer match anything (stale, or the detector went blind): {stale}"
+    )
+    home_hits = " ".join(allowlisted_hits.get(HOME_REL.as_posix(), []))
+    assert "date-word->column map" in home_hits and "list-field rule" in home_hits, (
+        f"the detector no longer sees BOTH definitions in the home — it is blind: {home_hits!r}"
+    )
     assert not violations, (
         "DEBT-09: the document-filter vocabulary has a literal copy outside its one home "
         f"(app/{HOME_REL.as_posix()}). Import TIMESTAMP_DATE_COLUMNS / LIST_FIELD_NAMES instead:\n  "
