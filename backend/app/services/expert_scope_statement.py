@@ -22,7 +22,7 @@ So the preview, the event and the run all read one composition. ⛔ No LLM clien
 (``match_document_chunks``): ``is_latest = true`` and the ``retrievable`` column (migration 205),
 queried on the USER-JWT client so the ``documents`` SELECT RLS policy — the same visibility predicate
 retrieval applies — decides what is counted. Ingest status is NOT filtered: a document still ingesting
-is "one of this chat's documents that will not be used" all the same. The D-267-20 DB check (267-05)
+is "one of this chat's documents that will not be searched" all the same. The D-267-20 DB check (267-05)
 must use this identical predicate.
 """
 from __future__ import annotations

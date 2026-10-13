@@ -119,7 +119,8 @@ describe("eventCardModel — the backend builder's real output, rendered to word
     expect(m.dropped.connections).toEqual(["Slack"])
     expect(m.dropped.empty).toBe(false)
     expect(m.excludedSubline).toBe(
-      "ACME_MSA_2026.pdf · ACME_SOW_03.docx · ACME_invoices_Q3.xlsx · Board_deck_Q3.pptx · Chat attachments stay readable.",
+      // 279-03 WR-04 (D-09/D-16): was "ACME_MSA_2026.pdf · ACME_SOW_03.docx · ACME_invoices_Q3.xlsx · Board_deck_Q3.pptx · Chat attachments stay readable."
+      "Won't be searched: ACME_MSA_2026.pdf · ACME_SOW_03.docx · ACME_invoices_Q3.xlsx · Board_deck_Q3.pptx · Chat attachments stay readable.",
     )
   })
 
@@ -157,7 +158,8 @@ describe("eventCardModel — the backend builder's real output, rendered to word
     const names = ["a.pdf", "b.pdf", "c.pdf", "d.pdf", "e.pdf", "f.pdf"]
     const m = eventCardModel({ ...changed, excluded: { count: 9, names } })
     expect(m.excludedSubline).toBe(
-      "a.pdf · b.pdf · c.pdf · d.pdf · e.pdf · and 4 more · Chat attachments stay readable.",
+      // 279-03 WR-04 (D-09/D-16): was "a.pdf · b.pdf · c.pdf · d.pdf · e.pdf · and 4 more · Chat attachments stay readable."
+      "Won't be searched: a.pdf · b.pdf · c.pdf · d.pdf · e.pdf · and 4 more · Chat attachments stay readable.",
     )
   })
 

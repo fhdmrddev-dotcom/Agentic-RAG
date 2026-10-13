@@ -4,7 +4,7 @@
  * ⛔ ONE PAYLOAD, TWO LISTS. This leaf renders the columns it is GIVEN and computes nothing about
  * an Expert: which items belong in which column is decided by one pure selector
  * (`connectionLedgerColumns` in `catalog/expertCatalog.ts` for connections; the restricted-cost
- * preview selector for `Will use` / `Won't use`), built from one server payload. A ledger whose two
+ * preview selector for `Will use` / `Won't search`), built from one server payload. A ledger whose two
  * sides were computed by two independent strings could disagree, and that is the defect the sketch's
  * build obligation names.
  *

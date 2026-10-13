@@ -322,6 +322,10 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
       setActiveExpert(null)
       return
     }
+    // 279-03 WR-06 (SEED-328): never keep a DIFFERENT Expert on the chip while this one loads — the
+    // previous thread's Expert is not this chat's. Same id (a successful PATCH the thread just caught
+    // up with) keeps the chip, so it never blanks between the optimistic set and the load (Pitfall 4).
+    setActiveExpert((prev) => (prev?.id === expertId ? prev : null))
     let cancelled = false
     getExpert(expertId)
       .then((exp) => {
@@ -329,6 +333,11 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
       })
       .catch((err) => {
         console.error("Failed to load active expert:", err)
+        // 279-03 WR-06: a failed load states itself in the existing alert (cleared on thread switch).
+        if (!cancelled) {
+          setActiveExpert(null)
+          setExpertChangeError("This chat's Expert could not be loaded.")
+        }
       })
     return () => {
       cancelled = true
@@ -801,7 +810,8 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
       // 267-REVIEW WR-07: the folder id too, so a brand-new chat's preview states its real cost.
       threadFolderId={dialogFolderId}
       hasMessages={messages.some((m) => m.role === "user" || m.role === "assistant")}
-      onExpertHandoff={thread && threadNav ? handleExpertHandoff : undefined}
+      // 279-03 WR-01 (client): no handoff while this thread streams — the server refuses it (409).
+      onExpertHandoff={thread && threadNav && !isStreaming ? handleExpertHandoff : undefined}
       onOpenConnections={onOpenConnections}
       onBrowseExperts={onBrowseExperts}
       // Phase 268 (D-268-12d): the scope chip — only on an existing thread; a new chat keeps the
@@ -948,6 +958,8 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
                 onDismiss={handleDismissExpert}
                 // 267-REVIEW WR-06 (D-267-35): no folder picked → state the biased narrowing.
                 unscopedChat={!scopeFolderId}
+                // 279-03 WR-03: a restricted Expert states its scope for the picked folder.
+                folderId={scopeFolderId}
               />
             </div>
           ) : (
@@ -1132,6 +1144,9 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
               // 267-REVIEW WR-06 (D-267-35): an empty thread with no folder (e.g. a catalog Start
               // Chat) gets no event (D-267-12), so the spotlight states the biased narrowing.
               unscopedChat={!thread?.folder_id}
+              // 279-03 WR-03: a restricted Expert states its scope for this thread's folder.
+              folderId={thread?.folder_id ?? null}
+              threadId={thread?.id ?? null}
             />
           </div>
         </div>
