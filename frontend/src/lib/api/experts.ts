@@ -242,7 +242,7 @@ export async function getExpert(bundleId: string): Promise<ExpertBundle> {
 // What a restricted Expert WILL and WILL NOT read on this thread, asked BEFORE the invite. The
 // route lives under `/threads` (it is a statement about a thread's scope) but its shape is an
 // Expert's, so it is declared here beside the other Expert reads. ⛔ One response feeds both
-// ledger columns: the `Won't use · N` heading is `excluded_count`, never a list length.
+// ledger columns: the `Won't search · N` heading is `excluded_count`, never a list length.
 
 export interface ExpertScopePreview {
   expert_id: string

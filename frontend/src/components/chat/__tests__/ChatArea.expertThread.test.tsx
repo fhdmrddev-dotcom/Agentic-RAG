@@ -493,7 +493,7 @@ describe("(D) CR-01 — the list holds the server's Expert after a change", () =
 // 267-REVIEW WR-06 (D-267-35) — the catalog Start Chat door: an empty thread with no folder, bound
 // to a biased Expert. No event is written there (D-267-12); the spotlight must state the narrowing.
 describe("(E) WR-06 — the empty unscoped thread's spotlight states D-267-35", () => {
-  it("(11) the spotlight shows Won't use · All your documents at rest", async () => {
+  it("(11) the spotlight shows Won't search · All your documents at rest", async () => {
     h.getExpertScopePreview.mockResolvedValue({
     expert_id: "e-cr",
     expert_name: "Contract Reviewer",

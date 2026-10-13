@@ -384,7 +384,7 @@ async def test_the_preview_route_gates_then_describes_the_threads_folder():
 #
 # Before the first message the dialog's context line reads "This chat · /Client ACME", but the preview
 # had no way to learn that folder (no thread yet, no folder parameter), so it described a chat with no
-# folder: no `Won't use`. The thread `handleSend` then creates DOES carry the folder, and the restricted
+# folder: no `Won't search`. The thread `handleSend` then creates DOES carry the folder, and the restricted
 # run excludes its documents — a cost stated as zero. `folder_id` is read ONLY when there is no thread,
 # and only for a folder the caller can see (404 otherwise, before the gate or any statement).
 

@@ -674,7 +674,7 @@ describe("267-REVIEW WR-06 — narrowingLedgerColumns", () => {
     excluded_names: [],
   } as const
 
-  it("biased, no thread folder, with folders → Will use its folders (+ attachments); Won't use All your documents", async () => {
+  it("biased, no thread folder, with folders → Will use its folders (+ attachments); Won't search All your documents", async () => {
     const { narrowingLedgerColumns } = await import("../expertCatalog")
     const cols = narrowingLedgerColumns({ ...base, expert_folders: [...base.expert_folders], excluded_names: [] })
     expect(cols).not.toBeNull()
@@ -683,7 +683,8 @@ describe("267-REVIEW WR-06 — narrowingLedgerColumns", () => {
     expect(will.heading).toBe("Will use")
     expect(new Set(will.items.map((i) => i.label))).toEqual(new Set(["Financial Reports", "Chat attachments"]))
     expect(wont.tone).toBe("no")
-    expect(wont.heading).toBe("Won't use")
+    // 279-03 WR-04 (D-09/D-16): was expect(wont.heading).toBe("Won't use")
+    expect(wont.heading).toBe("Won't search")
     expect(wont.items.map((i) => i.label)).toEqual(["All your documents"])
   })
 
@@ -693,6 +694,18 @@ describe("267-REVIEW WR-06 — narrowingLedgerColumns", () => {
     expect(narrowingLedgerColumns({ ...p, mode: "restricted" })).toBeNull()
     expect(narrowingLedgerColumns({ ...p, thread_folder: { id: "t", name: "HR", doc_count: 2 } })).toBeNull()
     expect(narrowingLedgerColumns({ ...p, expert_folders: [] })).toBeNull()
+  })
+})
+
+// 279-03 WR-04 (D-09) — the ledger's "no" heading names SEARCH, the one thing an excluded document
+// is denied (the chat's own attachments stay readable). The old export names must not survive.
+describe("279-03 WR-04 — LEDGER_COPY says Won't search", () => {
+  it("279-03: wontSearch(n) / wontSearchAll, and neither retired key remains", () => {
+    const copy = LEDGER_COPY as unknown as Record<string, unknown>
+    expect((copy.wontSearch as (n: number) => string)?.(7)).toBe("Won't search · 7")
+    expect(copy.wontSearchAll).toBe("Won't search")
+    const retired = ["wontUse", "wontUseAll"] // 279-03 D-09: the pre-279 key names
+    for (const key of retired) expect(key in copy).toBe(false)
   })
 })
 

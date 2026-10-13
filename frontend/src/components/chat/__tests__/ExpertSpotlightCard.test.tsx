@@ -253,7 +253,7 @@ describe("ExpertSpotlightCard (Phase 260 / PACK-03 / D-260-06 — retired at 262
 describe("WR-06 — the spotlight states the biased narrowing on an unscoped chat", () => {
   const biased: ExpertBundle = { ...mockFinancialExpert, scope_mode: "biased", is_system: false }
 
-  it("unscopedChat: Will use its folders, Won't use All your documents — visible at rest", async () => {
+  it("unscopedChat: Will use its folders, Won't search All your documents — visible at rest", async () => {
     mockPreview.mockResolvedValue({
     expert_id: "e-fa",
     expert_name: "Financial Analyzer",
@@ -265,7 +265,8 @@ describe("WR-06 — the spotlight states the biased narrowing on an unscoped cha
   })
     render(<ExpertSpotlightCard expert={biased} onSelectPrompt={vi.fn()} unscopedChat />)
     const wont = await screen.findByTestId("scope-ledger-col-no")
-    expect(wont.textContent).toContain("Won't use")
+    // 279-03 WR-04 (D-09/D-16): was expect(wont.textContent).toContain("Won't use")
+    expect(wont.textContent).toContain("Won't search")
     expect(wont.textContent).toContain("All your documents")
     expect(wont).toBeVisible()
     expect(screen.getByText("Financial Reports")).toBeVisible()

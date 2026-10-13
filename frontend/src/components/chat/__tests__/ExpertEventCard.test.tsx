@@ -87,6 +87,13 @@ describe("ExpertEventCard — expert_changed (the fixture swap)", () => {
     expect(sub.textContent).toContain("Board_deck_Q3.pptx")
   })
 
+  it("(3b) 279-03 D-16: the sub-line says what the names ARE before it lists them", () => {
+    render(<ExpertEventCard event={changed} />)
+    const dropped = screen.getByTestId("expert-event-dropped")
+    const sub = within(dropped).getByText(/Chat attachments stay readable\.$/)
+    expect(sub.textContent?.startsWith("Won't be searched: ")).toBe(true)
+  })
+
   it("(4) never renders the row's content sentence — only the payload", () => {
     render(<ExpertEventCard event={changed} />)
     expect(screen.queryByText(/Now: HR Policies\./)).toBeNull()

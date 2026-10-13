@@ -8,7 +8,7 @@
  *
  * ⭐ THE ROW STATES ITS COST BEFORE IT CAN BE ACCEPTED. A restricted row fetches
  * `GET /threads/expert-scope-preview` on open and offers NO invite control until it answers; its
- * `Will use` / `Won't use · N` ledger comes from that ONE response (`previewLedgerColumns`). A row
+ * `Will use` / `Won't search · N` ledger comes from that ONE response (`previewLedgerColumns`). A row
  * missing a required connection shows `Brings` / `Missing` and the gate line instead (R3), and is
  * never previewed — it cannot be invited.
  *
