@@ -11527,6 +11527,8 @@ cells rot within days.
 | [`backend/app/services/tools/agent_control.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsagent_controlpy) | 1 / 1 / 478 (was `0 / 0 / 0`) | no (young) | young (created 278-03). task, write_todos, ask_user + sub-agent sets. ⛔ task_service stays a LAZY import (it imports tool_dispatcher) |
 | [`backend/app/services/tools/connector.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsconnectorpy) | 1 / 1 / 380 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Connector chat tool + approval timeout. ⛔ trifecta/approval/audit AST-pinned; dispatch_tool resolves it as a tool_dispatcher global |
 | [`backend/app/services/document_vocabulary.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_vocabularypy) | 1 / 1 / 38 (was `0 / 0 / 0`) | no (young) | young (created 278-02). DEBT-09 ONE home: 3 timestamptz date words → column + the list-field set. ⛔ leaf, no app imports; a copy elsewhere fails the 278 fence |
+| [`backend/app/services/expert_scope_statement.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scope_statementpy) | 0 / 0 / 0 | no (young) | young (created 279-01, row added AT PLANNING). The async scope statement moved verbatim from expert_scope.py (AST-pinned). ⛔ never imports expert_scope_events |
+| [`backend/app/services/expert_scope_events.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scope_eventspy) | 0 / 0 / 0 | no (young) | young (created 279-01, row added AT PLANNING). Transcript wording + its ONE writer (insert_expert_changed_row), moved verbatim (AST-pinned). ⛔ imports statement, never the reverse |
 
 
 
@@ -19960,3 +19962,15 @@ Every earlier "split still OWED" sentence in this file's sections (244, 264, 267
 ### `backend/app/services/view_filter_compiler.py` — Phase 278 close
 
 **`7 / 6 / 302` (was `6 / 5 / 300`).** ⚠ FIRES (113, 114, 237, 240, 272, 278). It had fired since 272 with no CLAUDE.md row; the row was added by 278-04. Honoured by construction (278-02): `LIST_VALUE_FIELDS = frozenset(LIST_FIELD_NAMES)`, imported from the vocabulary home. The 272 G-1 eq-on-a-list-element rule is unchanged.
+
+## Phase 279 rows — added AT PLANNING (2026-10-13)
+
+The G-5 gate (`node scripts/check-hot-file-ledger.cjs 279`, over every file the four 279 plans name) needs a row for every module this phase CREATES, because the gate has no existence check (precedent: the 278 and 273 planning rows). Two modules are new, both created by 279-01's single pure-move commit that splits `backend/app/services/expert_scope.py` (6 / 3 / 632, FIRING since 275-01) along its ledger seam (SEAM-01, D-01): `expert_scope.py` keeps only the pure `ExpertScope`, `compose_expert_scope` and `folder_path`. Both rows read `0 / 0 / 0` at planning; 279-04 re-derives every triple on the merged tree with the CLAUDE.md recipe and writes the touched files' cells LAST, so no wave-2 worktree edits this file.
+
+### `backend/app/services/expert_scope_statement.py`
+
+**`0 / 0 / 0`** at 279 planning. Young; row added AT PLANNING. 279-01. The async half of the scope statement, moved verbatim (AST-pinned by `test_279_pure_move.py` against PHASE_BASE `a5a94ba67`): `_NAMED_LIMIT`, `_mode`, `_count_kb_documents` (one RLS documents query per folder set, through `RETRIEVABLE_COLUMN`), `ScopeStatement`, `describe_expert_scope`, `_scope_ref`, `describe_scope_change`, `scope_preview`. ⛔ Binding invariants: never imports `expert_scope_events` (the only legal import direction is events → statement, D-01); the caller-side visibility rule (`fetch_visible_folders`, SEED-124) keeps its one home; tests patch `resolve_expert_bundle` / `get_expert_service` / `fetch_visible_folders` / `connection_states` HERE, where they are used (no re-export shim, D-02). 279-03 rewords its docstring only (WR-04, "will not be searched").
+
+### `backend/app/services/expert_scope_events.py`
+
+**`0 / 0 / 0`** at 279 planning. Young; row added AT PLANNING. 279-01. The transcript wording plus its ONE writer, moved verbatim (AST-pinned): the label constants, `_dropped_line` (shared by 267's `expert_changed` and 268's `stops` — one wording for Dropped), `build_expert_changed_event`, `insert_expert_changed_row` (async DB write — it sits beside `event_sentence` so the statement module never has to import this one), `_line_items`, `event_sentence`, `_scope_line`, `build_scope_effect`, `build_scope_changed_event`, `_folder_label`, `scope_event_sentence`. Not pure, and says so in its docstring. ⛔ Binding invariants: imports `ScopeStatement` and `_scope_ref` from the statement module, never the reverse; the UI scope words have their other home in `scopeCopy.ts`, and the MODEL-facing words stay in `scope_history_note.py` (a separate register). 279-02 changes `build_expert_changed_event`'s `excluded` condition for restricted → restricted swaps (D-07) in its own commit, after the byte-equal move.

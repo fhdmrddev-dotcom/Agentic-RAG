@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: in_progress
-last_updated: "2026-10-13T06:00:00.000Z"
-last_activity: 2026-10-13 -- Phase 279 context gathered
+status: executing
+last_updated: "2026-10-13T14:54:41.612Z"
+last_activity: 2026-10-13 -- Phase 279 planning complete
 progress:
-  total_phases: 7
+  total_phases: 14
   completed_phases: 2
-  total_plans: 6
+  total_plans: 10
   completed_plans: 6
-  percent: 29
+  percent: 14
 ---
 
 # Project State
@@ -58,8 +58,8 @@ Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: **278** (One Home for Tools and Filters) — ✅ COMPLETE 2026-10-13 · verification `passed` 5/5 (self-verified) · next **279**; next migration **207**
 Next: **279** (The Expert Scope Seam) — context gathered 2026-10-13 (`79a0b9afe`, `279-CONTEXT.md` D-01..D-14): 3-part split of `expert_scope.py` (pure / statement / events, repoint, 278 pure-move kit); all 16 SEED-328 items measured still open — fix all small ones, IN-02 + CR-01 gateway test recorded not-fixed; WR-04 reworded to "Won't search", WR-05 quoted background; 4 G-4 Chrome scenarios + two-org CR-03(b) drive. Seeds: 328 folded; 327/320/067 deferred; 303 note. Resume: `/gsd:plan-phase 279`.
 Plan: 4/4 (278-01 pins, 278-02 DEBT-09 one home, 278-03 split, 278-04 SC#5 live smoke + records)
-Status: Phase 278 CLOSED by hand 2026-10-13. `tool_dispatcher.py` 5,068 → 274 L (registry only, 30 tools, pin identical; handlers in 11 `services/tools/` modules, move `18abc1ed5`); `document_vocabulary.py` one home (DEBT-09); SEAM-02 confirmed discharged (records corrected beside originals); SEED-224 → partially-answered. SC#5: live Anthropic `claude-sonnet-5` search_documents+execute_code → `search.query` run_id `09c962aa` (`42eca96c1`). Review 278-REVIEW.md 1 CR / 4 WR / 4 IN: CR-01 fixed `774375682` (root-level test_141 fence missed by the tests/unit retarget pass), WR-02/03/04 fixed (`7766f18ed`, `c2f3411f2`, `c6316eb0a`), WR-01 measured (root-level failing sets identical base vs HEAD; test_096 hangs at both), IN-01..04 deferred. Final gate at `520d5e2ad`: 71 failed / 7223 passed / 0 collection errors, failing set == base. Verification `9c6727ed8` passed 5/5. Owed / inherited: ~~landing drift~~ FIXED `6ba316b6a` (fast, 29 → 30); `tests/integration` not run (mutates DB); UAT 7 providers + parallel-thread + long-message ⛔ not run by decision; SEED-171 vitest red (WorkflowBuilderPage.canvas, provably unmodified); security gate ✅ `278-SECURITY.md` 20/20 closed, threats_open 0 (2026-10-13).
-Last activity: 2026-10-12 — 277 closed by hand. CLAUDE.md 121,650 → **89,171** chars (gate OK, no WARN). Review 277-REVIEW.md: 0 critical / **8 warning** / 5 info, all guard-hardening beyond the SCs (verifier). **WR-01 + WR-08 FIXED 2026-10-12 (quick 261012-x1l)**; WR-02..07 + IN-01..05 untriaged. ⚠ `state.begin-phase` was run at 277 start despite the rule above and wrote `total_phases: 14` (false; corrected to 7 by hand) — the ninth false-record occurrence.
+Status: Ready to execute
+Last activity: 2026-10-13 -- Phase 279 planning complete
 
 ### Quick Tasks Completed
 

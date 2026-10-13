@@ -99,13 +99,17 @@ and are stated so a phase can run early when its files are free:
 
 - **278 and 279 (the extractions) come before every fix phase.** G-5: a refactor goes before the next
   feature or fix on a hot file.
+
   - `tool_dispatcher.py` (98 commits / 43 phases / 5,068 lines) has had its split deferred twice
     (OV-273-02, and 272 before it). DEBT-09's vocabulary is read by the search handlers, so the split
     lands **before** the vocabulary move, inside 278.
+
   - DEBT-09 is itself an extraction (three restated copies → one home), so it rides the same
     behaviour-preserving phase as SEAM-02 rather than a fix phase.
+
   - `expert_scope.py` crossed G-5 at 275-01, and its own ledger section says *"the next phase that
     touches this file proposes an extraction FIRST"*.
+
   - 279 runs after 278 only because both close with a full backend gate. Their files are disjoint, so
     they may run in parallel worktrees if neither mutates the local DB (worktree rule 4).
 
@@ -149,8 +153,10 @@ and are stated so a phase can run early when its files are free:
 **Plans**: 2 plans (wave 1, both inline under `inline_plan_threshold`)
 
 Plans:
+
 - [x] 277-01-PLAN.md — split CLAUDE.md by function to <= 90k (verdict cells <= 80 + vitest history to docs/VITEST-COUNT-GATE.md + D-03 moves only if needed), bind the cell cap to the FIRING table at 80, no-loss proof, guards driven RED (REG-04)
 - [x] 277-02-PLAN.md — repair the v4.5 archive in place: REQUIREMENTS line 9 + 19 SUMMARY requirements fields from their PLANs, re-verify 270/271 rows (REG-05)
+
 **Flags**: Docs-only; no source file is touched, so G-5 cannot fire. Split by **function** (the precedents are `docs/HOT-FILE-LEDGER.md` and `docs/SANDBOX-PACKAGES.md`). The gate names the biggest sections: Workflow guardrails 55,145 and Parallel execution 24,125, of which the vitest-gate correction history is narrative. The verdicts, index and scan list stay in CLAUDE.md. ⚠ The vendored GSD framework wiring table (G-7, REG-02) stays in CLAUDE.md, because it is the list used to re-apply the guardrails after a framework update. **REG-05 must not use `milestone.complete` or `state.*` SDK verbs** (STATE.md records eight false-record occurrences); hand-edit only. Re-measure the gate at **every later phase close**, so the band holds through the milestone and not just at 277.
 
 #### Phase 278: One Home for Tools and Filters
@@ -170,10 +176,12 @@ Plans:
 **Plans**: 4 plans in 3 waves
 
 Plans:
+
 - [x] 278-01-PLAN.md — wave 1: pins first — base failing set, registry pin (names/order/bindings/static literal/schema sha256), AST pure-move pin (xfail strict), D-07 retarget-only checker, ten fences anchored/tupled (SEAM-03)
 - [x] 278-02-PLAN.md — wave 1 (TDD): one home for the filter vocabulary (`document_vocabulary.py`), three import swaps with base-pinned values, divergence fence driven RED (DEBT-09)
 - [x] 278-03-PLAN.md — wave 2: the split — `tool_dispatcher.py` → registry + `services/tools/` families in ONE retarget-only commit, extension-contract guards extended, full unit gate set-diffed (SEAM-03)
 - [x] 278-04-PLAN.md — wave 3 (operator checkpoint): SEAM-02 measured + stale records corrected beside originals, merged-tree gates, Anthropic two-tool live smoke, ledger cells written last, SEED-224 → partially-answered (SEAM-02, SEAM-03, DEBT-09)
+
 **Flags**: ⛔ **G-5 extraction phase, behaviour-preserving** — pure moves verified AST-identical against PHASE_BASE where possible, with **TDD pin-first** (pins land RED-proof before the move). `tool_dispatcher.py` FIRES (98/43/5068), with the split deferred twice (OV-273-02). The Extension Contract applies: the registry stays closed and statically declared, **never dynamically registered**. `search_documents_tool.py` (1,163 lines) sits beside the split and must not gain logic. SC#10: a pure move whose registry pin is identical does not change provider behaviour, so one live multi-tool row is the proportionate check; discuss records that decision. Seeds: `SEED-224` (extraction half only; the five-tab redesign stays out of scope).
 
 #### Phase 279: The Expert Scope Seam
@@ -189,7 +197,22 @@ Plans:
   4. The backend unit gate is ≤ 71 failed with 0 collection errors, and the frontend count gate shows no per-file decrease (SEAM-01).
 
 **How we'd know this failed**: a fixture's output changes by a character after the move; a SEED-328 item disappears from the record because it was hard; CR-03(b) arrives as a second inline org check on the send path (268's "0 new send-path branches" broken) instead of one helper; WR-05's untrusted handoff summary still becomes a user message and the record says "fixed"; the seed still reads `planted` at close.
-**Plans**: TBD (target 3: extraction · SEED-328 backend items incl. the org-equality helper · SEED-328 copy items + close)
+**Plans**: 4 plans in 3 waves (target was 3; the drives + close are split from the frontend work because a checkpoint plan must not carry implementation, and the regrouping lets 279-02 and 279-03 run in parallel with no shared file)
+
+Plans:
+**Wave 1**
+
+- [ ] 279-01-PLAN.md — wave 1: pins first (test_279_pure_move strict-xfail, send If-count + org-helper Wave-0 pins, base failing set), parameterised retarget checker (278 defaults proven), then ONE pure-move commit: expert_scope.py → pure / expert_scope_statement.py / expert_scope_events.py, all importers + 12 test patches repointed (SEAM-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 279-02-PLAN.md — wave 2 (TDD, backend): `_require_thread_org` at PATCH/handoff/preview/send (CR-03(b), IN-01, D-18), WR-01, WR-02, IN-05, WR-05 quoted background, IN-03, GET /experts manager view, D-07 restricted→restricted fix, WR-08 multi-folder note (SEAM-01)
+- [ ] 279-03-PLAN.md — wave 2 (TDD, frontend, parallel with 02): "Won't search" reword + card prefix (WR-04, D-16), WR-03, IN-01 dialog field, D-15 send-409 narrowing, WR-06 chip, WR-01 client, WR-07 Start Chat reason (SEAM-01)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 279-04-PLAN.md — wave 3 (operator checkpoints): 4 G-4 Chrome drives (D-12) + WR-05 DB proof, two-org CR-03(b) live drive (D-13), then gates, the SEED-328 record (one row per item), seed → answered, ledger + CLAUDE.md rows, VALIDATION, STATE (SEAM-01)
+
 **Flags**: ⛔ **G-5 extraction phase.** `SEED-328` (folded at intake) fires on `run_producer.py`, `threads.py` (90 phases), `experts.py`, `ChatArea.tsx` (42 phases), `StreamsProvider.tsx` (38 phases) and the Expert catalog, all G-5-firing. Each item is either **honoured by construction** (one helper, one call, no new branch) or recorded as an override under `STATE.md → Guardrail overrides`. If an item changes rendered chat copy (WR-03/04/07/08), **G-4** applies to that item: the operator names the scenario at scope time and it is driven in Chrome. `run_producer.py`'s runs table is SELECT-only under the user JWT (268 finding), so a user-JWT UPDATE there silently no-ops. Measure writes, never assume them.
 
 #### Phase 280: In Once, Out Clean
