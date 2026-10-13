@@ -958,6 +958,8 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
                 onDismiss={handleDismissExpert}
                 // 267-REVIEW WR-06 (D-267-35): no folder picked → state the biased narrowing.
                 unscopedChat={!scopeFolderId}
+                // 279-03 WR-03: a restricted Expert states its scope for the picked folder.
+                folderId={scopeFolderId}
               />
             </div>
           ) : (
@@ -1142,6 +1144,9 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
               // 267-REVIEW WR-06 (D-267-35): an empty thread with no folder (e.g. a catalog Start
               // Chat) gets no event (D-267-12), so the spotlight states the biased narrowing.
               unscopedChat={!thread?.folder_id}
+              // 279-03 WR-03: a restricted Expert states its scope for this thread's folder.
+              folderId={thread?.folder_id ?? null}
+              threadId={thread?.id ?? null}
             />
           </div>
         </div>

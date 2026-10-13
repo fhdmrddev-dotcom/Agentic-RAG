@@ -280,3 +280,52 @@ describe("WR-06 — the spotlight states the biased narrowing on an unscoped cha
     expect(screen.queryByTestId("scope-ledger")).toBeNull()
   })
 })
+
+// 279-03 WR-03(2) (SEED-328) — a RESTRICTED Expert's spotlight said nothing about what it would
+// not search: the narrowing effect returned early for restricted. With a picked folder it now asks
+// the server about THAT folder and states the ledger, re-asking when the folder changes.
+describe("279-03 WR-03 — the spotlight states a restricted Expert's scope for the picked folder", () => {
+  const restrictedPreview = (folder: string) => ({
+    expert_id: mockFinancialExpert.id,
+    expert_name: "Financial Analyzer",
+    mode: "restricted",
+    expert_folders: [{ id: "f-kb", name: "SEC Filings" }],
+    thread_folder: { id: folder, name: folder === "f-1" ? "Client ACME" : "Client Beta", doc_count: 4 },
+    excluded_count: 4,
+    excluded_names: ["ACME_MSA_2026.pdf"],
+  })
+
+  it("folderId 'f-1' fetches the preview for f-1 and renders the ledger at rest", async () => {
+    mockPreview.mockReset()
+    mockPreview.mockImplementation(async (_id: string, _t: string | null, f: string) => restrictedPreview(f))
+    render(<ExpertSpotlightCard expert={mockFinancialExpert} onSelectPrompt={vi.fn()} folderId="f-1" />)
+    const wont = await screen.findByTestId("scope-ledger-col-no")
+    expect(wont.textContent).toContain("Won't search · 4")
+    expect(wont.textContent).toContain("ACME_MSA_2026.pdf")
+    expect(wont).toBeVisible()
+    expect(screen.getByText("SEC Filings")).toBeVisible()
+    expect(mockPreview).toHaveBeenCalledWith(mockFinancialExpert.id, null, "f-1")
+  })
+
+  it("changing folderId re-fetches for the new folder; an empty thread passes its id", async () => {
+    mockPreview.mockReset()
+    mockPreview.mockImplementation(async (_id: string, _t: string | null, f: string) => restrictedPreview(f))
+    const { rerender } = render(
+      <ExpertSpotlightCard expert={mockFinancialExpert} onSelectPrompt={vi.fn()} folderId="f-1" threadId="t-9" />,
+    )
+    await screen.findByTestId("scope-ledger-col-no")
+    expect(mockPreview).toHaveBeenLastCalledWith(mockFinancialExpert.id, "t-9", "f-1")
+    rerender(
+      <ExpertSpotlightCard expert={mockFinancialExpert} onSelectPrompt={vi.fn()} folderId="f-2" threadId="t-9" />,
+    )
+    await vi.waitFor(() => expect(mockPreview).toHaveBeenLastCalledWith(mockFinancialExpert.id, "t-9", "f-2"))
+    expect(mockPreview).toHaveBeenCalledTimes(2)
+  })
+
+  it("no folder → no fetch and no ledger (unchanged)", () => {
+    mockPreview.mockReset()
+    render(<ExpertSpotlightCard expert={mockFinancialExpert} onSelectPrompt={vi.fn()} />)
+    expect(mockPreview).not.toHaveBeenCalled()
+    expect(screen.queryByTestId("scope-ledger")).toBeNull()
+  })
+})

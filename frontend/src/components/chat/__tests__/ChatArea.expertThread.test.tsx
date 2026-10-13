@@ -518,6 +518,33 @@ describe("(E) WR-06 — the empty unscoped thread's spotlight states D-267-35", 
     expect(wont).toBeVisible()
     expect(h.getExpertScopePreview).toHaveBeenCalledWith(CR.id, null)
   })
+
+  it("(11b) 279-03 WR-03: an empty thread WITH a folder and a restricted Expert asks about that folder", async () => {
+    const HR = expert({ id: "e-hr", name: "HR Advisor", slug: "hr-advisor", scope_mode: "restricted" })
+    h.getExpert.mockResolvedValue(HR)
+    h.getExpertScopePreview.mockResolvedValue({
+      expert_id: HR.id,
+      expert_name: "HR Advisor",
+      mode: "restricted",
+      expert_folders: [{ id: "f-1", name: "HR Policies" }],
+      thread_folder: { id: "f-acme", name: "Client ACME", doc_count: 4 },
+      excluded_count: 4,
+      excluded_names: ["ACME_MSA_2026.pdf"],
+    })
+    render(
+      shell(
+        <ChatArea
+          thread={{ ...THREAD, id: "thread-S", active_expert_id: HR.id, folder_id: "f-acme" } as Thread}
+          onCreateThread={vi.fn()}
+          folders={[]}
+        />,
+      ),
+    )
+    await screen.findByTestId("expert-spotlight-card")
+    const wont = await screen.findByTestId("scope-ledger-col-no")
+    expect(wont.textContent).toContain("Won't search · 4")
+    expect(h.getExpertScopePreview).toHaveBeenCalledWith(HR.id, "thread-S", "f-acme")
+  })
 })
 
 // 267-REVIEW WR-07 — before the first message the dialog says "This chat · /Client ACME", but the
