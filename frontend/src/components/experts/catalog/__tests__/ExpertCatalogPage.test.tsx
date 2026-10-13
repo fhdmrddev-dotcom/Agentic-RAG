@@ -184,7 +184,17 @@ describe("ExpertCatalogPage · PACK-11 honesty", () => {
     await screen.findByText("Contract Reviewer")
     expect(api.listExperts).toHaveBeenCalledTimes(1)
     // ⛔ No argument is passed, so the management arm cannot be reached from this surface.
-    expect(vi.mocked(api.listExperts).mock.calls[0]).toEqual([])
+    // 279-03 WR-07: was expect(vi.mocked(api.listExperts).mock.calls[0]).toEqual([])
+    // It now passes (includeSystem=true, enabledOnly=false) so a MANAGER sees disabled Experts; the
+    // server honours `false` only for experts:manage (279-02 Commit G). The third argument
+    // (forManagement) is still never passed, so the management arm stays unreachable.
+    expect(vi.mocked(api.listExperts).mock.calls[0]).toEqual([true, false])
+  })
+
+  it("(8b) 279-03 WR-07: all three list reads (mount, post-install, poll) pass (true, false)", async () => {
+    const src = (await import("../ExpertCatalogPage.tsx?raw")).default as string
+    expect(src.match(/listExperts\(true, false\)/g)).toHaveLength(3)
+    expect(src).not.toMatch(/listExperts\(\)/)
   })
 })
 
@@ -201,6 +211,31 @@ describe("ExpertCatalogPage — a failed start is VISIBLE (262-UAT 3.6)", () => 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t start a chat with Contract Reviewer/i)
     // The grid is still there — the error does not replace the catalog.
     expect(screen.getByText("Contract Reviewer")).toBeInTheDocument()
+  })
+
+  // 279-03 WR-07 (SEED-328): every failure read "Check your connection and try again", so a server
+  // refusal (403, wrong org) sent the user to debug their network. The server's reason is shown.
+  it("279-03 WR-07: an ApiError shows the server's reason, not the network sentence", async () => {
+    const { ApiError } = await import("@/lib/api/_core")
+    vi.mocked(api.listExperts).mockResolvedValue([A])
+    const onStartChat = vi.fn().mockRejectedValue(new ApiError("Expert bundle not found or access denied", 403))
+    render(<ExpertCatalogPage folders={[]} onStartChat={onStartChat} onInspect={vi.fn()} />)
+    await userEvent.click(await screen.findByRole("button", { name: /start chat/i }))
+    const alert = await screen.findByRole("alert")
+    expect(alert.textContent).toBe(
+      "Couldn't start a chat with Contract Reviewer. Expert bundle not found or access denied",
+    )
+    expect(alert.textContent).not.toContain("Check your connection")
+  })
+
+  it("279-03 WR-07: a TypeError (network) keeps the network sentence", async () => {
+    vi.mocked(api.listExperts).mockResolvedValue([A])
+    const onStartChat = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"))
+    render(<ExpertCatalogPage folders={[]} onStartChat={onStartChat} onInspect={vi.fn()} />)
+    await userEvent.click(await screen.findByRole("button", { name: /start chat/i }))
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Couldn't start a chat with Contract Reviewer. Check your connection and try again.",
+    )
   })
 })
 

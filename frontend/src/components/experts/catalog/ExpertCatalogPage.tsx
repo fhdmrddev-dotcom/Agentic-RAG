@@ -46,6 +46,12 @@
  *      page still makes exactly ONE read — the suite's case (8) still pins that.
  * The list read is still the only READ, still with no arguments, so the management arm stays
  * unreachable from here.
+ *
+ * ⚠ CORRECTED BY 279-03 (WR-07 / SEED-328) — "still with no arguments" is no longer true and is kept
+ * rather than deleted. All three reads now pass `(true, false)`: system Experts included, and
+ * `enabledOnly=false` so a MANAGER sees an Expert they disabled (the server honours `false` only for
+ * `experts:manage` — 279-02 Commit G; a member's list is unchanged). The third argument
+ * (`forManagement`) is still never passed, so the management arm is still unreachable from here.
  */
 
 import { useEffect, useRef, useState } from "react"
@@ -100,8 +106,8 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
     let mounted = true
     setLoading(true)
     setError(null)
-    // ⛔ The ONE read. Defaults only — the grant-aware arm.
-    listExperts()
+    // ⛔ The ONE read — the grant-aware arm. (279-03 WR-07: was "Defaults only"; see the docblock.)
+    listExperts(true, false)
       .then((data) => {
         if (!mounted) return
         setExperts(data)
@@ -139,8 +145,15 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
     setStartError(null)
     try {
       await props.onStartChat(expert)
-    } catch {
-      setStartError(`Couldn't start a chat with ${expert.name}. Check your connection and try again.`)
+    } catch (err) {
+      // 279-03 WR-07 (SEED-328): name the real cause. Only a network failure (TypeError) or a
+      // reason-less error reads the connection sentence; a server refusal shows its own words
+      // (rendered as React text — the startHandoff pattern in InviteExpertDialog).
+      const reason =
+        err instanceof TypeError || !(err instanceof Error) || !err.message.trim()
+          ? "Check your connection and try again."
+          : err.message
+      setStartError(`Couldn't start a chat with ${expert.name}. ${reason}`)
     } finally {
       startingRef.current = false
       setStartingId(null)
@@ -173,7 +186,7 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
       prev && prev.id === expert.id ? { ...prev, install: result.install } : prev,
     )
     try {
-      const rows = await listExperts()
+      const rows = await listExperts(true, false)
       setExperts(rows)
       setInspected((prev) => freshInspected(prev, rows))
     } catch {
@@ -191,7 +204,7 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
     if (!anyInstalling) return
     let mounted = true
     const timer = setInterval(() => {
-      listExperts()
+      listExperts(true, false)
         .then((rows) => {
           if (!mounted) return
           setExperts(rows)
