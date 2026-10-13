@@ -207,7 +207,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 279-02-PLAN.md — wave 2 (TDD, backend): `_require_thread_org` at PATCH/handoff/preview/send (CR-03(b), IN-01, D-18), WR-01, WR-02, IN-05, WR-05 quoted background, IN-03, GET /experts manager view, D-07 restricted→restricted fix, WR-08 multi-folder note (SEAM-01)
-- [ ] 279-03-PLAN.md — wave 2 (TDD, frontend, parallel with 02): "Won't search" reword + card prefix (WR-04, D-16), WR-03, IN-01 dialog field, D-15 send-409 narrowing, WR-06 chip, WR-01 client, WR-07 Start Chat reason (SEAM-01)
+- [x] 279-03-PLAN.md — wave 2 (TDD, frontend, parallel with 02): "Won't search" reword + card prefix (WR-04, D-16), WR-03, IN-01 dialog field, D-15 send-409 narrowing, WR-06 chip, WR-01 client, WR-07 Start Chat reason (SEAM-01)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -291,7 +291,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 277. Registers Back Inside the Band | 2/2 | Complete | 2026-10-12 |
 | 278. One Home for Tools and Filters | 4/4 | Complete | 2026-10-13 |
-| 279. The Expert Scope Seam | 2/4 | In Progress | - |
+| 279. The Expert Scope Seam | 3/4 | In Progress | - |
 | 280. In Once, Out Clean | 0/TBD | Not started | - |
 | 281. A Refusal Names Its Cause | 0/TBD | Not started | - |
 | 282. The Slow Run and the Paused Run | 0/TBD | Not started | - |
