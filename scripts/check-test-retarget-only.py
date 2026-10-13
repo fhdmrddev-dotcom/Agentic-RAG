@@ -10,10 +10,24 @@ MECHANICAL check of that claim, because 45+ files are retargeted and a reviewer 
 
 USAGE (run with backend/venv's python; stdlib only)::
 
-    check-test-retarget-only.py <old_rev> <new_rev|WORKTREE>
-    check-test-retarget-only.py --no-loss <old_rev> <new_rev|WORKTREE>
+    check-test-retarget-only.py [options] <old_rev> <new_rev|WORKTREE>
+    check-test-retarget-only.py --no-loss [options] <old_rev> <new_rev|WORKTREE>
 
 Exit codes: 0 clear · 1 violation · 2 harness error. ``WORKTREE`` reads the files on disk.
+
+OPTIONS (Phase 279 / D-03 — parameterised, not forked; with NO option the 278 behaviour is
+reproduced exactly, and ``18abc1ed5^ 18abc1ed5`` must still read CLEAR in both modes)::
+
+    --source <repo-rel .py>          the split module      (default backend/app/services/tool_dispatcher.py)
+    --dest <repo-rel path|glob>      a move home; repeatable (default backend/app/services/tools/*.py)
+    --norm-module <regex>=<module>   repeatable; when given these REPLACE the 278 norm() rules (each
+                                     regex -> module, plus the matching ``<basename>.py`` path form)
+    --exclude-prefix <prefix>        the move's own pin files (default test_278_)
+    --extra-scope <repo-rel>         repeatable; ``""`` means none (default scripts/uat-adversarial-sync.py)
+
+The 279 invocation (the expert_scope split, 279-01)::
+
+    check-test-retarget-only.py --source backend/app/services/expert_scope.py --dest backend/app/services/expert_scope_statement.py --dest backend/app/services/expert_scope_events.py --norm-module "app\\.services\\.expert_scope_(statement|events)\\b=app.services.expert_scope" --exclude-prefix test_279_ --extra-scope "" <old_rev> <new_rev|WORKTREE>
 
 ── RETARGET MODE ─────────────────────────────────────────────────────────────────────────────
 
@@ -71,15 +85,20 @@ re-added). A dropped comment or docstring line exits 1 and is printed.
 - Scope is files that existed at ``<old_rev>``. A NEW test file is not checked (nothing to diff).
 - No-loss is a multiset over stripped lines: a common line (``return result``) dropped in one place
   and duplicated in another nets to zero. The AST pin covers code; this covers prose.
+- (279) A retarget to the WRONG sibling module (``expert_scope_statement`` vs ``expert_scope_events``)
+  is NORM-EQUAL and passes here. 279 closes that with ``test_279_pure_move``'s fresh-import / AST /
+  one-home pins and by RUNNING the retargeted suites — not by this script.
 """
 from __future__ import annotations
 
 import ast
 import difflib
+import fnmatch
 import re
 import subprocess
 import sys
 from collections import Counter
+from dataclasses import dataclass, field
 from pathlib import Path
 
 EXIT_CLEAR = 0
@@ -89,9 +108,25 @@ EXIT_HARNESS = 2
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKTREE = "WORKTREE"
 
+# The 278 defaults. Phase 279 (D-03) turned each into a CLI option whose default is this value, so a
+# run with no option reproduces the 278 check exactly.
 _TD_REL = "backend/app/services/tool_dispatcher.py"
 _TOOLS_DIR_REL = "backend/app/services/tools"
 _EXTRA_SCOPE = ("scripts/uat-adversarial-sync.py",)
+_DEFAULT_DESTS = (f"{_TOOLS_DIR_REL}/*.py",)
+_DEFAULT_EXCLUDE_PREFIX = "test_278_"
+
+
+@dataclass(frozen=True)
+class Config:
+    """What a run checks. ``Config()`` IS the 278 configuration."""
+
+    source: str = _TD_REL
+    dests: tuple[str, ...] = _DEFAULT_DESTS
+    # (compiled regex, replacement module) — empty means the 278 norm() rules apply unchanged.
+    norm_modules: tuple[tuple[re.Pattern[str], str], ...] = field(default_factory=tuple)
+    exclude_prefix: str = _DEFAULT_EXCLUDE_PREFIX
+    extra_scope: tuple[str, ...] = _EXTRA_SCOPE
 
 _ASSERT_RE = re.compile(
     r"\bassert\b|pytest\.(fail|raises|skip)\b|pytest\.mark\.(skip|skipif|xfail)\b|\.assert_\w+\("
@@ -151,18 +186,52 @@ def _changed_files(old: str, new: str, *paths: str) -> list[str]:
     return [ln.strip() for ln in out.splitlines() if ln.strip()]
 
 
-def _tools_files_at(rev: str) -> list[str]:
+def _tools_files_at(rev: str, dir_rel: str = _TOOLS_DIR_REL, pattern: str = "*.py") -> list[str]:
+    """The files directly under ``dir_rel`` matching ``pattern`` at ``rev`` (278: ``tools/*.py``)."""
     if rev == WORKTREE:
-        d = REPO_ROOT / _TOOLS_DIR_REL
-        return sorted(f"{_TOOLS_DIR_REL}/{p.name}" for p in d.glob("*.py")) if d.is_dir() else []
-    out = _git("ls-tree", "--name-only", rev, f"{_TOOLS_DIR_REL}/")
-    return sorted(ln.strip() for ln in out.splitlines() if ln.strip().endswith(".py"))
+        d = REPO_ROOT / dir_rel
+        return sorted(f"{dir_rel}/{p.name}" for p in d.glob(pattern) if p.is_file()) if d.is_dir() else []
+    out = _git("ls-tree", "--name-only", rev, f"{dir_rel}/")
+    return sorted(
+        ln.strip() for ln in out.splitlines()
+        if ln.strip() and fnmatch.fnmatchcase(ln.strip().rsplit("/", 1)[-1], pattern)
+    )
+
+
+def _dest_files_at(rev: str, dests: tuple[str, ...]) -> list[str]:
+    """Every move-home file a ``--dest`` names at ``rev``: an explicit path as-is (absent → it simply
+    contributes no lines), a glob expanded over its directory."""
+    out: set[str] = set()
+    for spec in dests:
+        if any(ch in spec for ch in "*?["):
+            dir_rel, _, pattern = spec.rpartition("/")
+            out.update(_tools_files_at(rev, dir_rel, pattern))
+        else:
+            out.add(spec)
+    return sorted(out)
 
 
 # ── classification ──────────────────────────────────────────────────────────────────────────
 
 
-def norm(s: str) -> str:
+def _path_form(pattern: re.Pattern[str], module: str) -> tuple[re.Pattern[str], str]:
+    """The ``<basename>.py`` path form of one ``--norm-module`` mapping: the regex's last dotted
+    component (its trailing ``\\b`` dropped) followed by ``.py``, mapped to the module's basename."""
+    last = re.split(r"\\\.", pattern.pattern)[-1]
+    if last.endswith(r"\b"):
+        last = last[:-2]
+    return re.compile(rf"\b{last}\.py"), f"{module.rsplit('.', 1)[-1]}.py"
+
+
+def norm(s: str, cfg: Config | None = None) -> str:
+    if cfg is not None and cfg.norm_modules:
+        # 279 (D-03): the mappings REPLACE the 278 module rules — each regex → its module, plus the
+        # matching path form (``expert_scope_statement.py`` → ``expert_scope.py``).
+        for pattern, module in cfg.norm_modules:
+            s = pattern.sub(module, s)
+            path_re, path_repl = _path_form(pattern, module)
+            s = path_re.sub(path_repl, s)
+        return s
     s = re.sub(r"app\.services\.tools\.\w+", "app.services.tool_dispatcher", s)
     s = s.replace("app.services.search_documents_tool", "app.services.tool_dispatcher")
     s = re.sub(r"""(["'])tools\1\s*/\s*(["'])\w+\.py\2""", r'\1tool_dispatcher.py\1', s)
@@ -211,7 +280,7 @@ def _classify(line: str, lineno: int, import_lines: set[int]) -> str | None:
     return None
 
 
-def _check_file(rel: str, old: str, new: str) -> tuple[list[str], list[str]]:
+def _check_file(rel: str, old: str, new: str, cfg: Config | None = None) -> tuple[list[str], list[str]]:
     """(violations, assert-span path lines) for one file."""
     old_src = _read_at(old, rel)
     new_src = _read_at(new, rel) if _exists_at(new, rel) else ""
@@ -264,7 +333,7 @@ def _check_file(rel: str, old: str, new: str) -> tuple[list[str], list[str]]:
             n_text = new_lines[n_idx] if n_idx is not None else None
             o_cls = _classify(o_text, o_idx + 1, old_imports) if o_text is not None else None
             n_cls = _classify(n_text, n_idx + 1, new_imports) if n_text is not None else None
-            if paired and o_cls is None and n_cls is None and norm(o_text) == norm(n_text):
+            if paired and o_cls is None and n_cls is None and norm(o_text, cfg) == norm(n_text, cfg):
                 o_cls = n_cls = "NORM-EQUAL"
             if o_text is not None:
                 judge("-", o_idx + 1, o_text, o_cls, old_asserts)
@@ -288,18 +357,19 @@ def _py_path_entries(line: str) -> int:
     return sum(1 for m in _STRING_RE.finditer(line) if re.search(r"""\.py["']$""", m.group(1)))
 
 
-def _retarget_mode(old: str, new: str, log) -> int:
-    candidates = _changed_files(old, new, "backend/tests", *_EXTRA_SCOPE)
+def _retarget_mode(old: str, new: str, log, cfg: Config | None = None) -> int:
+    cfg = cfg or Config()
+    candidates = _changed_files(old, new, "backend/tests", *cfg.extra_scope)
     scope = [
         rel for rel in candidates
-        if (rel.startswith("backend/tests/") or rel in _EXTRA_SCOPE)
-        and not Path(rel).name.startswith("test_278_")
+        if (rel.startswith("backend/tests/") or rel in cfg.extra_scope)
+        and not Path(rel).name.startswith(cfg.exclude_prefix)
         and _exists_at(old, rel)
     ]
     violations: list[str] = []
     assert_span: list[str] = []
     for rel in scope:
-        v, a = _check_file(rel, old, new)
+        v, a = _check_file(rel, old, new, cfg)
         violations.extend(v)
         assert_span.extend(a)
     log(f"retarget-only check {old} -> {new}: {len(scope)} file(s) in scope "
@@ -328,17 +398,21 @@ def _added_lines(old_lines: list[str], new_lines: list[str]) -> list[str]:
     return out
 
 
-def _no_loss_mode(old: str, new: str, log) -> int:
-    old_src = _read_at(old, _TD_REL)
+def _no_loss_mode(old: str, new: str, log, cfg: Config | None = None) -> int:
+    cfg = cfg or Config()
+    source = cfg.source
+    if not _exists_at(old, source):
+        raise HarnessError(f"--source {source} does not exist at {old}")
+    old_src = _read_at(old, source)
     old_td = old_src.split("\n")
-    new_td = _lines_at(new, _TD_REL)
+    new_td = _lines_at(new, source)
     try:
         top_import_lines: set[int] = set()
         for node in ast.parse(old_src).body:
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 top_import_lines.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
     except SyntaxError as exc:
-        raise HarnessError(f"{_TD_REL} at {old} does not parse: {exc}") from exc
+        raise HarnessError(f"{source} at {old} does not parse: {exc}") from exc
 
     removed: list[tuple[int, str]] = []
     matcher = difflib.SequenceMatcher(None, old_td, new_td, autojunk=False)
@@ -349,27 +423,32 @@ def _no_loss_mode(old: str, new: str, log) -> int:
                     removed.append((idx + 1, old_td[idx]))
 
     available: Counter[str] = Counter(ln.strip() for ln in _added_lines(old_td, new_td))
-    tools_files = sorted(set(_tools_files_at(new)) | set(_tools_files_at(old) if old != WORKTREE else []))
-    for rel in tools_files:
+    dest_files = sorted(
+        (set(_dest_files_at(new, cfg.dests)) | set(_dest_files_at(old, cfg.dests) if old != WORKTREE else []))
+        - {source}  # the source's own re-added lines are already counted above
+    )
+    present_at_new = [rel for rel in dest_files if _exists_at(new, rel)]
+    for rel in dest_files:
         added = _added_lines(_lines_at(old, rel), _lines_at(new, rel))
         available.update(ln.strip() for ln in added)
 
+    dest_label = " + ".join(cfg.dests)
     lost: list[str] = []
     for lineno, text in removed:
         key = text.strip()
         if available[key] > 0:
             available[key] -= 1
         else:
-            lost.append(f"{_TD_REL}:{lineno} [-] lost {key}")
+            lost.append(f"{source}:{lineno} [-] lost {key}")
     log(f"no-loss check {old} -> {new}: {len(removed)} removed non-blank non-import line(s) from "
-        f"{_TD_REL}; {len(tools_files)} tools/ file(s) at the new rev")
+        f"{source}; {len(present_at_new)} destination file(s) at the new rev ({dest_label})")
     if lost:
-        log(f"VIOLATION — {len(lost)} removed line(s) appear nowhere in tools/*.py or the new "
-            "tool_dispatcher.py (a dropped comment, docstring or line):")
+        log(f"VIOLATION — {len(lost)} removed line(s) appear nowhere in {dest_label} or the new "
+            f"{source} (a dropped comment, docstring or line):")
         for line in lost:
             log(f"  {line}")
         return EXIT_VIOLATION
-    log("no-loss: CLEAR (every removed line reappears in tools/*.py or tool_dispatcher.py)")
+    log(f"no-loss: CLEAR (every removed line reappears in {dest_label} or {source})")
     return EXIT_CLEAR
 
 
@@ -383,21 +462,79 @@ def main(argv: list[str] | None = None) -> int:
     def log(msg: str = "") -> None:
         print(msg, flush=True)
 
+    usage = (
+        "usage: check-test-retarget-only.py [--no-loss] [--source <rel.py>] [--dest <rel|glob>]... "
+        "[--norm-module <regex>=<module>]... [--exclude-prefix <prefix>] [--extra-scope <rel>]... "
+        "<old_rev> <new_rev|WORKTREE>"
+    )
     no_loss = False
-    if argv and argv[0] == "--no-loss":
-        no_loss = True
-        argv = argv[1:]
-    if len(argv) != 2:
-        log("usage: check-test-retarget-only.py [--no-loss] <old_rev> <new_rev|WORKTREE>")
+    source: str | None = None
+    dests: list[str] = []
+    norm_modules: list[tuple[re.Pattern[str], str]] = []
+    exclude_prefix: str | None = None
+    extra_scope: list[str] | None = None
+    positional: list[str] = []
+    value_opts = ("--source", "--dest", "--norm-module", "--exclude-prefix", "--extra-scope")
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--no-loss":
+            no_loss = True
+            i += 1
+            continue
+        name, eq, inline = arg.partition("=")
+        if name in value_opts:
+            if eq:
+                value = inline
+            elif i + 1 < len(argv):
+                value = argv[i + 1]
+                i += 1
+            else:
+                log(f"{name} needs a value\n{usage}")
+                return EXIT_HARNESS
+            i += 1
+            if name == "--source":
+                source = value
+            elif name == "--dest":
+                dests.append(value)
+            elif name == "--norm-module":
+                regex, sep, module = value.rpartition("=")
+                if not sep or not regex or not module:
+                    log(f"--norm-module wants <regex>=<module>, got {value!r}\n{usage}")
+                    return EXIT_HARNESS
+                try:
+                    norm_modules.append((re.compile(regex), module))
+                except re.error as exc:
+                    log(f"--norm-module regex {regex!r} does not compile: {exc}")
+                    return EXIT_HARNESS
+            elif name == "--exclude-prefix":
+                exclude_prefix = value
+            else:  # --extra-scope; "" means none
+                extra_scope = (extra_scope or []) + ([value] if value else [])
+            continue
+        if arg.startswith("--"):
+            log(f"unknown option {arg}\n{usage}")
+            return EXIT_HARNESS
+        positional.append(arg)
+        i += 1
+    if len(positional) != 2:
+        log(usage)
         return EXIT_HARNESS
-    old, new = argv
+    cfg = Config(
+        source=source or _TD_REL,
+        dests=tuple(dests) or _DEFAULT_DESTS,
+        norm_modules=tuple(norm_modules),
+        exclude_prefix=exclude_prefix if exclude_prefix is not None else _DEFAULT_EXCLUDE_PREFIX,
+        extra_scope=tuple(extra_scope) if extra_scope is not None else _EXTRA_SCOPE,
+    )
+    old, new = positional
     try:
         if old == WORKTREE:
             raise HarnessError("<old_rev> must be a git revision, not WORKTREE")
         _git("rev-parse", "--verify", f"{old}^{{commit}}")
         if new != WORKTREE:
             _git("rev-parse", "--verify", f"{new}^{{commit}}")
-        return _no_loss_mode(old, new, log) if no_loss else _retarget_mode(old, new, log)
+        return _no_loss_mode(old, new, log, cfg) if no_loss else _retarget_mode(old, new, log, cfg)
     except HarnessError as exc:
         log(f"FATAL: {exc}")
         return EXIT_HARNESS
