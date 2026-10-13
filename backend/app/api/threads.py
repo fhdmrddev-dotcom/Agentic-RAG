@@ -1342,6 +1342,13 @@ async def handoff_thread(
     # 279-02 (D-05): the inline compare became the ONE helper.
     _require_thread_org(source, _org_id, expert_id=body.expert_id,
                         detail="Switch to this chat's organization to hand it off.")
+    # 267-REVIEW-INDEPENDENT WR-01 (279-02): the streaming answer is written only at run end, so a
+    # summary now would leave it out. Refused until the run finishes — the PATCH door's shape (WR-04).
+    if await _thread_has_active_run(supabase, str(thread_id), current_user["id"]):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wait for this answer to finish before handing off.",
+        )
 
     rows_resp = await aexec(
         supabase.table("messages")

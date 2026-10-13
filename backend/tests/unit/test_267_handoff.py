@@ -478,3 +478,25 @@ async def test_WR03_a_source_thread_in_another_org_is_refused_before_any_model_c
     assert exc.value.detail == "Switch to this chat's organization to hand it off."
     emit.assert_not_awaited()
     assert txn.entered == 0
+
+
+# ── 267-REVIEW-INDEPENDENT WR-01 (279-02): no handoff while the source's answer is streaming ──────
+#
+# The summary reads the source's user/assistant rows, and the streaming answer is persisted only at
+# run end — so a handoff mid-run would summarise a chat without its last answer. Refused with the
+# PATCH door's shape (WR-04), before the messages read, the model call and the transaction.
+
+
+@pytest.mark.asyncio
+async def test_WR01_a_handoff_while_the_answer_is_streaming_is_refused_before_any_read_or_write():
+    emit = AsyncMock()
+    txn = Txn(HConn())
+    sb = _sb()
+    sb.answers["runs"] = SimpleNamespace(data=[{"run_id": "r-streaming"}])
+    with pytest.raises(HTTPException) as exc:
+        await _handoff(sb, emit=emit, txn=txn)
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "Wait for this answer to finish before handing off."
+    assert sb.queries("messages") == []
+    emit.assert_not_awaited()
+    assert txn.entered == 0
