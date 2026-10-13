@@ -57,9 +57,16 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: 279 (the-expert-scope-seam) — EXECUTING
 Next: **279** (The Expert Scope Seam) — context gathered 2026-10-13 (`79a0b9afe`, `279-CONTEXT.md` D-01..D-14): 3-part split of `expert_scope.py` (pure / statement / events, repoint, 278 pure-move kit); all 16 SEED-328 items measured still open — fix all small ones, IN-02 + CR-01 gateway test recorded not-fixed; WR-04 reworded to "Won't search", WR-05 quoted background; 4 G-4 Chrome scenarios + two-org CR-03(b) drive. Seeds: 328 folded; 327/320/067 deferred; 303 note. Resume: `/gsd:plan-phase 279`.
-Plan: 1 of 4
+Plan: 2 of 4 (279-01 COMPLETE 2026-10-13 — move commit `fa164ef3e`; next 279-02, then 279-03, then 279-04)
 Status: Executing Phase 279
-Last activity: 2026-10-13 -- Phase 279 execution started
+Last activity: 2026-10-13 -- 279-01 complete: pins `a90dde594`, checker `24ed4131a`, pure move `fa164ef3e`
+
+**279-01 (2026-10-13):** `expert_scope.py` split into pure (143 lines, no `app.` import) /
+`expert_scope_statement.py` / `expert_scope_events.py`, AST-identical to `a5a94ba67`, no shim, 0 fixture
+bytes changed; checker CLEAR in both modes; root-level set equal (35/35); backend gate 71 failed, SET ==
+`279-base-failed.txt`. Measured surprise: model docstrings are OpenAPI descriptions, so the move commit
+also regenerated `docs/public/api/openapi.{snapshot,public}.json`. 279-02 owns: `RETIRED` entries
+(D-07, WR-08) and removing the 8 strict-xfail markers in `test_279_org_helper.py`.
 
 ### Quick Tasks Completed
 

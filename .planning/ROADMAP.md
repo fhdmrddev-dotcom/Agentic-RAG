@@ -202,7 +202,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 279-01-PLAN.md — wave 1: pins first (test_279_pure_move strict-xfail, send If-count + org-helper Wave-0 pins, base failing set), parameterised retarget checker (278 defaults proven), then ONE pure-move commit: expert_scope.py → pure / expert_scope_statement.py / expert_scope_events.py, all importers + 12 test patches repointed (SEAM-01)
+- [x] 279-01-PLAN.md — wave 1: pins first (test_279_pure_move strict-xfail, send If-count + org-helper Wave-0 pins, base failing set), parameterised retarget checker (278 defaults proven), then ONE pure-move commit: expert_scope.py → pure / expert_scope_statement.py / expert_scope_events.py, all importers + 12 test patches repointed (SEAM-01)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -291,7 +291,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 277. Registers Back Inside the Band | 2/2 | Complete | 2026-10-12 |
 | 278. One Home for Tools and Filters | 4/4 | Complete | 2026-10-13 |
-| 279. The Expert Scope Seam | 0/TBD | Not started | - |
+| 279. The Expert Scope Seam | 1/4 | In Progress | - |
 | 280. In Once, Out Clean | 0/TBD | Not started | - |
 | 281. A Refusal Names Its Cause | 0/TBD | Not started | - |
 | 282. The Slow Run and the Paused Run | 0/TBD | Not started | - |
