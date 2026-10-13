@@ -363,7 +363,7 @@ async def test_the_preview_route_gates_then_describes_the_threads_folder():
          patch.object(threads_mod, "describe_expert_scope", desc), \
          patch.object(threads_mod, "get_pg_pool", AsyncMock(return_value=MagicMock())), \
          patch("app.dependencies.resolve_caller_role", AsyncMock(return_value=("member", set()))), \
-         patch.object(threads_mod, "aexec", AsyncMock(return_value=MagicMock(data={"id": str(thread_id), "folder_id": ACME_FOLDER}))):
+         patch.object(threads_mod, "aexec", AsyncMock(return_value=MagicMock(data={"id": str(thread_id), "folder_id": ACME_FOLDER, "org_id": ORG_ID}))):
         out = await threads_mod.get_expert_scope_preview(
             request=MagicMock(),
             expert_id=UUID(HR_ID),
@@ -455,7 +455,7 @@ async def test_WR07_with_a_thread_the_threads_own_folder_wins_over_folder_id():
     thread_id = uuid4()
     p = _route_patches(gate, desc, VISIBLE_FOLDERS)
     with p[0], p[1], p[2], p[3], p[4], \
-         patch.object(threads_mod, "aexec", AsyncMock(return_value=MagicMock(data={"id": str(thread_id), "folder_id": None}))):
+         patch.object(threads_mod, "aexec", AsyncMock(return_value=MagicMock(data={"id": str(thread_id), "folder_id": None, "org_id": ORG_ID}))):
         await threads_mod.get_expert_scope_preview(
             request=MagicMock(),
             expert_id=UUID(HR_ID),

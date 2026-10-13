@@ -762,6 +762,20 @@ async def assert_expert_bindable(
     return bundle, str(active_org_id)
 
 
+def _require_thread_org(thread_row: dict | None, active_org_id: str | None, *, expert_id, detail: str) -> None:
+    """267-REVIEW-INDEPENDENT CR-03(b) / IN-01 / WR-03 (279-02, D-05 / D-18): an Expert in play on a
+    thread must be gated in the THREAD's own org. ONE helper, called once at each of the four doors
+    (PATCH, handoff, preview, send) — never a second inline compare beside it.
+
+    No-op without a thread row (a brand-new chat) or without an Expert: clearing is never gated.
+    With no active org the compare cannot match a thread org, so an Expert-thread send fails
+    CLOSED (D-18) instead of silently clearing the Expert at send."""
+    if thread_row is None or not expert_id:
+        return
+    if str(thread_row.get("org_id") or "") != str(active_org_id or ""):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
 async def create_thread(
     background_tasks: BackgroundTasks,
@@ -816,6 +830,7 @@ async def get_expert_scope_preview(
     supabase: Client = Depends(get_user_supabase_client),
 ):
     thread_folder_id = None
+    t_row = None  # 279-02 IN-01: the thread row (with its org) when a thread is named
     if thread_id is None and folder_id is not None:
         # 267-REVIEW WR-07: a brand-new chat has no thread yet but may already have its folder
         # picked, and the thread handleSend creates will carry it. Read ONLY without a thread (a
@@ -829,7 +844,7 @@ async def get_expert_scope_preview(
     if thread_id is not None:
         t_resp = await aexec(
             supabase.table("threads")
-            .select("id, folder_id")
+            .select("id, folder_id, org_id")
             .eq("id", str(thread_id))
             .eq("user_id", current_user["id"])
             .maybe_single()
@@ -840,6 +855,8 @@ async def get_expert_scope_preview(
         thread_folder_id = t_row.get("folder_id")
 
     _bundle, org_id = await assert_expert_bindable(request, current_user, expert_id)
+    _require_thread_org(t_row, org_id, expert_id=expert_id,
+                        detail="Switch to this chat's organization to preview an Expert.")
     try:
         statement = await describe_expert_scope(
             supabase=supabase,
@@ -1202,11 +1219,9 @@ async def rename_thread(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
         # 267-REVIEW WR-03: the org the gate validated must be the thread's own org (the same rule
         # the handoff door enforces), or an Expert gated in one org is bound into another's thread.
-        if bound_org_id is not None and str(before_row.get("org_id") or "") != bound_org_id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Switch to this chat's organization to invite an Expert.",
-            )
+        # 279-02 (D-05): the inline compare became the ONE helper; a clear passes (no Expert).
+        _require_thread_org(before_row, bound_org_id, expert_id=update_data.get("active_expert_id"),
+                            detail="Switch to this chat's organization to invite an Expert.")
         before_expert = before_row.get("active_expert_id")
         after_expert = update_data["active_expert_id"]
         if str(before_expert or "") != str(after_expert or "") and await _thread_has_active_run(
@@ -1324,11 +1339,9 @@ async def handoff_thread(
     # thread is written into the SOURCE thread's org (D-267-34). They must be one org, or an Expert
     # gated in B is bound inside an A thread (a tier bypass when A lacks `experts`). Refusing is the
     # smaller correct change: gating against the source org would need a second membership check.
-    if str(source.get("org_id") or "") != _org_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Switch to this chat's organization to hand it off.",
-        )
+    # 279-02 (D-05): the inline compare became the ONE helper.
+    _require_thread_org(source, _org_id, expert_id=body.expert_id,
+                        detail="Switch to this chat's organization to hand it off.")
 
     rows_resp = await aexec(
         supabase.table("messages")
@@ -1579,13 +1592,18 @@ async def send_message(
 
     thread_resp = await aexec(
         supabase.table("threads")
-        .select("id, active_workflow_run_id")
+        .select("id, active_workflow_run_id, org_id, active_expert_id")
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
         .single()
     )
     if not thread_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+    # 279-02 (CR-03(b) / D-05 / D-11 / D-18): an Expert thread is answered only in its OWN org —
+    # refused here, before the preflight, the user INSERT, the scoping resolve and the run row, so
+    # no orphan message is left behind. No active org on an Expert thread is refused too (fail closed).
+    _require_thread_org(thread_resp.data, active_org_id, expert_id=thread_resp.data.get("active_expert_id"),
+                        detail="Switch to this chat's organization to keep chatting with its Expert.")
 
     # ── Phase 092 MODE-01 / MODE-02 — server-side lock + workflow kickoff ──────
     # This is the AUTHORITATIVE workflow lock (the grayed client toggle is courtesy

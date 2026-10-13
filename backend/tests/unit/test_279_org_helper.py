@@ -25,6 +25,10 @@ PHASE_BASE — GREEN now and forever (the helper is a CALL, never an ``if`` in t
 Every pin that reads post-helper code is ``xfail(strict=True)`` PER TEST / PER PARAM (never module
 level), because the backend gate has zero headroom and a plain failing test is never committed.
 279-02 removes those markers in the commit that lands the helper.
+
+⚠ 279-02 Commit A: the markers are GONE (every pin is a plain test now), and two cases are added
+beside them — the preview door refusing before ``describe_expert_scope``, and a CLEAR on a
+cross-org thread proceeding (clearing is never gated).
 """
 from __future__ import annotations
 
@@ -56,8 +60,6 @@ ORG_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 ORG_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 THREAD_ID = "33333333-3333-3333-3333-333333333333"
 EXPERT_ID = "44444444-4444-4444-4444-444444444444"
-
-_PENDING = "RED until 279-02 lands _require_thread_org"
 
 _DOORS = ("send_message", "rename_thread", "handoff_thread", "get_expert_scope_preview")
 
@@ -204,17 +206,16 @@ def test_send_message_gains_no_branch_relative_to_the_phase_base():
     assert _ifs(head_src, "send_message") == base_count
 
 
-# ── the helper and its four call sites (strict xfail until 279-02) ───────────────────────────
+# ── the helper and its four call sites (279-02 Commit A removed the strict-xfail markers) ────
 
 
-@pytest.mark.xfail(strict=True, reason=_PENDING)
 def test_the_helper_exists():
     assert callable(getattr(threads_mod, "_require_thread_org", None))
 
 
 @pytest.mark.parametrize(
     "door",
-    [pytest.param(d, id=d, marks=pytest.mark.xfail(strict=True, reason=_PENDING)) for d in _DOORS],
+    [pytest.param(d, id=d) for d in _DOORS],
 )
 def test_each_door_calls_the_helper_exactly_once(door):
     src = inspect.getsource(getattr(threads_mod, door))
@@ -224,7 +225,6 @@ def test_each_door_calls_the_helper_exactly_once(door):
 _INLINE_ORG_COMPARE = re.compile(r"""str\(\s*\w+\.get\(\s*["']org_id["']\s*\)""")
 
 
-@pytest.mark.xfail(strict=True, reason=_PENDING)
 def test_no_inline_org_compare_remains_in_any_door():
     """D-05: the two inline checks (PATCH, handoff) are REPLACED by the helper, not kept beside it."""
     assert callable(getattr(threads_mod, "_require_thread_org", None))  # non-vacuity: replaced BY it
@@ -235,7 +235,6 @@ def test_no_inline_org_compare_remains_in_any_door():
 # ── behaviour on the send door ───────────────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason=_PENDING)
 @pytest.mark.asyncio
 async def test_an_expert_thread_in_another_org_is_refused_before_any_write():
     """CR-03(b): thread in ORG_A with an Expert, active org ORG_B → 409, nothing written."""
@@ -246,7 +245,6 @@ async def test_an_expert_thread_in_another_org_is_refused_before_any_write():
     _assert_nothing_written(h)
 
 
-@pytest.mark.xfail(strict=True, reason=_PENDING)
 @pytest.mark.asyncio
 async def test_an_expert_thread_with_no_active_org_is_refused_before_any_write():
     """D-18: no active org on an Expert thread fails CLOSED (409), never clears the Expert at send."""
@@ -266,3 +264,46 @@ async def test_a_plain_thread_in_another_org_is_not_refused():
     assert len(h.inserted_rows) == 1, "the user message was written"
     assert h.preflight.await_count == 1
     assert h.register.await_count == 1
+
+
+# ── the preview door and the clear (279-02 Commit A) ─────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_the_preview_refuses_an_expert_gated_in_another_org_before_describing():
+    """IN-01: the thread is in ORG_A, the gate validated ORG_B → 409 before any statement is built,
+    so another org's folders are never described against this thread."""
+    gate = AsyncMock(return_value=({"id": EXPERT_ID}, ORG_B))
+    desc = AsyncMock(side_effect=AssertionError("describe_expert_scope must not run"))
+    row = {"id": THREAD_ID, "folder_id": None, "org_id": ORG_A}
+    with patch.object(threads_mod, "assert_expert_bindable", gate), \
+         patch.object(threads_mod, "describe_expert_scope", desc), \
+         patch.object(threads_mod, "aexec", AsyncMock(return_value=SimpleNamespace(data=row))):
+        with pytest.raises(HTTPException) as exc:
+            await threads_mod.get_expert_scope_preview(
+                request=MagicMock(),
+                expert_id=UUID(EXPERT_ID),
+                thread_id=UUID(THREAD_ID),
+                current_user={"id": USER_ID},
+                supabase=MagicMock(),
+            )
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "Switch to this chat's organization to preview an Expert."
+    gate.assert_awaited_once()
+    desc.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_clearing_the_expert_on_a_thread_of_another_org_is_never_gated():
+    """D-05: the helper is a no-op without an Expert, so a CLEAR on an ORG_A thread while ORG_B is
+    active goes through (empty thread → the plain update, no event machinery)."""
+    from app.models.thread import ThreadUpdate
+    from tests.unit.test_267_expert_changed_event import FakeConn, FakeTxn, ThreadsDb, _patch_thread
+    from tests.unit.test_267_scope_preview import FA_ID
+
+    db = ThreadsDb(before_expert=FA_ID, messages=0, after_expert=None)  # thread org = THREAD_ORG
+    txn = FakeTxn(FakeConn())
+    resp = await _patch_thread(ThreadUpdate(clear_active_expert=True), db, txn, active_org=ORG_B)
+    assert txn.entered == 0
+    assert len(db.updates()) == 1
+    assert resp["active_expert_id"] is None
