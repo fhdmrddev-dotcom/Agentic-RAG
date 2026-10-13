@@ -507,3 +507,50 @@ async def test_get_messages_returns_only_allowlisted_system_kinds():
         res = await threads_mod.get_messages(thread_id=THREAD_ID, current_user={"id": USER_ID}, supabase=FakeSupabase())
     assert [m["role"] for m in res] == ["user", "assistant", "system", "system"]
     assert seen[1].call("neq") == []
+
+
+# ── 267-REVIEW-INDEPENDENT WR-02 (279-02): two quick swaps must not record "A → C" ─────────────────
+#
+# The event's "before" is built from the row this PATCH read. If another PATCH changed the Expert (or
+# the folder) in between, the UPDATE must match 0 rows and the event INSERT must never run — the
+# 268 folder arm's ``ScopeChangeConflict`` shape, one arm over.
+
+
+class LostRaceConn(FakeConn):
+    """The UPDATE matches no row (another PATCH moved the thread first)."""
+
+    async def execute(self, sql, *args):
+        self.executed.append((sql, args))
+        return "UPDATE 0" if sql.lstrip().startswith("UPDATE") else "INSERT 0 1"
+
+
+@pytest.mark.asyncio
+async def test_WR02_the_expert_update_is_conditional_and_a_lost_race_writes_no_event():
+    from app.api import threads as threads_mod
+
+    conn = LostRaceConn()
+    with pytest.raises(threads_mod.ExpertChangeConflict):
+        await threads_mod._write_expert_change(
+            conn, thread_id=THREAD_ID, user_id=USER_ID, org_id=THREAD_ORG,
+            update_data={"active_expert_id": HR_ID}, event=MagicMock(),
+            expected_expert_id=FA_ID, expected_folder_id=ACME_FOLDER,
+        )
+    assert len(conn.executed) == 1, "the event INSERT ran after a lost race"
+    sql, args = conn.executed[0]
+    assert "active_expert_id IS NOT DISTINCT FROM $4::uuid" in sql
+    assert "folder_id IS NOT DISTINCT FROM $5::uuid" in sql
+    assert (str(args[3]), str(args[4])) == (FA_ID, ACME_FOLDER)
+
+
+@pytest.mark.asyncio
+async def test_WR02_rename_thread_maps_a_lost_race_to_409_not_500():
+    db = ThreadsDb(before_expert=FA_ID, after_expert=HR_ID)
+    txn = FakeTxn(LostRaceConn())
+    with pytest.raises(HTTPException) as exc:
+        await _patch_thread(ThreadUpdate(active_expert_id=UUID(HR_ID)), db, txn)
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "The Expert changed while you were choosing. Try again."
+    assert txn.entered == 1 and txn.committed is False
+    assert [s for s, _ in txn.conn.executed if "INSERT" in s] == []
+    upd_args = txn.conn.executed[0][1]
+    assert (str(upd_args[3]), str(upd_args[4])) == (FA_ID, ACME_FOLDER)  # the row this PATCH read

@@ -409,3 +409,20 @@ def test_the_scope_effect_route_is_registered_under_the_thread():
 
     paths = {(r.path, tuple(sorted(getattr(r, "methods", ())))) for r in router.routes}
     assert ("/threads/{thread_id}/scope-effect", ("GET",)) in paths
+
+
+# ── 267-REVIEW-INDEPENDENT WR-02 (279-02): the folder arm checks the Expert too ────────────────────
+
+
+@pytest.mark.asyncio
+async def test_WR02_the_folder_update_is_also_conditional_on_the_expert_it_read():
+    import re
+
+    db = ThreadsDb(before_expert=HR_ID, folder_id=ACME_FOLDER)
+    txn = FakeTxn(FakeConn())
+    await _patch_folder(ThreadUpdate(folder_id=UUID(ACME_SUB)), db, txn)
+    sql, args = txn.conn.executed[0]
+    m = re.search(r"active_expert_id IS NOT DISTINCT FROM \$(\d+)::uuid", sql)
+    assert m, sql
+    assert str(args[int(m.group(1)) - 1]) == HR_ID
+    assert "folder_id IS NOT DISTINCT FROM $4::uuid" in sql

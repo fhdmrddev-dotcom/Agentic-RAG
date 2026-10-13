@@ -960,23 +960,42 @@ async def _expert_changed_event(
     return build_expert_changed_event(before, after, at=datetime.now(timezone.utc))
 
 
-async def _write_expert_change(conn, *, thread_id, user_id, org_id, update_data: dict, event) -> None:
+class ExpertChangeConflict(Exception):
+    """267-REVIEW-INDEPENDENT WR-02: the thread's Expert or folder moved after this PATCH read it."""
+
+
+async def _write_expert_change(conn, *, thread_id, user_id, org_id, update_data: dict, event,
+                               expected_expert_id, expected_folder_id) -> None:
     """The UPDATE and the event row, on ONE user-JWT (RLS-as-caller) connection inside its txn.
 
     D-267-34: ``org_id`` is the THREAD's own org, set explicitly — the messages autofill trigger
     takes ``org_members … LIMIT 1``, which is the wrong org for a two-org user. ``tool_calls`` is a
     plain list: the pool's jsonb codec encodes it (a pre-dumped string would be double-encoded).
+
+    267-REVIEW-INDEPENDENT WR-02 (279-02): the UPDATE is conditional on the Expert AND folder the
+    event's "before" was built from. If another PATCH moved either in between, 0 rows update and
+    ``ExpertChangeConflict`` is raised BEFORE the event INSERT, so the txn writes nothing and no
+    false "A → C" is recorded (``_write_scope_change``'s shape).
     """
     after = update_data.get("active_expert_id")
-    params: list = [UUID(str(thread_id)), UUID(str(user_id)), UUID(str(after)) if after else None]
+    params: list = [
+        UUID(str(thread_id)),
+        UUID(str(user_id)),
+        UUID(str(after)) if after else None,
+        UUID(str(expected_expert_id)) if expected_expert_id else None,
+        UUID(str(expected_folder_id)) if expected_folder_id else None,
+    ]
     sets = ["active_expert_id = $3::uuid"]
     if "title" in update_data:
         params.append(update_data["title"])
         sets.append(f"title = ${len(params)}")
-    await conn.execute(
-        f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid",
+    updated = await conn.execute(
+        f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid "
+        "AND active_expert_id IS NOT DISTINCT FROM $4::uuid AND folder_id IS NOT DISTINCT FROM $5::uuid",
         *params,
     )
+    if str(updated).split()[-1:] == ["0"]:
+        raise ExpertChangeConflict()
     # 267-REVIEW-INDEPENDENT CR-03: the row is written by the ONE writer the send-time clear also uses.
     await insert_expert_changed_row(conn, thread_id=thread_id, user_id=user_id, org_id=org_id, event=event)
 
@@ -1025,18 +1044,21 @@ class ScopeChangeConflict(Exception):
 
 
 async def _write_scope_change(conn, *, thread_id, user_id, org_id, folder_id, event, expected_folder_id,
-                              title=None) -> None:
+                              expected_expert_id=None, title=None) -> None:
     """The UPDATE and the event row on ONE user-JWT connection inside its txn (``_write_expert_change``'s
     shape). ``org_id`` is the THREAD's (D-267-34); ``tool_calls`` a plain list (the jsonb codec).
 
     268-REVIEW WR-02: the UPDATE is conditional on ``expected_folder_id`` — the folder the event's
     "from" was built from. If another PATCH moved it in between, 0 rows update and
-    ``ScopeChangeConflict`` is raised BEFORE the event INSERT, so the caller's txn writes nothing."""
+    ``ScopeChangeConflict`` is raised BEFORE the event INSERT, so the caller's txn writes nothing.
+    267-REVIEW-INDEPENDENT WR-02 (279-02): also conditional on ``expected_expert_id`` — the Expert the
+    event's statements were built under — so a concurrent Expert swap is a conflict too."""
     params: list = [
         UUID(str(thread_id)),
         UUID(str(user_id)),
         UUID(str(folder_id)) if folder_id else None,
         UUID(str(expected_folder_id)) if expected_folder_id else None,
+        UUID(str(expected_expert_id)) if expected_expert_id else None,
     ]
     sets = ["folder_id = $3::uuid"]
     if title is not None:
@@ -1044,7 +1066,7 @@ async def _write_scope_change(conn, *, thread_id, user_id, org_id, folder_id, ev
         sets.append(f"title = ${len(params)}")
     updated = await conn.execute(
         f"UPDATE public.threads SET {', '.join(sets)} WHERE id = $1::uuid AND user_id = $2::uuid "
-        "AND folder_id IS NOT DISTINCT FROM $4::uuid",
+        "AND folder_id IS NOT DISTINCT FROM $4::uuid AND active_expert_id IS NOT DISTINCT FROM $5::uuid",
         *params,
     )
     if str(updated).split()[-1:] == ["0"]:
@@ -1111,6 +1133,7 @@ async def _apply_folder_change(thread_id: str, body: ThreadUpdate, request: Requ
                     folder_id=new_folder,
                     event=event,
                     expected_folder_id=old_folder,
+                    expected_expert_id=row.get("active_expert_id"),
                     title=update_data.get("title"),
                 )
         except ScopeChangeConflict:
@@ -1262,7 +1285,16 @@ async def rename_thread(
                     org_id=thread_org_id,
                     update_data=update_data,
                     event=event,
+                    expected_expert_id=before_expert,
+                    expected_folder_id=before_row.get("folder_id"),
                 )
+        except ExpertChangeConflict:
+            # 267-REVIEW-INDEPENDENT WR-02: the txn rolled back — no UPDATE, no event with a false
+            # "from". Caught ABOVE `except Exception`, or a lost race would read as a 500.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The Expert changed while you were choosing. Try again.",
+            )
         except Exception:
             # T-267-20: the literal only; the cause goes to the log. The exception left the
             # transaction, so asyncpg rolled back the UPDATE with the INSERT.
