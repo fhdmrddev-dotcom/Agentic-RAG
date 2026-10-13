@@ -1,0 +1,39 @@
+{
+  "kind": "expert_changed",
+  "at": "2026-09-25T14:32:00Z",
+  "before": {
+    "id": "e4000000-0000-4000-8000-0000000000d4",
+    "name": "Legal Advisor",
+    "scope_mode": "restricted"
+  },
+  "after": {
+    "id": "e2000000-0000-4000-8000-0000000000b2",
+    "name": "HR Advisor",
+    "scope_mode": "restricted"
+  },
+  "now": {
+    "folders": [
+      {
+        "id": "f2000000-0000-4000-8000-000000000002",
+        "name": "HR Policies",
+        "doc_count": null
+      }
+    ],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+  },
+  "dropped": {
+    "folders": [
+      {
+        "id": "f1000000-0000-4000-8000-000000000001",
+        "name": "Financial Reports & Filings",
+        "doc_count": null
+      }
+    ],
+    "thread_folder": null,
+    "all_documents": false,
+    "connections": []
+  },
+  "excluded": null
+}

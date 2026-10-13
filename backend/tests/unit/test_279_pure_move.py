@@ -105,7 +105,11 @@ PER_MODULE: frozenset[str] = frozenset({"logger"})
 # purpose. 279-02 retires `build_expert_changed_event` (D-07, restricted→restricted exclusion) and
 # `ExpertScope` / `compose_expert_scope` (WR-08, scoped_folder_paths) BY NAME, with the reason as
 # the value, IN the commit that changes them (SEED-177). UNMOVED names may be retired too.
-RETIRED: dict[str, str] = {}
+RETIRED: dict[str, str] = {
+    "build_expert_changed_event": (
+        "279-02 D-07: restricted→restricted excluded computed against the previous side's effective scope"
+    ),
+}
 
 _EXPECTED_HOME_COUNTS = {"expert_scope_statement.py": 8, "expert_scope_events.py": 14}
 

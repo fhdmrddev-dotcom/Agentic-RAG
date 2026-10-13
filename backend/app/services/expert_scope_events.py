@@ -56,7 +56,17 @@ def build_expert_changed_event(before: ScopeStatement, after: ScopeStatement, *,
     now = after.used()
     dropped = _dropped_line(before, after)
     excluded = None
-    if after.expert is not None and after.expert.scope_mode == "restricted" and after.excluded_count > 0:
+    # 279-02 D-07 (SEED-328 drive note): the exclusion is a DROP only if the previous side read the
+    # thread folder (or everything). Restricted → restricted on a folder-scoped thread used to state
+    # the thread folder's documents as newly lost, though the previous Expert never read them either.
+    # ``_dropped_line`` is unchanged (268's ``stops`` shares it).
+    prev = before.used()
+    if (
+        after.expert is not None
+        and after.expert.scope_mode == "restricted"
+        and after.excluded_count > 0
+        and (prev.all_documents or prev.thread_folder is not None)
+    ):
         excluded = TranscriptExclusion(count=after.excluded_count, names=list(after.excluded_names))
     return ExpertChangedEvent(
         at=at,
