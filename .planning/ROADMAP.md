@@ -211,7 +211,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 279-04-PLAN.md — wave 3 (operator checkpoints): 4 G-4 Chrome drives (D-12) + WR-05 DB proof, two-org CR-03(b) live drive (D-13), then gates, the SEED-328 record (one row per item), seed → answered, ledger + CLAUDE.md rows, VALIDATION, STATE (SEAM-01)
+- [x] 279-04-PLAN.md — wave 3 (operator checkpoints): 4 G-4 Chrome drives (D-12) + WR-05 DB proof, two-org CR-03(b) live drive (D-13), then gates, the SEED-328 record (one row per item), seed → answered, ledger + CLAUDE.md rows, VALIDATION, STATE (SEAM-01)
 
 **Flags**: ⛔ **G-5 extraction phase.** `SEED-328` (folded at intake) fires on `run_producer.py`, `threads.py` (90 phases), `experts.py`, `ChatArea.tsx` (42 phases), `StreamsProvider.tsx` (38 phases) and the Expert catalog, all G-5-firing. Each item is either **honoured by construction** (one helper, one call, no new branch) or recorded as an override under `STATE.md → Guardrail overrides`. If an item changes rendered chat copy (WR-03/04/07/08), **G-4** applies to that item: the operator names the scenario at scope time and it is driven in Chrome. `run_producer.py`'s runs table is SELECT-only under the user JWT (268 finding), so a user-JWT UPDATE there silently no-ops. Measure writes, never assume them.
 
@@ -291,7 +291,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 277. Registers Back Inside the Band | 2/2 | Complete | 2026-10-12 |
 | 278. One Home for Tools and Filters | 4/4 | Complete | 2026-10-13 |
-| 279. The Expert Scope Seam | 3/4 | In Progress | - |
+| 279. The Expert Scope Seam | 4/4 | Executed (verification pending) | - |
 | 280. In Once, Out Clean | 0/TBD | Not started | - |
 | 281. A Refusal Names Its Cause | 0/TBD | Not started | - |
 | 282. The Slow Run and the Paused Run | 0/TBD | Not started | - |

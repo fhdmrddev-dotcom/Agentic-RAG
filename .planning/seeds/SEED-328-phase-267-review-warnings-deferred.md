@@ -3,9 +3,9 @@ seed_id: SEED-328
 title: Phase 267 independent-review warnings WR-01..WR-08, info IN-01..IN-05 and the deferred CR-03(b) org guard on send — accepted and deferred
 created: 2026-09-29
 surface: Agentic-RAG
-status: folded
+status: answered
 partial: false
-status_note: "Folded into Phase 279 (SEAM-01) at v4.6 intake; discuss 2026-10-13 measured all 16 items still open. Each gets a fixed / not-fixed row in the 279 record (D-04..D-11); status flips again at 279 close."
+status_note: "Answered by Phase 279 (SEAM-01), closed 2026-10-13: every item has a row in .planning/phases/279-the-expert-scope-seam/279-SEED-328-RECORD.md (15 fixed, 5 not fixed). Not-fixed homes: IN-02 -> SEED-303 (scope-widening ruling, D-06); IN-04 CR-01 half -> SEED-327 (D-08); the refused-message drive note and 267-FIX live note #4 -> re-open trigger 'the first phase that adds a pre-INSERT resolution refusal on the send path' (D-19); 267-FIX live note #5 (CR-03(c) chip-clear never browser-driven) -> still owed to a live drive. Was: folded into 279 at v4.6 intake; discuss 2026-10-13 measured all 16 items still open."
 trigger_when: "any phase whose files_modified names run_producer.py, threads.py send/handoff paths, ChatArea.tsx, StreamsProvider.tsx, expert_scope.py or the Expert catalog; OR the operator extracts one shared org-equality helper for PATCH, handoff and preview"
 trigger_paths: ["backend/app/services/run_producer.py", "backend/app/api/threads.py", "backend/app/services/expert_scope.py", "backend/app/api/experts.py", "frontend/src/components/chat/ChatArea.tsx", "frontend/src/providers/StreamsProvider.tsx", "frontend/src/components/experts/catalog/**"]
 trigger_surfaces: []

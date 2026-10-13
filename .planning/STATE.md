@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
 status: executing
-last_updated: "2026-10-13T16:25:00.000Z"
-last_activity: 2026-10-13 -- 279-02 complete (9 SEED-328 backend fixes)
+last_updated: "2026-10-13T20:00:00.000Z"
+last_activity: 2026-10-13 -- 279-04 complete (G-4 drives, SEED-328 record, seed answered); 279 pending verification
 progress:
   total_phases: 14
   completed_phases: 2
   total_plans: 10
-  completed_plans: 7
+  completed_plans: 8
   percent: 14
 ---
 
@@ -55,11 +55,24 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ## Current Position
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: 279 (the-expert-scope-seam) — EXECUTING
-Next: **279** (The Expert Scope Seam) — context gathered 2026-10-13 (`79a0b9afe`, `279-CONTEXT.md` D-01..D-14): 3-part split of `expert_scope.py` (pure / statement / events, repoint, 278 pure-move kit); all 16 SEED-328 items measured still open — fix all small ones, IN-02 + CR-01 gateway test recorded not-fixed; WR-04 reworded to "Won't search", WR-05 quoted background; 4 G-4 Chrome scenarios + two-org CR-03(b) drive. Seeds: 328 folded; 327/320/067 deferred; 303 note. Resume: `/gsd:plan-phase 279`.
-Plan: 3 of 4 (279-01 COMPLETE — move `fa164ef3e`; 279-02 COMPLETE 2026-10-13 — `d55e0ef6a`..`11a73af35`; 279-03 running in parallel; then 279-04)
-Status: Executing Phase 279
-Last activity: 2026-10-13 -- 279-02 complete: 9 lettered commits A-I, backend gate SET == base (71), root-level SET equal (44/44)
+Phase: 279 (the-expert-scope-seam) — EXECUTED 4/4, **pending verification** (`/gsd:verify-work 279`, then `/gsd:code-review 279` as a fresh-context subagent)
+Next: verify 279. Record: `.planning/phases/279-the-expert-scope-seam/279-SEED-328-RECORD.md` (20 item rows: 15 fixed, 5 not fixed); UAT: `279-UAT-LOG.md` (rows 1a-5 ✅); 4-axis: `279-VALIDATION.md`. SEED-328 → `status: answered`.
+Plan: 4 of 4 (279-01 move `fa164ef3e`; 279-02 `d55e0ef6a`..`11a73af35`; 279-03 `9ac6d12f6`..`10d7e2d5e`; 279-04 close)
+Status: Phase 279 executed — verification pending
+Last activity: 2026-10-13 -- 279-04 close: G-4 ×4 + two-org CR-03(b) drive passed; record + seed + ledger + CLAUDE.md rows
+Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
+
+**279-03 (2026-10-13):** "Won't use" → "Won't search" (29 hits / 13 files measured, not 30), swap-card
+"Won't be searched:" prefix (D-16), WR-03 no-folder + spotlight statements, IN-01 dialog field, D-15
+send-409 narrowed to the `Thread is workflow-locked` prefix, WR-06 chip clear, WR-01 client hide, WR-07
+server reason + `listExperts(true, false)`. Typecheck set == base.
+
+**279-04 (2026-10-13):** G-4 rows 1a/1b/2a/2a-DB/2b/3/4 and the two-org row 5 driven in Chrome (operator
+approved; row 5 sent by the operator, sentence reported verbatim). WR-05 recorded fixed on Chrome + DB
+evidence (row `5a547220…`) as a TRUST-03 mitigation, not enforcement. D-18 local parity read:
+`null_org_expert_threads = 0` (of 60). Guardrail overrides: **none** (OV-279-01 not required). Three
+files crossed G-5 in the phase (`ExpertSpotlightCard.tsx`, `expertEventCopy.ts`, `ScopeLedger.tsx`) —
+next phase on any of them: extraction FIRST.
 
 **279-01 (2026-10-13):** `expert_scope.py` split into pure (143 lines, no `app.` import) /
 `expert_scope_statement.py` / `expert_scope_events.py`, AST-identical to `a5a94ba67`, no shim, 0 fixture
@@ -96,6 +109,24 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 | 4 | 271 G-4 sign-off (G4-1..G4-6) + P-01 / P-03 decisions | `271-UAT.md` |
 | 5 | 272 live re-drive of the review fixes | `272-HUMAN-UAT.md` |
 | 6 | Logged-in production smoke test of v4.5 (270-274 + 276 live since 2026-10-05) | also owed from v4.4 |
+
+### Owed from Phase 279 (2026-10-13)
+
+| # | Item | Notes |
+|---|---|---|
+| 1 | 279 deploy: run D-18 NULL-org Expert-thread SELECT on cloud (read-only) before promoting | `SELECT count(*) AS null_org_expert_threads FROM public.threads WHERE active_expert_id IS NOT NULL AND org_id IS NULL` — local `0`. `> 0` means those threads become refused-at-send after deploy: accept (D-18 fail-closed) or propose an approval-gated backfill. `279-SEED-328-RECORD.md` § "D-18 cloud parity" |
+| 2 | 4-axis UAT rows — owed by decision (D-17 + operator `ready`, 2026-10-13) | 8 cross-provider rows + multi-tool + parallel-thread + long-message, all ⛔ in `279-VALIDATION.md`. **First to run if re-opened: parallel-thread** (WR-01's handoff gate is per-thread) |
+| 3 | 267-FIX live note #5 — CR-03(c) snapshot-reconcile chip-clear, never browser-driven | UAT-LOG row 3 drove the `getExpert`-failure arm via a client-injected failure, not this arm |
+| 4 | IN-03 provider-docs-first check | Anthropic tool_choice auto + Gemini function-calling mode AUTO docs; only those two receive the coerce rung's system text. SEED-327 untouched |
+| 5 | Review notes for `/gsd:code-review 279` | the two 409 tests (`StreamsProvider.stopping.test.ts:1018`, `streamsProvider_state01b_403.test.tsx:171`) now run the generic arm; stale `workflow-lock-error-banner` testid on the org 409; `ExpertDetailModal` copy unpinned; `test_264_born_for_carrier.py` changed outside 279-02's file list |
+| 6 | `graphify update .` after the close | run at 279-04 close; `graphify-out/` is never committed |
+
+### Guardrail overrides (v4.6)
+
+- **279:** none written. OV-279-01 (threads.py IN-05) was pre-written in the plan and NOT required —
+  279-02-SUMMARY row D route proof: event=None rides `if event is not None:` then the existing
+  `elif update_data:` arm (test `test_IN05_a_non_member_clear_writes_no_event_through_the_plain_update_arm`).
+  Every touched FIRING file is recorded honoured by construction in `279-SEED-328-RECORD.md` § G-5.
 
 ### Carry into the next milestone's scoping (✅ consumed by v4.6 intake 2026-10-12 — kept as the record)
 
