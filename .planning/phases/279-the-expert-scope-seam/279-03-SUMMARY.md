@@ -179,6 +179,21 @@ No test was deleted; no per-file count decreased.
 (line/col stripped, sorted) is **identical** to the base set above — `comm -13 base after` (new) is
 empty and `comm -23` (gone) is empty. After ⊆ base holds.
 
+## Frontend count gate (run once, from this worktree, `GSD_VITEST_MAX_WORKERS=2`)
+
+`node scripts/vitest-count-gate.cjs` → `total 10210 · failed 1 · pinned total 9400`,
+**`RESULT: COUNT GATE VIOLATED (1 reason(s))` — `[failing-tests]` only.** No per-file decrease was
+reported. The one failure, captured from the gate's own JSON report before any re-run:
+`src/pages/WorkflowBuilderPage.canvas.test.tsx :: WorkflowBuilderPage canvas door — flag ON (D-183-01)
+clicking Canvas flips aria-selected and mounts the canvas; clicking Spine returns` — `STACK_TRACE_ERROR`
+after **6900 ms** (a timeout signature under full-gate load).
+- **Provably unmodified by this plan:** `git diff --numstat 10596004b HEAD -- frontend/src/pages
+  frontend/src/components/workflows` is empty; nothing this plan touched is imported by that suite's
+  subject.
+- Re-run alone: `Tests 154 passed (154)`. One green sample of a timing-sensitive suite is not proof
+  of innocence, so this is recorded as an observation, not as "fine": whether it reds at base was
+  not established (a second full gate would exceed the one-run budget for this agent).
+
 ## D-14 — FIRING files changed by guarded expressions only (honoured by construction)
 
 - `StreamsProvider.tsx`: one module constant + one condition widened to
