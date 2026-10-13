@@ -227,9 +227,17 @@ class ThreadsDb:
 
 
 class FakeConn:
-    def __init__(self, fail_on: str | None = None):
+    def __init__(self, fail_on: str | None = None, role: str | None = "member"):
         self.fail_on = fail_on
         self.executed: list[tuple] = []
+        # 279-02 IN-05: the membership read (``_caller_role_in_org``) — recorded apart from
+        # ``executed`` so the UPDATE/INSERT indexes the cases above read stay where they were.
+        self.role = role
+        self.fetched: list[tuple] = []
+
+    async def fetchrow(self, sql, *args):
+        self.fetched.append((sql, args))
+        return {"role": self.role} if self.role else None
 
     async def execute(self, sql, *args):
         self.executed.append((sql, args))
@@ -374,7 +382,9 @@ async def test_a_removal_with_messages_writes_the_event():
     db = ThreadsDb(before_expert=FA_ID, after_expert=None)
     txn = FakeTxn(FakeConn())
     await _patch_thread(ThreadUpdate(clear_active_expert=True), db, txn)
-    assert txn.entered == 1 and txn.committed is True
+    # 279-02 IN-05 (D-04): was `assert txn.entered == 1 and txn.committed is True` — a clear now
+    # reads the caller's membership in the THREAD's org first, on its own user-JWT connection.
+    assert txn.entered == 2 and txn.committed is True
     tool_calls = txn.conn.executed[1][1][4]
     assert tool_calls[0]["after"] is None
     assert tool_calls[0]["before"]["name"] == "Financial Analyzer"
@@ -554,3 +564,50 @@ async def test_WR02_rename_thread_maps_a_lost_race_to_409_not_500():
     assert [s for s, _ in txn.conn.executed if "INSERT" in s] == []
     upd_args = txn.conn.executed[0][1]
     assert (str(upd_args[3]), str(upd_args[4])) == (FA_ID, ACME_FOLDER)  # the row this PATCH read
+
+
+# ── 267-REVIEW-INDEPENDENT IN-05 (279-02): a clear is stated in the THREAD's org ─────────────────
+#
+# A clear runs no gate, so it has no validated org. It used to be described in the caller's ACTIVE
+# org with the caller's active-org role, which for a two-org user names the other org's folders. It
+# is now described in the thread's own org with the caller's role THERE (one membership read); a
+# caller who is not a member of that org gets no event row, and the clear still goes through.
+
+
+@pytest.mark.asyncio
+async def test_IN05_a_clear_is_stated_in_the_threads_org_with_the_callers_role_there():
+    from app.api import threads as threads_mod
+
+    db = ThreadsDb(before_expert=FA_ID, after_expert=None)
+    txn = FakeTxn(FakeConn(role="admin"))
+    spy = AsyncMock(wraps=threads_mod.describe_expert_scope)
+    with patch.object(threads_mod, "describe_expert_scope", spy):
+        await _patch_thread(ThreadUpdate(clear_active_expert=True), db, txn)  # active org = ORG_ID
+    assert ORG_ID != THREAD_ORG
+    assert spy.await_count == 2
+    assert {c.kwargs["org_id"] for c in spy.await_args_list} == {THREAD_ORG}
+    assert [c.kwargs["caller_roles"] for c in spy.await_args_list] == [["admin"], ["admin"]]
+    (sql, args), = txn.conn.fetched
+    assert "org_members" in sql and "auth.uid()" in sql
+    assert str(args[0]) == THREAD_ORG
+    assert str(txn.conn.executed[1][1][2]) == THREAD_ORG  # the event row's org
+
+
+@pytest.mark.asyncio
+async def test_IN05_a_non_member_clear_writes_no_event_through_the_plain_update_arm():
+    """D-14: event=None is driven through rename_thread's REAL ``elif update_data:`` arm."""
+    from app.api import threads as threads_mod
+
+    db = ThreadsDb(before_expert=FA_ID, after_expert=None)
+    txn = FakeTxn(FakeConn(role=None))
+    write = AsyncMock(wraps=threads_mod._write_expert_change)
+    insert = AsyncMock()
+    with patch.object(threads_mod, "_write_expert_change", write),          patch.object(threads_mod, "insert_expert_changed_row", insert):
+        resp = await _patch_thread(ThreadUpdate(clear_active_expert=True), db, txn)
+    write.assert_not_awaited()
+    insert.assert_not_called()
+    assert txn.conn.executed == []
+    ups = db.updates()
+    assert len(ups) == 1
+    assert ups[0].call("update") == [("update", ({"active_expert_id": None},), {})]
+    assert resp["active_expert_id"] is None

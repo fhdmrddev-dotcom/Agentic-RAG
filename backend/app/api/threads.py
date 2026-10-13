@@ -727,6 +727,23 @@ async def _caller_roles(request: Request, current_user: dict) -> list[str]:
     return [_role] if _role else []
 
 
+async def _caller_role_in_org(request: Request, current_user: dict, org_id: str | None) -> list[str] | None:
+    """267-REVIEW-INDEPENDENT IN-05 (279-02): the caller's role in ONE named org (the thread's), not
+    the active org. ``None`` when there is no org or the caller is not a member of it. The same
+    membership read ``resolve_active_org_or_none`` runs, on the caller's own RLS connection."""
+    if not org_id:
+        return None
+    async with get_user_pg_connection(request, current_user) as conn:
+        row = await conn.fetchrow(
+            "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = auth.uid()",
+            UUID(str(org_id)),
+        )
+    if row is None:
+        logger.info("expert clear on a thread: the caller is not a member of its org; no event")
+        return None
+    return [row["role"]] if row["role"] else []
+
+
 async def assert_expert_bindable(
     request: Request, current_user: dict, expert_id: UUID
 ) -> tuple[dict, str]:
@@ -933,14 +950,19 @@ async def _expert_changed_event(
     after_expert: str | None,
     folder_id: str | None,
     org_id: str | None,
+    caller_roles: list[str] | None = None,
 ):
-    """Both sides stated through the ONE statement helper, then the pure event builder."""
+    """Both sides stated through the ONE statement helper, then the pure event builder.
+
+    ``caller_roles`` (279-02 IN-05): the role in ``org_id`` when the caller already resolved it (a
+    clear, stated in the thread's org); otherwise the active org's role, which IS ``org_id`` for a
+    bind because the gate validated it."""
     common = dict(
         supabase=supabase,
         pool=await get_pg_pool(),
         user_id=current_user["id"],
         org_id=org_id,
-        caller_roles=await _caller_roles(request, current_user),
+        caller_roles=caller_roles if caller_roles is not None else await _caller_roles(request, current_user),
         thread_folder_id=folder_id,
     )
     try:
@@ -1260,18 +1282,22 @@ async def rename_thread(
         if str(before_expert or "") != str(after_expert or "") and await _thread_has_messages(
             supabase, thread_id, current_user["id"]
         ):
-            event = await _expert_changed_event(
+            # 267-REVIEW-INDEPENDENT IN-05 (279-02): a bind is stated in the org the gate validated
+            # (= the thread's, by _require_thread_org). A clear has no gate (bound_org_id None), so it
+            # is stated in the THREAD's org with the caller's role THERE; a non-member gets no event
+            # and the clear proceeds through the plain update below (clearing is never gated).
+            _clear_roles = (
+                None if bound_org_id else await _caller_role_in_org(request, current_user, before_row.get("org_id"))
+            )
+            event = None if (bound_org_id is None and _clear_roles is None) else await _expert_changed_event(
                 request,
                 current_user,
                 supabase,
                 before_expert=before_expert,
                 after_expert=after_expert,
                 folder_id=before_row.get("folder_id"),
-                org_id=(
-                    bound_org_id
-                    or await resolve_active_org_or_none(request, current_user)
-                    or before_row.get("org_id")
-                ),
+                org_id=bound_org_id or before_row.get("org_id"),
+                caller_roles=_clear_roles,
             )
             thread_org_id = before_row.get("org_id")
 
