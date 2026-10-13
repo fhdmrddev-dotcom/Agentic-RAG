@@ -50,11 +50,17 @@ class ExpertScope:
 
     ``excluded_folder_ids`` is the thread-folder subtree minus the Expert's folders, and is
     non-empty ONLY for a ``restricted`` Expert on a folder-scoped thread; ``()`` otherwise.
+
+    ``scoped_folder_paths`` (279-02 WR-08 / D-17) is NOT sorted: it is every visible root the scope
+    reads, in a stable order — the thread folder first (biased), then the Expert's folders in their
+    own order, each skipped when an earlier path already covers it. ``scoped_folder_path`` is
+    unchanged (the first folder's path), so the legacy comparison holds; ``()`` when nothing resolves.
     """
 
     effective_folder_ids: tuple[str, ...]
     scoped_folder_path: str | None
     excluded_folder_ids: tuple[str, ...]
+    scoped_folder_paths: tuple[str, ...] = ()
 
 
 def compose_expert_scope(
@@ -95,6 +101,14 @@ def compose_expert_scope(
             curr = str(f["parent_id"]) if f.get("parent_id") else None
         return ("/" + "/".join(reversed(parts))) if parts else ""
 
+    def _paths(fids: list[str]) -> tuple[str, ...]:
+        """279-02 WR-08: every resolved, non-empty path, in order, minus any an earlier one covers."""
+        out: list[str] = []
+        for p in (_get_path(str(f)) for f in fids):
+            if p and not any(p == q or p.startswith(q + "/") for q in out):
+                out.append(p)
+        return tuple(out)
+
     scoped_folder_path: str | None = None
     excluded_folder_ids: tuple[str, ...] = ()
 
@@ -121,10 +135,12 @@ def compose_expert_scope(
             if expert_folder_ids:
                 scoped_folder_path = _get_path(expert_folder_ids[0]) or None
 
+    _roots = [str(thread_folder_id)] if (thread_folder_id and scope_mode != "restricted") else []
     return ExpertScope(
         effective_folder_ids=effective_folder_ids,
         scoped_folder_path=scoped_folder_path,
         excluded_folder_ids=excluded_folder_ids,
+        scoped_folder_paths=_paths(_roots + [str(f) for f in expert_folder_ids]),
     )
 
 

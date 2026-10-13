@@ -393,6 +393,9 @@ class ThreadScoping(NamedTuple):
     scoped_folder_path: str | None
     born_for_bundle_id: UUID | None
     scoped_connection_keys: tuple[str, ...] | None
+    # 279-02 WR-08 (D-17): EVERY folder path the scope reads (the note names them all when 2+).
+    # Defaulted LAST so the positional 5-field ``ThreadScoping(None, None, None, bundle, None)`` holds.
+    scoped_folder_paths: tuple[str, ...] | None = None
 
 
 class ExpertScopeUnavailable(ValueError):
@@ -588,6 +591,7 @@ async def _resolve_thread_scoping(
         # every non-empty composition is handed on verbatim.
         effective_folder_ids = _scope.effective_folder_ids or None
         scoped_folder_path = _scope.scoped_folder_path if effective_folder_ids else None
+        scoped_folder_paths = _scope.scoped_folder_paths if effective_folder_ids else None  # 279-02 WR-08
 
         # Phase 267 (D-267-01 / D-267-02): NO tool list. The Expert thread keeps the plain
         # thread's tools; the tool-floor flag is kept on the row for compatibility and read by
@@ -626,6 +630,7 @@ async def _resolve_thread_scoping(
             scoped_folder_path,
             resolved.bundle_id,
             scoped_connection_keys,
+            scoped_folder_paths,
         )
     except Exception as exc:
         logger.error(
@@ -819,6 +824,7 @@ async def run_producer(
                     resolved_provider=resolved_provider,
                     effective_folder_ids=_scoping.effective_folder_ids,
                     scoped_folder_path=_scoping.scoped_folder_path,
+                    scoped_folder_paths=_scoping.scoped_folder_paths,  # 279-02 WR-08
                     # Phase 267 (D-267-29 / D-267-32) — the Expert ADDS: its approved
                     # connections and member skills, as neutrally named data. Paired with
                     # the continuation build below. None on a plain run => byte-identical.
@@ -1036,6 +1042,7 @@ async def spawn_continuation_run(
                 dropped_tool_calls=tuple(dropped_tool_calls),
                 effective_folder_ids=_scoping.effective_folder_ids,
                 scoped_folder_path=_scoping.scoped_folder_path,
+                scoped_folder_paths=_scoping.scoped_folder_paths,  # 279-02 WR-08
                 # Phase 267 (D-267-29 / D-267-32) — same additive Expert data as the
                 # Deep build above; a resumed run is the same run and adds the same.
                 scoped_connection_keys=_scoping.scoped_connection_keys,

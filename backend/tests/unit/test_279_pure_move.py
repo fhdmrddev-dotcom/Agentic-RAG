@@ -109,6 +109,8 @@ RETIRED: dict[str, str] = {
     "build_expert_changed_event": (
         "279-02 D-07: restricted→restricted excluded computed against the previous side's effective scope"
     ),
+    "ExpertScope": "279-02 WR-08 (D-17): scoped_folder_paths",
+    "compose_expert_scope": "279-02 WR-08 (D-17): scoped_folder_paths",
 }
 
 _EXPECTED_HOME_COUNTS = {"expert_scope_statement.py": 8, "expert_scope_events.py": 14}

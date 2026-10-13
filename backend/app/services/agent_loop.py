@@ -280,6 +280,9 @@ class RunContext:
     # filter that read it. A thread's scoping never removes a tool; the two fields below only ADD.)
     # Phase 261 (BUG-260920-01 / D-v4.3-01) — synchronized scoped folder path
     scoped_folder_path: str | None = None
+    # 279-02 WR-08 (D-17) — EVERY folder path of a multi-folder scope, so the scope note names them
+    # all. None or one path => the single-folder note, byte-identical to base.
+    scoped_folder_paths: tuple[str, ...] | None = None
     # Phase 264 (264-01 / PACK-17 / D-264-03) — ADDITIVE default-off born-for scope id,
     # resolved alongside the fields above and carried to the LOAD path. OFF by default
     # (None) at EVERY existing call site → Deep Mode byte-identical (the 092/133/135
@@ -1270,6 +1273,34 @@ def _one_line(text: str, cap: int) -> str:
     return flat
 
 
+def _folder_scope_note(scoped_folder_path: str, scoped_folder_paths: tuple[str, ...] | None) -> str:
+    """The system-prompt line that keeps tool calls inside the chat's folder scope.
+
+    279-02 WR-08 (D-17): one path (or none listed) renders the EXISTING single-folder note, byte for
+    byte — pinned against the phase base by test_279_scope_fixes. Two or more paths name EVERY folder
+    the scope reads, because naming only the first told the model to filter its own ls/grep/
+    query_documents calls to part of the scope. The ls/tree/grep default stays the first path.
+    """
+    if not scoped_folder_paths or len(scoped_folder_paths) <= 1:
+        return (
+            f"\n\n**IMPORTANT: This chat is scoped to the folder '{scoped_folder_path}'. "
+            f"All tool calls should be restricted to this folder and its subfolders. "
+            f"When using ls, tree, or grep, default the path to '{scoped_folder_path}'. "
+            f"When using query_documents, always include a folder filter (e.g., "
+            f"JOIN folders or WHERE folder_id IN ...) to restrict to this folder scope. "
+            f"When the user asks 'what documents do you have?' or similar, they mean within this folder scope only.**"
+        )
+    listed = ", ".join(f"'{p}'" for p in scoped_folder_paths)
+    return (
+        f"\n\n**IMPORTANT: This chat is scoped to these folders: {listed}. "
+        f"All tool calls should be restricted to these folders and their subfolders. "
+        f"When using ls, tree, or grep, default the path to '{scoped_folder_path}'. "
+        f"When using query_documents, always include a folder filter (e.g., "
+        f"JOIN folders or WHERE folder_id IN ...) to restrict to this folder scope. "
+        f"When the user asks 'what documents do you have?' or similar, they mean within these folders only.**"
+    )
+
+
 #: The ONE `workspace_files.kind` a person's attachment carries — stamped by the upload route
 #: (`workspace.py`, `kind="template_input"`, D-12) and by nothing else. ⛔ WR-01 (244-07): the
 #: announcement is an ALLOW-LIST on this value, because every other kind on that table is
@@ -1494,14 +1525,7 @@ async def run_agent_loop(
 
     # Augment system prompt with folder scope context so LLM generates scoped queries
     if scoped_folder_path:
-        folder_scope_note = (
-            f"\n\n**IMPORTANT: This chat is scoped to the folder '{scoped_folder_path}'. "
-            f"All tool calls should be restricted to this folder and its subfolders. "
-            f"When using ls, tree, or grep, default the path to '{scoped_folder_path}'. "
-            f"When using query_documents, always include a folder filter (e.g., "
-            f"JOIN folders or WHERE folder_id IN ...) to restrict to this folder scope. "
-            f"When the user asks 'what documents do you have?' or similar, they mean within this folder scope only.**"
-        )
+        folder_scope_note = _folder_scope_note(scoped_folder_path, ctx.scoped_folder_paths)  # 279-02 WR-08
         active_system_prompt = active_system_prompt + folder_scope_note
 
     # Inject enabled skills catalog (General Mode only) — SKIL-09

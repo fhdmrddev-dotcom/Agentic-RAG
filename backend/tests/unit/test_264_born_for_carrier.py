@@ -385,9 +385,13 @@ async def test_resolve_thread_scoping_no_expert_yields_a_none_fifth_element():
         current_user={"id": str(uuid4()), "org_id": str(uuid4())},
         pool=MagicMock(),
     )
-    assert len(result) == 5, f"expected a 5-tuple, got {len(result)}"
-    assert result == (None, None, None, None, None)
+    # 279-02 WR-08 (D-17): was `assert len(result) == 5, …` and `assert result == (None, None, None,
+    # None, None)`. ThreadScoping gained a DEFAULTED 6th field (`scoped_folder_paths`), so the
+    # no-consultant arm is six Nones; the five-positional construction it returns still holds.
+    assert len(result) == 6, f"expected a 6-tuple, got {len(result)}"
+    assert result == (None, None, None, None, None, None)
     assert result.born_for_bundle_id is None
+    assert result.scoped_folder_paths is None
 
 
 @pytest.mark.asyncio

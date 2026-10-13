@@ -7,14 +7,16 @@
   now computed against the PREVIOUS side's effective scope: it is set only when the previous side
   read the thread folder (or everything). ``_dropped_line`` is untouched (268 shares it), and no
   existing 267/268 fixture line changes. The new fixture is the real builder's output.
+* **WR-08 (D-17) — the folder-scope note names every folder** when a run is scoped to 2+, and the
+  single-folder note stays byte-identical to the phase base (see the section below).
 """
 from __future__ import annotations
 
+import ast
 import json
 import pathlib
+import subprocess
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
 
 import pytest
 
@@ -76,3 +78,130 @@ async def test_D07_the_restricted_to_restricted_fixture_is_the_real_builders_out
     )
     assert fixture == ev.model_dump(mode="json")
     assert fixture["excluded"] is None
+
+
+# ── WR-08 (D-17): the folder-scope note names every folder, only when there is more than one ─────
+#
+# ``ExpertScope.scoped_folder_path`` carried the FIRST folder only, so a run scoped to two folders was
+# told "This chat is scoped to the folder '/HR'" while retrieval searched '/HR' AND '/Legal' — the
+# model then filtered its own ls/grep/query_documents calls to half the scope. The paths now travel
+# as ``scoped_folder_paths`` (ExpertScope → ThreadScoping → RunContext) and the note lists them all
+# when there are 2+; the single-folder note stays BYTE-IDENTICAL to the phase base (pinned below by
+# evaluating the base revision's own f-string). The sub-agent (task_service.py) keeps the first-path
+# note by decision (D-17).
+
+PHASE_BASE = "a5a94ba676a63a595f0c2408c7ce17b2ddfe5ada"
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+AGENT_LOOP = REPO_ROOT / "backend" / "app" / "services" / "agent_loop.py"
+
+HR_F = "f2000000-0000-4000-8000-000000000002"
+LEGAL_F = "f7000000-0000-4000-8000-000000000007"
+ACME_F = "f3000000-0000-4000-8000-000000000003"
+ACME_SUB_F = "f4000000-0000-4000-8000-000000000004"
+GONE_F = "f9000000-0000-4000-8000-000000000009"
+FOLDERS = [
+    {"id": HR_F, "name": "HR Policies", "parent_id": None},
+    {"id": LEGAL_F, "name": "Legal", "parent_id": None},
+    {"id": ACME_F, "name": "Client ACME", "parent_id": None},
+    {"id": ACME_SUB_F, "name": "Contracts", "parent_id": ACME_F},
+]
+
+
+def _base_note(path: str) -> str:
+    """The PHASE_BASE note, rendered by evaluating the base revision's own f-string."""
+    try:
+        src = subprocess.run(
+            ["git", "show", f"{PHASE_BASE}:backend/app/services/agent_loop.py"],
+            cwd=REPO_ROOT, capture_output=True, text=True, encoding="utf-8", check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pytest.skip("phase base not reachable from this checkout")
+    for node in ast.walk(ast.parse(src)):
+        if (
+            isinstance(node, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == "folder_scope_note" for t in node.targets)
+        ):
+            expr = ast.Expression(node.value)
+            return eval(compile(expr, "<base>", "eval"), {"scoped_folder_path": path})  # noqa: S307
+    raise AssertionError("base folder_scope_note assignment not found")
+
+
+@pytest.mark.parametrize("paths", [None, (), ("/HR Policies",)], ids=["none", "empty", "one"])
+def test_WR08_the_single_folder_note_is_byte_identical_to_the_phase_base(paths):
+    from app.services.agent_loop import _folder_scope_note
+
+    assert _folder_scope_note("/HR Policies", paths) == _base_note("/HR Policies")
+
+
+def test_WR08_two_folders_are_both_named_and_the_default_path_stays_the_first():
+    from app.services.agent_loop import _folder_scope_note
+
+    note = _folder_scope_note("/HR Policies", ("/HR Policies", "/Legal"))
+    assert "'/HR Policies'" in note and "'/Legal'" in note
+    assert "default the path to '/HR Policies'" in note
+    assert note != _base_note("/HR Policies")
+    assert "expert" not in note.lower()
+
+
+def test_WR08_the_call_site_passes_the_run_contexts_paths():
+    calls = [
+        n for n in ast.walk(ast.parse(AGENT_LOOP.read_text(encoding="utf-8")))
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "_folder_scope_note"
+    ]
+    assert len(calls) == 1
+    assert [ast.unparse(a) for a in calls[0].args] == ["scoped_folder_path", "ctx.scoped_folder_paths"]
+
+
+def test_WR08_compose_restricted_with_two_visible_folders_carries_both_paths():
+    from app.services.expert_scope import compose_expert_scope
+
+    s = compose_expert_scope(
+        scope_mode="restricted", thread_folder_id=None, expert_folder_ids=[HR_F, LEGAL_F], visible_folders=FOLDERS
+    )
+    assert s.scoped_folder_paths == ("/HR Policies", "/Legal")
+    assert s.scoped_folder_paths[0] == s.scoped_folder_path
+
+
+def test_WR08_compose_invisible_folders_carry_no_paths():
+    from app.services.expert_scope import compose_expert_scope
+
+    s = compose_expert_scope(
+        scope_mode="restricted", thread_folder_id=None, expert_folder_ids=[GONE_F], visible_folders=FOLDERS
+    )
+    assert s.scoped_folder_path is None and s.scoped_folder_paths == ()
+
+
+def test_WR08_compose_biased_with_a_thread_folder_lists_the_union_thread_first():
+    from app.services.expert_scope import compose_expert_scope
+
+    s = compose_expert_scope(
+        scope_mode="biased", thread_folder_id=ACME_F, expert_folder_ids=[HR_F, ACME_SUB_F], visible_folders=FOLDERS
+    )
+    # ACME_SUB_F is inside the thread subtree, so it is already covered by '/Client ACME'.
+    assert s.scoped_folder_paths == ("/Client ACME", "/HR Policies")
+    assert s.scoped_folder_path == "/Client ACME"
+
+
+def test_WR08_compose_biased_inside_the_thread_folder_stays_single():
+    from app.services.expert_scope import compose_expert_scope
+
+    s = compose_expert_scope(
+        scope_mode="biased", thread_folder_id=ACME_F, expert_folder_ids=[ACME_SUB_F], visible_folders=FOLDERS
+    )
+    assert s.scoped_folder_paths == ("/Client ACME",)
+
+
+def test_WR08_thread_scoping_keeps_its_five_positional_shape_and_carries_the_paths():
+    import app.services.run_producer as rp
+
+    legacy = rp.ThreadScoping(None, None, None, None, None)
+    assert legacy.scoped_folder_paths is None
+    src = (REPO_ROOT / "backend" / "app" / "services" / "run_producer.py").read_text(encoding="utf-8")
+    assert src.count("scoped_folder_paths=_scoping.scoped_folder_paths") == 2  # both RunContext builds
+
+
+def test_WR08_run_context_has_a_default_none_paths_field():
+    from app.services.agent_loop import RunContext
+
+    fields = RunContext.__dataclass_fields__
+    assert "scoped_folder_paths" in fields and fields["scoped_folder_paths"].default is None
