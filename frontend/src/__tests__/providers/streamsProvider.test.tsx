@@ -1942,7 +1942,13 @@ describe("099-08 — kickoff refusal surfaces the server detail", () => {
   })
 
   it("Test 3 — 409 lock-refusal is byte-equivalent: fixed copy, temps rolled back, NO draft stashed", async () => {
-    mockPostMessage.mockRejectedValueOnce(new ApiError("ignored", 409))
+    // 279-03 D-15: was new ApiError("ignored", 409) — any 409 used to mean the lock
+    mockPostMessage.mockRejectedValueOnce(
+      new ApiError(
+        "Thread is workflow-locked — cancel the active workflow to switch back to Deep mode.",
+        409,
+      ),
+    )
 
     const { result } = renderProvider()
 
@@ -1962,6 +1968,39 @@ describe("099-08 — kickoff refusal surfaces the server detail", () => {
 
     // 409 does NOT stash a draft — retrying a doomed Deep send is meaningless.
     expect(useStreamsStore.getState().failedSendDrafts.has("thread-A")).toBe(false)
+  })
+
+  // 279-03 D-15 (SEED-328): a send 409 that is NOT the workflow lock (the org-mismatch refusal) used
+  // to be disguised as the lock and lost the typed draft. It now reaches the generic ApiError arm.
+  it("Test 3b — 279-03 D-15: a non-lock 409 shows the SERVER's reason and stashes the draft", async () => {
+    const detail = "Switch to this chat's organization to keep chatting with its Expert."
+    mockPostMessage.mockRejectedValueOnce(new ApiError(detail, 409))
+
+    const { result } = renderProvider()
+
+    await act(async () => {
+      await result.current.sendMessage("thread-A", "my prompt")
+    })
+
+    const bucketA =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-A") ?? []
+    expect(bucketA.find((m) => m.role === "user")).toBeUndefined()
+    expect(bucketA.find((m) => m.role === "assistant")).toBeUndefined()
+
+    const err = useStreamsStore.getState().reconcileErrors.get("thread-A")
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).status).toBe(409)
+    expect(err?.message).toBe(detail)
+    expect(err?.message).not.toBe(LOCK_COPY)
+    expect(useStreamsStore.getState().failedSendDrafts.get("thread-A")).toBe("my prompt")
+  })
+
+  it("Test 3c — 279-03 D-15: the lock prefix the provider keys on is the backend's literal (?raw)", async () => {
+    // @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+    const py = (await import("../../../../backend/app/services/workflow_kickoff.py?raw")).default as string
+    expect(py).toContain('"Thread is workflow-locked')
+    const tsx = (await import("../../providers/StreamsProvider.tsx?raw")).default as string
+    expect(tsx).toContain('WORKFLOW_LOCK_DETAIL_PREFIX = "Thread is workflow-locked"')
   })
 
   it("Test 4 — a genuine non-ApiError network failure keeps the failed placeholder, no banner", async () => {
