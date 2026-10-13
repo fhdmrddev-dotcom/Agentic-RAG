@@ -9,8 +9,10 @@ live thread's folder scope, and GET /threads/{id}/scope-effect states the effect
 * A change while an answer streams is ALLOWED (no 409, D-268-12a — research Q1 proved the loop reads
   ``threads.folder_id`` once per run); ``during_run`` is snapshotted so the card's footer says so.
 * A body changing both the Expert and the folder is a 422: one PATCH writes one event.
-* The route resolves with the producer's own inputs — the ACTIVE org and the caller's role
-  (Pitfall 9) — and 404s a thread the caller does not own before any other read.
+* ~~The route resolves with the producer's own inputs — the ACTIVE org and the caller's role
+  (Pitfall 9)~~ — ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-01): an Expert thread is stated in the
+  THREAD's org with the caller's role there (both routes) — and 404s a thread the caller does not
+  own before any other read.
 
 The writer fakes are imported from 267's suite, never copied.
 """
@@ -296,6 +298,9 @@ def _route_patches(db_aexec, desc, *, auth=None):
         patch.object(threads_mod, "get_pg_pool", AsyncMock(return_value=MagicMock())),
         patch.object(threads_mod, "resolve_active_org_or_none", AsyncMock(return_value=ORG_ID)),
         patch("app.dependencies.resolve_caller_role", AsyncMock(return_value=("admin", set()))),
+        # 279-REVIEW WR-01: the Expert is now stated with the caller's role in the THREAD's org —
+        # the `_caller_role_in_org` membership read on the user-JWT connection answers "admin".
+        patch.object(threads_mod, "get_user_pg_connection", FakeTxn(FakeConn(role="admin"))),
         _auth_patch(auth),
     ]
 
@@ -365,7 +370,12 @@ async def test_the_route_404s_a_thread_the_caller_does_not_own_before_any_other_
 async def test_the_route_resolves_with_the_producers_inputs_active_org_and_caller_role():
     out, desc, seen = await _get_effect(thread_row=dict(ROW, active_expert_id=HR_ID))
     kw = desc.await_args.kwargs
-    assert kw["org_id"] == ORG_ID          # the ACTIVE org, never the thread's (Pitfall 9)
+    # assert kw["org_id"] == ORG_ID          # the ACTIVE org, never the thread's (Pitfall 9)
+    # ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-01): that pin held the defect. ORG_ID is the caller's
+    # ACTIVE org and THREAD_ORG the thread's; an Expert thread is stated in the THREAD's org, with the
+    # caller's role THERE. Pitfall 9 still holds for every run that can happen: an Expert-thread run
+    # is refused unless the active org IS the thread's org (send door + _resolve_thread_scoping).
+    assert kw["org_id"] == THREAD_ORG
     assert kw["caller_roles"] == ["admin"]
     assert kw["expert_id"] == HR_ID
     assert seen[0].table_name == "threads" and seen[0].call("eq")[1] == ("eq", ("user_id", USER_ID), {})
@@ -409,3 +419,108 @@ def test_the_scope_effect_route_is_registered_under_the_thread():
 
     paths = {(r.path, tuple(sorted(getattr(r, "methods", ())))) for r in router.routes}
     assert ("/threads/{thread_id}/scope-effect", ("GET",)) in paths
+
+
+# ── 267-REVIEW-INDEPENDENT WR-02 (279-02): the folder arm checks the Expert too ────────────────────
+
+
+@pytest.mark.asyncio
+async def test_WR02_the_folder_update_is_also_conditional_on_the_expert_it_read():
+    import re
+
+    db = ThreadsDb(before_expert=HR_ID, folder_id=ACME_FOLDER)
+    txn = FakeTxn(FakeConn())
+    await _patch_folder(ThreadUpdate(folder_id=UUID(ACME_SUB)), db, txn)
+    sql, args = txn.conn.executed[0]
+    m = re.search(r"active_expert_id IS NOT DISTINCT FROM \$(\d+)::uuid", sql)
+    assert m, sql
+    assert str(args[int(m.group(1)) - 1]) == HR_ID
+    assert "folder_id IS NOT DISTINCT FROM $4::uuid" in sql
+
+
+# ── 279-REVIEW WR-01: both routes state a thread's Expert in the THREAD's org ──────────────────────
+#
+# The caller's ACTIVE org is ORG_ID; the thread (and its Expert) belong to THREAD_ORG. The resolver
+# below names the Expert ONLY in THREAD_ORG — the "bundle cannot be named in B" case from the review.
+# Before the fix both routes asked in ORG_ID, got nothing, and stated the thread alone (no Expert,
+# not held) — and the folder PATCH persisted that false row into the org-A thread.
+
+
+def _org_aware_patches():
+    from tests.unit.test_267_scope_preview import BUNDLES
+
+    calls = []
+
+    async def _resolve(*, pool, bundle_id, caller_org_id, caller_user_id, caller_roles=None):
+        calls.append((str(caller_org_id), list(caller_roles or [])))
+        return BUNDLES.get(str(bundle_id)) if str(caller_org_id) == THREAD_ORG else None
+
+    return calls, [
+        patch("app.services.expert_scope_statement.resolve_expert_bundle", AsyncMock(side_effect=_resolve)),
+        # Not nameable in the active org at all → describe_scope_change's LookupError arm.
+        patch("app.services.expert_scope_statement.get_expert_service", AsyncMock(return_value=None)),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_WR01_scope_effect_states_an_expert_thread_in_the_threads_org_not_the_active_one():
+    from types import SimpleNamespace
+
+    from app.api import threads as threads_mod
+    from tests.unit.test_267_scope_preview import scope_patches
+
+    calls, org_patches = _org_aware_patches()
+    conn = FakeConn(role="member")
+
+    async def _aexec(q):
+        return SimpleNamespace(data=dict(ROW, active_expert_id=HR_ID))
+
+    with ExitStack() as stack:
+        for p in (*scope_patches(), *org_patches):
+            stack.enter_context(p)
+        stack.enter_context(patch.object(threads_mod, "aexec", _aexec))
+        stack.enter_context(patch.object(threads_mod, "get_pg_pool", AsyncMock(return_value=MagicMock())))
+        stack.enter_context(patch.object(threads_mod, "resolve_active_org_or_none", AsyncMock(return_value=ORG_ID)))
+        stack.enter_context(patch.object(threads_mod, "get_user_pg_connection", FakeTxn(conn)))
+        stack.enter_context(_auth_patch())
+        out = await threads_mod.get_scope_effect(
+            thread_id=UUID(THREAD_ID), request=MagicMock(), folder_id=None, clear=False,
+            current_user={"id": USER_ID}, supabase=FakeSupabase(),
+        )
+    assert calls and {c[0] for c in calls} == {THREAD_ORG}
+    assert {c[1][0] for c in calls} == {"member"}  # the caller's role in the THREAD's org
+    assert [str(a[0]) for _sql, a in conn.fetched] == [THREAD_ORG]
+    assert out.held is True  # the restricted Expert holds the thread folder back
+    assert out.expert is not None and out.expert.name == "HR Advisor"
+
+
+@pytest.mark.asyncio
+async def test_WR01_a_folder_patch_on_an_expert_thread_in_another_active_org_persists_the_threads_statement():
+    from app.api import threads as threads_mod
+
+    calls, org_patches = _org_aware_patches()
+    db = ThreadsDb(before_expert=HR_ID, folder_id=ACME_FOLDER)  # thread org THREAD_ORG, active ORG_ID
+    txn = FakeTxn(FakeConn(role="member"))
+    with ExitStack() as stack:
+        # The writer patches first, then the org-aware resolver ON TOP of their org-blind one.
+        for p in (*_writer_patches(db, txn), _auth_patch(), *org_patches):
+            stack.enter_context(p)
+        await threads_mod.rename_thread(
+            thread_id=THREAD_ID, body=ThreadUpdate(folder_id=UUID(ACME_SUB)), request=MagicMock(),
+            current_user={"id": USER_ID}, supabase=FakeSupabase(),
+        )
+    assert calls and {c[0] for c in calls} == {THREAD_ORG}
+    ev = _event_of(txn)
+    assert ev["expert"] is not None and ev["expert"]["name"] == "HR Advisor"
+    assert ev["held"] is True
+    # The row still lands in the THREAD's org (D-267-34, unchanged).
+    assert str(txn.conn.executed[1][1][2]) == THREAD_ORG
+
+
+@pytest.mark.asyncio
+async def test_WR01_a_plain_thread_makes_no_membership_read():
+    db = ThreadsDb(before_expert=None, folder_id=ACME_FOLDER)
+    txn = FakeTxn(FakeConn())
+    await _patch_folder(ThreadUpdate(folder_id=UUID(ACME_SUB)), db, txn)
+    assert txn.conn.fetched == []
+    assert txn.entered == 1

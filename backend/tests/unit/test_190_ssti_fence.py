@@ -68,7 +68,7 @@ _PHASE_TYPES = _APP_ROOT / "services" / "harness" / "phase_types.py"
 #: two are constructions and the other two are prose quoting them.
 _SANDBOXED_SITES = (
     _APP_ROOT / "services" / "template_render_service.py",
-    _APP_ROOT / "services" / "tool_dispatcher.py",
+    _APP_ROOT / "services" / "tools" / "render_template.py",
 )
 
 #: The evaluator vocabulary, as PROPERTIES rather than substrings.

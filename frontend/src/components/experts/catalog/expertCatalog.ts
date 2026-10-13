@@ -183,6 +183,17 @@ export const START_COPY = {
   busy: "Starting…",
 } as const
 
+/**
+ * 279-REVIEW WR-05 — a DISABLED Expert. Only an `experts:manage` caller is sent one (279-02 Commit G:
+ * the catalog reads `listExperts(true, false)`), and every chat door refuses it (`assert_expert_bindable`
+ * → 404), so its card and modal carry this status instead of a Start control that can only fail.
+ */
+export const DISABLED_COPY = {
+  /** The card's short status words (the pill); the full line is its title and the modal's footer. */
+  tag: "Disabled",
+  line: "Disabled for this organization — enable it in Organization admin → Experts to chat with it.",
+} as const
+
 /** Ledger headings live beside the selector that builds the ledger's payload (UI-SPEC §7). */
 export const LEDGER_COPY = {
   brings: "Brings",
@@ -190,12 +201,16 @@ export const LEDGER_COPY = {
   more: (k: number): string => `and ${k} more`,
   // Phase 267 plan 04 (PACK-25 / D-267-18 / D-267-19): the restricted-cost ledger's headings.
   willUse: "Will use",
-  /** ⛔ `n` is the server's `excluded_count`, never a list length (the list is capped at five). */
-  wontUse: (n: number): string => `Won't use · ${n}`,
+  /**
+   * ⛔ `n` is the server's `excluded_count`, never a list length (the list is capped at five).
+   * 279-03 WR-04 (D-09): the heading says SEARCH — an excluded document is not searched, but the
+   * chat's own attachments stay readable, so "use" overstated the wall.
+   */
+  wontSearch: (n: number): string => `Won't search · ${n}`,
   /** Always readable, whatever the scope (D-267-19) — listed last in the Will use column. */
   chatAttachments: "Chat attachments",
-  /** 267-REVIEW WR-06 (D-267-35): the no-count heading over `All your documents`. */
-  wontUseAll: "Won't use",
+  /** 267-REVIEW WR-06 (D-267-35): the no-count heading over `All your documents` (279-03 D-09 wording). */
+  wontSearchAll: "Won't search",
 } as const
 
 export interface ConnectionGate {
@@ -293,6 +308,9 @@ export function connectionLedgerColumns(
  *   • `chat`    — installed and ready: the existing Start Chat control.
  *   • `connect` — install ready/legacy, but a required connection is missing. Gate order is
  *                 install → connection: an install that is not ready always wins.
+ *   • 279-REVIEW WR-05: a bundle with `is_enabled === false` is a `status` (DISABLED_COPY.line)
+ *                 before any install or connection fact — no door would let it join a chat. A row
+ *                 without the key reads as enabled (the column's default, as on the server).
  */
 export type InstallView =
   | { kind: "legacy" }
@@ -313,6 +331,7 @@ function installCause(install: NonNullable<ExpertBundle["install"]>): string {
 }
 
 export function installView(expert: ExpertBundle): InstallView {
+  if (expert.is_enabled === false) return { kind: "status", line: DISABLED_COPY.line }
   const view = installOnlyView(expert)
   // Gate order install → connection: only an Expert that could otherwise start a chat is asked
   // about its connections, so a surface never shows two gate reasons at once.
@@ -354,6 +373,7 @@ function installOnlyView(expert: ExpertBundle): InstallView {
  */
 export function installCardLine(expert: ExpertBundle): string | null {
   if (installView(expert).kind !== "status") return null
+  if (expert.is_enabled === false) return DISABLED_COPY.tag // 279-REVIEW WR-05
   const state = expert.install?.state
   if (state === "installing") return INSTALL_COPY.cardInstalling
   if (state === "failed") return INSTALL_COPY.cardFailedNeedsAdmin
@@ -437,11 +457,14 @@ export function inviteBlock(expert: ExpertBundle): InviteBlock | null {
 }
 
 /**
- * `Will use` = the Expert's folders (server-named) then `Chat attachments`; `Won't use · N` only
- * when the server excluded something. ⛔ ONE response feeds both columns, and the heading's N is
+ * `Will use` = the Expert's folders (server-named) then `Chat attachments`; `Won't search · N`
+ * only when the server excluded something. ⛔ ONE response feeds both columns, and the heading's N is
  * `excluded_count` — the names list is capped, so its length is never the count.
  */
-export function previewLedgerColumns(preview: ExpertScopePreview): LedgerColumn[] {
+export function previewLedgerColumns(
+  preview: ExpertScopePreview,
+  opts?: { onThread?: boolean },
+): LedgerColumn[] {
   const will: LedgerColumn["items"] = (preview.expert_folders ?? []).map((f) =>
     typeof f.name === "string" && f.name.trim()
       ? { label: f.name }
@@ -458,9 +481,21 @@ export function previewLedgerColumns(preview: ExpertScopePreview): LedgerColumn[
     const names = preview.excluded_names ?? []
     columns.push({
       tone: "no",
-      heading: LEDGER_COPY.wontUse(count),
+      heading: LEDGER_COPY.wontSearch(count),
       items: names.map((label) => ({ label })),
       more: Math.max(0, count - names.length),
+    })
+  }
+  // 279-03 WR-03 (SEED-328): a RESTRICTED Expert on an EXISTING thread with NO folder searches only
+  // its own folders — everything else is not searched. The server computes exclusions only against a
+  // thread folder (so `excluded_count` is 0 here), and `compose_expert_scope` must stay byte-equal,
+  // so this one column is driven from a client fact. ⚠ Never on a brand-new chat (no thread): the
+  // caller omits `onThread` there, and the narrowing selector below never passes it.
+  if (preview.mode === "restricted" && !preview.thread_folder && opts?.onThread) {
+    columns.push({
+      tone: "no",
+      heading: LEDGER_COPY.wontSearchAll,
+      items: [{ label: PREVIEW_COPY.contextAll }],
     })
   }
   return columns
@@ -469,7 +504,7 @@ export function previewLedgerColumns(preview: ExpertScopePreview): LedgerColumn[
 /**
  * 267-REVIEW WR-06 (D-267-35) — a BIASED Expert on a chat with NO folder reads only its own folders
  * (kept, and STATED — never silent). `Will use` = the same column `previewLedgerColumns` builds;
- * `Won't use` = `All your documents`. `null` when the preview shows no narrowing: a restricted
+ * `Won't search` = `All your documents`. `null` when the preview shows no narrowing: a restricted
  * Expert (its own ledger), a chat with a folder (thread ∪ Expert), or an Expert with no folders
  * (an empty composition reaches retrieval as no filter). ⛔ Built from the ONE preview payload.
  *
@@ -484,6 +519,6 @@ export function narrowingLedgerColumns(preview: ExpertScopePreview): LedgerColum
   const [will] = previewLedgerColumns({ ...preview, excluded_count: 0, excluded_names: [] })
   return [
     will,
-    { tone: "no", heading: LEDGER_COPY.wontUseAll, items: [{ label: PREVIEW_COPY.contextAll }] },
+    { tone: "no", heading: LEDGER_COPY.wontSearchAll, items: [{ label: PREVIEW_COPY.contextAll }] },
   ]
 }

@@ -34,8 +34,19 @@ const path = require('path');
 const HARD_LIMIT = 150000;
 const WARN_LIMIT = 120000;
 // Phase 208 — the hot-file ledger's disposition cell carries the VERDICT only.
-// 200 is generous: the longest legitimate verdict at the split measured 115.
-const LEDGER_CELL_LIMIT = 200;
+// ~~200 is generous: the longest legitimate verdict at the split measured 115.~~
+// ⚠ SUPERSEDED 2026-10-12 (Phase 277), kept beside the original: this hook bound
+// `startsWith('| File | commits')`, a header CLAUDE.md has not carried since the
+// 2026-09-06 move, so it parsed ZERO rows of the table that stayed here while that
+// table's verdict cells regrew to 23,049 chars. It now binds the FIRING shortlist's
+// EXACT header at an 80-char cap -- the same table, cap, floor and truncation check
+// as scripts/check-claude-md-size.cjs. (The docs scan list's 200 cap lives in the
+// gate only; this hook runs on CLAUDE.md files alone.)
+const LEDGER_CELL_LIMIT = 80;
+const MIN_SHORTLIST_ROWS = 100;
+const SHORTLIST_HEADER = '| Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |';
+const SHORTLIST_CELLS = 5;
+const SHORTLIST_VERDICT = 3;
 
 let raw = '';
 process.stdin.on('data', (c) => (raw += c));
@@ -60,16 +71,51 @@ process.stdin.on('end', () => {
   // previous guard could not have caught either trip in the turn that caused it:
   // at 51k it said nothing at all, while the column that would grow to 60k was
   // being written a paragraph at a time.
+  // The ROOT CLAUDE.md is the one that must carry the table: its directory holds `.git`
+  // (a directory in the main checkout, a file in a worktree). A nested CLAUDE.md without
+  // the table is not a finding.
+  const isRoot = (() => {
+    try {
+      return fs.existsSync(path.join(path.dirname(path.resolve(filePath)), '.git'));
+    } catch {
+      return false;
+    }
+  })();
+  const splitCells = (l) => l.replace(/\\\|/g, '\u0000').split('|').map((c) => c.trim());
+
   const ledger = (() => {
     const rowLines = text.split('\n');
-    const start = rowLines.findIndex((l) => l.startsWith('| File | commits'));
-    if (start === -1) return null;
+    const start = rowLines.findIndex((l) => l.trim() === SHORTLIST_HEADER);
+    const missing = [];
+    if (start === -1) {
+      if (isRoot) {
+        missing.push(`${filePath}  0 rows parsed (floor ${MIN_SHORTLIST_ROWS}) — the cell cap would bind nothing`);
+        return { long: [], dupes: [], malformed: [], missing };
+      }
+      return null;
+    }
     const rows = [];
-    for (let i = start + 2; i < rowLines.length && rowLines[i].startsWith('|'); i++) {
+    let i = start + 2;
+    for (; i < rowLines.length && rowLines[i].startsWith('|'); i++) {
       // Split on UNESCAPED pipes -- cells legitimately contain an escaped one.
-      const cells = rowLines[i].replace(/\\\|/g, '\u0000').split('|').map((c) => c.trim());
+      const cells = splitCells(rowLines[i]);
       const m = /`([^`]+)`/.exec(cells[1] || '');
-      if (m) rows.push({ line: i + 1, path: m[1], cells: cells.length, d: cells[4] || '' });
+      if (m) rows.push({ line: i + 1, path: m[1], cells: cells.length, d: cells[SHORTLIST_VERDICT] || '' });
+    }
+    if (isRoot) {
+      if (rows.length < MIN_SHORTLIST_ROWS) {
+        missing.push(`${filePath}  ${rows.length} rows parsed (floor ${MIN_SHORTLIST_ROWS}) — the cell cap would bind nothing`);
+      }
+      // TRUNCATION, same as the gate: the floor alone misses a break after row 100.
+      let k = 0;
+      for (let j = i; j < rowLines.length && !rowLines[j].startsWith('## '); j++) {
+        if (rowLines[j].startsWith('| `') && splitCells(rowLines[j]).length === SHORTLIST_CELLS) k++;
+      }
+      if (k > 0) {
+        missing.push(
+          `${filePath}  table cut short at line ${i + 1}: ${rows.length} rows parsed, ${k} more FIRING-shaped rows follow before the next heading`
+        );
+      }
     }
     const seen = new Map();
     const dupes = [];
@@ -83,13 +129,15 @@ process.stdin.on('end', () => {
         .map((r) => `line ${r.line}  ${r.d.length} chars (cap ${LEDGER_CELL_LIMIT})  ${r.path}`),
       dupes,
       malformed: rows
-        .filter((r) => r.cells !== 6)
-        .map((r) => `line ${r.line}  ${r.cells} cells, expected 6  ${r.path}`),
+        .filter((r) => r.cells !== SHORTLIST_CELLS)
+        .map((r) => `line ${r.line}  ${r.cells} cells, expected ${SHORTLIST_CELLS}  ${r.path}`),
+      missing,
     };
   })();
 
   const structural = ledger
     ? [
+        ...ledger.missing.map((x) => `  [shortlist-missing] ${x}`),
         ...ledger.long.map((x) => `  [disposition-too-long] ${x}`),
         ...ledger.dupes.map((x) => `  [duplicate-row] ${x}`),
         ...ledger.malformed.map((x) => `  [malformed-row] ${x}`),
@@ -100,31 +148,12 @@ process.stdin.on('end', () => {
   const chars = text.length;
   if (chars < WARN_LIMIT && structural.length === 0) process.exit(0);
 
-  if (structural.length) {
-    process.stdout.write(
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'PostToolUse',
-          additionalContext: [
-            `HOT-FILE LEDGER — ${structural.length} structural problem(s) in ${filePath}:`,
-            ...structural,
-            '',
-            'The table is the AUDIT SCAN LIST: it keeps the VERDICT, nothing more. Every',
-            "reason, invariant, correction and named seam goes in that file's own section",
-            'in docs/HOT-FILE-LEDGER.md, in the SAME COMMIT. A row without a section is',
-            'drift -- and so is a paragraph in a cell. This one column reaching 45% of',
-            'CLAUDE.md is what caused BOTH 150k trips.',
-            'Verify with: node scripts/check-claude-md-size.cjs',
-          ].join('\n'),
-          claude_md_chars: chars,
-          ledger_structural_problems: structural.length,
-          file_path: filePath,
-        },
-      })
-    );
-    process.exit(0);
-  }
-
+  // ~~if (structural.length) { write the ledger block ALONE; process.exit(0); }~~
+  // ⚠ SUPERSEDED 2026-10-12 (261012-x1l / WR-01), kept beside the original: that early
+  // return HID THE STOP. A CLAUDE.md over 150k with one 81-char cell got a cell-length
+  // nit and no "WILL NOT LOAD" -- the one condition that silently drops every
+  // instruction. Now ONE combined context: the size verdict LEADS whenever
+  // chars >= WARN_LIMIT, then the ledger block, then a single Verify line.
   const over = chars >= HARD_LIMIT;
   const pct = Math.round((chars / HARD_LIMIT) * 1000) / 10;
 
@@ -149,18 +178,40 @@ process.stdin.on('end', () => {
       .join('\n');
   })();
 
+  const sizeLines =
+    chars >= WARN_LIMIT
+      ? [
+          over
+            ? `STOP — ${filePath} is ${chars} chars, at or over the ${HARD_LIMIT} limit. It WILL NOT LOAD.`
+            : `WARNING — ${filePath} is ${chars} chars (${pct}% of the ${HARD_LIMIT} limit, headroom ${HARD_LIMIT - chars}).`,
+          over
+            ? 'Every session and every subagent is silently losing these instructions. Split it before doing anything else.'
+            : 'Split it now, on schedule, rather than at the ceiling.',
+          'Biggest sections:',
+          biggest,
+          'Split by FUNCTION, never by deletion: CLAUDE.md keeps the verdict / index /',
+          'audit-scan-list; the narrative moves to docs/<TOPIC>.md under a same-commit',
+          'sync rule. Precedents: docs/HOT-FILE-LEDGER.md, docs/SANDBOX-PACKAGES.md.',
+        ]
+      : [];
+
+  const ledgerLines = structural.length
+    ? [
+        `HOT-FILE LEDGER — ${structural.length} structural problem(s) in ${filePath}:`,
+        ...structural,
+        '',
+        'The table is the AUDIT SCAN LIST: it keeps the VERDICT, nothing more. Every',
+        "reason, invariant, correction and named seam goes in that file's own section",
+        'in docs/HOT-FILE-LEDGER.md, in the SAME COMMIT. A row without a section is',
+        'drift -- and so is a paragraph in a cell. This one column reaching 45% of',
+        'CLAUDE.md is what caused BOTH 150k trips.',
+      ]
+    : [];
+
   const additionalContext = [
-    over
-      ? `STOP — ${filePath} is ${chars} chars, at or over the ${HARD_LIMIT} limit. It WILL NOT LOAD.`
-      : `WARNING — ${filePath} is ${chars} chars (${pct}% of the ${HARD_LIMIT} limit, headroom ${HARD_LIMIT - chars}).`,
-    over
-      ? 'Every session and every subagent is silently losing these instructions. Split it before doing anything else.'
-      : 'Split it now, on schedule, rather than at the ceiling.',
-    'Biggest sections:',
-    biggest,
-    'Split by FUNCTION, never by deletion: CLAUDE.md keeps the verdict / index /',
-    'audit-scan-list; the narrative moves to docs/<TOPIC>.md under a same-commit',
-    'sync rule. Precedents: docs/HOT-FILE-LEDGER.md, docs/SANDBOX-PACKAGES.md.',
+    ...sizeLines,
+    ...(sizeLines.length && ledgerLines.length ? [''] : []),
+    ...ledgerLines,
     'Verify with: node scripts/check-claude-md-size.cjs',
   ].join('\n');
 
@@ -171,6 +222,7 @@ process.stdin.on('end', () => {
         additionalContext,
         claude_md_chars: chars,
         claude_md_over_limit: over,
+        ledger_structural_problems: structural.length,
         file_path: filePath,
       },
     })

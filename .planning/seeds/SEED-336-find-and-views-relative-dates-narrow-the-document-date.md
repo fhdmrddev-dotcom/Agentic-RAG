@@ -3,9 +3,9 @@ seed_id: SEED-336
 title: In Find and saved Views, a relative-date condition on a custom date field silently narrows the DOCUMENT date instead of that field
 created: 2026-10-03
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Reviewed at Phase 278 discuss (2026-10-13), trigger fired on view_filter_compiler.py / document_search_service.py. Deferred by operator: 278 is behaviour-preserving (SC#4) and either fix changes what existing saved Views return. Re-open: the first phase allowed to change Find/Views results. 278's single date-word home (DEBT-09) makes the fix a one-place change."
 trigger_when: "The next phase that touches view_filter_compiler.py / view_operators_extra.py / document_search_service.py or the Phase 114 filter builder; or a user reports a saved View returning documents outside a 'within the next N days' window on a contract/renewal date field."
 trigger_paths: ["backend/app/services/view_filter_compiler.py", "backend/app/services/view_operators_extra.py", "backend/app/services/document_search_service.py", "backend/app/services/document_view_resolver.py"]
 trigger_surfaces: ["library"]

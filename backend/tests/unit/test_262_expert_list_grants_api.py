@@ -202,15 +202,68 @@ def test_a_member_cannot_widen_the_list_to_disabled_experts_with_enabled_only_fa
     """
     _wire(expert_test_app)
 
+    # 279-02 (SEED-328 drive note): STRENGTHENED — the arm now asks `experts:manage` when a caller
+    # sends enabled_only=false, so the member's answer is pinned (False) rather than left to the
+    # real seam; and the question is proven to have been asked.
     with patch(
         "app.services.entitlement_service.check_entitlement", new_callable=AsyncMock
     ) as mock_check, patch(
+        "app.api.experts._has_org_permission", new_callable=AsyncMock
+    ) as mock_perm, patch(
         "app.api.experts.list_experts_service", new_callable=AsyncMock
     ) as mock_list:
         mock_check.return_value = ALLOWED
+        mock_perm.return_value = False
         mock_list.return_value = []
 
         resp = TestClient(expert_test_app).get("/experts?enabled_only=false")
 
     assert resp.status_code == status.HTTP_200_OK
     assert mock_list.await_args.kwargs["enabled_only"] is True
+    assert [c.args[-1] for c in mock_perm.await_args_list] == ["experts:manage"]
+
+
+def test_a_manager_may_list_disabled_experts_on_the_grant_aware_arm(expert_test_app):
+    """279-02 (SEED-328 drive note): a caller holding `experts:manage` who sends enabled_only=false
+    sees disabled Experts in the catalog (still through the grant-aware arm, own id/roles)."""
+    _wire(expert_test_app)
+
+    with patch(
+        "app.services.entitlement_service.check_entitlement", new_callable=AsyncMock
+    ) as mock_check, patch(
+        "app.api.experts._has_org_permission", new_callable=AsyncMock
+    ) as mock_perm, patch(
+        "app.api.experts.list_experts_service", new_callable=AsyncMock
+    ) as mock_list:
+        mock_check.return_value = ALLOWED
+        mock_perm.return_value = True
+        mock_list.return_value = []
+
+        resp = TestClient(expert_test_app).get("/experts?enabled_only=false")
+
+    assert resp.status_code == status.HTTP_200_OK
+    kwargs = mock_list.await_args.kwargs
+    assert kwargs["enabled_only"] is False
+    assert kwargs["caller_user_id"] is not None  # the grant-aware arm, not the management one
+
+
+def test_the_default_list_never_asks_the_manage_permission(expert_test_app):
+    """279-02: the permission is asked ONLY when a caller sends enabled_only=false (short-circuit)."""
+    _wire(expert_test_app)
+
+    with patch(
+        "app.services.entitlement_service.check_entitlement", new_callable=AsyncMock
+    ) as mock_check, patch(
+        "app.api.experts._has_org_permission", new_callable=AsyncMock
+    ) as mock_perm, patch(
+        "app.api.experts.list_experts_service", new_callable=AsyncMock
+    ) as mock_list:
+        mock_check.return_value = ALLOWED
+        mock_perm.return_value = True
+        mock_list.return_value = []
+
+        resp = TestClient(expert_test_app).get("/experts")
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert mock_list.await_args.kwargs["enabled_only"] is True
+    mock_perm.assert_not_awaited()

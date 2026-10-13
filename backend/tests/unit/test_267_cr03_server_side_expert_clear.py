@@ -67,12 +67,12 @@ async def _stale_send(pool, aexec, *, get_expert=None, describe_error=None):
     patches = [
         patch("app.utils.db.aexec", aexec),
         patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=None)),
-        patch("app.services.expert_scope.resolve_expert_bundle", AsyncMock(return_value=None)),
-        patch("app.services.expert_scope.get_expert_service", get_expert),
-        patch("app.services.expert_scope.fetch_visible_folders", AsyncMock(return_value=[])),
+        patch("app.services.expert_scope_statement.resolve_expert_bundle", AsyncMock(return_value=None)),
+        patch("app.services.expert_scope_statement.get_expert_service", get_expert),
+        patch("app.services.expert_scope_statement.fetch_visible_folders", AsyncMock(return_value=[])),
     ]
     if describe_error is not None:
-        patches.append(patch("app.services.expert_scope.describe_expert_scope", AsyncMock(side_effect=describe_error)))
+        patches.append(patch("app.services.expert_scope_statement.describe_expert_scope", AsyncMock(side_effect=describe_error)))
     for p in patches:
         p.start()
     try:
@@ -80,7 +80,11 @@ async def _stale_send(pool, aexec, *, get_expert=None, describe_error=None):
             await _resolve_thread_scoping(
                 supabase=MagicMock(),
                 thread_id=THREAD,
-                current_user={"id": USER, "org_id": ACTIVE_ORG},
+                # current_user={"id": USER, "org_id": ACTIVE_ORG},
+                # ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-02): an Expert thread whose org is not the
+                # caller's is now refused BEFORE any resolve or clear (ExpertThreadOrgMismatch), so
+                # the stale clear these (a) cases drive is reachable only in the thread's own org.
+                current_user={"id": USER, "org_id": THREAD_ORG},
                 pool=pool,
             )
     finally:
@@ -130,13 +134,14 @@ async def test_a_the_clear_is_conditional_on_the_expert_it_read():
     table.update.return_value = table
     with patch("app.utils.db.aexec", aexec), \
          patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=None)), \
-         patch("app.services.expert_scope.resolve_expert_bundle", AsyncMock(return_value=None)), \
-         patch("app.services.expert_scope.get_expert_service", AsyncMock(return_value={"name": "HR Advisor"})), \
-         patch("app.services.expert_scope.fetch_visible_folders", AsyncMock(return_value=[])):
+         patch("app.services.expert_scope_statement.resolve_expert_bundle", AsyncMock(return_value=None)), \
+         patch("app.services.expert_scope_statement.get_expert_service", AsyncMock(return_value={"name": "HR Advisor"})), \
+         patch("app.services.expert_scope_statement.fetch_visible_folders", AsyncMock(return_value=[])):
         with pytest.raises(ValueError):
             await _resolve_thread_scoping(
                 supabase=supabase, thread_id=THREAD,
-                current_user={"id": USER, "org_id": ACTIVE_ORG}, pool=pool,
+                # current_user={"id": USER, "org_id": ACTIVE_ORG}, pool=pool,
+                current_user={"id": USER, "org_id": THREAD_ORG}, pool=pool,  # 279-REVIEW WR-02
             )
     table.update.assert_called_with({"active_expert_id": None})
     assert ("active_expert_id", EXPERT) in [c.args for c in table.eq.call_args_list]
@@ -164,7 +169,7 @@ async def test_a_the_patch_door_and_the_send_door_write_one_row_shape():
     import inspect
 
     from app.api import threads as threads_mod
-    from app.services import expert_scope, run_producer
+    from app.services import expert_scope_events as expert_scope, run_producer
 
     assert "insert_expert_changed_row(" in inspect.getsource(threads_mod._write_expert_change)
     assert "insert_expert_changed_row(" in inspect.getsource(run_producer)

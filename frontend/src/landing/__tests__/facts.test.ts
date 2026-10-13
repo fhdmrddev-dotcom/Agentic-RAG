@@ -49,7 +49,7 @@ describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
     expect(EXTRACT_CAPABILITIES).toHaveLength(7)
     expect(PRODUCE_FORMATS).toHaveLength(9)
     expect(GAUNTLET_STAGES).toHaveLength(10)
-    expect(BUILTIN_TOOL_COUNT).toBe(29)
+    expect(BUILTIN_TOOL_COUNT).toBe(30) // 30 since 273 added show_artifact
     expect(CONNECTOR_CATALOG).toHaveLength(13)
     expect(SURFACE_TABS.library).toHaveLength(5)
     expect(SURFACE_TABS.settings).toHaveLength(5)
@@ -85,7 +85,7 @@ describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
 
   it("literal fence: no hardcoded product claim numbers in landing JSX copy, index.html, or app.html", () => {
     const subdirs = ["components", "scenes"]
-    const trackedClaimNumerals = new Set(["8", "10", "11", "13", "29"])
+    const trackedClaimNumerals = new Set(["8", "10", "11", "13", "30"])
 
     // Match text nodes between > and <
     const textNodeRegex = />([^<]+)</g

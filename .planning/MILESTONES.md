@@ -32,7 +32,7 @@ can interact with — plus the one absent DMS capability, retention with legal h
 ⚠ Verification mode is `self-verified` for 270-276. 271/272/273 close `human_needed` (operator
 sign-offs owed, every ROADMAP SC verified).
 ✅ 270-274 + 276 deployed 2026-10-05 (prod `bd9e126c3`, cloud DB at migration 203).
-⛔ **275 NOT deployed** — production migrations 204 → 205 → 206 before the backend; sweep flag stays off.
+✅ **275 DEPLOYED 2026-10-12** — prod `784647e2d`; migrations 204 → 205 → 206 applied in order (each VERIFY all PASS), backend live 18:32, advisors 0 ERROR, 0 deletes in the 4-min window; sweep flag stays off.
 Known deferred items at close: 47 (see STATE.md Deferred Items).
 
 ---

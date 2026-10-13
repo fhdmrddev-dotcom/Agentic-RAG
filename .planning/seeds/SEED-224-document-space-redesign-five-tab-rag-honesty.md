@@ -1,7 +1,10 @@
 ---
 seed_id: SEED-224
 title: Document space redesign — the Stitch "RAG Document Manager" journey as a five-tab Documents section, RAG-honesty first
-status: planted
+status: partially-answered
+partial: true
+folded_into: "278"
+status_note: "Extraction half ANSWERED (discharged by 272-01's pure move; confirmed by measurement at 278-04, 2026-10-13: retrieval_service.py 24 / 13 / 176, one top-level def, test_272_pure_move 9 passed). The five-tab Documents redesign half stays open. Previously: Extraction half ONLY folded into Phase 278 (SEAM-02) at v4.6 intake; measured at 278 discuss (2026-10-13) as already discharged by 272-01 (retrieval_service.py 174 L, orchestrator only). Flip to partially-answered when 278 ships. The five-tab Documents redesign half stays open."
 planted: 2026-08-28
 planted_by: Claude, 2026-08-28, operator direction after reviewing Stitch project "RAG Document Manager V1" — "capture the requirements… same tone, same level of information, same level of user experience… keep it simple, do not deviate from the RAG"
 enriched: 2026-08-28 — the two load-bearing assumptions MEASURED rather than assumed, the host surface located, and the G-5 exposure derived from git (see "Measured at planting time")
@@ -91,10 +94,12 @@ buckets excluded), and `grep -c <basename> CLAUDE.md` is **0** for every row bel
 |---|---|---|---|
 | `frontend/src/components/ingestion/DocumentList.tsx` | 22 / 12 / 609 | **FIRES** | ⚠ none |
 | `frontend/src/pages/IngestionPage.tsx` | 26 / 9 / 601 | **FIRES** | ⚠ none |
-| `backend/app/services/retrieval_service.py` | 17 / 9 / 362 | **FIRES** | ⚠ none |
+| `backend/app/services/retrieval_service.py` | ~~17 / 9 / 362~~ | ~~**FIRES**~~ | ~~⚠ none~~ |
 | `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 6 / 5 / 393 | **FIRES** | ⚠ none |
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | **FIRES — at threshold** | ⚠ none |
 | `frontend/src/components/ingestion/DocumentUpload.tsx` | 10 / 1 / 144 | no (1 phase) | ⚠ none |
+
+⚠ **CORRECTED 2026-10-13 (Phase 278, 278-04) for the `retrieval_service.py` row only:** measured `24 / 13 / 176`, the orchestrator only (one top-level def, `search_documents`). The extraction was discharged by 272-01's pure move, and the file has rows in CLAUDE.md and `docs/HOT-FILE-LEDGER.md`. It still FIRES by phase count, but the owed extraction is no longer owed. The other rows are not re-derived here.
 
 `DocumentList.tsx` at **12 phases** and `retrieval_service.py` at **9** have been invisible to
 their own guardrail for their entire lives. **A discuss-phase for this seed must add these rows

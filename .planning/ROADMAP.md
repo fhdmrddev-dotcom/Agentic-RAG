@@ -28,7 +28,274 @@
 - ✅ **v4.2 The Connected Knowledge You Can Actually Run** — Phases **247-254** (shipped 2026-09-18, git tag `v4.2`). 8 phases (247-251 scoped; **252 / 253 / 254 inserted by audit**), **31 plans**, migration **181**, 6 days. **25/26 requirements satisfied · 1 ⛔ unsatisfied (`DEBT-06`).** Integration **19/19** · flows **3/3**. **26 requirements in 6 categories**, 25 mapped to the five scoped phases and `DEBT-06` held as a **milestone-wide standing gate** that ends the milestone **unmet, by measurement**. ⚠ **The bullet above is CORRECTED, not rewritten: its closing claim — *"migrations 179/180 are not in cloud and `production` is 287 commits behind, so v4.1's own output is undeployed"* — was true when written and is now FALSE.** Measured at this scoping: `production` moved `e65610ac2 → eebc4c42f` (**292 commits**), `production..develop` is **0**, migrations **179 and 180 are applied and verified in cloud** (177/178 measured **already present** — `scripts/pending-cloud-migrations.sh` diffs git refs, not the live database, and over-reported by two), and `get_advisors(security)` returns **zero ERROR findings**. **v4.1 IS deployed.** v4.2 is therefore the SECOND consecutive **consolidation** milestone — no new capability axis, every requirement closes something already in a register, and each was **DRIVEN against the tree on 2026-09-13 rather than read from a `status:` field**, a method that caught three wrong register entries (two stale toward *"still broken"*, one toward *"fine"*). Watch-loop honesty (247) · the credential boundary (248) · the model you actually run (249) · run-honesty residue (250) · register integrity (251) — then **three phases the audit added**: the four blockers five green verifications could not see (252) · the bootstrap artifact that shipped every function wide open (253) · the independent review of 249-253 (254). **v4.2 opened on deployed code for the first time in three milestones, and closed on it.**
 - ✅ **v4.3 What You Can Actually Sell** — Phases **255-264** (shipped 2026-09-23, git tag `v4.3`). 10 phases (255-260 scoped; 261-264 added in-milestone), **39 plans**, migrations **182-192**, 6 days. **31/32 requirements delivered · PACK-05 carried to SEED-304 by decision.** Extension contract, token metering + USD, enforceable tiers, Experts as data.
 - ✅ **v4.4 Experts That Actually Work** — Phases **265-269** (shipped 2026-09-29, git tag `v4.4`). 5 phases, **24 plans**, migrations **194-198**, 7 days. **17/17 requirements satisfied** (audit `tech_debt`, no blockers). A client installs an Expert and gets grounded answers from its own knowledge in their own org — proven by live drives as a real user, never by a mocked test. ✅ **DEPLOYED 2026-09-29** — production `82babd8d0`; migrations 195-198 applied to production (194 already was). Operator smoke test owed.
-- ✅ **v4.5 Find It, Show It** — Phases **270-276** (shipped 2026-10-12, git tag `v4.5`). 7 phases, **38 plans**, migrations **199-206**, 14 days. **25/25 requirements satisfied** (audit `tech_debt`, no blockers). Find a document by what it IS and get the file back out, an agent that answers with interactive artifacts from a closed registry, thread-scoped attachments, retention with legal hold, and public docs. ✅ 270-274 + 276 **LIVE 2026-10-05** (prod `bd9e126c3`); ⛔ **275 NOT deployed** — production migrations 204 → 205 → 206 first.
+- ✅ **v4.5 Find It, Show It** — Phases **270-276** (shipped 2026-10-12, git tag `v4.5`). 7 phases, **38 plans**, migrations **199-206**, 14 days. **25/25 requirements satisfied** (audit `tech_debt`, no blockers). Find a document by what it IS and get the file back out, an agent that answers with interactive artifacts from a closed registry, thread-scoped attachments, retention with legal hold, and public docs. ✅ 270-274 + 276 **LIVE 2026-10-05** (prod `bd9e126c3`); ✅ **275 deployed 2026-10-12** (prod `784647e2d`, migrations 204-206).
+- 🚧 **v4.6 Pay It Down** — Phases 277-283 (started 2026-10-12). Repair only: 10 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extractions, 2 register-hygiene items (20 requirements).
+
+---
+
+## v4.6 Pay It Down — 🚧 IN PROGRESS
+
+**Started:** 2026-10-12. **Roadmap created:** 2026-10-12.
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **20 v4.6 requirements, 20 mapped, 0 orphans.**
+⚠ The intake summary said *"19"*; the categories add to **20** (10 FIX + 5 DEBT + 3 SEAM + 2 REG), counted from `REQUIREMENTS.md`.
+
+**Goal:** Every open **major** bug fixed and the v4.5 tech debt cleared. **Repair only — no new user capability.**
+
+**Milestone rule (every phase):** a fix is proven by **driving the defect it closes**, RED first, on the
+path the bug report names, with the evidence recorded (DB row, request/response, screenshot, transcript).
+A mocked or fixture test alone does not close a bug. ⛔ *Presence assertions cannot see content drift*:
+where the words are the deliverable (a refusal, a cause, a path), assert the rendered **content**.
+⛔ **Measure before fixing.** Four requirements arrive with a record saying the work is already partly
+or fully done (FIX-03/04/05 fixed in code 2026-09-10; FIX-10 narrowed to one item 2026-08-29; SEAM-02
+recorded as discharged by 272-01). Each is re-measured against the tree at discuss. A record is a
+claim, and this project has found three wrong register entries in one sitting before.
+
+**Red line (every phase — the Extension Contract, `docs/EXTENSION-CONTRACT.md`):** the closed core
+(**7 phase types / 1 emitter / 30 tools** at v4.5 close) is re-counted against each phase's base commit.
+Count it; do not substring-match it. **No phase adds a tool, a phase type, an emitter or a validator
+kind.** A repair milestone that grows the core has stopped being a repair milestone.
+
+**Baseline gates (every phase):** backend `pytest tests/unit -q --continue-on-collection-errors` at
+**≤ 71 failed, 0 collection errors** (zero headroom); frontend `GSD_VITEST_MAX_WORKERS=2 node
+scripts/vitest-count-gate.cjs` with no per-file decrease and 0 failing; the frontend typecheck as
+`npx tsc -p tsconfig.app.json --noEmit` measured as a **set diff** against base (plain `tsc --noEmit`
+checks zero files); `node scripts/check-claude-md-size.cjs` with **no warning** once Phase 277 lands.
+
+**Numbering:** Phases **277-283**. **Migrations resume at `207`**, measured at roadmap creation (`ls
+supabase/migrations | tail` ends at `206_retention_hold_hardening.sql`). No phase is pre-assigned a
+migration. Only Phase 280 is likely to need one (FIX-02's atomicity, or DEBT-08's decision); whichever
+phase needs one takes the **next free** number at its own discuss, after running `ls` again.
+
+**Solo running:** Claude builds and reviews. Phases close `verification_mode: self-verified`, and the
+review runs as a fresh-context `/gsd:code-review`.
+
+**Out of scope (operator, at intake):** any new user-facing capability · `SEED-354` (hold private
+documents) · `SEED-334` (272 SC#4 remaining providers) · Open Platform (`SEED-013`) · the owed v4.5
+operator UAT/sign-offs (they stay in `STATE.md` "Owed") · medium/minor bugs not named in
+`REQUIREMENTS.md`. ⛔ A fix that needs a missing capability to be complete is **recorded and
+deferred**, never built inside this milestone (G-7's "a closure round may never introduce a new
+capability", applied milestone-wide).
+
+### Phase Table
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 277 | Registers Back Inside the Band | The always-loaded project instructions sit below the warn band with nothing deleted, and the v4.5 records say what shipped | REG-04, REG-05 | 4 | docs-only · no source touched · split by FUNCTION, same-commit sync rule · ledger table stays complete |
+| 278 | One Home for Tools and Filters | The agent's tool dispatcher splits into registry and handlers, and the document-filter vocabulary has one home, with behaviour unchanged | SEAM-02, SEAM-03, DEBT-09 | 5 | ⛔ **G-5 extraction** (`tool_dispatcher.py` OV-273-02; `retrieval_service.py` SEED-224, **measure first**) · behaviour-preserving · registry pinned 30/30 · TDD pin-first |
+| 279 | The Expert Scope Seam | `expert_scope.py` is split along its named seam and every deferred Phase 267 review item is fixed or carries a written reason | SEAM-01 | 4 | ⛔ **G-5 extraction** (`expert_scope.py`) · `SEED-328` folded · G-5 (`threads.py`, `run_producer.py`, `ChatArea.tsx`, `StreamsProvider.tsx`) honoured by construction |
+| 280 | In Once, Out Clean | A document that comes in arrives exactly once and completely, and one that goes out leaves nothing behind | FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11 | 5 | **measure first** (FIX-03/04/05 fixed in code 2026-09-10) · migration **207** only if needed · security_enforcement · hold guard order · live OneDrive row (⛔ if no credential) · G-5 (`documents.py`, `ingest_splice.py`, `sources.py`) |
+| 281 | A Refusal Names Its Cause | When a workflow step or a publish is refused, the author reads the check that actually failed, in plain words, and the freshness check ignores archived documents | FIX-09, FIX-10, DEBT-07 | 5 | closed core recount · **G-4** · G-2 skip recorded (copy on shipped layouts) · `SEED-221` folded · G-5 (`phase_types.py`, `validator_kinds.py`, `PublishGauntlet.tsx`, `doorVocabulary.ts`, `WorkflowBuilderPage.tsx`) · UI hint |
+| 282 | The Slow Run and the Paused Run | A slow model gets the timeout the operator set, and a paused run asks its question in one place with one draft | FIX-06, FIX-07 | 5 | **G-2 sketch** (FIX-07) · **G-4** · **SC#10 four-axis UAT, full 8-row roster** · G-5 (`openai_service.py`, `MessageList.tsx`, `PendingAskCard.tsx`, `WorkspacePanel.tsx`, `streamsStore.ts`) · UI hint |
+| 283 | Every Member Reaches Their Own Settings | An ordinary member reaches their own settings, and a large document's detail panel stays navigable | FIX-01, FIX-08 | 4 | ⛔ **G-5: `SettingsPage.tsx` tab seam OWED — taken first** · **G-4** · security_enforcement (two-role fence) · G-2 skip recorded unless discuss opens a new door · UI hint |
+
+**Dependency order:** 277 → 278 → 279 → 280 → 281 → 282 → 283. The real constraints are narrower,
+and are stated so a phase can run early when its files are free:
+
+- **277 comes first.** It is docs-only and touches no source, so it cannot collide with a G-5 file.
+  CLAUDE.md measures **121,650 chars** (81.1% of the 150k hard limit) and every later phase edits
+  hot-file ledger rows in it. Splitting first gives six phases of headroom, instead of splitting under
+  pressure at close. The ledger table is the one thing every later phase writes to, so it must be in
+  its final shape before they start.
+
+- **278 and 279 (the extractions) come before every fix phase.** G-5: a refactor goes before the next
+  feature or fix on a hot file.
+
+  - `tool_dispatcher.py` (98 commits / 43 phases / 5,068 lines) has had its split deferred twice
+    (OV-273-02, and 272 before it). DEBT-09's vocabulary is read by the search handlers, so the split
+    lands **before** the vocabulary move, inside 278.
+
+  - DEBT-09 is itself an extraction (three restated copies → one home), so it rides the same
+    behaviour-preserving phase as SEAM-02 rather than a fix phase.
+
+  - `expert_scope.py` crossed G-5 at 275-01, and its own ledger section says *"the next phase that
+    touches this file proposes an extraction FIRST"*.
+
+  - 279 runs after 278 only because both close with a full backend gate. Their files are disjoint, so
+    they may run in parallel worktrees if neither mutates the local DB (worktree rule 4).
+
+- **279 comes before 282.** `SEED-328` touches `threads.py`, `run_producer.py`, `ChatArea.tsx` and
+  `StreamsProvider.tsx`, and FIX-06/FIX-07 touch the same send path and chat surfaces. Two phases must
+  not edit `StreamsProvider.tsx` concurrently.
+
+- **280 and 281 have no dependency on each other.** 280 is ingestion, storage and watch; 281 is the
+  harness and the Workflow Studio. They are sequenced only for G-8 cadence and can swap or run in
+  parallel.
+
+- **282 comes before 283.** FIX-06 edits the Model Registry (`admin.py`, `ModelRegistryTab.tsx`,
+  `config.py`) and FIX-01 edits settings gating (`settings.py`, `dependencies.py`, `SettingsPage.tsx`).
+  Serialising them keeps one settings/registry change in flight at a time.
+
+### Phase Checklist
+
+- [x] **Phase 277: Registers Back Inside the Band** (completed 2026-10-12): split CLAUDE.md by function into `docs/` below 120k with nothing deleted; repair the v4.5 bookkeeping drift (REG-04, REG-05)
+- [x] **Phase 278: One Home for Tools and Filters**: `tool_dispatcher.py` registry/handler split pinned at 30 tools; `retrieval_service.py` seam measured and closed; one home for the filter vocabulary (SEAM-02, SEAM-03, DEBT-09)
+- [x] **Phase 279: The Expert Scope Seam**: `expert_scope.py` extracted along its named seam; every `SEED-328` item fixed or recorded with a reason (SEAM-01)
+- [ ] **Phase 280: In Once, Out Clean**: same-bytes upload never retires the in-flight copy; Graph adapter pages, encodes and decodes honestly; purge and delete remove bytes and answer 404; a recorded decision for artifact rows on disposal (FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11)
+- [ ] **Phase 281: A Refusal Names Its Cause**: emit failure names the check that failed; publish and describe-door refusals in plain words; freshness ignores archived documents (FIX-09, FIX-10, DEBT-07)
+- [ ] **Phase 282: The Slow Run and the Paused Run**: per-model timeout reaches the provider call with deliberate retries; one `ask_user` input with one draft (FIX-06, FIX-07)
+- [ ] **Phase 283: Every Member Reaches Their Own Settings**: Settings reachable by members with operator tabs hidden and refused; bounded Chunks section (FIX-01, FIX-08)
+
+### Phase Details
+
+#### Phase 277: Registers Back Inside the Band
+
+**Goal**: The instructions every session and subagent loads sit back **below the 120,000-char warn band**, split by function into `docs/` with **nothing deleted**, and the v4.5 records say what actually shipped.
+**Depends on**: Nothing (first phase of v4.6).
+**Requirements**: REG-04, REG-05
+**Success Criteria** (what must be TRUE):
+
+  1. `node scripts/check-claude-md-size.cjs` exits 0 with **no warning**. CLAUDE.md is below 120,000 chars, and each moved section lives in a named `docs/<TOPIC>.md` with a pointer left at its old place, all in **one commit** (REG-04).
+  2. Nothing is lost. Every line removed from CLAUDE.md in that commit is present in a `docs/` file the same commit adds or extends, checked mechanically (removed-lines set minus added-lines set = empty) rather than by reading. The G-5-firing hot-file table stays in CLAUDE.md, complete (REG-04).
+  3. The guards still fire after the split. `check-claude-md-size.cjs` (`[disposition-too-long]`, `[duplicate-row]`, `[malformed-row]`) and `check-hot-file-ledger.cjs` are each driven RED against a planted defect, and the file is restored md5-identical (REG-04).
+  4. The archived v4.5 records match the phase directories, re-derived from those directories and never from a summary line: FIND-01/02/03/06 carry their real status in `milestones/v4.5-REQUIREMENTS.md`, the 270/271 progress rows match their VERIFICATION frontmatter, and every v4.5 SUMMARY carries its `requirements` field (REG-05).
+
+**How we'd know this failed**: the size drops because prose was deleted, not moved; a hot-file row leaves the scan table, so its guardrail can never fire again; the split lands at 119,9xx and Phase 278's first ledger edit puts it back over; a pointer names a `docs/` file that does not exist; an archived artifact's body text changes beyond the named fields; REG-05 ticks a requirement because a summary says so.
+**Plans**: 2 plans (wave 1, both inline under `inline_plan_threshold`)
+
+Plans:
+
+- [x] 277-01-PLAN.md — split CLAUDE.md by function to <= 90k (verdict cells <= 80 + vitest history to docs/VITEST-COUNT-GATE.md + D-03 moves only if needed), bind the cell cap to the FIRING table at 80, no-loss proof, guards driven RED (REG-04)
+- [x] 277-02-PLAN.md — repair the v4.5 archive in place: REQUIREMENTS line 9 + 19 SUMMARY requirements fields from their PLANs, re-verify 270/271 rows (REG-05)
+
+**Flags**: Docs-only; no source file is touched, so G-5 cannot fire. Split by **function** (the precedents are `docs/HOT-FILE-LEDGER.md` and `docs/SANDBOX-PACKAGES.md`). The gate names the biggest sections: Workflow guardrails 55,145 and Parallel execution 24,125, of which the vitest-gate correction history is narrative. The verdicts, index and scan list stay in CLAUDE.md. ⚠ The vendored GSD framework wiring table (G-7, REG-02) stays in CLAUDE.md, because it is the list used to re-apply the guardrails after a framework update. **REG-05 must not use `milestone.complete` or `state.*` SDK verbs** (STATE.md records eight false-record occurrences); hand-edit only. Re-measure the gate at **every later phase close**, so the band holds through the milestone and not just at 277.
+
+#### Phase 278: One Home for Tools and Filters
+
+**Goal**: The agent's tool dispatcher is split into a **registry and handlers**, the retrieval orchestrator's seam is closed, and the document-filter vocabulary has **one home**. Every tool, search and filter behaves exactly as before.
+**Depends on**: Phase 277 (the hot-file ledger is in its final shape before this phase edits its rows).
+**Requirements**: SEAM-02, SEAM-03, DEBT-09
+**Success Criteria** (what must be TRUE):
+
+  1. `tool_dispatcher.py` is split into a registry module and handler modules. The closed core counts **30 tools** before and after, counted by `test_259_closed_core_inventory.py` and not substring-matched. A registry pin taken at the phase base (tool names, order, full schema text) compares **identical** after the split (SEAM-03).
+  2. The seam state of `retrieval_service.py` is **measured** at discuss. Its ledger section records the extraction as discharged by 272-01 (a pure move into `retrieval_rpc/rank/documents/scope.py`; the file is 174 lines and is the orchestrator only), while the CLAUDE.md row still reads *"extraction still OWED"*. Either the remaining seam is taken, or the discharge is confirmed by its AST pin (`test_272_pure_move.py`). In both cases the stale CLAUDE.md row and `SEED-224`'s extraction half are corrected **beside** their originals (SEAM-02).
+  3. The date-word → column map and the topics-is-a-list rule are each defined **once** and imported by `retrieval_scope.py`, `document_search_service.py` and `view_filter_compiler.py`. A test fails when a divergent copy is planted, driven RED and then restored (DEBT-09).
+  4. Behaviour is unchanged. The backend unit gate is ≤ 71 failed with 0 collection errors; the frontend count gate shows no per-file decrease; the 272 retrieval pins (`test_unfiltered_rpc_calls_are_pinned`) and the 275 retrievable-predicate pins stay green (SEAM-02, SEAM-03, DEBT-09).
+  5. A live chat turn that uses two tools (`search_documents` + `execute_code`) completes on one native provider after the split, with the same audit rows (`search.query` carrying `run_id`) as before (SEAM-03).
+
+**How we'd know this failed**: the registry gains or loses a tool, or a schema string changes by a byte; a moved handler changes behaviour and a test edited in the same commit hides it; the "one home" is a fourth copy, with the old three left in place; the divergence test passes against a planted divergence; SEAM-02 is ticked by re-reading the 272 record instead of measuring the file; the split is done but the registry is still built by mutation at import time, so its order depends on import order.
+**Plans**: 4 plans in 3 waves
+
+Plans:
+
+- [x] 278-01-PLAN.md — wave 1: pins first — base failing set, registry pin (names/order/bindings/static literal/schema sha256), AST pure-move pin (xfail strict), D-07 retarget-only checker, ten fences anchored/tupled (SEAM-03)
+- [x] 278-02-PLAN.md — wave 1 (TDD): one home for the filter vocabulary (`document_vocabulary.py`), three import swaps with base-pinned values, divergence fence driven RED (DEBT-09)
+- [x] 278-03-PLAN.md — wave 2: the split — `tool_dispatcher.py` → registry + `services/tools/` families in ONE retarget-only commit, extension-contract guards extended, full unit gate set-diffed (SEAM-03)
+- [x] 278-04-PLAN.md — wave 3 (operator checkpoint): SEAM-02 measured + stale records corrected beside originals, merged-tree gates, Anthropic two-tool live smoke, ledger cells written last, SEED-224 → partially-answered (SEAM-02, SEAM-03, DEBT-09)
+
+**Flags**: ⛔ **G-5 extraction phase, behaviour-preserving** — pure moves verified AST-identical against PHASE_BASE where possible, with **TDD pin-first** (pins land RED-proof before the move). `tool_dispatcher.py` FIRES (98/43/5068), with the split deferred twice (OV-273-02). The Extension Contract applies: the registry stays closed and statically declared, **never dynamically registered**. `search_documents_tool.py` (1,163 lines) sits beside the split and must not gain logic. SC#10: a pure move whose registry pin is identical does not change provider behaviour, so one live multi-tool row is the proportionate check; discuss records that decision. Seeds: `SEED-224` (extraction half only; the five-tab redesign stays out of scope).
+
+#### Phase 279: The Expert Scope Seam
+
+**Goal**: `expert_scope.py` is split along its named seam. The **pure** scope composition stays apart from the async statement and transcript-event wording, and every item the Phase 267 independent review deferred is **fixed or carries a written reason**.
+**Depends on**: Phase 277. No file overlap with 278, so it may run in parallel with it (worktree rule 4 applies if either mutates the local DB).
+**Requirements**: SEAM-01
+**Success Criteria** (what must be TRUE):
+
+  1. `expert_scope.py` (632 lines, 3 phases, crossed G-5 at 275-01) is extracted along the seam its `docs/HOT-FILE-LEDGER.md` section names. `compose_expert_scope` stays pure (no I/O, not async; the AST fence stays green), the moved functions are AST-identical to the phase base, and the 267/268 fixtures (`test_267_expert_scope.py`'s 11 cases, the 268 Dropped-line fixtures) stay byte-equal (SEAM-01).
+  2. Every `SEED-328` item (CR-03(b), WR-01..WR-08, IN-01..IN-05 and the CR-02/03 live-drive observations) has a row in the phase record reading **fixed**, with the test or drive that proves it, or **not fixed**, with the reason. `SEED-328`'s frontmatter `status` changes to match, so the register scan no longer reports it as `planted` (SEAM-01).
+  3. If CR-03(b) is fixed, it is fixed as **one** shared org-equality helper used by PATCH, handoff and preview (which also closes IN-01). A two-org user sending on an Expert thread with the wrong org active is refused before any run row is written, and this is driven live as that user, not only unit-tested (SEAM-01).
+  4. The backend unit gate is ≤ 71 failed with 0 collection errors, and the frontend count gate shows no per-file decrease (SEAM-01).
+
+**How we'd know this failed**: a fixture's output changes by a character after the move; a SEED-328 item disappears from the record because it was hard; CR-03(b) arrives as a second inline org check on the send path (268's "0 new send-path branches" broken) instead of one helper; WR-05's untrusted handoff summary still becomes a user message and the record says "fixed"; the seed still reads `planted` at close.
+**Plans**: 4 plans in 3 waves (target was 3; the drives + close are split from the frontend work because a checkpoint plan must not carry implementation, and the regrouping lets 279-02 and 279-03 run in parallel with no shared file)
+
+Plans:
+**Wave 1**
+
+- [x] 279-01-PLAN.md — wave 1: pins first (test_279_pure_move strict-xfail, send If-count + org-helper Wave-0 pins, base failing set), parameterised retarget checker (278 defaults proven), then ONE pure-move commit: expert_scope.py → pure / expert_scope_statement.py / expert_scope_events.py, all importers + 12 test patches repointed (SEAM-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 279-02-PLAN.md — wave 2 (TDD, backend): `_require_thread_org` at PATCH/handoff/preview/send (CR-03(b), IN-01, D-18), WR-01, WR-02, IN-05, WR-05 quoted background, IN-03, GET /experts manager view, D-07 restricted→restricted fix, WR-08 multi-folder note (SEAM-01)
+- [x] 279-03-PLAN.md — wave 2 (TDD, frontend, parallel with 02): "Won't search" reword + card prefix (WR-04, D-16), WR-03, IN-01 dialog field, D-15 send-409 narrowing, WR-06 chip, WR-01 client, WR-07 Start Chat reason (SEAM-01)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 279-04-PLAN.md — wave 3 (operator checkpoints): 4 G-4 Chrome drives (D-12) + WR-05 DB proof, two-org CR-03(b) live drive (D-13), then gates, the SEED-328 record (one row per item), seed → answered, ledger + CLAUDE.md rows, VALIDATION, STATE (SEAM-01)
+
+**Flags**: ⛔ **G-5 extraction phase.** `SEED-328` (folded at intake) fires on `run_producer.py`, `threads.py` (90 phases), `experts.py`, `ChatArea.tsx` (42 phases), `StreamsProvider.tsx` (38 phases) and the Expert catalog, all G-5-firing. Each item is either **honoured by construction** (one helper, one call, no new branch) or recorded as an override under `STATE.md → Guardrail overrides`. If an item changes rendered chat copy (WR-03/04/07/08), **G-4** applies to that item: the operator names the scenario at scope time and it is driven in Chrome. `run_producer.py`'s runs table is SELECT-only under the user JWT (268 finding), so a user-JWT UPDATE there silently no-ops. Measure writes, never assume them.
+
+#### Phase 280: In Once, Out Clean
+
+**Goal**: A document that comes in **arrives exactly once and completely**, whether uploaded twice in a hurry or listed from a large OneDrive folder, and one that goes out **leaves nothing behind**: no orphaned bytes, no 500, no unanswered question about the artifacts that cited it.
+**Depends on**: Phase 277. No file overlap with 278/279; independent of 281.
+**Requirements**: FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11
+**Success Criteria** (what must be TRUE):
+
+  1. Uploading the same bytes twice while the first copy is still `pending`/`processing` (two concurrent requests, driven against the live local stack) leaves **exactly one** copy visible in `GET /documents` and in search, returns no 409, and never sets `is_latest = false` on the in-flight row. A RED-first test proves it, and every other minter caller (watch import, promote) goes through the same fixed path (FIX-02).
+  2. The Graph adapter's three defects are **measured first** (all three were recorded fixed in code on 2026-09-10, `45b4fb9dc` / `db7a083a2`) and each is pinned by a driven test: an unrecognised pagination cursor **raises** and never restarts at page 1; a search term containing `?` `#` `&` `/` `(` `'` cannot change the request path; folder paths come back decoded, or `None` for a drive-internal id. A **live re-drive** of a real OneDrive folder whose name contains a space and which holds more than one page imports every page and stores `/Team Docs/…`, which a `path contains '/Team Docs/'` rule matches. If no Microsoft credential is available, that row is recorded ⛔ with the reason and is never omitted (FIX-03, FIX-04, FIX-05).
+  3. Both watch purge doors (`DELETE /watches/{id}?purge_documents=true` and `POST /watches/{id}/purge`) remove the stored file bytes **after** the row delete succeeds, as the Library delete does, and a storage listing shows no object left for a purged document. A held document still refuses, and its bytes stay (DEBT-10).
+  4. `DELETE /documents/{id}` for a row the caller does not own, or one that does not exist, answers **404** `Document not found` with CORS headers. One grep finds every other handler with the same `maybe_single()` → `.data` shape, and each is fixed or listed with a reason (DEBT-11).
+  5. A **recorded decision** (CONTEXT `<decisions>` and `docs/`) states what happens to `message_artifacts` rows when retention disposes their source document. If the decision requires enforcement, disposition enforces it, with a test that drives RED first and a dry-run that names the affected artifact count (DEBT-08).
+
+**How we'd know this failed**: the dedup fix swallows the second upload's error but still retires the first; the minter is made atomic for the upload door only and the watch path still races; the OneDrive row reads "pass" on doubles alone; bytes are removed **before** the row delete, so a hold refusal leaves a row with no file; a purge of a held document removes bytes; the 404 distinguishes "exists in another org" from "does not exist" (an existence oracle); DEBT-08's decision says "delete" and no code does it, or says "keep" and the artifact then renders a broken reference with no explanation.
+**Plans**: TBD (target 4: same-bytes minter · Graph adapter measure + live re-drive · purge bytes + delete 404 · DEBT-08 decision + enforcement + close)
+**Flags**: **Measure first** for FIX-03/04/05: the work left may be only the live re-drive the report names (`238-VERIFICATION.md` M-9). **Migration `207`** only if FIX-02's atomicity needs a database function (a unique-index-aware upsert or one-statement retire+insert) or DEBT-08's decision needs a constraint. Apply it via the SQL editor, regenerate `full-schema.sql` (no reset), mirror any REVOKE in `scripts/full-schema-supplement.sql`, and run `get_advisors(security)`. **security_enforcement**: purge and delete are data-protection actions; the 275 hold guard runs before any delete, and its order (guard → rows → bytes, D-38) is binding. ⚠ The unmeasured CR-01 note in `BUG-261005-01` (the minter's folder check compares `user_id`, never the folder's org) is **driven once here**. If it reproduces, file it as a new bug and do not fold it silently. **G-5 audit at discuss**: `backend/app/api/documents.py` (FIRES, 36 phases), `backend/app/services/ingest_splice.py` (FIRES), `backend/app/api/sources.py` (FIRES), `backend/app/services/sources/adapters/microsoft_graph.py`, `backend/app/services/retention/disposition.py`. Each change is honoured by construction or recorded. **Deploy parity**: migration before backend; `WATCH_PROCESS_ENABLED` and `RETENTION_SWEEP_ENABLED` stay as they are in production.
+
+#### Phase 281: A Refusal Names Its Cause
+
+**Goal**: When a workflow step fails or a publish is refused, the author reads **the check that actually failed**, in plain words and by the step's canvas name, never a machine code or a wrong subsystem. The freshness check stops counting archived documents.
+**Depends on**: Phase 277. Independent of 280 (disjoint files); may run before or alongside it.
+**Requirements**: FIX-09, FIX-10, DEBT-07
+**Success Criteria** (what must be TRUE):
+
+  1. An emit step whose field map has 100% citation coverage but misses template placeholder keys (`covers_template: false`, the `Compliance Gap Report` shape, reproduced as a fixture and once live) reports the **key-coverage** failure and names the missing keys. Attempts that failed differently (narrated vs incomplete keys) are reported as different causes. "citations_required" never appears unless the citation check failed (FIX-09).
+  2. A publish refusal shows the precise `harness_audit` reason for the failing step under its canvas label, and the text *"(view coming soon)"* is gone. The golden-run link opens `WorkflowRunPage` when the canvas flag is on, or the phrase is removed with no new schedule promise in its place (FIX-10, closing `BUG-260815-06` item #4).
+  3. A describe-door refusal such as `connection_not_allowed` renders as a plain sentence from **one** translation table beside `doorVocabulary.ts`. `test_214_argument_seams.py` asserts the rendered screen shows the sentence and **not** the raw code, and an unknown code falls back to a sentence, never to the code (FIX-10, `SEED-221`).
+  4. A freshness-validated step over a folder that contains archived (`retrievable = false`) documents counts only retrievable ones, by importing `RETRIEVABLE_COLUMN` rather than restating the predicate, proven RED-first (DEBT-07).
+  5. **G-4**: the operator defines the lived-experience scenarios at scope time ("I'd recognise failure if…"), and Chrome MCP drives each refusal to the screen. The assertions read the rendered **words**, not the presence of a block.
+
+**How we'd know this failed**: a new validator kind or phase type appears (closed core broken); the client invents its own cause table and starts overclaiming, trading the honesty 192/193.2 fought for against legibility; the translation table covers `connection_not_allowed` and nothing else; "coming soon" is replaced by "later" or another unowned promise; the freshness fix is a fourth copy of the retrievable predicate; the emit cause is right in `harness_audit` but the gauntlet still renders the last validator's message ("the least informative error wins by being last").
+**Plans**: TBD (target 3-4: emit cause precedence · gauntlet + describe-door copy · freshness · G-4 drive + close)
+**Flags**: **Closed-core recount** (7 / 1 / 30) against the phase base. A cause-precedence change is data inside the existing executor, never a new one. **G-2**: the refusals sit on shipped layouts (the gauntlet's worded verdict, the describe door), so no layout decision is open. The skip is **recorded as a decision** at discuss (OV-266-01 is what an unrecorded skip cost). **G-4** fires. **G-5 audit at discuss**: `backend/app/services/harness/phase_types.py` (FIRES), `backend/app/services/harness/validator_kinds.py` (FIRES), `backend/app/services/template_render_service.py`, `backend/app/services/workflow_authoring.py` (FIRES), `frontend/src/components/workflows/PublishGauntlet.tsx` (FIRES), `doorVocabulary.ts` (FIRES), `WorkflowBuilderPage.tsx` (FIRES ×6), `backend/app/services/harness/freshness.py`. Seeds: `SEED-221` (folded). Read the sketch-findings skill for the gauntlet's worded-verdict vocabulary before writing copy.
+**UI hint**: yes
+
+#### Phase 282: The Slow Run and the Paused Run
+
+**Goal**: A slow model gets **the timeout the operator set**, with retries chosen deliberately, and a paused run asks its question in **one place with one draft** that every rendering agrees on.
+**Depends on**: Phase 279 (it edits `threads.py`, `ChatArea.tsx` and `StreamsProvider.tsx`; this phase edits the same send path and chat surfaces).
+**Requirements**: FIX-06, FIX-07
+**Success Criteria** (what must be TRUE):
+
+  1. A per-model `llm_call_timeout_seconds` of N (up to the maximum the Model Registry accepts) is the timeout the provider call actually gets, on **every** provider client, not only the OpenAI-compatible one. It is read back from the built client in a test, and a stub endpoint that answers at 700 s completes under a 900 s setting. A value above a real ceiling is **refused in the Model Registry with the reason on screen**, never stored and silently capped (FIX-06).
+  2. `max_retries` is set explicitly per client, with the reason recorded in CONTEXT `<decisions>`, and a timed-out call does not multiply the wait past the operator's budget unannounced (FIX-06).
+  3. One `ask_user` pause shows **exactly one** answer input, in the layout the operator approves in the sketch. A selection made in any rendering of the question shows identically wherever the question appears. Options expose their selected state to assistive technology (e.g. `aria-pressed`), not by colour alone. No control without a handler remains: `Answer in panel →` either works or is gone. A workflow pause with the panel **closed** still has a reachable input, the `BUG-260828-07` case (FIX-07).
+  4. **SC#10 four-axis UAT.** The full native roster plus OpenRouter (**8 rows**, derived from `MODEL_CAPABILITIES` by provider, newest registry-backed model each) run a turn under the new client settings and raise and answer an `ask_user` pause. A blocked row is recorded ⛔ with its reason and issue id, never omitted. There is at least one multi-tool row, one parallel-thread row (Thread A paused while Thread B streams) and one long-message row (FIX-06, FIX-07).
+  5. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. panel open, panel closed, two threads paused at once, a slow local model on GPU), and Chrome MCP drives each one. The draft-agreement check reads both renderings' DOM state, not a screenshot (FIX-07).
+
+**How we'd know this failed**: the timeout reaches `get_llm_client` but the Anthropic, Google or Responses-surface client still binds the SDK default; the UI accepts 3600 while the httpx pool or read timeout still binds at 600; retries stay at the SDK default "by omission"; `PendingAskStack`'s mount condition is narrowed and a workflow pause becomes unreachable with the panel closed (the SHELL-03 failure, a third time); the draft is "shared" by copying state between two cards so they can still diverge; the board lists only the rows that passed.
+**Plans**: TBD (target 4: client timeout + retries across providers + registry refusal · sketch-approved single-input `ask_user` with one shared draft · a11y + dead control · 8-row board + G-4 drive)
+**Flags**: ⛔ **G-2 FIRES for FIX-07, and a sketch is genuinely needed.** Sketch 006 option C (calm panel card plus chat **pointer**) conflicts with 244-12's chat-column mount, which exists for reachability when the panel is closed. Where the single input lives in each panel state is an **open layout decision**, and the operator-approved mockup is the acceptance bar. Run `/gsd:sketch` before plan and read the sketch-findings skill (`references/pending-question.md`). **Provider-docs-first** for FIX-06: read each provider SDK's own timeout and retry documentation (OpenAI, Anthropic native, Google), and keep provider-specific handling at the service boundary. **G-5 audit at discuss**: `backend/app/services/openai_service.py` (FIRES, 36 phases), `backend/app/services/anthropic_service.py` (FIRES), `backend/app/config.py` (FIRES; `MODEL_CAPABILITIES` seam owed), `backend/app/api/admin.py`, `frontend/src/components/admin/ModelRegistryTab.tsx` (FIRES), `MessageList.tsx`, `MessageItem.tsx`, `PendingAskCard.tsx` (FIRES), `WorkspacePanel.tsx` (FIRES), `streamsStore.ts` (FIRES), `PausedRunCue.tsx`. ⛔ The FIX-06 change stays a constructor argument at the client boundary, and the agent loop's `per_call_budget` call sites do not move (`agent_loop.py` prompt-assembly seam OV-273-03 is owed and not taken here). Seeds: `SEED-289` / `SEED-172` (sibling local-model findings; the 13 rowless local models on the 300 s inferred default are **noted, not fixed**, unless discuss shows they are the same defect).
+**UI hint**: yes
+
+#### Phase 283: Every Member Reaches Their Own Settings
+
+**Goal**: An ordinary org member can **reach and use their own settings** (Memory, Audit Log, "Show technical names") while operator-only tabs stay hidden **and refused**, and a large document's detail panel stays navigable when its Chunks section is open.
+**Depends on**: Phase 282 (it edits the Model Registry and `config.py`; this phase edits settings gating, so the two stay serial).
+**Requirements**: FIX-01, FIX-08
+**Success Criteria** (what must be TRUE):
+
+  1. Signed in as an ordinary member (not an operator) in a real org, a user finds a Settings door, opens Memory, Audit Log and "Show technical names", and saves a change that persists across reload. Operator-only tabs (models, providers and the rest of `model_management`) do not render for them (FIX-01).
+  2. The UI gate and the API gate agree, checked by a two-role fence on the real auth path: a member's own-settings write is accepted, and a member calling an operator-only settings endpoint directly is refused 403. Nothing becomes reachable by widening `model_management`'s audience (FIX-01).
+  3. With the Chunks section expanded on a document with about 1,000 chunks, every section below it is reachable without scrolling past the chunks. The list is bounded and scrolls inside itself, with the chunk count shown. This is measured by the next section's bounding rect in Chrome, not by `scrollTop` (FIX-08).
+  4. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. a member's first visit, an operator's view unchanged, a 1,000-chunk document), and Chrome MCP drives each one as the real role (FIX-01, FIX-08).
+
+**How we'd know this failed**: the fix widens `model_management` (the documented workaround) so members also see model management; a member sees an operator tab that 403s on first click; the Settings door appears but the page renders empty for a member; the client hides a tab whose API still accepts a member's write; Chunks gets a "Show first 20 / Show all" button (which the report rules out as a fix); the bounded list traps keyboard focus or wheel scroll; a filter box for finding a chunk arrives (a capability, out of scope).
+**Plans**: TBD (target 3-4: `SettingsPage.tsx` tab seam (behaviour-preserving) · per-tab + API gating with two-role fence · bounded Chunks section · G-4 drive + close)
+**Flags**: ⛔ **G-5: `frontend/src/pages/SettingsPage.tsx` FIRES (24 phases) and its tab seam is OWED**. FIX-01 is a per-tab gating change, which is exactly that seam, so wave 1 takes it behaviour-preserving before any gate moves. Also FIRING: `frontend/src/lib/nav-items.ts`, `backend/app/api/settings.py`, `backend/app/dependencies.py` (access-gate module seam named: `app/security/access.py`), `DocumentDetailPanel.tsx`. **security_enforcement**: the change is a permission boundary, so the API gate is the authority and the UI only reflects it. **G-2**: FIX-08's layout is settled by its own report (bound the list using the per-chunk `max-h` pattern already in the file), and FIX-01 reuses the existing rail entry or profile menu. The sketch skip is **recorded as a decision** unless discuss decides a new door is needed, in which case `/gsd:sketch` runs first. The dev account is in two orgs, so prove the active org before every drive. Read the sketch-findings skill for the Settings and document-detail-panel contracts.
+**UI hint**: yes
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 277. Registers Back Inside the Band | 2/2 | Complete | 2026-10-12 |
+| 278. One Home for Tools and Filters | 4/4 | Complete | 2026-10-13 |
+| 279. The Expert Scope Seam | 4/4 | Complete (verified 4/4; owed: D-18 cloud read, 4-axis rows, review leftovers) | 2026-10-14 |
+| 280. In Once, Out Clean | 0/TBD | Not started | - |
+| 281. A Refusal Names Its Cause | 0/TBD | Not started | - |
+| 282. The Slow Run and the Paused Run | 0/TBD | Not started | - |
+| 283. Every Member Reaches Their Own Settings | 0/TBD | Not started | - |
 
 ---
 
@@ -47,8 +314,8 @@ metric artifacts from a closed registry, `show_artifact` the one deliberate tool
 chat attachments stay in their thread, explicit promote (274) · retention policies, legal hold, audited disposition with
 dry run and typed-count confirm, archived out of retrieval but findable (275) · public `/docs`, Syrel API reference,
 coverage gate, changelog, videos (276).
-✅ **270-274 + 276 LIVE 2026-10-05** (prod `bd9e126c3`, cloud DB at migration 203). ⛔ **275 NOT DEPLOYED** — production
-migrations **204 → 205 → 206** before the backend, `get_advisors(security)`, `RETENTION_SWEEP_ENABLED` stays false.
+✅ **270-274 + 276 LIVE 2026-10-05** (prod `bd9e126c3`, cloud DB at migration 203). ✅ **275 DEPLOYED 2026-10-12** (prod `784647e2d`, migrations 204-206). ~~⛔ 275 NOT DEPLOYED — production
+migrations **204 → 205 → 206** before the backend, `get_advisors(security)`, `RETENTION_SWEEP_ENABLED` stays false.~~ Sweep flag stays off.
 Owed operator checks: 271 G-4 sign-off · 272 live re-drive of review fixes · 273 STRUCTURED-path drive · 275-UAT.md.
 
 ---

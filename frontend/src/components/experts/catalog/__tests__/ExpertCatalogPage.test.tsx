@@ -184,7 +184,17 @@ describe("ExpertCatalogPage · PACK-11 honesty", () => {
     await screen.findByText("Contract Reviewer")
     expect(api.listExperts).toHaveBeenCalledTimes(1)
     // ⛔ No argument is passed, so the management arm cannot be reached from this surface.
-    expect(vi.mocked(api.listExperts).mock.calls[0]).toEqual([])
+    // 279-03 WR-07: was expect(vi.mocked(api.listExperts).mock.calls[0]).toEqual([])
+    // It now passes (includeSystem=true, enabledOnly=false) so a MANAGER sees disabled Experts; the
+    // server honours `false` only for experts:manage (279-02 Commit G). The third argument
+    // (forManagement) is still never passed, so the management arm stays unreachable.
+    expect(vi.mocked(api.listExperts).mock.calls[0]).toEqual([true, false])
+  })
+
+  it("(8b) 279-03 WR-07: all three list reads (mount, post-install, poll) pass (true, false)", async () => {
+    const src = (await import("../ExpertCatalogPage.tsx?raw")).default as string
+    expect(src.match(/listExperts\(true, false\)/g)).toHaveLength(3)
+    expect(src).not.toMatch(/listExperts\(\)/)
   })
 })
 
@@ -201,6 +211,31 @@ describe("ExpertCatalogPage — a failed start is VISIBLE (262-UAT 3.6)", () => 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t start a chat with Contract Reviewer/i)
     // The grid is still there — the error does not replace the catalog.
     expect(screen.getByText("Contract Reviewer")).toBeInTheDocument()
+  })
+
+  // 279-03 WR-07 (SEED-328): every failure read "Check your connection and try again", so a server
+  // refusal (403, wrong org) sent the user to debug their network. The server's reason is shown.
+  it("279-03 WR-07: an ApiError shows the server's reason, not the network sentence", async () => {
+    const { ApiError } = await import("@/lib/api/_core")
+    vi.mocked(api.listExperts).mockResolvedValue([A])
+    const onStartChat = vi.fn().mockRejectedValue(new ApiError("Expert bundle not found or access denied", 403))
+    render(<ExpertCatalogPage folders={[]} onStartChat={onStartChat} onInspect={vi.fn()} />)
+    await userEvent.click(await screen.findByRole("button", { name: /start chat/i }))
+    const alert = await screen.findByRole("alert")
+    expect(alert.textContent).toBe(
+      "Couldn't start a chat with Contract Reviewer. Expert bundle not found or access denied",
+    )
+    expect(alert.textContent).not.toContain("Check your connection")
+  })
+
+  it("279-03 WR-07: a TypeError (network) keeps the network sentence", async () => {
+    vi.mocked(api.listExperts).mockResolvedValue([A])
+    const onStartChat = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"))
+    render(<ExpertCatalogPage folders={[]} onStartChat={onStartChat} onInspect={vi.fn()} />)
+    await userEvent.click(await screen.findByRole("button", { name: /start chat/i }))
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Couldn't start a chat with Contract Reviewer. Check your connection and try again.",
+    )
   })
 })
 
@@ -505,5 +540,54 @@ describe("ExpertCatalogPage — install (266-04)", () => {
       expect(within(screen.getByRole("dialog")).getByText(INSTALL_COPY.installing)).toBeInTheDocument(),
     )
     expect(screen.queryByText(readError)).toBeNull()
+  })
+})
+
+// ── 279-REVIEW WR-05 — a manager's DISABLED Expert carries "Disabled" and no Start Chat ──────────
+//
+// 279-02 Commit G sends an `experts:manage` caller the org's disabled Experts, and every chat door
+// refuses them (404). Before the fix the card drew an ordinary Start Chat that could only fail.
+
+describe("ExpertCatalogPage — a disabled Expert (279-REVIEW WR-05)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("the CARD says Disabled (the full reason as its title) and renders no Start Chat", async () => {
+    const off = bundle({ name: "PhD Literature review", slug: "phd-lit", is_enabled: false })
+    vi.mocked(api.listExperts).mockResolvedValue([A, off])
+    const { container } = renderCatalog()
+    await screen.findByText("PhD Literature review")
+
+    const card = cardOf(container, "phd-lit")
+    const tag = within(card).getByText("Disabled")
+    expect(tag).toHaveAttribute(
+      "title",
+      "Disabled for this organization — enable it in Organization admin → Experts to chat with it.",
+    )
+    expect(card.textContent).not.toContain("Start Chat")
+    expect(within(card).queryByRole("button", { name: /start chat/i })).toBeNull()
+    expect(within(card).getAllByRole("button")).toHaveLength(1) // Details only — never a dead control
+    // The enabled neighbour is untouched.
+    expect(within(cardOf(container, "contract-reviewer")).getByRole("button", { name: /start chat/i })).toBeInTheDocument()
+    expect(container.querySelectorAll("button:disabled")).toHaveLength(0)
+  })
+
+  it("the DETAIL MODAL states the reason and renders no Start Scoped Chat", async () => {
+    const user = userEvent.setup()
+    const off = bundle({ name: "PhD Literature review", slug: "phd-lit", is_enabled: false })
+    vi.mocked(api.listExperts).mockResolvedValue([off])
+    const { container } = renderCatalog()
+    await screen.findByText("PhD Literature review")
+
+    await user.click(within(cardOf(container, "phd-lit")).getByRole("button", { name: "Details" }))
+    const dialog = await screen.findByRole("dialog")
+    expect(
+      within(dialog).getByText(
+        "Disabled for this organization — enable it in Organization admin → Experts to chat with it.",
+      ),
+    ).toBeInTheDocument()
+    expect(dialog.textContent).not.toContain("Start Scoped Chat with Expert")
+    expect(within(dialog).queryByRole("button", { name: /start/i })).toBeNull()
   })
 })

@@ -59,9 +59,53 @@ const WARN_LIMIT = 120000;
 // which is the half both previous splits skipped -- they bought headroom and
 // changed nothing structural, so the trip recurred unmeasured.
 //
-// 200 is deliberately generous: the longest LEGITIMATE verdict measured at the
-// Phase 208 split was 115 chars (`frontend/src/lib/api.ts`).
-const LEDGER_CELL_LIMIT = 200;
+// ~~200 is deliberately generous: the longest LEGITIMATE verdict measured at the
+// Phase 208 split was 115 chars (`frontend/src/lib/api.ts`).~~
+// ⚠ SUPERSEDED 2026-10-12 (Phase 277) for the CLAUDE.md table — the sentence above is
+// kept, not deleted, because the reason it stopped being true is the finding.
+//
+// -- THE THIRD TRIP (Phase 277) -------------------------------------------------
+// This is the THIRD trip toward the limit (CLAUDE.md read 121,650 chars, [WARN]).
+// At 2026-10-12 the CLAUDE.md FIRING table's verdict cells measured 23,049 chars
+// (the whole table 37,585; longest cell 248) and had been bound by NO cap at all
+// since the 2026-09-06 move: ledgerRows() bound ONLY the scan-list header
+// (`| File | commits / phases / lines | G-5 | Disposition |`), which does not
+// occur in CLAUDE.md, so against CLAUDE.md it parsed ZERO rows and reported a
+// clean check it never performed. The cap moved with the scan list and the
+// table that stayed behind refilled unwatched.
+//
+// So there are now TWO bindings, each to an EXACT header:
+//   - the CLAUDE.md FIRING shortlist, capped by LEDGER_CELL_LIMIT (80: a verdict
+//     and its phase anchor; every reason lives in docs/HOT-FILE-LEDGER.md);
+//   - the docs scan list, capped by SCAN_LIST_CELL_LIMIT (200), its behaviour unchanged
+//     (428 of its 505 cells are over 80, and no decision asked to shorten them).
+// And because a binding that parses nothing is exactly how this went unseen,
+// the root CLAUDE.md MUST parse at least MIN_SHORTLIST_ROWS rows, and the table
+// must not be cut short partway through -- either fails as [shortlist-missing].
+// No per-section budget is added (D-09).
+const LEDGER_CELL_LIMIT = 80;
+const SCAN_LIST_CELL_LIMIT = 200;
+const MIN_SHORTLIST_ROWS = 100;
+
+const SHORTLIST_HEADER = '| Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |';
+const SCAN_LIST_HEADER = '| File | commits / phases / lines | G-5 | Disposition |';
+
+/** CLAUDE.md FIRING shortlist: `| path | triple | verdict |` -> 5 cells, verdict at [3]. */
+const SHORTLIST_SPEC = {
+  name: 'FIRING shortlist',
+  header: SHORTLIST_HEADER,
+  verdictIndex: 3,
+  expectedCells: 5,
+  limit: LEDGER_CELL_LIMIT,
+};
+/** docs/HOT-FILE-LEDGER.md scan list: `| path | triple | G-5 | disposition |` -> 6 cells. */
+const SCAN_LIST_SPEC = {
+  name: 'scan list',
+  header: SCAN_LIST_HEADER,
+  verdictIndex: 4,
+  expectedCells: 6,
+  limit: SCAN_LIST_CELL_LIMIT,
+};
 
 
 const SKIP_DIRS = new Set(['node_modules', 'venv', '.venv', '.git', 'worktrees', 'dist', 'build', '__pycache__']);
@@ -150,41 +194,75 @@ function history(root) {
 }
 
 
+/** Split a table line on UNESCAPED pipes -- cells legitimately contain an escaped one. */
+function splitCells(line) {
+  return line.replace(/\\\|/g, '\u0000').split('|').map((c) => c.trim());
+}
+
 /**
- * Parse the hot-file ledger table and return its rows. Returns [] when the file
- * carries no such table, so this is a no-op for every other CLAUDE.md.
+ * Parse ONE hot-file table, bound by its EXACT header (spec.header), and return
+ * { found, rows, end } -- `end` is the 0-based index of the first line after the
+ * table. found=false / rows=[] when the file carries no such table, so this is a
+ * no-op for every other CLAUDE.md.
  */
-function ledgerRows(text) {
+function ledgerRows(text, spec) {
   const lines = text.split('\n');
   // ⚠ EXACT match. docs/HOT-FILE-LEDGER.md carries three tables starting "| File | commits";
   // a prefix match binds to a 2-row one and reports a clean check it never performed.
-  const start = lines.findIndex((l) => l.trim() === '| File | commits / phases / lines | G-5 | Disposition |');
-  if (start === -1) return [];
+  const start = lines.findIndex((l) => l.trim() === spec.header);
+  if (start === -1) return { found: false, rows: [], end: -1, lines };
   const rows = [];
-  for (let i = start + 2; i < lines.length && lines[i].startsWith('|'); i++) {
-    // Split on UNESCAPED pipes -- cells legitimately contain an escaped one.
-    const cells = lines[i].replace(/\\\|/g, '\u0000').split('|').map((c) => c.trim());
+  let i = start + 2;
+  for (; i < lines.length && lines[i].startsWith('|'); i++) {
+    const cells = splitCells(lines[i]);
     const m = /`([^`]+)`/.exec(cells[1] || '');
     if (!m) continue;
-    rows.push({ line: i + 1, path: m[1], cells: cells.length, disposition: cells[4] || '' });
+    rows.push({ line: i + 1, path: m[1], cells: cells.length, disposition: cells[spec.verdictIndex] || '' });
   }
-  return rows;
+  return { found: true, rows, end: i, lines };
 }
 
-/** Over-long dispositions, duplicate rows, malformed rows. */
-function ledgerFindings(text) {
-  const rows = ledgerRows(text);
+/**
+ * Over-long cells, duplicate rows, malformed rows -- and, when `opts.floor` is set,
+ * a table that binds too few rows or was cut short partway through ([shortlist-missing]).
+ */
+function ledgerFindings(text, spec, opts = {}) {
+  const parsed = ledgerRows(text, spec);
+  const rows = parsed.rows;
   const long = rows
-    .filter((r) => r.disposition.length > LEDGER_CELL_LIMIT)
-    .map((r) => Object.assign({}, r, { len: r.disposition.length }));
+    .filter((r) => r.disposition.length > spec.limit)
+    .map((r) => Object.assign({}, r, { len: r.disposition.length, cap: spec.limit }));
   const seen = new Map();
   const dupes = [];
   for (const r of rows) {
     if (seen.has(r.path)) dupes.push({ path: r.path, lines: [seen.get(r.path), r.line] });
     else seen.set(r.path, r.line);
   }
-  const malformed = rows.filter((r) => r.cells !== 6);
-  return { rows: rows.length, long, dupes, malformed };
+  const malformed = rows
+    .filter((r) => r.cells !== spec.expectedCells)
+    .map((r) => Object.assign({}, r, { expected: spec.expectedCells }));
+  const missing = [];
+  if (opts.floor) {
+    if (rows.length < opts.floor) {
+      missing.push(`${rows.length} rows parsed (floor ${opts.floor}) — the cell cap would bind nothing`);
+    }
+    if (parsed.found) {
+      // TRUNCATION: the floor alone misses a break after row 100. Scan from where the parser
+      // stopped to the next `## ` heading; any further row of the table's own shape means
+      // the table was cut short and every row below the break is unguarded.
+      let k = 0;
+      for (let j = parsed.end; j < parsed.lines.length && !parsed.lines[j].startsWith('## '); j++) {
+        const l = parsed.lines[j];
+        if (l.startsWith('| `') && splitCells(l).length === spec.expectedCells) k++;
+      }
+      if (k > 0) {
+        missing.push(
+          `table cut short at line ${parsed.end + 1}: ${rows.length} rows parsed, ${k} more FIRING-shaped rows follow before the next heading`
+        );
+      }
+    }
+  }
+  return { rows: rows.length, long, dupes, malformed, missing };
 }
 
 function main() {
@@ -232,15 +310,30 @@ function main() {
   // FIRING-ONLY shortlist under a DIFFERENT header ("| Hot file (FIRING) |") precisely so it
   // is not parsed as the scan list. These per-cell rules -- 200-char cap, no duplicate row,
   // 6 cells -- still bind, they simply bind where the table actually lives now.
+  //
+  // ⚠ CORRECTED 2026-10-12 (Phase 277): "a DIFFERENT header precisely so it is not parsed"
+  // was true and was the defect -- the shortlist was then parsed by NOTHING, so its cells
+  // regrew to 23,049 chars under no cap. Each table is now bound by its OWN exact header:
+  // every CLAUDE.md gets SHORTLIST_SPEC (80-char cap, 5 cells, plus the MIN_SHORTLIST_ROWS
+  // floor and the truncation check on the ROOT CLAUDE.md), and docs/HOT-FILE-LEDGER.md keeps
+  // SCAN_LIST_SPEC (200-char cap, 6 cells) exactly as before.
   const LEDGER_FILES = [path.join(root, 'docs', 'HOT-FILE-LEDGER.md')];
+  const ROOT_CLAUDE_MD = path.join(root, 'CLAUDE.md');
+  const targets = files
+    .map((file) => ({
+      file,
+      spec: SHORTLIST_SPEC,
+      opts: path.resolve(file) === path.resolve(ROOT_CLAUDE_MD) ? { floor: MIN_SHORTLIST_ROWS } : {},
+    }))
+    .concat(LEDGER_FILES.map((file) => ({ file, spec: SCAN_LIST_SPEC, opts: {} })));
   const structural = [];
-  for (const file of files.concat(LEDGER_FILES)) {
-    if (!fs.existsSync(file)) continue;
-    const rel = path.relative(root, file).split(path.sep).join('/');
-    const f = ledgerFindings(fs.readFileSync(file, 'utf8'));
-    if (f.rows === 0) continue;
-    if (f.long.length || f.dupes.length || f.malformed.length) {
-      structural.push(Object.assign({ rel }, f));
+  for (const t of targets) {
+    if (!fs.existsSync(t.file)) continue;
+    const rel = path.relative(root, t.file).split(path.sep).join('/');
+    const f = ledgerFindings(fs.readFileSync(t.file, 'utf8'), t.spec, t.opts);
+    if (f.rows === 0 && f.missing.length === 0) continue;
+    if (f.long.length || f.dupes.length || f.malformed.length || f.missing.length) {
+      structural.push(Object.assign({ rel, table: t.spec.name }, f));
     }
   }
 
@@ -263,18 +356,21 @@ function main() {
 
 
   for (const s of structural) {
-    const n = s.long.length + s.dupes.length + s.malformed.length;
-    console.log('\nHOT-FILE LEDGER — %d structural problem(s) in %s', n, s.rel);
+    const n = s.long.length + s.dupes.length + s.malformed.length + s.missing.length;
+    console.log('\nHOT-FILE LEDGER — %d structural problem(s) in %s (%s)', n, s.rel, s.table);
+    for (const x of s.missing) {
+      console.log('  [shortlist-missing] %s  %s', s.rel, x);
+    }
     for (const r of s.long) {
       console.log('  [disposition-too-long] line %d  %d chars (cap %d)  %s',
-        r.line, r.len, LEDGER_CELL_LIMIT, r.path);
+        r.line, r.len, r.cap, r.path);
     }
     for (const d of s.dupes) {
       console.log('  [duplicate-row] lines %s  %s — one file, one row; merge them',
         d.lines.join(' + '), d.path);
     }
     for (const m of s.malformed) {
-      console.log('  [malformed-row] line %d  %d cells, expected 6  %s', m.line, m.cells, m.path);
+      console.log('  [malformed-row] line %d  %d cells, expected %d  %s', m.line, m.cells, m.expected, m.path);
     }
     console.log('  The table is the AUDIT SCAN LIST: it keeps the VERDICT, nothing more.');
     console.log('  The narrative belongs in that file\'s own section in docs/HOT-FILE-LEDGER.md,');

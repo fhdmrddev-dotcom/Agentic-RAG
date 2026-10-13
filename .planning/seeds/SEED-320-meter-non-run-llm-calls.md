@@ -3,9 +3,9 @@ seed_id: SEED-320
 title: LLM calls made outside a run (the Expert handoff summary) are disclosed on /admin/spend but never metered
 created: 2026-09-28
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Reviewed at 279 discuss (2026-10-13), trigger fired on thread_handoff.py (WR-05 wraps the marker); NOT folded by operator decision (keep 279 at SEAM-01). Re-open: the next phase touching thread_handoff.py's provider call or /admin/spend counting."
 trigger_when: Any phase touching backend/app/services/thread_handoff.py, adding or changing a provider call that is not made inside a runs row (summaries, titles, authoring drafts), or changing what /admin/spend counts.
 trigger_paths: ["backend/app/services/thread_handoff.py", "backend/app/services/expert_authoring.py", "backend/app/services/skill_body_authoring.py", "backend/app/db/rates.py", "frontend/src/components/admin/spend/AttributionDisclosures.tsx"]
 trigger_surfaces: [admin, chat, provider]

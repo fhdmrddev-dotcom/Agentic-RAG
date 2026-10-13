@@ -9,6 +9,18 @@
  *   - backend/app/services/harness/programmatic.py
  *   - backend/app/services/tool_dispatcher.py
  *   - backend/app/services/agent_loop.py
+ * and (Phase 278, SEAM-03 / D-05) the eleven tool-handler modules split out of tool_dispatcher.py:
+ *   - backend/app/services/tools/__init__.py
+ *   - backend/app/services/tools/base.py
+ *   - backend/app/services/tools/documents.py
+ *   - backend/app/services/tools/skills.py
+ *   - backend/app/services/tools/sandbox.py
+ *   - backend/app/services/tools/runtime_gap.py
+ *   - backend/app/services/tools/render_template.py
+ *   - backend/app/services/tools/workspace.py
+ *   - backend/app/services/tools/memory.py
+ *   - backend/app/services/tools/agent_control.py
+ *   - backend/app/services/tools/connector.py
  *
  * Runs scripts/check-extension-contract.cjs --files <edited-file> and alerts immediately
  * if a dynamic dispatch, eval, importlib, or registry mutation was introduced.
@@ -27,6 +39,18 @@ const WATCHED_FILES = new Set([
   'backend/app/services/harness/programmatic.py',
   'backend/app/services/tool_dispatcher.py',
   'backend/app/services/agent_loop.py',
+  // Phase 278 (D-05): the tool handler families — closed list, kept in step with the scanner.
+  'backend/app/services/tools/__init__.py',
+  'backend/app/services/tools/base.py',
+  'backend/app/services/tools/documents.py',
+  'backend/app/services/tools/skills.py',
+  'backend/app/services/tools/sandbox.py',
+  'backend/app/services/tools/runtime_gap.py',
+  'backend/app/services/tools/render_template.py',
+  'backend/app/services/tools/workspace.py',
+  'backend/app/services/tools/memory.py',
+  'backend/app/services/tools/agent_control.py',
+  'backend/app/services/tools/connector.py',
 ]);
 
 let raw = '';

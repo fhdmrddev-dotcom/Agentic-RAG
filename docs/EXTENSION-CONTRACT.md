@@ -33,6 +33,7 @@ The following components are strictly **CLOSED** and must never be dynamically r
 - Programmatic Functions (`PROGRAMMATIC_PHASE_REGISTRY` in `programmatic.py`)
 - Validation Gate Kinds (`VALIDATOR_REGISTRY` and `PROGRAMMATIC_VALIDATOR_REGISTRY` in `validators.py`)
 - Agent Built-in Tools (`_TOOL_REGISTRY` in `tool_dispatcher.py`)
+  - *Phase 278 (SEAM-03, 2026-10-13):* the tools home is now the registry module `tool_dispatcher.py` plus the `backend/app/services/tools/` family package (`documents`, `skills`, `sandbox`, `runtime_gap`, `render_template`, `workspace`, `memory`, `agent_control`, `connector`, with the `base` leaf types). Each handler is imported BY NAME into the static `_TOOL_REGISTRY` dict literal, which stays the one closed list; nothing is registered.
 
 ---
 
@@ -115,5 +116,6 @@ To prevent recurring design debates, this contract formally records what the arc
 
 This contract is not a suggestion; it is enforced by automated gates:
 - `scripts/check-extension-contract.cjs`: line-based pattern scanner auditing the six trigger paths (`phase_types.py`, `validator_kinds.py`, `emitters.py`, `programmatic.py`, `tool_dispatcher.py`, `agent_loop.py`).
+  - *Phase 278 (D-05, 2026-10-13):* plus every `backend/app/services/tools/*.py` module (11 files, `__init__.py` included), each named explicitly — 17 paths in total. The hook's watch list and `test_255`'s `TRIGGER_FILES` carry the same 17, and `test_255` asserts the count so a dropped path fails.
 - `backend/tests/unit/test_255_extension_contract_guard.py`: Unit test suite ensuring registries remain static and closed.
 - `.claude/hooks/extension-contract-guard.js` (PostToolUse): runs the scanner when an agent edits a trigger path and reports a violation back to that agent. It does not block commits; there is no pre-commit hook.

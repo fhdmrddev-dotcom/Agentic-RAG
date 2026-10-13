@@ -1,6 +1,8 @@
 ---
 phase: 272-close-means-wrong
 plan: 01
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 272-01-PLAN.md frontmatter requirements
+requirements-completed: [FIND-07]
 subsystem: retrieval / agent tools
 tags: [refactor, pure-move, g-5, extraction, retrieval, tool-dispatcher, seam]
 requires: []

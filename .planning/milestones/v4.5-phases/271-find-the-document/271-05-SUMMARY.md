@@ -1,6 +1,8 @@
 ---
 phase: 271-find-the-document
 plan: 05
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 271-05-PLAN.md frontmatter requirements
+requirements-completed: [FIND-01, FIND-02, FIND-03, FIND-06]
 subsystem: verification (live DB, browser) + registers
 tags: [find, rls, gotrue, two-org-fence, g4-drive, playwright, hot-file-ledger, seeds]
 requires:

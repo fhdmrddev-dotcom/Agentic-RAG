@@ -193,6 +193,11 @@ const WATCHDOG_INACTIVITY_MS = 20_000 // per-thread N: quiet-for-this-long → p
 // could not be resolved still climbs down.
 const STOP_TIMEOUT_MS = 8000
 
+// 279-03 D-15 (SEED-328): the ONE send 409 that keeps the fixed workflow-lock copy. Cross-pinned to
+// backend/app/services/workflow_kickoff.py by streamsProvider.test.tsx (Test 3c, `?raw`); any other
+// send 409 (e.g. the org-mismatch refusal) reaches the generic ApiError arm with its own words.
+const WORKFLOW_LOCK_DETAIL_PREFIX = "Thread is workflow-locked"
+
 // WR-04 fix (260529-0sc): the persistence trigger set now includes the panel
 // todo/task Maps. This equalityFn returns true (= "no change, skip") ONLY when
 // all three watched refs are unchanged, so a reference change in bucketsBySurface
@@ -3022,7 +3027,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           } catch (err) {
             if (err instanceof Error && err.name === "AbortError") {
               // Caller-initiated abort.
-            } else if (err instanceof ApiError && err.status === 409) {
+            } else if (
+              err instanceof ApiError &&
+              err.status === 409 &&
+              err.message.startsWith(WORKFLOW_LOCK_DETAIL_PREFIX)
+            ) {
               // Phase 092 (092-06 / F3): a 409 lock-refusal (MODE-02 server-side
               // Harness→Deep refusal). Roll back BOTH optimistic bubbles — the
               // user bubble AND the orphaned assistant placeholder — so no ghost

@@ -150,9 +150,9 @@ export const GAUNTLET_STAGES: readonly GauntletStageFact[] = Object.freeze([
 ])
 
 /**
- * Built-in tool count from _TOOL_REGISTRY in backend/app/services/tool_dispatcher.py:4202-4238.
+ * Built-in tool count from _TOOL_REGISTRY in backend/app/services/tool_dispatcher.py (registry only since 278).
  */
-export const BUILTIN_TOOL_COUNT = 29
+export const BUILTIN_TOOL_COUNT = 30
 
 /**
  * Built-in tool groups matching the comment blocks in tool_dispatcher.py.
@@ -165,6 +165,7 @@ export const TOOL_GROUPS: readonly { name: string; count: number }[] = Object.fr
   { name: "Knowledge view queries", count: 1 },
   { name: "Document relationships", count: 1 },
   { name: "Skill & sandbox attachments", count: 2 },
+  { name: "Artifacts", count: 1 },
 ])
 
 /**
@@ -243,7 +244,7 @@ export const VERBATIM_QUOTES: readonly VerbatimQuoteFact[] = Object.freeze([
  */
 export const HERO_FACTS: HeroFacts = Object.freeze({
   checksCount: GAUNTLET_STAGES.length, // 10
-  toolsCount: BUILTIN_TOOL_COUNT, // 29
+  toolsCount: BUILTIN_TOOL_COUNT, // 30
   providersCount: MODEL_PROVIDERS.length, // 8
   localRuntimesCount: LOCAL_RUNTIMES.length, // 2
   citationCoverage: "100%", // citation gate enforced by gauntlet

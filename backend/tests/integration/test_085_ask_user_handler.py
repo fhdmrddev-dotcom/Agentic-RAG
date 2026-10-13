@@ -366,7 +366,7 @@ async def test_handle_ask_user_subscribe_first_ordering(redis_client):
 
     # Patch redis.sadd just for this test
     with patch.object(redis_client, "sadd", _sadd_recorder), \
-         patch("app.services.tool_dispatcher.aexec", side_effect=_aexec_recorder):
+         patch("app.services.tools.agent_control.aexec", side_effect=_aexec_recorder):
         try:
             result = await _handle_ask_user(
                 {"prompt": "pick a", "timeout_seconds": 5},
@@ -416,7 +416,7 @@ async def test_handle_ask_user_response_publish_returns_text(redis_client):
     ctx = _build_ctx(redis_client, tool_call_id=tcid, run_id=run_id)
     pub_task = asyncio.create_task(_publisher())
 
-    with patch("app.services.tool_dispatcher.aexec", AsyncMock(return_value=MagicMock(data=[]))):
+    with patch("app.services.tools.agent_control.aexec", AsyncMock(return_value=MagicMock(data=[]))):
         try:
             result = await _handle_ask_user(
                 {"prompt": "what is the meaning of life?", "timeout_seconds": 5},
@@ -457,7 +457,7 @@ async def test_handle_ask_user_choice_click_resolves_option_text(redis_client):
     ctx = _build_ctx(redis_client, tool_call_id=tcid, run_id=run_id)
     pub_task = asyncio.create_task(_publisher())
 
-    with patch("app.services.tool_dispatcher.aexec", AsyncMock(return_value=MagicMock(data=[]))):
+    with patch("app.services.tools.agent_control.aexec", AsyncMock(return_value=MagicMock(data=[]))):
         try:
             result = await _handle_ask_user(
                 {
@@ -499,7 +499,7 @@ async def test_handle_ask_user_choice_click_out_of_range_stays_empty(redis_clien
     ctx = _build_ctx(redis_client, tool_call_id=tcid, run_id=run_id)
     pub_task = asyncio.create_task(_publisher())
 
-    with patch("app.services.tool_dispatcher.aexec", AsyncMock(return_value=MagicMock(data=[]))):
+    with patch("app.services.tools.agent_control.aexec", AsyncMock(return_value=MagicMock(data=[]))):
         try:
             result = await _handle_ask_user(
                 {"prompt": "pick one", "options": ["a", "b"], "timeout_seconds": 5},
@@ -532,7 +532,7 @@ async def test_handle_ask_user_cancel_sentinel_returns_cancel_text(redis_client)
     ctx = _build_ctx(redis_client, tool_call_id=tcid, run_id=run_id)
     pub_task = asyncio.create_task(_publisher())
 
-    with patch("app.services.tool_dispatcher.aexec", AsyncMock(return_value=MagicMock(data=[]))):
+    with patch("app.services.tools.agent_control.aexec", AsyncMock(return_value=MagicMock(data=[]))):
         try:
             result = await _handle_ask_user(
                 {"prompt": "anything?", "timeout_seconds": 5},
@@ -565,7 +565,7 @@ async def test_handle_ask_user_shutdown_sentinel_returns_shutdown_text(redis_cli
     ctx = _build_ctx(redis_client, tool_call_id=tcid, run_id=run_id)
     pub_task = asyncio.create_task(_publisher())
 
-    with patch("app.services.tool_dispatcher.aexec", AsyncMock(return_value=MagicMock(data=[]))):
+    with patch("app.services.tools.agent_control.aexec", AsyncMock(return_value=MagicMock(data=[]))):
         try:
             result = await _handle_ask_user(
                 {"prompt": "anything?", "timeout_seconds": 5},
@@ -588,7 +588,7 @@ async def test_handle_ask_user_timeout_returns_timed_out(redis_client):
     from app.services.tool_dispatcher import _handle_ask_user
 
     ctx = _build_ctx(redis_client, tool_call_id="tcid-timeout")
-    with patch("app.services.tool_dispatcher.aexec", AsyncMock(return_value=MagicMock(data=[]))):
+    with patch("app.services.tools.agent_control.aexec", AsyncMock(return_value=MagicMock(data=[]))):
         result = await _handle_ask_user(
             {"prompt": "no response coming", "timeout_seconds": 1},
             ctx,

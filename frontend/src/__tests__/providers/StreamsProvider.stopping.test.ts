@@ -1015,7 +1015,13 @@ describe("194.1-03 R5 — both honesty arms still reach the screen with no place
 
   it("the 409 lock-refusal arm is UNAFFECTED — both temps roll back, no node survives", async () => {
     const { ApiError } = await import("@/lib/api")
-    mockPostMessage.mockRejectedValue(new ApiError("locked", 409))
+    // mockPostMessage.mockRejectedValue(new ApiError("locked", 409))
+    // ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-06): since D-15 only a detail starting with
+    // WORKFLOW_LOCK_DETAIL_PREFIX takes the lock arm, so "locked" ran the GENERIC arm and passed by
+    // coincidence. The server's real literal (workflow_kickoff.py) now drives the arm this title names.
+    mockPostMessage.mockRejectedValue(
+      new ApiError("Thread is workflow-locked — cancel the active workflow to switch back to Deep mode.", 409),
+    )
     const { result } = renderActions()
 
     await act(async () => {
@@ -1025,6 +1031,27 @@ describe("194.1-03 R5 — both honesty arms still reach the screen with no place
     expect(readBucket(THREAD).filter((m) => m.role === "assistant")).toHaveLength(0)
     expect(readBucket(THREAD).filter((m) => m.role === "user")).toHaveLength(0)
     expect(useStreamsStore.getState().reconcileErrors.get(THREAD)).toBeDefined()
+    // What tells the two arms apart: the lock arm stores its FIXED copy and stashes no draft.
+    expect(useStreamsStore.getState().reconcileErrors.get(THREAD)?.message).toBe(
+      "This thread is running a workflow — cancel it to send a Deep message.",
+    )
+    expect(useStreamsStore.getState().failedSendDrafts.has(THREAD)).toBe(false)
+  })
+
+  it("279-REVIEW WR-06 — a NON-lock 409 takes the generic arm: the server's words, the draft stashed", async () => {
+    const { ApiError } = await import("@/lib/api")
+    const MSG = "Switch to this chat's organization to keep chatting with its Expert."
+    mockPostMessage.mockRejectedValue(new ApiError(MSG, 409))
+    const { result } = renderActions()
+
+    await act(async () => {
+      await result.current.sendMessage(THREAD, "hi", { workflowDefinitionId: "wf-def-1" })
+    })
+
+    expect(readBucket(THREAD).filter((m) => m.role === "assistant")).toHaveLength(0)
+    expect(readBucket(THREAD).filter((m) => m.role === "user")).toHaveLength(0)
+    expect(useStreamsStore.getState().reconcileErrors.get(THREAD)?.message).toBe(MSG)
+    expect(useStreamsStore.getState().failedSendDrafts.get(THREAD)).toBe("hi")
   })
 
   it("the generic ApiError rollback arm is UNAFFECTED — routes to reconcileErrors", async () => {

@@ -65,7 +65,8 @@ describe("ScopeLedger", () => {
   it("(4) a column's own `more` count is added to the overflow, never re-derived from the items", () => {
     render(
       <ScopeLedger
-        columns={[{ tone: "no", heading: "Won't use", items: [{ label: "x.pdf" }], more: 3 }]}
+        // 279-03 WR-04 (D-09/D-16): was columns={[{ tone: "no", heading: "Won't use", items: [{ label: "x.pdf" }], more: 3 }]}
+        columns={[{ tone: "no", heading: "Won't search", items: [{ label: "x.pdf" }], more: 3 }]}
       />,
     )
     expect(screen.getByText("and 3 more")).toBeTruthy()

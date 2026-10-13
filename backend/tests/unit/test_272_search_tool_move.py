@@ -193,6 +193,10 @@ def test_patch_where_used_old_target_alone_is_missed(monkeypatch):
     ``search_documents`` runs instead — against stubbed infrastructure (the RPC call and the
     embedding), so nothing leaves the process — and the old-target recorder sees ZERO calls."""
     td, tool = _td(), _tool()
+    # Phase 278 (SEAM-03): tool_dispatcher no longer binds `search_documents` at all (unused since
+    # 272; the split dropped it, so a stale patch there now raises). The surviving "old target" is
+    # the module tool_dispatcher used to import it FROM, retrieval_service.
+    from app.services import retrieval_service as td_retrieval
     rpc = importlib.import_module("app.services.retrieval_rpc")
     calls: list = []
 
@@ -203,7 +207,7 @@ def test_patch_where_used_old_target_alone_is_missed(monkeypatch):
     async def _no_rows(*a, **k):
         return []
 
-    monkeypatch.setattr(td, "search_documents", _rec)
+    monkeypatch.setattr(td_retrieval, "search_documents", _rec)
     monkeypatch.setattr(rpc, "_call_as_user", _no_rows)
     monkeypatch.setattr(rpc, "embed_texts", lambda *a, **k: [[0.25, 0.5]])
     monkeypatch.setattr(tool, "write_audit_entry", AsyncMock())

@@ -12,6 +12,37 @@ from app.services.tool_dispatcher import _TOOL_REGISTRY
 
 APP_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "app"
 
+# Phase 278 (D-07 / D-08): every file that holds tool handlers, as a TUPLE. The dispatcher split
+# moves the handlers into app/services/tools/*.py and edits THIS constant, never the asserts below.
+_HANDLER_FILES = (
+    APP_DIR / "services" / "tools" / "documents.py",
+    APP_DIR / "services" / "tools" / "skills.py",
+    APP_DIR / "services" / "tools" / "sandbox.py",
+    APP_DIR / "services" / "tools" / "render_template.py",
+    APP_DIR / "services" / "tools" / "workspace.py",
+    APP_DIR / "services" / "tools" / "memory.py",
+    APP_DIR / "services" / "tools" / "agent_control.py",
+    APP_DIR / "services" / "tools" / "connector.py",
+    APP_DIR / "services" / "search_documents_tool.py",
+    APP_DIR / "services" / "show_artifact_tool.py",
+)
+
+
+def _anchored_handler_trees() -> list[tuple[pathlib.Path, ast.Module]]:
+    """Each handler file, parsed — and ANCHORED (Phase 278 D-08): a file with no handler def
+    would make every absence check below pass vacuously, so it fails here instead."""
+    out = []
+    for path in _HANDLER_FILES:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        defs = [n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+        assert any(d.startswith(("_handle_", "handle_")) for d in defs), (
+            f"ANCHOR: no tool handler def in {path.name} — the handlers moved; "
+            "repoint _HANDLER_FILES at every file that now holds them"
+        )
+        out.append((path, tree))
+    assert len(out) == len(_HANDLER_FILES)
+    return out
+
 
 def test_phase_type_registry_contains_zero_expert_executors():
     """PACK-01 / EXT-01 Red Line: PHASE_TYPE_REGISTRY_ENTRIES has strictly 7 executors.
@@ -46,12 +77,11 @@ def test_tool_dispatcher_contains_zero_expert_tools_or_dispatchers():
     for tool_name in _TOOL_REGISTRY:
         assert "expert" not in tool_name.lower(), f"Expert tool registered in _TOOL_REGISTRY: {tool_name}"
 
-    dispatcher_path = APP_DIR / "services" / "tool_dispatcher.py"
-    tree = ast.parse(dispatcher_path.read_text(encoding="utf-8"), filename=str(dispatcher_path))
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if node.name.startswith("_handle_expert"):
-                pytest.fail(f"Expert-specific tool handler found in tool_dispatcher: {node.name}")
+    for dispatcher_path, tree in _anchored_handler_trees():
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name.startswith("_handle_expert"):
+                    pytest.fail(f"Expert-specific tool handler found in {dispatcher_path.name}: {node.name}")
 
 
 def test_no_second_encoding_of_the_tool_set_survives():
@@ -62,10 +92,9 @@ def test_no_second_encoding_of_the_tool_set_survives():
     """
     for name in ("EXPERT_CORE_TOOLS", "EXPERT_DELIVERABLE_TOOLS"):
         assert not hasattr(tool_dispatcher, name), f"{name} is back in tool_dispatcher"
-    dispatcher_path = APP_DIR / "services" / "tool_dispatcher.py"
-    tree = ast.parse(dispatcher_path.read_text(encoding="utf-8"), filename=str(dispatcher_path))
     module_names = {
         t.id
+        for _path, tree in _anchored_handler_trees()
         for node in tree.body
         if isinstance(node, (ast.Assign, ast.AnnAssign))
         for t in (node.targets if isinstance(node, ast.Assign) else [node.target])

@@ -35,7 +35,10 @@ from uuid import uuid4
 import pytest
 
 import app.services.tool_dispatcher as td
-from app.services.tool_dispatcher import ToolContext, _resolve_skill_visibility_or
+from app.services.tools import sandbox as td_sandbox
+from app.services.tools import skills as td_skills
+from app.services.tool_dispatcher import ToolContext
+from app.services.tools.skills import _resolve_skill_visibility_or
 from app.utils.skill_visibility import build_skill_visibility_or
 
 # The grammar-only PostgREST evaluator 264-02 built. IMPORTED, never re-implemented.
@@ -64,7 +67,36 @@ _WIDENED_PREDICATE = (
     f"and(born_for_expert_bundle_id.eq.{_BUNDLE},is_enabled.is.true)))"
 )
 
-_DISPATCHER_SRC = Path(inspect.getsourcefile(td))
+# Phase 278 (D-07 / D-08): the handler sources the structural fences below read, as a TUPLE. The
+# dispatcher split puts the resolver + load/save/read_skill_file in tools/skills.py and the
+# execute_code injection in tools/sandbox.py — so these fences span TWO files after the move, and a
+# single-file repoint would count half the code (4 resolver calls -> 3). The move edits THIS line.
+_HANDLER_SRCS = (Path(inspect.getsourcefile(td_skills)), Path(inspect.getsourcefile(td_sandbox)))
+
+
+def _handler_texts(srcs: tuple[Path, ...]) -> list[str]:
+    """Every source in ``_HANDLER_SRCS``, ANCHORED (Phase 278 D-08): the resolver's def must be
+    found EXACTLY ONCE across the tuple, so a fence pointed at files the code left fails here
+    instead of counting zero sites and passing."""
+    texts = [p.read_text(encoding="utf-8") for p in srcs]
+    assert texts and len(texts) == len(srcs)
+    resolver_defs = sum(
+        1
+        for text in texts
+        for n in ast.walk(ast.parse(text))
+        if isinstance(n, ast.AsyncFunctionDef) and n.name == "_resolve_skill_visibility_or"
+    )
+    assert resolver_defs == 1, (
+        f"ANCHOR: _resolve_skill_visibility_or is defined {resolver_defs} times across "
+        f"{[p.name for p in srcs]} (expected exactly 1) — repoint _HANDLER_SRCS"
+    )
+    return texts
+
+
+def _walk_handlers(srcs: tuple[Path, ...]):
+    """``ast.walk`` over every anchored handler source, in tuple order."""
+    for text in _handler_texts(srcs):
+        yield from ast.walk(ast.parse(text))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -322,10 +354,9 @@ async def test_the_fail_closed_empty_org_arm_survives_the_widening():
 # The four per-site DECISIONS, readable in source (D-264-04)
 # ─────────────────────────────────────────────────────────────────────────────
 def _resolver_calls() -> list[ast.Call]:
-    tree = ast.parse(_DISPATCHER_SRC.read_text(encoding="utf-8"))
     return [
         node
-        for node in ast.walk(tree)
+        for node in _walk_handlers(_HANDLER_SRCS)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "_resolve_skill_visibility_or"
@@ -359,10 +390,10 @@ def test_exactly_four_call_sites_and_exactly_three_of_them_opt_in():
 def test_the_born_for_bundle_id_is_read_through_getattr_never_as_an_attribute():
     """The `:1408` / `:1566` precedent in this very file (`skill_instructions_override`,
     `skill_snapshot`), and the reason is a real one: duck-typed ctx stubs."""
-    tree = ast.parse(_DISPATCHER_SRC.read_text(encoding="utf-8"))
+    nodes = list(_walk_handlers(_HANDLER_SRCS))
     attribute_reads = [
         node
-        for node in ast.walk(tree)
+        for node in nodes
         if isinstance(node, ast.Attribute)
         and node.attr == "born_for_bundle_id"
         and isinstance(node.value, ast.Name)
@@ -379,7 +410,7 @@ def test_the_born_for_bundle_id_is_read_through_getattr_never_as_an_attribute():
     # documentation. Measured: this is exactly what the first version of this assertion did.
     getattr_reads = [
         node
-        for node in ast.walk(tree)
+        for node in nodes
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "getattr"
@@ -395,7 +426,7 @@ def test_the_born_for_bundle_id_is_read_through_getattr_never_as_an_attribute():
     # …and that one place is the resolver, not a handler that bypassed it.
     resolver = next(
         n
-        for n in ast.walk(tree)
+        for n in nodes
         if isinstance(n, ast.AsyncFunctionDef) and n.name == "_resolve_skill_visibility_or"
     )
     assert getattr_reads[0] in set(ast.walk(resolver)), (
@@ -414,7 +445,7 @@ def test_the_save_skill_site_states_its_refusal_in_source():
     corpus with no user-visible capability, and it is a WRITE handler's helper while PACK-17's
     axis is *read the body you were promised*. The comment beside the call must say so.
     """
-    lines = _DISPATCHER_SRC.read_text(encoding="utf-8").splitlines()
+    lines = "\n".join(_handler_texts(_HANDLER_SRCS)).splitlines()
     call_idx = [
         i
         for i, line in enumerate(lines)
@@ -449,7 +480,7 @@ def test_no_or_application_line_moved():
     the wrong number, because the previous correction in that same paragraph replaced a
     "five call sites" claim and this is the sentence that replaced it.
     """
-    src = _DISPATCHER_SRC.read_text(encoding="utf-8")
+    src = "\n".join(_handler_texts(_HANDLER_SRCS))
     applications = re.findall(r"^\s*\.or_\((_\w+)\)", src, flags=re.MULTILINE)
     assert len(applications) == 7, (
         f"expected the seven SEED-125 .or_() applications, found {len(applications)}"
@@ -671,13 +702,13 @@ async def test_the_handler_resolves_the_filter_exactly_ONCE_per_invocation(monke
     round-trip per miss — and, worse, could resolve a DIFFERENT string.
     """
     calls: list[bool] = []
-    real = td._resolve_skill_visibility_or
+    real = td_skills._resolve_skill_visibility_or
 
     async def _counting(ctx, *, born_for=False):
         calls.append(born_for)
         return await real(ctx, born_for=born_for)
 
-    monkeypatch.setattr(td, "_resolve_skill_visibility_or", _counting)
+    monkeypatch.setattr(td_skills, "_resolve_skill_visibility_or", _counting)
 
     sb = _two_skill_supabase()
     await td._handle_load_skill(
@@ -697,10 +728,9 @@ def test_the_miss_branch_reads_the_SAME_variable_the_primary_query_applied():
     assignment to `_skill_filter`, exactly ONE resolver call, and BOTH `.or_()` applications
     read that same Name.
     """
-    tree = ast.parse(_DISPATCHER_SRC.read_text(encoding="utf-8"))
     handler = next(
         n
-        for n in ast.walk(tree)
+        for n in _walk_handlers(_HANDLER_SRCS)
         if isinstance(n, ast.AsyncFunctionDef) and n.name == "_handle_load_skill"
     )
 

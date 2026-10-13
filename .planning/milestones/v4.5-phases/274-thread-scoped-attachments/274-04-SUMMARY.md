@@ -1,6 +1,8 @@
 ---
 phase: 274-thread-scoped-attachments
 plan: 04
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed copied verbatim from 274-04-PLAN.md frontmatter requirements
+requirements-completed: [ATT-01, ATT-02, ATT-03]
 subsystem: frontend / chat attachment chip + panel Files row + Save to Library mounts
 tags: [chat, attachment, promote, library, panel, a11y, listbox, polling, copy-port, phase-274, att-01, att-02, att-03]
 requires:

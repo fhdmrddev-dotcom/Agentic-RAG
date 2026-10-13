@@ -24,7 +24,7 @@ echo "✓ Baseline PASS: 11/11 tests green with all defenses intact."
 echo ""
 
 DEFENSES=(
-    "tool_dispatcher_trifecta|backend/app/services/tool_dispatcher.py|TRUST-03 trifecta fence forces posture='ask'|test_llm01_indirect_01_tool_dispatcher_email_hijack"
+    "tool_dispatcher_trifecta|backend/app/services/tools/connector.py|TRUST-03 trifecta fence forces posture='ask'|test_llm01_indirect_01_tool_dispatcher_email_hijack"
     "chat_tools_envelope|backend/app/services/connectors/chat_tools.py|wrap_untrusted_tool_result XML isolation envelope|test_llm01_delim_01_chat_tools_isolation_envelope"
     "service_tools_param_fence|backend/app/services/connectors/service_tools.py|_ISSUE_KEY regex validation & parameter transport fence|test_llm01_param_injection_refused"
     "embedding_metadata_prompt|backend/app/services/embedding_service.py|METADATA_EXTRACTION_ANTI_INJECTION boundary constant|test_llm01_meta_extraction_prompt_boundary"

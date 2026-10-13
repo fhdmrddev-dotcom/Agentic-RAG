@@ -72,7 +72,8 @@ key-decisions:
   - "275-04: OrgAdminShell.test.tsx adopted into the count gate by FILE path (11), because it carries the retired locked-Retention fence"
   - "275-04: the release dialog names the hold's COVERAGE (folder paths + direct-document count) — HoldOut carries no document names"
 
-requirements-completed: []
+# Repaired 2026-10-12 (Phase 277, REG-05): requirements-completed was [] and is replaced with the list copied verbatim from 275-04-PLAN.md frontmatter requirements (D-15)
+requirements-completed: [RET-01, RET-02, RET-03, RET-04]
 
 duration: ~38min
 completed: 2026-10-12
