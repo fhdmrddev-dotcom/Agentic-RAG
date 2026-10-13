@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
 status: in_progress
-last_updated: "2026-10-12T21:30:00.000Z"
-last_activity: 2026-10-12 -- Phase 277 complete (verified passed 4/4)
+last_updated: "2026-10-13T04:00:00.000Z"
+last_activity: 2026-10-13 -- Phase 278 executed 4/4 (review + verify pending)
 progress:
   total_phases: 7
   completed_phases: 1
@@ -57,7 +57,7 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: **277** (Registers Back Inside the Band) — ✅ COMPLETE 2026-10-12 · verification `passed` 4/4 · next **278** (One Home for Tools and Filters); next migration **207**
 Plan: 2/2 (277-01 REG-04 split, 277-02 REG-05 archive repair)
-Status: Phase 278 EXECUTING — wave 2/3 done 2026-10-13 (278-03 split: tool_dispatcher.py 5,068 → 274 L + 11 `services/tools/` modules, move `18abc1ed5`, D-07 + no-loss CLEAR, full gate failing set == base 71, merged `13a48d3da`); wave 1 done (278-01 pins + fence hardening, pre-move base `5642c0dd9`; 278-02 DEBT-09 one home `document_vocabulary.py`); merged `4caabc863`, merged-tree targeted 765 passed / 28 xfailed (move pins) / 0 failed; base gate 71 failed (`278-base-failed.txt`). Next: wave 2 (278-03 the split). — Planned 2026-10-13 — 4 plans / 3 waves (278-01 ∥ 278-02 → 278-03 → 278-04 operator checkpoint for the Anthropic live smoke); plan-check passed after 1 revision (3 warnings fixed, `8cdc9f284`); reqs 3/3, CONTEXT decisions 13/13, ledger gate OK — ready to execute 278
+Status: Phase 278 EXECUTED 2026-10-13 — 4/4 plans. Wave 3 (278-04) done: SC#5 live Anthropic `claude-sonnet-5` two-tool turn (search_documents + execute_code) on the post-split backend → `search.query` row with run_id `09c962aa`, `code.execute` row, key sets identical to pre-278 (`42eca96c1`); records `3b625c8fd` (tool_dispatcher 99/44/274 G-5 DISCHARGED, retrieval_service corrected beside original, SEED-224 → partially-answered); size/ledger/seeds gates 0. Full backend gate 71 failed == base set. Inherited, held for close: landing drift (facts.ts 29 vs 30 tools), SEED-171 vitest red (WorkflowBuilderPage.canvas, provably unmodified). Next: code review → regression gate → verifier. Waves 1-2: 278-01 pins, 278-02 DEBT-09 `document_vocabulary.py`, 278-03 split `18abc1ed5` (tool_dispatcher.py 5,068 → 274 L + 11 `services/tools/` modules), merged `13a48d3da`.
 Last activity: 2026-10-12 — 277 closed by hand. CLAUDE.md 121,650 → **89,171** chars (gate OK, no WARN). Review 277-REVIEW.md: 0 critical / **8 warning** / 5 info, all guard-hardening beyond the SCs (verifier). **WR-01 + WR-08 FIXED 2026-10-12 (quick 261012-x1l)**; WR-02..07 + IN-01..05 untriaged. ⚠ `state.begin-phase` was run at 277 start despite the rule above and wrote `total_phases: 14` (false; corrected to 7 by hand) — the ninth false-record occurrence.
 
 ### Quick Tasks Completed
