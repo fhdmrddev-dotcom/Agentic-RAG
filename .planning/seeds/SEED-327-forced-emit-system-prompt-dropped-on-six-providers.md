@@ -3,9 +3,9 @@ seed_id: SEED-327
 title: forced_emit's instructions never reach 6 of 8 providers (system_prompt dropped by the OpenAI-compat and Responses adapters) — likely root cause of 267 F-4
 created: 2026-09-29
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Reviewed at 279 discuss (2026-10-13), trigger fired on threads.py/forced_emit.py; NOT folded by operator decision: needs a shared provider-adapter change + 8 live provider rows, a phase of its own. 279 fixes IN-03 (directive wording) only and records the CR-01 gateway test as belonging here. Re-open: the operator schedules the F-4 / handoff-summariser fix, or the next cross-provider structured-output failure."
 trigger_when: "the operator schedules the F-4 / handoff-summariser fix; OR any phase whose files_modified names forced_emit.py, provider_gateway/openai_compat.py or provider_gateway/openai_responses.py; OR the next cross-provider structured-output failure"
 trigger_paths: ["backend/app/services/forced_emit.py", "backend/app/services/provider_gateway/openai_compat.py", "backend/app/services/provider_gateway/openai_responses.py", "backend/app/api/threads.py"]
 trigger_surfaces: []

@@ -3,15 +3,15 @@ seed_id: SEED-328
 title: Phase 267 independent-review warnings WR-01..WR-08, info IN-01..IN-05 and the deferred CR-03(b) org guard on send — accepted and deferred
 created: 2026-09-29
 surface: Agentic-RAG
-status: planted
+status: folded
 partial: false
-status_note:
+status_note: "Folded into Phase 279 (SEAM-01) at v4.6 intake; discuss 2026-10-13 measured all 16 items still open. Each gets a fixed / not-fixed row in the 279 record (D-04..D-11); status flips again at 279 close."
 trigger_when: "any phase whose files_modified names run_producer.py, threads.py send/handoff paths, ChatArea.tsx, StreamsProvider.tsx, expert_scope.py or the Expert catalog; OR the operator extracts one shared org-equality helper for PATCH, handoff and preview"
 trigger_paths: ["backend/app/services/run_producer.py", "backend/app/api/threads.py", "backend/app/services/expert_scope.py", "backend/app/api/experts.py", "frontend/src/components/chat/ChatArea.tsx", "frontend/src/providers/StreamsProvider.tsx", "frontend/src/components/experts/catalog/**"]
 trigger_surfaces: []
 migration_note:
 relates_to: ["267", "267-REVIEW-INDEPENDENT.md", "267-FIX-CR02-CR03-SUMMARY.md", "SEED-303", "SEED-327"]
-folded_into: null
+folded_into: "279"
 renumbered_from: null
 renumbered_because: null
 ---

@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-067
 title: New-chat / thread-select hangs ~5-7s — frontend latency that scales with thread count
-status: planted
+status: deferred
+status_note: "Reviewed at 279 discuss (2026-10-13), trigger fired on ChatArea.tsx (WR-06 chip hydration); NOT folded: latency is unrelated to Expert scope. Re-open: unchanged trigger_when."
 planted: 2026-06-07
 phase_origin: Phase 096 post-fix operator observation (during SEED-064 verification) — DB-timed
 category: B/C — real frontend perf characteristic; diagnose under the SEED-065 latency family
