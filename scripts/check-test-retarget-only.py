@@ -41,6 +41,11 @@ is stripped (autocrlf on this box). Rules:
 3. A changed line that falls inside an ``assert`` statement's line span is allowed ONLY if it is
    PATH class (NORM-EQUAL is not enough there), and every such line is printed under
    ``assert-span path lines (allowed, listed for review)`` so the verifier sees it.
+4. (278-REVIEW WR-04) A diff hunk may never LOSE a ``.py`` path entry: the number of ``.py`` string
+   literals on its removed PATH / NORM-EQUAL lines must not exceed the number on its added ones.
+   Each unpaired removal is reported as ``path-entry-removed``. Without this, deleting
+   ``"services/tools/memory.py",`` from a fence's scan list classified PATH and passed CLEAR —
+   narrowing what an absence fence scans while its own ``seen == len(...)`` still agreed with itself.
 
 ── NO-LOSS MODE ─────────────────────────────────────────────────────────────────────────────
 
@@ -59,6 +64,10 @@ re-added). A dropped comment or docstring line exits 1 and is printed.
   the registry pin and the full gate's failing-SET diff — this script is one of four proofs.
 - PATH lines are shape-checked, not meaning-checked: repointing a fence at the WRONG file passes
   here. D-08's anchor asserts (each fence first asserts it found its code) are what catch that.
+  ACCEPTED at 278-REVIEW WR-04 rather than fixed: knowing the RIGHT family needs a handler → file
+  map at the new rev plus knowing which handler each fence is about, i.e. re-deriving D-08's
+  per-fence intent. Rule 4 catches a scan list SHRINKING; a same-count swap to the wrong family is
+  left to the anchor asserts.
 - Scope is files that existed at ``<old_rev>``. A NEW test file is not checked (nothing to diff).
 - No-loss is a multiset over stripped lines: a common line (``return result``) dropped in one place
   and duplicated in another nets to zero. The AST pin covers code; this covers prose.
@@ -241,6 +250,13 @@ def _check_file(rel: str, old: str, new: str) -> tuple[list[str], list[str]]:
         if tag == "equal":
             continue
         paired = tag == "replace" and (i2 - i1) == (j2 - j1)
+        # 278-REVIEW WR-04 — a hunk may never LOSE a ``.py`` path entry. Without this, a lone removed
+        # ``"services/tools/memory.py",`` classifies PATH and passes, which silently narrows an
+        # absence fence's scan list (``_HANDLER_FILES`` etc. — the fence's own ``seen == len(...)``
+        # compares the shrunken tuple with itself). Counted over PATH / NORM-EQUAL lines only, so a
+        # comment or import naming a file never counts. A retarget keeps or grows the count.
+        removed_entries: list[tuple[int, str]] = []
+        added_entries = 0
         for k in range(max(i2 - i1, j2 - j1)):
             o_idx = i1 + k if i1 + k < i2 else None
             n_idx = j1 + k if j1 + k < j2 else None
@@ -252,9 +268,24 @@ def _check_file(rel: str, old: str, new: str) -> tuple[list[str], list[str]]:
                 o_cls = n_cls = "NORM-EQUAL"
             if o_text is not None:
                 judge("-", o_idx + 1, o_text, o_cls, old_asserts)
+                if o_cls in ("PATH", "NORM-EQUAL"):
+                    removed_entries.extend((o_idx + 1, o_text) for _ in range(_py_path_entries(o_text)))
             if n_text is not None:
                 judge("+", n_idx + 1, n_text, n_cls, new_asserts)
+                if n_cls in ("PATH", "NORM-EQUAL"):
+                    added_entries += _py_path_entries(n_text)
+        if len(removed_entries) > added_entries:
+            for lineno, text in removed_entries[added_entries:]:
+                violations.append(
+                    f"{rel}:{lineno} [-] path-entry-removed ({len(removed_entries)} removed vs "
+                    f"{added_entries} added in this hunk) {text.strip()}"
+                )
     return violations, assert_span
+
+
+def _py_path_entries(line: str) -> int:
+    """How many string literals on the line name a ``.py`` file (a scan-list / path entry)."""
+    return sum(1 for m in _STRING_RE.finditer(line) if re.search(r"""\.py["']$""", m.group(1)))
 
 
 def _retarget_mode(old: str, new: str, log) -> int:
