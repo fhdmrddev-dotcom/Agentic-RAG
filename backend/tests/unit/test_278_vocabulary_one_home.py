@@ -12,7 +12,9 @@ four entries, ``document_search_service`` three), and the list rule was typed tw
 frozenset). The home is ``backend/app/services/document_vocabulary.py``; the three named modules
 import it, and this fence fails when a copy reappears.
 
-Five tests:
+Six tests (``test_column_tables_cover_the_home`` added by 278-REVIEW WR-02):
+  * ``test_column_tables_cover_the_home`` — the column half's two dependent tables
+    (``document_search_service._TIMESTAMP_COLUMNS``, ``retrieval_scope._MONTH_SQL``) cover the home.
   * ``test_values_equal_phase_base`` — every module binding equals its PHASE_BASE literal, key order
     included, so every Find, View and agent filter returns exactly what it did (behaviour unchanged).
   * ``test_named_modules_import_the_home`` — the three named modules carry the import (source anchor).
@@ -165,6 +167,31 @@ def test_runtime_identity():
     assert list(scope._DATE_FIELD_COLUMN.items()) == list(expected_field_column.items())
     assert scope._DATE_WORDS == tuple(vocab.TIMESTAMP_DATE_COLUMNS)
     assert vfc.LIST_VALUE_FIELDS == frozenset(vocab.LIST_FIELD_NAMES)
+
+
+def test_column_tables_cover_the_home():
+    """278-REVIEW WR-02 — the COLUMN half of the vocabulary has two dependent tables.
+
+    * ``document_search_service._TIMESTAMP_COLUMNS`` decides whether Find's sort parses a column as a
+      datetime. It is derived from the home; this pins that it still equals the home's column set.
+    * ``retrieval_scope._MONTH_SQL`` is indexed with ``_MONTH_SQL[_DATE_FIELD_COLUMN[field]]``. It must
+      stay CONSTANT SQL text (no splicing a column name into SQL — ``test_no_f_string_sql``), so it
+      cannot be derived; it is pinned instead. A fourth date word added to the home without its month
+      statement would otherwise be a ``KeyError`` on the agent path, not a failing test.
+    """
+    vocab = _vocab()
+    dss = importlib.import_module("app.services.document_search_service")
+    scope = importlib.import_module("app.services.retrieval_scope")
+
+    assert dss._TIMESTAMP_COLUMNS == set(vocab.TIMESTAMP_DATE_COLUMNS.values()), (
+        f"document_search_service._TIMESTAMP_COLUMNS {sorted(dss._TIMESTAMP_COLUMNS)!r} differs from "
+        f"the home's columns {sorted(vocab.TIMESTAMP_DATE_COLUMNS.values())!r} — Find would sort a "
+        "date column as a string"
+    )
+    assert set(scope._MONTH_SQL) == set(scope._DATE_FIELD_COLUMN.values()), (
+        f"retrieval_scope._MONTH_SQL keys {sorted(scope._MONTH_SQL)!r} differ from the date columns "
+        f"{sorted(scope._DATE_FIELD_COLUMN.values())!r} — add a constant month statement per column"
+    )
 
 
 # ── Layer 2: AST ban on literal copies ───────────────────────────────────────────────────────────

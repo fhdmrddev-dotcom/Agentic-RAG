@@ -106,7 +106,10 @@ _SORT = {
     "source_created_desc": ("source_created_at", True),
     "name_asc": ("filename", False),
 }
-_TIMESTAMP_COLUMNS = {"created_at", "source_created_at", "source_modified_at"}
+# 278-REVIEW WR-02: derived from the home, never re-typed — a date word added to
+# ``document_vocabulary.TIMESTAMP_DATE_COLUMNS`` must sort as a datetime here too, not as a string.
+# Same type (``set``) and same members as the hand-typed literal it replaces.
+_TIMESTAMP_COLUMNS = set(_DATE_COLUMN.values())
 
 _NOT_IN_A_FOLDER = object()  # sentinel: folder condition = "Not in a folder"
 
