@@ -36,7 +36,7 @@ class ScopeEffect(BaseModel):
 
     The ONE payload the composer chip (``held``), the picker ledger (``next`` / ``stops`` or
     ``saved``) and — snapshotted — the ``scope_changed`` card render from. Built by
-    ``expert_scope.build_scope_effect`` from ``describe_expert_scope`` statements resolved with the
+    ``expert_scope_events.build_scope_effect`` from ``describe_expert_scope`` statements resolved with the
     producer's own inputs (active org + caller role, Pitfall 9). ``stops`` is empty when the new scope
     contains the old; ``saved`` is set only when ``held``.
     """
@@ -72,7 +72,7 @@ class ScopePreviewThreadFolder(BaseModel):
 class ExpertScopePreview(BaseModel):
     """Phase 267 (D-267-17 / D-267-18 / D-267-19 / PACK-25) — GET /threads/expert-scope-preview.
 
-    Built by ``app.services.expert_scope.scope_preview`` from the SAME statement the transcript
+    Built by ``app.services.expert_scope_statement.scope_preview`` from the SAME statement the transcript
     event reads, so the invite dialog and the event cannot disagree. ``excluded_count`` and
     ``excluded_names`` (≤ 5) come from ONE documents query — the heading and the list are never two
     computations. ``expert_folders == []`` on a restricted Expert is the UI's gate line (266 CR-01).

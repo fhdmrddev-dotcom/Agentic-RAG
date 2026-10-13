@@ -19100,7 +19100,7 @@
      "expert_folders"
     ],
     "title": "ExpertScopePreview",
-    "description": "Phase 267 (D-267-17 / D-267-18 / D-267-19 / PACK-25) \u2014 GET /threads/expert-scope-preview.\n\nBuilt by ``app.services.expert_scope.scope_preview`` from the SAME statement the transcript\nevent reads, so the invite dialog and the event cannot disagree. ``excluded_count`` and\n``excluded_names`` (\u2264 5) come from ONE documents query \u2014 the heading and the list are never two\ncomputations. ``expert_folders == []`` on a restricted Expert is the UI's gate line (266 CR-01)."
+    "description": "Phase 267 (D-267-17 / D-267-18 / D-267-19 / PACK-25) \u2014 GET /threads/expert-scope-preview.\n\nBuilt by ``app.services.expert_scope_statement.scope_preview`` from the SAME statement the transcript\nevent reads, so the invite dialog and the event cannot disagree. ``excluded_count`` and\n``excluded_names`` (\u2264 5) come from ONE documents query \u2014 the heading and the list are never two\ncomputations. ``expert_folders == []`` on a restricted Expert is the UI's gate line (266 CR-01)."
    },
    "ExternalActionPhaseConfig": {
     "properties": {
@@ -24916,7 +24916,7 @@
      "stops"
     ],
     "title": "ScopeEffect",
-    "description": "Phase 268 (D-268-12c / R1) \u2014 GET /threads/{id}/scope-effect: what the NEXT message searches.\n\nThe ONE payload the composer chip (``held``), the picker ledger (``next`` / ``stops`` or\n``saved``) and \u2014 snapshotted \u2014 the ``scope_changed`` card render from. Built by\n``expert_scope.build_scope_effect`` from ``describe_expert_scope`` statements resolved with the\nproducer's own inputs (active org + caller role, Pitfall 9). ``stops`` is empty when the new scope\ncontains the old; ``saved`` is set only when ``held``."
+    "description": "Phase 268 (D-268-12c / R1) \u2014 GET /threads/{id}/scope-effect: what the NEXT message searches.\n\nThe ONE payload the composer chip (``held``), the picker ledger (``next`` / ``stops`` or\n``saved``) and \u2014 snapshotted \u2014 the ``scope_changed`` card render from. Built by\n``expert_scope_events.build_scope_effect`` from ``describe_expert_scope`` statements resolved with the\nproducer's own inputs (active org + caller role, Pitfall 9). ``stops`` is empty when the new scope\ncontains the old; ``saved`` is set only when ``held``."
    },
    "ScopeFolderRef": {
     "properties": {

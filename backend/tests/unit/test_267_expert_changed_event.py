@@ -56,7 +56,7 @@ def _ref(folder_ref):
 
 @pytest.mark.asyncio
 async def test_swap_biased_to_restricted_states_now_dropped_and_the_exclusions():
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     before = await describe(FakeSupabase(), FA_ID, ACME_FOLDER)
     after = await describe(FakeSupabase(), HR_ID, ACME_FOLDER)
@@ -85,7 +85,7 @@ async def test_swap_biased_to_restricted_states_now_dropped_and_the_exclusions()
 async def test_join_on_a_plain_thread_states_the_measured_narrowing_honestly():
     """D-267-35: a biased Expert on a thread with NO folder narrows to its own folders — stated as
     ``Dropped: All your documents``, never hidden."""
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     before = await describe(FakeSupabase(), None, None)
     after = await describe(FakeSupabase(), FA_ID, None)
@@ -102,7 +102,7 @@ async def test_join_on_a_plain_thread_states_the_measured_narrowing_honestly():
 
 @pytest.mark.asyncio
 async def test_removal_in_a_folder_returns_to_the_thread_folder():
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     before = await describe(FakeSupabase(), FA_ID, ACME_FOLDER)
     after = await describe(FakeSupabase(), None, ACME_FOLDER)
@@ -119,7 +119,7 @@ async def test_removal_in_a_folder_returns_to_the_thread_folder():
 
 @pytest.mark.asyncio
 async def test_removal_on_a_plain_thread_returns_to_all_documents():
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     before = await describe(FakeSupabase(), FA_ID, None)
     after = await describe(FakeSupabase(), None, None)
@@ -132,7 +132,7 @@ async def test_removal_on_a_plain_thread_returns_to_all_documents():
 async def test_connections_now_are_the_new_experts_and_dropped_only_what_it_lacks():
     """D-267-29: ``now`` lists the after-Expert's CONNECTED names (the Brings statement); ``dropped``
     lists the before-Expert's connected names the after-Expert does not bring."""
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     both = resolved(FA_ID, "Financial Analyzer", "biased", [FIN_FOLDER], ["slack", "hubspot"])
     before = await describe(FakeSupabase(), FA_ID, None, bundles={FA_ID: both, CR_ID: CR})
@@ -144,7 +144,7 @@ async def test_connections_now_are_the_new_experts_and_dropped_only_what_it_lack
 
 @pytest.mark.asyncio
 async def test_an_empty_dropped_side_is_all_empty_and_not_all_documents():
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     st = await describe(FakeSupabase(), CR_ID, ACME_FOLDER)
     ev = build_expert_changed_event(st, st, at=AT)
@@ -156,7 +156,7 @@ async def test_an_empty_dropped_side_is_all_empty_and_not_all_documents():
 
 @pytest.mark.asyncio
 async def test_the_sentence_is_plain_text_from_the_same_payload():
-    from app.services.expert_scope import build_expert_changed_event, event_sentence
+    from app.services.expert_scope_events import build_expert_changed_event, event_sentence
 
     fa_acme = await describe(FakeSupabase(), FA_ID, ACME_FOLDER)
     hr_acme = await describe(FakeSupabase(), HR_ID, ACME_FOLDER)
@@ -181,7 +181,7 @@ async def test_the_sentence_is_plain_text_from_the_same_payload():
 @pytest.mark.asyncio
 async def test_the_expert_changed_fixture_is_the_real_builders_output():
     """The wire contract 267-04's ExpertEventCard renders (``fixtures/phase267/expert_changed.json``)."""
-    from app.services.expert_scope import build_expert_changed_event
+    from app.services.expert_scope_events import build_expert_changed_event
 
     before = await describe(FakeSupabase(), FA_ID, ACME_FOLDER)
     after = await describe(FakeSupabase(), HR_ID, ACME_FOLDER)

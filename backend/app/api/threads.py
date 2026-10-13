@@ -67,14 +67,16 @@ from app.models.thread import (
 )
 # Phase 267 (D-267-11 / D-267-17) — the ONE statement of what a thread reads with an Expert, which
 # the preview route and the rename_thread event writer both read (never a second derivation).
-from app.services.expert_scope import (
+from app.services.expert_scope_events import (
     build_expert_changed_event,
     build_scope_changed_event,
     build_scope_effect,
-    describe_expert_scope,
-    describe_scope_change,
     insert_expert_changed_row,
     scope_event_sentence,
+)
+from app.services.expert_scope_statement import (
+    describe_expert_scope,
+    describe_scope_change,
     scope_preview,
 )
 # Phase 267 (D-267-14 / PACK-24) — the handoff summary is a SERVICE (never a tool); see its docstring.

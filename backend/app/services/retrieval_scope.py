@@ -74,7 +74,7 @@ class RetrievalPredicate:
 
 # Phase 275 (D-36) — the ONE Python name for "may an agent read this document": migration 205's STORED
 # generated column `retrievable` = archived_at IS NULL AND (source_state IS NULL OR source_state =
-# 'live'). Every Python reader names this constant (expert_scope imports it); none restates the rule.
+# 'live'). Every Python reader names this constant (expert_scope_statement imports it); none restates the rule.
 RETRIEVABLE_COLUMN = "retrievable"
 
 # The predicates ``match_document_chunks`` / ``keyword_search_chunks`` hardcode today (migration

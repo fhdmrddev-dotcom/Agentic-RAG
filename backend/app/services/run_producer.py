@@ -427,11 +427,11 @@ async def _state_expert_removed(
         logger.warning("expert cleared on thread %s: the thread has no org; no event", thread_id)
         return
     try:
-        from app.services.expert_scope import (  # noqa: PLC0415
+        from app.services.expert_scope_events import (  # noqa: PLC0415
             build_expert_changed_event,
-            describe_expert_scope,
             insert_expert_changed_row,
         )
+        from app.services.expert_scope_statement import describe_expert_scope  # noqa: PLC0415
 
         common = dict(
             supabase=supabase,

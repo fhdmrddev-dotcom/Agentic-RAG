@@ -175,7 +175,7 @@ class MessageResponse(BaseModel):
 # ``now`` / ``dropped`` are GENERIC scope lines — folders, the thread's folder, "all documents",
 # connections — never Expert-specific keys, so Phase 268 (CHAT-08, the folder-scope event) adds a
 # KIND, not a second renderer. Every name is SNAPSHOTTED at write time: renaming or deleting an
-# Expert or folder later does not rewrite history. Built only by ``app.services.expert_scope`` /
+# Expert or folder later does not rewrite history. Built only by ``app.services.expert_scope_events`` /
 # ``app.services.thread_handoff``; ``backend/tests/fixtures/phase267/*.json`` are the executable
 # copies 267-04 renders from.
 

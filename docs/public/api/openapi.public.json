@@ -16523,7 +16523,7 @@
           "expert_folders"
         ],
         "title": "ExpertScopePreview",
-        "description": "Built by ``app.services.expert_scope.scope_preview`` from the SAME statement the transcript event reads, so the invite dialog and the event cannot disagree. ``excluded_count`` and ``excluded_names`` (≤ 5) come from ONE documents query — the heading and the list are never two computations."
+        "description": "Built by ``app.services.expert_scope_statement.scope_preview`` from the SAME statement the transcript event reads, so the invite dialog and the event cannot disagree. ``excluded_count`` and ``excluded_names`` (≤ 5) come from ONE documents query — the heading and the list are never two computations."
       },
       "ExternalActionPhaseConfig": {
         "properties": {

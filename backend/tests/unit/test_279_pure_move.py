@@ -111,8 +111,6 @@ _EXPECTED_HOME_COUNTS = {"expert_scope_statement.py": 8, "expert_scope_events.py
 
 _NEW_MODULES = (_STATEMENT_REL, _EVENTS_REL)
 
-_PENDING = "RED until the 279-01 move commit creates expert_scope_statement.py / expert_scope_events.py"
-
 
 def _blob_at_base(rel_path: str, sha: str = PHASE_BASE_SHA) -> str:
     """A tracked file's contents at the phase base commit (or at ``sha``)."""
@@ -178,16 +176,8 @@ def _module_file(mod: str) -> Path:
 def _module_params():
     return [
         pytest.param("app.services.expert_scope", id="expert_scope"),
-        pytest.param(
-            "app.services.expert_scope_statement",
-            id="expert_scope_statement",
-            marks=pytest.mark.xfail(strict=True, reason=_PENDING),
-        ),
-        pytest.param(
-            "app.services.expert_scope_events",
-            id="expert_scope_events",
-            marks=pytest.mark.xfail(strict=True, reason=_PENDING),
-        ),
+        pytest.param("app.services.expert_scope_statement", id="expert_scope_statement"),
+        pytest.param("app.services.expert_scope_events", id="expert_scope_events"),
     ]
 
 
@@ -246,7 +236,6 @@ def test_unmoved_bindings_are_ast_identical():
 # ── 3. AST equality of every moved binding ───────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason=_PENDING)
 def test_moved_bindings_are_ast_identical():
     _new_module_files()
     base = _bindings(_blob_at_base(_BASE_REL))
@@ -269,7 +258,6 @@ def test_moved_bindings_are_ast_identical():
 # ── 4. one home per name ─────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason=_PENDING)
 def test_each_name_has_exactly_one_home():
     files = dict(_new_module_files())
     files[_BASE_REL] = REPO_ROOT / _BASE_REL
@@ -299,7 +287,6 @@ def _has_future_annotations(tree: ast.Module) -> bool:
     )
 
 
-@pytest.mark.xfail(strict=True, reason=_PENDING)
 def test_new_modules_use_future_annotations():
     missing = []
     for rel, path in _new_module_files().items():
@@ -330,7 +317,6 @@ def _imported_modules(node: ast.stmt) -> list[str]:
     return []
 
 
-@pytest.mark.xfail(strict=True, reason=_PENDING)
 def test_import_direction():
     """D-01: events → statement → pure, never the reverse; the pure module imports nothing from app."""
     files = _new_module_files()
@@ -355,7 +341,6 @@ def test_import_direction():
 # ── 6. no re-export shim (D-02) ──────────────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason=_PENDING)
 def test_no_reexport_shim():
     """``expert_scope.py`` binds no MOVE_MAP name — not by definition, not by import (D-02)."""
     tree = ast.parse(_module_source(_BASE_REL))
