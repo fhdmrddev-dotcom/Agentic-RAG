@@ -445,7 +445,10 @@ export function inviteBlock(expert: ExpertBundle): InviteBlock | null {
  * only when the server excluded something. ⛔ ONE response feeds both columns, and the heading's N is
  * `excluded_count` — the names list is capped, so its length is never the count.
  */
-export function previewLedgerColumns(preview: ExpertScopePreview): LedgerColumn[] {
+export function previewLedgerColumns(
+  preview: ExpertScopePreview,
+  opts?: { onThread?: boolean },
+): LedgerColumn[] {
   const will: LedgerColumn["items"] = (preview.expert_folders ?? []).map((f) =>
     typeof f.name === "string" && f.name.trim()
       ? { label: f.name }
@@ -465,6 +468,18 @@ export function previewLedgerColumns(preview: ExpertScopePreview): LedgerColumn[
       heading: LEDGER_COPY.wontSearch(count),
       items: names.map((label) => ({ label })),
       more: Math.max(0, count - names.length),
+    })
+  }
+  // 279-03 WR-03 (SEED-328): a RESTRICTED Expert on an EXISTING thread with NO folder searches only
+  // its own folders — everything else is not searched. The server computes exclusions only against a
+  // thread folder (so `excluded_count` is 0 here), and `compose_expert_scope` must stay byte-equal,
+  // so this one column is driven from a client fact. ⚠ Never on a brand-new chat (no thread): the
+  // caller omits `onThread` there, and the narrowing selector below never passes it.
+  if (preview.mode === "restricted" && !preview.thread_folder && opts?.onThread) {
+    columns.push({
+      tone: "no",
+      heading: LEDGER_COPY.wontSearchAll,
+      items: [{ label: PREVIEW_COPY.contextAll }],
     })
   }
   return columns

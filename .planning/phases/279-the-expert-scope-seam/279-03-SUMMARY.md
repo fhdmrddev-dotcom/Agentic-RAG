@@ -63,3 +63,4 @@ src/stores/streamsStore.ts TS2345 x1
 
 | Letter | Item | Commit SHA | RED test (file + case) + RED line | GREEN result |
 |---|---|---|---|---|
+| A | WR-04 / D-09 / D-16 "Won't search" + "Won't be searched:" | `9ac6d12f6` | 9 files run against base source: `Tests 11 failed \| 186 passed (197)` — InviteExpertDialog (9)(10)(13)(15)(W6), ExpertEventCard (3b), ExpertSpotlightCard unscopedChat, expertCatalog narrowing + new `279-03 LEDGER_COPY`, expertEventCopy (7)(11) | `Tests 197 passed (197)`; backend `test_279_pure_move.py` + `test_267_scope_preview.py` → `28 passed` |

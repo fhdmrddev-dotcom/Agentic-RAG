@@ -262,9 +262,46 @@ describe("R4 / R5 / R6 — the restricted-cost preview", () => {
     await open()
     const r = row("hr-advisor")
     await within(r).findByText("Will use")
+    // 279-03 WR-03: the original (11) asserted NO "Won't" column here — that pinned the defect (SEED-328 WR-03)
     // 279-03 WR-04 (D-09/D-16): was expect(within(r).queryByText(/Won't use/)).toBeNull()
+    // 279-03 WR-03: was expect(within(r).queryByText(/Won't search/)).toBeNull()
+    // 279-03 WR-03: was expect(within(r).queryByTestId("scope-ledger-col-no")).toBeNull()
+    // On an EXISTING thread with no folder a restricted Expert searches only its own folders, so
+    // "All your documents" is what it will not search — stated before the invite, never a "· 0" box.
+    const wont = within(r).getByTestId("scope-ledger-col-no")
+    atRest(within(wont).getByText("Won't search"))
+    atRest(within(wont).getByText("All your documents"))
+    expect(within(r).queryByText(/Won't search · 0/)).toBeNull()
+    atRest(within(r).getByTestId("invite-expert-btn-hr-advisor"))
+  })
+
+  it("(11b) 279-03 WR-03: a brand-new chat (no thread yet) keeps 'Will use' alone", async () => {
+    mockGetExpertScopePreview.mockResolvedValue({ ...preview, excluded_count: 0, excluded_names: [], thread_folder: null })
+    await open({ threadId: null })
+    const r = row("hr-advisor")
+    await within(r).findByText("Will use")
     expect(within(r).queryByText(/Won't search/)).toBeNull()
     expect(within(r).queryByTestId("scope-ledger-col-no")).toBeNull()
+  })
+
+  it("(11c) 279-03 IN-01 (D-20): a preview refusal shows the server's sentence, not the generic copy", async () => {
+    const { ApiError } = await import("@/lib/api/_core")
+    mockGetExpertScopePreview.mockRejectedValue(
+      new ApiError("Switch to this chat's organization to preview an Expert.", 409),
+    )
+    await open()
+    const alert = await within(row("hr-advisor")).findByTestId("scope-preview-error")
+    expect(alert.textContent).toContain("Switch to this chat's organization to preview an Expert.")
+    expect(alert.textContent).not.toContain("Couldn't check which documents")
+    atRest(within(alert).getByText("Switch to this chat's organization to preview an Expert."))
+  })
+
+  it("(11d) 279-03 IN-01: a network failure (TypeError) keeps the generic copy", async () => {
+    mockGetExpertScopePreview.mockRejectedValue(new TypeError("Failed to fetch"))
+    await open()
+    const alert = await within(row("hr-advisor")).findByTestId("scope-preview-error")
+    expect(alert.textContent).toContain("Couldn't check which documents HR Advisor will skip.")
+    expect(alert.textContent).not.toContain("Failed to fetch")
   })
 
   it("(12) a restricted Expert with no folders says it cannot answer from documents, and has no invite", async () => {

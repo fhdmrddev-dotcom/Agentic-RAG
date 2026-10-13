@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dialog"
 import { listExperts } from "@/lib/api"
 import { getExpertScopePreview, type ExpertScopePreview } from "@/lib/api/experts"
+import { ApiError } from "@/lib/api/_core"
 import type { ExpertBundle } from "@/types"
 import {
   CONNECTION_COPY,
@@ -74,7 +75,9 @@ interface InviteExpertDialogProps {
 
 type PreviewState =
   | { status: "loading" }
-  | { status: "error" }
+  // 279-03 IN-01 (D-20): a refusal keeps the server's sentence (e.g. the org 409) to show in place of
+  // the generic copy; a network failure (TypeError) or an empty message leaves it undefined.
+  | { status: "error"; message?: string }
   | { status: "ready"; preview: ExpertScopePreview }
 
 // ⚠ RETIRED (262-02 / D-262-06 / RESEARCH R-7): the per-Expert icon guesser that lived here
@@ -120,6 +123,8 @@ interface RowActionsProps {
   activeName: string | null
   hasMessages: boolean
   canHandoff: boolean
+  /** 279-03 WR-03: true on an EXISTING thread (`!!threadId`) — never on a brand-new chat. */
+  onThread: boolean
   /** The expert id whose handoff is in flight, if any. */
   busyId: string | null
   refusal: string | null
@@ -142,6 +147,7 @@ function ExpertRowActions({
   activeName,
   hasMessages,
   canHandoff,
+  onThread,
   busyId,
   refusal,
   onInvite,
@@ -191,7 +197,7 @@ function ExpertRowActions({
             role="alert"
             className={cn(ALERT, "mt-3 flex flex-wrap items-center justify-between gap-2")}
           >
-            <span>{PREVIEW_COPY.checkFailed(expert.name)}</span>
+            <span>{preview.message ?? PREVIEW_COPY.checkFailed(expert.name)}</span>
             <button type="button" onClick={guard(onRetry)} {...inert} className={cn(BTN, GHOST, INERT)}>
               {PREVIEW_COPY.tryAgain}
             </button>
@@ -211,7 +217,11 @@ function ExpertRowActions({
         canInvite: false,
       }
     }
-    return { node: <ScopeLedger columns={previewLedgerColumns(preview.preview)} />, canInvite: true }
+    // 279-03 WR-03: on an existing thread the selector states what a restricted Expert will not search.
+    return {
+      node: <ScopeLedger columns={previewLedgerColumns(preview.preview, { onThread })} />,
+      canInvite: true,
+    }
   }
 
   // ── R1: the active Expert — the shipped Active pill, and its ledger if restricted ─────────────
@@ -389,9 +399,10 @@ export function InviteExpertDialog({
             setPreviews((p) => ({ ...p, [expertId]: { status: "ready", preview } }))
           }
         })
-        .catch(() => {
+        .catch((err: unknown) => {
           if (generationRef.current === generation) {
-            setPreviews((p) => ({ ...p, [expertId]: { status: "error" } }))
+            const message = err instanceof ApiError && err.message.trim() ? err.message : undefined
+            setPreviews((p) => ({ ...p, [expertId]: { status: "error", message } }))
           }
         })
     },
@@ -609,6 +620,7 @@ export function InviteExpertDialog({
                     activeName={activeName}
                     hasMessages={hasMessages}
                     canHandoff={!!onHandoff && !!threadId}
+                    onThread={!!threadId}
                     busyId={busyId}
                     refusal={refusals[expert.id] ?? null}
                     onInvite={() => {
