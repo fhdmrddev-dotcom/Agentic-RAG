@@ -56,7 +56,7 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: 279 (the-expert-scope-seam) — EXECUTED 4/4, reviewed (`279-REVIEW.md`, 6 warnings fixed — `279-REVIEW-FIX.md`), **verified 4/4** (`279-VERIFICATION.md`, self-verified)
-Next: deploy proposal (operator-gated) — first run the D-18 cloud READ (owed row 1). Record: `279-SEED-328-RECORD.md`; UAT: `279-UAT-LOG.md` (rows 1a-5 ✅) + REVIEW-FIX WR-05 live row ✅; 4-axis: `279-VALIDATION.md`. SEED-328 → `status: answered`.
+Next: deploy proposal (operator-gated) — D-18 cloud READ done: 0. Record: `279-SEED-328-RECORD.md`; UAT: `279-UAT-LOG.md` (rows 1a-5 ✅) + REVIEW-FIX WR-05 live row ✅; 4-axis: `279-VALIDATION.md`. SEED-328 → `status: answered`.
 Plan: 4 of 4 (279-01 move `fa164ef3e`; 279-02 `d55e0ef6a`..`11a73af35`; 279-03 `9ac6d12f6`..`10d7e2d5e`; 279-04 close)
 Status: Phase 279 complete — verified, not pushed
 Last activity: 2026-10-13 -- 279-04 close: G-4 ×4 + two-org CR-03(b) drive passed; record + seed + ledger + CLAUDE.md rows
@@ -114,7 +114,7 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | 279 deploy: run D-18 NULL-org Expert-thread SELECT on cloud (read-only) before promoting | `SELECT count(*) AS null_org_expert_threads FROM public.threads WHERE active_expert_id IS NOT NULL AND org_id IS NULL` — local `0`. `> 0` means those threads become refused-at-send after deploy: accept (D-18 fail-closed) or propose an approval-gated backfill. `279-SEED-328-RECORD.md` § "D-18 cloud parity" |
+| 1 | ✅ DONE 2026-10-14 — cloud D-18 read: `null_org_expert_threads = 0` (Supabase MCP, read-only SELECT). Nothing to accept or backfill. ~~279 deploy: run D-18 NULL-org Expert-thread SELECT on cloud (read-only) before promoting~~ | `SELECT count(*) AS null_org_expert_threads FROM public.threads WHERE active_expert_id IS NOT NULL AND org_id IS NULL` — local `0`. `> 0` means those threads become refused-at-send after deploy: accept (D-18 fail-closed) or propose an approval-gated backfill. `279-SEED-328-RECORD.md` § "D-18 cloud parity" |
 | 2 | 4-axis UAT rows — owed by decision (D-17 + operator `ready`, 2026-10-13) | 8 cross-provider rows + multi-tool + parallel-thread + long-message, all ⛔ in `279-VALIDATION.md`. **First to run if re-opened: parallel-thread** (WR-01's handoff gate is per-thread) |
 | 3 | 267-FIX live note #5 — CR-03(c) snapshot-reconcile chip-clear, never browser-driven | UAT-LOG row 3 drove the `getExpert`-failure arm via a client-injected failure, not this arm |
 | 4 | IN-03 provider-docs-first check | Anthropic tool_choice auto + Gemini function-calling mode AUTO docs; only those two receive the coerce rung's system text. SEED-327 untouched |
