@@ -58,7 +58,7 @@ Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: 279 (the-expert-scope-seam) — EXECUTED 4/4, reviewed (`279-REVIEW.md`, 6 warnings fixed — `279-REVIEW-FIX.md`), **verified 4/4** (`279-VERIFICATION.md`, self-verified)
 Next: deploy proposal (operator-gated) — D-18 cloud READ done: 0. Record: `279-SEED-328-RECORD.md`; UAT: `279-UAT-LOG.md` (rows 1a-5 ✅) + REVIEW-FIX WR-05 live row ✅; 4-axis: `279-VALIDATION.md`. SEED-328 → `status: answered`.
 Plan: 4 of 4 (279-01 move `fa164ef3e`; 279-02 `d55e0ef6a`..`11a73af35`; 279-03 `9ac6d12f6`..`10d7e2d5e`; 279-04 close)
-Status: Phase 279 complete — verified, not pushed
+Status: Phase 279 complete — **DEPLOYED 2026-10-13 20:45Z**: develop `60ce3797c` → master `a248672f0` → production `222d63341` (277+278+279; no migrations; advisors 0 ERROR; cloud D-18 = 0). Vercel READY; backend `/health` ok, `/docs` 401. ⚠ Coolify backend build for `222d63341` not confirmed (no new route to probe) + logged-in prod smoke owed
 Last activity: 2026-10-13 -- 279-04 close: G-4 ×4 + two-org CR-03(b) drive passed; record + seed + ledger + CLAUDE.md rows
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
 
