@@ -237,3 +237,25 @@ None.
 _Fixed: 2026-10-13T20:33:18Z_
 _Fixer: Claude (gsd-code-fixer)_
 _Iteration: 1_
+
+## Orchestrator follow-up (2026-10-14)
+
+**WR-05 live (Chrome, G-4).** Backend restarted on `6a2afdaf0` (PID 70308, started 00:35:26 local,
+after the last fix commit; `/health` 200). Signed in as `fhdmrd@gmail.com`, org admin header
+"fhdmrd@gmail.com's Organization · ORG ADMIN". Org admin → Experts → Disable "PhD Literature review"
+(`is_enabled=false` 20:36:07Z). Expert catalog, rendered DOM text of that card: "PhD Literature
+review · BIASED · General · Org Custom · 1 folder · … · Details · **Disabled**" — no "Start Chat"
+(the next card, UAT-265 Billing SOP Advisor, still shows "Start Chat"). Details modal: "**Disabled
+for this organization — enable it in Organization admin → Experts to chat with it.**"; its only
+buttons are "Close". **Restored:** Enable → `is_enabled=true` 20:36:44Z; disabled Experts locally = 0.
+Verdict: ✅ pass.
+
+Observation (not fixed, recorded): the catalog subtitle still reads "Every Expert shown here is one
+you can actually use." — no longer literally true for a manager, who now also sees disabled Experts
+(marked "Disabled"). Copy follow-up, no behaviour impact.
+
+**WR-02 ruling.** Offered strict (add `org_id` to ~12 test mock helpers) vs the shipped narrowing
+(compare only when the thread row carries an `org_id`). The operator replied `ready` without
+`strict`, so the narrowing stands. Residual gap, recorded: continuing a paused run on a legacy
+NULL-org Expert thread resolves in the run's org as before 279; local NULL-org Expert threads = 0,
+and the cloud count is the D-18 read-only check owed before promotion.
