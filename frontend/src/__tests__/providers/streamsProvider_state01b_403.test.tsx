@@ -168,7 +168,12 @@ describe("StreamsProvider sendMessage catch — STATE-01b amber 403 (D-04) + D-0
 
   it("409: rolls back BOTH bubbles + sets reconcileErrors, NO blockedNotice (unchanged, D-05)", async () => {
     const THREAD_ID = "thread-409"
-    mockPostMessage.mockRejectedValue(new ApiError("locked", 409))
+    // mockPostMessage.mockRejectedValue(new ApiError("locked", 409))
+    // ⚠ CORRECTED 2026-10-14 (279-REVIEW WR-06): "locked" no longer starts with
+    // WORKFLOW_LOCK_DETAIL_PREFIX (D-15), so it ran the GENERIC arm. The real literal drives the lock arm.
+    mockPostMessage.mockRejectedValue(
+      new ApiError("Thread is workflow-locked — cancel the active workflow to switch back to Deep mode.", 409),
+    )
 
     const { result } = renderProvider()
 
@@ -186,6 +191,9 @@ describe("StreamsProvider sendMessage catch — STATE-01b amber 403 (D-04) + D-0
     const banner = useStreamsStore.getState().reconcileErrors.get(THREAD_ID) as ApiError | undefined
     expect(banner?.status).toBe(409)
     expect(bucket.some((m) => m.blockedNotice)).toBe(false)
+    // 279-REVIEW WR-06: what only the LOCK arm does — its fixed copy, and no stashed draft.
+    expect(banner?.message).toBe("This thread is running a workflow — cancel it to send a Deep message.")
+    expect(useStreamsStore.getState().failedSendDrafts.has(THREAD_ID)).toBe(false)
   })
 
   it("400: rolls back BOTH + sets reconcileErrors + failedSendDrafts, NO blockedNotice (unchanged, D-05)", async () => {
