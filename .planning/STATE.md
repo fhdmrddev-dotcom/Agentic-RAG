@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
 status: in_progress
-last_updated: "2026-10-13T04:00:00.000Z"
-last_activity: 2026-10-13 -- Phase 278 executed 4/4 (review + verify pending)
+last_updated: "2026-10-13T06:00:00.000Z"
+last_activity: 2026-10-13 -- Phase 278 complete (verified passed 5/5)
 progress:
   total_phases: 7
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 14
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 6
+  percent: 29
 ---
 
 # Project State
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.6 Pay It Down — 277 closed; next Phase 278 (One Home for Tools and Filters)
+**Current focus:** v4.6 Pay It Down — 277 + 278 closed; next Phase 279
 
 ---
 
@@ -55,9 +55,9 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ## Current Position
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: **277** (Registers Back Inside the Band) — ✅ COMPLETE 2026-10-12 · verification `passed` 4/4 · next **278** (One Home for Tools and Filters); next migration **207**
-Plan: 2/2 (277-01 REG-04 split, 277-02 REG-05 archive repair)
-Status: Phase 278 EXECUTED 2026-10-13 — 4/4 plans. Wave 3 (278-04) done: SC#5 live Anthropic `claude-sonnet-5` two-tool turn (search_documents + execute_code) on the post-split backend → `search.query` row with run_id `09c962aa`, `code.execute` row, key sets identical to pre-278 (`42eca96c1`); records `3b625c8fd` (tool_dispatcher 99/44/274 G-5 DISCHARGED, retrieval_service corrected beside original, SEED-224 → partially-answered); size/ledger/seeds gates 0. Full backend gate 71 failed == base set. Inherited, held for close: landing drift (facts.ts 29 vs 30 tools), SEED-171 vitest red (WorkflowBuilderPage.canvas, provably unmodified). Next: code review → regression gate → verifier. Waves 1-2: 278-01 pins, 278-02 DEBT-09 `document_vocabulary.py`, 278-03 split `18abc1ed5` (tool_dispatcher.py 5,068 → 274 L + 11 `services/tools/` modules), merged `13a48d3da`.
+Phase: **278** (One Home for Tools and Filters) — ✅ COMPLETE 2026-10-13 · verification `passed` 5/5 (self-verified) · next **279**; next migration **207**
+Plan: 4/4 (278-01 pins, 278-02 DEBT-09 one home, 278-03 split, 278-04 SC#5 live smoke + records)
+Status: Phase 278 CLOSED by hand 2026-10-13. `tool_dispatcher.py` 5,068 → 274 L (registry only, 30 tools, pin identical; handlers in 11 `services/tools/` modules, move `18abc1ed5`); `document_vocabulary.py` one home (DEBT-09); SEAM-02 confirmed discharged (records corrected beside originals); SEED-224 → partially-answered. SC#5: live Anthropic `claude-sonnet-5` search_documents+execute_code → `search.query` run_id `09c962aa` (`42eca96c1`). Review 278-REVIEW.md 1 CR / 4 WR / 4 IN: CR-01 fixed `774375682` (root-level test_141 fence missed by the tests/unit retarget pass), WR-02/03/04 fixed (`7766f18ed`, `c2f3411f2`, `c6316eb0a`), WR-01 measured (root-level failing sets identical base vs HEAD; test_096 hangs at both), IN-01..04 deferred. Final gate at `520d5e2ad`: 71 failed / 7223 passed / 0 collection errors, failing set == base. Verification `9c6727ed8` passed 5/5. Owed / inherited: landing drift (`facts.ts:155` 29 vs 30 tools, G-3 fast fix); `tests/integration` not run (mutates DB); UAT 7 providers + parallel-thread + long-message ⛔ not run by decision; SEED-171 vitest red (WorkflowBuilderPage.canvas, provably unmodified); security gate `/gsd:secure-phase 278` not run.
 Last activity: 2026-10-12 — 277 closed by hand. CLAUDE.md 121,650 → **89,171** chars (gate OK, no WARN). Review 277-REVIEW.md: 0 critical / **8 warning** / 5 info, all guard-hardening beyond the SCs (verifier). **WR-01 + WR-08 FIXED 2026-10-12 (quick 261012-x1l)**; WR-02..07 + IN-01..05 untriaged. ⚠ `state.begin-phase` was run at 277 start despite the rule above and wrote `total_phases: 14` (false; corrected to 7 by hand) — the ninth false-record occurrence.
 
 ### Quick Tasks Completed
