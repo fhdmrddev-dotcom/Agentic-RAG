@@ -65,3 +65,14 @@ newest registry-backed id; `native_tools` / `emit_tier` read from the registry a
 - 267-FIX live note #5: the CR-03(c) snapshot-reconcile chip-clear, never browser-driven.
 - IN-03 provider-docs-first check (Anthropic tool_choice auto, Gemini function-calling mode AUTO).
 - D-18 cloud parity READ before promotion (`279-SEED-328-RECORD.md` § "D-18 cloud parity").
+- **Phase-review leftovers (recorded 2026-10-14, owed, non-blocking — none unmeets a success criterion):**
+  - IN-01 the `workflow-lock-error-banner` testid now sits on every send 409 (words correct, name stale).
+  - IN-02 the folder-arm 409 says the folder changed when it was the Expert that changed.
+  - IN-03 `check-test-retarget-only.py --exclude-prefix ""` scans zero files and still reports CLEAR.
+  - IN-04 the "could not be loaded" alert outlives a later successful load.
+  - IN-05 a transient org-validation failure refuses with the misleading org sentence.
+  - IN-06 the multi-folder scope note can default `ls` to the excluded thread folder when the restricted Expert's first folder is unreadable.
+  - WR-02 narrowing residual: continuing a paused run on a legacy NULL-org Expert thread resolves in the run's org (operator ruling 2026-10-14; local count 0; cloud = the D-18 read).
+  - Catalog subtitle "Every Expert shown here is one you can actually use." is no longer literally true for a manager (who now sees disabled Experts, marked "Disabled").
+  - `ExpertDetailModal` copy still has no direct test pin beyond the WR-05 rendered-words tests.
+

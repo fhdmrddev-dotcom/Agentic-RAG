@@ -55,10 +55,10 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ## Current Position
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: 279 (the-expert-scope-seam) — EXECUTED 4/4, **pending verification** (`/gsd:verify-work 279`, then `/gsd:code-review 279` as a fresh-context subagent)
-Next: verify 279. Record: `.planning/phases/279-the-expert-scope-seam/279-SEED-328-RECORD.md` (20 item rows: 15 fixed, 5 not fixed); UAT: `279-UAT-LOG.md` (rows 1a-5 ✅); 4-axis: `279-VALIDATION.md`. SEED-328 → `status: answered`.
+Phase: 279 (the-expert-scope-seam) — EXECUTED 4/4, reviewed (`279-REVIEW.md`, 6 warnings fixed — `279-REVIEW-FIX.md`), **verified 4/4** (`279-VERIFICATION.md`, self-verified)
+Next: deploy proposal (operator-gated) — first run the D-18 cloud READ (owed row 1). Record: `279-SEED-328-RECORD.md`; UAT: `279-UAT-LOG.md` (rows 1a-5 ✅) + REVIEW-FIX WR-05 live row ✅; 4-axis: `279-VALIDATION.md`. SEED-328 → `status: answered`.
 Plan: 4 of 4 (279-01 move `fa164ef3e`; 279-02 `d55e0ef6a`..`11a73af35`; 279-03 `9ac6d12f6`..`10d7e2d5e`; 279-04 close)
-Status: Phase 279 executed — verification pending
+Status: Phase 279 complete — verified, not pushed
 Last activity: 2026-10-13 -- 279-04 close: G-4 ×4 + two-org CR-03(b) drive passed; record + seed + ledger + CLAUDE.md rows
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
 
@@ -118,7 +118,7 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 | 2 | 4-axis UAT rows — owed by decision (D-17 + operator `ready`, 2026-10-13) | 8 cross-provider rows + multi-tool + parallel-thread + long-message, all ⛔ in `279-VALIDATION.md`. **First to run if re-opened: parallel-thread** (WR-01's handoff gate is per-thread) |
 | 3 | 267-FIX live note #5 — CR-03(c) snapshot-reconcile chip-clear, never browser-driven | UAT-LOG row 3 drove the `getExpert`-failure arm via a client-injected failure, not this arm |
 | 4 | IN-03 provider-docs-first check | Anthropic tool_choice auto + Gemini function-calling mode AUTO docs; only those two receive the coerce rung's system text. SEED-327 untouched |
-| 5 | Review notes for `/gsd:code-review 279` | the two 409 tests (`StreamsProvider.stopping.test.ts:1018`, `streamsProvider_state01b_403.test.tsx:171`) now run the generic arm; stale `workflow-lock-error-banner` testid on the org 409; `ExpertDetailModal` copy unpinned; `test_264_born_for_carrier.py` changed outside 279-02's file list |
+| 5 | Phase-review leftovers (owed, non-blocking) | `279-REVIEW.md` IN-01..IN-06 (stale `workflow-lock-error-banner` testid on every send 409; folder-arm 409 wording; vacuous `--exclude-prefix ""` CLEAR; WR-06 alert outlives a later load; transient org-check failure shows the org sentence; WR-08 note `ls` default) + WR-02 NULL-org continuation residual (operator ruling 2026-10-14) + catalog subtitle no longer literally true for managers + `ExpertDetailModal` copy unpinned + `test_264_born_for_carrier.py` changed outside 279-02's list. The two 409 test titles: ✅ fixed by WR-06 `16e355582`. List: `279-VALIDATION.md` § Still owed |
 | 6 | `graphify update .` after the close | run at 279-04 close; `graphify-out/` is never committed |
 
 ### Guardrail overrides (v4.6)
