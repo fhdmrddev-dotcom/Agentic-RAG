@@ -765,3 +765,31 @@ describe("IN-06 — the preview's thread_folder.name admits null on both sides",
     expect(ts).toMatch(/thread_folder: \{ id: string; name: string \| null; doc_count: number \} \| null/)
   })
 })
+
+// 279-REVIEW WR-05 — a DISABLED Expert (only a manager is sent one) is a status, never a Start control.
+describe("279-REVIEW WR-05 — a disabled Expert is a status, not a Start Chat", () => {
+  it("pins the words", async () => {
+    const { DISABLED_COPY } = await import("../expertCatalog")
+    expect(DISABLED_COPY.tag).toBe("Disabled")
+    expect(DISABLED_COPY.line).toBe(
+      "Disabled for this organization — enable it in Organization admin → Experts to chat with it.",
+    )
+  })
+
+  it("is_enabled false → status (before any install or connection fact); the card line is the tag", async () => {
+    const { DISABLED_COPY, installCardLine } = await import("../expertCatalog")
+    const line = { kind: "status", line: DISABLED_COPY.line }
+    expect(installView({ ...ALPHA, is_enabled: false })).toEqual(line)
+    expect(installView({ ...firstParty(install("ready")), is_enabled: false })).toEqual(line)
+    expect(installView({ ...firstParty(install("not_installed")), is_enabled: false })).toEqual(line)
+    expect(installCardLine({ ...ALPHA, is_enabled: false })).toBe("Disabled")
+  })
+
+  it("enabled, or a row without the key, is unchanged", async () => {
+    const { installCardLine } = await import("../expertCatalog")
+    expect(installView(ALPHA)).toEqual({ kind: "legacy" })
+    const { is_enabled: _drop, ...noKey } = ALPHA
+    expect(installView(noKey as ExpertBundle)).toEqual({ kind: "legacy" })
+    expect(installCardLine(ALPHA)).toBeNull()
+  })
+})

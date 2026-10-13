@@ -183,6 +183,17 @@ export const START_COPY = {
   busy: "Starting…",
 } as const
 
+/**
+ * 279-REVIEW WR-05 — a DISABLED Expert. Only an `experts:manage` caller is sent one (279-02 Commit G:
+ * the catalog reads `listExperts(true, false)`), and every chat door refuses it (`assert_expert_bindable`
+ * → 404), so its card and modal carry this status instead of a Start control that can only fail.
+ */
+export const DISABLED_COPY = {
+  /** The card's short status words (the pill); the full line is its title and the modal's footer. */
+  tag: "Disabled",
+  line: "Disabled for this organization — enable it in Organization admin → Experts to chat with it.",
+} as const
+
 /** Ledger headings live beside the selector that builds the ledger's payload (UI-SPEC §7). */
 export const LEDGER_COPY = {
   brings: "Brings",
@@ -297,6 +308,9 @@ export function connectionLedgerColumns(
  *   • `chat`    — installed and ready: the existing Start Chat control.
  *   • `connect` — install ready/legacy, but a required connection is missing. Gate order is
  *                 install → connection: an install that is not ready always wins.
+ *   • 279-REVIEW WR-05: a bundle with `is_enabled === false` is a `status` (DISABLED_COPY.line)
+ *                 before any install or connection fact — no door would let it join a chat. A row
+ *                 without the key reads as enabled (the column's default, as on the server).
  */
 export type InstallView =
   | { kind: "legacy" }
@@ -317,6 +331,7 @@ function installCause(install: NonNullable<ExpertBundle["install"]>): string {
 }
 
 export function installView(expert: ExpertBundle): InstallView {
+  if (expert.is_enabled === false) return { kind: "status", line: DISABLED_COPY.line }
   const view = installOnlyView(expert)
   // Gate order install → connection: only an Expert that could otherwise start a chat is asked
   // about its connections, so a surface never shows two gate reasons at once.
@@ -358,6 +373,7 @@ function installOnlyView(expert: ExpertBundle): InstallView {
  */
 export function installCardLine(expert: ExpertBundle): string | null {
   if (installView(expert).kind !== "status") return null
+  if (expert.is_enabled === false) return DISABLED_COPY.tag // 279-REVIEW WR-05
   const state = expert.install?.state
   if (state === "installing") return INSTALL_COPY.cardInstalling
   if (state === "failed") return INSTALL_COPY.cardFailedNeedsAdmin

@@ -542,3 +542,52 @@ describe("ExpertCatalogPage — install (266-04)", () => {
     expect(screen.queryByText(readError)).toBeNull()
   })
 })
+
+// ── 279-REVIEW WR-05 — a manager's DISABLED Expert carries "Disabled" and no Start Chat ──────────
+//
+// 279-02 Commit G sends an `experts:manage` caller the org's disabled Experts, and every chat door
+// refuses them (404). Before the fix the card drew an ordinary Start Chat that could only fail.
+
+describe("ExpertCatalogPage — a disabled Expert (279-REVIEW WR-05)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("the CARD says Disabled (the full reason as its title) and renders no Start Chat", async () => {
+    const off = bundle({ name: "PhD Literature review", slug: "phd-lit", is_enabled: false })
+    vi.mocked(api.listExperts).mockResolvedValue([A, off])
+    const { container } = renderCatalog()
+    await screen.findByText("PhD Literature review")
+
+    const card = cardOf(container, "phd-lit")
+    const tag = within(card).getByText("Disabled")
+    expect(tag).toHaveAttribute(
+      "title",
+      "Disabled for this organization — enable it in Organization admin → Experts to chat with it.",
+    )
+    expect(card.textContent).not.toContain("Start Chat")
+    expect(within(card).queryByRole("button", { name: /start chat/i })).toBeNull()
+    expect(within(card).getAllByRole("button")).toHaveLength(1) // Details only — never a dead control
+    // The enabled neighbour is untouched.
+    expect(within(cardOf(container, "contract-reviewer")).getByRole("button", { name: /start chat/i })).toBeInTheDocument()
+    expect(container.querySelectorAll("button:disabled")).toHaveLength(0)
+  })
+
+  it("the DETAIL MODAL states the reason and renders no Start Scoped Chat", async () => {
+    const user = userEvent.setup()
+    const off = bundle({ name: "PhD Literature review", slug: "phd-lit", is_enabled: false })
+    vi.mocked(api.listExperts).mockResolvedValue([off])
+    const { container } = renderCatalog()
+    await screen.findByText("PhD Literature review")
+
+    await user.click(within(cardOf(container, "phd-lit")).getByRole("button", { name: "Details" }))
+    const dialog = await screen.findByRole("dialog")
+    expect(
+      within(dialog).getByText(
+        "Disabled for this organization — enable it in Organization admin → Experts to chat with it.",
+      ),
+    ).toBeInTheDocument()
+    expect(dialog.textContent).not.toContain("Start Scoped Chat with Expert")
+    expect(within(dialog).queryByRole("button", { name: /start/i })).toBeNull()
+  })
+})
