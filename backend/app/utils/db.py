@@ -2,11 +2,14 @@
 
 Wraps `query.execute()` in `starlette.concurrency.run_in_threadpool` so the
 asyncio event loop is not blocked on Postgres round-trips. This is the
-SSE-path threadpool wrap referenced in research §A1–A2 — it coexists with
-the existing `_patch_postgrest_maybe_single` patch in `main.py:17–40` (both
-wrap `execute`; the postgrest patch handles a 204-error edge case at
-import time, while `aexec` runs the call off the event loop at request
-time).
+SSE-path threadpool wrap referenced in research §A1–A2: `aexec` runs the
+call off the event loop at request time and returns its result unchanged.
+
+A `.maybe_single()` query that matches 0 rows returns `None` from
+`.execute()` (postgrest 2.29), so read its row through `maybe_row` below
+rather than `.data`. (Phase 280 / D-30 deleted the `main.py` postgrest patch
+this paragraph used to describe: it wrapped `SyncSingleRequestBuilder`, not
+the maybe_single builder, for an error code postgrest never produces.)
 
 Usage:
     from app.utils.db import aexec
