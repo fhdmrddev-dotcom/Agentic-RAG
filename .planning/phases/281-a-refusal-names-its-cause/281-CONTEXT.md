@@ -187,6 +187,12 @@ they name. The originals stay above, unedited, so the correction is visible.
   `completed`.
 - **D-31 (seeds routed at plan-phase):** SEED-218 folded (D-27). SEED-350 and SEED-339 deferred (path
   match only, different defect), with the routing written into their frontmatter.
+- **D-32 (operator ruling at plan-check, 2026-10-14; amends D-01's composer lead):** the composed
+  failure message names the step **when the author gave it a name on the canvas** (`PhaseSpec.name`, the
+  field `nodeTitle`'s first rung reads): `Step "<author name>" failed after N attempts:`, else
+  `This step failed after N attempts:`. Never the slug, never a backfilled or derived name; `blocked_step.step_name`
+  stays `null`-not-backfilled. Recorded choice: D-04's one string is kept, so the gauntlet and run-page cards
+  repeat an author-set name once inside the cause.
 
 ### Claude's Discretion
 - The exact merge key for "same cause" across attempts. (The counter itself is now decided by D-25.)
