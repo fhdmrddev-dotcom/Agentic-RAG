@@ -952,6 +952,9 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               folders={folders}
               onLaunch={doRun}
               onOpenRun={canvasEnabled ? openRunSurface : undefined}
+              // SEED-218 / D-27: the describe door's connect control → the UNGOVERNED Connections
+              // door, never operator-only `settings`. Not canvas-gated: Connections always exists.
+              onOpenConnections={() => onNavigate("connections")}
             />
           ) : activeView === "skill-studio" ? (
             // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio

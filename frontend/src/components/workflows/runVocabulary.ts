@@ -186,6 +186,8 @@ function failureClause(emitFailure: EmitFailure | null | undefined): string {
     case "no_template_bound":
       return CLAUSE_FAILED_NO_DOCUMENT
     case "citation_gate_rejected":
+    // 281-03 (D-30): routed by the docblock's own "visible decision" rule — a failed check.
+    case "template_fields_missing":
     case "integrity_failed":
       return CLAUSE_FAILED_CHECKS
     default:

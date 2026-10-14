@@ -169,6 +169,13 @@ export function blockedStepHeadline(face: string): string {
 export const BLOCKED_STEP_NEXT =
   "Open the trial run to see what this step actually produced, then fix that step on the canvas and publish again."
 
+/** Phase 281-03 (D-28) — the same next step for a surface WITHOUT the run link (the canvas
+ *  layer is off, so the run room does not exist and no link renders). A line that says *"Open
+ *  the trial run"* above a link that is not there points at a dead control, which is worse than
+ *  saying nothing — so the card picks this one whenever it cannot open a run. Same red line as
+ *  its sibling: it names no cause, no validator and no remedy. */
+export const BLOCKED_STEP_NEXT_NO_RUN = "Fix that step on the canvas, then publish again."
+
 /** Tier 3 of the face ladder — the author's own step position, never a gauntlet stage. */
 export const STEP_ORDINAL_PREFIX = "Step"
 

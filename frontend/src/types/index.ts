@@ -1322,15 +1322,19 @@ export type EmitSubStep =
    *  run's model. The ONE member a non-`llm_emit` phase can carry. */
   | "model_fallback"
 
-/** Phase 101.1-04 (GAP-C / D-11) — the 5 distinguishable emit failure states the harness
+/** Phase 101.1-04 (GAP-C / D-11) — the 6 distinguishable emit failure states the harness
  *  streams via `phase_substep` (failure field). Each renders failed-as-failed on the rail
- *  (closed taxonomy + reason_unknown fallback) — never an empty "done" card (RC-4). */
+ *  (closed taxonomy + reason_unknown fallback) — never an empty "done" card (RC-4).
+ *  Phase 281 (2026-10-14, D-30): was 5 — `template_fields_missing` is split from
+ *  `citation_gate_rejected`, so a fill that only left template fields empty no longer reads
+ *  as an uncited or invented value. */
 export type EmitFailure =
   | "model_failed_to_emit"
   | "citation_gate_rejected"
   | "render_failed"
   | "integrity_failed"
   | "no_template_bound"
+  | "template_fields_missing"
 
 export interface Phase {
   slug: string

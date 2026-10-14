@@ -105,6 +105,9 @@ const FAILURES: EmitFailure[] = [
   "render_failed",
   "integrity_failed",
   "no_template_bound",
+  // Phase 281-03 (D-30): split from `citation_gate_rejected` — a keys-only miss. Added here
+  // deliberately: this array is meant to be the WHOLE union, like SUBSTEPS above.
+  "template_fields_missing",
 ]
 
 describe("PhaseCard — GAP-C emit sub-steps (D-11)  [owner: 101.1-04]", () => {
@@ -191,7 +194,10 @@ describe("PhaseCard — GAP-C 5 emit failure states (D-11 / RC-4)  [owner: 101.1
       unmount()
     }
     // 5 distinguishable failure states → 5 distinct rendered reasons.
-    expect(reasons.size).toBe(5)
+    // Phase 281-03 (D-30): re-pinned on purpose from the literal 5 to the union's size — the
+    // union gained `template_fields_missing`, and the claim (one distinct reason per member)
+    // is unchanged.
+    expect(reasons.size).toBe(FAILURES.length)
   })
 
   it("a typed emit failure renders failed-as-failed even before status flips to 'failed' (RC-4)", () => {
@@ -1116,5 +1122,57 @@ describe("PhaseCard — 252-04: a dead run's phase card stops claiming running",
     dead.unmount()
     const live = render(<PhaseCard phase={fillPhase({ status: "retrying" })} position={0} />)
     expect(statusAtomOf(live.container)).toStrictEqual(["↻", "Attempt"])
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// Phase 281-03 (FIX-09 · D-30 / D-04) — a keys-only emit miss has its OWN words, and the
+// server's composed multi-line cause renders as lines.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+describe("PhaseCard 281-03 — template_fields_missing never reads as a citation failure", () => {
+  it("renders a reason that names missing template fields and never says 'citation'", () => {
+    render(
+      <PhaseCard
+        phase={fillPhase({ status: "failed", emitFailure: "template_fields_missing" })}
+        position={0}
+      />,
+    )
+    const alert = screen.getByRole("alert")
+    const text = alert.textContent ?? ""
+    // BOTH strings of the copy entry (reason + where-line) are inside the alert.
+    expect(text).not.toMatch(/citation/i)
+    expect(text).toMatch(/template/i)
+    expect(text).toMatch(/fields/i)
+    expect(text).toMatch(/missing/i)
+    // …and it is the typed copy, not the sentinel a missing taxonomy entry falls to.
+    expect(text).not.toContain(FAILED_REASON_UNKNOWN)
+  })
+
+  it("the uncited / invented case keeps its own copy, unchanged", () => {
+    render(
+      <PhaseCard
+        phase={fillPhase({ status: "failed", emitFailure: "citation_gate_rejected" })}
+        position={0}
+      />,
+    )
+    expect(screen.getByRole("alert").textContent).toMatch(
+      /The emitted field-map had uncited or invented values/,
+    )
+  })
+
+  it("a reconciled run's composed two-line cause renders VERBATIM, with whitespace-pre-line", () => {
+    const CAUSE =
+      'Step "Write the summary" failed after 2 attempt(s):\n• 2 attempt(s) — the model left template fields empty.'
+    render(
+      <PhaseCard
+        phase={fillPhase({ status: "failed", error: undefined, failureReason: CAUSE })}
+        position={0}
+      />,
+    )
+    const alert = screen.getByRole("alert")
+    const reason = Array.from(alert.querySelectorAll("span")).find((s) => s.textContent === CAUSE)
+    expect(reason, "the composed cause must render verbatim as one text child").toBeDefined()
+    expect(reason!.className.split(/\s+/)).toContain("whitespace-pre-line")
+    expect(reason!.children).toHaveLength(0)
   })
 })
