@@ -253,3 +253,13 @@ def test_disposition_shares_the_one_bytes_function():
     from app.services.retention import disposition
 
     assert disposition._remove_bytes is document_purge.remove_document_bytes
+
+
+def test_the_bucket_name_has_one_home():
+    """280-REVIEW IN-03: after the lift, disposition kept an unused ``STORAGE_BUCKET`` copy, so the
+    bucket name had two homes and a rename could update one and not the other."""
+    from app.services import document_purge
+    from app.services.retention import disposition
+
+    assert document_purge.STORAGE_BUCKET == "documents"
+    assert not hasattr(disposition, "STORAGE_BUCKET"), "disposition.py still carries its own bucket name"

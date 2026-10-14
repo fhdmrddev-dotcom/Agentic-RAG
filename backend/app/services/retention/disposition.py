@@ -63,7 +63,8 @@ from app.services.retention.load import (
 logger = logging.getLogger(__name__)
 
 SWEEP_ACTOR = rdb.SWEEP_ACTOR_NAME
-STORAGE_BUCKET = "documents"
+# 280-REVIEW IN-03: the bucket name lives in ONE home, `document_purge.STORAGE_BUCKET`, beside the
+# bytes step this module imports. The copy that sat here was unused after the lift.
 
 
 class DispositionError(Exception):
