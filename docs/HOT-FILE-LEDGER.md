@@ -11529,6 +11529,9 @@ cells rot within days.
 | [`backend/app/services/document_vocabulary.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_vocabularypy) | 1 / 1 / 38 (was `0 / 0 / 0`) | no (young) | young (created 278-02). DEBT-09 ONE home: 3 timestamptz date words → column + the list-field set. ⛔ leaf, no app imports; a copy elsewhere fails the 278 fence |
 | [`backend/app/services/expert_scope_statement.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scope_statementpy) | 2 / 1 / 315 (was `0 / 0 / 0`) | no (young) | young (created 279-01, row added AT PLANNING). Async scope statement, moved verbatim (AST-pinned); 279-03 docstring word. ⛔ never imports expert_scope_events |
 | [`backend/app/services/expert_scope_events.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scope_eventspy) | 2 / 1 / 228 (was `0 / 0 / 0`) | no (young) | young (created 279-01). Transcript wording + its ONE writer; **279-02 H** D-07 r→r `excluded` fix. ⛔ imports statement, never the reverse |
+| [`backend/app/utils/db.py`](docs/HOT-FILE-LEDGER.md#backendapputilsdbpy) | 2 / 2 / 59 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added at 280 PLANNING. **280-01**: + `maybe_row()` beside `aexec`; docstring fixed with the main.py patch deletion (D-30) |
+| [`backend/app/api/takeoff.py`](docs/HOT-FILE-LEDGER.md#backendappapitakeoffpy) | 1 / 1 / 221 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added at 280 PLANNING. **280-01**: 5 `maybe_row` one-liners (DEBT-11), status codes unchanged |
+| [`backend/app/services/document_purge.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_purgepy) | 0 / 0 / 0 | no (new) | young (created 280-01). Row added AT CREATION. ⛔ guard → rows → bytes (T-275-12); bytes only for rows the DELETE returned |
 
 
 
@@ -20222,3 +20225,36 @@ Scan-list disposition cell before 279-04 (replaced):
 CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
 
 > ⚠ STALE · last touch 267-03
+
+---
+
+## `backend/app/utils/db.py`
+
+**`2 / 2 / 59`** at Phase 280 planning (2026-10-14; phases 058 and 118). ⚠ **Absent from the scan list for its entire life** — found by `check-hot-file-ledger.cjs --files` during 280 research, and added in the planning commit (the 271 precedent: a row is added in the commit that first names the file, never in a parallel worktree).
+
+What it owns. The tiny supabase-py helpers every async handler shares: `aexec(query)` (the D-v2.5-01 threadpool wrap) and `coerce_uid`. **280-01 adds `maybe_row(resp)`**, which returns the row a `.maybe_single()` query found, or `None` — postgrest 2.29 returns `None` (not a response whose `.data` is `None`) on 0 rows, so a bare `resp.data` is an `AttributeError` → 500 (BUG-261012-02, DEBT-11). The same commit corrects the module docstring that still described `main.py`'s dead `_patch_postgrest_maybe_single` patch (D-30).
+
+⛔ Binding: `maybe_row` adds no branch to any caller — each site keeps its existing `if not …: raise 404/403` (the 275 D-32 `ast.If` count on `delete_document`).
+
+---
+
+## `backend/app/api/takeoff.py`
+
+**`1 / 1 / 221`** at Phase 280 planning (2026-10-14; created by Phase 220, `fccdf1cd0`). ⚠ **Absent from the scan list for its entire life**; row added in the 280 planning commit.
+
+What it owns. The CAD takeoff routes (`get_document_takeoff`, `match_document_takeoff`, `resolve_document_takeoff_item`). **280-01**: five `maybe_single()` → `.data` sites routed through `maybe_row` (DEBT-11 sweep); each site keeps its existing status code. No seam proposed — the file is small and below threshold.
+
+---
+
+## `backend/app/services/document_purge.py`
+
+**`0 / 0 / 0`** — created by Phase 280 (`280-01`). **Row added AT CREATION**, in the planning commit.
+
+What it owns. The one shared purge path for the two watch purge doors in `api/sources.py` (`DELETE /sources/watches/{id}?purge_documents=true`, `POST /sources/watches/{id}/purge`) — the "extraction FIRST" that `api/sources.py`'s section required at the 275 close (D-12) — plus `remove_document_bytes`, lifted byte-identical from `retention/disposition.py::_remove_bytes` so retention and purge share ONE bytes step (D-11).
+
+⛔ Binding invariants:
+- Order is **hold guard → row delete → bytes** (275 D-38 / T-275-12). A held document refuses before anything is deleted, and keeps its bytes.
+- Bytes are removed only for the `file_path`s of the rows the DELETE itself returned (PostgREST `return=representation`), never from a pre-SELECT (D-31, no TOCTOU).
+- The guard is called through the module attribute `hold_guard.assert_none_held` / `hold_guard.map_hold_refusal` — a by-name import makes the monkeypatched guard tests vacuous (D-31).
+- Only the storage remove may sit inside a `try`; a storage failure is logged, never raised.
+- The Library delete in `api/documents.py` does NOT move here (275 D-32 fence; deferred).

@@ -229,7 +229,21 @@ Plans:
   5. A **recorded decision** (CONTEXT `<decisions>` and `docs/`) states what happens to `message_artifacts` rows when retention disposes their source document. If the decision requires enforcement, disposition enforces it, with a test that drives RED first and a dry-run that names the affected artifact count (DEBT-08).
 
 **How we'd know this failed**: the dedup fix swallows the second upload's error but still retires the first; the minter is made atomic for the upload door only and the watch path still races; the OneDrive row reads "pass" on doubles alone; bytes are removed **before** the row delete, so a hold refusal leaves a row with no file; a purge of a held document removes bytes; the 404 distinguishes "exists in another org" from "does not exist" (an existence oracle); DEBT-08's decision says "delete" and no code does it, or says "keep" and the artifact then renders a broken reference with no explanation.
-**Plans**: TBD (target 4: same-bytes minter · Graph adapter measure + live re-drive · purge bytes + delete 404 · DEBT-08 decision + enforcement + close)
+**Plans**: 4 plans in 3 waves (D-23 target kept; the OneDrive live re-drive moved from the Graph plan into the close plan because it needs the fixed minter and an operator checkpoint, and a checkpoint plan must not carry implementation)
+
+Plans:
+**Wave 1**
+
+- [ ] 280-01-PLAN.md — wave 1 (TDD): phase base failing set; `sources.py` purge extraction FIRST into `document_purge.py` (G-5, D-12), then bytes after the row delete (DEBT-10, D-11/D-31); `maybe_row` + AST fence + 22-site 404 sweep (DEBT-11, D-08/D-09/D-29); dead `main.py` patch deleted (D-30)
+- [ ] 280-02-PLAN.md — wave 1 (TDD, stubbed, parallel with 01): 238 pins re-driven RED/GREEN (measure first); `_item_segment` so client ids cannot shape the Graph path (FIX-04, D-28); stale comment (D-17); `Team Docs` 105-file folder generated outside the repo (D-27)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 280-03-PLAN.md — wave 2 (TDD, live DB, lock): live RED drives; same-bytes minter — in-flight leg, insert-then-retire, 23505→winner, `already_in_library` (FIX-02, D-01..D-04, D-24/D-25); CR-01 filed first if it reproduces, then fixed without an oracle (D-05/D-26)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 280-04-PLAN.md — wave 3 (operator checkpoint at the end): live per-path purge + delete 404 evidence (SC#3/SC#4); DEBT-08 KEEP record in two homes + caption test (D-06/D-07); ledger + CLAUDE.md rows, seeds, full gates; then the OneDrive re-drive (SC#2) — pass, or OWED/⛔ with reason
 **Flags**: **Measure first** for FIX-03/04/05: the work left may be only the live re-drive the report names (`238-VERIFICATION.md` M-9). **Migration `207`** only if FIX-02's atomicity needs a database function (a unique-index-aware upsert or one-statement retire+insert) or DEBT-08's decision needs a constraint. Apply it via the SQL editor, regenerate `full-schema.sql` (no reset), mirror any REVOKE in `scripts/full-schema-supplement.sql`, and run `get_advisors(security)`. **security_enforcement**: purge and delete are data-protection actions; the 275 hold guard runs before any delete, and its order (guard → rows → bytes, D-38) is binding. ⚠ The unmeasured CR-01 note in `BUG-261005-01` (the minter's folder check compares `user_id`, never the folder's org) is **driven once here**. If it reproduces, file it as a new bug and do not fold it silently. **G-5 audit at discuss**: `backend/app/api/documents.py` (FIRES, 36 phases), `backend/app/services/ingest_splice.py` (FIRES), `backend/app/api/sources.py` (FIRES), `backend/app/services/sources/adapters/microsoft_graph.py`, `backend/app/services/retention/disposition.py`. Each change is honoured by construction or recorded. **Deploy parity**: migration before backend; `WATCH_PROCESS_ENABLED` and `RETENTION_SWEEP_ENABLED` stay as they are in production.
 
 #### Phase 281: A Refusal Names Its Cause
@@ -292,7 +306,7 @@ Plans:
 | 277. Registers Back Inside the Band | 2/2 | Complete | 2026-10-12 |
 | 278. One Home for Tools and Filters | 4/4 | Complete | 2026-10-13 |
 | 279. The Expert Scope Seam | 4/4 | Complete (verified 4/4; owed: D-18 cloud read, 4-axis rows, review leftovers) | 2026-10-14 |
-| 280. In Once, Out Clean | 0/TBD | Not started | - |
+| 280. In Once, Out Clean | 0/4 | Planned | - |
 | 281. A Refusal Names Its Cause | 0/TBD | Not started | - |
 | 282. The Slow Run and the Paused Run | 0/TBD | Not started | - |
 | 283. Every Member Reaches Their Own Settings | 0/TBD | Not started | - |
