@@ -142,6 +142,11 @@ def test_a_storage_failure_is_logged_never_raised(monkeypatch, caplog):
     failures = [r for r in caplog.records if r.name == "app.services.document_purge"]
     assert failures, "the storage failure was swallowed without a log line"
     assert any(r.exc_info for r in failures), "the storage exception was not logged with its traceback"
+    # 280-REVIEW IN-04: the bytes step is shared by retention AND both watch purge doors, so its
+    # line must not claim the failure for retention. This is a watch purge.
+    bytes_line = next(r for r in failures if r.exc_info)
+    assert not bytes_line.getMessage().startswith("retention:"), bytes_line.getMessage()
+    assert bytes_line.getMessage().startswith("remove_document_bytes:"), bytes_line.getMessage()
 
 
 # ── the two doors, through the helper ────────────────────────────────────────────────────

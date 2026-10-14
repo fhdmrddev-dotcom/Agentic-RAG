@@ -83,5 +83,10 @@ async def remove_document_bytes(storage, paths: list[str], removed: list[str], n
         await run_in_threadpool(lambda: storage.storage.from_(STORAGE_BUCKET).remove(paths))
         removed.extend(paths)
     except Exception:
-        logger.exception("retention: removing %d file(s) after a confirmed delete failed", len(paths))
+        # 280-REVIEW IN-04: a NEUTRAL prefix — this step is shared by retention disposition and both
+        # watch purge doors, so "retention:" misattributed every watch-purge failure. (The lift was
+        # byte-identical until this line; the caller's own warning, if any, names the caller.)
+        logger.exception(
+            "remove_document_bytes: removing %d stored file(s) after a confirmed row delete failed", len(paths)
+        )
         not_removed.extend(paths)
