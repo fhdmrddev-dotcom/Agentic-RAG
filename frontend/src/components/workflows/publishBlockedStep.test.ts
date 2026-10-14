@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   BLOCKED_STEP_NEXT,
+  BLOCKED_STEP_NEXT_NO_RUN,
   BLOCKED_STEP_TITLE,
   blockedStepFace,
   blockedStepHeadline,
@@ -173,6 +174,36 @@ describe("the words", () => {
       "named_failures",
     ]) {
       expect(copy.toLowerCase()).not.toContain(forbidden.toLowerCase())
+    }
+  })
+})
+
+// Phase 281-03 (D-28) — the next-step line never names a link that is not there.
+describe("the words — 281-03: the no-run next line", () => {
+  it("is a real sentence, distinct from the run-link line", () => {
+    expect(typeof BLOCKED_STEP_NEXT_NO_RUN).toBe("string")
+    expect(BLOCKED_STEP_NEXT_NO_RUN.trim().length).toBeGreaterThan(10)
+    expect(BLOCKED_STEP_NEXT_NO_RUN).not.toBe(BLOCKED_STEP_NEXT)
+  })
+
+  it("never tells the author to open a run (there is no link to open one with)", () => {
+    expect(BLOCKED_STEP_NEXT_NO_RUN).not.toMatch(/open the trial run/i)
+    expect(BLOCKED_STEP_NEXT_NO_RUN).not.toMatch(/\bopen\b/i)
+    expect(BLOCKED_STEP_NEXT_NO_RUN).not.toMatch(/\brun\b/i)
+  })
+
+  it("keeps the same red line — it names no cause, validator or remedy", () => {
+    const copy = BLOCKED_STEP_NEXT_NO_RUN.toLowerCase()
+    for (const forbidden of [
+      "citations_required",
+      "citation",
+      "retriev",
+      "validator",
+      "structural_gate",
+      "golden_run",
+      "named_failures",
+    ]) {
+      expect(copy).not.toContain(forbidden)
     }
   })
 })
