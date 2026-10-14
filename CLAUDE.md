@@ -464,12 +464,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
 | `frontend/src/lib/api.ts` | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ STALE · last touch 271-03 |
 | `frontend/src/types/index.ts` | 98 / 77 / 1542 (was `98 / 78 / 1542`) | **275-04**: `Document` +5 optional retention fields, additive. Seam OWED |
-| `backend/app/main.py` | 89 / 64 / 1002 (was `87 / 63 / 978`) | last touch 275-03 · ⛔ |
+| `backend/app/main.py` | 90 / 65 / 977 (was `89 / 64 / 1002`) | honoured by construction (280-01: dead postgrest patch deleted) · ⛔ |
 | `backend/app/config.py` | 91 / 53 / 1705 (was `90 / 52 / 1698`) | ⚠ STALE · last touch 275-03 · `MODEL_CAPABILITIES` seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (249-01/03) · ⛔ |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (249-02/03) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `backend/app/api/documents.py` | 92 / 36 / 2532 (was `91 / 35 / 2518`) | last touch 275-02 |
+| `backend/app/api/documents.py` | 95 / 37 / 2534 (was `92 / 36 / 2532`) | last touch 280-01 / 280-03 · honoured by construction |
 | `scripts/vitest-count-gate.cjs` | 290 / 65 / 6428 (was `290 / 68 / 6428`) | last touch 275-02/04 |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
 | `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ NOW FIRES at 3 phases · last touch 256-03 |
@@ -579,7 +579,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 5 / 4 / 269 (was `2 / 2 / 205`) | ⚠ now FIRES · honoured by construction (279-03) · extraction FIRST · ⛔ |
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 10 / 5 / 648 (was `4 / 4 / 614`) | honoured by construction (279-03: ONE field + prop) · seam TAKEN |
 | `frontend/src/components/skills/SkillFormDialog.tsx` | 13 / 9 / 657 | ⚠ row STALE · honoured by construction (263-04) · ⛔ |
-| `backend/app/api/skills.py` | 19 / 10 / 858 | ⛔ FIRES · absent its ENTIRE LIFE — row added 263 PLANNING |
+| `backend/app/api/skills.py` | 20 / 10 / 859 (was `19 / 10 / 858`) | ⛔ FIRES · last touch 280-01 (6 maybe_row guards) |
 | `frontend/src/lib/api/skills.ts` | 6 / 4 / 748 | ⛔ NOW FIRES at 4 phases · re-derived 263 planning |
 | `backend/app/services/openai_service.py` | 72 / 36 / 2268 | ⛔ FIRES at 36 phases · absent its ENTIRE LIFE — row added 262 |
 | `backend/app/services/provider_gateway/openai_compat.py` | 6 / 4 / 525 | ⚠ FIRES at 4 phases · absent its ENTIRE LIFE — row added 262 · ⛔ |
@@ -595,26 +595,27 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 9 / 6 / 372 (was `8 / 5 / 359`) | honoured by construction (279-03: ONE reason expression) |
 | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 7 / 5 / 531 (was `6 / 4 / 531`) | honoured by construction (279-03: ONE copy change) |
 | `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ 0/0/0 AT PLANNING · measured at 262-04 · ⛔ |
-| `backend/app/services/ingest_splice.py` | 19 / 7 / 930 (was `15 / 6 / 877`) | ⚠ STALE · last touch 270-01 · ⛔ |
+| `backend/app/services/ingest_splice.py` | 22 / 8 / 1043 (was `19 / 7 / 930`) | honoured by construction (280: minter-only hunks) · ⛔ |
 | `frontend/src/components/ingestion/FolderTree.tsx` | 13 / 8 / 213 (was `12 / 7 / 207`) | last touch 275-02 · ⛔ |
 | `frontend/src/components/ingestion/FolderNode.tsx` | 13 / 7 / 303 (was `12 / 6 / 272`) | last touch 275-02 · ⛔ |
 | `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05 · ⛔ |
-| `backend/app/models/document.py` | 12 / 9 / 216 (was `11 / 8 / 207`) | last touch 275-03 · ⛔ |
+| `backend/app/models/document.py` | 13 / 10 / 221 (was `12 / 9 / 216`) | last touch 280-03 (one optional field) · ⛔ |
 | `frontend/src/components/ingestion/DocumentRow.tsx` | 10 / 5 / 583 (was `8 / 4 / 564`) | **275-04**: ONE `retention` prop + ONE `<RetentionRowChips>`; still seven `<td>` |
 | `frontend/src/components/org/OrgAdminShell.tsx` | 7 / 5 / 454 (was `3 / 5 / 442`) | ⚠ now FIRES · last touch 275-04 · extraction FIRST next · ⛔ |
 | `frontend/src/lib/api/documents.ts` | 8 / 8 / 503 (was `7 / 7 / 499`) | last touch 275-02 |
-| `backend/app/api/folders.py` | 12 / 8 / 277 (was `11 / 7 / 233`) | last touch 275-02 |
+| `backend/app/api/folders.py` | 14 / 9 / 277 (was `12 / 8 / 277`) | last touch 280-01 (2 maybe_row guards) |
 | `backend/app/api/kb.py` | 14 / 9 / 515 (was `13 / 8 / 504`) | last touch 275-02 · ⛔ |
 | `backend/app/services/audit_service.py` | 8 / 8 / 96 | ⚠ absent its ENTIRE LIFE — row added 275-01 · ⛔ |
 | `backend/app/services/expert_scope.py` | 8 / 4 / 159 (was `6 / 3 / 632`) | ✅ G-5 DISCHARGED (279-01): pure / statement / events |
 | `backend/app/services/document_relationship_service.py` | 6 / 4 / 465 (was `5 / 3 / 457`) | honoured by construction |
-| `backend/app/api/sources.py` | 9 / 3 / 706 (was `8 / 2 / 693`) | ⚠ now FIRES · last touch 275-02 · ⛔ |
+| `backend/app/api/sources.py` | 10 / 4 / 698 (was `9 / 3 / 706`) | ✅ G-5 extraction FIRST DISCHARGED (280-01: document_purge) · ⛔ |
 | `backend/app/models/document_search.py` | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ now FIRES · last touch 275-03 · ⛔ |
 | `backend/app/services/document_view_resolver.py` | 5 / 5 / 412 (was `4 / 4 / 403`) | ⚠ FIRES since 271 — row added 275-05 · last touch 275-02 |
 | `backend/app/services/retrieval_documents.py` | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ now FIRES · last touch 275-02 |
 | `frontend/src/pages/findState.ts` | 3 / 3 / 374 (was `2 / 2 / 361`) | ⚠ now FIRES · last touch 275-02 · STRICT LEAF · ⛔ |
 | `frontend/src/components/chat/expertEventCopy.ts` | 5 / 3 / 315 | ⚠ now FIRES (279) — row added 279-04 · extraction FIRST · ⛔ |
 | `frontend/src/components/experts/ScopeLedger.tsx` | 6 / 3 / 126 | ⚠ now FIRES (279) — row added 279-04 · extraction FIRST · ⛔ |
+| `backend/app/services/sources/adapters/microsoft_graph.py` | 8 / 5 / 507 (was `3 / 2 / 376`) | ⚠ now FIRES (5 phases) — row added 280-04 · honoured by construction |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
