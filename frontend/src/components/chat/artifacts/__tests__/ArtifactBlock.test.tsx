@@ -13,7 +13,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 import { ArtifactBlock } from "../ArtifactBlock"
 import { ARTIFACT_COMPONENTS, lazyChartFrom, rendererFor } from "../artifactRegistry"
 import { ArtifactErrorBoundary } from "../ArtifactErrorBoundary"
-import { chartBar, table16, metricWithDelta, missing, mutable } from "./fixtures"
+import { chartBar, table16, metricWithDelta, missing, mutable, clone } from "./fixtures"
 
 const flags = vi.hoisted(() => ({ throwTable: false }))
 
@@ -183,5 +183,36 @@ describe("ArtifactBlock", () => {
     )
     assertNoSpecLeak(container.textContent ?? "")
     expect(container.textContent).not.toContain("dynamically")
+  })
+})
+
+/**
+ * Phase 280 (DEBT-08 / D-06 / D-07, SC#5's failure mode) — retention KEEPS chat artifacts.
+ *
+ * Retention may delete the document a chart was built from; the artifact row stays (it is a
+ * conversation record, immutable, with no document_id). The failure this pins is "says keep, and the
+ * artifact then renders a broken reference with no explanation". Nothing in the client can know the
+ * source was disposed, so the record below is simply a table whose caption names `contract.pdf`.
+ * Asserted on rendered CONTENT (the caption text a person reads, and that no anchor exists), never on
+ * test-id presence. Decision record: docs/RETENTION-AND-ARTIFACTS.md.
+ */
+describe("a chart whose source document was disposed (DEBT-08)", () => {
+  it("keeps naming the file as plain caption text and renders no link", () => {
+    const disposed = {
+      ...clone(table16),
+      id: "a_r7t280d0c8",
+      caption: {
+        row_count: 16,
+        sources: [{ tool: "query_tables", document: "contract.pdf", page: null }],
+        source_count: 1,
+        lineage: null,
+      },
+    }
+    render(<ArtifactBlock artifacts={[disposed]} />)
+    const figure = screen.getByTestId("artifact-block")
+    const caption = within(figure).getByTestId("artifact-caption")
+    expect(caption).toHaveTextContent("contract.pdf")
+    expect(caption).toHaveTextContent("table 1Data: query_tables · contract.pdf · 16 rows")
+    expect(figure.querySelector("a")).toBeNull()
   })
 })
