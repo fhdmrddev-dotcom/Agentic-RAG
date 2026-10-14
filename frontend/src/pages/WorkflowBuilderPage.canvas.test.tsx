@@ -145,6 +145,8 @@ import templateFirstDraftSource from "@/components/workflows/useTemplateFirstDra
 // Phase 193 fast-fix (AUTH-01): the CTA is queried by its GOVERNED id, never by a literal —
 // a hard-coded name here is what let the page's copy go stale without any suite reddening.
 import { DESCRIBE_CTA } from "@/components/workflows/doorVocabulary"
+// Phase 281 (D-11) — the describe refusal's words are read off the table, never retyped.
+import { describeRefusal } from "@/components/workflows/describeRefusalVocabulary"
 import { WorkflowBuilderPage, type BuilderDefinition } from "./WorkflowBuilderPage"
 // Plan 186-16 (WR-10), on its own line so this file's diff stays 0-deletion: the empty
 // draft's sentence, IMPORTED rather than re-typed, so the precedence row below compares
@@ -2596,11 +2598,16 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
   })
 
   it("an HONEST generate failure produces no receipt at all", async () => {
-    mockGenerate.mockResolvedValue({ ok: false, error: "Couldn't generate the workflow." })
+    // Phase 281 (D-11/D-12, SEED-221): the refusal now renders through describeRefusalVocabulary;
+    // re-captured on purpose — the mock is a REAL server code rather than free text the page
+    // used to print raw, and the block is read for the table's sentence, never the code.
+    mockGenerate.mockResolvedValue({ ok: false, error: "could_not_generate" })
     renderFresh()
     await draftIt()
 
-    await screen.findByTestId("generate-error")
+    const errorBlock = await screen.findByTestId("generate-error")
+    expect(errorBlock.textContent ?? "").toContain(describeRefusal("could_not_generate").sentence)
+    expect(errorBlock.textContent ?? "").not.toContain("could_not_generate")
     expect(screen.queryByTestId("seed-receipt")).toBeNull()
     // 197-09 — and no card either. `showReceipt` is written in the `onDrafted` handler and
     // nowhere else, so a failure cannot produce an arrival claim about a draft that does
