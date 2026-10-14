@@ -579,3 +579,64 @@ async def test_expert_install_refuses_an_inflight_copy_in_another_folder_through
             )
     assert "insert" not in db.kinds(), "a second copy was minted beside the in-flight one"
     enqueue.assert_not_awaited()
+
+
+# ── 7. CR-01: a folder files a document only into its own org (D-05 / D-26, BUG-261014-01) ──
+
+OTHER_USER = "00000000-0000-0000-0000-0000000000ff"
+
+
+def _missing_folder_refusal(db: _FakeDB, **kw) -> HTTPException:
+    with pytest.raises(HTTPException) as exc:
+        _mint(db, folder_id=str(uuid4()), **kw)
+    return exc.value
+
+
+def _assert_identical_404(got: HTTPException, ref: HTTPException) -> None:
+    assert (got.status_code, got.detail, got.headers) == (ref.status_code, ref.detail, ref.headers)
+    assert got.status_code == 404 and got.detail == "Folder not found"
+
+
+def test_upload_into_a_folder_of_the_callers_other_org_mints_in_that_org():
+    """org_id=None (the /upload shape), folder in org B, caller a member of B → org B, explicitly."""
+    db = _FakeDB(
+        folders=_folders(F1, org=ORG_B),
+        members=[{"user_id": USER, "org_id": ORG_A}, {"user_id": USER, "org_id": ORG_B}],
+        trigger_org=ORG_A,  # the LIMIT 1 pick — must NOT decide this document's org
+    )
+    res = _mint(db, folder_id=F1)
+
+    assert res.is_duplicate is False
+    inserted = next(s for s in db.doc_sites() if s.kind == "insert").arg
+    assert inserted["org_id"] == ORG_B, "the folder's org was not stamped explicitly"
+    assert db.doc(res.document["id"])["org_id"] == ORG_B
+    assert ("eq", ("org_id", ORG_B)) in db.inflight_site().filters()
+
+
+def test_a_folder_in_an_org_the_caller_is_not_in_refuses_like_a_missing_folder():
+    db = _FakeDB(folders=_folders(F1, org=ORG_B), members=[{"user_id": USER, "org_id": ORG_A}])
+    ref = _missing_folder_refusal(db)
+    with pytest.raises(HTTPException) as exc:
+        _mint(db, folder_id=F1)
+    _assert_identical_404(exc.value, ref)
+    assert "insert" not in db.kinds()
+
+
+def test_an_explicit_org_that_differs_from_the_folders_org_refuses_like_a_missing_folder():
+    db = _FakeDB(
+        folders=_folders(F1, org=ORG_B),
+        members=[{"user_id": USER, "org_id": ORG_A}, {"user_id": USER, "org_id": ORG_B}],
+    )
+    ref = _missing_folder_refusal(db, org_id=ORG_A, on_conflict="link")
+    with pytest.raises(HTTPException) as exc:
+        _mint(db, folder_id=F1, org_id=ORG_A, on_conflict="link")
+    _assert_identical_404(exc.value, ref)
+    assert "insert" not in db.kinds()
+
+
+def test_another_owners_folder_is_still_the_existing_403():
+    db = _FakeDB(folders=[{"id": F1, "user_id": OTHER_USER, "org_id": ORG_A}])
+    with pytest.raises(HTTPException) as exc:
+        _mint(db, folder_id=F1)
+    assert exc.value.status_code == 403
+    assert exc.value.detail == "Cannot upload to a folder you do not own"
