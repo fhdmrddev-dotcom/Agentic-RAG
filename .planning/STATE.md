@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: ready_to_plan
+status: ready_to_execute
 last_updated: 2026-10-14T16:45:21.359Z
 last_activity: 2026-10-14 -- Phase 280 execution started
 progress:
@@ -11,7 +11,7 @@ progress:
   total_plans: 14
   completed_plans: 14
   percent: 21
-stopped_at: Phase 281 context gathered — ready to plan Phase 281
+stopped_at: Phase 281 planned (4 plans, 3 waves) — ready to execute
 ---
 
 # Project State
@@ -54,6 +54,8 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ---
 
 ## Current Position
+
+**Phase 281 planned (2026-10-14):** 4 plans / 3 waves (01+02 → 03 → 04 non-autonomous G-4 drives A-D). Research corrected 4 CONTEXT premises → amendments D-24..D-32 (operator). SEED-218 folded; SEED-350/339 deferred. Checker PASSED (iteration 2, 0 blockers). Ledger rows added for emit_cause.py, freshness.py, describeRefusalVocabulary.ts, runVocabulary.ts. Next: `/gsd:execute-phase 281`.
 
 **Phase 281 (2026-10-14):** discuss done — `.planning/phases/281-a-refusal-names-its-cause/281-CONTEXT.md` (D-01..D-23). G-2 sketch skip RECORDED (D-21). Folded: BUG-260730-02, BUG-260815-06 (#4), SEED-221. Left open: BUG-260828-05. G-4 scenarios A-D operator-named. No migration expected. Next: `/gsd:plan-phase 281` (re-run the seeds sweep there).
 
