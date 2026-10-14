@@ -167,6 +167,11 @@ def mint_document_row(
        ⚠ CORRECTED (Phase 280, FIX-02 / D-02): BOTH modes now re-query the winner, scoped
        exactly as documents_dedup_idx, and return it as the duplicate. The 409 survives only
        as the "winner not found" fallback.
+
+    ⚠ ``on_conflict`` IS INERT since Phase 280 (280-REVIEW IN-02). No branch reads it: "raise" and
+    "link" take the identical path above. It stays in the signature only so the seven callers that
+    pass it (``test_280_minter_sequence``'s caller inventory) need no change; a value passed here
+    decides nothing. Removing it is a caller sweep, not a behaviour change.
     """
     # 1. Folder ownership validation (G-1: owner-only parity with documents.py:610-617)
     if folder_id:
