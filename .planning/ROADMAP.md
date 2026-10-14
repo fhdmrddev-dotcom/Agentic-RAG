@@ -260,7 +260,21 @@ Plans:
   5. **G-4**: the operator defines the lived-experience scenarios at scope time ("I'd recognise failure if…"), and Chrome MCP drives each refusal to the screen. The assertions read the rendered **words**, not the presence of a block.
 
 **How we'd know this failed**: a new validator kind or phase type appears (closed core broken); the client invents its own cause table and starts overclaiming, trading the honesty 192/193.2 fought for against legibility; the translation table covers `connection_not_allowed` and nothing else; "coming soon" is replaced by "later" or another unowned promise; the freshness fix is a fourth copy of the retrievable predicate; the emit cause is right in `harness_audit` but the gauntlet still renders the last validator's message ("the least informative error wins by being last").
-**Plans**: TBD (target 3-4: emit cause precedence · gauntlet + describe-door copy · freshness · G-4 drive + close)
+**Plans**: 4 plans in 3 waves (D-23 target kept; freshness rides the emit plan; the gauntlet render waits on the emit contract and a second test-running agent slot)
+
+Plans:
+**Wave 1**
+
+- [ ] 281-01-PLAN.md — wave 1 (TDD, backend): phase base failing set; new pure leaf `harness/emit_cause.py` (one composer, per-shot records, `template_fields_missing` split); engine precedence + `reason_is_final` + identity projection + true retry feedback (FIX-09, D-01..D-06, D-25, D-26, D-30); `freshness.py` imports `RETRIEVABLE_COLUMN`, RED-first (DEBT-07, D-16)
+- [ ] 281-02-PLAN.md — wave 1 (TDD, parallel with 01): additive `reason_code` on the 3 `connection_not_allowed` arms; new leaf `describeRefusalVocabulary.ts` (4 codes + subs + fallback, `SERVICES_LABEL` imported); describe door renders sentence + next step, code only on reveal; S-7 inverted (FIX-10 / SEED-221, D-11..D-15, D-24)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 281-03-PLAN.md — wave 2 (TDD, frontend): golden-run link by `onOpenRun` presence + leave guard, no "coming soon" (D-07/D-08/D-28/D-29); gated next line; pre-line cause; `template_fields_missing` copy on PhaseCard / runVocabulary; SEED-218 connect control → Connections (D-27)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 281-04-PLAN.md — wave 3 (operator checkpoints): merged-tree gates + closed-core recount + ledger/CLAUDE.md rows + seeds sweep; G-4 Chrome drives A-D (D-17..D-20) matched to the DB; evidence-gated bug/seed closes; STATE
 **Flags**: **Closed-core recount** (7 / 1 / 30) against the phase base. A cause-precedence change is data inside the existing executor, never a new one. **G-2**: the refusals sit on shipped layouts (the gauntlet's worded verdict, the describe door), so no layout decision is open. The skip is **recorded as a decision** at discuss (OV-266-01 is what an unrecorded skip cost). **G-4** fires. **G-5 audit at discuss**: `backend/app/services/harness/phase_types.py` (FIRES), `backend/app/services/harness/validator_kinds.py` (FIRES), `backend/app/services/template_render_service.py`, `backend/app/services/workflow_authoring.py` (FIRES), `frontend/src/components/workflows/PublishGauntlet.tsx` (FIRES), `doorVocabulary.ts` (FIRES), `WorkflowBuilderPage.tsx` (FIRES ×6), `backend/app/services/harness/freshness.py`. Seeds: `SEED-221` (folded). Read the sketch-findings skill for the gauntlet's worded-verdict vocabulary before writing copy.
 **UI hint**: yes
 
@@ -307,7 +321,7 @@ Plans:
 | 278. One Home for Tools and Filters | 4/4 | Complete | 2026-10-13 |
 | 279. The Expert Scope Seam | 4/4 | Complete (verified 4/4; owed: D-18 cloud read, 4-axis rows, review leftovers) | 2026-10-14 |
 | 280. In Once, Out Clean | 4/4 | Complete | 2026-10-14 |
-| 281. A Refusal Names Its Cause | 0/TBD | Not started | - |
+| 281. A Refusal Names Its Cause | 0/4 | Planned | - |
 | 282. The Slow Run and the Paused Run | 0/TBD | Not started | - |
 | 283. Every Member Reaches Their Own Settings | 0/TBD | Not started | - |
 
