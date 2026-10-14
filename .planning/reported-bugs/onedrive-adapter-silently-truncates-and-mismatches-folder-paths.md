@@ -174,3 +174,24 @@ WR-03 is fixed against doubles. **Drive a real OneDrive folder whose name contai
 underscored filename — no space, so no percent-encoding, so the defect could not appear. **This
 row is the reason it shipped**, and it belongs with `238-VERIFICATION.md` M-9 behind the same
 Azure app registration.
+
+---
+
+# ⚠ 2026-10-14 — Phase 280 live re-drive: this report's three defects did not reproduce, but SC#2 is PARTIAL, so the status stays `folded`
+
+The owed re-drive ran on the real OneDrive folder `/Team Docs`, which has a space in its name and
+holds 95 top-level files plus `Q3 Plans/` with 10. The shipped config was untouched: page_size 30,
+non-recursive. Evidence is in `.planning/phases/280-in-once-out-clean/280-LIVE-EVIDENCE.md` § SC#2.
+
+- **WR-02 (silent truncation):** did not reproduce. Watch A paged 4 times (29/30/30/6 = 95 listed),
+  with `listing_complete = true` and the run reading `success`.
+- **WR-03 (encoded paths):** did not reproduce. Every stored path reads `/Team Docs/…` or
+  `/Team Docs/Q3 Plans/…`, and 0 paths are still percent-encoded. A pre-created
+  `path contains '/Team Docs/'` rule is in `metadata._classification` on **104 of 104** imported
+  documents.
+- **The count fails:** **104 of 105** were imported. One download (`team-note-058.txt`) failed on a
+  transient TLS `ConnectError`, and the watch never retries it. That is a different defect, filed as
+  **BUG-261014-02**. D-15 requires all 105 "by count, not some", so per D-16 this report is NOT
+  closed.
+- **Re-open/close trigger:** a re-drive that imports all 105, or an operator ruling that the
+  shortfall belongs to BUG-261014-02.
