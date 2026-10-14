@@ -377,6 +377,21 @@ def test_a_failed_retire_is_logged_and_the_inserted_row_is_kept(caplog):
     assert any(r["id"] == new_id for r in db.tables["documents"])
 
 
+@pytest.mark.parametrize("error", [RuntimeError("retire refused"), AttributeError("'_Q' has no attribute 'lt'")])
+def test_a_failed_retire_is_logged_at_error_with_its_traceback(caplog, error):
+    """280-REVIEW IN-01. The retire stays non-fatal (D-25: never lose the minted row), but a failure
+    leaves two latest rows, and the catch-all also swallowed programming errors — a fake without
+    `.lt` once kept a suite green while the retire never ran (test_274_promote_preview_parity).
+    So it is logged at ERROR with exc_info, never as a one-line WARNING."""
+    db = _FakeDB(docs=[_row(id="v1", content_hash="other", status="completed")], update_error=error)
+    with caplog.at_level(logging.WARNING, logger="app.services.ingest_splice"):
+        res = _mint(db)
+
+    rec = next(r for r in caplog.records if res.document["id"] in r.getMessage())
+    assert rec.levelno == logging.ERROR, rec.levelname
+    assert rec.exc_info is not None and rec.exc_info[1] is error
+
+
 # ── 3. 23505 → the winner (D-02) ────────────────────────────────────────────────────────────
 
 

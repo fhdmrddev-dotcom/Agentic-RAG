@@ -488,13 +488,19 @@ def mint_document_row(
                 )
             retire_query.neq("id", doc["id"]).lt("version_number", next_version).execute()
         except Exception as retire_exc:  # noqa: BLE001 — the minted row stands either way
-            log.warning(
+            # 280-REVIEW IN-01: ERROR with the traceback, not a one-line WARNING. A failed retire
+            # leaves two latest rows, and this catch also receives programming errors
+            # (AttributeError/TypeError) — a fake without `.lt` once kept a suite green while the
+            # retire never ran. Re-raising is NOT the narrower choice: the row is already inserted
+            # and its bytes not yet stored, so raising here would strand a `pending` row.
+            log.error(
                 "mint_document_row: retiring earlier versions of %r failed after minting document %s "
                 "(v%s); the new row is kept: %s",
                 filename,
                 doc.get("id"),
                 next_version,
                 retire_exc,
+                exc_info=True,
             )
 
     return MintResult(
