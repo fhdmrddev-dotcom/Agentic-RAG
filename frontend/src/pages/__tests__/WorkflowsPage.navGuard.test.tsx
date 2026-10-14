@@ -5,6 +5,9 @@
  *   - FIX-10 (D-10 / D-28): the publish gauntlet's golden-run link → the page's `onOpenRun`
  *     (`ChatLayout.openRunSurface`, app-level navigation that bypasses the Builder's own leave
  *     prompt).
+ *   - D-27 / SEED-218: the describe door's connect control → the page's `onOpenConnections`
+ *     (the members' Connections door, never operator-only `settings`), handed to the door shell
+ *     as its `onOpenSettings`.
  *
  * ⚠ WHY THIS IS ITS OWN FILE AND NOT MORE CASES IN `WorkflowsPage.test.tsx`. That suite mounts
  * the REAL door shell, Builder and gauntlet, and the real Builder registers its own leave
@@ -121,5 +124,32 @@ describe("WorkflowsPage 281-03 — the golden-run link passes the unsaved-work g
   it("with onOpenRun ABSENT (canvas layer off), the gauntlet receives undefined — no link renders", async () => {
     const { gauntlet } = await openBuilder()
     expect(gauntlet().onOpenRun).toBeUndefined()
+  })
+})
+
+describe("WorkflowsPage 281-03 — the describe door's connect control has a destination (D-27 / SEED-218)", () => {
+  it("the door's onOpenSettings calls the page's onOpenConnections, once", async () => {
+    const onOpenConnections = vi.fn()
+    const { door } = await openBuilder({ onOpenConnections })
+
+    expect(typeof door.onOpenSettings).toBe("function")
+    door.onOpenSettings?.()
+    expect(onOpenConnections).toHaveBeenCalledTimes(1)
+  })
+
+  it("with the unsaved-work guard REFUSING, it does not navigate", async () => {
+    const onOpenConnections = vi.fn()
+    const { door } = await openBuilder({ onOpenConnections })
+    door.registerCanLeave?.(() => false)
+
+    // NON-VACUITY: a control that does not exist trivially "does not navigate".
+    expect(typeof door.onOpenSettings).toBe("function")
+    door.onOpenSettings?.()
+    expect(onOpenConnections).not.toHaveBeenCalled()
+  })
+
+  it("with onOpenConnections ABSENT, the door receives onOpenSettings === undefined (today's non-control span)", async () => {
+    const { door } = await openBuilder()
+    expect(door.onOpenSettings).toBeUndefined()
   })
 })
