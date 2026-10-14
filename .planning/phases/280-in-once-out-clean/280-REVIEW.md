@@ -36,7 +36,12 @@ findings:
   warning: 6
   info: 6
   total: 12
-status: issues_found
+status: resolved
+fix_pass: 2026-10-14
+fixed: [WR-01, WR-02, WR-05, WR-06, IN-01, IN-02, IN-03, IN-04, IN-06]
+needs_human_verification: [WR-01, WR-02]   # logic/semantics choices, see Fix log
+no_change_needed: []
+deferred_to_bugs: {WR-03: BUG-261014-03, WR-04: BUG-261014-04, IN-05: BUG-261014-05}
 ---
 
 # Phase 280: Code Review Report
@@ -296,3 +301,85 @@ with `toHaveTextContent(/query_tables · contract\.pdf · 16 rows/)`).
 _Reviewed: 2026-10-14_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+## Fix log
+
+**Fix pass:** 2026-10-14, on `develop` (main working tree), after `0b077d7fb`. Every finding was
+checked against the code before anything changed; all nine fixed findings held as claimed, so
+`no_change_needed` is empty. Behavioural fixes were driven RED first, then GREEN. Each commit is by
+path only.
+
+| ID | Outcome | Commit | Red → green evidence |
+|---|---|---|---|
+| WR-01 | fixed, **needs human verification** | `4ed20aee4` (+ live proof in `8c307069c`) | 3 new fake cases red (retired v1 returned as live; a newer retired row preferred over the live winner; a different-name retired match returned instead of refused), then green. Live: `test_same_bytes_as_a_retired_version_restores_it_through_the_real_index` is red on the pre-WR-01 minter (`1206174bb`, "a RETIRED row was returned as the live copy") and green now. |
+| WR-02 | fixed, **needs human verification** | `8aeab2e0b` | 4 fake cases red (earlier and later rival v2, higher-version rival, the v1 race), then green. Live tightened to *exactly one* latest, plus a new v1-race test. On the HEAD minter the live run was red: 2 latest v2 rows, and 2 latest v1 rows in 2 of 3 rounds. Green now (3+3 rounds). |
+| WR-05 | fixed | `1206174bb` | 2 fake cases (`org_from_membership`, `explicit_org`) red with 403, then the identical 404. |
+| WR-06 | fixed | `8c307069c` | Test-only. The forced-collision test is red on the phase-base minter `2dd80abbe` (409, both shapes) and green now. The spy asserts a `documents_dedup_idx` 23505 was raised and resolved to the landed winner. |
+| IN-01 | fixed | `a25a384ea` | New test red (WARNING, not ERROR) for both RuntimeError and AttributeError, then green. Within the same session the ERROR line exposed a real fake gap (`'_Site' object has no attribute 'gte'`), which WR-02 then closed. |
+| IN-02 | fixed (docstring) | `243611a0c` | No behaviour. Grep confirms no branch reads `on_conflict`. |
+| IN-03 | fixed | `54383956d` | `test_the_bucket_name_has_one_home` red, then green. No reference to `disposition.STORAGE_BUCKET` in backend/app, backend/tests, frontend/src or scripts. |
+| IN-04 | fixed | `ac19a21f9` | The storage-failure test (watch purge) now asserts the prefix: red on `retention:`, green on `remove_document_bytes:`. No existing test asserted the old text, so none needed re-pinning. |
+| IN-06 | fixed (test honesty) | `791253f09` | Test-only, no red step applies. 9/9 green. `docs/RETENTION-AND-ARTIFACTS.md` cites the renamed test and was updated in the same commit. |
+| WR-03 | **deferred → BUG-261014-03** | `34ae14693` | Re-verified: `watch_service.py:359-372` links a duplicate's existing id, and both doors purge every linked id. |
+| WR-04 | **deferred → BUG-261014-04** | `34ae14693` | Re-verified: a double enqueue failure only logs, there is no document reaper, and the D-24 in-flight leg returns the dead row. |
+| IN-05 | **deferred → BUG-261014-05** | `34ae14693` | Re-verified: `storage3` `remove` returns the deleted objects, and the helper discards them. |
+
+### What each fix chose, and why
+
+- **WR-01.** The 23505 re-query is no longer `.limit(1)`. It prefers the `is_latest` match.
+  - If only a retired match exists, there are two cases:
+    - **Same filename:** the row is restored, using the existing `POST /documents/{id}/restore`
+      semantics (promote it, then retire its siblings) and returned live. This honours "make A
+      current again".
+    - **Different filename:** the 409 fallback answers. Restoring that row would flip another file's
+      current version behind the person's back.
+  - **Human check:** is restoring on re-upload the product behaviour wanted? The alternative is a 409
+    that points at Restore.
+  - **Residual, not fixed (it pre-dates 280, as the review notes):** the *completed* dedup leg can
+    still return a retired completed copy as `already_in_library`.
+- **WR-02.** A settle step after the insert, with no migration. Rows rank by
+  `(version_number, created_at, id)`. Each mint does three things:
+  1. reads the other latest rows of its name at or above its version;
+  2. retires the ones ranked below it;
+  3. retires itself if any rival ranks above it.
+
+  The proof is in the code comment. The step runs for v1 too, which adds one SELECT per mint.
+  - **Recorded residuals:**
+    - the two rows still share a `version_number`;
+    - the guarantee needs every settle write to succeed (a failure logs at ERROR).
+  - **Human check:** the "later created wins" ordering.
+  - **Caveat:** the D-03 sentence in CONTEXT was not edited, as instructed. The code comment strikes
+    and corrects it, and CONTEXT's D-03 "brief window accepted" text is now known to be false.
+- **WR-05.** The org/membership arm runs before the owner arm, so the user-JWT behaviour is unchanged.
+  - **Not done:** the reviewer's second suggestion, validating `library_folder_id` at watch create
+    (`sources.py`). It is outside this brief, and the minter's 404 now covers the sync path.
+- **IN-01.** Narrowest change: log at ERROR with `exc_info=True`.
+  - Re-raising was rejected. The row is already inserted and its bytes not yet stored, so raising
+    would strand a `pending` row (the BUG-261014-04 shape).
+- **Re-pins made deliberately, with the reason written in each test:**
+  - `test_266_mint_org_scope`: the base sequence (no `.limit(1)` on the re-query), the
+    retire-then-settle kinds, and `gte`/`in_` added to the fake;
+  - `test_274_promote_preview_parity`: `gte`/`in_` added to the fake;
+  - `test_ingest_splice`: the 403 case now carries an org, and the link mock's winner is
+    `is_latest`;
+  - `test_280_minter_sequence`: the first-upload and new-version kinds now include the settle READ,
+    and the fake stamps `created_at`.
+
+### Fences and constraints held
+
+- No change to `documents.py`, so the 275 D-32 delete fence and the `upload_document` `if`-count are
+  untouched.
+- Every `ingest_splice.py` edit is inside `mint_document_row`: its docstring, the folder step, the
+  23505 branch, and step 6b with nested helpers and a function-local `datetime` import (D-19).
+- No migration (D-22). No new tool, phase type or emitter.
+
+### Gates run after the pass
+
+- **Unit (the requested set):** `502 passed`.
+- **Live, under the local-DB lock:** `test_280_same_bytes_live.py`, `test_280_cr01_two_org_live.py`
+  and `test_280_purge_bytes_live.py` gave **36 passed, 0 skipped**. The lock was released.
+- **Vitest:** `ArtifactBlock.test.tsx` 9/9.
+- **Not run:** the full backend baseline (`node scripts/check-backend-unit-baseline.cjs`) and the
+  vitest count gate. These belong to the phase's verify step.
+
+_Fix pass: 2026-10-14 · Fixer: Claude (gsd-code-fixer)_
