@@ -11,10 +11,10 @@ Seeds folded at intake: **SEED-221** (into FIX-10), **SEED-328** (into SEAM-01),
 ### Major bugs (FIX)
 
 - [ ] **FIX-01**: An ordinary org member can open Settings and use Memory, Audit Log and "Show technical names"; operator-only tabs stay hidden from them. — `BUG-261004-02`
-- [ ] **FIX-02**: Uploading the same bytes while the first copy is still indexing never retires that copy and never 409s; exactly one copy stays visible in the Library and in search. — `BUG-261005-01`
-- [ ] **FIX-03**: A watched OneDrive/SharePoint folder larger than one page imports every page, or fails loudly — it never silently restarts the listing at page 1. — `onedrive-adapter-…` WR-02
-- [ ] **FIX-04**: A OneDrive search query cannot alter the Microsoft Graph request path. — `onedrive-adapter-…` WR-01
-- [ ] **FIX-05**: Folder paths minted by the OneDrive adapter use one encoding, so a filing rule written against the displayed path matches. — `onedrive-adapter-…` WR-03
+- [x] **FIX-02**: Uploading the same bytes while the first copy is still indexing never retires that copy and never 409s; exactly one copy stays visible in the Library and in search. — `BUG-261005-01`
+- [x] **FIX-03**: A watched OneDrive/SharePoint folder larger than one page imports every page, or fails loudly — it never silently restarts the listing at page 1. — `onedrive-adapter-…` WR-02
+- [x] **FIX-04**: A OneDrive search query cannot alter the Microsoft Graph request path. — `onedrive-adapter-…` WR-01
+- [x] **FIX-05**: Folder paths minted by the OneDrive adapter use one encoding, so a filing rule written against the displayed path matches. — `onedrive-adapter-…` WR-03
 - [ ] **FIX-06**: A per-model timeout is the timeout the provider call actually gets, up to the maximum the UI accepts; a value above a real ceiling is refused with the reason; `max_retries` is chosen deliberately, not inherited from the SDK default. — `BUG-260916-01`
 - [ ] **FIX-07**: One `ask_user` pause shows one answer input; the draft is the same wherever it appears; option selection is not conveyed by colour alone; no dead button remains. — `BUG-260918-01`
 - [ ] **FIX-08**: Expanding the Chunks section on a 1,000-chunk document leaves every section below it reachable. — `BUG-260908-01`
@@ -24,10 +24,10 @@ Seeds folded at intake: **SEED-221** (into FIX-10), **SEED-328** (into SEAM-01),
 ### v4.5 audit debt (DEBT)
 
 - [ ] **DEBT-07**: The harness freshness validator (`harness/freshness.py`) excludes archived (`retrievable=false`) documents. — W-1
-- [ ] **DEBT-08**: A recorded decision states what happens to `message_artifacts` rows when their source document is disposed by retention, and the code enforces it if the decision requires. — W-2
+- [x] **DEBT-08**: A recorded decision states what happens to `message_artifacts` rows when their source document is disposed by retention, and the code enforces it if the decision requires. — W-2
 - [ ] **DEBT-09**: The date-word→column map and the topics-is-a-list rule each have one home, imported by `retrieval_scope.py`, `document_search_service.py` and `view_filter_compiler.py`; a test fails if they diverge. — W-3
-- [ ] **DEBT-10**: Both watch purge paths remove the stored file bytes as well as the document rows. — W-5 / `BUG-261012-01`
-- [ ] **DEBT-11**: `DELETE /documents/{id}` answers 404, not 500, when the caller owns no such row. — W-5 / `BUG-261012-02`
+- [x] **DEBT-10**: Both watch purge paths remove the stored file bytes as well as the document rows. — W-5 / `BUG-261012-01`
+- [x] **DEBT-11**: `DELETE /documents/{id}` answers 404, not 500, when the caller owns no such row. — W-5 / `BUG-261012-02`
 
 ### Owed G-5 extractions (SEAM)
 
@@ -61,20 +61,20 @@ Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not excee
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FIX-01 | Phase 283 | Pending |
-| FIX-02 | Phase 280 | Pending |
-| FIX-03 | Phase 280 | Pending |
-| FIX-04 | Phase 280 | Pending |
-| FIX-05 | Phase 280 | Pending |
+| FIX-02 | Phase 280 | Complete |
+| FIX-03 | Phase 280 | Complete |
+| FIX-04 | Phase 280 | Complete |
+| FIX-05 | Phase 280 | Complete |
 | FIX-06 | Phase 282 | Pending |
 | FIX-07 | Phase 282 | Pending |
 | FIX-08 | Phase 283 | Pending |
 | FIX-09 | Phase 281 | Pending |
 | FIX-10 | Phase 281 | Pending |
 | DEBT-07 | Phase 281 | Pending |
-| DEBT-08 | Phase 280 | Pending |
+| DEBT-08 | Phase 280 | Complete |
 | DEBT-09 | Phase 278 | Pending |
-| DEBT-10 | Phase 280 | Pending |
-| DEBT-11 | Phase 280 | Pending |
+| DEBT-10 | Phase 280 | Complete |
+| DEBT-11 | Phase 280 | Complete |
 | SEAM-01 | Phase 279 | Pending |
 | SEAM-02 | Phase 278 | Pending |
 | SEAM-03 | Phase 278 | Pending |

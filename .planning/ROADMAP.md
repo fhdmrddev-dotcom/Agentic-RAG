@@ -130,7 +130,7 @@ and are stated so a phase can run early when its files are free:
 - [x] **Phase 277: Registers Back Inside the Band** (completed 2026-10-12): split CLAUDE.md by function into `docs/` below 120k with nothing deleted; repair the v4.5 bookkeeping drift (REG-04, REG-05)
 - [x] **Phase 278: One Home for Tools and Filters**: `tool_dispatcher.py` registry/handler split pinned at 30 tools; `retrieval_service.py` seam measured and closed; one home for the filter vocabulary (SEAM-02, SEAM-03, DEBT-09)
 - [x] **Phase 279: The Expert Scope Seam**: `expert_scope.py` extracted along its named seam; every `SEED-328` item fixed or recorded with a reason (SEAM-01)
-- [ ] **Phase 280: In Once, Out Clean**: same-bytes upload never retires the in-flight copy; Graph adapter pages, encodes and decodes honestly; purge and delete remove bytes and answer 404; a recorded decision for artifact rows on disposal (FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11)
+- [x] **Phase 280: In Once, Out Clean**: same-bytes upload never retires the in-flight copy; Graph adapter pages, encodes and decodes honestly; purge and delete remove bytes and answer 404; a recorded decision for artifact rows on disposal (FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11)
 - [ ] **Phase 281: A Refusal Names Its Cause**: emit failure names the check that failed; publish and describe-door refusals in plain words; freshness ignores archived documents (FIX-09, FIX-10, DEBT-07)
 - [ ] **Phase 282: The Slow Run and the Paused Run**: per-model timeout reaches the provider call with deliberate retries; one `ask_user` input with one draft (FIX-06, FIX-07)
 - [ ] **Phase 283: Every Member Reaches Their Own Settings**: Settings reachable by members with operator tabs hidden and refused; bounded Chunks section (FIX-01, FIX-08)
@@ -306,7 +306,7 @@ Plans:
 | 277. Registers Back Inside the Band | 2/2 | Complete | 2026-10-12 |
 | 278. One Home for Tools and Filters | 4/4 | Complete | 2026-10-13 |
 | 279. The Expert Scope Seam | 4/4 | Complete (verified 4/4; owed: D-18 cloud read, 4-axis rows, review leftovers) | 2026-10-14 |
-| 280. In Once, Out Clean | 0/4 | Planned | - |
+| 280. In Once, Out Clean | 4/4 | Complete | 2026-10-14 |
 | 281. A Refusal Names Its Cause | 0/TBD | Not started | - |
 | 282. The Slow Run and the Paused Run | 0/TBD | Not started | - |
 | 283. Every Member Reaches Their Own Settings | 0/TBD | Not started | - |
