@@ -1,9 +1,9 @@
 ---
 phase: 280-in-once-out-clean
 verified: 2026-10-14T00:00:00Z
-status: human_needed
+status: passed
 score: 4/5 success criteria verified in code and live; SC#2 live row PARTIAL (104/105)
-overrides_applied: 0
+overrides_applied: 3  # operator-delegated rulings 2026-10-14, see Operator rulings
 gaps: []
 human_verification:
   - test: "SC#2 OneDrive live re-drive: re-run after BUG-261014-02 (TLS download failure never retried) is ruled on/fixed, or accept 104/105"
@@ -64,3 +64,12 @@ All seven IDs appear in the plan frontmatter and in REQUIREMENTS.md (FIX-02..05,
 No success criterion is unmet by code. Open items are operator-gated: the SC#2 live row (104/105, BUG-261014-02) and the WR-01/WR-02 rulings. Status is therefore `human_needed`.
 
 _Verifier: Claude (gsd-verifier)_
+
+
+## Operator rulings (2026-10-14)
+
+The operator delegated all three open items: *"this is a testing environment so you take the decision that are best for production grade later"*. Claude's rulings:
+
+1. **SC#2, 104/105: ACCEPTED.** None of the three Graph defects reproduced (4 pages, decoded `/Team Docs/` paths, rule matched 104/104, `listing_complete`). The missing file is a transient TLS download failure that is never retried. That is `BUG-261014-02`, a production-relevant reliability bug that stays **open**, recommended for the next repair phase. BUG-260910-04 is closed and 238 M-9 is flipped to PASS by ruling.
+2. **WR-01, auto-restore of a retired same-name match: KEPT.** A re-upload of old bytes expresses "make this current". The alternatives are worse: a 409 is a dead end for the user, and a new version row is impossible without a migration, because `documents_dedup_idx` includes retired rows. Restore uses the existing Restore semantics.
+3. **WR-02, "later upload wins": KEPT.** It guarantees exactly one latest row. The residual is a shared `version_number`, closable only by a constraint (a future migration).

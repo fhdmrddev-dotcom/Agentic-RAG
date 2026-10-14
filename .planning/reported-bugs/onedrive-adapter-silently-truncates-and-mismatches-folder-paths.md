@@ -4,10 +4,10 @@ title: The OneDrive/Graph adapter silently stops importing past one page, inject
 reported: 2026-09-10
 surface: Agentic-RAG
 severity: major
-status: folded   # folded into Phase 280 at discuss 2026-10-14 (280-CONTEXT.md)
+status: closed   # closed 2026-10-14 by Phase 280 ruling (see verified_closed_by)
 affected_areas: [backend/connectors, backend/ingestion, RAG/classification]
 folded_into: "280"
-verified_closed_by: null
+verified_closed_by: "Phase 280 live re-drive 2026-10-14 (280-LIVE-EVIDENCE.md SC#2): none of the three defects reproduced on the real OneDrive folder /Team Docs (4 pages, decoded paths, rule matched 104/104); the 1/105 shortfall is a transient TLS download failure never retried, ruled to belong to BUG-261014-02 (operator delegated the ruling 2026-10-14: 'you take the decision that are best for production grade'). Fixes 45b4fb9dc / db7a083a2 / b6073107c."
 related_seeds: [SEED-282]
 re_open_trigger: null
 reproduces_on:
