@@ -188,5 +188,36 @@ Meridian — Risks*, archive it with the approved reversible write (record `arch
 it after), and run the workflow. PASS iff the screen shows the staleness verdict and the audit row
 names the 2026-06-08 date, not the fresh upload's.
 
-(The Task 4 sign-off section is added only when the operator's verdict arrives, so that Task 4's
-`grep` cannot pass on a placeholder.)
+## Operator sign-off (Task 4)
+
+> `approved`
+
+Recorded verbatim, **2026-10-15**. Before replying, the operator was shown: row A ⛔ OWED (the model
+passed the emit gate; golden run `e4b3625a-5d4b-4cc2-96db-cf3e54c57bfc` completed and publish was
+refused by the judge, score 18), row B ✅ PASS, row C ⛔ OWED (the drafting model returned
+`could_not_generate` twice) with the SEED-218 connect click ✅ PASS, and row D ⛔ OWED (the archive
+write was not approved, and the folder's data cannot produce the decisive arrangement). They were
+offered two options: "close with A, C, D owed" (recommended) or "re-run". They were also told that
+the draft was bound to *Security & Compliance Policies* for the publish and then restored (DB:
+`project_folder_id = null`, `status = draft`), and told about the evidence-gated flips.
+
+**What the verdict rules:**
+- **Row B ✅ PASS is accepted.** The flip it gates stands: BUG-260815-06 → `closed`.
+- **The SEED-218 connect click ✅ PASS is accepted.** SEED-218 → `answered` stands, with its
+  `doorVocabulary.ts` "in Settings" copy residual.
+- **Rows A, C and D are OWED by DECISION.** The phase closes with them owed. That is a decision, not
+  a claim that they ran (CLAUDE.md G-7 note). Their flips stay unmade: BUG-260730-02 stays `folded`,
+  SEED-221 stays `folded`.
+- **No flip is disputed,** so none is reverted.
+
+**Re-run order, A → C → D.** Run A first: it carries the most owed evidence (D-17, D-06 live half,
+the D-32 chat half, and row B's leftover "failed-step reason equals A's cause" sub-check), and it
+gates BUG-260730-02.
+1. **A:** the re-drive recipe is at the end of § Row A ("To re-drive: publish live a draft whose emit
+   reliably misses a template field …"). The D-32 inputs are recorded there too (emit step unnamed;
+   "Open the chat thread" renders the thread).
+2. **C:** the re-drive recipe is in § Row C ("To re-drive: when the drafting model is healthy …").
+   First check that `POST /workflows/generate` returns `reason_code: no_service_chosen`. This row gates
+   SEED-221.
+3. **D:** the re-drive recipe is at the end of § Row D ("To re-drive (needs operator approval): upload
+   one fresh document …"). It needs a new per-action approval for the reversible `archived_at` write.
