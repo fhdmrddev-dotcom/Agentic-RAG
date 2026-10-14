@@ -623,7 +623,8 @@ async def upload_document(
 
     if mint_result.is_duplicate:
         response.status_code = status.HTTP_200_OK
-        return doc
+        # Phase 280 (FIX-02 / D-01): the same bytes already in the Library, in flight or done.
+        return {**doc, "already_in_library": True}
 
     # Phase 230 (QUEUE-01 / H-3): Cut over /documents/upload to durable ingestion_jobs
     # 1. Store raw uploaded bytes durably in Supabase Storage immediately

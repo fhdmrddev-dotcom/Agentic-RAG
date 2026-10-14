@@ -96,6 +96,11 @@ class DocumentResponse(BaseModel):
     archived_policy_name: str | None = None
     retrievable: bool | None = None
 
+    # Phase 280 (FIX-02 / D-01) — `/upload` answers 200 with the EXISTING document (in flight or
+    # completed) when the same bytes are already in the Library. NOT a column; DEFAULTED for the
+    # 217 reason, and declared at all because response_model filtering strips an undeclared key.
+    already_in_library: bool | None = None
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def tables_stage_applies(self) -> bool:
