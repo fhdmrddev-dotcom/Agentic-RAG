@@ -4,10 +4,10 @@ title: Upload files a document into another org's folder (the document's org dif
 reported: 2026-10-14
 surface: Agentic-RAG
 severity: major
-status: folded   # folded into Phase 280 (D-05 / D-26), filed before the fix per D-05
+status: closed   # closed 2026-10-14 by Phase 280 plan 04 on live evidence
 affected_areas: [backend/ingest, documents/folders, org-scope]
 folded_into: "280"
-verified_closed_by: null
+verified_closed_by: "280 (8f83c307e — 280-LIVE-EVIDENCE.md SC#1)"
 related_seeds: [SEED-313]
 re_open_trigger: null
 reproduces_on:
@@ -64,3 +64,7 @@ In the minter's folder check: select `id, user_id, org_id` through `maybe_row`. 
 No new status code and no message that tells "exists in another org" apart from "does not exist"
 (no existence oracle). This answers only the **folder** arm of SEED-313: a `/upload` with no folder
 still lands in the trigger's org.
+
+## Closed 2026-10-14 (Phase 280, plan 04)
+
+The minter's folder check now requires the folder's org to match the minting org (or the caller's membership when no org is passed), with the identical 404 otherwise (fix `8f83c307e`). Live: `test_280_cr01_two_org_live.py` 6/6 re-run at `b794a40c5`: a two-org user's upload lands in the folder's org. The no-folder `/upload` arm stays with SEED-313. Evidence: `.planning/phases/280-in-once-out-clean/280-LIVE-EVIDENCE.md` SC#1.

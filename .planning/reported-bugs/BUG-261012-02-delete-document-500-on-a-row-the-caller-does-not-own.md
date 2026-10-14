@@ -4,10 +4,10 @@ title: DELETE /documents/{id} answers 500 instead of 404 when the caller owns no
 reported: 2026-10-12
 surface: Agentic-RAG
 severity: minor
-status: folded   # folded into Phase 280 at discuss 2026-10-14 (280-CONTEXT.md)
+status: closed   # closed 2026-10-14 by Phase 280 plan 04 on live evidence
 affected_areas: [backend/documents, api/errors]
 folded_into: "280"
-verified_closed_by: null
+verified_closed_by: "280 (51a9e7962 — 280-LIVE-EVIDENCE.md SC#4)"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -73,3 +73,7 @@ None needed for data safety; the request deletes nothing. Clients should treat a
 
 - `.planning/phases/275-retention-legal-hold/275-G4-EVIDENCE.md` §5.3 MEMBER-7, §5.4 OBS-1
 - `backend/app/api/documents.py:1824-1833`
+
+## Closed 2026-10-14 (Phase 280, plan 04)
+
+Every `maybe_single()` read in `backend/app` goes through `app.utils.db.maybe_row` (fix `51a9e7962`, AST fence `test_280_maybe_row_fence.py`). Live, through real postgrest 2.29 as a signed-in user: `delete_document` for another user's document and for a random uuid both raise the identical `404 'Document not found'`. Evidence: `.planning/phases/280-in-once-out-clean/280-LIVE-EVIDENCE.md` SC#4.
