@@ -44,6 +44,20 @@ def coerce_uid(user_id) -> str:
     return str(UUID(str(user_id)))
 
 
+def maybe_row(resp):
+    """The row a ``.maybe_single()`` query found, or ``None``.
+
+    Measured (Phase 280, BUG-261012-02): postgrest 2.29's
+    ``SyncMaybeSingleRequestBuilder.execute`` returns ``None`` — not a response whose ``.data``
+    is ``None`` — when the query matches 0 rows. Reading ``.data`` straight off that result is an
+    ``AttributeError``, which reaches the client as a 500 (and without CORS headers) instead of
+    the handler's own 404/403 branch. Every ``maybe_single()`` read goes through this, or through
+    an explicit None-guard; ``tests/unit/test_280_maybe_row_fence.py`` pins that over
+    ``backend/app``.
+    """
+    return resp.data if resp is not None else None
+
+
 async def aexec(query):
     """Run a sync supabase-py query off the event loop.
 

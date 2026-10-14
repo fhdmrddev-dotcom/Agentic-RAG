@@ -8,7 +8,7 @@ from app.dependencies import get_current_user, get_supabase, get_user_supabase_c
 from app.models.folder import FolderCreate, FolderMoveRequest, FolderUpdate, FolderResponse
 from app.services.audit_service import write_audit_entry
 from app.services.retention import hold_guard  # Phase 275 (D-15): the one hold check
-from app.utils.db import aexec
+from app.utils.db import aexec, maybe_row
 from app.utils.folder_utils import fetch_visible_folders, _null_foreign_global_owner
 
 log = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ async def rename_folder(
         .maybe_single()
         .execute()
     )
-    if not current.data:
+    if not maybe_row(current):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
 
     # Check for duplicate name under same parent (excluding the folder itself)
@@ -229,7 +229,7 @@ async def toggle_global(
         .maybe_single()
         .execute()
     )
-    if not current.data:
+    if not maybe_row(current):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Folder not found or you are not the owner",
