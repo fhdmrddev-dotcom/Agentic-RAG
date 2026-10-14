@@ -170,20 +170,52 @@ def mint_document_row(
     """
     # 1. Folder ownership validation (G-1: owner-only parity with documents.py:610-617)
     if folder_id:
-        folder_check = (
+        folder = maybe_row(
             supabase.table("folders")
-            .select("id, user_id")
+            .select("id, user_id, org_id")
             .eq("id", folder_id)
             .maybe_single()
             .execute()
         )
-        if not maybe_row(folder_check):
+        if not folder:
             raise HTTPException(status_code=404, detail="Folder not found")
-        if folder_check.data["user_id"] != user_id:
+        if folder["user_id"] != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cannot upload to a folder you do not own",
             )
+        # Phase 280 (CR-01 / BUG-261014-01, D-05 / D-26) — a folder files a document only into
+        # ITS OWN org. Before this, only `user_id` was compared, so:
+        #   * /upload (org_id=None) let the autofill trigger pick the document's org with
+        #     `LIMIT 1` and no ORDER BY — a two-org person uploading into their other org's folder
+        #     got a document whose org differed from its folder's (measured live);
+        #   * a caller passing org_id could file an org A document into an org B folder.
+        # ⛔ Every refusal below is the IDENTICAL 404 a nonexistent folder gets: "this folder is
+        #   in an org you are not in" must not be distinguishable from "no such folder".
+        # ⚠ The membership read runs under the client the minter was given. A user-JWT client may
+        #   read its own memberships (`org_members_self_select`: user_id = auth.uid()); the
+        #   service role reads all. No new client, no new status code.
+        # ⚠ Answers only the FOLDER arm of SEED-313: a /upload with no folder still lands in the
+        #   trigger's org. SEED-318 (same-named /upload retiring an Expert install copy) unchanged.
+        folder_org = folder.get("org_id")
+        if not folder_org:
+            raise HTTPException(status_code=404, detail="Folder not found")
+        if org_id:
+            if str(folder_org) != str(org_id):
+                raise HTTPException(status_code=404, detail="Folder not found")
+        else:
+            membership = (
+                supabase.table("org_members")
+                .select("org_id")
+                .eq("user_id", user_id)
+                .eq("org_id", folder_org)
+                .limit(1)
+                .execute()
+            )
+            if not membership.data:
+                raise HTTPException(status_code=404, detail="Folder not found")
+            # Mint with the folder's org explicitly; the autofill trigger then no-ops.
+            org_id = str(folder_org)
 
     # 2. Content hashing
     content_hash = hashlib.sha256(raw).hexdigest()

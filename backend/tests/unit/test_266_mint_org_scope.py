@@ -421,7 +421,10 @@ class _FolderTable:
         return self
 
     def execute(self):
-        return _Result({"id": self._id, "user_id": USER})
+        # Phase 280 (CR-01 / BUG-261014-01, D-26): the minter now reads the folder's org and
+        # refuses (identical 404) when it differs from the minting org. `folders.org_id` is
+        # NOT NULL in the schema, so the probe returns the install's org, as a real folder would.
+        return _Result({"id": self._id, "user_id": USER, "org_id": ORG_A})
 
 
 def _mint_into(db: _FakeDB, folder_id: str, **kw):
