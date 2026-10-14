@@ -13,7 +13,7 @@ What this proves, on the real arbiters (``documents_dedup_idx`` and
     4) leave exactly one non-failed row, ``is_latest = true``, and both results carry its id.
   * Every one of the 7 minter callers' parameter sets (D-04) gets the same answer.
   * A real new version (same filename, different bytes) still versions, and two concurrent new
-    versions never leave ZERO latest rows (D-25).
+    versions never leave ZERO latest rows (D-25) — nor two (280-REVIEW WR-02: exactly one).
 
 Every client is built from ``backend/.env`` via ``_local_env()`` (Pitfall 6 — ``tests/conftest.py``
 points ``settings`` at a placeholder). Users, orgs, folders and documents are deleted in ``finally``
@@ -276,8 +276,10 @@ async def test_a_new_version_retires_the_old_one_after_inserting(pg_pool, subjec
 
 
 @pytest.mark.parametrize("round_no", range(3))
-async def test_two_concurrent_new_versions_never_leave_zero_latest(pg_pool, subject, round_no):
-    """D-25 / T-280-14: two concurrent v2 mints must never retire each other."""
+async def test_two_concurrent_new_versions_settle_to_exactly_one_latest(pg_pool, subject, round_no):
+    """D-25 / T-280-14: two concurrent v2 mints must never retire each other — and (280-REVIEW
+    WR-02) must not BOTH stay latest either. This test used to assert only "not zero", which the
+    two-latest end state passed; the settle step makes the exact contract hold."""
     uid, tok = subject["uid"], subject["tok"]
     name = f"280-v2race-{round_no}-{uuid4().hex[:6]}.txt"
 
@@ -297,4 +299,27 @@ async def test_two_concurrent_new_versions_never_leave_zero_latest(pg_pool, subj
     rows = await _latest_for(pg_pool, uid, name)
     latest = [r for r in rows if r["is_latest"]]
     assert latest, f"two concurrent new versions left ZERO latest rows: {rows}"
+    assert len(latest) == 1, f"two concurrent new versions left {len(latest)} latest rows: {rows}"
     assert next(r for r in rows if str(r["id"]) == str(v1.document["id"]))["is_latest"] is False
+
+
+@pytest.mark.parametrize("round_no", range(3))
+async def test_two_concurrent_first_uploads_of_one_name_settle_to_exactly_one_latest(pg_pool, subject, round_no):
+    """280-REVIEW WR-02: the same race with no prior version — both mints read no versions and both
+    insert v1. Before the settle step no retire ran on that path at all."""
+    uid, tok = subject["uid"], subject["tok"]
+    name = f"280-v1race-{round_no}-{uuid4().hex[:6]}.txt"
+
+    results = await asyncio.gather(
+        async_mint_document_row(
+            raw=_raw("v1a"), filename=name, mime_type=MIME, user_id=uid, supabase=user_client(tok),
+        ),
+        async_mint_document_row(
+            raw=_raw("v1b"), filename=name, mime_type=MIME, user_id=uid, supabase=user_client(tok),
+        ),
+        return_exceptions=True,
+    )
+    assert not [r for r in results if isinstance(r, BaseException)], results
+    rows = await _latest_for(pg_pool, uid, name)
+    assert len(rows) == 2, rows
+    assert len([r for r in rows if r["is_latest"]]) == 1, f"expected exactly one latest row: {rows}"

@@ -468,40 +468,82 @@ def mint_document_row(
     # ⚠ `.lt("version_number", next_version)`, not merely `.neq("id", new_id)`: two concurrent
     #   new versions both read the same max and both insert the same next_version; excluding only
     #   your own id lets each retire the other, leaving ZERO latest rows (T-280-14). The neq stays
-    #   as a belt. A brief window in which two rows read is_latest = true is accepted
-    #   (documents_latest_idx is NOT unique, measured 2026-10-14).
+    #   as a belt. ~~A brief window in which two rows read is_latest = true is accepted
+    #   (documents_latest_idx is NOT unique, measured 2026-10-14).~~
+    # ⚠ CORRECTED (280-REVIEW WR-02) — that window was NOT brief: both v2 rows retired only v1 and
+    #   neither ever retired the other, so two latest rows stayed until the next version arrived
+    #   (retrieval served both). Same for two concurrent FIRST uploads of one name (two v1 rows,
+    #   and no retire ran at all on that path). The SETTLE step below closes it with no migration:
+    #   the rows are totally ordered by (version_number, created_at, id) and the greatest one is
+    #   latest. After its own insert, every mint reads the other latest rows of this name at or
+    #   above its version, retires those that rank BELOW it, and retires ITSELF if one ranks above.
+    #   Why that leaves exactly one latest once both mints settle: the greatest row G never ranks
+    #   below anything, so nothing retires it. Any other row X either was visible to G's retire or
+    #   settle read (G retired it), or committed after those ran — so after G committed — and X's
+    #   own settle read then sees G and X retires itself.
+    #   ⚠ RESIDUALS, recorded rather than built around: the two rows still share one
+    #   version_number (only a constraint, i.e. a migration, prevents that), and the guarantee
+    #   holds only when every settle write succeeds (a failure is logged at ERROR, below).
     # ⚠ The org is the INSERTED row's when none was passed: /upload's row is stamped by the
     #   autofill trigger, and an unscoped retire touched same-named files in every org the person
     #   belongs to (T-280-15).
     # ⚠ A retire failure must never lose the row that was already minted — log it and return.
-    if has_prior_version:
+    from datetime import datetime, timezone
+
+    retire_org = org_id or doc.get("org_id")
+
+    def _same_name(query):
+        query = query.eq("user_id", user_id).eq("filename", filename)
+        if retire_org:
+            query = query.eq("org_id", retire_org)
+        if folder_scoped:
+            query = query.eq("folder_id", folder_id) if folder_id else query.is_("folder_id", "null")
+        return query
+
+    def _rank(row: dict, version: int | None = None) -> tuple:
         try:
-            retire_query = (
-                supabase.table("documents").update({"is_latest": False}).eq("user_id", user_id).eq("filename", filename)
-            )
-            retire_org = org_id or doc.get("org_id")
-            if retire_org:
-                retire_query = retire_query.eq("org_id", retire_org)
-            if folder_scoped:
-                retire_query = (
-                    retire_query.eq("folder_id", folder_id) if folder_id else retire_query.is_("folder_id", "null")
-                )
-            retire_query.neq("id", doc["id"]).lt("version_number", next_version).execute()
-        except Exception as retire_exc:  # noqa: BLE001 — the minted row stands either way
-            # 280-REVIEW IN-01: ERROR with the traceback, not a one-line WARNING. A failed retire
-            # leaves two latest rows, and this catch also receives programming errors
-            # (AttributeError/TypeError) — a fake without `.lt` once kept a suite green while the
-            # retire never ran. Re-raising is NOT the narrower choice: the row is already inserted
-            # and its bytes not yet stored, so raising here would strand a `pending` row.
-            log.error(
-                "mint_document_row: retiring earlier versions of %r failed after minting document %s "
-                "(v%s); the new row is kept: %s",
-                filename,
-                doc.get("id"),
-                next_version,
-                retire_exc,
-                exc_info=True,
-            )
+            created = datetime.fromisoformat(str(row.get("created_at") or "").replace("Z", "+00:00"))
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+        except ValueError:
+            created = datetime.min.replace(tzinfo=timezone.utc)
+        return (int(row.get("version_number") if version is None else version), created, str(row.get("id")))
+
+    try:
+        if has_prior_version:
+            _same_name(supabase.table("documents").update({"is_latest": False})).neq("id", doc["id"]).lt(
+                "version_number", next_version
+            ).execute()
+        # The settle READ — rival latest rows of this name at or above our version.
+        rivals = (
+            _same_name(supabase.table("documents").select("id, version_number, created_at"))
+            .eq("is_latest", True)
+            .neq("id", doc["id"])
+            .gte("version_number", next_version)
+            .execute()
+        ).data or []
+        mine = _rank(doc, next_version)
+        below = [str(r["id"]) for r in rivals if _rank(r) < mine]
+        if below:
+            _same_name(supabase.table("documents").update({"is_latest": False})).in_("id", below).execute()
+        if any(_rank(r) > mine for r in rivals):
+            supabase.table("documents").update({"is_latest": False}).eq("id", doc["id"]).execute()
+            doc = {**doc, "is_latest": False}
+    except Exception as retire_exc:  # noqa: BLE001 — the minted row stands either way
+        # 280-REVIEW IN-01: ERROR with the traceback, not a one-line WARNING. A failed retire
+        # leaves two latest rows, and this catch also receives programming errors
+        # (AttributeError/TypeError) — a fake without `.lt` once kept a suite green while the
+        # retire never ran. Re-raising is NOT the narrower choice: the row is already inserted
+        # and its bytes not yet stored, so raising here would strand a `pending` row.
+        log.error(
+            "mint_document_row: retiring earlier versions of %r failed after minting document %s "
+            "(v%s); the new row is kept: %s",
+            filename,
+            doc.get("id"),
+            next_version,
+            retire_exc,
+            exc_info=True,
+        )
 
     return MintResult(
         document=doc,

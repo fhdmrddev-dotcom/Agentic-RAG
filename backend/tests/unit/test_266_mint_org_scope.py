@@ -38,7 +38,10 @@ FILENAME = "acme_q3_2026_financial_report.md"
 MIME = "text/markdown"
 
 # Phase 280 (FIX-02): "lt" added — the retire is now scoped .lt("version_number", next_version).
-_FILTERS = ("eq", "neq", "is_", "lt")
+# 280-REVIEW WR-02: "gte" / "in_" added — the settle step reads rivals .gte("version_number", v)
+#   and retires the ones ranked below it .in_("id", …). Without them the settle raised
+#   AttributeError, which the minter logs (at ERROR since IN-01) and survives.
+_FILTERS = ("eq", "neq", "is_", "lt", "gte", "in_")
 
 
 class _Result:
@@ -66,6 +69,8 @@ class _Site:
     neq = _rec("neq")
     is_ = _rec("is_")
     lt = _rec("lt")
+    gte = _rec("gte")
+    in_ = _rec("in_")
     order = _rec("order")
     limit = _rec("limit")
     maybe_single = _rec("maybe_single")
@@ -81,6 +86,10 @@ class _Site:
             if name == "is_" and a[1] == "null" and row.get(a[0]) is not None:
                 return False
             if name == "lt" and not (row.get(a[0]) is not None and row.get(a[0]) < a[1]):
+                return False
+            if name == "gte" and not (row.get(a[0]) is not None and row.get(a[0]) >= a[1]):
+                return False
+            if name == "in_" and row.get(a[0]) not in a[1]:
                 return False
         return True
 
@@ -308,8 +317,9 @@ def test_upload_path_retires_only_after_a_successful_insert():
     scoped to exclude the new row and any concurrent same-version row."""
     db = _retire_db(None)
     res = _mint(db, None)
-    assert [s.kind for s in db.sites] == ["select", "select", "select", "insert", "update"]
-    retire = db.sites[-1]
+    # 280-REVIEW WR-02 re-pin, deliberate: the settle READ follows the retire.
+    assert [s.kind for s in db.sites] == ["select", "select", "select", "insert", "update", "select"]
+    retire = db.retire_site()
     assert retire.arg == {"is_latest": False}
     assert retire.filters() == [
         ("eq", ("user_id", USER)),

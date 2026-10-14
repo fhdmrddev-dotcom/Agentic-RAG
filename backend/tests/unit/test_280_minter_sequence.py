@@ -57,7 +57,7 @@ HASH = hashlib.sha256(RAW).hexdigest()
 FILENAME = "q3_board_pack.md"
 MIME = "text/markdown"
 
-_FILTERS = ("eq", "neq", "is_", "lt")
+_FILTERS = ("eq", "neq", "is_", "lt", "gte", "in_")  # 280-REVIEW WR-02: gte, in_
 
 
 # ── the fake ────────────────────────────────────────────────────────────────────────────────
@@ -80,6 +80,8 @@ class _Q:
     neq = _rec("neq")
     is_ = _rec("is_")
     lt = _rec("lt")
+    gte = _rec("gte")
+    in_ = _rec("in_")
     order = _rec("order")
     limit = _rec("limit")
 
@@ -101,6 +103,10 @@ class _Q:
             if name == "is_" and val == "null" and have is not None:
                 return False
             if name == "lt" and not (have is not None and have < val):
+                return False
+            if name == "gte" and not (have is not None and have >= val):
+                return False
+            if name == "in_" and str(have) not in {str(v) for v in val}:
                 return False
         return True
 
@@ -170,6 +176,7 @@ class _FakeDB:
         self.insert_error = insert_error
         self.update_error = update_error
         self.storage = MagicMock()
+        self.clock = 0
 
     def table(self, name):
         assert name in self.tables, f"unexpected table {name!r}"
@@ -188,6 +195,10 @@ class _FakeDB:
             self.concurrent_winner = None
         if not row.get("org_id"):
             row["org_id"] = self.trigger_org
+        # 280-REVIEW WR-02: Postgres stamps created_at (now()); the settle step orders by it. The
+        # fake's clock runs AFTER every fixture row (00:00:xx) unless a test says otherwise.
+        self.clock += 1
+        row.setdefault("created_at", f"2026-10-14T01:00:{self.clock:02d}Z")
         for r in rows:
             if r.get("status") != "failed" and all(
                 str(r.get(c)) == str(row.get(c)) for c in ("org_id", "user_id", "content_hash", "folder_id")
@@ -259,8 +270,10 @@ def test_first_upload_issues_dedup_then_inflight_then_version_then_insert_and_no
     res = _mint(db)
 
     assert res.is_duplicate is False
-    assert db.kinds() == ["select", "select", "select", "insert"], db.kinds()
-    completed, inflight, version, _ = db.doc_sites()
+    # 280-REVIEW WR-02 re-pin, deliberate: the insert is followed by the settle READ (rival latest
+    # rows of this filename), even for a v1 — two concurrent first uploads both mint v1.
+    assert db.kinds() == ["select", "select", "select", "insert", "select"], db.kinds()
+    completed, inflight, version, _, _ = db.doc_sites()
     assert ("eq", ("status", "completed")) in completed.filters()
     assert inflight.arg == "*"
     assert inflight.filters() == [
@@ -312,7 +325,8 @@ def test_a_new_version_inserts_before_it_retires():
     res = _mint(db)
 
     assert res.is_duplicate is False and res.version_number == 2
-    assert db.kinds() == ["select", "select", "select", "insert", "update"], db.kinds()
+    # 280-REVIEW WR-02 re-pin: the settle READ follows the retire.
+    assert db.kinds() == ["select", "select", "select", "insert", "update", "select"], db.kinds()
     new_id = res.document["id"]
     retire = db.retire_site()
     assert ("neq", ("id", new_id)) in retire.filters()
@@ -345,15 +359,55 @@ def test_retire_keeps_the_folder_predicate_under_folder_scope():
     assert ("eq", ("folder_id", F1)) in f and ("eq", ("org_id", ORG_A)) in f
 
 
-def test_two_concurrent_new_versions_do_not_retire_each_other():
-    """The other v2 was inserted by a concurrent request; ours must leave it latest (lt, not neq)."""
+def test_two_concurrent_new_versions_settle_to_the_later_created_one():
+    """280-REVIEW WR-02. Two concurrent new versions both read max=1 and both insert v2. The `lt`
+    retire alone never touches the other v2, so BOTH stayed latest — not for "a brief window" but
+    until the next version (retrieval served both). The settle step makes exactly one win: the
+    total order is (version_number, created_at, id), the greatest is latest. Here ours is later."""
     other_v2 = _row(id="v2-other", content_hash="h-other", version_number=2, created_at="2026-10-14T00:00:01Z")
     db = _FakeDB(docs=[_row(id="v1", content_hash="h-v1", status="completed")], concurrent_winner=other_v2)
     res = _mint(db)
 
     assert res.version_number == 2
-    assert db.doc("v2-other")["is_latest"] is True
+    assert db.doc("v2-other")["is_latest"] is False, "the earlier-created rival v2 was left latest"
     assert db.doc(res.document["id"])["is_latest"] is True
+    assert _latest_ids(db) == [res.document["id"]]
+
+
+def test_a_new_version_retires_itself_when_a_later_rival_already_landed():
+    """The other half of the settle: the rival v2 was created AFTER ours (its insert started later)
+    but committed before our settle read. Ours retires ITSELF, so the result never depends on which
+    mint's settle runs last, and the returned document says so."""
+    other_v2 = _row(id="v2-other", content_hash="h-other", version_number=2, created_at="2026-10-14T23:59:59Z")
+    db = _FakeDB(docs=[_row(id="v1", content_hash="h-v1", status="completed")], concurrent_winner=other_v2)
+    res = _mint(db)
+
+    assert res.is_duplicate is False and res.version_number == 2
+    assert db.doc(res.document["id"])["is_latest"] is False
+    assert res.document["is_latest"] is False, "the result claims a latest row the DB has retired"
+    assert _latest_ids(db) == ["v2-other"]
+
+
+def test_a_rival_of_a_higher_version_wins_even_if_ours_is_newer():
+    """A slow mint read max=1 (so it inserts v2) while another mint already read max=2 and inserted v3.
+    Version outranks time: ours retires itself, v3 stays."""
+    other_v3 = _row(id="v3-other", content_hash="h-other", version_number=3, created_at="2026-10-14T00:00:01Z")
+    db = _FakeDB(docs=[_row(id="v1", content_hash="h-v1", status="completed")], concurrent_winner=other_v3)
+    res = _mint(db)
+
+    assert res.version_number == 2
+    assert _latest_ids(db) == ["v3-other"]
+
+
+def test_two_concurrent_first_uploads_of_one_name_settle_to_one_latest():
+    """The same race with no prior version: both read no versions and both mint v1. Before WR-02 no
+    retire ran at all on that path, so two v1 rows stayed latest."""
+    other_v1 = _row(id="v1-other", content_hash="h-other", version_number=1, created_at="2026-10-14T00:00:01Z")
+    db = _FakeDB(concurrent_winner=other_v1)
+    res = _mint(db)
+
+    assert res.version_number == 1
+    assert _latest_ids(db) == [res.document["id"]]
 
 
 def test_a_failed_insert_retires_nothing():

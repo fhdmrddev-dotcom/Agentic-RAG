@@ -83,6 +83,16 @@ class _Query:
         self._filters.append(lambda r: r.get(col) is not None and r.get(col) < val)
         return self
 
+    def gte(self, col, val):
+        # 280-REVIEW WR-02: the minter's settle step reads rivals .gte("version_number", v).
+        self._filters.append(lambda r: r.get(col) is not None and r.get(col) >= val)
+        return self
+
+    def in_(self, col, vals):
+        # 280-REVIEW WR-02: … and retires the ones ranked below it .in_("id", …).
+        self._filters.append(lambda r: r.get(col) in vals)
+        return self
+
     def order(self, col, desc=False):
         self._order = (col, desc)
         return self
