@@ -20281,6 +20281,21 @@ CLAUDE.md verdict cell as of 2026-10-14 (replaced by 280-04):
 
 > last touch 275-02
 
+### `backend/app/api/documents.py` — BUG-261014-06 (quick fix, 2026-10-14)
+
+**`96 / 37 / 2531` (was `95 / 37 / 2534`).** Honoured by construction. `list_documents` counted
+tables/images with ONE `.in_("document_id", <every id>)` per table; PostgREST carries `in.(...)` in
+the URL, so 286 ids came back `414 URI too long` and every folder read 0 documents. The two reads now
+run in batches of `_ID_BATCH = 100` and sum into the same `Counter`s. 0 new `if` (one `for` loop, two
+reads folded into it); response shape unchanged. Pinned by
+`tests/unit/test_261014_list_documents_batches_in.py` (RED `assert 250 <= 100` before the fix).
+⚠ The `.in_("folder_id", global_folder_ids)` read above it is the same shape and stays unbatched —
+safe at today's folder counts, not by construction.
+
+CLAUDE.md verdict cell before BUG-261014-06 (replaced):
+
+> last touch 280-01 / 280-03 · honoured by construction
+
 ### `backend/app/api/folders.py` — Phase 280 close
 
 **`14 / 9 / 277` (was `12 / 8 / 277`).** Honoured by construction. **280-01** (`51a9e7962`): `rename_folder` and `toggle_global` read through `maybe_row`; the existing 404 and 403 stay, and no branch was added.

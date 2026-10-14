@@ -738,6 +738,9 @@ async def upload_document(
     return doc
 
 
+_ID_BATCH = 100  # ids per `.in_()` — 100 UUIDs keep the PostgREST URL ~3.7 KB
+
+
 @router.get("", response_model=list[DocumentResponse])
 async def list_documents(
     current_user: dict = Depends(get_current_user),
@@ -780,20 +783,14 @@ async def list_documents(
     if merged:
         from collections import Counter  # noqa: PLC0415
         doc_ids = [d["id"] for d in merged]
-        table_rows_res = (
-            supabase.table("document_tables")
-            .select("document_id")
-            .in_("document_id", doc_ids)
-            .execute()
-        )
-        image_rows_res = (
-            supabase.table("document_images")
-            .select("document_id")
-            .in_("document_id", doc_ids)
-            .execute()
-        )
-        tc = Counter(r["document_id"] for r in (table_rows_res.data or []))
-        ic = Counter(r["document_id"] for r in (image_rows_res.data or []))
+        # BUG-261014-06: `in.(...)` rides the URL — 286 ids came back 414, so batch it.
+        tc: Counter = Counter()
+        ic: Counter = Counter()
+        for i in range(0, len(doc_ids), _ID_BATCH):
+            batch = doc_ids[i : i + _ID_BATCH]
+            for table, counter in (("document_tables", tc), ("document_images", ic)):
+                res = supabase.table(table).select("document_id").in_("document_id", batch).execute()
+                counter.update(r["document_id"] for r in (res.data or []))
         for doc in merged:
             doc["table_count"] = tc.get(doc["id"], 0)
             doc["image_count"] = ic.get(doc["id"], 0)
