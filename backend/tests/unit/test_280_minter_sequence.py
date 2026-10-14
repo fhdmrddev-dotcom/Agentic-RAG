@@ -640,3 +640,27 @@ def test_another_owners_folder_is_still_the_existing_403():
         _mint(db, folder_id=F1)
     assert exc.value.status_code == 403
     assert exc.value.detail == "Cannot upload to a folder you do not own"
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {},                                          # /upload shape: org_id=None → membership arm
+        {"org_id": ORG_A, "on_conflict": "link"},    # watch_new / watch_modified shape
+    ],
+    ids=["org_from_membership", "explicit_org"],
+)
+def test_a_foreign_org_folder_of_another_owner_is_the_identical_404_under_the_service_role(kw):
+    """280-REVIEW WR-05. This fake applies no RLS, so it reads like the SERVICE-ROLE client the watch
+    sync mints with. A folder in an org the caller is not in, owned by someone else, must answer the
+    404 a nonexistent folder gets — before 280-REVIEW the owner comparison ran first and answered
+    403, which told a service-role caller the folder EXISTS (an existence oracle, D-05 / D-18)."""
+    db = _FakeDB(
+        folders=[{"id": F1, "user_id": OTHER_USER, "org_id": ORG_B}],
+        members=[{"user_id": USER, "org_id": ORG_A}],
+    )
+    ref = _missing_folder_refusal(db, **kw)
+    with pytest.raises(HTTPException) as exc:
+        _mint(db, folder_id=F1, **kw)
+    _assert_identical_404(exc.value, ref)
+    assert "insert" not in db.kinds()

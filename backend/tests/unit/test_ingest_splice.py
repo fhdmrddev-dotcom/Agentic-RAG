@@ -173,9 +173,14 @@ def test_mint_document_row_folder_ownership_validation():
     assert exc_404.value.status_code == 404
     assert exc_404.value.detail == "Folder not found"
 
-    # Case 2: Folder owned by other user -> 403
+    # Case 2: Folder owned by other user, IN THE MINTING ORG -> 403
+    # ⚠ 280-REVIEW WR-05 re-pin, deliberate: the org/membership arm now runs BEFORE the owner arm,
+    #   so a folder with no org (this mock used to carry none) is the 404 a missing folder gets.
+    #   The 403 is still the answer for another owner's folder inside the caller's own org, which
+    #   is what the folder below now is (org passed explicitly, so no membership read is needed).
+    org = "33333333-3333-3333-3333-333333333333"
     supabase._tables["folders"]._select.execute.return_value = _make_result(
-        {"id": FOLDER_ID, "user_id": OTHER_USER_ID}
+        {"id": FOLDER_ID, "user_id": OTHER_USER_ID, "org_id": org}
     )
 
     with pytest.raises(HTTPException) as exc_403:
@@ -185,6 +190,7 @@ def test_mint_document_row_folder_ownership_validation():
             mime_type=MIME_TYPE,
             user_id=USER_ID,
             folder_id=FOLDER_ID,
+            org_id=org,
             supabase=supabase,
         )
     assert exc_403.value.status_code == 403

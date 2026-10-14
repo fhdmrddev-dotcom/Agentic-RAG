@@ -179,11 +179,6 @@ def mint_document_row(
         )
         if not folder:
             raise HTTPException(status_code=404, detail="Folder not found")
-        if folder["user_id"] != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Cannot upload to a folder you do not own",
-            )
         # Phase 280 (CR-01 / BUG-261014-01, D-05 / D-26) — a folder files a document only into
         # ITS OWN org. Before this, only `user_id` was compared, so:
         #   * /upload (org_id=None) let the autofill trigger pick the document's org with
@@ -197,6 +192,12 @@ def mint_document_row(
         #   service role reads all. No new client, no new status code.
         # ⚠ Answers only the FOLDER arm of SEED-313: a /upload with no folder still lands in the
         #   trigger's org. SEED-318 (same-named /upload retiring an Expert install copy) unchanged.
+        # ⚠ CORRECTED (280-REVIEW WR-05): the "IDENTICAL 404" above held only under user-JWT RLS,
+        #   because the owner comparison (403) used to run FIRST. Under the service-role client (the
+        #   watch sync), RLS hides nothing, so a foreign-org folder owned by someone else answered
+        #   403 while a missing one answered 404. The org/membership arm now runs BEFORE the owner
+        #   arm, so a folder outside the minting org always reaches the 404 first; the 403 is left
+        #   only for a folder in the caller's own org that someone else owns.
         folder_org = folder.get("org_id")
         if not folder_org:
             raise HTTPException(status_code=404, detail="Folder not found")
@@ -214,6 +215,12 @@ def mint_document_row(
             )
             if not membership.data:
                 raise HTTPException(status_code=404, detail="Folder not found")
+        if folder["user_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot upload to a folder you do not own",
+            )
+        if not org_id:
             # Mint with the folder's org explicitly; the autofill trigger then no-ops.
             org_id = str(folder_org)
 
