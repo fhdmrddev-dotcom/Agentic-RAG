@@ -191,6 +191,11 @@ async def test_an_external_action_on_an_unpicked_connection_is_refused(monkeypat
 
     assert result["ok"] is False
     assert result["error"] == "connection_not_allowed"
+    # Phase 281 (D-13, SEED-221): the ADDITIVE sub-reason that lets the client word this arm
+    # on its own. `error` above is unchanged; the constant is imported, never retyped.
+    from app.services.workflow_authoring import CONNECTION_REFUSAL_SERVICE_NOT_ALLOWED
+
+    assert result["reason_code"] == CONNECTION_REFUSAL_SERVICE_NOT_ALLOWED
     # ⚠ A FAILURE NEVER CARRIES A RUNNABLE OR PARTIAL DRAFT (REQ-2 c, D-214-21). A draft
     # containing a hole is a draft that can be PUBLISHED if the hole is missed.
     assert "definition" not in result
@@ -215,6 +220,11 @@ async def test_a_picked_connection_with_an_UNGRANTED_tool_is_refused(monkeypatch
 
     assert result["ok"] is False
     assert result["error"] == "connection_not_allowed"
+    # Phase 281 (D-13, SEED-221): the ADDITIVE sub-reason that lets the client word this arm
+    # on its own. `error` above is unchanged; the constant is imported, never retyped.
+    from app.services.workflow_authoring import CONNECTION_REFUSAL_ACTION_NOT_ALLOWED
+
+    assert result["reason_code"] == CONNECTION_REFUSAL_ACTION_NOT_ALLOWED
     assert "definition" not in result
 
 
@@ -243,6 +253,11 @@ async def test_an_empty_allowed_list_refuses_ANY_external_action(monkeypatch):
 
     assert result["ok"] is False
     assert result["error"] == "connection_not_allowed"
+    # Phase 281 (D-13, SEED-221): the ADDITIVE sub-reason that lets the client word this arm
+    # on its own. `error` above is unchanged; the constant is imported, never retyped.
+    from app.services.workflow_authoring import CONNECTION_REFUSAL_NO_SERVICE
+
+    assert result["reason_code"] == CONNECTION_REFUSAL_NO_SERVICE
     assert "definition" not in result
 
 
