@@ -275,7 +275,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 281-04-PLAN.md — wave 3 (operator checkpoints): merged-tree gates + closed-core recount + ledger/CLAUDE.md rows + seeds sweep; G-4 Chrome drives A-D (D-17..D-20) matched to the DB; evidence-gated bug/seed closes; STATE
+- [x] 281-04-PLAN.md — wave 3 (operator checkpoints): merged-tree gates + closed-core recount + ledger/CLAUDE.md rows + seeds sweep; G-4 Chrome drives A-D (D-17..D-20) matched to the DB; evidence-gated bug/seed closes; STATE
 **Flags**: **Closed-core recount** (7 / 1 / 30) against the phase base. A cause-precedence change is data inside the existing executor, never a new one. **G-2**: the refusals sit on shipped layouts (the gauntlet's worded verdict, the describe door), so no layout decision is open. The skip is **recorded as a decision** at discuss (OV-266-01 is what an unrecorded skip cost). **G-4** fires. **G-5 audit at discuss**: `backend/app/services/harness/phase_types.py` (FIRES), `backend/app/services/harness/validator_kinds.py` (FIRES), `backend/app/services/template_render_service.py`, `backend/app/services/workflow_authoring.py` (FIRES), `frontend/src/components/workflows/PublishGauntlet.tsx` (FIRES), `doorVocabulary.ts` (FIRES), `WorkflowBuilderPage.tsx` (FIRES ×6), `backend/app/services/harness/freshness.py`. Seeds: `SEED-221` (folded). Read the sketch-findings skill for the gauntlet's worded-verdict vocabulary before writing copy.
 **UI hint**: yes
 
