@@ -18,6 +18,14 @@ SECURITY (T-102-03-05 — Information Disclosure): both queries bind the scope w
 the documents whose ``folder_id`` is in the caller-supplied resolved scope. The
 ``documents`` table columns are confirmed against ``supabase/full-schema.sql``:
 ``created_at`` (the upload/creation timestamp), ``filename``, ``folder_id``.
+The one column name spliced into these statements (Phase 281, DEBT-07) is an IMPORTED
+module constant, asserted to be a plain identifier at import — never runtime input,
+never an f-string.
+
+Phase 281 (DEBT-07 / D-16): both reads count ONLY documents an agent may read. An
+archived or source-gone recent document used to make a stale folder read FRESH. The
+predicate is the ONE Python name for that rule (Phase 275 D-36, migration 205's stored
+generated column), imported from ``retrieval_scope`` and never restated here.
 """
 
 from __future__ import annotations
@@ -27,7 +35,23 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
+# Phase 275 (D-36) / Phase 281 (D-16): the one home of the "may an agent read this
+# document" rule. Imported, never restated; retrieval_scope.py itself is not edited.
+from app.services.retrieval_scope import RETRIEVABLE_COLUMN
+
+assert RETRIEVABLE_COLUMN.isidentifier()  # a fixed identifier, never user input (T-281-01)
+
 __all__ = ["newest_document_age_days", "exact_stem_collisions"]
+
+# Built by plain concatenation AT IMPORT from the imported constant; ``$N`` binds only.
+_NEWEST_SQL = (
+    "SELECT max(created_at) AS newest FROM documents "
+    "WHERE folder_id = ANY($1::uuid[]) AND " + RETRIEVABLE_COLUMN
+)
+_STEMS_SQL = (
+    "SELECT filename FROM documents "
+    "WHERE folder_id = ANY($1::uuid[]) AND " + RETRIEVABLE_COLUMN
+)
 
 
 def _stem(filename: str) -> str:
@@ -53,14 +77,7 @@ async def newest_document_age_days(
     """
     if not folder_ids:
         return None
-    row = await pool.fetchrow(
-        """
-        SELECT max(created_at) AS newest
-        FROM documents
-        WHERE folder_id = ANY($1::uuid[])
-        """,
-        list(folder_ids),
-    )
+    row = await pool.fetchrow(_NEWEST_SQL, list(folder_ids))
     newest = row["newest"] if row is not None else None
     if newest is None:
         return None
@@ -91,14 +108,7 @@ async def exact_stem_collisions(
     """
     if not folder_ids:
         return []
-    rows = await pool.fetch(
-        """
-        SELECT filename
-        FROM documents
-        WHERE folder_id = ANY($1::uuid[])
-        """,
-        list(folder_ids),
-    )
+    rows = await pool.fetch(_STEMS_SQL, list(folder_ids))
     by_stem: dict[str, set[str]] = {}
     for r in rows:
         fname = r["filename"]
