@@ -11080,19 +11080,19 @@ cells rot within days.
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 17 / 8 / 489 | **FIRES** | honoured by construction (199) — ⚠ the 200 canvas port is REVERTED here (2026-08-20) |
-| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 54 / 27 / 2954 | **FIRES** | ⚠ row was STALE at `51 / 24 / 2925`; **256-05 does NOT modify it**. extraction TAKEN (200-03) · honoured by construction (211 / 214 / **214.1**) — ⚠ G-5 obligation stays **OWED** |
-| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 43 / 17 / 1415 | **FIRES** | the 192 / 192.1 extraction is TAKEN — ⚠ **not a standing `satisfied`**; and `onOpenSettings` is UNWIRED here (`SEED-218`) |
+| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 55 / 28 / 3014 (was `54 / 27 / 2954`) | **FIRES** | **281-01** (`0ab03994e`): `_exec_llm_emit` records per-shot causes and calls the emit_cause leaf; +1 `If`, 0 new def. honoured by construction · ⚠ G-5 obligation stays **OWED** |
+| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 45 / 18 / 1447 (was `43 / 17 / 1415`) | **FIRES** | the 192 / 192.1 extraction is TAKEN. **281-03**: `onOpenRun` + `onOpenConnections` pass-throughs, both via `canLeaveBuilderRef`; 0 new hooks. `onOpenSettings` now wired (`SEED-218`) |
 | [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 19 / 6 / 1616 | **FIRES** | ✅ **G-5 DISCHARGED (192.2-02)** |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 10 / 4 / 727 | ⚠ **FIRES** | no seam proposed |
 | [`frontend/src/components/workflows/library/libraryFilter.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryfilterts) | 6 / 4 / 435 | ⚠ **FIRES** | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | [`frontend/src/components/workflows/library/libraryRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryrowts) | 4 / 3 / 201 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 192.2) |
 | [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 18 / 12 / 1075 | **FIRES** | honoured by construction (193 / 193.1 / 199 / **214**) — 214-13 added the service picker and its refusal as CHILDREN |
-| [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 56 / 21 / 2977 | **FIRES** | honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214.1**) — 214.1 added one import + one gated node, zero `useState` |
+| [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 57 / 22 / 2993 (was `56 / 21 / 2977`) | **FIRES** | honoured by construction ×7 (193.1 / 193.2 / 197 / 200.3 / 214 / 214.1 / **281-02**) — 281-02: ONE import + ONE inline `describeRefusal(...)`; useState 21 → 21, useEffect 7 → 7 |
 | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 43 / 23 / 2261 | **FIRES** | honoured by construction (192.2 / **258-03**: two route dependencies, no new branch/handler; ⚠ extraction still OWED) |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 22 / 15 / 537 (was `21 / 14 / 537`) | ⚠ **FIRES** | **279-01**: docstring repoints to the new expert_scope homes only (OpenAPI regen). ⛔ a body touching both pairs is a 422 |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 60 / 30 / 1134 (was `58 / 29 / 1124`) | ⚠ **FIRES** | ⚠ STALE (`58/29/1124`). **271-02**: `classification-rules` branch retired; `handleAskInChat` (new thread → prefill → navigate) on the ONE LibraryPage mount |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 61 / 31 / 1137 (was `60 / 30 / 1134`) | ⚠ **FIRES** | **281-03** (`2510ffdb7`): ONE prop `onOpenConnections={() => onNavigate("connections")}` after the pinned `onOpenRun` line; hooks 27 → 27, 0 branches. honoured by construction |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 4 / 3 / 249 (was `2 / 1 / 204`) | ⚠ **FIRES** | now FIRES (3 phases). **271-02**: optional `onOpenFilingRules`; link + pill in ONE right cluster, never a tab. 271-05 G4-3: Back returns to Ingestion |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
@@ -11103,13 +11103,13 @@ cells rot within days.
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 52 / 26 / 2724 | **FIRES** | ⚠ row was STALE at `48 / 25 / 2585`. honoured by construction (193.2 / 194 / 192.2 / 200.1 / 214 / **256-05**) — 256-05 is **COMMENT-ONLY** |
 | [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 29 / 13 / 1942 | **FIRES** | ⚠ STALE (`28/12/1939`). **268-REVIEW WR-06**: the golden shell carries the definition's org — one kwarg. ⛔ ctx still withholds org |
-| [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 16 / 10 / 1002 (was `15 / 9 / 989`) | **FIRES** | ⚠ row STALE. **281-02** (planned): ONE additive sub-reason key on the 3 `connection_not_allowed` arms. honoured by construction (193.2 / 197 / 214 / 214.1) |
+| [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 17 / 11 / 1025 (was `16 / 10 / 1002`) | **FIRES** | **281-02** (`fa08ee6f1`): ONE additive `reason_code` on the 3 `connection_not_allowed` returns; 0 lines removed, `error`/`detail` byte-identical. honoured by construction (… / 214.1 / 281) |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | honoured by construction (193.2 / 197 / **214.1**) — `setDeclaredInputs` is the sixth `meta` writer, the shape the five before it take |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 16 / 10 / 646 | **FIRES** | honoured by construction (194 / 194.1) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 9 / 5 / 756 (was `8 / 4 / 748`) | **FIRES** | ⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id`/`expert_id` (+8 lines). ⛔ NOT the shape to copy (C-5) |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 41 / 19 / 1750 | **FIRES** | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches |
-| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 60 / 23 / 3297 | **FIRES** | ⚠ STALE (`58/21/3290`). **268-REVIEW WR-06**: the resume shell carries its run's org — the org read MOVED above the INSERT, one kwarg |
+| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 61 / 24 / 3387 (was `60 / 23 / 3297`) | **FIRES** | **281-01** (`7704bd0f6`): the executor's cause wins over the validator's shape text; one keyword-only `reason_is_final`, one `_attempt_identity` helper. 5 new conditionals vs cap 4 → **OV-281-01** |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
 | [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |
@@ -11126,7 +11126,7 @@ cells rot within days.
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ **FIRES** | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 98 / 77 / 1542 (was `98 / 78 / 1542`) | ⚠ **FIRES** | **275-04**: `Document` gains optional archived_at / archived_policy_id / archived_policy_name / retrievable / source_state, additive. Seam OWED |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 99 / 78 / 1546 (was `98 / 77 / 1542`) | ⚠ **FIRES** | **281-03** (`0b9841e55`): `EmitFailure` gains `template_fields_missing`, one union member, additive. Seam OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 90 / 65 / 977 (was `89 / 64 / 1002`) | ⚠ **FIRES** | Honoured by construction. **280-01** (D-30): the dead `_patch_postgrest_maybe_single` deleted (−25 L; it wrapped only the Single builder). ⛔ scheduler_service untouched |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 91 / 53 / 1705 (was `90 / 52 / 1698`) | ⚠ **FIRES** | **275-03**: ONE flag `retention_sweep_enabled` (default False); hour, poll, lease stay code constants (D-37). Parity in 4 artifacts, same commit |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
@@ -11136,13 +11136,13 @@ cells rot within days.
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 290 / 65 / 6428 (was `290 / 68 / 6428`) | ⚠ **FIRES** | **275-02/04**: `src/components/retention` DIRECTORY + 9 retention suites pinned; `OrgAdminShell.test.tsx` adopted by FILE (11). ⛔ `scripts/` is gate-exempt |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 5 / 2 / 465 | no (2 phases) | **275-03**: `retention` tag in the Documents group (one line). ⛔ `scripts/` is gate-exempt |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
-| [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
+| [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 18 / 12 / 796 (was `17 / 11 / 788`) | ⚠ **FIRES** | **281-03** (`0b9841e55`): ONE `template_fields_missing` copy entry (never says "citation") + `whitespace-pre-line` on the reason. honoured by construction (200 / 214 / 281) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 4 / 4 / 291 | ⚠ **FIRES** | ⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253; re-derived under CR-08. It crossed the threshold in the very commit that added its row (200) |
 | [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 15 / 7 / 791 | ⚠ **FIRES** | ⚠ row STALE a 2nd time (`12 / 5 / 749`; CLAUDE.md read `14/6/762`). ⚠ absent at 5 phases (added 196). honoured by construction (255 / **256-05**) |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 15 / 5 / 1640 | ⚠ **FIRES** | ⚠ row STALE at `10/4/1191` (+362 lines). honoured by construction (**249-01**): roster widened to 11 + words on 2 EXISTING controls. ⛔ `deprecated` semantics unchanged (D-149-04) |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 12 / 10 / 499 | ⚠ **FIRES** | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 phases |
-| [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 19 / 9 / 1343 (was `17 / 9 / 1289`) | ⚠ **FIRES** | ⚠ row STALE. **281-03** (planned): ONE optional `onOpenRun` prop; the run link renders only when present (D-28). honoured by construction (214 / BUG-260828-09) |
+| [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 20 / 10 / 1372 (was `19 / 9 / 1343`) | ⚠ **FIRES** | **281-03** (`db9fa3cbd`): ONE optional `onOpenRun` prop; the run link renders only when present (D-28); "coming soon" deleted; `HardWall` untouched. honoured by construction (214 / 281) |
 | [`frontend/src/components/workflows/PhaseSpineGraph.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasespinegraphtsx) | 5 / 5 / 473 | ⚠ **FIRES** | honoured by construction (200) |
 | [`frontend/src/components/workflows/phaseDuration.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasedurationts) | 5 / 1 / 525 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/receiptVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsreceiptvocabularyts) | 3 / 1 / 303 | no (1 phase) | young (200) |
@@ -11169,7 +11169,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/decisionsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionsvocabularyts) | 1 / 1 / 226 | no (1 phase) | young (197) |
 | [`frontend/src/components/workflows/DecisionsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionslisttsx) | 4 / 2 / 413 | no (2 phases) | young (197, 199) |
 | [`frontend/src/components/workflows/DraftArrivalCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdraftarrivalcardtsx) | 1 / 1 / 338 | no (1 phase) | young (197) |
-| [`frontend/src/components/workflows/useTemplateFirstDraft.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsusetemplatefirstdraftts) | 6 / 3 / 673 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (**214**) — ⚠ its detail-file ANCHOR did not resolve until this commit |
+| [`frontend/src/components/workflows/useTemplateFirstDraft.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsusetemplatefirstdraftts) | 7 / 4 / 677 (was `6 / 3 / 673`) | ⚠ **FIRES** | **281-02** (`57a668c06`): ONE import + two call-site swaps to `refusalKey(...)` / `REQUEST_FAILED_KEY`. honoured by construction (214 / 281) |
 | [`frontend/src/components/workflows/toolNames.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstoolnamests) | 1 / 1 / 128 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/StepCardSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepcardsectiontsx--stepcardsectioncontextts) | 1 / 1 / 95 | no (1 phase) | young (200) |
 | [`frontend/src/providers/ThemeProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersthemeprovidertsx) | 1 / 1 / 149 | no (1 phase) | young (200) |
@@ -11252,7 +11252,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/publishRefusalVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusalvocabularyts) | 1 / 1 / 290 | no (1 phase) | young (214-10) — pinned at 41 |
 | [`frontend/src/components/workflows/stepActionWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepactionwordsts) | 2 / 1 / 91 | no (1 phase) | young (214) — the action half of a step's identity |
 | [`frontend/src/components/workflows/stepIdentityVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentityvocabularyts) | 1 / 1 / 206 | no (1 phase) | young (214-11) — ⚠ its six PAUSE sentences are consumed by NOTHING (`SEED-219`) |
-| [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 4 / 3 / 812 (was `2 / 2 / 803`) | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row STALE, now FIRES. **281-02** (planned): ONE optional sub-reason field on `GenerateResult` ok:false. honoured by construction. NOT covered by the `lib/api.ts` BARREL row |
+| [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 5 / 4 / 825 (was `4 / 3 / 812`) | ⚠ **FIRES** | **281-02** (`fa08ee6f1`): ONE optional `reason_code?: string \| null` on `GenerateResult` ok:false, additive. honoured by construction. NOT covered by the `lib/api.ts` BARREL row |
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 19 / 11 / 1967 (was `16 / 10 / 1935`) | ⚠ **FIRES** | **273-05**: `onArtifact` SSE branch + `artifacts` carried through the mapper (Array.isArray guard), additive |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 6 / 4 / 748 | ⚠ **FIRES** | ⛔ row was STALE at `4/2/715` reading `no (2 phases)` — re-derived 263 planning. Holds `FullAppSettings`, not only skills. D-263-03 reuses its `POST /skills` caller, adds no endpoint. |
@@ -11293,8 +11293,8 @@ cells rot within days.
 | [`frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestion__tests__ingestionstriptesttsx) | 3 / 3 / 516 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` caused. Pin was UNDER-set 25 vs 30 → 31 |
 | [`backend/app/services/extractors/aspects/vision_text.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsvision_textpy) | 1 / 0 / 367 | no (0 phases) | young (`SEED-226`) — the vision-as-OCR leaf. ⛔ It writes nothing and adds NO dependency; a transcription is stamped `advisory` so it can never pass as a parsed text layer |
 | [`backend/app/services/extractors/aspects/dxf.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsdxfpy) | 2 / 0 / 180 | no (0 phases) | ⚠ absent for its entire life — row added `SEED-226`. It is the only path that READS measurements rather than inferring them (`DIMENSION` values the CAD software computed) |
-| [`frontend/src/components/workflows/publishBlockedStep.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepts) | 0 / 0 / 176 | no (new) | young (`BUG-260828-09`) — the step-face resolver. ⚠ It derives NO second name ladder: `nodeTitle` is called, and `name ?? slug` is the one forbidden edit |
-| [`frontend/src/components/workflows/PublishBlockedStepCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepcardtsx) | 0 / 0 / 101 | no (new) | young (`BUG-260828-09`) — the card a failed publish leads with. ⚠ **G-2 OVERRIDDEN, not satisfied**; jsdom cannot prove what it is for |
+| [`frontend/src/components/workflows/publishBlockedStep.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepts) | 2 / 1 / 183 (was `0 / 0 / 176`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE `BLOCKED_STEP_NEXT_NO_RUN` constant. ⚠ It derives NO second name ladder: `nodeTitle` is called, and `name ?? slug` is the one forbidden edit |
+| [`frontend/src/components/workflows/PublishBlockedStepCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepcardtsx) | 2 / 1 / 109 (was `0 / 0 / 101`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE optional `canOpenRun` flag; next line is `BLOCKED_STEP_NEXT_NO_RUN` when there is no link; the cause keeps its line breaks. ⚠ **G-2 OVERRIDDEN, not satisfied** |
 | [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 6 / 3 / 421 | ⚠ **FIRES** | ⚠ **the row read `5 / 2 / 399 · no (2 phases)` — present and WRONG, the state that stops an audit.** 256 is the THIRD phase; row promoted into CLAUDE.md's firing table by 256-04 |
 | [`backend/app/db/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappdbschedulespy) | 1 / 1 / 359 | no (1 phase) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim; young (204) |
 | [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 7 / 5 / 643 | **FIRES** | ⚠ row STALE at 4/2/608. 247-02: missing_since lifecycle on disappearance/restore; H-5 incomplete listing guard preserved. Seam 2 remains primary writer |
@@ -11532,10 +11532,10 @@ cells rot within days.
 | [`backend/app/utils/db.py`](docs/HOT-FILE-LEDGER.md#backendapputilsdbpy) | 4 / 2 / 76 (was `2 / 2 / 59`) | no (2 phases) | **280-01**: + `maybe_row()` beside `aexec` (0-row-safe `.maybe_single()` read); docstring fixed with the main.py patch deletion (D-30). AST fence: `test_280_maybe_row_fence` |
 | [`backend/app/api/takeoff.py`](docs/HOT-FILE-LEDGER.md#backendappapitakeoffpy) | 2 / 1 / 222 (was `1 / 1 / 221`) | no (1 phase) | **280-01**: 5 `maybe_row` one-liners (DEBT-11), status codes unchanged. Below threshold; no seam proposed |
 | [`backend/app/services/document_purge.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_purgepy) | 2 / 1 / 87 (was `0 / 0 / 0`) | no (young) | young (created 280-01). ⛔ guard → rows → bytes (T-275-12); bytes only for rows the DELETE returned; guard via module attribute (D-31) |
-| [`backend/app/services/harness/emit_cause.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessemit_causepy) | 0 / 0 / 0 | no (young) | young (created 281-01, row added AT PLANNING). The ONE composer of emit-failure causes (D-30). ⛔ pure leaf; never imports phase_types or harness_engine |
-| [`backend/app/services/harness/freshness.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessfreshnesspy) | 1 / 1 / 113 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 281 planning. **281-01**: imports `RETRIEVABLE_COLUMN` (DEBT-07). ⛔ never restates the predicate; no f-string SQL |
-| [`frontend/src/components/workflows/describeRefusalVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescriberefusalvocabularyts) | 0 / 0 / 0 | no (young) | young (created 281-02, row added AT PLANNING). The ONE code→words table for describe-door refusals (SEED-221). ⛔ imports door words, never retypes |
-| [`frontend/src/components/workflows/runVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunvocabularyts) | 9 / 4 / 660 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 4 phases — row added 281 planning. **281-03** (planned): ONE `case` in `failureClause`. honoured by construction |
+| [`backend/app/services/harness/emit_cause.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessemit_causepy) | 1 / 1 / 292 (was `0 / 0 / 0`) | no (young) | young (created 281-01, `0ab03994e`). The ONE composer of emit-failure causes (D-30); a step is named only by its author-set name (D-32). ⛔ pure leaf; never imports phase_types or harness_engine |
+| [`backend/app/services/harness/freshness.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessfreshnesspy) | 2 / 2 / 123 (was `1 / 1 / 113`) | no (2 phases) | **281-01** (`76bbc0601`): both reads gain `AND <RETRIEVABLE_COLUMN>`, imported from retrieval_scope (DEBT-07). honoured by construction. ⛔ never restates the predicate; no f-string SQL |
+| [`frontend/src/components/workflows/describeRefusalVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescriberefusalvocabularyts) | 1 / 1 / 151 (was `0 / 0 / 0`) | no (young) | young (created 281-02, `fa08ee6f1`). The ONE code→words table for describe-door refusals (SEED-221). ⛔ imports door words, never retypes; joins `SWEPT_SOURCES` |
+| [`frontend/src/components/workflows/runVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunvocabularyts) | 10 / 5 / 662 (was `9 / 4 / 660`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE until 281 planning. **281-03** (`0b9841e55`): ONE `case "template_fields_missing"` in `failureClause`. honoured by construction. Seam not proposed |
 
 
 
@@ -20424,7 +20424,8 @@ What it owns. The ONE composer of an emit step's failure cause (FIX-09, BUG-2607
 - **A pure leaf.** stdlib only, no I/O. It never imports `phase_types` or `harness_engine` (the 200-03 one-module-per-concern invariant `phase_types.py`'s section names); an AST test pins it and is driven RED with a planted import.
 - **Callers import it function-locally** (the `harness` package cycle documented at `harness_engine.py` `HumanInputTimeout`).
 - **"citation" appears only for the `uncited` / `invented` kinds.** A cause that never happened is never named.
-- **The string never leads with a step name or slug.** The surface names the step (`nodeTitle`); `step_name` is never backfilled server-side.
+- ~~**The string never leads with a step name or slug.**~~ The surface names the step (`nodeTitle`); `step_name` is never backfilled server-side.
+  ⚠ **CORRECTED 2026-10-14 (281-04) — the step-name half of that invariant was overruled by D-32 (operator, at 281 plan-check), and the original is struck through rather than deleted.** The composed string now leads `Step "<author name>" failed after N attempts:` when the author named the step on the canvas (`PhaseSpec.name`, cleaned by `publish_service._clean_label`), else `This step failed after N attempts:`. **The slug half still holds:** the slug, a backfilled name or a derived name never appears, and `blocked_step.step_name` stays `null`-not-backfilled. Pinned by `test_281_emit_cause.py`'s D-32 arms (`0ab03994e`).
 - **No "fix", no promise, no "soon"/"later"** in any sentence or check line (sketch-findings `run-honesty.md`).
 
 ## `backend/app/services/harness/freshness.py`
@@ -20477,3 +20478,187 @@ Scan-list disposition cell before 281 planning (replaced):
 Scan-list disposition cell before 281 planning (replaced):
 
 > young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL**
+
+## Phase 281 close (2026-10-14, 281-04)
+
+All triples below were re-derived on the merged tree at `3931b0978` (281-01..03 merged; 281-04 changed no source file) with the CLAUDE.md recipe, six-digit quick-task buckets subtracted. The set is every non-test source file plans 01-03 changed since PHASE_BASE `95c62fc83` (`git diff --name-only 95c62fc83 HEAD -- backend/app frontend/src`, tests excluded). ⚠ `backend/app/api/documents.py` is in that diff too, but only through the out-of-phase quick fix BUG-261014-06 (`e422066ca`), whose own section above already re-derived it — 281 did not touch it and it is not re-recorded here. Each section quotes the scan-list cell it replaced and, where the file has one, the CLAUDE.md FIRING verdict cell it replaced, verbatim, so no wording is lost. ⚠ **Two files FIRE and had no CLAUDE.md FIRING row:** `runVocabulary.ts` (5 phases) and `lib/api/knowledge.ts` (4 phases); both rows are added in this commit. `harness_engine.py` carries **OV-281-01**; every other file is honoured by construction.
+
+### `backend/app/services/harness/emit_cause.py` — Phase 281 close
+
+**`1 / 1 / 292` (was `0 / 0 / 0`).** Created by **281-01** (`0ab03994e`, 292 lines, stdlib only). Below threshold (1 phase). The executor, the engine's gate path and the no-validator `fail_phase` branch all call it, so `_failure_reason`, `run_failed.reason`, `blocked_step.cause` and the chat failure message carry one string (D-04). The AST leaf guard was driven RED with a planted import in a tmp_path copy (`281-01-SUMMARY.md`).
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> young (created 281-01, row added AT PLANNING). The ONE composer of emit-failure causes (D-30). ⛔ pure leaf; never imports phase_types or harness_engine
+
+### `backend/app/services/harness/freshness.py` — Phase 281 close
+
+**`2 / 2 / 123` (was `1 / 1 / 113`).** Honoured by construction. **281-01** (`76bbc0601`, +26 / -16): `_NEWEST_SQL` and `_STEMS_SQL` are built by plain concatenation at import with the imported `RETRIEVABLE_COLUMN`, guarded by `assert RETRIEVABLE_COLUMN.isidentifier()`; the `$1` binds are unchanged. `retrieval_scope.py`'s diff against PHASE_BASE is empty. Below threshold (2 phases), so no CLAUDE.md FIRING row.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 281 planning. **281-01**: imports `RETRIEVABLE_COLUMN` (DEBT-07). ⛔ never restates the predicate; no f-string SQL
+
+### `backend/app/services/harness/phase_types.py` — Phase 281 close
+
+**`55 / 28 / 3014` (was `54 / 27 / 2954`).** Honoured by construction. **281-01** (`0ab03994e`, +114 / -54): function-local imports of the leaf and of `publish_service._clean_label`; one `records` list per invocation, appended at each reject and at every terminal return; every failure return carries `attempt_causes`; audit metadata gains additive `emit_rejected.missing_keys` and `emit_failed.attempt`. AST vs PHASE_BASE: def 55 → 55, If 112 → 113, IfExp 20 → 20, Try 10 → 10, loops 18 → 18. The extraction it is owed is neither taken nor obstructed.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> ⚠ row was STALE at `51 / 24 / 2925`; **256-05 does NOT modify it**. extraction TAKEN (200-03) · honoured by construction (211 / 214 / **214.1**) — ⚠ G-5 obligation stays **OWED**
+
+CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
+
+> extraction TAKEN (200-03)
+
+### `backend/app/services/harness_engine.py` — Phase 281 close
+
+**`61 / 24 / 3387` (was `60 / 23 / 3297`).** **281-01** (`7704bd0f6`, +101 / -11): records accumulate across engine attempts; when the executor diagnosed the failure, the composed cause is the `gate_failed` audit `error` (the validator text moves to additive `validator_error`), the SSE `error` and `ctx.retry_feedback` (D-26); `reason_is_final` (keyword-only, default False) threads through `_resolve_failure_with_ask_user` to both `_route_on_failure` calls. AST vs PHASE_BASE: def 30 → 31, If 106 → 107, IfExp 34 → 38. ⚠ **That is 5 new conditional nodes against the plan's cap of 4**; the fifth sits inside the `_attempt_identity` helper the plan asked for. Recorded as **OV-281-01** under `STATE.md → Guardrail overrides (v4.6)`; still no new branch family. Not touched: the escape handler, `cancel_phase`, `finish_run`, the pause arm.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> ⚠ STALE (`58/21/3290`). **268-REVIEW WR-06**: the resume shell carries its run's org — the org read MOVED above the INSERT, one kwarg
+
+CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
+
+> ⚠ STALE · last touch 268-REVIEW WR-06
+
+### `backend/app/services/workflow_authoring.py` — Phase 281 close
+
+**`17 / 11 / 1025` (was `16 / 10 / 1002`).** Honoured by construction. **281-02** (`fa08ee6f1`, +23 / -0): three module constants `CONNECTION_REFUSAL_*` (`no_service_chosen`, `service_not_allowed`, `action_not_allowed`) and one additive `reason_code` key on each of the three `connection_not_allowed` returns in `_check_allowed_connections`. Zero lines removed, so every `error` and `detail` is byte-identical; a failure still never carries `definition`/`readiness`.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> ⚠ row STALE. **281-02** (planned): ONE additive sub-reason key on the 3 `connection_not_allowed` arms. honoured by construction (193.2 / 197 / 214 / 214.1)
+
+CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
+
+> honoured by construction (193.2 / 197 / 214 / **214.1**)
+
+### `frontend/src/components/layout/ChatLayout.tsx` — Phase 281 close
+
+**`61 / 31 / 1137` (was `60 / 30 / 1134`).** Honoured by construction. **281-03** (`2510ffdb7`, +3 / -0): exactly one added non-comment line, `onOpenConnections={() => onNavigate("connections")}`, placed after the pinned `onOpenRun={canvasEnabled ? openRunSurface : undefined}` line (the `ChatLayout.launch.test.tsx` raw pin still matches). `grep -c "useState\|useEffect\|useCallback"` 27 → 27; `onNavigate("settings")` 0 → 0.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> ⚠ STALE (`58/29/1124`). **271-02**: `classification-rules` branch retired; `handleAskInChat` (new thread → prefill → navigate) on the ONE LibraryPage mount
+
+CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
+
+> ⚠ STALE · last touch 271-02
+
+### `frontend/src/components/panel/PhaseCard.tsx` — Phase 281 close
+
+**`18 / 12 / 796` (was `17 / 11 / 788`).** Honoured by construction. **281-03** (`0b9841e55`, +9 / -1): one fixed-copy entry for the new `template_fields_missing` failure value (pinned by a rendered-alert case to contain no "citation") and `whitespace-pre-line` on the reason span, so the server's multi-line cause shows line by line.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214)
+
+CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
+
+> ⚠ row STALE · honoured by construction (200 / 214)
+
+### `frontend/src/components/workflows/PublishBlockedStepCard.tsx` — Phase 281 close
+
+**`2 / 1 / 109` (was `0 / 0 / 101`).** **281-03** (`db9fa3cbd`, +12 / -4): the card gains ONE optional `canOpenRun` flag and shows `BLOCKED_STEP_NEXT` only when it is true, else `BLOCKED_STEP_NEXT_NO_RUN`, so it never names a link that is not there (D-28); the cause paragraph gains `whitespace-pre-line`. Below threshold (one phase bucket; `BUG-260828-09` is a dated bucket).
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> young (`BUG-260828-09`) — the card a failed publish leads with. ⚠ **G-2 OVERRIDDEN, not satisfied**; jsdom cannot prove what it is for
+
+### `frontend/src/components/workflows/PublishGauntlet.tsx` — Phase 281 close
+
+**`20 / 10 / 1372` (was `19 / 9 / 1343`).** Honoured by construction. **281-03** (`db9fa3cbd`, +42 / -13): one optional prop forwarded wrapper → `GauntletContent` → `RunLink` and `PublishBlockedStepCard`; the run arm gained one `if (!onOpenRun) return null` and renders an enabled `▦ Open the golden run that was judged ›` button that hands over the verdict's exact `golden_run_id`. `grep -ci "coming soon"` = 0; `slice(0, 8)` 1 → 0; no changed line matches `hardwall|no-override`.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> ⚠ row STALE. **281-03** (planned): ONE optional `onOpenRun` prop; the run link renders only when present (D-28). honoured by construction (214 / BUG-260828-09)
+
+CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
+
+> honoured by construction (214 / **BUG-260828-09**)
+
+### `frontend/src/components/workflows/describeRefusalVocabulary.ts` — Phase 281 close
+
+**`1 / 1 / 151` (was `0 / 0 / 0`).** Created by **281-02** (`fa08ee6f1`, 151 lines). Below threshold. It joined `WorkflowDoorSwitch.test.tsx`'s `SWEPT_SOURCES` (6 → 7) in its creating commit; the copy fence was driven RED with a planted retyped door word and restored sha256-identical (`281-02-SUMMARY.md`).
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> young (created 281-02, row added AT PLANNING). The ONE code→words table for describe-door refusals (SEED-221). ⛔ imports door words, never retypes
+
+### `frontend/src/components/workflows/publishBlockedStep.ts` — Phase 281 close
+
+**`2 / 1 / 183` (was `0 / 0 / 176`).** **281-03** (`db9fa3cbd`, +7 / -0): one exported constant, the next-step line used when there is no run link. The name ladder is untouched. Below threshold.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> young (`BUG-260828-09`) — the step-face resolver. ⚠ It derives NO second name ladder: `nodeTitle` is called, and `name ?? slug` is the one forbidden edit
+
+### `frontend/src/components/workflows/runVocabulary.ts` — Phase 281 close
+
+**`10 / 5 / 662` (was `9 / 4 / 660`).** Honoured by construction. **281-03** (`0b9841e55`, +2 / -0): one `case "template_fields_missing":` joins the `CLAUSE_FAILED_CHECKS` group of the exhaustive `failureClause` switch. ⚠ **It FIRES (5 phases) and had no CLAUDE.md FIRING row** — added in this commit.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> ⚠ absent its ENTIRE LIFE at 4 phases — row added 281 planning. **281-03** (planned): ONE `case` in `failureClause`. honoured by construction
+
+CLAUDE.md verdict cell: *(none — row added by 281-04)*
+
+### `frontend/src/components/workflows/useTemplateFirstDraft.ts` — Phase 281 close
+
+**`7 / 4 / 677` (was `6 / 3 / 673`).** Honoured by construction. **281-02** (`57a668c06`, +9 / -5): one import from `describeRefusalVocabulary.ts`; the ok:false arm stores `refusalKey(...)` and the thrown arm stores `REQUEST_FAILED_KEY`. No new state.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> honoured by construction (**214**) — ⚠ its detail-file ANCHOR did not resolve until this commit
+
+CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
+
+> honoured by construction (**214**)
+
+### `frontend/src/lib/api/knowledge.ts` — Phase 281 close
+
+**`5 / 4 / 825` (was `4 / 3 / 812`).** Honoured by construction. **281-02** (`fa08ee6f1`, +14 / -1): one optional field on the `ok: false` arm, absent from a pre-fix server, which is why it is optional. ⚠ **It FIRES (4 phases) and had no CLAUDE.md FIRING row** — added in this commit. The next phase that adds a concern here takes a refactor recommendation first.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> ⚠ row STALE, now FIRES. **281-02** (planned): ONE optional sub-reason field on `GenerateResult` ok:false. honoured by construction. NOT covered by the `lib/api.ts` BARREL row
+
+CLAUDE.md verdict cell: *(none — row added by 281-04)*
+
+### `frontend/src/pages/WorkflowBuilderPage.tsx` — Phase 281 close
+
+**`57 / 22 / 2993` (was `56 / 21 / 2977`).** Honoured by construction. **281-02** (`57a668c06`, +21 / -5): one import and one inline `describeRefusal(...)` computation in the generate-error block; the sentence always, the code + server detail in mono only under `showTechnical`. Probes PHASE_BASE → HEAD: `useState` 21 → 21, `useEffect(` 7 → 7, `fetch(` 0 → 0, `dangerouslySetInnerHTML` 0 → 0.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214.1**) — 214.1 added one import + one gated node, zero `useState`
+
+CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
+
+> honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214
+
+### `frontend/src/pages/WorkflowsPage.tsx` — Phase 281 close
+
+**`45 / 18 / 1447` (was `43 / 17 / 1415`).** Honoured by construction. **281-03** (`db9fa3cbd`, `2510ffdb7`; +33 / -1): one new prop (`onOpenConnections`) and two pass-throughs (`onOpenRun` to the gauntlet, `onOpenSettings` to `WorkflowDoorSwitch`), each wrapped in the existing `canLeaveBuilderRef` guard. No new state, ref or hook. The guard cases live in `pages/__tests__/WorkflowsPage.navGuard.test.tsx` (7 cases).
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> the 192 / 192.1 extraction is TAKEN — ⚠ **not a standing `satisfied`**; and `onOpenSettings` is UNWIRED here (`SEED-218`)
+
+CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
+
+> the 192 / 192.1 extraction is TAKEN
+
+### `frontend/src/types/index.ts` — Phase 281 close
+
+**`99 / 78 / 1546` (was `98 / 77 / 1542`).** **281-03** (`0b9841e55`, +6 / -2): one union member. `tsc -p tsconfig.app.json` set diff vs PHASE_BASE is empty, so no other `Record<EmitFailure, …>` consumer needed an edit. The seam stays OWED.
+
+Scan-list disposition cell before 281-04 (replaced):
+
+> **275-04**: `Document` gains optional archived_at / archived_policy_id / archived_policy_name / retrievable / source_state, additive. Seam OWED
+
+CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
+
+> **275-04**: `Document` +5 optional retention fields, additive. Seam OWED
