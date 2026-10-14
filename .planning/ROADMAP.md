@@ -239,7 +239,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 280-03-PLAN.md — wave 2 (TDD, live DB, lock): live RED drives; same-bytes minter — in-flight leg, insert-then-retire, 23505→winner, `already_in_library` (FIX-02, D-01..D-04, D-24/D-25); CR-01 filed first if it reproduces, then fixed without an oracle (D-05/D-26)
+- [x] 280-03-PLAN.md — wave 2 (TDD, live DB, lock): live RED drives; same-bytes minter — in-flight leg, insert-then-retire, 23505→winner, `already_in_library` (FIX-02, D-01..D-04, D-24/D-25); CR-01 filed first if it reproduces, then fixed without an oracle (D-05/D-26)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
