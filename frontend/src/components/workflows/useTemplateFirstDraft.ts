@@ -122,6 +122,9 @@ import {
 // the `TemplateReadAnswer` mistake in a second place — two homes for one server answer.
 import type { GenerateReadiness } from "@/lib/api"
 import type { BuilderPhase, BuilderStore, TemplateAssetDescriptor } from "./builderStore"
+// Phase 281 (FIX-10) — the describe refusal table's KEY builders. A leaf module: it imports
+// only the door vocabulary, so no cycle back to the page or the door shell can form here.
+import { REQUEST_FAILED_KEY, refusalKey } from "./describeRefusalVocabulary"
 import type { TemplatePlaceholdersState } from "@/hooks/useTemplatePlaceholders"
 
 /**
@@ -620,13 +623,14 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
         onDraftedRef.current(def, result.readiness)
       } else {
         // ok:false is an HONEST failure — never a renderable broken draft.
-        store.getState().setErrorState(result.error, result.detail)
+        // Phase 281 (D-11/D-13, SEED-221): the store holds the table KEY (the code joined to its
+        // additive sub-reason), never words; the page turns it into a sentence + next step.
+        store.getState().setErrorState(refusalKey(result.error, result.reason_code), result.detail)
       }
     } catch (e) {
-      store.getState().setErrorState(
-        "Couldn't generate the workflow.",
-        e instanceof Error ? e.message : undefined,
-      )
+      // Phase 281 (D-24): the thrown message may be a server SENTENCE (the plan-tier refusal),
+      // so it rides as the detail of the client-only REQUEST_FAILED_KEY and renders as is.
+      store.getState().setErrorState(REQUEST_FAILED_KEY, e instanceof Error ? e.message : undefined)
     }
     // ⚠ `templateRead` JOINS THE DEPENDENCY LIST, which is why the reading and the wire must
     // live in ONE module: a reading held on the host would either be stale in this closure or
