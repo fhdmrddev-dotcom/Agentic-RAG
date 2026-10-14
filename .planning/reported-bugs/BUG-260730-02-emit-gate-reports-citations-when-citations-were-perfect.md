@@ -144,3 +144,14 @@ on its own.
 - `backend/app/services/harness/validator_kinds.py` — the `deterministic` branch that reports
   `"no field_map on output"`.
 - [[BUG-260730-01]] — the defect whose fix unmasked this one.
+
+## 2026-10-15 — Phase 281 live attempt (281-04, row A): NOT closed
+
+The fix shipped in plans 281-01/02 and is unit-pinned, but the live half (D-06 / D-17) could not be
+read: the live publish of `compliance-gap-report-cim40y` at `33886624f` (drives HEAD; source `3931b0978`) produced golden run
+`e4b3625a-5d4b-4cc2-96db-cf3e54c57bfc`, whose emit step **passed its gate on the first model call**
+(`covers_template: true`, 151/151 cited, zero `emit_rejected` / `emit_failed` rows); publish was then
+refused by the judge stage. **Model passed: no refusal to read** (281-RESEARCH Pitfall 2). The draft
+also had to be bound to a knowledge base to publish at all, so July's unbound conditions are not
+reproducible through today's UI. `status` stays `folded`, `verified_closed_by` stays null. Evidence:
+`.planning/phases/281-a-refusal-names-its-cause/281-LIVE-EVIDENCE.md` § Row A (re-drive recipe there).

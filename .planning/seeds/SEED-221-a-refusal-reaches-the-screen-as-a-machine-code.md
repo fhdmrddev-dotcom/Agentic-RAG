@@ -67,3 +67,13 @@ that fires `BUG-260815-06`'s trigger should weigh both together.
 It surfaced in wave 5's seam audit, after both owning plans had merged. Adding a translation is small,
 but it is a copy decision on a refusal surface, and a fix authored in response to a finding needs its
 own UAT row — which this phase cannot supply, since its own G-4 drive is still owed.
+
+## 2026-10-15 — Phase 281 live attempt (281-04, row C): NOT answered
+
+The translation table shipped (`describeRefusalVocabulary.ts`, plans 281-02) and is unit-pinned, but
+D-19 could not be read live at `33886624f` (drives HEAD; source `3931b0978`): two describe-door drafts with no service ticked
+(`allowed_connection_ids: []`) both came back `could_not_generate` (`model_failed_to_emit`, then
+`provider_error`), so `connection_not_allowed · no_service_chosen` never rendered. Those two refusals
+did render the table's `could_not_generate` sentence and next step, with no code visible while
+technical names were off. That is evidence for the mechanism, not for this seed's code. `status` stays `folded`.
+Evidence: `.planning/phases/281-a-refusal-names-its-cause/281-LIVE-EVIDENCE.md` § Row C.

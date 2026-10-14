@@ -4,7 +4,7 @@ milestone: v4.6
 milestone_name: Pay It Down
 status: executing
 last_updated: "2026-10-14T18:18:26.457Z"
-last_activity: 2026-10-14 -- Phase 281 execution started
+last_activity: 2026-10-15 -- 281-04 Task 3 G-4 drives A-D recorded
 progress:
   total_phases: 14
   completed_phases: 4
@@ -54,6 +54,8 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 
 ## Current Position
 
+**Phase 281 executed 4/4 plans (2026-10-15) — G-4 sign-off (281-04 Task 4) PENDING.** Rows in `.planning/phases/281-a-refusal-names-its-cause/281-LIVE-EVIDENCE.md`, driven at `33886624f`: **A ⛔ OWED** (model passed: golden run `e4b3625a…` completed, emit passed on its first call, and publish was refused by the JUDGE, so there was no emit cause to read; the draft had to be KB-bound to publish, then restored to unbound) · **B ✅ PASS** (no "coming soon"; link opened the judged run, 3 ids equal; failed-step-reason sub-check not exercisable) · **C ⛔ OWED** (drafting model returned `could_not_generate` twice, so `connection_not_allowed` never rendered; the SEED-218 `Connect Linear` click ✅ landed on Connections) · **D ⛔ OWED** (archive write not approved; folder docs all 2026-06-08 vs `max_age_days 2`, so no decisive arrangement without a fresh upload). Flips: BUG-260815-06 → closed (row B); SEED-218 → answered (residual: DOOR_REFUSAL still says "in Settings"); BUG-260730-02 and SEED-221 unchanged, with dated notes. Guardrail overrides: OV-281-01 only (below). **Owed rows, run first: A** (a live emit refusal also unlocks B's sub-check and the D-32 chat half), then C (needs a healthy drafting model), then D (needs operator approval + one fresh upload).
+
 **Phase 281 planned (2026-10-14):** 4 plans / 3 waves (01+02 → 03 → 04 non-autonomous G-4 drives A-D). Research corrected 4 CONTEXT premises → amendments D-24..D-32 (operator). SEED-218 folded; SEED-350/339 deferred. Checker PASSED (iteration 2, 0 blockers). Ledger rows added for emit_cause.py, freshness.py, describeRefusalVocabulary.ts, runVocabulary.ts. Next: `/gsd:execute-phase 281`.
 
 **Phase 281 (2026-10-14):** discuss done — `.planning/phases/281-a-refusal-names-its-cause/281-CONTEXT.md` (D-01..D-23). G-2 sketch skip RECORDED (D-21). Folded: BUG-260730-02, BUG-260815-06 (#4), SEED-221. Left open: BUG-260828-05. G-4 scenarios A-D operator-named. No migration expected. Next: `/gsd:plan-phase 281` (re-run the seeds sweep there).
@@ -63,9 +65,9 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: 281 (a-refusal-names-its-cause) — EXECUTING
 Next: deploy proposal (operator-gated) — D-18 cloud READ done: 0. Record: `279-SEED-328-RECORD.md`; UAT: `279-UAT-LOG.md` (rows 1a-5 ✅) + REVIEW-FIX WR-05 live row ✅; 4-axis: `279-VALIDATION.md`. SEED-328 → `status: answered`.
-Plan: 1 of 4
+Plan: 4 of 4 (281-04 Task 4: operator G-4 sign-off pending)
 Status: Executing Phase 281
-Last activity: 2026-10-14 -- Phase 281 execution started
+Last activity: 2026-10-15 -- 281-04 Task 3 G-4 drives A-D recorded (B pass; A/C/D owed)
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
 
 **279-03 (2026-10-13):** "Won't use" → "Won't search" (29 hits / 13 files measured, not 30), swap-card
