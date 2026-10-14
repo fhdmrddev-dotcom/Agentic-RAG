@@ -137,6 +137,72 @@ Success criteria are ROADMAP Phase 280 SC#1-5. "How we'd know this failed" is in
 - **D-22:** Deploy parity: no migration is expected. `WATCH_PROCESS_ENABLED` and `RETENTION_SWEEP_ENABLED` stay as they are in production.
 - **D-23:** Plans target **4** (G-8): same-bytes minter + CR-01 · Graph adapter pins + live re-drive · purge helper extraction + bytes + 404 sweep · DEBT-08 record + docs + close.
 
+### Refinements after research (2026-10-14): Claude's autonomous rulings; the operator was away and may overrule
+`280-RESEARCH.md` measured four places where the decisions above rest on a wrong fact. Each ruling
+takes the researcher's recommendation and stays inside the decision's intent. **None adds a user
+capability or a migration.**
+- **D-24 (refines D-02):** the **in-flight** dedup check is **folder-agnostic**: user + hash +
+  `status <> 'failed'` + `is_latest` (+ org when passed). This is the shape of the live leg of
+  `workspace_promote.find_existing_copy`. Why: under D-02's literal folder scope, same bytes uploaded
+  to a different folder while the first copy is pending still retire it, and the second copy then
+  fails at completion on `documents_completed_hash_unique_idx` (which has no folder column). That is
+  exactly SC#1's failure mode.
+  - The 23505 re-query stays scoped exactly as the index that fired.
+  - **Accepted residual, recorded rather than built around:** two *truly concurrent* inserts into
+    different folders both pass. The one that completes second fails at completion. Closing that
+    needs a constraint, which means a migration.
+  - **Side effect to state in the plan:** `expert_install` now raises `ExpertInstallConflict` for an
+    in-flight copy in another folder, as it already does for a completed one.
+- **D-25 (refines D-03):** the retire runs only after the INSERT succeeds and is scoped
+  `.neq("id", new_id).lt("version_number", next_version)`, with the org taken from the inserted row
+  when `org_id` was not passed. Why: excluding only the new id lets two concurrent new versions retire
+  each other, leaving zero latest rows. Taking the org from the inserted row also closes a latent
+  cross-org retire on `/upload`.
+  - A retire failure is logged and never loses the inserted row.
+  - `documents_latest_idx` is measured **non-unique**, so insert-first is safe with no migration.
+- **D-26 (resolves D-05 for `/upload`):** when `org_id is None` and a folder is given, the minter
+  checks that the caller is a member of `folder.org_id` and then mints with
+  `org_id = folder.org_id` explicitly.
+  - A non-member, or a folder org that differs from an explicitly passed `org_id`, gets the
+    identical `404 "Folder not found"`.
+  - Why: `/upload`'s "minting org" is otherwise picked by a `LIMIT 1` trigger with no `ORDER BY`, so
+    "equal to the minting org" is undefined.
+  - The drive is a live integration test with a seeded two-org GoTrue user, because the dev account
+    owns 0 folders and the UI path cannot produce the mismatch.
+  - D-05's "file the bug first if it reproduces" stands.
+- **D-27 (corrects D-14/D-15's drive shape):** the watch lists at `page_size=30`, not 100 (`:272` is
+  the folder picker), and it is **non-recursive**. The drive therefore uses:
+  - `Team Docs/` holding **95** top-level files (4 pages at 30), one of them with a space in its name;
+  - `Team Docs/Q3 Plans/` holding **10** files (105 total, as in D-14);
+  - **watch A** on `/Team Docs` (proves paging, `listing_complete`, and depth-1 paths);
+  - **watch B** on `/Team Docs/Q3 Plans` (proves the decoded depth-2 path with a space).
+
+  Still **no knob and the shipped config untouched**. The operator approves before the drive. If the
+  operator is unavailable, the row is recorded as **owed**, never as passed.
+- **D-28 (adds to FIX-04):** the Graph item ids that reach `_children_url` and `read_file`
+  (client-supplied through browse, `WatchCreateRequest.source_folder_id` and import file ids) go
+  through one `_item_segment(id)` helper. It refuses empty, `.` and `..`, and returns
+  `quote(id, safe="!")`.
+  - Measured: httpx collapses `../` and a `?` changes which endpoint is called. This is the class
+    WR-01 fixed for search.
+  - The cursor-prefix check is **not** tightened (A3).
+- **D-29 (refines D-08):** **22** unguarded sites, not 21. `ingest_splice.py:422` is the extra one; a
+  broad `except` masks it. It is fixed too, so the fence needs no exemption.
+- **D-30 (resolves D-10):** the `main.py:66-88` patch is **proven dead**: wrong class, the "204"
+  code appears nowhere in postgrest 2.29.0, and `.single()` on 0 rows raises PGRST116. Delete it in a
+  behaviour-neutral commit with that evidence, and update the docstring at `app/utils/db.py:6-9` in
+  the same commit.
+- **D-31 (refines D-11):** the purge helper takes `file_path`s from the **DELETE's own returned
+  rows**, so only rows actually deleted lose bytes (no TOCTOU).
+  - It calls `hold_guard.assert_none_held` / `map_hold_refusal` **through the module attribute**,
+    because a direct import makes the monkeypatched guard tests vacuous.
+  - The two `test_275_delete_paths.py` order pins gain `storage.remove`, amended deliberately with
+    the reason written in the test.
+  - SC#3 evidence is **per path** (local storage already holds 35 orphans), never a global count.
+- **UI gate:** the ROADMAP text matches the UI keyword regex only through "page"/"pages" (pagination).
+  This phase adds no UI surface, so UI-SPEC is skipped (`--skip-ui` equivalent). DEBT-08's frontend
+  work is one assertion in an existing test.
+
 ### Claude's Discretion
 - The helper names and module paths (D-08, D-11), the internal docs file for D-07, and whether the 404 helper lives next to the existing supabase utilities.
 - Whether the frontend shows a note for `already_in_library` (D-01), using existing toast/copy patterns only.
