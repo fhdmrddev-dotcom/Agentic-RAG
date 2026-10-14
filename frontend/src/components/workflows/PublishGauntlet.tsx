@@ -129,6 +129,17 @@ export interface PublishGauntletProps {
    */
   onRunningChange?: (running: boolean) => void
   /**
+   * Phase 281-03 (FIX-10, D-08 / D-28) — open the golden run that was judged, by its id.
+   *
+   * OPTIONAL AND ADDITIVE, and its absence is a decision rather than a default: it is absent
+   * when the canvas layer is off, because the run room it would open does not exist then — and
+   * the run link is then NOT RENDERED at all (the SEED-190 `RunLogPanel` precedent: a dead
+   * control is worse than an absent one). Present ⇒ the link is an enabled control handing this
+   * the verdict's exact `golden_run_id`; the run page opens at the top (D-29, step focus
+   * deferred). Absent ⇒ every call site renders exactly what it did, minus the old promise.
+   */
+  onOpenRun?: (runId: string) => void
+  /**
    * Phase 184-11 (R12, sketch 141-B) — WHY publish cannot be attempted yet, in the
    * author's own words, or absent/null when it can.
    *
@@ -376,21 +387,28 @@ function VerdictFields({ verdict }: { verdict: PublishVerdict }) {
   )
 }
 
-/** The "view the golden run" link, gated on golden_run_id != null; else the note.
- *  IR-02: the run-surface route is deferred (D-103-A → 103.1/104), so this is NOT
- *  yet navigable. Render it as a disabled button (not an <a href="#"> that scrolls
- *  to top) with an honest "coming soon" title — no dead affordance. */
-function RunLink({ goldenRunId }: { goldenRunId: string | null }) {
+/** The "open the golden run" link, gated on golden_run_id != null; else the note.
+ *  Phase 281-03 (D-08 / D-28 / D-29): the link opens the run that was judged, by its exact
+ *  id, and renders ONLY when the caller passed `onOpenRun` — absent (canvas layer off) ⇒ no
+ *  control and no promise in its place. The label names no id fragment and promises no title;
+ *  the run page opens at the top (step focus is deferred). */
+function RunLink({
+  goldenRunId,
+  onOpenRun,
+}: {
+  goldenRunId: string | null
+  onOpenRun?: (runId: string) => void
+}) {
   if (goldenRunId != null) {
+    if (!onOpenRun) return null
     return (
       <button
         type="button"
         data-testid="run-link"
-        disabled
-        title="Run view coming soon — the golden-run surface lands in a later phase (D-103-A)."
-        className="mt-4 inline-flex cursor-not-allowed items-center gap-2 rounded border border-primary/40 bg-primary/10 px-3 py-1.5 text-[12px] font-semibold text-primary opacity-70"
+        onClick={() => onOpenRun(goldenRunId)}
+        className="mt-4 inline-flex items-center gap-2 rounded border border-primary/40 bg-primary/10 px-3 py-1.5 text-[12px] font-semibold text-primary transition-colors hover:bg-primary/20"
       >
-        ▦ Golden run that was judged · {goldenRunId.slice(0, 8)}… (view coming soon)
+        ▦ Open the golden run that was judged ›
       </button>
     )
   }
@@ -681,6 +699,7 @@ function GauntletContent({
   blocked,
   blockedReason,
   onCancel,
+  onOpenRun,
 }: {
   definitionId: string
   definition?: DefShape | null
@@ -697,6 +716,8 @@ function GauntletContent({
    *  the sheet's footer Cancel inherits the "never close mid-publish" guard rather than
    *  becoming a second, unguarded exit. */
   onCancel: () => void
+  /** Phase 281-03 — the wrapper's `onOpenRun`, forwarded verbatim (see its docblock). */
+  onOpenRun?: (runId: string) => void
 }) {
   const [goldenInput, setGoldenInput] = useState("")
   const [outcome, setOutcome] = useState<PublishOutcome | null>(null)
@@ -876,7 +897,11 @@ function GauntletContent({
           which is exactly what makes the effect above fall through to the headline. */}
       {blockedStepOf(verdict?.blocked_step) != null && (
         <div ref={causeAnchorRef} tabIndex={-1} className="scroll-mt-2 outline-none">
-          <PublishBlockedStepCard step={verdict?.blocked_step} definition={definition} />
+          <PublishBlockedStepCard
+            step={verdict?.blocked_step}
+            definition={definition}
+            canOpenRun={onOpenRun != null}
+          />
         </div>
       )}
 
@@ -1136,9 +1161,11 @@ function GauntletContent({
                 </div>
               )}
 
-              {/* The run link gates on golden_run_id != null. */}
-              {!isSuccess && <RunLink goldenRunId={verdict.golden_run_id} />}
-              {isSuccess && verdict.golden_run_id != null && <RunLink goldenRunId={verdict.golden_run_id} />}
+              {/* The run link gates on golden_run_id != null, and (281-03) on onOpenRun. */}
+              {!isSuccess && <RunLink goldenRunId={verdict.golden_run_id} onOpenRun={onOpenRun} />}
+              {isSuccess && verdict.golden_run_id != null && (
+                <RunLink goldenRunId={verdict.golden_run_id} onOpenRun={onOpenRun} />
+              )}
 
               {/* The judge / any block is a HARD WALL — no override, only Fix & re-publish. */}
               {isBlock && <HardWall onFix={() => setOutcome(null)} />}
@@ -1165,6 +1192,7 @@ export function PublishGauntlet({
   onPublished,
   blockedReason,
   onRunningChange,
+  onOpenRun,
 }: PublishGauntletProps) {
   const [open, setOpen] = useState(false)
   // Phase 184-11 (R12): the reason's id, so `aria-describedby` can point at it. `useId`
@@ -1333,6 +1361,7 @@ export function PublishGauntlet({
                 blocked={blocked}
                 blockedReason={blockedReason}
                 onCancel={requestClose}
+                onOpenRun={onOpenRun}
               />
             </div>
           </div>

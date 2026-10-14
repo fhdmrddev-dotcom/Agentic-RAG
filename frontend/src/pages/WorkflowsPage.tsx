@@ -955,6 +955,19 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPagePro
                   // (already supplied by the Builder's renderPublish) into the prepended
                   // pub-scale soul block. Additive only — zero change to the publish flow.
                   definition={_def as DefShape}
+                  // Phase 281-03 (D-10 / D-28): the golden-run link. `onOpenRun` is
+                  // `openRunSurface`, app-level navigation that bypasses the Builder's own
+                  // leave prompt — so it passes the SAME unsaved-work guard the breadcrumb
+                  // uses first, and adds no state. Absent (canvas layer off) ⇒ `undefined`,
+                  // and the gauntlet then renders no link at all.
+                  onOpenRun={
+                    onOpenRun
+                      ? (id: string) => {
+                          if (canLeaveBuilderRef.current !== null && !canLeaveBuilderRef.current()) return
+                          onOpenRun(id)
+                        }
+                      : undefined
+                  }
                   onPublished={(version) =>
                     // WR-04: the definition's own slug is the lookup key (the loaded
                     // definition carries it for Open/Tweak; the just-built draft
