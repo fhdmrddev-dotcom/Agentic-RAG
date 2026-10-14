@@ -106,6 +106,11 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 |---|-------------|------|--------|-----------|
 | 261012-x1l | fix 277-REVIEW WR-01 (size hook leads with STOP/WARNING when ledger findings exist) + WR-08 (uniform `· ⛔` marker on 66 moved FIRING cells + legend) | 2026-10-12 | 30d659415 | [261012-x1l-fix-review-warnings-wr-01-and-wr-08-from](./quick/261012-x1l-fix-review-warnings-wr-01-and-wr-08-from/) |
 | fast 2026-10-13 | landing drift: `facts.ts` BUILTIN_TOOL_COUNT 29 → 30 (+ `Artifacts` group for `show_artifact`); landing vitest 53/53 | 2026-10-13 | 6ba316b6a | — |
+| fast 2026-10-14 | BUG-261014-06: Library read 0 documents at 286 (`414 URI too long`) — `list_documents` count reads batched at 100 ids. **Stopgap, develop only**: the operator held the prod hotfix ("a sustainable solution not a batch"); Phase 284 replaces it | 2026-10-14 | e422066ca | — |
+
+### Roadmap Evolution
+
+- Phase 284 added 2026-10-14: **Library at Scale** (FIX-11) — server-paged list, server-side counts, no growing id lists; from BUG-261014-06 + BUG-261014-07 (every document list silently capped at 1,000 rows).
 
 ### Owed to the operator (carried from v4.5)
 
