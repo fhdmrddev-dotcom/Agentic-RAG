@@ -270,7 +270,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 281-03-PLAN.md — wave 2 (TDD, frontend): golden-run link by `onOpenRun` presence + leave guard, no "coming soon" (D-07/D-08/D-28/D-29); gated next line; pre-line cause; `template_fields_missing` copy on PhaseCard / runVocabulary; SEED-218 connect control → Connections (D-27)
+- [x] 281-03-PLAN.md — wave 2 (TDD, frontend): golden-run link by `onOpenRun` presence + leave guard, no "coming soon" (D-07/D-08/D-28/D-29); gated next line; pre-line cause; `template_fields_missing` copy on PhaseCard / runVocabulary; SEED-218 connect control → Connections (D-27)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
