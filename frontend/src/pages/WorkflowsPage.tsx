@@ -251,6 +251,15 @@ interface WorkflowsPageProps {
    * constructs no run route of its own, exactly as it constructs no launch route of its own.
    */
   onOpenRun?: (runId: string) => void
+  /**
+   * Phase 281-03 (D-27 / SEED-218) — where the describe door's "Connect …" control goes.
+   *
+   * It goes to the UNGOVERNED Connections door a member can open, never to `settings`, which
+   * is operator-only (the `ChatLayout` composer-flyout rule). Handed to `WorkflowDoorSwitch` as
+   * its `onOpenSettings` through the same unsaved-work guard the breadcrumb uses. ABSENT ⇒ the
+   * door gets `undefined` and its picker keeps rendering a plain span, not a dead control.
+   */
+  onOpenConnections?: () => void
 }
 
 /**
@@ -282,7 +291,7 @@ type PageView = "library" | "builder" | "run-log"
  */
 type SourceState = "pending" | "ok" | "failed"
 
-export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPageProps) {
+export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections }: WorkflowsPageProps) {
   // Phase 184.1-01: does this page host the Builder's chrome, or has the Builder taken it?
   // Fail-closed and read through the shared rule — see `useCanvasGate`'s docblock for why
   // an ancestor has to ask at all (the three bands are contributed at three nesting levels).
@@ -921,6 +930,16 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPagePro
             // Phase 184-11 (D-184-16 debt 1): the Builder registers its unsaved-work
             // predicate here; the breadcrumb above consults it.
             registerCanLeave={registerCanLeave}
+            // Phase 281-03 (D-27 / SEED-218): the describe refusal's connect control. Leaves
+            // only through the same unsaved-work guard; absent ⇒ `undefined` (today's span).
+            onOpenSettings={
+              onOpenConnections
+                ? () => {
+                    if (canLeaveBuilderRef.current !== null && !canLeaveBuilderRef.current()) return
+                    onOpenConnections()
+                  }
+                : undefined
+            }
             // Phase 200.3 (SEED-164 / D-03): Test Run from builder header
             onTestRun={async (_def, draftId) => {
               if (onLaunch && _def) {
