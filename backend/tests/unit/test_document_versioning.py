@@ -111,17 +111,22 @@ class TestDocumentVersioning:
             "updated_at": "2026-04-12T00:00:00",
         }
 
+        # ⚠ Phase 280 (FIX-02 / BUG-261005-01): re-pinned deliberately. The minter gained an
+        #   in-flight dedup select after the completed one, and the is_latest retire moved AFTER
+        #   the insert (it used to run before it and retire an in-flight same-bytes copy).
         # Sequential execute() calls:
         # 1. folder_id check — skipped (no folder_id)
-        # 2. dedup check (content_hash, is_latest=True) — empty (new content)
-        # 3. existing_versions check (filename) — returns version 1
-        # 4. update is_latest=False
+        # 2. dedup check (content_hash, completed) — empty (new content)
+        # 3. in-flight dedup check (non-failed, is_latest) — empty
+        # 4. existing_versions check (filename) — returns version 1
         # 5. insert new doc row
+        # 6. update is_latest=False (after the insert)
         builder.execute.side_effect = [
             _make_result([]),           # dedup check: no match
+            _make_result([]),           # in-flight check: no match
             _make_result([{"id": DOC_V1_ID, "version_number": 1}]),  # existing version
-            _make_result([]),           # update is_latest=False
             _make_result([inserted_doc]),  # insert new doc
+            _make_result([]),           # update is_latest=False
         ]
 
         app.dependency_overrides[get_current_user] = lambda: MOCK_USER
@@ -186,12 +191,17 @@ class TestDocumentVersioning:
             "updated_at": "2026-04-12T00:00:00",
         }
 
+        # ⚠ Phase 280 (FIX-02 / BUG-261005-01): re-pinned deliberately. The minter gained an
+        #   in-flight dedup select after the completed one, and the is_latest retire moved AFTER
+        #   the insert (it used to run before it and retire an in-flight same-bytes copy).
         # Sequential execute() calls:
         # 1. dedup check — empty (brand new)
-        # 2. existing_versions — empty (never uploaded)
-        # 3. insert doc row
+        # 2. in-flight dedup check — empty
+        # 3. existing_versions — empty (never uploaded)
+        # 4. insert doc row
         builder.execute.side_effect = [
             _make_result([]),            # dedup: no match
+            _make_result([]),            # in-flight: no match
             _make_result([]),            # existing_versions: no previous
             _make_result([inserted_doc]),  # insert
         ]
@@ -254,11 +264,15 @@ class TestDocumentVersioning:
 
         # Dedup returns empty because is_latest=True filter excludes the stale row
         # Upload proceeds: checks existing versions, updates old, inserts new
+        # ⚠ Phase 280 (FIX-02 / BUG-261005-01): re-pinned deliberately. The minter gained an
+        #   in-flight dedup select after the completed one, and the is_latest retire moved AFTER
+        #   the insert (it used to run before it and retire an in-flight same-bytes copy).
         builder.execute.side_effect = [
             _make_result([]),            # dedup: empty (stale filtered out by is_latest=True)
+            _make_result([]),            # in-flight: empty
             _make_result([{"id": DOC_V1_ID, "version_number": 1}]),  # existing version
-            _make_result([]),            # update is_latest=False
             _make_result([inserted_doc]),  # insert new
+            _make_result([]),            # update is_latest=False (after the insert)
         ]
 
         app.dependency_overrides[get_current_user] = lambda: MOCK_USER

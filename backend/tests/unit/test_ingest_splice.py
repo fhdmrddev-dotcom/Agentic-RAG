@@ -196,8 +196,11 @@ def test_mint_document_row_versioning_cascade():
     supabase = _build_mock_supabase()
     existing_version_row = {"id": DOC_ID_1, "version_number": 2}
     # 1. Dedup select -> empty
-    # 2. Versions select -> returns existing_version_row
+    # 2. In-flight select -> empty  (Phase 280 FIX-02: new leg; the retire now runs AFTER the
+    #    insert, so the update assertion below still holds — it is just issued later)
+    # 3. Versions select -> returns existing_version_row
     supabase._tables["documents"]._select.execute.side_effect = [
+        _make_result([]),
         _make_result([]),
         _make_result([existing_version_row]),
     ]
@@ -226,7 +229,12 @@ def test_mint_document_row_versioning_cascade():
 
 
 def test_mint_document_row_unique_violation_raise():
-    """Unique index collision (23505) with on_conflict='raise' raises HTTP 409 Conflict."""
+    """Unique index collision (23505) with on_conflict='raise' and NO winner found raises HTTP 409.
+
+    ⚠ Phase 280 (FIX-02 / D-02) relabel: this is now the "winner not found" FALLBACK. A 23505
+    re-queries the winning row for BOTH on_conflict modes and returns it as a duplicate; the 409
+    survives only when that re-query finds nothing, which is what this mock (every select []) is.
+    """
     supabase = _build_mock_supabase()
     supabase._tables["documents"]._select.execute.return_value = _make_result([])
     supabase._tables["documents"]._insert.execute.side_effect = Exception("error: 23505: duplicate key value violates unique constraint")
@@ -256,9 +264,11 @@ def test_mint_document_row_unique_violation_link():
         "version_number": 1,
     }
     # 1. Dedup select -> empty (since existing is pending, not completed)
-    # 2. Version select -> empty
-    # 3. Link select (after 23505) -> returns linked_doc
+    # 2. In-flight select -> empty (Phase 280 FIX-02: the concurrent winner was not yet visible)
+    # 3. Version select -> empty
+    # 4. Link select (after 23505) -> returns linked_doc
     supabase._tables["documents"]._select.execute.side_effect = [
+        _make_result([]),
         _make_result([]),
         _make_result([]),
         _make_result([linked_doc]),

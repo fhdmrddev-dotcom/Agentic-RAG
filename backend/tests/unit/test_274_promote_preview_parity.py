@@ -76,6 +76,13 @@ class _Query:
         self._filters.append(lambda r: r.get(col) is None)
         return self
 
+    def lt(self, col, val):
+        # Phase 280 (FIX-02 / D-25): the minter's retire is now scoped .lt("version_number", …).
+        # Without this the retire raised AttributeError, which the minter logs and survives — so
+        # these cases would have stayed green while the retire never ran.
+        self._filters.append(lambda r: r.get(col) is not None and r.get(col) < val)
+        return self
+
     def order(self, col, desc=False):
         self._order = (col, desc)
         return self
@@ -120,9 +127,11 @@ class _FakeSupabase:
 
 def _db(*docs: dict) -> dict:
     return {
+        # Phase 280 (CR-01 / BUG-261014-01, D-26): the minter refuses a folder whose org differs
+        # from the minting org, and `folders.org_id` is NOT NULL — so the fake carries it.
         "folders": [
-            {"id": FOLDER_A, "user_id": USER},
-            {"id": FOLDER_B, "user_id": USER},
+            {"id": FOLDER_A, "user_id": USER, "org_id": ORG},
+            {"id": FOLDER_B, "user_id": USER, "org_id": ORG},
         ],
         "documents": [copy.deepcopy(d) for d in docs],
     }
@@ -198,6 +207,9 @@ async def test_parity_same_name_same_folder_is_the_next_version():
     assert preview.duplicate_of is None
     assert preview.next_version == 2
     assert mint.is_duplicate is False and mint.version_number == 2
+    # Phase 280: the retire now runs AFTER the insert and is caught-and-logged on failure, so a
+    # fake missing `lt` kept this case green with the retire never running. Assert it ran.
+    assert next(d for d in db["documents"] if d["id"] == "doc-v1")["is_latest"] is False
     _assert_parity(preview, mint)
 
 

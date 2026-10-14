@@ -37,7 +37,8 @@ HASH = hashlib.sha256(RAW).hexdigest()
 FILENAME = "acme_q3_2026_financial_report.md"
 MIME = "text/markdown"
 
-_FILTERS = ("eq", "neq", "is_")
+# Phase 280 (FIX-02): "lt" added — the retire is now scoped .lt("version_number", next_version).
+_FILTERS = ("eq", "neq", "is_", "lt")
 
 
 class _Result:
@@ -64,6 +65,7 @@ class _Site:
     eq = _rec("eq")
     neq = _rec("neq")
     is_ = _rec("is_")
+    lt = _rec("lt")
     order = _rec("order")
     limit = _rec("limit")
     maybe_single = _rec("maybe_single")
@@ -78,6 +80,8 @@ class _Site:
                 return False
             if name == "is_" and a[1] == "null" and row.get(a[0]) is not None:
                 return False
+            if name == "lt" and not (row.get(a[0]) is not None and row.get(a[0]) < a[1]):
+                return False
         return True
 
     def filters(self) -> list[tuple]:
@@ -88,6 +92,10 @@ class _Site:
 
     def execute(self):
         if self.kind == "insert":
+            if self.db.insert_winner is not None:
+                # Phase 280: a CONCURRENT request's row lands just before ours (the race).
+                self.db.rows.append(dict(self.db.insert_winner))
+                self.db.insert_winner = None
             if self.db.insert_error is not None:
                 raise self.db.insert_error
             self.db.rows.append(dict(self.arg))
@@ -126,10 +134,11 @@ class _FakeTable:
 
 
 class _FakeDB:
-    def __init__(self, rows=None, insert_error: Exception | None = None):
+    def __init__(self, rows=None, insert_error: Exception | None = None, insert_winner: dict | None = None):
         self.rows: list[dict] = [dict(r) for r in (rows or [])]
         self.sites: list[_Site] = []
         self.insert_error = insert_error
+        self.insert_winner = insert_winner
 
     def table(self, name):
         assert name == "documents", f"unexpected table {name!r}"
@@ -147,9 +156,17 @@ class _FakeDB:
     def retire_site(self) -> _Site:
         return next(s for s in self.sites if s.kind == "update" and s.arg == {"is_latest": False})
 
-    def link_site(self) -> _Site:
+    def inflight_site(self) -> _Site:
+        """Phase 280 (FIX-02 / D-24): the in-flight leg — non-failed AND is_latest, any folder."""
         return next(s for s in self.sites if s.kind == "select" and s.arg == "*"
-                    and ("neq", ("status", "failed")) in s.filters())
+                    and ("eq", ("is_latest", True)) in s.filters())
+
+    def link_site(self) -> _Site:
+        # Phase 280: the in-flight leg also filters neq status failed; the 23505 re-query is the
+        # one WITHOUT is_latest.
+        return next(s for s in self.sites if s.kind == "select" and s.arg == "*"
+                    and ("neq", ("status", "failed")) in s.filters()
+                    and ("eq", ("is_latest", True)) not in s.filters())
 
 
 def _row(**over) -> dict:
@@ -183,12 +200,24 @@ def _mint(db: _FakeDB, org_id: str | None, on_conflict: str = "raise"):
 
 
 def _all_sites_db(org: str | None) -> _FakeDB:
-    """A row that misses dedup (pending), hits versioning (same filename) and is found by the
-    link re-query after a 23505 — so ONE mint call reaches all four sites."""
+    """An earlier version (other bytes, same filename) hits versioning; a CONCURRENT request's
+    pending copy of the same bytes lands at insert time, so the insert 23505s and the re-query
+    finds it — ONE mint call reaches dedup, in-flight, version, insert and the re-query.
+
+    ⚠ Phase 280 (FIX-02 / BUG-261005-01) re-pin: this used to seed the pending copy UP FRONT, which
+    the new in-flight leg now (correctly) returns before any other query. And the is_latest retire
+    now runs only after a SUCCESSFUL insert, so site (c) is reached by `_retire_db` below."""
     return _FakeDB(
-        rows=[_row(org_id=org, status="pending")],
+        rows=[_row(id="v0", org_id=org, content_hash="older-bytes", status="completed")],
         insert_error=Exception("duplicate key value violates unique constraint (23505)"),
+        insert_winner=_row(org_id=org, status="pending"),
     )
+
+
+def _retire_db(org: str | None) -> _FakeDB:
+    """An earlier version with other bytes and the same filename; the insert succeeds, so the
+    retire (site c) runs — after the insert (Phase 280, D-03)."""
+    return _FakeDB(rows=[_row(id="v0", org_id=org, content_hash="older-bytes", status="completed")])
 
 
 # ---------------------------------------------------------------------------------------------
@@ -203,8 +232,12 @@ def test_every_site_is_org_scoped_when_org_is_passed():
 
     assert db.dedup_site().has_org(ORG_A), "(a) dedup select is not org-scoped"
     assert db.version_site().has_org(ORG_A), "(b) version lookup is not org-scoped"
-    assert db.retire_site().has_org(ORG_A), "(c) is_latest retirement is not org-scoped"
     assert db.link_site().has_org(ORG_A), "(d) on_conflict='link' re-query is not org-scoped"
+    assert db.inflight_site().has_org(ORG_A), "(e, Phase 280) in-flight leg is not org-scoped"
+
+    retire = _retire_db(ORG_A)
+    _mint(retire, ORG_A, on_conflict="link")
+    assert retire.retire_site().has_org(ORG_A), "(c) is_latest retirement is not org-scoped"
 
 
 # ---------------------------------------------------------------------------------------------
@@ -212,6 +245,16 @@ def test_every_site_is_org_scoped_when_org_is_passed():
 # ---------------------------------------------------------------------------------------------
 
 # The call sequence mint_document_row issued at the phase base (522e7b4fc) for this scenario.
+#
+# ⚠ RE-PINNED IN PHASE 280 (FIX-02 / BUG-261005-01), deliberately and in the same commit as the
+#   minter change. At 522e7b4fc the sequence was: completed dedup → version → UPDATE is_latest=false
+#   → insert → link re-query. That retire-BEFORE-insert is the defect: a same-bytes second upload
+#   retired the in-flight copy and then hit 23505 (409 on raise; the just-retired copy on link).
+#   Now: completed dedup → IN-FLIGHT select (non-failed + is_latest, any folder — D-24) → version
+#   READ → insert → (23505) re-query for BOTH raise and link. The retire runs only after a
+#   SUCCESSFUL insert, scoped neq(id)/lt(version_number) — pinned by
+#   `test_upload_path_retires_only_after_a_successful_insert` below. /upload still issues no
+#   org predicate on any query.
 _BASE_SEQUENCE = [
     ("select", "*", [
         ("eq", ("user_id", USER), {}),
@@ -219,15 +262,19 @@ _BASE_SEQUENCE = [
         ("eq", ("status", "completed"), {}),
         ("limit", (1,), {}),
     ]),
+    ("select", "*", [
+        ("eq", ("user_id", USER), {}),
+        ("eq", ("content_hash", HASH), {}),
+        ("neq", ("status", "failed"), {}),
+        ("eq", ("is_latest", True), {}),
+        ("order", ("created_at",), {"desc": True}),
+        ("limit", (1,), {}),
+    ]),
     ("select", "id, version_number", [
         ("eq", ("user_id", USER), {}),
         ("eq", ("filename", FILENAME), {}),
         ("order", ("version_number",), {"desc": True}),
         ("limit", (1,), {}),
-    ]),
-    ("update", {"is_latest": False}, [
-        ("eq", ("user_id", USER), {}),
-        ("eq", ("filename", FILENAME), {}),
     ]),
     ("insert", None, []),
     ("select", "*", [
@@ -252,6 +299,22 @@ def test_upload_path_without_org_issues_the_base_queries_exactly():
     assert issued == _BASE_SEQUENCE
     for s in db.sites:
         assert not any(n == "eq" and a[0] == "org_id" for n, a in s.filters()), s.kind
+
+
+def test_upload_path_retires_only_after_a_successful_insert():
+    """Phase 280 (FIX-02 / D-03 / D-25): the retire is the LAST call, after the insert, and is
+    scoped to exclude the new row and any concurrent same-version row."""
+    db = _retire_db(None)
+    res = _mint(db, None)
+    assert [s.kind for s in db.sites] == ["select", "select", "select", "insert", "update"]
+    retire = db.sites[-1]
+    assert retire.arg == {"is_latest": False}
+    assert retire.filters() == [
+        ("eq", ("user_id", USER)),
+        ("eq", ("filename", FILENAME)),
+        ("neq", ("id", res.document["id"])),
+        ("lt", ("version_number", 2)),
+    ]
 
 
 def test_upload_path_insert_payload_carries_no_org_id():
@@ -358,7 +421,10 @@ class _FolderTable:
         return self
 
     def execute(self):
-        return _Result({"id": self._id, "user_id": USER})
+        # Phase 280 (CR-01 / BUG-261014-01, D-26): the minter now reads the folder's org and
+        # refuses (identical 404) when it differs from the minting org. `folders.org_id` is
+        # NOT NULL in the schema, so the probe returns the install's org, as a real folder would.
+        return _Result({"id": self._id, "user_id": USER, "org_id": ORG_A})
 
 
 def _mint_into(db: _FakeDB, folder_id: str, **kw):
