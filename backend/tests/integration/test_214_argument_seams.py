@@ -1057,6 +1057,8 @@ def test_S4_the_five_kinds_are_ONE_list_across_python_and_typescript():
 #   useTemplateFirstDraft.ts:623       store.getState().setErrorState(result.error, ...)
 #   builderStore.ts:433                -> errorMessage
 #   WorkflowBuilderPage.tsx:2180       -> "Couldn't generate — {errorMessage}"
+#   ⚠ 2026-10-14 (Phase 281, D-15): the hook now stores refusalKey(error, reason_code) and the
+#   page renders describeRefusal(...) from describeRefusalVocabulary.ts — the lines above are history.
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_S7_the_generate_refusal_returns_the_new_code_from_the_real_service():
@@ -1070,50 +1072,104 @@ def test_S7_the_generate_refusal_returns_the_new_code_from_the_real_service():
         "a docblock would not count — comments are stripped above)"
     )
     assert re.search(r'"ok":\s*False', code), "the refusal is not the structured ok:false shape"
+    # Phase 281 (D-13): each of the three connection_not_allowed returns carries an ADDITIVE
+    # sub-reason, so the describe door can word each situation on its own.
+    assert len(re.findall(r'"reason_code":', code)) == 3, (
+        "expected the additive reason_code on exactly the three connection_not_allowed returns"
+    )
 
 
-def test_S7_the_refusal_reaches_a_rendered_screen_and_the_screen_shows_the_RAW_CODE():
+def test_S7_the_refusal_reaches_a_rendered_screen_as_a_SENTENCE_never_the_code():
     """⭐ THE PATH IS ASSERTED, NOT ASSUMED — and asserting it found something.
 
-    The chain resolves: ``useTemplateFirstDraft`` calls ``setErrorState(result.error, ...)``
+    ⚠ INVERTED 2026-10-14 (Phase 281, D-15). This case was
+    ``test_S7_the_refusal_reaches_a_rendered_screen_and_the_screen_shows_the_RAW_CODE`` and it
+    pinned the defect on purpose, so that the day the code was translated it would fail and say
+    why. That day is Phase 281 (FIX-10, folding SEED-221). Its original docblock is kept below,
+    struck rather than deleted, because the finding it recorded is the reason this case exists.
+
+    ~~The chain resolves: ``useTemplateFirstDraft`` calls ``setErrorState(result.error, ...)``
     for ANY ``ok: false``; ``builderStore.setErrorState`` writes ``errorMessage``;
     ``WorkflowBuilderPage`` renders it. So no component MUST change for the new code to be
-    REACHABLE — which is what plan 214-13 assumed and this case now proves.
+    REACHABLE — which is what plan 214-13 assumed and this case now proves.~~
 
-    ⚠ **BUT WHAT REACHES THE SCREEN IS THE MACHINE CODE.** ``result.error`` is the raw string
+    ~~⚠ BUT WHAT REACHES THE SCREEN IS THE MACHINE CODE. ``result.error`` is the raw string
     ``connection_not_allowed`` and it is passed as the MESSAGE, so an author whose describe
-    door refuses reads:
+    door refuses reads: ``Couldn't generate — connection_not_allowed``. … The assertions below
+    pin the path as it IS, so the day someone translates the code this case fails and says
+    why.~~
 
-        Couldn't generate — connection_not_allowed
+    WHAT IS TRUE NOW, and what this case asserts:
 
-    Every other refusal in this phase was given a governed sentence (plan ``214-03``'s
-    vocabularies); this one was not, because it crosses a plan boundary — ``214-13`` owns the
-    code and ``214-04`` owns the page. **That is a FINDING with a named owner, recorded in
-    214-14-SUMMARY.md, not a defect this plan absorbs.** The assertions below pin the path as
-    it IS, so the day someone translates the code this case fails and says why.
+    * the hook stores a table KEY — ``setErrorState(refusalKey(result.error, result.reason_code),
+      …)`` — never the raw code as words;
+    * the page renders ``describeRefusal(errorMessage, errorDetail)`` and no longer prints the
+      stored value after a dash;
+    * ``describeRefusalVocabulary.ts`` maps all four server codes, the three sub-reasons, and
+      exports a fallback, so an unknown code still reaches the screen as a SENTENCE;
+    * and the RENDER is proved, not inferred: the table's own suite and the page suite (which
+      reads the sentence with technical names off and finds no code) are RUN through the S-1
+      harness, and the runner's verdict is read.
     """
     hook = _read(_FRONTEND_SRC / "components" / "workflows" / "useTemplateFirstDraft.ts")
     store = _read(_FRONTEND_SRC / "components" / "workflows" / "builderStore.ts")
     page = _read(_FRONTEND_SRC / "pages" / "WorkflowBuilderPage.tsx")
+    table_path = _FRONTEND_SRC / "components" / "workflows" / "describeRefusalVocabulary.ts"
+    assert table_path.is_file(), "the describe refusal table is gone — no code can become words"
+    table = _read(table_path)
 
-    assert re.search(r"setErrorState\(\s*result\.error", hook), (
-        "the hook no longer forwards the server's error code — the new refusal would reach "
-        "no screen at all"
+    assert re.search(r"setErrorState\(\s*refusalKey\(\s*result\.error\s*,\s*result\.reason_code", hook), (
+        "the hook no longer stores the table KEY — the code would reach the screen as words again"
     )
     assert re.search(r"errorMessage:\s*message", store), (
         "setErrorState no longer stores the message it is handed"
     )
-    assert "{errorMessage}" in page, "the builder no longer renders errorMessage"
+    assert "describeRefusal(" in page, "the builder no longer renders through the refusal table"
+    assert "{errorMessage}" not in page, (
+        "the builder prints the stored refusal key raw again — SEED-221's defect, back on screen"
+    )
+    assert "Couldn't generate — {errorMessage}" not in page
 
-    # The finding, pinned: the hook hands a CODE where the render expects a SENTENCE, and no
-    # module maps this code to governed copy.
-    for vocab in ("publishRefusalVocabulary", "doorVocabulary", "argumentVocabulary"):
-        assert f"connection_not_allowed" not in _read(
-            _FRONTEND_SRC / "components" / "workflows" / f"{vocab}.ts"
-        ), (
-            f"{vocab}.ts now maps connection_not_allowed to copy — if the hook was taught to "
-            "use it, delete this assertion and say so; if not, the map is unreachable"
+    # The table is TOTAL over the server's codes: all four, the three sub-reasons, a fallback.
+    for code in ("connection_not_allowed", "no_authoring_model", "could_not_generate", "grounding_failed"):
+        assert re.search(r"^\s*\"?" + code + r"\"?\s*:\s*\{", table, re.M), (
+            f"describeRefusalVocabulary.ts has no entry for the server code {code!r}"
         )
+    for sub in ("no_service_chosen", "service_not_allowed", "action_not_allowed"):
+        assert f'"connection_not_allowed:{sub}": {{' in table, (
+            f"describeRefusalVocabulary.ts has no sentence for the sub-reason {sub!r}"
+        )
+    assert "export const REFUSAL_FALLBACK" in table, "no fallback — an unknown code has no sentence"
+
+    # …and the RENDER, run rather than assumed (the S-1 harness shape, verbatim).
+    frontend = _REPO_ROOT / "frontend"
+    targets = [
+        _FRONTEND_SRC / "components" / "workflows" / "describeRefusalVocabulary.test.ts",
+        _FRONTEND_SRC / "pages" / "WorkflowBuilderPage.test.tsx",
+    ]
+    for t in targets:
+        assert t.is_file(), f"cited hop does not exist: {t} — a vitest run naming it exits 0"
+
+    if not (frontend / "node_modules").exists():
+        pytest.skip("frontend/node_modules absent — bootstrap the worktree to run this hop")
+
+    env = {**os.environ, "GSD_VITEST_MAX_WORKERS": "2", "CI": "1"}
+    rel = [str(t.relative_to(frontend)).replace("\\", "/") for t in targets]
+    proc = subprocess.run(
+        ["npx", "--no-install", "vitest", "run", *rel],
+        cwd=str(frontend), env=env, capture_output=True, text=True, shell=(os.name == "nt"),
+        timeout=900,
+    )
+    out = (proc.stdout or "") + (proc.stderr or "")
+    assert proc.returncode == 0, f"the refusal render suites did not pass:\n{out[-4000:]}"
+    # Positive control: a run that executed NOTHING also exits 0. Require evidence of cases.
+    # ANSI colour codes are stripped first: with colour on, vitest prints the summary as
+    # ``Tests <ESC>[22m <ESC>[1m<ESC>[32m35 passed`` and the plain regex finds nothing (measured
+    # while driving this case, 2026-10-14).
+    out = re.sub(r"\x1b\[[0-9;]*m", "", out)
+    assert re.search(r"Tests\s+\d+\s+passed", out), (
+        f"vitest exited 0 with no evidence it executed a case:\n{out[-2000:]}"
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
