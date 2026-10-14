@@ -144,10 +144,52 @@ block.
 - **D-23 · G-8.** Target **3-4 plans**: emit cause precedence + taxonomy · gauntlet link + describe-door
   table · freshness (it may ride the emit plan) · G-4 drive + close.
 
+### Amendments after research (operator, at /gsd:plan-phase 281, 2026-10-14)
+
+`281-RESEARCH.md` measured four CONTEXT premises false. These amendments **supersede** the decisions
+they name. The originals stay above, unedited, so the correction is visible.
+
+- **D-24 (amends D-14):** describe-door wording replacements, operator-approved:
+  - `no_authoring_model` → next step *"Ask whoever runs this workspace to set up a drafting model."*
+    The authoring model is env-only (`config.py:1510`), so no Settings door exists for anyone.
+  - `connection_not_allowed · no service chosen` → *"This step acts outside the app, but no service is
+    chosen for this workflow."* / *"Go back, tick a service under “{SERVICES_LABEL}”, then draft
+    again."* `SERVICES_LABEL` is **imported** from `doorVocabulary.ts`, never retyped (D-24(a) copy
+    fence).
+  - **New 4th code `grounding_failed`** → *"The draft pointed at a tool, skill or folder this workflow
+    can't use."* / *"Try again, or describe the work in more detail."*
+  - **Catch arm:** a server sentence (e.g. the entitlement *"Your plan doesn't include…"*) renders as
+    is. The unknown-code fallback never hides it.
+- **D-25 (resolves Discretion: attempt counter):** an "attempt" in the emit message is **every model
+  call** (the golden run: 9 calls inside 3 engine retries). The `Phase N (slug) gate failed after k
+  attempt(s)` prefix is dropped from the composed string, so it never carries two totals.
+- **D-26 (new):** the model's retry feedback (`ctx.retry_feedback`) carries the **executor's true
+  cause**, not the validator's shape message (which fed the golden run a false *"invented=36"*). It is a
+  deliberate model-input change and gets its own test.
+- **D-27 (folds SEED-218):** the describe door refusal's connect affordance (`onOpenSettings`, threaded
+  but unwired) is wired in `WorkflowsPage.tsx`, which the golden-run link plan already edits. No dead
+  control ships beside the new words.
+- **D-28 (amends D-07/D-10):** the gauntlet **is** reachable with the canvas flag off
+  (`renderPublish` is mounted on both header branches). The link renders **only when `onOpenRun` is
+  present** (prop presence, the SEED-190 / RunLogPanel precedent). With the flag off, both the button
+  and the "coming soon" text are removed. The click goes through the Builder's existing
+  `canLeaveBuilderRef` unsaved-work check. `BLOCKED_STEP_NEXT`'s *"Open the trial run…"* line is gated
+  the same way, so it never names a link that isn't there.
+- **D-29 (amends D-09):** the run page cannot focus a step today, so the link opens at the top.
+  Step focus is deferred.
+- **D-30 (refines D-01/D-05):** per-call causes are recorded **by the executor**, because the audit
+  rows lack the missing-field names and the narration attempt number. One new pure leaf,
+  `harness/emit_cause.py`, composes the message for the executor, the engine and the no-validator
+  branch. A new failure value, `template_fields_missing`, splits off from `citation_gate_rejected`.
+  `PhaseCard.tsx`'s fixed copy and the frontend type union follow it. The engine's identical-output
+  short-circuit must ignore the new keys, so retries are not multiplied. ⛔ Do not "fix" the validator
+  by adding `retrieved_ids` to the failure output: the gate would pass and the run would end
+  `completed`.
+- **D-31 (seeds routed at plan-phase):** SEED-218 folded (D-27). SEED-350 and SEED-339 deferred (path
+  match only, different defect), with the routing written into their frontmatter.
+
 ### Claude's Discretion
-- The exact merge key for "same cause" across attempts, and which attempt counter is user-facing.
-  Engine gate retries and `_EMIT_MAX_ATTEMPTS = 3` executor attempts are different counters. Pick the
-  one whose count matches what the author would call "an attempt", and state it in the plan.
+- The exact merge key for "same cause" across attempts. (The counter itself is now decided by D-25.)
 - The wire shape of the per-cause list on `blocked_step`. It must be additive and must keep
   `step_name: null`-not-backfilled.
 - The name of the describe-door sub-reason field.

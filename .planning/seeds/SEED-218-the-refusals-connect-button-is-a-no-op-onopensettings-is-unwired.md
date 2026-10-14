@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-218
 title: The describe door's refusal offers a *connect* button that does nothing — `onOpenSettings` is threaded and lands on no handler
-status: planted
+status: folded
+status_note: "Folded into Phase 281 at /gsd:plan-phase 281 (2026-10-14, operator) — 281-CONTEXT.md D-27: wire onOpenSettings in WorkflowsPage.tsx so the refusal connect affordance works."
 planted: 2026-08-28
 planted_by: Claude, 2026-08-28, measured by plan `214-13` and recorded at the phase close; owner named, wiring not done
 surface: Agentic-RAG

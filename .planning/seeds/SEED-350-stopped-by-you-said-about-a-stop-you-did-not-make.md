@@ -3,9 +3,9 @@ seed_id: SEED-350
 title: "\"Stopped by you\" is shown for runs an operator killed, a user-disable sweep ended, or a workflow delete cascaded — Phase 194 review WR-04, still open"
 created: 2026-10-04
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Reviewed at /gsd:plan-phase 281 (2026-10-14): path match only (runVocabulary.ts / phase_types.py), different defect from refusal-cause wording — deferred, trigger unchanged."
 trigger_when: "Any phase whose files_modified names runVocabulary.ts, the shared cancel path (_cancel_run_internals in backend/app/services/run_lifecycle.py) or the operator Kill in admin.py; OR a user asks why the app says they stopped a run they did not stop."
 trigger_paths: ["frontend/src/components/workflows/runVocabulary.ts", "backend/app/services/run_lifecycle.py", "backend/app/api/runs.py", "backend/app/api/admin.py", "backend/app/api/workflows.py"]
 trigger_surfaces: ["workflow", "admin"]
