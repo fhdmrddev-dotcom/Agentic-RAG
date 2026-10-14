@@ -62,7 +62,10 @@ from app.models.source import (
     WatchSyncResponse,
     WatchUpdateRequest,
 )
-from app.services.retention import hold_guard  # Phase 275 (D-38): the one hold check
+# Phase 280 (D-12): both purge doors share ONE body — hold check → rows → bytes (275 D-38). Called
+# through the module attribute because `delete_folder_watch`'s `purge_documents` query parameter
+# would shadow a by-name import inside that route.
+from app.services import document_purge
 from app.services.sources.failure_cause import SOFT_FAILURE_THRESHOLD
 from app.services.sources.health_verdict import verdict_for_runs
 
@@ -331,16 +334,11 @@ async def delete_folder_watch(
         if doc_ids:
             # Phase 275 (D-14 / D-38): check the hold first; a database refusal is the same 409 and
             # any other error PROPAGATES — the watch is deleted only after its documents were.
-            await hold_guard.assert_none_held(
-                request, current_user, doc_ids, kind="watch_delete", service_supabase=service_supabase,
+            # Phase 280 (D-12): that body lives in ONE helper shared with the purge door below.
+            await document_purge.purge_documents(
+                request, current_user, doc_ids, kind="watch_delete",
+                supabase=supabase, service_supabase=service_supabase,
             )
-            with hold_guard.map_hold_refusal(kind="watch_delete"):
-                await run_in_threadpool(
-                    lambda: supabase.table("documents")
-                    .delete()
-                    .in_("id", doc_ids)
-                    .execute()
-                )
 
     deleted = await delete_watch(pool, watch_id, user_id=user_id)
     if not deleted:
@@ -475,17 +473,11 @@ async def purge_missing_watch_documents(
     if doc_ids:
         # Phase 275 (D-14 / D-38): check the hold first; a database refusal is the same 409 and any
         # other error PROPAGATES — nothing is counted as purged and no watch item is deleted
-        # unless the document delete succeeded.
-        await hold_guard.assert_none_held(
-            request, current_user, doc_ids, kind="watch_purge", service_supabase=service_supabase,
+        # unless the document delete succeeded. Phase 280 (D-12): the one shared purge body.
+        await document_purge.purge_documents(
+            request, current_user, doc_ids, kind="watch_purge",
+            supabase=supabase, service_supabase=service_supabase,
         )
-        with hold_guard.map_hold_refusal(kind="watch_purge"):
-            await run_in_threadpool(
-                lambda: supabase.table("documents")
-                .delete()
-                .in_("id", doc_ids)
-                .execute()
-            )
         purged_count = len(doc_ids)
 
     if item_ids:
