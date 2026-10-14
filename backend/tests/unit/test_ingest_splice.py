@@ -268,6 +268,9 @@ def test_mint_document_row_unique_violation_link():
         "file_path": f"{USER_ID}/{DOC_ID_1}/{FILENAME}",
         "status": "pending",  # still pending in concurrent ingest!
         "version_number": 1,
+        # 280-REVIEW WR-01: the winner is the LIVE copy. A retired match is no longer returned as
+        # the duplicate, so the mock must say what a real concurrent winner is: is_latest.
+        "is_latest": True,
     }
     # 1. Dedup select -> empty (since existing is pending, not completed)
     # 2. In-flight select -> empty (Phase 280 FIX-02: the concurrent winner was not yet visible)

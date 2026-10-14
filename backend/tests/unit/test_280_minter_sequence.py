@@ -402,6 +402,67 @@ def test_the_requery_is_folder_and_org_scoped_when_both_are_known():
     assert ("eq", ("folder_id", F1)) in f and ("eq", ("org_id", ORG_A)) in f
 
 
+RAW_B = b"# phase 280 different bytes"
+
+
+def _latest_ids(db: _FakeDB, filename: str = FILENAME) -> list[str]:
+    return [r["id"] for r in db.tables["documents"] if r["filename"] == filename and r["is_latest"]]
+
+
+def test_same_bytes_as_a_retired_earlier_version_is_restored_never_returned_retired():
+    """280-REVIEW WR-01, the reviewer's sequence, all in one folder (the root):
+
+      1. bytes A as x → v1, still ``pending``;
+      2. bytes B as x → v2 inserts, v1 is retired (``is_latest=false``, still ``pending``);
+      3. bytes A as x again → the completed leg misses (v1 is not completed), the in-flight leg
+         misses (v1 is not latest), v3 hits 23505 on v1.
+
+    Before the fix the re-query returned RETIRED v1 as ``already_in_library`` — a document retrieval
+    cannot see (it requires is_latest), and the person's "make A current again" was silently dropped.
+    Now the retired same-named winner is restored (the ``POST /documents/{id}/restore`` semantics:
+    promote it, then retire its siblings) and returned live."""
+    db = _FakeDB()
+    v1 = _mint(db)
+    v2 = _mint(db, raw=RAW_B)
+    v1_id, v2_id = v1.document["id"], v2.document["id"]
+    assert db.doc(v1_id)["is_latest"] is False and db.doc(v1_id)["status"] == "pending"  # precondition
+
+    res = _mint(db)
+
+    assert res.is_duplicate is True
+    assert res.document["id"] == v1_id
+    assert res.document["is_latest"] is True, "a RETIRED row was returned as the live copy"
+    assert db.doc(v1_id)["is_latest"] is True
+    assert db.doc(v2_id)["is_latest"] is False
+    assert _latest_ids(db) == [v1_id]
+
+
+def test_the_requery_prefers_the_live_winner_over_a_retired_row():
+    """With no org known (/upload, root), the 23505 re-query is not org-scoped and can match one row
+    per org. The live (is_latest) one is the winner, never a retired one that happens to be newer."""
+    retired_newer = _row(id="retired-b", org_id=ORG_B, is_latest=False, created_at="2026-10-14T00:00:09Z")
+    winner = _row(id="winner")
+    db = _FakeDB(docs=[retired_newer], concurrent_winner=winner)
+    res = _mint(db)
+    assert res.is_duplicate is True and res.document["id"] == "winner"
+    assert db.doc("retired-b")["is_latest"] is False, "a retired row in another org was restored"
+
+
+def test_same_bytes_as_a_retired_row_under_another_name_is_refused_not_returned():
+    """The retired match is ANOTHER file's earlier version (same bytes, different name). Restoring it
+    would flip that other file's current version behind the person's back, and returning it would
+    report an invisible document as the live copy — so there is no live winner: the 409 fallback."""
+    db = _FakeDB()
+    v1 = _mint(db)
+    v2 = _mint(db, raw=RAW_B)
+
+    with pytest.raises(HTTPException) as exc:
+        _mint(db, filename="renamed.md")
+    assert exc.value.status_code == 409
+    assert db.doc(v1.document["id"])["is_latest"] is False
+    assert db.doc(v2.document["id"])["is_latest"] is True
+
+
 def test_409_survives_only_when_no_winner_is_found():
     db = _FakeDB(insert_error=Exception("23505 duplicate key value violates unique constraint"))
     with pytest.raises(HTTPException) as exc:

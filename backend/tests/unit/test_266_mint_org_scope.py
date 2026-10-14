@@ -255,6 +255,9 @@ def test_every_site_is_org_scoped_when_org_is_passed():
 #   SUCCESSFUL insert, scoped neq(id)/lt(version_number) — pinned by
 #   `test_upload_path_retires_only_after_a_successful_insert` below. /upload still issues no
 #   org predicate on any query.
+# ⚠ RE-PINNED AGAIN (280-REVIEW WR-01), deliberately: the 23505 re-query lost its `.limit(1)`.
+#   Without an org (this /upload shape) one row per org can match, and the minter must prefer
+#   the live (is_latest) one over a newer RETIRED one, so it reads them all and picks.
 _BASE_SEQUENCE = [
     ("select", "*", [
         ("eq", ("user_id", USER), {}),
@@ -283,7 +286,6 @@ _BASE_SEQUENCE = [
         ("neq", ("status", "failed"), {}),
         ("is_", ("folder_id", "null"), {}),
         ("order", ("created_at",), {"desc": True}),
-        ("limit", (1,), {}),
     ]),
 ]
 

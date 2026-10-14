@@ -411,16 +411,51 @@ def mint_document_row(
                 link_query = link_query.eq("folder_id", folder_id)
             else:
                 link_query = link_query.is_("folder_id", "null")
-            link_match = link_query.order("created_at", desc=True).limit(1).execute()
-            if link_match.data:
-                linked_doc = link_match.data[0]
+            # ⚠ 280-REVIEW WR-01 — NEVER A RETIRED ROW. The index has no is_latest predicate, so the
+            #   row that fired can be a RETIRED earlier version (bytes A as x.pdf v1, bytes B as v2
+            #   retires v1, bytes A again → 23505 on v1). Returning it would report a document
+            #   retrieval cannot see as the live copy. So: the live (is_latest) match is the winner;
+            #   with only a retired match, a SAME-NAMED one is restored exactly as
+            #   `POST /documents/{id}/restore` does (promote it, then retire its siblings), and a
+            #   differently-named one has no live winner here — the 409 below.
+            # ⚠ No `.limit(1)`: without an org (/upload at the root) one row per org can match, and
+            #   the live one must be preferred over a newer retired one. With an org the unique index
+            #   leaves at most one row.
+            link_rows = link_query.order("created_at", desc=True).execute().data or []
+            linked_doc = next((r for r in link_rows if r.get("is_latest")), None)
+            if linked_doc is None and link_rows and link_rows[0].get("filename") == filename:
+                retired = link_rows[0]
+                promoted = (
+                    supabase.table("documents").update({"is_latest": True}).eq("id", retired["id"]).execute()
+                )
+                if promoted.data:
+                    linked_doc = promoted.data[0]
+                    sibling_query = (
+                        supabase.table("documents")
+                        .update({"is_latest": False})
+                        .eq("user_id", user_id)
+                        .eq("filename", filename)
+                    )
+                    sibling_org = org_id or linked_doc.get("org_id")
+                    if sibling_org:
+                        sibling_query = sibling_query.eq("org_id", sibling_org)
+                    if folder_scoped:
+                        sibling_query = (
+                            sibling_query.eq("folder_id", folder_id)
+                            if folder_id
+                            else sibling_query.is_("folder_id", "null")
+                        )
+                    sibling_query.neq("id", linked_doc["id"]).execute()
+            if linked_doc is not None:
                 return MintResult(
                     document=linked_doc,
                     is_duplicate=True,
                     storage_path=linked_doc.get("file_path", ""),
                     version_number=linked_doc.get("version_number", 1),
                 )
-            # The winner is not visible (another org's row, or already failed): the only 409 left.
+            # No live winner is visible (another org's row, already failed, or only a retired
+            # earlier version of ANOTHER file — restoring that would flip its current version
+            # behind the person's back): the only 409 left.
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="File already exists in this folder",
