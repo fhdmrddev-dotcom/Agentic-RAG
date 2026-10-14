@@ -1,0 +1,151 @@
+/**
+ * Phase 281 (FIX-10, folding SEED-221) — THE DESCRIBE REFUSAL TABLE.
+ *
+ * ── WHAT THIS FILE IS ────────────────────────────────────────────────────────────────────
+ * The ONE place a describe-door refusal code becomes words (D-11). `POST /workflows/generate`
+ * answers a refused draft with `{ ok: false, error: <code>, reason_code?, detail? }`. Before 281
+ * the hook stored `error` verbatim and the Builder page printed it after a dash, so an author read
+ * `connection_not_allowed` — a machine code — as the only explanation of why nothing was drafted.
+ * Now the hook stores a KEY (`refusalKey`), and the page asks this table for one plain sentence
+ * plus one next step (`describeRefusal`). The raw code and the server's `detail` (which carries
+ * the step slug) are kept, but only for the app-wide technical-names reveal (D-12) — the same
+ * two-audience rule the canvas already follows (sketch-findings `node-vocabulary-and-reveal.md`).
+ *
+ * ⚠ IT IS A LEAF BESIDE `doorVocabulary.ts`, NOT GROWTH OF IT (D-22). That module is a G-5 hot
+ * file and its governed-id count is pinned by two suites; adding seven rows there would move both
+ * pins for words that are not door words. This file imports the ONE door word it needs.
+ *
+ * ── WHY EACH SENTENCE IS THE SENTENCE IT IS ──────────────────────────────────────────────
+ * • `no_authoring_model` — the drafting model is ENV-ONLY (`Settings.harness_authoring_model`,
+ *   `backend/app/config.py:1510`). No settings page holds it, for any role. D-14's first draft
+ *   said "choose one in Settings", which would have sent a member to a door that does not exist
+ *   (T-281-10), so D-24 replaced it with asking whoever runs the workspace.
+ * • `connection_not_allowed` has THREE situations (D-13), distinguished by the server's additive
+ *   `reason_code`:
+ *     – no service chosen: the author ticked nothing, and a step acts outside the app. The picker
+ *       lives on the PREVIOUS screen (the describe door), so the next step says "go back", and it
+ *       names the picker by its real label, IMPORTED as `SERVICES_LABEL` — never retyped (the
+ *       D-24(a) copy fence sweeps this file to hold that).
+ *     – service not allowed: the step names a service the author did not tick. The allowed set
+ *       is the author's OWN ticks, so D-14's "or ask an admin" named the wrong door; the polish
+ *       sends them back to tick it, or to describe the step without it.
+ *     – action not allowed: the service is ticked but the action is not granted on it.
+ *     – no / unknown sub-reason (a pre-281 server, or a future one): a general sentence that is
+ *       still true of all three, pointing at the same picker.
+ * • `could_not_generate` / `grounding_failed` — the model's fault, not the author's, so the next
+ *   step is to try again or say more. `grounding_failed` is the fourth code D-24 added: the draft
+ *   named a tool, skill or folder the workflow cannot use.
+ * • No sentence promises anything unowned: no "coming soon", no "later" (run-honesty never-say).
+ *
+ * ── THE CATCH ARM (D-24) ─────────────────────────────────────────────────────────────────
+ * A request that fails before a body is read (a non-OK status) throws in `generateWorkflow`, and
+ * its message may be a real server SENTENCE — the entitlement refusal ("Your plan doesn't
+ * include …") is the case that matters. The hook stores `REQUEST_FAILED_KEY` with that message as
+ * the detail, and this table renders the message AS IS. The unknown-code fallback must never
+ * swallow a sentence the server already wrote for a person.
+ *
+ * ── WHAT THE PAGE DOES WITH THE RESULT ───────────────────────────────────────────────────
+ * `sentence` and `next` always render. `technical` (the key, its two parts joined by " · ") and
+ * `technicalDetail` (the server's own text) render small, in mono, only when technical names are
+ * on. Everything renders as React text children; nothing here is ever HTML.
+ */
+import { SERVICES_LABEL } from "@/components/workflows/doorVocabulary"
+
+/** Every key this table words: the four server codes, plus the three `reason_code` sub-reasons. */
+export type DescribeRefusalKey =
+  | "connection_not_allowed"
+  | "connection_not_allowed:no_service_chosen"
+  | "connection_not_allowed:service_not_allowed"
+  | "connection_not_allowed:action_not_allowed"
+  | "no_authoring_model"
+  | "could_not_generate"
+  | "grounding_failed"
+
+/** One plain sentence and one next step — the whole of what an author reads (D-11). */
+export interface RefusalWords {
+  sentence: string
+  next: string
+}
+
+// ⚠ ADDING A CODE IS A COMPILE ERROR until REFUSAL_FOR_KEY gains its entry
+export const REFUSAL_FOR_KEY: Record<DescribeRefusalKey, RefusalWords> = {
+  "connection_not_allowed:no_service_chosen": {
+    sentence: "This step acts outside the app, but no service is chosen for this workflow.",
+    next: `Go back, tick a service under “${SERVICES_LABEL}”, then draft again.`,
+  },
+  "connection_not_allowed:service_not_allowed": {
+    sentence: "This step uses a connected service this workflow isn't allowed to use.",
+    next: `Go back and tick that service under “${SERVICES_LABEL}”, or describe the step without it.`,
+  },
+  "connection_not_allowed:action_not_allowed": {
+    sentence: "That service doesn't allow the action this step needs.",
+    next: "Describe the step with a different action, or choose a different service.",
+  },
+  connection_not_allowed: {
+    sentence: "This step uses a connected service in a way this workflow doesn't allow.",
+    next: `Go back and check the services ticked under “${SERVICES_LABEL}”, then draft again.`,
+  },
+  no_authoring_model: {
+    sentence: "No model is set up for drafting workflows.",
+    next: "Ask whoever runs this workspace to set up a drafting model.",
+  },
+  could_not_generate: {
+    sentence: "The model couldn't produce a usable draft.",
+    next: "Try again, or describe the work in more detail.",
+  },
+  grounding_failed: {
+    sentence: "The draft pointed at a tool, skill or folder this workflow can't use.",
+    next: "Try again, or describe the work in more detail.",
+  },
+}
+
+/** What an unknown code reads as. Never the code itself — that stays behind the reveal. */
+export const REFUSAL_FALLBACK: RefusalWords = {
+  sentence: "Something stopped the draft from being written.",
+  next: "Try again.",
+}
+
+/** A CLIENT-ONLY key for the hook's catch arm (a thrown request). Never a server code. */
+export const REQUEST_FAILED_KEY = "request_failed"
+
+/** The key the hook stores: the server code, joined to its additive sub-reason when present. */
+export function refusalKey(code: string, reasonCode?: string | null): string {
+  return reasonCode ? `${code}:${reasonCode}` : code
+}
+
+/** The resolved words, plus what the technical-names reveal may show. */
+export interface DescribedRefusal extends RefusalWords {
+  technical: string | null
+  technicalDetail: string | null
+}
+
+const isKnownKey = (key: string): key is DescribeRefusalKey =>
+  Object.prototype.hasOwnProperty.call(REFUSAL_FOR_KEY, key)
+
+/** The key as the reveal shows it: its two parts joined by a middle dot. */
+const technicalOf = (key: string): string => key.split(":").join(" · ")
+
+/** Turn a stored key (and the server's detail) into what the describe door renders. Total. */
+export function describeRefusal(
+  key: string | null | undefined,
+  detail?: string | null,
+): DescribedRefusal {
+  const technicalDetail = detail ? detail : null
+  if (!key) {
+    return { ...REFUSAL_FALLBACK, technical: null, technicalDetail }
+  }
+  if (key === REQUEST_FAILED_KEY) {
+    // D-24: a sentence the server already wrote for a person renders as is.
+    const sentence = detail && detail.trim() ? detail : REFUSAL_FALLBACK.sentence
+    return { sentence, next: REFUSAL_FALLBACK.next, technical: null, technicalDetail: null }
+  }
+  if (isKnownKey(key)) {
+    return { ...REFUSAL_FOR_KEY[key], technical: technicalOf(key), technicalDetail }
+  }
+  // A known code with a sub-reason this client has not learned yet: the code-only words.
+  const code = key.split(":")[0]
+  if (isKnownKey(code)) {
+    return { ...REFUSAL_FOR_KEY[code], technical: technicalOf(key), technicalDetail }
+  }
+  return { ...REFUSAL_FALLBACK, technical: technicalOf(key), technicalDetail }
+}

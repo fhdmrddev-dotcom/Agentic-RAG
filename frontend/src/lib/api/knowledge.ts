@@ -767,7 +767,20 @@ export type GenerateReadiness = {
  *  even on a FAILED generation (`ok:false`) — read the body, never throw on it. */
 export type GenerateResult =
   | { ok: true; definition: WorkflowDefinitionJSON; readiness?: GenerateReadiness }
-  | { ok: false; error: string; detail?: string }
+  | {
+      ok: false
+      error: string
+      detail?: string
+      /**
+       *  ── Phase 281 (D-13, FIX-10 / SEED-221) — WHICH situation refused the draft ──────────
+       *  An ADDITIVE sub-reason beside `error`. `connection_not_allowed` is returned for three
+       *  different situations, and this names which (`no_service_chosen` /
+       *  `service_not_allowed` / `action_not_allowed`), so the describe door can give each its
+       *  own sentence. Absent from a pre-281 server, which is why it is optional; `error` and
+       *  `detail` keep their meaning. Read it through `describeRefusalVocabulary.refusalKey`.
+       */
+      reason_code?: string | null
+    }
 
 /** The body of POST /workflows/generate (D-103-CONF-2 / D-103-3 template supply). */
 export interface GenerateWorkflowBody {
