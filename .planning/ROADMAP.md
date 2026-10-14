@@ -265,8 +265,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 281-01-PLAN.md — wave 1 (TDD, backend): phase base failing set; new pure leaf `harness/emit_cause.py` (one composer, per-shot records, `template_fields_missing` split); engine precedence + `reason_is_final` + identity projection + true retry feedback (FIX-09, D-01..D-06, D-25, D-26, D-30); `freshness.py` imports `RETRIEVABLE_COLUMN`, RED-first (DEBT-07, D-16)
-- [ ] 281-02-PLAN.md — wave 1 (TDD, parallel with 01): additive `reason_code` on the 3 `connection_not_allowed` arms; new leaf `describeRefusalVocabulary.ts` (4 codes + subs + fallback, `SERVICES_LABEL` imported); describe door renders sentence + next step, code only on reveal; S-7 inverted (FIX-10 / SEED-221, D-11..D-15, D-24)
+- [x] 281-01-PLAN.md — wave 1 (TDD, backend): phase base failing set; new pure leaf `harness/emit_cause.py` (one composer, per-shot records, `template_fields_missing` split); engine precedence + `reason_is_final` + identity projection + true retry feedback (FIX-09, D-01..D-06, D-25, D-26, D-30); `freshness.py` imports `RETRIEVABLE_COLUMN`, RED-first (DEBT-07, D-16)
+- [x] 281-02-PLAN.md — wave 1 (TDD, parallel with 01): additive `reason_code` on the 3 `connection_not_allowed` arms; new leaf `describeRefusalVocabulary.ts` (4 codes + subs + fallback, `SERVICES_LABEL` imported); describe door renders sentence + next step, code only on reveal; S-7 inverted (FIX-10 / SEED-221, D-11..D-15, D-24)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

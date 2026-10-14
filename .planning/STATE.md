@@ -133,6 +133,10 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
   279-02-SUMMARY row D route proof: event=None rides `if event is not None:` then the existing
   `elif update_data:` arm (test `test_IN05_a_non_member_clear_writes_no_event_through_the_plain_update_arm`).
   Every touched FIRING file is recorded honoured by construction in `279-SEED-328-RECORD.md` § G-5.
+- **OV-281-01 (G-5, `harness_engine.py`):** 281-01's plan capped the engine at "≤ 4 new conditional
+  nodes"; measured AST delta is If 106→107, IfExp 34→38 = **5**. The 5th lives inside the new
+  `_attempt_identity` helper the plan itself asked for; no new branching kind. Recorded by the
+  orchestrator 2026-10-14 as a call-out, still honoured by construction (281-01-SUMMARY).
 
 ### Carry into the next milestone's scoping (✅ consumed by v4.6 intake 2026-10-12 — kept as the record)
 
