@@ -105,6 +105,43 @@ def _graph_error_reason(body: bytes | str | None) -> str:
         return ""
 
 
+def _item_segment(item_id: str | None) -> str:
+    """One Graph item id as exactly ONE path segment, or a refusal. Never raw interpolation.
+
+    ⛔ Phase 280 / D-28 — THE SIBLING OF BUG-260910-04 / 238-REVIEW WR-01. WR-01 stopped the
+    SEARCH term from shaping the URL; the item ids that reach `_children_url` and `read_file`
+    were still interpolated raw, and they arrive from the client (`browse?folder_id=`,
+    `WatchCreateRequest.source_folder_id`, import file ids). Measured in the venv
+    (httpx 0.28.1), URL built as `…/me/drive/items/{id}/children`:
+
+      · `x/../../drives/D1/root` → httpx COLLAPSES the dot segments and sends
+        `/v1.0/me/drive/drives/D1/root/children` — another drive, same token;
+      · `x?$expand=children&a=` → the `?` opens a real query string and the `children` call
+        becomes an item-metadata call with a caller-chosen query;
+      · `a#frag` → the fragment swallows `/children` and it is never sent.
+
+    So: `quote(item_id, safe="!")` escapes `/`, `?`, `#`, `&` and every other URL-syntax
+    character, and the id can no longer leave its segment. ⚠ `!` stays LITERAL because real
+    personal OneDrive ids look like `ABC123!105`; `%21` would probably also work but is
+    unverified against live Graph (RESEARCH A2), and this fix must not gamble the happy path.
+
+    ⚠ Encoding CANNOT help `.` and `..`: `.` is unreserved, so `quote` leaves them as-is and
+    httpx would still collapse them. They are path syntax, not ids — refused. So is an empty
+    id (`items//children` addresses nothing) and `None` (an f-string would issue the literal
+    item `None`). An all-whitespace id is NOT stripped: it is passed to `quote` unchanged and
+    issued encoded, so Graph — not this helper — says whether it names an item. Guessing what
+    the caller meant is the WR-02 mistake.
+    """
+    if item_id is None or item_id in ("", ".", ".."):
+        raise ValueError(
+            f"Refusing to address a OneDrive item by the id {str(item_id)[:60]!r}"
+            f"{'...' if item_id is not None and len(item_id) > 60 else ''}: an empty or "
+            "dot-segment id is path syntax, not an item, and issuing it would let the "
+            "transport resolve a different Graph endpoint under this connection's token."
+        )
+    return quote(item_id, safe="!")
+
+
 def _folder_path(item: dict[str, Any]) -> str | None:
     """The item's own folder path, or `None` when Graph did not say.
 
@@ -165,7 +202,8 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
     def _children_url(folder_id: str | None) -> str:
         if folder_id in VIRTUAL_ROOT_IDS:
             return f"{GRAPH_API_BASE}/me/drive/root/children"
-        return f"{GRAPH_API_BASE}/me/drive/items/{folder_id}/children"
+        # ⛔ D-28 — through the helper, never raw. `folder_id` comes from the client.
+        return f"{GRAPH_API_BASE}/me/drive/items/{_item_segment(folder_id)}/children"
 
     async def _get_page(
         self,
@@ -227,6 +265,13 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
             #   the transport rather than by the caller") and the sibling `google_drive.py:254`
             #   already obeys it. A term interpolated into the path lets a `?` open a real query
             #   string and `../` choose a different Graph endpoint under the caller's token.
+            # ⚠ CORRECTED (Phase 280, D-17) — the WR-01 lines above are FALSE about this code and
+            #   are kept beside the correction rather than deleted. The search term does NOT
+            #   ride in a params value: `list_files` percent-encodes it with `quote(safe="")`
+            #   INTO the OData function in the URL path, `search(q='…')` (see its WR-01 note),
+            #   because Graph documents search as that function. The protection is the
+            #   encoding, not the transport. `extra_params` below has no caller today. The same
+            #   class for item ids is closed by `_item_segment` (D-28).
             # ⚠ Only on the FIRST page: a `nextLink` already carries its own `$search`, and
             #   re-adding it would be the caller's parameter fighting Graph's own cursor.
             if extra_params:
@@ -364,6 +409,8 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
         transport, which refuses a declared over-cap length before reading and abandons the
         wire read past it — the cap therefore bounds RESIDENCY, not just the return value.
         """
+        # ⛔ D-28 — refuse a path-syntax id BEFORE spending a token refresh on it.
+        item_segment = _item_segment(file_id)
         token = await self._get_auth_token(connection)
         cap = clamp_read_cap(max_bytes)
 
@@ -388,7 +435,7 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
         meta_resp = await send_pinned_http(
             "graph_read",
             "GET",
-            f"{GRAPH_API_BASE}/me/drive/items/{file_id}",
+            f"{GRAPH_API_BASE}/me/drive/items/{item_segment}",
             headers=self._headers(token),
             timeout=30.0,
             max_bytes=256 * 1024,
