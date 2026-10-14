@@ -234,8 +234,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 280-01-PLAN.md — wave 1 (TDD): phase base failing set; `sources.py` purge extraction FIRST into `document_purge.py` (G-5, D-12), then bytes after the row delete (DEBT-10, D-11/D-31); `maybe_row` + AST fence + 22-site 404 sweep (DEBT-11, D-08/D-09/D-29); dead `main.py` patch deleted (D-30)
-- [ ] 280-02-PLAN.md — wave 1 (TDD, stubbed, parallel with 01): 238 pins re-driven RED/GREEN (measure first); `_item_segment` so client ids cannot shape the Graph path (FIX-04, D-28); stale comment (D-17); `Team Docs` 105-file folder generated outside the repo (D-27)
+- [x] 280-01-PLAN.md — wave 1 (TDD): phase base failing set; `sources.py` purge extraction FIRST into `document_purge.py` (G-5, D-12), then bytes after the row delete (DEBT-10, D-11/D-31); `maybe_row` + AST fence + 22-site 404 sweep (DEBT-11, D-08/D-09/D-29); dead `main.py` patch deleted (D-30)
+- [x] 280-02-PLAN.md — wave 1 (TDD, stubbed, parallel with 01): 238 pins re-driven RED/GREEN (measure first); `_item_segment` so client ids cannot shape the Graph path (FIX-04, D-28); stale comment (D-17); `Team Docs` 105-file folder generated outside the repo (D-27)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
