@@ -93,9 +93,13 @@ _EXPECTED_CALL_SITES = {
     #   harness_engine.py:2315 → 2390   (the fail_run arm)
     #   harness_engine.py:2356 → 2431   (the dangling-skip-target guard)
     #   harness_engine.py:2638 → 2713   (the completed path, after the while loop)
-    "services/harness_engine.py:2390",
-    "services/harness_engine.py:2431",
-    "services/harness_engine.py:2713",
+    # ⚠ RE-DERIVED at Phase 281 Plan 01 (FIX-09): check (a), the per-file COUNTS, stayed
+    #   identical; only positions shifted, by +75 then +90, when the emit-cause precedence
+    #   block, `_attempt_identity` and the `reason_is_final` threading landed above them.
+    #   harness_engine.py:2390 → 2465 · 2431 → 2506 · 2713 → 2803
+    "services/harness_engine.py:2465",
+    "services/harness_engine.py:2506",
+    "services/harness_engine.py:2803",
     # ⚠ RE-DERIVED at Phase 268 Plan 01: +8 line shift in services/run_lifecycle.py —
     #   register_run_start gained `org_id` / `expert_id` kwargs, their forward to insert_run and
     #   a 4-line docstring note, all ABOVE this call. Check (a), the per-file COUNTS, stayed
