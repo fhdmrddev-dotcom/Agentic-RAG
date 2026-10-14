@@ -37,12 +37,14 @@ applicable**: KEEP enforces nothing.
 SC#5's failure mode is: *"says keep, and the artifact then renders a broken reference with no
 explanation"*. It is pinned in
 `frontend/src/components/chat/artifacts/__tests__/ArtifactBlock.test.tsx`
-(`a chart whose source document was disposed …`). The test renders a table whose caption names
-`contract.pdf`, a source that is understood to be disposed (nothing in the client can know that). It
-asserts:
+(`an artifact's source is plain text, so a disposed source cannot break it (DEBT-08)`; renamed from
+`a chart whose source document was disposed …` by 280-REVIEW IN-06). The test renders an ORDINARY
+table whose caption names `contract.pdf`: the client holds no signal that a source was disposed, so
+the test pins the property that makes disposal harmless for every artifact. It asserts:
 
-- the rendered `artifact-caption` **text** contains `contract.pdf`;
-- the figure contains **no `<a>` element**.
+- the rendered `artifact-caption` **text** matches `Data: query_tables · contract.pdf · 16 rows`
+  (in pieces, not glued across the label chip's text node);
+- the figure contains **no link role and no `<a>` element**.
 
 The test asserts content, not presence, because a presence assertion cannot see content drift. It was
 driven RED once against a planted `<a href="#">` around the caption source, then restored

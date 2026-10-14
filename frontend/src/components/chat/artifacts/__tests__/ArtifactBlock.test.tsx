@@ -191,14 +191,22 @@ describe("ArtifactBlock", () => {
  *
  * Retention may delete the document a chart was built from; the artifact row stays (it is a
  * conversation record, immutable, with no document_id). The failure this pins is "says keep, and the
- * artifact then renders a broken reference with no explanation". Nothing in the client can know the
- * source was disposed, so the record below is simply a table whose caption names `contract.pdf`.
- * Asserted on rendered CONTENT (the caption text a person reads, and that no anchor exists), never on
- * test-id presence. Decision record: docs/RETENTION-AND-ARTIFACTS.md.
+ * artifact then renders a broken reference with no explanation". Decision record:
+ * docs/RETENTION-AND-ARTIFACTS.md.
+ *
+ * ⚠ 280-REVIEW IN-06 — WHAT THIS CAN AND CANNOT SEE, stated rather than implied. The client holds no
+ *   signal that a source was disposed, so there is no "disposed" record to build: the fixture below is
+ *   an ORDINARY artifact whose caption names `contract.pdf` (it used to be called `disposed`, which
+ *   claimed a distinction the test cannot draw). What it pins is the property that makes disposal
+ *   harmless for EVERY artifact: the source is plain caption text and nothing in the block is a link,
+ *   so nothing can render as a broken reference. If a future caption ever links its source, this test
+ *   is where that change must answer for a disposed document.
+ *   The caption is asserted in pieces, not as one string glued across adjacent text nodes, so markup
+ *   that is irrelevant to D-06 (the label chip sitting beside "Data:") cannot break it.
  */
-describe("a chart whose source document was disposed (DEBT-08)", () => {
-  it("keeps naming the file as plain caption text and renders no link", () => {
-    const disposed = {
+describe("an artifact's source is plain text, so a disposed source cannot break it (DEBT-08)", () => {
+  it("names the source file as caption text and renders no link anywhere in the block", () => {
+    const sourceNamedArtifact = {
       ...clone(table16),
       id: "a_r7t280d0c8",
       caption: {
@@ -208,11 +216,12 @@ describe("a chart whose source document was disposed (DEBT-08)", () => {
         lineage: null,
       },
     }
-    render(<ArtifactBlock artifacts={[disposed]} />)
+    render(<ArtifactBlock artifacts={[sourceNamedArtifact]} />)
     const figure = screen.getByTestId("artifact-block")
     const caption = within(figure).getByTestId("artifact-caption")
-    expect(caption).toHaveTextContent("contract.pdf")
-    expect(caption).toHaveTextContent("table 1Data: query_tables · contract.pdf · 16 rows")
+    expect(caption).toHaveTextContent(/Data: query_tables · contract.pdf · 16 rows/)
+    expect(within(figure).getByTestId("artifact-label-chip")).toHaveTextContent("table 1")
+    expect(within(figure).queryByRole("link")).toBeNull()
     expect(figure.querySelector("a")).toBeNull()
   })
 })
