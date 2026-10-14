@@ -323,3 +323,126 @@ async def test_two_concurrent_first_uploads_of_one_name_settle_to_exactly_one_la
     rows = await _latest_for(pg_pool, uid, name)
     assert len(rows) == 2, rows
     assert len([r for r in rows if r["is_latest"]]) == 1, f"expected exactly one latest row: {rows}"
+
+
+# ---------------------------------------------------------------------------------------------
+# The 23505 -> winner branch, FORCED against the real documents_dedup_idx (280-REVIEW WR-06)
+# ---------------------------------------------------------------------------------------------
+#
+# The gather() race above cannot show which branch answered: whenever one thread's INSERT commits
+# before the other's in-flight SELECT, the in-flight leg resolves it and the 23505 branch never
+# runs. These tests make the collision deterministic: a wrapper client lets every pre-check run
+# against the real database, then lands the "concurrent" winner (service role) immediately before
+# the minter's own INSERT. The INSERT can only fail on the real unique index, and a spy on that
+# INSERT records the error, so a pass is evidence the branch ran — not that the race was avoided.
+
+
+class _RaceClient:
+    """Delegates everything to a real supabase-py client, except ``documents.insert``: it first
+    calls ``before_insert(payload)`` (once), then records any exception the real INSERT raises."""
+
+    def __init__(self, real, before_insert):
+        self._real = real
+        self._before_insert = before_insert
+        self.insert_errors: list[str] = []
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    def table(self, name):
+        table = self._real.table(name)
+        if name != "documents":
+            return table
+        outer = self
+
+        class _Table:
+            def __getattr__(self, attr):
+                return getattr(table, attr)
+
+            def insert(self, payload):
+                if outer._before_insert is not None:
+                    hook, outer._before_insert = outer._before_insert, None
+                    hook(payload)
+                builder = table.insert(payload)
+
+                class _Insert:
+                    def __getattr__(self, attr):
+                        return getattr(builder, attr)
+
+                    def execute(self):
+                        try:
+                            return builder.execute()
+                        except Exception as exc:  # the spy: record, then let the minter see it
+                            outer.insert_errors.append(str(exc))
+                            raise
+
+                return _Insert()
+
+        return _Table()
+
+
+def _land_winner(org_id: str, landed: list[str]):
+    """The concurrent request: the same row the minter is about to insert, under a new id."""
+
+    def hook(payload: dict) -> None:
+        winner_id = str(uuid4())
+        row = dict(payload)
+        row.update({
+            "id": winner_id,
+            "org_id": org_id,
+            "file_path": f"{payload['user_id']}/{winner_id}/{payload['filename']}",
+        })
+        _admin().table("documents").insert(row).execute()
+        landed.append(winner_id)
+
+    return hook
+
+
+@pytest.mark.parametrize("use_folder", [False, True], ids=["root_upload_shape", "folder"])
+async def test_a_forced_concurrent_insert_resolves_to_the_winner_through_the_real_index(
+    pg_pool, subject, use_folder,
+):
+    uid, tok = subject["uid"], subject["tok"]
+    raw, name = _raw(f"forced-{use_folder}"), f"280-forced-{uuid4().hex[:6]}.txt"
+    landed: list[str] = []
+    client = _RaceClient(user_client(tok), _land_winner(subject["org"], landed))
+
+    res = await async_mint_document_row(
+        raw=raw, filename=name, mime_type=MIME, user_id=uid, supabase=client,
+        folder_id=subject["f1"] if use_folder else None, on_conflict="raise",
+    )
+
+    assert len(landed) == 1, "the winner was not landed before the minter's INSERT"
+    assert len(client.insert_errors) == 1, f"the INSERT did not collide: {client.insert_errors}"
+    assert "23505" in client.insert_errors[0] and "documents_dedup_idx" in client.insert_errors[0],         client.insert_errors[0]
+    assert res.is_duplicate is True
+    assert str(res.document["id"]) == landed[0], "the 23505 did not resolve to the winning row"
+    rows = _live(await _state(pg_pool, uid, raw))
+    assert [str(r["id"]) for r in rows] == landed, rows
+    assert rows[0]["is_latest"] is True
+
+
+async def test_same_bytes_as_a_retired_version_restores_it_through_the_real_index(pg_pool, subject):
+    """280-REVIEW WR-01 on the real index: A as x (v1, pending), B as x (v2 retires v1), A as x again.
+    The third INSERT collides with RETIRED v1 (documents_dedup_idx has no is_latest predicate); the
+    spy proves it, and the answer is v1 restored as the one latest row, never v1 still retired."""
+    uid, tok = subject["uid"], subject["tok"]
+    raw_a, raw_b, name = _raw("wr01-a"), _raw("wr01-b"), f"280-wr01-{uuid4().hex[:6]}.txt"
+
+    v1 = await async_mint_document_row(raw=raw_a, filename=name, mime_type=MIME, user_id=uid,
+                                       supabase=user_client(tok))
+    v2 = await async_mint_document_row(raw=raw_b, filename=name, mime_type=MIME, user_id=uid,
+                                       supabase=user_client(tok))
+    before = {str(r["id"]): r["is_latest"] for r in await _latest_for(pg_pool, uid, name)}
+    assert before == {str(v1.document["id"]): False, str(v2.document["id"]): True}, before
+
+    spy = _RaceClient(user_client(tok), None)
+    again = await async_mint_document_row(raw=raw_a, filename=name, mime_type=MIME, user_id=uid,
+                                          supabase=spy)
+
+    assert len(spy.insert_errors) == 1 and "23505" in spy.insert_errors[0], spy.insert_errors
+    assert again.is_duplicate is True
+    assert str(again.document["id"]) == str(v1.document["id"])
+    assert again.document["is_latest"] is True, "a RETIRED row was returned as the live copy"
+    after = {str(r["id"]): r["is_latest"] for r in await _latest_for(pg_pool, uid, name)}
+    assert after == {str(v1.document["id"]): True, str(v2.document["id"]): False}, after
