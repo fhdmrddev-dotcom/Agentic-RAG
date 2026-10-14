@@ -4,9 +4,9 @@ title: DELETE /documents/{id} answers 500 instead of 404 when the caller owns no
 reported: 2026-10-12
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded   # folded into Phase 280 at discuss 2026-10-14 (280-CONTEXT.md)
 affected_areas: [backend/documents, api/errors]
-folded_into: null
+folded_into: "280"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

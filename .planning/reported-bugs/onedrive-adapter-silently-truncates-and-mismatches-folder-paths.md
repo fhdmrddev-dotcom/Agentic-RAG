@@ -4,9 +4,9 @@ title: The OneDrive/Graph adapter silently stops importing past one page, inject
 reported: 2026-09-10
 surface: Agentic-RAG
 severity: major
-status: open   # ALL THREE FIXED 2026-09-10 (45b4fb9dc, db7a083a2). Open only for the LIVE re-drive named below.
+status: folded   # folded into Phase 280 at discuss 2026-10-14 (280-CONTEXT.md)
 affected_areas: [backend/connectors, backend/ingestion, RAG/classification]
-folded_into: null
+folded_into: "280"
 verified_closed_by: null
 related_seeds: [SEED-282]
 re_open_trigger: null

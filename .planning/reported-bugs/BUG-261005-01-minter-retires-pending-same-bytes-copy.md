@@ -4,9 +4,9 @@ title: The shared document minter retires a still-indexing copy of the same byte
 reported: 2026-10-05
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded   # folded into Phase 280 at discuss 2026-10-14 (280-CONTEXT.md)
 affected_areas: [backend/ingestion, documents, library, search]
-folded_into: null
+folded_into: "280"
 verified_closed_by: null
 related_seeds: [SEED-247]
 re_open_trigger: null

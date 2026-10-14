@@ -4,7 +4,7 @@ milestone: v4.6
 milestone_name: Pay It Down
 status: executing
 last_updated: "2026-10-13T20:00:00.000Z"
-last_activity: 2026-10-13 -- 279-04 complete (G-4 drives, SEED-328 record, seed answered); 279 pending verification
+last_activity: 2026-10-14 -- 280 context gathered (280-CONTEXT.md, D-01..D-23); next /gsd:plan-phase 280
 progress:
   total_phases: 14
   completed_phases: 2
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 279 — the-expert-scope-seam
+**Current focus:** Phase 280 — in-once-out-clean (context gathered 2026-10-14)
 
 ---
 
@@ -53,6 +53,8 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ---
 
 ## Current Position
+
+**Phase 280 (2026-10-14):** discuss done — `.planning/phases/280-in-once-out-clean/280-CONTEXT.md`. No migration expected. 4 bugs folded (BUG-261005-01, BUG-260910-04, BUG-261012-01, BUG-261012-02). Owed to operator: upload the generated `Team Docs` folder to OneDrive before the live re-drive (D-14). Next: `/gsd:plan-phase 280`.
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: 279 (the-expert-scope-seam) — EXECUTED 4/4, reviewed (`279-REVIEW.md`, 6 warnings fixed — `279-REVIEW-FIX.md`), **verified 4/4** (`279-VERIFICATION.md`, self-verified)

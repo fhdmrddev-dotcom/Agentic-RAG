@@ -4,9 +4,9 @@ title: Both watch purge paths delete the document rows but never remove the stor
 reported: 2026-10-12
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded   # folded into Phase 280 at discuss 2026-10-14 (280-CONTEXT.md)
 affected_areas: [backend/watch, backend/connectors, storage, data-protection]
-folded_into: null
+folded_into: "280"
 verified_closed_by: null
 related_seeds: [SEED-210, SEED-072]
 re_open_trigger: null
