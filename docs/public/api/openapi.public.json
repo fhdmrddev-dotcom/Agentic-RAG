@@ -15177,6 +15177,17 @@
             ],
             "title": "Retrievable"
           },
+          "already_in_library": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Already In Library"
+          },
           "tables_stage_applies": {
             "type": "boolean",
             "title": "Tables Stage Applies",
