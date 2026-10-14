@@ -3,9 +3,17 @@ seed_id: SEED-313
 title: /upload never stamps the caller's active org — a two-org user's upload lands in an arbitrary org
 created: 2026-09-24
 surface: Agentic-RAG
-status: planted
-partial: false
-status_note: "Phase 270 (2026-09-30) touched the trigger path and left this open: the phase adds a download route and a file-facts write, and changes neither upload org-stamping nor versioning."
+status: partially-answered
+partial: true
+status_note: |
+  Moved `planted` -> `partially-answered` on 2026-10-14 (Phase 280 plan 04). Original line: `status: planted`.
+  AXIS SETTLED (folder arm): 280-03 D-26 (`8f83c307e`, BUG-261014-01) - a /upload INTO A FOLDER now mints in that
+  folder's org (membership checked; otherwise the identical 404), so a two-org user's foldered upload no longer
+  lands in the trigger's LIMIT 1 org. Proven live by test_280_cr01_two_org_live.py.
+  AXIS OPEN (no-folder arm): a /upload with no folder still passes org_id=None and lands in
+  autofill_org_id_by_owner's LIMIT 1 org. The caller's active org (X-Org-Id) is still not stamped.
+  Previous note, verbatim: Phase 270 (2026-09-30) touched the trigger path and left this open: the phase adds a
+  download route and a file-facts write, and changes neither upload org-stamping nor versioning.
 trigger_when: Any phase touching backend/app/api/documents.py upload, the autofill_org_id trigger, or multi-org membership.
 trigger_paths: ["backend/app/api/documents.py", "backend/app/dependencies.py", "supabase/migrations/*autofill*"]
 trigger_surfaces: []
@@ -65,3 +73,11 @@ to guess for multi-org users) is the Medium half.
 - Phase 266 RESEARCH, finding C-8 (`266-RESEARCH.md` §claims table).
 - D-266-18: `backend/app/services/ingest_splice.py` org-scoped at four sites when `org_id` is passed (266-02).
 - Migration 106: `autofill_org_id` trigger, `LIMIT 1` without ORDER BY.
+
+## 2026-10-14 - Phase 280 answered the folder arm only
+
+Phase 280 plan 03 (D-26) made the shared minter check the folder's org: a foldered `/upload` mints into the
+folder's org after a membership check, and a mismatch or non-member answers the same `404 "Folder not found"`
+as a missing folder. That fixes the folder arm of this seed (BUG-261014-01, closed on live evidence).
+A `/upload` with **no folder** is unchanged: it still mints with `org_id=None`, so the `autofill_org_id_by_owner`
+trigger picks the owner's `LIMIT 1` org. The seed stays open for that arm; its trigger is unchanged.
