@@ -4,9 +4,9 @@ title: The emit step's failure is reported as a citation problem when citation c
 reported: 2026-07-30
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/harness, emit/render_template, workflows/publish-gauntlet, observability]
-folded_into: null
+folded_into: 281  # /gsd:discuss-phase 281, 2026-10-14 — 281-CONTEXT.md D-01..D-06
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

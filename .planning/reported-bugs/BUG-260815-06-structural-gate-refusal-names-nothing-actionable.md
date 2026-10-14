@@ -4,9 +4,9 @@ title: The publish gauntlet's structural-gate refusal says only "the golden run 
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: major
-status: open  # NARROWED 2026-08-29 — 4 of 5 requirements shipped; only #4 remains
+status: folded  # 2026-10-14: remaining #4 folded into Phase 281 (281-CONTEXT.md D-07..D-10). WAS: open  # NARROWED 2026-08-29 — 4 of 5 requirements shipped; only #4 remains
 affected_areas: [workflows/publish-gauntlet, frontend/workflows, observability, admin/control-room]
-folded_into: null
+folded_into: 281
 verified_closed_by: null
 related_seeds: [SEED-165]
 re_open_trigger: "⚠ FIRED A SECOND TIME AND DECLINED A SECOND TIME — at /gsd:discuss-phase 214 (2026-08-28). Phase 214 DOES touch the gauntlet's refusal copy (STEP-03 adds a new refusal naming the step and the missing argument), so this trigger fired exactly as written. It was declined on the same reasoning as 197 and recorded as D-214-13: 214's OWN refusal is written correctly from birth, so the phase adds nothing to this pile, and repairing the other five stages' copy is repair on files 214 does not otherwise touch — a capability inside a phase already carrying a threat model. `status` stays `open` and `folded_into` stays null ON PURPOSE, for the second time. ⚠ TWO DECLINES IS THE SIGNAL, NOT THE ABSENCE OF ONE: the next phase that fires this trigger should weigh that this bug has now been read, understood and passed over twice, and either fold it or state why it never will be. See .planning/phases/214-a-step-names-its-service-and-its-action/214-CONTEXT.md D-214-13. ── ORIGINAL TRIGGER, PRESERVED VERBATIM ── Considered at /gsd:discuss-phase 197 (2026-08-18) and DELIBERATELY NOT FOLDED — it shares SEED-163's root but is repair on the PUBLISH surface, while 197's SC#1 asks for the author to be ASKED, not better refused. Status stays `open` and `folded_into` stays null on purpose. Re-open at: the next phase touching the publish gauntlet's refusal copy, OR a second report of an author stuck on an unexplained refusal. See .planning/phases/197-guided-authoring/197-CONTEXT.md <deferred>."

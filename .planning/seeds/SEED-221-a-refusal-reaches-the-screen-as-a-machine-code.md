@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-221
 title: "The describe door's refusal reaches a real screen as a MACHINE CODE — *\"Couldn't generate — connection_not_allowed\"*. One plan owns the code, another owns the page, neither owns the translation"
-status: planted
+status: folded
+status_note: "Folded into Phase 281 (FIX-10) at milestone v4.6 intake; routing confirmed at /gsd:discuss-phase 281 on 2026-10-14 — 281-CONTEXT.md D-11..D-15 (one table, all 3 codes + fallback, S-7 test inverted)."
 planted: 2026-08-28
 planted_by: Claude, 2026-08-28, measured by plan `214-14`'s cross-plan seam audit (seam S-7) and recorded at the phase close
 surface: Agentic-RAG

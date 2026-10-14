@@ -11,7 +11,7 @@ progress:
   total_plans: 14
   completed_plans: 14
   percent: 21
-stopped_at: Phase 280 complete (4/4) — ready to discuss Phase 281
+stopped_at: Phase 281 context gathered — ready to plan Phase 281
 ---
 
 # Project State
@@ -54,6 +54,8 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ---
 
 ## Current Position
+
+**Phase 281 (2026-10-14):** discuss done — `.planning/phases/281-a-refusal-names-its-cause/281-CONTEXT.md` (D-01..D-23). G-2 sketch skip RECORDED (D-21). Folded: BUG-260730-02, BUG-260815-06 (#4), SEED-221. Left open: BUG-260828-05. G-4 scenarios A-D operator-named. No migration expected. Next: `/gsd:plan-phase 281` (re-run the seeds sweep there).
 
 **Phase 280 (2026-10-14):** discuss done — `.planning/phases/280-in-once-out-clean/280-CONTEXT.md`. No migration expected. 4 bugs folded (BUG-261005-01, BUG-260910-04, BUG-261012-01, BUG-261012-02). Owed to operator: upload the generated `Team Docs` folder to OneDrive before the live re-drive (D-14). Next: `/gsd:plan-phase 280`.
 
