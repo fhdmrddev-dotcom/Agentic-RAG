@@ -29,7 +29,7 @@
 - ✅ **v4.3 What You Can Actually Sell** — Phases **255-264** (shipped 2026-09-23, git tag `v4.3`). 10 phases (255-260 scoped; 261-264 added in-milestone), **39 plans**, migrations **182-192**, 6 days. **31/32 requirements delivered · PACK-05 carried to SEED-304 by decision.** Extension contract, token metering + USD, enforceable tiers, Experts as data.
 - ✅ **v4.4 Experts That Actually Work** — Phases **265-269** (shipped 2026-09-29, git tag `v4.4`). 5 phases, **24 plans**, migrations **194-198**, 7 days. **17/17 requirements satisfied** (audit `tech_debt`, no blockers). A client installs an Expert and gets grounded answers from its own knowledge in their own org — proven by live drives as a real user, never by a mocked test. ✅ **DEPLOYED 2026-09-29** — production `82babd8d0`; migrations 195-198 applied to production (194 already was). Operator smoke test owed.
 - ✅ **v4.5 Find It, Show It** — Phases **270-276** (shipped 2026-10-12, git tag `v4.5`). 7 phases, **38 plans**, migrations **199-206**, 14 days. **25/25 requirements satisfied** (audit `tech_debt`, no blockers). Find a document by what it IS and get the file back out, an agent that answers with interactive artifacts from a closed registry, thread-scoped attachments, retention with legal hold, and public docs. ✅ 270-274 + 276 **LIVE 2026-10-05** (prod `bd9e126c3`); ✅ **275 deployed 2026-10-12** (prod `784647e2d`, migrations 204-206).
-- 🚧 **v4.6 Pay It Down** — Phases 277-283 (started 2026-10-12). Repair only: 10 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extractions, 2 register-hygiene items (20 requirements).
+- 🚧 **v4.6 Pay It Down** — Phases 277-284 (started 2026-10-12; 284 added 2026-10-14). Repair only: 11 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extractions, 2 register-hygiene items (21 requirements).
 
 ---
 
@@ -87,6 +87,7 @@ capability", applied milestone-wide).
 | 281 | A Refusal Names Its Cause | When a workflow step or a publish is refused, the author reads the check that actually failed, in plain words, and the freshness check ignores archived documents | FIX-09, FIX-10, DEBT-07 | 5 | closed core recount · **G-4** · G-2 skip recorded (copy on shipped layouts) · `SEED-221` folded · G-5 (`phase_types.py`, `validator_kinds.py`, `PublishGauntlet.tsx`, `doorVocabulary.ts`, `WorkflowBuilderPage.tsx`) · UI hint |
 | 282 | The Slow Run and the Paused Run | A slow model gets the timeout the operator set, and a paused run asks its question in one place with one draft | FIX-06, FIX-07 | 5 | **G-2 sketch** (FIX-07) · **G-4** · **SC#10 four-axis UAT, full 8-row roster** · G-5 (`openai_service.py`, `MessageList.tsx`, `PendingAskCard.tsx`, `WorkspacePanel.tsx`, `streamsStore.ts`) · UI hint |
 | 283 | Every Member Reaches Their Own Settings | An ordinary member reaches their own settings, and a large document's detail panel stays navigable | FIX-01, FIX-08 | 4 | ⛔ **G-5: `SettingsPage.tsx` tab seam OWED — taken first** · **G-4** · security_enforcement (two-role fence) · G-2 skip recorded unless discuss opens a new door · UI hint |
+| 284 | Library at Scale | The Library, Find and every picker stay correct and fast at tens of thousands of documents: server pages, server counts, no growing id lists | FIX-11 | 7 | ⛔ **G-5: `LibraryPage.tsx` extraction OWED — taken first** · **measure first** (10k/50k seeded) · migration **207** only if needed · security_enforcement (INVOKER, revoke PUBLIC) · **G-4** · G-5 (`documents.py`, `document_search_service.py`, `DocumentList.tsx`) · UI hint |
 
 **Dependency order:** 277 → 278 → 279 → 280 → 281 → 282 → 283. The real constraints are narrower,
 and are stated so a phase can run early when its files are free:
@@ -313,6 +314,26 @@ Plans:
 **Flags**: ⛔ **G-5: `frontend/src/pages/SettingsPage.tsx` FIRES (24 phases) and its tab seam is OWED**. FIX-01 is a per-tab gating change, which is exactly that seam, so wave 1 takes it behaviour-preserving before any gate moves. Also FIRING: `frontend/src/lib/nav-items.ts`, `backend/app/api/settings.py`, `backend/app/dependencies.py` (access-gate module seam named: `app/security/access.py`), `DocumentDetailPanel.tsx`. **security_enforcement**: the change is a permission boundary, so the API gate is the authority and the UI only reflects it. **G-2**: FIX-08's layout is settled by its own report (bound the list using the per-chunk `max-h` pattern already in the file), and FIX-01 reuses the existing rail entry or profile menu. The sketch skip is **recorded as a decision** unless discuss decides a new door is needed, in which case `/gsd:sketch` runs first. The dev account is in two orgs, so prove the active org before every drive. Read the sketch-findings skill for the Settings and document-detail-panel contracts.
 **UI hint**: yes
 
+#### Phase 284: Library at Scale
+
+**Goal**: The Library, Find and every document picker stay correct and fast for an account with **tens of thousands of documents**: the server returns one page at a time, the server does the counting, and no request ever carries an ever-growing list of ids.
+**Depends on**: Phase 280 (it edited `documents.py`); after Phase 283 in sequence. Added 2026-10-14 from `BUG-261014-06` (Library read 0 documents at 286, `414 URI too long`) and `BUG-261014-07` (every list silently cut at 1,000 rows).
+**Requirements**: FIX-11
+**Success Criteria** (what must be TRUE):
+
+  1. With **10,000** and **50,000** documents seeded locally for one account, the Library opens Root and a folder showing the **correct total** and the first page; the page's response size and load time are **measured and recorded** for both sizes, and neither grows with the library (FIX-11).
+  2. **Nothing is silently missing:** an account with more than 1,000 documents reaches every one by paging, and the total shown equals `count(*)` in the database. No list request depends on the API's 1,000-row cap (FIX-11).
+  3. Folder counts, the CHUNKS / VECTORS tiles and each row's table / image counts come from **server-side aggregates** and equal the database counts at 10,000 documents. No request carries an id list that grows with the library; the `BUG-261014-06` batching stopgap is removed (FIX-11).
+  4. **Find pages in the database** (limit / offset in SQL), not by loading every match and slicing (`document_search_service.py:573` today) (FIX-11).
+  5. Every screen that loads the whole document list just to pick one (`CreateLinkDialog`, `TakeoffSection`, `LegalHoldDialog` and the rest of the `listDocuments()` callers) **searches on the server** instead (FIX-11).
+  6. A guard test fails if any list endpoint returns an unbounded result or any query is built from an unbounded id list, and it is **driven RED** against a planted regression (FIX-11).
+  7. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. opening a 10,000-document folder, paging to the end, picking a document in the link dialog), and Chrome MCP drives each one (FIX-11).
+
+**How we'd know this failed**: the list pages, but folder totals or the tiles are still counted from the page in the browser (so they read 50, not 10,000); the 1,000-row cap is "fixed" by raising `max_rows`; the batching stays and simply runs 100+ round-trips; Find still loads every match before slicing; a picker still downloads the whole library; the RLS boundary loosens because a new aggregate function runs as `SECURITY DEFINER` (or keeps the default `PUBLIC` EXECUTE grant).
+**Plans**: TBD (target 4: `LibraryPage.tsx` extraction, behaviour-preserving · server-paged `GET /documents` + server aggregates (migration **207** only if an index or function is needed) · Find + pickers on server search · 10k/50k seeded measurement + guard + G-4 drive)
+**Flags**: ⛔ **G-5: `frontend/src/pages/LibraryPage.tsx` FIRES and its extraction is OWED — taken first.** Also FIRING: `backend/app/api/documents.py`, `backend/app/services/document_search_service.py`, `frontend/src/components/ingestion/DocumentList.tsx`, `frontend/src/lib/api/documents.ts`, `frontend/src/types/index.ts`; `frontend/src/hooks/useDocuments.ts` and `DocumentsPager.tsx` read their ledger sections first. **security_enforcement**: any new SQL function is `SECURITY INVOKER`, revoked from `PUBLIC`, and proven as `authenticated`, never through the service role. **measure first**: record today's figures at 10k/50k before changing anything. Supabase Realtime stays a hint: a document-change event refetches the current page, never patches a full in-memory list. **G-2**: the pager exists (`DocumentsPager`), so the sketch skip is recorded unless discuss changes the Library layout. Cross-check `BUG-261014-06` / `-07` at discuss.
+**UI hint**: yes
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -324,6 +345,7 @@ Plans:
 | 281. A Refusal Names Its Cause | 0/4 | Planned | - |
 | 282. The Slow Run and the Paused Run | 0/TBD | Not started | - |
 | 283. Every Member Reaches Their Own Settings | 0/TBD | Not started | - |
+| 284. Library at Scale | 0/TBD | Not started | - |
 
 ---
 

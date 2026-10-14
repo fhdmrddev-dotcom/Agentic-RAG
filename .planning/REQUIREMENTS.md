@@ -20,6 +20,7 @@ Seeds folded at intake: **SEED-221** (into FIX-10), **SEED-328** (into SEAM-01),
 - [ ] **FIX-08**: Expanding the Chunks section on a 1,000-chunk document leaves every section below it reachable. — `BUG-260908-01`
 - [ ] **FIX-09**: When an emit step fails, the reported cause is the check that actually failed — never "citations" when citation coverage was 100%. — `BUG-260730-02`
 - [ ] **FIX-10**: A publish-gauntlet refusal shows the author the precise reason recorded in `harness_audit`, in plain words, never a machine code. — `BUG-260815-06` + `SEED-221`
+- [ ] **FIX-11**: The Library, Find and every document picker stay correct and fast for an account with tens of thousands of documents — the server pages and counts, no request carries a growing id list, and no list is silently cut at the API's 1,000-row cap. — `BUG-261014-06` + `BUG-261014-07` (added 2026-10-14)
 
 ### v4.5 audit debt (DEBT)
 
@@ -70,6 +71,7 @@ Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not excee
 | FIX-08 | Phase 283 | Pending |
 | FIX-09 | Phase 281 | Pending |
 | FIX-10 | Phase 281 | Pending |
+| FIX-11 | Phase 284 | Pending |
 | DEBT-07 | Phase 281 | Pending |
 | DEBT-08 | Phase 280 | Complete |
 | DEBT-09 | Phase 278 | Pending |
@@ -81,7 +83,7 @@ Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not excee
 | REG-04 | Phase 277 | Complete |
 | REG-05 | Phase 277 | Complete |
 
-**Coverage:** 20 v4.6 requirements · 20 mapped · 0 orphans · 0 duplicates (roadmap created 2026-10-12).
+**Coverage:** 21 v4.6 requirements · 21 mapped · 0 orphans · 0 duplicates (roadmap created 2026-10-12; FIX-11 / Phase 284 added 2026-10-14).
 
 ---
 *Requirements defined: 2026-10-12*

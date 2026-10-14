@@ -9,6 +9,7 @@ affected_areas: [backend/api/documents, frontend/library]
 folded_into: null
 verified_closed_by: "quick fix 2026-10-14 — test_261014_list_documents_batches_in.py + live GET /documents 200 (286 docs) + Library rendered 286 documents / 8,026 chunks"
 related_seeds: []
+related_bugs: [BUG-261014-07]
 re_open_trigger: "Any other `.in_()` over an unbounded id list (e.g. documents.py's global_folder_ids read) returns 414, or GET /documents 500s again."
 reproduces_on:
   branch: develop
@@ -35,3 +36,10 @@ reproduces_on:
 
 `list_documents` batches the two count reads at `_ID_BATCH = 100` ids. Live after uvicorn reload:
 `GET /documents` 200, 286 rows; Library shows CHUNKS 8,026 across 286 documents, Root 200.
+
+## ⚠ The fix is a stopgap (2026-10-14)
+
+Batching clears the 414 only. The list is still unpaginated and the API silently caps it at 1,000
+rows — see `BUG-261014-07`. The batching ships on `develop` only (the production hotfix was held by
+the operator) and is to be **removed** by Phase 284 (FIX-11), which replaces it with server-side
+aggregates and a server-paged list.
