@@ -2,11 +2,14 @@
 
 Wraps `query.execute()` in `starlette.concurrency.run_in_threadpool` so the
 asyncio event loop is not blocked on Postgres round-trips. This is the
-SSE-path threadpool wrap referenced in research §A1–A2 — it coexists with
-the existing `_patch_postgrest_maybe_single` patch in `main.py:17–40` (both
-wrap `execute`; the postgrest patch handles a 204-error edge case at
-import time, while `aexec` runs the call off the event loop at request
-time).
+SSE-path threadpool wrap referenced in research §A1–A2: `aexec` runs the
+call off the event loop at request time and returns its result unchanged.
+
+A `.maybe_single()` query that matches 0 rows returns `None` from
+`.execute()` (postgrest 2.29), so read its row through `maybe_row` below
+rather than `.data`. (Phase 280 / D-30 deleted the `main.py` postgrest patch
+this paragraph used to describe: it wrapped `SyncSingleRequestBuilder`, not
+the maybe_single builder, for an error code postgrest never produces.)
 
 Usage:
     from app.utils.db import aexec
@@ -42,6 +45,20 @@ def coerce_uid(user_id) -> str:
     rule services each carried their own copy of (Phase 118 AR-118-01 hoist).
     """
     return str(UUID(str(user_id)))
+
+
+def maybe_row(resp):
+    """The row a ``.maybe_single()`` query found, or ``None``.
+
+    Measured (Phase 280, BUG-261012-02): postgrest 2.29's
+    ``SyncMaybeSingleRequestBuilder.execute`` returns ``None`` — not a response whose ``.data``
+    is ``None`` — when the query matches 0 rows. Reading ``.data`` straight off that result is an
+    ``AttributeError``, which reaches the client as a 500 (and without CORS headers) instead of
+    the handler's own 404/403 branch. Every ``maybe_single()`` read goes through this, or through
+    an explicit None-guard; ``tests/unit/test_280_maybe_row_fence.py`` pins that over
+    ``backend/app``.
+    """
+    return resp.data if resp is not None else None
 
 
 async def aexec(query):

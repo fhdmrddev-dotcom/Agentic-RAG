@@ -36,9 +36,10 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, Optional, Sequence
 from uuid import UUID
 
-from starlette.concurrency import run_in_threadpool
-
 from app.db import retention as rdb
+# Phase 280 (D-11): the one bytes step, lifted byte-identical into document_purge and shared with
+# both watch purge doors. The alias keeps the single caller below unchanged.
+from app.services.document_purge import remove_document_bytes as _remove_bytes
 from app.services.retention.evaluate import (
     ARCHIVE_KINDS,
     DISPOSE_KINDS,
@@ -502,17 +503,6 @@ async def confirm_batch(
     out["removed_paths"] = removed
     out["bytes_not_removed"] = not_removed
     return out
-
-
-async def _remove_bytes(storage, paths: list[str], removed: list[str], not_removed: list[str]) -> None:
-    if not paths or storage is None:
-        return
-    try:
-        await run_in_threadpool(lambda: storage.storage.from_(STORAGE_BUCKET).remove(paths))
-        removed.extend(paths)
-    except Exception:
-        logger.exception("retention: removing %d file(s) after a confirmed delete failed", len(paths))
-        not_removed.extend(paths)
 
 
 async def _record_failure(pool, snap, p: PolicyFacts, qrow: dict, decision: str, exc: Exception, *,

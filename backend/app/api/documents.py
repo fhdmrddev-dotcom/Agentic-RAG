@@ -36,7 +36,7 @@ from app.services.email_attachments import ingest_email_attachments
 from app.services.ingest_enrich import enrich_for_ingest
 from app.services.extraction_service import ExtractedDocument
 from app.services.retention import hold_guard  # Phase 275 (D-14 / D-32): the one hold check
-from app.utils.db import aexec
+from app.utils.db import aexec, maybe_row
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
 
@@ -833,7 +833,7 @@ async def list_document_versions(
         .maybe_single()
         .execute()
     )
-    if not doc.data:
+    if not maybe_row(doc):
         raise HTTPException(status_code=404, detail="Document not found")
     # 2. Fetch all sibling versions
     result = (
@@ -1230,7 +1230,7 @@ async def restore_document_version(
         .maybe_single()
         .execute()
     )
-    if not doc.data:
+    if not maybe_row(doc):
         raise HTTPException(status_code=404, detail="Document not found")
     target = doc.data
     folder_id = target["folder_id"]
@@ -1293,7 +1293,7 @@ async def reingest_document(
         .maybe_single()
         .execute()
     )
-    if not doc.data:
+    if not maybe_row(doc):
         raise HTTPException(status_code=404, detail="Document not found")
 
     target = doc.data
@@ -1663,7 +1663,7 @@ async def reextract_document(
         # branch below. Bare HTTPException (no `from e`) keeps supabase-py internals
         # out of the response surface (T-071.2-04-01 information-disclosure constraint).
         raise HTTPException(status_code=404, detail="Document not found")
-    if not doc.data:
+    if not maybe_row(doc):
         # 404 (not 403) — avoid leaking existence to non-owners (T-071-04-01).
         raise HTTPException(status_code=404, detail="Document not found")
     target = doc.data
@@ -1821,16 +1821,18 @@ async def delete_document(
     # RLS-enforced `supabase`.
     service_supabase: Client = Depends(get_supabase),
 ):
-    doc_resp = await aexec(
+    # Phase 280 (DEBT-11 / D-09, BUG-261012-02): a foreign row and a missing id are the same
+    # owner-filtered 0-row miss — postgrest 2.29 returns None for it, so read through maybe_row
+    # and both answer the identical 404 (no existence oracle).
+    target = maybe_row(await aexec(
         supabase.table("documents")
         .select("*")
         .eq("id", document_id)
         .eq("user_id", current_user["id"])
         .maybe_single()
-    )
-    if not doc_resp.data:
+    ))
+    if not target:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-    target = doc_resp.data
     folder_id = target.get("folder_id")
 
     if scope == "all":
@@ -1935,7 +1937,7 @@ async def move_document(
         .maybe_single()
         .execute()
     )
-    if not doc.data:
+    if not maybe_row(doc):
         raise HTTPException(status_code=404, detail="Document not found")
 
     # 2. Validate target folder accessibility (if not moving to root)
@@ -1948,7 +1950,7 @@ async def move_document(
             .maybe_single()
             .execute()
         )
-        if not folder.data:
+        if not maybe_row(folder):
             raise HTTPException(status_code=404, detail="Folder not found")
 
     # 3. Perform move

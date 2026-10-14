@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
 from app.services.file_facts import read_file_facts
 from app.services.transient_errors import is_transient
+from app.utils.db import maybe_row
 
 log = logging.getLogger(__name__)
 
@@ -165,7 +166,7 @@ def mint_document_row(
             .maybe_single()
             .execute()
         )
-        if not folder_check.data:
+        if not maybe_row(folder_check):
             raise HTTPException(status_code=404, detail="Folder not found")
         if folder_check.data["user_id"] != user_id:
             raise HTTPException(
@@ -420,7 +421,7 @@ async def splice_document(
     if not (filename and mime_type and user_id and storage_path):
         try:
             res = supabase.table("documents").select("*").eq("id", document_id).maybe_single().execute()
-            doc = res.data or {}
+            doc = maybe_row(res) or {}
         except Exception as e:
             log.warning("Could not fetch document %s row: %s", document_id, e)
         filename = filename or doc.get("filename", "")
