@@ -199,6 +199,14 @@ capability or a migration.**
   - The two `test_275_delete_paths.py` order pins gain `storage.remove`, amended deliberately with
     the reason written in the test.
   - SC#3 evidence is **per path** (local storage already holds 35 orphans), never a global count.
+- **D-32 (corrects D-03/D-25, after code review, 2026-10-14):** D-03's "a brief window in which two rows read
+  `is_latest = true` is accepted" was **measured false** (280-REVIEW WR-02): two concurrent new versions
+  left **two latest rows permanently**. The review fix (`8aeab2e0b`) settles concurrent same-name versions to
+  exactly one latest row ("later upload wins") with no migration. The two rows can still share a
+  `version_number`; only a constraint would close that. WR-01 (`4ed20aee4`): when the only match is a
+  retired same-name row, the minter **restores** it, as the existing Restore action does; a different-name
+  retired match answers 409. ⚠ Both are rulings Claude made without the operator and need confirming. WR-01's
+  auto-restore is the more capability-shaped of the two under the v4.6 repair-only rule.
 - **UI gate:** the ROADMAP text matches the UI keyword regex only through "page"/"pages" (pagination).
   This phase adds no UI surface, so UI-SPEC is skipped (`--skip-ui` equivalent). DEBT-08's frontend
   work is one assertion in an existing test.
