@@ -20,6 +20,7 @@ import type { ReactElement } from "react"
 
 import { ADD_PROVIDER_ROSTER, ModelRegistryTab } from "../ModelRegistryTab"
 import { ApiError, type ModelRegistryRow } from "@/lib/api"
+import { MODEL_TIMEOUT_HELP_LINE } from "@/lib/api/admin"
 
 afterEach(() => {
   cleanup()
@@ -753,5 +754,81 @@ describe("ModelRegistryTab — provider sections are FOLDED on arrival", () => {
     expect(
       screen.queryByRole("button", { name: /edit context for claude-opus-4-8/i }),
     ).not.toBeInTheDocument()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 282 Plan 01 (FIX-06; D-07, D-21, D-22) — the Timeout cell's help line and the
+// server's refusal. The client never pre-blocks: 1801 is SENT, and the 422 sentence the
+// server writes is what the operator reads, in the same in-row slot as every refusal.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("ModelRegistryTab (282) — the Timeout help line and the 422 refusal", () => {
+  it("renders a rejected 422 detail in the row's role=alert slot", async () => {
+    const user = userEvent.setup()
+    const sentence =
+      "Timeout must be between 1 and 1800 seconds, because a longer call would outlast the run watchdog, which ends a run that has been silent for 2400 s. 1801 was not saved."
+    const onSet = vi.fn().mockRejectedValue(new ApiError(sentence, 422))
+    const { container } = renderTab(
+      <ModelRegistryTab rows={[makeRow()]} onSetCapability={onSet} onLock={noop} showTechnical={false} />,
+    )
+
+    await user.click(screen.getByRole("button", { name: /edit timeout for gpt-5\.6-sol/i }))
+    const input = screen.getByRole("spinbutton", { name: /^timeout for gpt-5\.6-sol/i })
+    await user.clear(input)
+    await user.type(input, "1801")
+    await user.keyboard("{Enter}")
+
+    expect(onSet).toHaveBeenCalledWith("gpt-5.6-sol", { llm_call_timeout_seconds: 1801 })
+    const slot = await waitFor(() => {
+      const el = container.querySelector('[data-model-error="gpt-5.6-sol"]')
+      expect(el).not.toBeNull()
+      return el as HTMLElement
+    })
+    expect(within(slot).getByRole("alert")).toHaveTextContent(sentence)
+  })
+
+  it("shows the help line while the Timeout cell edits, wired by aria-describedby, gone after Escape", async () => {
+    const user = userEvent.setup()
+    renderTab(
+      <ModelRegistryTab rows={[makeRow()]} onSetCapability={noop} onLock={noop} showTechnical={false} />,
+    )
+
+    expect(screen.queryByTestId("timeout-help")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /edit timeout for gpt-5\.6-sol/i }))
+
+    const help = screen.getByTestId("timeout-help")
+    expect(help.textContent).toBe(MODEL_TIMEOUT_HELP_LINE)
+    expect(help.textContent).toContain("Between 1 and 1800 seconds.")
+    expect(help.id).toBe("timeout-help-gpt-5.6-sol")
+    const input = screen.getByRole("spinbutton", { name: /^timeout for gpt-5\.6-sol/i })
+    expect(input).toHaveAttribute("aria-describedby", "timeout-help-gpt-5.6-sol")
+
+    await user.keyboard("{Escape}")
+    expect(screen.queryByTestId("timeout-help")).not.toBeInTheDocument()
+  })
+
+  it("does not show the help line while another numeric cell edits", async () => {
+    const user = userEvent.setup()
+    renderTab(
+      <ModelRegistryTab rows={[makeRow()]} onSetCapability={noop} onLock={noop} showTechnical={false} />,
+    )
+    await user.click(screen.getByRole("button", { name: /edit context for gpt-5\.6-sol/i }))
+    expect(screen.queryByTestId("timeout-help")).not.toBeInTheDocument()
+    const input = screen.getByRole("spinbutton", { name: /^context for gpt-5\.6-sol/i })
+    expect(input).not.toHaveAttribute("aria-describedby")
+  })
+
+  it("sends an out-of-range timeout to the server (no client pre-block)", async () => {
+    const user = userEvent.setup()
+    const onSet = vi.fn().mockResolvedValue(undefined)
+    renderTab(
+      <ModelRegistryTab rows={[makeRow()]} onSetCapability={onSet} onLock={noop} showTechnical={false} />,
+    )
+    await user.click(screen.getByRole("button", { name: /edit timeout for gpt-5\.6-sol/i }))
+    const input = screen.getByRole("spinbutton", { name: /^timeout for gpt-5\.6-sol/i })
+    await user.clear(input)
+    await user.type(input, "1801")
+    await user.keyboard("{Enter}")
+    expect(onSet).toHaveBeenCalledWith("gpt-5.6-sol", { llm_call_timeout_seconds: 1801 })
   })
 })
