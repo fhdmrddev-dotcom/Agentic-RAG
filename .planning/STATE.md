@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: ready_to_plan
+status: ready_to_execute
 last_updated: 2026-10-15T21:46:53.109Z
-last_activity: 2026-10-16 -- Phase 284 context gathered (auto)
+last_activity: 2026-10-16 -- Phase 284 planned (5 plans, 3 waves)
 progress:
   total_phases: 15
   completed_phases: 6
   total_plans: 25
   completed_plans: 25
   percent: 40
-stopped_at: Phase 284 context gathered — planning next (284-CONTEXT.md)
+stopped_at: Phase 284 planned — executing (284-01..05)
 ---
 
 # Project State
@@ -55,7 +55,7 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 
 ## Current Position
 
-**Phase 284 context gathered (2026-10-16, `--auto`).** `284-CONTEXT.md` D-01..D-27: envelope `GET /documents` (breaking, documented), one SQL summary for every count, Find paged in SQL, pickers on `POST /document-search`, per-document lists bounded, synthetic 10k/50k account + baseline first, two-layer guard, LibraryPage data-hook extraction first, sketch skipped by decision, G-4 A-E. Seeds: 248 folded (Library half), 317 / 352 deferred. Next: plan-phase 284.
+**Phase 284 PLANNED (2026-10-16, `--auto`).** 5 plans / 3 waves (01 FE extraction ∥ 02 seed+baseline+view 207+paged API · 03 Library on server ∥ 04 Find SQL+pickers+route guard · 05 request recorder+fence+close checkpoint). RESEARCH `249efeab5`, UI-SPEC approved, checker PASSED 0 blockers. Owed by decision: v4.6 changelog line for the `GET /documents` envelope (R-06; owner: v4.6 close); legacy-array tolerance in page clients (owner: first prod deploy after 284 — remove once production runs the envelope). **Context:** `284-CONTEXT.md` D-01..D-27: envelope `GET /documents` (breaking, documented), one SQL summary for every count, Find paged in SQL, pickers on `POST /document-search`, per-document lists bounded, synthetic 10k/50k account + baseline first, two-layer guard, LibraryPage data-hook extraction first, sketch skipped by decision, G-4 A-E. Seeds: 248 folded (Library half), 317 / 352 deferred. Next: plan-phase 284.
 
 **Post-282 bug fixes (2026-10-15), all closed on live re-drives, not pushed:** BUG-261015-03 `ee0f4beaf` (ask_user 300 s floor + null-guidance schema text; 7/7 rows paused past 100 s and answered), -04 `5358a243a` (credit 400 / 402 → billing copy; Anthropic row live), -05 `bdf18576e` (run linked to its reply at save time + live-copy-wins reload merge; Spark 1 bubble through a forced mid-window reload; cloud row not driven), -06 `b77aade1e` (NEW, major: the shutdown sentinel was Redis-wide, so the unit suite / another worker interrupted live pauses; now per-process). 278 pins changed deliberately: `_handle_ask_user` RETIRED from the pure-move fence; schema digests re-captured (only the ask_user description changed, proven). Backend gate: failing set == base (71) after the pin re-capture. `spark-x2.5-4b` enabled by the operator.
 
