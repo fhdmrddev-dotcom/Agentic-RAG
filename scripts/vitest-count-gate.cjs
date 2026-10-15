@@ -3572,6 +3572,7 @@ const BASELINE = {
   "LibraryPage.test.tsx": 12,
   "librarySelection.test.ts": 25,
   "useDocuments.test.ts": 7,
+  "useLibraryDocuments.test.ts": 13, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT.
   "DocumentList.test.tsx": 7,
   "DocumentList.moveToFolder.test.tsx": 4,
   "ViewsGroup.test.tsx": 10,
@@ -5568,6 +5569,8 @@ const TARGETS = [
   // — so its G-5 obligation is not triggered by a code change here. What changes is that
   // its two suites stop being invisible to this gate.
   "src/__tests__/hooks/useDocuments.test.ts",
+  // Phase 284-01 Task 2 — the D-24 Library data hook. FILE-LEVEL.
+  "src/__tests__/hooks/useLibraryDocuments.test.ts",
   "src/__tests__/components/DocumentList.moveToFolder.test.tsx",
   "src/components/ingestion/DocumentList.test.tsx",
   "src/components/ingestion/ViewsGroup.test.tsx",
