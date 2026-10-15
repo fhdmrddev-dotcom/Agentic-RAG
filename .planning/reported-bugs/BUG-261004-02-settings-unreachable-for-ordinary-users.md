@@ -4,10 +4,10 @@ title: Settings is unreachable for ordinary users, yet it holds user features (M
 reported: 2026-10-04
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [frontend/navigation, frontend/settings, auth/permissions]
 folded_into: "283"
-verified_closed_by: null
+verified_closed_by: "Phase 283 — 283-LIVE-EVIDENCE.md D-13 + D-22 #1/#2 (2026-10-15, fhdmrd.dev member in 22f9c615)"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
