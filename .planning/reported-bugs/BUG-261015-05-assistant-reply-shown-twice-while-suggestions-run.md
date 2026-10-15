@@ -4,10 +4,10 @@ title: The assistant reply shows twice (one finished, one still "Thinking…") u
 reported: 2026-10-15
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [frontend/chat-messages, frontend/streams-reconcile, backend/agent-loop]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "fix bdf18576e, 2026-10-15"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -59,3 +59,16 @@ It looks like a double send, which erodes trust in the local-model path that SEE
 ⛔ **G-5:** `StreamsProvider.tsx`, `MessageList.tsx` and `useMessages.ts` all fire.
 
 **Close only after a live re-drive on a local model and one cloud row.**
+
+## Fixed and re-driven (2026-10-15)
+
+**The fix is commit `bdf18576e`:**
+- **Backend:** `link_run_message` writes `runs.message_id` the moment the reply is saved, and only while it is still unset.
+- **Frontend:** `lib/liveRunTwin.ts` is used by both `StreamsProvider` reload merges. While a run is streaming on a live subscription **and** the DB still says `streaming`, the merge keeps the live copy and hides the saved twin.
+- **A first draft regressed `MessageItem.answerOutOfFold` §6b** (a run that ended while the client was elsewhere). It was fixed by the DB-status condition.
+
+**Live check, on spark-x2.5-4b with the tab visible:**
+- **Thread:** `Zebra check`, `7bde6272`.
+- **The window:** the reply was saved, and the API returned it with `run_status: streaming` and its run id, at 18:51:25 UTC. The run completed at 18:51:49.
+- **The reload:** the chat switched to another thread and back inside that window, forcing a reload.
+- **Result:** the assistant bubble count was **1** before the switch, 1 after it, and 1 after completion. Before the fix, this window showed 2.

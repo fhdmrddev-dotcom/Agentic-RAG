@@ -4,10 +4,10 @@ title: A shutting-down app process interrupts EVERY paused ask_user in Redis, in
 reported: 2026-10-15
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/ask-user, backend/lifespan, backend/tests]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "fix b77aade1e, 2026-10-15"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -53,3 +53,18 @@ Each case cancels paused questions that belong to processes which are still aliv
 - **Isolate the tests:** keep the unit suite off the live Redis, either through a test `REDIS_URL` DB index or a mocked `get_redis` in `test_health`.
 - **Re-drive:** a pause on worker A must survive a restart of worker B.
 - **Also re-drive BUG-261015-03's pause rows,** since they were invalidated by this.
+
+## Fixed and re-driven (2026-10-15)
+
+**The fix is commit `b77aade1e`:**
+- A process-local `_LOCAL_CHANNELS` set.
+- Both subscribe sites register and unregister their channel.
+- The shutdown broadcast publishes only to this process's channels.
+
+**Live check, backend restarted on the fix:**
+- **The pause:** a deepseek-v4-pro pause was opened (run `1122d2c6`, pending 1 at 18:52:47 UTC).
+- **The test:** `pytest tests/unit/test_health.py` was then run. It drives the full `TestClient(app)` lifespan, startup and shutdown, against the live local Redis, from 18:52:51 to 18:53:13.
+- **Result:** afterwards the pause was **still pending**. It was answered "Blue", and the run completed "You chose **Blue**."
+- **Before the fix,** the same kind of run interrupted 7 of 7 live pauses.
+
+**Not driven:** a two-worker restart (worker A's pause survives worker B restarting). That case is covered by the same code path and by the unit test.
