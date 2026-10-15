@@ -135,7 +135,9 @@ const BASELINE = {
   // Add-form Timeout cases (placeholder 300 -> 900 by provider, blank sends no key, typed is a number).
   // 36 -> 37 the same day: the live drive found the browser's native max=1800 hiding the
   // server's refusal sentence; the +1 fences 1801 reaching the server and its alert in the form.
-  "ModelRegistryTab.test.tsx": 37,
+  // 282-REVIEW WR-05 — 37 -> 39, measured 2026-10-15 (39/39 passed in a targeted run): "1e3" and
+  // "900.5" are refused in the form instead of parseInt sending 1 and 900.
+  "ModelRegistryTab.test.tsx": 39,
   "addProviderRoster.lockstep.test.ts": 4,
   "hideControlLegibility.test.tsx": 6,
   // Phase 249 Plan 02 (MODEL-05) — the pick-time chip, its negative arm, its consequence text,

@@ -1508,6 +1508,14 @@ function AddModelForm({
       setErrorDetail("Enter a model id.")
       return
     }
+    // 282-REVIEW WR-05: send exactly what was typed. parseInt read "1e3" as 1 and "900.5" as 900 —
+    // both legal, so the server saved a timeout the operator never chose. A whole number (sign
+    // allowed, so 0 / -5 still reach the server's range sentence) or blank; anything else stops here.
+    const timeoutTyped = timeoutDraft.trim()
+    if (timeoutTyped !== "" && !/^-?\d+$/.test(timeoutTyped)) {
+      setErrorDetail("Timeout must be a whole number of seconds.")
+      return
+    }
     setBusy(true)
     setErrorDetail(null)
     // Build by conditional inclusion — start from {model_id, provider}; NEVER add `enabled`.
@@ -1516,8 +1524,7 @@ function AddModelForm({
     if (ctx !== undefined) body.context_window_tokens = ctx
     const out = numOrUndef(outValue)
     if (out !== undefined) body.max_output_tokens = out
-    const timeoutS = numOrUndef(timeoutDraft)
-    if (timeoutS !== undefined) body.llm_call_timeout_seconds = timeoutS
+    if (timeoutTyped !== "") body.llm_call_timeout_seconds = Number(timeoutTyped)
     if (toolsValue === "native") body.native_tools = true
     else if (toolsValue === "none") body.native_tools = false
     // OMIT native_tools entirely on "unknown" (never a bare false).

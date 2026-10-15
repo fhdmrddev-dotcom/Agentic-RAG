@@ -901,4 +901,16 @@ describe("ModelRegistryTab (282-04) — Timeout on the Add model by ID form", ()
     const form = screen.getByRole("form", { name: /add model by id/i })
     expect(await within(form).findByRole("alert")).toHaveTextContent(sentence)
   })
+
+  // 282-REVIEW WR-05: parseInt turned "1e3" into a 1-second timeout and "900.5" into 900 — both
+  // legal, so the server accepted a number the operator never typed. Refuse in the form instead.
+  it.each(["1e3", "900.5"])("a non-whole Timeout (%s) is refused in the form and nothing is sent", async (typed) => {
+    const { user, onAddModel } = await openForm()
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "spark-x2.5-4b")
+    fireEvent.change(screen.getByRole("spinbutton", { name: /^timeout seconds$/i }), { target: { value: typed } })
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+    const form = screen.getByRole("form", { name: /add model by id/i })
+    expect(await within(form).findByRole("alert")).toHaveTextContent("Timeout must be a whole number of seconds.")
+    expect(onAddModel).not.toHaveBeenCalled()
+  })
 })
