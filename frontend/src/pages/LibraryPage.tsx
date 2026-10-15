@@ -431,13 +431,16 @@ export function LibraryPage({
 
   const canUploadToFolder = !selectedFolderId || !selectedFolder || selectedFolder.user_id === user?.id
 
-  // ⚠ 284-01 Task 2 → Task 3: FolderDetail still takes the folder's documents until Task 3 hands
-  // it the summary's count and size. This is the one derivation left on the page for that commit.
+  // ⚠ Wave 1 only: the raw array for the Ingestion tab and Find's relationship candidates
+  // (284-03 / 284-04 remove both readers, then the hook deletes it).
   const ingestionDocuments = libDocs.documentsForIngestion
-  const folderDocuments = useMemo(() => {
-    if (selectedFolderId === null) return []
-    return ingestionDocuments.filter((d) => d.folder_id === selectedFolderId)
-  }, [selectedFolderId, ingestionDocuments])
+  // 284-01 (D-07 / UI-SPEC S5): the selected folder's count and size are the summary's. A folder
+  // absent from a READY summary holds no documents — an answered zero, not an unknown.
+  const summaryState = libDocs.summaryState
+  const selectedFolderCount =
+    selectedFolderId === null || libDocs.summary === null
+      ? null
+      : (libDocs.summary.folders[selectedFolderId] ?? { count: 0, size_bytes: 0, archived: 0 })
 
   const subfolderCount = useMemo(() => {
     if (selectedFolderId === null) return 0
@@ -789,6 +792,12 @@ export function LibraryPage({
                 onFilterChange={handleFindFilterChange}
                 documents={ingestionDocuments}
                 folders={folders}
+                connections={libDocs.summary?.connections ?? []}
+                documentTypes={libDocs.summary?.document_types ?? []}
+                listState={summaryState}
+                onRetry={() => {
+                  libDocs.refresh().catch(console.error)
+                }}
               />
             ),
             saveDisabledReason: canSaveAsView(find)
@@ -990,7 +999,11 @@ export function LibraryPage({
 
       {/* Phase 217.1-06 (LIB-01 / D-217.1 sparkline-drop) — CHUNKS · VECTORS · FOUND BY
           A SEARCH. Numbers stand alone; an unreachable source says so. */}
-      <LibraryStatTiles documents={ingestionDocuments} />
+      <LibraryStatTiles
+        chunks={libDocs.summary?.chunks ?? null}
+        documents={libDocs.summary?.total ?? null}
+        state={summaryState}
+      />
 
       <div className="min-w-0">
         {selectedFolderId === null ? (
@@ -1011,7 +1024,9 @@ export function LibraryPage({
             {selectedFolder && (
               <FolderDetail
                 folder={selectedFolder}
-                documents={folderDocuments}
+                count={selectedFolderCount?.count ?? null}
+                sizeBytes={selectedFolderCount?.size_bytes ?? null}
+                state={summaryState}
                 subfolderCount={subfolderCount}
               />
             )}

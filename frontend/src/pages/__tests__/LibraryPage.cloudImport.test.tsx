@@ -381,8 +381,10 @@ describe("the Library's cloud door — what the page must NOT grow", () => {
     // needs the second. Pinned so an EIGHTH is a diff a reviewer sees.
     // 284-01 (R-11), 2026-10-16: the seven `.folder_id` reads moved into `useLibraryDocuments` with
     // the derivations (D-24); the property this pin guards — no `folder_id:` body key on the page —
-    // is asserted unchanged above. ONE read stays until 284-01 Task 3 (FolderDetail's array input).
-    expect(pageSource.match(/\.folder_id\b/g)?.length).toBe(1)
+    // is asserted unchanged above. 7 → 0: the page now reads no document field at all (the
+    // last read left with FolderDetail's array input, 284-01 Task 3). `?? 0` because a regex with
+    // no match answers `null`, not an empty list.
+    expect(pageSource.match(/\.folder_id\b/g)?.length ?? 0).toBe(0)
   })
 
   it("the door reads the SHIPPED permission predicate, and no second one is introduced", () => {
