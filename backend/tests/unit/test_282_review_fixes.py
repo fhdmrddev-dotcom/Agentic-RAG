@@ -214,3 +214,56 @@ async def test_wr02_an_empty_exception_message_still_names_the_exception():
         )
     assert finalize.await_args.kwargs["error"] == "_Silent"
     assert res["summary"] == "Sub-agent failed: _Silent"
+
+
+# ── WR-03 ─────────────────────────────────────────────────────────────────────────────────
+
+
+async def test_wr03_a_timeout_ends_the_ladder_instead_of_resending_the_prompt(monkeypatch):
+    import app.services.forced_emit as fe
+
+    calls: list = []
+
+    async def _timing_out_open(provider, request):
+        calls.append(request)
+        raise TimeoutError()
+
+    monkeypatch.setattr(fe, "open_stream", _timing_out_open)
+    monkeypatch.setattr(fe, "get_model_capability", lambda _m: {"emit_tier": "force_strict"})
+    monkeypatch.setattr(fe, "get_per_call_timeout_async", AsyncMock(return_value=900))
+    result = await fe.forced_emit(
+        messages=[{"role": "user", "content": "fill it"}],
+        model="qwen/qwen3-30b-a3b",
+        provider="lmstudio",
+        emitter="emit_fields",
+        tools=[],
+        user_settings=None,
+    )
+    assert len(calls) == 1, "a timed-out rung must not re-send the prompt on the next rung"
+    assert result["emitted"] is None
+    assert result["failure"] == "provider_error"
+    assert result["truncated"] is False
+
+
+async def test_wr03_a_non_timeout_raise_still_descends(monkeypatch):
+    import app.services.forced_emit as fe
+
+    calls: list = []
+
+    async def _failing_open(provider, request):
+        calls.append(request)
+        raise RuntimeError("400 strict schema")
+
+    monkeypatch.setattr(fe, "open_stream", _failing_open)
+    monkeypatch.setattr(fe, "get_model_capability", lambda _m: {"emit_tier": "force_strict"})
+    monkeypatch.setattr(fe, "get_per_call_timeout_async", AsyncMock(return_value=900))
+    result = await fe.forced_emit(
+        messages=[{"role": "user", "content": "fill it"}],
+        model="gpt-5.6",
+        provider="openai",
+        emitter="emit_fields",
+        tools=[],
+        user_settings=None,
+    )
+    assert len(calls) == 3
+    assert result["failure"] == "provider_error"

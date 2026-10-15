@@ -223,6 +223,9 @@ def _failure(
     a reader who trusted it would thread the totals twice and look for a second site
     that does not exist. ⛔ A SECOND call site would have to thread the totals again;
     adding one without doing so silently re-opens the hole.
+
+    ⚠ 282-REVIEW WR-03 ADDED that second call site: the timed-out-rung arm, which ends the
+    ladder. It passes both ladder totals explicitly, like the floor.
     """
     return {
         "emitted": None,
@@ -501,8 +504,8 @@ async def forced_emit(
     ladder_in_tok: int | None = None
     ladder_out_tok: int | None = None
     # Phase 282 (FIX-06, D-01): the per-model budget reaches every rung's client constructor
-    # and the OpenAI-family open guard. A TimeoutError from that guard is an ``Exception`` and
-    # descends a rung through the existing per-rung except below, like any provider raise.
+    # and the OpenAI-family open guard. A TimeoutError from that guard ENDS the ladder
+    # (282-REVIEW WR-03) — it never descends a rung like other provider raises.
     _timeout_s = await get_per_call_timeout_async(model, settings, provider=provider)
     for rung_name, forced, rung_strict in _RUNGS_BY_TIER[emit_tier]:
         # Phase 103 strict override: an explicit ``strict=False`` demotes the
@@ -538,6 +541,25 @@ async def forced_emit(
             stream, calling_mode = await open_stream(provider, req)
             content, tool_calls, finish_reason, _rung_in, _rung_out = (
                 await run_in_threadpool(_drain, stream)
+            )
+        except TimeoutError:
+            # 282-REVIEW WR-03: a per-call timeout is TERMINAL for the ladder. Descending would
+            # re-queue the same prompt on a model that is busy (the previous rung's request may
+            # still be in flight) and stack silent budgets past the run watchdog (D-21). The
+            # failure keeps the existing provider_error value; a distinct timed_out label is
+            # deferred (it needs a new emit_cause kind + copy). Ladder totals threaded (S-5).
+            logger.info(
+                "forced_emit: rung=%s timed out; ending the ladder emit_tier=%s provider=%s",
+                rung_name, emit_tier, provider,
+            )
+            return _failure(
+                emit_tier,
+                provider,
+                forced=False,
+                truncated=False,
+                failure_override="provider_error",
+                input_tokens=ladder_in_tok,
+                output_tokens=ladder_out_tok,
             )
         except Exception:  # noqa: BLE001 — a provider raise → descend to the next rung
             logger.info(

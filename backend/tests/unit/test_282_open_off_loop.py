@@ -257,7 +257,7 @@ async def test_drain_without_a_numeric_deadline_uses_timeout_seconds():
 # ── Test 6: the harness callers survive an open-guard TimeoutError ────────────────────────
 
 
-async def test_forced_emit_descends_on_an_open_guard_timeout(monkeypatch):
+async def test_forced_emit_ends_the_ladder_on_an_open_guard_timeout(monkeypatch):
     import app.services.forced_emit as fe
 
     calls: list = []
@@ -284,10 +284,10 @@ async def test_forced_emit_descends_on_an_open_guard_timeout(monkeypatch):
         tools=[{"function": {"name": "render_template", "parameters": {}}}],
         user_settings=None,
     )
-    # The `force` ladder is (non_strict_force, coerce): BOTH rungs were tried, the
-    # TimeoutError was caught by the existing per-rung except each time, and the ladder
-    # landed on the honest provider_error floor — nothing escaped.
-    assert len(calls) == 2
+    # 282-REVIEW WR-03: the `force` ladder is (non_strict_force, coerce), but a timeout is
+    # TERMINAL — the second rung would re-send the prompt to a busy model and stack budgets
+    # past the watchdog. One call, then the honest provider_error floor — nothing escaped.
+    assert len(calls) == 1
     assert all(r.timeout_s == 7 for r in calls)
     assert res["emitted"] is None
     assert res["failure"] == "provider_error"
