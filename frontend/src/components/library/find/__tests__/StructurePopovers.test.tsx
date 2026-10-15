@@ -15,6 +15,7 @@ import {
   VersionEditor,
 } from "@/components/library/find/StructurePopovers"
 import { RELATIONSHIP_FILTER_VERBS } from "@/components/relationships/relationshipLabels"
+import { summarizeDocuments } from "@/hooks/useLibraryDocuments"
 import type { Document, Folder } from "@/types"
 
 function doc(over: Partial<Document>): Document {
@@ -64,6 +65,10 @@ const DOCS: Document[] = [
   }),
 ]
 
+// 284-01 (D-07 / R-03): Added by and Document type read the SUMMARY lists, not the documents.
+// Derived from the same DOCS through `summarizeDocuments`, so every assertion below keeps its intent.
+const SUMMARY = summarizeDocuments(DOCS)
+
 const SHELL = "w-72 rounded-lg border border-border bg-popover p-3 shadow-md space-y-3"
 
 describe("every editor shares the shipped popover idiom", () => {
@@ -71,9 +76,9 @@ describe("every editor shares the shipped popover idiom", () => {
     ["Version", (c) => <VersionEditor onApply={vi.fn()} onCancel={c} />],
     ["Relationship", (c) => <RelationshipEditor documents={DOCS} onApply={vi.fn()} onCancel={c} />],
     ["Folder", (c) => <FolderEditor folders={[folder("f1", "Contracts")]} onApply={vi.fn()} onCancel={c} />],
-    ["Added by", (c) => <AddedByEditor documents={DOCS} onApply={vi.fn()} onCancel={c} />],
+    ["Added by", (c) => <AddedByEditor connections={SUMMARY.connections} onApply={vi.fn()} onCancel={c} />],
     ["Date", (c) => <DateEditor onApply={vi.fn()} onFilterCondition={vi.fn()} onCancel={c} />],
-    ["Document type", (c) => <DocumentTypeEditor documents={DOCS} onApply={vi.fn()} onCancel={c} />],
+    ["Document type", (c) => <DocumentTypeEditor documentTypes={SUMMARY.document_types} onApply={vi.fn()} onCancel={c} />],
   ]
   it.each(cases)("%s: role=dialog with an aria-label, the shipped shell, Esc cancels", (name, make) => {
     const onCancel = vi.fn()
@@ -197,7 +202,7 @@ describe("FolderEditor (SC#3)", () => {
 
 describe("AddedByEditor (T-271-11)", () => {
   it("offers You, one option per distinct connection, and Anyone else — never an email", () => {
-    render(<AddedByEditor documents={DOCS} onApply={vi.fn()} onCancel={vi.fn()} />)
+    render(<AddedByEditor connections={SUMMARY.connections} onApply={vi.fn()} onCancel={vi.fn()} />)
     const names = screen.getAllByRole("radio").map((r) => (r as HTMLInputElement).labels?.[0]?.textContent)
     expect(names).toEqual(["You", "Drive Finance (connected source)", "Anyone else"])
     expect(document.body.textContent).not.toContain("@")
@@ -205,7 +210,7 @@ describe("AddedByEditor (T-271-11)", () => {
 
   it("Apply emits kind me / connection / others", () => {
     const onApply = vi.fn()
-    render(<AddedByEditor documents={DOCS} onApply={onApply} onCancel={vi.fn()} />)
+    render(<AddedByEditor connections={SUMMARY.connections} onApply={onApply} onCancel={vi.fn()} />)
     fireEvent.click(screen.getByRole("radio", { name: "You" }))
     fireEvent.click(screen.getByRole("button", { name: "Apply" }))
     expect(onApply).toHaveBeenLastCalledWith({ kind: "me", connectionId: null, label: "You" })
@@ -283,14 +288,14 @@ describe("DateEditor (P-10)", () => {
 
 describe("DocumentTypeEditor (P-10)", () => {
   it("offers the distinct recorded document types", () => {
-    render(<DocumentTypeEditor documents={DOCS} onApply={vi.fn()} onCancel={vi.fn()} />)
+    render(<DocumentTypeEditor documentTypes={SUMMARY.document_types} onApply={vi.fn()} onCancel={vi.fn()} />)
     const names = screen.getAllByRole("checkbox").map((r) => (r as HTMLInputElement).labels?.[0]?.textContent)
     expect(names).toEqual(["Contract", "Memo"])
   })
 
   it("one pick → eq; several → one_of; both on the metadata field document_type", () => {
     const onApply = vi.fn()
-    render(<DocumentTypeEditor documents={DOCS} onApply={onApply} onCancel={vi.fn()} />)
+    render(<DocumentTypeEditor documentTypes={SUMMARY.document_types} onApply={onApply} onCancel={vi.fn()} />)
     const apply = screen.getByRole("button", { name: "Apply" })
     expect(apply).toBeDisabled()
     fireEvent.click(screen.getByRole("checkbox", { name: "Contract" }))
@@ -303,5 +308,65 @@ describe("DocumentTypeEditor (P-10)", () => {
       op: "one_of",
       values: ["Contract", "Memo"],
     })
+  })
+})
+
+// ── 284-01 (D-07 / R-03 / UI-SPEC S12) — the two editors take bounded lists, with honest arms ──
+describe("Added by and Document type read the summary lists", () => {
+  it("Added by sorts the connection labels as before and names an unnamed connection", () => {
+    render(
+      <AddedByEditor
+        connections={[
+          { id: "c2", name: "Zeta Box", count: 1 },
+          { id: "c3", name: null, count: 4 },
+          { id: "c1", name: "Alpha Drive", count: 9 },
+        ]}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+    const names = screen.getAllByRole("radio").map((r) => (r as HTMLInputElement).labels?.[0]?.textContent)
+    expect(names).toEqual([
+      "You",
+      "Alpha Drive (connected source)",
+      "Unnamed connection (connected source)",
+      "Zeta Box (connected source)",
+      "Anyone else",
+    ])
+  })
+
+  it("Added by while the list loads says Loading… and offers no connection yet", () => {
+    render(<AddedByEditor connections={[]} listState="loading" onApply={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…")
+    expect(screen.queryByText(/connected source/)).toBeNull()
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
+  it("Added by after a failure says so, and Try again retries", () => {
+    const onRetry = vi.fn()
+    render(
+      <AddedByEditor connections={[]} listState="error" onRetry={onRetry} onApply={vi.fn()} onCancel={vi.fn()} />,
+    )
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn’t load this list.")
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it("Document type while the list loads says Loading…, not No document types recorded yet", () => {
+    render(<DocumentTypeEditor documentTypes={[]} listState="loading" onApply={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…")
+    expect(screen.queryByText("No document types recorded yet.")).toBeNull()
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0)
+  })
+
+  it("Document type after a failure says so, and Try again retries", () => {
+    const onRetry = vi.fn()
+    render(
+      <DocumentTypeEditor documentTypes={[]} listState="error" onRetry={onRetry} onApply={vi.fn()} onCancel={vi.fn()} />,
+    )
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn’t load this list.")
+    expect(screen.queryByText("No document types recorded yet.")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
   })
 })

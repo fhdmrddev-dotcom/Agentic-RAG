@@ -5,6 +5,7 @@
  * Version default is always visible (a filter that hides rows by default must show that it
  * does). These cases assert the WORDS on each chip and the ACTION each editor dispatches.
  */
+import type { ComponentProps } from "react"
 import { describe, it, expect, vi } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
 import { FindQuickAdd } from "@/components/library/find/FindQuickAdd"
@@ -33,9 +34,18 @@ const DOCS = [
   },
 ] as unknown as Document[]
 
-function renderQA(find: Partial<FindState> = {}, filter: ViewFilter = EMPTY) {
+// 284-01 (D-07 / R-03): the Added by and Document type options are the SUMMARY's lists (here the
+// one DOCS row's type); `documents` now feeds only the Relationship editor and is optional.
+const DOC_TYPES = [{ value: "Contract", count: 1 }]
+
+function renderQA(
+  find: Partial<FindState> = {},
+  filter: ViewFilter = EMPTY,
+  extra: Partial<ComponentProps<typeof FindQuickAdd>> = {},
+) {
   const dispatch = vi.fn()
   const onFilterChange = vi.fn()
+  const onRetry = vi.fn()
   render(
     <FindQuickAdd
       find={{ ...initialFindState, ...find }}
@@ -44,9 +54,14 @@ function renderQA(find: Partial<FindState> = {}, filter: ViewFilter = EMPTY) {
       onFilterChange={onFilterChange}
       documents={DOCS}
       folders={FOLDERS}
+      connections={[]}
+      documentTypes={DOC_TYPES}
+      listState="ready"
+      onRetry={onRetry}
+      {...extra}
     />,
   )
-  return { dispatch, onFilterChange }
+  return { dispatch, onFilterChange, onRetry }
 }
 
 describe("FindQuickAdd — resting", () => {
@@ -251,5 +266,34 @@ describe("FindQuickAdd — Include archived (275-02, D-04)", () => {
   it("never changes without a click: rendering and re-rendering dispatch nothing", () => {
     const { dispatch } = renderQA({ include_archived: true })
     expect(dispatch).not.toHaveBeenCalled()
+  })
+})
+
+// ── 284-01 (D-07 / R-03 / UI-SPEC S12) — the row threads the summary lists to the editors ──
+describe("FindQuickAdd — the summary lists, not the documents", () => {
+  it("Added by offers the connections it is handed", () => {
+    renderQA({}, EMPTY, { connections: [{ id: "c1", name: "Drive Finance", count: 3 }] })
+    fireEvent.click(screen.getByRole("button", { name: "＋ Added by" }))
+    expect(screen.getByRole("radio", { name: "Drive Finance (connected source)" })).toBeInTheDocument()
+  })
+
+  it("renders with no documents prop at all (it is optional now)", () => {
+    renderQA({}, EMPTY, { documents: undefined })
+    fireEvent.click(screen.getByRole("button", { name: "＋ Document type" }))
+    expect(screen.getByRole("checkbox", { name: "Contract" })).toBeInTheDocument()
+  })
+
+  it("a loading list reaches the editor as Loading…", () => {
+    renderQA({}, EMPTY, { listState: "loading", documentTypes: [] })
+    fireEvent.click(screen.getByRole("button", { name: "＋ Document type" }))
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…")
+  })
+
+  it("a failed list reaches the editor, and its Try again is the row's onRetry", () => {
+    const { onRetry } = renderQA({}, EMPTY, { listState: "error", connections: [] })
+    fireEvent.click(screen.getByRole("button", { name: "＋ Added by" }))
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn’t load this list.")
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
   })
 })

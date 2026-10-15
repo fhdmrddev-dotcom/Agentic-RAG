@@ -3615,7 +3615,8 @@ const BASELINE = {
   "ingestionFailureCopy.test.ts": 25,
   "IngestionTab.test.tsx": 42, // +2 BUG-260923-02 History paging
   "pipelineGroups.test.ts": 7,
-  "LibraryStatTiles.test.tsx": 13,
+  "LibraryStatTiles.test.tsx": 16, // RAISED 13 → 16 at 284-01 Task 3 (+3 CHUNKS arm cases; the 13 converted in place to number props)
+  "FolderDetail284.test.tsx": 5, // 284-01 Task 3 — the folder band takes numbers. BOTH KNOBS, SAME COMMIT.
   "viewRulePhrase.test.ts": 4,
   "ViewCardGrid.test.tsx": 14,
   "IndexFoldersTable.test.tsx": 6,
@@ -4154,8 +4155,8 @@ const BASELINE = {
   "ConditionPopover.test.tsx": 13, // 271-04 (2026-10-03)
   // ── Phase 271-04 Task 1 — every suite it CREATED, at its measured passing count. BOTH KNOBS. ──
   "FilterBar.find271.test.tsx": 11, // 271-04 (3 are the Views-tab DOM snapshot pins)
-  "StructurePopovers.test.tsx": 22, // 271-04
-  "FindQuickAdd.test.tsx": 22, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03) · RE-PINNED 18 → 22 at 275-02 (+4 Include archived chip cases)
+  "StructurePopovers.test.tsx": 27, // 271-04 · RAISED 22 → 27 at 284-01 Task 3 (+5 summary-list arm cases)
+  "FindQuickAdd.test.tsx": 26, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03) · RE-PINNED 18 → 22 at 275-02 (+4 Include archived chip cases) · RAISED 22 → 26 at 284-01 Task 3 (+4 summary-list cases)
   // ── Phase 271-04 Task 2 — the Find results surface and the exact pager. BOTH KNOBS. ──
   "DocumentsFindBody.test.tsx": 26, // 271-04
   "DocumentsPager.exact271.test.tsx": 3, // 271-04
@@ -5600,6 +5601,8 @@ const TARGETS = [
   "src/components/library/__tests__/IngestionTab.test.tsx",
   "src/components/library/ingestion/__tests__/pipelineGroups.test.ts",
   "src/components/library/__tests__/LibraryStatTiles.test.tsx",
+  // Phase 284-01 Task 3 — the folder band takes numbers. FILE-LEVEL.
+  "src/components/ingestion/__tests__/FolderDetail284.test.tsx",
   "src/components/library/__tests__/viewRulePhrase.test.ts",
   "src/components/library/__tests__/ViewCardGrid.test.tsx",
   "src/components/library/__tests__/IndexFoldersTable.test.tsx",
