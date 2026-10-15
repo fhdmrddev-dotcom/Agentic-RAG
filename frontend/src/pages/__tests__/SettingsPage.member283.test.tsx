@@ -60,14 +60,18 @@ import { SettingsPage } from "../SettingsPage"
 const MEMBER = { model_management: false }
 const OPERATOR = { model_management: true }
 
-function renderSettings(features: Record<string, boolean>) {
-  return render(
-    <EffectiveFeaturesProvider value={{ features, loading: false, refetch: () => {} }}>
+function settingsTree(features: Record<string, boolean>, loading = false) {
+  return (
+    <EffectiveFeaturesProvider value={{ features, loading, refetch: () => {} }}>
       <TechnicalNamesProvider>
         <SettingsPage />
       </TechnicalNamesProvider>
-    </EffectiveFeaturesProvider>,
+    </EffectiveFeaturesProvider>
   )
+}
+
+function renderSettings(features: Record<string, boolean>) {
+  return render(settingsTree(features))
 }
 
 function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
@@ -274,5 +278,51 @@ describe("SettingsPage — an operator's view is unchanged apart from the two mo
       "aria-selected",
       "true",
     )
+  })
+})
+
+// 283-REVIEW WR-02. The features map fails CLOSED to `{}` while it loads, so an operator reads
+// as a member until it arrives. D-05's landing ("operator → 0, member → 6") is only right
+// because the page holds its spinner and decides NOTHING during that window
+// (`if (featuresLoading) return` in SettingsPage). Every other render in this suite passes
+// `loading: false`, so nothing pinned that guard. Each case below re-renders under ONE tree
+// (`rerender`), so the component instance — and any tab it wrongly settled on while
+// loading — survives into the resolved state, exactly as in the browser.
+describe("SettingsPage — the features-loading window decides nothing (WR-02)", () => {
+  async function assertDecidedNothingWhileLoading() {
+    // Spinner only: no strip, no gated call, and no landing tab written to storage.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(screen.queryAllByRole("tab")).toEqual([])
+    expect(screen.queryByRole("tabpanel")).toBeNull()
+    expect(gated.getSettings).not.toHaveBeenCalled()
+    expect(gated.getJudgeModel).not.toHaveBeenCalled()
+    expect(localStorage.getItem("settings_active_tab")).toBeNull()
+  }
+
+  it("holds the spinner while loading, then lands an OPERATOR on AI Model with one getSettings", async () => {
+    const { rerender } = render(settingsTree({}, true))
+    await assertDecidedNothingWhileLoading()
+
+    rerender(settingsTree(OPERATOR, false))
+    const ai = await screen.findByRole("tab", { name: "AI Model" })
+    expect(tabNames()).toEqual(["AI Model", "Search", "Integrations", "Preferences", "Memory", "Audit Log"])
+    expect(ai).toHaveAttribute("aria-selected", "true")
+    await waitFor(() => expect(gated.getSettings).toHaveBeenCalledTimes(1))
+    // Landing is derived, never persisted — only a click writes the key.
+    expect(localStorage.getItem("settings_active_tab")).toBeNull()
+  })
+
+  it("holds the spinner while loading, then lands a MEMBER on Preferences with no gated call", async () => {
+    const { rerender } = render(settingsTree({}, true))
+    await assertDecidedNothingWhileLoading()
+
+    rerender(settingsTree(MEMBER, false))
+    const prefs = await screen.findByRole("tab", { name: "Preferences" })
+    expect(tabNames()).toEqual(["Preferences", "Memory", "Audit Log"])
+    expect(prefs).toHaveAttribute("aria-selected", "true")
+    for (const [fn, spy] of Object.entries(gated)) {
+      expect(spy, `${fn} must never be called for a member`).not.toHaveBeenCalled()
+    }
+    expect(localStorage.getItem("settings_active_tab")).toBeNull()
   })
 })
