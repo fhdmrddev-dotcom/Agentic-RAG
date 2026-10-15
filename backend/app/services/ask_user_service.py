@@ -54,6 +54,21 @@ logger = logging.getLogger(__name__)
 # handful of consecutive failed refreshes cannot let the advertisement lapse.
 _CHANNELS_TTL_REFRESH_SECONDS = 300
 
+# BUG-261015-06: the ask_user channels THIS process is waiting on. The shutdown sentinel goes only
+# to these. A Redis-wide SCAN reached every process sharing the Redis (the other uvicorn worker,
+# another instance, a test run's TestClient lifespan) and interrupted pauses that were still alive.
+_LOCAL_CHANNELS: set[str] = set()
+
+
+def register_local_channel(channel: str) -> None:
+    """Record that this process is subscribed on ``channel`` (call right after SUBSCRIBE)."""
+    _LOCAL_CHANNELS.add(channel)
+
+
+def unregister_local_channel(channel: str) -> None:
+    """Forget ``channel`` (call in the subscriber's cleanup)."""
+    _LOCAL_CHANNELS.discard(channel)
+
 
 async def _subscribe_and_block(
     redis: "aioredis.Redis",
@@ -89,6 +104,7 @@ async def _subscribe_and_block(
     pubsub = redis.pubsub()
     try:
         await pubsub.subscribe(channel)                  # SUBSCRIBE first
+        register_local_channel(channel)                  # BUG-261015-06: this process owns it
         await redis.sadd(channels_set_key, channel)      # advertise to sweep paths
         await redis.expire(channels_set_key, 3600)       # safety TTL — auto-clear leaks
 
@@ -143,6 +159,7 @@ async def _subscribe_and_block(
         except asyncio.TimeoutError:
             return None
     finally:
+        unregister_local_channel(channel)
         try:
             await pubsub.unsubscribe(channel)
         except Exception:  # noqa: BLE001
@@ -333,33 +350,21 @@ async def publish_cancel_sentinel(redis: "aioredis.Redis", run_id: UUID) -> None
 
 
 async def broadcast_shutdown_sentinel_to_all(redis: "aioredis.Redis") -> None:
-    """Broadcast a shutdown sentinel to EVERY active ask_user channel system-wide.
+    """Send the shutdown sentinel to every ask_user channel THIS process is waiting on.
 
-    Called from ``main.py`` lifespan shutdown BEFORE the RUN_TASKS cancel loop
-    per RESEARCH §A.6. SCANs ``ask_user:channels:*``, SMEMBERS each, PUBLISHes
-    ``{"kind": "shutdown"}`` to every channel found. Paused handlers wake and
-    return ``ToolResult("ask_user interrupted by server shutdown")``; the agent
-    loop iterates once more, then the normal RUN_TASKS cancel propagates.
+    Called from ``main.py`` lifespan shutdown BEFORE the RUN_TASKS cancel loop per RESEARCH §A.6.
+    Paused handlers wake and return ``ToolResult("ask_user interrupted by server shutdown")``; the
+    agent loop iterates once more, then the normal RUN_TASKS cancel propagates.
 
-    Best-effort — never blocks shutdown on Redis failure. Each SCAN page +
-    SMEMBERS + PUBLISH wrapped in its own try/except (one bad key doesn't kill
-    the sweep).
+    BUG-261015-06: the name is kept for its callers and patches, but the scope is now
+    THIS PROCESS (``_LOCAL_CHANNELS``), not ``SCAN ask_user:channels:*``. A Redis-wide sweep reached
+    pauses owned by processes that were not shutting down.
+
+    Best-effort — never blocks shutdown on Redis failure; one bad publish doesn't stop the rest.
     """
     payload = json.dumps({"kind": "shutdown"})
-    try:
-        async for key in redis.scan_iter("ask_user:channels:*", count=100):
-            try:
-                channels = await redis.smembers(key)
-                for ch in channels:
-                    try:
-                        await redis.publish(ch, payload)
-                    except Exception:  # noqa: BLE001
-                        logger.exception(
-                            "ask_user shutdown publish failed for %s", ch
-                        )
-            except Exception:  # noqa: BLE001
-                logger.exception(
-                    "ask_user shutdown SMEMBERS failed for key=%s", key
-                )
-    except Exception:  # noqa: BLE001
-        logger.exception("ask_user shutdown SCAN failed")
+    for ch in list(_LOCAL_CHANNELS):
+        try:
+            await redis.publish(ch, payload)
+        except Exception:  # noqa: BLE001
+            logger.exception("ask_user shutdown publish failed for %s", ch)

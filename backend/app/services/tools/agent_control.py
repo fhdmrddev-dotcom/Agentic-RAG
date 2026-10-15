@@ -26,6 +26,7 @@ from uuid import UUID
 
 from app.utils.db import aexec
 from app.config import settings
+from app.services.ask_user_service import register_local_channel, unregister_local_channel
 from app.services.tools.base import ToolContext, ToolResult
 
 logger = logging.getLogger(__name__)
@@ -361,6 +362,7 @@ async def _handle_ask_user(args: dict, ctx: ToolContext) -> ToolResult:
     try:
         # ── Step 1: SUBSCRIBE first ───────────────────────────────────────
         await pubsub.subscribe(channel)
+        register_local_channel(channel)  # BUG-261015-06: the shutdown sentinel is per process
         # ── Step 2: advertise to cancel + shutdown sweep paths ────────────
         await ctx.redis.sadd(channels_set_key, channel)
         await ctx.redis.expire(channels_set_key, 3600)  # safety TTL
@@ -467,6 +469,7 @@ async def _handle_ask_user(args: dict, ctx: ToolContext) -> ToolResult:
         # the others. SREM keeps the channels:set honest (only LIVE
         # subscribers should be there); the safety TTL above is the
         # eventual-consistency safety net.
+        unregister_local_channel(channel)
         try:
             await pubsub.unsubscribe(channel)
         except Exception:  # noqa: BLE001
