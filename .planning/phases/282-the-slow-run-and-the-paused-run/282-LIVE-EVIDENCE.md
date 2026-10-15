@@ -31,13 +31,51 @@ Evidence files: `C:/Users/fhdmr/AppData/Local/Temp/agentic-rag-282/` (`*_03*`).
 
 ## Operator setup (Task 2)
 
-*(pending — the operator's reply is recorded here verbatim: backend sha, LM Studio model, keyed
-providers, active org, row-6 decision)*
+Operator reply, verbatim (relayed by the orchestrator, 2026-10-15):
+
+> `ready: sha=22c409c2c lmstudio=spark-x2.5-4b`
+
+The four blank fields were resolved by the orchestrator, not the operator: **row6 = NO** (no approval
+for the reversible write; G4-6 is owed, "write not approved"); **keys = derive by driving** (a key
+failure is ⛔ with the measured error); **org = read from the UI before the first drive**; **sandbox =
+from the app's own status**.
 
 ## Pre-drive proofs
 
-- Backend sha the app is running: *(pending)*
-- Active org (DOM switcher text + membership read): *(pending)*
+- **Backend sha:** develop HEAD `22c409c2c`; the orchestrator measured backend :8000 `/health` 200 with
+  its process (pid 39116) started 2026-10-15 17:28, after the merge, and frontend :5173 200. Re-read by
+  the executor: `/health` → `{"status":"ok","redis":"ok","maintenance":false}`.
+- **LM Studio :1234** (`/v1/models`): `spark-x2.5-4b`, `nvidia_nvidia-nemotron-nano-9b-v2`,
+  `text-embedding-nomic-embed-text-v1.5`. None of the three 900 s models (`openai/gpt-oss-20b`,
+  `qwen3.6-35b-a3b-mtp`, `qwen3.5-9b-mtp`) is loaded.
+- **Effective timeout of the operator's model** (local reads only): `spark-x2.5-4b` has **no
+  `model_capabilities_overrides` row** and is **not in `MODEL_CAPABILITIES`**, so both
+  `get_per_call_timeout` and `get_per_call_timeout_async` resolve **300 s** (the unknown-model default,
+  `DEFAULT_LLM_CALL_TIMEOUT_SECONDS`). The other loaded chat model, `nvidia_nvidia-nemotron-nano-9b-v2`,
+  has a row at **550 s**. ⚠ **Neither loaded model can carry a single call past 600 s**: the run
+  would end at 300 s (or 550 s) by design. That bears directly on G4-4.
+- **Sandbox:** `Settings().sandbox_enabled` → `True`, read in-process (the app's own settings object;
+  the env file itself was not opened). Not yet confirmed from a running endpoint.
+- **Workflow-pause candidate:** `workflow_definitions` id `f59d361b-bc73-4f6c-b856-1a499195b59f`, slug
+  `fresh-pause-102uat-20a89243`, `status: published`, org `22f9c615-…`; its definition text mentions
+  `ask_user` and `approval`. Whether it actually raises a pause on a run is still to be driven.
+- **Active org (DOM):** *not read — see the blocker below.*
+
+### ⛔ Blocker found at resume (2026-10-15)
+
+The executor that resumed Task 3 **has no Chrome MCP tools**. Its tool set is Read / Write / Edit /
+Bash / Grep / Glob. That blocks Task 3 in two ways:
+
+1. **G4-1, G4-2, G4-3 and G4-5** need DOM-state reads (`aria-checked`, textarea `value`, the
+   `[data-ask-card]` count, `document.activeElement`) in the operator's Chrome. No browser tool means
+   no evidence. A screenshot or API substitute is not acceptable evidence under the plan.
+2. **The SC#10 board** is driven over HTTP with **the signed-in user's JWT, read from the Chrome
+   session** (VALIDATION.md "Method"). Without the browser the executor has no legitimate user token.
+   Two alternatives were **not** taken, because each needs explicit operator approval:
+   - minting a token with the local Supabase JWT secret (impersonating the user);
+   - reading the browser's on-disk session.
+
+No row was driven. Every board and G-4 row below stays pending. No bug or seed was flipped.
 
 ## SC#10 board (D-16)
 
@@ -73,7 +111,15 @@ providers, active org, row-6 decision)*
 
 ### G4-4 — Slow local model past 600 s (D-26)
 
-*(pending)*
+*(not driven yet.)* **Pre-assessment from local reads:** the operator's model `spark-x2.5-4b` resolves
+to **300 s** (no Registry row, so the default applies). A call longer than 600 s on it would be ended at
+300 s with a `timed_out:` error. That is the timeout working as designed, not the D-09 part 3 proof. The
+only other loaded chat model (`nvidia_nvidia-nemotron-nano-9b-v2`) is 550 s. **Unless a 900 s model is
+loaded** (`openai/gpt-oss-20b`, `qwen3.6-35b-a3b-mtp` or `qwen3.5-9b-mtp`, each with a Registry row
+at 900), this row can only end as **⛔ OWED: "no loaded local model has a timeout above 600 s"**.
+Raising spark's timeout to 900 would be a Registry write, and no write was approved. The SCALED
+automated test (`test_282_slow_stub_scaled.py`, 63/63 test_282 green on the merged tree) remains the
+proof meanwhile.
 
 ### G4-5 — Registry refusal on screen (SC#1 live)
 
@@ -81,7 +127,9 @@ providers, active org, row-6 decision)*
 
 ### G4-6 — The timeout sentence (optional, needs approval)
 
-*(pending)*
+**OWED — write not approved** (row6 = NO, 2026-10-15). Not driven. The sentence itself is pinned by
+`test_282_timeout_bound.py::test_timed_out_error_keeps_prefix_and_names_the_setting` (green on the
+merged tree).
 
 ## Operator sign-off
 
