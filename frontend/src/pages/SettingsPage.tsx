@@ -446,8 +446,11 @@ export function SettingsPage() {
   // ⚠ A PERSISTED CHOICE CAN NAME A TAB THIS CALLER NO LONGER HAS. `settings_active_tab`
   // outlives a permission change, so an ex-operator (or anyone whose map has not resolved
   // yet) would land on a `TabsContent` with no trigger — a blank panel under a strip that
-  // does not mark anything active. Land them on Memory instead: with Connections moved to
-  // its own page (2026-09-01), Memory is the first tab every caller can still use.
+  // does not mark anything active. ~~Land them on Memory instead: with Connections moved to
+  // its own page (2026-09-01), Memory is the first tab every caller can still use.~~
+  // ⚠ SUPERSEDED (Phase 283, D-05; struck rather than deleted, 283-REVIEW IN-01): they land
+  // on their FIRST VISIBLE tab (`settingsTabFallback` in `settingsTabs.ts`) — AI Model for
+  // an operator, Preferences for a member. Memory is no longer the landing for anyone.
   //
   // ⚠ "5" IS IN THIS LIST BECAUSE THE TAB IT NAMED IS GONE, NOT BECAUSE IT IS GOVERNED.
   // A user who last used Connections has "5" persisted in localStorage; without this it
