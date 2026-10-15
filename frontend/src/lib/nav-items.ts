@@ -144,6 +144,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
  * error / pre-resolve (useEffectiveFeatures), so a blip hides every governed feature
  * rather than flashing an operators-only one. RENDER-ONLY — 148-05's `require_visible`
  * API is the security authority; this just avoids dead nav.
+ *
+ * ⚠ CORRECTED (283-REVIEW IN-05; the paragraph above is kept as written, and its "strictly
+ * `true`" and "Fail-CLOSED by construction" claims are FALSE for the body below since the
+ * 2026-09-09 correction). The filter hides only a KNOWN `false`: an absent/`undefined` key
+ * (loading, or a failed fetch) SHOWS the door. It fails OPEN on "not told yet", because the
+ * API (`require_visible`) is the wall and a vanishing rail on a network blip was the
+ * reported defect. The fail-CLOSED decision lives per TAB in `settingsTabs.ts`, not here.
  */
 export function visibleNavItems(features: EffectiveFeatures): readonly NavItem[] {
   // ⛔ HIDE ONLY WHAT IS *KNOWN* TO BE DENIED. `=== true` WAS WRONG, AND THE OPERATOR HIT IT.
