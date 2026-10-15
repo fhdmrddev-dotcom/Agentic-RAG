@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: ready_to_plan
-last_updated: 2026-10-15T15:30:00.000Z
-last_activity: 2026-10-15 -- Phase 282 closed (verified 5/5; review fixed; not pushed)
+status: planning
+last_updated: "2026-10-15T19:07:09.944Z"
+last_activity: "2026-10-15 -- Phase 281 closed. Owed by operator decision: G-4 rows A, C, D (run A first; D needs a new archived_at write approval). WR-02 kept by design. Post-fix gates: backend 71 failed (same set), vitest OK 10269/0. BUG-261015-01 open. Not pushed."
 progress:
-  total_phases: 14
+  total_phases: 15
   completed_phases: 6
   total_plans: 22
   completed_plans: 22
-  percent: 36
-stopped_at: Phase 282 CLOSED — next phase 283
+  percent: 40
 ---
 
 # Project State
@@ -153,6 +152,7 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
   279-02-SUMMARY row D route proof: event=None rides `if event is not None:` then the existing
   `elif update_data:` arm (test `test_IN05_a_non_member_clear_writes_no_event_through_the_plain_update_arm`).
   Every touched FIRING file is recorded honoured by construction in `279-SEED-328-RECORD.md` § G-5.
+
 - **OV-281-01 (G-5, `harness_engine.py`):** 281-01's plan capped the engine at "≤ 4 new conditional
   nodes"; measured AST delta is If 106→107, IfExp 34→38 = **5**. The 5th lives inside the new
   `_attempt_identity` helper the plan itself asked for; no new branching kind. Recorded by the
