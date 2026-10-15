@@ -25,6 +25,9 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { stripComments } from "@/lib/stripComments.testutil"
+import chunksSource from "../DocumentChunksSection.tsx?raw"
 import type { Document, DocumentChunkRow, DocumentContentResponse, MetadataFieldDef } from "@/types"
 
 vi.mock("@/lib/supabase", () => ({
@@ -363,6 +366,100 @@ describe("Chunks section — four honest arms and the per-chunk model", () => {
     openSection("Chunks")
     expect(await screen.findByText(payload)).toBeInTheDocument()
     expect(container.querySelector("img")).toBeNull()
+  })
+
+  // ── Phase 283 (FIX-08 / BUG-260908-01, D-16..D-20) ─────────────────────────────────
+  // "suppose that I have 1000 chunks I have to scroll down 1000 times to reach to the
+  // next menu." The LIST is bounded inside ONE labelled, keyboard-reachable region so the
+  // sections below Chunks sit at a fixed offset at any chunk count. These cases assert the
+  // rendered DOM (roles, accessible names, class tokens), never a test id. The bounding-rect
+  // half of D-20 on a ~1,000-chunk document is the orchestrator's G-4 drive.
+  const twoChunks = () => [
+    chunk({ id: "c1", chunk_index: 0, content: "first chunk body" }),
+    chunk({ id: "c2", chunk_index: 1, content: "second chunk body" }),
+  ]
+
+  it("D-16/D-17: bounds the chunk list inside ONE labelled, focusable region", async () => {
+    listDocumentChunks.mockResolvedValue(twoChunks())
+    render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
+    expect(await screen.findByText("The spec")).toBeInTheDocument()
+
+    openSection("Chunks")
+    const region = await screen.findByRole("region", { name: "Chunk list, 2 chunks" })
+    expect(region).toHaveAttribute("tabindex", "0")
+    const tokens = region.className.split(/\s+/)
+    expect(tokens).toContain("max-h-96")
+    expect(tokens).toContain("overflow-y-auto")
+    // Every chunk row lives INSIDE the bound — none leaks out below it.
+    expect(within(region).getAllByRole("listitem")).toHaveLength(2)
+  })
+
+  it("D-17: names a single chunk in the singular", async () => {
+    listDocumentChunks.mockResolvedValue([chunk()])
+    render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
+    expect(await screen.findByText("The spec")).toBeInTheDocument()
+
+    openSection("Chunks")
+    const region = await screen.findByRole("region", { name: /^chunk list/i })
+    expect(region).toHaveAccessibleName("Chunk list, 1 chunk")
+  })
+
+  it("⛔ D-17: no overscroll containment, so wheel at the list end chains to the panel", async () => {
+    listDocumentChunks.mockResolvedValue(twoChunks())
+    render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
+    expect(await screen.findByText("The spec")).toBeInTheDocument()
+
+    openSection("Chunks")
+    const region = await screen.findByRole("region", { name: "Chunk list, 2 chunks" })
+    expect(region.className.split(/\s+/).filter((t) => t.startsWith("overscroll"))).toEqual([])
+    // And nowhere in the component's CODE (comments stripped — the header comment may
+    // explain the rule without tripping it).
+    expect(stripComments(chunksSource)).not.toMatch(/overscroll/)
+  })
+
+  it("⛔ D-17: the region is ONE Tab stop, and the next Tab leaves it (no focus trap)", async () => {
+    const user = userEvent.setup()
+    listDocumentChunks.mockResolvedValue(twoChunks())
+    render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
+    expect(await screen.findByText("The spec")).toBeInTheDocument()
+
+    openSection("Chunks")
+    const region = await screen.findByRole("region", { name: "Chunk list, 2 chunks" })
+    // The per-chunk max-h-32 bodies are NOT Tab stops — 1,000 of them would be the trap.
+    expect(region.querySelectorAll("[tabindex]")).toHaveLength(0)
+    region.focus()
+    expect(document.activeElement).toBe(region)
+    await user.tab()
+    expect(region.contains(document.activeElement)).toBe(false)
+  })
+
+  it("D-18: the chunk count stays in the section header, never inside the list", async () => {
+    listDocumentChunks.mockResolvedValue(twoChunks())
+    render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
+    expect(await screen.findByText("The spec")).toBeInTheDocument()
+
+    const head = openSection("Chunks")
+    const region = await screen.findByRole("region", { name: "Chunk list, 2 chunks" })
+    expect(region.textContent ?? "").not.toMatch(/\bof\b \d+|showing|\d+ chunks?/i)
+    // The header badge still carries the number.
+    expect(within(head).getByText("2")).toBeInTheDocument()
+  })
+
+  it("the empty and error arms are NOT wrapped in the chunk-list region", async () => {
+    listDocumentChunks.mockResolvedValue([])
+    render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
+    expect(await screen.findByText("The spec")).toBeInTheDocument()
+    openSection("Chunks")
+    expect(await screen.findByText("This document has no indexed chunks")).toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: /chunk list/i })).toBeNull()
+
+    cleanup()
+    listDocumentChunks.mockRejectedValue(new Error("boom"))
+    render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
+    expect(await screen.findByText("The spec")).toBeInTheDocument()
+    openSection("Chunks")
+    expect(await screen.findByRole("alert")).toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: /chunk list/i })).toBeNull()
   })
 })
 
