@@ -113,6 +113,26 @@ async def insert_run(
     )
 
 
+async def link_run_message(
+    pool: asyncpg.Pool,
+    *,
+    run_id: UUID,
+    message_id: UUID,
+) -> None:
+    """Link a run to its assistant message the moment the message is saved (BUG-261015-05).
+
+    ``finalize_run`` also writes ``message_id``, but only at end-of-stream. Work that runs after
+    the answer is saved (the suggestions call) left a window where a messages fetch returned the
+    reply with ``run_id = null``, and the chat rendered it beside the live streaming copy. The
+    ``message_id IS NULL`` guard never re-points a run that is already linked.
+    """
+    await pool.execute(
+        "UPDATE runs SET message_id = $2 WHERE run_id = $1 AND message_id IS NULL",
+        run_id,
+        message_id,
+    )
+
+
 async def finalize_run(
     pool: asyncpg.Pool,
     *,

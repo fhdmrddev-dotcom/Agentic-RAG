@@ -93,7 +93,7 @@ from app.services.retrieval_service import _call_as_user, _vector_literal
 from app.services.provider_gateway import classify_provider_error, message_for_kind
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
-from app.db.runs import insert_assistant_message
+from app.db.runs import insert_assistant_message, link_run_message
 from app.models.message import TRANSCRIPT_EVENT_KINDS
 from app.services.scope_note import SCOPE_CHANGED_KIND, ScopeNoteFold
 from app.utils.folder_utils import fetch_visible_folders
@@ -2048,6 +2048,17 @@ async def run_agent_loop(
             _cached_id = str(_inserted_id) if _inserted_id else None
         except Exception as e:
             logger.error("Failed to persist assistant message: %s", e)
+        if _cached_id and run_id:
+            # BUG-261015-05: link now, not at finalize, so a fetch during the post-answer work
+            # (suggestions) returns the reply WITH its run id and the chat shows one copy.
+            try:
+                await link_run_message(
+                    await get_pg_pool(),
+                    run_id=UUID(str(run_id)),
+                    message_id=UUID(_cached_id),
+                )
+            except Exception as e:
+                logger.warning("early runs.message_id link failed for run %s: %s", run_id, e)
         _persist_assistant_message._cached_id = _cached_id  # type: ignore[attr-defined]
         return _cached_id
 
