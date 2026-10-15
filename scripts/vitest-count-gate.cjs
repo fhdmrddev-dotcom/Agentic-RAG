@@ -4215,6 +4215,8 @@ const BASELINE = {
   "OrgAdminShell.test.tsx": 12, // RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
   // Phase 282-02 — the one ask-draft home (FIX-07 / D-12): one draft per ask, GC on the ask slice, panel-home refcount, the global reset
   "askDraftStore.test.ts": 7,
+  // Phase 282-02 — the D-15 fences: one input per pause across both homes, the pointer, the rail handoff, BUG-260828-07 reachability
+  "PendingAskStack.oneInput.test.tsx": 11,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6150,6 +6152,8 @@ const TARGETS = [
   "src/components/org/OrgAdminShell.test.tsx",
   // Phase 282-02 — the ask-draft store's suite goes by FILE path (no `src/stores` entry).
   "src/stores/__tests__/askDraftStore.test.ts",
+  // Phase 282-02 — panel __tests__ entries are FILE-level, so the new suite is named here.
+  "src/components/panel/__tests__/PendingAskStack.oneInput.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

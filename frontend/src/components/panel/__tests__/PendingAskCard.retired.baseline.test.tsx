@@ -239,8 +239,12 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * into `stores/askDraftStore.ts` (D-12; `useState` 9 → 7), the chips gained the radio
      * keyboard + non-colour mark (D-13 / D-24), and the root gained `data-ask-card` /
      * `data-ask-home` (D-14). The retirement-sentence fences below are untouched and green.
+     *
+     * 2026-10-15 — 282-02 Task 3 RE-BASELINED 907 → 1014, not loosened: `PendingAskStack` gained
+     * the `home` prop + the panel-home `useLayoutEffect` (D-11 / D-24), and the chat pointer
+     * `AskPointer` lives in this file (D-10 / D-14). Retirement fences untouched and green.
      */
-    expect(src.split("\n").length).toBe(907)
+    expect(src.split("\n").length).toBe(1014)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */
