@@ -3136,7 +3136,7 @@ const BASELINE = {
   // suite (a directory TARGETS entry reaches it) and guarded NOTHING. It could have lost
   // every case and the gate would still have said OK. The twelfth suite found in this
   // state in a week — see SEED-229, which proposes the gate self-check that would end it.
-  "PendingAskCard.test.tsx": 45,
+  "PendingAskCard.test.tsx": 54, // RE-PINNED 45 → 54 at 282-02 (radio keyboard, non-colour mark, the shared draft: answer/expiry settle, 500 keeps it)
   // SEED-227 — pinned at 3 in the SAME COMMIT that creates the file and its TARGETS line,
   // from this script's own printed `actual` column (`— 3 new`), not booked ahead. An
   // unpinned file is not a lightly-guarded one, it is an UNGUARDED one: the count could
@@ -4213,6 +4213,10 @@ const BASELINE = {
   // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
   // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
   "OrgAdminShell.test.tsx": 12, // RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
+  // Phase 282-02 — the one ask-draft home (FIX-07 / D-12): one draft per ask, GC on the ask slice, panel-home refcount, the global reset
+  "askDraftStore.test.ts": 7,
+  // Phase 282-02 — the D-15 fences: one input per pause across both homes, the pointer, the rail handoff, BUG-260828-07 reachability
+  "PendingAskStack.oneInput.test.tsx": 11,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6146,6 +6150,10 @@ const TARGETS = [
   // Phase 275-04 — the org shell's suite goes by FILE path (no `src/components/org` entry): it
   // carries the deliberately retired locked-Retention fence and its replacement.
   "src/components/org/OrgAdminShell.test.tsx",
+  // Phase 282-02 — the ask-draft store's suite goes by FILE path (no `src/stores` entry).
+  "src/stores/__tests__/askDraftStore.test.ts",
+  // Phase 282-02 — panel __tests__ entries are FILE-level, so the new suite is named here.
+  "src/components/panel/__tests__/PendingAskStack.oneInput.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -435,7 +435,7 @@ export function WorkspacePanel({
       {/* Pending ask_user pins to the VERY TOP regardless of section order (D-03). */}
       {pendingAsks.length > 0 && (
         <div className="border-b border-border/40 p-2">
-          <PendingAskStack />
+          <PendingAskStack home="panel" />
         </div>
       )}
 
