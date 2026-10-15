@@ -11536,6 +11536,11 @@ cells rot within days.
 | [`backend/app/services/harness/freshness.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessfreshnesspy) | 2 / 2 / 123 (was `1 / 1 / 113`) | no (2 phases) | **281-01** (`76bbc0601`): both reads gain `AND <RETRIEVABLE_COLUMN>`, imported from retrieval_scope (DEBT-07). honoured by construction. ⛔ never restates the predicate; no f-string SQL |
 | [`frontend/src/components/workflows/describeRefusalVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescriberefusalvocabularyts) | 1 / 1 / 151 (was `0 / 0 / 0`) | no (young) | young (created 281-02, `fa08ee6f1`). The ONE code→words table for describe-door refusals (SEED-221). ⛔ imports door words, never retypes; joins `SWEPT_SOURCES` |
 | [`frontend/src/components/workflows/runVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunvocabularyts) | 10 / 5 / 662 (was `9 / 4 / 660`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE until 281 planning. **281-03** (`0b9841e55`): ONE `case "template_fields_missing"` in `failureClause`. honoured by construction. Seam not proposed |
+| [`backend/app/services/google_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogle_servicepy) | 11 / 7 / 638 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: `stream_google` + `timeout_s`; one `_google_client` builder (HttpOptions ms, 1 attempt). honoured by construction |
+| [`backend/app/services/provider_gateway/anthropic.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayanthropicpy) | 4 / 4 / 124 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_anthropic`. honoured by construction |
+| [`backend/app/services/provider_gateway/google.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaygooglepy) | 3 / 3 / 106 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_google`. honoured by construction |
+| [`frontend/src/setupTests.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcsetupteststs) | 2 / 1 / 8 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 282 planning (not exempt by the gate's regexes). **282-02**: ONE global `afterEach(resetAskDrafts)` (D-24) |
+| [`frontend/src/stores/askDraftStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresaskdraftstorets) | 0 / 0 / 0 | no (young) | young (created 282-02, row added AT PLANNING). The ONE ask_user draft home keyed by tool_call_id + panel-home presence (D-12). ⛔ never inside streamsStore.ts |
 
 
 
@@ -20662,3 +20667,55 @@ Scan-list disposition cell before 281-04 (replaced):
 CLAUDE.md verdict cell as of 2026-10-14 (replaced by 281-04):
 
 > **275-04**: `Document` +5 optional retention fields, additive. Seam OWED
+
+## Phase 282 planning (2026-10-15)
+
+Rows added in the 282 planning commit, before execution, following the 281 planning precedent (the `hot-file-ledger-guard.js` hook fired at PLAN-write time and named the backend three; the two frontend files are named by 282-02). Triples re-derived with the CLAUDE.md recipe at `5e6eb877c`; six-digit quick-task buckets subtracted (none present). CONTEXT D-25 required these rows. The post-edit triples are re-derived on the merged tree by 282-03 Task 1.
+
+## `backend/app/services/google_service.py`
+
+**`11 / 7 / 638`** at Phase 282 planning (phase buckets 075.5, 075.6, 075.10, 076.2, 084, 101.1, 115). ⚠ **Absent from the scan list for its entire life while it FIRES at 7 phases** — G-5 could never have fired on it. Its sibling `anthropic_service.py` has had a row for many phases; the Google one was simply never added.
+
+What it owns. The native google-genai streaming call (`stream_google`) that the gateway's Google adapter wraps, and its client construction. **282-01 (FIX-06, D-01, D-03)**: `stream_google` gains a trailing `timeout_s` and the body builds its client through one new builder `_google_client(api_key, timeout_s)`: `HttpOptions(timeout=<ms>, retry_options=HttpRetryOptions(attempts=1))` when a budget is set, today's bare `genai.Client(api_key=)` when not.
+
+⛔ Binding invariants:
+- **genai's timeout is MILLISECONDS and `0` means NO timeout.** Never pass `0`; the builder floors at 1 ms.
+- **Retries stay at one attempt, explicitly.** Once `HttpRetryOptions` is set without `attempts`, genai makes 5 attempts. The explicit `attempts=1` is the decision (D-03).
+- **The client is built lazily inside the generator body** (first `next()` in the producer thread), so a Google call never blocks the event loop. Do not hoist it.
+
+Honoured by construction: one builder, one trailing kwarg. Seam: none proposed.
+
+## `backend/app/services/provider_gateway/anthropic.py`
+
+**`4 / 4 / 124`** at Phase 282 planning (092.5, 101.1, 137.1, 149). ⚠ **Absent for its entire life while FIRING.** Found by the PLAN-write hook during 282 planning.
+
+What it owns. The Anthropic gateway adapter: destructures `GatewayRequest`, translates forcing (`tool_choice`), strips an unsupported assistant prefill, and returns the lazy `stream_anthropic` generator. **282-01 (D-01)**: one forwarded kwarg, `timeout_s=request.timeout_s`.
+
+⛔ Binding: provider-specific handling stays here and in `anthropic_service.py` (provider-docs-first); the shared chunk/SSE path is never branched (the D-14 RED LINE named in `dispatcher.py`). The adapter returns a bare generator, so it carries no `budget_deadline`; the drain uses the loop's own `asyncio.timeout(per_call_budget)` byte-identically.
+
+## `backend/app/services/provider_gateway/google.py`
+
+**`3 / 3 / 106`** at Phase 282 planning (092.5, 101.1, 149). ⚠ **Absent for its entire life; it crossed the G-5 threshold at Phase 149 and nobody noticed**, which is the failure this gate exists to catch.
+
+What it owns. The Google gateway adapter (the mirror of `anthropic.py`). **282-01 (D-01)**: one forwarded kwarg, `timeout_s=request.timeout_s`. Same binding invariants as `anthropic.py` above.
+
+## `frontend/src/setupTests.ts`
+
+**`2 / 1 / 8`** at Phase 282 planning (088). ⚠ **Absent for its entire life.** It is NOT exempt: the gate's `EXEMPT` regexes match `__tests__/`, `*.test.*` and `tests?/`, not `setupTests.ts`, and it is loaded by every vitest file (`vitest.config.ts` `setupFiles`).
+
+What it owns. Global test setup: jest-dom matchers and the vitest-axe matcher. **282-02 (D-24)**: one `afterEach(() => resetAskDrafts())`, because the new ask-draft store is a module singleton that outlives `cleanup()` and a leaked selection is flipped OFF by the next case's toggle click (282-RESEARCH R8, measured on `streamsProvider_244_settle_ask` Tests 11→12 and `PendingAskCard.test.tsx`).
+
+⛔ Binding: anything added here runs in EVERY test file. Keep it to resets and matchers; never a mock (a global mock would silently change what 600+ suites test).
+
+## `frontend/src/stores/askDraftStore.ts`
+
+**`0 / 0 / 0`** — created by Phase 282 (`282-02`). **Row added AT CREATION**, in the planning commit.
+
+What it owns. The ONE home of an `ask_user` answer draft (`choiceIndex`, `freeText`), keyed by `tool_call_id` (D-12), plus the settled marker the chat pointer reads, plus the panel-home presence refcount (`panelHomes[threadId]`) that decides pointer-or-card in the chat column (D-11). Drafts are garbage-collected by a module-load subscription on `useStreamsStore`'s `pendingAsksByThread` slice, so no provider edit is needed.
+
+⛔ Binding invariants:
+- **Never inside `streamsStore.ts`** (FIRES; D-12). This is a separate store on purpose.
+- **No state is copied between cards.** Every rendering (chat card, panel card, pointer, `WorkflowRunPage`'s direct card) READS this store; copying is the roadmap's named failure.
+- **Selectors return stable references** (`EMPTY_DRAFT`, the `EMPTY_ASKS` precedent in `StreamsProvider.tsx`); a fresh `{}` from a zustand v5 selector loops.
+- **GC on the ask slice, never on card unmount** (a thread switch unmounts the card and must keep the draft).
+- Not persisted across reload (D-12, as before).

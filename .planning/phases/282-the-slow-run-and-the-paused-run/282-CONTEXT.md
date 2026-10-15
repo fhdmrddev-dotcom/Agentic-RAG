@@ -337,6 +337,12 @@ same commit. Any new file gets a row (the hot-file gate enforces this).
 - **A `CHECK` constraint on `llm_call_timeout_seconds`**: needs a migration. D-08's clamp covers the read side.
 - **Persisting an ask draft across reload.**
 
+### Reviewed Seeds at plan time (2026-10-15, not folded)
+The plan-time sweep (`check-seeds-register.cjs --phase 282`) matched **37 seeds**, all by `trigger_paths` globs on broad hot files (`config.py`, `agent_loop.py`, `admin.py`, `task_service.py`, `forced_emit.py`, `provider_gateway/**`). Each was triaged by title + `trigger_when`; none is the defect this phase fixes, so **none is folded**. Statuses are left unchanged on purpose: flipping 37 path-matched seeds to `deferred` would be a false record (they were not decided against, only not in scope).
+- **SEED-308** (Registry fields saved but not read at runtime): `llm_call_timeout_seconds` IS read (async resolver tier 1); this phase makes it reach the client. The seed's other fields stay open.
+- **SEED-327** (forced_emit's system prompt dropped by the OpenAI-compat / Responses adapters): a distinct defect on files this phase touches; 282's adapter edits are timeout plumbing only and must not change message assembly. Stays `deferred`.
+- **SEED-040, SEED-289** (already routed at discuss), and the remaining 33 (SEED-027, 052, 053, 054, 079, 177, 185, 188, 192, 194, 198, 249, 273, 280, 284, 287, 288, 291, 299, 300, 301, 303, 304, 310, 314, 319, 323, 324, 328, 334, 339, 346, 350): path-only matches, unrelated to client timeouts or the ask_user input.
+
 ### Reviewed Todos (not folded)
 - "SPIKE — NL→workflow authoring": a keyword-only match, unrelated.
 

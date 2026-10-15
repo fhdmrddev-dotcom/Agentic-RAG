@@ -293,7 +293,17 @@ Plans:
   5. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. panel open, panel closed, two threads paused at once, a slow local model on GPU), and Chrome MCP drives each one. The draft-agreement check reads both renderings' DOM state, not a screenshot (FIX-07).
 
 **How we'd know this failed**: the timeout reaches `get_llm_client` but the Anthropic, Google or Responses-surface client still binds the SDK default; the UI accepts 3600 while the httpx pool or read timeout still binds at 600; retries stay at the SDK default "by omission"; `PendingAskStack`'s mount condition is narrowed and a workflow pause becomes unreachable with the panel closed (the SHELL-03 failure, a third time); the draft is "shared" by copying state between two cards so they can still diverge; the board lists only the rows that passed.
-**Plans**: TBD (target 4: client timeout + retries across providers + registry refusal · sketch-approved single-input `ask_user` with one shared draft · a11y + dead control · 8-row board + G-4 drive)
+**Plans**: 3 plans in 2 waves (D-18 / G-8; 01 and 02 share no files and run in parallel worktrees; the a11y + dead-control work rides plan 02)
+
+Plans:
+**Wave 1**
+
+- [ ] 282-01-PLAN.md — wave 1 (TDD, backend + Registry): ceiling 1800 + boot check + DB-tier clamp, explicit timeout/max_retries on all four client families via `GatewayRequest.timeout_s`, off-loop OpenAI-family open under one shared deadline (BUG-261015-02), the 422 watchdog sentence + help line, the `did not answer within N s` run-failure text, SCALED 2 s < 3 s stub proof (FIX-06; D-01..D-09, D-19..D-23)
+- [ ] 282-02-PLAN.md — wave 1 (TDD, frontend): new `stores/askDraftStore.ts` (one draft per `tool_call_id`, GC on the ask slice, panel-home refcount), card reads it, radio keyboard + non-colour mark, `PendingAskStack home` prop + chat pointer (sketch 282 variant A), `home="panel"` on the panel mount, D-15 fences, global test reset (FIX-07; D-10..D-15, D-24)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 282-03-PLAN.md — wave 2 (operator checkpoints): merged-tree gates + ledger/CLAUDE.md rows; SC#10 8-row board (3 axes); G-4 rows 1-4 in Chrome on DOM state + Registry refusal on screen; operator confirms sketch A; evidence-gated bug/seed flips + STATE (FIX-06, FIX-07; D-16, D-17, D-25, D-26)
 **Flags**: ⛔ **G-2 FIRES for FIX-07, and a sketch is genuinely needed.** Sketch 006 option C (calm panel card plus chat **pointer**) conflicts with 244-12's chat-column mount, which exists for reachability when the panel is closed. Where the single input lives in each panel state is an **open layout decision**, and the operator-approved mockup is the acceptance bar. Run `/gsd:sketch` before plan and read the sketch-findings skill (`references/pending-question.md`). **Provider-docs-first** for FIX-06: read each provider SDK's own timeout and retry documentation (OpenAI, Anthropic native, Google), and keep provider-specific handling at the service boundary. **G-5 audit at discuss**: `backend/app/services/openai_service.py` (FIRES, 36 phases), `backend/app/services/anthropic_service.py` (FIRES), `backend/app/config.py` (FIRES; `MODEL_CAPABILITIES` seam owed), `backend/app/api/admin.py`, `frontend/src/components/admin/ModelRegistryTab.tsx` (FIRES), `MessageList.tsx`, `MessageItem.tsx`, `PendingAskCard.tsx` (FIRES), `WorkspacePanel.tsx` (FIRES), `streamsStore.ts` (FIRES), `PausedRunCue.tsx`. ⛔ The FIX-06 change stays a constructor argument at the client boundary, and the agent loop's `per_call_budget` call sites do not move (`agent_loop.py` prompt-assembly seam OV-273-03 is owed and not taken here). Seeds: `SEED-289` / `SEED-172` (sibling local-model findings; the 13 rowless local models on the 300 s inferred default are **noted, not fixed**, unless discuss shows they are the same defect).
 **UI hint**: yes
 
@@ -343,7 +353,7 @@ Plans:
 | 279. The Expert Scope Seam | 4/4 | Complete (verified 4/4; owed: D-18 cloud read, 4-axis rows, review leftovers) | 2026-10-14 |
 | 280. In Once, Out Clean | 4/4 | Complete | 2026-10-14 |
 | 281. A Refusal Names Its Cause | 4/4 | Complete (owed by operator decision: G-4 rows A, C, D; WR-02 kept by design) | 2026-10-15 |
-| 282. The Slow Run and the Paused Run | 0/TBD | Not started | - |
+| 282. The Slow Run and the Paused Run | 0/3 | Planned | - |
 | 283. Every Member Reaches Their Own Settings | 0/TBD | Not started | - |
 | 284. Library at Scale | 0/TBD | Not started | - |
 
