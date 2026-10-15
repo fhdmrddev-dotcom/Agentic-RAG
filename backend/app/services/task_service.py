@@ -35,7 +35,7 @@ from uuid import UUID, uuid4
 
 from starlette.concurrency import run_in_threadpool
 
-from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
+from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_per_call_timeout_async
 from app.db.runs import finalize_run, insert_run
 from app.dependencies import get_pg_pool
 from app.services.openai_service import get_tools
@@ -297,6 +297,10 @@ async def _stream_one_iteration(
         "",
     )
 
+    # Phase 282 (FIX-06, D-01): the per-model budget reaches the client constructor and the
+    # OpenAI-family open guard. A TimeoutError from that guard propagates to the sub-agent
+    # exactly as any provider error from open_stream does.
+    _timeout_s = await get_per_call_timeout_async(model, settings)
     _gw_request = GatewayRequest(
         messages=messages,
         model=model,
@@ -305,6 +309,7 @@ async def _stream_one_iteration(
         system_prompt=_system_prompt,
         user_settings=user_settings,
         tool_choice="auto",
+        timeout_s=_timeout_s,
     )
     stream, calling_mode = await open_stream(_provider, _gw_request)
 

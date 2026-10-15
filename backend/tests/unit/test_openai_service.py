@@ -4,7 +4,17 @@ Settings are patched so no real environment values are needed.
 """
 from unittest.mock import patch, MagicMock
 
+import httpx
 import pytest
+
+from app.config import LLM_CONNECT_TIMEOUT_S, NO_BUDGET_LLM_MAX_RETRIES, NO_BUDGET_LLM_TIMEOUT_S
+
+# Phase 282 (FIX-06, D-03/D-23): a no-budget client is built with the NAMED no-budget
+# timeout and retry count, explicit in the constructor rather than inherited by omission.
+_NO_BUDGET = {
+    "timeout": httpx.Timeout(NO_BUDGET_LLM_TIMEOUT_S, connect=LLM_CONNECT_TIMEOUT_S),
+    "max_retries": NO_BUDGET_LLM_MAX_RETRIES,
+}
 
 
 class TestGetLlmClient:
@@ -17,7 +27,7 @@ class TestGetLlmClient:
             with patch("app.services.openai_service.OpenAI") as MockOpenAI:
                 from app.services.openai_service import get_llm_client
                 get_llm_client()
-                MockOpenAI.assert_called_once_with(api_key="sk-test")
+                MockOpenAI.assert_called_once_with(api_key="sk-test", **_NO_BUDGET)
 
     def test_returns_client_with_custom_base_url_when_configured(self):
         """When llm_base_url is set, OpenAI is constructed with base_url."""
@@ -31,6 +41,7 @@ class TestGetLlmClient:
                 MockOpenAI.assert_called_once_with(
                     api_key="sk-openrouter",
                     base_url="https://openrouter.ai/api/v1",
+                    **_NO_BUDGET,
                 )
 
     def test_client_uses_llm_api_key(self):
