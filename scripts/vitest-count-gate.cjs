@@ -1747,6 +1747,8 @@ const BASELINE = {
   "SettingsPage.a11y.test.tsx": 4,
   "SettingsPage.sourceCeiling.test.tsx": 9,
   "SettingsPage.changedFields.test.tsx": 17,
+  // Phase 283-01 (D-14) — the Settings tab registry suite. Registered in BOTH knobs in one commit.
+  "settingsTabs.test.ts": 11,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
@@ -4889,6 +4891,9 @@ const TARGETS = [
   // BOTH knobs in the SAME commit: a BASELINE key naming a file that does not exist makes the
   // gate exit 2 and halts every agent.
   "src/pages/__tests__/SettingsPage.changedFields.test.tsx",
+  // Phase 283-01 (D-14) — the tab-registration seam's own suite (registry rule + source-order
+  // fence tying the literal <TabsTrigger> order to SETTINGS_TABS). BASELINE pin in the same commit.
+  "src/components/settings/__tests__/settingsTabs.test.ts",
   // Added in 188-10 — and this one is an ADOPTION, not a new file, which is the case the
   // panel-directory comment above explicitly reserved: "a later phase that wants
   // WorkspacePanel inside the gate should adopt it deliberately, with its own measured
