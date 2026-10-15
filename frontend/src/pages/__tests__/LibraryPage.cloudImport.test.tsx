@@ -379,7 +379,10 @@ describe("the Library's cloud door — what the page must NOT grow", () => {
     // five LINES, and one of them (`counts[d.folder_id] = (counts[d.folder_id] ?? 0) + 1`)
     // carries three occurrences. ⛔ A LINE count is not an OCCURRENCE count, and the fence
     // needs the second. Pinned so an EIGHTH is a diff a reviewer sees.
-    expect(pageSource.match(/\.folder_id\b/g)?.length).toBe(7)
+    // 284-01 (R-11), 2026-10-16: the seven `.folder_id` reads moved into `useLibraryDocuments` with
+    // the derivations (D-24); the property this pin guards — no `folder_id:` body key on the page —
+    // is asserted unchanged above. ONE read stays until 284-01 Task 3 (FolderDetail's array input).
+    expect(pageSource.match(/\.folder_id\b/g)?.length).toBe(1)
   })
 
   it("the door reads the SHIPPED permission predicate, and no second one is introduced", () => {

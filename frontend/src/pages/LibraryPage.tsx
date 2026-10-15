@@ -42,7 +42,9 @@ import { LibraryStatTiles } from "@/components/library/LibraryStatTiles"
 import { DocumentsPager } from "@/components/library/DocumentsPager"
 import { ReembedSearchPointer } from "@/components/settings/ReembedStatusCard"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
-import { useDocuments } from "@/hooks/useDocuments"
+// Phase 284-01 (D-24) — the page's ONE documents read. Every row and number the page used to
+// derive from the whole library is this hook's; the page derives nothing from documents.
+import { useLibraryDocuments } from "@/hooks/useLibraryDocuments"
 import { useFolders } from "@/hooks/useFolders"
 import { useAuth } from "@/hooks/useAuth"
 import {
@@ -56,7 +58,7 @@ import { listExpertInstalls } from "@/lib/api/experts"
 // Phase 275 (S7-S9): the ONE batched retention read + its leaves (no fetch in any of them).
 import { useRetentionStates } from "@/components/retention/useRetentionStates"
 import { RetentionFolderLine } from "@/components/retention/RetentionFolderLine"
-import { ArchivedHiddenLine, splitArchived } from "@/components/retention/ArchivedHiddenLine"
+import { ArchivedHiddenLine } from "@/components/retention/ArchivedHiddenLine"
 import { provenanceByFolder } from "@/components/experts/catalog/expertCatalog"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -248,7 +250,6 @@ export function LibraryPage({
   onAskInChat?: (question: string) => Promise<boolean> | void
 } = {}) {
   const { user } = useAuth()
-  const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
   const { folders, createFolder, renameFolder, deleteFolder, toggleOrgShared } = useFolders()
 
   // ⭐ ONE reducer replaces `selectedFolderId`, `selectedViewId`, `editingView`, `filter` and
@@ -298,22 +299,8 @@ export function LibraryPage({
     }, 100)
   }
 
-  /** Sketch 231-A — what the header pill and the `In progress` badge both read.
-   *
-   *  ⛔ IT FETCHES NOTHING. These are documents the page already holds, counted — the same rule
-   *  `IngestionTab` carries ("every document it renders is one the page already holds"). A second
-   *  poll for a number that is already in memory is how two surfaces come to disagree about it.
-   *
-   *  ⚠ `paused` is counted as in-flight ON PURPOSE. A rate-limited document has not finished and
-   *  has not failed; calling it idle would be the same class of lie as calling a queued file
-   *  "added", which is the defect this whole change exists to fix. */
-  const inFlightCount = useMemo(
-    () =>
-      documents.filter(
-        (d) => d.status === "pending" || d.status === "processing" || d.status === "paused",
-      ).length,
-    [documents],
-  )
+  // Sketch 231-A's in-flight count (the header pill + the `In progress` badge) moved into
+  // `useLibraryDocuments` with its docblock and its `paused` predicate (284-01, D-24).
   const selectedFolderId = activeFolderId(lib)
   const selectedViewId = activeViewId(lib)
   const editingView = lib.editingView
@@ -351,6 +338,29 @@ export function LibraryPage({
   const [matchCount, setMatchCount] = useState<number | null>(null)
   const filterReqId = useRef(0)
 
+  // Phase 217.1-06 (LIB-01) — the Documents tab's pager state. The offset keys off (folder,
+  // view, filter) changes so a navigation never strands a stale page. ⛔ It is UI state and
+  // STAYS here; the data hook below takes it as arguments and answers that page (284-01).
+  const [pageOffset, setPageOffset] = useState(0)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => {
+    setPageOffset(0)
+  }, [selectedFolderId, filteredDocs])
+
+  // ⭐ Phase 284-01 (D-24) — the page's documents, as rows and numbers. Named `libDocs` because
+  // `lib` is the selection reducer's state above.
+  const libDocs = useLibraryDocuments({
+    folderId: selectedFolderId,
+    filteredDocs,
+    includeArchived: find.include_archived,
+    offset: pageOffset,
+    limit: pageSize,
+    selectedDocId,
+    findRows: findResult.rows,
+  })
+  const { upload, deleteDoc, uploading, uploadingCount } = libDocs
+  const loadDocuments = libDocs.refresh
+
   // Load the field defs (for the operator menu) + the saved views once.
   useEffect(() => {
     listMetadataFields().then(setCustomFields).catch(() => setCustomFields([]))
@@ -376,20 +386,9 @@ export function LibraryPage({
     }
   }, [sidebarPinnedExpanded])
 
-  // Resolve the selected doc from the live documents array so it tracks edits +
-  // re-fetches (loadDocuments reconcile). Falls back to closed if it disappears.
-  // Phase 271-04 (UI-SPEC S4): a Find row may be an OLDER version, which `documents` (latest
-  // rows only) never holds — so the Find answer is the second place a selection resolves from.
-  // The live `documents` row still wins for a latest document.
-  const selectedDoc = useMemo<Document | null>(
-    () =>
-      selectedDocId === null
-        ? null
-        : documents.find((d) => d.id === selectedDocId) ??
-          findResult.rows.find((d) => d.id === selectedDocId) ??
-          null,
-    [selectedDocId, documents, findResult.rows],
-  )
+  // The open document — resolved by `useLibraryDocuments` (the live row first, then Find's
+  // answer for an older version, else closed). Moved there with its comment by 284-01 (D-24).
+  const selectedDoc = libDocs.selectedDoc
 
   // Phase 153 (CITE-01 / SC#2 / T-153-02-01): consume the one-shot cross-view
   // "Open document" intent from a chat citation. We route it through the EXISTING
@@ -432,30 +431,31 @@ export function LibraryPage({
 
   const canUploadToFolder = !selectedFolderId || !selectedFolder || selectedFolder.user_id === user?.id
 
+  // ⚠ 284-01 Task 2 → Task 3: FolderDetail still takes the folder's documents until Task 3 hands
+  // it the summary's count and size. This is the one derivation left on the page for that commit.
+  const ingestionDocuments = libDocs.documentsForIngestion
   const folderDocuments = useMemo(() => {
     if (selectedFolderId === null) return []
-    return documents.filter((d) => d.folder_id === selectedFolderId)
-  }, [selectedFolderId, documents])
+    return ingestionDocuments.filter((d) => d.folder_id === selectedFolderId)
+  }, [selectedFolderId, ingestionDocuments])
 
   const subfolderCount = useMemo(() => {
     if (selectedFolderId === null) return 0
     return folders.filter((f) => f.parent_id === selectedFolderId).length
   }, [selectedFolderId, folders])
 
-  const rootDocumentCount = useMemo(() => {
-    return documents.filter((d) => d.folder_id == null).length
-  }, [documents])
-
-  // Phase 114 (D-114-13/8): per-folder document counts so every NavRow shows a
-  // count (parity with the mandated View count). Sourced from the documents the
-  // page already holds — no per-folder resolve call (would degrade at ~10k docs).
+  // Phase 284-01 (D-24 / UI-SPEC S4) — the Root and per-folder counts are the summary's
+  // (`useLibraryDocuments`). Unanswered → `undefined`, so NavRow omits the slot, never a 0.
+  // Phase 114 (D-114-13/8): every NavRow shows a count (parity with the mandated View count),
+  // and there is still no per-folder resolve call (would degrade at ~10k docs).
+  const rootDocumentCount = libDocs.summary?.root.count
   const folderDocumentCounts = useMemo(() => {
+    const folderCounts = libDocs.summary?.folders
+    if (!folderCounts) return undefined
     const counts: Record<string, number> = {}
-    for (const d of documents) {
-      if (d.folder_id) counts[d.folder_id] = (counts[d.folder_id] ?? 0) + 1
-    }
+    for (const [id, bucket] of Object.entries(folderCounts)) counts[id] = bucket.count
     return counts
-  }, [documents])
+  }, [libDocs.summary])
 
   // Phase 266 (D-266-13): an installed Expert's folder names where it came from —
   // "Shared with org · from Financial Analyzer" — through NavRow's existing shared label.
@@ -650,39 +650,15 @@ export function LibraryPage({
     </div>
   )
 
-  // When a filter/view is active the list shows the resolved set (folderId
-  // undefined → DocumentList does no further folder filtering); otherwise it
-  // scopes to the selected folder's (or Root's) documents BEFORE paging.
-  const folderScopedDocuments = useMemo(() => {
-    if (filteredDocs !== null) return filteredDocs
-    if (selectedFolderId === null) {
-      return documents.filter((d) => d.folder_id == null)
-    }
-    return documents.filter((d) => d.folder_id === selectedFolderId)
-  }, [filteredDocs, selectedFolderId, documents])
-
-  // Phase 275 (S9 / D-04): browse hides archived rows unless the ONE include-archived state (Find's
-  // reducer, shared with its `Include archived` chip) is on. 275-REVIEW F-WR-11: a saved view or an
-  // ad-hoc filter honours the SAME state (its resolve has no archived predicate), so it can never
-  // disagree with Find over the same conditions.
-  const archived = splitArchived(folderScopedDocuments, find.include_archived)
-  const listDocuments = archived.shown
+  // ⭐ Phase 284-01 (D-24) — the folder scoping, the archived split (Phase 275 S9 / D-04, one
+  // include-archived state shared with Find) and the pager slice all moved into
+  // `useLibraryDocuments`, with their comments. The page reads the answer:
+  //   `rows`           — what DocumentList renders (one page, or the whole resolved view)
+  //   `total`          — the pager's denominator; `archivedHidden` — ArchivedHiddenLine's count
+  // When a filter/view is active the list shows the resolved set (folderId undefined →
+  // DocumentList does no further folder filtering).
+  const pagedDocuments = libDocs.rows
   const listFolderId = filteredDocs !== null ? undefined : selectedFolderId
-
-  // Phase 217.1-06 (LIB-01) — the Documents tab's client-side pager state. The offset
-  // keys off (folder, view, filter) changes so a navigation never strands a stale page.
-  const [pageOffset, setPageOffset] = useState(0)
-  const [pageSize, setPageSize] = useState(25)
-  useEffect(() => {
-    setPageOffset(0)
-  }, [selectedFolderId, filteredDocs])
-
-  // ⛔ Client-side slice. `GET /documents` is unpaginated (documents.py:726-760), so the
-  // denominator here is real — bounded by PostgREST's 1000-row ceiling, which the pager's
-  // honest arm names (WR-04 / T-217.1-11a). Views' server-resolved list is NOT re-sliced
-  // here — a saved view's row count is its own resolve, not the pager's business.
-  const pagedDocuments =
-    filteredDocs !== null ? listDocuments : listDocuments.slice(pageOffset, pageOffset + pageSize)
 
   // Phase 275 (planning flag 2): ONE `POST /retention/document-states` for what is on screen — the
   // browse page, Find's page and the open document — plus the selected folder. Passed DOWN.
@@ -811,7 +787,7 @@ export function LibraryPage({
                 dispatch={findDispatch}
                 filter={filter}
                 onFilterChange={handleFindFilterChange}
-                documents={documents}
+                documents={ingestionDocuments}
                 folders={folders}
               />
             ),
@@ -914,7 +890,7 @@ export function LibraryPage({
             <div data-testid="documents-doclist">
               {/* 275-05 (S9): every row hidden as archived → the hidden line below says so; the
                   list's "No documents in this folder" would claim an emptiness that is not true. */}
-              {!(listDocuments.length === 0 && archived.archivedCount > 0) && (
+              {!(libDocs.total === 0 && (libDocs.archivedHidden ?? 0) > 0) && (
                 <DocumentList
                   documents={pagedDocuments}
                   onDelete={deleteDoc}
@@ -930,16 +906,16 @@ export function LibraryPage({
             </div>
             {/* 275-REVIEW F-WR-11: for a view / filter resolve too — one include-archived state. */}
             <ArchivedHiddenLine
-              count={archived.archivedCount}
+              count={libDocs.archivedHidden ?? 0}
               included={find.include_archived}
               onChange={(include) => findDispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: include })}
             />
             {/* Phase 217.1-06 — the client-side pager (the sketch's table footer). Shown on
                 the folder view only; a filter/view resolve carries its own server count. */}
-            {filteredDocs === null && (
+            {filteredDocs === null && libDocs.total !== null && (
               <div data-testid="documents-tfoot">
                 <DocumentsPager
-                  total={listDocuments.length}
+                  total={libDocs.total}
                   offset={pageOffset}
                   limit={pageSize}
                   onChange={(off, lim) => {
@@ -1014,14 +990,14 @@ export function LibraryPage({
 
       {/* Phase 217.1-06 (LIB-01 / D-217.1 sparkline-drop) — CHUNKS · VECTORS · FOUND BY
           A SEARCH. Numbers stand alone; an unreachable source says so. */}
-      <LibraryStatTiles documents={documents} />
+      <LibraryStatTiles documents={ingestionDocuments} />
 
       <div className="min-w-0">
         {selectedFolderId === null ? (
           <>
             <h2 className="text-lg font-semibold leading-tight">Root</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Documents not assigned to a folder · <AnimatedNumber value={rootDocumentCount} />{" "}
+              Documents not assigned to a folder · {rootDocumentCount === undefined ? "…" : <AnimatedNumber value={rootDocumentCount} />}{" "}
               {rootDocumentCount === 1 ? "document" : "documents"}
             </p>
           </>
@@ -1066,7 +1042,7 @@ export function LibraryPage({
         onEditView={handleEditView}
         onRenameView={handleRenameView}
         onDeleted={handleDeletedView}
-        corpusCount={listDocuments.length}
+        corpusCount={libDocs.total ?? undefined}
         onNewView={handleNewView}
       />
       {selectedViewId !== null && (
@@ -1132,8 +1108,8 @@ export function LibraryPage({
             tabs={LIBRARY_TABS}
             subtitle="What the agent can read, and how well it reads it."
             onSelectTab={(next) => dispatch({ type: "SELECT_TAB", tab: next as LibraryTab })}
-            inFlight={inFlightCount}
-            totalDocuments={documents.length}
+            inFlight={libDocs.inFlight ?? 0}
+            totalDocuments={libDocs.summary?.total}
             onOpenQueue={() => dispatch({ type: "SELECT_TAB", tab: "ingestion" })}
             listTestId={`${tab}-tabslist`}
             attention={attentionByTab}
@@ -1255,7 +1231,7 @@ export function LibraryPage({
               className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
             >
               <IngestionTab
-                documents={documents}
+                documents={ingestionDocuments}
                 upload={upload}
                 uploading={uploading}
                 uploadingCount={uploadingCount}
