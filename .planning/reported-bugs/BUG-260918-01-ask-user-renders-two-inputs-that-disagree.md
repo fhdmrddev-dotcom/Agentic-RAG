@@ -4,10 +4,10 @@ title: An ask_user pause renders TWO full answer cards whose drafts disagree, pl
 reported: 2026-09-18
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [frontend/chat, frontend/workspace-panel, PausedRunCue.tsx, PendingAskCard.tsx, MessageList.tsx, a11y]
 folded_into: "282"
-verified_closed_by: null
+verified_closed_by: "282"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -179,3 +179,14 @@ and **C** are untouched.
 - `.planning/reported-bugs/BUG-260828-07-approval-buttons-absent-in-chat-thread.md` — the reachability bug 244-12 closed, whose fix caused this
 - `c2ffdaad7` — the Finding-A fix on `develop`, undeployed
 - Original operator screenshot: `screenshots/Screenshot 2026-09-18 205410.png`
+
+## Verified closed (Phase 282, 2026-10-15, develop `22c409c2c`)
+
+This was driven live in Chrome and checked by reading DOM state (`282-LIVE-EVIDENCE.md` G4-1 / G4-2 / G4-3):
+
+- **G4-1, panel open:** 1 Send Answer, inside `[data-ask-home="panel"]`. Chat shows the pointer. "Answer in
+  panel →" focuses the panel's `role=radio` chip. ArrowDown checks Blue, and the pointer reads "Draft: Blue".
+  The checked chip carries `ask-radio-dot`, so it is not marked by colour alone.
+- **G4-2, workflow pause with the panel on the rail:** 1 input, in chat. Abort plus "because" carried over
+  rail → open → rail, and the pointer showed "Draft: Abort".
+- **G4-3, two threads paused:** A kept Red plus "because A", and B kept Blue with no text, across A → B → A → B.

@@ -2,7 +2,7 @@
 phase: 282-the-slow-run-and-the-paused-run
 plan: 03
 type: live-evidence
-status: pending
+status: driven
 created: 2026-10-15
 merged_sha: 3c9bb11ab
 ---
@@ -59,7 +59,7 @@ from the app's own status**.
 - **Workflow-pause candidate:** `workflow_definitions` id `f59d361b-bc73-4f6c-b856-1a499195b59f`, slug
   `fresh-pause-102uat-20a89243`, `status: published`, org `22f9c615-…`; its definition text mentions
   `ask_user` and `approval`. Whether it actually raises a pause on a run is still to be driven.
-- **Active org (DOM):** *not read — see the blocker below.*
+- **Active org:** read at drive time; see "Drives: done by the orchestrator" below.
 
 ### ⛔ Blocker found at resume (2026-10-15)
 
@@ -77,59 +77,121 @@ Bash / Grep / Glob. That blocks Task 3 in two ways:
 
 No row was driven. Every board and G-4 row below stays pending. No bug or seed was flipped.
 
+## Drives: done by the orchestrator (2026-10-15, 13:44–14:01 UTC)
+
+The blocker above was cleared by having the **orchestrator** run Task 3 itself, because it has the Chrome MCP tools:
+- **Environment:** Chrome at 1536 px, on the operator's signed-in session.
+- **Auth:** each board POST used the page's own Supabase session token and `X-Org-Id` (the same headers `getAuthHeaders` sends). Neither was written to a file.
+- **Active org:** `GET /org/me` → `22f9c615-0eec-440a-8804-ed4784d6f57f`, "fhdmrd@gmail.com's Organization" (org-admin). It is the same org as the workflow candidate.
+- **Sandbox:** proven on. Row 1's `execute_code` ran and printed 391.
+- **Global settings:** none changed. Every row used a per-request `model` + `provider`.
+- **Run reads:** from the local DB (`runs`, read-only). Message reads used `GET /threads/{id}/messages`.
+
+### ⚠ Prompt amendment, and why
+
+- **Pass 1** used the authored pause prompt verbatim. In **5 of 5** native rows that paused, the question **expired after about 60 s**, before it could be answered. The final messages read "You didn't respond in time…" and similar. gpt-5.6-sol's first ask expired at the 300 s default.
+- **Cause:** the ask_user schema makes `timeout_seconds` **required** but describes it as "Optional" (`openai_service.py:1135-1137`), so the models picked about 60. Filed as **BUG-261015-03** (major, open, not folded into 282).
+- **Pass 2** appended "with timeout_seconds set to 1200" to the prompt. All five paused until they were answered. **The pass-2 rows are the verdict rows.** Pass-1 run ids are kept below.
+
 ## SC#10 board (D-16)
 
 | # | Provider | Model | Axis | Thread / run ids | Run status | Final message names Blue | `runs.error` | Verdict |
 |---|---|---|---|---|---|---|---|---|
-| 1 | OpenAI | `gpt-5.6-sol` | multi-tool | pending | pending | pending | pending | pending |
-| 2 | Anthropic | `claude-sonnet-5` | parallel-thread A | pending | pending | pending | pending | pending |
-| 3 | Google | `gemini-3.5-flash` | parallel-thread B | pending | pending | pending | pending | pending |
-| 4 | DeepSeek | `deepseek-v4-pro` | long-message (≥ 5 KB) | pending | pending | pending | pending | pending |
-| 5 | Zhipu | `glm-5.2` | — | pending | pending | pending | pending | pending |
-| 6 | MiniMax | `MiniMax-M3` | — | pending | pending | pending | pending | pending |
-| 7 | Moonshot | `kimi-k2.6` | — | pending | pending | pending | pending | pending |
-| 8 | OpenRouter | `z-ai/glm-5.2` | — | pending | pending | pending | pending | pending |
+| 1 | OpenAI | `gpt-5.6-sol` | multi-tool | `c152dd60…` / `448c1be5-b340-48fc-b035-302625d3cfd3` | completed 13:55:50 | "The “invoice” search returned 5 results, Python printed 391, and your preferred colour is Blue." | none | ✅ PASS (first ask expired at 300 s and the model re-asked; the re-ask was answered Blue) |
+| 2 | Anthropic | `claude-sonnet-5` | ~~parallel-thread A~~ | `7ccb6589…` / `d512fe97-428c-46de-bfd7-1469e9ade5d9` | failed 13:45:46 | — | `BadRequestError 400 … Your credit balance is too low to access the …` | ⛔ **no credit** (n/a — configuration). Chat showed "Model parameter error…", a mislabel filed as **BUG-261015-04** |
+| 3 | Google | `gemini-3.5-flash` | parallel-thread B | `b7dd3900…` / `7122a691-0dd2-4c0a-a3d8-fec17dbd58cc` | completed 13:52:36 | "You selected Blue as your preferred colour." | none | ✅ PASS |
+| 4 | DeepSeek | `deepseek-v4-pro` | long-message (5,685 B) | `0a6bceae…` / `c8d77147-8879-4811-8265-61b5095f9731` | completed 13:52:45 | "You chose Blue." | none | ✅ PASS |
+| 5 | Zhipu | `glm-5.2` | **parallel-thread A** (moved from row 2) | `8a95fb75…` / `b9b8d4d1-42a4-4394-9a41-c639a6ee25b7` | completed (answered about 13:53) | "You chose Blue." | none | ✅ PASS |
+| 6 | MiniMax | `MiniMax-M3` | — | `00e73b13…` / `dc4f88de-989a-4f51-b41c-66193fcd5640` | completed 13:52:21 | "You chose Blue." | none | ✅ PASS |
+| 7 | Moonshot | `kimi-k2.6` | — | `e9961bef…` / `2b643199-4b58-492e-9d0b-65b091c49ccc` | completed | "You chose Blue." | none | ✅ PASS |
+| 8 | OpenRouter | `z-ai/glm-5.2` | — | `2c39d7a8…` / `8d2c655c-63b7-46d2-9743-0b7edf00dfb4` | failed 13:46:16 | — | `APIStatusError 402 … This request requires more credits, or fewer max_tokens…` | ⛔ **no OpenRouter credit** (n/a — configuration) |
 
-- Multi-tool tool events (row 1): *(pending)*
-- Parallel-thread timestamps (A ask created / B completed / A answered / A completed): *(pending)*
-- Long-message prompt byte length (row 4): *(pending)*
-- A1 LangSmith nesting: *(pending)*
+**Score: 6 PASS · 2 ⛔ (billing, not code) · 0 FAIL.** Every ask_user tool call on the passing rows returned `"Blue"`.
+
+- **Multi-tool (row 1):** the tool events were `write_todos`, `search_documents` (done, 5 results), `execute_code` (done, printed 391 = 17×23), `ask_user` ×2 (the first expired at 300 s, the second was answered Blue), then `write_todos`.
+- **Parallel-thread (rows 5 + 3):** the axis moved from row 2 to row 5 because row 2 is ⛔.
+  - A's ask was raised about 13:49:50 and left unanswered.
+  - B was answered at 13:52:26 and **completed at 13:52:36 while A was still pending** (A's run read `streaming`).
+  - A was then answered Blue at about 13:53 (its draft was changed from Red plus "because A" to Blue, and the text cleared) and completed with "You chose Blue."
+- **Long-message (row 4):** the prompt was **5,685 bytes**, ahead of the pause instruction. Pass 1 was 5,652 B.
+- **A1 LangSmith nesting:** not checked in this drive. **A1 is unverified**, and owed.
+- **Board-wide:** all 8 rows are listed and none is blank. No global setting changed.
+- **Pass-1 run ids (expired asks, kept for the record):**
+  - row 3 `1e189703…`
+  - row 4 `3b9f1de4…`
+  - row 5 `a8222fef…`
+  - row 6 `77e9b002…`
+  - row 7 `35d45a5e…`
+- **Side observation:** in pass 1, the POST for row 3 (Google) took about 24 s, from 13:45:43 to 13:46:07. In pass 2 every POST took 96–155 ms, so it did not recur. It is not filed.
 
 ## G-4 rows (D-17)
 
-### G4-1 — Deep pause, panel open (sketch 282 variant A)
+### G4-1: Deep pause, panel open (sketch 282 variant A). ✅ PASS
 
-*(pending)*
+Thread `282 board 5 zhipu` (pass 1). DOM reads:
+- **Before:** `Send Answer` count **1**, home `panel`. Cards: `[panel]`. `ask-pointer` present in `main`. Pointer draft "No answer yet". Radios `Red:false:ti0`, `Blue:false:ti-1`.
+- **The pointer button:** `[data-testid="ask-pointer-go"]` reads "Answer in panel →" and is **32 px** high (UI-SPEC owed item 2, measured).
+- **After clicking it:** the active element is `BUTTON role=radio "Red"`, inside `[data-ask-home="panel"]`.
+- **After ArrowDown:** the active element is `radio "Blue"`. Radios `Red:false:ti-1`, `Blue:true:ti0`. **Pointer draft "Draft: Blue"**.
+- **Not colour-only:** the checked chip's mark contains `[data-testid="ask-radio-dot"]` (a filled 8 px dot). The unchecked chip has an empty ring.
 
-### G4-2 — Workflow pause, panel on the rail (BUG-260828-07)
+### G4-2: Workflow pause, panel on the rail (BUG-260828-07). ✅ PASS
 
-*(pending)*
+- **Candidate:** `f59d361b…` (definition read first). Its only phase, `brief`, has a **pre** freshness validator, `max_age_days: 2`, `on_failure: ask_user`.
+- **Run:** thread `194a0c34…`, run `f901f8ce-e71c-452e-b2f8-44bd8cd4d433`, on deepseek-v4-pro. It paused with "A validation check on phase 'brief' flagged: freshness:staleness|newest source is 129d old (> 2d). How should the run proceed?" Options: Proceed anyway, Abort.
 
-### G4-3 — Two threads paused at once
+| State | Send Answer | home | pointer | checked option | textarea |
+|---|---|---|---|---|---|
+| rail | 1 | chat | no | none | "" |
+| rail, after selecting option 2 and typing | 1 | chat | no | **Abort** | **"because"** |
+| panel open | 1 | panel | yes, "Draft: Abort" | **Abort** | **"because"** |
+| rail again | 1 | chat | no | **Abort** | **"because"** |
 
-*(pending)*
+Sent Abort at 13:57:39. The run completed with "Phase 1 (brief) validation flagged … aborted by user".
+**Once settled:** 0 cards, 0 pointer, 0 Send Answer. That is UI-SPEC owed item 6, observed.
 
-### G4-4 — Slow local model past 600 s (D-26)
+### G4-3: Two threads paused at once. ✅ PASS
 
-*(not driven yet.)* **Pre-assessment from local reads:** the operator's model `spark-x2.5-4b` resolves
-to **300 s** (no Registry row, so the default applies). A call longer than 600 s on it would be ended at
-300 s with a `timed_out:` error. That is the timeout working as designed, not the D-09 part 3 proof. The
-only other loaded chat model (`nvidia_nvidia-nemotron-nano-9b-v2`) is 550 s. **Unless a 900 s model is
-loaded** (`openai/gpt-oss-20b`, `qwen3.6-35b-a3b-mtp` or `qwen3.5-9b-mtp`, each with a Registry row
-at 900), this row can only end as **⛔ OWED: "no loaded local model has a timeout above 600 s"**.
-Raising spark's timeout to 900 would be a Registry write, and no write was approved. The SCALED
-automated test (`test_282_slow_stub_scaled.py`, 63/63 test_282 green on the merged tree) remains the
-proof meanwhile.
+Threads A = `282 p2 board 5 zhipu thread A` and B = `282 p2 board 6 minimax`.
 
-### G4-5 — Registry refusal on screen (SC#1 live)
+| Visit | checked | textarea |
+|---|---|---|
+| A, after selecting and typing | Red | "because A" |
+| B, first visit | none | "" (A's draft was **not** copied) |
+| B, after selecting | Blue | "" |
+| A, return | **Red** | **"because A"** |
+| B, revisit | **Blue** | "" |
 
-*(pending)*
+### G4-4: Slow local model past 600 s (D-26). ⛔ OWED
 
-### G4-6 — The timeout sentence (optional, needs approval)
+- **Reason:** no loaded local model has a timeout above 600 s. The operator loaded `spark-x2.5-4b`, which has no Registry row and so resolves to the 300 s default. The only other loaded chat model is nemotron, at 550 s.
+- **Not done, by decision:** loading a 900 s model, or raising Spark's timeout. A Registry write was not approved.
+- **The automated half stands as the proof:** `test_282_slow_stub_scaled.py`.
+- **Second-thread observation (BUG-261015-02), recorded anyway:**
+  - A Spark run on a 12,132 B prompt (`0561d8f1-5b8d-4734-8ebf-56b61b77d17d`) completed at 14:00:52 after 74 s.
+  - In its first 20 s, a deepseek thread (`bd0d550e-1d8d-4ebb-bb25-ce9005b3c70e`) posted in **136 ms** and completed in 8 s.
+  - 180 `/health` pings in that window: p50 **8 ms**, max **192 ms**, **0** above 500 ms. The baseline maximum was 44 ms.
+  - ⚠ The backend runs 2 workers, so this supports the automated measurement rather than replacing it.
 
-**OWED — write not approved** (row6 = NO, 2026-10-15). Not driven. The sentence itself is pinned by
-`test_282_timeout_bound.py::test_timed_out_error_keeps_prefix_and_names_the_setting` (green on the
-merged tree).
+### G4-5: Registry refusal on screen (SC#1 live). ✅ PASS
+
+Model Registry, `glm-4.7-flash`:
+- **Before:** the DB value is `llm_call_timeout_seconds = 550`, `updated_at 2026-08-18 07:03:28`.
+- **While editing:** `[data-testid="timeout-help"]` reads exactly "Between 1 and 1800 seconds. Local models and Google models are tried once. Other cloud providers retry quick failures up to 2 times." The input's `aria-describedby` is `timeout-help-glm-4.7-flash`.
+- **After typing 1801 + Enter:** one `role=alert` inside `[data-model-error="glm-4.7-flash"]` reads exactly "Timeout must be between 1 and 1800 seconds, because a longer call would outlast the run watchdog, which ends a run that has been silent for 2400 s. 1801 was not saved." The cell still shows `550s`. The help line is gone once the cell closes, as UI-SPEC owed item 5 requires.
+- **After:** the DB still holds **550** with the same `updated_at`. Nothing was stored.
+
+### G4-6: The timeout sentence (optional, needs approval)
+
+**OWED: write not approved** (row6 = NO, 2026-10-15). Not driven. The sentence itself is pinned by `test_282_timeout_bound.py::test_timed_out_error_keeps_prefix_and_names_the_setting`, which is green on the merged tree.
+
+### Evidence-gated flips (done 2026-10-15)
+
+- **BUG-260918-01 → `closed`** (G4-1, G4-2 and G4-3 PASS). `verified_closed_by: "282"`.
+- **BUG-261015-02 → `closed`** (`test_282_open_off_loop.py` green, plus the G4-4 second-thread observation). `verified_closed_by: "282"`.
+- **BUG-260916-01 stays `folded`** because G4-4 is ⛔ OWED. The automated half is `test_282_slow_stub_scaled.py`. G4-5 passed.
+- **SEED-172** stays `partially-answered`. Its status_note now says #2 and #3 (the timeout field) were **answered** by 282, and #4 is open.
+- **New, not folded:** BUG-261015-03 (ask_user's required timeout makes models pick about 60 s) and BUG-261015-04 (Anthropic out-of-credit shown as "Model parameter error").
 
 ## Operator sign-off
 

@@ -4,10 +4,10 @@ title: The OpenAI-compat / Responses stream is opened synchronously on the event
 reported: 2026-10-15
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/provider-routing, backend/agent-loop, local-models]
 folded_into: "282"
-verified_closed_by: null
+verified_closed_by: "282"
 related_seeds: ["SEED-172"]
 re_open_trigger: null
 reproduces_on:
@@ -61,3 +61,14 @@ sites do not move.
 - `backend/app/services/openai_service.py:2199`, `:2410`, `:2464`, `:2488`
 - `backend/app/services/provider_gateway/openai_responses.py:553-561`
 - `backend/app/services/agent_loop.py:521-618`
+
+## Verified closed (Phase 282, 2026-10-15, develop `22c409c2c`)
+
+- **Automated:** `test_282_open_off_loop.py` is green on the merged tree (63/63 test_282). The measured
+  loop stall went from 2.970 s to 0.065 s (282-01).
+- **Live (G4-4 second-thread observation):**
+  - An LM Studio run (`spark-x2.5-4b`, 12 KB prompt, run `0561d8f1…`) was opened while a cloud thread
+    posted in 136 ms and completed in 8 s (`bd0d550e…`).
+  - 180 `/health` pings over the 20 s window: p50 8 ms, max 192 ms, none above 500 ms.
+  - ⚠ With 2 uvicorn workers, a ping can land on the idle worker, so the live half supports the automated
+    proof rather than replacing it.

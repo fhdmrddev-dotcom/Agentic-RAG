@@ -97,3 +97,10 @@ Roster re-derived 2026-10-15 at `3c9bb11ab` from `app.config.MODEL_CAPABILITIES`
   second-thread observation when recorded.
 - SEED-172 → stays `partially-answered`; findings #2 and #3 (timeout field) recorded as answered by 282,
   #4 open.
+
+### Amendment at drive time (2026-10-15, recorded rather than silently changed)
+
+The pause prompt above was driven verbatim in pass 1. Every native row's question expired after about 60 s,
+before it could be answered, because the models chose that `timeout_seconds` (BUG-261015-03). **Pass 2**
+appended "with timeout_seconds set to 1200" to the prompt and is the verdict pass. The FAIL conditions are
+unchanged. Details are in `282-LIVE-EVIDENCE.md` under "Prompt amendment".
