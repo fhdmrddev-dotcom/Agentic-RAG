@@ -74,9 +74,14 @@ function renderSettings(features: Record<string, boolean> = { model_management: 
   )
 }
 
-/** A caller whose map does NOT carry `model_management` — the shape a member has. */
+/** ~~A caller whose map does NOT carry `model_management` — the shape a member has.~~
+ *
+ *  ⚠ CORRECTED (283-REVIEW IN-03; struck rather than deleted): `{}` is NOT a member's shape.
+ *  `/features` returns `{ model_management: false }` for a member; `{}` means "not told yet",
+ *  a different state that the page also fails closed on, so a `{}` fixture could pass for the
+ *  wrong reason. This helper now passes the explicit member map. */
 function renderAsMember() {
-  return renderSettings({})
+  return renderSettings({ model_management: false })
 }
 
 function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
