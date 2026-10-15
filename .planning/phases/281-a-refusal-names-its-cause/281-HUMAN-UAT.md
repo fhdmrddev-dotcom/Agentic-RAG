@@ -3,7 +3,7 @@ status: partial
 phase: 281-a-refusal-names-its-cause
 source: [281-VERIFICATION.md, 281-LIVE-EVIDENCE.md]
 started: 2026-10-15T09:00:00Z
-updated: 2026-10-15T09:00:00Z
+updated: 2026-10-15T12:00:00Z
 ---
 
 ## Current Test
@@ -26,14 +26,14 @@ result: [pending]
 
 ### 4. WR-02 policy confirmation
 expected: The operator accepts that an all-archived scope passes freshness exactly like an empty scope (Phase 102's design, pinned by `test_281_freshness_retrievable.py`), or asks for fail-closed (a one-line `validator_kinds.py` change that also flips the empty-scope verdict).
-result: [pending]
+result: passed — operator answered "keep" on 2026-10-15; an all-archived scope passes like an empty scope, by design.
 
 ## Summary
 
 total: 4
-passed: 0
+passed: 1
 issues: 0
-pending: 4
+pending: 3
 skipped: 0
 blocked: 0
 

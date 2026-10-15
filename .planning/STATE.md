@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: executing
-last_updated: "2026-10-14T18:18:26.457Z"
-last_activity: 2026-10-15 -- 281-04 Task 3 G-4 drives A-D recorded
+status: ready_to_plan
+last_updated: 2026-10-15T08:41:13.865Z
+last_activity: 2026-10-15 -- Phase 281 closed (WR-02 kept; rows A, C, D owed)
 progress:
   total_phases: 14
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 18
-  completed_plans: 14
-  percent: 29
+  completed_plans: 18
+  percent: 36
+stopped_at: Phase 281 complete (4/4) — ready to discuss Phase 282
 ---
 
 # Project State
@@ -32,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 281 — a-refusal-names-its-cause
+**Current focus:** Phase 282 — the slow run and the paused run
 
 ---
 
@@ -63,11 +64,11 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 **Phase 280 (2026-10-14):** discuss done — `.planning/phases/280-in-once-out-clean/280-CONTEXT.md`. No migration expected. 4 bugs folded (BUG-261005-01, BUG-260910-04, BUG-261012-01, BUG-261012-02). Owed to operator: upload the generated `Team Docs` folder to OneDrive before the live re-drive (D-14). Next: `/gsd:plan-phase 280`.
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: 281 (a-refusal-names-its-cause) — EXECUTING
-Next: deploy proposal (operator-gated) — D-18 cloud READ done: 0. Record: `279-SEED-328-RECORD.md`; UAT: `279-UAT-LOG.md` (rows 1a-5 ✅) + REVIEW-FIX WR-05 live row ✅; 4-axis: `279-VALIDATION.md`. SEED-328 → `status: answered`.
-Plan: 4 of 4 (281-04 Task 4: operator G-4 sign-off pending)
-Status: Executing Phase 281
-Last activity: 2026-10-15 -- 281-04 Task 3 G-4 drives A-D recorded (B pass; A/C/D owed)
+Phase: 282 (the-slow-run-and-the-paused-run) — not started
+Next: `/gsd:discuss-phase 282` (G-2 sketch first for FIX-07). Deploy of 277-281 + BUG-261014-06 stays operator-gated.
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-15 -- Phase 281 closed. Owed by operator decision: G-4 rows A, C, D (run A first; D needs a new archived_at write approval). WR-02 kept by design. Post-fix gates: backend 71 failed (same set), vitest OK 10269/0. BUG-261015-01 open. Not pushed.
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
 
 **279-03 (2026-10-13):** "Won't use" → "Won't search" (29 hits / 13 files measured, not 30), swap-card

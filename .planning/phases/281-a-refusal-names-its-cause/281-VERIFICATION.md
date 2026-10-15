@@ -14,9 +14,6 @@ human_verification:
   - test: "Row D: freshness-checked step over a folder whose newest doc is archived (needs approved reversible archived_at write)"
     expected: "Archived doc's date does not decide the verdict"
     why_human: "Operator did not approve the write; re-run order A, C, D"
-  - test: "WR-02 operator confirmation: an all-archived scope passes freshness (consistent with the empty-scope verdict)"
-    expected: "Operator accepts as by design, or asks for a refusal"
-    why_human: "Behavioural policy call, pinned by test, awaiting confirmation"
 ---
 
 # Phase 281: A Refusal Names Its Cause Verification Report
@@ -57,10 +54,10 @@ All three IDs appear in plan frontmatter and in REQUIREMENTS.md; no orphans. (RE
 
 ## Anti-Patterns
 
-No TBD/FIXME/XXX in `emit_cause.py` or `describeRefusalVocabulary.ts`. Review findings: CR-01, WR-01, WR-03 fixed RED-first; WR-02 pinned "consistent by design" pending operator confirmation; WR-04 deferred to BUG-261015-01 by the operator. Out of scope and noted: `backend/app/api/documents.py` appears in the phase diff stat (separate quick fix per orchestrator). Pre-existing unrelated failure `tests/test_200_phase_counts.py::test_llm_single_emits_no_measure_key` (fails at HEAD without the WR-01 files too).
+No TBD/FIXME/XXX in `emit_cause.py` or `describeRefusalVocabulary.ts`. Review findings: CR-01, WR-01, WR-03 fixed RED-first; WR-02 pinned "consistent by design" and accepted by the operator ("keep", 2026-10-15); WR-04 deferred to BUG-261015-01 by the operator. Out of scope and noted: `backend/app/api/documents.py` appears in the phase diff stat (separate quick fix per orchestrator). Pre-existing unrelated failure `tests/test_200_phase_counts.py::test_llm_single_emits_no_measure_key` (fails at HEAD without the WR-01 files too).
 
 ## Gaps Summary
 
-No gap in what the code does. Remaining: the operator-owed live rows A, C, D (SC#1 "once live", SC#3 live code render, SC#4 live verdict, SC#5) and the WR-02 policy confirmation. Closing with these owed is a recorded decision, not a pass. Full backend baseline and vitest count gate were not run by this verifier (orchestrator running them).
+No gap in what the code does. Remaining: the operator-owed live rows A, C, D (SC#1 "once live", SC#3 live code render, SC#4 live verdict, SC#5). WR-02 was accepted as by design by the operator ("keep", 2026-10-15). Closing with these owed is a recorded decision, not a pass. Post-review-fix gates (orchestrator, 2026-10-15): backend baseline 71 failed, same set as base, GATE PASSED; vitest count gate OK, 10269 total, 0 failing.
 
 _Verifier: Claude (gsd-verifier)_

@@ -18,13 +18,13 @@ Seeds folded at intake: **SEED-221** (into FIX-10), **SEED-328** (into SEAM-01),
 - [ ] **FIX-06**: A per-model timeout is the timeout the provider call actually gets, up to the maximum the UI accepts; a value above a real ceiling is refused with the reason; `max_retries` is chosen deliberately, not inherited from the SDK default. — `BUG-260916-01`
 - [ ] **FIX-07**: One `ask_user` pause shows one answer input; the draft is the same wherever it appears; option selection is not conveyed by colour alone; no dead button remains. — `BUG-260918-01`
 - [ ] **FIX-08**: Expanding the Chunks section on a 1,000-chunk document leaves every section below it reachable. — `BUG-260908-01`
-- [ ] **FIX-09**: When an emit step fails, the reported cause is the check that actually failed — never "citations" when citation coverage was 100%. — `BUG-260730-02`
-- [ ] **FIX-10**: A publish-gauntlet refusal shows the author the precise reason recorded in `harness_audit`, in plain words, never a machine code. — `BUG-260815-06` + `SEED-221`
+- [x] **FIX-09**: When an emit step fails, the reported cause is the check that actually failed — never "citations" when citation coverage was 100%. — `BUG-260730-02`
+- [x] **FIX-10**: A publish-gauntlet refusal shows the author the precise reason recorded in `harness_audit`, in plain words, never a machine code. — `BUG-260815-06` + `SEED-221`
 - [ ] **FIX-11**: The Library, Find and every document picker stay correct and fast for an account with tens of thousands of documents — the server pages and counts, no request carries a growing id list, and no list is silently cut at the API's 1,000-row cap. — `BUG-261014-06` + `BUG-261014-07` (added 2026-10-14)
 
 ### v4.5 audit debt (DEBT)
 
-- [ ] **DEBT-07**: The harness freshness validator (`harness/freshness.py`) excludes archived (`retrievable=false`) documents. — W-1
+- [x] **DEBT-07**: The harness freshness validator (`harness/freshness.py`) excludes archived (`retrievable=false`) documents. — W-1
 - [x] **DEBT-08**: A recorded decision states what happens to `message_artifacts` rows when their source document is disposed by retention, and the code enforces it if the decision requires. — W-2
 - [ ] **DEBT-09**: The date-word→column map and the topics-is-a-list rule each have one home, imported by `retrieval_scope.py`, `document_search_service.py` and `view_filter_compiler.py`; a test fails if they diverge. — W-3
 - [x] **DEBT-10**: Both watch purge paths remove the stored file bytes as well as the document rows. — W-5 / `BUG-261012-01`
@@ -69,10 +69,10 @@ Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not excee
 | FIX-06 | Phase 282 | Pending |
 | FIX-07 | Phase 282 | Pending |
 | FIX-08 | Phase 283 | Pending |
-| FIX-09 | Phase 281 | Pending |
-| FIX-10 | Phase 281 | Pending |
+| FIX-09 | Phase 281 | Complete |
+| FIX-10 | Phase 281 | Complete |
 | FIX-11 | Phase 284 | Pending |
-| DEBT-07 | Phase 281 | Pending |
+| DEBT-07 | Phase 281 | Complete |
 | DEBT-08 | Phase 280 | Complete |
 | DEBT-09 | Phase 278 | Pending |
 | DEBT-10 | Phase 280 | Complete |
