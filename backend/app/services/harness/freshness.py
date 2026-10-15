@@ -74,6 +74,13 @@ async def newest_document_age_days(
     document exists in it (an empty scope is "no freshness signal", NOT stale —
     the validator decides what to do with ``None``). The age is computed against
     ``datetime.now(timezone.utc)`` so it is timezone-correct.
+
+    281-REVIEW WR-02 — CONSISTENT BY DESIGN, recorded so it is visible: a scope whose
+    every document is archived or gone at the source also returns ``None``, and the
+    validator passes it exactly as it passes an empty folder (Phase 102's design: no
+    document an agent may read is no staleness signal). What DEBT-07 forbids — an
+    archived document's date deciding the verdict — cannot happen on either path.
+    Pinned by the ``test_wr02_*`` cases in this module's Phase 281 test file.
     """
     if not folder_ids:
         return None
