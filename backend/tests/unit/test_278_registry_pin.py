@@ -178,15 +178,27 @@ def test_nothing_mutates_the_registry():
 # self_improve_enabled=i)), ensure_ascii=False) encoded UTF-8. Keyed by (w, s, i).
 # ⚠ A mismatch means a tool schema string every provider receives changed by AT LEAST ONE BYTE —
 # the roadmap failure mode for a "pure move". Never re-capture to make this green inside 278.
+# ⚠ RE-CAPTURED 2026-10-15 (BUG-261015-03), outside 278, deliberately: ask_user's timeout_seconds
+# description changed from "Optional. Maximum seconds to wait. Server clamps." to text telling the model
+# to pass null. Proven the ONLY byte change: with the old description restored in memory, all 8 combos hashed
+# to the 278 digests below. RENDER_TEMPLATE_TOOL is unchanged. The 278 digests, kept for the record:
+#   (True, True, True): "48a44e238df3998d52e96e55730b2ef2d1d8af64e0bfe963e2b975c4950bc559",
+#   (True, True, False): "9f7525d3d09dbd1f45e086f1c95d8fda7127eb76b229c0e62720841c0b3d75b5",
+#   (True, False, True): "627ab0764fb406eec7f69d11d9b5bf99e1fd320ed62e83079fc6b1a88ca8c415",
+#   (True, False, False): "09c2ac5006f6b05bd808d0f68ed9584496910736847afa180400e641215494bb",
+#   (False, True, True): "0d3b47edfb6bae77939cbc0c3654fb2da6ceb18ab0efa55f83ad958bfda545e6",
+#   (False, True, False): "52a324a98a5dc098dca7b02ed35d31d43c4016c9d65120acf6a9fb84eb4e9fb5",
+#   (False, False, True): "df266c3b425f6d3825e78b2ce1a91c2f38cdc8a253fcbf1c68b68e0491c6c4fb",
+#   (False, False, False): "dbee6dd9ee102b11b48ed1975344b158882e5990059542e67f8dce6db08605d6",
 SCHEMA_SHA256: dict = {
-    (True, True, True): "48a44e238df3998d52e96e55730b2ef2d1d8af64e0bfe963e2b975c4950bc559",
-    (True, True, False): "9f7525d3d09dbd1f45e086f1c95d8fda7127eb76b229c0e62720841c0b3d75b5",
-    (True, False, True): "627ab0764fb406eec7f69d11d9b5bf99e1fd320ed62e83079fc6b1a88ca8c415",
-    (True, False, False): "09c2ac5006f6b05bd808d0f68ed9584496910736847afa180400e641215494bb",
-    (False, True, True): "0d3b47edfb6bae77939cbc0c3654fb2da6ceb18ab0efa55f83ad958bfda545e6",
-    (False, True, False): "52a324a98a5dc098dca7b02ed35d31d43c4016c9d65120acf6a9fb84eb4e9fb5",
-    (False, False, True): "df266c3b425f6d3825e78b2ce1a91c2f38cdc8a253fcbf1c68b68e0491c6c4fb",
-    (False, False, False): "dbee6dd9ee102b11b48ed1975344b158882e5990059542e67f8dce6db08605d6",
+    (True, True, True): "c883da9ac213135cbcf7d4f2a23534695e7ff27331a9eea20de9f197e65c12dd",
+    (True, True, False): "9cc26986031aa0f6d981527470ac33960339744dffebf292686dfc94363a0b6b",
+    (True, False, True): "b364e3e0245e4afb2789ed5800e2718681f4fe228cb1dc582e8f97dfbf2b53a9",
+    (True, False, False): "96cca8475333eae0b8bbb6df725fa88626961db7e3bc830caa8b99483f6b474d",
+    (False, True, True): "fd8f7276f1836e5ec5b396bfa4305f2df82e40c4b5cee6bd79abb3732ce229e5",
+    (False, True, False): "9f734c1c0b2abcfe9fbf9de6ffb10087662e904906e726394c839998f1e675a1",
+    (False, False, True): "d7ac152b38d4050751747370dc7a8c0a7a5856bc63d977e1bf14a2993ed795e6",
+    (False, False, False): "39555dbd1ae1e6b339669182a50408cd7c462692d554949a21a649756fe6dd50",
     "RENDER_TEMPLATE_TOOL": "aa76bc5f0db6a685ab22e9b1bbfa1d2c628f14e9a2ccee08cfb474f048e13b0f",
 }
 
