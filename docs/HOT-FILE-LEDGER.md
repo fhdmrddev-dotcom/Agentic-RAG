@@ -11556,6 +11556,7 @@ cells rot within days.
 | [`frontend/src/lib/api/library.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapilibraryts) | 2 / 1 / 85 | no (1 phase) | ⚠ absent — row added 284 planning. **284-01**: `getLibrarySummary()` beside `getIndexSummary()` (`cache: "no-store"`), re-exported from the barrel |
 | [`frontend/src/hooks/useLibraryDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuselibrarydocumentsts) | 0 / 0 / 0 | no (young) | young (created 284-01). The D-24 seam: every Library number and row derived from documents; 284-03 re-points it at the server |
 | [`frontend/src/test-utils/fakeLibraryApi.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctest-utilsfakelibraryapits) | 0 / 0 / 0 | no (young) | young (created 284-03). Test-only fake: page / summary / single read from ONE fixture array. ⛔ never imported outside a test |
+| [`backend/app/models/document_view.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_viewpy) | 5 / 3 / 110 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 284 planning. **284-04**: `AdHocResolve` gains `offset` / `limit` / `include_archived` (the Find vocabulary); honoured by construction (additive fields) |
 
 
 
@@ -21249,4 +21250,10 @@ What it owns. The `LibraryPage.tsx` extraction owed by G-5 (D-24): page rows, th
 **`0 / 0 / 0`** — created by Phase 284 (`284-03`). **Row added AT CREATION**, in the planning commit (not exempt by the gate's regexes: `test-utils/` is not `__tests__/`).
 
 What it owns. One fixture array answering `listDocumentsPage` / `getLibrarySummary` / `getDocument` the way the server does (filter, `created_at desc, id desc`, slice, exact total; aggregates over the SAME array), so the nine suites that mocked `@/hooks/useDocuments` keep every case when the Library switches source. ⛔ Binding: never imported by product code (the `stripComments.testutil.ts` rule), and it lives here rather than in `setupTests.ts` (the `mockReactFlow.ts` file-local rule).
+
+## `backend/app/models/document_view.py`
+
+**`5 / 3 / 110`** at Phase 284 planning (buckets 113, 114, 165). ⚠ **Absent from the scan list for its entire life, and it FIRES (3 phases).** Found by the 284 planner's second ledger pass (the first `--files` sweep did not name it; 284-04 does). The saved-view request / response models: `ViewFilter`, the view CRUD bodies and `AdHocResolve` (the body of the stateless `POST /document-views/resolve`).
+
+**284-04 (D-10)**: `AdHocResolve` gains `offset: int = Field(0, ge=0)`, `limit: int = Field(25, ge=1, le=200)` and `include_archived: bool = True` — the `DocumentSearchRequest` shape; `include_archived` defaults to TRUE because today's resolve has no archived predicate, so every existing count-only caller is byte-identical. Honoured by construction (additive fields, `extra` policy unchanged). A CLAUDE.md FIRING row is added at the 284 close.
 
