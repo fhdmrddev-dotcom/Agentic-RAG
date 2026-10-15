@@ -288,9 +288,16 @@ function classifyFailure(phase: Phase): ClassifiedFailure {
 
   // GAP-C (D-11): a typed emit-failure value takes precedence — it is the closed-taxonomy
   // failed-as-failed render (never the generic gate copy, never an empty 'done').
+  // 281-REVIEW CR-01 (D-04): the server's composed cause (live `gate_failed.error`, or the
+  // recorded `_failure_reason`) IS the reason whenever one reached the client; the fixed copy
+  // is only the never-empty fallback (e.g. the no-validator `phase_failed`, which has no text).
   if (phase.emitFailure && phase.emitFailure in EMIT_FAILURE_COPY) {
     const copy = EMIT_FAILURE_COPY[phase.emitFailure]
-    return { kind: phase.emitFailure, reason: copy.reason, where: `phase: ${slug} · ${copy.where}` }
+    return {
+      kind: phase.emitFailure,
+      reason: raw.length > 0 ? raw : copy.reason,
+      where: `phase: ${slug} · ${copy.where}`,
+    }
   }
 
   // reason_unknown — MANDATORY fallback when the error/reason is empty. Never an
