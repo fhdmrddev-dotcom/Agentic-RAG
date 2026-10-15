@@ -4,6 +4,8 @@ title: Local LLM providers (Ollama / LM Studio) cannot be added through the Mode
 created: 2026-08-17
 planted_during: operator local-model testing, during Phase 195 execution
 status: partially-answered
+status_note: "Phase 282 discuss (2026-10-15) FOLDED finding #2 (600 s SDK ceiling + max_retries) and finding #3 for the llm_call_timeout_seconds field only (the PATCH bound already exists; the resolver DB tier clamp is added). Finding #4 stays open."
+folded_into: "282"
 priority: medium   # ⬆ operator fired arm 1 on 2026-09-13. Finding #1 SHIPPED in Phase 249 (MODEL-04). Findings #2/#3/#4 REMAIN OPEN — see the Phase 249 section at the end.
 trigger_fired: >
   2026-09-13, at the v4.1 milestone close — the OPERATOR, unprompted: "I need to add manually from

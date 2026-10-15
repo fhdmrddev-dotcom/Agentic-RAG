@@ -4,9 +4,9 @@ title: An ask_user pause renders TWO full answer cards whose drafts disagree, pl
 reported: 2026-09-18
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/chat, frontend/workspace-panel, PausedRunCue.tsx, PendingAskCard.tsx, MessageList.tsx, a11y]
-folded_into: null
+folded_into: "282"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
