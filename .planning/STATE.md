@@ -11,7 +11,7 @@ progress:
   total_plans: 18
   completed_plans: 18
   percent: 36
-stopped_at: Phase 281 complete (4/4) — ready to discuss Phase 282
+stopped_at: Phase 282 context gathered (autonomous) — planning next
 ---
 
 # Project State
@@ -55,6 +55,8 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 
 ## Current Position
 
+**Phase 282 (2026-10-15):** discuss done AUTONOMOUSLY (operator: "take best decisions") — `.planning/phases/282-the-slow-run-and-the-paused-run/282-CONTEXT.md` (D-01..D-18). G-2 sketch `282-one-answer-input` written + Chrome-driven; winner A (input follows the open panel) — **operator confirmation OWED at G-4**. Folded BUG-260916-01, BUG-260918-01, SEED-172 #2/#3, new BUG-261015-02 (conditional). SEED-289 → deferred. No migration expected. Next: `/gsd:plan-phase 282`.
+
 **Phase 281 executed 4/4 plans (2026-10-15) — G-4 sign-off (281-04 Task 4) PENDING.** Rows in `.planning/phases/281-a-refusal-names-its-cause/281-LIVE-EVIDENCE.md`, driven at `33886624f`: **A ⛔ OWED** (model passed: golden run `e4b3625a…` completed, emit passed on its first call, and publish was refused by the JUDGE, so there was no emit cause to read; the draft had to be KB-bound to publish, then restored to unbound) · **B ✅ PASS** (no "coming soon"; link opened the judged run, 3 ids equal; failed-step-reason sub-check not exercisable) · **C ⛔ OWED** (drafting model returned `could_not_generate` twice, so `connection_not_allowed` never rendered; the SEED-218 `Connect Linear` click ✅ landed on Connections) · **D ⛔ OWED** (archive write not approved; folder docs all 2026-06-08 vs `max_age_days 2`, so no decisive arrangement without a fresh upload). Flips: BUG-260815-06 → closed (row B); SEED-218 → answered (residual: DOOR_REFUSAL still says "in Settings"); BUG-260730-02 and SEED-221 unchanged, with dated notes. Guardrail overrides: OV-281-01 only (below). **Owed rows, run first: A** (a live emit refusal also unlocks B's sub-check and the D-32 chat half), then C (needs a healthy drafting model), then D (needs operator approval + one fresh upload).
 
 **Phase 281 planned (2026-10-14):** 4 plans / 3 waves (01+02 → 03 → 04 non-autonomous G-4 drives A-D). Research corrected 4 CONTEXT premises → amendments D-24..D-32 (operator). SEED-218 folded; SEED-350/339 deferred. Checker PASSED (iteration 2, 0 blockers). Ledger rows added for emit_cause.py, freshness.py, describeRefusalVocabulary.ts, runVocabulary.ts. Next: `/gsd:execute-phase 281`.
@@ -64,7 +66,7 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 **Phase 280 (2026-10-14):** discuss done — `.planning/phases/280-in-once-out-clean/280-CONTEXT.md`. No migration expected. 4 bugs folded (BUG-261005-01, BUG-260910-04, BUG-261012-01, BUG-261012-02). Owed to operator: upload the generated `Team Docs` folder to OneDrive before the live re-drive (D-14). Next: `/gsd:plan-phase 280`.
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: 282 (the-slow-run-and-the-paused-run) — not started
+Phase: 282 (the-slow-run-and-the-paused-run) — context gathered, planning
 Next: `/gsd:discuss-phase 282` (G-2 sketch first for FIX-07). Deploy of 277-281 + BUG-261014-06 stays operator-gated.
 Plan: Not started
 Status: Ready to plan
