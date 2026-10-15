@@ -390,6 +390,28 @@ def _convert_tools_to_google(tools: list[dict]) -> list[types.Tool]:
     return [types.Tool(function_declarations=declarations)]
 
 
+# ── Client construction (Phase 282 FIX-06) ───────────────────────────────────
+
+
+def _google_client(api_key: str, timeout_s: float | None) -> "genai.Client":
+    """Build the genai client with the per-model budget (Phase 282 D-01 / D-03).
+
+    ⚠ ``HttpOptions.timeout`` is MILLISECONDS, and ``0`` means NO timeout — so the value is
+    floored at 1 ms and never 0. ``HttpRetryOptions(attempts=1)`` makes the single attempt
+    explicit: genai's retry default, once ``retry_options`` is set without ``attempts``, is 5.
+    No budget → today's bare client (no timeout), unchanged for no-budget callers.
+    """
+    if timeout_s is not None and timeout_s > 0:
+        return genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(
+                timeout=max(1, int(timeout_s * 1000)),
+                retry_options=types.HttpRetryOptions(attempts=1),
+            ),
+        )
+    return genai.Client(api_key=api_key)
+
+
 # ── Main streaming entry point ───────────────────────────────────────────────
 
 
@@ -403,6 +425,7 @@ def stream_google(
     max_tokens: int,
     force_no_tools: bool = False,
     tool_config: "types.ToolConfig | None" = None,
+    timeout_s: float | None = None,
 ) -> Generator[dict, None, None]:
     """Stream a Gemini call via the native google-genai SDK; yield normalized
     event dicts for the threads.py agent loop.
@@ -412,7 +435,7 @@ def stream_google(
     tool dispatch — SDK auto-invoke would short-circuit our sandbox and
     LangSmith traces).
     """
-    client = genai.Client(api_key=api_key)
+    client = _google_client(api_key, timeout_s)
 
     google_contents, system_instruction_from_messages = _convert_messages_to_google(messages)
     google_tools = _convert_tools_to_google(tools) if (tools and not force_no_tools) else []

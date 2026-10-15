@@ -103,4 +103,5 @@ def open_google_stream(request: "GatewayRequest") -> Generator[dict, None, None]
         max_tokens=_g_max_tokens,
         force_no_tools=request.force_no_tools,
         tool_config=_g_tool_config,
+        timeout_s=request.timeout_s,  # Phase 282 FIX-06: the budget reaches the client
     )

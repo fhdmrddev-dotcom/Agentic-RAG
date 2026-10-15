@@ -65,6 +65,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Generator
 
+from app.config import llm_max_retries_for
+
 # The raw-SDK boundary this adapter WRAPS (does not reimplement). Imported into
 # this namespace so the seam + integration tests patch it HERE (Task 3 repoint).
 from app.services.openai_service import (
@@ -510,6 +512,11 @@ def open_openai_compat_stream(
     # is byte-identical (force_tool_name=None / strict_response_format=False are the
     # constructor defaults). Self-contained at this adapter; the shared chunk handler
     # (``_ClosableEventStream._normalize``) is NOT branched (the D-14 RED LINE).
+    # Phase 282 (FIX-06, D-01/D-19): the budget and the provider's retry count reach the
+    # client constructor — forwarded ONLY when a budget is set (no-budget callers unchanged).
+    _retries_provider = request.active_provider_name or (
+        request.user_settings.active_provider if request.user_settings else None
+    )
     stream, calling_mode = create_adaptive_streaming_chat(
         messages=request.messages,
         model=request.model,
@@ -518,6 +525,11 @@ def open_openai_compat_stream(
         tools_override=request.tools,
         force_tool_name=request.force_tool_name,
         strict_response_format=request.strict_schema,
+        **(
+            {"timeout_s": request.timeout_s, "max_retries": llm_max_retries_for(_retries_provider)}
+            if request.timeout_s is not None
+            else {}
+        ),
     )
     return (
         _ClosableEventStream(stream, request.active_provider_name, calling_mode),

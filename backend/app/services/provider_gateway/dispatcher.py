@@ -82,6 +82,10 @@ class GatewayRequest:
     # leaks into the consumer).
     force_tool_name: str | None = None
     strict_schema: bool = False
+    # Phase 282 (FIX-06, D-01): the per-model per-call budget the consumer resolved
+    # (``get_per_call_timeout_async``). Each adapter builds its client with it, and the
+    # OpenAI-family open is guarded by it. ``None`` = a no-budget caller — byte-identical.
+    timeout_s: float | None = None
 
 
 # ⭐ THE EXTENSION CONTRACT FOR WIRE PROTOCOLS, made literal (Phase 262).

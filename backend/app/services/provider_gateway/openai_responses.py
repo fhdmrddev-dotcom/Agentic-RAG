@@ -62,7 +62,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Generator
 
-from app.config import settings
+from app.config import llm_max_retries_for, settings
 from app.models.user_settings import tool_args_progress_emit_boundary_bytes
 from app.services.openai_service import (
     CallingMode,
@@ -550,7 +550,17 @@ def open_openai_responses_stream(
     call is retried ONCE without the ``reasoning`` field, and only when the refusal names
     it. Every other error propagates untouched.
     """
-    client = get_llm_client(request.user_settings)
+    # Phase 282 (FIX-06, D-01/D-19): the budget + the provider's retry count reach the client
+    # constructor, forwarded ONLY when a budget is set. Responses is OpenAI's own surface, so
+    # the helper reads cloud — never a typed literal.
+    if request.timeout_s is None:
+        client = get_llm_client(request.user_settings)
+    else:
+        client = get_llm_client(
+            request.user_settings,
+            timeout_s=request.timeout_s,
+            max_retries=llm_max_retries_for(request.active_provider_name),
+        )
     kwargs = _build_kwargs(request)
 
     try:

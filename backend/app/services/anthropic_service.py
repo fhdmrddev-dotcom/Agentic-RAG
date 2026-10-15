@@ -22,8 +22,14 @@ import logging
 from typing import TYPE_CHECKING, Generator
 
 import anthropic
+import httpx
 
-from app.config import settings
+from app.config import (
+    LLM_CONNECT_TIMEOUT_S,
+    NO_BUDGET_LLM_TIMEOUT_S,
+    llm_max_retries_for,
+    settings,
+)
 
 # Phase 075.1 Plan 04 (B-260519-04) — LangSmith @traceable wrap for the
 # Anthropic main-loop generator. langsmith.wrappers.wrap_anthropic is NOT
@@ -140,6 +146,18 @@ def _convert_tools_to_anthropic(tools: list[dict]) -> list[dict]:
     return anthropic_tools
 
 
+def _anthropic_client(api_key: str, timeout_s: float | None) -> anthropic.Anthropic:
+    """Build the Anthropic client with the per-model budget in the CONSTRUCTOR (Phase 282
+    FIX-06, D-01/D-02): read/write/pool = the budget, connect short, retries chosen by
+    provider class (D-19). No budget → the named no-budget timeout (today's 600 s)."""
+    t = NO_BUDGET_LLM_TIMEOUT_S if timeout_s is None else float(timeout_s)
+    return anthropic.Anthropic(
+        api_key=api_key,
+        timeout=httpx.Timeout(t, connect=min(LLM_CONNECT_TIMEOUT_S, t)),
+        max_retries=llm_max_retries_for("anthropic"),
+    )
+
+
 # Plan 075.4-03 Task 3 — re-verified producing LangSmith spans.
 # Required env: LANGSMITH_API_KEY + LANGSMITH_TRACING=true (or
 # LANGCHAIN_TRACING_V2=true legacy alias). LANGSMITH_PROJECT optional
@@ -158,6 +176,7 @@ def stream_anthropic(
     max_tokens: int,
     force_no_tools: bool = False,
     tool_choice: dict | None = None,
+    timeout_s: float | None = None,
 ) -> Generator[dict, None, None]:
     """Stream Anthropic API call; yield normalized event dicts for threads.py agent loop.
 
@@ -166,7 +185,7 @@ def stream_anthropic(
     Tool arguments buffered until content_block_stop before yielding tool_start
     (avoids partial-JSON issue — see RESEARCH.md anti-pattern #1).
     """
-    client = anthropic.Anthropic(api_key=api_key)
+    client = _anthropic_client(api_key, timeout_s)
 
     anthropic_messages = _convert_messages_to_anthropic(messages)
     anthropic_tools = _convert_tools_to_anthropic(tools) if tools else []

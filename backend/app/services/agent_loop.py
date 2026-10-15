@@ -2559,6 +2559,7 @@ async def run_agent_loop(
                             force_no_tools=force_no_tools,
                             user_settings=user_settings,
                             tool_choice=tool_choice,
+                            timeout_s=per_call_budget,
                         )
                         _stream, _calling_mode = await open_stream(
                             active_provider_name, _gw_request
@@ -2643,6 +2644,7 @@ async def run_agent_loop(
                             force_no_tools=force_no_tools,
                             user_settings=user_settings,
                             tool_choice=tool_choice,
+                            timeout_s=per_call_budget,
                         )
                         stream, calling_mode = await open_stream(
                             active_provider_name, _gw_request
