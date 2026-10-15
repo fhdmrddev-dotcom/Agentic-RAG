@@ -60,6 +60,24 @@ from app.models.message import MessageCreate
 logger = logging.getLogger(__name__)
 
 
+def _timed_out_error(budget, iteration, model) -> str:
+    """The ``runs.error`` text for a run ended by the per-call ``asyncio`` timer.
+
+    The ``timed_out: ...`` prefix is BYTE-IDENTICAL to Phase 066 (D-066-07; pinned by
+    test_066_terminal_classification and the frontend's ``categorizeError``). Phase 282 D-04
+    as corrected by D-22 appends what the prefix never said: which setting chose N and where
+    to change it — true whichever resolver tier supplied N, because a Model Registry row
+    always wins when present. A connect ``APITimeoutError`` never reaches this text.
+    """
+    return (
+        f"timed_out: {budget}s per-call deadline "
+        f"exceeded at iteration {iteration} "
+        f"(model={model})"
+        f". {model} did not answer within {budget} s, its per-call timeout. "
+        "You can change it in the Model Registry."
+    )
+
+
 async def _finalize_producer_run(
     *,
     run_id,
@@ -876,10 +894,8 @@ async def run_producer(
             # Strict partition guard: timer fire = system = 'timed_out'. The
             # user-Stop write at runs.py stays 'cancelled' (UNCHANGED).
             _terminal_status = "timed_out"
-            _terminal_error = (
-                f"timed_out: {_last_per_call_budget}s per-call deadline "
-                f"exceeded at iteration {_last_iteration} "
-                f"(model={_last_model_id})"
+            _terminal_error = _timed_out_error(
+                _last_per_call_budget, _last_iteration, _last_model_id
             )
             logger.warning(
                 "Run %s timed out at iteration %d (model=%s, budget=%ds)",

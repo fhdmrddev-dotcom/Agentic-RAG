@@ -39,6 +39,7 @@ from app.config import (
     API_SURFACES,
     MODEL_CAPABILITIES,
     _infer_provider_for,
+    llm_call_timeout_ceiling_reason,
     settings,
 )
 from app.dependencies import (
@@ -1490,6 +1491,16 @@ async def set_model_capability(
             # fires the per-call timer instantly (every run `timed_out` — the T-066-05 DoS)
             # and a 0 context window is not a smaller model, it is a broken row.
             _lo, _hi = _MODEL_CAP_INT_BOUNDS[col]
+            if not (_lo <= val <= _hi) and col == "llm_call_timeout_seconds":
+                # Phase 282 D-07 / D-21: the timeout refusal is an operator sentence naming
+                # WHY the ceiling is there (the run watchdog), never a raw engine column name.
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Timeout must be between {_lo} and {_hi} seconds, because "
+                        f"{llm_call_timeout_ceiling_reason(settings)}. {val} was not saved."
+                    ),
+                )
             if not (_lo <= val <= _hi):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

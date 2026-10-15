@@ -33,6 +33,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, Check, ChevronDown, Loader2, Lock, Plus, RotateCcw, Trash2, Unlock } from "lucide-react"
 
 import { ApiError, type AddModelBody, type ModelCapabilityPatch, type ModelRegistryRow } from "@/lib/api"
+import { MODEL_TIMEOUT_HELP_LINE } from "@/lib/api/admin"
 import { familyDefaults } from "@/lib/model-defaults"
 import { providerLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
@@ -583,7 +584,23 @@ function ModelRow({
         </td>
       </tr>
 
-      {/* The in-row 409 plain-language refusal — never a silent failure (D-149-09). */}
+      {/* Phase 282 D-22: the Timeout help line — only while that cell edits (a table-fixed
+          10% column has no room for a permanent line). Sits ABOVE the refusal slot. */}
+      {editing === "llm_call_timeout_seconds" && (
+        <tr>
+          <td colSpan={NUM_FIELDS.length + 6} className="border-t-0 px-4 pb-2">
+            <span
+              id={`timeout-help-${id}`}
+              data-testid="timeout-help"
+              className="text-[11px] leading-4 text-muted-foreground"
+            >
+              {MODEL_TIMEOUT_HELP_LINE}
+            </span>
+          </td>
+        </tr>
+      )}
+
+      {/* The in-row 409/422 plain-language refusal — never a silent failure (D-149-09). */}
       {errorDetail && (
         <tr data-model-error={id}>
           <td colSpan={NUM_FIELDS.length + 6} className="border-t-0 px-4 pb-2">
@@ -737,6 +754,7 @@ function NumericCell({
         ref={inputRef}
         type="number"
         aria-label={`${field.label} for ${modelId}`}
+        aria-describedby={field.key === "llm_call_timeout_seconds" ? `timeout-help-${modelId}` : undefined}
         defaultValue={value === null ? "" : String(value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
