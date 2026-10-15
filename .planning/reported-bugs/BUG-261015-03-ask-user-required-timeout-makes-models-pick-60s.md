@@ -7,7 +7,7 @@ severity: major
 status: closed
 affected_areas: [backend/agent-loop, backend/tools, frontend/ask-user]
 folded_into: null
-verified_closed_by: "fix 5d0 (see git log fix(BUG-261015-03)), 2026-10-15"
+verified_closed_by: "fix ee0f4beaf, 2026-10-15"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -61,7 +61,7 @@ pause rows passed once the wait was long enough, and this is a separate defect f
 
 ## Fixed and re-driven (2026-10-15)
 
-**The fix** is in commit `fix(BUG-261015-03)`. It has two parts:
+**The fix** is commit `ee0f4beaf`. It has two parts:
 - **A server floor:** `ask_user_min_timeout_seconds = 300`. `_resolve_ask_timeout` clamps the model's value to between 300 and 1800 s.
 - **The schema text** now tells the model to pass null unless the user asked for a deadline. `timeout_seconds` stays in `required` for strict mode.
 
