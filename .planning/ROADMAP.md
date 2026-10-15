@@ -329,8 +329,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 283-01-PLAN.md — wave 1 (TDD, frontend): `settingsTabs.ts` tab-registration seam reproducing today's rule exactly + source-order fence, SettingsPage asks the registry with literal JSX triggers, `AuditLogSection.tsx` extracted; existing SettingsPage suites unedited (FIX-01; D-03, D-14, D-15)
-- [ ] 283-03-PLAN.md — wave 1 (TDD, frontend): the Chunks list bounded at `max-h-96` inside a labelled `role=region` with one Tab stop and no overscroll containment, fences driven RED by plants (FIX-08; D-16..D-20)
+- [x] 283-01-PLAN.md — wave 1 (TDD, frontend): `settingsTabs.ts` tab-registration seam reproducing today's rule exactly + source-order fence, SettingsPage asks the registry with literal JSX triggers, `AuditLogSection.tsx` extracted; existing SettingsPage suites unedited (FIX-01; D-03, D-14, D-15)
+- [x] 283-03-PLAN.md — wave 1 (TDD, frontend): the Chunks list bounded at `max-h-96` inside a labelled `role=region` with one Tab stop and no overscroll containment, fences driven RED by plants (FIX-08; D-16..D-20)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
