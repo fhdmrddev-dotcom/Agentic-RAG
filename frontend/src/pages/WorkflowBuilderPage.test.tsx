@@ -49,6 +49,8 @@ vi.mock("@/lib/api", () => ({
 
 import { WorkflowBuilderPage } from "./WorkflowBuilderPage"
 import { TechnicalNamesProvider, useTechnicalNames } from "@/providers/TechnicalNamesProvider"
+// 281-REVIEW WR-03 — only the TYPED entitlement refusal may render its own words.
+import { EntitlementRefusalError } from "@/lib/api/_core"
 import {
   REFUSAL_FALLBACK,
   REFUSAL_FOR_KEY,
@@ -452,9 +454,39 @@ describe("281 (FIX-10) — a describe refusal renders as one sentence and one ne
 
   it("a thrown request carrying a server sentence renders that sentence as is (D-24 catch arm)", async () => {
     const ENTITLEMENT = "Your plan doesn't include workflows. It is part of the Team plan."
-    mockGenerate.mockRejectedValue(new Error(ENTITLEMENT))
+    // 281-REVIEW WR-03: the server-worded sentence now arrives as a TYPED signal.
+    mockGenerate.mockRejectedValue(new EntitlementRefusalError(ENTITLEMENT))
     const { err } = await draftAndRefuse(false)
     expect(err.querySelector("p.font-medium")?.textContent).toBe(ENTITLEMENT)
     expect(err.textContent ?? "").not.toContain("request_failed")
+  })
+
+  // 281-REVIEW WR-03 — any OTHER thrown text is machine-flavoured: it never becomes the
+  // author's sentence. The table's request-failed words render; the raw text is reveal-only.
+  it.each([
+    ["a network error", () => new TypeError("Failed to fetch"), "Failed to fetch"],
+    [
+      "a non-entitlement status",
+      () => new Error("Failed to generate workflow (status 502)"),
+      "Failed to generate workflow (status 502)",
+    ],
+  ])("281-REVIEW WR-03: %s reads the table's sentence + next step, never the raw text", async (_l, make, raw) => {
+    mockGenerate.mockRejectedValue(make())
+    const { err } = await draftAndRefuse(false)
+    const text = err.textContent ?? ""
+    expect(err.querySelector("p.font-medium")?.textContent).toBe(REFUSAL_FALLBACK.sentence)
+    expect(text).toContain(REFUSAL_FALLBACK.next)
+    expect(text).not.toContain(raw)
+    expect(err.querySelector(".font-mono")).toBeNull()
+  })
+
+  it("281-REVIEW WR-03: with technical names ON the raw thrown text shows small, beside the sentence", async () => {
+    mockGenerate.mockRejectedValue(new TypeError("Failed to fetch"))
+    const { user, err } = await draftAndRefuse(true)
+    expect(err.textContent ?? "").not.toContain("Failed to fetch")
+    await user.click(screen.getByTestId("reveal-toggle"))
+    const block = screen.getByTestId("generate-error")
+    expect(block.querySelector(".font-mono")?.textContent ?? "").toContain("Failed to fetch")
+    expect(block.querySelector("p.font-medium")?.textContent).toBe(REFUSAL_FALLBACK.sentence)
   })
 })

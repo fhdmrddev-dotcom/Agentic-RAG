@@ -17,6 +17,7 @@ import {
   REFUSAL_FALLBACK,
   REFUSAL_FOR_KEY,
   REQUEST_FAILED_KEY,
+  ENTITLEMENT_REFUSED_KEY,
   describeRefusal,
   refusalKey,
   type DescribeRefusalKey,
@@ -134,7 +135,9 @@ describe("281 (D-24) — the catch arm: a server sentence renders AS IS", () => 
   })
 
   it("the entitlement sentence is the visible sentence, verbatim", () => {
-    const r = describeRefusal(REQUEST_FAILED_KEY, ENTITLEMENT)
+    // 281-REVIEW WR-03: the server-worded entitlement refusal arrives on its OWN typed key —
+    // REQUEST_FAILED_KEY no longer trusts whatever was thrown.
+    const r = describeRefusal(ENTITLEMENT_REFUSED_KEY, ENTITLEMENT)
     expect(r.sentence).toBe(ENTITLEMENT)
     expect(r.next).toBe(REFUSAL_FALLBACK.next)
     expect(r.technical).toBeNull()
@@ -144,6 +147,25 @@ describe("281 (D-24) — the catch arm: a server sentence renders AS IS", () => 
   it("with no detail it falls back to the fallback sentence", () => {
     expect(describeRefusal(REQUEST_FAILED_KEY, "").sentence).toBe(REFUSAL_FALLBACK.sentence)
     expect(describeRefusal(REQUEST_FAILED_KEY).sentence).toBe(REFUSAL_FALLBACK.sentence)
+    expect(describeRefusal(ENTITLEMENT_REFUSED_KEY, "").sentence).toBe(REFUSAL_FALLBACK.sentence)
+  })
+
+  it("281-REVIEW WR-03: ENTITLEMENT_REFUSED_KEY is client-only too, never a table code", () => {
+    expect(typeof ENTITLEMENT_REFUSED_KEY).toBe("string")
+    expect(ENTITLEMENT_REFUSED_KEY).not.toBe(REQUEST_FAILED_KEY)
+    expect(ALL_KEYS as string[]).not.toContain(ENTITLEMENT_REFUSED_KEY)
+  })
+
+  it.each([
+    "Failed to generate workflow (status 502)",
+    "Failed to fetch",
+    "Your plan doesn't include workflows.",
+  ])("281-REVIEW WR-03: any other thrown text (%s) reads the fallback; the raw text is reveal-only", (raw) => {
+    const r = describeRefusal(REQUEST_FAILED_KEY, raw)
+    expect(r.sentence).toBe(REFUSAL_FALLBACK.sentence)
+    expect(r.next).toBe(REFUSAL_FALLBACK.next)
+    expect(r.technical).toBeNull()
+    expect(r.technicalDetail).toBe(raw)
   })
 })
 

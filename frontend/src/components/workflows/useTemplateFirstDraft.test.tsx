@@ -50,6 +50,9 @@ import { useTemplateFirstDraft, type TemplateFirstDefinition } from "./useTempla
 import templateFirstDraftSource from "./useTemplateFirstDraft?raw"
 import { createBuilderStore, type BuilderPhase, type BuilderStore } from "./builderStore"
 import { REQUEST_FAILED_KEY, refusalKey } from "./describeRefusalVocabulary"
+// 281-REVIEW WR-03 — the typed entitlement signal and its client-only key.
+import { ENTITLEMENT_REFUSED_KEY } from "./describeRefusalVocabulary"
+import { EntitlementRefusalError } from "@/lib/api/_core"
 import {
   generateWorkflow,
   readTemplatePlaceholdersFromFile,
@@ -524,6 +527,28 @@ describe("useTemplateFirstDraft — an honest failure", () => {
     })
     expect(store.getState().errorMessage).toBe(REQUEST_FAILED_KEY)
     expect(store.getState().errorDetail).toBe("Your plan doesn't include workflows.")
+  })
+
+  it("281-REVIEW WR-03: a TYPED entitlement refusal is stored under ENTITLEMENT_REFUSED_KEY", async () => {
+    mockedGenerate.mockRejectedValue(new EntitlementRefusalError("Your plan doesn't include workflows."))
+    const { view, store } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    expect(store.getState().errorMessage).toBe(ENTITLEMENT_REFUSED_KEY)
+    expect(store.getState().errorDetail).toBe("Your plan doesn't include workflows.")
+  })
+
+  it("281-REVIEW WR-03: a network TypeError stays on REQUEST_FAILED_KEY (never trusted as words)", async () => {
+    mockedGenerate.mockRejectedValue(new TypeError("Failed to fetch"))
+    const { view, store } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    expect(store.getState().errorMessage).toBe(REQUEST_FAILED_KEY)
+    expect(store.getState().errorDetail).toBe("Failed to fetch")
   })
 })
 
