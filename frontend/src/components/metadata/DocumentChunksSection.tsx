@@ -27,6 +27,12 @@
  * a11y: loading `role="status" aria-live="polite"`, error `role="alert"` + *Try again*,
  * and an empty arm whose sentence is DIFFERENT from the error's (D-117-10). Panel-scoped
  * AA tokens throughout, never the global muted.
+ *
+ * Phase 283 (FIX-08, BUG-260908-01, D-16..D-20, 2026-10-15): the list is bounded at max-h-96
+ * inside a labelled role=region with tabIndex 0, so a 1,000-chunk document no longer buries
+ * the sections below; no overscroll containment, so wheel at the list end chains to the
+ * panel; one Tab stop (the bodies stay unfocusable); the count stays in the section header.
+ * Above 1,000 chunks the header count is the PostgREST cap, which is Phase 284.
  */
 import { useCallback, useEffect, useState } from "react"
 import { listDocumentChunks } from "@/lib/api"
@@ -98,11 +104,19 @@ export function DocumentChunksSection({ docId, onTotalChange }: DocumentChunksSe
       )}
 
       {state === "ready" && rows.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {rows.map((row) => (
-            <ChunkRowView key={row.id} row={row} />
-          ))}
-        </ul>
+        <div
+          role="region"
+          aria-label={`Chunk list, ${rows.length} ${rows.length === 1 ? "chunk" : "chunks"}`}
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- WCAG 2.1.1: a scrollable region must be keyboard-reachable (axe scrollable-region-focusable); labelled, and not a focus trap
+          tabIndex={0}
+          className="max-h-96 overflow-y-auto rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <ul className="flex flex-col gap-2">
+            {rows.map((row) => (
+              <ChunkRowView key={row.id} row={row} />
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )
