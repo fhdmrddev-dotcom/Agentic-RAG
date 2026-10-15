@@ -26,14 +26,14 @@ Syrel has one rail of icons down the left side. **New chat** is always at the to
 | Connections | The catalog of outside services and your connections to them | Everyone (only org admins make changes) |
 | Skills | Your skills and the skills shared with your organisation | Everyone |
 | Experts | The catalog of Experts available to you | Everyone |
-| Settings | AI model, search and integration settings, memory and your audit log | People with model management — platform operators by default |
+| Settings | Your preferences, memory and audit log; AI model, search and integration settings | Everyone — the AI Model, Search & Retrieval and Integrations tabs only for people with model management (platform operators by default) |
 
 Some entries only appear for certain roles:
 
 - **Org admin** (a shield icon) — for organisation admins. See [Organisations and what is shared](/docs/get-started/workspaces-and-orgs).
 - **Control Room** and **Spend** — for platform operators, who run the deployment.
 
-An operator can change who sees Workflows and Settings from the Control Room's feature visibility settings. An entry you cannot see is hidden on purpose, and the server refuses the matching requests too.
+An operator can change who sees Workflows and the model-management tabs in Settings from the Control Room's feature visibility settings. An entry you cannot see is hidden on purpose, and the server refuses the matching requests too.
 
 ## Other places you reach from the rail
 
@@ -48,4 +48,4 @@ Before v4.5 the rail also had a **Classification** entry for classification rule
 
 ## Plain words or technical names
 
-Labels across Syrel use everyday words — a workflow step reads "Write it up" rather than its internal type name. Builders and admins can reveal the technical names where they need them.
+Labels across Syrel use everyday words — a workflow step reads "Write it up" rather than its internal type name. Anyone can reveal the technical names from **Settings → Preferences** when they need them.
