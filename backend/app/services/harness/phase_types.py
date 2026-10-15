@@ -1356,7 +1356,8 @@ def _emit_failure_output(
 
 
 async def _emit_unexpected_failure(
-    phase, *, definition, emitter, run_id, pool, ctx, exc, records: list | None = None
+    phase, *, definition, emitter, run_id, pool, ctx, exc, records: list | None = None,
+    calls: int = 0,
 ) -> dict:
     """Phase 101.1-07 (gap 1b — the executor half of the D-08 layer-6 backstop).
 
@@ -1372,18 +1373,23 @@ async def _emit_unexpected_failure(
     Phase 281 (FIX-09 / D-32): ``records`` is the invocation's cause trail so far; the
     backstop adds one ``unexpected`` record and surfaces the ONE composed cause, headed by
     the step's author-set name only (never the slug).
+
+    281-REVIEW WR-01 (D-25): ``calls`` is the number of model calls the invocation made.
+    The ``unexpected`` cause rides the in-flight call's record when one exists (never a
+    second count for one call), and with ``calls == 0`` it is an ``attempt`` 0 record, so
+    the composed message claims no attempt.
     """
     from app.services.harness.emit_cause import (  # noqa: PLC0415 — the harness package cycle
         KIND_UNEXPECTED,
         compose_emit_failure,
-        shot_record,
+        record_terminal,
     )
     from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
 
     logger.exception("llm_emit: unexpected failure run=%s", run_id)
     step_name = _clean_label(getattr(phase, "name", None))
     causes = list(records or [])
-    causes.append(shot_record(len(causes) + 1, [KIND_UNEXPECTED]))
+    record_terminal(causes, max(int(calls or 0), 0), KIND_UNEXPECTED)
     msg = compose_emit_failure(causes, step_name=step_name)
     await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
         definition=definition, phase=phase, emitter=emitter, result=None, gate=None,
@@ -1488,6 +1494,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         classify_forced_failure,
         classify_rejection,
         compose_emit_failure,
+        record_terminal,
         shot_record,
         terminal_failure_value,
     )
@@ -1495,6 +1502,8 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
 
     step_name = _clean_label(getattr(phase, "name", None))
     records: list[dict] = []
+    # 281-REVIEW WR-01 (D-25): model calls made so far — the backstop's attempt count.
+    calls_made = 0
 
     try:
         # ── 1. GAP-B inject (D-10) — resolve the bound template SERVER-SIDE ──────────
@@ -1517,7 +1526,8 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         )
         if not src.get("bytes"):
             # State (e): no template bound AND no ephemeral upload resolved — honest fail.
-            records.append(shot_record(1, [KIND_NO_TEMPLATE], detail=src.get("error") or None))
+            # 281-REVIEW WR-01: no model call was made — an ``attempt`` 0 record, no count.
+            records.append(shot_record(0, [KIND_NO_TEMPLATE], detail=src.get("error") or None))
             msg = compose_emit_failure(records, step_name=step_name)
             await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
                 definition=definition, phase=phase, emitter=emitter, result=None, gate=None,
@@ -1598,6 +1608,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             await _emit_audit(ctx, event_type="emit_forced", metadata=forced_md)
 
             await _emit_phase_substep(ctx, phase, status="emitting")  # the forced LLM call is in flight (atomic)
+            calls_made = attempt
             result = await forced_emit(
                 messages=messages,
                 model=model,
@@ -1811,8 +1822,8 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         entry = resolve_emitter(emitter)
         if entry.post_processor is None:
             # Defensive: a registered emitter with no driver cannot produce a deliverable.
-            records.append(shot_record(attempt, [KIND_RENDER_FAILED],
-                                       detail=f"the emitter {emitter!r} has no render driver registered"))
+            record_terminal(records, attempt, KIND_RENDER_FAILED,
+                            detail=f"the emitter {emitter!r} has no render driver registered")
             msg = compose_emit_failure(records, step_name=step_name)
             await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
                 definition=definition, phase=phase, emitter=emitter, result=result,
@@ -1913,7 +1924,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         reason = (render_out or {}).get("reason")
         if status == "failed" and reason in ("integrity", "residual_tokens", "harvest_failed", "no_verdict"):
             # State (d): the rendered file won't open / has residual tokens — NEVER persisted.
-            records.append(shot_record(attempt, [KIND_INTEGRITY_FAILED]))
+            record_terminal(records, attempt, KIND_INTEGRITY_FAILED)
             msg = compose_emit_failure(records, step_name=step_name)
             await _emit_audit(ctx, event_type="emit_integrity_failed", metadata=_emit_audit_metadata(
                 definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
@@ -1927,9 +1938,11 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             )
 
         # State (c): a render error (sandbox error / bad asset / resolution) — honest fail.
-        records.append(shot_record(attempt, [KIND_RENDER_FAILED], detail=str(
+        # 281-REVIEW WR-01: a terminal cause rides the call it belongs to (a non-strict
+        # policy delivers the last REJECTED shot, whose record already exists).
+        record_terminal(records, attempt, KIND_RENDER_FAILED, detail=str(
             (render_out or {}).get("message") or reason or "unknown render error"
-        )))
+        ))
         msg = compose_emit_failure(records, step_name=step_name)
         await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
             definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
@@ -1947,7 +1960,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         # run-failed catch (which would strand the workflow_phases row in active).
         return await _emit_unexpected_failure(
             phase, definition=definition, emitter=emitter, run_id=run_id,
-            pool=pool, ctx=ctx, exc=_emit_exc, records=records,
+            pool=pool, ctx=ctx, exc=_emit_exc, records=records, calls=calls_made,
         )
 
 

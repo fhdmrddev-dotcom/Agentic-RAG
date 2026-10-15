@@ -118,6 +118,9 @@ def test_dunder_all_is_the_pinned_contract():
         "KIND_ORDER",
         "FAILURE_TEMPLATE_FIELDS_MISSING",
         "shot_record",
+        # 281-REVIEW WR-01: added deliberately — the executor attaches a terminal cause to
+        # the model call it belongs to instead of counting that call twice.
+        "record_terminal",
         "classify_forced_failure",
         "classify_rejection",
         "terminal_failure_value",

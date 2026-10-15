@@ -33,7 +33,9 @@ THE HONESTY RULES (each is pinned by ``tests/unit/test_281_emit_cause.py``):
   "Check …" line (D-03). No sentence says "fix", "soon", "later" or promises anything
   (sketch-findings ``run-honesty.md``).
 * **An attempt is one sealed model call (D-25).** The header total is the number of
-  records. A shot that failed two checks (e.g. missing fields AND uncited values) counts
+  records with ``attempt >= 1``; a terminal cause on the same call is merged into that
+  call's record (:func:`record_terminal`), and an ``attempt`` 0 record (no model call was
+  made) names its cause with no count anywhere (281-REVIEW WR-01). A shot that failed two checks (e.g. missing fields AND uncited values) counts
   under BOTH bullets, so bullet counts may sum above the header total: the merge key is
   the cause KIND, not the shot (Claude's discretion, recorded here).
 * **Missing fields are named by the template's own placeholder names (D-02)**, in the
@@ -61,6 +63,7 @@ __all__ = [
     "KIND_ORDER",
     "FAILURE_TEMPLATE_FIELDS_MISSING",
     "shot_record",
+    "record_terminal",
     "classify_forced_failure",
     "classify_rejection",
     "terminal_failure_value",
@@ -164,6 +167,25 @@ def shot_record(
     return record
 
 
+def record_terminal(records: list, attempt: int, kind: str, *, detail: str | None = None) -> None:
+    """Attach a terminal cause (render / integrity / unexpected) to the call it belongs to.
+
+    281-REVIEW WR-01 (D-25): an attempt is ONE model call. A non-strict citation policy
+    delivers the last rejected shot to the render, so a render failure after it belongs to
+    THAT call's record — appending a new record would count one call twice. A different
+    (or no previous) call gets its own record. Mutates ``records`` in place.
+    """
+    if records and isinstance(records[-1], dict) and records[-1].get("attempt") == int(attempt):
+        last = records[-1]
+        kinds = last.setdefault("kinds", [])
+        if kind not in kinds:
+            kinds.append(str(kind))
+        if detail is not None:
+            last["detail"] = str(detail)
+        return
+    records.append(shot_record(attempt, [kind], detail=detail))
+
+
 def classify_forced_failure(failure: str | None, truncated: bool) -> str:
     """State (a): the forced shot never produced a field-map. A provider that threw is
     not a model that narrated (Pitfall 9); a cut-off answer is not prose."""
@@ -264,7 +286,17 @@ def compose_emit_failure(records: list[dict], *, step_name: str | None = None) -
     recs = [r for r in (records or []) if isinstance(r, dict)]
     if not recs:
         return ""
-    total = len(recs)
+
+    def _counted(rec: dict) -> bool:
+        # 281-REVIEW WR-01: a record with ``attempt`` 0 is a terminal arm reached before any
+        # model call (no template, an error while resolving it). It names its cause but is
+        # never counted as an attempt.
+        try:
+            return int(rec.get("attempt", 1)) > 0
+        except (TypeError, ValueError):
+            return True
+
+    total = sum(1 for rec in recs if _counted(rec))
 
     by_kind: dict[str, list[dict]] = {}
     for rec in recs:
@@ -275,18 +307,29 @@ def compose_emit_failure(records: list[dict], *, step_name: str | None = None) -
 
     attempts = _plural(total, "attempt", "attempts")
     name = step_name.strip() if isinstance(step_name, str) else ""
-    head = (
-        f'Step "{step_name}" failed after {total} {attempts}:'
-        if name
-        else f"This step failed after {total} {attempts}:"
-    )
+    if total == 0:
+        # No model call was made: the header carries no count at all.
+        head = f'Step "{step_name}" failed:' if name else "This step failed:"
+    else:
+        head = (
+            f'Step "{step_name}" failed after {total} {attempts}:'
+            if name
+            else f"This step failed after {total} {attempts}:"
+        )
 
-    ordered = sorted(by_kind, key=lambda k: (-len(by_kind[k]), KIND_ORDER.index(k)))
+    def _k(kind: str) -> int:
+        return sum(1 for rec in by_kind[kind] if _counted(rec))
+
+    ordered = sorted(by_kind, key=lambda k: (-_k(k), -len(by_kind[k]), KIND_ORDER.index(k)))
     lines = [head]
     for kind in ordered:
-        k = len(by_kind[kind])
+        k = _k(kind)
+        sentence = _sentence(kind, by_kind[kind])
+        if k == 0:
+            lines.append(f"• {sentence[:1].upper()}{sentence[1:]} {_CHECK_LINES[kind]}")
+            continue
         lines.append(
             f"• {k} {_plural(k, 'attempt', 'attempts')} — "
-            f"{_sentence(kind, by_kind[kind])} {_CHECK_LINES[kind]}"
+            f"{sentence} {_CHECK_LINES[kind]}"
         )
     return "\n".join(lines)
