@@ -829,7 +829,10 @@ export function SettingsPage() {
 
   const handleReset = () => {
     if (s) {
-      if (activeTab === "0" || window.confirm("Reset all unsaved changes across all tabs?")) {
+      // 283-REVIEW IN-02: key on the tab actually SHOWN. D-05 redirects a retired/unknown
+      // persisted id (e.g. "5", "9") to "0" for an operator, so the raw `activeTab` would
+      // prompt a cross-tab confirm on the AI Model tab.
+      if (effectiveTab === "0" || window.confirm("Reset all unsaved changes across all tabs?")) {
         hydrate(s)
       }
     }

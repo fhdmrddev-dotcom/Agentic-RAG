@@ -281,6 +281,31 @@ describe("SettingsPage — an operator's view is unchanged apart from the two mo
   })
 })
 
+describe("SettingsPage — Reset keys on the tab actually shown (283-REVIEW IN-02)", () => {
+  it.each(["5", "9"])(
+    "an operator redirected from a persisted %s to AI Model resets without the cross-tab confirm",
+    async (persisted) => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(false)
+      try {
+        localStorage.setItem("settings_active_tab", persisted)
+        renderSettings(OPERATOR)
+        expect(await screen.findByRole("tab", { name: "AI Model" })).toHaveAttribute("aria-selected", "true")
+        await waitFor(() => expect(gated.getSettings).toHaveBeenCalled())
+        await user.click(await screen.findByRole("button", { name: /reset/i }))
+        expect(confirm).not.toHaveBeenCalled()
+
+        // Positive control: on a different SHOWN tab the cross-tab confirm does fire.
+        await user.click(screen.getByRole("tab", { name: "Preferences" }))
+        await user.click(screen.getByRole("button", { name: /reset/i }))
+        expect(confirm).toHaveBeenCalledTimes(1)
+      } finally {
+        confirm.mockRestore()
+      }
+    },
+  )
+})
+
 // 283-REVIEW WR-02. The features map fails CLOSED to `{}` while it loads, so an operator reads
 // as a member until it arrives. D-05's landing ("operator → 0, member → 6") is only right
 // because the page holds its spinner and decides NOTHING during that window
