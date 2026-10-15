@@ -221,6 +221,43 @@ Layouts stay as shipped (the pager, the tiles, the tree, the detail panel).
   Checks read the rendered **numbers and rows** and the network log, not the presence of a block.
   The dev account is in two orgs — prove the active org before each drive.
 
+### Corrections and resolutions after research (2026-10-16, `284-RESEARCH.md` `249efeab5`)
+
+Research measured facts that override the discuss-time scout. These **supersede** the D-numbers they name.
+
+- **R-01 (supersedes D-04 / D-14 mechanism):** the visible-set union is a `security_invoker` **view**
+  `public.library_documents` (migration 207), not an RPC and not `or=`. It drops `full_markdown` and adds
+  `filename_key`, `version_count`, `has_earlier`. SELECT granted to `authenticated` only, revoked from
+  PUBLIC/anon, mirrored in `scripts/full-schema-supplement.sql` (the dump is `--no-privileges`). The SQL
+  predicate is `folder_is_org_shared` (renamed in migration 111), not `folder_is_globally_visible`.
+- **R-02:** the view is keyed on `auth.uid()`, so the service role reads zero rows. The agent's
+  `query_documents_by_view` path (service role) keeps the two-leg `resolve_filter` path, bounded by its own
+  limit, with an exact total (own + global − overlap). The Library and Find use the view.
+- **R-03 (supersedes D-06 location):** the summary is **`GET /library/summary`** in `library.py`, one
+  `GROUPING SETS` scan through `get_user_pg_connection` (the `/library/index-summary` precedent). No new SQL
+  function. It also carries the distinct **`document_types`** list (for `StructurePopovers.DocumentTypeEditor`).
+- **R-04 (corrects D-02 / D-06):** `paused` is not a document status (the CHECK allows pending, processing,
+  completed, failed). `in_flight` = pending | processing. The page keeps today's displayed semantics.
+- **R-05 (D-15 exception, accepted):** Takeoff needs spreadsheets, not "pick by name". Its read is a bounded
+  `GET /documents?kind=spreadsheet` page. `LegalHoldDialog`'s second whole-library `getDocumentStates` loop
+  is removed too (server-side org filter or a page-bounded read).
+- **R-06 (resolves open Q1, D-01 changelog):** the breaking change is stated in the route docstring and the
+  public API `pagination.md` page in the same commit. The v4.6 changelog entry is **recorded as owed at the
+  v4.6 close** (no v4.6 changelog mechanism exists yet).
+- **R-07 (resolves open Q2, D-20 seed shape):** S10 = 6,000 Root / 3,000 in the big folder / 1,000 spread;
+  S50 = 30,000 Root / exactly **10,000** in the big folder / 10,000 spread. G-4 B runs on S50.
+- **R-08 (resolves open Q3):** IngestionTab History gets an `order=updated_desc` value (its shipped sort).
+- **R-09 (resolves open Q5):** production `max_rows` is read read-only via the Supabase MCP during the
+  measurement plan and recorded. It is not changed.
+- **R-10 (resolves open Q6):** the kb and governance-edge list routes go on the D-23 allow-list with a
+  planted seed carrying the re-open trigger, unless the fix is ≤ 10 lines in a file the phase already edits.
+- **R-11 (corrects D-24):** `LibraryPage.cloudImport.test.tsx:382` pins `.folder_id` ×7, so the extraction
+  edits that pin deliberately (recorded). Nine suites mock `@/hooks/useDocuments`; a `fakeLibraryApi(docs)`
+  test helper keeps their cases when wave 2 switches the source. Retired on purpose, with reasons: the
+  ROW_CAP cases, `test_261014_list_documents_batches_in.py`, Find's `test_legs_are_two_queries…`.
+- **R-12:** Find's `has_earlier` lineage read (batched by 100 filenames, about 500 round trips at 50k) is
+  replaced by the view's `has_earlier` column.
+
 ### Claude's Discretion
 - Exact endpoint / function names, the summary's JSON field names, the page-size defaults for per-document
   lists, whether the D-04 union is a PostgREST `or=` filter or a SQL function (decided by what can page
