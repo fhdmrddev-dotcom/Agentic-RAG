@@ -10,14 +10,14 @@ Seeds folded at intake: **SEED-221** (into FIX-10), **SEED-328** (into SEAM-01),
 
 ### Major bugs (FIX)
 
-- [ ] **FIX-01**: An ordinary org member can open Settings and use Memory, Audit Log and "Show technical names"; operator-only tabs stay hidden from them. — `BUG-261004-02`
+- [x] **FIX-01**: An ordinary org member can open Settings and use Memory, Audit Log and "Show technical names"; operator-only tabs stay hidden from them. — `BUG-261004-02`
 - [x] **FIX-02**: Uploading the same bytes while the first copy is still indexing never retires that copy and never 409s; exactly one copy stays visible in the Library and in search. — `BUG-261005-01`
 - [x] **FIX-03**: A watched OneDrive/SharePoint folder larger than one page imports every page, or fails loudly — it never silently restarts the listing at page 1. — `onedrive-adapter-…` WR-02
 - [x] **FIX-04**: A OneDrive search query cannot alter the Microsoft Graph request path. — `onedrive-adapter-…` WR-01
 - [x] **FIX-05**: Folder paths minted by the OneDrive adapter use one encoding, so a filing rule written against the displayed path matches. — `onedrive-adapter-…` WR-03
 - [ ] **FIX-06**: A per-model timeout is the timeout the provider call actually gets, up to the maximum the UI accepts; a value above a real ceiling is refused with the reason; `max_retries` is chosen deliberately, not inherited from the SDK default. — `BUG-260916-01`
 - [ ] **FIX-07**: One `ask_user` pause shows one answer input; the draft is the same wherever it appears; option selection is not conveyed by colour alone; no dead button remains. — `BUG-260918-01`
-- [ ] **FIX-08**: Expanding the Chunks section on a 1,000-chunk document leaves every section below it reachable. — `BUG-260908-01`
+- [x] **FIX-08**: Expanding the Chunks section on a 1,000-chunk document leaves every section below it reachable. — `BUG-260908-01`
 - [x] **FIX-09**: When an emit step fails, the reported cause is the check that actually failed — never "citations" when citation coverage was 100%. — `BUG-260730-02`
 - [x] **FIX-10**: A publish-gauntlet refusal shows the author the precise reason recorded in `harness_audit`, in plain words, never a machine code. — `BUG-260815-06` + `SEED-221`
 - [ ] **FIX-11**: The Library, Find and every document picker stay correct and fast for an account with tens of thousands of documents — the server pages and counts, no request carries a growing id list, and no list is silently cut at the API's 1,000-row cap. — `BUG-261014-06` + `BUG-261014-07` (added 2026-10-14)
@@ -61,14 +61,14 @@ Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not excee
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 283 | Pending |
+| FIX-01 | Phase 283 | Complete |
 | FIX-02 | Phase 280 | Complete |
 | FIX-03 | Phase 280 | Complete |
 | FIX-04 | Phase 280 | Complete |
 | FIX-05 | Phase 280 | Complete |
 | FIX-06 | Phase 282 | Pending |
 | FIX-07 | Phase 282 | Pending |
-| FIX-08 | Phase 283 | Pending |
+| FIX-08 | Phase 283 | Complete |
 | FIX-09 | Phase 281 | Complete |
 | FIX-10 | Phase 281 | Complete |
 | FIX-11 | Phase 284 | Pending |

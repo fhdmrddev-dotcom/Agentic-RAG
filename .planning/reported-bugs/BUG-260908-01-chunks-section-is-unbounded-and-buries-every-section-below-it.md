@@ -4,10 +4,10 @@ title: The Chunks section renders every chunk with no height bound, so expanding
 reported: 2026-09-08
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [frontend/metadata, frontend/document-detail-panel, DocumentChunksSection.tsx, DocumentDetailPanel.tsx, UX/navigation]
 folded_into: "283"
-verified_closed_by: null
+verified_closed_by: "Phase 283 — 283-LIVE-EVIDENCE.md D-22 #3 (764-chunk doc: 384px region, next section 401px below; CR-01 fix ba3aacdde; operator Tab-key check 2026-10-16)"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:

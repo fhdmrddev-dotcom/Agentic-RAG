@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: executing
-last_updated: "2026-10-15T19:51:53.594Z"
+status: ready_to_plan
+last_updated: 2026-10-15T21:46:53.109Z
 last_activity: 2026-10-15 -- Phase 283 execution started
 progress:
   total_phases: 15
   completed_phases: 6
   total_plans: 25
-  completed_plans: 22
+  completed_plans: 25
   percent: 40
+stopped_at: Phase 283 complete (3/3) — ready to discuss Phase 284
 ---
 
 # Project State
@@ -32,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 283 — every-member-reaches-their-own-settings
+**Current focus:** Phase 284 — library at scale
 
 ---
 
@@ -75,11 +76,11 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 **Phase 280 (2026-10-14):** discuss done — `.planning/phases/280-in-once-out-clean/280-CONTEXT.md`. No migration expected. 4 bugs folded (BUG-261005-01, BUG-260910-04, BUG-261012-01, BUG-261012-02). Owed to operator: upload the generated `Team Docs` folder to OneDrive before the live re-drive (D-14). Next: `/gsd:plan-phase 280`.
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: 283 (every-member-reaches-their-own-settings) — EXECUTING
+Phase: 284
 Next: `/gsd:discuss-phase 282` (G-2 sketch first for FIX-07). Deploy of 277-281 + BUG-261014-06 stays operator-gated.
-Plan: 1 of 3
-Status: Executing Phase 283
-Last activity: 2026-10-15 -- Phase 283 execution started
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-15
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
 
 **279-03 (2026-10-13):** "Won't use" → "Won't search" (29 hits / 13 files measured, not 30), swap-card

@@ -134,7 +134,7 @@ and are stated so a phase can run early when its files are free:
 - [x] **Phase 280: In Once, Out Clean**: same-bytes upload never retires the in-flight copy; Graph adapter pages, encodes and decodes honestly; purge and delete remove bytes and answer 404; a recorded decision for artifact rows on disposal (FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11)
 - [x] **Phase 281: A Refusal Names Its Cause**: emit failure names the check that failed; publish and describe-door refusals in plain words; freshness ignores archived documents (FIX-09, FIX-10, DEBT-07)
 - [x] **Phase 282: The Slow Run and the Paused Run**: per-model timeout reaches the provider call with deliberate retries; one `ask_user` input with one draft (FIX-06, FIX-07)
-- [ ] **Phase 283: Every Member Reaches Their Own Settings**: Settings reachable by members with operator tabs hidden and refused; bounded Chunks section (FIX-01, FIX-08)
+- [x] **Phase 283: Every Member Reaches Their Own Settings**: Settings reachable by members with operator tabs hidden and refused; bounded Chunks section (FIX-01, FIX-08) — completed 2026-10-16
 
 ### Phase Details
 
@@ -368,7 +368,7 @@ Plans:
 | 280. In Once, Out Clean | 4/4 | Complete | 2026-10-14 |
 | 281. A Refusal Names Its Cause | 4/4 | Complete (owed by operator decision: G-4 rows A, C, D; WR-02 kept by design) | 2026-10-15 |
 | 282. The Slow Run and the Paused Run | 4/4 | Complete (verified 5/5, self-verified; review CR-01 + WR-02..05 fixed, WR-01 partial; owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through, SC#10 rows 2/8 on credit) | 2026-10-15 |
-| 283. Every Member Reaches Their Own Settings | 0/TBD | Not started | - |
+| 283. Every Member Reaches Their Own Settings | 3/3 | Complete (verified 4/4 SCs; review CR-01 + WR-01/02 + 4 info fixed, IN-04/IN-06 skipped by decision; G-4 driven live, Tab row confirmed by operator) | 2026-10-16 |
 | 284. Library at Scale | 0/TBD | Not started | - |
 
 ---

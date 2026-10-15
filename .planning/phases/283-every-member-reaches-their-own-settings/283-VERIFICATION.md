@@ -1,7 +1,7 @@
 ---
 phase: 283-every-member-reaches-their-own-settings
 verified: 2026-10-16T00:00:00Z
-status: human_needed
+status: passed
 score: 4/4 roadmap success criteria verified (SC#4 carries one owed row)
 overrides_applied: 0
 re_verification: false
@@ -58,3 +58,7 @@ The live drive first found a real keyboard defect: up to 736 nested chunk-body s
 - Review items IN-04 (no retired-id reuse fence) and IN-06 (UI and API disagree on `audience: "off"`) were skipped by decision. Neither is a roadmap criterion.
 - `LibraryStatTiles` returns a member 403 on `/settings/reembed-progress`. It is pre-existing, outside this phase, and recorded in the evidence.
 - The ROADMAP progress row still reads "0/TBD, Not started". The orchestrator should update it at close.
+
+## Human verification — resolved 2026-10-16
+
+The one owed row (real Tab key press on the Chunks list, D-17) was run by the operator with the window in front and reported "checked, working". Recorded in `283-HUMAN-UAT.md`. Status moved `human_needed` → `passed`.

@@ -130,3 +130,7 @@ next section header.
 | D-22 #2 operator's view unchanged (6 tabs, AI Model landing, moved blocks under Preferences) | PASS |
 | D-22 #3 large document Chunks section (bounded, next section reachable, no wheel trap) | PASS on 764 chunks (deviation recorded above) |
 | D-22 #3 keyboard (no Tab trap) | FAILED live → fixed (`ba3aacdde`) → re-measured: 0 nested focus stops; real Tab key press OWED |
+
+## Owed row — closed 2026-10-16
+
+Real Tab key press on the chunk list, driven by the operator: one Tab leaves the list. D-22 #3 keyboard → **PASS**.
