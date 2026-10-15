@@ -1167,3 +1167,130 @@ async def test_281_d32_unnamed_step_never_falls_back_to_the_slug(_patch_executor
 
     assert out["text"].startswith("This step failed after 3 attempts:")
     assert "write-report" not in out["text"]
+
+
+# ── 281-REVIEW WR-01 (D-25) — the header total equals the model calls actually made ──
+#
+# An attempt is ONE model call. A non-strict policy (flag/partial/draft) DELIVERS the last
+# rejected shot to the render; when that render then fails, the render cause belongs to the
+# SAME call and must not be counted as a further attempt. A path that made NO model call
+# must not claim "1 attempt" at all.
+
+
+def _uncited_fm():
+    from app.services.template_render_service import EmitFieldMap
+
+    return EmitFieldMap.model_validate({
+        "scalars": [{"key": "project_name", "value": "Meridian",
+                     "source_chunk_id": None, "source_doc": None, "source_page": None}],
+        "rows": [],
+    })
+
+
+@pytest.mark.asyncio
+async def test_281_wr01_nonstrict_render_failure_counts_each_model_call_once(_patch_executor):
+    """The reviewer's probe: flag policy, 3 uncited shots, render fails → 3, never 4."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["forced_queue"] = [_forced_ok(_uncited_fm()) for _ in range(3)]
+    bag["render_result"] = {"status": "failed", "reason": "sandbox_error", "message": "boom"}
+    phase = _fake_phase()
+    phase.config.citation_policy = "flag"
+    ctx = _fake_ctx(_fake_definition([_fake_asset_ref()]), audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(phase, _retrieved_accumulated("chunk-1"), ctx)
+
+    assert len(bag["forced_calls"]) == 3
+    lines = out["text"].split("\n")
+    assert lines[0] == "This step failed after 3 attempts:"
+    assert lines[1].startswith("• 3 attempts — the citation check failed")
+    assert lines[2].startswith("• 1 attempt — the template could not be filled in: boom")
+    assert out["failure"] == "render_failed"
+
+
+@pytest.mark.asyncio
+async def test_281_wr01_backstop_after_a_delivered_shot_counts_that_call_once(
+    _patch_executor, monkeypatch
+):
+    """An exception raised by the render of a delivered (rejected) shot is the same call."""
+    from app.services.harness import emitters
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    async def _boom_render(validated_map, resolved_template, ctx):
+        raise RuntimeError("docxtpl crashed mid-render")
+
+    entry = emitters.EMITTER_REGISTRY["render_template"]
+    monkeypatch.setitem(
+        emitters.EMITTER_REGISTRY, "render_template",
+        emitters.EmitterEntry(schema_builder=entry.schema_builder, post_processor=_boom_render),
+    )
+    bag = _patch_executor
+    bag["forced_queue"] = [_forced_ok(_uncited_fm()) for _ in range(3)]
+    phase = _fake_phase()
+    phase.config.citation_policy = "flag"
+    ctx = _fake_ctx(_fake_definition([_fake_asset_ref()]), audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(phase, _retrieved_accumulated("chunk-1"), ctx)
+
+    assert len(bag["forced_calls"]) == 3
+    assert out["text"].split("\n")[0] == "This step failed after 3 attempts:"
+
+
+@pytest.mark.asyncio
+async def test_281_wr01_gate_passed_then_render_failed_is_one_attempt(_patch_executor):
+    """Control: a cited shot that passed the gate, then failed to render, is ONE call."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["render_result"] = {"status": "failed", "reason": "sandbox_error", "message": "boom"}
+    ctx = _fake_ctx(_fake_definition([_fake_asset_ref()]), audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(_fake_phase(), _retrieved_accumulated("chunk-1"), ctx)
+
+    assert len(bag["forced_calls"]) == 1
+    assert out["text"].split("\n")[0] == "This step failed after 1 attempt:"
+
+
+@pytest.mark.asyncio
+async def test_281_wr01_no_template_made_no_model_call_and_claims_no_attempt(_patch_executor):
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["resolve_result"] = {
+        "bytes": None, "filename": None, "provenance": "template_input",
+        "mime": None, "error": "No template uploaded to this thread.",
+    }
+    ctx = _fake_ctx(_fake_definition([]), audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(_fake_phase(), {}, ctx)
+
+    assert bag["forced_calls"] == []
+    assert out["failure"] == "no_template_bound"
+    assert out["text"].split("\n")[0] == "This step failed:"
+    assert "attempt" not in out["text"]
+    assert "No template is attached to this step: No template uploaded to this thread." in out["text"]
+    assert bag["surface_calls"][-1] == out["text"]
+
+
+@pytest.mark.asyncio
+async def test_281_wr01_exception_before_any_model_call_claims_no_attempt(
+    _patch_executor, monkeypatch
+):
+    from app.services.harness import phase_types
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    async def _boom_resolve(**kwargs):
+        raise RuntimeError("storage unreachable")
+
+    monkeypatch.setattr(phase_types, "resolve_template_source", _boom_resolve)
+    bag = _patch_executor
+    phase = _fake_phase()
+    phase.name = "Write the report"
+    ctx = _fake_ctx(_fake_definition([_fake_asset_ref()]), audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(phase, {}, ctx)
+
+    assert bag["forced_calls"] == []
+    assert out["text"].split("\n")[0] == 'Step "Write the report" failed:'
+    assert "attempt" not in out["text"]

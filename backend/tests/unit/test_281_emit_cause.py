@@ -386,3 +386,40 @@ def test_named_step_singular():
     ec = _ec()
     text = ec.compose_emit_failure([ec.shot_record(1, [ec.KIND_NARRATED])], step_name="X")
     assert text.split("\n")[0] == 'Step "X" failed after 1 attempt:'
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 281-REVIEW WR-01 — a terminal cause rides the call it belongs to; zero calls, no count
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def test_wr01_record_terminal_merges_into_the_same_call():
+    ec = _ec()
+    records = [ec.shot_record(n, [ec.KIND_UNCITED], uncited=1) for n in (1, 2, 3)]
+    ec.record_terminal(records, 3, ec.KIND_RENDER_FAILED, detail="boom")
+    assert len(records) == 3
+    assert records[-1]["kinds"] == [ec.KIND_UNCITED, ec.KIND_RENDER_FAILED]
+    text = ec.compose_emit_failure(records)
+    assert text.split("\n")[0] == "This step failed after 3 attempts:"
+    assert "• 1 attempt — the template could not be filled in: boom." in text
+
+
+def test_wr01_record_terminal_appends_for_a_new_call():
+    ec = _ec()
+    records = [ec.shot_record(1, [ec.KIND_UNCITED], uncited=1)]
+    ec.record_terminal(records, 2, ec.KIND_RENDER_FAILED)
+    assert [r["attempt"] for r in records] == [1, 2]
+
+
+def test_wr01_zero_call_record_is_worded_without_a_count():
+    ec = _ec()
+    zero = [ec.shot_record(0, [ec.KIND_NO_TEMPLATE], detail="No template uploaded to this thread.")]
+    text = ec.compose_emit_failure(zero)
+    assert text == (
+        "This step failed:\n"
+        "• No template is attached to this step: No template uploaded to this thread. "
+        "Check that this step names a template."
+    )
+    named = ec.compose_emit_failure(zero, step_name="Write the report")
+    assert named.split("\n")[0] == 'Step "Write the report" failed:'
+    assert "attempt" not in named
