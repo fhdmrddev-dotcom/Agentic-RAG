@@ -4,14 +4,14 @@ milestone: v4.6
 milestone_name: Pay It Down
 status: ready_to_plan
 last_updated: 2026-10-15T15:30:00.000Z
-last_activity: 2026-10-15 -- Phase 282 all 4 plans executed; operator approved G-4 sign-off
+last_activity: 2026-10-15 -- Phase 282 closed (verified 5/5; review fixed; not pushed)
 progress:
   total_phases: 14
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 22
   completed_plans: 22
   percent: 36
-stopped_at: Phase 282 executed 4/4 + signed off — code review + verifier next
+stopped_at: Phase 282 CLOSED — next phase 283
 ---
 
 # Project State
@@ -33,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 282 — the slow run and the paused run
+**Current focus:** Phase 283 — every member reaches their own settings
 
 ---
 
@@ -54,6 +54,8 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ---
 
 ## Current Position
+
+**Phase 282 CLOSED (2026-10-15).** Review `3268b6228`: 1 critical / 5 warnings / 4 info; fixed `817cc2b3b`..`d78f3c93b` test-first (CR-01 retries now key on the routing provider; WR-02/04/05 fixed; WR-01 partial — an in-flight cloud open keeps running; WR-03 timeout label deferred; IN-01..04 left). Verification `64a0a2c06`: **passed 5/5**, `self-verified`. Backend baseline after fixes 71 failed / 7546 passed / 0 errors, failing SET == base `d1ba70553`. Owed by decision: G4-4 (max 356 s), G4-6, A1, Add-form click-through, SC#10 rows 2/8 once credit exists; operator to enable `spark-x2.5-4b`. Open bugs from the phase: BUG-261015-03 (major), -04, -05. Hot-file ledger triples for the 6 review-fix files not re-derived (presence gate green). **Not pushed.** Next: `/gsd:discuss-phase 283`.
 
 **Phase 282 executed 4/4 + operator sign-off `approved` (2026-10-15).** 282-03: SC#10 board 6 PASS / 2 ⛔ billing / 0 FAIL; G4-1/2/3/5 PASS on DOM state; BUG-260918-01 + BUG-261015-02 closed; BUG-261015-03 (ask_user required timeout → models pick ~60 s, major) + BUG-261015-04 (Anthropic credit 400 shown as model-parameter error, minor) filed, open. 282-04 (`f173d3a4a`, `8fb2bb684`, operator-requested): self-hosted models default to 900 s; Timeout on Add model by ID; live-verified; backend 71 = base set; ModelRegistryTab pin 37. **Owed by decision:** G4-4 (> 600 s; measured max 356 s), G4-6 (needs approved write), A1 LangSmith nesting, fixed Add-form click-through; operator to enable `spark-x2.5-4b` (added rows start disabled). Not pushed. Next: `/gsd:code-review 282` → gsd-verifier.
 
