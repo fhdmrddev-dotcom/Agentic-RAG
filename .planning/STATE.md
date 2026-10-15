@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
 status: ready_to_plan
-last_updated: 2026-10-15T08:41:13.865Z
-last_activity: 2026-10-15 -- Phase 281 closed (WR-02 kept; rows A, C, D owed)
+last_updated: 2026-10-15T15:30:00.000Z
+last_activity: 2026-10-15 -- Phase 282 all 4 plans executed; operator approved G-4 sign-off
 progress:
   total_phases: 14
   completed_phases: 5
-  total_plans: 18
-  completed_plans: 18
+  total_plans: 22
+  completed_plans: 22
   percent: 36
-stopped_at: Phase 282 wave 1 merged (01+02) — wave 2 (282-03, operator checkpoints) next
+stopped_at: Phase 282 executed 4/4 + signed off — code review + verifier next
 ---
 
 # Project State
@@ -54,6 +54,8 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ---
 
 ## Current Position
+
+**Phase 282 executed 4/4 + operator sign-off `approved` (2026-10-15).** 282-03: SC#10 board 6 PASS / 2 ⛔ billing / 0 FAIL; G4-1/2/3/5 PASS on DOM state; BUG-260918-01 + BUG-261015-02 closed; BUG-261015-03 (ask_user required timeout → models pick ~60 s, major) + BUG-261015-04 (Anthropic credit 400 shown as model-parameter error, minor) filed, open. 282-04 (`f173d3a4a`, `8fb2bb684`, operator-requested): self-hosted models default to 900 s; Timeout on Add model by ID; live-verified; backend 71 = base set; ModelRegistryTab pin 37. **Owed by decision:** G4-4 (> 600 s; measured max 356 s), G4-6 (needs approved write), A1 LangSmith nesting, fixed Add-form click-through; operator to enable `spark-x2.5-4b` (added rows start disabled). Not pushed. Next: `/gsd:code-review 282` → gsd-verifier.
 
 **Phase 282 wave 1 (2026-10-15):** 282-01 (FIX-06) + 282-02 (FIX-07) executed in parallel worktrees, merged `fdcfde57d`, worktrees torn down (venv/node_modules intact). 01: backend gate 71 failed / 7508 passed / 0 errors, failing SET == base; loop stall 2.970 s → 0.065 s. 02: count gate 1 failing — `WorkflowBuilderPage.canvas.test.tsx` STACK_TRACE_ERROR timeout, file untouched by the phase, same failure in 280-04, green alone (inherited-vs-new to settle at 282-03 Task 1 by re-running at base). Merged-tree tsc set == base (58). Next: 282-03.
 

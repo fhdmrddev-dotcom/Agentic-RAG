@@ -220,4 +220,14 @@ Model Registry, `glm-4.7-flash`:
 
 ## Operator sign-off
 
-*(pending — Task 4)*
+**`approved` — operator, 2026-10-15.** The reply covered the whole sign-off list as presented:
+
+1. Sketch 282 variant A: the answer input follows the open panel, and chat shows a one-line pointer.
+2. Space on a chip selects only; Enter or a click deselects (D-24).
+3. The 32 px pointer button, the `ring-2 ring-offset-2` focus ring, and the Timeout help line that shows only while the cell is edited.
+4. Left owed, by decision:
+   - **G4-4** (> 600 s local call): measured maximum **356 s** on the operator's hardware.
+   - **G4-6** (the run-failure sentence on a live run): needs an approved test write.
+   - **A1** (LangSmith nesting on the board rows).
+   - **The 282-04 Add-form click-through** after the `min`/`max` fix (proven by vitest; the live tab froze).
+   - **Enabling `spark-x2.5-4b`** in the Registry is the operator's own row; not flipped by Claude.

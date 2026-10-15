@@ -303,11 +303,11 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 282-03-PLAN.md — wave 2 (operator checkpoints): merged-tree gates + ledger/CLAUDE.md rows; SC#10 8-row board (3 axes); G-4 rows 1-4 in Chrome on DOM state + Registry refusal on screen; operator confirms sketch A; evidence-gated bug/seed flips + STATE (FIX-06, FIX-07; D-16, D-17, D-25, D-26)
+- [x] 282-03-PLAN.md — wave 2 (operator checkpoints): merged-tree gates + ledger/CLAUDE.md rows; SC#10 8-row board (3 axes); G-4 rows 1-4 in Chrome on DOM state + Registry refusal on screen; operator confirms sketch A; evidence-gated bug/seed flips + STATE (FIX-06, FIX-07; D-16, D-17, D-25, D-26)
 
 **Wave 3** *(operator-approved at the G-4 sign-off, 2026-10-15)*
 
-- [ ] 282-04-PLAN.md — wave 3 (TDD, backend + Registry): self-hosted models default to 900 s when no timeout is set (resolver takes the provider), Timeout field on "Add model by ID" bound 1..1800 with the shared refusal sentence (FIX-06 follow-up; D-27..D-30)
+- [x] 282-04-PLAN.md — wave 3 (TDD, backend + Registry): self-hosted models default to 900 s when no timeout is set (resolver takes the provider), Timeout field on "Add model by ID" bound 1..1800 with the shared refusal sentence (FIX-06 follow-up; D-27..D-30)
 **Flags**: ⛔ **G-2 FIRES for FIX-07, and a sketch is genuinely needed.** Sketch 006 option C (calm panel card plus chat **pointer**) conflicts with 244-12's chat-column mount, which exists for reachability when the panel is closed. Where the single input lives in each panel state is an **open layout decision**, and the operator-approved mockup is the acceptance bar. Run `/gsd:sketch` before plan and read the sketch-findings skill (`references/pending-question.md`). **Provider-docs-first** for FIX-06: read each provider SDK's own timeout and retry documentation (OpenAI, Anthropic native, Google), and keep provider-specific handling at the service boundary. **G-5 audit at discuss**: `backend/app/services/openai_service.py` (FIRES, 36 phases), `backend/app/services/anthropic_service.py` (FIRES), `backend/app/config.py` (FIRES; `MODEL_CAPABILITIES` seam owed), `backend/app/api/admin.py`, `frontend/src/components/admin/ModelRegistryTab.tsx` (FIRES), `MessageList.tsx`, `MessageItem.tsx`, `PendingAskCard.tsx` (FIRES), `WorkspacePanel.tsx` (FIRES), `streamsStore.ts` (FIRES), `PausedRunCue.tsx`. ⛔ The FIX-06 change stays a constructor argument at the client boundary, and the agent loop's `per_call_budget` call sites do not move (`agent_loop.py` prompt-assembly seam OV-273-03 is owed and not taken here). Seeds: `SEED-289` / `SEED-172` (sibling local-model findings; the 13 rowless local models on the 300 s inferred default are **noted, not fixed**, unless discuss shows they are the same defect).
 **UI hint**: yes
 
@@ -357,7 +357,7 @@ Plans:
 | 279. The Expert Scope Seam | 4/4 | Complete (verified 4/4; owed: D-18 cloud read, 4-axis rows, review leftovers) | 2026-10-14 |
 | 280. In Once, Out Clean | 4/4 | Complete | 2026-10-14 |
 | 281. A Refusal Names Its Cause | 4/4 | Complete (owed by operator decision: G-4 rows A, C, D; WR-02 kept by design) | 2026-10-15 |
-| 282. The Slow Run and the Paused Run | 2/3 | In Progress | - |
+| 282. The Slow Run and the Paused Run | 4/4 | Executed — review + verify next (owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through) | - |
 | 283. Every Member Reaches Their Own Settings | 0/TBD | Not started | - |
 | 284. Library at Scale | 0/TBD | Not started | - |
 
