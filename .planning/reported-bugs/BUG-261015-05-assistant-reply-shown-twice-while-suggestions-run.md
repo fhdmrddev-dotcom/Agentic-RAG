@@ -72,3 +72,5 @@ It looks like a double send, which erodes trust in the local-model path that SEE
 - **The window:** the reply was saved, and the API returned it with `run_status: streaming` and its run id, at 18:51:25 UTC. The run completed at 18:51:49.
 - **The reload:** the chat switched to another thread and back inside that window, forcing a reload.
 - **Result:** the assistant bubble count was **1** before the switch, 1 after it, and 1 after completion. Before the fix, this window showed 2.
+
+**Not driven: the cloud row this report asked for.** On cloud the save-to-close window is about 1-2 s, too short to land a reload in by hand. The fix does not depend on the provider, the same code runs for every model, and it is unit-proven. Re-open if a doubled reply is seen on any provider.
