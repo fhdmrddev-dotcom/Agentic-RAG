@@ -223,9 +223,9 @@ Muted text on the panel uses the panel-scoped AA tokens (`text-panel-muted-foreg
 - [x] Dimension 3 Color: PASS
 - [x] Dimension 4 Typography: FLAG (non-blocking, inherited legacy values — see checker notes)
 - [x] Dimension 5 Spacing: FLAG (non-blocking, inherited legacy values — see checker notes)
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-10-15 (gsd-ui-checker, autonomous run)
 
 ### Checker notes (2026-10-15, gsd-ui-checker — APPROVED with 3 non-blocking FLAGs)
 
