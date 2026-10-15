@@ -2798,6 +2798,68 @@ CREATE TABLE public.legal_holds (
 
 
 --
+-- Name: library_documents; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.library_documents WITH (security_invoker='true') AS
+ SELECT id,
+    user_id,
+    filename,
+    file_path,
+    file_size,
+    mime_type,
+    status,
+    error_message,
+    chunk_count,
+    created_at,
+    updated_at,
+    content_hash,
+    metadata,
+    folder_id,
+    version_number,
+    is_latest,
+    ingestion_step,
+    extractor,
+    document_type_norm,
+    date_typed,
+    org_id,
+    source_connection_id,
+    ingest_visibility,
+    source_state,
+    thread_key,
+    page_count,
+    source_created_at,
+    source_modified_at,
+    source_author,
+    archived_at,
+    archived_policy_id,
+    archived_policy_name,
+    retrievable,
+    (lower(filename) COLLATE "C") AS filename_key,
+    ( SELECT (count(*))::integer AS count
+           FROM public.documents e
+          WHERE ((e.user_id = d.user_id) AND (e.filename = d.filename) AND ((e.user_id = ( SELECT auth.uid() AS uid)) OR ((e.folder_id IS NOT NULL) AND (e.folder_id IN ( SELECT f.id
+                   FROM public.folders f
+                  WHERE ((f.user_id <> ( SELECT auth.uid() AS uid)) AND public.folder_is_org_shared(f.id)))))))) AS version_count,
+    (EXISTS ( SELECT 1
+           FROM public.documents e
+          WHERE ((e.user_id = d.user_id) AND (e.filename = d.filename) AND (e.version_number < d.version_number) AND ((e.user_id = ( SELECT auth.uid() AS uid)) OR ((e.folder_id IS NOT NULL) AND (e.folder_id IN ( SELECT f.id
+                   FROM public.folders f
+                  WHERE ((f.user_id <> ( SELECT auth.uid() AS uid)) AND public.folder_is_org_shared(f.id))))))))) AS has_earlier
+   FROM public.documents d
+  WHERE ((user_id = ( SELECT auth.uid() AS uid)) OR ((folder_id IS NOT NULL) AND (folder_id IN ( SELECT f.id
+           FROM public.folders f
+          WHERE ((f.user_id <> ( SELECT auth.uid() AS uid)) AND public.folder_is_org_shared(f.id))))));
+
+
+--
+-- Name: VIEW library_documents; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.library_documents IS 'Phase 284 (mig 207): the Library visible set — own documents ∪ documents in org-shared folders the caller does not own. security_invoker: RLS on documents/folders applies beneath it. Keyed on auth.uid(): the service role reads 0 rows. SELECT-only.';
+
+
+--
 -- Name: message_artifacts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -10656,3 +10718,11 @@ REVOKE EXECUTE ON FUNCTION public.documents_hold_identity_guard() FROM PUBLIC, a
 REVOKE EXECUTE ON FUNCTION public.folders_hold_identity_guard() FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.retention_policies_folder_same_org() FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.documents_inherit_family_archive() FROM PUBLIC, anon, authenticated;
+
+-- migration 207 — library_documents: the Library's visible set (security_invoker); READ-only to authenticated and service_role, nothing to anon / PUBLIC.
+REVOKE ALL ON TABLE public.library_documents FROM PUBLIC;
+REVOKE ALL ON TABLE public.library_documents FROM anon;
+REVOKE ALL ON TABLE public.library_documents FROM authenticated;
+REVOKE ALL ON TABLE public.library_documents FROM service_role;
+GRANT SELECT ON TABLE public.library_documents TO authenticated;
+GRANT SELECT ON TABLE public.library_documents TO service_role;

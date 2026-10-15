@@ -66,3 +66,31 @@ Ground truth (asyncpg as postgres): `{"big_folder_id": "ea595fbd-6880-5816-a543-
 | Picker read (whole list, as CreateLink/LegalHold/Takeoff download it) | 200 | 1,064,078 | 429.5 | 645.9 | 1000 | 1000 | 50020 | **NO** |
 | POST /document-search page 1 (limit 25) | 200 | 27,491 | 16869.2 | 18243.5 | 25 | 49720 | 49720 | yes |
 | Library open request set (GET /documents + GET /folders, parallel) | 200/200 | 1,069,311 | 348.6 | 553.6 | — | — | — | — |
+
+## EXPLAIN (migration 207)
+
+Run after the first apply of 207, at **50,000 + 20** seeded, as `authenticated` with the owner's claims
+(`_apply_rls_user_context` — RLS on, so the plans include the documents policy's per-row filter),
+`EXPLAIN (ANALYZE, BUFFERS)`, local Postgres 17.6, after `VACUUM (ANALYZE)`. Top lines and timings,
+verbatim:
+
+| query | top node | rows scanned | buffers | execution time |
+|---|---|---|---|---|
+| Root page 1 (`is_latest AND folder_id IS NULL AND archived_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 25`) | `Limit` ← `Sort` (top-N heapsort, 28 kB) | 29,808 | shared hit=3,052 | **32.9 ms** |
+| Root `count(*)` (same predicate) | `Aggregate` ← `Bitmap Heap Scan on documents d` | 29,808 | shared hit=2,949 | **27.0 ms** |
+| Big LAST page (`folder_id = Big AND archived_at IS NULL … LIMIT 25 OFFSET 9925`, selecting `version_count, has_earlier` too) | `Limit` ← `Result` ← `Sort` | 9,948 | shared hit=81,960 | **65.7 ms** |
+| Big `count(*)` | `Aggregate` ← `Bitmap Heap Scan` (`Recheck Cond: folder_id = …`) | 9,948 | shared hit=2,294 | **9.3 ms** |
+| All latest `count(*)` | `Aggregate` ← `Bitmap Heap Scan` | 50,020 | shared hit=3,010 | **36.7 ms** |
+| `GET /library/summary` SQL (`LIBRARY_SUMMARY_SQL`) | `MixedAggregate` (hash keys folder_id · status,step · status · connection · doc_type; group key `()`) | 50,020 → 40 groups | — | **69.4 ms** |
+
+**Index decision: no index.** Every plan is under 70 ms at 50k, far inside the D-22 500 ms bar, so
+migration 207 carries no index (D-19 "only if needed"). Recorded for whoever reads these later:
+
+- The count is a `Bitmap Heap Scan` over every visible row (Pitfall 2's warning sign) — it is O(n) and
+  costs ~27-37 ms at 50k. It is not the dominant cost and does not threaten 500 ms; a covering partial
+  index would buy little here and is deferred until a measurement says otherwise.
+- The Big LAST page selecting `version_count` / `has_earlier` shows those correlated subqueries are
+  evaluated for **every row the OFFSET skips** (the `Result` node above the `Sort` processes 9,948
+  rows; 81,960 buffer hits vs ~2-3k for the plain reads). Postgres postpones them past the sort but
+  not past the offset. Still 65.7 ms here — but `GET /documents` does NOT select them (its
+  `LIST_SELECT` names neither), so this cost lands only on a caller that asks for them (Find, 284-04).
