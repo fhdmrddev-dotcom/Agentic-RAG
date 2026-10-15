@@ -3181,7 +3181,7 @@ const BASELINE = {
   // "never pin from a red run" rule is honoured where it binds: on the files being pinned.
   // ⬆ RAISED 2 → 5 at `262-05`: the catalog's entry action (present / ungoverned / the
   //   eighth-entry count). ⛔ An EXTENSION, never a lowering — the D-07 pair above is intact.
-  "nav-items.test.ts": 5,
+  "nav-items.test.ts": 6, // 283-02: +1 (the Settings door stands for a member, FIX-01)
   "navItemsConnections.test.ts": 6,
   "activeViewReachability.test.ts": 11,
 
@@ -3564,7 +3564,7 @@ const BASELINE = {
   // The fence was doing its job; what it caught was a real drift. +1 case is 233's own positive
   // control for the now-NAMED exclusion.
   "IngestionStrip.test.tsx": 31,
-  "DetailSections.lazy.test.tsx": 14,
+  "DetailSections.lazy.test.tsx": 20, // 283-03: +6 (the bounded, labelled, one-Tab-stop chunk list, FIX-08)
   "CR01.reset.test.tsx": 2,
   "DetailSections.tables.test.tsx": 15,
   "tabsContrast.test.ts": 14,
