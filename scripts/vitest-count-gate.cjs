@@ -3136,7 +3136,7 @@ const BASELINE = {
   // suite (a directory TARGETS entry reaches it) and guarded NOTHING. It could have lost
   // every case and the gate would still have said OK. The twelfth suite found in this
   // state in a week — see SEED-229, which proposes the gate self-check that would end it.
-  "PendingAskCard.test.tsx": 45,
+  "PendingAskCard.test.tsx": 54, // RE-PINNED 45 → 54 at 282-02 (radio keyboard, non-colour mark, the shared draft: answer/expiry settle, 500 keeps it)
   // SEED-227 — pinned at 3 in the SAME COMMIT that creates the file and its TARGETS line,
   // from this script's own printed `actual` column (`— 3 new`), not booked ahead. An
   // unpinned file is not a lightly-guarded one, it is an UNGUARDED one: the count could

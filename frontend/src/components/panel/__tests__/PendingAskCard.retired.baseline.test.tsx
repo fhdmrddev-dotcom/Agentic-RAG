@@ -234,8 +234,13 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * edit did not disturb what the file actually guards. The pin stays EXACT for the reason
      * stated above: a range would stop catching a `?raw` import that silently resolved
      * elsewhere, which is this clause's only job.
+     *
+     * 2026-10-15 — 282-02 RE-BASELINED 837 → 907, not loosened: the draft moved out of the card
+     * into `stores/askDraftStore.ts` (D-12; `useState` 9 → 7), the chips gained the radio
+     * keyboard + non-colour mark (D-13 / D-24), and the root gained `data-ask-card` /
+     * `data-ask-home` (D-14). The retirement-sentence fences below are untouched and green.
      */
-    expect(src.split("\n").length).toBe(837)
+    expect(src.split("\n").length).toBe(907)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */

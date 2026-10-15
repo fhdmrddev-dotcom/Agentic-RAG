@@ -33,7 +33,7 @@
  * not active" answer) flips the card to the expired state with a visible
  * constant message; other failures show a retryable error line — never silence.
  */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { cn } from "@/lib/utils"
 // ── Phase 214-11 Task 2 (STEP-04 / D-214-16) — the shared identity element, the FIFTH surface.
 // It takes props; this card resolves nothing and reaches for no connection list.
@@ -51,6 +51,9 @@ import {
 // Phase 244-15 (G-8): the STORE, deliberately — not a provider hook. See `settleAnswered`
 // in `PendingAskStack` for the measured reason (eight suites mock the provider module).
 import { useStreamsStore } from "@/stores/streamsStore"
+// Phase 282-02 (FIX-07 / D-12): the ONE draft home. A plain module, not a provider hook, so the
+// eight suites that mock `@/providers/StreamsProvider` with an allow-list are unaffected.
+import { useAskDraft, useAskDraftStore } from "@/stores/askDraftStore"
 import { answerAskUser, ApiError } from "@/lib/api"
 import type { PendingAsk } from "@/types"
 import {
@@ -269,6 +272,13 @@ interface PendingAskCardProps {
    * and `StepIdentity` knows about the map.
    */
   shape?: StepIdentityProps["shape"]
+  /**
+   * Phase 282-02 (D-10 / D-14) — which `PendingAskStack` home rendered this card. It is written
+   * onto the pending root as `data-ask-home` beside `data-ask-card={tool_call_id}`, so the chat
+   * pointer's `Answer in panel →` can find the PANEL card for its ask. Omitted (no attribute) for
+   * a direct mount such as WorkflowRunPage's.
+   */
+  home?: "chat" | "panel"
 }
 
 type CardState = "pending" | "answered" | "expired"
@@ -281,6 +291,7 @@ export function PendingAskCard({
   action = null,
   service = null,
   shape,
+  home,
 }: PendingAskCardProps) {
   const { tool_call_id, prompt, timeout_seconds, run_id, draft } = ask
   // ask_user with no choices → backend stores options=null (free-text path).
@@ -288,8 +299,17 @@ export function PendingAskCard({
   // crashed the whole panel — there is no error boundary). See BUG-260529-03.
   const options = ask.options ?? []
 
-  const [choiceIndex, setChoiceIndex] = useState<number | null>(null)
-  const [freeText, setFreeText] = useState("")
+  // ── Phase 282-02 (FIX-07 / D-12) — the draft is READ, not owned. ──
+  // It used to be two `useState`s here, so the chat card and the panel card for ONE pause held
+  // two drafts that disagreed (BUG-260918-01 B). Now every rendering reads the one draft keyed by
+  // `tool_call_id`; the two setters keep their old names so every downstream read is unchanged.
+  const { choiceIndex, freeText } = useAskDraft(tool_call_id)
+  const setChoice = useAskDraftStore((s) => s.setChoice)
+  const setFreeTextAction = useAskDraftStore((s) => s.setFreeText)
+  const markSettled = useAskDraftStore((s) => s.markSettled)
+  const setChoiceIndex = (i: number | null) => setChoice(tool_call_id, i)
+  const setFreeText = (t: string) => setFreeTextAction(tool_call_id, t)
+  const chipRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [state, setState] = useState<CardState>("pending")
   const [submitting, setSubmitting] = useState(false)
   const [answeredValue, setAnsweredValue] = useState<string>("")
@@ -330,11 +350,13 @@ export function PendingAskCard({
     if (state !== "pending") return
     if (remaining <= 0) {
       setState("expired")
+      // 282-02 (D-12): the draft dies with the ask, and the pointer learns it is settled.
+      markSettled(tool_call_id)
       return
     }
     const t = setTimeout(() => setRemaining((r) => r - 1), 1000)
     return () => clearTimeout(t)
-  }, [remaining, state, hasDeadline])
+  }, [remaining, state, hasDeadline, markSettled, tool_call_id])
 
   // A2 / Pitfall 1: a pure-SSE prompt lacks run_id. Trigger ONE reconcile on
   // mount-if-missing so the GET-reconciled prompt (carrying run_id) replaces it
@@ -377,6 +399,8 @@ export function PendingAskCard({
       // removes the prompt from the store, reactively unmounting this card.
       setAnsweredValue(valueForDisplay)
       setState("answered")
+      // 282-02 (D-12): SUCCESS ONLY — clear the one draft and record the settle in one write.
+      markSettled(tool_call_id)
       // ── Phase 244-15 (G-8) — SUCCESS ONLY, and after the optimistic flip. ──────────
       //
       // The comment two lines up describes the SSE path and is still true THERE. On the
@@ -407,6 +431,7 @@ export function PendingAskCard({
         // the calm expired state instead of a dead-but-submittable card.
         setExpiredMessage("This prompt has expired — the run is no longer active")
         setState("expired")
+        markSettled(tool_call_id)
       } else if (status === 409) {
         // ⚠ THE RUN IS OVER, AND THE SERVER IS THE ONLY PARTY THAT KNOWS.
         //
@@ -428,6 +453,7 @@ export function PendingAskCard({
         // can act on — offering a retry on it is the defect this replaces.
         setExpiredMessage("This run has already ended — your answer was not saved")
         setState("expired")
+        markSettled(tool_call_id)
       } else if (status !== null && status >= 500) {
         // ⚠ NAMED, NOT "try again". A 500 means the answer was NOT recorded, and clicking
         // the same button again will do the same thing. Saying which half failed is the
@@ -578,6 +604,9 @@ export function PendingAskCard({
       className="flex flex-col gap-2 rounded-md border border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)] p-3"
       role="group"
       aria-labelledby={labelId}
+      // 282-02 (D-14): how the chat pointer's `Answer in panel →` finds THIS ask's panel card.
+      data-ask-card={tool_call_id}
+      data-ask-home={home}
     >
       {/* Assertive announce — "blocked on me" must reach a screen reader. */}
       <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--warning))]">
@@ -626,27 +655,68 @@ export function PendingAskCard({
         {prompt}
       </p>
 
-      {/* Choice chips (optional) — radiogroup of role=radio buttons (D3). */}
+      {/* Choice chips (optional) — radiogroup of role=radio buttons (D3).
+          282-02 (D-13 / D-24) completes the APG radio pattern: ONE tab stop (roving tabindex —
+          the selected chip, else the first), arrows move AND select with wrap, Space selects
+          only (never deselects), while Enter and click keep the D-13 toggle through `onClick`.
+          The aria-hidden mark + its dot make selection a SHAPE as well as a colour. */}
       {options.length > 0 && (
         <div role="radiogroup" aria-labelledby={labelId} className="flex flex-col gap-1.5">
           {options.map((opt, i) => {
             const selected = choiceIndex === i
+            const onChipKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+              let target: number | null = null
+              if (e.key === "ArrowDown" || e.key === "ArrowRight") target = (i + 1) % options.length
+              else if (e.key === "ArrowUp" || e.key === "ArrowLeft")
+                target = (i - 1 + options.length) % options.length
+              else if (e.key === " ") {
+                e.preventDefault()
+                if (!selected) setChoiceIndex(i)
+                return
+              }
+              if (target === null) return
+              e.preventDefault()
+              setChoiceIndex(target)
+              chipRefs.current[target]?.focus()
+            }
             return (
               <button
                 key={i}
+                ref={(el) => {
+                  chipRefs.current[i] = el
+                }}
                 type="button"
                 role="radio"
                 aria-checked={selected}
+                tabIndex={(choiceIndex ?? 0) === i ? 0 : -1}
                 onClick={() => setChoiceIndex(selected ? null : i)}
+                onKeyDown={onChipKeyDown}
                 className={cn(
-                  "rounded-md border px-3 py-2 text-left text-[13px] transition-colors",
-                  "min-h-[44px] focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  "flex items-center gap-2 rounded-md border px-3 py-2 text-left text-[13px] transition-colors",
+                  "min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   selected
                     ? "border-[hsl(var(--warning))] bg-[hsl(var(--warning))] font-semibold text-[hsl(var(--warning-foreground))]"
                     : "border-border bg-card text-foreground hover:border-[hsl(var(--warning))] hover:bg-[hsl(var(--warning)/0.12)]",
                 )}
               >
-                {opt}
+                <span
+                  aria-hidden="true"
+                  data-testid="ask-radio-mark"
+                  className={cn(
+                    "flex h-4 w-4 flex-none items-center justify-center rounded-full border-2",
+                    selected
+                      ? "border-[hsl(var(--warning-foreground))]"
+                      : "border-[hsl(var(--muted-foreground-dim))]",
+                  )}
+                >
+                  {selected && (
+                    <span
+                      data-testid="ask-radio-dot"
+                      className="h-2 w-2 rounded-full bg-[hsl(var(--warning-foreground))]"
+                    />
+                  )}
+                </span>
+                <span>{opt}</span>
               </button>
             )
           })}
