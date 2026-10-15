@@ -52,6 +52,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // mount. This entry opens the SAME page pinned to the Connections tab, which fetches
   // its own rows through `listConnectorConnections()` and needs neither endpoint.
   //
+  // ⚠ SUPERSEDED 2026-10-15 (Phase 283, FIX-01) — the paragraph above is KEPT RATHER THAN
+  // DELETED, because its reasoning was sound for its day and its premise is what changed. A
+  // member reaching Settings no longer meets a 403 on mount: SettingsPage skips `getSettings`
+  // for a member and gates its operator tabs (`settingsTabs.ts`), so Settings WAS un-tagged
+  // (see its entry below). Its citation `api/settings.py:331,341` is STALE — measured `:578,
+  // :587`. Connections stays its own ungoverned door for its own reasons (its own page since
+  // 2026-09-01, a per-user asset); nothing here depends on Settings any more.
+  //
   // ⚠ It is ungoverned by DESIGN, not by omission: a connection is a per-user asset,
   // like a thread. If connections ever need governing they get their OWN feature key —
   // never `model_management`, whose audience is about models.
@@ -109,10 +117,22 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // ⛔ `Sparkles` stays in two places ON PURPOSE: `ExpertIcon`'s fallback (an Expert with no icon
   // of its own) and `ExpertCard`'s "Start Chat" button, where it marks an ACTION, not an Expert.
   { view: "experts", icon: GraduationCap, label: "Experts" },
-  // Phase 148 (VIS-01): governed by `model_management` (Operators-only on the day-one
-  // map) — vanishes for a non-operator; the chat model picker (GET /settings/providers)
-  // is an ungated Run carve-out (148-05), so chat/run never breaks by hiding Settings.
-  { view: "settings", icon: Settings, label: "Settings", feature: "model_management" },
+  // ⚠ UNGOVERNED SINCE 2026-10-15 (Phase 283, FIX-01 / BUG-261004-02), AND THE REASON IS
+  // MEASURED. The note this replaces read: *"Phase 148 (VIS-01): governed by `model_management`
+  // (Operators-only on the day-one map) — vanishes for a non-operator"*. That hid the WHOLE home
+  // because three of its tabs are about models — and with it the member's own Memory, Audit Log,
+  // "Show technical names" and default chat model, none of which call a gated endpoint.
+  //
+  // The door is now ungoverned by DESIGN, like `connections`, `skills` and `experts` above. The
+  // gating moved to where it is true:
+  //   - per TAB in the page — `components/settings/settingsTabs.ts`, fail-CLOSED on the
+  //     `model_management === true` boolean; a member sees Preferences · Memory · Audit Log only;
+  //   - per ROUTE at the API — `require_visible("model_management")` on `api/settings.py:578, 587,
+  //     1004, 1033`; `GET /settings/providers` (`:1067`) stays the Run carve-out for the chat
+  //     model picker. Fenced on the real gate by `backend/tests/unit/test_283_settings_two_role_fence.py`
+  //     and `test_283_settings_route_inventory.py`.
+  // ⛔ `model_management`'s audience is NOT widened (still Operators-only); only the door opened.
+  { view: "settings", icon: Settings, label: "Settings" },
 ] as const
 
 /**

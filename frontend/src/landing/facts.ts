@@ -192,7 +192,7 @@ export const CONNECTOR_CATALOG: readonly ConnectorFact[] = Object.freeze([
  */
 export const SURFACE_TABS = Object.freeze({
   library: ["Documents", "Views", "Ingestion", "Indexing", "Health"] as const,
-  settings: ["AI Model", "Search & Retrieval", "Integrations", "Memory", "Audit Log"] as const, // admin view; retrieval label is dynamic
+  settings: ["AI Model", "Search & Retrieval", "Integrations", "Preferences", "Memory", "Audit Log"] as const, // admin view; retrieval label is dynamic; a member sees Preferences · Memory · Audit Log (283)
   controlRoom: ["Control Plane", "Users & Access", "Model Registry", "Secrets", "Audit log"] as const,
   orgAdmin: ["Members", "Experts", "Audit", "Settings", "Invitations & Roles", "SSO", "Subscription", "Retention"] as const,
 })

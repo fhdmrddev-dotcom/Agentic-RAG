@@ -11198,7 +11198,7 @@ cells rot within days.
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
-| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 47 / 24 / 1773 | ⚠ **FIRES** | ⚠ STALE for the THIRD close running at `44 / 23 / 1738`. ⭐ SHRANK — 242 moved the payload helpers out; the tab-registration seam stays OWED |
+| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 53 / 27 / 1658 (was `47 / 24 / 1773`) | ⚠ **FIRES** | ⚠ STALE a FOURTH close. **283**: tab-registration seam TAKEN (283-01, `settingsTabs.ts`); Audit Log + Preferences extracted. Per-tab state / hydrate / save split OWED (D-15) |
 | [`frontend/src/pages/settingsSearchPayload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingssearchpayloadts) | 2 / 2 / 116 | no (2 phases) | Created by 242. Row added AT CREATION rather than at the third phase — an absent row makes G-5 absent forever, silently, at any count |
 | [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
 | [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
@@ -11306,7 +11306,7 @@ cells rot within days.
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 26 / 14 / 420 (was `25 / 14 / 416`) | ⚠ **FIRES** | **276-01** (D-14): Iris mark `<img>`; **276-06** (D-27): on the dark `#0A0E18` chip, classes only. 244-14's `overflow-x-hidden` stands |
 | [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 36 / 27 / 418 (was `35 / 26 / 412`) | ⚠ **FIRES** | **276-06**: boot splash spin ring → moving Iris (`thinking`) in a `role=status`; 1 import, hook call sites 9 → 9. Reachability fence green |
-| [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 12 / 8 / 153 (was `9 / 6 / 118`) | ⚠ **FIRES** | ⚠ STALE (`9/6/118`). **271-02**: the Classification entry REMOVED (7 entries); `Wand2` moved to the Filing rules link. 271-05 G4-3: the rail has none |
+| [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 13 / 9 / 173 (was `12 / 8 / 153`) | ⚠ **FIRES** | **283-02** (FIX-01): the Settings entry UNGOVERNED (no `feature` key); per-tab gate in the page, per-route `require_visible` at the API. `visibleNavItems` unchanged |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
 | [`frontend/src/lib/api/sources.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisourcests) | 6 / 2 / 313 (was `5 / 1 / 312`) | no (2 phases) | **275-02**: purgeWatchFiles throws `ApiRefusal` (was `ApiError`); the section renders its sentence unchanged |
@@ -11541,11 +11541,11 @@ cells rot within days.
 | [`backend/app/services/provider_gateway/google.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaygooglepy) | 4 / 4 / 107 (was `3 / 3 / 106`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_google`. honoured by construction |
 | [`frontend/src/setupTests.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcsetupteststs) | 3 / 2 / 12 (was `2 / 1 / 8`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 282 planning (not exempt by the gate's regexes). **282-02**: ONE global `afterEach(resetAskDrafts)` (D-24). ⛔ resets + matchers only |
 | [`frontend/src/stores/askDraftStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresaskdraftstorets) | 1 / 1 / 128 (was `0 / 0 / 0`) | no (young) | young (created 282-02). The ONE ask_user draft home keyed by tool_call_id + settled marker + panel-home refcount, GC on the ask slice (D-12). ⛔ never inside streamsStore.ts |
-| [`frontend/src/components/metadata/DocumentChunksSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentchunkssectiontsx) | 1 / 1 / 147 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-03** (FIX-08): ONE bounded `role="region"` wrapper (`max-h-96`) around the chunk list. ⛔ no overscroll |
-| [`frontend/src/components/settings/settingsTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssettingstabsts) | 0 / 0 / 0 | no (young) | young (created 283-01). Row added AT CREATION. The ONE home of Settings tab id / audience / order / fallback; labels stay literal JSX |
-| [`frontend/src/components/settings/AuditLogSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsauditlogsectiontsx) | 0 / 0 / 0 | no (young) | young (created 283-01). Row added AT CREATION. The Audit Log tab body, moved verbatim out of `SettingsPage.tsx`; imports the `@/lib/api` barrel |
-| [`frontend/src/components/settings/PreferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingspreferencessectiontsx) | 0 / 0 / 0 | no (young) | young (created 283-02). Row added AT CREATION. Preferences tab body: technical-names toggle + default model, moved verbatim from tab "0" |
-| [`frontend/src/landing/facts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclandingfactsts) | 4 / 1 / 546 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-02**: `SURFACE_TABS.settings` gains "Preferences" in extracted strip order |
+| [`frontend/src/components/metadata/DocumentChunksSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentchunkssectiontsx) | 2 / 2 / 161 (was `1 / 1 / 147`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-03** (FIX-08): ONE bounded `role="region"` wrapper (`max-h-96`) around the chunk list. ⛔ no overscroll |
+| [`frontend/src/components/settings/settingsTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssettingstabsts) | 2 / 1 / 123 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-01; 283-02 added Preferences "6" + the first-visible fallback). ONE home of tab id / audience / order / fallback; labels stay literal JSX |
+| [`frontend/src/components/settings/AuditLogSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsauditlogsectiontsx) | 1 / 1 / 221 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-01). Row added AT CREATION. The Audit Log tab body, moved verbatim out of `SettingsPage.tsx`; imports the `@/lib/api` barrel |
+| [`frontend/src/components/settings/PreferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingspreferencessectiontsx) | 1 / 1 / 39 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-02). Preferences tab ("6") body: technical-names toggle + default model, moved verbatim from tab "0". ⛔ calls no gated endpoint |
+| [`frontend/src/landing/facts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclandingfactsts) | 5 / 2 / 546 (was `4 / 1 / 546`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-02**: `SURFACE_TABS.settings` gains "Preferences" in extracted strip order (6 tabs) |
 
 
 
@@ -21105,4 +21105,74 @@ What it owns. The member-visible Preferences tab body (`"6"`, D-02): the "Show t
 **`4 / 1 / 546`** at Phase 283 planning (phase bucket 226). ⚠ **Absent from the scan list for its entire life.**
 
 What it owns. The landing page's derived product facts, checked against the code by `scripts/check-landing-drift.cjs`. **283-02**: `SURFACE_TABS.settings` gains `"Preferences"` after `"Integrations"`, because the drift check compares it with the `<TabsTrigger>` labels extracted from `SettingsPage.tsx` in SOURCE order; `facts.test.ts` length 5 → 6 in the same commit.
+
+## Phase 283 close (2026-10-15, 283-02)
+
+All triples below were re-derived on the merged tree at `aec0d23e1` (283-01 and 283-03 merged; 283-02 Tasks 1-3 committed) with the CLAUDE.md recipe; no six-digit quick-task bucket appears in any of them (`SettingsPage.tsx` carries the bare two-digit buckets `31`, `34`, `48`, counted as the recipe counts them, which is the convention its earlier triples used). The set is every non-test source file the phase changed since PHASE_BASE `9a0b78622` (`git diff --name-only 9a0b78622 HEAD -- frontend/src backend/app`, tests excluded): 7 files, and **no backend source file** (D-09). Each section quotes the scan-list cell it replaced and, where the file has one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. No file newly FIRES: only `SettingsPage.tsx` and `nav-items.ts` are at or above three phases, and both already have FIRING rows.
+
+### `frontend/src/pages/SettingsPage.tsx` — Phase 283 close
+
+**`53 / 27 / 1658` (was `47 / 24 / 1773` in the scan list and `47 / 24 / 1814` in CLAUDE.md).** ⚠ **STALE for a FOURTH close running**: the planning measurement was already `51 / 26 / 1849` against those cells. **283-01** (`6ed90fddd`, `984045570`) took the **tab-registration seam** this ledger recorded as OWED: every tab's id, audience, strip order and fallback now live once in `components/settings/settingsTabs.ts`, and the Audit Log body moved verbatim to `AuditLogSection.tsx` (1849 → 1645). **283-02** (`af13d877b`) added the literal Preferences `"6"` trigger and panel, moved the technical-names row and `<ModelDefaultPreference />` out of tab `"0"` into `PreferencesSection.tsx`, stopped rendering the three operator `TabsContent` blocks for a member (D-07), and rendered Reset only for `canManageModels` (D-06).
+
+⛔ **NOT "G-5 discharged" (D-15).** The per-tab state, `hydrate`, payload and save handlers are all still in this file; that deeper split remains **OWED** and is the seam the next phase on this file should take first.
+
+Scan-list disposition cell before 283-02 (replaced):
+
+> ⚠ STALE for the THIRD close running at `44 / 23 / 1738`. ⭐ SHRANK — 242 moved the payload helpers out; the tab-registration seam stays OWED
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 283-02):
+
+> ⚠ row STALE · honoured by construction (mig 180) · tab seam still OWED
+
+### `frontend/src/lib/nav-items.ts` — Phase 283 close
+
+**`13 / 9 / 173` (was `12 / 8 / 153`).** **283-02** (`aec0d23e1`): the Settings entry's `feature: "model_management"` is removed, so the property is ABSENT and `visibleNavItems` keeps the door for a member (FIX-01, D-01). The Phase 148 note above it is replaced by a dated "UNGOVERNED SINCE 2026-10-15" note naming where the gating went (per tab in `settingsTabs.ts`, per route at `api/settings.py:578, 587, 1004, 1033`; `/settings/providers` the carve-out) and that `model_management`'s audience is not widened. The Connections note's "WRONG fix" paragraph is KEPT and marked SUPERSEDED, with its stale `api/settings.py:331,341` citation re-measured. `visibleNavItems` is unchanged (still fail-open for an unknown key).
+
+Scan-list disposition cell before 283-02 (replaced):
+
+> ⚠ STALE (`9/6/118`). **271-02**: the Classification entry REMOVED (7 entries); `Wand2` moved to the Filing rules link. 271-05 G4-3: the rail has none
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 283-02):
+
+> ⚠ STALE · last touch 271-02 / 271-05
+
+### `frontend/src/components/settings/settingsTabs.ts` — Phase 283 close
+
+**`2 / 1 / 123` (was `0 / 0 / 0`).** Created by **283-01** reproducing the page's rule exactly; **283-02** (`af13d877b`) added Preferences `"6"` (`everyone`) between Integrations and Memory and switched the fallback to the caller's FIRST VISIBLE tab (operator `"0"`, member `"6"`), redirecting every id the caller cannot see, unknown ids included (D-05). `settingsTabs.test.ts` was rewritten in place to the new rule (11 cases, unchanged count).
+
+Scan-list disposition cell before 283-02 (replaced):
+
+> young (created 283-01). Row added AT CREATION. The ONE home of Settings tab id / audience / order / fallback; labels stay literal JSX
+
+### `frontend/src/components/settings/AuditLogSection.tsx` — Phase 283 close
+
+**`1 / 1 / 221` (was `0 / 0 / 0`).** Created by **283-01** (`984045570`), a verbatim move of the Audit Log tab body (one diff: `export`). Not touched by 283-02.
+
+Scan-list disposition cell before 283-02 (replaced):
+
+> young (created 283-01). Row added AT CREATION. The Audit Log tab body, moved verbatim out of `SettingsPage.tsx`; imports the `@/lib/api` barrel
+
+### `frontend/src/components/settings/PreferencesSection.tsx` — Phase 283 close
+
+**`1 / 1 / 39` (was `0 / 0 / 0`).** Created by **283-02** (`af13d877b`): the technical-names row markup and `<ModelDefaultPreference />`, moved out of tab `"0"`; it calls `useTechnicalNames()` itself. Fenced by `SettingsPage.member283.test.tsx` (zero gated calls for a member across every tab click, with the operator `getSettings` positive control).
+
+Scan-list disposition cell before 283-02 (replaced):
+
+> young (created 283-02). Row added AT CREATION. Preferences tab body: technical-names toggle + default model, moved verbatim from tab "0"
+
+### `frontend/src/landing/facts.ts` — Phase 283 close
+
+**`5 / 2 / 546` (was `4 / 1 / 546`).** **283-02** (`af13d877b`): `SURFACE_TABS.settings` reads `["AI Model", "Search & Retrieval", "Integrations", "Preferences", "Memory", "Audit Log"]`, in the same commit as the trigger; `check-landing-drift.cjs` exits 0.
+
+Scan-list disposition cell before 283-02 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-02**: `SURFACE_TABS.settings` gains "Preferences" in extracted strip order
+
+### `frontend/src/components/metadata/DocumentChunksSection.tsx` — Phase 283 close
+
+**`2 / 2 / 161` (was `1 / 1 / 147`).** **283-03** (`d88ae029c`): the ready arm's list wrapped in ONE bounded, labelled, focusable `role="region"` (`max-h-96 overflow-y-auto`); no overscroll containment, one Tab stop, count stays in the section header. The verdict cell is unchanged apart from the triple.
+
+Scan-list disposition cell before 283-02 (replaced; the text is kept, only the triple moved):
+
+> ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-03** (FIX-08): ONE bounded `role="region"` wrapper (`max-h-96`) around the chunk list. ⛔ no overscroll
 

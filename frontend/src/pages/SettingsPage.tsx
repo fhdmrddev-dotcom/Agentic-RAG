@@ -26,6 +26,7 @@ import { Check, Eye, EyeOff, Save, RotateCcw, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MemorySection } from "@/components/settings/MemorySection"
 import { AuditLogSection } from "@/components/settings/AuditLogSection"
+import { PreferencesSection } from "@/components/settings/PreferencesSection"
 import {
   isSettingsTabVisible,
   resolveSettingsTab,
@@ -46,20 +47,20 @@ import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
 import { SourceFileCeilingCard } from "@/components/settings/SourceFileCeilingCard"
 import { SOURCE_CEILING_RECOMMENDED_MB } from "@/components/settings/sourceCeilingCopy"
 import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
-// Phase 167 (VIS-02 / D-167-04 / SEED-116) — the per-user default-model picker. Lives
-// in the personal-preferences home (this Settings surface, NOT the operator Control Room):
-// the user picks a default WITHIN the operator/org-allowed set; the always-on 🔒 footer
-// surfaces the operator lock. Self-fetching (getModelDefault), so it needs no page state.
-import { ModelDefaultPreference } from "@/components/settings/ModelDefaultPreference"
+// ⚠ MOVED 2026-10-15 (Phase 283, FIX-01 / D-02): the per-user default-model picker
+// (`ModelDefaultPreference`, Phase 167) and the "Show technical names" toggle
+// (`TechnicalNamesToggle` + `useTechnicalNames`, Phase 154) are no longer imported here.
+// Both now render from `components/settings/PreferencesSection.tsx` under the member-visible
+// Preferences tab ("6"). Phase 154's stated reason for hosting the toggle in tab "0" —
+// *"so every user can reach it (SC#3)"* — is SUPERSEDED: it was false from the day Phase 148
+// gated tab "0" on `model_management`, after which only operators could reach either control.
 // ⚠ Phase 190-16's Connections tab and its two imports left this file on 2026-09-01 —
 // see `pages/ConnectionsPage.tsx`. D-25's ruling is UNCHANGED and travelled with it:
 // connections belong to the user (an org admin), not to the Control Room, which is why
 // the new page is ungoverned. What changed is only which door opens it.
-// Phase 154 (LANG-01) — the app-wide plain-language reveal spine (Wave 1). The
-// Settings page HOSTS the "Show technical names" toggle (D-01/SC#3) wired to the
-// shared context, and routes bounded user-facing labels through the term-map (D-04).
-import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
-import { useTechnicalNames } from "@/providers/TechnicalNamesProvider"
+// Phase 154 (LANG-01) — the app-wide plain-language reveal spine (Wave 1). This page
+// routes bounded user-facing labels through the term-map (D-04); the toggle itself
+// moved to PreferencesSection in Phase 283 (see the note above).
 import { usePlainLabel } from "@/lib/termMap"
 
 // Phase 242 — the payload helpers moved to `./settingsSearchPayload` (react-refresh:
@@ -383,13 +384,23 @@ function ProviderCard({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 /**
- * ⚠ THREE OF THIS PAGE'S FIVE TABS ARE OPERATOR-ONLY AT THE API, AND THE PAGE MUST SAY SO
- * BY ABSENCE. `GET /settings`, `PUT /settings` and the re-embed routes all carry
- * `require_visible("model_management")` (`api/settings.py:331,341,560,589`), which
- * `api/features.py:21` classifies Operators-only. Rendering AI Model, Search or
- * Integrations to a member offers a control whose every call is a 403 — the
- * locked/badged placeholder Phase 148 (sketch 069-A) explicitly rejected in favour of the
- * VANISH. Memory and Audit Log fetch through their own endpoints and stay.
+ * ⚠ THREE OF THIS PAGE'S SIX TABS ARE OPERATOR-ONLY AT THE API, AND THE PAGE MUST SAY SO
+ * BY ABSENCE. `GET /settings`, `PUT /settings`, `GET /settings/reembed-progress` and
+ * `POST /settings/reembed` all carry `require_visible("model_management")`
+ * (`api/settings.py:578, 587, 1004, 1033` — measured 2026-10-15, Phase 283; the earlier
+ * citation `api/settings.py:331,341,560,589` is STALE and kept here only so it can be
+ * recognised), which `api/features.py:21` classifies Operators-only. `GET /settings/providers`
+ * (`:1067`) is the one ungated route — the Phase 148 Run carve-out for the chat model picker.
+ * Rendering AI Model, Search or Integrations to a member offers a control whose every call
+ * is a 403 — the locked/badged placeholder Phase 148 (sketch 069-A) explicitly rejected in
+ * favour of the VANISH. Preferences, Memory and Audit Log fetch through owner-scoped,
+ * ungated endpoints (`/me/preferences`, the memory routes, `/audit-logs`) and stay.
+ *
+ * ⚠ PHASE 283 (FIX-01, D-07): the three operator `TabsContent` blocks are not RENDERED for a
+ * member at all — not merely unmounted by Radix — so `JudgeModelPicker`, `ReembedStatusCard`
+ * and `EngineHealthCard` (each a gated caller) structurally cannot mount for one. Fenced by
+ * `__tests__/SettingsPage.member283.test.tsx`; refused at the API regardless, fenced by
+ * `backend/tests/unit/test_283_settings_two_role_fence.py`.
  *
  * ⚠ THE MAP FAILS TO `{}`, WHICH IS WHY THE TEST IS `=== true` AND NOT A TRUTHINESS CHECK:
  * a blip must hide a governed tab, never flash one. Same rule `visibleNavItems` follows.
@@ -409,13 +420,13 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Phase 154 (LANG-01 / D-01, D-03, D-04) — host the app-wide "Show technical
-  // names" reveal here so EVERY user can flip it (SC#3). It reads/writes the SAME
-  // shared context the admin Control Room consumes (D-01a), so the two toggles can
-  // never disagree. `retrievalTabLabel` / `embeddingLabel` are bounded, DISPLAY-only
-  // relabels routed through the single-source term-map (D-02a) — plain by default,
-  // today's technical wording under the reveal. Deep expert-config knobs stay as-is.
-  const { showTechnical, toggle: toggleTechnical } = useTechnicalNames()
+  // Phase 154 (LANG-01 / D-01, D-03, D-04) — the app-wide "Show technical names" reveal
+  // was hosted here "so EVERY user can flip it (SC#3)". ⚠ SUPERSEDED 2026-10-15 (Phase 283,
+  // D-02): it lived in the operator-only AI Model tab, so only operators could; it now
+  // renders from `PreferencesSection` (tab "6"), still on the SAME shared context the admin
+  // Control Room consumes (D-01a). `retrievalTabLabel` / `embeddingLabel` are bounded,
+  // DISPLAY-only relabels routed through the single-source term-map (D-02a) — plain by
+  // default, today's technical wording under the reveal. Deep expert-config knobs stay as-is.
   const retrievalTabLabel = usePlainLabel("settings.tab.retrieval")
   const embeddingLabel = usePlainLabel("settings.embedding")
 
@@ -447,6 +458,9 @@ export function SettingsPage() {
   //
   // Phase 283-01 (D-14): the rule now lives in `components/settings/settingsTabs.ts` — the one
   // home of every tab's id, audience, strip order and fallback; this page only asks it.
+  // Phase 283-02 (D-05): the landing is no longer Memory for everyone — any tab the caller
+  // cannot see (governed, retired "5", or unknown) resolves to their FIRST VISIBLE tab:
+  // AI Model for an operator, Preferences for a member.
   const effectiveTab = resolveSettingsTab(activeTab, canManageModels)
 
   function handleTabChange(value: string) {
@@ -905,10 +919,14 @@ export function SettingsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5">
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset
-            </Button>
+            {/* Phase 283 (D-06): Reset re-hydrates the operator tabs from `GET /settings`,
+                which a member never fetches — for them it was a dead button. */}
+            {canManageModels && (
+              <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5">
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
+              </Button>
+            )}
           </div>
         </div>
 
@@ -959,36 +977,18 @@ export function SettingsPage() {
                 reused: a persisted `settings_active_tab` of "5" now falls through to the
                 guard below rather than selecting a tab that no longer exists.
                 Phase 190-16's note on never renumbering still governs 0-4. */}
+            {/* Phase 283 (FIX-01 / D-02, D-03, D-04): Preferences is "6" — never the retired "5". */}
+            {isSettingsTabVisible("6", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="6">Preferences</TabsTrigger>}
             {isSettingsTabVisible("3", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="3">Memory</TabsTrigger>}
             {isSettingsTabVisible("4", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="4">Audit Log</TabsTrigger>}
           </TabsList>
 
-          {/* Tab 0: AI Model */}
+          {/* Tab 0: AI Model — operator-only, and NOT RENDERED for a member (Phase 283, D-07).
+              The "Show technical names" row and the default chat model that opened this tab
+              moved to Preferences (tab "6") in Phase 283 (D-02). */}
+          {isSettingsTabVisible("0", canManageModels) && (
           <TabsContent value="0">
             <div className="bg-card/50 ghost-border rounded-xl p-6 space-y-6">
-              {/* Phase 154 (LANG-01 / D-01, D-03) — the app-wide "Show technical
-                  names" reveal HOST. The toggle is tab-agnostic (it flips the whole
-                  app off the shared context) but lives here, near the top of the AI
-                  Model tab, so every user can reach it (SC#3). Flipping it moves the
-                  SAME value the admin Control Room reads (D-01a) — one switch. */}
-              <div className="flex items-center justify-between gap-4 rounded-lg ghost-border bg-muted/20 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">Show technical names</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Reveal the raw field, model, and status names alongside the plain labels — everywhere in the app.
-                  </p>
-                </div>
-                <TechnicalNamesToggle enabled={showTechnical} onToggle={toggleTechnical} />
-              </div>
-
-              {/* Phase 167 (VIS-02 / D-167-04 / SEED-116) — the per-user default chat
-                  model. A PERSONAL preference (this Settings home, not the operator
-                  Control Room): the user picks WITHIN the operator/org-allowed set, and
-                  the always-on 🔒 footer surfaces the operator lock. Self-contained
-                  (self-fetches + self-persists via /me/preferences), outside the AI Model
-                  save cycle — mirrors the EngineHealthCard/JudgeModelPicker infra cards. */}
-              <ModelDefaultPreference />
-
               {/* LLM Providers SectionCard */}
               <SectionCard
                 title="LLM Providers"
@@ -1274,8 +1274,10 @@ export function SettingsPage() {
               />
             </div>
           </TabsContent>
+          )}
 
-          {/* Tab 1: Search & Retrieval */}
+          {/* Tab 1: Search & Retrieval — operator-only, not rendered for a member (Phase 283, D-07) */}
+          {isSettingsTabVisible("1", canManageModels) && (
           <TabsContent value="1">
             <div className="bg-card/50 ghost-border rounded-xl p-6 space-y-6">
               {/* Phase 111.1 — Embeddings & Extraction (sketches 024/026).
@@ -1528,8 +1530,10 @@ export function SettingsPage() {
               </div>
             </div>
           </TabsContent>
+          )}
 
-          {/* Tab 2: Integrations */}
+          {/* Tab 2: Integrations — operator-only, not rendered for a member (Phase 283, D-07) */}
+          {isSettingsTabVisible("2", canManageModels) && (
           <TabsContent value="2">
             <div className="bg-card/50 ghost-border rounded-xl p-6 space-y-6">
               {/* Web Search SectionCard */}
@@ -1609,6 +1613,15 @@ export function SettingsPage() {
                   {savedIntegrations ? "Saved!" : savingIntegrations ? "Saving\u2026" : "Save Integrations"}
                 </Button>
               </div>
+            </div>
+          </TabsContent>
+          )}
+
+          {/* Tab 6: Preferences — every caller (Phase 283, FIX-01 / D-02). The member's own
+              "Show technical names" and default chat model; calls no gated endpoint (D-07). */}
+          <TabsContent value="6">
+            <div className="bg-card/50 ghost-border rounded-xl p-6 space-y-6">
+              <PreferencesSection />
             </div>
           </TabsContent>
 

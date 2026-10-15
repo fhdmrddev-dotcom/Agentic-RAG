@@ -19,7 +19,7 @@ Syrel writes an audit record as things happen. Records are insert-only for users
 
 The **Audit Log** tab in Settings lists your own actions: document uploads and deletes, searches (with the query and the documents it returned), code runs, skills loaded, chats created and deleted, settings changes, and more. Filter by date range (all, 7, 30 or 90 days) and by action type, and export the filtered view as CSV.
 
-> **Note:** Settings appears in the rail for people with model management, which is platform operators by default. If you do not see Settings, ask your administrator.
+> **Note:** Settings is in everyone's rail, and Audit Log is one of your own tabs there, next to Preferences and Memory.
 
 ## Your organisation's activity
 

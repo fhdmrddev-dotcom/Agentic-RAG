@@ -495,7 +495,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent its ENTIRE LIFE · THIRD wire-type drift (239) |
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row STALE · honoured by construction (BUG-260912-01) |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | seam named (239-05), RODE it (239-07) · ⛔ |
-| `frontend/src/pages/SettingsPage.tsx` | 47 / 24 / 1814 | ⚠ row STALE · honoured by construction (mig 180) · tab seam still OWED |
+| `frontend/src/pages/SettingsPage.tsx` | 53 / 27 / 1658 (was `47 / 24 / 1814`) | tab seam TAKEN (283-01); per-tab state split OWED (D-15) · ⛔ |
 | `frontend/src/pages/settingsSearchPayload.ts` | 2 / 2 / 116 | young (created 242) |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 5 / 4 / 151 | ⚠ FIRES · honoured by construction (249-02) · ⛔ |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 16 / 6 / 990 | honoured by construction (206.2) |
@@ -545,7 +545,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/App.tsx` | 36 / 27 / 418 (was `35 / 26 / 412`) | last touch 276-06 |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06) · ⛔ |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 4 / 3 / 249 (was `2 / 1 / 204`) | now FIRES (3 phases) · last touch 271-02 / 271-05 |
-| `frontend/src/lib/nav-items.ts` | 12 / 8 / 153 (was `10 / 7 / 141`) | ⚠ STALE · last touch 271-02 / 271-05 |
+| `frontend/src/lib/nav-items.ts` | 13 / 9 / 173 (was `12 / 8 / 153`) | last touch 283-02: Settings door ungoverned (FIX-01) |
 | `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold |
 | `frontend/src/components/classification/RuleBuilderPanel.tsx` | 6 / 5 / 501 (was `4 / 3 / 502`) | ⚠ STALE · last touch 271-02 · ⛔ |
 | `backend/app/api/workspace.py` | 16 / 8 / 848 (was `13 / 7 / 757`) | ⚠ STALE · last touch 274-01 · ⛔ |
