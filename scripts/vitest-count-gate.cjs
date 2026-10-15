@@ -4213,6 +4213,8 @@ const BASELINE = {
   // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
   // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
   "OrgAdminShell.test.tsx": 12, // RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
+  // Phase 282-02 — the one ask-draft home (FIX-07 / D-12): one draft per ask, GC on the ask slice, panel-home refcount, the global reset
+  "askDraftStore.test.ts": 7,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6146,6 +6148,8 @@ const TARGETS = [
   // Phase 275-04 — the org shell's suite goes by FILE path (no `src/components/org` entry): it
   // carries the deliberately retired locked-Retention fence and its replacement.
   "src/components/org/OrgAdminShell.test.tsx",
+  // Phase 282-02 — the ask-draft store's suite goes by FILE path (no `src/stores` entry).
+  "src/stores/__tests__/askDraftStore.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
