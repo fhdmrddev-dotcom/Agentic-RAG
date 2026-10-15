@@ -17,7 +17,7 @@
  *   registers of one fact; this fence is what stops them drifting apart.
  */
 import { describe, expect, it } from "vitest"
-// @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+// Vite `?raw` import (the `SearchDocumentsBody.test.ts` idiom) — the page's SOURCE text.
 import settingsPageSrc from "@/pages/SettingsPage.tsx?raw"
 import { stripComments } from "@/lib/stripComments.testutil"
 import {
