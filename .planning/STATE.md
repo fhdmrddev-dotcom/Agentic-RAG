@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: planning
-last_updated: "2026-10-15T19:07:09.944Z"
-last_activity: "2026-10-15 -- Phase 281 closed. Owed by operator decision: G-4 rows A, C, D (run A first; D needs a new archived_at write approval). WR-02 kept by design. Post-fix gates: backend 71 failed (same set), vitest OK 10269/0. BUG-261015-01 open. Not pushed."
+status: executing
+last_updated: "2026-10-15T19:51:21.591Z"
+last_activity: 2026-10-15 -- Phase 283 planning complete
 progress:
   total_phases: 15
   completed_phases: 6
-  total_plans: 22
+  total_plans: 25
   completed_plans: 22
   percent: 40
 ---
@@ -78,8 +78,8 @@ Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: 282 (the-slow-run-and-the-paused-run) — planned 3/3, executing
 Next: `/gsd:discuss-phase 282` (G-2 sketch first for FIX-07). Deploy of 277-281 + BUG-261014-06 stays operator-gated.
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-10-15 -- Phase 281 closed. Owed by operator decision: G-4 rows A, C, D (run A first; D needs a new archived_at write approval). WR-02 kept by design. Post-fix gates: backend 71 failed (same set), vitest OK 10269/0. BUG-261015-01 open. Not pushed.
+Status: Ready to execute
+Last activity: 2026-10-15 -- Phase 283 planning complete
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
 
 **279-03 (2026-10-13):** "Won't use" → "Won't search" (29 hits / 13 files measured, not 30), swap-card

@@ -11541,6 +11541,11 @@ cells rot within days.
 | [`backend/app/services/provider_gateway/google.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaygooglepy) | 4 / 4 / 107 (was `3 / 3 / 106`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_google`. honoured by construction |
 | [`frontend/src/setupTests.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcsetupteststs) | 3 / 2 / 12 (was `2 / 1 / 8`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 282 planning (not exempt by the gate's regexes). **282-02**: ONE global `afterEach(resetAskDrafts)` (D-24). ⛔ resets + matchers only |
 | [`frontend/src/stores/askDraftStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresaskdraftstorets) | 1 / 1 / 128 (was `0 / 0 / 0`) | no (young) | young (created 282-02). The ONE ask_user draft home keyed by tool_call_id + settled marker + panel-home refcount, GC on the ask slice (D-12). ⛔ never inside streamsStore.ts |
+| [`frontend/src/components/metadata/DocumentChunksSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentchunkssectiontsx) | 1 / 1 / 147 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-03** (FIX-08): ONE bounded `role="region"` wrapper (`max-h-96`) around the chunk list. ⛔ no overscroll |
+| [`frontend/src/components/settings/settingsTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssettingstabsts) | 0 / 0 / 0 | no (young) | young (created 283-01). Row added AT CREATION. The ONE home of Settings tab id / audience / order / fallback; labels stay literal JSX |
+| [`frontend/src/components/settings/AuditLogSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsauditlogsectiontsx) | 0 / 0 / 0 | no (young) | young (created 283-01). Row added AT CREATION. The Audit Log tab body, moved verbatim out of `SettingsPage.tsx`; imports the `@/lib/api` barrel |
+| [`frontend/src/components/settings/PreferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingspreferencessectiontsx) | 0 / 0 / 0 | no (young) | young (created 283-02). Row added AT CREATION. Preferences tab body: technical-names toggle + default model, moved verbatim from tab "0" |
+| [`frontend/src/landing/facts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclandingfactsts) | 4 / 1 / 546 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-02**: `SURFACE_TABS.settings` gains "Preferences" in extracted strip order |
 
 
 
@@ -21049,3 +21054,55 @@ Scan-list disposition cell before 282-04 (replaced):
 CLAUDE.md verdict cell before 282-04 (replaced):
 
 > last touch 275-02/04
+
+## Phase 283 planning (2026-10-15)
+
+Rows added in the 283 planning commit, before execution, following the 281 and 282 planning precedent (the `hot-file-ledger-guard.js` hook fires at PLAN-write time on a `files_modified` source file with no row). Triples re-derived with the CLAUDE.md recipe at `3547e181b`; no six-digit quick-task bucket appears. Wave 1 (283-01 and 283-03) edits NEITHER this file NOR CLAUDE.md, so the two parallel worktrees share no file; the post-edit triples, the stale `SettingsPage.tsx` row and the CLAUDE.md FIRING cells are re-derived once, on the merged tree, by 283-02 Task 3 (single owner).
+
+## `frontend/src/components/metadata/DocumentChunksSection.tsx`
+
+**`1 / 1 / 147`** at Phase 283 planning (phase bucket 217). ⚠ **Absent from the scan list for its entire life.** Created by `217-10` as a child section of `DocumentDetailPanel.tsx` (FIRES), which is exactly why it was never listed: the parent had the row, the child did the rendering.
+
+What it owns. The lazy, read-only Chunks section of the document detail panel: four honest arms (loading / error / empty / ready) and the per-chunk embedding model. **283-03 (FIX-08, `BUG-260908-01`, D-16..D-20)**: the ready arm's `<ul>` is wrapped in ONE `div` with `role="region"`, `tabIndex={0}`, `aria-label` "Chunk list, {n} chunks" and `max-h-96 overflow-y-auto`, so every section below Chunks sits at a fixed offset at any chunk count.
+
+⛔ Binding invariants:
+- **No `overscroll-*` class** (D-17): wheel scroll at the list end must chain to the panel's scroll container (`DocumentDetailPanel.tsx`).
+- **One Tab stop, on the region.** Never a `tabIndex` on the per-chunk `max-h-32` bodies (1,000 Tab stops is a focus trap in all but name).
+- **The count lives only in the `PanelSection` header** (D-18); no counter inside the list.
+- **Lazy by construction** (D-217-04): the fetch stays in the component that only mounts when the accordion opens.
+- Above 1,000 chunks the header count is the PostgREST cap, not the document (`documents.py` has no `.range()`); that is Phase 284, not this file.
+
+## `frontend/src/components/settings/settingsTabs.ts`
+
+**`0 / 0 / 0`** — created by Phase 283 (`283-01`). **Row added AT CREATION**, in the planning commit (the `settingsSearchPayload.ts` precedent).
+
+What it owns. The Settings tab REGISTRATION seam owed by `SettingsPage.tsx` (D-14): each tab declared once with its id, audience (`everyone` | `model_management`) and strip order, plus pure `visibleSettingsTabs`, `isSettingsTabVisible` and `resolveSettingsTab`. 283-01 reproduces today's behaviour exactly (retired `"5"` and governed-for-a-member resolve to `"3"`; unknown ids pass through); 283-02 adds Preferences `"6"` and switches the fallback to the caller's first visible tab (D-05).
+
+⛔ Binding invariants:
+- **Labels are NOT rendered from here.** The `<TabsTrigger>` labels stay literal JSX in `SettingsPage.tsx`, because `scripts/lib/docs-content.cjs` and `scripts/check-landing-drift.cjs` regex-scrape them (floor 3). A `{tabs.map(...)}` strip harness-errors the docs-coverage gate.
+- **The registry takes `canManageModels`; it never reads the features map.** The fail-closed `=== true` decision stays in ONE place, the page (contrast `visibleNavItems`, fail-open by design).
+- **`"5"` is retired and never reused** (D-03).
+- A `.ts` module, never exports from the page (`react-refresh/only-export-components`).
+
+## `frontend/src/components/settings/AuditLogSection.tsx`
+
+**`0 / 0 / 0`** — created by Phase 283 (`283-01`). **Row added AT CREATION**, in the planning commit.
+
+What it owns. The Audit Log tab body (paged list, filters, CSV export), moved verbatim out of `SettingsPage.tsx` by 283-01 (D-14). Owner-scoped at the API (`GET /audit-logs` filters on the caller's `user_id`); no feature gate.
+
+⛔ Binding: imports `getAuditLogs` / `exportAuditLogs` / `AuditEntry` from the `@/lib/api` BARREL, never `@/lib/api/settings` — every SettingsPage suite mocks the barrel, and a submodule import silently escapes the mock.
+
+## `frontend/src/components/settings/PreferencesSection.tsx`
+
+**`0 / 0 / 0`** — created by Phase 283 (`283-02`). **Row added AT CREATION**, in the planning commit.
+
+What it owns. The member-visible Preferences tab body (`"6"`, D-02): the "Show technical names" row and `<ModelDefaultPreference />`, moved byte-identical out of the operator AI Model tab. It calls `useTechnicalNames()` itself, so `SettingsPage.tsx` drops that hook and three imports.
+
+⛔ Binding: it must call no `model_management`-gated endpoint (D-07). `ModelDefaultPreference` reads and writes `/me/preferences` (ungated, RLS-scoped); the toggle is `localStorage`. No section heading (UI-SPEC: the tab label is the heading).
+
+## `frontend/src/landing/facts.ts`
+
+**`4 / 1 / 546`** at Phase 283 planning (phase bucket 226). ⚠ **Absent from the scan list for its entire life.**
+
+What it owns. The landing page's derived product facts, checked against the code by `scripts/check-landing-drift.cjs`. **283-02**: `SURFACE_TABS.settings` gains `"Preferences"` after `"Integrations"`, because the drift check compares it with the `<TabsTrigger>` labels extracted from `SettingsPage.tsx` in SOURCE order; `facts.test.ts` length 5 → 6 in the same commit.
+

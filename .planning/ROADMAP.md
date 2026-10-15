@@ -324,7 +324,17 @@ Plans:
   4. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. a member's first visit, an operator's view unchanged, a 1,000-chunk document), and Chrome MCP drives each one as the real role (FIX-01, FIX-08).
 
 **How we'd know this failed**: the fix widens `model_management` (the documented workaround) so members also see model management; a member sees an operator tab that 403s on first click; the Settings door appears but the page renders empty for a member; the client hides a tab whose API still accepts a member's write; Chunks gets a "Show first 20 / Show all" button (which the report rules out as a fix); the bounded list traps keyboard focus or wheel scroll; a filter box for finding a chunk arrives (a capability, out of scope).
-**Plans**: TBD (target 3-4: `SettingsPage.tsx` tab seam (behaviour-preserving) · per-tab + API gating with two-role fence · bounded Chunks section · G-4 drive + close)
+**Plans**: 3 plans in 2 waves (D-23 / G-8; 01 and 03 share no files and run in parallel worktrees; the G-4 drive, the D-13 live two-role check and the close are orchestrator-owned, recorded in `283-LIVE-EVIDENCE.md`)
+
+Plans:
+**Wave 1**
+
+- [ ] 283-01-PLAN.md — wave 1 (TDD, frontend): `settingsTabs.ts` tab-registration seam reproducing today's rule exactly + source-order fence, SettingsPage asks the registry with literal JSX triggers, `AuditLogSection.tsx` extracted; existing SettingsPage suites unedited (FIX-01; D-03, D-14, D-15)
+- [ ] 283-03-PLAN.md — wave 1 (TDD, frontend): the Chunks list bounded at `max-h-96` inside a labelled `role=region` with one Tab stop and no overscroll containment, fences driven RED by plants (FIX-08; D-16..D-20)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 283-02-PLAN.md — wave 2 (TDD, backend fences + frontend): D-10 two-role fence on the real gate + D-11 route inventory (driven RED), Preferences tab `"6"` with the toggle + default model moved verbatim, derived first-visible fallback, Reset and operator panels gated, zero gated calls, Settings rail door un-gated, docs/landing facts in the same commit, phase ledger close on the merged tree (FIX-01; D-01..D-13, D-15, D-21..D-23)
 **Flags**: ⛔ **G-5: `frontend/src/pages/SettingsPage.tsx` FIRES (24 phases) and its tab seam is OWED**. FIX-01 is a per-tab gating change, which is exactly that seam, so wave 1 takes it behaviour-preserving before any gate moves. Also FIRING: `frontend/src/lib/nav-items.ts`, `backend/app/api/settings.py`, `backend/app/dependencies.py` (access-gate module seam named: `app/security/access.py`), `DocumentDetailPanel.tsx`. **security_enforcement**: the change is a permission boundary, so the API gate is the authority and the UI only reflects it. **G-2**: FIX-08's layout is settled by its own report (bound the list using the per-chunk `max-h` pattern already in the file), and FIX-01 reuses the existing rail entry or profile menu. The sketch skip is **recorded as a decision** unless discuss decides a new door is needed, in which case `/gsd:sketch` runs first. The dev account is in two orgs, so prove the active org before every drive. Read the sketch-findings skill for the Settings and document-detail-panel contracts.
 **UI hint**: yes
 
