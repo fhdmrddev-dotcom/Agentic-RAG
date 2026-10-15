@@ -31,8 +31,18 @@
  * Phase 283 (FIX-08, BUG-260908-01, D-16..D-20, 2026-10-15): the list is bounded at max-h-96
  * inside a labelled role=region with tabIndex 0, so a 1,000-chunk document no longer buries
  * the sections below; no overscroll containment, so wheel at the list end chains to the
- * panel; one Tab stop (the bodies stay unfocusable); the count stays in the section header.
+ * panel; ~~one Tab stop (the bodies stay unfocusable)~~; the count stays in the section header.
  * Above 1,000 chunks the header count is the PostgREST cap, which is Phase 284.
+ *
+ * ⚠ CORRECTED 2026-10-16 (283-REVIEW CR-01; the original claim is struck through above, not
+ * deleted). "One Tab stop" was FALSE in the target browsers while each chunk body carried its
+ * own `max-h-32 overflow-auto` cap: Chrome 130+ ("keyboard-focusable scrollers") and Firefox
+ * put an overflowing scroll container with no focusable children into the Tab order, and the
+ * live drive measured 736 of 764 bodies overflowing — up to 736 Tab stops inside the list.
+ * The jsdom fence was green throughout because jsdom has no layout. The per-chunk cap is
+ * REMOVED: each chunk shows its full text, and the region is the only scroll container, so
+ * it is one Tab stop and its whole content stays keyboard-scrollable. (`tabIndex={-1}` on the
+ * bodies was rejected: it would leave overflowing chunk text unreachable by keyboard.)
  */
 import { useCallback, useEffect, useState } from "react"
 import { listDocumentChunks } from "@/lib/api"
@@ -150,8 +160,11 @@ function ChunkRowView({ row }: { row: DocumentChunkRow }) {
           </span>
         )}
       </div>
-      {/* ⛔ A React text child — untrusted chunk text escapes here. No innerHTML. */}
-      <p className="max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-[0.7rem] leading-relaxed text-foreground">
+      {/* ⛔ A React text child — untrusted chunk text escapes here. No innerHTML.
+          ⛔ NO height cap and NO overflow utility on this body (283-REVIEW CR-01): the
+          bounded region above is the ONE scroll container. A nested scroller here becomes
+          its own Tab stop in Chrome 130+ and Firefox once its text overflows. */}
+      <p className="whitespace-pre-wrap break-words font-mono text-[0.7rem] leading-relaxed text-foreground">
         {row.content}
       </p>
     </li>

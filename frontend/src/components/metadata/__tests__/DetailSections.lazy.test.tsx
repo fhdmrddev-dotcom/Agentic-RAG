@@ -417,7 +417,15 @@ describe("Chunks section — four honest arms and the per-chunk model", () => {
     expect(stripComments(chunksSource)).not.toMatch(/overscroll/)
   })
 
-  it("⛔ D-17: the region is ONE Tab stop, and the next Tab leaves it (no focus trap)", async () => {
+  it("⛔ D-17: the region is the ONLY scroll container — no nested scroller can become a Tab stop", async () => {
+    // 283-REVIEW CR-01, and found independently by the live drive (283-LIVE-EVIDENCE.md):
+    // Chrome 130+ and Firefox put an overflowing scroll container with no focusable children
+    // into the sequential Tab order ("keyboard-focusable scrollers"). The per-chunk
+    // `max-h-32 overflow-auto` body was exactly that, and 736 of 764 bodies overflowed on the
+    // largest real local document, so Tab from the region walked up to 736 stops before
+    // leaving. The previous version of this case asserted `[tabindex]` count 0 plus a
+    // `user.tab()` walk, which jsdom passes no matter what the browser does: jsdom has no
+    // layout and no scroller focusability. These assertions check the MECHANISM instead.
     const user = userEvent.setup()
     listDocumentChunks.mockResolvedValue(twoChunks())
     render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
@@ -425,7 +433,34 @@ describe("Chunks section — four honest arms and the per-chunk model", () => {
 
     openSection("Chunks")
     const region = await screen.findByRole("region", { name: "Chunk list, 2 chunks" })
-    // The per-chunk max-h-32 bodies are NOT Tab stops — 1,000 of them would be the trap.
+
+    // (a) DOM: nothing INSIDE the region is a scroll container or carries a height cap.
+    // Non-vacuity: the descendants include the two chunk bodies, so the sweep has subjects.
+    const descendants = Array.from(region.querySelectorAll("*"))
+    expect(descendants.some((el) => el.textContent === "first chunk body")).toBe(true)
+    const nestedScrollers = descendants
+      .filter((el) =>
+        (el.getAttribute("class") ?? "")
+          .split(/\s+/)
+          .some((t) => /^(overflow-auto|overflow-y-auto|overflow-scroll|overflow-y-scroll|max-h-)/.test(t)),
+      )
+      .map((el) => `<${el.tagName.toLowerCase()} class="${el.getAttribute("class")}">`)
+    expect(nestedScrollers).toEqual([])
+
+    // (b) SOURCE: ChunkRowView's code (comments stripped) carries no overflow-/max-h- utility.
+    // `truncate` (overflow: hidden) is not user-scrollable and is not matched.
+    const code = stripComments(chunksSource)
+    const rowStart = code.indexOf("function ChunkRowView")
+    const rowEnd = code.indexOf("export default", rowStart)
+    expect(rowStart).toBeGreaterThan(-1)
+    expect(rowEnd).toBeGreaterThan(rowStart)
+    const rowCode = code.slice(rowStart, rowEnd)
+    // Non-vacuity: the slice really holds the chunk body's class list.
+    expect(rowCode).toMatch(/whitespace-pre-wrap/)
+    expect(rowCode.match(/\b(overflow-[a-z-]+|max-h-[\w[\]().-]+)/g) ?? []).toEqual([])
+
+    // Secondary (jsdom-level only — the real-browser Tab walk is the G-4 drive): the region
+    // takes focus and the next Tab leaves it.
     expect(region.querySelectorAll("[tabindex]")).toHaveLength(0)
     region.focus()
     expect(document.activeElement).toBe(region)
