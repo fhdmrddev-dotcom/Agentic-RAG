@@ -30,7 +30,12 @@ findings:
   warning: 2
   info: 6
   total: 9
-status: issues_found
+status: partially_fixed
+fixes:
+  fixed: 7
+  skipped: 2
+  skipped_ids: [IN-04, IN-06]
+  fixed_at: 2026-10-16
 ---
 
 # Phase 283: Code Review Report
@@ -167,6 +172,34 @@ Re-render under a single provider with `rerender` so the component instance is k
 - `PUT /admin/visibility` accepts `"off"` (`admin.py:131`). If `model_management` is set to off, every operator loses the three tabs in the UI while the API keeps serving them.
 - The mismatch is in the safe direction (the UI is stricter) and is not introduced by 283. But Settings is now the place where it shows: the page renders with only Preferences, Memory and Audit Log for operators too.
 **Fix:** No change needed for 283. Either refuse `"off"` for non-kill-switch keys in `PUT /admin/visibility`, or make `feature_visible` honour `"off"` the same way `/features` does. Record the choice as a decision.
+
+## Fixes applied
+
+Applied 2026-10-16 on `develop` from base `e4c543a37`, one commit per finding, scope per the orchestrator's ruling (every Critical and Warning, plus the cheap Info items; IN-04 and IN-06 skipped). Every new or changed test was **driven RED** against a planted regression before it was counted, and each planted file was restored and checked by md5.
+
+| Finding | Result | Commit | What changed |
+|---|---|---|---|
+| CR-01 | fixed | `ba3aacdde` | Removed the per-chunk `max-h-32 overflow-auto` from the chunk body in `DocumentChunksSection.tsx`. Each chunk now shows its full text, and the `max-h-96` region is the only scroll container, so it is one Tab stop and all of its text stays keyboard-scrollable. `tabIndex={-1}` was rejected because it would leave overflowing text unreachable. The header comment's "one Tab stop" claim is struck through and corrected (736 of 764 bodies overflowed in the live drive). The jsdom-vacuous case in `DetailSections.lazy.test.tsx` was replaced with two checks that can fail: (a) a DOM sweep finding no `overflow-auto/-y-auto/-scroll/-y-scroll` or `max-h-*` class inside the region, and (b) a comment-stripped source fence finding no `overflow-*` or `max-h-*` utility in `ChunkRowView`. Both have non-vacuity guards. The region focus and `user.tab()` lines are kept as a secondary jsdom-level check. **RED:** with the old body, (a) failed listing the two `<p class="max-h-32 overflow-auto …">` elements, and (b), driven on its own, failed with `['max-h-32', 'overflow-auto']`. `283-UI-SPEC.md` §4's keyboard line is struck through and annotated. ⚠ The real-browser Tab walk is still owed to G-4: the jsdom fence checks the mechanism, not Chrome's behaviour. |
+| WR-01 | fixed | `191d34098` | `_reset_caches(monkeypatch)` now uses `monkeypatch.setattr` for all eight `user_settings` cache globals, including the `_removed_model_ids_cache` pair the original reset did not touch. pytest restores each binding at teardown. That is enough because the loaders rebind these names through `global` and never mutate them in place. **RED:** a throwaway probe test that ran after the suite read the leaked `sk-test` row with the old file and a clean cache with the new one. The probe was deleted. Both 283 backend suites pass, 14/14. |
+| WR-02 | fixed | `f5239abe7` | Two cases in `SettingsPage.member283.test.tsx` render `{ features: {}, loading: true }`, then `rerender` the same tree with a resolved map. While loading: no tab, no tabpanel, no `getSettings`/`getJudgeModel` call, and nothing written to `settings_active_tab`. After resolving: an operator gets six tabs, lands on AI Model, and `getSettings` runs exactly once; a member gets three tabs, lands on Preferences, and makes zero gated calls. **RED:** with `if (featuresLoading) return` planted out, both cases failed on the empty-strip assertion. |
+| IN-01 | fixed | `9545e3a5f` | The "Land them on Memory" sentence is struck through and annotated with the D-05 rule (first visible tab via `settingsTabFallback`). The "5" rationale is kept. |
+| IN-02 | fixed | `88fcaa9c3` | `handleReset` now compares `effectiveTab === "0"`. New cases (persisted `"5"` and `"9"`, operator) assert that Reset on AI Model fires no `window.confirm`, with a positive control on Preferences where it fires once. **RED:** both cases failed with `activeTab` planted back. |
+| IN-03 | fixed | `326676e94` | `renderAsMember()` in `SettingsPage.test.tsx` now passes `{ model_management: false }`, and its docblock is corrected (append-only). All 24 cases stay green. |
+| IN-04 | skipped | — | Out of scope by the orchestrator's ruling (no retired-id reuse fence added). Still open. |
+| IN-05 | fixed | `e2346e446` | Added an append-only correction under the `visibleNavItems` JSDoc: the filter hides only a known `false` and fails OPEN on unknown or loading; the fail-closed decision lives per tab in `settingsTabs.ts`. |
+| IN-06 | skipped | — | Out of scope by the orchestrator's ruling. This is a pre-existing UI/API disagreement on `audience: "off"`, which the review itself rated "no change needed for 283". It still needs a recorded decision. |
+| (gate) | — | `044485a0f` | Raised the `SettingsPage.member283.test.tsx` count-gate pin from 16 to 20 (+2 WR-02, +2 IN-02). Raised only, never lowered. |
+
+**Gates after the fixes:**
+- **Targeted vitest** (`src/pages src/components/settings src/components/metadata src/lib`): 114 files, 2308 passed, 0 failed.
+- **`npx tsc -p tsconfig.app.json --noEmit`:** 66 errors at base `e4c543a37` (bootstrapped throwaway worktree, torn down with `teardown-worktree.sh`) and 66 at HEAD. The set diff is empty, so there are no new errors.
+- **`lint:a11y`** on the six touched files: 0 errors at both base and HEAD.
+- **`check-hot-file-ledger.cjs`:** OK.
+- **`GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`:** `count gate OK`, 438/438 pinned files present, 0 failing, total 10344.
+
+⚠ **Still owed:**
+- **CONTEXT D-16's wording.** It still says "same pattern as the per-chunk `max-h-32` one level down". It was left untouched because it is a decision record, and this correction lives in the UI-SPEC and the component instead.
+- **The G-4 real-browser Tab walk on the chunk region.** The MCP tab was hidden during the live drive, so no key presses were delivered.
 
 ---
 
