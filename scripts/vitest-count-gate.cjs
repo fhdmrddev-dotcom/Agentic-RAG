@@ -1749,6 +1749,10 @@ const BASELINE = {
   "SettingsPage.changedFields.test.tsx": 17,
   // Phase 283-01 (D-14) — the Settings tab registry suite. Registered in BOTH knobs in one commit.
   "settingsTabs.test.ts": 11,
+  // Phase 283-02 (FIX-01 / D-12) — a member's and an operator's Settings page as rendered content
+  // (tab strips, landing tab, moved blocks, Reset, zero gated calls + the operator positive
+  // control). Registered in BOTH knobs in one commit.
+  "SettingsPage.member283.test.tsx": 16,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
@@ -4891,6 +4895,8 @@ const TARGETS = [
   // BOTH knobs in the SAME commit: a BASELINE key naming a file that does not exist makes the
   // gate exit 2 and halts every agent.
   "src/pages/__tests__/SettingsPage.changedFields.test.tsx",
+  // Phase 283-02 (FIX-01 / D-12) — the member/operator Settings fence. BASELINE pin in the same commit.
+  "src/pages/__tests__/SettingsPage.member283.test.tsx",
   // Phase 283-01 (D-14) — the tab-registration seam's own suite (registry rule + source-order
   // fence tying the literal <TabsTrigger> order to SETTINGS_TABS). BASELINE pin in the same commit.
   "src/components/settings/__tests__/settingsTabs.test.ts",

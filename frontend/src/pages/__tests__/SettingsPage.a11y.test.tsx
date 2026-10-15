@@ -150,7 +150,7 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
 }
 
 beforeEach(() => {
-  localStorage.setItem("settings_active_tab", "0") // AI Model tab — hosts the toggle
+  localStorage.setItem("settings_active_tab", "6") // Preferences tab — hosts the toggle since 283-02
   // Radix selects/dropdowns use pointer-capture APIs jsdom lacks — stub defensively.
   if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
   if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
@@ -217,6 +217,8 @@ describe("SettingsPage a11y — relabeled tabs keep tablist/tab roles + names", 
     // D-04 relabel: "Search & Retrieval" → plain "Search" by default (reveal OFF).
     expect(screen.getByRole("tab", { name: "Search" })).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: "Integrations" })).toBeInTheDocument()
+    // 283-02 (D-03/D-04): Preferences "6" sits between Integrations and Memory.
+    expect(screen.getByRole("tab", { name: "Preferences" })).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: "Memory" })).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: "Audit Log" })).toBeInTheDocument()
   })
