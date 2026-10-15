@@ -134,3 +134,83 @@ async def test_wr01_an_open_still_queued_when_the_guard_fires_never_starts(monke
         await dispatcher._open_off_loop(req)
     await asyncio.sleep(0.5)  # let the shielded work item run to its end
     assert opened == []
+
+
+# ── WR-02 ─────────────────────────────────────────────────────────────────────────────────
+
+
+def _parent_ctx():
+    from app.services.tool_dispatcher import ToolContext
+
+    ctx = MagicMock(spec=ToolContext)
+    ctx.redis = MagicMock()
+    ctx.run_id = "00000000-0000-0000-0000-000000000002"
+    ctx.current_user = {"id": "00000000-0000-0000-0000-000000000003"}
+    ctx.user_settings = MagicMock()
+    ctx.user_settings.active_provider = "lmstudio"
+    ctx.user_settings.sub_agent_model = "qwen/qwen3-30b-a3b"
+    ctx.model = "qwen/qwen3-30b-a3b"
+    ctx.thread_id = "00000000-0000-0000-0000-000000000001"
+    ctx.pool = MagicMock()
+    ctx.supabase = MagicMock()
+    ctx.spawn = MagicMock()
+    ctx.emit = AsyncMock()
+    ctx.scoped_folder_path = None
+    ctx.folder_subtree_ids = None
+    ctx.dead_gap_tokens_in_run = set()
+    ctx.skill_instructions_override = None
+    ctx.phase_whitelist = None
+    ctx.workflow_run_id = None
+    ctx.skill_snapshot = None
+    ctx.per_run_task_semaphore = None
+    ctx.parent_run_id = None
+    return ctx
+
+
+async def test_wr02_a_timed_out_sub_agent_records_why():
+    from app.services.task_service import run_task_sub_agent
+
+    finalize = AsyncMock()
+    # The REAL _stream_one_iteration runs; only the gateway open times out, exactly as the
+    # 282 open guard does (a bare TimeoutError whose str() is "").
+    with patch("app.services.task_service.open_stream", AsyncMock(side_effect=TimeoutError())), \
+         patch("app.config.get_model_capability_async", AsyncMock(return_value={"provider": "openrouter"})), \
+         patch("app.services.task_service.get_per_call_timeout_async", AsyncMock(return_value=900)), \
+         patch("app.services.task_service.get_pg_pool", AsyncMock(return_value=MagicMock())), \
+         patch("app.services.task_service.insert_run", AsyncMock()), \
+         patch("app.services.task_service.finalize_run", finalize):
+        res = await run_task_sub_agent(
+            parent_ctx=_parent_ctx(),
+            description="Summarise the brief",
+            instructions=None,
+            allowed_tools=[],
+            max_steps=3,
+        )
+
+    error = finalize.await_args.kwargs["error"]
+    assert error.startswith("timed_out: 900s per-call deadline exceeded")
+    assert "did not answer within 900 s" in error
+    assert "Model Registry" in error
+    assert res["summary"] == f"Sub-agent failed: {error}"
+
+
+async def test_wr02_an_empty_exception_message_still_names_the_exception():
+    from app.services.task_service import run_task_sub_agent
+
+    class _Silent(Exception):
+        pass
+
+    finalize = AsyncMock()
+    with patch("app.services.task_service._stream_one_iteration", AsyncMock(side_effect=_Silent())), \
+         patch("app.services.task_service.get_pg_pool", AsyncMock(return_value=MagicMock())), \
+         patch("app.services.task_service.insert_run", AsyncMock()), \
+         patch("app.services.task_service.finalize_run", finalize):
+        res = await run_task_sub_agent(
+            parent_ctx=_parent_ctx(),
+            description="Summarise the brief",
+            instructions=None,
+            allowed_tools=[],
+            max_steps=3,
+        )
+    assert finalize.await_args.kwargs["error"] == "_Silent"
+    assert res["summary"] == "Sub-agent failed: _Silent"

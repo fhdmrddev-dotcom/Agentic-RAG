@@ -311,7 +311,11 @@ async def _stream_one_iteration(
         tool_choice="auto",
         timeout_s=_timeout_s,
     )
-    stream, calling_mode = await open_stream(_provider, _gw_request)
+    try:
+        stream, calling_mode = await open_stream(_provider, _gw_request)
+    except TimeoutError as exc:
+        exc.budget_s = _timeout_s  # 282-REVIEW WR-02: the sub-agent's sentence names it
+        raise
 
     # WR-01 (093 REVIEW) — only do the STRUCTURED tool-recovery dance when the
     # phase actually HAS tools. A no-tools call (llm_single passes tools=[]) can
@@ -734,6 +738,7 @@ async def run_task_sub_agent(
     sub_similarity_scores: list[float] = []
     sub_retrieval_error: dict | None = None
 
+    step = 0  # WR-02: bound before the loop so the timed-out arm can always name it
     try:
         for step in range(max_steps):
             # Emit per-iteration heartbeat on the SUB-agent's stream so Phase
@@ -898,13 +903,27 @@ async def run_task_sub_agent(
                     "Sub-agent reached max_steps without producing a final answer."
                 )
 
+    except TimeoutError as _te:
+        # 282-REVIEW WR-02: the per-call guard raises a bare TimeoutError (str == ""). Name the
+        # model, the budget and where to change it — the SAME sentence the Deep run records.
+        from app.services.run_producer import _timed_out_error  # lazy: cycle-safe
+
+        logger.warning("task_service: sub-agent timed out (sub_run_id=%s)", sub_run_id)
+        _budget = getattr(_te, "budget_s", None)
+        final_status = "error"
+        error_msg = (
+            _timed_out_error(_budget, step, effective_model)
+            if _budget is not None
+            else (str(_te) or type(_te).__name__)
+        )
+        summary = f"Sub-agent failed: {error_msg}"
     except Exception as e:  # noqa: BLE001
         logger.exception(
             "task_service: sub-agent loop failed (sub_run_id=%s)", sub_run_id,
         )
         final_status = "error"
-        error_msg = str(e)
-        summary = f"Sub-agent failed: {e}"
+        error_msg = str(e) or type(e).__name__  # WR-02: never a blank reason
+        summary = f"Sub-agent failed: {error_msg}"
     finally:
         # 6a. Finalize the sub-agent's runs row.
         # D-17 (S4): persist the accumulated usage instead of the old None/None.
