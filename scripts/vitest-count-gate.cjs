@@ -133,7 +133,9 @@ const BASELINE = {
   // single-owner for wave 2 (D-25). A pin is a floor.
   // Phase 282-04 — 33 -> 36, measured 2026-10-15 (36/36 passed in a targeted run): the +3 are the
   // Add-form Timeout cases (placeholder 300 -> 900 by provider, blank sends no key, typed is a number).
-  "ModelRegistryTab.test.tsx": 36,
+  // 36 -> 37 the same day: the live drive found the browser's native max=1800 hiding the
+  // server's refusal sentence; the +1 fences 1801 reaching the server and its alert in the form.
+  "ModelRegistryTab.test.tsx": 37,
   "addProviderRoster.lockstep.test.ts": 4,
   "hideControlLegibility.test.tsx": 6,
   // Phase 249 Plan 02 (MODEL-05) — the pick-time chip, its negative arm, its consequence text,

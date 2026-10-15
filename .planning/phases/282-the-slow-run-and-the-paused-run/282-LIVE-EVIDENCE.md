@@ -193,6 +193,31 @@ Model Registry, `glm-4.7-flash`:
 - **SEED-172** stays `partially-answered`. Its status_note now says #2 and #3 (the timeout field) were **answered** by 282, and #4 is open.
 - **New, not folded:** BUG-261015-03 (ask_user's required timeout makes models pick about 60 s) and BUG-261015-04 (Anthropic out-of-credit shown as "Model parameter error").
 
+## Plan 282-04 live drive (2026-10-15, 14:29–14:39 UTC, backend restarted on `f173d3a4a`)
+
+- **The backend serves the new code:** in the live `/openapi.json`, `AddModelRequest` has a `llm_call_timeout_seconds` property.
+- **D-27, the resolver against the live local DB:**
+  - an unregistered id with provider `lmstudio` → **900**;
+  - the same id with `openai` → **300**.
+- **Found while driving:** the operator had added `spark-x2.5-4b` from the Registry UI at 14:06:38 UTC and set its Timeout to 1200 (`operator_audit_log`: `model.added`, then `model.capability.set`).
+  - **A model added from the Registry starts disabled** (D-159-02), and the resolver reads only enabled rows. A Spark send was therefore rerouted to the org default `deepseek-v4-flash`, with the fallback notice. That run (`6502211b…`) was cancelled at once.
+  - This is the standing add-lands-disabled rule, not a 282 defect. **Owed to the operator:** enable Spark in the Registry for it to run, at its stored 1200 s.
+- **The G-4 row 4 re-drive used `nvidia_nvidia-nemotron-nano-9b-v2`:**
+  - Model setup: LM Studio, enabled, stored 1200 s. The operator set that at 14:06:52; it was 550 before.
+  - Run `df9cbe53-b471-4b68-b3be-0a5d220fbc59` was **one model call with no tools**. It ran from 14:31:14 to 14:37:10, **356 s**, and **completed**. It reasoned and then declined the task in 440 chars.
+  - It passed the old 300 s default without being cut off. **It did not reach 600 s**, so per D-30 **G4-4 stays ⛔ OWED, with a measured maximum of 356 s on the operator's hardware.** Spark (4B) is faster and was not expected to go longer.
+- **The Add form, live:**
+  - the Timeout field is present;
+  - its placeholder reads `300` for openai and **`900` after switching the provider to lmstudio**;
+  - the hint reads "s · blank = default".
+- **⚠ A defect the live drive found and fixed in this plan:**
+  - The field carried native `min=1 max=1800`. Typing 1801 and pressing Add model made the **browser** block the submit with its generic message "Value must be less than or equal to 1800." No request was sent, and the reason (the run watchdog) never appeared.
+  - Both attributes were removed. A new vitest case fences that 1801 reaches the server and that its refusal shows in the form's `role=alert` (37/37).
+- **The refusal after the fix:**
+  - `POST /admin/models` with 1801, sent through the page's session, → **422** with exactly "Timeout must be between 1 and 1800 seconds, because a longer call would outlast the run watchdog, which ends a run that has been silent for 2400 s. 1801 was not saved."
+  - **0** `zz-282-04%` rows in the DB afterwards.
+  - The click-through re-drive of the fixed form could not run: the Chrome tab's renderer stopped responding to input and screenshots (CDP timeouts). So **the in-form alert is proven by vitest, not by a live click.** That re-drive is owed.
+
 ## Operator sign-off
 
 *(pending — Task 4)*

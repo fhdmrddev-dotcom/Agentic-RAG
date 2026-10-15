@@ -884,4 +884,21 @@ describe("ModelRegistryTab (282-04) — Timeout on the Add model by ID form", ()
       llm_call_timeout_seconds: 1200,
     })
   })
+
+  // Found driving the live form (2026-10-15): a native max=1800 made the BROWSER block 1801 with
+  // "Value must be less than or equal to 1800." — no request, and no reason on screen.
+  it("1801 reaches the server (no client pre-block) and its refusal shows in the form's alert", async () => {
+    const sentence =
+      "Timeout must be between 1 and 1800 seconds, because a longer call would outlast the run watchdog, which ends a run that has been silent for 2400 s. 1801 was not saved."
+    const { user, onAddModel } = await openForm(vi.fn().mockRejectedValue(new ApiError(sentence, 422)))
+    const t = screen.getByRole("spinbutton", { name: /^timeout seconds$/i })
+    expect(t).not.toHaveAttribute("max")
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "spark-x2.5-4b")
+    await user.type(t, "1801")
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+    await waitFor(() => expect(onAddModel).toHaveBeenCalledTimes(1))
+    expect(onAddModel.mock.calls[0][0]).toMatchObject({ llm_call_timeout_seconds: 1801 })
+    const form = screen.getByRole("form", { name: /add model by id/i })
+    expect(await within(form).findByRole("alert")).toHaveTextContent(sentence)
+  })
 })

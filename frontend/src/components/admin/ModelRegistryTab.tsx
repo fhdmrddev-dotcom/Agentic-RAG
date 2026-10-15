@@ -34,7 +34,6 @@ import { AlertTriangle, Check, ChevronDown, Loader2, Lock, Plus, RotateCcw, Tras
 
 import { ApiError, type AddModelBody, type ModelCapabilityPatch, type ModelRegistryRow } from "@/lib/api"
 import {
-  MODEL_CAP_INT_BOUNDS,
   MODEL_TIMEOUT_DEFAULT_S,
   MODEL_TIMEOUT_DEFAULT_SELF_HOSTED_S,
   MODEL_TIMEOUT_HELP_LINE,
@@ -1641,10 +1640,11 @@ function AddModelForm({
         {/* Phase 282 D-29: local models are slower, so the Timeout can be set at add time. The
             placeholder is the default a blank field means — read from the admin.ts mirror. */}
         <CapField label="Timeout">
+          {/* ⚠ No native min/max: the browser would block 1801 with its own generic bubble and the
+              operator would never read WHY (the run watchdog). The server's sentence shows in this
+              form's role=alert instead — the same rule the table cell follows (no client pre-block). */}
           <input
             type="number"
-            min={MODEL_CAP_INT_BOUNDS.llm_call_timeout_seconds[0]}
-            max={MODEL_CAP_INT_BOUNDS.llm_call_timeout_seconds[1]}
             value={timeoutDraft}
             placeholder={String(
               SELF_HOSTED_PROVIDERS.has(provider) ? MODEL_TIMEOUT_DEFAULT_SELF_HOSTED_S : MODEL_TIMEOUT_DEFAULT_S,
