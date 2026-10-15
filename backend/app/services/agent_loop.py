@@ -552,6 +552,11 @@ async def _drain_stream_with_close_on_cancel(
     producer_exception: list[BaseException] = []
 
     loop = asyncio.get_running_loop()
+    # Phase 282 D-20: ONE deadline across open + drain — the dispatcher stamps it on an
+    # OpenAI-family stream after its off-loop open; call sites are unchanged.
+    _deadline = getattr(stream, "budget_deadline", None)
+    if isinstance(_deadline, (int, float)):
+        timeout_seconds = max(0.0, _deadline - loop.time())
 
     def _producer():
         # Sync producer — drives _TracedStream.__iter__ to completion.
