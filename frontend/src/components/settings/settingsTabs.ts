@@ -46,7 +46,10 @@ export const SETTINGS_TABS: readonly SettingsTabDef[] = [
   { id: "0", audience: "model_management", name: "AI Model" },
   { id: "1", audience: "model_management", name: "Search & Retrieval" },
   { id: "2", audience: "model_management", name: "Integrations" },
-  // ← 283-02 (D-04) inserts Preferences "6" HERE, between Integrations and Memory.
+  // 283-02 (FIX-01 / D-02, D-03, D-04): the member's personal preferences — "Show technical names"
+  // and the default chat model — moved out of the operator-only AI Model tab. "6", never "5"
+  // (retired below); it sits between Integrations and Memory in the strip.
+  { id: "6", audience: "everyone", name: "Preferences" },
   { id: "3", audience: "everyone", name: "Memory" },
   { id: "4", audience: "everyone", name: "Audit Log" },
 ]
@@ -89,39 +92,32 @@ export function isSettingsTabVisible(id: string, canManageModels: boolean): bool
 }
 
 /**
- * Where a persisted choice the caller can no longer use lands.
+ * Where a persisted choice the caller can no longer use lands: the caller's FIRST VISIBLE tab.
  *
- * Today this is the FIRST `everyone` tab ("3", Memory) for BOTH roles — reproducing the page's
- * hardcoded `"3"` exactly. ⚠ 283-02 (D-05) switches it to the caller's first VISIBLE tab, which
- * moves an operator's fallback to "0"; `settingsTabs.test.ts` pins today's value so that change is
- * a visible, deliberate edit rather than a silent one.
+ * 283-02 (D-05): an operator lands on "0" (AI Model), a member on "6" (Preferences). Derived from
+ * the registry, never a literal — before 283-01 the page hardcoded `"3"` (Memory) for both roles,
+ * and 283-01 reproduced that as "the first `everyone` tab" so the seam stayed behaviour-preserving.
+ * `settingsTabs.test.ts` was rewritten in place by 283-02 to pin the new rule.
  */
 export function settingsTabFallback(canManageModels: boolean): string {
-  void canManageModels // today's rule does not depend on the role; 283-02 makes it.
-  const first = SETTINGS_TABS.find((t) => t.audience === "everyone")
-  // The registry always declares at least one `everyone` tab; "3" mirrors the page's old literal.
-  return first?.id ?? "3"
+  const first = visibleSettingsTabs(canManageModels)[0]
+  // Every caller sees at least the `everyone` tabs, so `first` always exists; "6" is belt-and-braces.
+  return first?.id ?? "6"
 }
 
 /**
  * The tab a persisted choice resolves to for this caller.
  *
- * - nothing persisted → "0" (the page's historical starting point; a member is then redirected)
- * - a retired id → the fallback, for BOTH roles (an operator with "5" persisted needs it too)
- * - a known governed tab and `!canManageModels` → the fallback
- * - anything else → passed through unchanged
+ * - nothing persisted → the fallback (operator "0", member "6")
+ * - an id this caller can see → passed through unchanged
+ * - ANY id this caller cannot see — a governed tab without `canManageModels`, the retired "5", or
+ *   an id the registry does not know → the fallback (283-02 / D-05)
  *
- * ⚠ AN UNKNOWN ID PASSES THROUGH — exactly as the page did at PHASE_BASE, where the ternary only
- *   redirected "5" and the governed ids. That selects a `TabsContent` that does not exist (an empty
- *   panel; no data is reachable through it). It is reproduced here, not endorsed: 283-02 (D-05)
- *   is the plan that redirects unknown ids too.
+ * ⚠ UNTIL 283-02 AN UNKNOWN ID PASSED THROUGH and selected a `TabsContent` that does not exist (an
+ *   empty panel under a strip marking nothing active). `settings_active_tab` is user-editable
+ *   localStorage, so redirecting every invisible id is what makes a forced value harmless (T-283-14).
  */
 export function resolveSettingsTab(persisted: string | null, canManageModels: boolean): string {
-  const id = persisted ?? "0"
-  if (RETIRED_SETTINGS_TABS.includes(id)) return settingsTabFallback(canManageModels)
-  const tab = byId(id)
-  if (tab !== undefined && !audienceAllows(tab, canManageModels)) {
-    return settingsTabFallback(canManageModels)
-  }
-  return id
+  if (persisted !== null && isSettingsTabVisible(persisted, canManageModels)) return persisted
+  return settingsTabFallback(canManageModels)
 }
