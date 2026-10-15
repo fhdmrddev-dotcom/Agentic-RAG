@@ -4,9 +4,9 @@ title: Settings is unreachable for ordinary users, yet it holds user features (M
 reported: 2026-10-04
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/navigation, frontend/settings, auth/permissions]
-folded_into: null
+folded_into: "283"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
