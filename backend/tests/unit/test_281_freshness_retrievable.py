@@ -81,3 +81,66 @@ def test_the_rule_is_never_restated_in_this_file():
     lines = [ln for ln in src.splitlines() if "retrievable" in ln]
     assert lines == [], lines
     assert "from app.services.retrieval_scope import RETRIEVABLE_COLUMN" in src
+
+
+# ── 281-REVIEW WR-02 — a scope whose every document is archived reads like an EMPTY scope ──
+#
+# Resolved as CONSISTENT BY DESIGN, not changed. Phase 102 designed the empty case
+# explicitly: 102-03-PLAN specifies ``None when the scope is empty`` and the validator
+# condition ``age is not None and age > max_age_days``, and ``freshness.py`` documents an
+# empty scope as "no freshness signal, NOT stale". A folder with nothing an agent may read
+# has nothing stale in it, so the verdict is the empty-folder verdict. What DEBT-07 forbids
+# (an archived document's date deciding the verdict, D-20) is pinned by the control case.
+
+
+class _FilteringPool:
+    """A fake ``documents`` table that applies the imported predicate when the SQL asks."""
+
+    def __init__(self, docs):
+        self.docs = docs  # [{"created_at": datetime, "filename": str, "readable": bool}]
+
+    def _rows(self, sql):
+        from app.services.retrieval_scope import RETRIEVABLE_COLUMN
+
+        filtered = re.search(r"\bAND\s+" + re.escape(RETRIEVABLE_COLUMN) + r"\b", sql)
+        return [d for d in self.docs if d["readable"] or not filtered]
+
+    async def fetchrow(self, sql, *args):
+        rows = self._rows(sql)
+        return {"newest": max((d["created_at"] for d in rows), default=None)}
+
+    async def fetch(self, sql, *args):
+        return [{"filename": d["filename"]} for d in self._rows(sql)]
+
+
+def _freshness_verdict(docs):
+    from types import SimpleNamespace
+
+    import app.services.harness.validator_kinds  # noqa: F401
+    from app.services.harness.validators import VALIDATOR_REGISTRY
+
+    ctx = SimpleNamespace(pool=_FilteringPool(docs), folder_subtree_ids=[uuid4()])
+    return asyncio.run(VALIDATOR_REGISTRY["freshness"]({}, {"max_age_days": 30}, ctx))
+
+
+def _old_doc(readable):
+    from datetime import datetime, timedelta, timezone
+
+    return {
+        "created_at": datetime.now(timezone.utc) - timedelta(days=400),
+        "filename": "policy.docx",
+        "readable": readable,
+    }
+
+
+def test_wr02_all_archived_scope_gets_the_empty_scope_verdict():
+    empty = _freshness_verdict([])
+    all_archived = _freshness_verdict([_old_doc(readable=False)])
+    assert (all_archived.passed, all_archived.error_message) == (empty.passed, empty.error_message)
+    assert empty.passed is True  # the Phase 102 design: no document is no staleness signal
+
+
+def test_wr02_control_the_same_document_readable_is_stale():
+    verdict = _freshness_verdict([_old_doc(readable=True)])
+    assert verdict.passed is False
+    assert str(verdict.error_message).startswith("freshness:staleness|")
