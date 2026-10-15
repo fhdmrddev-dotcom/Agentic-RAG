@@ -11,6 +11,7 @@
  */
 import { API_BASE, getAuthHeaders } from "./_core"
 import type { IndexSummary } from "./settings"
+import type { LibrarySummary } from "../../types"
 
 /** GET /library/index-summary — the Indexing tab's three cards' data, one fetch. */
 export async function getIndexSummary(): Promise<IndexSummary> {
@@ -18,6 +19,16 @@ export async function getIndexSummary(): Promise<IndexSummary> {
   const res = await fetch(`${API_BASE}/library/index-summary`, { headers, cache: "no-store" })
   if (!res.ok) throw new Error("Failed to load library index summary")
   return res.json() as Promise<IndexSummary>
+}
+
+/** Phase 284 (FIX-11 / D-02 / D-07) — GET /library/summary: every number the Library shows
+ *  without listing a row (totals, per-folder counts and sizes, status and step counts, the
+ *  Find option lists). Uncached, like `getIndexSummary`: a count is only worth showing fresh. */
+export async function getLibrarySummary(): Promise<LibrarySummary> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/library/summary`, { headers, cache: "no-store" })
+  if (!res.ok) throw new Error("Failed to load library summary")
+  return res.json() as Promise<LibrarySummary>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

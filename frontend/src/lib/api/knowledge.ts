@@ -268,15 +268,26 @@ export async function deleteView(id: string): Promise<void> {
  *  just `{total: N}` (the live builder count + per-view sidebar badges, D-114-15);
  *  the full resolve returns `{documents, total}`. The returned `documents` are
  *  plain rows (no response_model) so `_source`/`_confidence` survive (112 CR-01). */
+//
+// Phase 284 (FIX-11 / D-01 / R-06): both resolves take an optional page — `offset`, `limit`
+// (server default 25, max 200) and `include_archived` (server default TRUE: today's resolve
+// has no archived predicate). ⛔ Each key is sent only when given, so a `count_only` call —
+// every sidebar / card / rules badge — produces the SAME URL and body it did before 284.
 export async function resolveView(
   id: string,
-  opts: { count_only?: boolean } = {},
-): Promise<{ documents?: Document[]; total: number }> {
+  opts: { count_only?: boolean; offset?: number; limit?: number; include_archived?: boolean } = {},
+): Promise<{ documents?: Document[]; total: number; offset?: number; limit?: number }> {
   const headers = await getAuthHeaders()
-  const qs = opts.count_only ? "?count_only=true" : ""
+  const params = new URLSearchParams()
+  if (opts.count_only) params.set("count_only", "true")
+  if (opts.offset !== undefined) params.set("offset", String(opts.offset))
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit))
+  if (opts.include_archived !== undefined) params.set("include_archived", String(opts.include_archived))
+  const query = params.toString()
+  const qs = query ? `?${query}` : ""
   const res = await fetch(`${API_BASE}/document-views/${id}/resolve${qs}`, { headers })
   if (!res.ok) throw new Error("Failed to resolve view")
-  return res.json() as Promise<{ documents?: Document[]; total: number }>
+  return res.json() as Promise<{ documents?: Document[]; total: number; offset?: number; limit?: number }>
 }
 
 /** POST /document-views/resolve — STATELESS ad-hoc resolve/count for an UNSAVED
@@ -292,16 +303,21 @@ export async function resolveView(
  *  their own transient cycle). */
 export async function resolveAdHoc(
   filter_expr: ViewFilter,
-  opts: { count_only?: boolean } = {},
-): Promise<{ documents?: Document[]; total: number }> {
+  opts: { count_only?: boolean; offset?: number; limit?: number; include_archived?: boolean } = {},
+): Promise<{ documents?: Document[]; total: number; offset?: number; limit?: number }> {
   const headers = await getAuthHeaders()
+  // Key order is the wire's: filter_expr, count_only, then the page keys only when given.
+  const body: Record<string, unknown> = { filter_expr, count_only: opts.count_only ?? false }
+  if (opts.offset !== undefined) body.offset = opts.offset
+  if (opts.limit !== undefined) body.limit = opts.limit
+  if (opts.include_archived !== undefined) body.include_archived = opts.include_archived
   const res = await fetch(`${API_BASE}/document-views/resolve`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ filter_expr, count_only: opts.count_only ?? false }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error("Failed to resolve filter")
-  return res.json() as Promise<{ documents?: Document[]; total: number }>
+  return res.json() as Promise<{ documents?: Document[]; total: number; offset?: number; limit?: number }>
 }
 
 /** Live "N documents match" count for an AD-HOC (unsaved) filter (D-114-2).
