@@ -514,9 +514,8 @@ def open_openai_compat_stream(
     # (``_ClosableEventStream._normalize``) is NOT branched (the D-14 RED LINE).
     # Phase 282 (FIX-06, D-01/D-19): the budget and the provider's retry count reach the
     # client constructor — forwarded ONLY when a budget is set (no-budget callers unchanged).
-    _retries_provider = request.active_provider_name or (
-        request.user_settings.active_provider if request.user_settings else None
-    )
+    # 282-REVIEW CR-01: keyed on the ENDPOINT's provider, never the registry vendor.
+    _retries_provider = request.retries_provider()
     stream, calling_mode = create_adaptive_streaming_chat(
         messages=request.messages,
         model=request.model,

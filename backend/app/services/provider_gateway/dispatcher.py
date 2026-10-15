@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, AsyncIterator
 
 # Re-export the EXISTING CallingMode enum — do NOT define a new one (Pitfall 3).
@@ -90,6 +90,20 @@ class GatewayRequest:
     # (``get_per_call_timeout_async``). Each adapter builds its client with it, and the
     # OpenAI-family open is guarded by it. ``None`` = a no-budget caller — byte-identical.
     timeout_s: float | None = None
+    # 282-REVIEW CR-01: the provider that chose the ENDPOINT — ``open_stream``'s first argument,
+    # stamped there. ``active_provider_name`` is the REGISTRY vendor of the model id (it keys
+    # <think>/usage normalisation) and names ``openrouter`` for an LM Studio slug like
+    # ``qwen/qwen3-30b-a3b``, so it must never pick the self-hosted retry count.
+    routing_provider: str | None = None
+
+    def retries_provider(self) -> str | None:
+        """The provider whose SDK retry count applies: the routing provider, else the one the
+        client's endpoint is built from (``user_settings.active_provider``), else the adapter's."""
+        return (
+            self.routing_provider
+            or (getattr(self.user_settings, "active_provider", None) if self.user_settings else None)
+            or self.active_provider_name
+        )
 
 
 # ⭐ THE EXTENSION CONTRACT FOR WIRE PROTOCOLS, made literal (Phase 262).
@@ -257,4 +271,6 @@ async def open_stream(
 
         return open_google_stream(request), CallingMode.NATIVE
     else:
+        if request.routing_provider is None and provider:
+            request = replace(request, routing_provider=provider)  # CR-01; caller's object untouched
         return await _open_off_loop(request)

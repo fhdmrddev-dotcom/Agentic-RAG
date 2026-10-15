@@ -559,7 +559,7 @@ def open_openai_responses_stream(
         client = get_llm_client(
             request.user_settings,
             timeout_s=request.timeout_s,
-            max_retries=llm_max_retries_for(request.active_provider_name),
+            max_retries=llm_max_retries_for(request.retries_provider()),  # 282-REVIEW CR-01
         )
     kwargs = _build_kwargs(request)
 
