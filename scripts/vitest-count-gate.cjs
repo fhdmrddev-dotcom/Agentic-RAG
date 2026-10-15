@@ -1752,7 +1752,8 @@ const BASELINE = {
   // Phase 283-02 (FIX-01 / D-12) — a member's and an operator's Settings page as rendered content
   // (tab strips, landing tab, moved blocks, Reset, zero gated calls + the operator positive
   // control). Registered in BOTH knobs in one commit.
-  "SettingsPage.member283.test.tsx": 16,
+  // 283-REVIEW: 16 → 20 (+2 WR-02 features-loading window, +2 IN-02 Reset keys on the shown tab).
+  "SettingsPage.member283.test.tsx": 20,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
