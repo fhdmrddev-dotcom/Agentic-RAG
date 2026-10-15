@@ -1132,7 +1132,16 @@ ASK_USER_TOOL = {
                     "items": {"type": "string"},
                     "description": "Optional. Multiple-choice options. If provided, panel renders as buttons; user can still type free-text.",
                 },
-                "timeout_seconds": {"type": ["integer", "null"], "description": "Optional. Maximum seconds to wait. Server clamps."},
+                "timeout_seconds": {
+                    "type": ["integer", "null"],
+                    # BUG-261015-03: required by strict mode, so the text must say what to pass.
+                    "description": (
+                        "Pass null unless the user asked for a specific deadline. null waits "
+                        f"{settings.ask_user_min_timeout_seconds} seconds. The server raises any value "
+                        f"below {settings.ask_user_min_timeout_seconds} to {settings.ask_user_min_timeout_seconds} "
+                        f"and caps it at {settings.ask_user_max_timeout_seconds}."
+                    ),
+                },
             },
             "required": ["prompt", "options", "timeout_seconds"],
         },

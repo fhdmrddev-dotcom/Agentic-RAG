@@ -185,7 +185,12 @@ UNMOVED: tuple[str, ...] = (
 PER_MODULE: frozenset[str] = frozenset({"logger"})
 
 # name → the reason it is no longer compared. EMPTY in 278 — a pure move changes nothing on purpose.
-RETIRED: dict[str, str] = {}
+RETIRED: dict[str, str] = {
+    "_handle_ask_user": (
+        "BUG-261015-03 (2026-10-15): deliberate post-move edit. The wait clamp moved into "
+        "_resolve_ask_timeout with a 300 s floor; pinned by test_bug_261015_03_ask_user_floor.py."
+    ),
+}
 
 _EXPECTED_FAMILY_COUNTS = {
     "base.py": 2,

@@ -1410,6 +1410,10 @@ class Settings(BaseSettings):
     # task_per_run_concurrency: asyncio.Semaphore size per top-level run (in-process).
     # task_global_concurrency: Redis tasks:global:active counter cap (cross-worker).
     ask_user_max_timeout_seconds: int = 1800
+    # BUG-261015-03: the floor on a model-chosen wait. timeout_seconds is REQUIRED in the strict
+    # schema, so models must pick a value, and without a floor they picked ~60 s and the question
+    # expired before a person could answer. Equal to the null default (300 s).
+    ask_user_min_timeout_seconds: int = 300
     task_max_steps: int = 10
     task_per_run_concurrency: int = 3
     task_global_concurrency: int = 20

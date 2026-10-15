@@ -583,9 +583,13 @@ async def test_handle_ask_user_shutdown_sentinel_returns_shutdown_text(redis_cli
 
 
 @pytest.mark.asyncio
-async def test_handle_ask_user_timeout_returns_timed_out(redis_client):
+async def test_handle_ask_user_timeout_returns_timed_out(redis_client, monkeypatch):
     """Test T2-6: no PUBLISH → ToolResult containing 'timed out' and timeout value."""
+    from app.config import settings
     from app.services.tool_dispatcher import _handle_ask_user
+
+    # BUG-261015-03: the production floor is 300 s; lower it so this test waits 1 s.
+    monkeypatch.setattr(settings, "ask_user_min_timeout_seconds", 1)
 
     ctx = _build_ctx(redis_client, tool_call_id="tcid-timeout")
     with patch("app.services.tools.agent_control.aexec", AsyncMock(return_value=MagicMock(data=[]))):
