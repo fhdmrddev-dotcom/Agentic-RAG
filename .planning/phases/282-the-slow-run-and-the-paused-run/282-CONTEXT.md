@@ -258,6 +258,18 @@ same commit. Any new file gets a row (the hot-file gate enforces this).
   change.
 - The connect timeout value within ≤ 10 s.
 
+### Amendment 2026-10-15 at the G-4 sign-off: plan 282-04 (operator decision, verbatim: "local models are slower we should be able to modify the timeout from ui" → "yes 282-04")
+
+- **D-27:** A model on a self-hosted provider (`config._SELF_HOSTED_PROVIDERS`: ollama, lmstudio, custom) with no stored, env or registered timeout resolves to **900 s** (`DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED`). A cloud model still resolves to 300 s.
+  - The provider is passed to both resolvers as a keyword. When it is absent, the resolver falls back to the DB row's `provider`, then the registered `provider`.
+  - The set of self-hosted providers stays in one place, the mig 180 predicate, and is never duplicated as a second list.
+  - Why: G-4 row 4 measured an unregistered LM Studio model (`spark-x2.5-4b`) silently running at 300 s.
+- **D-28:** The resolver call sites (`agent_loop` ×2, `forced_emit`, `task_service`) pass the provider they already route on. No call site gains a lookup.
+- **D-29:** "Add model by ID" gets a **Timeout** field.
+  - Its placeholder shows the default that applies when the field is left blank: 900 for a self-hosted provider, 300 otherwise. Leaving it blank stores nothing, and the resolver default applies.
+  - `AddModelRequest.llm_call_timeout_seconds` is bound 1..1800 server-side and refused with **the same sentence** as the PATCH, from one shared helper.
+- **D-30:** This is a new capability, approved by the operator at sign-off. It is not a gap-closure round (G-7 does not apply). G-4 row 4 is re-driven if a model call can be made to exceed 600 s on the operator's hardware; otherwise it stays owed with the measured maximum.
+
 </decisions>
 
 <canonical_refs>

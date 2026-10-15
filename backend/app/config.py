@@ -761,6 +761,12 @@ def get_model_capability(
 # genuinely hung streams.
 DEFAULT_LLM_CALL_TIMEOUT_SECONDS: int = 300
 
+# Phase 282 D-27: the unknown-model fallback for a SELF-HOSTED provider (mig 180's
+# `_SELF_HOSTED_PROVIDERS`). Local models are slower: G-4 row 4 measured an LM Studio model the
+# Registry had never seen running at the 300 s cloud default with no hint on screen. A stored,
+# env or registered value still wins; this only replaces the last-resort number.
+DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED: int = 900
+
 # T-066-05 mitigation: lower / upper bounds for the
 # LLM_CALL_TIMEOUT_OVERRIDES env-var parser, the Model Registry PATCH and the
 # resolver's DB tier. Operator misconfiguration to 0 / negative integer would
@@ -808,7 +814,17 @@ def llm_call_timeout_ceiling_reason(settings_obj: "Settings | None" = None) -> s
 _RUN_STALE_SWEEP_INTERVAL_MIN_S: int = 5
 
 
-def get_per_call_timeout(model_id: str, settings_obj: "Settings | None" = None) -> int:
+def _default_llm_call_timeout(provider: str | None) -> int:
+    """Phase 282 D-27: the last-resort timeout, chosen by provider class from the ONE self-hosted
+    predicate (mig 180). Never a second list of names."""
+    if (provider or "").lower() in _SELF_HOSTED_PROVIDERS:
+        return DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED
+    return DEFAULT_LLM_CALL_TIMEOUT_SECONDS
+
+
+def get_per_call_timeout(
+    model_id: str, settings_obj: "Settings | None" = None, *, provider: str | None = None
+) -> int:
     """Resolve the per-LLM-call deadline (seconds) for a given model.
 
     Phase 066 D-066-03. Lookup precedence:
@@ -836,8 +852,8 @@ def get_per_call_timeout(model_id: str, settings_obj: "Settings | None" = None) 
     if "llm_call_timeout_seconds" in cap:
         return cap["llm_call_timeout_seconds"]  # type: ignore[typeddict-item]
 
-    # 3. Unknown-model fallback
-    return DEFAULT_LLM_CALL_TIMEOUT_SECONDS
+    # 3. Unknown-model fallback (Phase 282 D-27: 900 s for a self-hosted provider)
+    return _default_llm_call_timeout(provider or cap.get("provider"))
 
 
 def _parse_llm_call_timeout_overrides(raw: str) -> dict[str, int]:
@@ -890,7 +906,7 @@ def _parse_llm_call_timeout_overrides(raw: str) -> dict[str, int]:
 # ── Phase 081.1: Async 4-tier resolution (DB > env CSV > static > default) ──
 
 async def get_per_call_timeout_async(
-    model_id: str, settings_obj: "Settings | None" = None
+    model_id: str, settings_obj: "Settings | None" = None, *, provider: str | None = None
 ) -> int:
     """Async counterpart of :func:`get_per_call_timeout` with DB tier (D-11/D-12).
 
@@ -898,14 +914,17 @@ async def get_per_call_timeout_async(
       1. DB ``model_capabilities_overrides`` row ``llm_call_timeout_seconds``
       2. Env ``LLM_CALL_TIMEOUT_OVERRIDES`` CSV (same as sync tier 1)
       3. Static ``MODEL_CAPABILITIES`` dict (same as sync tier 2)
-      4. ``DEFAULT_LLM_CALL_TIMEOUT_SECONDS`` (300s)
+      4. ``DEFAULT_LLM_CALL_TIMEOUT_SECONDS`` (300s), or 900 s for a self-hosted provider
+         (Phase 282 D-27) — the ``provider`` kwarg, else the DB row's, else the registered one.
     """
     # Tier 1 — DB overrides
     from app.models.user_settings import _load_model_overrides  # lazy import
+    _row_provider: str | None = None
     try:
         db_overrides = await _load_model_overrides()
         db_cap = db_overrides.get(model_id)
         if db_cap is not None:
+            _row_provider = db_cap.get("provider")
             db_timeout = db_cap.get("llm_call_timeout_seconds")
             if db_timeout is not None:
                 # Phase 282 D-08: the stored value gets the SAME bound the PATCH and the env
@@ -942,8 +961,8 @@ async def get_per_call_timeout_async(
     if "llm_call_timeout_seconds" in cap:
         return cap["llm_call_timeout_seconds"]  # type: ignore[typeddict-item]
 
-    # Tier 4 — Default
-    return DEFAULT_LLM_CALL_TIMEOUT_SECONDS
+    # Tier 4 — Default (Phase 282 D-27: 900 s for a self-hosted provider)
+    return _default_llm_call_timeout(provider or _row_provider or cap.get("provider"))
 
 
 async def get_model_capability_async(

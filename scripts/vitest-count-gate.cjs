@@ -131,7 +131,9 @@ const BASELINE = {
   // help line while the Timeout cell edits, no help line on another cell, no client pre-block).
   // Raised here, not in 282-01, because this file was
   // single-owner for wave 2 (D-25). A pin is a floor.
-  "ModelRegistryTab.test.tsx": 33,
+  // Phase 282-04 — 33 -> 36, measured 2026-10-15 (36/36 passed in a targeted run): the +3 are the
+  // Add-form Timeout cases (placeholder 300 -> 900 by provider, blank sends no key, typed is a number).
+  "ModelRegistryTab.test.tsx": 36,
   "addProviderRoster.lockstep.test.ts": 4,
   "hideControlLegibility.test.tsx": 6,
   // Phase 249 Plan 02 (MODEL-05) — the pick-time chip, its negative arm, its consequence text,

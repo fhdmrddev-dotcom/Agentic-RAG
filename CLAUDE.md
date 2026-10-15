@@ -445,7 +445,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/db/runs.py` | 9 / 8 / 266 | ⚠ absent its ENTIRE LIFE — row added 268 · ⛔ |
 | `frontend/src/pages/admin/AdminSpendPage.tsx` | 9 / 3 / 974 | ⚠ NOW FIRES (crossed in 268) · extraction FIRST next · ⛔ |
 | `backend/app/services/run_producer.py` | 23 / 11 / 1145 (was `21 / 10 / 1117`) | honoured by construction (282-01: ONE `_timed_out_error` helper) |
-| `backend/app/services/task_service.py` | 23 / 13 / 991 (was `20 / 11 / 970`) | honoured by construction (282-01: ONE budget lookup) |
+| `backend/app/services/task_service.py` | 24 / 13 / 991 (was `23 / 13 / 991`) | honoured by construction (282-04: provider kwarg) |
 | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02 (SEED-297) · ⛔ |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
 | `backend/app/api/runs.py` | 41 / 19 / 1750 | ⚠ STALE · last touch 268-REVIEW CR-01/WR-06 |
@@ -465,12 +465,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api.ts` | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ STALE · last touch 271-03 |
 | `frontend/src/types/index.ts` | 99 / 78 / 1546 (was `98 / 77 / 1542`) | **281-03**: `EmitFailure` +1 member, additive. Seam OWED |
 | `backend/app/main.py` | 90 / 65 / 977 (was `89 / 64 / 1002`) | honoured by construction (280-01: dead postgrest patch deleted) · ⛔ |
-| `backend/app/config.py` | 92 / 54 / 1790 (was `91 / 53 / 1705`) | honoured by construction (282-01) · `MODEL_CAPABILITIES` seam OWED · ⛔ |
-| `backend/app/api/admin.py` | 42 / 17 / 2024 (was `38 / 14 / 1968`) | honoured by construction (282-01: ONE timeout 422 arm) · ⛔ |
+| `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
+| `backend/app/api/admin.py` | 43 / 17 / 2051 (was `42 / 17 / 2024`) | honoured by construction (282-04: one refusal helper, add timeout) · ⛔ |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (249-02/03) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 96 / 37 / 2531 (was `95 / 37 / 2534`) | last touch BUG-261014-06 (`.in_` batched) · honoured by construction |
-| `scripts/vitest-count-gate.cjs` | 290 / 65 / 6428 (was `290 / 68 / 6428`) | last touch 275-02/04 |
+| `scripts/vitest-count-gate.cjs` | 298 / 66 / 6443 (was `290 / 65 / 6428`) | last touch 282-04 (ModelRegistryTab pin 33 → 36) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
 | `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ NOW FIRES at 3 phases · last touch 256-03 |
 | `frontend/src/components/panel/PhaseCard.tsx` | 18 / 12 / 796 (was `17 / 11 / 788`) | honoured by construction (281-03: one copy entry + one className) |
@@ -479,7 +479,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/validator_kinds.py` | 15 / 7 / 791 | ⚠ row STALE · honoured by construction (256-05) |
 | `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ FIRES · absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
-| `frontend/src/components/admin/ModelRegistryTab.tsx` | 17 / 7 / 1679 (was `15 / 5 / 1640`) | honoured by construction (282-01: help line) · `AddModelForm` seam OWED · ⛔ |
+| `frontend/src/components/admin/ModelRegistryTab.tsx` | 18 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |
 | `frontend/src/components/workflows/soulData.ts` | 12 / 10 / 499 | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 p |
 | `frontend/src/components/workflows/PublishGauntlet.tsx` | 20 / 10 / 1372 (was `17 / 9 / 1289`) | honoured by construction (281-03: ONE optional `onOpenRun` prop) |
 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 5 / 5 / 473 | honoured by construction (200) |
@@ -532,7 +532,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 68 / 33 / 3682 (was `66 / 32 / 3675`) | honoured by construction (282-01: 2 kwargs, drain deadline) · seam OWED · ⛔ |
+| `backend/app/services/agent_loop.py` | 69 / 33 / 3682 (was `68 / 33 / 3682`) | honoured by construction (282-04: provider kwarg ×2) · seam OWED · ⛔ |
 | `backend/app/services/tool_dispatcher.py` | 99 / 44 / 274 (was `98 / 43 / 5068`) | ✅ G-5 DISCHARGED (278-03): registry only; handlers in services/tools/ · ⛔ |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
@@ -562,7 +562,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `scripts/full-schema-supplement.sql` | 15 / 10 / 690 | ⚠ row STALE · last touch 266-01 · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
-| `backend/app/services/forced_emit.py` | 12 / 8 / 724 (was `11 / 7 / 716`) | honoured by construction (282-01: ONE budget lookup per rung) · ⛔ |
+| `backend/app/services/forced_emit.py` | 13 / 8 / 724 (was `12 / 8 / 724`) | honoured by construction (282-04: provider kwarg) · ⛔ |
 | `backend/app/services/template_asset_service.py` | 4 / 3 / 344 | ⚠ absent its ENTIRE LIFE — row added 274-REVIEW WR-01 |
 | `backend/app/db/entitlements.py` | 2 / 1 / 169 | young (created 258) |
 | `backend/app/services/entitlement_service.py` | 2 / 1 / 130 | young (created 258) |
@@ -585,7 +585,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/provider_gateway/openai_compat.py` | 7 / 5 / 537 (was `6 / 4 / 525`) | honoured by construction (282-01: budget forwarded only when set) · ⛔ |
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
 | `backend/app/services/provider_gateway/openai_responses.py` | 2 / 2 / 573 (was `0 / 0 / 563`) | young · 282-01: budget + retries reach the client when set · ⛔ |
-| `frontend/src/lib/api/admin.ts` | 8 / 5 / 1113 (was `5 / 2 / 1098`) | ⚠ FIRES (row was stale) · 282-01: bound 1800 + help line · ⛔ |
+| `frontend/src/lib/api/admin.ts` | 9 / 5 / 1122 (was `8 / 5 / 1113`) | ⚠ FIRES · 282-04: default mirrors + AddModelBody timeout · ⛔ |
 | `frontend/src/components/admin/CapabilityGrid.tsx` | 3 / 3 / 264 | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 · ⛔ |
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) · ⛔ |
 | `frontend/src/lib/activeViewReachability.ts` | 1 / 1 / 159 | ⚠ row read 0/0/0 AT PLANNING · measured 262-01 · ⛔ |

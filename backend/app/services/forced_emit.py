@@ -503,7 +503,7 @@ async def forced_emit(
     # Phase 282 (FIX-06, D-01): the per-model budget reaches every rung's client constructor
     # and the OpenAI-family open guard. A TimeoutError from that guard is an ``Exception`` and
     # descends a rung through the existing per-rung except below, like any provider raise.
-    _timeout_s = await get_per_call_timeout_async(model, settings)
+    _timeout_s = await get_per_call_timeout_async(model, settings, provider=provider)
     for rung_name, forced, rung_strict in _RUNGS_BY_TIER[emit_tier]:
         # Phase 103 strict override: an explicit ``strict=False`` demotes the
         # strict_force rung (skip it — it would be a redundant non-strict duplicate);

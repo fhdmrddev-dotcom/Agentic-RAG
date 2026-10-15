@@ -2538,7 +2538,7 @@ async def run_agent_loop(
                         # producer-shell classifier reads (loop machinery, not
                         # stream construction).
                         _model_id = body.model or user_settings.llm_model
-                        per_call_budget = await get_per_call_timeout_async(_model_id, settings)
+                        per_call_budget = await get_per_call_timeout_async(_model_id, settings, provider=active_provider_name)
                         # Phase 066 D-066-07: capture for outer-except error format
                         _last_iteration = iteration
                         _last_model_id = _model_id
@@ -2607,7 +2607,7 @@ async def run_agent_loop(
                         # (DB > env > static > default). STAYS consumer-side — loop
                         # machinery, not stream construction.
                         _model_id = body.model or user_settings.llm_model
-                        per_call_budget = await get_per_call_timeout_async(_model_id, settings)
+                        per_call_budget = await get_per_call_timeout_async(_model_id, settings, provider=active_provider_name)
                         # Phase 066 D-066-07: capture for outer-except error format
                         _last_iteration = iteration
                         _last_model_id = _model_id

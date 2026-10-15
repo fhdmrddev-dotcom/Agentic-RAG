@@ -617,6 +617,13 @@ export const MODEL_TIMEOUT_HELP_LINE =
   `Between ${MODEL_TIMEOUT_MIN_S} and ${MODEL_TIMEOUT_MAX_S} seconds. ` +
   "Local models and Google models are tried once. Other cloud providers retry quick failures up to 2 times."
 
+/** Phase 282 D-27 / D-29 — the timeout a model gets when none is stored, by provider class.
+ *  Mirrors `backend/app/config.py` `DEFAULT_LLM_CALL_TIMEOUT_SECONDS` (300) and
+ *  `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` (900); a backend test reads both lines. Shown as
+ *  the Add form's Timeout placeholder so a blank field says what it will mean. */
+export const MODEL_TIMEOUT_DEFAULT_S = 300
+export const MODEL_TIMEOUT_DEFAULT_SELF_HOSTED_S = 900
+
 /** True when `value` is a legal write for `column` — non-integer / out-of-range reads false.
  *  A column with no declared bound (every non-integer column) is always legal here; its own
  *  type/enum guard lives server-side. */
@@ -642,6 +649,8 @@ export interface AddModelBody {
   native_tools?: boolean | null
   deprecated?: boolean
   deprecated_reason?: string | null
+  /** Phase 282 D-29 — optional; omitted when blank so the resolver default applies. */
+  llm_call_timeout_seconds?: number | null
 }
 
 // ── Plan-07 shape reconciliation (149-06 SUMMARY handoff) ─────────────────────

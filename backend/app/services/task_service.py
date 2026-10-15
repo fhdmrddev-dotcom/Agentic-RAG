@@ -300,7 +300,7 @@ async def _stream_one_iteration(
     # Phase 282 (FIX-06, D-01): the per-model budget reaches the client constructor and the
     # OpenAI-family open guard. A TimeoutError from that guard propagates to the sub-agent
     # exactly as any provider error from open_stream does.
-    _timeout_s = await get_per_call_timeout_async(model, settings)
+    _timeout_s = await get_per_call_timeout_async(model, settings, provider=_provider)
     _gw_request = GatewayRequest(
         messages=messages,
         model=model,

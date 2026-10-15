@@ -33,7 +33,12 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, Check, ChevronDown, Loader2, Lock, Plus, RotateCcw, Trash2, Unlock } from "lucide-react"
 
 import { ApiError, type AddModelBody, type ModelCapabilityPatch, type ModelRegistryRow } from "@/lib/api"
-import { MODEL_TIMEOUT_HELP_LINE } from "@/lib/api/admin"
+import {
+  MODEL_CAP_INT_BOUNDS,
+  MODEL_TIMEOUT_DEFAULT_S,
+  MODEL_TIMEOUT_DEFAULT_SELF_HOSTED_S,
+  MODEL_TIMEOUT_HELP_LINE,
+} from "@/lib/api/admin"
 import { familyDefaults } from "@/lib/model-defaults"
 import { providerLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
@@ -1466,6 +1471,8 @@ function AddModelForm({
   const [toolsDraft, setToolsDraft] = useState<"unknown" | "native" | "none">("unknown")
   const [touched, setTouched] = useState({ ctx: false, out: false, tools: false })
   const [note, setNote] = useState("")
+  // Phase 282 D-29: blank = store nothing, so the resolver default (the placeholder) applies.
+  const [timeoutDraft, setTimeoutDraft] = useState("")
   const [busy, setBusy] = useState(false)
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
 
@@ -1510,6 +1517,8 @@ function AddModelForm({
     if (ctx !== undefined) body.context_window_tokens = ctx
     const out = numOrUndef(outValue)
     if (out !== undefined) body.max_output_tokens = out
+    const timeoutS = numOrUndef(timeoutDraft)
+    if (timeoutS !== undefined) body.llm_call_timeout_seconds = timeoutS
     if (toolsValue === "native") body.native_tools = true
     else if (toolsValue === "none") body.native_tools = false
     // OMIT native_tools entirely on "unknown" (never a bare false).
@@ -1628,6 +1637,23 @@ function AddModelForm({
             <option value="none">none</option>
           </select>
           <CapSourceTag source={toolsSource} />
+        </CapField>
+        {/* Phase 282 D-29: local models are slower, so the Timeout can be set at add time. The
+            placeholder is the default a blank field means — read from the admin.ts mirror. */}
+        <CapField label="Timeout">
+          <input
+            type="number"
+            min={MODEL_CAP_INT_BOUNDS.llm_call_timeout_seconds[0]}
+            max={MODEL_CAP_INT_BOUNDS.llm_call_timeout_seconds[1]}
+            value={timeoutDraft}
+            placeholder={String(
+              SELF_HOSTED_PROVIDERS.has(provider) ? MODEL_TIMEOUT_DEFAULT_SELF_HOSTED_S : MODEL_TIMEOUT_DEFAULT_S,
+            )}
+            aria-label="Timeout seconds"
+            onChange={(e) => setTimeoutDraft(e.target.value)}
+            className="w-24 rounded-[6px] border border-border bg-background px-2 py-1 font-mono text-xs text-foreground placeholder:text-muted-foreground/50"
+          />
+          <span className="text-[10px] text-muted-foreground">s · blank = default</span>
         </CapField>
       </div>
 

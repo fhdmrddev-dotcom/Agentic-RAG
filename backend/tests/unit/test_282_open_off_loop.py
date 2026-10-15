@@ -266,7 +266,7 @@ async def test_forced_emit_descends_on_an_open_guard_timeout(monkeypatch):
         calls.append(request)
         raise TimeoutError
 
-    async def _budget(model, settings_obj=None):
+    async def _budget(model, settings_obj=None, *, provider=None):  # 282-04 D-28: provider kwarg
         return 7
 
     monkeypatch.setattr(fe, "open_stream", _timeout_open)

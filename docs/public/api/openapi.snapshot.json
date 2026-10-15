@@ -15499,6 +15499,17 @@
        }
       ],
       "title": "Deprecated Reason"
+     },
+     "llm_call_timeout_seconds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Llm Call Timeout Seconds"
      }
     },
     "type": "object",

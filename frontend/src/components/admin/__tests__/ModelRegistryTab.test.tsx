@@ -832,3 +832,56 @@ describe("ModelRegistryTab (282) — the Timeout help line and the 422 refusal",
     expect(onSet).toHaveBeenCalledWith("gpt-5.6-sol", { llm_call_timeout_seconds: 1801 })
   })
 })
+
+// ── Phase 282 Plan 04 (D-29) — a Timeout on the + Add model by ID form ──
+// Local models are slower (operator, 2026-10-15). The field's placeholder names the default that
+// applies when it is left blank (900 s self-hosted, 300 s otherwise — config.py D-27), blank sends
+// NO key (so nothing is stored and the resolver default applies), and a typed value is a number.
+describe("ModelRegistryTab (282-04) — Timeout on the Add model by ID form", () => {
+  async function openForm(onAddModel = vi.fn().mockResolvedValue(undefined)) {
+    const user = userEvent.setup()
+    renderTab(
+      <ModelRegistryTab
+        rows={[makeRow()]}
+        onSetCapability={noop}
+        onLock={noop}
+        onAddModel={onAddModel}
+        showTechnical={false}
+      />,
+    )
+    await user.click(screen.getByRole("button", { name: /add model by id/i }))
+    return { user, onAddModel }
+  }
+
+  it("shows a Timeout input whose placeholder is the provider's default (300 cloud → 900 self-hosted)", async () => {
+    const { user } = await openForm()
+    const t = screen.getByRole("spinbutton", { name: /^timeout seconds$/i })
+    expect(t).toHaveDisplayValue("")
+    expect(t).toHaveAttribute("placeholder", "300")
+    await user.selectOptions(screen.getByRole("combobox", { name: /provider/i }), "lmstudio")
+    expect(screen.getByRole("spinbutton", { name: /^timeout seconds$/i })).toHaveAttribute("placeholder", "900")
+  })
+
+  it("blank Timeout sends no llm_call_timeout_seconds key", async () => {
+    const { user, onAddModel } = await openForm()
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "spark-x2.5-4b")
+    await user.selectOptions(screen.getByRole("combobox", { name: /provider/i }), "lmstudio")
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+    await waitFor(() => expect(onAddModel).toHaveBeenCalledTimes(1))
+    expect(onAddModel.mock.calls[0][0]).not.toHaveProperty("llm_call_timeout_seconds")
+  })
+
+  it("a typed Timeout is sent as a number", async () => {
+    const { user, onAddModel } = await openForm()
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "spark-x2.5-4b")
+    await user.selectOptions(screen.getByRole("combobox", { name: /provider/i }), "lmstudio")
+    await user.type(screen.getByRole("spinbutton", { name: /^timeout seconds$/i }), "1200")
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+    await waitFor(() => expect(onAddModel).toHaveBeenCalledTimes(1))
+    expect(onAddModel.mock.calls[0][0]).toMatchObject({
+      model_id: "spark-x2.5-4b",
+      provider: "lmstudio",
+      llm_call_timeout_seconds: 1200,
+    })
+  })
+})
