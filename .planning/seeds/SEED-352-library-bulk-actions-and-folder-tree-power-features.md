@@ -3,9 +3,9 @@ seed_id: SEED-352
 title: Library power features deferred since v1.0 — bulk move/copy/delete, folder-tree search and keyboard navigation, folder templates, drag-to-reorder, and import from a local folder
 created: 2026-10-04
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Reviewed at Phase 284 discuss (2026-10-16): fires on 284 files, but every item is a new capability (bulk actions, tree search, templates, drag reorder, local import); 284 is a scale fix with no new capability. Trigger unchanged."
 trigger_when: "Any phase whose files_modified names FolderTree.tsx, FolderNode.tsx, DocumentList.tsx, LibraryPage.tsx or backend/app/api/folders.py; OR a user or demo needs to move or delete more than a handful of documents at once; OR a library grows past ~50 folders."
 trigger_paths: ["frontend/src/components/ingestion/FolderTree.tsx", "frontend/src/components/ingestion/FolderNode.tsx", "frontend/src/components/ingestion/DocumentList.tsx", "frontend/src/components/ingestion/DocumentRow.tsx", "frontend/src/pages/LibraryPage.tsx", "backend/app/api/folders.py", "backend/app/api/documents.py"]
 trigger_surfaces: ["library"]
