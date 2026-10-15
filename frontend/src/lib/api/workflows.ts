@@ -11,6 +11,7 @@
  */
 
 import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders, getAuthToken } from "./_core"
+import { EntitlementRefusalError } from "./_core"
 import type { GenerateResult, GenerateWorkflowBody, PublishOutcome, PublishVerdict, WorkflowDefinitionJSON, WorkflowDraftRow, WorkflowDraftWriteResult } from "./knowledge"
 export class WorkflowConflictError extends Error {
   constructor(message = "workflow is published and cannot be modified") {
@@ -960,7 +961,13 @@ export async function generateWorkflow(
     body: JSON.stringify(body),
     signal,
   })
-  if (!res.ok) throw new Error(entitlementRefusalMessage(await res.json().catch(() => null)) ?? `Failed to generate workflow (status ${res.status})`)
+  if (!res.ok) {
+    // 281-REVIEW WR-03: the tier refusal is thrown TYPED, so the describe door can tell the
+    // server's sentence from a status line.
+    const tierMsg = entitlementRefusalMessage(await res.json().catch(() => null))
+    if (tierMsg) throw new EntitlementRefusalError(tierMsg)
+    throw new Error(`Failed to generate workflow (status ${res.status})`)
+  }
   return (await res.json()) as GenerateResult
 }
 

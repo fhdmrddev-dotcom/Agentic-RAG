@@ -125,6 +125,10 @@ import type { BuilderPhase, BuilderStore, TemplateAssetDescriptor } from "./buil
 // Phase 281 (FIX-10) — the describe refusal table's KEY builders. A leaf module: it imports
 // only the door vocabulary, so no cycle back to the page or the door shell can form here.
 import { REQUEST_FAILED_KEY, refusalKey } from "./describeRefusalVocabulary"
+import { ENTITLEMENT_REFUSED_KEY } from "./describeRefusalVocabulary"
+// Imported from `_core` directly (not the `@/lib/api` barrel), so suites that mock the
+// barrel wholesale still see the real class.
+import { EntitlementRefusalError } from "@/lib/api/_core"
 import type { TemplatePlaceholdersState } from "@/hooks/useTemplatePlaceholders"
 
 /**
@@ -628,9 +632,12 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
         store.getState().setErrorState(refusalKey(result.error, result.reason_code), result.detail)
       }
     } catch (e) {
-      // Phase 281 (D-24): the thrown message may be a server SENTENCE (the plan-tier refusal),
-      // so it rides as the detail of the client-only REQUEST_FAILED_KEY and renders as is.
-      store.getState().setErrorState(REQUEST_FAILED_KEY, e instanceof Error ? e.message : undefined)
+      // Phase 281 (D-24) / 281-REVIEW WR-03: only a TYPED entitlement refusal carries a server
+      // SENTENCE; any other throw rides REQUEST_FAILED_KEY and its text stays reveal-only.
+      store.getState().setErrorState(
+        e instanceof EntitlementRefusalError ? ENTITLEMENT_REFUSED_KEY : REQUEST_FAILED_KEY,
+        e instanceof Error ? e.message : undefined,
+      )
     }
     // ⚠ `templateRead` JOINS THE DEPENDENCY LIST, which is why the reading and the wire must
     // live in ONE module: a reading held on the host would either be stale in this closure or

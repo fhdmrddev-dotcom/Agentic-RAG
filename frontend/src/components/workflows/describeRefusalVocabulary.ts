@@ -40,9 +40,10 @@
  * ── THE CATCH ARM (D-24) ─────────────────────────────────────────────────────────────────
  * A request that fails before a body is read (a non-OK status) throws in `generateWorkflow`, and
  * its message may be a real server SENTENCE — the entitlement refusal ("Your plan doesn't
- * include …") is the case that matters. The hook stores `REQUEST_FAILED_KEY` with that message as
- * the detail, and this table renders the message AS IS. The unknown-code fallback must never
- * swallow a sentence the server already wrote for a person.
+ * include …") is the case that matters. 281-REVIEW WR-03: that sentence arrives TYPED
+ * (`EntitlementRefusalError`); the hook stores it under `ENTITLEMENT_REFUSED_KEY` and this table
+ * renders it AS IS. Every OTHER throw (`Failed to fetch`, `… (status 502)`) is stored under
+ * `REQUEST_FAILED_KEY` and reads the fallback sentence, its raw text only under the reveal.
  *
  * ── WHAT THE PAGE DOES WITH THE RESULT ───────────────────────────────────────────────────
  * `sentence` and `next` always render. `technical` (the key, its two parts joined by " · ") and
@@ -108,6 +109,10 @@ export const REFUSAL_FALLBACK: RefusalWords = {
 /** A CLIENT-ONLY key for the hook's catch arm (a thrown request). Never a server code. */
 export const REQUEST_FAILED_KEY = "request_failed"
 
+/** 281-REVIEW WR-03: a CLIENT-ONLY key for a TYPED entitlement refusal
+ *  (`EntitlementRefusalError`) — the one thrown message the server wrote for a person. */
+export const ENTITLEMENT_REFUSED_KEY = "entitlement_refused"
+
 /** The key the hook stores: the server code, joined to its additive sub-reason when present. */
 export function refusalKey(code: string, reasonCode?: string | null): string {
   return reasonCode ? `${code}:${reasonCode}` : code
@@ -134,10 +139,15 @@ export function describeRefusal(
   if (!key) {
     return { ...REFUSAL_FALLBACK, technical: null, technicalDetail }
   }
-  if (key === REQUEST_FAILED_KEY) {
+  if (key === ENTITLEMENT_REFUSED_KEY) {
     // D-24: a sentence the server already wrote for a person renders as is.
     const sentence = detail && detail.trim() ? detail : REFUSAL_FALLBACK.sentence
     return { sentence, next: REFUSAL_FALLBACK.next, technical: null, technicalDetail: null }
+  }
+  if (key === REQUEST_FAILED_KEY) {
+    // 281-REVIEW WR-03: any OTHER thrown text (`Failed to fetch`, a status line) is not words
+    // for a person — the table's sentence renders, and the raw text only under the reveal.
+    return { ...REFUSAL_FALLBACK, technical: null, technicalDetail }
   }
   if (isKnownKey(key)) {
     return { ...REFUSAL_FOR_KEY[key], technical: technicalOf(key), technicalDetail }
