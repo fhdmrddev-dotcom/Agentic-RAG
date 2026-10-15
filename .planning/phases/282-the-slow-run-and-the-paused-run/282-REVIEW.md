@@ -29,7 +29,8 @@ findings:
   warning: 5
   info: 4
   total: 10
-status: issues_found
+status: partially_fixed
+fixed_at: 2026-10-15
 ---
 
 # Phase 282: Code Review Report
@@ -285,6 +286,80 @@ value above 1800 that the resolver will clamp. Meanwhile the form's placeholder 
 default (300/900).
 **Fix:** In the tombstone arm, write `NULL` for every `_ADD_MODEL_CAP_COLUMNS` entry that the body
 omits.
+
+## Fix log
+
+Fixed 2026-10-15. Scope was Critical + Warning only; IN-01..IN-04 were left as they are.
+Each finding was first driven RED by a unit test that failed on `3268b6228` because of the
+defect. The fix came after that, and then the test was run green. Backend pins are in
+`backend/tests/unit/test_282_review_fixes.py`; the WR-05 pin is in `ModelRegistryTab.test.tsx`.
+
+| Finding | Outcome | Commit | What the RED test showed before the fix |
+|---|---|---|---|
+| CR-01 | **fixed** | `817cc2b3b` | A request with registry vendor `openrouter` and LM Studio routing got `max_retries` 2, not 0. So did `open_stream("ollama", …)` for an id the registry calls `deepseek`. |
+| WR-01 | **partially fixed** (rest deferred) | `ff769333e` | With the thread hop held 0.3 s and a budget of 0.05 s, the open still started after `TimeoutError`. |
+| WR-02 | **fixed** | `2cfae5911` | `runs.error` was `""` for a sub-agent whose open timed out. An exception with an empty message also recorded `""`. |
+| WR-03 | **fixed** (label deferred) | `5d35ea1c9` | A `force_strict` ladder sent the prompt 3 times after a `TimeoutError`. |
+| WR-04 | **fixed** | `40c51678e` | `my-local=2400` was dropped from the parsed overrides instead of clamped to 1800. |
+| WR-05 | **fixed** | `4ad7ad089` | The Add form accepted `1e3` and `900.5` and sent `1` and `900`. |
+
+**CR-01.** `GatewayRequest` has a new `routing_provider` field. `open_stream` stamps it from its
+own first argument, which is the routing provider at all three callers: agent_loop's
+`user_settings.active_provider`, task_service's `_provider`, and forced_emit's target provider,
+whose endpoint forced_emit injects. Both OpenAI-family adapters now pick `max_retries` through
+one method, `GatewayRequest.retries_provider()`. It checks routing provider, then
+`user_settings.active_provider`, then the adapter provider. `active_provider_name` still keys
+the `<think>` and usage normalisation, as before. The self-hosted predicate is still only
+`_SELF_HOSTED_PROVIDERS`. With this fix, the Model Registry help line ("Local models … are tried
+once") is true for the unregistered slugs in the table above.
+
+**WR-01. Fixed:** a `threading.Event` is set when the guard exits. If the open is still queued
+in the executor at that point, it raises `_OpenAbandoned` and never calls `create()`. So no
+request is started for a run that has already ended. **Deferred:** an open that is already
+inside `create()` when the guard fires still runs to the end, including the SDK's own retries.
+After CR-01 this affects cloud providers only (`max_retries=2`), because self-hosted now gets 0
+retries. Stopping an SDK retry that is already in flight needs a new mechanism, for example an
+httpx request hook on the client that checks the flag. The only other option is to drop cloud
+retries on this path, which reverses D-19's fast retry on 429/5xx. Both choices are bigger than
+a review fix. Capping the client timeout at the remaining budget was also considered, and not
+done: the retries start only after the guard fires, so a cap does not stop them. Re-open when
+cloud spend after a `timed_out` run is observed, or when the client builder next changes.
+
+**WR-02.** The open in `_stream_one_iteration` now attaches its budget to the `TimeoutError`
+(`exc.budget_s`). `run_task_sub_agent` has its own `except TimeoutError` arm, which records
+`run_producer._timed_out_error(budget, step, model)`. That is the same sentence the Deep run
+records, so no new copy was written. The generic arm now falls back to `type(e).__name__` when
+`str(e)` is empty. The budget is carried on the exception rather than looked up again, because
+`test_282_local_timeout_default` pins exactly one `get_per_call_timeout_async` call site in
+`task_service.py`.
+
+**WR-03.** `except TimeoutError` now comes before the per-rung `except Exception`. It returns
+the `_failure` floor at once and passes the ladder token totals explicitly (Phase 256 S-5). The
+`_failure` docstring records that this is now a second call site. The 282 test that pinned the
+old behaviour (`test_forced_emit_descends_on_an_open_guard_timeout`, which expected 2 calls) was
+renamed `…ends_the_ladder…` and now expects 1 call. **Deferred: the label.** The failure value
+is still `provider_error`, not `timed_out`. A new value would need a new `emit_cause` kind, its
+sentence and Check line, and a check of every consumer of `failure`: phase_types, harness_engine,
+publish_service, eval_runner, ingest_enrich. The behaviour (no re-send, no stacked budgets) is
+the defect, and it is fixed. The step still reads "the model provider returned an error. Check
+that this step's model provider is reachable."
+
+**WR-04.** The env parser clamps a value above 1800 to 1800 and logs it. Values below 1 and
+non-integers are still dropped.
+
+**WR-05.** A non-blank Timeout must match `^-?\d+$`. Anything else stops in the form's
+`role=alert` with "Timeout must be a whole number of seconds." and nothing is sent. The sign is
+allowed so that 0 and -5 still reach the server's range sentence. A blank field still sends no
+key. The count-gate pin for `ModelRegistryTab.test.tsx` was raised from 37 to 39 (measured,
+39/39) in the same commit.
+
+**Gates (2026-10-15):**
+- `pytest tests/unit -k 282`: 101 passed.
+- `check-backend-unit-baseline.cjs`: 71 failed, 7546 passed, 0 errors. The gate passed at the
+  71 ceiling.
+- `ModelRegistryTab.test.tsx` plus its a11y suite: 52/52 passed.
+- `tsc -p tsconfig.app.json`: 103 lines, unchanged, none in `ModelRegistryTab.tsx`.
+- No public API model changed, so the OpenAPI snapshot was not regenerated.
 
 ---
 
