@@ -4,10 +4,10 @@ title: An Anthropic "credit balance is too low" 400 is shown in chat as "Model p
 reported: 2026-10-15
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [backend/provider-routing, frontend/chat-errors]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "fix 5358a243a, 2026-10-15"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -40,3 +40,14 @@ without checking for Anthropic's billing message.
 
 A G-3-sized copy fix at the error-classification boundary. Leave it open until a phase touches provider
 error copy.
+
+## Fixed and re-driven (2026-10-15)
+
+**The fix is commit `5358a243a`:**
+- A structured-body credit signal is now classified as `billing`: the message "credit balance is too low", or the `billing_error` type.
+- HTTP 402 is now `billing`.
+- An ordinary 400, or a crafted top-level message, stays `bad_request`.
+
+**Live check:** the `fix 261015 anthropic` row, on `claude-sonnet-5` with the account still out of credit, run `1fb459f7`, now shows *"Billing error: your account has insufficient credits. Please check your provider's billing dashboard."*
+
+**Not driven live:** OpenRouter's 402. That case is unit-proven only.

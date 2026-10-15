@@ -4,10 +4,10 @@ title: ask_user's schema REQUIRES timeout_seconds but calls it "Optional", so mo
 reported: 2026-10-15
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/agent-loop, backend/tools, frontend/ask-user]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "fix 5d0 (see git log fix(BUG-261015-03)), 2026-10-15"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -58,3 +58,19 @@ Small and contained (G-3 sized): describe the parameter so models pass `null` un
 deadline, and/or apply a server-side floor. Because this changes provider-facing tool text, a
 cross-provider re-drive of the pause prompt is required before it is closed. Not folded into 282: 282's
 pause rows passed once the wait was long enough, and this is a separate defect found during the drive.
+
+## Fixed and re-driven (2026-10-15)
+
+**The fix** is in commit `fix(BUG-261015-03)`. It has two parts:
+- **A server floor:** `ask_user_min_timeout_seconds = 300`. `_resolve_ask_timeout` clamps the model's value to between 300 and 1800 s.
+- **The schema text** now tells the model to pass null unless the user asked for a deadline. `timeout_seconds` stays in `required` for strict mode.
+
+Two pins were changed deliberately:
+- **`test_278_pure_move`** retires `_handle_ask_user` by name, with the reason recorded.
+- **`test_278_registry_pin`** re-captured its digests. With the old text restored, all 8 combinations hash to the 278 values, which proves the only change is this description.
+
+**The live re-drive, without the "1200" hint** (threads `fix2 261015 *`):
+- **Rows:** 7 of 7 paused for more than 100 s, each stored at 300 s. All were answered "Blue" and completed "You chose Blue": gpt-5.6-sol, gemini-3.5-flash, deepseek-v4-pro, glm-5.2, MiniMax-M3, kimi-k2.6 and spark-x2.5-4b.
+- **Spark** asked for 30 s, and the server raised it to 300.
+- **Rows not driven:** Anthropic and OpenRouter were ⛔ for billing.
+- **An earlier attempt is void.** All 7 of its pauses were interrupted by a concurrent unit-suite run, which is BUG-261015-06, not this bug.
