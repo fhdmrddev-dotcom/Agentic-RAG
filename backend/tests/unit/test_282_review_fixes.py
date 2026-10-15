@@ -267,3 +267,16 @@ async def test_wr03_a_non_timeout_raise_still_descends(monkeypatch):
     )
     assert len(calls) == 3
     assert result["failure"] == "provider_error"
+
+
+# ── WR-04 ─────────────────────────────────────────────────────────────────────────────────
+
+
+def test_wr04_env_override_above_the_ceiling_clamps_like_the_db_tier():
+    out = config._parse_llm_call_timeout_overrides("my-local=2400,cloud-x=600")
+    assert out == {"my-local": config._LLM_CALL_TIMEOUT_MAX_S, "cloud-x": 600}
+
+
+@pytest.mark.parametrize("bad", ["0", "-5", "abc", "900.5"])
+def test_wr04_env_override_below_one_or_non_integer_is_still_dropped(bad):
+    assert config._parse_llm_call_timeout_overrides(f"my-local={bad}") == {}

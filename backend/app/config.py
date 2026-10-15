@@ -866,7 +866,8 @@ def _parse_llm_call_timeout_overrides(raw: str) -> dict[str, int]:
 
     T-066-05 mitigation: every value is integer-coerced and bounded to
     ``[_LLM_CALL_TIMEOUT_MIN_S, _LLM_CALL_TIMEOUT_MAX_S]`` (1..1800 since Phase 282 D-21).
-    Out-of-range values are dropped with a logged warning.
+    Values below the minimum are dropped and values above the maximum are clamped to it
+    (282-REVIEW WR-04, matching the DB tier), each with a logged warning.
     """
     out: dict[str, int] = {}
     if not raw or not raw.strip():
@@ -886,13 +887,21 @@ def _parse_llm_call_timeout_overrides(raw: str) -> dict[str, int]:
                 model_id, val_str,
             )
             continue
-        if val < _LLM_CALL_TIMEOUT_MIN_S or val > _LLM_CALL_TIMEOUT_MAX_S:
+        if val < _LLM_CALL_TIMEOUT_MIN_S:
             logger.warning(
                 "LLM_CALL_TIMEOUT_OVERRIDES: ignoring out-of-range value for %r: %d "
                 "(must be in [%d, %d])",
                 model_id, val, _LLM_CALL_TIMEOUT_MIN_S, _LLM_CALL_TIMEOUT_MAX_S,
             )
             continue
+        if val > _LLM_CALL_TIMEOUT_MAX_S:
+            # 282-REVIEW WR-04: clamp, as the DB tier does (D-08) — the operator chose a long
+            # timeout, so the nearest legal one honours it. Dropping it fell back to 300/900 s.
+            logger.warning(
+                "LLM_CALL_TIMEOUT_OVERRIDES: %r=%d exceeds %d; using %d",
+                model_id, val, _LLM_CALL_TIMEOUT_MAX_S, _LLM_CALL_TIMEOUT_MAX_S,
+            )
+            val = _LLM_CALL_TIMEOUT_MAX_S
         if val < 30:
             logger.warning(
                 "LLM_CALL_TIMEOUT_OVERRIDES: tight per-call budget for %r: %ds "
