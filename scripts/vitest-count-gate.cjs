@@ -4140,6 +4140,7 @@ const BASELINE = {
   // ── Phase 271-03 — every suite this plan CREATED, at its measured passing count. BOTH KNOBS, SAME COMMIT. ──
   "findState.test.ts": 54, // 271-03 (2026-10-03) · RE-PINNED 49 → 54 at 275-02 (+5 Include archived cases, D-04)
   "documents.search271.test.ts": 3, // 271-03
+  "libraryPaging284.test.ts": 22, // 284-01 Task 1 — the paged wire contract. BOTH KNOBS, SAME COMMIT.
   "useDocumentFind.test.tsx": 11, // 271-03
   "relationshipLabels.test.ts": 5, // 271-03
   "LinkTargetCombobox.test.tsx": 9, // 271-03
@@ -6116,6 +6117,8 @@ const TARGETS = [
   // Phase 271-03 — every suite this plan created. FILE-LEVEL.
   "src/pages/__tests__/findState.test.ts",
   "src/lib/api/__tests__/documents.search271.test.ts",
+  // Phase 284-01 Task 1 — the paged wire contract. FILE-LEVEL.
+  "src/lib/api/__tests__/libraryPaging284.test.ts",
   "src/hooks/__tests__/useDocumentFind.test.tsx",
   "src/components/relationships/relationshipLabels.test.ts",
   "src/components/relationships/LinkTargetCombobox.test.tsx",
