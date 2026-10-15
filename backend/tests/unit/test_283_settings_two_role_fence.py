@@ -54,13 +54,27 @@ _SETTINGS_ROW = {
 _OVERRIDES = [{"model_id": "gpt-4o", "provider": "openai", "enabled": True, "deprecated": False}]
 
 
-def _reset_caches():
-    us._settings_cache = None
-    us._settings_cache_time = 0.0
-    us._model_overrides_cache = {}
-    us._model_overrides_cache_time = 0.0
-    us._all_model_overrides_cache = {}
-    us._all_model_overrides_cache_time = 0.0
+def _reset_caches(monkeypatch):
+    """Cold-start every settings cache for THIS test, and give the originals back afterwards.
+
+    283-REVIEW WR-01: these were plain assignments, so the row this file primes (including
+    ``openai_api_key: "sk-test"``) stayed in the process-wide cache after the test, stamped
+    fresh — and ``load_app_settings()`` has no TTL, so any later test that read settings
+    without resetting first got this file's row. ``monkeypatch.setattr`` restores the original
+    BINDING at teardown. That is sufficient because the loaders rebind these names rather than
+    mutating them in place, and each call below passes a fresh object.
+    """
+    for name, cold in [
+        ("_settings_cache", None),
+        ("_settings_cache_time", 0.0),
+        ("_model_overrides_cache", {}),
+        ("_model_overrides_cache_time", 0.0),
+        ("_all_model_overrides_cache", {}),
+        ("_all_model_overrides_cache_time", 0.0),
+        ("_removed_model_ids_cache", set()),
+        ("_removed_model_ids_cache_time", 0.0),
+    ]:
+        monkeypatch.setattr(us, name, cold)
 
 
 def _prime(monkeypatch, pool, who):
@@ -85,7 +99,7 @@ def _prime(monkeypatch, pool, who):
         return await inner(sql, *args)
 
     monkeypatch.setattr(pool._conn, "fetchrow", fetchrow)
-    _reset_caches()
+    _reset_caches(monkeypatch)
     app.dependency_overrides[get_current_user] = lambda: {"id": who, "email": f"{who[:4]}@x.test"}
 
 
