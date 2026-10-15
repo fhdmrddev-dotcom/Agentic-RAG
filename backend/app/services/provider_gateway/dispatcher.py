@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, AsyncIterator
 
@@ -192,6 +193,10 @@ def _open_openai_family(request: GatewayRequest):
     return open_openai_compat_stream(request)
 
 
+class _OpenAbandoned(Exception):
+    """The run gave up on this open before its thread started; nothing was sent (WR-01)."""
+
+
 def _close_late_stream(task: "asyncio.Future") -> None:
     """Done-callback for an open that finished AFTER its guard fired: close the stream it
     returned instead of leaking the httpx response (a cloud provider would keep generating
@@ -217,11 +222,23 @@ async def _open_off_loop(request: GatewayRequest):
     """
     loop = asyncio.get_running_loop()
     deadline = None if request.timeout_s is None else loop.time() + request.timeout_s
-    task = asyncio.ensure_future(asyncio.to_thread(_open_openai_family, request))
+    # 282-REVIEW WR-01: the hop can sit queued behind busy drains in the default executor. If
+    # the guard fires (or the run is cancelled) first, the queued work item must not start a
+    # request nobody will read. An open ALREADY inside ``create()`` is not stopped by this —
+    # see the deferral recorded in 282-REVIEW.md.
+    abandoned = threading.Event()
+
+    def _open_unless_abandoned(req: GatewayRequest):
+        if abandoned.is_set():
+            raise _OpenAbandoned()
+        return _open_openai_family(req)
+
+    task = asyncio.ensure_future(asyncio.to_thread(_open_unless_abandoned, request))
     try:
         async with asyncio.timeout_at(deadline):
             stream, mode = await asyncio.shield(task)
     except BaseException:
+        abandoned.set()
         task.add_done_callback(_close_late_stream)
         raise
     if deadline is not None:

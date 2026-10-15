@@ -106,3 +106,31 @@ def test_cr01_responses_adapter_keys_retries_on_the_same_routing_provider(monkey
     with pytest.raises(_Stop):
         openai_responses.open_openai_responses_stream(req)
     assert rec["max_retries"] == 0
+
+
+# ── WR-01 ─────────────────────────────────────────────────────────────────────────────────
+
+
+async def test_wr01_an_open_still_queued_when_the_guard_fires_never_starts(monkeypatch):
+    """Simulate a saturated default executor: the thread hop waits 0.3 s before running the
+    open, and the run's budget is 0.05 s. The guard fires first; the shielded work item must
+    then NOT open a request nobody will read."""
+    opened: list = []
+
+    def _fake_open(request):
+        opened.append(request)
+        raise _Stop
+
+    real_to_thread = asyncio.to_thread
+
+    async def _queued_to_thread(fn, *args, **kwargs):
+        await asyncio.sleep(0.3)
+        return await real_to_thread(fn, *args, **kwargs)
+
+    monkeypatch.setattr(dispatcher, "_open_openai_family", _fake_open)
+    monkeypatch.setattr(dispatcher.asyncio, "to_thread", _queued_to_thread)
+    req = GatewayRequest(messages=[], model="m", active_provider_name="openai", timeout_s=0.05)
+    with pytest.raises(TimeoutError):
+        await dispatcher._open_off_loop(req)
+    await asyncio.sleep(0.5)  # let the shielded work item run to its end
+    assert opened == []
