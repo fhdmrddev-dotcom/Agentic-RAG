@@ -1,7 +1,8 @@
 ---
 phase: 284
 slug: library-at-scale
-status: draft
+status: approved
+reviewed_at: 2026-10-16
 shadcn_initialized: true
 preset: not applicable (components.json style "default", baseColor slate, cssVariables, iconLibrary lucide; Aether Deep Midnight tokens in frontend/src/index.css .dark)
 created: 2026-10-16
@@ -51,6 +52,8 @@ If the planner wants a shared `LoadingRows` helper (SEED-248 "Where to start" §
 The helper must render exactly the skeleton vocabulary defined in §Loading vocabulary and must not be a fifth one.
 
 ---
+
+**Visual anchor (unchanged, shipped):** the documents list column is the focal point; the stat tiles, pager and counts are secondary. New loading and error states sit inside the list column and never compete with it. New copy is 400/600 at 14px/12px only; 700 and the micro-sizes (11px, 0.65rem, 0.7rem) are inherited on shipped elements and not used for new lines.
 
 ## Spacing Scale
 
@@ -308,8 +311,8 @@ Not a typeahead. The read is a bounded `GET /documents?kind=spreadsheet` page of
 | Loading | disabled, one option **"Loading rate sheets…"** |
 | Loaded, 0 | disabled, shipped option verbatim: "No Excel rate sheets found in Library", but only after success |
 | Loaded | options; the first is auto-selected (shipped) |
-| Loaded, total > 50 | below the select row, `text-[11px] text-muted-foreground`: **"Showing the 50 most recent of {M} spreadsheets."** |
-| Failed | disabled, one option **"Couldn't load rate sheets"**. Below the row, a **"Try again"** text button (`text-[11px] text-primary hover:underline`). |
+| Loaded, total > 50 | below the select row, `text-xs text-muted-foreground`: **"Showing the 50 most recent of {M} spreadsheets."** |
+| Failed | disabled, one option **"Couldn't load rate sheets"**. Below the row, a **"Try again"** text button (`text-xs text-primary hover:underline`). |
 
 ---
 
