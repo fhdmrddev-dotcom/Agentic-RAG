@@ -11,7 +11,7 @@ progress:
   total_plans: 18
   completed_plans: 18
   percent: 36
-stopped_at: Phase 282 planned (3 plans / 2 waves) — executing
+stopped_at: Phase 282 wave 1 merged (01+02) — wave 2 (282-03, operator checkpoints) next
 ---
 
 # Project State
@@ -54,6 +54,8 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ---
 
 ## Current Position
+
+**Phase 282 wave 1 (2026-10-15):** 282-01 (FIX-06) + 282-02 (FIX-07) executed in parallel worktrees, merged `fdcfde57d`, worktrees torn down (venv/node_modules intact). 01: backend gate 71 failed / 7508 passed / 0 errors, failing SET == base; loop stall 2.970 s → 0.065 s. 02: count gate 1 failing — `WorkflowBuilderPage.canvas.test.tsx` STACK_TRACE_ERROR timeout, file untouched by the phase, same failure in 280-04, green alone (inherited-vs-new to settle at 282-03 Task 1 by re-running at base). Merged-tree tsc set == base (58). Next: 282-03.
 
 **Phase 282 planned (2026-10-15, autonomous):** 3 plans / 2 waves (01 FIX-06 + 02 FIX-07 parallel → 03 board + G-4, non-autonomous). Research amendments D-19..D-26: ceiling **1800** (run watchdog 2400 s; prod max stored 1200), shared open+drain deadline + off-loop open (BUG-261015-02 measured 3.8 s loop stall), retries local/Google 0 · cloud 2. UI-SPEC approved (rev 1). Checker PASSED 0 blockers / 3 warnings (W2, W3 fixed in plan; W1 accepted). Ledger rows added for 5 files. 37 path-matched seeds reviewed, none folded.
 

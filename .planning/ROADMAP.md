@@ -298,8 +298,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 282-01-PLAN.md — wave 1 (TDD, backend + Registry): ceiling 1800 + boot check + DB-tier clamp, explicit timeout/max_retries on all four client families via `GatewayRequest.timeout_s`, off-loop OpenAI-family open under one shared deadline (BUG-261015-02), the 422 watchdog sentence + help line, the `did not answer within N s` run-failure text, SCALED 2 s < 3 s stub proof (FIX-06; D-01..D-09, D-19..D-23)
-- [ ] 282-02-PLAN.md — wave 1 (TDD, frontend): new `stores/askDraftStore.ts` (one draft per `tool_call_id`, GC on the ask slice, panel-home refcount), card reads it, radio keyboard + non-colour mark, `PendingAskStack home` prop + chat pointer (sketch 282 variant A), `home="panel"` on the panel mount, D-15 fences, global test reset (FIX-07; D-10..D-15, D-24)
+- [x] 282-01-PLAN.md — wave 1 (TDD, backend + Registry): ceiling 1800 + boot check + DB-tier clamp, explicit timeout/max_retries on all four client families via `GatewayRequest.timeout_s`, off-loop OpenAI-family open under one shared deadline (BUG-261015-02), the 422 watchdog sentence + help line, the `did not answer within N s` run-failure text, SCALED 2 s < 3 s stub proof (FIX-06; D-01..D-09, D-19..D-23)
+- [x] 282-02-PLAN.md — wave 1 (TDD, frontend): new `stores/askDraftStore.ts` (one draft per `tool_call_id`, GC on the ask slice, panel-home refcount), card reads it, radio keyboard + non-colour mark, `PendingAskStack home` prop + chat pointer (sketch 282 variant A), `home="panel"` on the panel mount, D-15 fences, global test reset (FIX-07; D-10..D-15, D-24)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -353,7 +353,7 @@ Plans:
 | 279. The Expert Scope Seam | 4/4 | Complete (verified 4/4; owed: D-18 cloud read, 4-axis rows, review leftovers) | 2026-10-14 |
 | 280. In Once, Out Clean | 4/4 | Complete | 2026-10-14 |
 | 281. A Refusal Names Its Cause | 4/4 | Complete (owed by operator decision: G-4 rows A, C, D; WR-02 kept by design) | 2026-10-15 |
-| 282. The Slow Run and the Paused Run | 0/3 | Planned | - |
+| 282. The Slow Run and the Paused Run | 2/3 | In Progress | - |
 | 283. Every Member Reaches Their Own Settings | 0/TBD | Not started | - |
 | 284. Library at Scale | 0/TBD | Not started | - |
 
