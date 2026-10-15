@@ -126,7 +126,12 @@ const BASELINE = {
   // the defect: `expect(...getAllByRole("option")).toHaveLength(8)` pinned the 8-cloud roster
   // that made every self-hosted model unaddable (SEED-172). A fence outside the gate that
   // pins a bug is worse than no fence — it reads as coverage.
-  "ModelRegistryTab.test.tsx": 29,
+  // Phase 282-03 — 29 -> 33, measured on the merged tree's one gate run (2026-10-15, 33/33 passed).
+  // The +4 are 282-01's Registry timeout cases (the 422 detail in the row's role=alert slot, the
+  // help line while the Timeout cell edits, no help line on another cell, no client pre-block).
+  // Raised here, not in 282-01, because this file was
+  // single-owner for wave 2 (D-25). A pin is a floor.
+  "ModelRegistryTab.test.tsx": 33,
   "addProviderRoster.lockstep.test.ts": 4,
   "hideControlLegibility.test.tsx": 6,
   // Phase 249 Plan 02 (MODEL-05) — the pick-time chip, its negative arm, its consequence text,

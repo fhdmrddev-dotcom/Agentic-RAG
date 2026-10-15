@@ -10999,7 +10999,7 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 78 / 39 / 2569 (was `75 / 38 / 2437`) | ⚠ **FIRES** | **273-03**: 1 schema + CHAT_ONLY_TOOLS + 1 get_tools line. ⛔ no anyOf/oneOf/type arrays in SHOW_ARTIFACT_TOOL (Gemini) |
+| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 79 / 40 / 2602 (was `78 / 39 / 2569`) | ⚠ **FIRES** | **282-01**: `get_llm_client` + keyword-only `timeout_s`/`max_retries` in the constructor, before `wrap_openai`; embedding client gets the named no-budget values. honoured by construction |
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on resolve_document_id / resolve_document / fetch_full_document; 272 pins retired by name |
@@ -11076,7 +11076,7 @@ cells rot within days.
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 271 / 91 / 2544 (was `265 / 90 / 2459`) | ⚠ **FIRES** | honoured by construction (**279-02**): ONE `_require_thread_org` at 4 doors; send stays 11 `if`s (pinned); OV-279-01 not required. ⛔ 0 new send-path branches |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 107 / 41 / 4991 (was `106 / 40 / 4982`) | ⚠ **FIRES** | honoured by construction (**279-03 C**, D-15): ONE constant + ONE widened 409 condition (`startsWith` lock prefix). ⛔ `onTurnBoundary` still FLUSHES before moving |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
-| [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
+| [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 17 / 8 / 489 | **FIRES** | honoured by construction (199) — ⚠ the 200 canvas port is REVERTED here (2026-08-20) |
@@ -11106,7 +11106,7 @@ cells rot within days.
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 17 / 11 / 1025 (was `16 / 10 / 1002`) | **FIRES** | **281-02** (`fa08ee6f1`): ONE additive `reason_code` on the 3 `connection_not_allowed` returns; 0 lines removed, `error`/`detail` byte-identical. honoured by construction (… / 214.1 / 281) |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | honoured by construction (193.2 / 197 / **214.1**) — `setDeclaredInputs` is the sixth `meta` writer, the shape the five before it take |
-| [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 16 / 10 / 646 | **FIRES** | honoured by construction (194 / 194.1) |
+| [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 9 / 5 / 756 (was `8 / 4 / 748`) | **FIRES** | ⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id`/`expert_id` (+8 lines). ⛔ NOT the shape to copy (C-5) |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 41 / 19 / 1750 | **FIRES** | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 61 / 24 / 3387 (was `60 / 23 / 3297`) | **FIRES** | **281-01** (`7704bd0f6`): the executor's cause wins over the validator's shape text; one keyword-only `reason_is_final`, one `_attempt_identity` helper. 5 new conditionals vs cap 4 → **OV-281-01** |
@@ -11121,15 +11121,15 @@ cells rot within days.
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 93 / 43 / 1186 (was `91 / 42 / 1171`) | **FIRES** | honoured by construction (**279-03 D/E**): ONE functional setActiveExpert + guarded catch; `&& !isStreaming`; 2 props. Zero new hooks. ⛔ no scope branch in send |
-| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 15 / 8 / 836 | **FIRES** | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open |
+| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 17 / 9 / 1013 (was `15 / 8 / 836`) | **FIRES** | honoured by construction (**282-02**): draft moved to askDraftStore (useState 9 → 7); APG radio keys + mark; `home` prop; +`AskPointer` (+177 lines). ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ **FIRES** | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 99 / 78 / 1546 (was `98 / 77 / 1542`) | ⚠ **FIRES** | **281-03** (`0b9841e55`): `EmitFailure` gains `template_fields_missing`, one union member, additive. Seam OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 90 / 65 / 977 (was `89 / 64 / 1002`) | ⚠ **FIRES** | Honoured by construction. **280-01** (D-30): the dead `_patch_postgrest_maybe_single` deleted (−25 L; it wrapped only the Single builder). ⛔ scheduler_service untouched |
-| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 91 / 53 / 1705 (was `90 / 52 / 1698`) | ⚠ **FIRES** | **275-03**: ONE flag `retention_sweep_enabled` (default False); hour, poll, lease stay code constants (D-37). Parity in 4 artifacts, same commit |
-| [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
+| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 92 / 54 / 1790 (was `91 / 53 / 1705`) | ⚠ **FIRES** | **282-01**: `_LLM_CALL_TIMEOUT_MAX_S` 1800 + boot check vs the 2400 s watchdog; `llm_max_retries_for`; named no-budget constants; DB-tier clamp. No env var added. honoured by construction |
+| [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 42 / 17 / 2024 (was `38 / 14 / 1968`) | ⚠ **FIRES** | honoured by construction (**282-01**): ONE timeout-only 422 arm naming the watchdog reason; other int columns keep their sentence. ⛔ order, 422 shape and every other guard byte-unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 95 / 37 / 2534 (was `92 / 36 / 2532`) | ⚠ **FIRES** | Honoured by construction. **280-01**: `delete_document` reads via `maybe_row` (D-09: foreign = random id = 404) + 6 `maybe_row` guards. **280-03**: `/upload` dup → `already_in_library`. 0 new `if` |
@@ -11140,7 +11140,7 @@ cells rot within days.
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 4 / 4 / 291 | ⚠ **FIRES** | ⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253; re-derived under CR-08. It crossed the threshold in the very commit that added its row (200) |
 | [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 15 / 7 / 791 | ⚠ **FIRES** | ⚠ row STALE a 2nd time (`12 / 5 / 749`; CLAUDE.md read `14/6/762`). ⚠ absent at 5 phases (added 196). honoured by construction (255 / **256-05**) |
-| [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 15 / 5 / 1640 | ⚠ **FIRES** | ⚠ row STALE at `10/4/1191` (+362 lines). honoured by construction (**249-01**): roster widened to 11 + words on 2 EXISTING controls. ⛔ `deprecated` semantics unchanged (D-149-04) |
+| [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 17 / 7 / 1679 (was `15 / 5 / 1640`) | ⚠ **FIRES** | honoured by construction (**282-01**): ONE help-line row while the Timeout cell edits + `aria-describedby`; the 422 reuses the in-row refusal slot. ⛔ `deprecated` semantics unchanged (D-149-04) |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 12 / 10 / 499 | ⚠ **FIRES** | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 phases |
 | [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 20 / 10 / 1372 (was `19 / 9 / 1343`) | ⚠ **FIRES** | **281-03** (`db9fa3cbd`): ONE optional `onOpenRun` prop; the run link renders only when present (D-28); "coming soon" deleted; `HardWall` untouched. honoured by construction (214 / 281) |
 | [`frontend/src/components/workflows/PhaseSpineGraph.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasespinegraphtsx) | 5 / 5 / 473 | ⚠ **FIRES** | honoured by construction (200) |
@@ -11270,9 +11270,9 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 14 / 7 / 991 (was `11 / 6 / 737`) | ⚠ **FIRES** | ⚠ STALE (`11/6/737`). **272-04**: the trend skips `invalid_filter` / `refused_retry` rows (4 lines, D-24); kind 2 still counts |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 66 / 32 / 3675 (was `65 / 31 / 3651`) | ⚠ **FIRES** | honoured by construction (**279-02 I**, WR-08): ONE guarded `_folder_scope_note` + ONE call; single-folder note byte-identical. ⛔ prompt-assembly seam OWED (OV-273-03) |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 68 / 33 / 3682 (was `66 / 32 / 3675`) | ⚠ **FIRES** | honoured by construction (**282-01**): 2 × `timeout_s=per_call_budget` + the drain helper reads the shared deadline (+1 If, +0 defs; no OV-282-01). ⛔ prompt-assembly seam OWED (OV-273-03) |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
-| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 21 / 10 / 1117 (was `17 / 9 / 1029`) | ⚠ **FIRES** | honoured by construction (**279-01/02**): 2 lazy imports repointed; ONE defaulted `scoped_folder_paths` field (WR-08). ⛔ runs is SELECT-only under the user JWT |
+| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 23 / 11 / 1145 (was `21 / 10 / 1117`) | ⚠ **FIRES** | honoured by construction (**282-01**): ONE `_timed_out_error` helper; `timed_out:` prefix byte-identical, sentence names model, N and the Registry. ⛔ runs is SELECT-only under the user JWT |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
 | [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
@@ -11364,9 +11364,9 @@ cells rot within days.
 | [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
 | [`.claude/settings.json`](docs/HOT-FILE-LEDGER.md#claudesettingsjson) | 9 / 4 / 202 | ⚠ **FIRES** | ⚠ **absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** `.claude/` is EXEMPT: no gate could ask. The ONE hook dispatch table; a too-narrow `matcher` fires NEVER, in silence |
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
-| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 21 / 12 / 973 (was `20 / 11 / 970`) | ⚠ **FIRES** | ⚠ STALE (`20/11/970`). **272-04**: D-09 lock shared BY REFERENCE, never a copy. **272-REVIEW WR-08**: sub-agent reads llm_content; date + vocabulary when it can search |
+| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 23 / 13 / 991 (was `21 / 12 / 973`) | ⚠ **FIRES** | honoured by construction (**282-01**): ONE awaited budget lookup forwarded to `open_stream`; a guard TimeoutError propagates like any provider error. D-09 lock shared BY REFERENCE |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
-| [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 11 / 7 / 716 (was `10 / 6 / 705`) | ⚠ **FIRES** | honoured by construction (**279-02 F**, IN-03): ONE constant + ONE IfExp; field-map path byte-identical; SEED-327 NOT fixed. ⛔ accumulators init `None` never `0` |
+| [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 12 / 8 / 724 (was `11 / 7 / 716`) | ⚠ **FIRES** | honoured by construction (**282-01**): ONE awaited budget lookup forwarded to every rung; a guard TimeoutError descends a rung via the existing except. ⛔ accumulators init `None` never `0` |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 2 / 1 / 103 | no (new) | young (created 257-01). The single home of token-to-USD conversion (METER-02 / D-257-13). CostResult with Decimal arithmetic and None on unrated. |
 | [`backend/app/db/rates.py`](docs/HOT-FILE-LEDGER.md#backendappdbratespy) | 9 / 2 / 898 (was `2 / 1 / 507`) | no (2 phases) | **268-02**: ONE `per_root` CTE feeds every spend query; root-only predicate appears ONCE. ⛔ never register a rate for model `unknown` (shell USD would double-count) |
 | [`backend/app/api/admin_spend.py`](docs/HOT-FILE-LEDGER.md#backendappapiadmin_spendpy) | 4 / 2 / 247 (was `1 / 1 / 202`) | no (2 phases) | honoured by construction (**268-02**): ONE validated `expert` Query on both routes (422 before the rates layer); 4 additive summary keys, every 257 key unchanged |
@@ -11509,10 +11509,10 @@ cells rot within days.
 | [`backend/app/security/secret_cipher.py`](docs/HOT-FILE-LEDGER.md#backendappsecuritysecret_cipherpy) | 5 / 2 / 256 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added mig 180 |
 | [`backend/app/services/oauth_refresh_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesoauth_refresh_servicepy) | 5 / 2 / 362 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added BUG-260912-01 |
 | [`frontend/src/components/sources/SourceFolderPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcefolderpickertsx) | 2 / 1 / 375 | no (1 phase) | ⚠ absent its entire life — row added BUG-260912-01 |
-| [`backend/app/services/provider_gateway/openai_compat.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_compatpy) | 6 / 4 / 525 | ⚠ **FIRES** | ⚠ FIRES at 4 phases · absent its ENTIRE LIFE — row added 262 |
-| [`backend/app/services/provider_gateway/dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaydispatcherpy) | 8 / 3 / 196 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 262, BELOW threshold |
-| [`backend/app/services/provider_gateway/openai_responses.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_responsespy) | 1 / 1 / 563 | no (1 phase) | young (created 262) |
-| [`frontend/src/lib/api/admin.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiadmints) | 7 / 4 / 1099 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 262 |
+| [`backend/app/services/provider_gateway/openai_compat.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_compatpy) | 7 / 5 / 537 (was `6 / 4 / 525`) | ⚠ **FIRES** | honoured by construction (**282-01**): budget + `llm_max_retries_for(provider)` reach the client ONLY when `timeout_s` is set; no-budget callers and fakes byte-identical. ⛔ D-14 RED LINE |
+| [`backend/app/services/provider_gateway/dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaydispatcherpy) | 10 / 4 / 260 (was `8 / 3 / 196`) | ⚠ **FIRES** | ⚠ FIRES (4 phases). **282-01**: `GatewayRequest.timeout_s`; OpenAI-family open off the loop under one deadline + late-close (+3 defs, +3 conditionals, measured). ⛔ D-14: chunk/SSE path unbranched |
+| [`backend/app/services/provider_gateway/openai_responses.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_responsespy) | 2 / 2 / 573 (was `1 / 1 / 563`) | no (2 phases) | young (created 262). **282-01**: ONE if/else — budget + cloud retries reach `get_llm_client` only when `timeout_s` is set. honoured by construction |
+| [`frontend/src/lib/api/admin.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiadmints) | 8 / 5 / 1113 (was `7 / 4 / 1099`) | ⚠ **FIRES** | ⚠ FIRES (5 phases). **282-01**: the timeout bound mirror 3600 → 1800 (the only other copy) + `MODEL_TIMEOUT_HELP_LINE` reading that mirror, never retyping it. honoured by construction |
 | [`frontend/src/components/admin/CapabilityGrid.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadmincapabilitygridtsx) | 3 / 3 / 264 | ⚠ **FIRES** | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 |
 | [`frontend/src/components/admin/ModelAdvancedCapabilities.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodeladvancedcapabilitiestsx) | 1 / 1 / 290 | no (1 phase) | young (created 262) |
 | [`backend/app/services/tools/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicestools__init__py) | 1 / 1 / 20 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Package marker: docstring ONLY. ⛔ no imports, no re-exports, no side effects, so import order can never matter |
@@ -11536,11 +11536,11 @@ cells rot within days.
 | [`backend/app/services/harness/freshness.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessfreshnesspy) | 2 / 2 / 123 (was `1 / 1 / 113`) | no (2 phases) | **281-01** (`76bbc0601`): both reads gain `AND <RETRIEVABLE_COLUMN>`, imported from retrieval_scope (DEBT-07). honoured by construction. ⛔ never restates the predicate; no f-string SQL |
 | [`frontend/src/components/workflows/describeRefusalVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescriberefusalvocabularyts) | 1 / 1 / 151 (was `0 / 0 / 0`) | no (young) | young (created 281-02, `fa08ee6f1`). The ONE code→words table for describe-door refusals (SEED-221). ⛔ imports door words, never retypes; joins `SWEPT_SOURCES` |
 | [`frontend/src/components/workflows/runVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunvocabularyts) | 10 / 5 / 662 (was `9 / 4 / 660`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE until 281 planning. **281-03** (`0b9841e55`): ONE `case "template_fields_missing"` in `failureClause`. honoured by construction. Seam not proposed |
-| [`backend/app/services/google_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogle_servicepy) | 11 / 7 / 638 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: `stream_google` + `timeout_s`; one `_google_client` builder (HttpOptions ms, 1 attempt). honoured by construction |
-| [`backend/app/services/provider_gateway/anthropic.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayanthropicpy) | 4 / 4 / 124 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_anthropic`. honoured by construction |
-| [`backend/app/services/provider_gateway/google.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaygooglepy) | 3 / 3 / 106 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_google`. honoured by construction |
-| [`frontend/src/setupTests.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcsetupteststs) | 2 / 1 / 8 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 282 planning (not exempt by the gate's regexes). **282-02**: ONE global `afterEach(resetAskDrafts)` (D-24) |
-| [`frontend/src/stores/askDraftStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresaskdraftstorets) | 0 / 0 / 0 | no (young) | young (created 282-02, row added AT PLANNING). The ONE ask_user draft home keyed by tool_call_id + panel-home presence (D-12). ⛔ never inside streamsStore.ts |
+| [`backend/app/services/google_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogle_servicepy) | 12 / 8 / 661 (was `11 / 7 / 638`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: `stream_google` + `timeout_s`; ONE lazy `_google_client` builder (HttpOptions ms, attempts=1). honoured by construction |
+| [`backend/app/services/provider_gateway/anthropic.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayanthropicpy) | 5 / 5 / 125 (was `4 / 4 / 124`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_anthropic`. honoured by construction |
+| [`backend/app/services/provider_gateway/google.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaygooglepy) | 4 / 4 / 107 (was `3 / 3 / 106`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_google`. honoured by construction |
+| [`frontend/src/setupTests.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcsetupteststs) | 3 / 2 / 12 (was `2 / 1 / 8`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 282 planning (not exempt by the gate's regexes). **282-02**: ONE global `afterEach(resetAskDrafts)` (D-24). ⛔ resets + matchers only |
+| [`frontend/src/stores/askDraftStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresaskdraftstorets) | 1 / 1 / 128 (was `0 / 0 / 0`) | no (young) | young (created 282-02). The ONE ask_user draft home keyed by tool_call_id + settled marker + panel-home refcount, GC on the ask slice (D-12). ⛔ never inside streamsStore.ts |
 
 
 
@@ -20719,3 +20719,233 @@ What it owns. The ONE home of an `ask_user` answer draft (`choiceIndex`, `freeTe
 - **Selectors return stable references** (`EMPTY_DRAFT`, the `EMPTY_ASKS` precedent in `StreamsProvider.tsx`); a fresh `{}` from a zustand v5 selector loops.
 - **GC on the ask slice, never on card unmount** (a thread switch unmounts the card and must keep the draft).
 - Not persisted across reload (D-12, as before).
+
+## Phase 282 close (2026-10-15, 282-03)
+
+All triples below were re-derived on the merged tree at `3c9bb11ab` (282-01 and 282-02 merged; 282-03 changed no source file) with the CLAUDE.md recipe; no six-digit quick-task bucket appears in any of them. The set is every non-test source file plans 01-02 changed since PHASE_BASE `d1ba70553` (`git diff --name-only d1ba70553 HEAD -- backend/app frontend/src`, tests excluded): 20 files. Each section quotes the scan-list cell it replaced and, where the file has one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. ⚠ **Three files FIRE and had no CLAUDE.md FIRING row:** `google_service.py` (8 phases), `provider_gateway/anthropic.py` (5) and `provider_gateway/google.py` (4); all three rows are added in this commit. ⚠ **Two CLAUDE.md rows were stale below the threshold:** `provider_gateway/dispatcher.py` read `6 / 2 / 153` *BELOW threshold* and `lib/api/admin.ts` read `5 / 2 / 1098`, while both already FIRED at PHASE_BASE (3 and 4 phases). No plan raised **OV-282-01** (`agent_loop.py` stayed at +1 conditional, +0 defs); every file is honoured by construction.
+
+### `backend/app/api/admin.py` — Phase 282 close
+
+**`42 / 17 / 2024` (was `38 / 14 / 1968`).** **282-01** (`d7467f4a9`, +11 / -0): one import (`llm_call_timeout_ceiling_reason`) and one arm inside the existing `_MODEL_CAP_INT_BOUNDS` loop that raises the timeout's own sentence (`Timeout must be between 1 and 1800 seconds, because ... N was not saved.`). Every other int column keeps its old sentence; the guard order and the 422 status are unchanged; nothing is written on refusal.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> honoured by construction (249-01/03) · ⛔
+
+### `backend/app/config.py` — Phase 282 close
+
+**`92 / 54 / 1790` (was `91 / 53 / 1705`).** **282-01** (`d7467f4a9`, +93 / -8): the ceiling drops 3600 → 1800 (D-21) with a boot check beside `_validate_run_stale_sweep_bounds` (watchdog must exceed the ceiling + 120); `llm_max_retries_for(provider)` beside `_SELF_HOSTED_PROVIDERS` (0 self-hosted, 2 cloud; `LLM_MAX_RETRIES_*`); `LLM_CONNECT_TIMEOUT_S`, `NO_BUDGET_LLM_TIMEOUT_S`, `NO_BUDGET_LLM_MAX_RETRIES`; `llm_call_timeout_ceiling_reason()`; the resolver's DB tier clamps to [1, 1800] (D-08). Two stale `[1, 3600]` comments corrected. No env var added or renamed, so no deploy-artifact parity edit. The `MODEL_CAPABILITIES` seam stays OWED and was not obstructed.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> **275-03**: ONE flag `retention_sweep_enabled` (default False); hour, poll, lease stay code constants (D-37). Parity in 4 artifacts, same commit
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> ⚠ STALE · last touch 275-03 · `MODEL_CAPABILITIES` seam OWED · ⛔
+
+### `backend/app/services/agent_loop.py` — Phase 282 close
+
+**`68 / 33 / 3682` (was `66 / 32 / 3675`).** **282-01** (`46b95d72c`, `4d54874f3`; +7 / -0): two `timeout_s=per_call_budget,` kwargs on the existing `GatewayRequest` constructions and three code lines in `_drain_stream_with_close_on_cancel` that honour a stream's `budget_deadline`. AST vs PHASE_BASE: `If`+`IfExp` 191 → 192 (+1), defs 25 → 25. The two drain call sites and the `async with asyncio.timeout(timeout_seconds):` literal are byte-unchanged; `test_061_hard_timeout.py` has no diff and is green. Within the plan's budget, so **no OV-282-01**.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> honoured by construction (**279-02 I**, WR-08): ONE guarded `_folder_scope_note` + ONE call; single-folder note byte-identical. ⛔ prompt-assembly seam OWED (OV-273-03)
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> honoured by construction (279-02: ONE guarded note) · seam OWED · ⛔
+
+### `backend/app/services/anthropic_service.py` — Phase 282 close
+
+**`12 / 11 / 373` (was `11 / 10 / 354`).** **282-01** (`46b95d72c`, +21 / -2): one builder `_anthropic_client(api_key, timeout_s)` that puts `httpx.Timeout(budget, connect=5)` and `llm_max_retries_for("anthropic")` into the SDK constructor (no budget → the named 600 s), and a trailing `timeout_s` on `stream_anthropic`. Constructor kwargs only, as CONTEXT's G-5 audit planned. The adapter-pattern audit stays due.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> adapter-pattern audit due
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> adapter-pattern audit due
+
+### `backend/app/services/forced_emit.py` — Phase 282 close
+
+**`12 / 8 / 724` (was `11 / 7 / 716`).** **282-01** (`46b95d72c`, +9 / -1): one `await get_per_call_timeout_async(model, settings)` and one `timeout_s=_timeout_s` on the rung request. A `TimeoutError` from the open guard is caught by the existing per-rung `except Exception`; the `force` ladder tries both rungs and returns `{"emitted": None, "failure": "provider_error"}` (pinned in `test_282_open_off_loop.py`). No new branch.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> honoured by construction (**279-02 F**, IN-03): ONE constant + ONE IfExp; field-map path byte-identical; SEED-327 NOT fixed. ⛔ accumulators init `None` never `0`
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> honoured by construction (279-02: ONE constant + IfExp) · ⛔
+
+### `backend/app/services/google_service.py` — Phase 282 close
+
+**`12 / 8 / 661` (was `11 / 7 / 638`).** **282-01** (`46b95d72c`, +24 / -1): exactly as planned — a trailing `timeout_s` on `stream_google` and one builder `_google_client(api_key, timeout_s)` built lazily in the producer thread. Readback: with a 900 s budget `_http_options.timeout == 900000` (ms) and `retry_options.attempts == 1`; without a budget the bare client (`timeout is None`). It FIRES (8 phases) and had no CLAUDE.md FIRING row; one is added in this commit.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: `stream_google` + `timeout_s`; one `_google_client` builder (HttpOptions ms, 1 attempt). honoured by construction
+
+CLAUDE.md verdict cell: *(none — row added by 282-03)*
+
+### `backend/app/services/openai_service.py` — Phase 282 close
+
+**`79 / 40 / 2602` (was `78 / 39 / 2569`).** **282-01** (`46b95d72c`, +36 / -3): `get_llm_client(user_settings, *, timeout_s=None, max_retries=None)` builds `httpx.Timeout(budget, connect=5)` and the retry count into the `OpenAI(...)` constructor before `wrap_openai`; no budget → `NO_BUDGET_LLM_TIMEOUT_S` (600) and 2 retries, named rather than implicit (D-23). `get_embedding_client` gets the same named no-budget values. `stream_*` helpers forward the pair only when a budget is set. Two constructor-kwarg tests were updated for the intended change (`ff92ba85a`).
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> **273-03**: 1 schema + CHAT_ONLY_TOOLS + 1 get_tools line. ⛔ no anyOf/oneOf/type arrays in SHOW_ARTIFACT_TOOL (Gemini)
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> ⛔ FIRES at 36 phases · absent its ENTIRE LIFE — row added 262
+
+### `backend/app/services/provider_gateway/anthropic.py` — Phase 282 close
+
+**`5 / 5 / 125` (was `4 / 4 / 124`).** **282-01** (`46b95d72c`, +1 / -0): exactly the one forwarded kwarg planned. It FIRES (5 phases) and had no CLAUDE.md FIRING row; one is added in this commit.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_anthropic`. honoured by construction
+
+CLAUDE.md verdict cell: *(none — row added by 282-03)*
+
+### `backend/app/services/provider_gateway/dispatcher.py` — Phase 282 close
+
+**`10 / 4 / 260` (was `8 / 3 / 196`).** **282-01** (`46b95d72c`, `4d54874f3`; +99 / -35): `GatewayRequest` gains `timeout_s`; the OpenAI-compat/Responses branch opens its stream through `asyncio.to_thread` under `asyncio.timeout_at(deadline)` and stamps `stream.budget_deadline` for the drain (D-20, BUG-261015-02). AST vs PHASE_BASE: defs 2 → 5 (**+3**, one more than the plan's +2 — the late-close callback `_close_late_stream` is a named module function, not a closure), `If`+`IfExp` 6 → 9 (+3). Measured loop freeze: ticker max gap 2.970 s → 0.065 s. ⚠ It already FIRED at PHASE_BASE (`8 / 3 / 196`) while its CLAUDE.md row still read `6 / 2 / 153` and *BELOW threshold* — that row was stale; 282 makes it 4 phases. The next phase adding a concern here takes a refactor recommendation first.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 262, BELOW threshold
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> ⚠ absent its ENTIRE LIFE — row added 262, BELOW threshold · ⛔
+
+### `backend/app/services/provider_gateway/google.py` — Phase 282 close
+
+**`4 / 4 / 107` (was `3 / 3 / 106`).** **282-01** (`46b95d72c`, +1 / -0): exactly the one forwarded kwarg planned. It FIRES (4 phases) and had no CLAUDE.md FIRING row; one is added in this commit.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_google`. honoured by construction
+
+CLAUDE.md verdict cell: *(none — row added by 282-03)*
+
+### `backend/app/services/provider_gateway/openai_compat.py` — Phase 282 close
+
+**`7 / 5 / 537` (was `6 / 4 / 525`).** **282-01** (`46b95d72c`, +12 / -0): one conditional `**{...}` spread forwarding `timeout_s` and `max_retries=llm_max_retries_for(provider)` to `stream_openai_compat` only when the request carries a budget, so lambda fakes and no-budget callers are unchanged. The shared chunk/SSE path is not branched.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> ⚠ FIRES at 4 phases · absent its ENTIRE LIFE — row added 262
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> ⚠ FIRES at 4 phases · absent its ENTIRE LIFE — row added 262 · ⛔
+
+### `backend/app/services/provider_gateway/openai_responses.py` — Phase 282 close
+
+**`2 / 2 / 573` (was `1 / 1 / 563`).** **282-01** (`46b95d72c`, +12 / -2): one `if request.timeout_s is None` / `else` around the `get_llm_client` call; the retry count comes from `llm_max_retries_for(request.active_provider_name)`, never a typed literal. Below threshold (2 phases).
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> young (created 262)
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> young (created 262) · ⛔
+
+### `backend/app/services/run_producer.py` — Phase 282 close
+
+**`23 / 11 / 1145` (was `21 / 10 / 1117`).** **282-01** (`d7467f4a9`, +20 / -4): the inline f-string that built the per-call timeout error moved into one module helper `_timed_out_error(budget, iteration, model)`; the `timed_out: Ns per-call deadline exceeded at iteration I (model=M)` prefix is byte-identical (D-066-07) and the appended sentence names the model, N and where to change it (D-22). Pinned by `test_282_timeout_bound.py`.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> honoured by construction (**279-01/02**): 2 lazy imports repointed; ONE defaulted `scoped_folder_paths` field (WR-08). ⛔ runs is SELECT-only under the user JWT
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> honoured by construction (279-02: ONE defaulted field)
+
+### `backend/app/services/task_service.py` — Phase 282 close
+
+**`23 / 13 / 991` (was `21 / 12 / 973`).** **282-01** (`46b95d72c`, +6 / -1): one import, one `await get_per_call_timeout_async(model, settings)` and one `timeout_s=_timeout_s` on the sub-agent's request. No new handling: a guard `TimeoutError` propagates to the sub-agent caller exactly as any provider error from `open_stream` does (recorded in 282-01-SUMMARY, not pinned).
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> ⚠ STALE (`20/11/970`). **272-04**: D-09 lock shared BY REFERENCE, never a copy. **272-REVIEW WR-08**: sub-agent reads llm_content; date + vocabulary when it can search
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> honoured by construction (264-01)
+
+### `frontend/src/components/admin/ModelRegistryTab.tsx` — Phase 282 close
+
+**`17 / 7 / 1679` (was `15 / 5 / 1640`).** **282-01** (`d7467f4a9`, +19 / -1): one import (`MODEL_TIMEOUT_HELP_LINE`), one conditional `<tr>` rendered only while `editing === "llm_call_timeout_seconds"` (`data-testid="timeout-help"`), and `aria-describedby` on that one input. The server's 422 sentence shows in the existing in-row refusal slot (RESEARCH R6), so no new error state. The `AddModelForm` seam stays OWED and was not obstructed.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> ⚠ row STALE at `10/4/1191` (+362 lines). honoured by construction (**249-01**): roster widened to 11 + words on 2 EXISTING controls. ⛔ `deprecated` semantics unchanged (D-149-04)
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> ⚠ FIRES · honoured by construction (249-01) · `AddModelForm` seam OWED · ⛔
+
+### `frontend/src/components/panel/PendingAskCard.tsx` — Phase 282 close
+
+**`17 / 9 / 1013` (was `15 / 8 / 836`).** **282-02** (`3c2c1af6d`, `3b88e0c26`; +195 / -18): the two draft `useState`s are gone (the card reads `askDraftStore`; `useState` 9 → 7), `useLayoutEffect` 0 → 1 (the panel-home refcount), the chips gained the APG radio keyboard (roving tabindex, arrows, Space selects only — D-24) and an `aria-hidden` non-colour mark, the card writes `data-ask-home`, and one component `AskPointer` was added in this file per CONTEXT (no new component file). `dangerouslySetInnerHTML` 0 → 0. Net state went DOWN, as CONTEXT's G-5 audit required. The line-count pin in `PendingAskCard.retired.baseline.test.tsx` moved 837 → 1014 with dated re-baseline comments.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> G-5 FIRES · honoured by construction (244-15)
+
+### `frontend/src/components/panel/WorkspacePanel.tsx` — Phase 282 close
+
+**`17 / 11 / 646` (was `16 / 10 / 646`).** **282-02** (`3b88e0c26`, +1 / -1): `<PendingAskStack />` → `<PendingAskStack home="panel" />`. The mount condition is byte-identical.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> honoured by construction (194 / 194.1)
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> honoured by construction (194 / 194.1)
+
+### `frontend/src/lib/api/admin.ts` — Phase 282 close
+
+**`8 / 5 / 1113` (was `7 / 4 / 1099`).** **282-01** (`d7467f4a9`, +15 / -1): `MODEL_CAP_INT_BOUNDS.llm_call_timeout_seconds` `[1, 3600]` → `[1, 1800]`, mirroring `config.py:_LLM_CALL_TIMEOUT_MAX_S` (the only two copies), and one exported constant `MODEL_TIMEOUT_HELP_LINE` built from that mirror. A backend test reads `LLM_MAX_RETRIES_CLOUD` and asserts the sentence carries the same count. It already FIRED at PHASE_BASE (`7 / 4 / 1099`) while its CLAUDE.md row read `5 / 2 / 1098`; 282 makes it 5 phases.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 262
+
+CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
+
+> ⚠ absent its ENTIRE LIFE — row added 262 · ⛔
+
+### `frontend/src/setupTests.ts` — Phase 282 close
+
+**`3 / 2 / 12` (was `2 / 1 / 8`).** **282-02** (`ec604a533`, +5 / -1): one import and one `afterEach(() => resetAskDrafts())`. Below threshold (2 phases). It runs in every vitest file, so the 282-02 count gate's one load-timing red (`WorkflowBuilderPage.canvas.test.tsx`) was recorded as not fully excludable on this file's account; 282-03's merged-tree run is recorded in `282-03-SUMMARY.md`.
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 282 planning (not exempt by the gate's regexes). **282-02**: ONE global `afterEach(resetAskDrafts)` (D-24)
+
+### `frontend/src/stores/askDraftStore.ts` — Phase 282 close
+
+**`1 / 1 / 128` (was `0 / 0 / 0`).** Created by **282-02** (`ec604a533`, 128 lines). `drafts` / `settled` / `panelHomes`; selectors return the stable frozen `EMPTY_DRAFT`; a module-load `useStreamsStore.subscribe` on `pendingAsksByThread` drops drafts and settles whose ask is gone. `streamsStore.ts` untouched. Below threshold (1 phase).
+
+Scan-list disposition cell before 282-03 (replaced):
+
+> young (created 282-02, row added AT PLANNING). The ONE ask_user draft home keyed by tool_call_id + panel-home presence (D-12). ⛔ never inside streamsStore.ts
