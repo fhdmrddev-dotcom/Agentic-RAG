@@ -101,6 +101,29 @@ def _has_insufficient_quota(exc: Exception) -> bool:
     return False
 
 
+# BUG-261015-04: a credit refusal that is not an `insufficient_quota` code. Anthropic returns
+# a 400 `invalid_request_error` whose body message names the credit balance (measured on the
+# Phase 282 board, run d512fe97), and documents a `billing_error` type. Read from the
+# STRUCTURED body only, never str(exc) (T-175-03-02).
+_CREDIT_SIGNATURES = (
+    "credit balance is too low",
+)
+
+
+def _has_credit_signal(exc: Exception) -> bool:
+    """True when the structured body says the account is out of credit."""
+    body = getattr(exc, "body", None)
+    if not isinstance(body, dict):
+        return False
+    err = body.get("error")
+    if not isinstance(err, dict):
+        return False
+    if err.get("type") == "billing_error":
+        return True
+    msg = err.get("message")
+    return isinstance(msg, str) and any(sig in msg.lower() for sig in _CREDIT_SIGNATURES)
+
+
 # Phase 175 XPROV-01 (D-04): the exact OpenAI 400 substrings for the reasoning-first
 # tools-unsupported constraint (gpt-5.6-class). Matched only against the STRUCTURED body
 # message, lower-cased — never str(exc) — so a crafted top-level message cannot force a
@@ -196,6 +219,9 @@ def _classify_status(status: int | None) -> ErrorKind:
         return "rate_limit"
     if status in (401, 403):
         return "auth"
+    if status == 402:
+        # HTTP Payment Required (OpenRouter "requires more credits", Anthropic billing_error).
+        return "billing"
     if status == 400:
         return "bad_request"
     if status >= 500:
@@ -249,6 +275,9 @@ def classify_provider_error(provider: str, exc: Exception) -> ErrorKind:
         return "auth"
     if _isinstance_any(exc, _OpenAIPermissionError, _AnthropicPermissionError):
         return "auth"
+    # BUG-261015-04: an out-of-credit 400 is billing, not a model-parameter error.
+    if _has_credit_signal(exc):
+        return "billing"
     if _isinstance_any(exc, _OpenAIBadRequestError, _AnthropicBadRequestError):
         return "bad_request"
     if _isinstance_any(exc, _OpenAIServerError, _AnthropicServerError):
