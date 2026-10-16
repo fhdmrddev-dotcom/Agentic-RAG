@@ -42,6 +42,7 @@ from app.db.watches import (
     list_watches,
     recent_runs_by_watch,
     update_watch,
+    watch_purge_scope,
 )
 from app.dependencies import (
     get_current_user,
@@ -329,15 +330,25 @@ async def delete_folder_watch(
         )
 
     if purge_documents:
-        items = await get_watch_items(pool, watch_id)
-        doc_ids = [str(it["document_id"]) for it in items if it.get("document_id")]
-        if doc_ids:
+        # Phase 285 FIX-13 (D-06 / D-08): delete only what this watch MINTED and no other item
+        # still references. A document the watch only dedup-linked (a hand upload, another
+        # source's copy) is KEPT — row and bytes. ⚠ Stated behaviour change: a held LINKED
+        # document no longer makes this purge 409, because it is not being deleted.
+        scope = await watch_purge_scope(pool, watch_id, user_id=user_id, states=None)
+        if scope.purge_doc_ids:
             # Phase 275 (D-14 / D-38): check the hold first; a database refusal is the same 409 and
             # any other error PROPAGATES — the watch is deleted only after its documents were.
             # Phase 280 (D-12): that body lives in ONE helper shared with the purge door below.
             await document_purge.purge_documents(
-                request, current_user, doc_ids, kind="watch_delete",
+                request, current_user, scope.purge_doc_ids, kind="watch_delete",
                 supabase=supabase, service_supabase=service_supabase,
+            )
+        if scope.kept_doc_ids:
+            # Phase 285 D-09: this door answers 204 (changing that is client-visible), so the kept
+            # count is logged rather than returned.
+            logger.info(
+                "delete_folder_watch: watch %s kept %d linked or shared document(s)",
+                watch_id, len(scope.kept_doc_ids),
             )
 
     deleted = await delete_watch(pool, watch_id, user_id=user_id)
@@ -454,43 +465,47 @@ async def purge_missing_watch_documents(
             detail="Watch not found or unauthorized.",
         )
 
-    # 1. Query items that are in missing or unauthorized state
-    async with pool.acquire() as con:
-        items = await con.fetch(
-            """
-            SELECT id, document_id
-            FROM connector_watch_items
-            WHERE watch_id = $1
-              AND state IN ('missing', 'unauthorized')
-            """,
-            watch_id,
-        )
-
-    doc_ids = [str(r["document_id"]) for r in items if r.get("document_id")]
-    item_ids = [r["id"] for r in items]
+    # Phase 285 FIX-13 (D-06 / D-08): the missing/unauthorized items, partitioned into what this
+    # watch MINTED and nobody else uses (purged) and what it only linked or shares (kept). The
+    # set logic lives in ONE SQL helper (D-20), never inline here. ⚠ Stated behaviour change: a
+    # held LINKED document no longer makes this purge 409, because it is not being deleted.
+    scope = await watch_purge_scope(
+        pool, watch_id, user_id=user_id, states=["missing", "unauthorized"],
+    )
 
     purged_count = 0
-    if doc_ids:
+    if scope.purge_doc_ids:
         # Phase 275 (D-14 / D-38): check the hold first; a database refusal is the same 409 and any
         # other error PROPAGATES — nothing is counted as purged and no watch item is deleted
         # unless the document delete succeeded. Phase 280 (D-12): the one shared purge body.
-        await document_purge.purge_documents(
-            request, current_user, doc_ids, kind="watch_purge",
+        deleted = await document_purge.purge_documents(
+            request, current_user, scope.purge_doc_ids, kind="watch_purge",
             supabase=supabase, service_supabase=service_supabase,
         )
-        purged_count = len(doc_ids)
+        # Phase 285 D-09: the rows the DELETE actually returned, never the number requested.
+        purged_count = len(deleted)
+    kept_count = len(scope.kept_doc_ids)
 
-    if item_ids:
+    if scope.item_ids:
+        # Every in-scope item row goes, linked ones included: unlinking is not deleting (D-09).
         async with pool.acquire() as con:
             await con.execute(
                 "DELETE FROM connector_watch_items WHERE id = ANY($1::uuid[])",
-                item_ids,
+                scope.item_ids,
             )
 
+    # The message is the only text the person sees (WatchedFoldersSection renders res.message).
+    message = f"Purged {purged_count} missing or disconnected file(s)."
+    if kept_count > 0:
+        message += (
+            f" Kept {kept_count} that {'is' if kept_count == 1 else 'are'} also in your Library "
+            "from another source or a hand upload."
+        )
     return WatchPurgeResponse(
         status="ok",
         purged_count=purged_count,
-        message=f"Successfully purged {purged_count} missing or disconnected files.",
+        message=message,
+        kept_count=kept_count,
     )
 
 

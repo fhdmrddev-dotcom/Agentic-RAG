@@ -211,8 +211,14 @@ def test_delete_folder_watch_and_purge(monkeypatch, client):
     monkeypatch.setattr("app.api.sources.delete_watch", AsyncMock(return_value=True))
 
     doc_id = str(uuid4())
-    items = [{"document_id": doc_id}]
-    monkeypatch.setattr("app.api.sources.get_watch_items", AsyncMock(return_value=items))
+    # FIX-13 (285), amended deliberately: door 1 takes its set from watch_purge_scope (one minted,
+    # unshared document here), no longer from get_watch_items.
+    from app.db.watches import WatchPurgeScope
+
+    monkeypatch.setattr(
+        "app.api.sources.watch_purge_scope",
+        AsyncMock(return_value=WatchPurgeScope(item_ids=[uuid4()], purge_doc_ids=[doc_id], kept_doc_ids=[])),
+    )
 
     doc_deleted = []
     doc_builder = MagicMock()
@@ -271,9 +277,17 @@ def test_purge_missing_watch_documents(monkeypatch, client):
     doc_id = str(uuid4())
     item_id = uuid4()
 
+    # FIX-13 / D-09 (285), amended deliberately: the door takes its set from watch_purge_scope (one
+    # minted, unshared document here) and counts the rows the DELETE actually returned.
+    from app.db.watches import WatchPurgeScope
+
+    monkeypatch.setattr(
+        "app.api.sources.watch_purge_scope",
+        AsyncMock(return_value=WatchPurgeScope(item_ids=[item_id], purge_doc_ids=[doc_id], kept_doc_ids=[])),
+    )
+
     mock_pool = MagicMock()
     mock_con = AsyncMock()
-    mock_con.fetch.return_value = [{"id": item_id, "document_id": doc_id}]
     mock_con.execute.return_value = "DELETE 1"
     mock_pool.acquire.return_value.__aenter__.return_value = mock_con
     real_app.dependency_overrides[deps.get_pg_pool] = lambda: mock_pool
@@ -281,10 +295,12 @@ def test_purge_missing_watch_documents(monkeypatch, client):
     doc_builder = MagicMock()
     doc_builder.delete.return_value = doc_builder
     doc_builder.in_.return_value = doc_builder
-    doc_builder.execute.return_value = MagicMock(data=[])
+    doc_builder.execute.return_value = MagicMock(data=[{"id": doc_id, "file_path": f"u/{doc_id}/a.txt"}])
 
     sb_mock = MagicMock()
     sb_mock.table.return_value = doc_builder
+    # storage3 answers with the objects it deleted (Phase 285 D-10's realistic shape).
+    sb_mock.storage.from_.return_value.remove.return_value = [{"name": f"u/{doc_id}/a.txt"}]
     real_app.dependency_overrides[deps.get_user_supabase_client] = lambda: sb_mock
 
     res = client.post(f"/sources/watches/{WATCH_ID}/purge", headers=_auth_headers())
@@ -292,6 +308,9 @@ def test_purge_missing_watch_documents(monkeypatch, client):
     data = res.json()
     assert data["status"] == "ok"
     assert data["purged_count"] == 1
+    assert data["kept_count"] == 0
+    mock_con.execute.assert_awaited_once()
+    assert mock_con.execute.await_args.args[1] == [item_id]
 
 
 def test_tenant_isolation_other_user_watch_returns_404(monkeypatch, client):
