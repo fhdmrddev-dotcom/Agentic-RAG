@@ -26361,6 +26361,11 @@
           "message": {
             "type": "string",
             "title": "Message"
+          },
+          "kept_count": {
+            "type": "integer",
+            "title": "Kept Count",
+            "default": 0
           }
         },
         "type": "object",
