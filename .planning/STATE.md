@@ -90,7 +90,7 @@ Phase: 285
 Next: `/gsd:discuss-phase 282` (G-2 sketch first for FIX-07). Deploy of 277-281 + BUG-261014-06 stays operator-gated.
 Plan: Not started
 Status: Milestone complete
-Last activity: 2026-10-16
+Last activity: 2026-10-16 - Completed quick task 261016-u3w: Syrel Iris loader on 23 page/panel loaders (SEED-359 A)
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
 
 **279-03 (2026-10-13):** "Won't use" → "Won't search" (29 hits / 13 files measured, not 30), swap-card
@@ -127,6 +127,7 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 261016-u3w | SEED-359 part A: 23 page/panel/section/dialog loaders swapped to one shared Syrel Iris `SyrelLoader`; 88 button/inline spinners and components/chat untouched. G-2 note: re-uses the 276-approved Iris visual, no new sketch | 2026-10-16 | 912808491 | [261016-u3w-swap-page-and-panel-loaders-to-the-syrel](./quick/261016-u3w-swap-page-and-panel-loaders-to-the-syrel/) |
 | 261012-x1l | fix 277-REVIEW WR-01 (size hook leads with STOP/WARNING when ledger findings exist) + WR-08 (uniform `· ⛔` marker on 66 moved FIRING cells + legend) | 2026-10-12 | 30d659415 | [261012-x1l-fix-review-warnings-wr-01-and-wr-08-from](./quick/261012-x1l-fix-review-warnings-wr-01-and-wr-08-from/) |
 | fast 2026-10-13 | landing drift: `facts.ts` BUILTIN_TOOL_COUNT 29 → 30 (+ `Artifacts` group for `show_artifact`); landing vitest 53/53 | 2026-10-13 | 6ba316b6a | — |
 | fast 2026-10-14 | BUG-261014-06: Library read 0 documents at 286 (`414 URI too long`) — `list_documents` count reads batched at 100 ids. **Stopgap, develop only**: the operator held the prod hotfix ("a sustainable solution not a batch"); Phase 284 replaces it | 2026-10-14 | e422066ca | — |
