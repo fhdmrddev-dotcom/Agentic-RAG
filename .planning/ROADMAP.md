@@ -401,7 +401,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 285-01-PLAN.md — migration 209 (attempts + minted marker, tightened backfill, stuck-pending heal) + FIX-12 retry, typed failures on the run row, minted marker writes
+- [x] 285-01-PLAN.md — migration 209 (attempts + minted marker, tightened backfill, stuck-pending heal) + FIX-12 retry, typed failures on the run row, minted marker writes
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

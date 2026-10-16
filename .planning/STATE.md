@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
 status: executing
-last_updated: "2026-10-16T15:19:51.304Z"
-last_activity: 2026-10-16 -- Phase 285 execution started
+last_updated: "2026-10-16T16:02:22.350Z"
+last_activity: 2026-10-16
 progress:
   total_phases: 16
   completed_phases: 8
   total_plans: 34
-  completed_plans: 31
+  completed_plans: 32
   percent: 50
 ---
 
@@ -85,9 +85,9 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: 285 (Watch and Re-upload Close Out) — EXECUTING
 Next: `/gsd:discuss-phase 282` (G-2 sketch first for FIX-07). Deploy of 277-281 + BUG-261014-06 stays operator-gated.
-Plan: 1 of 3
-Status: Executing Phase 285
-Last activity: 2026-10-16 -- Phase 285 execution started
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-10-16
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
 
 **279-03 (2026-10-13):** "Won't use" → "Won't search" (29 hits / 13 files measured, not 30), swap-card
@@ -164,6 +164,14 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 | 3 | Remove the legacy-array tolerance in `frontend/src/lib/api/documents.ts` | one release after the production deploy (WR-03 accepted on that basis) |
 | 4 | Hot-file ledger triples for the files touched after 284-05's ledger close (`58b4bc367`) | review fixes + 284-06; the presence gate is green, the triples are not re-derived |
 | 5 | SEED-355 / 356 / 358 | planted with structured triggers; out of 284's Library scope |
+
+### Phase 285 (in progress, 2026-10-16)
+
+| # | Item | Notes |
+|---|---|---|
+| 1 | 285-01 DONE — migration 209 applied LOCALLY (VERIFY 8/8 ×2, 112 minted / 9 linked, heal 0/0); FIX-12 retry (cap 3, reset on version change) | decisions: re-mint through the existing new-file branch (2 minter call sites); failure summary on the RUN row only (`run_error`); doc marked failed only when this iteration minted it |
+| 2 | ⛔ Production paste of 209 is OWED, and it must land BEFORE the backend deploys | `_WATCH_ITEM_COLUMNS` now selects `failed_attempts, minted`; then VERIFY + `get_advisors(security)` |
+| 3 | Base for 285 gates: PHASE_BASE `c8c764e90`, 71 failed / 7688 passed | failing set `C:/Users/fhdmr/AppData/Local/Temp/agentic-rag-285/base_failed.norm.txt` (strip glued `C:...` warning suffixes before `comm`) |
 
 ### Guardrail overrides (v4.6)
 
