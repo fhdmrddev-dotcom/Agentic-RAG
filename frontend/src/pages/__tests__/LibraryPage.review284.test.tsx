@@ -75,6 +75,8 @@ vi.mock("@/lib/supabase", () => ({
   },
 }))
 
+import { DocumentListError } from "@/lib/api/documents"
+
 const FOLDERS: Folder[] = []
 
 function doc(id: string, over: Partial<Document> = {}): Document {
@@ -208,5 +210,38 @@ describe("CR-01 — the browse list never sits on a page past the end", () => {
     await waitFor(() =>
       expect(libraryApi.listDocumentsPage.mock.calls.at(-1)?.[0]).toMatchObject({ offset: 0 }),
     )
+  })
+})
+
+describe("IN-07 — a failed page change: the pager describes the rows on screen", () => {
+  it("keeps '1–25 of 30' above page 1's rows when page 2 fails, and Next re-asks page 2", async () => {
+    installFakeLibraryApi({ ...libraryApi }, many(30))
+    renderPage()
+    await waitFor(() => expect(tfoot()).toHaveTextContent("1–25 of 30"))
+    libraryApi.listDocumentsPage.mockRejectedValueOnce(new DocumentListError(null, "x"))
+    next()
+    expect(
+      await screen.findByText("Couldn’t refresh this list. The rows shown may be out of date."),
+    ).toBeInTheDocument()
+    expect(screen.getByText("d29.pdf")).toBeInTheDocument()
+    expect(tfoot()).toHaveTextContent("1–25 of 30")
+    expect(tfoot()).not.toHaveTextContent("26–30")
+    next()
+    await waitFor(() => expect(tfoot()).toHaveTextContent("26–30 of 30"))
+    expect(screen.getByText("d00.pdf")).toBeInTheDocument()
+    expect(screen.queryByText("Couldn’t refresh this list. The rows shown may be out of date.")).toBeNull()
+  })
+
+  it("a failed Previous keeps describing the rows shown, too", async () => {
+    installFakeLibraryApi({ ...libraryApi }, many(30))
+    renderPage()
+    await waitFor(() => expect(tfoot()).toHaveTextContent("1–25 of 30"))
+    next()
+    await waitFor(() => expect(tfoot()).toHaveTextContent("26–30 of 30"))
+    libraryApi.listDocumentsPage.mockRejectedValueOnce(new DocumentListError(null, "x"))
+    fireEvent.click(within(tfoot()).getByRole("button", { name: /Previous/ }))
+    await screen.findByText("Couldn’t refresh this list. The rows shown may be out of date.")
+    expect(screen.getByText("d00.pdf")).toBeInTheDocument()
+    expect(tfoot()).toHaveTextContent("26–30 of 30")
   })
 })
