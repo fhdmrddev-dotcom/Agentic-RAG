@@ -393,6 +393,38 @@ class WatchService:
             version_changed = existing is not None and str(item.modified_at or "") != (
                 existing.get("source_version") or ""
             )
+            # ⛔ 285-REVIEW CR-02: "never landed" is a property of the ROW, not only of `state`.
+            # `_handle_unauthorized_watch` (VIS-04, deliberately unchanged) flips EVERY item to
+            # `unauthorized`, `failed` ones included, and overwrites `last_error`. Without this,
+            # the restore arm below set such an item `present` with no live document when access
+            # returned: never read again, never counted — the FIX-12 / D-02 failure mode.
+            # `failed_attempts > 0` means it never landed (every success resets it to 0); no
+            # document at all means the same for a legacy row that predates the counter. Such an
+            # item is put back to `failed` here (best-effort; the routing does not depend on the
+            # write) and then takes the SAME retry path and D-01 cap as any failed item.
+            if (
+                existing is not None
+                and existing.get("state") in ("missing", "unauthorized")
+                and (int(existing.get("failed_attempts") or 0) > 0 or not existing.get("document_id"))
+            ):
+                try:
+                    await update_item_state(
+                        self.pool, existing["id"], state="failed",
+                        error=existing.get("last_error"), clear_missing_since=True,
+                    )
+                    if existing.get("document_id"):
+                        await run_in_threadpool(
+                            lambda doc_id=existing["document_id"]: supabase.table("documents")
+                            .update({"source_state": None})
+                            .eq("id", str(doc_id))
+                            .execute()
+                        )
+                except Exception as norm_err:
+                    logger.error(
+                        "Watch %s failed to return never-landed item %s to failed: %s",
+                        watch_id, item.id, norm_err, exc_info=True,
+                    )
+                existing = {**existing, "state": "failed"}
             retry_failed = existing is not None and existing.get("state") == "failed"
             # The count this tick continues: a version change starts it again (D-01).
             prior_attempts = (
@@ -415,7 +447,8 @@ class WatchService:
                 # ⛔ FIX-12 / D-01 / D-05 (orchestrator ruling 5): a `failed` item is RE-MINTED
                 # through this SAME new-file body — read → mint → bytes → enqueue. It never
                 # reaches the restore/modify/rename `else:` below, which would flip it to
-                # `present` with no document. Re-minting is safe: the minter's dedup legs skip
+                # `present` with no document. (A never-landed item an auth blip or H-5 moved to
+                # `unauthorized` / `missing` is routed here too — 285-REVIEW CR-02, above.) Re-minting is safe: the minter's dedup legs skip
                 # `failed` rows, so the item ends on exactly one non-failed document. Routing
                 # here (not a third call) keeps watch_service.py at exactly 2 minter call sites,
                 # which `test_280_minter_sequence.py` pins.
