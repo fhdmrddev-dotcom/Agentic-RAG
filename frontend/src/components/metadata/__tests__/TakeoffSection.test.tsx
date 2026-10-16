@@ -17,6 +17,8 @@ vi.mock("@/lib/api/takeoff", () => ({
 // `libraryListFence.test.ts`; this suite pins that every read it makes is a bounded page.
 vi.mock("@/lib/api", () => ({
   listDocumentsPage: vi.fn(),
+  // 284-REVIEW WR-04: the saved rate sheet is read by id when it is not on the page.
+  getDocument: vi.fn(),
 }))
 
 function page(documents: Document[], total = documents.length) {
@@ -246,5 +248,74 @@ describe("TakeoffSection Component (Phase 220, TAKEOFF-04)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }))
     expect(await screen.findByRole("option", { name: "Master_Rate_Sheet.xlsx" })).toBeInTheDocument()
     expect(api.listDocumentsPage).toHaveBeenCalledTimes(2)
+  })
+
+  // ── 284-REVIEW WR-04: the SAVED rate sheet is always shown, and Match only ever uses what the
+  // select shows. The page is the 50 newest non-archived spreadsheets; the sheet a takeoff was
+  // matched against can be older, or archived — before this, the select matched no option (blank
+  // in Chrome, the first option elsewhere) while Match still sent the hidden saved id. ──
+  const savedTakeoffDoc = (savedId: string): Document => ({
+    ...mockDoc,
+    metadata: {
+      _takeoff: { ...(mockDoc.metadata?._takeoff as object), rate_sheet_document_id: savedId },
+    },
+  })
+
+  it("a saved sheet outside the page is read by id, shown first and selected — and Match uses it", async () => {
+    vi.mocked(api.listDocumentsPage).mockResolvedValue(page([sheet(1), sheet(2)], 73))
+    vi.mocked(api.getDocument).mockResolvedValue({ ...mockRateDocs[0], id: "saved-old", filename: "Rates 2019.xlsx" })
+    vi.mocked(takeoffApi.matchDocumentTakeoff).mockResolvedValue(
+      (mockDoc.metadata?._takeoff as { boq: never }).boq,
+    )
+    render(<TakeoffSection doc={savedTakeoffDoc("saved-old")} />)
+    await screen.findByRole("option", { name: "Rates 2019.xlsx" })
+    expect(api.getDocument).toHaveBeenCalledWith("saved-old")
+    expect(Array.from(rateSelect().options).map((o) => o.textContent)).toEqual([
+      "Rates 2019.xlsx",
+      "Rates 1.xlsx",
+      "Rates 2.xlsx",
+    ])
+    expect(rateSelect()).toHaveValue("saved-old")
+    fireEvent.click(screen.getByRole("button", { name: /Re-Match/ }))
+    await waitFor(() => expect(takeoffApi.matchDocumentTakeoff).toHaveBeenCalledWith("doc-cad-1", "saved-old"))
+  })
+
+  it("an archived saved sheet says so in its option", async () => {
+    vi.mocked(api.getDocument).mockResolvedValue({
+      ...mockRateDocs[0],
+      id: "saved-arch",
+      filename: "Old Rates.xlsx",
+      archived_at: "2026-09-01T00:00:00Z",
+    })
+    render(<TakeoffSection doc={savedTakeoffDoc("saved-arch")} />)
+    expect(await screen.findByRole("option", { name: "Old Rates.xlsx (archived)" })).toBeInTheDocument()
+    expect(rateSelect()).toHaveValue("saved-arch")
+  })
+
+  it("a saved sheet that is gone (404) says so, and the select and Match move to a shown sheet", async () => {
+    const { DocumentListError } = await vi.importActual<typeof import("@/lib/api/documents")>("@/lib/api/documents")
+    vi.mocked(api.getDocument).mockRejectedValue(new DocumentListError(404, "Couldn't load this document."))
+    vi.mocked(takeoffApi.matchDocumentTakeoff).mockResolvedValue(
+      (mockDoc.metadata?._takeoff as { boq: never }).boq,
+    )
+    render(<TakeoffSection doc={savedTakeoffDoc("deleted-sheet")} />)
+    expect(await screen.findByText("The saved rate sheet is no longer available.")).toBeInTheDocument()
+    expect(rateSelect()).toHaveValue("rates-1")
+    fireEvent.click(screen.getByRole("button", { name: /Re-Match/ }))
+    await waitFor(() => expect(takeoffApi.matchDocumentTakeoff).toHaveBeenCalledWith("doc-cad-1", "rates-1"))
+  })
+
+  it("a saved sheet ON the page costs no extra read", async () => {
+    render(<TakeoffSection doc={savedTakeoffDoc("rates-1")} />)
+    await screen.findByRole("option", { name: "Master_Rate_Sheet.xlsx" })
+    expect(rateSelect()).toHaveValue("rates-1")
+    expect(api.getDocument).not.toHaveBeenCalled()
+  })
+
+  it("Match is disabled while the select cannot show the sheet it would use", () => {
+    vi.mocked(api.listDocumentsPage).mockReturnValue(new Promise(() => {}))
+    render(<TakeoffSection doc={savedTakeoffDoc("saved-old")} />)
+    expect(rateSelect()).toHaveTextContent("Loading rate sheets…")
+    expect(screen.getByRole("button", { name: /Re-Match/ })).toBeDisabled()
   })
 })
