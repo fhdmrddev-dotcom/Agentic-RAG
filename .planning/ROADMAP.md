@@ -364,8 +364,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 284-03-PLAN.md — wave 2 (TDD, frontend, no DB): hook body on the server, Realtime INSERT / DELETE → debounced refetch, single-document read, `fakeLibraryApi` keeps the nine suites' cases, loading / failed / warm states (SEED-248 Library half), exact pager with the ROW_CAP arm deleted, IngestionTab on the summary + paged lists, Chunks scroll-sentinel paging, Tables / Images / Versions "N of M" (FIX-11; D-07..D-13, D-17, D-24, R-04, R-08, R-11)
-- [ ] 284-04-PLAN.md — wave 2 (TDD, backend + frontend, DB lock): Find paged in SQL over the view (lineage batching gone), saved views / filters paged with the agent tool on its two-leg path (byte-identical output), D-23 layer 1 route inventory driven RED + SEED-355 / SEED-356 planted, CreateLinkDialog / RelationshipEditor / LegalHoldDialog typeahead on `POST /document-search`, Takeoff one bounded spreadsheet page (FIX-11; D-10, D-14, D-15, D-16, D-18, D-23, R-02, R-05, R-10..R-12)
+- [x] 284-03-PLAN.md — wave 2 (TDD, frontend, no DB): hook body on the server, Realtime INSERT / DELETE → debounced refetch, single-document read, `fakeLibraryApi` keeps the nine suites' cases, loading / failed / warm states (SEED-248 Library half), exact pager with the ROW_CAP arm deleted, IngestionTab on the summary + paged lists, Chunks scroll-sentinel paging, Tables / Images / Versions "N of M" (FIX-11; D-07..D-13, D-17, D-24, R-04, R-08, R-11)
+- [x] 284-04-PLAN.md — wave 2 (TDD, backend + frontend, DB lock): Find paged in SQL over the view (lineage batching gone), saved views / filters paged with the agent tool on its two-leg path (byte-identical output), D-23 layer 1 route inventory driven RED + SEED-355 / SEED-356 planted, CreateLinkDialog / RelationshipEditor / LegalHoldDialog typeahead on `POST /document-search`, Takeoff one bounded spreadsheet page (FIX-11; D-10, D-14, D-15, D-16, D-18, D-23, R-02, R-05, R-10..R-12)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -384,7 +384,7 @@ Plans:
 | 281. A Refusal Names Its Cause | 4/4 | Complete (owed by operator decision: G-4 rows A, C, D; WR-02 kept by design) | 2026-10-15 |
 | 282. The Slow Run and the Paused Run | 4/4 | Complete (verified 5/5, self-verified; review CR-01 + WR-02..05 fixed, WR-01 partial; owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through, SC#10 rows 2/8 on credit) | 2026-10-15 |
 | 283. Every Member Reaches Their Own Settings | 3/3 | Complete (verified 4/4 SCs; review CR-01 + WR-01/02 + 4 info fixed, IN-04/IN-06 skipped by decision; G-4 driven live, Tab row confirmed by operator) | 2026-10-16 |
-| 284. Library at Scale | 2/5 | In Progress | - |
+| 284. Library at Scale | 4/5 | In Progress | - |
 
 ---
 
