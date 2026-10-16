@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: milestone_phases_complete
-last_updated: 2026-10-16T12:00:00.000Z
-last_activity: 2026-10-16 -- Phase 284 CLOSED (6/6 plans, verified 7/7, self-verified); every v4.6 phase (277-284) complete
+status: planning
+last_updated: "2026-10-16T14:38:17.513Z"
+last_activity: 2026-10-16 -- Phase 285 context gathered (FIX-12/13/14 + BUG-261014-05 folded; migration 209 planned)
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 8
   total_plans: 31
   completed_plans: 31
-  percent: 100
-stopped_at: Phase 284 closed — v4.6 phases all complete; next /gsd:audit-milestone
+  percent: 89
+stopped_at: Phase 285 context gathered — next /gsd:plan-phase 285
 ---
 
 # Project State
