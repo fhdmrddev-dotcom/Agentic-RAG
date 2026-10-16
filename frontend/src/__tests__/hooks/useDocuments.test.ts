@@ -355,6 +355,12 @@ describe("useDocuments", () => {
   // status change takes the row off this page's list and moves the summary's buckets; merging it
   // in place left it on its OLD folder's page wearing its new folder_id. A pure field update
   // (a stage advancing, a rename) still merges in place and asks for nothing. ──
+  /** The row Postgres replicates: real columns only — the server-derived `table_count` is absent. */
+  const replicatedRow = (row: Document): Partial<Document> => {
+    const copy: Partial<Document> = { ...row }
+    delete copy.table_count
+    return copy
+  }
   const onPageRow = (): Document =>
     ({
       id: "m1",
@@ -385,7 +391,7 @@ describe("useDocuments", () => {
     const row = onPageRow()
     renderHook(() => useHarness([row]))
     await waitFor(() => expect(mockOn).toHaveBeenCalled())
-    const { table_count: _derived, ...replicated } = row
+    const replicated = replicatedRow(row)
     emitRealtime({ eventType: "UPDATE", new: { ...replicated, ...change } })
     expect(onChange).toHaveBeenCalledTimes(1)
   })
@@ -394,7 +400,7 @@ describe("useDocuments", () => {
     const row = onPageRow()
     const { result } = renderHook(() => useHarness([row]))
     await waitFor(() => expect(mockOn).toHaveBeenCalled())
-    const { table_count: _derived, ...replicated } = row
+    const replicated = replicatedRow(row)
     emitRealtime({ eventType: "UPDATE", new: { ...replicated, ingestion_step: "embedding", filename: "renamed.pdf" } })
     expect(onChange).not.toHaveBeenCalled()
     expect(result.current.documents[0]).toMatchObject({ ingestion_step: "embedding", filename: "renamed.pdf", table_count: 3 })
@@ -404,7 +410,7 @@ describe("useDocuments", () => {
     const row = onPageRow()
     renderHook(() => useHarness([row]))
     await waitFor(() => expect(mockOn).toHaveBeenCalled())
-    const { table_count: _derived, ...replicated } = row
+    const replicated = replicatedRow(row)
     emitRealtime({ eventType: "UPDATE", new: { ...replicated, status: "completed" } })
     expect(onChange).toHaveBeenCalledTimes(1)
   })

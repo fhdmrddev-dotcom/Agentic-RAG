@@ -383,16 +383,15 @@ export function LibraryPage({
   // the pager never reads "51–49 of 49" and "Try again" never re-asks an impossible page. Only
   // on a READY answer: its total is the one for THIS offset.
   const listTotal = libDocs.listState === "ready" ? libDocs.total : null
+  // React's "adjust state while rendering" pattern (not an effect): guarded, so it settles in one
+  // extra pass and the out-of-range page is never committed to the screen.
+  const clampedOffset = listTotal === null ? pageOffset : clampPageOffset(pageOffset, listTotal, pageSize)
+  if (clampedOffset !== pageOffset) setPageOffset(clampedOffset)
   // 284-REVIEW IN-07: the page the pager describes — the rows on screen when a page change failed.
   const shownPage =
     libDocs.listState === "error" && libDocs.rowsPage !== null
       ? libDocs.rowsPage
       : { offset: pageOffset, limit: pageSize }
-  useEffect(() => {
-    if (listTotal === null) return
-    const clamped = clampPageOffset(pageOffset, listTotal, pageSize)
-    if (clamped !== pageOffset) setPageOffset(clamped)
-  }, [listTotal, pageOffset, pageSize])
 
   // Load the field defs (for the operator menu) + the saved views once.
   useEffect(() => {
