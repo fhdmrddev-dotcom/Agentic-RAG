@@ -3,15 +3,30 @@ seed_id: SEED-357
 title: "Library Root and Find page 1 take 2.5x longer at 50k than at 10k — the exact count and the top-25 sort both scan every latest row the user owns"
 created: 2026-10-16
 surface: Agentic-RAG
-status: planted
+status: answered
 partial: false
-status_note:
+status_note: |
+  ANSWERED by Phase 284-06 (migration 208, 2026-10-16, local; production not yet applied).
+  Quiet host (typeperf 12-16 %), HTTP median, 10k -> 50k:
+    Root page 1  45.1 -> 55.6 ms = 1.23x   (BEFORE, same host: 135.3 -> 445.6 ms = 3.29x;
+                                            284-05 run 1: 185.6 -> 470.7 ms = 2.54x)
+    Find page 1  47.4 -> 67.2 ms = 1.42x   (BEFORE: 154.7 -> 465.7 ms = 3.01x; 284-05: 2.59x)
+  SQL: the page node is flat (Root 0.82 -> 1.10 ms, Find 1.22 -> 1.22 ms). The exact count stays
+  linear by design (FIX-11), now ~0.45 us/row (Root 2.6 -> 13.5 ms, Find 5.1 -> 22.7 ms).
+  The cause was NOT "~250 ms of API-side handling". The API side is a flat ~40-60 ms, and the
+  time was inside the one PostgREST statement:
+    (a) the view's OR predicate allowed no ordered walk, and Root's embeds ran for every row;
+    (b) the documents SELECT policy evaluated auth.uid() per row, re-parsing the JWT claims each time.
+  Not fixed (recorded in 284-MEASUREMENTS.md "AFTER (208)"):
+    - GET /library/summary 45.7 -> 88.1 ms = 1.93x (an exact aggregate over every row);
+    - a deep page (Big LAST page) 69.1 -> 126.1 ms = 1.82x (linear in the OFFSET).
+  Production order: 207 -> 208 -> get_advisors(security) -> backend -> frontend.
 trigger_when: "An account (or org) in production passes 10,000 latest documents; OR the Library's first page or Find page 1 is reported slow; OR the next phase that edits supabase/migrations for the documents table or backend/app/api/documents.py's list handler."
 trigger_paths: ["backend/app/api/documents.py", "backend/app/services/document_search_service.py", "supabase/migrations/"]
 trigger_surfaces: ["library"]
 migration_note: "The fix is most likely an index (a new numbered migration, applied in production before the backend that relies on it)."
 relates_to: ["Phase 284 (FIX-11, SC#1 / D-22 — 284-MEASUREMENTS.md 'AFTER — verdict per D-22 criterion')", "BUG-261014-07 (closed by 284)"]
-folded_into: null
+folded_into: "284-06 (migration 208 — supabase/migrations/208_library_page_index.sql)"
 renumbered_from: null
 renumbered_because: null
 ---
