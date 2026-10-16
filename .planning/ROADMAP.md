@@ -359,8 +359,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 284-01-PLAN.md — wave 1 (TDD, frontend, no DB): the paged wire contract (`listDocumentsPage` / `getDocument` / `getLibrarySummary` / per-document pages / paged resolves, legacy-shape tolerant), the `useLibraryDocuments` extraction over `useDocuments` with the screen byte-identical (G-5 seam TAKEN), stat tiles / folder band / Find editors take numbers, R-11 `.folder_id` re-pin (FIX-11; D-01, D-02, D-07, D-11, D-12, D-16, D-17, D-24, R-03..R-06, R-08, R-11)
-- [ ] 284-02-PLAN.md — wave 1 (TDD, backend, DB lock): synthetic 10k / 50k account + BEFORE figures at base, migration **207** `library_documents` security_invoker view (SELECT-only, closed to anon / service role, supplement mirror, applied by script, regen) proven by leak / fail-closed / parity / drift live tests, `GET /library/summary` (one GROUPING SETS read), `GET /documents` envelope + `GET /documents/{id}` + bounded per-document lists, `BUG-261014-06` stopgap removed, public OpenAPI + pagination.md (FIX-11; D-01..D-07, D-11, D-13, D-17..D-21, R-01..R-08, R-11)
+- [x] 284-01-PLAN.md — wave 1 (TDD, frontend, no DB): the paged wire contract (`listDocumentsPage` / `getDocument` / `getLibrarySummary` / per-document pages / paged resolves, legacy-shape tolerant), the `useLibraryDocuments` extraction over `useDocuments` with the screen byte-identical (G-5 seam TAKEN), stat tiles / folder band / Find editors take numbers, R-11 `.folder_id` re-pin (FIX-11; D-01, D-02, D-07, D-11, D-12, D-16, D-17, D-24, R-03..R-06, R-08, R-11)
+- [x] 284-02-PLAN.md — wave 1 (TDD, backend, DB lock): synthetic 10k / 50k account + BEFORE figures at base, migration **207** `library_documents` security_invoker view (SELECT-only, closed to anon / service role, supplement mirror, applied by script, regen) proven by leak / fail-closed / parity / drift live tests, `GET /library/summary` (one GROUPING SETS read), `GET /documents` envelope + `GET /documents/{id}` + bounded per-document lists, `BUG-261014-06` stopgap removed, public OpenAPI + pagination.md (FIX-11; D-01..D-07, D-11, D-13, D-17..D-21, R-01..R-08, R-11)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -384,7 +384,7 @@ Plans:
 | 281. A Refusal Names Its Cause | 4/4 | Complete (owed by operator decision: G-4 rows A, C, D; WR-02 kept by design) | 2026-10-15 |
 | 282. The Slow Run and the Paused Run | 4/4 | Complete (verified 5/5, self-verified; review CR-01 + WR-02..05 fixed, WR-01 partial; owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through, SC#10 rows 2/8 on credit) | 2026-10-15 |
 | 283. Every Member Reaches Their Own Settings | 3/3 | Complete (verified 4/4 SCs; review CR-01 + WR-01/02 + 4 info fixed, IN-04/IN-06 skipped by decision; G-4 driven live, Tab row confirmed by operator) | 2026-10-16 |
-| 284. Library at Scale | 0/5 | Planned | - |
+| 284. Library at Scale | 2/5 | In Progress | - |
 
 ---
 
