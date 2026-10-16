@@ -35,15 +35,10 @@ import { API_BASE, getAuthHeaders, getAuthToken } from "./_core"
 // Phase 275 (S10): imported, never re-exported — the barrel contract (apiBarrel.test.ts).
 import { refusalOf } from "./refusal"
 
-// legacy — removed by 284-05 (D-16). Unwraps the paged envelope so develop keeps rendering
-// between the server switch (284-02) and the client switch (284-03).
-export async function listDocuments(): Promise<Document[]> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents`, { headers })
-  if (!res.ok) throw new Error("Failed to list documents")
-  const body = (await res.json()) as Document[] | DocumentListResponse
-  return Array.isArray(body) ? body : body.documents
-}
+// Phase 284-05 (D-16): the five whole-list clients (the whole library, and a document's every
+// chunk / table / image / version) are DELETED. Every caller reads a page below, and
+// `src/lib/__tests__/libraryListFence.test.ts` fails on any call, import or re-export of their
+// names and on an unparameterised `GET /documents` fetch anywhere in product code.
 
 // ──────────────────────────────────────────────────────────────────────────────────────
 // Phase 284 (FIX-11 / D-01 / D-11 / D-16 / D-17) — the paged reads.
@@ -52,8 +47,10 @@ export async function listDocuments(): Promise<Document[]> {
 // than the whole library as an array. The frontend and the backend deploy separately, so for
 // ONE RELEASE every client here also accepts the legacy array body (RESEARCH Pitfall 3) and
 // converts it with `total = rows.length` — honest for the array it was handed, and the only
-// number that array can support. That tolerance branch is deleted together with the legacy
-// whole-list clients by 284-05, whose D-16 fence fails on any remaining whole-list call.
+// number that array can support. 284-05 deleted the legacy whole-list clients but KEPT this
+// tolerance branch on purpose: one push may land the frontend before the backend, so it is
+// removed ONE RELEASE AFTER the production deploy of Phase 284 (it is not a whole-list call, and
+// the D-16 fence does not forbid it).
 //
 // T-284-01: only typed params reach the URL (offsets, limits, literal unions, a folder id or
 // "root") — never an id list. The server re-validates every one of them (422).
@@ -464,15 +461,6 @@ export async function deleteDocument(id: string, scope?: "version" | "all"): Pro
   if (!res.ok) throw await refusalOf(res, "Failed to delete document")
 }
 
-// legacy — removed by 284-05 (D-16). Unwraps the paged envelope across the deploy window.
-export async function fetchDocumentVersions(documentId: string): Promise<Document[]> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents/${documentId}/versions`, { headers })
-  if (!res.ok) throw new Error("Failed to fetch document versions")
-  const body = (await res.json()) as Document[] | DocumentVersionPage
-  return Array.isArray(body) ? body : body.versions
-}
-
 export async function restoreDocumentVersion(documentId: string): Promise<Document> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/documents/${documentId}/restore`, {
@@ -546,6 +534,10 @@ export async function toggleFolderOrgShared(id: string): Promise<Folder> {
 // and each throws a DISTINCT message, so a section's error arm can say which read failed
 // rather than sharing one anonymous "Failed to load".
 //
+// Phase 284-05 (D-16): the chunks / tables / images reads of this block were whole-list reads
+// (silently cut at 1,000 rows) and are deleted; their paged successors live above, next to
+// `listDocumentsPage`, and keep the same distinct error messages.
+//
 // ⚠ Every one of these MUST also be re-exported from `lib/api.ts`. A symbol exported from
 // this module and forgotten in the barrel typechecks perfectly and is invisible to every
 // consumer (D-207-06) — `apiBarrel.test.ts` now guards that for this module, not only for
@@ -578,19 +570,6 @@ export async function getDocumentContent(
   return res.json() as Promise<DocumentContentResponse>
 }
 
-/** GET /documents/{id}/chunks — the chunks the agent actually searches, in `chunk_index`
- *  order. `embedding_model` / `embedding_dimensions` are per-CHUNK because their variation
- *  mid-re-embed is the whole point (D-217-08): a half-re-embedded document is a fact only
- *  this list can show. */
-export async function listDocumentChunks(id: string): Promise<DocumentChunkRow[]> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents/${id}/chunks`, { headers })
-  if (!res.ok) throw new Error("Failed to load document chunks")
-  // legacy — removed by 284-05 (D-16). Unwraps the paged envelope across the deploy window.
-  const body = (await res.json()) as DocumentChunkRow[] | DocumentChunkPage
-  return Array.isArray(body) ? body : body.chunks
-}
-
 /** GET /documents/{id}/conversation — the other messages of this document's mail thread,
  *  oldest first.
  *
@@ -603,31 +582,6 @@ export async function fetchDocumentConversation(id: string): Promise<Conversatio
   const res = await fetch(`${API_BASE}/documents/${id}/conversation`, { headers })
   if (!res.ok) throw new Error("Failed to load conversation")
   return res.json() as Promise<ConversationResponse>
-}
-
-/** GET /documents/{id}/tables — the extracted tables, in `table_index` order.
- *  ⚠ Owner-only by migration 108: a document reached through SOMEONE ELSE'S globally
- *  visible folder returns an empty list here, and that is correct rather than a failure
- *  (the row's `table_count` badge, computed through the same client, already reads 0). */
-export async function listDocumentTables(id: string): Promise<DocumentTableRow[]> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents/${id}/tables`, { headers })
-  if (!res.ok) throw new Error("Failed to load document tables")
-  // legacy — removed by 284-05 (D-16). Unwraps the paged envelope across the deploy window.
-  const body = (await res.json()) as DocumentTableRow[] | DocumentTablePage
-  return Array.isArray(body) ? body : body.tables
-}
-
-/** GET /documents/{id}/images — the image DESCRIPTIONS.
- *  ⚠ There is no picture on this wire and there never can be: `document_images` stores no
- *  bytes, so the description IS the image. Same owner-only asymmetry as tables. */
-export async function listDocumentImages(id: string): Promise<DocumentImageRow[]> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents/${id}/images`, { headers })
-  if (!res.ok) throw new Error("Failed to load document images")
-  // legacy — removed by 284-05 (D-16). Unwraps the paged envelope across the deploy window.
-  const body = (await res.json()) as DocumentImageRow[] | DocumentImagePage
-  return Array.isArray(body) ? body : body.images
 }
 
 /** GET /documents/{id}/queries — the searches that returned this document, within the

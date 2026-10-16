@@ -19,7 +19,7 @@
  * Esc and Apply both return focus to the chip that opened it.
  */
 import { useRef, useState, type ReactElement } from "react"
-import type { Document, Folder, ViewCondition, ViewFilter } from "@/types"
+import type { Folder, ViewCondition, ViewFilter } from "@/types"
 import { FilterChip } from "@/components/ingestion/FilterBar"
 import { folderPathOf } from "@/components/chat/scopeCopy"
 import { RELATIONSHIP_FILTER_VERBS } from "@/components/relationships/relationshipLabels"
@@ -48,10 +48,6 @@ export interface FindQuickAddProps {
   dispatch: (action: FindAction) => void
   filter: ViewFilter
   onFilterChange: (filter: ViewFilter) => void
-  /** UNUSED since Phase 284-04: the Relationship editor searches the server itself (D-15), so
-   *  nothing reads this any more. Kept declared only so LibraryPage (284-03) can stop passing it
-   *  in the same wave without a type error — removed by 284-05. */
-  documents?: readonly Document[]
   folders: readonly Folder[]
   /** Phase 284-01 (D-07 / R-03) — the Added by options (`LibrarySummary.connections`). */
   connections: readonly { id: string; name: string | null; count: number }[]
