@@ -45,7 +45,7 @@ _SYNC_RUN_COLUMNS = (
 _WATCH_ITEM_COLUMNS = (
     "id, org_id, watch_id, user_id, external_id, name, path_hint, source_version, "
     "source_modified_at, content_hash, document_id, state, first_seen_at, last_seen_at, "
-    "missing_since, last_error, created_at, updated_at"
+    "missing_since, last_error, created_at, updated_at, failed_attempts, minted"
 )
 
 
@@ -269,6 +269,7 @@ async def release_watch(
     user_id: UUID | None = None,
     org_id: UUID | None = None,
     retain: int | None = None,
+    run_error: str | None = None,
 ) -> None:
     """Clear the lease, write the terminal outcome hint, and record ONE run row.
 
@@ -295,6 +296,15 @@ async def release_watch(
     All arguments after `error` are optional and net-new: the four existing call sites
     keep compiling unchanged, and a caller that supplies nothing still gets an honest
     zero-count row rather than no row at all.
+
+    ⭐ `run_error` (Phase 285 D-03, orchestrator ruling 3) is the per-file failure summary
+    of a SUCCESSFUL tick ("1 file failed: x.txt (ConnectError)"). It belongs to the RUN ROW
+    only: when given it replaces `error` in `connector_sync_runs.last_error` and never
+    reaches `connector_watches.last_error`. That column feeds WatchRowCard's connection pill,
+    which classifies the string unconditionally (WatchRowCard.tsx:240 / :341) — a file named
+    `permissions-matrix.xlsx` there would flip a healthy watch to "Authorisation withdrawn".
+    So on a success tick the watch row's `last_error` stays NULL. Without `run_error` both
+    columns receive `error`, exactly as before.
     """
     keep = settings.watch_run_history_retention if retain is None else retain
     c = counts or {}
@@ -365,7 +375,7 @@ async def release_watch(
                 started_at,
                 status,
                 failure_cause,
-                error,
+                run_error if run_error is not None else error,
                 bool(listing_complete),
                 int(c.get("new", 0)),
                 int(c.get("modified", 0)),
@@ -605,17 +615,27 @@ async def upsert_watch_item(
     document_id: UUID | None = None,
     state: str = "present",
     last_error: str | None = None,
+    failed_attempts: int | None = None,
+    minted: bool | None = None,
 ) -> dict:
-    """Upsert tracked item on unique (watch_id, external_id)."""
+    """Upsert tracked item on unique (watch_id, external_id).
+
+    Phase 285 (D-01 / D-06): `failed_attempts` and `minted` ride the SAME upsert (one write per
+    item). `None` means "keep the stored value" (M-2 / M-4): on INSERT it becomes the column
+    default (0 / false); on UPDATE the stored value stays. The DO UPDATE references the
+    PARAMETER ($13 / $14), never `EXCLUDED` — EXCLUDED carries the INSERT's defaulted value and
+    would silently overwrite a preserved marker.
+    """
     async with pool.acquire() as con:
         row = await con.fetchrow(
             f"""
             INSERT INTO connector_watch_items (
                 watch_id, external_id, name, user_id, org_id, path_hint,
                 source_version, source_modified_at, content_hash, document_id,
-                state, last_seen_at, last_error
+                state, last_seen_at, last_error, failed_attempts, minted
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), $12
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), $12,
+                COALESCE($13::int, 0), COALESCE($14::boolean, false)
             )
             ON CONFLICT (watch_id, external_id) DO UPDATE
             SET name = EXCLUDED.name,
@@ -627,6 +647,8 @@ async def upsert_watch_item(
                 state = EXCLUDED.state,
                 last_seen_at = now(),
                 last_error = EXCLUDED.last_error,
+                failed_attempts = COALESCE($13::int, connector_watch_items.failed_attempts),
+                minted = COALESCE($14::boolean, connector_watch_items.minted),
                 updated_at = now()
             RETURNING {_WATCH_ITEM_COLUMNS}
             """,
@@ -642,6 +664,8 @@ async def upsert_watch_item(
             _as_uuid(document_id) if document_id else None,
             state,
             last_error,
+            failed_attempts,
+            minted,
         )
         return dict(row) if row else {}
 
