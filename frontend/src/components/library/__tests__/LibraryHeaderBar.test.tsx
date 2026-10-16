@@ -136,6 +136,28 @@ describe("⭐ the reclaimed corner does a job", () => {
     expect(screen.getByTestId("library-queue-pill").textContent).not.toContain("1 files")
   })
 
+  // ── 284-03 (D-07 / D-12 / UI-SPEC S3): the count is the server's, and it is only stated once
+  // the summary has answered. Idle pill style, no spinner, in both unknown arms. ──
+  it("'Counting…' while the summary loads — idle style, no spinner, no number", () => {
+    renderBar({ inFlight: 0, totalDocuments: undefined, totalState: "loading" })
+    const pill = screen.getByTestId("library-queue-pill")
+    expect(pill).toHaveAttribute("data-live", "false")
+    expect(pill.textContent).toBe("Counting…")
+    expect(pill.querySelector(".animate-spin")).toBeNull()
+  })
+
+  it("'Count not known yet' when the summary failed — never '0 documents'", () => {
+    renderBar({ inFlight: 0, totalDocuments: undefined, totalState: "error" })
+    const pill = screen.getByTestId("library-queue-pill")
+    expect(pill.textContent).toBe("Count not known yet")
+    expect(pill.querySelector(".animate-spin")).toBeNull()
+  })
+
+  it("a ready total of 1,000 or more is grouped", () => {
+    renderBar({ inFlight: 0, totalDocuments: 10_000, totalState: "ready" })
+    expect(screen.getByTestId("library-queue-pill").textContent).toBe("10,000 documents")
+  })
+
   it("⛔ the pill LANDS somewhere — a control that lights up and goes nowhere is the defect", () => {
     const onOpenQueue = vi.fn()
     renderBar({ inFlight: 3, onOpenQueue })

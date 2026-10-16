@@ -1,49 +1,58 @@
 /**
- * Phase 284-01 (FIX-11 / D-07 / D-11 / D-12 / D-24) — the Library's documents, as ROWS and
- * NUMBERS rather than as the whole library.
+ * Phase 284 (FIX-11 / D-07 / D-08 / D-11 / D-12 / D-24) — the Library's documents, as ROWS and
+ * NUMBERS asked of the server, never as the whole library.
  *
- * `LibraryPage.tsx` used to hold every visible document in memory and derive everything from
- * that one array: the in-flight pill, the open document, the folder counts and sizes, the root
- * count, the browse list, the archived split and the pager slice. That is the reason the
- * Library cannot scale (SC#1-#3), and it was the page's owed G-5 extraction. This hook is the
- * named seam: the page asks it for what to SHOW, and it decides how that is answered.
+ * 284-01 extracted this seam from `LibraryPage.tsx` over the in-memory array; 284-03 replaced the
+ * BODY. The page asks for what to SHOW; this hook answers it with three reads:
+ *   · `GET /documents`            — ONE page of the browse list (or a view / filter resolve's page)
+ *   · `GET /library/summary`      — every number the Library shows without listing a row
+ *   · `GET /documents/{id}`       — a selected document on neither the page nor Find's rows (D-11)
  *
  * ── THE RULES ─────────────────────────────────────────────────────────────────────────
- * 1. THE PAGE DERIVES NOTHING FROM DOCUMENTS. Every row and every number the page renders
- *    comes from this hook's return. A child that only counts receives a number (D-07), never
- *    the array.
+ * 1. THE PAGE DERIVES NOTHING FROM DOCUMENTS. Every row and every number the page renders comes
+ *    from this hook. A child that only counts receives a number (D-07), never an array.
  * 2. `null` MEANS NOT ANSWERED, NEVER 0 (SEED-248 / D-12). `total`, `summary`, `inFlight` and
- *    `archivedHidden` are `null` until their read has answered; a caller renders "…" or
- *    "Not known yet" for `null` and must not coerce it into a count it does not have. (In
- *    wave 1 they are always answered, because the array is already in memory.)
- * 3. A FOLDER OR VIEW SWITCH IS A COLD LOAD; A PAGE CHANGE IS WARM (UI-SPEC §Loading
- *    vocabulary). `listState` / `summaryState` carry that. Wave 1 never loads, so both are
- *    `"ready"`.
- * 4. WAVE 1 IS BUILT ON `useDocuments` AND IS BYTE-IDENTICAL to what the page computed. Every
- *    derivation below was MOVED from `LibraryPage.tsx`, not rewritten. 284-03 swaps the BODY
- *    for `listDocumentsPage` + `getLibrarySummary` + `getDocument`, and the return shape does
- *    not change — so the page does not change again.
- *
- * ⚠ `documentsForIngestion` is the raw array, returned for the ONE consumer that still needs
- * it in wave 1 (the Ingestion tab, plus Find's relationship candidates). It is named for its
- * job so that 284-03 can delete it and the compiler names every remaining reader.
- *
- * The pager STATE (offset, size, the reset on navigation) stays in the page: it is UI state.
- * This hook takes `offset` / `limit` as arguments and answers that page.
+ *    `archivedHidden` stay `null` until their read has answered.
+ * 3. A SOURCE SWITCH (folder, view, filter) IS COLD — the rows belong to another list, so they
+ *    are cleared. A PAGE, ROWS-PER-PAGE or INCLUDE-ARCHIVED change is WARM — the rows stay while
+ *    the answer is fetched. A REALTIME-triggered refetch is SILENT — no state change at all
+ *    until the answer lands (UI-SPEC §Loading vocabulary).
+ * 4. REALTIME IS A HINT (D-08 / D-v2.5-03). An INSERT or DELETE never patches a list: it
+ *    schedules ONE refetch of the page and the summary, coalesced over 500 ms. Only an UPDATE to
+ *    a row already on the page merges in place (`useDocuments`, T-284-17).
+ * 5. A STALE ANSWER IS DROPPED (`useDocumentFind`'s `reqIdRef` guard): a slow earlier request can
+ *    never overwrite a later one.
  */
-import { useMemo } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react"
 
 import { useDocuments } from "@/hooks/useDocuments"
-import { splitArchived } from "@/components/retention/ArchivedHiddenLine"
-import type { Document, LibraryCount, LibrarySummary } from "@/types"
+import { getDocument, getLibrarySummary, listDocumentsPage, resolveAdHoc, resolveView } from "@/lib/api"
+import type { Document, LibrarySummary, ViewFilter } from "@/types"
 
 export type LibraryLoadState = "loading" | "ready" | "error"
+/** `cold` — nothing on screen yet for this list · `warm` — the person asked for another page and
+ *  the previous rows are still shown · `ready` · `error` (rows kept when there were any). */
+export type LibraryListState = "cold" | "warm" | "ready" | "error"
+
+/** What the list shows: a folder (or Root) browse, a saved view, or an unsaved filter. */
+export type LibrarySource =
+  | { kind: "browse"; folderId: string | null }
+  | { kind: "view"; viewId: string }
+  | { kind: "filter"; filter: ViewFilter }
+
+/** The coalescing window for a Realtime hint (D-08 / T-284-20). */
+export const LIBRARY_CHANGE_DEBOUNCE_MS = 500
 
 export interface UseLibraryDocumentsArgs {
-  /** The selected folder, or `null` for Root. */
-  folderId: string | null
-  /** The rows a saved view / ad-hoc filter resolved to; `null` = browse the folder. */
-  filteredDocs: Document[] | null
+  source: LibrarySource
   /** The ONE include-archived state (Find's reducer, Phase 275 D-04). */
   includeArchived: boolean
   offset: number
@@ -55,207 +64,327 @@ export interface UseLibraryDocumentsArgs {
 }
 
 export interface UseLibraryDocuments {
-  /** The browse rows to render: one page of the folder, or the whole resolved view. */
+  /** The server's page, in the server's order — never sliced here. */
   rows: Document[]
-  /** The rows the browse list could show (the pager's denominator); `null` until answered. */
+  /** The server's exact total for this list; `null` until answered. */
   total: number | null
-  /** Archived rows in this scope (shown or hidden — `ArchivedHiddenLine`'s count). */
+  /** Archived rows in this scope, shown or hidden (`ArchivedHiddenLine`'s count); `null` until known. */
   archivedHidden: number | null
-  /** Documents still being read — pending, processing or paused. */
+  /** Documents still being read: the summary's pending + processing (R-04); `null` until answered. */
   inFlight: number | null
-  /** The `GET /library/summary` shape; `null` until answered. */
+  /** The `GET /library/summary` answer; `null` until answered. */
   summary: LibrarySummary | null
   summaryState: LibraryLoadState
-  listState: LibraryLoadState
+  listState: LibraryListState
+  /** A load the person is waiting for (cold or warm) — never true for a background refetch. */
   loading: boolean
   error: Error | null
-  /** The open document, or `null` when it is not visible (or none is open). */
+  /** The open document, or `null` when none is open, it is still being read, or it is not visible. */
   selectedDoc: Document | null
-  /** Re-read the list (and, from 284-03, the summary). */
+  /** Opening a document failed for a reason other than "not visible" (S8). */
+  selectedDocError: Error | null
+  retrySelectedDoc: () => void
+  /** Re-read the page and the summary SILENTLY (after an edit, a move, an import). */
   refresh: () => Promise<void>
+  /** "Try again" on the list — a load the person asked for. */
+  retry: () => void
+  /** "Try again" on the numbers. */
+  retrySummary: () => void
+  /** Bumped by every debounced change hint, so a child's own lists can refetch on it too. */
+  changeTick: number
   upload: (file: File, folderId?: string | null) => Promise<{ isDuplicate: boolean }>
   deleteDoc: (id: string, scope?: "version" | "all") => Promise<void>
   uploading: boolean
   uploadingCount: number
-  /** ⚠ Wave 1 only — the raw array for the Ingestion tab (284-03 deletes it). */
-  documentsForIngestion: Document[]
 }
 
-function emptyCount(): LibraryCount {
-  return { count: 0, size_bytes: 0, archived: 0 }
+interface ListAnswer {
+  rows: Document[]
+  total: number
+  /** A view / filter's archived count (the browse count is the summary's). */
+  archived: number | null
 }
 
-function addTo(bucket: LibraryCount, d: Document): void {
-  bucket.count += 1
-  bucket.size_bytes += d.file_size ?? 0
-  if (d.archived_at) bucket.archived += 1
+/** The last list request that settled, and the rows it put on screen. */
+interface SettledList extends ListAnswer {
+  /** The request that settled (success or failure). */
+  sourceKey: string
+  pageKey: string
+  attempt: number
+  /** The source the ROWS belong to — kept from the previous answer when a request fails. */
+  answeredKey: string | null
+  error: Error | null
 }
 
-function isInFlight(d: Document): boolean {
-  return d.status === "pending" || d.status === "processing" || d.status === "paused"
+const NO_ROWS: Document[] = []
+
+interface SingleDoc {
+  id: string
+  doc: Document | null
+  error: Error | null
 }
 
-/** IngestionTab's rate-limit predicate, verbatim (case-insensitive). */
-function mentionsRateLimit(message: string | null): boolean {
-  const m = message?.toLowerCase()
-  return Boolean(m && (m.includes("rate limit") || m.includes("429") || m.includes("quota")))
+function isNotVisible(e: unknown): boolean {
+  return typeof e === "object" && e !== null && (e as { status?: unknown }).status === 404
 }
 
-/**
- * The client mirror of `GET /library/summary`, computed over documents already in memory.
- * Field names and semantics are the server's: `total`, `root` and `folders` INCLUDE archived;
- * `status.paused` is always 0 (R-04 — paused is not a stored document status).
- */
-export function summarizeDocuments(docs: readonly Document[]): LibrarySummary {
-  const root = emptyCount()
-  const folders: Record<string, LibraryCount> = {}
-  const status = { pending: 0, processing: 0, paused: 0, completed: 0, failed: 0 }
-  const steps: Record<string, number> = {}
-  const connections = new Map<string, { id: string; name: string | null; count: number }>()
-  const types = new Map<string, number>()
-  let archived = 0
-  let chunks = 0
-  let rateLimited = 0
+function asError(e: unknown, message: string): Error {
+  return e instanceof Error ? e : new Error(message)
+}
 
-  for (const d of docs) {
-    if (d.folder_id == null) addTo(root, d)
-    else addTo((folders[d.folder_id] ??= emptyCount()), d)
-    if (d.archived_at) archived += 1
-    chunks += d.chunk_count ?? 0
-    if (d.status === "pending" || d.status === "processing" || d.status === "completed" || d.status === "failed") {
-      status[d.status] += 1
-    }
-    // IngestionTab's fold: a step is counted only while the document is processing.
-    if (d.status === "processing" && d.ingestion_step) {
-      steps[d.ingestion_step] = (steps[d.ingestion_step] ?? 0) + 1
-    }
-    if (isInFlight(d) && mentionsRateLimit(d.error_message)) rateLimited += 1
-    if (d.source_connection_id) {
-      const c = connections.get(d.source_connection_id)
-      if (c) c.count += 1
-      else
-        connections.set(d.source_connection_id, {
-          id: d.source_connection_id,
-          name: d.source_connection_name ?? null,
-          count: 1,
-        })
-    }
-    const t = d.metadata?.document_type
-    if (typeof t === "string" && t.trim() !== "") types.set(t, (types.get(t) ?? 0) + 1)
+async function readList(
+  source: LibrarySource,
+  includeArchived: boolean,
+  offset: number,
+  limit: number,
+): Promise<ListAnswer> {
+  if (source.kind === "browse") {
+    const res = await listDocumentsPage({
+      folder_id: source.folderId ?? "root",
+      include_archived: includeArchived,
+      offset,
+      limit,
+    })
+    return { rows: res.documents, total: res.total, archived: null }
   }
-
+  const resolve = (opts: Parameters<typeof resolveView>[1]) =>
+    source.kind === "view" ? resolveView(source.viewId, opts) : resolveAdHoc(source.filter, opts)
+  // The archived count is ONE count read with the opposite flag: the difference between the two
+  // totals is exactly the archived rows the view holds. A failed count is an unknown, not a 0.
+  const [page, other] = await Promise.all([
+    resolve({ offset, limit, include_archived: includeArchived }),
+    resolve({ count_only: true, include_archived: !includeArchived }).catch(() => null),
+  ])
   return {
-    total: docs.length,
-    archived,
-    chunks,
-    root,
-    folders,
-    status,
-    steps,
-    rate_limited_in_flight: rateLimited,
-    connections: [...connections.values()],
-    // DocumentTypeEditor's order: sorted by `localeCompare`.
-    document_types: [...types.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([value, count]) => ({ value, count })),
-    document_types_truncated: false,
+    rows: page.documents ?? [],
+    total: page.total,
+    archived: other === null ? null : Math.abs(other.total - page.total),
   }
 }
 
 export function useLibraryDocuments({
-  folderId,
-  filteredDocs,
+  source,
   includeArchived,
   offset,
   limit,
   selectedDocId,
   findRows,
 }: UseLibraryDocumentsArgs): UseLibraryDocuments {
-  const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
+  // ⭐ ONE settled-request record, written ONLY in a request's callbacks. Every list state is
+  // DERIVED from it in render (never set synchronously in an effect), so the state machine cannot
+  // drift from the request that produced it.
+  const [settled, setSettled] = useState<SettledList | null>(null)
+  // `attempt` — a reload the person asked for; `changeTick` — a silent one (a hint or a refresh).
+  const [attempt, setAttempt] = useState(0)
+  const [changeTick, setChangeTick] = useState(0)
 
-  const summary = useMemo(() => summarizeDocuments(documents), [documents])
+  const [summary, setSummary] = useState<LibrarySummary | null>(null)
+  const [summaryState, setSummaryState] = useState<LibraryLoadState>("loading")
+  const [summaryTick, setSummaryTick] = useState(0)
 
-  /** Moved from LibraryPage.tsx by 284-01. Sketch 231-A — what the header pill and the
-   *  `In progress` badge both read.
-   *
-   *  ⛔ IT FETCHES NOTHING. These are documents the page already holds, counted — the same rule
-   *  `IngestionTab` carries ("every document it renders is one the page already holds"). A second
-   *  poll for a number that is already in memory is how two surfaces come to disagree about it.
-   *
-   *  ⚠ `paused` is counted as in-flight ON PURPOSE. A rate-limited document has not finished and
-   *  has not failed; calling it idle would be the same class of lie as calling a queued file
-   *  "added", which is the defect this whole change exists to fix. (R-04's correction — paused is
-   *  not a stored status — is a SERVER fact; wave 1 keeps this predicate byte-identical.) */
-  const inFlightCount = useMemo(
-    () =>
-      documents.filter(
-        (d) => d.status === "pending" || d.status === "processing" || d.status === "paused",
-      ).length,
-    [documents],
+  const reqIdRef = useRef(0)
+  const summaryReqRef = useRef(0)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const summaryKnownRef = useRef(false)
+
+  // ── the change hint (D-08): ONE refetch per 500 ms window, however many events land in it ──
+  const scheduleChange = useCallback(() => {
+    if (timerRef.current !== null) return
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null
+      setChangeTick((n) => n + 1)
+      setSummaryTick((n) => n + 1)
+    }, LIBRARY_CHANGE_DEBOUNCE_MS)
+  }, [])
+  useEffect(
+    () => () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current)
+    },
+    [],
   )
 
-  // Moved from LibraryPage.tsx by 284-01. Resolve the selected doc from the live documents array
-  // so it tracks edits + re-fetches (loadDocuments reconcile). Falls back to closed if it disappears.
-  // Phase 271-04 (UI-SPEC S4): a Find row may be an OLDER version, which `documents` (latest
-  // rows only) never holds — so the Find answer is the second place a selection resolves from.
-  // The live `documents` row still wins for a latest document.
-  const selectedDoc = useMemo<Document | null>(
+  // The on-page rows' setter (`useDocuments`' Realtime merge, the optimistic upload row). It
+  // edits the rows that are ON SCREEN; with nothing answered there is nothing to edit.
+  const setRows = useCallback<Dispatch<SetStateAction<Document[]>>>((update) => {
+    setSettled((prev) =>
+      prev === null ? prev : { ...prev, rows: typeof update === "function" ? update(prev.rows) : update },
+    )
+  }, [])
+
+  const base = useDocuments({ setRows, onChange: scheduleChange })
+
+  // ── the page ──────────────────────────────────────────────────────────────────────────
+  // Keyed on the SERIALISED source, so a new-but-equal object is the same list (no refetch).
+  const sourceKey = JSON.stringify(source)
+  const pageKey = `${offset}:${limit}:${includeArchived}`
+  useEffect(() => {
+    const myReq = ++reqIdRef.current
+    const request = { sourceKey, pageKey, attempt }
+    readList(JSON.parse(sourceKey) as LibrarySource, includeArchived, offset, limit).then(
+      (answer) => {
+        if (myReq !== reqIdRef.current) return
+        setSettled({ ...request, answeredKey: sourceKey, ...answer, error: null })
+      },
+      (e: unknown) => {
+        if (myReq !== reqIdRef.current) return
+        // Rows (if any) are deliberately left as they were: an error never swaps the list.
+        setSettled((prev) => ({
+          answeredKey: prev?.answeredKey ?? null,
+          rows: prev?.rows ?? [],
+          total: prev?.total ?? 0,
+          archived: prev?.archived ?? null,
+          ...request,
+          error: asError(e, "Couldn't load documents."),
+        }))
+      },
+    )
+  }, [sourceKey, pageKey, includeArchived, offset, limit, attempt, changeTick])
+
+  // Derived (UI-SPEC §Loading vocabulary): rows belong to THIS source, or none are shown (cold);
+  // the settled request is the one asked for, or the person is waiting (warm). A change hint is
+  // not part of the request identity, so a background refetch never reads as a wait (silent).
+  const onScreen = settled !== null && settled.answeredKey === sourceKey
+  const isCurrent =
+    settled !== null && settled.sourceKey === sourceKey && settled.pageKey === pageKey && settled.attempt === attempt
+  const listState: LibraryListState = !onScreen
+    ? isCurrent && settled.error
+      ? "error"
+      : "cold"
+    : !isCurrent
+      ? "warm"
+      : settled.error
+        ? "error"
+        : "ready"
+  const rows = onScreen ? settled.rows : NO_ROWS
+  const total = onScreen ? settled.total : null
+  const listArchived = onScreen ? settled.archived : null
+  const error = isCurrent ? settled.error : null
+
+  // ── the numbers ───────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const myReq = ++summaryReqRef.current
+    getLibrarySummary().then(
+      (s) => {
+        if (myReq !== summaryReqRef.current) return
+        summaryKnownRef.current = true
+        setSummary(s)
+        setSummaryState("ready")
+      },
+      () => {
+        if (myReq !== summaryReqRef.current) return
+        // A background refetch that fails keeps the last answer; a first read that fails says so.
+        if (!summaryKnownRef.current) setSummaryState("error")
+      },
+    )
+  }, [summaryTick])
+
+  const refresh = useCallback(async () => {
+    setChangeTick((n) => n + 1)
+    setSummaryTick((n) => n + 1)
+  }, [])
+  const retry = useCallback(() => setAttempt((n) => n + 1), [])
+  const retrySummary = useCallback(() => {
+    if (!summaryKnownRef.current) setSummaryState("loading")
+    setSummaryTick((n) => n + 1)
+  }, [])
+
+  // ── the open document (D-11) ──────────────────────────────────────────────────────────
+  // The page first, then Find's rows (an older version lives only there), else ONE read by id.
+  const fromLists = useMemo<Document | null>(
     () =>
       selectedDocId === null
         ? null
-        : documents.find((d) => d.id === selectedDocId) ??
-          findRows.find((d) => d.id === selectedDocId) ??
-          null,
-    [selectedDocId, documents, findRows],
+        : rows.find((d) => d.id === selectedDocId) ?? findRows.find((d) => d.id === selectedDocId) ?? null,
+    [selectedDocId, rows, findRows],
   )
-
-  // Moved from LibraryPage.tsx by 284-01. When a filter/view is active the list shows the
-  // resolved set (folderId undefined → DocumentList does no further folder filtering); otherwise
-  // it scopes to the selected folder's (or Root's) documents BEFORE paging.
-  const folderScopedDocuments = useMemo(() => {
-    if (filteredDocs !== null) return filteredDocs
-    if (folderId === null) {
-      return documents.filter((d) => d.folder_id == null)
+  const [single, setSingle] = useState<SingleDoc | null>(null)
+  // Remember the last row the selection resolved to, so paging away does not close the panel.
+  // (React's "adjust state while rendering" pattern — guarded, so it settles in one extra pass.)
+  if (fromLists && single?.doc !== fromLists) {
+    setSingle({ id: fromLists.id, doc: fromLists, error: null })
+  }
+  const known = single !== null && single.id === selectedDocId
+  // Only once the page has answered: a document on the page being loaded costs no extra read.
+  const listSettled = listState === "ready" || listState === "error"
+  const fetchId =
+    selectedDocId !== null && fromLists === null && !known && listSettled ? selectedDocId : null
+  useEffect(() => {
+    if (fetchId === null) return
+    let alive = true
+    getDocument(fetchId).then(
+      (doc) => {
+        if (alive) setSingle({ id: fetchId, doc, error: null })
+      },
+      (e: unknown) => {
+        if (!alive) return
+        // 404 → the panel stays closed with no copy that could confirm the document exists.
+        setSingle({ id: fetchId, doc: null, error: isNotVisible(e) ? null : asError(e, "Couldn't open that document.") })
+      },
+    )
+    return () => {
+      alive = false
     }
-    return documents.filter((d) => d.folder_id === folderId)
-  }, [filteredDocs, folderId, documents])
+  }, [fetchId])
+  const retrySelectedDoc = useCallback(() => setSingle(null), [])
+  const selectedDoc = fromLists ?? (known ? single.doc : null)
+  const selectedDocError = fromLists === null && known ? single.error : null
 
-  // Moved from LibraryPage.tsx by 284-01. Phase 275 (S9 / D-04): browse hides archived rows
-  // unless the ONE include-archived state (Find's reducer, shared with its `Include archived`
-  // chip) is on. 275-REVIEW F-WR-11: a saved view or an ad-hoc filter honours the SAME state (its
-  // resolve has no archived predicate), so it can never disagree with Find over the same conditions.
-  const archived = useMemo(
-    () => splitArchived(folderScopedDocuments, includeArchived),
-    [folderScopedDocuments, includeArchived],
+  // ── the doors ─────────────────────────────────────────────────────────────────────────
+  const { upload: baseUpload, deleteDoc: baseDelete } = base
+  const browseFolder = source.kind === "browse" ? source.folderId : undefined
+  const upload = useCallback(
+    async (file: File, folderId?: string | null) => {
+      const res = await baseUpload(file, folderId)
+      const doc = res.doc
+      // D-08: the new document is the first row of page 1 of ITS folder until the refetch the
+      // upload asked for reconciles it. Totals move with the summary refetch, never here.
+      if (doc && browseFolder !== undefined && offset === 0 && (doc.folder_id ?? null) === browseFolder) {
+        setRows((prev) => (prev.some((d) => d.id === doc.id) ? prev : [doc, ...prev]))
+      }
+      return { isDuplicate: res.isDuplicate }
+    },
+    [baseUpload, browseFolder, offset, setRows],
+  )
+  const deleteDoc = useCallback(
+    async (id: string, scope?: "version" | "all") => {
+      await baseDelete(id, scope)
+      // A deleted document must not stay open from the remembered row.
+      setSingle((prev) => (prev?.id === id ? { id, doc: null, error: null } : prev))
+    },
+    [baseDelete],
   )
 
-  // Moved from LibraryPage.tsx by 284-01. ⛔ Client-side slice. `GET /documents` is unpaginated
-  // until 284-02/284-03 (documents.py:726-760), so the denominator here is real — bounded by
-  // PostgREST's 1000-row ceiling, which the pager's honest arm names (WR-04 / T-217.1-11a).
-  // Views' server-resolved list is NOT re-sliced here — a saved view's row count is its own
-  // resolve, not the pager's business.
-  const rows = useMemo(
-    () =>
-      filteredDocs !== null ? archived.shown : archived.shown.slice(offset, offset + limit),
-    [filteredDocs, archived, offset, limit],
-  )
+  // ── the numbers the page shows ────────────────────────────────────────────────────────
+  const archivedHidden =
+    source.kind === "browse"
+      ? summary === null
+        ? null
+        : source.folderId === null
+          ? summary.root.archived
+          : (summary.folders[source.folderId]?.archived ?? 0)
+      : listArchived
+  const inFlight = summary === null ? null : summary.status.pending + summary.status.processing
 
   return {
     rows,
-    total: archived.shown.length,
-    archivedHidden: archived.archivedCount,
-    inFlight: inFlightCount,
+    total,
+    archivedHidden,
+    inFlight,
     summary,
-    summaryState: "ready",
-    listState: "ready",
-    loading: false,
-    error: null,
+    summaryState,
+    listState,
+    loading: listState === "cold" || listState === "warm",
+    error,
     selectedDoc,
-    refresh: loadDocuments,
+    selectedDocError,
+    retrySelectedDoc,
+    refresh,
+    retry,
+    retrySummary,
+    changeTick,
     upload,
     deleteDoc,
-    uploading,
-    uploadingCount,
-    documentsForIngestion: documents,
+    uploading: base.uploading,
+    uploadingCount: base.uploadingCount,
   }
 }

@@ -17,7 +17,7 @@
  * asserts equality, never by a second literal (T-217.1-08a).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, cleanup, waitFor } from "@testing-library/react"
+import { render, screen, cleanup, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { Document, Folder } from "@/types"
 
@@ -43,6 +43,9 @@ const mockFolders: Folder[] = [
   { id: "f2", name: "Finance", parent_id: null, is_org_shared: false, created_at: "2026-01-01", updated_at: "2026-01-01" },
 ]
 const listFolders = vi.fn<() => Promise<Folder[]>>().mockResolvedValue(mockFolders)
+// 284-03 (D-13): the three lists read GET /documents?status=… pages. The fake answers them from
+// the SAME fixture the case used to hand the tab whole (see `renderPlain`).
+const listDocumentsPage = vi.fn()
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
@@ -50,6 +53,7 @@ vi.mock("@/lib/api", async () => {
     ...actual,
     reingestDocument: (id: string) => reingestDocument(id),
     listFolders: () => listFolders(),
+    listDocumentsPage: (p: unknown) => listDocumentsPage(p),
   }
 })
 
@@ -86,6 +90,7 @@ const escapeRegExp = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 import { IngestionTab } from "../IngestionTab"
 import { acceptAttribute } from "@/components/ingestion/acceptedFormats"
 import { PIPELINE_CARDS, CARD_LABEL, cardForStage } from "../ingestion/pipelineGroups"
+import { installFakeLibraryApi, summarizeDocuments } from "@/test-utils/fakeLibraryApi"
 
 // ── FIXTURES ──────────────────────────────────────────────────────────────────────────
 
@@ -114,7 +119,9 @@ const baseDoc: Document = {
 const doc = (over: Partial<Document>): Document => ({ ...baseDoc, ...over })
 
 const defaultProps = {
-  documents: [] as Document[],
+  // 284-03 (D-13): the numbers are the summary's (an empty library unless a case says otherwise).
+  summary: summarizeDocuments([]),
+  summaryState: "ready" as const,
   upload: vi.fn(),
   uploading: false,
   uploadingCount: 0,
@@ -123,16 +130,30 @@ const defaultProps = {
   disabled: false,
 }
 
+/** A case's fixture: `documents` feeds BOTH the summary and the fake server's paged lists (284-03). */
+type Over = Partial<Parameters<typeof IngestionTab>[0]> & { documents?: Document[] }
+
+function mount({ documents = [], ...over }: Over) {
+  installFakeLibraryApi({ listDocumentsPage }, documents)
+  return render(<IngestionTab {...defaultProps} summary={summarizeDocuments(documents)} {...over} />)
+}
+
 /** Render with the ⌥ Technical-names reveal OFF (the default a non-technical user sees). */
-function renderPlain(over: Partial<Parameters<typeof IngestionTab>[0]> = {}) {
+function renderPlain(over: Over = {}) {
   showTechnical = false
-  return render(<IngestionTab {...defaultProps} {...over} />)
+  return mount(over)
 }
 
 /** Render with the ⌥ Technical-names reveal ON (an operator who asked for technical names). */
-function renderTechnical(over: Partial<Parameters<typeof IngestionTab>[0]> = {}) {
+function renderTechnical(over: Over = {}) {
   showTechnical = true
-  return render(<IngestionTab {...defaultProps} {...over} />)
+  return mount(over)
+}
+
+/** Open a sub-tab and wait for its list to answer (284-03: the lists are server pages now). */
+async function openSubTab(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole("tab", { name }))
+  await waitFor(() => expect(screen.queryByText("Loading files")).toBeNull())
 }
 
 beforeEach(() => {
@@ -167,7 +188,7 @@ describe("IngestionTab — the four sub-tabs (D-217.1-05)", () => {
   it("clicking In progress switches the visible body", async () => {
     const user = userEvent.setup()
     renderPlain({ documents: [doc({ status: "pending", filename: "in-progress.pdf" })] })
-    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    await openSubTab(user, "In progress")
     // Radix TabsContent uses data-state; the active panel has data-state="active"
     const inProgress = screen.getByTestId("ingestion-subtab-in-progress")
     expect(inProgress).toHaveAttribute("data-state", "active")
@@ -178,7 +199,7 @@ describe("IngestionTab — the four sub-tabs (D-217.1-05)", () => {
   it("clicking Needs attention switches the visible body", async () => {
     const user = userEvent.setup()
     renderPlain({ documents: [doc({ status: "failed", error_message: "error" })] })
-    await user.click(screen.getByRole("tab", { name: "Needs attention" }))
+    await openSubTab(user, "Needs attention")
     const needsAttention = screen.getByTestId("ingestion-subtab-needs-attention")
     expect(needsAttention).toHaveAttribute("data-state", "active")
     const addFiles = screen.getByTestId("ingestion-subtab-add-files")
@@ -188,7 +209,7 @@ describe("IngestionTab — the four sub-tabs (D-217.1-05)", () => {
   it("clicking History switches the visible body", async () => {
     const user = userEvent.setup()
     renderPlain()
-    await user.click(screen.getByRole("tab", { name: "History" }))
+    await openSubTab(user, "History")
     const history = screen.getByTestId("ingestion-subtab-history")
     expect(history).toHaveAttribute("data-state", "active")
     const addFiles = screen.getByTestId("ingestion-subtab-add-files")
@@ -315,10 +336,10 @@ describe("IngestionTab — mounts a DocumentUpload (D-217.1-22)", () => {
 
 describe("IngestionTab — the Needs attention row (D-217.1-21)", () => {
   /** Helper: render and click the Needs attention tab so the failed content is visible. */
-  async function renderNeedsAttention(over: Partial<Parameters<typeof IngestionTab>[0]> = {}) {
+  async function renderNeedsAttention(over: Over = {}) {
     const user = userEvent.setup()
     renderPlain(over)
-    await user.click(screen.getByRole("tab", { name: "Needs attention" }))
+    await openSubTab(user, "Needs attention")
     return user
   }
 
@@ -388,10 +409,10 @@ describe("IngestionTab — the raw error dict is gated behind the ⌥ reveal (D-
     '{"code": "23505", "message": "duplicate key value violates unique constraint", "hint": null, "details": null}'
 
   /** Helper: render with a failed doc and click the Needs attention tab. */
-  async function renderNeedsAttention(over: Partial<Parameters<typeof IngestionTab>[0]> = {}) {
+  async function renderNeedsAttention(over: Over = {}) {
     const user = userEvent.setup()
     renderPlain(over)
-    await user.click(screen.getByRole("tab", { name: "Needs attention" }))
+    await openSubTab(user, "Needs attention")
   }
 
   it("a Postgres error dict NEVER reaches the rendered DOM as text by default", async () => {
@@ -410,10 +431,9 @@ describe("IngestionTab — the raw error dict is gated behind the ⌥ reveal (D-
   })
 
   it("with Technical-names ON, the raw error_message string IS rendered", async () => {
-    showTechnical = true
-    render(<IngestionTab {...defaultProps} documents={[doc({ status: "failed", error_message: pgDict })]} />)
+    renderTechnical({ documents: [doc({ status: "failed", error_message: pgDict })] })
     const user = userEvent.setup()
-    await user.click(screen.getByRole("tab", { name: "Needs attention" }))
+    await openSubTab(user, "Needs attention")
     const reason = screen.getByTestId("failure-reason")
     expect(reason.textContent).toContain("23505")
     expect(reason.textContent).toContain("duplicate key value")
@@ -432,14 +452,14 @@ describe("IngestionTab — the empty arms say the thing they mean", () => {
   it("the queue is empty — 'Nothing is being read right now'", async () => {
     const user = userEvent.setup()
     renderPlain()
-    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    await openSubTab(user, "In progress")
     expect(screen.getByText("Nothing is being read right now.")).toBeInTheDocument()
   })
 
   it("needs attention is empty — 'Nothing needs attention'", async () => {
     const user = userEvent.setup()
     renderPlain()
-    await user.click(screen.getByRole("tab", { name: "Needs attention" }))
+    await openSubTab(user, "Needs attention")
     expect(screen.getByText("Nothing needs attention.")).toBeInTheDocument()
   })
 })
@@ -450,7 +470,7 @@ describe("IngestionTab — the four-card pipeline row (D-217.1-07)", () => {
   it("renders exactly four data-stage-card cards in PIPELINE_CARDS order", async () => {
     const user = userEvent.setup()
     renderPlain()
-    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    await openSubTab(user, "In progress")
     const cards = document.querySelectorAll("[data-stage-card]")
     expect(cards).toHaveLength(4)
     // Cards are rendered in PIPELINE_CARDS order
@@ -462,7 +482,7 @@ describe("IngestionTab — the four-card pipeline row (D-217.1-07)", () => {
   it("each card shows a label from CARD_LABEL", async () => {
     const user = userEvent.setup()
     renderPlain()
-    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    await openSubTab(user, "In progress")
     for (const cardId of PIPELINE_CARDS) {
       expect(screen.getByText(CARD_LABEL[cardId])).toBeInTheDocument()
     }
@@ -471,7 +491,7 @@ describe("IngestionTab — the four-card pipeline row (D-217.1-07)", () => {
   it("chevrons render between adjacent cards", async () => {
     const user = userEvent.setup()
     renderPlain()
-    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    await openSubTab(user, "In progress")
     // Three chevrons between four cards
     const chevrons = screen.getAllByText("›")
     expect(chevrons).toHaveLength(3)
@@ -488,7 +508,7 @@ describe("IngestionTab — the four-card pipeline row (D-217.1-07)", () => {
       doc({ id: "6", status: "processing", ingestion_step: "metadata" }),
     ]
     renderPlain({ documents: sixDocs })
-    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    await openSubTab(user, "In progress")
     // Read the count from each card by its data-stage-card attribute
     function countFor(cardId: string): number {
       const el = document.querySelector(`[data-stage-card="${cardId}"]`)
@@ -521,7 +541,7 @@ describe("IngestionTab — the queue table (D-217.1-07)", () => {
   it("renders a table with columns File, Stage, Folder, Size, Actions", async () => {
     const user = userEvent.setup()
     renderPlain({ documents: [doc({ id: "q1", status: "pending", file_size: 2048 })] })
-    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    await openSubTab(user, "In progress")
     const table = screen.getByTestId("queue-table")
     expect(table).toBeInTheDocument()
     expect(screen.getByText("File")).toBeInTheDocument()
@@ -534,14 +554,14 @@ describe("IngestionTab — the queue table (D-217.1-07)", () => {
   it("a pending document shows 'Waiting its turn' in the Stage cell", async () => {
     const user = userEvent.setup()
     renderPlain({ documents: [doc({ id: "q1", status: "pending", file_size: 2048 })] })
-    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    await openSubTab(user, "In progress")
     expect(screen.getByText("Waiting its turn")).toBeInTheDocument()
   })
 
   it("an N files label appears when the queue is non-empty", async () => {
     const user = userEvent.setup()
     renderPlain({ documents: [doc({ id: "q1", status: "pending" }), doc({ id: "q2", status: "processing" })] })
-    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    await openSubTab(user, "In progress")
     expect(screen.getByText("(2 files)")).toBeInTheDocument()
     expect(screen.getByTestId("ingestion-batch-lane")).toBeInTheDocument()
   })
@@ -550,11 +570,13 @@ describe("IngestionTab — the queue table (D-217.1-07)", () => {
     const user = userEvent.setup()
     renderPlain({
       documents: [
-        doc({ id: "p1", status: "paused" as any, error_message: "Rate limit reached (429)" }),
+        // 284-03 (R-04): `paused` is not a stored document status — a rate-limited file is still
+        // in flight (processing) with the provider's error on it, which is what the server counts.
+        doc({ id: "p1", status: "processing", error_message: "Rate limit reached (429)" }),
         doc({ id: "p2", status: "completed" }),
       ],
     })
-    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    await openSubTab(user, "In progress")
     expect(screen.getByTestId("ingestion-pause-banner")).toBeInTheDocument()
     expect(screen.getByTestId("ingestion-batch-lane")).toBeInTheDocument()
   })
@@ -571,7 +593,7 @@ describe("IngestionTab — the History sub-tab (D-217.1-07)", () => {
         doc({ id: "h2", status: "failed", filename: "bad.pdf", error_message: "corrupt", updated_at: "2026-08-28T10:00:00Z" }),
       ],
     })
-    await user.click(screen.getByRole("tab", { name: "History" }))
+    await openSubTab(user, "History")
     const historyTable = screen.getByTestId("history-table")
     expect(historyTable).toBeInTheDocument()
     expect(screen.getByText("done.pdf")).toBeInTheDocument()
@@ -581,14 +603,14 @@ describe("IngestionTab — the History sub-tab (D-217.1-07)", () => {
   it("completed documents show a 'Complete' badge", async () => {
     const user = userEvent.setup()
     renderPlain({ documents: [doc({ id: "h1", status: "completed", updated_at: "2026-08-29T10:00:00Z" })] })
-    await user.click(screen.getByRole("tab", { name: "History" }))
+    await openSubTab(user, "History")
     expect(screen.getByText("Complete")).toBeInTheDocument()
   })
 
   it("failed documents show a 'Failed' badge", async () => {
     const user = userEvent.setup()
     renderPlain({ documents: [doc({ id: "h2", status: "failed", error_message: "corrupt", updated_at: "2026-08-28T10:00:00Z" })] })
-    await user.click(screen.getByRole("tab", { name: "History" }))
+    await openSubTab(user, "History")
     const badges = screen.getAllByText("Failed")
     expect(badges.length).toBeGreaterThanOrEqual(1)
   })
@@ -596,7 +618,7 @@ describe("IngestionTab — the History sub-tab (D-217.1-07)", () => {
   it("shows 'Nothing has been ingested yet' when history is empty", async () => {
     const user = userEvent.setup()
     renderPlain()
-    await user.click(screen.getByRole("tab", { name: "History" }))
+    await openSubTab(user, "History")
     expect(screen.getByText("Nothing has been ingested yet.")).toBeInTheDocument()
   })
 })
@@ -616,12 +638,12 @@ describe("IngestionTab — History is paged (BUG-260923-02)", () => {
   it("shows 25 rows at a time, newest first, and pages forward", async () => {
     const user = userEvent.setup()
     renderPlain({ documents: many(60) })
-    await user.click(screen.getByRole("tab", { name: "History" }))
+    await openSubTab(user, "History")
     expect(screen.getByText("Showing 1–25 of 60")).toBeInTheDocument()
     expect(screen.getByText("file-000.pdf")).toBeInTheDocument()
     expect(screen.queryByText("file-025.pdf")).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: /Next/ }))
-    expect(screen.getByText("Showing 26–50 of 60")).toBeInTheDocument()
+    expect(await screen.findByText("Showing 26–50 of 60")).toBeInTheDocument()
     expect(screen.getByText("file-025.pdf")).toBeInTheDocument()
     expect(screen.queryByText("file-000.pdf")).not.toBeInTheDocument()
   })
@@ -629,7 +651,120 @@ describe("IngestionTab — History is paged (BUG-260923-02)", () => {
   it("no pager when everything fits on one page", async () => {
     const user = userEvent.setup()
     renderPlain({ documents: many(3) })
-    await user.click(screen.getByRole("tab", { name: "History" }))
+    await openSubTab(user, "History")
     expect(screen.queryByRole("button", { name: /Next/ })).not.toBeInTheDocument()
+  })
+})
+
+// ── 284-03 (FIX-11 / D-12 / D-13 / R-04 / R-08 / UI-SPEC S7) — the numbers are the summary's and
+// the lists are server pages; loading, failed and empty are three states. Layout unchanged. ──
+describe("IngestionTab — summary numbers and paged lists (284-03)", () => {
+  function deferredPage() {
+    let resolve!: (v: unknown) => void
+    const promise = new Promise((res) => {
+      resolve = res
+    })
+    return { promise, resolve }
+  }
+
+  it("while the summary loads, every card number is '…', the badge and the queue count are omitted", async () => {
+    const user = userEvent.setup()
+    renderPlain({ summary: null, summaryState: "loading" })
+    expect(screen.queryByTestId("in-progress-badge")).toBeNull()
+    await openSubTab(user, "In progress")
+    const cards = document.querySelectorAll("[data-stage-card]")
+    expect(cards).toHaveLength(4)
+    for (const card of cards) {
+      expect(card.textContent).toContain("…")
+      expect(card.textContent).not.toMatch(/\d/)
+    }
+    expect(screen.queryByText(/files\)/)).toBeNull()
+  })
+
+  it("a failed summary says so above the cards — numbers '—' — and Try again re-asks", async () => {
+    const user = userEvent.setup()
+    const onRetrySummary = vi.fn()
+    renderPlain({ summary: null, summaryState: "error", onRetrySummary })
+    await openSubTab(user, "In progress")
+    const alert = screen.getByText("Couldn’t load ingestion counts.").closest("[role='alert']") as HTMLElement
+    expect(alert).not.toBeNull()
+    for (const card of document.querySelectorAll("[data-stage-card]")) expect(card.textContent).toContain("—")
+    await user.click(within(alert).getByRole("button", { name: "Try again" }))
+    expect(onRetrySummary).toHaveBeenCalledTimes(1)
+  })
+
+  it("Queue, Needs attention and History read their own server pages (R-08: History by updated_at)", async () => {
+    const user = userEvent.setup()
+    renderPlain({ documents: [doc({ id: "q", status: "pending" })] })
+    await openSubTab(user, "In progress")
+    expect(listDocumentsPage).toHaveBeenLastCalledWith({ status: "in_flight", offset: 0, limit: 25 })
+    await openSubTab(user, "Needs attention")
+    expect(listDocumentsPage).toHaveBeenLastCalledWith({ status: "failed", offset: 0, limit: 25 })
+    await openSubTab(user, "History")
+    expect(listDocumentsPage).toHaveBeenLastCalledWith({ status: "done", order: "updated_desc", offset: 0, limit: 25 })
+  })
+
+  it("the queue heading counts the summary's in-flight total, never the page length", async () => {
+    const user = userEvent.setup()
+    const inflight = Array.from({ length: 40 }, (_, i) => doc({ id: `f${i}`, status: "pending" }))
+    renderPlain({ documents: inflight })
+    await openSubTab(user, "In progress")
+    expect(screen.getByText("(40 files)")).toBeInTheDocument()
+    expect(within(screen.getByTestId("queue-table")).getAllByText("Waiting its turn")).toHaveLength(25)
+    expect(screen.getByText("Showing 1–25 of 40")).toBeInTheDocument()
+  })
+
+  it("a list loading cold shows 3 bars and 'Loading files' — never its empty sentence", async () => {
+    const user = userEvent.setup()
+    renderPlain()
+    const gate = deferredPage()
+    listDocumentsPage.mockReturnValueOnce(gate.promise)
+    await user.click(screen.getByRole("tab", { name: "Needs attention" }))
+    const status = within(screen.getByTestId("ingestion-needs-attention")).getByRole("status")
+    expect(status).toHaveTextContent("Loading files")
+    expect(status.querySelectorAll(".animate-pulse")).toHaveLength(3)
+    expect(screen.queryByText("Nothing needs attention.")).toBeNull()
+    gate.resolve({ documents: [], total: 0, offset: 0, limit: 25 })
+    expect(await screen.findByText("Nothing needs attention.")).toBeInTheDocument()
+  })
+
+  it("a list that fails says it is a loading error, not an empty list — and Try again re-asks", async () => {
+    const user = userEvent.setup()
+    renderPlain({ documents: [doc({ id: "h1", status: "completed", filename: "done.pdf" })] })
+    listDocumentsPage.mockRejectedValueOnce(new Error("boom"))
+    await user.click(screen.getByRole("tab", { name: "History" }))
+    const line = await screen.findByText("Couldn’t load this list. This is a loading error, not an empty list.")
+    const alert = line.closest("[role='alert']") as HTMLElement
+    expect(alert).not.toBeNull()
+    expect(screen.queryByText("Nothing has been ingested yet.")).toBeNull()
+    await user.click(within(alert).getByRole("button", { name: "Try again" }))
+    expect(await screen.findByText("done.pdf")).toBeInTheDocument()
+  })
+
+  it("Needs attention pages 25 at a time with the server total", async () => {
+    const user = userEvent.setup()
+    const failedMany = Array.from({ length: 30 }, (_, i) =>
+      doc({ id: `x${String(i).padStart(2, "0")}`, status: "failed", filename: `bad-${i}.pdf` }),
+    )
+    renderPlain({ documents: failedMany })
+    await openSubTab(user, "Needs attention")
+    expect(screen.getAllByTestId("needs-attention-row")).toHaveLength(25)
+    expect(screen.getByText("Showing 1–25 of 30")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /Next/ }))
+    expect(await screen.findByText("Showing 26–30 of 30")).toBeInTheDocument()
+    expect(screen.getAllByTestId("needs-attention-row")).toHaveLength(5)
+  })
+
+  it("the rate-limit banner reads the summary's rate-limited in-flight count", async () => {
+    const user = userEvent.setup()
+    renderPlain({
+      summary: {
+        ...summarizeDocuments([]),
+        rate_limited_in_flight: 1,
+        status: { pending: 0, processing: 1, paused: 0, completed: 0, failed: 0 },
+      },
+    })
+    await openSubTab(user, "In progress")
+    expect(screen.getByTestId("ingestion-pause-banner")).toBeInTheDocument()
   })
 })

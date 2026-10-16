@@ -43,6 +43,7 @@ import userEvent from "@testing-library/user-event"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { Document, Folder, SavedView } from "@/types"
+import { installFakeLibraryApi, summarizeDocuments } from "@/test-utils/fakeLibraryApi"
 import composition from "../__generated__/sketchComposition.json"
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
@@ -73,10 +74,19 @@ const {
   mockGetHealthOverview: vi.fn(),
 }))
 
+// 284-03 (D-24): the page reads ONE page + the summary from the server. The fake answers both
+// from the SAME fixture this suite used to hand `useDocuments` whole (see `mockLibrary`).
+const libraryApi = vi.hoisted(() => ({
+  listDocumentsPage: vi.fn(),
+  getLibrarySummary: vi.fn(),
+  getDocument: vi.fn(),
+}))
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return {
     ...actual,
+    ...libraryApi,
     listViews: mockListViews,
     resolveView: mockResolveView,
     resolveAdHoc: mockResolveAdHoc,
@@ -231,6 +241,13 @@ const INGESTION_SUBTAB_BY_BLOCK: Record<string, string> = {
 // load cost, not a regression; the case bodies are unchanged.
 beforeAll(async () => { await import("@/pages/LibraryPage") }, 30_000)
 
+/** 284-03 (D-24): the ONE wiring swap — the fixture feeds the fake server, and `useDocuments`
+ *  keeps only its doors (upload / delete / uploading). */
+function mockLibrary({ documents, ...doors }: { documents: Document[] } & Record<string, unknown>) {
+  installFakeLibraryApi(libraryApi, documents)
+  mockUseDocuments.mockReturnValue(doors)
+}
+
 describe("sketch-composition fence — §1 the contract itself", () => {
   // ⚠ THE NON-VACUITY CONTROL. A moved or misnamed JSON import can resolve to an empty
   // object rather than throwing, and an empty contract makes every case below vacuously
@@ -259,7 +276,7 @@ describe("sketch-composition fence — §1 the contract itself", () => {
 describe("sketch-composition fence — §2 positive controls", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseDocuments.mockReturnValue({
+    mockLibrary({
       documents: sampleDocuments,
       uploading: false,
       uploadingCount: 0,
@@ -335,7 +352,16 @@ describe("sketch-composition fence — §2 positive controls", () => {
 
   it("the shipped tab-body hooks render — `data-testid` is the right convention", async () => {
     const { IngestionTab } = await import("../IngestionTab")
-    renderUI(<IngestionTab documents={sampleDocuments} />)
+    // 284-03 (D-13): the tab takes the summary, not the array (the base render omitted `upload` /
+    // `uploading`, a recorded inherited tsc error; supplied here with the conversion).
+    renderUI(
+      <IngestionTab
+        summary={summarizeDocuments(sampleDocuments)}
+        summaryState="ready"
+        upload={vi.fn()}
+        uploading={false}
+      />,
+    )
     expect(screen.getByTestId("ingestion-tab")).toBeInTheDocument()
   })
 })
@@ -357,7 +383,7 @@ const RETIRED_BLOCKS: Record<string, string> = {
 describe("sketch-composition fence — §3 every block the sketch draws", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseDocuments.mockReturnValue({
+    mockLibrary({
       documents: sampleDocuments,
       uploading: false,
       uploadingCount: 0,
@@ -466,7 +492,7 @@ describe("sketch-composition fence — §3 every block the sketch draws", () => 
 describe("sketch-composition fence — §4 every named button", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseDocuments.mockReturnValue({
+    mockLibrary({
       documents: sampleDocuments,
       uploading: false,
       uploadingCount: 0,

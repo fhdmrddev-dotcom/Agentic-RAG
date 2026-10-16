@@ -30,7 +30,7 @@
  * the literal and cannot tell a use from a mention.
  */
 import { useCallback, useEffect, useState } from "react"
-import { listDocumentImages } from "@/lib/api"
+import { listDocumentImagesPage } from "@/lib/api"
 import type { Document, DocumentImageRow } from "@/types"
 
 export interface DocumentImagesSectionProps {
@@ -44,6 +44,9 @@ export interface DocumentImagesSectionProps {
 }
 
 type LoadState = "loading" | "ready" | "error"
+
+/** 284-03 (D-17 / UI-SPEC S10): ONE bounded page, with the server's exact total. */
+const IMAGE_PAGE = 100
 
 /** Three empty claims, mirroring the tables section — three different facts, three
  *  sentences. */
@@ -63,16 +66,18 @@ export function imagesEmptyMessage(doc?: Pick<Document, "images_stage_applies" |
 
 export function DocumentImagesSection({ docId, doc, onTotalChange }: DocumentImagesSectionProps) {
   const [rows, setRows] = useState<DocumentImageRow[]>([])
+  const [total, setTotal] = useState(0)
   const [state, setState] = useState<LoadState>("loading")
 
   const load = useCallback(async () => {
     setState("loading")
     setRows([])
     try {
-      const res = await listDocumentImages(docId)
-      setRows(res)
+      const res = await listDocumentImagesPage(docId, { offset: 0, limit: IMAGE_PAGE })
+      setRows(res.images)
+      setTotal(res.total)
       setState("ready")
-      onTotalChange?.(res.length)
+      onTotalChange?.(res.total)
     } catch {
       setState("error")
     }
@@ -108,6 +113,13 @@ export function DocumentImagesSection({ docId, doc, onTotalChange }: DocumentIma
 
       {state === "ready" && rows.length === 0 && (
         <p className="py-1 text-sm text-panel-muted-foreground">{imagesEmptyMessage(doc)}</p>
+      )}
+
+      {/* 284-03 (S10): said only when the page shows part — otherwise the section is unchanged. */}
+      {state === "ready" && rows.length > 0 && rows.length < total && (
+        <p className="text-xs text-panel-muted-foreground">
+          {`${total.toLocaleString()} image descriptions in this document, showing the first ${rows.length.toLocaleString()}`}
+        </p>
       )}
 
       {state === "ready" && rows.length > 0 && (

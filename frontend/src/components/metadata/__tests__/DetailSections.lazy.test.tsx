@@ -64,7 +64,12 @@ vi.mock("@/lib/api", async () => {
     listDocuments: (...a: unknown[]) => listDocuments(...(a as [])),
     getDocumentContent: (...a: unknown[]) =>
       getDocumentContent(...(a as [string, { startLine?: number; endLine?: number }?])),
-    listDocumentChunks: (...a: unknown[]) => listDocumentChunks(...(a as [string])),
+    // 284-03 (D-17): the section reads the PAGE client. Each case's array fixture is served as
+    // ONE exact page (total = its length), so every case keeps its intent unchanged.
+    listDocumentChunksPage: async (...a: unknown[]) => {
+      const rows = await listDocumentChunks(...(a as [string]))
+      return { chunks: rows, total: rows.length, offset: 0, limit: 200 }
+    },
   }
 })
 

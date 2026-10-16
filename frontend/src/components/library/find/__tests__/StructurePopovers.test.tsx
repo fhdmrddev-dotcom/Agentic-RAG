@@ -15,7 +15,7 @@ import {
   VersionEditor,
 } from "@/components/library/find/StructurePopovers"
 import { RELATIONSHIP_FILTER_VERBS } from "@/components/relationships/relationshipLabels"
-import { summarizeDocuments } from "@/hooks/useLibraryDocuments"
+import { summarizeDocuments } from "@/test-utils/fakeLibraryApi"
 import type { Document, Folder } from "@/types"
 
 function doc(over: Partial<Document>): Document {

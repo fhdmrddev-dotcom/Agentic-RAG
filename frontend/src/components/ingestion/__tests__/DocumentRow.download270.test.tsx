@@ -28,6 +28,11 @@ vi.mock("@/lib/api", async () => {
   return {
     ...actual,
     fetchDocumentVersions: (...a: unknown[]) => fetchDocumentVersions(...a),
+    // 284-03 (D-17): the history reads the PAGE client; the case's array is served as one exact page.
+    fetchDocumentVersionsPage: async (...a: unknown[]) => {
+      const versions = (await fetchDocumentVersions(...a)) as unknown[]
+      return { versions, total: versions.length, offset: 0, limit: 50 }
+    },
     restoreDocumentVersion: (...a: unknown[]) => restoreDocumentVersion(...a),
     getDocumentDownloadUrl: vi.fn(),
   }
