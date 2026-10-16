@@ -493,6 +493,128 @@ async def test_wr01_new_item_storage_upload_fails_is_marked_minted(
     assert len(_failed_doc_writes(doc_query)) == 1
 
 
+# ── 285-REVIEW CR-02: a file that never landed stays retried and counted through an auth blip ──
+# `_handle_unauthorized_watch` flips EVERY item to `unauthorized`, `failed` ones included (VIS-04,
+# deliberately unchanged). When access returned, `retry_failed` read False and the restore arm set
+# the item `present` with no live document: never read again, never counted — the FIX-12 failure
+# mode. "Never landed" is now a property of the row (failed_attempts > 0, or no document at all),
+# not only of `state`.
+
+def _unauth(**over) -> dict:
+    return _item(state="unauthorized", last_error="401 Unauthorized", **over)
+
+
+def _state_calls(m, state: str) -> list:
+    return [c for c in m.state.call_args_list if c[1].get("state") == state]
+
+
+@pytest.mark.asyncio
+async def test_cr02_unauthorized_never_landed_item_is_read_again_and_lands(
+    mock_pool, mock_supabase, adapter
+):
+    res, m, rel = await _sync(
+        mock_pool, mock_supabase, adapter, [_file()],
+        items=[_unauth(failed_attempts=1, document_id=None)],
+    )
+
+    adapter.read_file.assert_awaited_once()
+    m.mint.assert_awaited_once()
+    assert _state_calls(m, "present") == [], "restored to present without a document (CR-02)"
+    final = m.upsert.call_args_list[-1][1]
+    assert final["state"] == "present"
+    assert final["failed_attempts"] == 0
+    assert final["minted"] is True
+    assert res["counts"]["new"] == 1
+    assert res["counts"]["restored"] == 0
+    assert rel.get("run_error") is None
+
+
+@pytest.mark.asyncio
+async def test_cr02_unauthorized_never_landed_item_failing_again_is_counted(
+    mock_pool, mock_supabase, adapter
+):
+    adapter.read_file.side_effect = httpx.ConnectError("")
+    res, m, rel = await _sync(
+        mock_pool, mock_supabase, adapter, [_file()],
+        items=[_unauth(failed_attempts=1, document_id=uuid4())],
+    )
+
+    adapter.read_file.assert_awaited_once()
+    up = m.upsert.call_args_list[-1][1]
+    assert up["state"] == "failed"
+    assert up["failed_attempts"] == 2  # the D-01 count continues across the blip
+    assert res["counts"]["errors"] == 1
+    assert rel["run_error"] == "1 file failed: team-note-058.txt (ConnectError)"
+
+
+@pytest.mark.asyncio
+async def test_cr02_missing_legacy_item_with_no_document_is_read_again(mock_pool, mock_supabase, adapter):
+    """A legacy failed row carries failed_attempts = 0; no document at all still means never landed."""
+    res, m, _ = await _sync(
+        mock_pool, mock_supabase, adapter, [_file()],
+        items=[_item(state="missing", failed_attempts=0, document_id=None, last_error=None)],
+    )
+
+    adapter.read_file.assert_awaited_once()
+    assert _state_calls(m, "present") == []
+    assert m.upsert.call_args_list[-1][1]["state"] == "present"
+    assert res["counts"]["new"] == 1
+
+
+@pytest.mark.asyncio
+async def test_cr02_past_cap_unauthorized_item_is_counted_and_returned_to_failed(
+    mock_pool, mock_supabase, adapter
+):
+    res, m, rel = await _sync(
+        mock_pool, mock_supabase, adapter, [_file()],
+        items=[_unauth(failed_attempts=3, document_id=None)],
+    )
+
+    adapter.read_file.assert_not_awaited()
+    assert _state_calls(m, "present") == []
+    assert len(_state_calls(m, "failed")) == 1, "the item must read failed again, not unauthorized"
+    assert res["counts"]["errors"] == 1
+    assert rel["run_error"].startswith("1 file failed: team-note-058.txt (")
+
+
+@pytest.mark.asyncio
+async def test_cr02_landed_unauthorized_item_still_takes_the_restore_arm(mock_pool, mock_supabase, adapter):
+    """Control: a file that DID land (no failed attempts, a document) is restored as before."""
+    res, m, _ = await _sync(
+        mock_pool, mock_supabase, adapter, [_file()],
+        items=[_unauth(failed_attempts=0, document_id=uuid4(), minted=True)],
+    )
+
+    adapter.read_file.assert_not_awaited()
+    assert len(_state_calls(m, "present")) == 1
+    assert res["counts"]["restored"] == 1
+
+
+@pytest.mark.asyncio
+async def test_cr02_failed_item_through_an_auth_blip_is_read_again(mock_pool, mock_supabase, adapter):
+    """The reviewer's drive: a failed item is flipped by a 401 listing, then access returns."""
+    failed = _item(state="failed", failed_attempts=1, document_id=None, last_error="ConnectError")
+
+    # Sync 1 — the listing raises a 401, so VIS-04 flips every item (this behaviour is unchanged).
+    adapter.list_files.side_effect = RuntimeError("Client error '401 Unauthorized' for url")
+    with _patched(adapter, items=[failed]) as m1:
+        res1 = await WatchService(pool=mock_pool, supabase=mock_supabase).sync_watch(_watch())
+    assert res1["status"] == "unauthorized"
+    flips = _state_calls(m1, "unauthorized")
+    assert len(flips) == 1 and flips[0][0][1] == failed["id"]
+
+    # The row as `update_item_state` leaves it: state and last_error replaced, attempts untouched.
+    after_blip = {**failed, "state": "unauthorized", "last_error": flips[0][1]["error"]}
+
+    # Sync 2 — access is back. The file never landed, so it must be read again, not restored.
+    adapter.list_files.side_effect = None
+    res2, m2, _ = await _sync(mock_pool, mock_supabase, adapter, [_file()], items=[after_blip])
+    adapter.read_file.assert_awaited_once()
+    assert _state_calls(m2, "present") == []
+    assert m2.upsert.call_args_list[-1][1]["state"] == "present"
+    assert res2["counts"]["new"] == 1
+
+
 # ── D-03: the summary's shape and bound ─────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
