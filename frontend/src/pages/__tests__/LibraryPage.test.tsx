@@ -570,8 +570,10 @@ describe("LibraryPage — plan 06 furniture (LIB-01)", () => {
     expect(within(pager).getByText(/1–1 of 1/)).toBeInTheDocument()
   })
 
-  it("the pager's 'list may be larger' arm renders at/above the 1000-row ceiling", async () => {
-    // 1000 sample docs → capped arm.
+  // 284-03 (D-09): REWRITTEN IN PLACE. This case pinned the 1000-row "may be larger" arm. The
+  // browse total is now the server's exact count, so a 1,000-document Root reads exactly 1,000.
+  it("the pager reads the exact server total at the old 1000-row ceiling — no 'may be larger' arm", async () => {
+    // 1000 sample docs → the exact total, no cap arm.
     const many = Array.from({ length: 1000 }, (_, i) => ({
       ...sampleDocuments[1],
       id: `many-${i}`,
@@ -587,6 +589,8 @@ describe("LibraryPage — plan 06 furniture (LIB-01)", () => {
     const { LibraryPage } = await import("@/pages/LibraryPage")
     renderPage(<LibraryPage />)
     const pager = await screen.findByTestId("documents-tfoot")
-    expect(within(pager).getByText(/may be larger than shown/)).toBeInTheDocument()
+    expect(pager).toHaveTextContent("1–25 of 1,000")
+    expect(pager.textContent).not.toContain("+")
+    expect(within(pager).queryByText(/may be larger than shown/)).toBeNull()
   })
 })

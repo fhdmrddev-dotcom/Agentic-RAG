@@ -32,7 +32,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import type { Document } from "@/types"
+import { summarizeDocuments } from "@/test-utils/fakeLibraryApi"
 
 import { CONTROL_FOR_CAUSE } from "@/components/sources/sourceHealthVocabulary"
 
@@ -98,7 +98,9 @@ const STOPPED_WATCH = {
 }
 
 const defaultProps = {
-  documents: [] as Document[],
+  // 284-03 (D-13): the tab reads the summary; an empty library here.
+  summary: summarizeDocuments([]),
+  summaryState: "ready" as const,
   upload: vi.fn(),
   uploading: false,
   uploadingCount: 0,
