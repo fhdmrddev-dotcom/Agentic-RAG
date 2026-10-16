@@ -248,6 +248,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 280-04-PLAN.md — wave 3 (operator checkpoint at the end): live per-path purge + delete 404 evidence (SC#3/SC#4); DEBT-08 KEEP record in two homes + caption test (D-06/D-07); ledger + CLAUDE.md rows, seeds, full gates; then the OneDrive re-drive (SC#2) — pass, or OWED/⛔ with reason
+
 **Flags**: **Measure first** for FIX-03/04/05: the work left may be only the live re-drive the report names (`238-VERIFICATION.md` M-9). **Migration `207`** only if FIX-02's atomicity needs a database function (a unique-index-aware upsert or one-statement retire+insert) or DEBT-08's decision needs a constraint. Apply it via the SQL editor, regenerate `full-schema.sql` (no reset), mirror any REVOKE in `scripts/full-schema-supplement.sql`, and run `get_advisors(security)`. **security_enforcement**: purge and delete are data-protection actions; the 275 hold guard runs before any delete, and its order (guard → rows → bytes, D-38) is binding. ⚠ The unmeasured CR-01 note in `BUG-261005-01` (the minter's folder check compares `user_id`, never the folder's org) is **driven once here**. If it reproduces, file it as a new bug and do not fold it silently. **G-5 audit at discuss**: `backend/app/api/documents.py` (FIRES, 36 phases), `backend/app/services/ingest_splice.py` (FIRES), `backend/app/api/sources.py` (FIRES), `backend/app/services/sources/adapters/microsoft_graph.py`, `backend/app/services/retention/disposition.py`. Each change is honoured by construction or recorded. **Deploy parity**: migration before backend; `WATCH_PROCESS_ENABLED` and `RETENTION_SWEEP_ENABLED` stay as they are in production.
 
 #### Phase 281: A Refusal Names Its Cause
@@ -279,6 +280,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 281-04-PLAN.md — wave 3 (operator checkpoints): merged-tree gates + closed-core recount + ledger/CLAUDE.md rows + seeds sweep; G-4 Chrome drives A-D (D-17..D-20) matched to the DB; evidence-gated bug/seed closes; STATE
+
 **Flags**: **Closed-core recount** (7 / 1 / 30) against the phase base. A cause-precedence change is data inside the existing executor, never a new one. **G-2**: the refusals sit on shipped layouts (the gauntlet's worded verdict, the describe door), so no layout decision is open. The skip is **recorded as a decision** at discuss (OV-266-01 is what an unrecorded skip cost). **G-4** fires. **G-5 audit at discuss**: `backend/app/services/harness/phase_types.py` (FIRES), `backend/app/services/harness/validator_kinds.py` (FIRES), `backend/app/services/template_render_service.py`, `backend/app/services/workflow_authoring.py` (FIRES), `frontend/src/components/workflows/PublishGauntlet.tsx` (FIRES), `doorVocabulary.ts` (FIRES), `WorkflowBuilderPage.tsx` (FIRES ×6), `backend/app/services/harness/freshness.py`. Seeds: `SEED-221` (folded). Read the sketch-findings skill for the gauntlet's worded-verdict vocabulary before writing copy.
 **UI hint**: yes
 
@@ -311,6 +313,7 @@ Plans:
 **Wave 3** *(operator-approved at the G-4 sign-off, 2026-10-15)*
 
 - [x] 282-04-PLAN.md — wave 3 (TDD, backend + Registry): self-hosted models default to 900 s when no timeout is set (resolver takes the provider), Timeout field on "Add model by ID" bound 1..1800 with the shared refusal sentence (FIX-06 follow-up; D-27..D-30)
+
 **Flags**: ⛔ **G-2 FIRES for FIX-07, and a sketch is genuinely needed.** Sketch 006 option C (calm panel card plus chat **pointer**) conflicts with 244-12's chat-column mount, which exists for reachability when the panel is closed. Where the single input lives in each panel state is an **open layout decision**, and the operator-approved mockup is the acceptance bar. Run `/gsd:sketch` before plan and read the sketch-findings skill (`references/pending-question.md`). **Provider-docs-first** for FIX-06: read each provider SDK's own timeout and retry documentation (OpenAI, Anthropic native, Google), and keep provider-specific handling at the service boundary. **G-5 audit at discuss**: `backend/app/services/openai_service.py` (FIRES, 36 phases), `backend/app/services/anthropic_service.py` (FIRES), `backend/app/config.py` (FIRES; `MODEL_CAPABILITIES` seam owed), `backend/app/api/admin.py`, `frontend/src/components/admin/ModelRegistryTab.tsx` (FIRES), `MessageList.tsx`, `MessageItem.tsx`, `PendingAskCard.tsx` (FIRES), `WorkspacePanel.tsx` (FIRES), `streamsStore.ts` (FIRES), `PausedRunCue.tsx`. ⛔ The FIX-06 change stays a constructor argument at the client boundary, and the agent loop's `per_call_budget` call sites do not move (`agent_loop.py` prompt-assembly seam OV-273-03 is owed and not taken here). Seeds: `SEED-289` / `SEED-172` (sibling local-model findings; the 13 rowless local models on the 300 s inferred default are **noted, not fixed**, unless discuss shows they are the same defect).
 **UI hint**: yes
 
@@ -338,6 +341,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 283-02-PLAN.md — wave 2 (TDD, backend fences + frontend): D-10 two-role fence on the real gate + D-11 route inventory (driven RED), Preferences tab `"6"` with the toggle + default model moved verbatim, derived first-visible fallback, Reset and operator panels gated, zero gated calls, Settings rail door un-gated, docs/landing facts in the same commit, phase ledger close on the merged tree (FIX-01; D-01..D-13, D-15, D-21..D-23)
+
 **Flags**: ⛔ **G-5: `frontend/src/pages/SettingsPage.tsx` FIRES (24 phases) and its tab seam is OWED**. FIX-01 is a per-tab gating change, which is exactly that seam, so wave 1 takes it behaviour-preserving before any gate moves. Also FIRING: `frontend/src/lib/nav-items.ts`, `backend/app/api/settings.py`, `backend/app/dependencies.py` (access-gate module seam named: `app/security/access.py`), `DocumentDetailPanel.tsx`. **security_enforcement**: the change is a permission boundary, so the API gate is the authority and the UI only reflects it. **G-2**: FIX-08's layout is settled by its own report (bound the list using the per-chunk `max-h` pattern already in the file), and FIX-01 reuses the existing rail entry or profile menu. The sketch skip is **recorded as a decision** unless discuss decides a new door is needed, in which case `/gsd:sketch` runs first. The dev account is in two orgs, so prove the active org before every drive. Read the sketch-findings skill for the Settings and document-detail-panel contracts.
 **UI hint**: yes
 
@@ -374,6 +378,7 @@ Plans:
 
 - [x] 284-05-PLAN.md — wave 3 (TDD guards + orchestrator checkpoint, DB lock): D-23 layer 2 request recorder (unit + live) and the D-16 whole-list fence, each driven RED, legacy array clients deleted; merged-tree gates, count-gate pins, ledger + CLAUDE.md close; AFTER measurement at 10k / 50k, production `max_rows` read (read-only), G-4 A-E, evidence-gated bug / seed / requirement flips (FIX-11; D-16, D-18, D-21..D-23, D-25..D-27, R-09)
 - [x] 284-06-PLAN.md — wave 4 (TDD, DB lock; added 2026-10-16 at the operator's request, SEED-357): locate where the 50k first-page time goes, migration **208** (the Library page index; the view rewritten as UNION ALL only if EXPLAIN demands it), applied by script, AFTER at 10k / 50k so Root and Find page 1 stay within 1.5x (FIX-11; SC#1, D-22)
+
 **Flags**: ⛔ **G-5: `frontend/src/pages/LibraryPage.tsx` FIRES and its extraction is OWED — taken first.** Also FIRING: `backend/app/api/documents.py`, `backend/app/services/document_search_service.py`, `frontend/src/components/ingestion/DocumentList.tsx`, `frontend/src/lib/api/documents.ts`, `frontend/src/types/index.ts`; `frontend/src/hooks/useDocuments.ts` and `DocumentsPager.tsx` read their ledger sections first. **security_enforcement**: any new SQL function is `SECURITY INVOKER`, revoked from `PUBLIC`, and proven as `authenticated`, never through the service role. **measure first**: record today's figures at 10k/50k before changing anything. Supabase Realtime stays a hint: a document-change event refetches the current page, never patches a full in-memory list. **G-2**: the pager exists (`DocumentsPager`), so the sketch skip is recorded unless discuss changes the Library layout. Cross-check `BUG-261014-06` / `-07` at discuss.
 **UI hint**: yes
 
@@ -391,10 +396,21 @@ Plans:
   5. A live re-drive of the OneDrive watch reaches **105/105** after one forced transient failure, or is recorded ⛔ with the reason if no credential is available (FIX-12).
 
 **How we'd know this failed**: the retry runs forever on a file that will never download, and every sync re-reads it with no cap and no visible state; a purge still deletes a hand upload because the "minted by this watch" test reads `source_connection_id` but a dedup link copied it; the stuck-row fix marks a row `failed` that a live worker was about to process (a race with the enqueue); the in-flight leg is loosened so far that FIX-02's same-bytes guarantee comes back broken; or the fix lands with only a mocked test and no driven defect.
-**Plans**: TBD (G-8 target 2-3)
+**Plans**: 3 plans (waves 1 → 2 → 3, serialized: every plan mutates the local DB)
 
 Plans:
-- [ ] TBD (run /gsd:discuss-phase 285, then /gsd:plan-phase 285)
+**Wave 1**
+
+- [ ] 285-01-PLAN.md — migration 209 (attempts + minted marker, tightened backfill, stuck-pending heal) + FIX-12 retry, typed failures on the run row, minted marker writes
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 285-02-PLAN.md — FIX-13 purge scope (minted and unshared only, honest receipt) + BUG-261014-05 bytes receipt
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 285-03-PLAN.md — FIX-14 enqueue-failure refusal in /upload, heal verified live, 280 guarantees re-pinned, SC#5 OneDrive re-drive (operator OK), bug closes + ledger
+
 **Flags**: added at the milestone audit · **security_enforcement** (destructive purge path) · ⛔ G-5: `backend/app/services/ingest_splice.py`, `backend/app/api/documents.py` and `backend/app/api/sources.py` FIRE, so read their ledger sections before planning; `watch_service.py` and `db/ingestion_jobs.py` need a ledger presence check · **measure first**: re-read each bug's cited lines against HEAD before fixing · migration only if needed (next free after **208**, run `ls` first) · repair only: no new user capability, and no retry *policy UI* · cross-check `BUG-261014-05` (minor, `remove_document_bytes` counts) at discuss as a fold candidate.
 **UI hint**: no
 
@@ -410,7 +426,7 @@ Plans:
 | 282. The Slow Run and the Paused Run | 4/4 | Complete (verified 5/5, self-verified; review CR-01 + WR-02..05 fixed, WR-01 partial; owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through, SC#10 rows 2/8 on credit) | 2026-10-15 |
 | 283. Every Member Reaches Their Own Settings | 3/3 | Complete (verified 4/4 SCs; review CR-01 + WR-01/02 + 4 info fixed, IN-04/IN-06 skipped by decision; G-4 driven live, Tab row confirmed by operator) | 2026-10-16 |
 | 284. Library at Scale | 6/6 | Complete (verified 7/7 SCs, self-verified; review R1 CR-01 + WR-01/02/04 + IN-05/07 and R2 WR-R2-01..05 fixed test-first, WR-03 accepted; G-4 A-F driven live, A/B re-driven on 208; migrations 207 + 208 LOCAL only — production apply owed) | 2026-10-16 |
-| 285. Watch and Re-upload Close Out | 0/0 | Not started | - |
+| 285. Watch and Re-upload Close Out | 0/3 | Planned | - |
 
 ---
 
