@@ -11,9 +11,17 @@ vi.mock("@/lib/api/takeoff", () => ({
   resolveDocumentTakeoffItem: vi.fn(),
 }))
 
+// 284-04 (D-15 R-05 exception / UI-SPEC S14): the rate-sheet list is ONE bounded server page of
+// spreadsheets — never the whole library filtered in the browser. `listDocuments` stays mocked so a
+// regression back to it is SEEN.
 vi.mock("@/lib/api", () => ({
   listDocuments: vi.fn(),
+  listDocumentsPage: vi.fn(),
 }))
+
+function page(documents: Document[], total = documents.length) {
+  return { documents, total, offset: 0, limit: 50 }
+}
 
 describe("TakeoffSection Component (Phase 220, TAKEOFF-04)", () => {
   const mockDoc: Document = {
@@ -112,7 +120,7 @@ describe("TakeoffSection Component (Phase 220, TAKEOFF-04)", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(api.listDocuments).mockResolvedValue(mockRateDocs)
+    vi.mocked(api.listDocumentsPage).mockResolvedValue(page(mockRateDocs))
     vi.mocked(takeoffApi.fetchDocumentTakeoff).mockResolvedValue(mockDoc.metadata?._takeoff as any)
   })
 
@@ -190,5 +198,51 @@ describe("TakeoffSection Component (Phase 220, TAKEOFF-04)", () => {
 
     expect(await screen.findByText((content) => content.includes("Drawing Declares No Units"))).toBeInTheDocument()
     expect(screen.getByText((content) => content.includes("Refusing to convert lengths"))).toBeInTheDocument()
+  })
+
+  // ── 284-04 (UI-SPEC S14): the five arms of the rate-sheet select ─────────────────────────
+  const sheet = (i: number): Document => ({ ...mockRateDocs[0], id: `rates-${i}`, filename: `Rates ${i}.xlsx` })
+  const rateSelect = () => screen.getByLabelText("Select reference rate sheet") as HTMLSelectElement
+
+  it("reads ONE bounded spreadsheet page — never the whole library", async () => {
+    render(<TakeoffSection doc={mockDoc} />)
+    await waitFor(() => expect(api.listDocumentsPage).toHaveBeenCalledTimes(1))
+    expect(api.listDocumentsPage).toHaveBeenCalledWith({ kind: "spreadsheet", offset: 0, limit: 50 })
+    expect(api.listDocuments).not.toHaveBeenCalled()
+  })
+
+  it("while loading the select is disabled and reads 'Loading rate sheets…'", () => {
+    vi.mocked(api.listDocumentsPage).mockReturnValue(new Promise(() => {}))
+    render(<TakeoffSection doc={mockDoc} />)
+    expect(rateSelect()).toBeDisabled()
+    expect(rateSelect()).toHaveTextContent("Loading rate sheets…")
+    expect(screen.queryByText("No Excel rate sheets found in Library")).toBeNull()
+  })
+
+  it("an answered empty page reads the shipped 'No Excel rate sheets found in Library'", async () => {
+    vi.mocked(api.listDocumentsPage).mockResolvedValue(page([]))
+    render(<TakeoffSection doc={mockDoc} />)
+    expect(await screen.findByText("No Excel rate sheets found in Library")).toBeInTheDocument()
+    expect(rateSelect()).toBeDisabled()
+  })
+
+  it("loaded: options in server order, the first auto-selected; more than 50 says how many exist", async () => {
+    vi.mocked(api.listDocumentsPage).mockResolvedValue(page([sheet(1), sheet(2)], 73))
+    render(<TakeoffSection doc={mockDoc} />)
+    await screen.findByRole("option", { name: "Rates 1.xlsx" })
+    expect(Array.from(rateSelect().options).map((o) => o.textContent)).toEqual(["Rates 1.xlsx", "Rates 2.xlsx"])
+    expect(rateSelect()).toHaveValue("rates-1")
+    expect(screen.getByText("Showing the 50 most recent of 73 spreadsheets.")).toBeInTheDocument()
+  })
+
+  it("a failed read is disabled with 'Couldn’t load rate sheets' and a Try again that reads again", async () => {
+    vi.mocked(api.listDocumentsPage).mockRejectedValueOnce(new Error("down"))
+    render(<TakeoffSection doc={mockDoc} />)
+    expect(await screen.findByRole("option", { name: "Couldn’t load rate sheets" })).toBeInTheDocument()
+    expect(rateSelect()).toBeDisabled()
+    expect(screen.queryByText("No Excel rate sheets found in Library")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+    expect(await screen.findByRole("option", { name: "Master_Rate_Sheet.xlsx" })).toBeInTheDocument()
+    expect(api.listDocumentsPage).toHaveBeenCalledTimes(2)
   })
 })

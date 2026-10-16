@@ -6,8 +6,30 @@
  * does). These cases assert the WORDS on each chip and the ACTION each editor dispatches.
  */
 import type { ComponentProps } from "react"
-import { describe, it, expect, vi } from "vitest"
+import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
+
+// 284-04 (D-15): the Relationship editor type-aheads against POST /document-search; the row no
+// longer forwards `documents` to it. The search is mocked so opening that editor never reaches
+// the network, and so a case can prove where its candidates come from.
+const m = vi.hoisted(() => ({ searchDocuments: vi.fn() }))
+vi.mock("@/lib/api/documents", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/documents")>("@/lib/api/documents")
+  return { ...actual, searchDocuments: m.searchDocuments }
+})
+beforeEach(() => {
+  m.searchDocuments.mockReset()
+  m.searchDocuments.mockResolvedValue({
+    documents: [
+      { id: "srv", filename: "From the server.pdf", version_count: 1, has_earlier: false },
+    ],
+    total: 1,
+    older_matches: 0,
+    sort: "added_desc",
+    offset: 0,
+    limit: 20,
+  })
+})
 import { FindQuickAdd } from "@/components/library/find/FindQuickAdd"
 import { initialFindState, type FindState } from "@/pages/findState"
 import type { Document, Folder, ViewFilter } from "@/types"
@@ -275,6 +297,15 @@ describe("FindQuickAdd — the summary lists, not the documents", () => {
     renderQA({}, EMPTY, { connections: [{ id: "c1", name: "Drive Finance", count: 3 }] })
     fireEvent.click(screen.getByRole("button", { name: "＋ Added by" }))
     expect(screen.getByRole("radio", { name: "Drive Finance (connected source)" })).toBeInTheDocument()
+  })
+
+  it("284-04: the Relationship editor's candidates come from the server search, never the documents prop", async () => {
+    renderQA() // DOCS is still handed to the row (284-05 deletes the prop)…
+    fireEvent.click(screen.getByRole("button", { name: "＋ Relationship" }))
+    // …but the editor offers the SERVER's answer, and never the prop's "Acme MSA 2019.pdf".
+    expect(await screen.findByRole("option", { name: "From the server.pdf" })).toBeInTheDocument()
+    expect(screen.queryByRole("option", { name: "Acme MSA 2019.pdf" })).toBeNull()
+    expect(m.searchDocuments).toHaveBeenCalledWith(expect.objectContaining({ version: "latest", limit: 20 }))
   })
 
   it("renders with no documents prop at all (it is optional now)", () => {

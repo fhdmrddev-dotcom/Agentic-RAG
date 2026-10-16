@@ -1,9 +1,17 @@
 /**
  * TakeoffSection — CAD Drawing Quantities & Grounded BOQ Table (Phase 220, TAKEOFF-04).
+ *
+ * Phase 284-04 (D-15's R-05 exception / UI-SPEC S14): the rate-sheet `<select>` reads ONE bounded
+ * server page — `GET /documents?kind=spreadsheet&limit=50`, newest first — instead of downloading
+ * the whole library and filtering it in the browser (at 50,000 documents that read was cut at
+ * 1,000, so a rate sheet could silently be missing). The select says which state it is in:
+ * loading, an answered empty page (the shipped copy, only after success), the page with its first
+ * row auto-selected, "Showing the 50 most recent of {M} spreadsheets." above 50, and a failure with
+ * Try again — never the empty copy for a failed read.
  */
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Calculator, Download, AlertTriangle, CheckCircle2, Loader2, FileSpreadsheet } from "lucide-react"
-import { listDocuments } from "@/lib/api"
+import { listDocumentsPage } from "@/lib/api"
 import {
   fetchDocumentTakeoff,
   matchDocumentTakeoff,
@@ -12,6 +20,9 @@ import {
 } from "@/lib/api/takeoff"
 import type { Document } from "@/types"
 import { cn } from "@/lib/utils"
+
+/** 284-04 (S14): the rate-sheet page — the 50 most recent spreadsheets. */
+const RATE_SHEET_PAGE = 50
 
 interface TakeoffSectionProps {
   doc: Document
@@ -28,6 +39,10 @@ export function TakeoffSection({ doc, onTotalChange, onRefresh }: TakeoffSection
 
   // Rate sheet selection & matching state
   const [rateDocs, setRateDocs] = useState<Document[]>([])
+  /** 284-04 (S14): the rate-sheet page's state, and the server's exact spreadsheet count. */
+  const [sheetsState, setSheetsState] = useState<"loading" | "ready" | "error">("loading")
+  const [sheetsTotal, setSheetsTotal] = useState(0)
+  const [sheetsAttempt, setSheetsAttempt] = useState(0)
   const [selectedRateDocId, setSelectedRateDocId] = useState<string>(() => {
     return takeoff?.rate_sheet_document_id || ""
   })
@@ -70,37 +85,33 @@ export function TakeoffSection({ doc, onTotalChange, onRefresh }: TakeoffSection
     }
   }, [doc.id])
 
-  // Fetch available rate sheets (.xlsx, .xls, .csv)
+  // Fetch available rate sheets: ONE bounded page of spreadsheets, newest first (284-04, R-05).
+  // The server's `kind=spreadsheet` is a constant mime/extension filter; nothing is re-filtered here.
   useEffect(() => {
     let cancelled = false
     async function fetchSheets() {
+      setSheetsState("loading")
       try {
-        const allDocs = await listDocuments()
+        const res = await listDocumentsPage({ kind: "spreadsheet", offset: 0, limit: RATE_SHEET_PAGE })
         if (!cancelled) {
-          const sheets = allDocs.filter((d) => {
-            const name = d.filename.toLowerCase()
-            return (
-              name.endsWith(".xlsx") ||
-              name.endsWith(".xls") ||
-              name.endsWith(".csv") ||
-              d.mime_type?.includes("spreadsheet") ||
-              d.mime_type?.includes("csv")
-            )
-          })
+          const sheets = res.documents
           setRateDocs(sheets)
-          if (!selectedRateDocId && sheets.length > 0) {
-            setSelectedRateDocId(sheets[0].id)
-          }
+          setSheetsTotal(res.total)
+          setSheetsState("ready")
+          setSelectedRateDocId((current) => current || (sheets[0]?.id ?? ""))
         }
       } catch {
-        // Non-blocking
+        // Non-blocking for the takeoff itself — but the select SAYS the read failed (S14).
+        if (!cancelled) setSheetsState("error")
       }
     }
     fetchSheets()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [sheetsAttempt])
+
+  const retrySheets = useCallback(() => setSheetsAttempt((n) => n + 1), [])
 
   const handleMatch = async () => {
     if (!selectedRateDocId) return
@@ -272,13 +283,17 @@ export function TakeoffSection({ doc, onTotalChange, onRefresh }: TakeoffSection
 
         <div className="flex items-center gap-2">
           <select
-            value={selectedRateDocId}
+            value={sheetsState === "ready" ? selectedRateDocId : ""}
             onChange={(e) => setSelectedRateDocId(e.target.value)}
-            disabled={matching || rateDocs.length === 0}
+            disabled={matching || sheetsState !== "ready" || rateDocs.length === 0}
             className="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             aria-label="Select reference rate sheet"
           >
-            {rateDocs.length === 0 ? (
+            {sheetsState === "loading" ? (
+              <option value="">Loading rate sheets…</option>
+            ) : sheetsState === "error" ? (
+              <option value="">Couldn’t load rate sheets</option>
+            ) : rateDocs.length === 0 ? (
               <option value="">No Excel rate sheets found in Library</option>
             ) : (
               rateDocs.map((r) => (
@@ -308,6 +323,17 @@ export function TakeoffSection({ doc, onTotalChange, onRefresh }: TakeoffSection
             )}
           </button>
         </div>
+
+        {sheetsState === "error" && (
+          <button type="button" onClick={retrySheets} className="text-xs text-primary hover:underline">
+            Try again
+          </button>
+        )}
+        {sheetsState === "ready" && sheetsTotal > RATE_SHEET_PAGE && (
+          <p className="text-xs text-muted-foreground">
+            Showing the {RATE_SHEET_PAGE} most recent of {sheetsTotal.toLocaleString()} spreadsheets.
+          </p>
+        )}
 
         {error && <p className="text-[11px] text-destructive mt-1">{error}</p>}
       </div>

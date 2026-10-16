@@ -8613,7 +8613,7 @@
      "document-views"
     ],
     "summary": "Resolve View",
-    "description": "Resolve a view to its complete listing of matching latest-version docs.\n\nTHE per-viewer leak-safe core (VIEW-06 / T-113-09): every documents query leg\nis scoped from the CALLER, NEVER from `view[\"user_id\"]`. A seeded global view\nresolves to DIFFERENT result sets per caller. Returns a complete listing\n(query-not-copy, D-113-1), newest-first, with a total count.\n\nThe saved AST compiles (Plan 01) to an ordered ``list[Fragment]`` of bound\nWHERE-fragment descriptors (R-114-A). `_apply` walks them across two legs \u2014 the\npromoted typed indexed columns (`document_type_norm` / `date_typed`) and a\nwhitelisted `metadata->>'field'` custom leg \u2014 chaining supabase-py builder calls\nso every VALUE rides as a bound PostgREST param (SC#4). Both legs are scoped\nidentically from the CALLER, then merged + DISTINCT-deduped by id (VIEW-06).\n\nRELATIVE-DATE / PHASE 115 HANDOFF (D-114-16): relative-date windows\n(`within_next` / `older_than`) are computed HERE from the server clock at resolve\ntime (never baked at save, never on the client) so a saved \"expiring within 90\ndays\" view drifts with the calendar. Phase 115's agent-tool MUST reuse this\nresolver, never re-derive its own window math.\n\n``count_only=True`` (D-114-15) returns just ``{\"total\": N}`` \u2014 the own+global\nDISTINCT-deduped count without materializing full rows \u2014 for the live builder\npreview and the per-view sidebar badges.",
+    "description": "Resolve a view to one page of its matching latest-version documents, with an exact total.\n\nChanged in v4.6: the listing is paged. Pass ``offset`` and ``limit`` (1 to 200, default 25)\nand read ``{documents, total, offset, limit}``, newest first; ``total`` is the exact number of\nmatches. ``include_archived`` (default true) leaves archived documents out when false, and\napplies to ``count_only`` too.\n\nPhase 284 (D-10): the read is ONE ranged ``count=\"exact\"`` query over migration 207's\n``library_documents`` (the view strategy), run on THIS route's user-JWT client, so neither the\nlisting nor the count is cut at PostgREST's max_rows any more.\n\nTHE per-viewer leak-safe core (VIEW-06 / T-113-09): every documents query leg\nis scoped from the CALLER, NEVER from `view[\"user_id\"]`. A seeded global view\nresolves to DIFFERENT result sets per caller. Returns a complete listing\n(query-not-copy, D-113-1), newest-first, with a total count.\n\nThe saved AST compiles (Plan 01) to an ordered ``list[Fragment]`` of bound\nWHERE-fragment descriptors (R-114-A). `_apply` walks them across two legs \u2014 the\npromoted typed indexed columns (`document_type_norm` / `date_typed`) and a\nwhitelisted `metadata->>'field'` custom leg \u2014 chaining supabase-py builder calls\nso every VALUE rides as a bound PostgREST param (SC#4). Both legs are scoped\nidentically from the CALLER, then merged + DISTINCT-deduped by id (VIEW-06).\n\nRELATIVE-DATE / PHASE 115 HANDOFF (D-114-16): relative-date windows\n(`within_next` / `older_than`) are computed HERE from the server clock at resolve\ntime (never baked at save, never on the client) so a saved \"expiring within 90\ndays\" view drifts with the calendar. Phase 115's agent-tool MUST reuse this\nresolver, never re-derive its own window math.\n\n``count_only=True`` (D-114-15) returns just ``{\"total\": N}`` \u2014 the own+global\nDISTINCT-deduped count without materializing full rows \u2014 for the live builder\npreview and the per-view sidebar badges.",
     "operationId": "resolve_view_document_views__view_id__resolve_get",
     "security": [
      {
@@ -8638,6 +8638,39 @@
        "type": "boolean",
        "default": false,
        "title": "Count Only"
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 25,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "include_archived",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": true,
+       "title": "Include Archived"
       }
      }
     ],
@@ -8669,7 +8702,7 @@
      "document-views"
     ],
     "summary": "Resolve Adhoc",
-    "description": "STATELESS ad-hoc resolve/count for an UNSAVED filter (114 CR-01).\n\nThe live FilterBar / IngestionPage preview an unsaved filter as the user builds\nit. Phase 113/114 had NO ad-hoc-by-body endpoint, so the client faked one with a\n``createView \u2192 resolve \u2192 deleteView`` dance \u2014 which fired a ``view.create``\nGOVERNANCE AUDIT row on EVERY debounced keystroke that was never cleaned up,\nflooding the compliance audit log (DMF-01) with ``__live_*`` throwaway rows, AND\ndouble-round-tripped (the page + the bar each ran their own transient cycle).\n\nThis endpoint takes the ``filter_expr`` AST inline and runs the IDENTICAL\ncompile + caller-scoped own+global two-leg resolve as ``resolve_view`` (the\nSHARED ``resolve_filter`` core, extracted to document_view_resolver in 115) \u2014\nwith NO ``document_views`` write and NO audit entry. ``count_only`` returns\n``{total}`` (the live \"N documents match\" preview + the page's list resolve share\nTHIS one path now); otherwise ``{documents, total}``.\n\nLeak-safety (VIEW-06) is preserved by construction: ``resolve_filter`` scopes\nevery leg from the CALLER, never a view owner (there IS no view here \u2014 the caller\nIS the only scope). SC#4 holds \u2014 the value rides as a bound PostgREST param via\nthe compiler + ``_apply``, never interpolated. ``folder_scope`` (optional) is\ncaller-owner-scoped exactly like a saved view's scope.",
+    "description": "STATELESS ad-hoc resolve/count for an UNSAVED filter (114 CR-01).\n\nThe live FilterBar / IngestionPage preview an unsaved filter as the user builds\nit. Phase 113/114 had NO ad-hoc-by-body endpoint, so the client faked one with a\n``createView \u2192 resolve \u2192 deleteView`` dance \u2014 which fired a ``view.create``\nGOVERNANCE AUDIT row on EVERY debounced keystroke that was never cleaned up,\nflooding the compliance audit log (DMF-01) with ``__live_*`` throwaway rows, AND\ndouble-round-tripped (the page + the bar each ran their own transient cycle).\n\nThis endpoint takes the ``filter_expr`` AST inline and runs the IDENTICAL\ncompile + caller-scoped own+global two-leg resolve as ``resolve_view`` (the\nSHARED ``resolve_filter`` core, extracted to document_view_resolver in 115) \u2014\nwith NO ``document_views`` write and NO audit entry. ``count_only`` returns\n``{total}`` (the live \"N documents match\" preview + the page's list resolve share\nTHIS one path now); otherwise ``{documents, total, offset, limit}`` \u2014 one PAGE (Phase 284,\nD-10: the body's ``offset`` / ``limit`` \u2264 200 / ``include_archived``) with an exact total.\n\nLeak-safety (VIEW-06) is preserved by construction: ``resolve_filter`` scopes\nevery leg from the CALLER, never a view owner (there IS no view here \u2014 the caller\nIS the only scope). SC#4 holds \u2014 the value rides as a bound PostgREST param via\nthe compiler + ``_apply``, never interpolated. ``folder_scope`` (optional) is\ncaller-owner-scoped exactly like a saved view's scope.",
     "operationId": "resolve_adhoc_document_views_resolve_post",
     "requestBody": {
      "content": {
@@ -15706,6 +15739,24 @@
        }
       ],
       "title": "Folder Scope"
+     },
+     "offset": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Offset",
+      "default": 0
+     },
+     "limit": {
+      "type": "integer",
+      "maximum": 200.0,
+      "minimum": 1.0,
+      "title": "Limit",
+      "default": 25
+     },
+     "include_archived": {
+      "type": "boolean",
+      "title": "Include Archived",
+      "default": true
      }
     },
     "type": "object",
@@ -15713,7 +15764,7 @@
      "filter_expr"
     ],
     "title": "AdHocResolve",
-    "description": "The body of the STATELESS ``POST /document-views/resolve`` endpoint (114 CR-01).\n\nThe live FilterBar / IngestionPage previews an UNSAVED filter WITHOUT persisting\na transient ``document_views`` row (which fired a per-keystroke ``view.create``\naudit row that was never cleaned up \u2014 an audit-log pollution / data-integrity\ndefect). This carries the same ``filter_expr`` AST inline; the endpoint runs the\nidentical compile + caller-scoped own+global two-leg resolve as ``resolve_view``\nbut performs NO DB write and NO audit. ``count_only`` returns just ``{total}``;\notherwise ``{documents, total}``. ``folder_scope`` is optional (parity with a\nsaved view's scope)."
+    "description": "The body of the STATELESS ``POST /document-views/resolve`` endpoint (114 CR-01).\n\nThe live FilterBar / IngestionPage previews an UNSAVED filter WITHOUT persisting\na transient ``document_views`` row (which fired a per-keystroke ``view.create``\naudit row that was never cleaned up \u2014 an audit-log pollution / data-integrity\ndefect). This carries the same ``filter_expr`` AST inline; the endpoint runs the\nidentical compile + caller-scoped own+global two-leg resolve as ``resolve_view``\nbut performs NO DB write and NO audit. ``count_only`` returns just ``{total}``;\notherwise ``{documents, total}``. ``folder_scope`` is optional (parity with a\nsaved view's scope).\n\nPhase 284 (D-10): the listing PAGES \u2014 ``offset`` / ``limit`` (1..200, default 25) select one\npage of the newest-first set and the answer is ``{documents, total, offset, limit}`` with an\nEXACT total. ``include_archived`` (default ``True``, today's behaviour) hides archived\ndocuments when ``False``; it applies to ``count_only`` too, so a caller can count the hidden\nones as ``count(include_archived=True) - count(include_archived=False)``."
    },
    "AddModelRequest": {
     "properties": {

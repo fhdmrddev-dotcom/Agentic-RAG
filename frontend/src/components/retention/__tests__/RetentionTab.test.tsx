@@ -33,9 +33,16 @@ vi.mock("@/lib/api/retention", async (importOriginal) => {
   return { ...actual, ...m }
 })
 vi.mock("@/hooks/useFolders", () => ({ useFolders: () => ({ folders: [] }) }))
-vi.mock("@/lib/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api")>()
-  return { ...actual, listDocuments: vi.fn().mockResolvedValue([]) }
+// 284-04 (D-15): the legal-hold picker type-aheads against POST /document-search, not the list
+// client — mocked here so no picker can reach the network.
+vi.mock("@/lib/api/documents", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/documents")>()
+  return {
+    ...actual,
+    searchDocuments: vi.fn().mockResolvedValue({
+      documents: [], total: 0, older_matches: 0, sort: "added_desc", offset: 0, limit: 20,
+    }),
+  }
 })
 
 import { RetentionTab } from "../RetentionTab"

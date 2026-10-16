@@ -10,8 +10,14 @@ every applier here is asserted TWICE:
 
 ``FakePostgrest`` is a tiny in-memory PostgREST: ``select`` (projection + ``count``), ``eq``,
 ``neq``, ``in_``, ``is_``, ``ilike`` (LIKE with backslash escapes), ``gte``, ``lt``, ``lte``,
-``contains``, ``order``, ``range``, ``limit``. ``rpc`` raises — the search path may never
-call one (D-03). The relationship suite imports it from here (the test_240 precedent).
+``contains``, ``order`` (with ``nullsfirst``), ``range``, ``limit``. ``rpc`` raises — the search
+path may never call one (D-03). The relationship suite imports it from here (the test_240 precedent).
+
+284-04 (D-14 / R-12): it also serves migration 207's ``library_documents`` VIEW, DERIVED from its
+``documents`` fixture exactly as the SQL does — the caller's own rows ∪ rows in a globally-visible
+folder (``patched["global"]``), ``full_markdown`` dropped, plus ``filename_key`` (lower-cased
+name), ``version_count`` and ``has_earlier`` computed over the SAME visible set. Extended, not
+forked: every 271 case still runs against this one fake.
 
 Imports of the service are inside the test bodies so RED is a per-test ImportError.
 """
@@ -114,7 +120,8 @@ class FakeQuery:
         self.cols = "*"
         self.count_mode = None
         self._range = None
-        self._order: list[tuple[str, bool]] = []
+        self._order: list[tuple[str, bool, bool | None]] = []
+        self.orders: list[tuple[str, bool, bool | None]] = []  # (col, desc, nullsfirst) as called
         self._limit = None
         client.queries.append(self)
 
@@ -157,9 +164,10 @@ class FakeQuery:
         self.calls.append(("in_", col, parse_pgrst_in_list(val)))
         return self
 
-    def order(self, col, desc=False, **_k):
+    def order(self, col, desc=False, nullsfirst=None, **_k):
         self.calls.append(("order", col, desc))
-        self._order.append((col, desc))
+        self._order.append((col, desc, nullsfirst))
+        self.orders.append((col, desc, nullsfirst))
         return self
 
     def range(self, start, end):
@@ -226,9 +234,15 @@ class FakeQuery:
         override = self.client.override(self) if self.client.override else None
         if override is not None:
             return override
-        rows = [r for r in self.client.tables.get(self.table, []) if self._match(r)]
-        for col, desc in reversed(self._order):
-            rows.sort(key=lambda r: (_get(r, col) is None, str(_get(r, col))), reverse=desc)
+        rows = [r for r in self.client.rows_for(self.table) if self._match(r)]
+        for col, desc, nullsfirst in reversed(self._order):
+            # Postgres: NULLS LAST for asc and NULLS FIRST for desc unless stated; a stable sort
+            # per key, last key first, so earlier keys win and ties keep the later keys' order.
+            nulls_first = desc if nullsfirst is None else nullsfirst
+            present = [r for r in rows if _get(r, col) is not None]
+            missing = [r for r in rows if _get(r, col) is None]
+            present.sort(key=lambda r: str(_get(r, col)), reverse=desc)
+            rows = missing + present if nulls_first else present + missing
         count = len(rows) if self.count_mode == "exact" else None
         if self._range is not None:
             s, e = self._range
@@ -245,11 +259,22 @@ class FakeQuery:
         return FakeResult(rows, count)
 
 
+VIEW = "library_documents"
+
+
 class FakePostgrest:
-    def __init__(self, tables=None, *, max_rows=None, override=None):
+    #: The ``patched`` fixture's state dict while a test runs (``state["global"]`` = the folder ids
+    #: whose documents the caller sees through the view's shared-folder leg). Set per test with
+    #: ``monkeypatch``, so it never leaks between tests.
+    view_state: dict | None = None
+
+    def __init__(self, tables=None, *, max_rows=None, override=None, view_caller=CALLER,
+                 view_global=None):
         self.tables = tables or {}
         self.max_rows = max_rows
         self.override = override
+        self.view_caller = view_caller
+        self.view_global = view_global
         self.queries: list[FakeQuery] = []
         self.executed: list[FakeQuery] = []
 
@@ -259,14 +284,53 @@ class FakePostgrest:
     def rpc(self, *a, **k):  # D-03: the search path never calls an RPC
         raise AssertionError(f"the document-search path called .rpc{a!r}")
 
+    # the view (migration 207), derived ---------------------------------------------------
+    def _view_global(self) -> set[str]:
+        if self.view_global is not None:
+            return {str(g) for g in self.view_global}
+        return {str(g) for g in ((self.view_state or {}).get("global") or [])}
+
+    def library_rows(self) -> list[dict]:
+        """``public.library_documents`` as the SQL defines it, over ``tables["documents"]``."""
+        if VIEW in self.tables:
+            return self.tables[VIEW]
+        caller, glob = str(self.view_caller), self._view_global()
+
+        def visible(r):
+            return str(r.get("user_id")) == caller or (
+                r.get("folder_id") is not None and str(r["folder_id"]) in glob
+            )
+
+        vis = [r for r in self.tables.get("documents", []) if visible(r)]
+        out = []
+        for r in vis:
+            lineage = [e for e in vis
+                       if e.get("user_id") == r.get("user_id") and e.get("filename") == r.get("filename")]
+            row = {k: v for k, v in r.items() if k != "full_markdown"}
+            row["filename_key"] = r["filename"].lower() if r.get("filename") is not None else None
+            row["version_count"] = len(lineage)
+            row["has_earlier"] = any(
+                (e.get("version_number") or 0) < (r.get("version_number") or 0) for e in lineage
+            )
+            out.append(row)
+        return out
+
+    def rows_for(self, table: str) -> list[dict]:
+        return self.library_rows() if table == VIEW else self.tables.get(table, [])
+
     # assertion helpers -----------------------------------------------------------------
     def candidate_legs(self):
-        from app.services.document_search_service import CANDIDATE_COLUMNS
-
-        return [q for q in self.queries if q.table == "documents" and q.cols == CANDIDATE_COLUMNS]
+        """284-04: every read of the view — the ONE page read and any ``count="exact"`` head read."""
+        return [q for q in self.queries if q.table == VIEW]
 
     def first_page_legs(self):
         return [q for q in self.candidate_legs() if q.count_mode == "exact"]
+
+    def page_reads(self):
+        """The row read(s) of the view — the select list is ``FIND_SELECT`` (never a head read)."""
+        from app.services.document_search_service import FIND_SELECT
+
+        return [q for q in self.queries if q.table == VIEW and q.cols == FIND_SELECT]
 
 
 def doc(id_, *, user_id=CALLER, filename=None, folder_id=None, version_number=1, is_latest=True,
@@ -297,9 +361,6 @@ def patched(monkeypatch):
 
     state = {"global": [], "visible": [], "subtree": None}
 
-    async def _global(supabase, user_id):
-        return list(state["global"])
-
     async def _visible(supabase, user_id, **_k):
         return [{"id": f} for f in state["visible"]]
 
@@ -309,7 +370,9 @@ def patched(monkeypatch):
     async def _meta(user_id, supabase):
         return {"document_type", "date", "title", "reviewed"}, set()
 
-    monkeypatch.setattr(svc, "get_globally_visible_folder_ids", _global)
+    # 284-04: the visibility union is the VIEW now (migration 207), so ``state["global"]`` drives
+    # the fake view's shared-folder leg instead of a patched ``get_globally_visible_folder_ids``.
+    monkeypatch.setattr(FakePostgrest, "view_state", state)
     monkeypatch.setattr(svc, "fetch_visible_folders", _visible)
     monkeypatch.setattr(svc, "resolve_project_subtree", _subtree)
     monkeypatch.setattr(resolver, "_build_field_meta", _meta)
@@ -409,7 +472,7 @@ async def test_name_is_escaped_once_per_leg(patched):
     client = FakePostgrest({"documents": rows})
     out = await run(client, name="ac%me_\\")
     legs = client.first_page_legs()
-    assert len(legs) == 2
+    assert len(legs) == 1  # 284-04: ONE read of the view (the two legs are its SQL union now)
     for q in legs:
         assert q.filters("ilike") == [("ilike", "filename", "%ac\\%me\\_\\\\%")]
     # Content: only the literal % / _ / \ match — the wildcard reading would also take d2.
@@ -463,7 +526,7 @@ async def test_unreachable_folder_returns_zero_and_issues_no_documents_query(pat
     out = await run(client, folder={"folder_id": F1})
     assert set(out) == RESULT_KEYS
     assert out["documents"] == [] and out["total"] == 0 and out["older_matches"] == 0
-    assert [q for q in client.queries if q.table == "documents"] == []
+    assert [q for q in client.queries if q.table in ("documents", VIEW)] == []
 
 
 # ─────────────────────────────── added by ───────────────────────────────
@@ -590,7 +653,7 @@ async def test_metadata_filter_reaches_every_leg_through_the_shipped_compiler(pa
     out = await run(client, filter_expr={"op": "and", "conditions": [
         {"field": "document_type", "op": "eq", "value": "Contract"}]})
     legs = client.first_page_legs()
-    assert len(legs) == 2
+    assert len(legs) == 1  # 284-04: ONE read of the view
     for q in legs:
         assert ("eq", "document_type_norm", "contract") in q.calls
     assert sorted(ids(out)) == ["c", "gc"]
@@ -605,7 +668,7 @@ async def test_metadata_whitelist_violation_is_a_422(patched):
         await run(client, filter_expr={"op": "and", "conditions": [
             {"field": "_confidence", "op": "eq", "value": "x"}]})
     assert ei.value.status == 422
-    assert [q for q in client.queries if q.table == "documents"] == []
+    assert [q for q in client.queries if q.table in ("documents", VIEW)] == []
 
 
 # ─────────────────────────────── version state ───────────────────────────────
@@ -634,7 +697,7 @@ async def test_version_latest_is_the_default_on_both_legs(patched):
     client = FakePostgrest({"documents": _lineage_rows()})
     out = await run(client)
     legs = client.first_page_legs()
-    assert len(legs) == 2
+    assert len(legs) == 1  # 284-04: ONE read of the view
     for q in legs:
         assert ("eq", "is_latest", True) in q.calls
     assert sorted(ids(out)) == ["a2", "b3", "c3", "x2"]
@@ -659,8 +722,12 @@ async def test_version_has_earlier_is_by_lineage(patched):
     patched["global"] = [G1]
     client = FakePostgrest({"documents": _lineage_rows()})
     out = await run(client, version="has_earlier")
-    for q in client.first_page_legs():
+    legs = client.first_page_legs()
+    assert len(legs) == 1
+    for q in legs:
         assert ("eq", "is_latest", True) in q.calls
+        # 284-04: the lineage fact is the view's column, filtered in SQL (no lineage read).
+        assert ("eq", "has_earlier", True) in q.calls
     assert sorted(ids(out)) == ["a2", "c3", "x2"]
     for d in out["documents"]:
         assert d["has_earlier"] is True
@@ -670,18 +737,24 @@ async def test_version_has_earlier_is_by_lineage(patched):
 
 
 @pytest.mark.asyncio
-async def test_legs_are_two_queries_and_a_row_in_both_appears_once(patched):
+async def test_one_view_read_and_a_row_visible_twice_appears_once(patched):
+    # 284-04 (R-11, D-14): the union moved into migration 207's view; the property the old case
+    # guarded — a document visible by both rules appears once — is asserted against the single read.
     patched["global"] = [G1]
     rows = [doc("both", folder_id=G1), doc("own"), doc("glob", user_id=OTHER, folder_id=G1),
             doc("hidden", user_id=OTHER)]
     client = FakePostgrest({"documents": rows})
     out = await run(client)
     legs = client.first_page_legs()
-    assert len(legs) == 2
-    own, glob = legs
-    assert own.filters()[0] == ("eq", "user_id", CALLER)
-    assert glob.filters()[0] == ("in_", "folder_id", [G1])
-    assert not any(c[0] == "or_" for q in legs for c in q.calls)
+    assert len(legs) == 1
+    (read,) = legs
+    assert read.table == VIEW
+    # No visibility predicate is interpolated or restated by the caller any more: no user_id leg,
+    # no folder_id leg, no or_ string — the view's SQL is the union.
+    assert ("eq", "user_id", CALLER) not in read.calls
+    assert not any(c[0] == "in_" and c[1] == "folder_id" for c in read.calls)
+    assert not any(c[0] == "or_" for c in read.calls)
+    assert [q for q in client.queries if q.table == "documents"] == []
     assert sorted(ids(out)) == ["both", "glob", "own"]
     assert out["total"] == 3
 
@@ -747,25 +820,28 @@ async def test_page_slices_after_the_sort_and_total_is_the_candidate_count(patch
 
 
 @pytest.mark.asyncio
-async def test_candidates_are_range_paged_until_the_count(patched):
+async def test_one_ranged_read_reports_the_exact_count_above_max_rows(patched):
+    # 284-04 (D-14 / R-12): was "candidates are range-paged until the count" — the 1,000-row walk
+    # is gone. ONE ranged read of the page answers, and its exact count is the total even when
+    # the matches exceed PostgREST's max_rows.
     rows = [doc(f"id-{i:04d}") for i in range(2500)]
     client = FakePostgrest({"documents": rows}, max_rows=1000)
     out = await run(client, limit=10)
     assert out["total"] == 2500
     ranges = [c for q in client.candidate_legs() for c in q.calls if c[0] == "range"]
-    assert ranges[0] == ("range", 0, 999)
-    assert len(ranges) == 3
+    assert ranges == [("range", 0, 9)]
+    assert len(ids(out)) == 10
 
 
 @pytest.mark.asyncio
 async def test_a_short_read_fails_loud(patched):
     from app.services.document_search_service import SearchTruncatedError
 
+    # The server says 1,500 match but hands back an EMPTY first page: the answer would be short,
+    # so the search refuses rather than showing it as if it were complete.
     def override(q):
-        if q.table == "documents" and q.count_mode == "exact":
-            return FakeResult([doc(f"id-{i}") for i in range(1000)], 1500)
-        if q.table == "documents" and q._range is not None:
-            return FakeResult([], None)
+        if q.table == VIEW and q.count_mode == "exact" and q._range is not None:
+            return FakeResult([], 1500)
         return None
 
     client = FakePostgrest({"documents": []}, override=override)
@@ -780,7 +856,7 @@ async def test_a_non_int_count_is_not_read_as_truncation(patched):
     from unittest.mock import MagicMock
 
     def override(q):
-        if q.table == "documents" and q.count_mode == "exact":
+        if q.table == VIEW and q.count_mode == "exact":
             return FakeResult([doc("only")], MagicMock())
         return None
 
@@ -793,7 +869,9 @@ async def test_a_non_int_count_is_not_read_as_truncation(patched):
 
 
 @pytest.mark.asyncio
-async def test_page_rows_are_hydrated_with_full_rows_and_facts(patched):
+async def test_page_rows_carry_the_view_facts_and_the_full_metadata(patched):
+    # 284-04: was "hydrated with full rows" — the page rows come straight from the ONE view read
+    # (no `select *` re-read, no full_markdown); the facts are the view's columns.
     rows = [
         doc("v1", filename="A.pdf", version_number=1, is_latest=False),
         doc("v2", filename="A.pdf", version_number=2, is_latest=True, source_connection_id=CONN,
@@ -811,8 +889,8 @@ async def test_page_rows_are_hydrated_with_full_rows_and_facts(patched):
     assert by_id["solo"]["version_count"] == 1
     assert by_id["solo"]["has_earlier"] is False
     assert by_id["solo"]["source_connection_name"] is None
-    hydrate = [q for q in client.queries if q.table == "documents" and q.cols == "*"]
-    assert len(hydrate) == 1
+    assert [q for q in client.queries if q.cols == "*"] == []
+    assert len(client.page_reads()) == 1
 
 
 @pytest.mark.asyncio

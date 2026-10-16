@@ -28,6 +28,8 @@ import asyncpg
 import pytest
 import pytest_asyncio
 
+from tests.integration._284_route_users import RouteUsers, as_user
+
 
 _POSTGRES_TEST_DSN = os.environ.get(
     "POSTGRES_DSN",
@@ -129,27 +131,20 @@ async def pg_pool():
 
 @pytest_asyncio.fixture
 async def test_user(pg_pool):
-    """Throwaway auth.users row; FK-safe teardown (docs + views + audit + user)."""
-    user_id = uuid4()
+    """A REAL signed-in user (GoTrue); FK-safe teardown (docs + views + fields + audit + user + org).
+
+    284-04 (D-10 / R-02): the resolve routes read ``library_documents`` through the CALLER's JWT,
+    and a service-role caller reads 0 rows from it (fail-closed), so the routes are driven with
+    ``as_user(test_user)``. ``second_user`` only OWNS rows, so it stays a plain seeded user.
+    """
+    users = RouteUsers(pg_pool)
     try:
-        await pg_pool.execute(
-            "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
-            user_id, f"phase-114-adhoc-{user_id}@test.local",
-        )
+        user_id = await users.create("114-adhoc")
     except Exception as e:
+        await users.drop_all()
         pytest.skip(f"test_user fixture setup failed: {type(e).__name__}: {e}")
     yield user_id
-    for sql in (
-        ("DELETE FROM public.documents WHERE user_id = $1", user_id),
-        ("DELETE FROM public.document_views WHERE user_id = $1", user_id),
-        ("DELETE FROM public.metadata_field_definitions WHERE user_id = $1", user_id),
-        ("DELETE FROM audit_log WHERE user_id = $1", user_id),
-        ("DELETE FROM auth.users WHERE id = $1", user_id),
-    ):
-        try:
-            await pg_pool.execute(*sql)
-        except Exception:
-            pass
+    await users.drop_all()
 
 
 @pytest_asyncio.fixture
@@ -222,7 +217,7 @@ async def test_adhoc_count_correct(pg_pool, test_user):
 
     out = await resolve_adhoc(
         body=AdHocResolve(filter_expr=_filter("language", "eq", value="en"), count_only=True),
-        current_user={"id": str(test_user)}, supabase=sb,
+        current_user={"id": str(test_user)}, supabase=as_user(test_user),
     )
     assert "documents" not in out, "count_only must NOT materialize full rows"
     assert out["total"] == 3, "ad-hoc count equals the caller's matching doc count"
@@ -244,14 +239,14 @@ async def test_adhoc_full_matches_saved_view(pg_pool, test_user):
 
     flt = _filter("title", "eq", value="quarterly brief")
     adhoc = await resolve_adhoc(
-        body=AdHocResolve(filter_expr=flt), current_user={"id": str(test_user)}, supabase=sb,
+        body=AdHocResolve(filter_expr=flt), current_user={"id": str(test_user)}, supabase=as_user(test_user),
     )
     # A saved view of the SAME filter must produce the identical set.
     view = await create_view(
         body=ViewCreate(name="ByTitle", filter_expr=flt),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    saved = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    saved = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
 
     adhoc_ids = {d["id"] for d in adhoc["documents"]}
     saved_ids = {d["id"] for d in saved["documents"]}
@@ -288,11 +283,11 @@ async def test_adhoc_writes_zero_audit_and_zero_views(pg_pool, test_user):
     for _ in range(3):
         await resolve_adhoc(
             body=AdHocResolve(filter_expr=_filter("language", "eq", value="en"), count_only=True),
-            current_user={"id": str(test_user)}, supabase=sb,
+            current_user={"id": str(test_user)}, supabase=as_user(test_user),
         )
     await resolve_adhoc(
         body=AdHocResolve(filter_expr=_filter("language", "eq", value="en")),
-        current_user={"id": str(test_user)}, supabase=sb,
+        current_user={"id": str(test_user)}, supabase=as_user(test_user),
     )
 
     audit_after = await pg_pool.fetchval(
@@ -322,7 +317,7 @@ async def test_adhoc_leak_safe_from_caller(pg_pool, test_user, second_user):
 
     out_a = await resolve_adhoc(
         body=AdHocResolve(filter_expr=_filter("title", "eq", value="Shared Name")),
-        current_user={"id": str(test_user)}, supabase=sb,
+        current_user={"id": str(test_user)}, supabase=as_user(test_user),
     )
     ids_a = {d["id"] for d in out_a["documents"]}
     assert str(doc_a) in ids_a, "A sees A's own doc"
@@ -350,13 +345,13 @@ async def test_adhoc_rejects_range_on_custom_number_live(pg_pool, test_user):
     with pytest.raises(HTTPException) as exc:
         await resolve_adhoc(
             body=AdHocResolve(filter_expr=_filter("amount", "gte", value=100)),
-            current_user={"id": str(test_user)}, supabase=sb,
+            current_user={"id": str(test_user)}, supabase=as_user(test_user),
         )
     assert exc.value.status_code == 422, "range op on a custom number field is a 422 (WR-01)"
 
     # Equality on the same custom number field is still allowed (only ORDER is wrong).
     ok = await resolve_adhoc(
         body=AdHocResolve(filter_expr=_filter("amount", "eq", value=100), count_only=True),
-        current_user={"id": str(test_user)}, supabase=sb,
+        current_user={"id": str(test_user)}, supabase=as_user(test_user),
     )
     assert "total" in ok, "eq on a custom number field still resolves (WR-01 allows equality)"

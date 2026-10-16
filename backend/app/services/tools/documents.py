@@ -516,9 +516,14 @@ async def _handle_query_documents_by_view(args: dict, ctx: ToolContext) -> ToolR
             caller=caller, flt=flt, folder_scope=folder_scope,
             count_only=True, supabase=ctx.supabase, retrievable_only=True,
         ))["total"]
+        # Phase 284 (R-02): this handler runs on the SERVICE ROLE, and migration 207's
+        # library_documents view is keyed on auth.uid() — it reads ZERO rows here (fail-closed).
+        # So the agent keeps the two caller-scoped legs, and the resolver reads only each leg's
+        # newest `limit` rows instead of every match and returns at most `limit` of them.
         full = await resolve_filter(
             caller=caller, flt=flt, folder_scope=folder_scope,
             count_only=False, supabase=ctx.supabase, retrievable_only=True,
+            via_view=False, limit=limit,
         )
     except ResolveError as e:  # the extracted core raises this, NOT HTTPException
         return ToolResult(result=json.dumps({
@@ -527,7 +532,7 @@ async def _handle_query_documents_by_view(args: dict, ctx: ToolContext) -> ToolR
             "hint": "call with no arguments to see filterable fields",
         }))
 
-    rows = (full.get("documents") or [])[:limit]
+    rows = full.get("documents") or []
     compact = [{
         "document_id": d["id"],
         "filename": d["filename"],

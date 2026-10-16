@@ -40,6 +40,8 @@ import asyncpg
 import pytest
 import pytest_asyncio
 
+from tests.integration._284_route_users import RouteUsers, as_user
+
 
 _POSTGRES_TEST_DSN = os.environ.get(
     "POSTGRES_DSN",
@@ -141,26 +143,20 @@ async def pg_pool():
 
 @pytest_asyncio.fixture
 async def test_user(pg_pool):
-    """Seed a throwaway auth.users row; FK-safe teardown (docs + views + audit + user)."""
-    user_id = uuid4()
+    """A REAL signed-in user (GoTrue); FK-safe teardown (docs + views + audit + user + org).
+
+    284-04 (D-10 / R-02): the resolve route reads ``library_documents`` through the CALLER's JWT,
+    and a service-role caller reads 0 rows from it (fail-closed), so the route is driven with
+    ``as_user(test_user)``. Writes (``create_view``) still go through the service-role ``sb``.
+    """
+    users = RouteUsers(pg_pool)
     try:
-        await pg_pool.execute(
-            "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
-            user_id, f"phase-113-resolve-{user_id}@test.local",
-        )
+        user_id = await users.create("113-resolve")
     except Exception as e:
+        await users.drop_all()
         pytest.skip(f"test_user fixture setup failed: {type(e).__name__}: {e}")
     yield user_id
-    for sql in (
-        ("DELETE FROM public.documents WHERE user_id = $1", user_id),
-        ("DELETE FROM public.document_views WHERE user_id = $1", user_id),
-        ("DELETE FROM audit_log WHERE user_id = $1", user_id),
-        ("DELETE FROM auth.users WHERE id = $1", user_id),
-    ):
-        try:
-            await pg_pool.execute(*sql)
-        except Exception:
-            pass
+    await users.drop_all()
 
 
 async def _seed_doc(pool, user_id, *, metadata, created_at, is_latest=True, version=1):
@@ -213,7 +209,7 @@ async def test_order_and_count(pg_pool, test_user):
         current_user={"id": str(test_user)},
         supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
 
     ids = [d["id"] for d in out["documents"]]
     assert set(ids) == {str(inv_old), str(inv_mid), str(inv_new)}, "only the 3 English docs match, the French doc excluded"
@@ -249,8 +245,8 @@ async def test_query_not_copy_one_doc_two_views(pg_pool, test_user):
         current_user={"id": str(test_user)}, supabase=sb,
     )
 
-    out_type = await resolve_view(view_id=str(v_type["id"]), current_user={"id": str(test_user)}, supabase=sb)
-    out_author = await resolve_view(view_id=str(v_author["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out_type = await resolve_view(view_id=str(v_type["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
+    out_author = await resolve_view(view_id=str(v_author["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
 
     type_ids = [d["id"] for d in out_type["documents"]]
     author_ids = [d["id"] for d in out_author["documents"]]
@@ -280,7 +276,7 @@ async def test_empty_filter_resolves_all_in_scope(pg_pool, test_user):
         body=ViewCreate(name="All", filter_expr=_empty_filter()),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
     ids = {d["id"] for d in out["documents"]}
     assert {str(d1), str(d2), str(d3)} <= ids, "empty filter must resolve to all in-scope docs"
     assert out["total"] == len(out["documents"])
@@ -313,7 +309,7 @@ async def test_only_latest_versions_resolve(pg_pool, test_user):
         body=ViewCreate(name="German", filter_expr=_filter_eq("language", "de")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
     ids = {d["id"] for d in out["documents"]}
     assert str(new_ver) in ids, "the latest version must resolve"
     assert str(old_ver) not in ids, "a superseded (is_latest=False) version must NOT resolve"
@@ -347,7 +343,7 @@ async def test_injection_value_neutralized_live(pg_pool, test_user):
         body=ViewCreate(name="evil", filter_expr=_filter_eq("language", payload)),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
 
     # The payload is a bound literal — it matches NOTHING (no doc has that exact
     # language) and is NEVER executed as SQL/template.

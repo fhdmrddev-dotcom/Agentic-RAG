@@ -16,6 +16,14 @@ folder scope (D-113-5) — exactly "a filter the backend silently ignores".
 FastAPI-free on purpose (the resolver precedent): it raises a plain ``ResolveError``; the
 route re-wraps it. Phase 272's agent tool can call it in-process.
 
+Phase 284 (FIX-11; D-14, R-12) — **Find pages in the database.** Migration 207's
+``public.library_documents`` (a ``security_invoker`` view) is the ONE SQL home of the Library's
+visible set and of the two lineage facts (``version_count``, ``has_earlier``). A search is now ONE
+builder over it — the shipped appliers below (unchanged), then ``.order(col, nullsfirst=False)
+.order("id").range(offset, offset + limit - 1)`` with ``count="exact"``. Nothing is read beyond
+the page: no candidate walk, no Python sort, no Python slice, no lineage read. At 50,000
+documents page 1 took 16.9 s before this (284-MEASUREMENTS.md).
+
 Safety invariants:
   - **Caller-scoped legs, kept as TWO queries.** Own leg ``user_id = caller``; global leg
     ``folder_id IN get_globally_visible_folder_ids(caller)`` — the same pair
@@ -23,15 +31,22 @@ Safety invariants:
     (RESEARCH A6). Every allow-list (folder subtree, relationship ids) is applied INSIDE
     both legs, so it can only NARROW visibility, never widen it. The route passes the
     user-JWT client, so RLS is the wall underneath both legs.
+    ⚠ **SUPERSEDED 2026-10-16 (Phase 284, D-14 / R-11)** — kept, not deleted, because the
+    property it protected still holds and is now STRONGER. The union is SQL inside the
+    ``security_invoker`` view (own ∪ org-shared folders the caller does not own, RLS beneath
+    it); this module interpolates NO visibility predicate anywhere — not an ``or_`` string, not
+    a folder-id list. Every allow-list still only narrows (it is ANDed onto the one read). The
+    service role reads ZERO rows from the view (``auth.uid()`` is NULL), so this core is
+    fail-closed for any caller that is not a user JWT.
   - **An unreachable folder returns ZERO rows** — the opposite of D-113-5. A folder the
     caller cannot see narrows to nothing; it never silently becomes "no narrowing".
   - **No embedding call, no retrieval import, no RPC call** (D-03). Pinned by
     ``tests/unit/test_271_no_embedding.py`` (a raising patch + a source fence over this
     file, which is why the forbidden names are not even spelled out here).
-  - **Exact total or fail loud.** Candidates are read with ``count="exact"`` and walked
-    with ``.range()`` until the reported count; a short read raises
-    ``SearchTruncatedError`` (503) — never a silently truncated answer (PostgREST
-    ``max-rows``, RESEARCH Pitfall 2).
+  - **Exact total or fail loud.** The page is read with ``count="exact"``; the total is the
+    server's count, never ``len(rows)``. A page that comes back SHORT of what that count
+    promises raises ``SearchTruncatedError`` (503), and so does a relationship allow-list above
+    ``REL_EDGE_CAP`` edges — never a silently truncated answer (PostgREST ``max-rows``).
   - **Server order is THE order** (D-03). Nulls last in both directions, ties on ``id``;
     the client never re-sorts.
   - **Values are bound, never interpolated** (SC#4): every value rides a builder param;
@@ -45,7 +60,7 @@ Safety invariants:
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from supabase import Client
 
@@ -57,6 +72,7 @@ from app.services.document_relationship_service import (
 )
 from app.services.document_vocabulary import TIMESTAMP_DATE_COLUMNS as _DATE_COLUMN
 from app.services.document_view_resolver import (
+    LIBRARY_ROW_COLUMNS,
     ResolveError,
     _relative_window,
     apply_fragments,
@@ -64,20 +80,21 @@ from app.services.document_view_resolver import (
 )
 from app.services.harness.scope import resolve_project_subtree
 from app.utils.db import aexec
-from app.utils.folder_utils import fetch_visible_folders, get_globally_visible_folder_ids
+from app.utils.folder_utils import fetch_visible_folders
 
 log = logging.getLogger(__name__)
 
-# The lightweight candidate projection: everything the filters, the sort and the lineage
-# step need, and nothing else. Page rows are re-read with ``select("*")`` afterwards.
-CANDIDATE_COLUMNS = (
-    "id,user_id,filename,folder_id,version_number,is_latest,created_at,"
-    "source_created_at,source_modified_at,date_typed,source_connection_id"
-)
-_LINEAGE_COLUMNS = "id,user_id,filename,version_number,folder_id"
-_PAGE = 1000
-# Lineage reads filter ``filename IN (...)``; keep each request's URL bounded.
-_LINEAGE_BATCH = 100
+#: The page row (read from migration 207's ``public.library_documents`` — the Library visible set,
+#: D-04, security_invoker, SELECT-only): every column of the view except the sort key ``filename_key`` (ordered by,
+#: never returned). ``full_markdown`` is not in the view at all (up to ~267 KB per row; Find
+#: used to send it to the browser). Pinned to the migration's own column list by
+#: ``tests/unit/test_284_find_sql.py``, so a column added to the view must be added here too.
+FIND_SELECT = LIBRARY_ROW_COLUMNS + ",version_count,has_earlier"
+
+#: D-14 / T-284-25 — a relationship allow-list is bounded by ONE document's edges, not by the
+#: library. Above this many edges the search refuses (503) instead of PostgREST cutting the edge
+#: read at max_rows (1,000) and answering short without saying so.
+REL_EDGE_CAP = 500
 
 
 def _pg_in_list(values: list[str]) -> str:
@@ -87,7 +104,8 @@ def _pg_in_list(values: list[str]) -> str:
     and escapes nothing inside the quotes. Measured against PostgREST 14.10, a filename like
     ``Q3 "final", draft.pdf`` is then read as two wrong names — a 200, not an error — so the
     lineage and relationship reads silently miss that document. File names come from users
-    and cloud drives, so they get this path; ids and UUIDs keep ``.in_()``.
+    and cloud drives, so they get this path; ids and UUIDs keep ``.in_()``. (Since 284 the
+    lineage facts are the view's columns; the relationship follow-to-latest read still uses this.)
     """
     return "(" + ",".join(
         '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"' for v in values
@@ -97,18 +115,23 @@ def _pg_in_list(values: list[str]) -> str:
 # shipped compiler's ``date`` field on ``date_typed`` (a ``date``), via ``filter_expr``.
 # ``_DATE_COLUMN`` is imported from its ONE home, ``document_vocabulary`` (DEBT-09, Phase 278).
 
-# Sort key → (column, descending). P-01: the default is ``added_desc``.
+# Sort key → (column, descending). P-01: the default is ``added_desc``. 284: the order runs in
+# SQL; ``name_asc`` orders by the view's ``filename_key`` (``lower(filename) COLLATE "C"`` —
+# codepoint order, the Python ``casefold`` sort it replaces, RESEARCH A7).
 _SORT = {
     "added_desc": ("created_at", True),
     "added_asc": ("created_at", False),
     "document_date_desc": ("date_typed", True),
     "source_modified_desc": ("source_modified_at", True),
     "source_created_desc": ("source_created_at", True),
-    "name_asc": ("filename", False),
+    "name_asc": ("filename_key", False),
 }
 # 278-REVIEW WR-02: derived from the home, never re-typed — a date word added to
 # ``document_vocabulary.TIMESTAMP_DATE_COLUMNS`` must sort as a datetime here too, not as a string.
 # Same type (``set``) and same members as the hand-typed literal it replaces.
+# 284: the sort is SQL now, so timestamptz columns sort as timestamps natively and nothing in this
+# module reads this set any more. It stays because ``test_278_vocabulary_one_home`` pins its
+# derivation from the vocabulary home (DEBT-09); deleting it is that fence's decision, not this one's.
 _TIMESTAMP_COLUMNS = set(_DATE_COLUMN.values())
 
 _NOT_IN_A_FOLDER = object()  # sentinel: folder condition = "Not in a folder"
@@ -120,7 +143,8 @@ TRUNCATED_DETAIL = "Couldn't read every matching document. Narrow the search and
 
 
 class SearchTruncatedError(ResolveError):
-    """A candidate read came back SHORT of the count the server reported (Pitfall 2).
+    """A read came back SHORT of the count the server reported (Pitfall 2), or a relationship
+    allow-list exceeded ``REL_EDGE_CAP`` edges.
 
     Status 503: the answer would be incomplete, so the search refuses rather than showing
     a short list as if it were the whole result.
@@ -212,8 +236,8 @@ def _apply_dates(q, req: DocumentSearchRequest):
 
 
 def _apply_version(q, version: str):
-    # latest / has_earlier → latest rows (has_earlier narrows further by lineage, below);
-    # older → the non-latest rows (D-06). No state ever mixes the two.
+    # latest / has_earlier → latest rows (has_earlier narrows further by lineage, in
+    # ``_find_query``); older → the non-latest rows (D-06). No state ever mixes the two.
     return q.eq("is_latest", version != "older")
 
 
@@ -230,31 +254,6 @@ def _apply_ids(q, id_allow):
 
 
 # ─────────────────────────────── reads ───────────────────────────────
-
-
-async def _fetch_all(build) -> list[dict]:
-    """Read EVERY row a filter matches: ``count="exact"`` + a ``.range()`` walk.
-
-    ``build(count)`` returns a FRESH builder (select first, then every filter) for each
-    page — the folder_utils ``fetch_all_folders(strict=True)`` precedent. Ordered by ``id``
-    so pages cannot overlap or skip. The ``isinstance(total, int)`` guard is load-bearing:
-    a missing / non-int count (a test double's MagicMock) is never evidence of truncation.
-    """
-    first = await aexec(build(True).order("id").range(0, _PAGE - 1))
-    rows = list(first.data or [])
-    total = getattr(first, "count", None)
-    if not isinstance(total, int):
-        return rows
-    while len(rows) < total:
-        page = await aexec(build(False).order("id").range(len(rows), len(rows) + _PAGE - 1))
-        batch = page.data or []
-        if not batch:
-            break
-        rows.extend(batch)
-    if len(rows) < total:
-        log.warning("document search read TRUNCATED: %s of %s rows", len(rows), total)
-        raise SearchTruncatedError()
-    return rows
 
 
 async def _resolve_folder(req: DocumentSearchRequest, caller: str, supabase: Client):
@@ -280,57 +279,6 @@ async def _resolve_folder(req: DocumentSearchRequest, caller: str, supabase: Cli
     return [fid for fid in raw if str(fid) in visible]
 
 
-async def _lineage_rows(rows: list[dict], supabase: Client) -> list[dict]:
-    """ONE batched lineage read over the rows' ``(user_id, filename)`` pairs.
-
-    The lineage key is ``(user_id, filename)`` — the handle ``list_document_versions`` and
-    ``_subject_version_ids`` use (RESEARCH §Definitions / A7). The read is a superset
-    (owners × names); exact pairs are matched in Python. Batched by filename so a very large
-    candidate set never builds an unbounded URL.
-    """
-    owners = sorted({r["user_id"] for r in rows if r.get("user_id")})
-    names = sorted({r["filename"] for r in rows if r.get("filename")})
-    if not owners or not names:
-        return []
-    out: list[dict] = []
-    for i in range(0, len(names), _LINEAGE_BATCH):
-        chunk = names[i:i + _LINEAGE_BATCH]
-
-        def build(count: bool, chunk=chunk):
-            return (
-                supabase.table("documents")
-                .select(_LINEAGE_COLUMNS, count="exact" if count else None)
-                .in_("user_id", owners)
-                .filter("filename", "in", _pg_in_list(chunk))
-            )
-
-        out.extend(await _fetch_all(build))
-    return out
-
-
-def _lineage_facts(rows: list[dict], lineage: list[dict], caller: str, global_ids: list[str]):
-    """Per row: ``(version_count, has_earlier)`` over the VISIBLE rows of its lineage.
-
-    Visible = passes a leg: own (``user_id == caller``) or in a globally-visible folder.
-    ``has_earlier`` (P-05) = a visible lineage row with a LOWER ``version_number`` exists.
-    (The shipped chevron's ``version_number > 1`` diverges after a delete; recorded, not
-    changed here.)
-    """
-    gset = {str(g) for g in global_ids}
-    by_key: dict[tuple, list[int]] = {}
-    for r in lineage:
-        if str(r.get("user_id")) != caller and str(r.get("folder_id")) not in gset:
-            continue
-        key = (r.get("user_id"), r.get("filename"))
-        by_key.setdefault(key, []).append(r.get("version_number") or 0)
-    facts: dict[str, tuple[int, bool]] = {}
-    for r in rows:
-        versions = by_key.get((r.get("user_id"), r.get("filename")), [])
-        mine = r.get("version_number") or 0
-        facts[r["id"]] = (max(len(versions), 1), any(v < mine for v in versions))
-    return facts
-
-
 async def _relationship_allow_list(
     caller: str, rel: FindRelationship, supabase: Client
 ) -> tuple[set[str], set[str]] | None:
@@ -353,6 +301,11 @@ async def _relationship_allow_list(
     also ``user_id = caller`` (RLS on ``document_relationships`` is owner-only anyway).
     An unreadable P returns ``None`` → the caller answers with the zero-result shape, so
     the picker can never become an existence oracle.
+
+    Bounded by ONE document's edges, never by the library (D-14): the edge read asks for at
+    most ``REL_EDGE_CAP + 1`` rows and a hub above the cap raises ``SearchTruncatedError``
+    rather than being cut silently at PostgREST's max_rows. Every later read is an ``in.()``
+    over at most that many endpoints.
     """
     p_row = await _resolve_readable_latest(str(rel.document_id), caller, supabase=supabase)
     if p_row is None:
@@ -370,8 +323,13 @@ async def _relationship_allow_list(
         .eq("rel_type", rel_type)
         .eq("user_id", caller)
         .in_(match_col, versions)
+        .limit(REL_EDGE_CAP + 1)
     )
-    endpoints = sorted({str(e[result_col]) for e in (edges.data or []) if e.get(result_col)})
+    edge_rows = edges.data or []
+    if len(edge_rows) > REL_EDGE_CAP:
+        log.warning("document search relationship allow-list above %s edges; refused", REL_EDGE_CAP)
+        raise SearchTruncatedError()
+    endpoints = sorted({str(e[result_col]) for e in edge_rows if e.get(result_col)})
     if not endpoints:
         return set(), set()
 
@@ -402,35 +360,11 @@ async def _relationship_allow_list(
     return latest_ids, older_ids
 
 
-def _sort_rows(rows: list[dict], sort: str) -> list[dict]:
-    """Server order (D-03): nulls LAST in both directions, ties on ``id`` ascending."""
-    col, desc = _SORT[sort]
-    present = sorted((r for r in rows if r.get(col) is not None), key=lambda r: r["id"])
-    missing = sorted((r for r in rows if r.get(col) is None), key=lambda r: r["id"])
-
-    values: dict[str, object] = {}
-    for r in present:
-        v = r[col]
-        values[r["id"]] = v.casefold() if col == "filename" else v
-    if col in _TIMESTAMP_COLUMNS:
-        try:
-            parsed = {
-                r["id"]: datetime.fromisoformat(str(r[col]).replace("Z", "+00:00")) for r in present
-            }
-            # Mixed naive/aware values cannot be compared; keep the strings then.
-            if len({p.tzinfo is None for p in parsed.values()}) <= 1:
-                values = parsed
-        except ValueError:
-            pass  # keep the ISO strings (Postgres' UTC text form sorts correctly as text)
-    # Stable sort: equal values keep their id-ascending order, in BOTH directions.
-    present.sort(key=lambda r: values[r["id"]], reverse=desc)
-    return present + missing
-
-
 # ─────────────────────────────── the core ───────────────────────────────
 
 
-async def _candidates(
+def _find_query(
+    q,
     *,
     caller: str,
     req: DocumentSearchRequest,
@@ -438,10 +372,13 @@ async def _candidates(
     fragments: list,
     folder_ids,
     id_allow,
-    global_ids: list[str],
-    supabase: Client,
-) -> list[dict]:
-    """Every visible row matching every condition (lightweight columns), deduped by id."""
+):
+    """Every condition, ANDed onto ONE read of the view. Only narrows — never widens.
+
+    ``structure`` is the shipped composition, unchanged. The version state adds one column
+    filter on top: ``older`` is the caller's OWN rows only (P-03 — a colleague's superseded
+    versions never show), ``has_earlier`` is the view's lineage fact.
+    """
 
     def structure(q):
         q = apply_fragments(q, fragments)  # the SHARED walk (no fork, D-115-6)
@@ -454,43 +391,21 @@ async def _candidates(
         q = _apply_ids(q, id_allow)
         return q
 
-    def own(count: bool):
-        base = supabase.table("documents").select(CANDIDATE_COLUMNS, count="exact" if count else None)
-        return structure(base.eq("user_id", caller))
-
-    rows = await _fetch_all(own)
-
-    # P-03: Older versions are the caller's OWN rows only — no global-folder leg.
-    if version != "older" and global_ids:
-
-        def glob(count: bool):
-            base = supabase.table("documents").select(CANDIDATE_COLUMNS, count="exact" if count else None)
-            return structure(base.in_("folder_id", global_ids))
-
-        rows += await _fetch_all(glob)
-
-    seen: set[str] = set()
-    merged: list[dict] = []
-    for r in rows:
-        if r["id"] not in seen:
-            seen.add(r["id"])
-            merged.append(r)
-    return merged
+    q = structure(q)
+    if version == "older":
+        q = q.eq("user_id", caller)
+    elif version == "has_earlier":
+        q = q.eq("has_earlier", True)
+    return q
 
 
-async def _hydrate(page: list[dict], facts: dict, supabase: Client) -> list[dict]:
-    """Re-read the PAGE rows in full (``select *``) and attach the per-row facts."""
-    if not page:
-        return []
-    page_ids = [r["id"] for r in page]
-    full = (await aexec(supabase.table("documents").select("*").in_("id", page_ids))).data or []
-    by_id = {r["id"]: r for r in full}
-    out = [by_id[i] for i in page_ids if i in by_id]  # the sorted order, preserved
+async def _attach_connection_names(rows: list[dict], supabase: Client) -> None:
+    """The connection NAME for connector-placed rows (Phase 270 P-02) — ONE read, page-bounded.
 
-    # Mirror of api/documents.py:799-814 (Phase 270 P-02) — the connection NAME for
-    # connector-placed rows, ONE batched user-JWT read. Decoration only: a failure leaves
-    # every name None, never a 500.
-    conn_ids = sorted({d["source_connection_id"] for d in out if d.get("source_connection_id")})
+    Mirror of ``api/documents.py``'s list decoration: the ids are at most the page's. Decoration
+    only — a failure leaves every name ``None``, never a 500.
+    """
+    conn_ids = sorted({d["source_connection_id"] for d in rows if d.get("source_connection_id")})
     conn_names: dict[str, str] = {}
     if conn_ids:
         try:
@@ -500,21 +415,21 @@ async def _hydrate(page: list[dict], facts: dict, supabase: Client) -> list[dict
             conn_names = {r["id"]: r.get("name") for r in (conn_res.data or [])}
         except Exception:
             log.debug("connection-name lookup failed; names stay None")
-    for d in out:
-        count, earlier = facts.get(d["id"], (1, False))
-        d["version_count"] = count
-        d["has_earlier"] = earlier
+    for d in rows:
         sid = d.get("source_connection_id")
         d["source_connection_name"] = conn_names.get(sid) if sid else None
-    return out
 
 
 async def search_documents(*, caller: str, req: DocumentSearchRequest, supabase: Client) -> dict:
     """Find documents by structured fields. Returns the plain-dict response (no model).
 
     ``{"documents": [row…], "total", "older_matches", "sort", "offset", "limit"}`` — each
-    row is the full ``documents`` row plus ``version_count``, ``has_earlier`` and
-    ``source_connection_name``. Performs no write and no audit entry (safe per keystroke).
+    row is a ``library_documents`` row (``FIND_SELECT``: the document's columns without
+    ``full_markdown``, plus ``version_count`` and ``has_earlier``) and ``source_connection_name``.
+    Performs no write and no audit entry (safe per keystroke).
+
+    ⛔ Pass the route's USER-JWT client. The view is keyed on ``auth.uid()``, so the service role
+    reads zero rows — fail-closed, never "everything".
     """
     caller = str(caller)
 
@@ -532,7 +447,7 @@ async def search_documents(*, caller: str, req: DocumentSearchRequest, supabase:
     older_matches = 0
     rel_older: set[str] = set()
 
-    # (c) relationship → an id allow-list, applied INSIDE both legs (it only narrows).
+    # (c) relationship → an id allow-list, ANDed onto the one read (it only narrows).
     if req.relationship is not None:
         allow = await _relationship_allow_list(caller, req.relationship, supabase)
         if allow is None:
@@ -540,42 +455,45 @@ async def search_documents(*, caller: str, req: DocumentSearchRequest, supabase:
         rel_latest, rel_older = allow
         id_allow = rel_older if req.version == "older" else rel_latest
 
-    global_ids = await get_globally_visible_folder_ids(supabase, caller)
-
-    def candidates_for(version: str, allow):
-        return _candidates(
+    def query(select: str, version: str, allow):
+        return _find_query(
+            supabase.table("library_documents").select(select, count="exact"),
             caller=caller, req=req, version=version, fragments=fragments,
-            folder_ids=folder_ids, id_allow=allow, global_ids=global_ids, supabase=supabase,
+            folder_ids=folder_ids, id_allow=allow,
         )
 
     # older_matches (P-02's hint): only for version=latest with a relationship set. It is
     # the SAME pipeline with version="older" — so pressing "Show them" (the same request
-    # with version=older) returns exactly this many rows. Counted, never hydrated.
+    # with version=older) returns exactly this many rows. Counted by a HEAD read, never rows.
     if req.version == "latest" and req.relationship is not None and rel_older:
-        older_matches = len(await candidates_for("older", rel_older))
+        head = await aexec(query("id", "older", rel_older).limit(1))
+        older_matches = head.count if isinstance(head.count, int) else len(head.data or [])
 
     if id_allow is not None and not id_allow:
         # An empty allow-list: never send `.in_("id", [])`; answer with the zero shape.
         return _zero_result(req, older_matches=older_matches)
 
-    # (d) candidates over both legs (own only for `older`).
-    candidates = await candidates_for(req.version, id_allow)
+    # (d) the page — ONE ranged read; order, total and slice are all the database's.
+    col, desc = _SORT[req.sort]
+    res = await aexec(
+        query(FIND_SELECT, req.version, id_allow)
+        .order(col, desc=desc, nullsfirst=False)
+        .order("id")
+        .range(req.offset, req.offset + req.limit - 1)
+    )
+    documents = list(res.data or [])
+    count = getattr(res, "count", None)
+    # The isinstance guard is load-bearing: a missing / non-int count (a test double's
+    # MagicMock) is never evidence of truncation, and never becomes the total.
+    total = count if isinstance(count, int) else len(documents)
+    if isinstance(count, int) and len(documents) < min(req.limit, max(count - req.offset, 0)):
+        log.warning(
+            "document search page SHORT: %s rows at offset %s of %s", len(documents), req.offset, count
+        )
+        raise SearchTruncatedError()
 
-    # (e) has_earlier — ONE batched lineage read over the candidates.
-    facts: dict = {}
-    if req.version == "has_earlier" and candidates:
-        facts = _lineage_facts(candidates, await _lineage_rows(candidates, supabase), caller, global_ids)
-        candidates = [r for r in candidates if facts[r["id"]][1]]
-
-    # (f) server sort, (g) exact total + page slice.
-    ordered = _sort_rows(candidates, req.sort)
-    total = len(ordered)
-    page = ordered[req.offset:req.offset + req.limit]
-
-    # (h) hydrate the page (lineage facts over the PAGE when not already computed).
-    if page and not facts:
-        facts = _lineage_facts(page, await _lineage_rows(page, supabase), caller, global_ids)
-    documents = await _hydrate(page, facts, supabase)
+    # (e) decoration over the page only.
+    await _attach_connection_names(documents, supabase)
 
     return {
         "documents": documents,

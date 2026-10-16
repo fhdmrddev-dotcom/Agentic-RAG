@@ -23,9 +23,10 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { Check, Folder as FolderIcon } from "lucide-react"
-import type { Document, Folder, ViewCondition } from "@/types"
+import type { Folder, ViewCondition } from "@/types"
 import { cn } from "@/lib/utils"
 import { LinkTargetCombobox } from "@/components/relationships/LinkTargetCombobox"
+import { useDocumentFind } from "@/hooks/useDocumentFind"
 import {
   RELATIONSHIP_FILTER_VERBS,
   type RelVerbKey,
@@ -231,15 +232,15 @@ export function VersionEditor({
 
 const NO_EXCLUDED: ReadonlySet<string> = new Set()
 
+/** How many candidates the Find relationship picker shows (271 UI-SPEC S6). */
+const RELATIONSHIP_VISIBLE = 8
+
 export function RelationshipEditor({
   initial,
-  documents,
   onApply,
   onCancel,
 }: {
   initial?: FindRelationshipCondition | null
-  /** The documents the person can see. Only LATEST versions are offered as the target. */
-  documents: readonly Document[]
   onApply: (relationship: FindRelationshipCondition) => void
   onCancel: () => void
 }) {
@@ -249,9 +250,25 @@ export function RelationshipEditor({
   )
   const name = useId()
   const inputId = useId()
-  // The target is a DOCUMENT, so only its latest version is offered (UI-SPEC S6): an older
-  // upload is reached through Version, never through a relationship.
-  const candidates = useMemo(() => documents.filter((d) => d.is_latest !== false), [documents])
+  // 284-04 (D-15 / R-05 / UI-SPEC S12): the candidates are ONE server search per debounced query —
+  // never the page's documents. The target is a DOCUMENT, so only its latest version is offered
+  // (UI-SPEC S6, now the server's `version: "latest"`): an older upload is reached through Version,
+  // never through a relationship. Archived documents stay offered (today's candidate set).
+  const [query, setQuery] = useState(initial?.documentName ?? "")
+  const typed = query.trim()
+  const find = useDocumentFind({
+    request: {
+      filter_expr: { op: "and", conditions: [] },
+      name: typed === "" ? null : typed,
+      version: "latest",
+      sort: "added_desc",
+      offset: 0,
+      limit: 20,
+      include_archived: true,
+    },
+    debounceMs: 250,
+  })
+  const shown = Math.min(find.rows.length, RELATIONSHIP_VISIBLE)
 
   return (
     <EditorShell
@@ -283,7 +300,7 @@ export function RelationshipEditor({
           …this document
         </label>
         <LinkTargetCombobox
-          candidates={candidates}
+          candidates={find.rows}
           excludeIds={NO_EXCLUDED}
           value={target?.id ?? null}
           onChoose={(d) => setTarget(d ? { id: d.id, filename: d.filename } : null)}
@@ -291,6 +308,12 @@ export function RelationshipEditor({
           maxVisible={8}
           inputId={inputId}
           initialQuery={initial?.documentName ?? ""}
+          onQueryChange={setQuery}
+          loading={find.loading}
+          error={find.error !== null}
+          hasMore={find.total !== null && find.total > shown}
+          onRetry={find.retry}
+          statusClassName="text-muted-foreground"
         />
       </div>
       <p className="text-xs text-muted-foreground">

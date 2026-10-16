@@ -7411,7 +7411,7 @@
           "document-views"
         ],
         "summary": "Resolve View",
-        "description": "Resolve a view to its complete listing of matching latest-version docs.",
+        "description": "Resolve a view to one page of its matching latest-version documents, with an exact total.",
         "operationId": "resolve_view_document_views__view_id__resolve_get",
         "security": [
           {
@@ -7436,6 +7436,39 @@
               "type": "boolean",
               "default": false,
               "title": "Count Only"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Archived"
             }
           }
         ],
@@ -13325,6 +13358,24 @@
               }
             ],
             "title": "Folder Scope"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Offset",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 200,
+            "minimum": 1,
+            "title": "Limit",
+            "default": 25
+          },
+          "include_archived": {
+            "type": "boolean",
+            "title": "Include Archived",
+            "default": true
           }
         },
         "type": "object",
@@ -13332,7 +13383,7 @@
           "filter_expr"
         ],
         "title": "AdHocResolve",
-        "description": "The live FilterBar / IngestionPage previews an UNSAVED filter WITHOUT persisting a transient ``document_views`` row (which fired a per-keystroke ``view.create`` audit row that was never cleaned up — an audit-log pollution / data-integrity defect). This carries the same ``filter_expr`` AST inline; the endpoint runs the identical compile + caller-scoped own+global two-leg resolve as ``resolve_view`` but performs NO DB write and NO audit. ``count_only`` returns just ``{total}``; otherwise ``{documents, total}``. ``folder_scope`` is optional (parity with a saved view's scope)."
+        "description": "The live FilterBar / IngestionPage previews an UNSAVED filter WITHOUT persisting a transient ``document_views`` row (which fired a per-keystroke ``view.create`` audit row that was never cleaned up — an audit-log pollution / data-integrity defect). This carries the same ``filter_expr`` AST inline; the endpoint runs the identical compile + caller-scoped own+global two-leg resolve as ``resolve_view`` but performs NO DB write and NO audit. ``count_only`` returns just ``{total}``; otherwise ``{documents, total}``. ``folder_scope`` is optional (parity with a saved view's scope).\n\n``include_archived`` (default ``True``, today's behaviour) hides archived documents when ``False``; it applies to ``count_only`` too, so a caller can count the hidden ones as ``count(include_archived=True) - count(include_archived=False)``."
       },
       "ApplicationAvailability": {
         "properties": {

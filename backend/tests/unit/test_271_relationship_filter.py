@@ -227,9 +227,10 @@ async def test_the_allow_list_is_applied_inside_both_legs(patched):
     client = _graph()
     client.tables["documents"].append(doc("dddddddd-0000-4000-8000-0000000000e1", user_id=OTHER, folder_id=G1))
     await run(client, relationship={"verb": "supersedes", "document_id": P2})
-    # The latest pipeline's two legs (the older_matches count runs its own own-leg query).
+    # The latest pipeline's read (the older_matches count runs its own own-only head read).
+    # 284-04 (D-14): ONE read of the view — the two legs are its SQL union now.
     legs = [q for q in client.first_page_legs() if ("eq", "is_latest", True) in q.calls]
-    assert len(legs) == 2
+    assert len(legs) == 1
     for q in legs:
         assert ("in_", "id", sorted([A, C2])) in q.calls
     (older_leg,) = [q for q in client.first_page_legs() if ("eq", "is_latest", False) in q.calls]

@@ -47,6 +47,33 @@ from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders, get_globally_visible_folder_ids
 
 
+#: Phase 284 (D-10): the row a ``via_view=True`` resolve returns — every column of migration 207's
+#: ``public.library_documents`` except its three derived ones (``filename_key``, ``version_count``,
+#: ``has_earlier``; a list does not need them, and the lineage pair costs a subquery per row an
+#: OFFSET skips). That is ``documents`` minus ``full_markdown`` (up to ~267 KB a row, which the old
+#: ``select("*")`` dragged through every resolve). Find's ``FIND_SELECT`` is this plus the lineage
+#: pair — one home for the column list.
+LIBRARY_ROW_COLUMNS = (
+    "id,user_id,filename,file_path,file_size,mime_type,status,error_message,chunk_count,"
+    "created_at,updated_at,content_hash,metadata,folder_id,version_number,is_latest,"
+    "ingestion_step,extractor,document_type_norm,date_typed,org_id,source_connection_id,"
+    "ingest_visibility,source_state,thread_key,page_count,source_created_at,source_modified_at,"
+    "source_author,archived_at,archived_policy_id,archived_policy_name,retrievable"
+)
+
+#: The page size a ``via_view=True`` listing uses when no ``limit`` is passed (the routes always
+#: pass one; their own default is the same 25).
+VIEW_PAGE_DEFAULT = 25
+
+
+def _exact_total(res, rows=None) -> int:
+    """The server's ``count="exact"`` when it is an int; otherwise the rows read (a test double)."""
+    count = getattr(res, "count", None)
+    if isinstance(count, int):
+        return count
+    return len(rows if rows is not None else (res.data or []))
+
+
 class ResolveError(Exception):
     """A plain validation/resolve failure with no FastAPI dependency.
 
@@ -294,10 +321,35 @@ async def resolve_filter(
     count_only: bool,
     supabase: Client,
     retrievable_only: bool = False,
+    via_view: bool = False,
+    offset: int = 0,
+    limit: int | None = None,
+    include_archived: bool = True,
 ):
     """The SHARED, leak-safe resolve core (114 CR-01; extracted in 115) — used by BOTH
     the route module's ``resolve_view`` / ``resolve_adhoc`` endpoints AND the Phase 115
     agent tool ``query_documents_by_view`` handler.
+
+    **Two strategies, ONE fragment walk (Phase 284, D-10 / R-02).** ``_apply`` below — the shared
+    ``apply_fragments`` walk, D-115-6 — is used by both; only the read around it differs.
+
+      * ``via_view=True`` — the ROUTES (user JWT). ONE read of migration 207's
+        ``public.library_documents`` (the Library visible set in SQL, ``security_invoker``):
+        latest only, archived hidden unless ``include_archived``, ``created_at desc, id desc``,
+        ``.range(offset, offset + limit - 1)`` with ``count="exact"`` →
+        ``{documents, total, offset, limit}``. ``count_only`` is ONE ``count="exact"`` head read →
+        ``{total}``. Neither is cut at PostgREST's max_rows any more (the old count_only topped out
+        near 1,000 per leg).
+      * ``via_view=False`` (the DEFAULT) — the AGENT tool (SERVICE ROLE). The view is keyed on
+        ``auth.uid()``, which is NULL for the service role, so it reads ZERO rows — fail-closed.
+        The agent therefore keeps the two caller-scoped legs below, unchanged in shape: each leg is
+        read ``.order("created_at", desc=True).limit(limit)`` when a ``limit`` is given (the union's
+        top N is always inside each leg's top N, so the merge is unchanged), and the total is EXACT
+        — three ``count="exact"`` head reads, own + global − own-rows-in-global-folders — instead
+        of ``len()`` of two capped id sets.
+
+    Both wrong turns are safe: a wrong ``True`` from the service role reads nothing (the view is
+    fail-closed); a wrong ``False`` from a route reads the old two legs, which are the PRE-284 path.
 
     Caller MUST have already done any readability gate (a saved view's 404-not-403);
     this core never reads a view owner — every documents query leg is scoped from
@@ -350,53 +402,73 @@ async def resolve_filter(
         q = apply_fragments(q, fragments, subtree)
         return q.eq(RETRIEVABLE_COLUMN, True) if retrievable_only else q
 
+    # ---- Strategy 1 (via_view=True): the ROUTES — ONE read of the view (Phase 284, D-10) ----
+    if via_view:
+        def _view(select: str):
+            q = _apply(
+                supabase.table("library_documents").select(select, count="exact").eq("is_latest", True)
+            )
+            return q if include_archived else q.is_("archived_at", "null")
+
+        if count_only:
+            head = await aexec(_view("id").limit(1))
+            return {"total": _exact_total(head)}
+        page_limit = limit if limit is not None else VIEW_PAGE_DEFAULT
+        res = await aexec(
+            _view(LIBRARY_ROW_COLUMNS)
+            .order("created_at", desc=True)
+            .order("id", desc=True)
+            .range(offset, offset + page_limit - 1)
+        )
+        rows = res.data or []
+        return {"documents": rows, "total": _exact_total(res, rows), "offset": offset,
+                "limit": page_limit}
+
+    # ---- Strategy 2 (via_view=False): the AGENT — two caller-scoped legs (R-02) ----
     global_folder_ids = await get_globally_visible_folder_ids(supabase, caller)
 
-    # ---- count-only mode (D-114-15) — own+global DISTINCT dedupe, no full rows ----
-    if count_only:
-        # Select ids only (NEVER `*` — avoids the silent >1000 undercount; mirrors
-        # the resolve dedupe exactly, RESEARCH §"Count-Only Path" option 1). The
-        # union of id SETS across the two legs is the DISTINCT total — a caller-owned
-        # doc living in a globally-visible folder matches BOTH legs but is counted
-        # once (Pitfall 1: NEVER own.count + global.count). Same caller-scoping as
-        # full resolve → a count over another user's docs is impossible by
-        # construction (T-114-02-02 / VIEW-06).
-        own_ids = {
-            d["id"]
-            for d in (await aexec(_apply(
-                supabase.table("documents").select("id")
-                .eq("user_id", caller).eq("is_latest", True)
-            ))).data or []
-        }
-        glob_ids: set[str] = set()
+    def _leg(select: str, *, count: bool, own: bool, in_global: bool):
+        """One caller-scoped builder, latest only: own (``user_id = caller``), global
+        (``folder_id IN`` the caller's globally-visible folders), or both (the overlap)."""
+        q = supabase.table("documents").select(select, count="exact" if count else None)
+        if own:
+            q = q.eq("user_id", caller)  # the VIEW-06 invariant: CALLER, never the view owner
+        if in_global:
+            q = q.in_("folder_id", global_folder_ids)
+        q = _apply(q.eq("is_latest", True))  # Pitfall 6: latest versions only (VER-03)
+        return q if include_archived else q.is_("archived_at", "null")
+
+    async def _total() -> int:
+        """EXACT distinct total: own + global − the caller's own rows living in a global folder.
+
+        A caller-owned doc in a globally-visible folder matches BOTH legs and is counted once
+        (Pitfall 1 — never a bare own.count + global.count). Three ``count="exact"`` head reads;
+        before 284 this was ``len()`` of two id sets, each cut at max_rows (1,000). Same
+        caller-scoping as the listing → a count over another user's docs is impossible by
+        construction (T-114-02-02 / VIEW-06).
+        """
+        n = _exact_total(await aexec(_leg("id", count=True, own=True, in_global=False).limit(1)))
         if global_folder_ids:
-            glob_ids = {
-                d["id"]
-                for d in (await aexec(_apply(
-                    supabase.table("documents").select("id")
-                    .in_("folder_id", global_folder_ids).eq("is_latest", True)
-                ))).data or []
-            }
-        return {"total": len(own_ids | glob_ids)}
+            n += _exact_total(await aexec(_leg("id", count=True, own=False, in_global=True).limit(1)))
+            n -= _exact_total(await aexec(_leg("id", count=True, own=True, in_global=True).limit(1)))
+        return n
+
+    # ---- count-only mode (D-114-15) — the own+global DISTINCT total, no rows ----
+    if count_only:
+        return {"total": await _total()}
 
     # ---- CALLER-SCOPED listing (clone list_documents) — scope from CALLER, never view.user_id ----
-    own = _apply(
-        supabase.table("documents")
-        .select("*")
-        .eq("user_id", caller)  # the VIEW-06 invariant: CALLER, never the view owner
-        .eq("is_latest", True)  # Pitfall 6: latest versions only (VER-03)
-    )
-    own_docs = (await aexec(own)).data or []
+    def _newest(q):
+        # The union's newest N always sit inside each leg's newest N (R-02): read no more.
+        return q.order("created_at", desc=True).limit(limit) if limit is not None else q
+
+    own_docs = (await aexec(_newest(_leg("*", count=False, own=True, in_global=False)))).data or []
 
     global_docs: list[dict] = []
     if global_folder_ids:
-        glob = _apply(
-            supabase.table("documents")
-            .select("*")
-            .in_("folder_id", global_folder_ids)
-            .eq("is_latest", True)
-        )
-        global_docs = (await aexec(glob)).data or []
+        global_docs = (
+            await aexec(_newest(_leg("*", count=False, own=False, in_global=True)))
+        ).data or []
 
     # 4. Merge, dedupe by id, sort created_at desc (clone documents.py:563-570).
     seen: set[str] = set()
@@ -409,4 +481,6 @@ async def resolve_filter(
 
     # Plain dict (NO response_model) so the rows round-trip the same metadata blob
     # GET /documents returns — the 112 CR-01 extra="allow" preservation lesson.
+    if limit is not None:
+        return {"documents": merged[:limit], "total": await _total()}
     return {"documents": merged, "total": len(merged)}

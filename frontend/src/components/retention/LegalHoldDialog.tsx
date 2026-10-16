@@ -10,6 +10,13 @@
  * cannot be computed reads `Couldn't count the documents yet.` — never 0.
  *
  * A failure keeps the dialog open with every field as typed and says what did NOT happen.
+ *
+ * Phase 284-04 (D-15 / R-05 / UI-SPEC S13) — the documents typeahead searches on the SERVER. It
+ * used to read the whole library (the unpaged list client) and then run a SECOND whole-library loop of
+ * `document-states` calls to drop other orgs' documents; at 50,000 documents the first read was
+ * silently cut at 1,000. Now each debounced query is ONE `POST /document-search` (latest, archived
+ * included, 20 rows; an empty query is the 20 most recent), and the active-org check runs over the
+ * ≤ 20 ids that came back. A failure SAYS so — the old catch silently offered nothing.
  */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { X } from "lucide-react"
@@ -26,7 +33,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { listDocuments } from "@/lib/api"
+import { useDocumentFind } from "@/hooks/useDocumentFind"
+import { cn } from "@/lib/utils"
 import { ApiRefusal } from "@/lib/api/refusal"
 import {
   addHoldCoverage,
@@ -41,25 +49,20 @@ import { AMBER_TEXT_CLASS } from "./RetentionChip"
 import { RETENTION_COPY, fillCopy } from "./retentionCopy"
 
 const C = RETENTION_COPY
-const MAX_SUGGESTIONS = 8
-/** `POST /retention/document-states` caps a request at 500 document ids. */
-const STATE_CHUNK = 500
 
 /**
  * 275-REVIEW F-WR-02 — keep only the documents in the ACTIVE org.
  *
- * `GET /documents` is scoped by owner, not by org, so an admin in two orgs gets the other org's
- * documents too — and every one of them would be refused (422) by the hold write. No org-scoped
- * document list exists, and the document rows carry no `org_id`; `document-states` reads the
- * requested ids through RLS **filtered to the active org** (`X-Org-Id`), so the ids it answers for
- * are exactly the ones a hold may cover. Asked in chunks of the server's cap.
+ * Document search (like `GET /documents`) is scoped by visibility, not by org, so an admin in two
+ * orgs gets the other org's documents too — and every one of them would be refused (422) by the
+ * hold write. The document rows carry no `org_id`; `document-states` reads the requested ids through
+ * RLS **filtered to the active org** (`X-Org-Id`), so the ids it answers for are exactly the ones a
+ * hold may cover. 284-04: ONE call over at most one search page (≤ 20 ids), never the library.
  */
-async function inActiveOrg(docs: readonly Document[]): Promise<Document[]> {
-  const ids = docs.map((d) => d.id)
-  const chunks: string[][] = []
-  for (let i = 0; i < ids.length; i += STATE_CHUNK) chunks.push(ids.slice(i, i + STATE_CHUNK))
-  const answers = await Promise.all(chunks.map((c) => getDocumentStates({ document_ids: c, folder_ids: [] })))
-  const inOrg = new Set(answers.flatMap((a) => (a.documents ?? []).map((d) => d.document_id)))
+async function inActiveOrg<T extends Document>(docs: readonly T[]): Promise<T[]> {
+  if (docs.length === 0) return []
+  const answer = await getDocumentStates({ document_ids: docs.map((d) => d.id), folder_ids: [] })
+  const inOrg = new Set((answer.documents ?? []).map((d) => d.document_id))
   return docs.filter((d) => inOrg.has(d.id))
 }
 
@@ -110,7 +113,9 @@ export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalH
   const [folderIds, setFolderIds] = useState<string[]>([])
   const [picked, setPicked] = useState<Document[]>([])
   const [query, setQuery] = useState("")
-  const [allDocs, setAllDocs] = useState<Document[]>([])
+  // 284-04: the last search answer that passed the active-org check, and whether that check failed.
+  const [orgRows, setOrgRows] = useState<Document[]>([])
+  const [orgCheckFailed, setOrgCheckFailed] = useState(false)
   const [count, setCount] = useState<number | null | "failed">(null)
   const [errors, setErrors] = useState<{ name?: string; reason?: string }>({})
   const [busy, setBusy] = useState(false)
@@ -144,17 +149,56 @@ export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalH
     setErrors({})
     setFailed(false)
     setRefused(null)
-    setAllDocs([])
-    const gen = ++openGen.current
-    listDocuments()
-      .then(inActiveOrg)
+    setOrgRows([])
+    setOrgCheckFailed(false)
+    ++openGen.current
+  }, [open])
+
+  // 284-04 (D-15 / R-05): ONE server search per debounced query — 20 rows, latest, archived
+  // included; an empty query is the 20 most recent. `request: null` while closed costs nothing.
+  const typed = query.trim()
+  const find = useDocumentFind({
+    request: open
+      ? {
+          filter_expr: { op: "and", conditions: [] },
+          name: typed === "" ? null : typed,
+          version: "latest",
+          sort: "added_desc",
+          offset: 0,
+          limit: 20, // one page — and so the most ids the org check below ever asks about
+          include_archived: true,
+        }
+      : null,
+    debounceMs: 250,
+  })
+
+  // The active-org check over the answer (≤ 20 ids). Two guards: the dialog's `openGen` (a check
+  // started for an earlier open never lands in this one) and `orgReq` (the hook already drops a
+  // stale SEARCH answer; this drops a stale CHECK of an earlier answer).
+  const orgReq = useRef(0)
+  useEffect(() => {
+    const my = ++orgReq.current
+    const gen = openGen.current
+    if (!open) return
+    inActiveOrg(find.rows)
       .then((docs) => {
-        if (alive.current && gen === openGen.current) setAllDocs(docs)
+        if (!alive.current || gen !== openGen.current || my !== orgReq.current) return
+        setOrgRows(docs)
+        setOrgCheckFailed(false)
       })
       .catch(() => {
-        /* the typeahead offers nothing rather than a guess (never another org's documents) */
+        if (!alive.current || gen !== openGen.current || my !== orgReq.current) return
+        // never a guess: nothing is offered, and the line below says the search failed
+        setOrgRows([])
+        setOrgCheckFailed(true)
       })
-  }, [open])
+  }, [open, find.rows])
+
+  const searchFailed = find.error !== null || orgCheckFailed
+  const retrySearch = () => {
+    setOrgCheckFailed(false)
+    find.retry()
+  }
 
   const docIds = useMemo(() => picked.map((d) => d.id), [picked])
   const hasPick = folderIds.length > 0 || docIds.length > 0
@@ -179,14 +223,14 @@ export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalH
   }, [open, hasPick, docIds, folderIds])
 
   const folderRows = useMemo(() => flattenFolders(folders ?? []), [folders])
+  // The server's answer IS the name match (no client re-filter, RESEARCH Pitfall 10); only the
+  // documents already picked are left out.
   const suggestions = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return []
     const taken = new Set(docIds)
-    return allDocs
-      .filter((d) => !taken.has(d.id) && d.filename.toLowerCase().includes(q))
-      .slice(0, MAX_SUGGESTIONS)
-  }, [query, allDocs, docIds])
+    return orgRows.filter((d) => !taken.has(d.id))
+  }, [orgRows, docIds])
+  // No number: the org check runs AFTER the server's count, so a number would include other orgs.
+  const moreMatch = find.total !== null && find.total > find.rows.length
 
   const toggleFolder = (id: string) =>
     setFolderIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -285,7 +329,15 @@ export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalH
             </Label>
             <Input id="hold-docs" value={query} onChange={(e) => setQuery(e.target.value)} autoComplete="off" />
             {suggestions.length > 0 && (
-              <ul role="listbox" aria-label={C.contract.documents} className="rounded-md border border-border">
+              <ul
+                role="listbox"
+                aria-label={C.contract.documents}
+                aria-busy={find.loading ? true : undefined}
+                className={cn(
+                  "max-h-48 overflow-y-auto rounded-md border border-border",
+                  find.loading && "transition-opacity opacity-60",
+                )}
+              >
                 {suggestions.map((d) => (
                   <li key={d.id} role="option" aria-selected={false}>
                     <button
@@ -302,6 +354,23 @@ export function LegalHoldDialog({ open, hold, onClose, onDone, onStale }: LegalH
                 ))}
               </ul>
             )}
+            {/* 284-04 (S13): what the search is doing — after the list, never inside it. */}
+            {searchFailed ? (
+              <p role="alert" className={`text-xs ${AMBER_TEXT_CLASS}`}>
+                Couldn’t search documents.{" "}
+                <button type="button" onClick={retrySearch} className="text-xs text-primary hover:underline">
+                  Try again
+                </button>
+              </p>
+            ) : find.loading ? (
+              <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
+                Searching…
+              </p>
+            ) : moreMatch ? (
+              <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
+                More documents match. Type more of the name to narrow.
+              </p>
+            ) : null}
             {picked.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {picked.map((d) => (
