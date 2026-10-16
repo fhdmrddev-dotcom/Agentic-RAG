@@ -247,8 +247,8 @@ as `authenticated` with the real claims:
 | index `(user_id, …, created_at DESC, id DESC)` only, view unchanged | 429 ms | 437 ms — the OR still forces a BitmapOr, so the index is not walked in order |
 | + a naive `UNION ALL` of the two legs | 466 ms | 956 ms (worse: each leg is planned as a separate subquery, so the version subqueries run for 49,720 rows) |
 | documents policy `auth.uid()` → `(SELECT auth.uid())` only | 211 ms | 72 ms |
-| the 208 view + its two indexes, policy unchanged | 126 ms (page 0.9 ms) | 212 ms (page 1.1 ms, Merge Append) |
-| **all three (migration 208)** | **15.0 ms** (page 0.7 ms) | **25.4 ms** (page 1.2 ms) |
+| the UNION ALL view (first candidate) + the Root/Find indexes, policy unchanged | 126 ms (page 0.9 ms) | 212 ms (page 1.1 ms, Merge Append) |
+| **all three (first candidate; the shipped 208 adds the `o.id` join + a folder index, see AFTER (208))** | **15.0 ms** (page 0.7 ms) | **25.4 ms** (page 1.2 ms) |
 
 **Why a naive UNION ALL does not work (Postgres 17.6, measured).** A UNION ALL leg with a WHERE
 clause cannot be flattened into an appendrel (`is_safe_append_member`: "the child can't have any
@@ -279,3 +279,154 @@ E   AssertionError: find: the full PostgREST statement (page + exact count over 
 10,020: the same 8 fail — Root scans 5,816, Find 9,720; page 64.1 / 51.6 ms; statement 89.5 / 92.4 ms
         against bounds of 41.6 / 49.4 ms.
 ```
+
+## AFTER (208) — 10k / 50k
+
+284-06 Task 3, 2026-10-16. Migration 208 applied to the local DB; **no backend code changed in 284-06**, so the operator's backend on :8000 (main checkout, `--reload`) serves exactly the code these figures belong to, and only the DB differs from the 284-05 AFTER tables above. Host CPU (`typeperf`) is recorded before each run.
+
+- 50k run: host CPU 15.0 / 15.8 / 12.1 %.
+
+### AFTER (208) — 50,000 seeded (+20 shared = 50,020 owner latest)
+
+Measured 2026-10-16T06:08:42.334839+00:00 against `http://127.0.0.1:8000`. Provenance: `{"plan_base": null}`.
+Ground truth (asyncpg as postgres): `{"big_folder_id": "ea595fbd-6880-5816-a543-c6eab092279c", "owner_latest_all": 50020, "root_latest_all": 30000, "root_latest_unarchived": 29808, "big_latest_all": 10000, "big_latest_unarchived": 9948, "owner_latest_unarchived": 49720, "legacy_visible_latest": 50020}`
+
+| surface | status | bytes | median ms | max ms | rows | reported total | DB count(*) | equal? |
+|---|---|---|---|---|---|---|---|---|
+| GET /documents Root page 1 (limit 25) | 200 | 26,538 | 55.6 | 64.4 | 25 | 29808 | 29808 | yes |
+| GET /documents Big page 1 (limit 25) | 200 | 27,208 | 49.0 | 51.7 | 25 | 9948 | 9948 | yes |
+| GET /documents Big LAST page (limit 25) | 200 | 24,886 | 126.1 | 136.3 | 23 | 9948 | 9948 | yes |
+| POST /document-search page 1 (limit 25) | 200 | 26,966 | 67.2 | 77.4 | 25 | 49720 | 49720 | yes |
+| Picker read (POST /document-search limit 20) | 200 | 21,569 | 75.8 | 87.7 | 20 | 49720 | 49720 | yes |
+| GET /library/summary | 200 | 2,557 | 88.1 | 95.2 | — | 50020 | 50020 | yes |
+| Library open request set (Root page + summary + folders, parallel) | 200/200/200 | 34,328 | 109.8 | 181.8 | — | — | — | — |
+
+- 10k run: host CPU 18.3 / 20.6 / 17.4 % right after the reseed; re-sampled over 24 s at 8.2-19.1 % (median 12.0 %) and measured immediately after.
+
+### AFTER (208) — 10,000 seeded (+20 shared = 10,020 owner latest)
+
+Measured 2026-10-16T06:10:02.038999+00:00 against `http://127.0.0.1:8000`. Provenance: `{"plan_base": null}`.
+Ground truth (asyncpg as postgres): `{"big_folder_id": "ea595fbd-6880-5816-a543-c6eab092279c", "owner_latest_all": 10020, "root_latest_all": 6000, "root_latest_unarchived": 5816, "big_latest_all": 3000, "big_latest_unarchived": 2918, "owner_latest_unarchived": 9720, "legacy_visible_latest": 10020}`
+
+| surface | status | bytes | median ms | max ms | rows | reported total | DB count(*) | equal? |
+|---|---|---|---|---|---|---|---|---|
+| GET /documents Root page 1 (limit 25) | 200 | 26,409 | 45.1 | 52.9 | 25 | 5816 | 5816 | yes |
+| GET /documents Big page 1 (limit 25) | 200 | 27,328 | 44.5 | 46.9 | 25 | 2918 | 2918 | yes |
+| GET /documents Big LAST page (limit 25) | 200 | 19,666 | 69.1 | 79.6 | 18 | 2918 | 2918 | yes |
+| POST /document-search page 1 (limit 25) | 200 | 26,999 | 47.4 | 58.8 | 25 | 9720 | 9720 | yes |
+| Picker read (POST /document-search limit 20) | 200 | 21,568 | 47.0 | 49.0 | 20 | 9720 | 9720 | yes |
+| GET /library/summary | 200 | 1,642 | 45.7 | 48.7 | — | 10020 | 10020 | yes |
+| Library open request set (Root page + summary + folders, parallel) | 200/200/200 | 30,904 | 62.8 | 69.4 | — | — | — | — |
+
+#### Run 2 (stability check, same code and DB)
+
+- 50k run 2: host CPU 21.4 / 19.4 / 17.2 / 17.0 % (the seed had just finished).
+
+### AFTER (208) run 2 — 50,000 seeded (+20 shared = 50,020 owner latest)
+
+Measured 2026-10-16T06:31:16.079962+00:00 against `http://127.0.0.1:8000`. Provenance: `{"plan_base": null}`.
+Ground truth (asyncpg as postgres): `{"big_folder_id": "ea595fbd-6880-5816-a543-c6eab092279c", "owner_latest_all": 50020, "root_latest_all": 30000, "root_latest_unarchived": 29808, "big_latest_all": 10000, "big_latest_unarchived": 9948, "owner_latest_unarchived": 49720, "legacy_visible_latest": 50020}`
+
+| surface | status | bytes | median ms | max ms | rows | reported total | DB count(*) | equal? |
+|---|---|---|---|---|---|---|---|---|
+| GET /documents Root page 1 (limit 25) | 200 | 26,538 | 74.6 | 83.8 | 25 | 29808 | 29808 | yes |
+| GET /documents Big page 1 (limit 25) | 200 | 27,208 | 48.1 | 48.7 | 25 | 9948 | 9948 | yes |
+| GET /documents Big LAST page (limit 25) | 200 | 24,886 | 122.8 | 133.6 | 23 | 9948 | 9948 | yes |
+| POST /document-search page 1 (limit 25) | 200 | 26,966 | 77.7 | 92.9 | 25 | 49720 | 49720 | yes |
+| Picker read (POST /document-search limit 20) | 200 | 21,569 | 62.9 | 77.1 | 20 | 49720 | 49720 | yes |
+| GET /library/summary | 200 | 2,557 | 88.0 | 92.2 | — | 50020 | 50020 | yes |
+| Library open request set (Root page + summary + folders, parallel) | 200/200/200 | 34,328 | 109.8 | 175.7 | — | — | — | — |
+
+- 10k run 2: host CPU 16.6 / 14.3 / 10.9 %.
+
+### AFTER (208) run 2 — 10,000 seeded (+20 shared = 10,020 owner latest)
+
+Measured 2026-10-16T06:33:49.315837+00:00 against `http://127.0.0.1:8000`. Provenance: `{"plan_base": null}`.
+Ground truth (asyncpg as postgres): `{"big_folder_id": "ea595fbd-6880-5816-a543-c6eab092279c", "owner_latest_all": 10020, "root_latest_all": 6000, "root_latest_unarchived": 5816, "big_latest_all": 3000, "big_latest_unarchived": 2918, "owner_latest_unarchived": 9720, "legacy_visible_latest": 10020}`
+
+| surface | status | bytes | median ms | max ms | rows | reported total | DB count(*) | equal? |
+|---|---|---|---|---|---|---|---|---|
+| GET /documents Root page 1 (limit 25) | 200 | 26,409 | 54.2 | 57.5 | 25 | 5816 | 5816 | yes |
+| GET /documents Big page 1 (limit 25) | 200 | 27,328 | 56.7 | 57.7 | 25 | 2918 | 2918 | yes |
+| GET /documents Big LAST page (limit 25) | 200 | 19,666 | 75.8 | 80.3 | 18 | 2918 | 2918 | yes |
+| POST /document-search page 1 (limit 25) | 200 | 26,999 | 49.5 | 50.7 | 25 | 9720 | 9720 | yes |
+| Picker read (POST /document-search limit 20) | 200 | 21,568 | 47.9 | 49.0 | 20 | 9720 | 9720 | yes |
+| GET /library/summary | 200 | 1,642 | 47.5 | 50.4 | — | 10020 | 10020 | yes |
+| Library open request set (Root page + summary + folders, parallel) | 200/200/200 | 30,904 | 68.3 | 108.7 | — | — | — | — |
+
+### AFTER (208) — statement level (the primary evidence)
+
+`pg_stat_statements` diff around real API calls (as in "SEED-357 — where the 50k time goes").
+"SQL" is the mean execution time of the ONE PostgREST statement per request. The statement time
+is what 208 changes. It is far less sensitive to host load than the HTTP time.
+
+| size | surface | BEFORE HTTP / SQL | AFTER HTTP / SQL (each capture: 5-9 calls) |
+|---|---|---|---|
+| 10,020 | Root page 1 | 135.3 / 89.8 ms | 42.8 / 3.59 · 59.8 / 3.88 · 48.0 / 3.60 · 52.1 / 3.49 · 55.9 / 3.45 |
+| 10,020 | Find page 1 | 154.7 / 97.4 ms | 48.0 / 5.69 · 66.7 / 6.31 · 55.9 / 6.08 · 53.5 / 6.34 · 62.1 / 5.92 |
+| 50,020 | Root page 1 | 445.6 / 407.9 ms | 54.0 / 13.51 · 59.5 / 14.85 · 54.6 / 13.43 · 64.5 / 15.62 · 63.1 / 15.40 |
+| 50,020 | Find page 1 | 465.7 / 417.2 ms | 64.0 / 20.31 · 75.6 / 20.39 · 79.5 / 21.57 · 71.7 / 22.45 · 81.2 / 23.60 |
+
+EXPLAIN (ANALYZE, BUFFERS) of the exact statement, as `authenticated` with a real token's claims.
+Full plans: `measurements/284-06-explain-{before,after}-{10000,50000}.txt`.
+
+| statement | 10k BEFORE | 50k BEFORE | 10k AFTER | 50k AFTER | AFTER ratio |
+|---|---|---|---|---|---|
+| Root: whole statement | 92.2 ms | 494.4 ms | 3.80 ms | 14.9 ms (generic plan 14.0) | 3.9x |
+| Root: the page (`Limit` node) | 66.0 ms | 355.8 ms | **0.82 ms** | **1.10 ms** | **1.34x** |
+| Root: the exact count (InitPlan) | 25.8 ms | 138.3 ms | 2.60 ms | 13.5 ms | 5.2x |
+| Find: whole statement | 96.3 ms | 473.9 ms | 6.71 ms | 24.3 ms (generic plan 25.9) | 3.6x |
+| Find: the page (`Limit` node) | 52.3 ms | 250.5 ms | **1.22 ms** | **1.22 ms** | **1.00x** |
+| Find: the exact count (InitPlan) | 43.2 ms | 222.7 ms | 5.10 ms | 22.7 ms | 4.5x |
+
+Plan shape AFTER (50k). Root: `Limit` ← `Incremental Sort` (presorted `created_at`) ← the
+embeds and the `documents_pkey` probe for `o.id` ← `Index Scan using
+documents_library_root_created_idx` (26 rows). Find: `Limit` ← `Incremental Sort` ← the `o.id`
+probe ← `Merge Append` (26 rows) of `Index Scan using documents_library_added_idx` and the shared
+leg's sort (0 rows for the owner). The count CTE is a Bitmap Heap Scan via the same index over the
+caller's rows, and its LEFT JOIN is removed. Under a forced generic plan the shapes are the same
+(`test_284_page_index_live.py` checks both).
+
+**So the page is flat, and the remaining growth is the exact count.** It is linear by
+construction: FIX-11 keeps the total exact, so every matched row is counted. It now costs
+~0.45 µs/row (Root 13.5 ms over 29,808 rows, Find 22.7 ms over 49,720), down from ~4.5 µs/row.
+Measured headroom not taken: wrapping `current_setting('app.agent_read')` in the 205 restrictive
+policy the same way saves only 10-15 % of the count (rolled-back test). A second policy change is
+not worth that.
+
+### AFTER (208) — paired HTTP ratios (10k and 50k measured close together, same host conditions)
+
+| pair | when (local) | Root page 1 | Find page 1 | Big page 1 | summary |
+|---|---|---|---|---|---|
+| measure run 1 | 10:08 / 10:10 | 55.6 / 45.1 = **1.23x** | 67.2 / 47.4 = **1.42x** | 49.0 / 44.5 = 1.10x | 88.1 / 45.7 = 1.93x |
+| capture A | 10:08 / 10:10 | 54.0 / 42.8 = **1.26x** | 64.0 / 48.0 = **1.33x** | — | — |
+| capture B (4 × 9 calls each, medians) | 10:31-32 / 10:33 | 61.3 / 54.0 = **1.14x** | 77.6 / 59.0 = **1.32x** | — | — |
+| measure run 2 | 10:31 / 10:33 | 74.6 / 54.2 = **1.38x** | 77.7 / 49.5 = **1.57x** | 48.1 / 56.7 = 0.85x | 88.0 / 47.5 = 1.85x |
+
+The HTTP figure is ~40-55 ms of request handling outside Postgres, plus the statement. That
+handling is the same work at both sizes (one statement, a 26 KB body, planning 1.5-2.0 ms at
+both), but it swings ±10 ms with host load. Find's statement grows by ~15 ms from 10k to 50k.
+That is the same size as the swing, so Find's HTTP ratio reads 1.32-1.57x depending on the pair.
+The 1.57x pair's 50k half ran right after a reseed at 17-21 % CPU (other samples 9-16 %). Its own
+statement time was 20.4 ms, the same as every other 50k capture, so the extra ~10 ms is outside
+Postgres.
+
+## AFTER (208) — verdict per D-22 criterion
+
+| D-22 criterion | Verdict (208) | Evidence |
+|---|---|---|
+| Every reported total equals `count(*)` | **MET** | 7 of 7 surfaces `yes` at both sizes, both runs |
+| First-page BYTES at 50k within 1.5x of 10k | **MET** (unchanged, 1.00x) | Root 26,538 / 26,409 · Find 26,966 / 26,999 |
+| First-page TIME at 50k within 1.5x — **Root** | **MET** | HTTP 1.14-1.38x across four pairs (284-05: 2.54x). SQL page node 1.34x |
+| First-page TIME at 50k within 1.5x — **Find** | **MET in 3 of 4 pairs** (1.32x · 1.33x · 1.42x); **1.57x in 1** | 284-05: 2.59x. SQL page node 1.00x. The 1.57x is host-side (statement 20.4 ms, as in every pair) |
+| First-page TIME — Big folder page 1 | **MET** | 0.85-1.10x (284-05: 1.45x). It now uses `documents_library_folder_created_idx` |
+| First page < 500 ms at 50k | **MET** | Root 54-75 ms, Find 64-81 ms (284-05: 470.7 / 499.4 quiet, 622-697 contended) |
+| Summary < 500 ms at 50k | **MET** | 88.0 / 88.1 ms |
+| Summary TIME within 1.5x | **MISSED: 1.85x / 1.93x** | The 284-05 verdict listed the summary under first-page time at 1.45x, against a 10k figure taken under contention (84.3 ms). On a quiet host the summary reads 45.7-47.5 ms at 10k and 88 ms at 50k. It is an exact GROUPING SETS aggregate over every visible row, so it is linear by construction, and 208 did not target it. Its SQL on the 208 view is 62-80 ms at 50k, against 55-60 ms on 207's view (rolled-back comparison): the UNION ALL costs it ~10-20 % |
+| Deep page (Big LAST page, offset 9,925) | not a D-22 first-page figure; 1.62-1.82x | 69.1-75.8 → 122.8-126.1 ms, linear in the OFFSET (the walk must skip the offset rows) |
+
+**Not fixed, and recorded rather than rounded.** First, the summary ratio, which needs a
+maintained counter or a cached summary, not an index. Second, any list whose filter has no
+matching index. These are IngestionTab's status lists, the `kind=spreadsheet` read, the
+unfiltered GET /documents, and Find sorted by anything but `added_desc`. The policy wrap roughly
+halves their statement time, but their page is still a full sort.
