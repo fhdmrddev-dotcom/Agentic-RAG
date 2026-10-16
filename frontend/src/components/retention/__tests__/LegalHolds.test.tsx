@@ -26,8 +26,29 @@ const m = vi.hoisted(() => ({
   countHoldCoverage: vi.fn(),
   getDocumentStates: vi.fn(),
   listDocuments: vi.fn(),
+  searchDocuments: vi.fn(),
   useFolders: vi.fn(),
 }))
+
+// 284-04 (D-15 / R-05 / UI-SPEC S13): the dialog type-aheads against POST /document-search (20
+// rows) instead of downloading the library; the list client stays mocked so a regression back to
+// it is SEEN. The search mock answers like the server: a case-insensitive name match, newest first
+// as given, `limit` rows, and the exact total (which includes other orgs' documents — Find is not
+// active-org scoped, which is why the dialog's org check still runs over what comes back).
+function answerFrom(pool: readonly Document[]) {
+  return async (body: { name?: string | null; offset: number; limit: number; sort: string }) => {
+    const q = (body.name ?? "").toLowerCase()
+    const hits = pool.filter((d) => d.filename.toLowerCase().includes(q))
+    return {
+      documents: hits.slice(body.offset, body.offset + body.limit),
+      total: hits.length,
+      older_matches: 0,
+      sort: body.sort,
+      offset: body.offset,
+      limit: body.limit,
+    }
+  }
+}
 
 vi.mock("@/lib/api/retention", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api/retention")>()
@@ -45,6 +66,11 @@ vi.mock("@/lib/api/retention", async (importOriginal) => {
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return { ...actual, listDocuments: m.listDocuments }
+})
+
+vi.mock("@/lib/api/documents", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/documents")>()
+  return { ...actual, searchDocuments: m.searchDocuments }
 })
 
 vi.mock("@/hooks/useFolders", () => ({ useFolders: m.useFolders }))
@@ -88,6 +114,7 @@ beforeEach(() => {
   m.listHolds.mockResolvedValue({ active: [ACTIVE], released: [RELEASED] } satisfies HoldList)
   m.countHoldCoverage.mockResolvedValue({ count: 7 })
   m.listDocuments.mockResolvedValue(DOCS)
+  m.searchDocuments.mockImplementation(answerFrom(DOCS))
   // The active-org filter (275-REVIEW F-WR-02): document-states answers only for active-org ids.
   m.getDocumentStates.mockImplementation(async (body: { document_ids: string[] }) => ({
     documents: body.document_ids.filter((id) => id !== "d-other").map((id) => ({ document_id: id })),
@@ -234,10 +261,11 @@ describe("LegalHoldDialog — place a hold (D-05 / D-35)", () => {
   })
 
   it("275-REVIEW F-WR-02: the typeahead offers only the ACTIVE org's documents", async () => {
-    m.listDocuments.mockResolvedValue([
-      ...DOCS,
-      { id: "d-other", filename: "Kessler Other Org Lease.pdf" },
-    ] as Document[])
+    // 284-04: the candidates are the server search's answer (not active-org scoped), so the
+    // other-org document comes BACK from the search and the org check must still drop it.
+    m.searchDocuments.mockImplementation(
+      answerFrom([...DOCS, { id: "d-other", filename: "Kessler Other Org Lease.pdf" }] as Document[]),
+    )
     const dialog = await openNew()
     await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalled())
     await userEvent.type(within(dialog).getByLabelText("Documents"), "kess")
@@ -246,14 +274,22 @@ describe("LegalHoldDialog — place a hold (D-05 / D-35)", () => {
     expect(m.getDocumentStates).toHaveBeenCalledWith({ document_ids: ["d1", "d2", "d-other"], folder_ids: [] })
   })
 
-  it("275-REVIEW F-WR-02: asks in chunks of at most 500 ids (the server's cap)", async () => {
-    m.listDocuments.mockResolvedValue(
-      Array.from({ length: 501 }, (_, i) => ({ id: `x${i}`, filename: `Doc ${i}.pdf` })) as Document[],
+  it("275-REVIEW F-WR-02 → 284-04 (R-05): the org check runs over the ≤ 20 ids the search returned, never the library", async () => {
+    // Was "asks in chunks of at most 500 ids": the dialog no longer walks the whole library, so the
+    // check is ONE document-states call over one search page.
+    m.searchDocuments.mockImplementation(
+      answerFrom(Array.from({ length: 501 }, (_, i) => ({ id: `x${i}`, filename: `Doc ${i}.pdf` })) as Document[]),
     )
-    await openNew()
-    await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalledTimes(2))
-    expect(m.getDocumentStates.mock.calls[0][0].document_ids).toHaveLength(500)
-    expect(m.getDocumentStates.mock.calls[1][0].document_ids).toHaveLength(1)
+    const dialog = await openNew()
+    await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalledTimes(1))
+    expect(m.getDocumentStates.mock.calls[0][0]).toEqual({
+      document_ids: Array.from({ length: 20 }, (_, i) => `x${i}`),
+      folder_ids: [],
+    })
+    // 501 match; 20 are shown — and the line says so WITHOUT a number (it would count other orgs).
+    const more = await within(dialog).findByText("More documents match. Type more of the name to narrow.")
+    expect(more.textContent).not.toMatch(/\d/)
+    expect(m.listDocuments).not.toHaveBeenCalled()
   })
 
   it("275-REVIEW F-WR-02: when the org check fails the typeahead offers nothing rather than a guess", async () => {
@@ -262,6 +298,8 @@ describe("LegalHoldDialog — place a hold (D-05 / D-35)", () => {
     await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalled())
     await userEvent.type(within(dialog).getByLabelText("Documents"), "kess")
     expect(within(dialog).queryByRole("button", { name: "Kessler Services Agreement.pdf" })).toBeNull()
+    // 284-04 (S13): …and it SAYS so — the old silent catch offered nothing with no reason given.
+    expect(await within(dialog).findByText("Couldn’t search documents.")).toBeInTheDocument()
   })
 
   it("275-REVIEW F-WR-02: the server's 422 refusal is RENDERED, never swallowed", async () => {
@@ -337,6 +375,71 @@ describe("LegalHoldDialog — place a hold (D-05 / D-35)", () => {
       "Couldn't add to the hold. Nothing changed. The hold still covers what it did before.",
     )
     expect(m.addHoldCoverage).toHaveBeenCalledWith("h1", { document_ids: [], folder_ids: ["f-inv"] })
+  })
+})
+
+// ── 284-04 (D-15 / R-05 / UI-SPEC S13) — the documents picker searches on the server ──────────
+describe("LegalHoldDialog — server typeahead (284-04)", () => {
+  async function openNew() {
+    render(<LegalHoldsList onRecorded={vi.fn()} />)
+    await screen.findAllByTestId("hold-card")
+    await userEvent.click(screen.getByRole("button", { name: "+ New hold" }))
+    return screen.findByRole("dialog")
+  }
+
+  it("opening reads NO library list: one search for the 20 most recent, archived included", async () => {
+    await openNew()
+    await waitFor(() => expect(m.searchDocuments).toHaveBeenCalledTimes(1))
+    expect(m.searchDocuments).toHaveBeenCalledWith({
+      filter_expr: { op: "and", conditions: [] },
+      name: null,
+      version: "latest",
+      sort: "added_desc",
+      offset: 0,
+      limit: 20,
+      include_archived: true,
+    })
+    expect(m.listDocuments).not.toHaveBeenCalled()
+  })
+
+  it("an empty query shows the 20 most recent in the folder list's bounded box", async () => {
+    m.searchDocuments.mockImplementation(
+      answerFrom(Array.from({ length: 30 }, (_, i) => ({ id: `x${i}`, filename: `Doc ${i}.pdf` })) as Document[]),
+    )
+    const dialog = await openNew()
+    const list = await within(dialog).findByRole("listbox", { name: "Documents" })
+    await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(20))
+    for (const cls of "max-h-48 overflow-y-auto rounded-md border border-border".split(" ")) {
+      expect(list.className).toContain(cls)
+    }
+  })
+
+  it("typing searches by name; the org check covers only that answer", async () => {
+    const dialog = await openNew()
+    await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalledTimes(1))
+    await userEvent.type(within(dialog).getByLabelText("Documents"), "olsen")
+    await waitFor(() =>
+      expect(m.searchDocuments).toHaveBeenLastCalledWith(expect.objectContaining({ name: "olsen" })),
+    )
+    await waitFor(() =>
+      expect(m.getDocumentStates).toHaveBeenLastCalledWith({ document_ids: ["d2"], folder_ids: [] }),
+    )
+    expect(await within(dialog).findByRole("button", { name: "Olsen Consulting SOW.pdf" })).toBeInTheDocument()
+    expect(within(dialog).queryByRole("button", { name: "Kessler Services Agreement.pdf" })).toBeNull()
+  })
+
+  it("a failed search says so in the dialog's refusal colour, with Try again that searches again", async () => {
+    m.searchDocuments.mockRejectedValueOnce(new Error("down"))
+    const dialog = await openNew()
+    const line = await within(dialog).findByText("Couldn’t search documents.")
+    const { AMBER_TEXT_CLASS } = await import("../RetentionChip")
+    for (const cls of AMBER_TEXT_CLASS.split(" ")) {
+      expect(line.closest("[role='alert']")?.className).toContain(cls)
+    }
+    await userEvent.click(within(dialog).getByRole("button", { name: "Try again" }))
+    expect(await within(dialog).findByRole("button", { name: "Kessler Services Agreement.pdf" })).toBeInTheDocument()
+    expect(m.searchDocuments).toHaveBeenCalledTimes(2)
+    expect(within(dialog).queryByText("Couldn’t search documents.")).toBeNull()
   })
 })
 

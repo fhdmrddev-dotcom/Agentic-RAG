@@ -4,8 +4,35 @@
  * emits, word for word, so a chip can never look set while sending something else (T-271-15).
  */
 import type { ReactElement } from "react"
-import { describe, it, expect, vi } from "vitest"
-import { render, screen, fireEvent, within } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach } from "vitest"
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react"
+import type { DocumentSearchRequest, DocumentSearchResponse } from "@/types"
+
+// 284-04 (D-15 / R-05 / UI-SPEC S12): the Relationship editor type-aheads against
+// POST /document-search instead of reading the page's documents. The mock answers like the server:
+// latest versions only for version "latest", a case-insensitive name match, `limit` rows, exact total.
+const m = vi.hoisted(() => ({ searchDocuments: vi.fn() }))
+vi.mock("@/lib/api/documents", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/documents")>("@/lib/api/documents")
+  return { ...actual, searchDocuments: m.searchDocuments }
+})
+
+function answerFrom(pool: readonly Document[]) {
+  return async (body: DocumentSearchRequest): Promise<DocumentSearchResponse> => {
+    const q = (body.name ?? "").toLowerCase()
+    const hits = pool
+      .filter((d) => (body.version === "latest" ? d.is_latest !== false : true))
+      .filter((d) => d.filename.toLowerCase().includes(q))
+    return {
+      documents: hits.slice(body.offset, body.offset + body.limit).map((d) => ({ ...d, version_count: 1, has_earlier: false })),
+      total: hits.length,
+      older_matches: 0,
+      sort: body.sort,
+      offset: body.offset,
+      limit: body.limit,
+    }
+  }
+}
 import {
   AddedByEditor,
   DateEditor,
@@ -69,12 +96,17 @@ const DOCS: Document[] = [
 // Derived from the same DOCS through `summarizeDocuments`, so every assertion below keeps its intent.
 const SUMMARY = summarizeDocuments(DOCS)
 
+beforeEach(() => {
+  m.searchDocuments.mockReset()
+  m.searchDocuments.mockImplementation(answerFrom(DOCS))
+})
+
 const SHELL = "w-72 rounded-lg border border-border bg-popover p-3 shadow-md space-y-3"
 
 describe("every editor shares the shipped popover idiom", () => {
   const cases: Array<[string, (onCancel: () => void) => ReactElement]> = [
     ["Version", (c) => <VersionEditor onApply={vi.fn()} onCancel={c} />],
-    ["Relationship", (c) => <RelationshipEditor documents={DOCS} onApply={vi.fn()} onCancel={c} />],
+    ["Relationship", (c) => <RelationshipEditor onApply={vi.fn()} onCancel={c} />],
     ["Folder", (c) => <FolderEditor folders={[folder("f1", "Contracts")]} onApply={vi.fn()} onCancel={c} />],
     ["Added by", (c) => <AddedByEditor connections={SUMMARY.connections} onApply={vi.fn()} onCancel={c} />],
     ["Date", (c) => <DateEditor onApply={vi.fn()} onFilterCondition={vi.fn()} onCancel={c} />],
@@ -124,14 +156,17 @@ describe("VersionEditor (D-06 / D-07)", () => {
 })
 
 describe("RelationshipEditor (D-04)", () => {
-  it("heads the 8 verbs, in table order, and the Phase 117 combobox over LATEST documents only", () => {
-    render(<RelationshipEditor documents={DOCS} onApply={vi.fn()} onCancel={vi.fn()} />)
+  it("heads the 8 verbs, in table order, and the Phase 117 combobox over LATEST documents only", async () => {
+    render(<RelationshipEditor onApply={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByText("Documents that…")).toBeInTheDocument()
     expect(screen.getByText("…this document")).toBeInTheDocument()
     const radios = screen.getAllByRole("radio").map((r) => (r as HTMLInputElement).labels?.[0]?.textContent)
     expect(radios).toEqual(RELATIONSHIP_FILTER_VERBS.map((v) => v.label))
     const combo = screen.getByRole("combobox")
     expect(combo).toHaveAttribute("placeholder", "Type a document name")
+    // 284-04: "latest only" is now the SERVER's version filter — asked for, then shown as answered.
+    await screen.findByRole("option", { name: "Acme MSA 2019.pdf" })
+    expect(m.searchDocuments).toHaveBeenCalledWith(expect.objectContaining({ version: "latest" }))
     const options = within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent)
     expect(options).not.toContain("Acme MSA 2019 (old).pdf")
     expect(options).toContain("Acme MSA 2019.pdf")
@@ -142,20 +177,22 @@ describe("RelationshipEditor (D-04)", () => {
     ).toBeInTheDocument()
   })
 
-  it("offers at most 8 candidates", () => {
+  it("offers at most 8 candidates", async () => {
     const many = Array.from({ length: 12 }, (_, i) => doc({ id: `m${i}`, filename: `Doc ${i}.pdf` }))
-    render(<RelationshipEditor documents={many} onApply={vi.fn()} onCancel={vi.fn()} />)
+    m.searchDocuments.mockImplementation(answerFrom(many))
+    render(<RelationshipEditor onApply={vi.fn()} onCancel={vi.fn()} />)
+    await screen.findByRole("option", { name: "Doc 0.pdf" })
     expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(8)
   })
 
-  it("Apply is disabled until a verb AND a document are picked, then emits one condition", () => {
+  it("Apply is disabled until a verb AND a document are picked, then emits one condition", async () => {
     const onApply = vi.fn()
-    render(<RelationshipEditor documents={DOCS} onApply={onApply} onCancel={vi.fn()} />)
+    render(<RelationshipEditor onApply={onApply} onCancel={vi.fn()} />)
     const apply = screen.getByRole("button", { name: "Apply" })
     expect(apply).toBeDisabled()
     fireEvent.click(screen.getByRole("radio", { name: "Is superseded by" }))
     expect(apply).toBeDisabled()
-    fireEvent.mouseDown(screen.getByRole("option", { name: "Acme MSA 2019.pdf" }))
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "Acme MSA 2019.pdf" }))
     expect(apply).toBeEnabled()
     fireEvent.click(apply)
     expect(onApply).toHaveBeenCalledWith({
@@ -163,6 +200,50 @@ describe("RelationshipEditor (D-04)", () => {
       documentId: "a",
       documentName: "Acme MSA 2019.pdf",
     })
+  })
+})
+
+// ── 284-04 (D-15 / R-05 / UI-SPEC S12) — the Relationship editor searches on the server ────────
+describe("RelationshipEditor — server typeahead (284-04)", () => {
+  it("asks for the 20 most recent latest documents, archived included, and types ahead by name", async () => {
+    render(<RelationshipEditor onApply={vi.fn()} onCancel={vi.fn()} />)
+    await screen.findByRole("option", { name: "Acme MSA 2019.pdf" })
+    expect(m.searchDocuments).toHaveBeenCalledWith({
+      filter_expr: { op: "and", conditions: [] },
+      name: null,
+      version: "latest",
+      sort: "added_desc",
+      offset: 0,
+      limit: 20,
+      include_archived: true,
+    })
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "board" } })
+    await waitFor(() =>
+      expect(m.searchDocuments).toHaveBeenLastCalledWith(expect.objectContaining({ name: "board" })),
+    )
+    await waitFor(() =>
+      expect(within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent)).toEqual([
+        "Board memo.docx",
+      ]),
+    )
+  })
+
+  it("says when more documents match than the 8 shown", async () => {
+    const many = Array.from({ length: 12 }, (_, i) => doc({ id: `m${i}`, filename: `Doc ${i}.pdf` }))
+    m.searchDocuments.mockImplementation(answerFrom(many))
+    render(<RelationshipEditor onApply={vi.fn()} onCancel={vi.fn()} />)
+    await screen.findByRole("option", { name: "Doc 0.pdf" })
+    expect(screen.getByRole("status")).toHaveTextContent("More documents match. Type more of the name to narrow.")
+  })
+
+  it("a failed search says so with Try again, and the retry searches again", async () => {
+    m.searchDocuments.mockRejectedValueOnce(new Error("down"))
+    render(<RelationshipEditor onApply={vi.fn()} onCancel={vi.fn()} />)
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent("Couldn’t search documents.")
+    fireEvent.click(within(alert).getByRole("button", { name: "Try again" }))
+    expect(await screen.findByRole("option", { name: "Acme MSA 2019.pdf" })).toBeInTheDocument()
+    expect(m.searchDocuments).toHaveBeenCalledTimes(2)
   })
 })
 

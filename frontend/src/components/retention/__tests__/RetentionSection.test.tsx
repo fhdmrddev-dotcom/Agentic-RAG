@@ -45,8 +45,19 @@ vi.mock("@/lib/api", async () => {
     ...actual,
     listMetadataFields: vi.fn().mockResolvedValue([]),
     listRelationships: vi.fn().mockResolvedValue({ subject: { document_id: "d", filename: "f" }, total: 0, documents: [] }),
-    listDocuments: vi.fn().mockResolvedValue([]),
     getDocumentDownloadUrl: vi.fn(),
+  }
+})
+
+// 284-04 (D-15): the panel's pickers (Add link) type-ahead against POST /document-search, not the
+// list client — mocked here so no picker can reach the network.
+vi.mock("@/lib/api/documents", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/documents")>("@/lib/api/documents")
+  return {
+    ...actual,
+    searchDocuments: vi.fn().mockResolvedValue({
+      documents: [], total: 0, older_matches: 0, sort: "added_desc", offset: 0, limit: 20,
+    }),
   }
 })
 

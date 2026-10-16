@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
-import type { RelatedDocumentsResponse, Document } from "@/types"
+import type { RelatedDocumentsResponse, Document, DocumentSearchResponse } from "@/types"
 
 vi.mock("@/lib/supabase", () => ({
   supabase: {
@@ -31,7 +31,8 @@ vi.mock("@/lib/supabase", () => ({
 const listRelationships = vi.fn<() => Promise<RelatedDocumentsResponse>>()
 const deleteRelationship = vi.fn<() => Promise<void>>()
 const createRelationship = vi.fn()
-const listDocuments = vi.fn<() => Promise<Document[]>>()
+// 284-04 (D-15): the Add-link dialog type-aheads against POST /document-search, not the list client.
+const searchDocuments = vi.fn<() => Promise<DocumentSearchResponse>>()
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
   return {
@@ -39,8 +40,11 @@ vi.mock("@/lib/api", async () => {
     listRelationships: (...a: unknown[]) => listRelationships(...(a as [])),
     deleteRelationship: (...a: unknown[]) => deleteRelationship(...(a as [])),
     createRelationship: (...a: unknown[]) => createRelationship(...(a as [])),
-    listDocuments: (...a: unknown[]) => listDocuments(...(a as [])),
   }
+})
+vi.mock("@/lib/api/documents", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/documents")>("@/lib/api/documents")
+  return { ...actual, searchDocuments: (...a: unknown[]) => searchDocuments(...(a as [])) }
 })
 
 import { RelationshipsSection } from "./RelationshipsSection"
@@ -90,7 +94,14 @@ const populated: RelatedDocumentsResponse = {
 beforeEach(() => {
   listRelationships.mockResolvedValue(populated)
   deleteRelationship.mockResolvedValue(undefined)
-  listDocuments.mockResolvedValue(candidateDocs)
+  searchDocuments.mockResolvedValue({
+    documents: candidateDocs.map((d) => ({ ...d, version_count: 1, has_earlier: false })),
+    total: candidateDocs.length,
+    older_matches: 0,
+    sort: "added_desc",
+    offset: 0,
+    limit: 20,
+  })
 })
 
 afterEach(() => {
@@ -166,7 +177,8 @@ describe("RelationshipsSection a11y — typeahead combobox roles (via the dialog
 
     // The candidate listbox + options render.
     await waitFor(() => expect(screen.getByRole("listbox")).toBeInTheDocument())
-    expect(screen.getByRole("option", { name: /candidate.pdf/i })).toBeInTheDocument()
+    // 284-04: the options are the server search's answer (debounced), so wait for them.
+    expect(await screen.findByRole("option", { name: /candidate.pdf/i })).toBeInTheDocument()
 
     // Arrow-down sets aria-activedescendant on the input (highlighted option).
     combobox.focus()
