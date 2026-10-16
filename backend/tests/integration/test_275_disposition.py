@@ -55,6 +55,8 @@ class _Storage:
         class _Bucket:
             def remove(self, paths):
                 outer.removed.extend(paths)
+                # Realistic storage3 return shape (Phase 285 D-10): the objects it deleted.
+                return [{"name": p} for p in paths]
 
         class _S:
             def from_(self, bucket):

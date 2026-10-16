@@ -26,10 +26,10 @@
 // Owner-scoping is the server's sole runtime gate; this tab passes only skillId.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react"
-import { Loader2 } from "lucide-react"
 import { listSkillVersions, listEvalRuns, listProposals } from "@/lib/api"
 import { lineDiff } from "@/lib/lineDiff"
 import type { SkillVersion, EvalRun, SkillProposal, PromotionGate } from "@/types"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 interface Props {
   skillId: string
@@ -174,9 +174,7 @@ export function VersionsTab({ skillId, liveVersionNumber, refreshNonce = 0 }: Pr
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" /> Loading version history…
-      </div>
+      <SyrelLoader size="section" label="Loading version history…" className="text-xs text-muted-foreground" />
     )
   }
 

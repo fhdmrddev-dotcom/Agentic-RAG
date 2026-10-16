@@ -469,7 +469,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/admin.py` | 43 / 17 / 2051 (was `42 / 17 / 2024`) | honoured by construction (282-04: one refusal helper, add timeout) · ⛔ |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (249-02/03) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `backend/app/api/documents.py` | 97 / 38 / 2653 (was `96 / 37 / 2531`) | honoured by construction (284-02: one ranged view read, stopgap gone) · ⛔ |
+| `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
 | `scripts/vitest-count-gate.cjs` | 308 / 68 / 6483 (was `298 / 66 / 6443`) | last touch 284-05 (10 pins raised, 5 suites adopted) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
 | `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ NOW FIRES at 3 phases · last touch 256-03 |
@@ -608,7 +608,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/audit_service.py` | 8 / 8 / 96 | ⚠ absent its ENTIRE LIFE — row added 275-01 · ⛔ |
 | `backend/app/services/expert_scope.py` | 8 / 4 / 159 (was `6 / 3 / 632`) | ✅ G-5 DISCHARGED (279-01): pure / statement / events |
 | `backend/app/services/document_relationship_service.py` | 6 / 4 / 465 (was `5 / 3 / 457`) | honoured by construction |
-| `backend/app/api/sources.py` | 10 / 4 / 698 (was `9 / 3 / 706`) | ✅ G-5 extraction FIRST DISCHARGED (280-01: document_purge) · ⛔ |
+| `backend/app/api/sources.py` | 11 / 5 / 713 (was `10 / 4 / 698`) | honoured by construction (285-02: purge scope via db helper) · ⛔ |
 | `backend/app/models/document_search.py` | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ now FIRES · last touch 275-03 · ⛔ |
 | `backend/app/services/document_view_resolver.py` | 6 / 6 / 486 (was `5 / 5 / 412`) | 284-04: two read strategies, ONE fragment walk · ⛔ |
 | `backend/app/services/retrieval_documents.py` | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ now FIRES · last touch 275-02 |
@@ -629,6 +629,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/library/find/StructurePopovers.tsx` | 5 / 3 / 746 | ⚠ now FIRES (284) — row added 284-05 · server-mode picker · ⛔ |
 | `frontend/src/components/metadata/DocumentChunksSection.tsx` | 4 / 3 / 265 | ⚠ now FIRES (284) — row added 284-05 · sentinel paging · ⛔ |
 | `frontend/src/components/relationships/CreateLinkDialog.tsx` | 5 / 3 / 267 | ⚠ now FIRES (284) — row added 284-05 · server type-ahead · ⛔ |
+| `backend/app/services/watch_service.py` | 8 / 6 / 769 | ⚠ FIRES, absent here — row added 285-03 · honoured by construction (285-01) |
+| `backend/app/db/watches.py` | 6 / 4 / 828 | ⚠ FIRES, absent here — row added 285-03 · honoured by construction (285-02) |
+| `frontend/src/components/sources/RunHistoryList.tsx` | 5 / 3 / 275 | ⚠ now FIRES (285) — row added 285-03 · comment-only change (285-01) |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

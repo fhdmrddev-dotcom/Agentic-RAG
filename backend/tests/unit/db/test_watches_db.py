@@ -518,3 +518,82 @@ async def test_last_success_by_watch_coerces_str_ids():
     assert bound_ids == [w1]
     assert all(isinstance(i, UUID) for i in bound_ids)
     assert bound_user == user_id
+
+
+# ── Phase 285 (FIX-12 / FIX-13; D-01, D-03, D-06) — attempts, minted marker, run_error ──
+#
+# ``failed_attempts`` and ``minted`` are written in the SAME upsert the loop already does
+# (one write per item). ``None`` means "keep the stored value" (M-2 / M-4): the DO UPDATE
+# references the PARAMETER, never ``EXCLUDED`` — EXCLUDED carries the INSERT's defaulted value
+# and would silently overwrite a preserved marker.
+#
+# ``run_error`` (D-03, orchestrator ruling 3) is the per-file failure summary. It belongs to
+# the RUN ROW only: ``connector_watches.last_error`` feeds WatchRowCard's connection pill, which
+# classifies the string unconditionally, so a filename like ``permissions-matrix.xlsx`` must
+# never reach it on a success tick.
+
+
+@pytest.mark.asyncio
+async def test_upsert_watch_item_preserves_attempts_and_minted_when_none():
+    pool, con = _pool_and_con()
+    con.fetchrow.return_value = {"id": uuid4()}
+
+    await upsert_watch_item(
+        pool, watch_id=uuid4(), external_id="f-1", name="a.txt", user_id=uuid4(),
+    )
+
+    sql = con.fetchrow.call_args[0][0]
+    assert "COALESCE($13::int, connector_watch_items.failed_attempts)" in sql
+    assert "COALESCE($14::boolean, connector_watch_items.minted)" in sql
+    assert "EXCLUDED.failed_attempts" not in sql
+    assert "EXCLUDED.minted" not in sql
+    assert "COALESCE($13::int, 0)" in sql
+    assert "COALESCE($14::boolean, false)" in sql
+    args = con.fetchrow.call_args[0]
+    assert len(args) == 15  # the SQL + 14 binds
+    assert args[13] is None and args[14] is None
+
+
+@pytest.mark.asyncio
+async def test_upsert_watch_item_binds_attempts_and_minted():
+    pool, con = _pool_and_con()
+    con.fetchrow.return_value = {"id": uuid4()}
+
+    await upsert_watch_item(
+        pool, watch_id=uuid4(), external_id="f-1", name="a.txt", user_id=uuid4(),
+        state="failed", last_error="ConnectError", failed_attempts=2, minted=True,
+    )
+
+    args = con.fetchrow.call_args[0]
+    assert args[13] == 2       # $13 failed_attempts
+    assert args[14] is True    # $14 minted
+    assert args[12] == "ConnectError"  # $12 last_error unchanged position
+
+
+@pytest.mark.asyncio
+async def test_release_watch_run_error_goes_to_run_row_only():
+    pool, con = _pool_and_con()
+
+    await release_watch(
+        pool, uuid4(), status="success", error=None,
+        run_error="1 file failed: x.txt (ConnectError)",
+        counts={"errors": 1}, listing_complete=True,
+    )
+
+    update_args = con.execute.call_args_list[0][0]
+    assert "UPDATE connector_watches" in update_args[0]
+    assert update_args[3] is None  # $3 connector_watches.last_error stays NULL
+    insert_args = _insert_call(con)
+    assert insert_args[7] == "1 file failed: x.txt (ConnectError)"  # $7 run row last_error
+    assert insert_args[5] == "success"
+    assert list(insert_args[9:15]) == [0, 0, 0, 0, 0, 1]
+
+
+@pytest.mark.asyncio
+async def test_release_watch_error_without_run_error_unchanged():
+    pool, con = _pool_and_con()
+
+    await release_watch(pool, uuid4(), status="failed", error="boom")
+
+    assert con.execute.call_args_list[0][0][3] == "boom"
+    assert _insert_call(con)[7] == "boom"

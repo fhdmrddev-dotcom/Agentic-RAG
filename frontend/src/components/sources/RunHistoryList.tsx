@@ -168,10 +168,12 @@ export function RunHistoryList({
            2026-09-09 this history drew it as one. Measured on the operator's own Gmail watch:
            `status = 'success'`, `listing_complete = true`, `count_errors = 2` — the check DID
            complete, so `failed` is correctly false, and two files still did not arrive.
-           ⛔ IT GETS THE REGISTER, NOT A SENTENCE. `run.last_error` is null on such a row, so
-           calling `sourceFailureSentence` here would print the unknown-failure prose about a
-           run that did not fail — inventing a reason is the defect, not the fix. The `errors`
-           bit already says how many; this only makes the eye stop. */
+           ⛔ IT GETS THE REGISTER, NOT A SENTENCE. Since Phase 285 (D-03) such a row's
+           `run.last_error` carries a run-level failure summary ("1 file failed: x.txt
+           (ConnectError)"), and it is deliberately NOT rendered here: the `failed && …` gate
+           below is the guarantee that a raw string never reaches JSX (T-235-12), and
+           `sourceFailureSentence` would print failure prose about a run that did not fail.
+           The `errors` bit already says how many; this only makes the eye stop. */
         const partial = !failed && run.count_errors > 0
         /* ⚠ THE FOLD'S OWN PREDICATE, re-asked per row — never a second rule. An expanded
            history still has to say a tick changed nothing, and an incomplete listing is not

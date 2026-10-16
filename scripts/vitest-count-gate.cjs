@@ -3642,6 +3642,8 @@ const BASELINE = {
   "McpAuthDoor.test.tsx": 9,
   "McpAuthDoor.byo.test.tsx": 3,
   "scrollAreaViewportWidth.test.tsx": 2,
+  // quick-261016-u3w (SEED-359 A) — new suite, adopted on creation; 10 measured.
+  "SyrelLoader.test.tsx": 10,
   // ── BUG-260904-02 (2026-09-04) — the follow-but-release scroll machine ───────────────
   // ⚠ FOUND IN NEITHER KNOB while carrying the entire scroll discipline of the chat: the gate
   // has never executed it and nothing guarded its count. Adopted here, in the commit that fixes
@@ -5649,6 +5651,7 @@ const TARGETS = [
   "src/components/settings/__tests__/ConnectionFormPanel.sourceTools.test.tsx",
   "src/components/settings/__tests__/ConnectionFormPanel.refreshReceipt.test.tsx",
   "src/components/ui/__tests__/scrollAreaViewportWidth.test.tsx",
+  "src/components/ui/__tests__/SyrelLoader.test.tsx", // quick-261016-u3w (SEED-359 A)
   // ── BUG-260904-02 — see the matching BASELINE entry. `src/__tests__/hooks` is reached by no
   // ── directory entry in this file, so this suite needed BOTH knobs. ───────────────────
   "src/__tests__/hooks/useFollowScroll.test.ts",

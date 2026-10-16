@@ -3,9 +3,9 @@ seed_id: SEED-315
 title: An Expert install Retry never reaches the ingest queue — its storage PUT 409s and it falls back to a direct splice
 created: 2026-09-24
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Reviewed at /gsd:discuss-phase 285 (2026-10-16) and deferred: 285 is repair-only (FIX-12, FIX-13, FIX-14); see 285-CONTEXT.md deferred section."
 trigger_when: Any phase touching backend/app/services/sources/import_service.py _enqueue_or_splice, the Expert installer's re-drive, or ingest retries/lease recovery.
 trigger_paths: ["backend/app/services/sources/import_service.py", "backend/app/services/expert_install_service.py"]
 trigger_surfaces: []

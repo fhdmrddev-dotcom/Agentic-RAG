@@ -109,8 +109,13 @@ class WatchSyncResponse(BaseModel):
 
 class WatchPurgeResponse(BaseModel):
     status: str
+    #: Phase 285 D-09: the rows the DELETE actually returned — never the number requested.
     purged_count: int
     message: str
+    #: Phase 285 D-09 / FIX-13: documents left in place because the watch only linked them (a hand
+    #: upload, another source's copy) or another item still uses them. Additive with a default,
+    #: the `WatchSyncResponse` precedent above, so every existing caller stays valid.
+    kept_count: int = 0
 
 
 # ══ Phase 235 (SURF-02 / SURF-03 · D-235-05 / D-235-07 / D-235-12 / D-235-21) ═════════════

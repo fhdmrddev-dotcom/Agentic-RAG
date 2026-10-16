@@ -4,10 +4,10 @@ title: remove_document_bytes reports every path as removed without reading what 
 reported: 2026-10-14
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [backend/retention, backend/connectors, backend/storage]
-folded_into: null
-verified_closed_by: null
+folded_into: "285"
+verified_closed_by: "285 (14a70e94f — 285-02 BUG-05 unit pins, D-10)"
 related_seeds: []
 re_open_trigger: "The next phase whose files_modified names backend/app/services/document_purge.py or backend/app/services/retention/disposition.py, OR any report/test that relies on removed_paths / not_removed being accurate (e.g. a retention disposal receipt shown to an operator)."
 reproduces_on:
@@ -67,3 +67,7 @@ None needed for canonically minted documents. For an audit, list `storage.object
 - `.planning/phases/280-in-once-out-clean/280-REVIEW.md` → IN-05 and its Fix log entry
 - `backend/app/services/document_purge.py` (`remove_document_bytes`)
 - `backend/venv/Lib/site-packages/storage3/_sync/file_api.py` (`remove` returns `response.json()`)
+
+## Closed 2026-10-16 (Phase 285)
+
+Closed by Phase 285 plan 02 (`14a70e94f`, D-10): `remove_document_bytes` reports as removed only the paths Storage's `remove()` response names. Anything else, including a raising call, is reported `not_removed`. The BUG-05 unit pins went RED first (`['u/d1/a.txt', 'u/d2/never-existed.txt'] == ['u/d1/a.txt']`), then green. Accepted residual (orchestrator ruling 7): retention may now over-report a path that was already absent under `bytes_not_removed`. That fails safe. Evidence: `.planning/phases/285-watch-and-re-upload-close-out/285-02-SUMMARY.md`, and `285-LIVE-EVIDENCE.md` § SC#2 (the minted positive control).

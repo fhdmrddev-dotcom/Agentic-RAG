@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,6 +11,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { getPublishGate } from "@/lib/api"
 import type { PublishGate } from "@/types"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 interface Props {
   skillId: string
@@ -103,10 +103,7 @@ export function PublishGateDialog({ skillId, open, onOpenChange, onConfirm, onRe
         </AlertDialogHeader>
 
         {loading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Checking the publish gate…
-          </div>
+          <SyrelLoader size="section" label="Checking the publish gate…" className="text-sm text-muted-foreground" />
         )}
 
         {loadError && <p className="text-sm text-destructive">{loadError}</p>}

@@ -73,7 +73,6 @@ import {
   AlertTriangle,
   Folder,
   HardDrive,
-  Loader2,
   Plus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -99,6 +98,7 @@ import {
   type SourceState,
   type WatchSyncOutcome,
 } from "./WatchRowCard"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 /**
  * ⭐ D-235-12 — THE INSTANCE-LEVEL TRUTH, SAID ONCE.
@@ -427,10 +427,7 @@ export function WatchedFoldersSection({
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin mr-2" />
-          Loading watched folders...
-        </div>
+        <SyrelLoader size="panel" label="Loading watched folders..." className="p-8 text-sm text-muted-foreground" />
       ) : watches.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-8 text-center rounded-lg border border-dashed border-border/60 bg-muted/10">
           <Folder className="h-8 w-8 text-muted-foreground mb-2 stroke-[1.5]" />

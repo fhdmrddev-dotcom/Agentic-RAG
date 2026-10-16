@@ -88,6 +88,7 @@ import {
   type PublishedWorkflow,
   type WorkflowDeletePreview,
 } from "@/lib/api"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 /** The in-place delete lifecycle (D-LOCK-04), adapting the 064-B KillPhase machine:
  *  idle → deleting (Deleting…) → deleted (Deleted · recorded) | error (Try again). */
@@ -202,12 +203,10 @@ export function WorkflowDeleteSheet({ wf, onDeleted, ref }: WorkflowDeleteSheetP
               // WHY there is a wait — the guard is fetching the exact victim before it will
               // offer the button (D-LOCK-03). "Loading the exact counts…" named the
               // mechanism, which is the thing this design language does not print.
-              // ⚠ `role="status"` and the never-guess rule are untouched: this arm still
-              // renders NO count, no placeholder and no destructive control.
-              <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
-                Checking what this will remove…
-              </p>
+              // ⚠ The status role is now carried by the shared Iris loader (quick-261016-u3w,
+              // SEED-359), and the never-guess rule is untouched: this arm still renders NO
+              // count, no placeholder and no destructive control.
+              <SyrelLoader size="section" label="Checking what this will remove…" className="text-sm text-muted-foreground" />
             ) : (
               <>
                 {/* ── PORTED FROM SKETCH 200 `fork-delete.html` §2, LOADED SPECIMEN ───────

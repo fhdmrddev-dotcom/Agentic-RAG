@@ -681,6 +681,7 @@ async def upload_document(
     org_uuid = UUID(str(raw_org_id)) if raw_org_id else None
     doc_uuid = UUID(str(doc["id"]))
 
+    enqueued = False
     try:
         from app.dependencies import get_pg_pool  # noqa: PLC0415
         pool = await get_pg_pool()
@@ -691,6 +692,7 @@ async def upload_document(
                 user_id=user_uuid,
                 org_id=org_uuid,
             )
+            enqueued = True
         else:
             raise ValueError("user_uuid is None")
     except Exception as q_exc:
@@ -709,8 +711,48 @@ async def upload_document(
                 "progress": {},
                 "max_retries": 3,
             }).execute()
+            enqueued = True
         except Exception as sb_exc:
             log.error("Failed to insert ingestion_job via supabase: %s", sb_exc)
+
+    # ── Phase 285 · FIX-14 / D-12 / D-13 — NOT QUEUED MEANS FAILED, NEVER PENDING. ─────────────
+    #
+    # ⛔ BUG-261014-04: when BOTH inserts above raised, this route used to log and answer 201 with
+    #    a `pending` row that no job would ever read. The minter's in-flight leg treats any
+    #    `pending` row with the same bytes as in flight (280 FIX-02 / D-24, folder-agnostic), so
+    #    that stranded row absorbed EVERY later upload of the same bytes, in EVERY folder, as
+    #    `already_in_library`. Marking it failed releases it: the next same-bytes upload mints.
+    #
+    # ⚠ Only /upload needs this (D-15 audit, 7 minter callers): the watch new-file and modify arms
+    #   already mark failed in their except arm; import_service, workspace_promote and
+    #   expert_install_service share `_enqueue_or_splice`'s never-strand fallback; email
+    #   attachments have no queue. Rows stranded by a process restart are the D-14 heal's job.
+    # ⚠ Gated on `ingest_worker_enabled`: with the worker off, the BackgroundTask below reads the
+    #   row, so a failed `ingestion_jobs` insert strands nothing.
+    # ⚠ The minter's in-flight leg (`ingest_splice.py`) is deliberately UNTOUCHED (FIX-02).
+    # ⚠ `.eq("status", "pending")` keeps the refusal from clobbering a row that already moved.
+    #   D-13: the storage-fail arm's shape — 201, `status: failed`, no audit task.
+    if not enqueued and getattr(settings, "ingest_worker_enabled", True):
+        log.error(
+            "Could not queue %s for reading (both enqueue paths failed) — marking it failed "
+            "rather than leaving a pending row with no job (BUG-261014-04)",
+            doc["id"],
+        )
+        try:
+            await run_in_threadpool(
+                lambda: service_supabase.table("documents").update({
+                    "status": "failed",
+                    "ingestion_step": "failed",
+                    "error_message": (
+                        "This file could not be queued for reading. "
+                        "Please try uploading it again."
+                    ),
+                }).eq("id", doc["id"]).eq("status", "pending").execute()
+            )
+        except Exception:  # noqa: BLE001 — the refusal write must not double-fault
+            log.exception("could not mark %s failed after an enqueue failure", doc["id"])
+        response.status_code = status.HTTP_201_CREATED
+        return {**doc, "status": "failed"}
 
     # 3. Fallback to BackgroundTask ONLY if ingest_worker_enabled is explicitly False
     if not getattr(settings, "ingest_worker_enabled", True):

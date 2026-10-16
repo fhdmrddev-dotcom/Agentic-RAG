@@ -42,7 +42,6 @@ import {
   Clock,
   Folder,
   HardDrive,
-  Loader2,
   Pause,
   Play,
   RefreshCw,
@@ -81,6 +80,7 @@ import {
 import { cn } from "@/lib/utils"
 import { ConnectionMarkGlyph } from "@/lib/connectionMark"
 import { watchProductMarkKey } from "./watchProductMark"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 export type SourceState = "healthy" | "waiting" | "paused" | "stopped" | "degraded"
 
@@ -739,12 +739,8 @@ export function WatchRowCard({
           {historyOpen && (
             <div className="border-t border-border/50 pt-2">
               {runsLoading ? (
-                <div
-                  data-testid="sources-history-loading"
-                  className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground"
-                >
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                  Loading the checks for this source...
+                <div data-testid="sources-history-loading" className="px-2 py-1 text-xs text-muted-foreground">
+                  <SyrelLoader size="section" label="Loading the checks for this source..." />
                 </div>
               ) : runsError ? (
                 <p data-testid="sources-history-error" className="px-2 py-1 text-xs text-muted-foreground">

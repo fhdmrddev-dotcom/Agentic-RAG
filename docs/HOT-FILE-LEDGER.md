@@ -11132,7 +11132,7 @@ cells rot within days.
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 43 / 17 / 2051 (was `42 / 17 / 2024`) | ⚠ **FIRES** | honoured by construction (**282-01** / **282-04**): ONE `_timeout_out_of_range_detail` helper serves the PATCH and Add model by ID; the add gains an optional bound timeout. ⛔ add still lands disabled |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
-| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 97 / 38 / 2653 (was `95 / 37 / 2534`) | ⚠ **FIRES** | Honoured by construction. **284-02**: `GET /documents` = ONE ranged `count=exact` read of `library_documents`; `GET /documents/{id}`; paged chunks/tables/images/versions. `_ID_BATCH` stopgap DELETED |
+| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 99 / 39 / 2698 (was `97 / 38 / 2653`) | ⚠ **FIRES** | Honoured by construction. **285-03** (D-12): both enqueue paths failed → the doc is marked `failed` (guard `status='pending'`) and 201 `failed` returned, like the storage-fail arm. Minter untouched |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 308 / 68 / 6483 (was `298 / 66 / 6443`) | ⚠ **FIRES** | last touch **284-05**: 10 pins raised to measured actuals (284-03 / 284-04 growth) + 5 suites adopted in BOTH knobs (incl. TakeoffSection, in neither before). No pin lowered |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 5 / 2 / 465 | no (2 phases) | **275-03**: `retention` tag in the Documents group (one line). ⛔ `scripts/` is gate-exempt |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
@@ -11297,9 +11297,9 @@ cells rot within days.
 | [`frontend/src/components/workflows/PublishBlockedStepCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepcardtsx) | 2 / 1 / 109 (was `0 / 0 / 101`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE optional `canOpenRun` flag; next line is `BLOCKED_STEP_NEXT_NO_RUN` when there is no link; the cause keeps its line breaks. ⚠ **G-2 OVERRIDDEN, not satisfied** |
 | [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 6 / 3 / 421 | ⚠ **FIRES** | ⚠ **the row read `5 / 2 / 399 · no (2 phases)` — present and WRONG, the state that stops an audit.** 256 is the THIRD phase; row promoted into CLAUDE.md's firing table by 256-04 |
 | [`backend/app/db/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappdbschedulespy) | 1 / 1 / 359 | no (1 phase) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim; young (204) |
-| [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 7 / 5 / 643 | **FIRES** | ⚠ row STALE at 4/2/608. 247-02: missing_since lifecycle on disappearance/restore; H-5 incomplete listing guard preserved. Seam 2 remains primary writer |
-| [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 4 / 3 / 709 | ⚠ **FIRES** | ⚠ row STALE at 2/2/696. 247-02: update_item_state & bulk_update record missing_since on missing; clear_missing_since resets to NULL on restore |
-| [`backend/app/api/sources.py`](docs/HOT-FILE-LEDGER.md#backendappapisourcespy) | 10 / 4 / 698 (was `9 / 3 / 706`) | ⚠ **FIRES** | ✅ **G-5 extraction FIRST DISCHARGED (280-01)**: both purge doors call `document_purge.purge_documents`; bytes now removed (DEBT-10; per-path live proof 280-04) |
+| [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 8 / 6 / 769 (was `7 / 5 / 643`) | ⚠ **FIRES** | Honoured by construction. **285-01**: a failed item is retried through the SAME new-file body (cap 3); typed `last_error`; minted marker. Still 2 minter calls. Listing-loop seam not triggered |
+| [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 6 / 4 / 828 (was `4 / 3 / 709`) | ⚠ **FIRES** | Honoured by construction. **285-01**: upsert takes `failed_attempts` / `minted` (COALESCE keeps), `release_watch(run_error=)`. **285-02**: `watch_purge_scope` + a frozen dataclass, asyncpg only |
+| [`backend/app/api/sources.py`](docs/HOT-FILE-LEDGER.md#backendappapisourcespy) | 11 / 5 / 713 (was `10 / 4 / 698`) | ⚠ **FIRES** | Honoured by construction. **285-02**: both purge doors ask `db.watches.watch_purge_scope` and purge only `purge_doc_ids`; door 2 reports `kept_count`. No inline SQL. Extraction discharged (280-01) |
 | [`frontend/src/components/sources/WatchedFoldersSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchedfolderssectiontsx) | 10 / 4 / 486 | ⚠ **FIRES — STATE CHANGE** | ⚠ the row read `9/3/470` and **no**; 252 was the 4th phase, so G-5 FIRES now. 247-03's WatchRowCard extraction stands as the discharge — re-assert it on the next touch |
 | [`frontend/src/components/sources/WatchRowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchrowcardtsx) | 3 / 2 / 770 | no (2 phases) | ⚠ row STALE (`2/1/649`) — 252-05 touched it (+121 L) and put it into BOTH count-gate knobs; it had run NOWHERE. NOT modified by 253; re-derived under CR-08 |
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
@@ -11310,7 +11310,7 @@ cells rot within days.
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
 | [`frontend/src/lib/api/sources.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisourcests) | 6 / 2 / 313 (was `5 / 1 / 312`) | no (2 phases) | **275-02**: purgeWatchFiles throws `ApiRefusal` (was `ApiError`); the section renders its sentence unchanged |
-| [`backend/app/models/source.py`](docs/HOT-FILE-LEDGER.md#backendappmodelssourcepy) | 5 / 1 / 196 | no (1 phase) | ⚠ absent — row added 235 (+117 L). `cause`/`status` are `Literal`s, so an unknown value is a ValidationError, never a string that renders |
+| [`backend/app/models/source.py`](docs/HOT-FILE-LEDGER.md#backendappmodelssourcepy) | 6 / 2 / 201 (was `5 / 1 / 196`) | no (2 phases) | **285-02**: ONE additive `kept_count: int = 0` on `WatchPurgeResponse` (the `WatchSyncResponse` precedent). `cause`/`status` stay `Literal`s |
 | [`backend/app/services/ingest_enrich.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_enrichpy) | 7 / 2 / 623 | no (2 phases) | ⚠ absent for its entire life — row added 235. ⚠ its `0 phases` is real: all three commits are DATED QUICK TASKS. `BUG-260906-01` closed here by `260906-5qd` |
 | [`backend/app/services/ingest_splice.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_splicepy) | 22 / 8 / 1043 (was `19 / 7 / 930`) | ⚠ **FIRES** | Honoured by construction: every 280 hunk sits inside `mint_document_row` (280-01 2 `maybe_row` reads; 280-03 in-flight leg, insert-then-retire, 23505 → winner, folder-org check). Queue steps untouched |
 | [`backend/app/services/email_attachments.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_attachmentspy) | 0 / 0 / 226 | no (new) | young (240) — the shared email-attachment child loop. ⛔ Closed the FOURTH two-paths disagreement: a watched mailbox ingested messages and zero attachments |
@@ -11319,7 +11319,7 @@ cells rot within days.
 | [`backend/app/services/sources/health_verdict.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourceshealth_verdictpy) | 1 / 1 / 149 | no (1 phase) | young (235) — the ONE stopped/not decision. ⭐ DERIVED from run history, never a counter column. Zero rows ≠ zero failures |
 | [`frontend/src/components/sources/sourceHealthVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcehealthvocabularyts) | 8 / 4 / 645 | ⛔ **FIRES — UNDISPOSITIONED** | ⚠ row STALE (`2/1/454`; CLAUDE.md read `6/3/560`). ⛔ G-5 FIRED AND NOBODY SAID SO: the row promised it would fire on the next touch and **252-03 WAS that touch**. Seam OWED |
 | [`frontend/src/components/sources/runHistoryFold.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistoryfoldts) | 1 / 1 / 125 | no (1 phase) | young (235) — the pure quiet-run fold; separating it is what proved the fence's collapsed-3/expanded-17 red was a FIXTURE defect |
-| [`frontend/src/components/sources/RunHistoryList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistorylisttsx) | 2 / 1 / 235 | no (1 phase) | young (235) — ✅ **G1a CLOSED (235-16)**: the summed one number replaced by the per-category breakdown. ⚠ It mounts BEHIND A CLICK; five fence reds are a harness finding |
+| [`frontend/src/components/sources/RunHistoryList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistorylisttsx) | 5 / 3 / 275 (was `2 / 1 / 235`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **285-01**: comment only + one vitest pin (a success row's run summary is never rendered, T-235-12). Extraction FIRST at the next feature phase |
 | [`frontend/src/components/layout/AttentionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionpopovertsx) | 1 / 1 / 109 | no (1 phase) | young (235) — ⛔ it renders no verdict and derives no count; it is handed conditions and draws them |
 | [`frontend/src/components/layout/attentionConditions.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionconditionsts) | 3 / 2 / 200 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 102`. honoured by construction (**244-04**): ONE optional `tab?: LibraryTab` set by the one existing producer — no second tenant, `detail` byte-identical |
 | [`frontend/src/components/library/SourcesAttentionSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarysourcesattentionsectiontsx) | 2 / 1 / 197 | no (1 phase) | young (235) — three separately-named honest states. ⛔ A DOOR, never a repair; no handler ⇒ no control |
@@ -11531,7 +11531,7 @@ cells rot within days.
 | [`backend/app/services/expert_scope_events.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scope_eventspy) | 2 / 1 / 228 (was `0 / 0 / 0`) | no (young) | young (created 279-01). Transcript wording + its ONE writer; **279-02 H** D-07 r→r `excluded` fix. ⛔ imports statement, never the reverse |
 | [`backend/app/utils/db.py`](docs/HOT-FILE-LEDGER.md#backendapputilsdbpy) | 4 / 2 / 76 (was `2 / 2 / 59`) | no (2 phases) | **280-01**: + `maybe_row()` beside `aexec` (0-row-safe `.maybe_single()` read); docstring fixed with the main.py patch deletion (D-30). AST fence: `test_280_maybe_row_fence` |
 | [`backend/app/api/takeoff.py`](docs/HOT-FILE-LEDGER.md#backendappapitakeoffpy) | 2 / 1 / 222 (was `1 / 1 / 221`) | no (1 phase) | **280-01**: 5 `maybe_row` one-liners (DEBT-11), status codes unchanged. Below threshold; no seam proposed |
-| [`backend/app/services/document_purge.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_purgepy) | 2 / 1 / 87 (was `0 / 0 / 0`) | no (young) | young (created 280-01). ⛔ guard → rows → bytes (T-275-12); bytes only for rows the DELETE returned; guard via module attribute (D-31) |
+| [`backend/app/services/document_purge.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_purgepy) | 4 / 2 / 105 (was `2 / 1 / 87`) | no (2 phases) | **285-02** (D-10): `remove_document_bytes` reports removed only what Storage confirmed. ⛔ guard → rows → bytes (T-275-12); bytes only for rows the DELETE returned |
 | [`backend/app/services/harness/emit_cause.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessemit_causepy) | 1 / 1 / 292 (was `0 / 0 / 0`) | no (young) | young (created 281-01, `0ab03994e`). The ONE composer of emit-failure causes (D-30); a step is named only by its author-set name (D-32). ⛔ pure leaf; never imports phase_types or harness_engine |
 | [`backend/app/services/harness/freshness.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessfreshnesspy) | 2 / 2 / 123 (was `1 / 1 / 113`) | no (2 phases) | **281-01** (`76bbc0601`): both reads gain `AND <RETRIEVABLE_COLUMN>`, imported from retrieval_scope (DEBT-07). honoured by construction. ⛔ never restates the predicate; no f-string SQL |
 | [`frontend/src/components/workflows/describeRefusalVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescriberefusalvocabularyts) | 1 / 1 / 151 (was `0 / 0 / 0`) | no (young) | young (created 281-02, `fa08ee6f1`). The ONE code→words table for describe-door refusals (SEED-221). ⛔ imports door words, never retypes; joins `SWEPT_SOURCES` |
@@ -11557,6 +11557,16 @@ cells rot within days.
 | [`frontend/src/hooks/useLibraryDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuselibrarydocumentsts) | 3 / 1 / 390 (was `0 / 0 / 0`) | no (young) | young (created 284-01). The D-24 seam. **284-03**: one page + one summary + one read by id; source = browse, view or filter; numbers `null` until answered. ⛔ never 0 |
 | [`frontend/src/test-utils/fakeLibraryApi.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctest-utilsfakelibraryapits) | 1 / 1 / 255 (was `0 / 0 / 0`) | no (young) | young (created 284-03). Test-only fake: page / summary / single read from ONE fixture array, answering like the server. ⛔ never imported by product code |
 | [`backend/app/models/document_view.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_viewpy) | 6 / 4 / 119 (was `5 / 3 / 110`) | ⚠ **FIRES** | ⚠ FIRES (4 phases). **284-04**: `AdHocResolve` gains `offset` / `limit` (≤ 200) / `include_archived` (default True); honoured by construction (additive, `extra` unchanged) |
+| [`frontend/src/components/panel/FilePreview.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilepreviewtsx) | 7 / 4 / 406 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 4 phases — row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader` (panel); honoured by construction |
+| [`frontend/src/components/settings/EngineHealthCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsenginehealthcardtsx) | 5 / 2 / 464 | no (2 phases) | row added quick-261016-u3w (gate demanded). Two loading rows → `SyrelLoader` (section); `engine-health-card` testid wrapper kept |
+| [`frontend/src/components/settings/MemorySection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmemorysectiontsx) | 5 / 2 / 284 | no (2 phases) | row added quick-261016-u3w (gate demanded). List loading arm → `SyrelLoader` (panel); entry-action spinners untouched |
+| [`frontend/src/components/skills/PublishGateDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillspublishgatedialogtsx) | 4 / 3 / 175 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 3 phases — row added quick-261016-u3w. Gate-check loading line → `SyrelLoader` (section); honoured by construction |
+| [`frontend/src/components/skills/SkillTestCasesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskilltestcasessectiontsx) | 4 / 2 / 218 | no (2 phases) | row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader` (section), words verbatim |
+| [`frontend/src/components/skills/studio/CaseEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsstudiocaseeditortsx) | 3 / 2 / 274 | no (2 phases) | row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader` (section), words verbatim |
+| [`frontend/src/components/skills/studio/VersionsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsstudioversionstabtsx) | 4 / 3 / 322 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 3 phases — row added quick-261016-u3w. Loading arm → `SyrelLoader` (section); honoured by construction |
+| [`frontend/src/components/ui/SyrelLoader.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsuisyrelloadertsx) | 2 / 0 / 50 | no (young) | young (created quick-261016-u3w, SEED-359 A). The ONE branded loader; renders IrisAvatar `thinking`, never forks it. ⛔ one polite status per block |
+| [`frontend/src/components/workflows/library/WorkflowDeleteSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowdeletesheettsx) | 3 / 1 / 339 | no (1 phase) | row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader`; ⛔ never-guess rule kept: no count, no destructive control while loading |
+| [`frontend/src/pages/SkillTunerPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesskilltunerpagetsx) | 21 / 5 / 921 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 5 phases — row added quick-261016-u3w. Skill loading arm → `SyrelLoader` (panel); honoured by construction |
 
 
 
@@ -21644,3 +21654,123 @@ Scan-list disposition cell before 284-05 (replaced):
 CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
 
 > ⚠ row STALE · last touch 266-01 · ⛔
+
+## Phase 285 close (2026-10-16, 285-03)
+
+All triples below were re-derived on the merged tree at `cca4e5a90` (285-01..03 code merged) with the CLAUDE.md recipe; six-digit quick-task buckets are subtracted and named per file. The set is every non-test source file the phase changed since PHASE_BASE `c8c764e90` (`git diff --name-only c8c764e90 HEAD -- backend/app frontend/src`, tests excluded): **7 files**. Migration 209, `scripts/apply_migration_209.py` and `supabase/full-schema.sql` are gate-exempt. Each subsection quotes the scan-list cell it replaced and, where the file had one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. **Newly FIRING or absent from CLAUDE.md, row ADDED:** `watch_service.py` (6), `db/watches.py` (4), `RunHistoryList.tsx` (3). `ingest_splice.py` and `db/ingestion_jobs.py` were NOT touched (D-12).
+
+### `backend/app/services/watch_service.py` — Phase 285 close
+
+**`8 / 6 / 769` (was `7 / 5 / 643`).** **285-01** (`9e9af4a1e`, FIX-12): a `failed` item is routed back through the EXISTING new-file branch (`existing is None or retry_failed`) rather than a third mint call, so `grep -c "async_mint_document_row("` still reads 2; `WATCH_ITEM_MAX_FAILED_ATTEMPTS = 3`, reset on a source version change. New module-level pieces are pure helpers (`_typed_error`, `_failure_summary`, `_minted_marker`). The error arm now marks a document failed only when THIS iteration minted it (never the previous good copy, never a dedup-linked hand upload). The run row carries the per-file summary; `connector_watches.last_error` stays NULL on a success tick. Proven live by SC#5 (105/105, 285-LIVE-EVIDENCE.md). ⛔ Binding: keep exactly 2 minter call sites (the 280 caller fence); the named seam (extract the paged-listing loop before a third adapter) is still the next refactor.
+
+Scan-list disposition cell before 285-03 (replaced):
+
+> ⚠ row STALE at 4/2/608. 247-02: missing_since lifecycle on disappearance/restore; H-5 incomplete listing guard preserved. Seam 2 remains primary writer
+
+CLAUDE.md FIRING row: none before — ADDED by 285-03 (6 phases).
+
+### `backend/app/db/watches.py` — Phase 285 close
+
+**`6 / 4 / 828` (was `4 / 3 / 709`).** **285-01** (`92bf5a869`): `upsert_watch_item` takes `failed_attempts` and `minted`, with `COALESCE($param, stored)` in ON CONFLICT so `None` means keep; `release_watch(run_error=)` writes the run row only. **285-02** (`4bcce53a1`, FIX-13): `watch_purge_scope(pool, watch_id, user_id, states)` returns a frozen `WatchPurgeScope(purge_doc_ids, kept_doc_ids)` — a document is purgeable only when this watch MINTED it and no other item (any watch, including a present sibling) still references it. `_WATCH_ITEM_COLUMNS` now selects `failed_attempts, minted`. ⛔ Binding: migration 209 must be applied BEFORE this code deploys; the scope never reads `source_connection_id` (T-285-10), and `user_id = $2` is in both statements (T-285-13).
+
+Scan-list disposition cell before 285-03 (replaced):
+
+> ⚠ row STALE at 2/2/696. 247-02: update_item_state & bulk_update record missing_since on missing; clear_missing_since resets to NULL on restore
+
+CLAUDE.md FIRING row: none before — ADDED by 285-03 (4 phases).
+
+### `backend/app/api/sources.py` — Phase 285 close
+
+**`11 / 5 / 713` (was `10 / 4 / 698`).** **285-02** (`4bcce53a1`, FIX-13): door 1 (`DELETE /watches/{id}?purge_documents=true`) and door 2 (`POST /watches/{id}/purge`) both call `watch_purge_scope` and hand only `purge_doc_ids` to `document_purge.purge_documents`; `purged_count = len(deleted)` (the rows the DELETE returned), and door 2 adds `kept_count`. Door 1 answers 204, so its kept count is logged. ⚠ Stated behaviour change: a held LINKED document no longer makes a watch purge 409, because it is not being deleted; a held MINTED one still refuses 409 and keeps its bytes. Proven live RED-first (285-LIVE-EVIDENCE.md § SC#2). ⛔ Binding: the set logic lives in `db/watches.py`, never inline in a door.
+
+Scan-list disposition cell before 285-03 (replaced):
+
+> ✅ **G-5 extraction FIRST DISCHARGED (280-01)**: both purge doors call `document_purge.purge_documents`; bytes now removed (DEBT-10; per-path live proof 280-04)
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 285-03):
+
+> ✅ G-5 extraction FIRST DISCHARGED (280-01: document_purge) · ⛔
+
+### `backend/app/models/source.py` — Phase 285 close
+
+**`6 / 2 / 201` (was `5 / 1 / 196`).** **285-02** (`4bcce53a1`): one additive field, `kept_count: int = 0`, on `WatchPurgeResponse`, with a default so every existing caller stays valid; the OpenAPI snapshot was regenerated in `c01426ca6`. 2 phases — no FIRING row owed.
+
+Scan-list disposition cell before 285-03 (replaced):
+
+> ⚠ absent — row added 235 (+117 L). `cause`/`status` are `Literal`s, so an unknown value is a ValidationError, never a string that renders
+
+CLAUDE.md FIRING row: none — 2 phases, does not fire.
+
+### `backend/app/services/document_purge.py` — Phase 285 close
+
+**`4 / 2 / 105` (was `2 / 1 / 87`).** **285-02** (`14a70e94f`, D-10 / BUG-261014-05): `remove_document_bytes` reads storage3's `remove()` response and reports as removed only the paths it names; every other path goes to `not_removed`. Its only diff hunk sits inside that function. Accepted effect (orchestrator ruling 7): retention may over-report an already-absent path under `bytes_not_removed` — the safe direction. 2 phases — no FIRING row owed. ⛔ Binding (unchanged): guard → rows → bytes (T-275-12); the guard is called through the module attribute (D-31).
+
+Scan-list disposition cell before 285-03 (replaced):
+
+> young (created 280-01). ⛔ guard → rows → bytes (T-275-12); bytes only for rows the DELETE returned; guard via module attribute (D-31)
+
+CLAUDE.md FIRING row: none — 2 phases, does not fire.
+
+### `backend/app/api/documents.py` — Phase 285 close
+
+**`99 / 39 / 2698` (was `97 / 38 / 2653`).** Quick-task buckets subtracted: 260328, 260405, 260906, 261014. **285-03** (`521bf6491`, FIX-14 / D-12 / D-13): inside `upload_document`'s existing enqueue block only — an `enqueued` flag; when the asyncpg insert AND the service-role insert both raised and `ingest_worker_enabled` is true, the document is set `failed` through `run_in_threadpool` with `.eq("status", "pending")`, the refusal write cannot double-fault, and the route returns 201 `{**doc, "status": "failed"}` before the audit task, exactly as the storage-fail arm does. With the worker disabled the BackgroundTask ingests the row, so the refusal never fires (unit pin). Proven live RED-first (285-LIVE-EVIDENCE.md § SC#3). ⛔ Binding: `ingest_splice.py`'s in-flight leg stays byte-unchanged (FIX-02, `git diff --quiet` from PHASE_BASE); the single-segment `GET /documents/{document_id}` stays below any literal `GET /documents/<word>` route.
+
+Scan-list disposition cell before 285-03 (replaced):
+
+> Honoured by construction. **284-02**: `GET /documents` = ONE ranged `count=exact` read of `library_documents`; `GET /documents/{id}`; paged chunks/tables/images/versions. `_ID_BATCH` stopgap DELETED
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 285-03):
+
+> honoured by construction (284-02: one ranged view read, stopgap gone) · ⛔
+
+### `frontend/src/components/sources/RunHistoryList.tsx` — Phase 285 close
+
+**`5 / 3 / 275` (was `2 / 1 / 235`).** **285-01** (`92bf5a869`): comment only, no logic change; one vitest regression pin — a `success` row carrying the new run-row summary renders the partial register and never the summary text (T-235-12). It now crosses the G-5 threshold at 3 phases, so the next FEATURE phase on it proposes the extraction first. ⛔ Binding (unchanged): it mounts behind a click, so a fence must open the row before asserting.
+
+Scan-list disposition cell before 285-03 (replaced):
+
+> young (235) — ✅ **G1a CLOSED (235-16)**: the summed one number replaced by the per-category breakdown. ⚠ It mounts BEHIND A CLICK; five fence reds are a harness finding
+
+CLAUDE.md FIRING row: none before — ADDED by 285-03 (3 phases).
+
+---
+
+### `frontend/src/components/panel/FilePreview.tsx` — quick-261016-u3w (2026-10-16)
+
+`7 / 4 / 406` (phases 087, 088, 101.1, 200). The file had NO scan-list row for its entire life, so G-5 could never fire on it at 4 phases; added because `check-hot-file-ledger.cjs` failed `[no-row]` on quick-261016-u3w. That task swapped one loading arm (a centred spinner, no words) for `<SyrelLoader size="panel">` and dropped the now-unused spinner import. Honoured by construction: a 3-line loading-arm swap, no state or effect touched. Seam: none proposed.
+
+### `frontend/src/components/settings/EngineHealthCard.tsx` — quick-261016-u3w (2026-10-16)
+
+`5 / 2 / 464` (phases 137.1, 155). Row added by quick-261016-u3w because the ledger gate failed `[no-row]`. Two loading rows ("Loading engine health…", "Loading smoke run…") became section-size `SyrelLoader`s; the outer card keeps `data-testid="engine-health-card"`. The sweep button's spinning RefreshCw is a running-action indicator and was left byte-unchanged. Does not fire.
+
+### `frontend/src/components/settings/MemorySection.tsx` — quick-261016-u3w (2026-10-16)
+
+`5 / 2 / 284` (phases 34, 155). Row added by quick-261016-u3w (gate `[no-row]`). The list loading arm became `<SyrelLoader size="panel" className="py-8" />`; the two per-entry action spinners are button-level and stayed. Does not fire.
+
+### `frontend/src/components/skills/PublishGateDialog.tsx` — quick-261016-u3w (2026-10-16)
+
+`4 / 3 / 175` (phases 136, 137, 165). ⚠ Absent from the scan list at 3 phases, so G-5 was silent on it. Row added by quick-261016-u3w (gate `[no-row]`). The "Checking the publish gate…" line became a section-size `SyrelLoader`; the sole spinner import was removed. Honoured by construction (a loading-arm swap). Seam: none proposed.
+
+### `frontend/src/components/skills/SkillTestCasesSection.tsx` — quick-261016-u3w (2026-10-16)
+
+`4 / 2 / 218` (phases 132, 155). Row added by quick-261016-u3w (gate `[no-row]`). "Loading test cases…" became a section-size `SyrelLoader`, words verbatim. Does not fire.
+
+### `frontend/src/components/skills/studio/CaseEditor.tsx` — quick-261016-u3w (2026-10-16)
+
+`3 / 2 / 274` (phases 137, 155). Row added by quick-261016-u3w (gate `[no-row]`). "Loading test cases…" became a section-size `SyrelLoader`, words verbatim. Does not fire.
+
+### `frontend/src/components/skills/studio/VersionsTab.tsx` — quick-261016-u3w (2026-10-16)
+
+`4 / 3 / 322` (phases 137, 155, 176). ⚠ Absent from the scan list at 3 phases. Row added by quick-261016-u3w (gate `[no-row]`). "Loading version history…" became a section-size `SyrelLoader`. Honoured by construction (a loading-arm swap). Seam: none proposed.
+
+### `frontend/src/components/ui/SyrelLoader.tsx` — quick-261016-u3w (2026-10-16)
+
+Young (created quick-261016-u3w, SEED-359 part A). The one shared branded loader: `IrisAvatar` in its `thinking` state at 20 / 32 / 48 px (section / panel / page), inside ONE `role="status" aria-live="polite"` root whose accessible name is the visible label or "Loading". ⛔ Reuse the Iris, never fork or restyle it (the 276-iris-avatar sketch is the approved visual). ⛔ Exactly one status per loading block: a caller that wraps it must not add its own role. Fenced by `SyrelLoader.test.tsx` (both count-gate knobs).
+
+### `frontend/src/components/workflows/library/WorkflowDeleteSheet.tsx` — quick-261016-u3w (2026-10-16)
+
+`3 / 1 / 339` (phase 192). Row added by quick-261016-u3w (gate `[no-row]`). The preview-loading `<p role="status">` became a section-size `SyrelLoader` (a div cannot sit in a p, so the whole p was replaced). ⛔ The never-guess rule is unchanged: the loading arm renders the fixed sentence only — no count, no placeholder, no destructive control. `PublishedCardDelete.test.tsx` re-captured the `loading` literal only (Iris gradient ids normalised like the radix id); the other six captures are byte-identical. The "Deleting…" running-action spinner stayed.
+
+### `frontend/src/pages/SkillTunerPage.tsx` — quick-261016-u3w (2026-10-16)
+
+`21 / 5 / 921` (phases 123, 123.1, 137, 139, 176). ⚠ Absent from the scan list at 5 phases — G-5 has been firing silently. Row added by quick-261016-u3w (gate `[no-row]`). The "Loading skill…" arm became a panel-size `SyrelLoader` (it used a spinning RefreshCw, whose import became unused and was removed). Honoured by construction (a loading-arm swap). ⚠ A refactor-first audit is owed before the next FEATURE phase here; no seam has been named yet.

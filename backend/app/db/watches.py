@@ -14,6 +14,7 @@ Key invariants:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -45,7 +46,7 @@ _SYNC_RUN_COLUMNS = (
 _WATCH_ITEM_COLUMNS = (
     "id, org_id, watch_id, user_id, external_id, name, path_hint, source_version, "
     "source_modified_at, content_hash, document_id, state, first_seen_at, last_seen_at, "
-    "missing_since, last_error, created_at, updated_at"
+    "missing_since, last_error, created_at, updated_at, failed_attempts, minted"
 )
 
 
@@ -269,6 +270,7 @@ async def release_watch(
     user_id: UUID | None = None,
     org_id: UUID | None = None,
     retain: int | None = None,
+    run_error: str | None = None,
 ) -> None:
     """Clear the lease, write the terminal outcome hint, and record ONE run row.
 
@@ -295,6 +297,15 @@ async def release_watch(
     All arguments after `error` are optional and net-new: the four existing call sites
     keep compiling unchanged, and a caller that supplies nothing still gets an honest
     zero-count row rather than no row at all.
+
+    ⭐ `run_error` (Phase 285 D-03, orchestrator ruling 3) is the per-file failure summary
+    of a SUCCESSFUL tick ("1 file failed: x.txt (ConnectError)"). It belongs to the RUN ROW
+    only: when given it replaces `error` in `connector_sync_runs.last_error` and never
+    reaches `connector_watches.last_error`. That column feeds WatchRowCard's connection pill,
+    which classifies the string unconditionally (WatchRowCard.tsx:240 / :341) — a file named
+    `permissions-matrix.xlsx` there would flip a healthy watch to "Authorisation withdrawn".
+    So on a success tick the watch row's `last_error` stays NULL. Without `run_error` both
+    columns receive `error`, exactly as before.
     """
     keep = settings.watch_run_history_retention if retain is None else retain
     c = counts or {}
@@ -365,7 +376,7 @@ async def release_watch(
                 started_at,
                 status,
                 failure_cause,
-                error,
+                run_error if run_error is not None else error,
                 bool(listing_complete),
                 int(c.get("new", 0)),
                 int(c.get("modified", 0)),
@@ -571,6 +582,100 @@ async def get_watch_items(
         return [dict(r) for r in rows]
 
 
+@dataclass(frozen=True)
+class WatchPurgeScope:
+    """What a watch purge may delete, and what it must keep (Phase 285 FIX-13)."""
+
+    #: Every in-scope item row. Door 2 deletes ALL of them — unlinking a kept document is not
+    #: deleting it.
+    item_ids: list[UUID]
+    #: Documents this watch MINTED that no item outside the scope still references.
+    purge_doc_ids: list[str]
+    #: Everything else the scope points at: dedup-linked documents (a hand upload, another
+    #: source's copy) and minted documents another item still uses.
+    kept_doc_ids: list[str]
+
+
+async def watch_purge_scope(
+    pool: asyncpg.Pool,
+    watch_id: UUID,
+    *,
+    user_id: UUID,
+    states: list[str] | None,
+) -> WatchPurgeScope:
+    """Partition a watch's items into what a purge may delete and what it must keep.
+
+    Phase 285 FIX-13 / BUG-261014-03. Both purge doors used to delete every document a watch item
+    pointed at, so a hand upload the watch only DEDUP-LINKED to lost its row and its bytes.
+
+    * D-06 — the test is the item's ``minted`` marker, written where the minter answered
+      ``is_duplicate`` (migration 209). It deliberately never reads the document's connection
+      provenance column: that is a copied field, and two watches on one connection share it —
+      the roadmap's named failure mode for a "minted" test.
+    * D-08 — a minted document still referenced by ANY item outside the scope is kept: another
+      watch's item, or (for door 2) a present sibling item of the same watch. The shared check
+      deliberately spans every user's and every watch's items: it can only KEEP more, and only a
+      boolean per document leaves this function.
+    * ``states`` = ``None`` scopes every item of the watch (door 1); a list scopes those states
+      (door 2: ``['missing', 'unauthorized']``).
+
+    ⛔ The caller must have proven ownership with ``get_watch(pool, watch_id, user_id=...)`` first.
+    The pool path is not RLS-gated, so ``user_id = $2`` is in the SQL as well (the
+    ``last_success_by_watch`` precedent), and the DELETE that follows runs under the user's JWT.
+
+    ⚠ Accepted residual: between this read and the DELETE another watch could link one of the
+    purge documents. The window is milliseconds and the outcome is that item's ``document_id``
+    going NULL (``ON DELETE SET NULL``), never the loss of a hand upload.
+    """
+    args = (_as_uuid(watch_id), _as_uuid(user_id), list(states) if states is not None else None)
+    async with pool.acquire() as con:
+        item_rows = await con.fetch(
+            """
+            SELECT id
+            FROM connector_watch_items
+            WHERE watch_id = $1
+              AND user_id = $2
+              AND ($3::text[] IS NULL OR state = ANY($3::text[]))
+            ORDER BY name ASC
+            """,
+            *args,
+        )
+        doc_rows = await con.fetch(
+            """
+            WITH scope AS (
+                SELECT id, document_id, minted
+                FROM connector_watch_items
+                WHERE watch_id = $1
+                  AND user_id = $2
+                  AND ($3::text[] IS NULL OR state = ANY($3::text[]))
+            )
+            SELECT s.document_id,
+                   bool_or(s.minted) AS minted,
+                   EXISTS (
+                       SELECT 1 FROM connector_watch_items o
+                       WHERE o.document_id = s.document_id
+                         AND o.id NOT IN (SELECT id FROM scope)
+                   ) AS shared
+            FROM scope s
+            WHERE s.document_id IS NOT NULL
+            GROUP BY s.document_id
+            ORDER BY s.document_id
+            """,
+            *args,
+        )
+
+    purge: list[str] = []
+    kept: list[str] = []
+    for r in doc_rows:
+        doc_id = str(r["document_id"])
+        # Fail safe: anything not provably minted-and-unshared is KEPT.
+        if r["minted"] is True and r["shared"] is False:
+            purge.append(doc_id)
+        else:
+            kept.append(doc_id)
+    return WatchPurgeScope(item_ids=[r["id"] for r in item_rows], purge_doc_ids=purge, kept_doc_ids=kept)
+
+
 async def get_watch_item_by_external_id(
     pool: asyncpg.Pool,
     watch_id: UUID,
@@ -605,17 +710,27 @@ async def upsert_watch_item(
     document_id: UUID | None = None,
     state: str = "present",
     last_error: str | None = None,
+    failed_attempts: int | None = None,
+    minted: bool | None = None,
 ) -> dict:
-    """Upsert tracked item on unique (watch_id, external_id)."""
+    """Upsert tracked item on unique (watch_id, external_id).
+
+    Phase 285 (D-01 / D-06): `failed_attempts` and `minted` ride the SAME upsert (one write per
+    item). `None` means "keep the stored value" (M-2 / M-4): on INSERT it becomes the column
+    default (0 / false); on UPDATE the stored value stays. The DO UPDATE references the
+    PARAMETER ($13 / $14), never `EXCLUDED` — EXCLUDED carries the INSERT's defaulted value and
+    would silently overwrite a preserved marker.
+    """
     async with pool.acquire() as con:
         row = await con.fetchrow(
             f"""
             INSERT INTO connector_watch_items (
                 watch_id, external_id, name, user_id, org_id, path_hint,
                 source_version, source_modified_at, content_hash, document_id,
-                state, last_seen_at, last_error
+                state, last_seen_at, last_error, failed_attempts, minted
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), $12
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), $12,
+                COALESCE($13::int, 0), COALESCE($14::boolean, false)
             )
             ON CONFLICT (watch_id, external_id) DO UPDATE
             SET name = EXCLUDED.name,
@@ -627,6 +742,8 @@ async def upsert_watch_item(
                 state = EXCLUDED.state,
                 last_seen_at = now(),
                 last_error = EXCLUDED.last_error,
+                failed_attempts = COALESCE($13::int, connector_watch_items.failed_attempts),
+                minted = COALESCE($14::boolean, connector_watch_items.minted),
                 updated_at = now()
             RETURNING {_WATCH_ITEM_COLUMNS}
             """,
@@ -642,6 +759,8 @@ async def upsert_watch_item(
             _as_uuid(document_id) if document_id else None,
             state,
             last_error,
+            failed_attempts,
+            minted,
         )
         return dict(row) if row else {}
 

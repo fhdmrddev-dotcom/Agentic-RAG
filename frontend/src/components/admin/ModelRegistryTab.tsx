@@ -42,6 +42,7 @@ import { familyDefaults } from "@/lib/model-defaults"
 import { providerLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
 import { ModelAdvancedCapabilities } from "@/components/admin/ModelAdvancedCapabilities"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 interface ModelRegistryTabProps {
   /** Every registry row the shell fetched; `null` while the fetch is in flight. */
@@ -186,12 +187,8 @@ export function ModelRegistryTab({
 
   if (rows === null) {
     return (
-      <div
-        className="flex items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-8 text-sm text-muted-foreground"
-        role="status"
-      >
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-        Loading the model registry…
+      <div className="rounded-[10px] border border-border bg-card px-4 py-8 text-sm text-muted-foreground">
+        <SyrelLoader size="panel" label="Loading the model registry…" />
       </div>
     )
   }

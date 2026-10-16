@@ -13,7 +13,7 @@
 // this client only renders what the owner-scoped API returns.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useState } from "react"
-import { Loader2, Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -25,6 +25,7 @@ import {
   listSkillVersions,
 } from "@/lib/api"
 import type { TestCase, SkillVersion } from "@/types"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 interface Props {
   skillId: string
@@ -111,9 +112,7 @@ export function SkillTestCasesSection({ skillId }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" /> Loading test cases…
-      </div>
+      <SyrelLoader size="section" label="Loading test cases…" className="text-xs text-muted-foreground" />
     )
   }
 

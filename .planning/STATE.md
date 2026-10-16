@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: milestone_phases_complete
-last_updated: 2026-10-16T12:00:00.000Z
-last_activity: 2026-10-16 -- Phase 284 CLOSED (6/6 plans, verified 7/7, self-verified); every v4.6 phase (277-284) complete
+status: milestone_complete
+last_updated: 2026-10-16T17:38:57.417Z
+last_activity: 2026-10-16
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 31
-  completed_plans: 31
-  percent: 100
-stopped_at: Phase 284 closed — v4.6 phases all complete; next /gsd:audit-milestone
+  total_phases: 16
+  completed_phases: 9
+  total_plans: 34
+  completed_plans: 34
+  percent: 56
+stopped_at: Milestone complete (Phase 285 was final phase)
 ---
 
 # Project State
@@ -33,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.6 close — every phase (277-284) complete; milestone audit next
+**Current focus:** Milestone complete
 
 ---
 
@@ -54,6 +54,12 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ---
 
 ## Current Position
+
+**Phase 285 EXECUTED 3/3 (2026-10-16) — ready for verification.** 285-03: `/documents/upload` marks a doc failed when both enqueue paths raised (FIX-14, `521bf6491`, live RED-first); 209 heal proven live (rolled back); SC#4 48 passed; closed core 7/1/30. **SC#5 PASSED 105/105** — operator chose "option-a (Recommended)"; watch A re-synced as it was (`team-note-058.txt` landed, completed), forced `ConnectError` on a temporary watch C showed a typed item failure + run row naming the file, then landed dedup-linked; C deleted without purge. BUG-261014-02/03/04/05 CLOSED; FIX-12/13/14 complete. Backend gate 71 = base set. Evidence `285-LIVE-EVIDENCE.md`. **Not pushed; 209 is LOCAL only** (production paste owed BEFORE the backend). Next: `/gsd:code-review 285` → verifier.
+
+**v4.6 AUDITED 2026-10-16 — `tech_debt`, 21/21, integration 9/9 CONNECTED** (`.planning/v4.6-MILESTONE-AUDIT.md`). Operator chose **B**: Phase **285** was added for BUG-261014-02/03/04 (FIX-12/13/14), and the milestone close waits for it. Next: `/gsd:discuss-phase 285`.
+
+**DEPLOYED 2026-10-16 — v4.6 phases 280-284 LIVE.** Operator: "push to production and apply needed migration". Migration **207** applied to cloud via MCP, VERIFY 7/7 PASS. Security advisors identical to the pre-apply baseline: 0 ERROR. Migration **208 applied by the operator** in the cloud SQL editor (the auto-mode classifier denied `apply_migration` twice, "Modify Shared Resources"). VERIFY read by MCP: **16/16 PASS**. Advisors after it are unchanged (0 ERROR). Live check in the operator's Chrome on the 208 view: Root page 1 200 (113 / 25 rows, embeds `table_count` / `image_count` present, no PGRST200); past-the-end page 200, empty, total 113; Find 200 (164); summary 200; the Library renders "1–25 of 113" and CHUNKS 3,491. Promoted `develop` → master `de963464b` → production `4841d493e` (from `222d63341`), clean `--no-ff`, content == develop. Backend live 13:18 (`/library/summary` 404 → 403; `/docs` 401). Frontend live (the bundle carries `/library/summary` + "Counting…"). Logged-in smoke in the operator's own Chrome (`fhdmrd@gmail.com`, org `747c6210…`): Root "1–25 of 113" = DB 113; CHUNKS 3,491 across 164 = DB; DMT folder pages 1–25 / 26–26 of 26. No Postgres ERROR since the deploy. ⚠ My curl polling tripped Vercel's bot checkpoint for this IP (403 challenge) — browsers pass; poll through the operator's Chrome, never curl.
 
 **Phase 284 CLOSED (2026-10-16) — Library at Scale (FIX-11).** 6 plans / 4 waves. 284-06 was added at the operator's request for SEED-357 (the page index). Verification `284-VERIFICATION.md`: **passed 7/7**, `self-verified`. The one human item (the browser at scale on the 208 view) was driven by the orchestrator: A/B @50k and A @10k PASS, click → rows 2.77 s / 2.65 s = 1.05x (dev build). Measured (`284-MEASUREMENTS.md`): every total = `count(*)` at 10k / 50k; Find page 1 at 50k 16.9 s → ~70 ms; Root page 1 2.54x → 1.14-1.38x and Find 2.59x → 1.32-1.42x after migration 208 (one host-noise pair 1.57x). The summary is 1.85-1.93x and < 500 ms, recorded. G-4 A-F PASS (`284-LIVE-EVIDENCE.md`); F was amended (folder conditions cannot be saved as views). The drive found and fixed, test-first: ungrouped counts `c96a0909e`, and AnimatedNumber painting "-17,721 documents" `bb47f34ce`. Review R1: CR-01 (offset past the end → 500) + WR-01/02/04 + IN-05/07 fixed test-first, merged `138fee3d9`; WR-03 accepted by the orchestrator. Review R2 (migration 208): WR-R2-01..05 fixed `34443231b` (VERIFY proves content, lock_timeout, policy 154-vs-208 parity, disjoint-legs fence). Flips: BUG-261014-07 → closed; BUG-261014-06 note; SEED-248 Library half shipped; SEED-357 → answered. New seeds: SEED-355/356 (R-10), SEED-358 (older paged routes 500 past the end). Gates on the merged tree: backend 71 = base set (7,688 passed), count gate OK 449/449, tsc 63 = 63. Local incident: for ~3 min during 284-06, the first 208 view broke PostgREST embeds on the operator's local :8000; reverted and fixed, no production impact. **Not pushed. Migrations 207 + 208 are LOCAL only.** Production order: paste 207 → paste 208 (VERIFY 16/16; production's policy text was confirmed by a read to equal the guard's v154) → `get_advisors(security)` → backend → frontend. Next: `/gsd:audit-milestone` (v4.6), then close v4.6 by hand.
 
@@ -80,11 +86,11 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 **Phase 280 (2026-10-14):** discuss done — `.planning/phases/280-in-once-out-clean/280-CONTEXT.md`. No migration expected. 4 bugs folded (BUG-261005-01, BUG-260910-04, BUG-261012-01, BUG-261012-02). Owed to operator: upload the generated `Team Docs` folder to OneDrive before the live re-drive (D-14). Next: `/gsd:plan-phase 280`.
 
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: 284
+Phase: 285
 Next: `/gsd:discuss-phase 282` (G-2 sketch first for FIX-07). Deploy of 277-281 + BUG-261014-06 stays operator-gated.
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-10-15
+Status: Milestone complete
+Last activity: 2026-10-16 - Completed quick task 261016-u3w: Syrel Iris loader on 23 page/panel loaders (SEED-359 A)
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
 
 **279-03 (2026-10-13):** "Won't use" → "Won't search" (29 hits / 13 files measured, not 30), swap-card
@@ -121,6 +127,7 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 261016-u3w | SEED-359 part A: 23 page/panel/section/dialog loaders swapped to one shared Syrel Iris `SyrelLoader`; 88 button/inline spinners and components/chat untouched. G-2 note: re-uses the 276-approved Iris visual, no new sketch | 2026-10-16 | 912808491 | [261016-u3w-swap-page-and-panel-loaders-to-the-syrel](./quick/261016-u3w-swap-page-and-panel-loaders-to-the-syrel/) |
 | 261012-x1l | fix 277-REVIEW WR-01 (size hook leads with STOP/WARNING when ledger findings exist) + WR-08 (uniform `· ⛔` marker on 66 moved FIRING cells + legend) | 2026-10-12 | 30d659415 | [261012-x1l-fix-review-warnings-wr-01-and-wr-08-from](./quick/261012-x1l-fix-review-warnings-wr-01-and-wr-08-from/) |
 | fast 2026-10-13 | landing drift: `facts.ts` BUILTIN_TOOL_COUNT 29 → 30 (+ `Artifacts` group for `show_artifact`); landing vitest 53/53 | 2026-10-13 | 6ba316b6a | — |
 | fast 2026-10-14 | BUG-261014-06: Library read 0 documents at 286 (`414 URI too long`) — `list_documents` count reads batched at 100 ids. **Stopgap, develop only**: the operator held the prod hotfix ("a sustainable solution not a batch"); Phase 284 replaces it | 2026-10-14 | e422066ca | — |
@@ -128,6 +135,7 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 ### Roadmap Evolution
 
 - Phase 284 added 2026-10-14: **Library at Scale** (FIX-11) — server-paged list, server-side counts, no growing id lists; from BUG-261014-06 + BUG-261014-07 (every document list silently capped at 1,000 rows).
+- Phase 285 added 2026-10-16: **Watch and Re-upload Close Out** (FIX-12/13/14). This came from the v4.6 milestone audit (`tech_debt`, 21/21): the operator chose option B, closing the three open majors filed during 280 before closing the milestone. Sources: BUG-261014-02 (failed watch download never retried), -03 (watch purge deletes a dedup-linked manual upload), -04 (stuck pending row absorbs same-bytes re-uploads).
 
 ### Owed to the operator (carried from v4.5)
 
@@ -155,11 +163,21 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | Production: paste **207**, then **208**, into the cloud SQL editor (each an approval-gated write), then `get_advisors(security)`, then deploy backend → frontend | 208's VERIFY must read 16/16, run together with its `SET search_path` line; on a lock timeout re-paste, never widen it. 208's guard was confirmed against production's policy text by a read on 2026-10-16 |
+| 1 | ~~Production: 207 → 208 → advisors → backend → frontend~~ **DONE 2026-10-16** — 207 (VERIFY 7/7), deploy `4841d493e`, 208 pasted by the operator (VERIFY 16/16), advisors 0 ERROR | 208's VERIFY must read 16/16, run together with its `SET search_path` line; on a lock timeout re-paste, never widen it. 208's guard was confirmed against production's policy text by a read on 2026-10-16 |
 | 2 | v4.6 public changelog entry for the `GET /documents` breaking change (envelope) | R-06; owner: v4.6 close |
 | 3 | Remove the legacy-array tolerance in `frontend/src/lib/api/documents.ts` | one release after the production deploy (WR-03 accepted on that basis) |
 | 4 | Hot-file ledger triples for the files touched after 284-05's ledger close (`58b4bc367`) | review fixes + 284-06; the presence gate is green, the triples are not re-derived |
 | 5 | SEED-355 / 356 / 358 | planted with structured triggers; out of 284's Library scope |
+
+### Phase 285 (executed 3/3, 2026-10-16 — verification next)
+
+| # | Item | Notes |
+|---|---|---|
+| 1 | 285-01 DONE — migration 209 applied LOCALLY (VERIFY 8/8 ×2, 112 minted / 9 linked, heal 0/0); FIX-12 retry (cap 3, reset on version change) | decisions: re-mint through the existing new-file branch (2 minter call sites); failure summary on the RUN row only (`run_error`); doc marked failed only when this iteration minted it |
+| 2 | ⛔ Production paste of 209 is OWED, and it must land BEFORE the backend deploys | `_WATCH_ITEM_COLUMNS` now selects `failed_attempts, minted`; then VERIFY + `get_advisors(security)` |
+| 3 | Base for 285 gates: PHASE_BASE `c8c764e90`, 71 failed / 7688 passed | failing set `C:/Users/fhdmr/AppData/Local/Temp/agentic-rag-285/base_failed.norm.txt` (strip glued `C:...` warning suffixes before `comm`) |
+| 4 | 285-02 DONE — purge scope minted+unshared (FIX-13), `kept_count`, honest `remove_document_bytes` (BUG-261014-05) | `4bcce53a1`, `14a70e94f` |
+| 5 | 285-03 DONE — FIX-14 enqueue refusal; SC#5 105/105 live; 4 bugs closed; ledger + CLAUDE.md rows | BUG-260910-04 / 238 M-9 NOT flipped — their own routing should cite 285 SC#5 |
 
 ### Guardrail overrides (v4.6)
 
