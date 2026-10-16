@@ -436,6 +436,14 @@ describe("useLibraryDocuments — the server body (284-03)", () => {
     expect(result.current.rows[0].tables_stage_applies).toBe(true)
   })
 
+  it("284-REVIEW WR-01: hands useDocuments the ON-PAGE rows, so a membership UPDATE can be told from a cosmetic one", async () => {
+    const { result } = renderHook(() => useLibraryDocuments(BASE_ARGS))
+    await waitFor(() => expect(result.current.listState).toBe("ready"))
+    const last = useDocumentsMock.mock.calls.at(-1)?.[0] as { rows?: Document[] }
+    expect(last.rows?.map((d) => d.id)).toEqual(result.current.rows.map((d) => d.id))
+    expect(last.rows?.length).toBeGreaterThan(0)
+  })
+
   it("an upload shows its document as the first row of page 1 of its folder until the refetch lands", async () => {
     const fresh = doc("new-1", { status: "pending", created_at: "2026-10-17T00:00:00Z" })
     upload.mockResolvedValue({ isDuplicate: false, doc: fresh })

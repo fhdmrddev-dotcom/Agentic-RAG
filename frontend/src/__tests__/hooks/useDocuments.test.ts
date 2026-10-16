@@ -64,7 +64,9 @@ import { useDocuments } from "@/hooks/useDocuments"
 const onChange = vi.fn()
 function useHarness(initial: Document[] = []) {
   const [documents, setRows] = useState<Document[]>(initial)
-  return { documents, ...useDocuments({ setRows, onChange }) }
+  // 284-REVIEW WR-01: the hook reads the on-page rows to tell a cosmetic UPDATE from one that
+  // changes which list the row belongs to.
+  return { documents, ...useDocuments({ rows: documents, setRows, onChange }) }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -345,6 +347,65 @@ describe("useDocuments", () => {
 
     expect(result.current.documents.find((d) => d.id === "d4")).toBeUndefined()
     // …and the page is re-asked, so what slides up into the gap is the server's answer.
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
+
+  // ── 284-REVIEW WR-01 — an UPDATE that changes which LIST a row belongs to is a refetch, not a
+  // merge. A move (`folder_id`), an archive (`archived_at`), a version flip (`is_latest`) or a
+  // status change takes the row off this page's list and moves the summary's buckets; merging it
+  // in place left it on its OLD folder's page wearing its new folder_id. A pure field update
+  // (a stage advancing, a rename) still merges in place and asks for nothing. ──
+  const onPageRow = (): Document =>
+    ({
+      id: "m1",
+      user_id: "user-1",
+      folder_id: "folder-a",
+      filename: "moving.pdf",
+      status: "processing",
+      file_path: "user-1/m1/moving.pdf",
+      file_size: 10,
+      mime_type: "application/pdf",
+      error_message: null,
+      ingestion_step: "extracting",
+      chunk_count: null,
+      is_latest: true,
+      archived_at: null,
+      created_at: "2026-10-01T00:00:00Z",
+      updated_at: "2026-10-01T00:00:00Z",
+      table_count: 3,
+    }) as Document
+
+  it.each([
+    ["folder_id", { folder_id: "folder-b" }],
+    ["folder_id → Root", { folder_id: null }],
+    ["archived_at", { archived_at: "2026-10-16T00:00:00Z" }],
+    ["is_latest", { is_latest: false }],
+    ["status (processing → pending)", { status: "pending" }],
+  ])("an UPDATE changing %s asks for ONE refetch", async (_label, change) => {
+    const row = onPageRow()
+    renderHook(() => useHarness([row]))
+    await waitFor(() => expect(mockOn).toHaveBeenCalled())
+    const { table_count: _derived, ...replicated } = row
+    emitRealtime({ eventType: "UPDATE", new: { ...replicated, ...change } })
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
+
+  it("a pure field UPDATE (a stage advancing) merges in place and asks for no refetch", async () => {
+    const row = onPageRow()
+    const { result } = renderHook(() => useHarness([row]))
+    await waitFor(() => expect(mockOn).toHaveBeenCalled())
+    const { table_count: _derived, ...replicated } = row
+    emitRealtime({ eventType: "UPDATE", new: { ...replicated, ingestion_step: "embedding", filename: "renamed.pdf" } })
+    expect(onChange).not.toHaveBeenCalled()
+    expect(result.current.documents[0]).toMatchObject({ ingestion_step: "embedding", filename: "renamed.pdf", table_count: 3 })
+  })
+
+  it("a terminal status still refetches exactly once (never twice for one event)", async () => {
+    const row = onPageRow()
+    renderHook(() => useHarness([row]))
+    await waitFor(() => expect(mockOn).toHaveBeenCalled())
+    const { table_count: _derived, ...replicated } = row
+    emitRealtime({ eventType: "UPDATE", new: { ...replicated, status: "completed" } })
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 })
