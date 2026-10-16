@@ -157,7 +157,7 @@ export function FolderTree({
       <NavRow
         icon={RootIcon}
         name="Root"
-        count={rootDocumentCount ?? 0}
+        count={rootDocumentCount}
         isSelected={isRootSelected}
         onSelect={() => onSelectFolder(null)}
       />

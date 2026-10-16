@@ -114,7 +114,9 @@ export function FolderNode({
   }
   const hasChildren = node.children.length > 0
   const isOwner = node.user_id === currentUserId
-  const count = folderDocumentCounts?.[node.id] ?? 0
+  // 284-03 (D-12 / UI-SPEC S4): no counts yet → the slot is omitted, never a 0. A READY summary
+  // that lacks this folder means it holds no documents — an answered zero.
+  const count = folderDocumentCounts === undefined ? undefined : (folderDocumentCounts[node.id] ?? 0)
 
   const FolderIconComponent = isSelected && isExpanded ? FolderOpen : FolderIcon
 

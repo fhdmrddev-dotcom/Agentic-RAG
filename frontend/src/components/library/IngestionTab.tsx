@@ -21,10 +21,15 @@
  * `librarySelection`'s reducer. The action-set count stays at 6.
  *
  * ⛔ NO PROGRESS ARITHMETIC OF ANY KIND (D-217-19).
- * ⛔ IT FETCHES NOTHING. Every document it renders is one the page already holds.
+ * ⭐ 284-03 (FIX-11 / D-13 / R-04 / R-08): ITS NUMBERS ARE THE SUMMARY'S, ITS LISTS ARE SERVER PAGES.
+ *    The cards, the counts and the rate-limit banner read `GET /library/summary` (handed down by
+ *    the page, never re-fetched here). Queue, Needs attention and History each read ONE
+ *    `GET /documents?status=…` page when their sub-tab is open (History by `updated_at`), paged
+ *    with the shipped `PaginationControls`. Loading, failed and empty are three states: an empty
+ *    sentence renders only after a successful answer (SEED-248). ⛔ No number here is a page length.
  * ⛔ NO SECOND STATUS VOCABULARY. Every stage word comes from `TERM_MAP`.
  */
-import React, { useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { IngestionStrip } from "@/components/ingestion/IngestionStrip"
@@ -35,8 +40,9 @@ import {
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import { classifyIngestionError } from "@/components/library/ingestionErrorVocabulary"
 import { formatBytes } from "@/lib/formatBytes"
-import { reingestDocument } from "@/lib/api"
-import type { Document } from "@/types"
+import { listDocumentsPage, reingestDocument } from "@/lib/api"
+import type { Document, DocumentListParams, LibrarySummary } from "@/types"
+import type { LibraryLoadState } from "@/hooks/useLibraryDocuments"
 import { UploadFolderPicker } from "@/components/library/ingestion/UploadFolderPicker"
 import { ConnectedSourceSection } from "@/components/sources/ConnectedSourceSection"
 import {
@@ -49,8 +55,8 @@ import { IngestionBatchLane } from "@/components/ingestion/IngestionBatchLane"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import { PaginationControls } from "@/components/health/PaginationControls"
 
-/** BUG-260923-02 — History rows per page. The list is already client-side; this pages it. */
-const HISTORY_PAGE_SIZE = 25
+/** BUG-260923-02 — rows per page. 284-03: Queue and Needs attention page the same way (S7). */
+const LIST_PAGE_SIZE = 25
 import {
   cardForStage,
   PIPELINE_CARDS,
@@ -62,11 +68,15 @@ import {
 function PipelineCard({
   cardId,
   count,
+  unknown,
 }: {
   cardId: PipelineCardId
-  count: number
+  /** `null` until the summary has answered (284-03, D-12). */
+  count: number | null
+  /** What a `null` count reads: "…" while loading, "—" after a failure (UI-SPEC S7). */
+  unknown: string
 }) {
-  const isPopulated = count > 0
+  const isPopulated = count !== null && count > 0
   return (
     <div
       data-stage-card={cardId}
@@ -90,7 +100,7 @@ function PipelineCard({
         )}
       </div>
       <span className={cn("font-mono text-lg font-bold tabular-nums", isPopulated ? "text-primary" : "text-foreground")}>
-        <AnimatedNumber value={count} />
+        {count === null ? unknown : <AnimatedNumber value={count} />}
       </span>
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {count === 1 ? "file here now" : "files here now"}
@@ -102,7 +112,13 @@ function PipelineCard({
 // The six `DocumentUpload` props `LibraryPage` already computes for the Documents tab.
 // Threaded unchanged so the Ingestion tab can start an upload without re-deriving them.
 export interface IngestionTabProps {
-  documents: Document[]
+  /** 284-03 (D-13): `GET /library/summary` — the cards, counts and banner. `null` until answered. */
+  summary: LibrarySummary | null
+  summaryState: LibraryLoadState
+  /** "Try again" on the counts. */
+  onRetrySummary?: () => void
+  /** The Library's debounced change hint (D-08) — the open list refetches on it, silently. */
+  changeTick?: number
   /** `useDocuments().upload` — the page-level upload handler. */
   upload: (file: File, folderId?: string | null) => Promise<{ isDuplicate: boolean }>
   /** True while one or more uploads are in flight. */
@@ -131,7 +147,10 @@ export interface IngestionTabProps {
 }
 
 export function IngestionTab({
-  documents,
+  summary,
+  summaryState,
+  onRetrySummary,
+  changeTick = 0,
   upload,
   uploading,
   uploadingCount,
@@ -147,42 +166,9 @@ export function IngestionTab({
   const [uploadFolderId, setUploadFolderId] = useState<string | null>(folderId ?? null)
   const [uploadFolderName, setUploadFolderName] = useState<string>(folderName ?? "Root")
 
-  // ── Pipeline card counts — fold the six stages into four cards ─────────────────
-  const stageCounts = new Map<PipelineCardId, number>()
-  for (const cardId of PIPELINE_CARDS) stageCounts.set(cardId, 0)
-  for (const doc of documents) {
-    if (doc.status === "processing" && doc.ingestion_step) {
-      const card = cardForStage(doc.ingestion_step as IngestionStageKey)
-      stageCounts.set(card, (stageCounts.get(card) ?? 0) + 1)
-    }
-  }
-
-  // Completed + failed for the History tab.
-  const historyDocs = documents.filter((d) => d.status === "completed" || d.status === "failed")
-  // BUG-260923-02 — History paged, newest first. Sorted into a COPY (the old code sorted the
-  // filtered array in place during render). A shrinking list clamps the page back into range.
-  const [historyOffset, setHistoryOffset] = useState(0)
-  const historySorted = [...historyDocs].sort(
-    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-  )
-  const historyStart =
-    historyOffset >= historySorted.length
-      ? Math.max(0, Math.floor((historySorted.length - 1) / HISTORY_PAGE_SIZE) * HISTORY_PAGE_SIZE)
-      : historyOffset
-  const historyPage = historySorted.slice(historyStart, historyStart + HISTORY_PAGE_SIZE)
-  const inFlight = documents.filter((d) => d.status === "pending" || d.status === "processing" || d.status === "paused")
-  const completedDocs = documents.filter((d) => d.status === "completed")
-  const failed = documents.filter((d) => d.status === "failed")
-
-  const totalBatchCount = inFlight.length + completedDocs.length
-  const pausedDoc = inFlight.find(
-    (d) =>
-      d.status === "paused" ||
-      d.error_message?.toLowerCase().includes("rate limit") ||
-      d.error_message?.toLowerCase().includes("429") ||
-      d.error_message?.toLowerCase().includes("quota")
-  )
-  const isPaused = Boolean(pausedDoc)
+  // ── 284-03 (D-13 / R-04) — every number is the summary's; `null` until it has answered ──
+  // In flight = pending + processing (`paused` is not a stored status, R-04).
+  const inFlightCount = summary === null ? null : summary.status.pending + summary.status.processing
 
   // The ⌥ Technical-names reveal.
   const { showTechnical } = useTechnicalNamesOptional() ?? { showTechnical: false }
@@ -223,7 +209,7 @@ export function IngestionTab({
               sketch's own variant C had to fix. */}
           <TabsTrigger value="in-progress" data-testid="subtab-in-progress">
             In progress
-            {inFlight.length > 0 && (
+            {inFlightCount !== null && inFlightCount > 0 && (
               <span
                 data-testid="in-progress-badge"
                 /* ⛔ aria-hidden, and that is deliberate rather than lazy. Without it the tab's
@@ -235,7 +221,7 @@ export function IngestionTab({
                 className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-1.5 text-[10px] tabular-nums text-sky-400"
               >
                 <span className="h-1 w-1 rounded-full bg-sky-400 animate-pulse" />
-                {inFlight.length}
+                {inFlightCount}
               </span>
             )}
           </TabsTrigger>
@@ -287,187 +273,22 @@ export function IngestionTab({
 
         {/* ── IN PROGRESS — the pipeline row + queue table ──────────────── */}
         <TabsContent value="in-progress" data-testid="ingestion-subtab-in-progress">
-          {/* ── Refusal Banner (SC#3, closes BUG-260815-05) — sits at top of sub-tab ─────── */}
-          {isPaused && (
-            <div className="mb-5">
-              <IngestionPauseBanner
-                provider="OpenAI"
-                statusCode={429}
-                statusText="insufficient_quota"
-                verbatimError={pausedDoc?.error_message || undefined}
-                completedCount={completedDocs.length}
-                totalCount={totalBatchCount > 0 ? totalBatchCount : 340}
-              />
-            </div>
-          )}
-
-          <div>
-            <h2 className="text-lg font-semibold leading-tight">Where every file is right now</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              A count of the files sitting at each stage of the pipeline.
-            </p>
-            {/* ── THE FOUR-CARD PIPELINE ROW ──────────────────────────────────────── */}
-            <div className="mt-3 flex items-center gap-2" data-testid="ingestion-stagecards">
-              {PIPELINE_CARDS.map((cardId, i) => (
-                <React.Fragment key={cardId}>
-                  <PipelineCard key={cardId} cardId={cardId} count={stageCounts.get(cardId) ?? 0} />
-                  {i < PIPELINE_CARDS.length - 1 && (
-                    <span className="text-muted-foreground/50 text-sm" aria-hidden="true">
-                      ›
-                    </span>
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-
-          {/* ── THE BATCH LANE (Sketch 227 Variant B winner) ──────────────── */}
-          {inFlight.length > 0 && (
-            <div className="mt-6" data-testid="ingestion-batch-lane-wrapper">
-              <IngestionBatchLane
-                totalFiles={totalBatchCount > 0 ? totalBatchCount : inFlight.length}
-                completedFiles={completedDocs.length}
-                isPaused={isPaused}
-              />
-            </div>
-          )}
-
-          {/* ── THE QUEUE TABLE ──────────────────────────────────────────────────── */}
-          <div className="mt-6" data-testid="ingestion-queue">
-            <h2 className="text-lg font-semibold leading-tight">
-              The queue{" "}
-              {inFlight.length > 0 && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  (<AnimatedNumber value={inFlight.length} /> {inFlight.length === 1 ? "file" : "files"})
-                </span>
-              )}
-            </h2>
-            {inFlight.length === 0 ? (
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Nothing is being read right now.
-              </p>
-            ) : (
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-sm" data-testid="queue-table">
-                  <thead>
-                    <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      <th className="px-4 py-3">File</th>
-                      <th className="px-4 py-3">Stage</th>
-                      <th className="px-4 py-3">Folder</th>
-                      <th className="px-4 py-3">Size</th>
-                      <th className="px-4 py-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inFlight.map((doc) => (
-                      <tr key={doc.id} className="border-b border-border/50">
-                        <td className="px-4 py-3 max-w-[200px] truncate" title={doc.filename}>
-                          {doc.filename}
-                        </td>
-                        <td className="px-4 py-3">
-                          {doc.status === "pending" ? (
-                            <span className="text-muted-foreground">Waiting its turn</span>
-                          ) : (
-                            <div className="w-full max-w-[420px]">
-                              <IngestionStrip document={doc} />
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                          --
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                          {formatBytes(doc.file_size)}
-                        </td>
-                        <td className="px-4 py-3">
-                          {/* Actions column reserved for future stop/retry */}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          <InProgressBody
+            summary={summary}
+            summaryState={summaryState}
+            onRetrySummary={onRetrySummary}
+            changeTick={changeTick}
+          />
         </TabsContent>
 
         {/* ── NEEDS ATTENTION — the same rows, re-mounted behind a sub-tab ────── */}
         <TabsContent value="needs-attention" data-testid="ingestion-subtab-needs-attention">
-          <div data-testid="ingestion-needs-attention">
-            <h2 className="text-lg font-semibold leading-tight">Needs attention</h2>
-            {failed.length === 0 ? (
-              <p className="mt-0.5 text-sm text-muted-foreground">Nothing needs attention.</p>
-            ) : (
-              <ul role="list" className="mt-3 flex flex-col gap-2">
-                {failed.map((doc) => (
-                  <NeedsAttentionRow key={doc.id} doc={doc} showTechnical={showTechnical} />
-                ))}
-              </ul>
-            )}
-          </div>
+          <NeedsAttentionBody changeTick={changeTick} showTechnical={showTechnical} />
         </TabsContent>
 
         {/* ── HISTORY — completed and failed, grouped by date ───────────────────── */}
         <TabsContent value="history" data-testid="ingestion-subtab-history">
-          <div>
-            <h2 className="text-lg font-semibold leading-tight">History</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Recently completed and failed uploads.
-            </p>
-            {historyDocs.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Nothing has been ingested yet.
-              </p>
-            ) : (
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-sm" data-testid="history-table">
-                  <thead>
-                    <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      <th className="px-4 py-3">File</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Size</th>
-                      <th className="px-4 py-3">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historyPage
-                      .map((doc) => (
-                        <tr key={doc.id} className="border-b border-border/50">
-                          <td className="px-4 py-3 max-w-[300px] truncate" title={doc.filename}>
-                            {doc.filename}
-                          </td>
-                          <td className="px-4 py-3">
-                            {doc.status === "completed" ? (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
-                                Complete
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
-                                Failed
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                            {formatBytes(doc.file_size)}
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                            {new Date(doc.updated_at).toLocaleDateString()}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-                {historySorted.length > HISTORY_PAGE_SIZE && (
-                  <PaginationControls
-                    offset={historyStart}
-                    limit={HISTORY_PAGE_SIZE}
-                    total={historySorted.length}
-                    onChange={setHistoryOffset}
-                  />
-                )}
-              </div>
-            )}
-          </div>
+          <HistoryBody changeTick={changeTick} />
         </TabsContent>
       </Tabs>
       </div>
@@ -543,5 +364,344 @@ function NeedsAttentionRow({
         </button>
       </div>
     </li>
+  )
+}
+
+// ── 284-03 (D-12 / D-13 / R-08 / UI-SPEC S7) — the three lists read server pages ─────────────
+
+type ListStatus = Extract<DocumentListParams["status"], "in_flight" | "failed" | "done">
+
+/**
+ * ONE `GET /documents?status=…` page, mounted only while its sub-tab is open (so a Library at
+ * rest costs nothing here). `null` total until answered; a stale answer is dropped; a change hint
+ * (`changeTick`) refetches silently. A shrinking list clamps the page back into range
+ * (BUG-260923-02's rule, now on the server's total).
+ */
+function usePagedStatusList(status: ListStatus, changeTick: number) {
+  const [offset, setOffset] = useState(0)
+  const [rows, setRows] = useState<Document[]>([])
+  const [total, setTotal] = useState<number | null>(null)
+  const [state, setState] = useState<LibraryLoadState>("loading")
+  const [attempt, setAttempt] = useState(0)
+  const reqRef = useRef(0)
+
+  useEffect(() => {
+    const myReq = ++reqRef.current
+    const params: DocumentListParams =
+      status === "done"
+        ? { status: "done", order: "updated_desc", offset, limit: LIST_PAGE_SIZE }
+        : { status, offset, limit: LIST_PAGE_SIZE }
+    listDocumentsPage(params).then(
+      (res) => {
+        if (myReq !== reqRef.current) return
+        if (res.total > 0 && offset >= res.total) {
+          setOffset(Math.floor((res.total - 1) / LIST_PAGE_SIZE) * LIST_PAGE_SIZE)
+          return
+        }
+        setRows(res.documents)
+        setTotal(res.total)
+        setState("ready")
+      },
+      () => {
+        if (myReq !== reqRef.current) return
+        setState("error")
+      },
+    )
+  }, [status, offset, attempt, changeTick])
+
+  const retry = useCallback(() => {
+    if (total === null) setState("loading")
+    setAttempt((n) => n + 1)
+  }, [total])
+
+  return { rows, total, state, offset, setOffset, retry }
+}
+
+/** The cold-load block: 3 bars, `sr-only` "Loading files" (UI-SPEC §Loading vocabulary). */
+function ListLoading() {
+  return (
+    <div role="status" aria-live="polite" className="mt-3 flex flex-col gap-2">
+      <span className="sr-only">Loading files</span>
+      {[0, 1, 2].map((i) => (
+        <div key={i} aria-hidden="true" className="h-10 w-full animate-pulse rounded-md bg-border/30" />
+      ))}
+    </div>
+  )
+}
+
+/** A page-level failure (DocumentsFindBody's treatment) — it says it is not the empty state. */
+function LoadAlert({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2"
+    >
+      <p className="text-sm text-destructive">{message}</p>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
+        >
+          Try again
+        </button>
+      )}
+    </div>
+  )
+}
+
+const LIST_LOAD_ERROR = "Couldn’t load this list. This is a loading error, not an empty list."
+
+function ListPager({ list }: { list: ReturnType<typeof usePagedStatusList> }) {
+  if (list.total === null || list.total <= LIST_PAGE_SIZE) return null
+  return (
+    <PaginationControls offset={list.offset} limit={LIST_PAGE_SIZE} total={list.total} onChange={list.setOffset} />
+  )
+}
+
+function isRateLimited(d: Document): boolean {
+  const m = d.error_message?.toLowerCase()
+  return Boolean(m && (m.includes("rate limit") || m.includes("429") || m.includes("quota")))
+}
+
+/** In progress: the banner, the four cards, the batch lane and the queue (layout unchanged). */
+function InProgressBody({
+  summary,
+  summaryState,
+  onRetrySummary,
+  changeTick,
+}: {
+  summary: LibrarySummary | null
+  summaryState: LibraryLoadState
+  onRetrySummary?: () => void
+  changeTick: number
+}) {
+  const queue = usePagedStatusList("in_flight", changeTick)
+
+  // ── Pipeline card counts — fold the server's per-step counts into four cards ──────
+  const stageCounts = new Map<PipelineCardId, number>()
+  for (const cardId of PIPELINE_CARDS) stageCounts.set(cardId, 0)
+  if (summary) {
+    for (const [step, n] of Object.entries(summary.steps)) {
+      const card = cardForStage(step as IngestionStageKey)
+      if (card) stageCounts.set(card, (stageCounts.get(card) ?? 0) + n)
+    }
+  }
+  const unknown = summaryState === "error" ? "—" : "…"
+
+  const inFlightCount = summary === null ? null : summary.status.pending + summary.status.processing
+  const completedCount = summary?.status.completed ?? 0
+  const totalBatchCount = (inFlightCount ?? 0) + completedCount
+  const isPaused = summary !== null && summary.rate_limited_in_flight > 0
+  // The provider's own words, when the rate-limited row is on the queue page; never a second read.
+  const pausedDoc = queue.rows.find(isRateLimited)
+
+  return (
+    <>
+      {/* ── Refusal Banner (SC#3, closes BUG-260815-05) — sits at top of sub-tab ─────── */}
+      {isPaused && (
+        <div className="mb-5">
+          <IngestionPauseBanner
+            provider="OpenAI"
+            statusCode={429}
+            statusText="insufficient_quota"
+            verbatimError={pausedDoc?.error_message || undefined}
+            completedCount={completedCount}
+            totalCount={totalBatchCount > 0 ? totalBatchCount : 340}
+          />
+        </div>
+      )}
+
+      {summaryState === "error" && summary === null && (
+        <div className="mb-3">
+          <LoadAlert message="Couldn’t load ingestion counts." onRetry={onRetrySummary} />
+        </div>
+      )}
+
+      <div>
+        <h2 className="text-lg font-semibold leading-tight">Where every file is right now</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          A count of the files sitting at each stage of the pipeline.
+        </p>
+        {/* ── THE FOUR-CARD PIPELINE ROW ──────────────────────────────────────── */}
+        <div className="mt-3 flex items-center gap-2" data-testid="ingestion-stagecards">
+          {PIPELINE_CARDS.map((cardId, i) => (
+            <React.Fragment key={cardId}>
+              <PipelineCard
+                key={cardId}
+                cardId={cardId}
+                count={summary === null ? null : (stageCounts.get(cardId) ?? 0)}
+                unknown={unknown}
+              />
+              {i < PIPELINE_CARDS.length - 1 && (
+                <span className="text-muted-foreground/50 text-sm" aria-hidden="true">
+                  ›
+                </span>
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      {/* ── THE BATCH LANE (Sketch 227 Variant B winner) ──────────────── */}
+      {inFlightCount !== null && inFlightCount > 0 && (
+        <div className="mt-6" data-testid="ingestion-batch-lane-wrapper">
+          <IngestionBatchLane
+            totalFiles={totalBatchCount > 0 ? totalBatchCount : inFlightCount}
+            completedFiles={completedCount}
+            isPaused={isPaused}
+          />
+        </div>
+      )}
+
+      {/* ── THE QUEUE TABLE ──────────────────────────────────────────────────── */}
+      <div className="mt-6" data-testid="ingestion-queue">
+        <h2 className="text-lg font-semibold leading-tight">
+          The queue{" "}
+          {inFlightCount !== null && inFlightCount > 0 && (
+            <span className="text-sm font-normal text-muted-foreground">
+              (<AnimatedNumber value={inFlightCount.toLocaleString()} /> {inFlightCount === 1 ? "file" : "files"})
+            </span>
+          )}
+        </h2>
+        {queue.state === "error" && <LoadAlert message={LIST_LOAD_ERROR} onRetry={queue.retry} />}
+        {queue.state === "loading" && queue.total === null ? (
+          <ListLoading />
+        ) : queue.state === "ready" && queue.total === 0 ? (
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Nothing is being read right now.
+          </p>
+        ) : queue.rows.length > 0 ? (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm" data-testid="queue-table">
+              <thead>
+                <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="px-4 py-3">File</th>
+                  <th className="px-4 py-3">Stage</th>
+                  <th className="px-4 py-3">Folder</th>
+                  <th className="px-4 py-3">Size</th>
+                  <th className="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {queue.rows.map((doc) => (
+                  <tr key={doc.id} className="border-b border-border/50">
+                    <td className="px-4 py-3 max-w-[200px] truncate" title={doc.filename}>
+                      {doc.filename}
+                    </td>
+                    <td className="px-4 py-3">
+                      {doc.status === "pending" ? (
+                        <span className="text-muted-foreground">Waiting its turn</span>
+                      ) : (
+                        <div className="w-full max-w-[420px]">
+                          <IngestionStrip document={doc} />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      --
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      {formatBytes(doc.file_size)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {/* Actions column reserved for future stop/retry */}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <ListPager list={queue} />
+          </div>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
+/** Needs attention: the failed documents, one page at a time. */
+function NeedsAttentionBody({ changeTick, showTechnical }: { changeTick: number; showTechnical: boolean }) {
+  const failed = usePagedStatusList("failed", changeTick)
+  return (
+    <div data-testid="ingestion-needs-attention">
+      <h2 className="text-lg font-semibold leading-tight">Needs attention</h2>
+      {failed.state === "error" && <LoadAlert message={LIST_LOAD_ERROR} onRetry={failed.retry} />}
+      {failed.state === "loading" && failed.total === null ? (
+        <ListLoading />
+      ) : failed.state === "ready" && failed.total === 0 ? (
+        <p className="mt-0.5 text-sm text-muted-foreground">Nothing needs attention.</p>
+      ) : failed.rows.length > 0 ? (
+        <>
+          <ul role="list" className="mt-3 flex flex-col gap-2">
+            {failed.rows.map((doc) => (
+              <NeedsAttentionRow key={doc.id} doc={doc} showTechnical={showTechnical} />
+            ))}
+          </ul>
+          <ListPager list={failed} />
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+/** History: completed and failed, newest `updated_at` first (R-08). */
+function HistoryBody({ changeTick }: { changeTick: number }) {
+  const history = usePagedStatusList("done", changeTick)
+  return (
+    <div>
+      <h2 className="text-lg font-semibold leading-tight">History</h2>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        Recently completed and failed uploads.
+      </p>
+      {history.state === "error" && <LoadAlert message={LIST_LOAD_ERROR} onRetry={history.retry} />}
+      {history.state === "loading" && history.total === null ? (
+        <ListLoading />
+      ) : history.state === "ready" && history.total === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          Nothing has been ingested yet.
+        </p>
+      ) : history.rows.length > 0 ? (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm" data-testid="history-table">
+            <thead>
+              <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <th className="px-4 py-3">File</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Size</th>
+                <th className="px-4 py-3">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.rows
+                .map((doc) => (
+                  <tr key={doc.id} className="border-b border-border/50">
+                    <td className="px-4 py-3 max-w-[300px] truncate" title={doc.filename}>
+                      {doc.filename}
+                    </td>
+                    <td className="px-4 py-3">
+                      {doc.status === "completed" ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                          Complete
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                          Failed
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      {formatBytes(doc.file_size)}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      {new Date(doc.updated_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          <ListPager list={history} />
+        </div>
+      ) : null}
+    </div>
   )
 }

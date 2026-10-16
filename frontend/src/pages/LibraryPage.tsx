@@ -194,6 +194,26 @@ function useIsMobile(): boolean {
   return isMobile
 }
 
+/** 284-03 (UI-SPEC S1 / S8) — a page-level load failure: DocumentsFindBody's shipped treatment.
+ *  It says what failed, and that it is not the empty state; "Try again" keeps focus on itself. */
+function PageAlert({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2"
+    >
+      <p className="text-sm text-destructive">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+
 function useIsWide(): boolean {
   const [isWide, setIsWide] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= WIDE_BREAKPOINT,
@@ -388,9 +408,10 @@ export function LibraryPage({
   // Phase 153 (CITE-01 / SC#2 / T-153-02-01): consume the one-shot cross-view
   // "Open document" intent from a chat citation. We route it through the EXISTING
   // owner/RLS-scoped panel by pre-selecting the id and letting `selectedDoc`
-  // resolve it from the user's OWN owner-scoped `documents` list — a document the
-  // user cannot see simply never resolves, so there is NO new unscoped fetch by
-  // raw document_id. Optional accessor so the page still renders in isolation
+  // resolve it. ⚠ 284-03 (D-11): the page holds ONE page of documents now, so a cited
+  // document off that page is read by id — `GET /documents/{id}` through the user's own JWT
+  // (T-284-19), whose uniform 404 leaves the panel closed. It is never an unscoped read.
+  // Optional accessor so the page still renders in isolation
   // (no provider) in unit tests. One-shot: consume so re-opening / closing works.
   const citationNav = useCitationNavOptional()
   const pendingDocumentId = citationNav?.pendingDocumentId ?? null
@@ -426,9 +447,6 @@ export function LibraryPage({
 
   const canUploadToFolder = !selectedFolderId || !selectedFolder || selectedFolder.user_id === user?.id
 
-  // ⚠ Wave 1 only: the raw array for the Ingestion tab and Find's relationship candidates
-  // (284-03 / 284-04 remove both readers, then the hook deletes it).
-  const ingestionDocuments = libDocs.documentsForIngestion
   // 284-01 (D-07 / UI-SPEC S5): the selected folder's count and size are the summary's. A folder
   // absent from a READY summary holds no documents — an answered zero, not an unknown.
   const summaryState = libDocs.summaryState
@@ -775,7 +793,6 @@ export function LibraryPage({
                 dispatch={findDispatch}
                 filter={filter}
                 onFilterChange={handleFindFilterChange}
-                documents={ingestionDocuments}
                 folders={folders}
                 connections={libDocs.summary?.connections ?? []}
                 documentTypes={libDocs.summary?.document_types ?? []}
@@ -875,38 +892,83 @@ export function LibraryPage({
         )}
       >
         {findSlots && findSlots.top}
+        {/* 284-03 (D-11 / UI-SPEC S8): a document opened by id that could not be read. The panel
+            stays closed; a 404 says nothing at all, so this cannot confirm a document exists. */}
+        {libDocs.selectedDocError && (
+          <PageAlert message="Couldn’t open that document." onRetry={libDocs.retrySelectedDoc} />
+        )}
         {findSlots && findSlots.body ? (
           findSlots.body
         ) : (
           <>
             {lead}
             {!findSlots && filterBarEl}
-            <div data-testid="documents-doclist">
-              {/* 275-05 (S9): every row hidden as archived → the hidden line below says so; the
-                  list's "No documents in this folder" would claim an emptiness that is not true. */}
-              {!(libDocs.total === 0 && (libDocs.archivedHidden ?? 0) > 0) && (
-                <DocumentList
-                  documents={pagedDocuments}
-                  onDelete={deleteDoc}
-                  onRefresh={loadDocuments}
-                  folderId={listFolderId}
-                  currentUserId={user?.id ?? ""}
-                  onSelect={setSelectedDocId}
-                  selectedDocId={selectedDocId}
-                  folders={folders}
-                  retention={retention}
+            {/* ⭐ 284-03 (D-12 / SEED-248 / UI-SPEC S1): loading, failed and empty are three states.
+                Cold (a folder, view or filter switch) → the skeleton, and NOTHING that claims an
+                answer. Warm (a page the person asked for) → the rows stay, dimmed and aria-busy.
+                A Realtime refetch → silent. A failure never swaps the rows for an empty list. */}
+            <div
+              data-testid="documents-doclist"
+              aria-busy={libDocs.listState === "warm" ? "true" : undefined}
+              className={cn("transition-opacity", libDocs.listState === "warm" && "opacity-60")}
+            >
+              {libDocs.listState === "cold" ? (
+                <div role="status" aria-live="polite" className="flex flex-col gap-2 py-1">
+                  <span className="sr-only">Loading documents</span>
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} aria-hidden="true" className="h-10 w-full animate-pulse rounded-md bg-border/30" />
+                  ))}
+                </div>
+              ) : libDocs.listState === "error" && libDocs.total === null ? (
+                <PageAlert
+                  message={
+                    listTarget !== null
+                      ? "Couldn’t load documents. This is a loading error, not an empty view."
+                      : "Couldn’t load documents. This is a loading error, not an empty folder."
+                  }
+                  onRetry={libDocs.retry}
                 />
+              ) : (
+                <>
+                  {libDocs.listState === "error" && (
+                    <div className="mb-3">
+                      <PageAlert
+                        message="Couldn’t refresh this list. The rows shown may be out of date."
+                        onRetry={libDocs.retry}
+                      />
+                    </div>
+                  )}
+                  {/* 275-05 (S9): every row hidden as archived → the hidden line below says so; the
+                      list's "No documents in this folder" would claim an emptiness that is not true. */}
+                  {!(libDocs.total === 0 && (libDocs.archivedHidden ?? 0) > 0) && (
+                    <DocumentList
+                      documents={pagedDocuments}
+                      onDelete={deleteDoc}
+                      onRefresh={loadDocuments}
+                      folderId={listFolderId}
+                      currentUserId={user?.id ?? ""}
+                      onSelect={setSelectedDocId}
+                      selectedDocId={selectedDocId}
+                      folders={folders}
+                      retention={retention}
+                    />
+                  )}
+                </>
               )}
             </div>
-            {/* 275-REVIEW F-WR-11: for a view / filter resolve too — one include-archived state. */}
-            <ArchivedHiddenLine
-              count={libDocs.archivedHidden ?? 0}
-              included={find.include_archived}
-              onChange={(include) => findDispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: include })}
-            />
-            {/* Phase 217.1-06 — the client-side pager (the sketch's table footer). Shown on
-                the folder view only; a filter/view resolve carries its own server count. */}
-            {listTarget === null && libDocs.total !== null && (
+            {/* 275-REVIEW F-WR-11: for a view / filter resolve too — one include-archived state.
+                284-03: only once the list has answered (S1 — no hidden line under a skeleton). */}
+            {libDocs.total !== null && (
+              <ArchivedHiddenLine
+                count={libDocs.archivedHidden ?? 0}
+                included={find.include_archived}
+                onChange={(include) => findDispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: include })}
+              />
+            )}
+            {/* Phase 217.1-06 — the pager (the sketch's table footer). ⭐ 284-03 (D-09 / D-10): for
+                browse, saved views and ad-hoc filters alike — every total is the server's exact
+                count, so the pager is exact everywhere. Hidden until the list has answered. */}
+            {libDocs.total !== null && (
               <div data-testid="documents-tfoot">
                 <DocumentsPager
                   total={libDocs.total}
@@ -1110,6 +1172,7 @@ export function LibraryPage({
             onSelectTab={(next) => dispatch({ type: "SELECT_TAB", tab: next as LibraryTab })}
             inFlight={libDocs.inFlight ?? 0}
             totalDocuments={libDocs.summary?.total}
+            totalState={summaryState}
             onOpenQueue={() => dispatch({ type: "SELECT_TAB", tab: "ingestion" })}
             listTestId={`${tab}-tabslist`}
             attention={attentionByTab}
@@ -1231,7 +1294,10 @@ export function LibraryPage({
               className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
             >
               <IngestionTab
-                documents={ingestionDocuments}
+                summary={libDocs.summary}
+                summaryState={summaryState}
+                onRetrySummary={libDocs.retrySummary}
+                changeTick={libDocs.changeTick}
                 upload={upload}
                 uploading={uploading}
                 uploadingCount={uploadingCount}

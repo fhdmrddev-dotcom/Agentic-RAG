@@ -43,7 +43,7 @@ import userEvent from "@testing-library/user-event"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { Document, Folder, SavedView } from "@/types"
-import { installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
+import { installFakeLibraryApi, summarizeDocuments } from "@/test-utils/fakeLibraryApi"
 import composition from "../__generated__/sketchComposition.json"
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
@@ -352,7 +352,16 @@ describe("sketch-composition fence — §2 positive controls", () => {
 
   it("the shipped tab-body hooks render — `data-testid` is the right convention", async () => {
     const { IngestionTab } = await import("../IngestionTab")
-    renderUI(<IngestionTab documents={sampleDocuments} />)
+    // 284-03 (D-13): the tab takes the summary, not the array (the base render omitted `upload` /
+    // `uploading`, a recorded inherited tsc error; supplied here with the conversion).
+    renderUI(
+      <IngestionTab
+        summary={summarizeDocuments(sampleDocuments)}
+        summaryState="ready"
+        upload={vi.fn()}
+        uploading={false}
+      />,
+    )
     expect(screen.getByTestId("ingestion-tab")).toBeInTheDocument()
   })
 })

@@ -23,7 +23,15 @@
  * 5. A STALE ANSWER IS DROPPED (`useDocumentFind`'s `reqIdRef` guard): a slow earlier request can
  *    never overwrite a later one.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react"
 
 import { useDocuments } from "@/hooks/useDocuments"
 import { getDocument, getLibrarySummary, listDocumentsPage, resolveAdHoc, resolveView } from "@/lib/api"
@@ -88,8 +96,6 @@ export interface UseLibraryDocuments {
   deleteDoc: (id: string, scope?: "version" | "all") => Promise<void>
   uploading: boolean
   uploadingCount: number
-  /** ⚠ 284-03 Task 1 window only — the current page rows for the Ingestion tab (Task 2 deletes it). */
-  documentsForIngestion: Document[]
 }
 
 interface ListAnswer {
@@ -98,6 +104,19 @@ interface ListAnswer {
   /** A view / filter's archived count (the browse count is the summary's). */
   archived: number | null
 }
+
+/** The last list request that settled, and the rows it put on screen. */
+interface SettledList extends ListAnswer {
+  /** The request that settled (success or failure). */
+  sourceKey: string
+  pageKey: string
+  attempt: number
+  /** The source the ROWS belong to — kept from the previous answer when a request fails. */
+  answeredKey: string | null
+  error: Error | null
+}
+
+const NO_ROWS: Document[] = []
 
 interface SingleDoc {
   id: string
@@ -151,11 +170,10 @@ export function useLibraryDocuments({
   selectedDocId,
   findRows,
 }: UseLibraryDocumentsArgs): UseLibraryDocuments {
-  const [rows, setRows] = useState<Document[]>([])
-  const [total, setTotal] = useState<number | null>(null)
-  const [listArchived, setListArchived] = useState<number | null>(null)
-  const [listState, setListState] = useState<LibraryListState>("cold")
-  const [error, setError] = useState<Error | null>(null)
+  // ⭐ ONE settled-request record, written ONLY in a request's callbacks. Every list state is
+  // DERIVED from it in render (never set synchronously in an effect), so the state machine cannot
+  // drift from the request that produced it.
+  const [settled, setSettled] = useState<SettledList | null>(null)
   // `attempt` — a reload the person asked for; `changeTick` — a silent one (a hint or a refresh).
   const [attempt, setAttempt] = useState(0)
   const [changeTick, setChangeTick] = useState(0)
@@ -166,9 +184,6 @@ export function useLibraryDocuments({
 
   const reqIdRef = useRef(0)
   const summaryReqRef = useRef(0)
-  /** The source whose rows are on screen (`null` = none yet). */
-  const answeredKeyRef = useRef<string | null>(null)
-  const lastRef = useRef({ key: "", page: "", attempt: 0, changeTick: 0 })
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const summaryKnownRef = useRef(false)
 
@@ -188,53 +203,62 @@ export function useLibraryDocuments({
     [],
   )
 
+  // The on-page rows' setter (`useDocuments`' Realtime merge, the optimistic upload row). It
+  // edits the rows that are ON SCREEN; with nothing answered there is nothing to edit.
+  const setRows = useCallback<Dispatch<SetStateAction<Document[]>>>((update) => {
+    setSettled((prev) =>
+      prev === null ? prev : { ...prev, rows: typeof update === "function" ? update(prev.rows) : update },
+    )
+  }, [])
+
   const base = useDocuments({ setRows, onChange: scheduleChange })
 
   // ── the page ──────────────────────────────────────────────────────────────────────────
   // Keyed on the SERIALISED source, so a new-but-equal object is the same list (no refetch).
   const sourceKey = JSON.stringify(source)
+  const pageKey = `${offset}:${limit}:${includeArchived}`
   useEffect(() => {
     const myReq = ++reqIdRef.current
-    const page = `${offset}:${limit}:${includeArchived}`
-    const prev = lastRef.current
-    lastRef.current = { key: sourceKey, page, attempt, changeTick }
-    const sameList = answeredKeyRef.current === sourceKey
-    const background =
-      sameList &&
-      prev.key === sourceKey &&
-      prev.page === page &&
-      prev.attempt === attempt &&
-      prev.changeTick !== changeTick
-
-    if (!sameList) {
-      // Cold: the previous rows belong to another list — never show them under this header.
-      setRows([])
-      setTotal(null)
-      setListArchived(null)
-      setError(null)
-      setListState("cold")
-    } else if (!background) {
-      setListState("warm")
-    }
-
+    const request = { sourceKey, pageKey, attempt }
     readList(JSON.parse(sourceKey) as LibrarySource, includeArchived, offset, limit).then(
       (answer) => {
         if (myReq !== reqIdRef.current) return
-        answeredKeyRef.current = sourceKey
-        setRows(answer.rows)
-        setTotal(answer.total)
-        setListArchived(answer.archived)
-        setError(null)
-        setListState("ready")
+        setSettled({ ...request, answeredKey: sourceKey, ...answer, error: null })
       },
       (e: unknown) => {
         if (myReq !== reqIdRef.current) return
         // Rows (if any) are deliberately left as they were: an error never swaps the list.
-        setError(asError(e, "Couldn't load documents."))
-        setListState("error")
+        setSettled((prev) => ({
+          answeredKey: prev?.answeredKey ?? null,
+          rows: prev?.rows ?? [],
+          total: prev?.total ?? 0,
+          archived: prev?.archived ?? null,
+          ...request,
+          error: asError(e, "Couldn't load documents."),
+        }))
       },
     )
-  }, [sourceKey, includeArchived, offset, limit, attempt, changeTick])
+  }, [sourceKey, pageKey, includeArchived, offset, limit, attempt, changeTick])
+
+  // Derived (UI-SPEC §Loading vocabulary): rows belong to THIS source, or none are shown (cold);
+  // the settled request is the one asked for, or the person is waiting (warm). A change hint is
+  // not part of the request identity, so a background refetch never reads as a wait (silent).
+  const onScreen = settled !== null && settled.answeredKey === sourceKey
+  const isCurrent =
+    settled !== null && settled.sourceKey === sourceKey && settled.pageKey === pageKey && settled.attempt === attempt
+  const listState: LibraryListState = !onScreen
+    ? isCurrent && settled.error
+      ? "error"
+      : "cold"
+    : !isCurrent
+      ? "warm"
+      : settled.error
+        ? "error"
+        : "ready"
+  const rows = onScreen ? settled.rows : NO_ROWS
+  const total = onScreen ? settled.total : null
+  const listArchived = onScreen ? settled.archived : null
+  const error = isCurrent ? settled.error : null
 
   // ── the numbers ───────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -275,9 +299,10 @@ export function useLibraryDocuments({
   )
   const [single, setSingle] = useState<SingleDoc | null>(null)
   // Remember the last row the selection resolved to, so paging away does not close the panel.
-  useEffect(() => {
-    if (fromLists) setSingle((prev) => (prev?.doc === fromLists ? prev : { id: fromLists.id, doc: fromLists, error: null }))
-  }, [fromLists])
+  // (React's "adjust state while rendering" pattern — guarded, so it settles in one extra pass.)
+  if (fromLists && single?.doc !== fromLists) {
+    setSingle({ id: fromLists.id, doc: fromLists, error: null })
+  }
   const known = single !== null && single.id === selectedDocId
   // Only once the page has answered: a document on the page being loaded costs no extra read.
   const listSettled = listState === "ready" || listState === "error"
@@ -318,7 +343,7 @@ export function useLibraryDocuments({
       }
       return { isDuplicate: res.isDuplicate }
     },
-    [baseUpload, browseFolder, offset],
+    [baseUpload, browseFolder, offset, setRows],
   )
   const deleteDoc = useCallback(
     async (id: string, scope?: "version" | "all") => {
@@ -361,6 +386,5 @@ export function useLibraryDocuments({
     deleteDoc,
     uploading: base.uploading,
     uploadingCount: base.uploadingCount,
-    documentsForIngestion: rows,
   }
 }

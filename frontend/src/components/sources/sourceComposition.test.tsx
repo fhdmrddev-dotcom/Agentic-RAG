@@ -52,7 +52,7 @@ import { MessageSquare, FileText, Plug, Workflow } from "lucide-react"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, Folder, SavedView } from "@/types"
-import { installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
+import { installFakeLibraryApi, summarizeDocuments } from "@/test-utils/fakeLibraryApi"
 import type { NavItem } from "@/lib/nav-items"
 import type { ConnectorWatch } from "@/lib/api/sources"
 
@@ -656,7 +656,8 @@ describe("source-composition fence — §2 positive controls", () => {
     const { IngestionTab } = await import("@/components/library/IngestionTab")
     renderUI(
       <IngestionTab
-        documents={sampleDocuments}
+        summary={summarizeDocuments(sampleDocuments)}
+        summaryState="ready"
         upload={vi.fn().mockResolvedValue({ isDuplicate: false })}
         uploading={false}
         uploadingCount={0}
