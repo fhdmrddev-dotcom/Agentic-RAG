@@ -3571,8 +3571,8 @@ const BASELINE = {
   "tabsContrast.test.ts": 14,
   "LibraryPage.test.tsx": 12,
   "librarySelection.test.ts": 25,
-  "useDocuments.test.ts": 7,
-  "useLibraryDocuments.test.ts": 24, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint)
+  "useDocuments.test.ts": 14, // RAISED 7 → 14 at 284-REVIEW WR-01 (a membership-changing Realtime UPDATE refetches; a cosmetic one merges)
+  "useLibraryDocuments.test.ts": 25, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint) · RAISED 24 → 25 at 284-REVIEW WR-01 (the on-page rows reach useDocuments)
   "DocumentList.test.tsx": 7,
   "DocumentList.moveToFolder.test.tsx": 4,
   "ViewsGroup.test.tsx": 10,
@@ -3613,11 +3613,11 @@ const BASELINE = {
   // trailing orphans close 217's deferred-§3 re-open trigger.
   "sketchComposition.test.tsx": 47,
   "ingestionFailureCopy.test.ts": 25,
-  "IngestionTab.test.tsx": 50, // +2 BUG-260923-02 History paging · RAISED 42 → 50 at 284-03 (the summary + three paged status lists)
+  "IngestionTab.test.tsx": 52, // +2 BUG-260923-02 History paging · RAISED 42 → 50 at 284-03 (the summary + three paged status lists) · RAISED 50 → 52 at 284-REVIEW CR-01 (a shrinking list clamps the page)
   "pipelineGroups.test.ts": 7,
   "LibraryStatTiles.test.tsx": 16, // RAISED 13 → 16 at 284-01 Task 3 (+3 CHUNKS arm cases; the 13 converted in place to number props)
   "FolderDetail284.test.tsx": 6, // 284-01 Task 3 — the folder band takes numbers; 284-05 checkpoint +1 (grouped counts). BOTH KNOBS, SAME COMMIT.
-  "AnimatedNumber.progress.test.ts": 3, // 284-05 checkpoint — the eased fraction never leaves [0, 1] (G-4 saw "-17,721"). BOTH KNOBS, SAME COMMIT.
+  "AnimatedNumber.progress.test.ts": 7, // 284-05 checkpoint — the eased fraction never leaves [0, 1] (G-4 saw "-17,721"). BOTH KNOBS, SAME COMMIT. · RAISED 3 → 7 at 284-REVIEW IN-05 (locale-grouped count-ups)
   "viewRulePhrase.test.ts": 4,
   "ViewCardGrid.test.tsx": 14,
   "IndexFoldersTable.test.tsx": 6,
@@ -3735,7 +3735,7 @@ const BASELINE = {
   // rather than fail. Phase 214's `WorkflowScheduleModal` finding, avoided by looking.
   // ⬆ RAISED 9 → 13 at 271-04, recording 271-02's Filing-rules header-link cases (measured `13`
   //   on the wave-1 gate run at ff4b98f01).
-  "LibraryHeaderBar.test.tsx": 16, // RAISED 13 → 16 at 284-03 (Counting… / Count not known yet)
+  "LibraryHeaderBar.test.tsx": 17, // RAISED 13 → 16 at 284-03 (Counting… / Count not known yet) · RAISED 16 → 17 at 284-REVIEW IN-05 (Reading 1,200 files)
   // 22 → 30: per-file selection (operator: "how can I select individual files") and the
   // two-column body that puts the folder tree inside the card it feeds.
   "SourcePreviewPanel.test.tsx": 30,
@@ -4246,7 +4246,10 @@ const BASELINE = {
   "DocumentChunksSection.paging284.test.tsx": 8, // 284-03 — chunks page by scroll sentinel, N of M
   "DocumentRow.versions284.test.tsx": 3, // 284-03 — versions say N of M
   "libraryListFence.test.ts": 3, // 284-05 — D-16: no product code asks for the whole library (planted-source self-test)
-  "TakeoffSection.test.tsx": 8, // 284-04 — ADOPTED at 284-05: ONE bounded spreadsheet page, never the whole library
+  "TakeoffSection.test.tsx": 13, // 284-04 — ADOPTED at 284-05: ONE bounded spreadsheet page, never the whole library · RAISED 8 → 13 at 284-REVIEW WR-04 (the saved rate sheet is always shown)
+  // 284-REVIEW CR-01 / IN-07 — the review-fix suites. BOTH KNOBS, SAME COMMIT.
+  "LibraryPage.review284.test.tsx": 5, // 284-REVIEW CR-01 + IN-07 — never a page past the end; the pager describes the rows shown
+  "pageClamp.test.ts": 3, // 284-REVIEW CR-01 — the ONE clamp for every paged list
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6204,6 +6207,9 @@ const TARGETS = [
   "src/components/ingestion/__tests__/DocumentRow.versions284.test.tsx",
   "src/lib/__tests__/libraryListFence.test.ts",
   "src/components/metadata/__tests__/TakeoffSection.test.tsx",
+  // 284-REVIEW CR-01 / IN-07 — FILE-LEVEL (no `src/pages` / `src/lib` directory entry).
+  "src/pages/__tests__/LibraryPage.review284.test.tsx",
+  "src/lib/__tests__/pageClamp.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
