@@ -4,9 +4,9 @@ title: remove_document_bytes reports every path as removed without reading what 
 reported: 2026-10-14
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [backend/retention, backend/connectors, backend/storage]
-folded_into: null
+folded_into: "285"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "The next phase whose files_modified names backend/app/services/document_purge.py or backend/app/services/retention/disposition.py, OR any report/test that relies on removed_paths / not_removed being accurate (e.g. a retention disposal receipt shown to an operator)."

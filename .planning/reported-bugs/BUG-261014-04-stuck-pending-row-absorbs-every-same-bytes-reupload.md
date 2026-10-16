@@ -4,9 +4,9 @@ title: A permanently stuck pending document absorbs every re-upload of the same 
 reported: 2026-10-14
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/ingestion, backend/upload, backend/watch-sync]
-folded_into: null
+folded_into: "285"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "The next phase whose files_modified names backend/app/api/documents.py's upload_document, backend/app/services/ingest_splice.py, or backend/app/db/ingestion_jobs.py, OR the first observed document stuck in 'pending' with no ingestion_jobs row (SELECT d.id FROM documents d LEFT JOIN ingestion_jobs j ON j.document_id = d.id WHERE d.status = 'pending' AND j.id IS NULL AND d.created_at < now() - interval '1 hour' returns any row)."

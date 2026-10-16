@@ -4,9 +4,9 @@ title: A watched file whose download fails once is never retried, and the next s
 reported: 2026-10-14
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/connectors, backend/ingestion]
-folded_into: null
+folded_into: "285"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

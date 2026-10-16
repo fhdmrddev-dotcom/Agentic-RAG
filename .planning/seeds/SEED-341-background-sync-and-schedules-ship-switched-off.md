@@ -3,9 +3,9 @@ seed_id: SEED-341
 title: Automatic folder sync and scheduled workflows ship switched OFF, and turning them on is an env-file edit plus a restart, not an operator control
 created: 2026-10-04
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Reviewed at /gsd:discuss-phase 285 (2026-10-16) and deferred: 285 is repair-only (FIX-12, FIX-13, FIX-14); see 285-CONTEXT.md deferred section."
 trigger_when: "Any phase whose files_modified names backend/app/config.py's watch/scheduler block, main.py's lifespan, deploy/onebox.env.example or the Control Room; OR the next deploy/install milestone (SEED-003); OR a customer or demo reports that a watched folder never synced or a schedule never ran."
 trigger_paths: ["backend/app/main.py", "backend/app/services/watch_service.py", "backend/app/services/scheduler_service.py", "deploy/onebox.env.example", "docker-compose.prod.yml", "frontend/src/components/admin/MaintenancePanel.tsx", "frontend/src/components/admin/ControlRoomPage.tsx"]
 trigger_surfaces: ["admin", "connectors", "workflow", "deployment"]

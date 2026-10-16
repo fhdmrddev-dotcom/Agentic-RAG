@@ -4,9 +4,9 @@ title: A watch purge deletes the rows AND bytes of a hand-uploaded document the 
 reported: 2026-10-14
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/connectors, backend/watch-sync, backend/ingestion, backend/retention]
-folded_into: null
+folded_into: "285"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "The next phase whose files_modified names backend/app/api/sources.py, backend/app/services/document_purge.py or backend/app/services/watch_service.py, OR the next phase that changes the minter's dedup legs (ingest_splice.mint_document_row). Whichever comes first must fold this or explicitly re-defer it."
