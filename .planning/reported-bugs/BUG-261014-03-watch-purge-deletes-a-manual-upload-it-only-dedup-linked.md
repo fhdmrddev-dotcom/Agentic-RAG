@@ -4,10 +4,10 @@ title: A watch purge deletes the rows AND bytes of a hand-uploaded document the 
 reported: 2026-10-14
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/connectors, backend/watch-sync, backend/ingestion, backend/retention]
 folded_into: "285"
-verified_closed_by: null
+verified_closed_by: "285 (4bcce53a1 — 285-LIVE-EVIDENCE.md SC#2)"
 related_seeds: []
 re_open_trigger: "The next phase whose files_modified names backend/app/api/sources.py, backend/app/services/document_purge.py or backend/app/services/watch_service.py, OR the next phase that changes the minter's dedup legs (ingest_splice.mint_document_row). Whichever comes first must fold this or explicitly re-defer it."
 reproduces_on:
@@ -83,3 +83,9 @@ the watch without `purge_documents=true` leaves every document in place.
 - `backend/app/services/watch_service.py:359-372`
 - `backend/app/api/sources.py:331-341`, `:469-481`
 - `backend/app/services/document_purge.py` (`purge_documents`)
+
+## Closed 2026-10-16 (Phase 285)
+
+Closed by Phase 285 plan 02 (`4bcce53a1`, FIX-13): both purge doors delete only documents the watch MINTED (`connector_watch_items.minted`, migration 209) and that no other item still references. A dedup-linked hand upload keeps its row and bytes. Door 2's receipt reports `kept_count`.
+
+Verified live, RED first: at both doors the hand upload's bytes read `1 -> 1` with the row present, while the watch-minted positive control read `1 -> 0`. Shared and present-sibling cases were also kept. Evidence: `.planning/phases/285-watch-and-re-upload-close-out/285-LIVE-EVIDENCE.md` § SC#2.

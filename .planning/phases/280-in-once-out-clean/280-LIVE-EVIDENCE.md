@@ -9,6 +9,7 @@ pass. HEAD at measurement: `b794a40c5` (plans 01-03 merged), 2026-10-14.
 |---|---|---|
 | SC#1 same-bytes minter + CR-01 | ✅ PASS | live re-run at `b794a40c5` |
 | SC#2 OneDrive re-drive | ⛔ **PARTIAL — OWED** (104 of 105) | paging, decoded paths, rule, success + complete all PASS; one file lost to a transient TLS error that is never retried (BUG-261014-02) |
+| ↳ ⚠ CORRECTED 2026-10-16 (Phase 285, D-18) | ✅ **105 / 105** | the row above is kept verbatim. 285 fixed BUG-261014-02 and re-synced watch A: `team-note-058.txt` landed, `completed`. See `285-LIVE-EVIDENCE.md` § SC#5 |
 | SC#3 door 1 | ✅ PASS | 2/2 paths `1 -> 0`, rows gone |
 | SC#3 door 2 | ✅ PASS | 2/2 paths `1 -> 0`, rows gone, `purged_count == 2` |
 | SC#3 held (both doors) | ✅ PASS | 409 `legal_hold`; rows present; paths `1 -> 1` |
@@ -115,6 +116,16 @@ count, not some", so this row is not a pass. Every other D-15 / D-27 criterion p
 folder. The one missing file was lost to a transient network error that the watch never retries.
 That is a separate defect, filed as **BUG-261014-02**. It is not a return of BUG-260910-04's paging
 or path defects.
+
+> ⚠ **CORRECTED 2026-10-16 (Phase 285, D-18).** The status above is kept verbatim as the 2026-10-14
+> measurement. The owed re-drive has now run. Phase 285 fixed BUG-261014-02 (`9e9af4a1e`: failed watch
+> items are retried). With the operator's explicit OK ("option-a"), it re-synced **this same watch A**
+> as it was, on 2026-10-16 at 17:03Z. `team-note-058.txt` was read again and landed (`state='present'`,
+> document `310aeac5-…`, `completed`). The run row read `success`, `count_new 1`, `count_errors 0`,
+> `last_error NULL`. Result: **A 95 + B 10 = 105 / 105, all `completed`.** This is the first arm of
+> "What closes this row" below. Evidence: `.planning/phases/285-watch-and-re-upload-close-out/285-LIVE-EVIDENCE.md`
+> § SC#5. Flipping BUG-260910-04 and 238-VERIFICATION M-9 against this pass is left to their own
+> routing; 285 did not touch them.
 
 ### Operator approval (Task 3), verbatim
 
