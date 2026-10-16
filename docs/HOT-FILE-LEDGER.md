@@ -11003,7 +11003,7 @@ cells rot within days.
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on resolve_document_id / resolve_document / fetch_full_document; 272 pins retired by name |
-| [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 6 / 4 / 463 (was `5 / 3 / 463`) | ⚠ **FIRES** | **279-01**: ONE comment repoint to `expert_scope_statement` (no code). Honoured by construction (278-02 vocabulary import). ⛔ ids/counts RLS-intersected (D-21) |
+| [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 7 / 5 / 503 (was `6 / 4 / 463`) | ⚠ **FIRES** | **284-04**: `_fetch_all` moved in VERBATIM from the Find core (its only remaining caller); function-local imports (Pitfall 5). Honoured by construction. ⛔ ids/counts RLS-intersected |
 | [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 4 / 1 / 1163 (was `0 / 0 / 0`) | no (young) | young (272-01 move; 272-04 kinds, D-09 lock, ONE audit writer, vocabulary). **272-REVIEW WR-01**: vocabulary values checked + JSON-quoted, note capped (2000). Split OWED → 273 |
 | [`frontend/src/components/chat/StepRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatsteprowtsx) | 3 / 2 / 253 (was `2 / 1 / 249`) | no (2 phases) | 273-05: `refused` node state (UI-D-02 amber pair). ⛔ derived from the result marker in toolStepDerivation, never from a tool name |
 | [`frontend/src/components/chat/ToolCallDetails.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcalldetailstsx) | 3 / 2 / 181 (was `2 / 1 / 171`) | no (2 phases) | 273-05: ToolArgsBlock hidden for show_artifact (L-2); dispatched BEFORE the `parsed.error` arm (L-3/L-4). ⛔ `detail` never rendered |
@@ -11028,27 +11028,27 @@ cells rot within days.
 | [`frontend/src/components/chat/artifacts/captionModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscaptionmodelts) | 1 / 1 / 73 (was `0 / 0 / 0`) | no (young) | young (273-02). Phrases the SERVER's caption facts (sources, lineage, counts) — never model text (D-04). Pure |
 | [`frontend/src/components/chat/artifacts/chartModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartmodelts) | 1 / 1 / 275 (was `0 / 0 / 0`) | no (young) | young (273-02). Pure chart derivations: slots, visible domain, tooltip rows, ticks, aria text. No React, no recharts |
 | [`frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesshowartifactbodytsx) | 1 / 1 / 192 (was `0 / 0 / 0`) | no (young) | young (273-05). Rail essence + expanded line for show_artifact. ⛔ reads `reason`, never `detail` or `values` (L-3/L-4) |
-| [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 5 / 3 / 584 (was `4 / 2 / 587`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). honoured by construction (278-02: vocabulary import, values pinned to base); `_DATE_COLUMN` is an import alias. ⛔ open/download not filtered |
+| [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 8 / 4 / 505 (was `5 / 3 / 584`) | ⚠ **FIRES** | **284-04**: Find = ONE ranged `count=exact` read of `library_documents`; the "two legs, never one `or_`" invariant RETIRED deliberately (the view holds the union). ⛔ short page → 503 |
 | [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-03**: `include_archived: bool = False`; ⛔ `extra="forbid"` kept, so backend ships before frontend |
 | [`backend/app/api/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_searchpy) | 1 / 1 / 48 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ user-JWT client only; remaps `ResolveError`; no write. **271-05**: the fence calls THIS coroutine with a GoTrue token (P-04) |
 | [`frontend/src/pages/findState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesfindstatets) | 3 / 3 / 374 (was `2 / 2 / 361`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `include_archived` + `SET_INCLUDE_ARCHIVED` (offset 0); key sent only when true (Pitfall 13). ⛔ STRICT LEAF: zero imports |
 | [`frontend/src/hooks/useDocumentFind.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentfindts) | 1 / 1 / 104 (was `0 / 0 / 0`) | no (1 phase) | young (271-03). ⛔ resting Find makes ZERO requests; an error KEEPS rows and chips. Driven live in 271-05 |
 | [`frontend/src/lib/documentAddedBy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentaddedbyts) | 1 / 1 / 27 (was `0 / 0 / 0`) | no (1 phase) | young (271-03). ⛔ the ONE `addedBy` rule (connection first, never an email); DocumentFileFacts and the Find column import it |
-| [`frontend/src/components/relationships/LinkTargetCombobox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipslinktargetcomboboxtsx) | 1 / 1 / 177 (was `0 / 0 / 0`) | no (1 phase) | young (271-03, extracted). ⛔ one combobox, two mounts. 271-05 drove it in the Relationship editor (latest-only candidates) |
-| [`frontend/src/components/relationships/CreateLinkDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipscreatelinkdialogtsx) | 4 / 2 / 236 (was `3 / 1 / 316`) | no (2 phases) | **271-03**: the combobox body EXTRACTED to `LinkTargetCombobox`; chips, note, preview, footer stay. ⛔ create stays outgoing-only (D-117-1) |
+| [`frontend/src/components/relationships/LinkTargetCombobox.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipslinktargetcomboboxtsx) | 2 / 2 / 235 (was `1 / 1 / 177`) | no (2 phases) | **284-04**: server mode — reports its query, never re-filters the answer; status / alert lines after the listbox. ⛔ one combobox, two mounts |
+| [`frontend/src/components/relationships/CreateLinkDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipscreatelinkdialogtsx) | 5 / 3 / 267 (was `4 / 2 / 236`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-04**: the target picker type-aheads on `POST /document-search` (debounced, limit 20) — no whole-library list. ⛔ create stays outgoing-only (D-117-1) |
 | [`frontend/src/components/relationships/relationshipLabels.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsrelationshipsrelationshiplabelsts) | 2 / 2 / 104 (was `1 / 1 / 43`) | no (2 phases) | **271-03**: `RELATIONSHIP_FILTER_VERBS` DERIVED from the two maps, pinned to the backend `_INVERSE_LABEL`. ⛔ never retyped |
-| [`frontend/src/components/library/DocumentsPager.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarydocumentspagertsx) | 3 / 2 / 112 (was `2 / 1 / 108`) | no (2 phases) | **271-04**: ONE optional `exact` prop skips the 1000-row cap arm for a server-exact total. ⛔ browse renders byte-identically |
+| [`frontend/src/components/library/DocumentsPager.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarydocumentspagertsx) | 4 / 3 / 101 (was `3 / 2 / 112`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-03**: the ROW_CAP arm DELETED (D-09); every pager total is exact and grouped (`1,500`, not `1500+`). ⛔ below 1,000 Find output byte-identical |
 | [`frontend/src/components/ingestion/FilterBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfilterbartsx) | 7 / 4 / 387 (was `6 / 3 / 311`) | ⚠ **FIRES** | ⚠ STALE (`6/3/311`). **271-04**: 4 optional props + `FilterChip`; Views DOM snapshot-pinned. ⚠ 271-05 F-1: Find's metadata chips read raw keys (`document_type is …`) |
 | [`frontend/src/components/ingestion/AutomationGroup.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionautomationgrouptsx) | 6 / 5 / 303 (was `5 / 4 / 303`) | ⚠ **FIRES** | **271-02**: ONE string (`No filing rules yet`, D-08). ⛔ no logic change. The next phase that touches it proposes the extraction first |
-| [`frontend/src/components/library/find/StructurePopovers.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindstructurepopoverstsx) | 3 / 2 / 686 (was `2 / 1 / 686`) | no (2 phases) | young (271-04). **276-07**: the date label reads "Added to Syrel". ⛔ one popover idiom |
-| [`frontend/src/components/library/find/FindQuickAdd.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindquickaddtsx) | 2 / 2 / 380 (was `1 / 1 / 358`) | no (2 phases) | **275-02**: one toggle `FilterChip` right of Version: `Include archived` / `Archived: included` + labelled ✕ |
+| [`frontend/src/components/library/find/StructurePopovers.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindstructurepopoverstsx) | 5 / 3 / 746 (was `3 / 2 / 686`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-01**: summary-fed editors keep You / Anyone else in loading / error. **284-04**: Relationship editor in server mode. ⛔ one popover idiom |
+| [`frontend/src/components/library/find/FindQuickAdd.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindquickaddtsx) | 5 / 3 / 394 (was `2 / 2 / 380`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-01**: Added by / Document type come from summary lists. **284-04**: Relationship editor searches the server. **284-05**: unused `documents` prop DELETED |
 | [`frontend/src/components/library/find/FindModeSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmodeswitchtsx) | 1 / 1 / 77 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ `role="radiogroup"`, never `role="tab"`. Driven in Chromium at 271-05 |
 | [`frontend/src/components/library/find/FindMetaLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindfindmetalinetsx) | 1 / 1 / 101 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ the ONLY count in Find; the client never re-sorts. **271-05 G4-6 live**: the header follows the sort, nulls last |
 | [`frontend/src/components/library/find/AskHandoffCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindaskhandoffcardtsx) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ no I/O, no list. **271-05 G4-4 live**: Enter opened a NEW thread with the question unsent; no list rendered in the Library |
 | [`frontend/src/components/library/find/askInChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfindaskinchatts) | 1 / 1 / 53 (was `0 / 0 / 0`) | no (1 phase) | young (271-02). ⛔ create thread → prefill → navigate; never sends. **271-05 G4-4 live**: POST /threads once, 0 message sends, prefill held 3 s |
 | [`frontend/src/components/library/find/DocumentsFindBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryfinddocumentsfindbodytsx) | 2 / 2 / 262 (was `1 / 1 / 262`) | no (2 phases) | **275-04**: `FindListProps` Pick gains `"retention"` (one token) so Find rows carry the chips. ⛔ owns the Find render; an error keeps the chips |
-| [`backend/app/models/document.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocumentpy) | 13 / 10 / 221 (was `12 / 9 / 216`) | ⚠ **FIRES — 10 phases** | **280-03**: ONE optional `already_in_library` on `DocumentResponse` (without it `response_model` strips the key). ⛔ optional only (217 precedent) |
-| [`frontend/src/components/ingestion/DocumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentrowtsx) | 10 / 5 / 583 (was `8 / 4 / 564`) | ⚠ **FIRES** | **275-04**: ONE optional `retention` prop + ONE `<RetentionRowChips>` after ClassificationRowChip. Still seven `<td>`. ⛔ no fetch here |
+| [`backend/app/models/document.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocumentpy) | 14 / 11 / 275 (was `13 / 10 / 221`) | ⚠ **FIRES** | **284-02**: five paged envelopes (`DocumentListResponse`, chunk / table / image / version pages) beside the row models; additive. ⛔ optional / additive only (217 precedent) |
+| [`frontend/src/components/ingestion/DocumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentrowtsx) | 11 / 6 / 591 (was `10 / 5 / 583`) | ⚠ **FIRES** | **284-03**: versions read ONE page (`fetchDocumentVersionsPage`, 50) and say "N versions, showing M" when capped. Still seven `<td>` |
 | [`backend/app/services/file_facts.py`](docs/HOT-FILE-LEDGER.md#backendappservicesfile_factspy) | 1 / 1 / 163 | no (1 phase) | young (created 270-01). ⛔ `read_file_facts` NEVER raises; a fact it cannot read is `None`, never `0` and never a substituted date. Re-measured `1/1/163` at 270 close |
 | [`frontend/src/lib/documentDownload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibdocumentdownloadts) | 2 / 1 / 63 | no (1 phase) | young (created 270-03). ⛔ the ONLY place the download label is derived and the request made. 270-04 names an older v1 row too (`Download v1 (viewed, not latest)`) |
 | [`frontend/src/components/metadata/DocumentDownloadButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdownloadbuttontsx) | 1 / 1 / 146 | no (1 phase) | young (created 270-03). ⛔ no `href`, no stored URL: the link is minted on click. The live drive found no signed URL in the DOM |
@@ -11094,7 +11094,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
 | [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 61 / 31 / 1137 (was `60 / 30 / 1134`) | ⚠ **FIRES** | **281-03** (`2510ffdb7`): ONE prop `onOpenConnections={() => onNavigate("connections")}` after the pinned `onOpenRun` line; hooks 27 → 27, 0 branches. honoured by construction |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
-| [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 4 / 3 / 249 (was `2 / 1 / 204`) | ⚠ **FIRES** | now FIRES (3 phases). **271-02**: optional `onOpenFilingRules`; link + pill in ONE right cluster, never a tab. 271-05 G4-3: Back returns to Ingestion |
+| [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 5 / 4 / 262 (was `4 / 3 / 249`) | ⚠ **FIRES** | **284-03**: optional `totalState`: "Counting…" while loading, "Count not known yet" on failure, never "0 documents" before an answer; numbers grouped |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
 | [`frontend/src/components/settings/ActionRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsactionrowtsx) | 1 / 1 / 153 | no (1 phase) | Single action permission row in grant list; renders direction, posture buttons, and forward-action reset affordance (CRED-02). |
 | [`frontend/src/components/settings/McpAuthDoor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmcpauthdoortsx) | 3 / 1 / 451 | no (1 phase) | Second writer of custom_client_id (Phase 222 BYO door). CRED-01 inline refusal shared with ConnectionFormPanel via customClientIdError; both doors must enforce the same boundary. |
@@ -11125,15 +11125,15 @@ cells rot within days.
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
-| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ **FIRES** | ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 99 / 78 / 1546 (was `98 / 77 / 1542`) | ⚠ **FIRES** | **281-03** (`0b9841e55`): `EmitFailure` gains `template_fields_missing`, one union member, additive. Seam OWED |
+| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 210 / 125 / 530 (was `208 / 124 / 523`) | ⚠ **FIRES** | **284-01**: re-exports the paged clients. **284-05**: the five whole-list clients' barrel lines DELETED; `libraryListFence.test.ts` fails on any re-export of them |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 100 / 79 / 1656 (was `99 / 78 / 1546`) | ⚠ **FIRES** | **284-01**: the paged wire types (`DocumentListResponse`, `LibrarySummary`, page params, the four per-document pages); additive only. Seam OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 90 / 65 / 977 (was `89 / 64 / 1002`) | ⚠ **FIRES** | Honoured by construction. **280-01** (D-30): the dead `_patch_postgrest_maybe_single` deleted (−25 L; it wrapped only the Single builder). ⛔ scheduler_service untouched |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 43 / 17 / 2051 (was `42 / 17 / 2024`) | ⚠ **FIRES** | honoured by construction (**282-01** / **282-04**): ONE `_timeout_out_of_range_detail` helper serves the PATCH and Add model by ID; the add gains an optional bound timeout. ⛔ add still lands disabled |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
-| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 95 / 37 / 2534 (was `92 / 36 / 2532`) | ⚠ **FIRES** | Honoured by construction. **280-01**: `delete_document` reads via `maybe_row` (D-09: foreign = random id = 404) + 6 `maybe_row` guards. **280-03**: `/upload` dup → `already_in_library`. 0 new `if` |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 298 / 66 / 6443 (was `290 / 65 / 6428`) | ⚠ **FIRES** | last touch **282-04**: `ModelRegistryTab.test.tsx` 33 → 36 (the 3 Add-form Timeout cases), measured in a targeted run |
+| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 97 / 38 / 2653 (was `95 / 37 / 2534`) | ⚠ **FIRES** | Honoured by construction. **284-02**: `GET /documents` = ONE ranged `count=exact` read of `library_documents`; `GET /documents/{id}`; paged chunks/tables/images/versions. `_ID_BATCH` stopgap DELETED |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 308 / 68 / 6483 (was `298 / 66 / 6443`) | ⚠ **FIRES** | last touch **284-05**: 10 pins raised to measured actuals (284-03 / 284-04 growth) + 5 suites adopted in BOTH knobs (incl. TakeoffSection, in neither before). No pin lowered |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 5 / 2 / 465 | no (2 phases) | **275-03**: `retention` tag in the Documents group (one line). ⛔ `scripts/` is gate-exempt |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 18 / 12 / 796 (was `17 / 11 / 788`) | ⚠ **FIRES** | **281-03** (`0b9841e55`): ONE `template_fields_missing` copy entry (never says "citation") + `whitespace-pre-line` on the reason. honoured by construction (200 / 214 / 281) |
@@ -11252,22 +11252,22 @@ cells rot within days.
 | [`frontend/src/components/workflows/publishRefusalVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusalvocabularyts) | 1 / 1 / 290 | no (1 phase) | young (214-10) — pinned at 41 |
 | [`frontend/src/components/workflows/stepActionWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepactionwordsts) | 2 / 1 / 91 | no (1 phase) | young (214) — the action half of a step's identity |
 | [`frontend/src/components/workflows/stepIdentityVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentityvocabularyts) | 1 / 1 / 206 | no (1 phase) | young (214-11) — ⚠ its six PAUSE sentences are consumed by NOTHING (`SEED-219`) |
-| [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 5 / 4 / 825 (was `4 / 3 / 812`) | ⚠ **FIRES** | **281-02** (`fa08ee6f1`): ONE optional `reason_code?: string \| null` on `GenerateResult` ok:false, additive. honoured by construction. NOT covered by the `lib/api.ts` BARREL row |
+| [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 6 / 5 / 841 (was `5 / 4 / 825`) | ⚠ **FIRES** | **284-01**: `resolveView` / `resolveAdHoc` take an optional page (`offset`, `limit`, `include_archived`), each key sent only when given. ⛔ count_only URL / body byte-identical |
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 19 / 11 / 1967 (was `16 / 10 / 1935`) | ⚠ **FIRES** | **273-05**: `onArtifact` SSE branch + `artifacts` carried through the mapper (Array.isArray guard), additive |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 6 / 4 / 748 | ⚠ **FIRES** | ⛔ row was STALE at `4/2/715` reading `no (2 phases)` — re-derived 263 planning. Holds `FullAppSettings`, not only skills. D-263-03 reuses its `POST /skills` caller, adds no endpoint. |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 15 / 372 (was `31 / 16 / 372`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<td>` kept |
-| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 57 / 19 / 1297 (was `57 / 21 / 1297`) | ⚠ **FIRES** | **275-04**: `useRetentionStates` (ONE batched read), folder line under FolderDetail, `splitArchived` + hidden line on Find's include_archived. Extraction OWED |
+| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 63 / 20 / 1344 (was `57 / 19 / 1297`) | ⚠ **FIRES** | **284-01**: extraction TAKEN (`useLibraryDocuments.ts`); the page derives nothing from documents. **284-03**: states + exact pager. Lines ROSE 1302 → 1344: G-5 NOT discharged |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 24 / 13 / 176 (was `23 / 12 / 174`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01), MEASURED at 278-04 (SEAM-02): one top-level def, test_272_pure_move 9 passed; one comment line, AST-identical. ⛔ 7 re-exports stay (D-10) |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
 | [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 16 / 11 / 666 (was `15 / 10 / 654`) | ⚠ **FIRES** | **275-04**: ONE optional `retention` prop → `<PanelSection title="Retention">` directly after File; no prop = no section. ⛔ the section reads nothing |
 | [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
-| [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 8 / 8 / 503 (was `7 / 7 / 499`) | ⚠ **FIRES** | **275-02**: deleteDocument / deleteFolder `throw await refusalOf(...)`; imports refusal.ts, exports nothing new (barrel contract) |
-| [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
+| [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 10 / 9 / 595 (was `8 / 8 / 503`) | ⚠ **FIRES** | **284-01**: the paged clients (offset / limit typed). **284-05**: the five whole-list clients DELETED (D-16). ⛔ legacy-array tolerance kept ONE release after the prod deploy |
+| [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 10 / 5 / 164 (was `8 / 3 / 120`) | ⚠ **FIRES** | **284-03**: never fetches a list of its own (D-24); INSERT / DELETE call `onChange` (one debounced refetch), on-page UPDATE merges. ⛔ the spread-merge keeps `*_stage_applies` |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 14 / 7 / 991 (was `11 / 6 / 737`) | ⚠ **FIRES** | ⚠ STALE (`11/6/737`). **272-04**: the trend skips `invalid_filter` / `refused_retry` rows (4 lines, D-24); kind 2 still counts |
 | [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 69 / 33 / 3682 (was `68 / 33 / 3682`) | ⚠ **FIRES** | honoured by construction (**282-01** kwargs + drain deadline; **282-04** `provider=active_provider_name` on the 2 budget lookups, 0 new branches). ⛔ prompt-assembly seam OWED (OV-273-03) |
@@ -11289,7 +11289,7 @@ cells rot within days.
 | [`frontend/src/components/sources/SourcePreviewPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcepreviewpaneltsx) | 1 / 1 / 453 | no (1 phase) | young (233) — 229-C at rest, 230-A on confirm. ⛔ Four sections, no removal control; collapse hides FILES, never the count |
 | [`frontend/src/components/sources/previewVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcespreviewvocabularyts) | 1 / 1 / 98 | no (1 phase) | young (233) — a strict leaf, zero imports. ⛔ No hash claim; the `here` qualifier is POSITIVE, not merely an absent overclaim |
 | [`frontend/src/components/sources/ConnectedSourceSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesconnectedsourcesectiontsx) | 4 / 3 / 165 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (**240**): byte-unchanged; the `is_enabled` refusal went into `sourceCapability.ts`. ⭐ Its owed seam WAS a test suite, supplied here |
-| [`frontend/src/components/library/IngestionTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryingestiontabtsx) | 17 / 6 / 512 | ⚠ **FIRES** | ⚠ row was STALE at `13 / 4 / 456` — +2 phases. honoured by construction (233 / **235**) — the reader-off instance statement, ZERO branches |
+| [`frontend/src/components/library/IngestionTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryingestiontabtsx) | 20 / 7 / 706 (was `17 / 6 / 512`) | ⚠ **FIRES** | **284-03**: reads the summary + three paged `GET /documents?status=` lists that mount with their sub-tab (none at rest); layout unchanged (D-13). ⛔ 42+5+6 pinned cases |
 | [`frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestion__tests__ingestionstriptesttsx) | 3 / 3 / 516 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` caused. Pin was UNDER-set 25 vs 30 → 31 |
 | [`backend/app/services/extractors/aspects/vision_text.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsvision_textpy) | 1 / 0 / 367 | no (0 phases) | young (`SEED-226`) — the vision-as-OCR leaf. ⛔ It writes nothing and adds NO dependency; a transcription is stamped `advisory` so it can never pass as a parsed text layer |
 | [`backend/app/services/extractors/aspects/dxf.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsdxfpy) | 2 / 0 / 180 | no (0 phases) | ⚠ absent for its entire life — row added `SEED-226`. It is the only path that READS measurements rather than inferring them (`DIMENSION` values the CAD software computed) |
@@ -11330,7 +11330,7 @@ cells rot within days.
 | [`backend/app/api/classification_rules.py`](docs/HOT-FILE-LEDGER.md#backendappapiclassification_rulespy) | 3 / 3 / 226 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |
 | [`backend/app/models/classification_rule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsclassification_rulepy) | 2 / 2 / 56 | no (2 phases) | row added 237 below threshold. Adds rule_scope ('watch' or 'classification') to RuleCreate, RuleUpdate, RuleResponse. |
 | [`backend/app/services/classification_rule_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesclassification_rule_servicepy) | 3 / 2 / 166 | no (2 phases) | row added 237 below threshold. Persists and queries rule_scope across rule CRUD and uploader rule evaluation. |
-| [`backend/app/services/document_view_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_view_resolverpy) | 5 / 5 / 412 (was `4 / 4 / 403`) | ⚠ **FIRES** | honoured by construction — one default-False kwarg + one `.eq` per read leg, Library callers unchanged, source fence |
+| [`backend/app/services/document_view_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_view_resolverpy) | 6 / 6 / 486 (was `5 / 5 / 412`) | ⚠ **FIRES** | **284-04**: `resolve_filter(via_view=…)` — routes read the view paged; the agent keeps its two service-role legs (exact 3-head total). ⛔ `apply_fragments` stays the one walk (D-115-6) |
 | [`backend/app/services/view_filter_compiler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesview_filter_compilerpy) | 7 / 6 / 302 (was `6 / 5 / 300`) | ⚠ **FIRES** | honoured by construction (278-02: vocabulary import, values pinned to base); `LIST_VALUE_FIELDS = frozenset(LIST_FIELD_NAMES)`. **272 G-1** eq-on-list rule unchanged |
 | [`frontend/src/components/classification/ClassificationRulesPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationclassificationrulespagetsx) | 3 / 3 / 264 (was `1 / 1 / 250`) | ⚠ **FIRES** | now FIRES (3 phases). **271-02**: ONE shape (P-07): no outer padding; header Back · Filing rules · subtitle · New rule; mounted only inside the Library |
 | [`frontend/src/components/classification/RuleBuilderPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationrulebuilderpaneltsx) | 6 / 5 / 501 (was `4 / 3 / 502`) | ⚠ **FIRES** | ⚠ STALE (`4/3/502`). **271-02**: two strings (`New filing rule`, `After extraction`). ⛔ no logic change |
@@ -11357,7 +11357,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 22 / 14 / 572 | **FIRES** | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253; re-derived under CR-08. **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
-| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 15 / 10 / 690 | ⚠ **FIRES** | ⚠ row STALE at `11/6/653`. **266-01**: mig 195's `expert_installs` ACL mirrored (REVOKE PUBLIC/anon/authenticated, GRANT SELECT). ⛔ `scripts/` is gate-EXEMPT: kept by hand |
+| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 21 / 14 / 838 (was `15 / 10 / 690`) | ⚠ **FIRES** | **284-02**: mig 207's `library_documents` grant block mirrored (SELECT-only, closed to PUBLIC / anon; ACL parity 349/349). ⛔ `scripts/` is gate-EXEMPT: kept by hand |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
 | [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
@@ -11389,8 +11389,8 @@ cells rot within days.
 | [`frontend/src/components/experts/catalog/startScopedChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogstartscopedchatts) | 1 / 1 / 70 | no (new) | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
 | [`backend/app/services/expert_install_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_install_servicepy) | 3 / 1 / 648 | no (1 phase) | planning triple `0/0/0`. **266-05 F-1**: Retry hands on a STRING id (an asyncpg UUID crashed live). ⛔ org only from the active-org dep; never a SYSTEM_USER_ID row |
 | [`backend/app/services/expert_corpus.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_corpuspy) | 1 / 1 / 174 | no (1 phase) | planning triple `0/0/0`. First-party corpora are DATA: slug `fullmatch` + path containment, CRLF→LF before any hash. ⛔ nothing is imported from the corpus dir |
-| [`frontend/src/components/ingestion/FolderTree.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldertreetsx) | 13 / 8 / 213 (was `12 / 7 / 207`) | ⚠ **FIRES** | **275-02**: confirm stays open until the delete answers; rethrows ONLY a 409 `ApiRefusal` to FolderNode. ⛔ no fetch here |
-| [`frontend/src/components/ingestion/FolderNode.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldernodetsx) | 13 / 7 / 303 (was `12 / 6 / 272`) | ⚠ **FIRES** | **275-02**: one `refusal` state (cleared when the confirm closes); a 409 swaps Delete+Cancel for the notice. ⛔ no fetch here |
+| [`frontend/src/components/ingestion/FolderTree.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldertreetsx) | 14 / 9 / 213 (was `13 / 8 / 213`) | ⚠ **FIRES** | **284-03**: the Root NavRow count passes through (`count={rootDocumentCount}`, no `?? 0`), so an unanswered count renders nothing. ⛔ no fetch here |
+| [`frontend/src/components/ingestion/FolderNode.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldernodetsx) | 15 / 8 / 316 (was `13 / 7 / 303`) | ⚠ **FIRES** | **284-03**: no counts yet → the count slot is OMITTED, never 0; a ready summary missing the folder is an answered 0. ⛔ no fetch here |
 | [`frontend/src/components/ingestion/NavRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionnavrowtsx) | 6 / 4 / 269 | ⚠ **FIRES — 4 phases** | ⚠ absent its ENTIRE LIFE — row added 266-05. **UI-3**: ONE optional `caption` (omitted → row unchanged). ⛔ words that are the deliverable render at rest, never tooltip-only |
 | [`backend/app/dependencies.py`](docs/HOT-FILE-LEDGER.md#backendappdependenciespy) | 24 / 12 / 1147 (was `23 / 12 / 1139`) | ⚠ **FIRES — 12 phases** | **267-01**: `feature_visible` factored out of `require_visible`. **267-05 F-1** (`cdb173609`): it awaits `ensure_settings_fresh()` first — a cold worker read `off`. ⛔ 403 text unchanged |
 | [`backend/app/services/expert_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scopepy) | 8 / 4 / 159 (was `6 / 3 / 632`) | ✅ **DISCHARGED** | ✅ **G-5 DISCHARGED (279-01, `fa164ef3e`)**: pure leaf (no `app.` import) + `expert_scope_statement.py` + `expert_scope_events.py`, AST-pinned. ⛔ stays pure |
@@ -11494,7 +11494,7 @@ cells rot within days.
 | [`frontend/src/components/retention/RetentionSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionretentionsectiontsx) | 1 / 1 / 179 | no (young) | young (275-04). Row added AT CREATION. S8 sentence per state + the Un-archive WRITE (D-19); member line EXACTLY D-17. ⛔ no read |
 | [`frontend/src/components/retention/ArchivedHiddenLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionarchivedhiddenlinetsx) | 1 / 1 / 53 | no (young) | young (275-04). Row added AT CREATION. S9 line + `splitArchived`; ONE include-archived state shared with Find (D-04) |
 | [`frontend/src/components/retention/LegalHoldsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionlegalholdslisttsx) | 1 / 1 / 185 | no (young) | young (275-04). Row added AT CREATION. S3 hold cards, released under <details>; self-fetching, last-known on error |
-| [`frontend/src/components/retention/LegalHoldDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionlegalholddialogtsx) | 1 / 1 / 306 | no (young) | young (275-04). Row added AT CREATION. S3 place/add, direct (protective); server count, never a fake 0 (D-35); failure keeps fields |
+| [`frontend/src/components/retention/LegalHoldDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionlegalholddialogtsx) | 4 / 2 / 427 (was `1 / 1 / 306`) | no (2 phases) | **284-04**: Documents input type-aheads on the server (20 suggestions; "More documents match" carries no number); org check over ≤ 20 ids. ⛔ server count, never a fake 0 |
 | [`frontend/src/components/retention/ReleaseHoldDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionreleaseholddialogtsx) | 1 / 1 / 115 | no (young) | young (275-04). Row added AT CREATION. 066 victim-naming release; Keep hold focused; outline amber, never red |
 | [`frontend/src/components/retention/WaitingForYou.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentionwaitingforyoutsx) | 1 / 1 / 89 | no (young) | young (275-04). Row added AT CREATION. S4 list, newest sweep first; cards inline, no banner (D-01) |
 | [`frontend/src/components/retention/DeleteBatchCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsretentiondeletebatchcardtsx) | 1 / 1 / 306 | no (young) | young (275-04). Row added AT CREATION. ⛔ type-the-count (D-03): untick CLEARS the count; exports the shared batch pieces |
@@ -11517,7 +11517,7 @@ cells rot within days.
 | [`frontend/src/components/admin/ModelAdvancedCapabilities.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodeladvancedcapabilitiestsx) | 1 / 1 / 290 | no (1 phase) | young (created 262) |
 | [`backend/app/services/tools/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicestools__init__py) | 1 / 1 / 20 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Package marker: docstring ONLY. ⛔ no imports, no re-exports, no side effects, so import order can never matter |
 | [`backend/app/services/tools/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsbasepy) | 1 / 1 / 149 (was `0 / 0 / 0`) | no (young) | young (created 278-03). `ToolContext` + `ToolResult` moved verbatim (AST-pinned). ⛔ leaf: stdlib + TYPE_CHECKING only; re-exported from tool_dispatcher.py (D-04) |
-| [`backend/app/services/tools/documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsdocumentspy) | 1 / 1 / 762 (was `0 / 0 / 0`) | no (young) | young (created 278-03). KB browse/query/relationships/web_search/analyze + folder and retention walls. ⛔ walls AST-pinned; no module-level tool_dispatcher import |
+| [`backend/app/services/tools/documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsdocumentspy) | 2 / 2 / 767 (was `1 / 1 / 762`) | no (2 phases) | **284-04**: `query_documents_by_view` passes `via_view=False` + `limit`; output byte-identical ≤ 50 rows (7 fixtures), total now exact past 1,000. ⛔ walls AST-pinned |
 | [`backend/app/services/tools/skills.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsskillspy) | 1 / 1 / 759 (was `0 / 0 / 0`) | no (young) | young (created 278-03). load/save/read_skill_file/attach + `_resolve_skill_visibility_or` (SEED-125 org gate). ⛔ one resolver; patch where used |
 | [`backend/app/services/tools/sandbox.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolssandboxpy) | 1 / 1 / 1218 (was `0 / 0 / 0`) | no (young) | young (created 278-03). execute_code, bounded sandbox, hydration, autoheal. ⛔ largest family; no module-level tool_dispatcher import |
 | [`backend/app/services/tools/runtime_gap.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsruntime_gappy) | 1 / 1 / 310 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Phase-142 pure classifier, allowlists, `SCRIPT_EXTS`, repeat-guard result. ⛔ no I/O; keeps `import re as _re_filename` |
@@ -11541,22 +11541,22 @@ cells rot within days.
 | [`backend/app/services/provider_gateway/google.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaygooglepy) | 4 / 4 / 107 (was `3 / 3 / 106`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 282 planning. **282-01**: ONE kwarg `timeout_s=request.timeout_s` forwarded to `stream_google`. honoured by construction |
 | [`frontend/src/setupTests.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcsetupteststs) | 3 / 2 / 12 (was `2 / 1 / 8`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 282 planning (not exempt by the gate's regexes). **282-02**: ONE global `afterEach(resetAskDrafts)` (D-24). ⛔ resets + matchers only |
 | [`frontend/src/stores/askDraftStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresaskdraftstorets) | 1 / 1 / 128 (was `0 / 0 / 0`) | no (young) | young (created 282-02). The ONE ask_user draft home keyed by tool_call_id + settled marker + panel-home refcount, GC on the ask slice (D-12). ⛔ never inside streamsStore.ts |
-| [`frontend/src/components/metadata/DocumentChunksSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentchunkssectiontsx) | 2 / 2 / 161 (was `1 / 1 / 147`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-03** (FIX-08): ONE bounded `role="region"` wrapper (`max-h-96`) around the chunk list. ⛔ no overscroll |
+| [`frontend/src/components/metadata/DocumentChunksSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentchunkssectiontsx) | 4 / 3 / 265 (was `2 / 2 / 161`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-03**: chunks page by scroll sentinel (200 at a time, `IntersectionObserver`, root = the bounded region); header = exact total. ⛔ no overscroll; one Tab stop |
 | [`frontend/src/components/settings/settingsTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssettingstabsts) | 2 / 1 / 123 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-01; 283-02 added Preferences "6" + the first-visible fallback). ONE home of tab id / audience / order / fallback; labels stay literal JSX |
 | [`frontend/src/components/settings/AuditLogSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsauditlogsectiontsx) | 1 / 1 / 221 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-01). Row added AT CREATION. The Audit Log tab body, moved verbatim out of `SettingsPage.tsx`; imports the `@/lib/api` barrel |
 | [`frontend/src/components/settings/PreferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingspreferencessectiontsx) | 1 / 1 / 39 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-02). Preferences tab ("6") body: technical-names toggle + default model, moved verbatim from tab "0". ⛔ calls no gated endpoint |
 | [`frontend/src/landing/facts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclandingfactsts) | 5 / 2 / 546 (was `4 / 1 / 546`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-02**: `SURFACE_TABS.settings` gains "Preferences" in extracted strip order (6 tabs) |
-| [`backend/app/api/document_views.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_viewspy) | 11 / 5 / 300 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 284 planning. **284-04**: `limit`/`offset` + exact `total` on both resolve routes; honoured by construction (no new branch) |
-| [`backend/app/api/library.py`](docs/HOT-FILE-LEDGER.md#backendappapilibrarypy) | 1 / 1 / 137 | no (1 phase) | ⚠ absent — row added 284 planning. **284-02**: `GET /library/summary` beside `index-summary`: ONE `GROUPING SETS` read over `library_documents`, as `authenticated` |
-| [`frontend/src/components/ingestion/FolderDetail.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfolderdetailtsx) | 3 / 2 / 59 | no (2 phases) | ⚠ absent — row added 284 planning. **284-01**: props become numbers (`count`, `sizeBytes`, load state); layout unchanged (UI-SPEC S5) |
-| [`frontend/src/components/library/LibraryStatTiles.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarystattilestsx) | 5 / 1 / 123 | no (1 phase) | ⚠ absent — row added 284 planning. **284-01**: CHUNKS + document count become number props with the VECTORS tri-state; VECTORS / FOUND unchanged |
-| [`frontend/src/components/metadata/DocumentTablesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumenttablessectiontsx) | 1 / 1 / 155 | no (1 phase) | ⚠ absent — row added 284 planning. **284-03**: one bounded page (50) + exact total; the "N of M" line renders only when N < M |
-| [`frontend/src/components/metadata/DocumentImagesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentimagessectiontsx) | 1 / 1 / 136 | no (1 phase) | ⚠ absent — row added 284 planning. **284-03**: one bounded page (100) + exact total; the "N of M" line renders only when N < M |
-| [`frontend/src/components/metadata/TakeoffSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatatakeoffsectiontsx) | 2 / 1 / 412 | no (1 phase) | ⚠ absent — row added 284 planning. **284-04**: rate sheets = one bounded `GET /documents?kind=spreadsheet` page of 50 (R-05); a failed read says so |
-| [`frontend/src/lib/api/library.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapilibraryts) | 2 / 1 / 85 | no (1 phase) | ⚠ absent — row added 284 planning. **284-01**: `getLibrarySummary()` beside `getIndexSummary()` (`cache: "no-store"`), re-exported from the barrel |
-| [`frontend/src/hooks/useLibraryDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuselibrarydocumentsts) | 0 / 0 / 0 | no (young) | young (created 284-01). The D-24 seam: every Library number and row derived from documents; 284-03 re-points it at the server |
-| [`frontend/src/test-utils/fakeLibraryApi.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctest-utilsfakelibraryapits) | 0 / 0 / 0 | no (young) | young (created 284-03). Test-only fake: page / summary / single read from ONE fixture array. ⛔ never imported outside a test |
-| [`backend/app/models/document_view.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_viewpy) | 5 / 3 / 110 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 284 planning. **284-04**: `AdHocResolve` gains `offset` / `limit` / `include_archived` (the Find vocabulary); honoured by construction (additive fields) |
+| [`backend/app/api/document_views.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_viewspy) | 13 / 6 / 323 (was `11 / 5 / 300`) | ⚠ **FIRES** | ⚠ FIRES (6 phases). **284-04**: both resolve routes page (`offset`/`limit` ≤ 200/`include_archived`) via `resolve_filter(via_view=True)`; honoured by construction. ⛔ 404-not-403 gate |
+| [`backend/app/api/library.py`](docs/HOT-FILE-LEDGER.md#backendappapilibrarypy) | 2 / 2 / 299 (was `1 / 1 / 137`) | no (2 phases) | **284-02**: `GET /library/summary` = ONE `GROUPING SETS` scan over `library_documents` as `authenticated` + one bounded name read. ⛔ reads the VIEW; `id, name` only |
+| [`frontend/src/components/ingestion/FolderDetail.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfolderdetailtsx) | 4 / 3 / 83 (was `3 / 2 / 59`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-01**: number props (`count`, `sizeBytes`, load state): `…` while loading, ONE "Count not known yet" on failure (UI-SPEC S5). Layout unchanged |
+| [`frontend/src/components/library/LibraryStatTiles.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarystattilestsx) | 6 / 2 / 140 (was `5 / 1 / 123`) | no (2 phases) | **284-01**: CHUNKS + its document count are number props with the VECTORS tri-state (`…` / Not known yet); VECTORS / FOUND keep their own endpoints |
+| [`frontend/src/components/metadata/DocumentTablesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumenttablessectiontsx) | 2 / 2 / 167 (was `1 / 1 / 155`) | no (2 phases) | **284-03**: one bounded page (50) + exact total; "{M} tables in this document, showing the first {N}" only when N < M. ⛔ owner-only RLS (mig 108) |
+| [`frontend/src/components/metadata/DocumentImagesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentimagessectiontsx) | 2 / 2 / 148 (was `1 / 1 / 136`) | no (2 phases) | **284-03**: one bounded page (100) + exact total; "{M} image descriptions in this document, showing the first {N}" only when N < M. ⛔ no image bytes on this wire |
+| [`frontend/src/components/metadata/TakeoffSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatatakeoffsectiontsx) | 3 / 2 / 438 (was `2 / 1 / 412`) | no (2 phases) | **284-04**: rate sheets = ONE `GET /documents?kind=spreadsheet&limit=50` page (R-05); loading / failed / empty / "50 most recent of M" arms (UI-SPEC S14) |
+| [`frontend/src/lib/api/library.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapilibraryts) | 3 / 2 / 96 (was `2 / 1 / 85`) | no (2 phases) | **284-01**: `getLibrarySummary()` beside `getIndexSummary()` (`cache: "no-store"`), re-exported from the barrel |
+| [`frontend/src/hooks/useLibraryDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuselibrarydocumentsts) | 3 / 1 / 390 (was `0 / 0 / 0`) | no (young) | young (created 284-01). The D-24 seam. **284-03**: one page + one summary + one read by id; source = browse, view or filter; numbers `null` until answered. ⛔ never 0 |
+| [`frontend/src/test-utils/fakeLibraryApi.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctest-utilsfakelibraryapits) | 1 / 1 / 255 (was `0 / 0 / 0`) | no (young) | young (created 284-03). Test-only fake: page / summary / single read from ONE fixture array, answering like the server. ⛔ never imported by product code |
+| [`backend/app/models/document_view.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_viewpy) | 6 / 4 / 119 (was `5 / 3 / 110`) | ⚠ **FIRES** | ⚠ FIRES (4 phases). **284-04**: `AdHocResolve` gains `offset` / `limit` (≤ 200) / `include_archived` (default True); honoured by construction (additive, `extra` unchanged) |
 
 
 
@@ -21081,7 +21081,7 @@ What it owns. The lazy, read-only Chunks section of the document detail panel: f
 - **One Tab stop, on the region.** Never a `tabIndex` on the per-chunk `max-h-32` bodies (1,000 Tab stops is a focus trap in all but name).
 - **The count lives only in the `PanelSection` header** (D-18); no counter inside the list.
 - **Lazy by construction** (D-217-04): the fetch stays in the component that only mounts when the accordion opens.
-- Above 1,000 chunks the header count is the PostgREST cap, not the document (`documents.py` has no `.range()`); that is Phase 284, not this file.
+- ~~Above 1,000 chunks the header count is the PostgREST cap, not the document (`documents.py` has no `.range()`); that is Phase 284, not this file.~~ ⚠ **CORRECTED 2026-10-16 (284-05) — FALSE since Phase 284, and struck rather than deleted.** `GET /documents/{id}/chunks` now pages with `.range()` and an exact `count="exact"` total (284-02), and this section's header reads the server's total while the list pages by scroll sentinel (284-03): the 2,500-chunk scale document reads `total == 2500` live.
 
 ## `frontend/src/components/settings/settingsTabs.ts`
 
@@ -21257,3 +21257,390 @@ What it owns. One fixture array answering `listDocumentsPage` / `getLibrarySumma
 
 **284-04 (D-10)**: `AdHocResolve` gains `offset: int = Field(0, ge=0)`, `limit: int = Field(25, ge=1, le=200)` and `include_archived: bool = True` — the `DocumentSearchRequest` shape; `include_archived` defaults to TRUE because today's resolve has no archived predicate, so every existing count-only caller is byte-identical. Honoured by construction (additive fields, `extra` policy unchanged). A CLAUDE.md FIRING row is added at the 284 close.
 
+## Phase 284 close (2026-10-16, 284-05)
+
+All triples below were re-derived on the merged tree at `30ea18d40` (284-01..04 merged; 284-05 Tasks 1-2 committed) with the CLAUDE.md recipe; six-digit quick-task buckets are subtracted and named per file, and bare two-digit buckets are counted as the recipe prints them (the convention earlier triples used). `LibraryPage.tsx` gives the `--follow` figure (it was renamed from `IngestionPage.tsx` at `dbd9b8c0b`) and the plain recipe figure beside it. The set is every non-test source file the phase changed since PHASE_BASE `f8659ac2d` (`git diff --name-only f8659ac2d HEAD -- frontend/src backend/app scripts supabase`, tests and migrations excluded per the gate's EXEMPT list): **35 watched files** under `backend/app` / `frontend/src` (`test-utils/fakeLibraryApi.ts` included — the gate does not exempt `test-utils/`), plus the **2 gate-exempt scripts** that carry CLAUDE.md FIRING rows (`vitest-count-gate.cjs`, `full-schema-supplement.sql`): **37 subsections**. Each quotes the scan-list cell it replaced and, where the file had one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. **Newly FIRING, CLAUDE.md row ADDED:** `api/document_views.py` (6), `models/document_view.py` (4), `FolderDetail.tsx`, `DocumentsPager.tsx`, `FindQuickAdd.tsx`, `StructurePopovers.tsx`, `DocumentChunksSection.tsx`, `CreateLinkDialog.tsx` (3 each). `LibraryPage.tsx`: extraction TAKEN, **G-5 NOT discharged** (its line count rose; see its subsection).
+
+### `backend/app/api/document_views.py` — Phase 284 close
+
+**`13 / 6 / 323` (was `11 / 5 / 300`).** **284-04** (`700a681b6`): `resolve_view` and `resolve_adhoc` take `offset` / `limit` (1-200, default 25) / `include_archived` and answer `{documents, total, offset, limit}` from ONE ranged `count="exact"` read of `library_documents` (`via_view=True`); `count_only` is one head read. Two parameters threaded into the shared core, no new branch in either route body. ⛔ Binding: a saved view's readability gate stays 404-not-403, and the `ResolveError → HTTPException(status, detail)` remap stays. Guarded by the route inventory (284-04) and the request recorder (284-05: 0 violations live at 50k, largest `in.()` 1).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 284 planning. **284-04**: `limit`/`offset` + exact `total` on both resolve routes; honoured by construction (no new branch)
+
+CLAUDE.md FIRING row: none before — ADDED by 284-05 (6 phases).
+
+### `backend/app/api/documents.py` — Phase 284 close
+
+**`97 / 38 / 2653` (was `95 / 37 / 2534` in the scan list and `96 / 37 / 2531` in CLAUDE.md).** Quick-task buckets subtracted: 260328, 260405, 260906, 261014. **284-02** (`bd80f57fe`): the list is one ranged `count="exact"` read of migration 207's `library_documents` (`LIST_SELECT`, no `full_markdown`), answering `{documents, total, offset, limit}`; `GET /documents/{id}` is new (uniform 404, 422 on a malformed id); `/chunks` (200/500), `/tables` (50/200), `/images` (100/200) and `/versions` (50/200) page with exact totals; `_assert_document_visible` is one view read. The BUG-261014-06 `_ID_BATCH` loop is deleted. An AST comparison against PHASE_BASE reads `upload_document` / `delete_document` IDENTICAL, so the 275 D-32 `ast.If` fences are untouched. ⛔ Binding: the single-segment `GET /documents/{document_id}` must stay BELOW any literal `GET /documents/<word>` route (`test_284_list_contract` walks `app.routes`). **284-05** drove the request recorder RED against this file twice (the batching loop re-inserted; `.range()` dropped) and restored it byte-identically.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> Honoured by construction. **280-01**: `delete_document` reads via `maybe_row` (D-09: foreign = random id = 404) + 6 `maybe_row` guards. **280-03**: `/upload` dup → `already_in_library`. 0 new `if`
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> last touch BUG-261014-06 (`.in_` batched) · honoured by construction
+
+### `backend/app/api/library.py` — Phase 284 close
+
+**`2 / 2 / 299` (was `1 / 1 / 137`).** **284-02** (`d540f6f8d`): `LIBRARY_SUMMARY_SQL` (one scan, six grouping sets) folded by `fold_summary_rows`; at most one `connector_connections` name read bounded by the distinct connection ids. 2 phases — no FIRING row owed. ⛔ Binding: the summary reads the VIEW, never `public.documents`; `id, name` only (column grants); the request recorder (284-05) captures its SQL text live and pins no `ANY($…)` over document ids.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent — row added 284 planning. **284-02**: `GET /library/summary` beside `index-summary`: ONE `GROUPING SETS` read over `library_documents`, as `authenticated`
+
+### `backend/app/models/document.py` — Phase 284 close
+
+**`14 / 11 / 275` (was `13 / 10 / 221`).** **284-02** (`bd80f57fe`): `DocumentListResponse`, `DocumentChunkPage`, `DocumentTablePage`, `DocumentImagePage` and `DocumentVersionPage`, each `{rows, total, offset, limit}` with `total` including rows beyond the page. No existing field changed. ⛔ Binding (unchanged): new response fields are optional (the 217 precedent).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **280-03**: ONE optional `already_in_library` on `DocumentResponse` (without it `response_model` strips the key). ⛔ optional only (217 precedent)
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> last touch 280-03 (one optional field) · ⛔
+
+### `backend/app/models/document_view.py` — Phase 284 close
+
+**`6 / 4 / 119` (was `5 / 3 / 110`).** **284-04** (`700a681b6`): the stateless resolve body takes the Find page vocabulary; `include_archived` defaults to TRUE so every existing count-only caller is byte-identical. Additive only.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 284 planning. **284-04**: `AdHocResolve` gains `offset` / `limit` / `include_archived` (the Find vocabulary); honoured by construction (additive fields)
+
+CLAUDE.md FIRING row: none before — ADDED by 284-05 (4 phases).
+
+### `backend/app/services/document_search_service.py` — Phase 284 close
+
+**`8 / 4 / 505` (was `5 / 3 / 584`).** **284-04** (`b7764503b`): the Find core reads one page of the view (`FIND_SELECT = LIBRARY_ROW_COLUMNS + version_count, has_earlier`), sorted and ranged in SQL; page 1 at 50k went 12.7 s → ~0.45 s. The "two caller-scoped legs, never one `or_`" invariant is RETIRED ON PURPOSE: the visibility union now lives in migration 207's `security_invoker` view, the one SQL home. `_fetch_all` left this file (moved verbatim to `retrieval_scope.py`). ⛔ Binding: a page SHORTER than the server's count raises `SearchTruncatedError` (503); a relationship allow-list above `REL_EDGE_CAP` (500) fails loud; pass the route's USER-JWT client (the service role reads 0 rows from the view).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ now FIRES (3 phases). honoured by construction (278-02: vocabulary import, values pinned to base); `_DATE_COLUMN` is an import alias. ⛔ open/download not filtered
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> ⚠ now FIRES · 278-02 vocabulary import (one home) · ⛔
+
+### `backend/app/services/document_view_resolver.py` — Phase 284 close
+
+**`6 / 6 / 486` (was `5 / 5 / 412`).** **284-04** (`700a681b6`): one fragment walk, two read strategies — `via_view=True` (the routes, user JWT: one ranged view read or one count head read) and `via_view=False` (the agent tool, service role: the two caller-scoped legs, each `limit`ed, with an exact own + global − own-in-global total instead of `len()` of two capped id sets). Agent output byte-identical for ≤ 50 rows across 7 fixtures. ⛔ Binding: `apply_fragments` stays the ONE walk (D-115-6); every leg is scoped from the CALLER, never a view owner (VIEW-06).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> honoured by construction — one default-False kwarg + one `.eq` per read leg, Library callers unchanged, source fence
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> ⚠ FIRES since 271 — row added 275-05 · last touch 275-02
+
+### `backend/app/services/retrieval_scope.py` — Phase 284 close
+
+**`7 / 5 / 503` (was `6 / 4 / 463`).** **284-04** (`b7764503b`): the 1,000-row `.range()` walk the Find core no longer needs was moved here verbatim, because the service-role scope proposer was its last caller; behaviour unchanged, imports kept function-local per this file's Pitfall 5 fence. ⛔ Binding (unchanged): ids / counts are RLS-intersected (D-21). The extraction recorded as FIRST next is still owed.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **279-01**: ONE comment repoint to `expert_scope_statement` (no code). Honoured by construction (278-02 vocabulary import). ⛔ ids/counts RLS-intersected (D-21)
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> last touch 279-01 (comment only) · extraction FIRST next · ⛔
+
+### `backend/app/services/tools/documents.py` — Phase 284 close
+
+**`2 / 2 / 767` (was `1 / 1 / 762`).** **284-04** (`700a681b6`): the agent handler asks the resolver for `limit` rows per leg instead of every match then a `[:limit]` slice. The only observable change is above 1,000 matches: the reported total is exact (it read `1000` for a 49,720-document library). No cross-provider scoreboard owed (byte-identity test). 2 phases — no FIRING row owed.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> young (created 278-03). KB browse/query/relationships/web_search/analyze + folder and retention walls. ⛔ walls AST-pinned; no module-level tool_dispatcher import
+
+### `frontend/src/components/ingestion/DocumentRow.tsx` — Phase 284 close
+
+**`11 / 6 / 591` (was `10 / 5 / 583`).** **284-03** (`bbd666006`): the version history reads one page of 50 with the exact total and renders "{M} versions, showing {N}" only when N < M. Columns unchanged (seven `<td>`).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **275-04**: ONE optional `retention` prop + ONE `<RetentionRowChips>` after ClassificationRowChip. Still seven `<td>`. ⛔ no fetch here
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> **275-04**: ONE `retention` prop + ONE `<RetentionRowChips>`; still seven `<td>`
+
+### `frontend/src/components/ingestion/FolderDetail.tsx` — Phase 284 close
+
+**`4 / 3 / 83` (was `3 / 2 / 59`).** **284-01** (`a928b8ccd`): `documents: Document[]` became `count` / `sizeBytes` numbers plus a load state, so a 10,000-document folder never needs its rows in the browser. ⛔ Binding (UI-SPEC S5): loading renders `…` in both slots; a failed summary renders ONE "Count not known yet"; badge / subfolders / Created come from the folder, not the summary.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent — row added 284 planning. **284-01**: props become numbers (`count`, `sizeBytes`, load state); layout unchanged (UI-SPEC S5)
+
+CLAUDE.md FIRING row: none before — ADDED by 284-05 (3 phases).
+
+### `frontend/src/components/ingestion/FolderNode.tsx` — Phase 284 close
+
+**`15 / 8 / 316` (was `13 / 7 / 303`).** Quick-task buckets subtracted: 260328, 260405. **284-03** (`765b30bf7`): one expression — `folderDocumentCounts === undefined ? undefined : (counts[id] ?? 0)` (D-12 / UI-SPEC S4). ⛔ Binding (unchanged): no fetch in this component.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **275-02**: one `refusal` state (cleared when the confirm closes); a 409 swaps Delete+Cancel for the notice. ⛔ no fetch here
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> last touch 275-02 · ⛔
+
+### `frontend/src/components/ingestion/FolderTree.tsx` — Phase 284 close
+
+**`14 / 9 / 213` (was `13 / 8 / 213`).** Quick-task buckets subtracted: 260405. **284-03** (`765b30bf7`): one prop expression. ⛔ Binding (unchanged): no fetch here; the 275-02 delete-confirm behaviour is untouched.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **275-02**: confirm stays open until the delete answers; rethrows ONLY a 409 `ApiRefusal` to FolderNode. ⛔ no fetch here
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> last touch 275-02 · ⛔
+
+### `frontend/src/components/library/DocumentsPager.tsx` — Phase 284 close
+
+**`4 / 3 / 101` (was `3 / 2 / 112`).** **284-03** (`765b30bf7`): the 271-04 `exact` prop's other arm — the 1,000-row cap line and its `+` — is gone, because no list is capped any more. ⛔ Binding: below 1,000 the output is byte-identical (`DocumentsPager.exact271` case 3).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **271-04**: ONE optional `exact` prop skips the 1000-row cap arm for a server-exact total. ⛔ browse renders byte-identically
+
+CLAUDE.md FIRING row: none before — ADDED by 284-05 (3 phases).
+
+### `frontend/src/components/library/IngestionTab.tsx` — Phase 284 close
+
+**`20 / 7 / 706` (was `17 / 6 / 512`).** **284-03** (`765b30bf7`): `documents: Document[]` is gone; the tab reads `LibrarySummary` for its numbers and three paged lists (`in_flight`, `completed`/`failed`, History by `updated_desc`), each mounting with its sub-tab, so the Library at rest makes no list request. The 429 banner is the summary's `rate_limited_in_flight`. ⛔ Binding: layout unchanged (D-13); the suites grew 42 → 50 (+5 readerOff, +6 reconnectControl unchanged).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ row was STALE at `13 / 4 / 456` — +2 phases. honoured by construction (233 / **235**) — the reader-off instance statement, ZERO branches
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> ⚠ row was STALE at `13 / 4 / 456`
+
+### `frontend/src/components/library/LibraryHeaderBar.tsx` — Phase 284 close
+
+**`5 / 4 / 262` (was `4 / 3 / 249`).** **284-03** (`765b30bf7`): one optional prop; absent ⇒ every other caller renders byte-identically. Copy per UI-SPEC S3.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> now FIRES (3 phases). **271-02**: optional `onOpenFilingRules`; link + pill in ONE right cluster, never a tab. 271-05 G4-3: Back returns to Ingestion
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> now FIRES (3 phases) · last touch 271-02 / 271-05
+
+### `frontend/src/components/library/LibraryStatTiles.tsx` — Phase 284 close
+
+**`6 / 2 / 140` (was `5 / 1 / 123`).** **284-01** (`a928b8ccd`): number props fed by the summary; numbers ≥ 1,000 grouped. 2 phases — no FIRING row owed.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent — row added 284 planning. **284-01**: CHUNKS + document count become number props with the VECTORS tri-state; VECTORS / FOUND unchanged
+
+### `frontend/src/components/library/find/FindQuickAdd.tsx` — Phase 284 close
+
+**`5 / 3 / 394` (was `2 / 2 / 380`).** **284-01** (`a928b8ccd`): the Added by and Document type options are `LibrarySummary.connections` / `document_types`, with loading / error arms. **284-04** (`7d7562093`): the Relationship editor type-aheads on `POST /document-search` (limit 20) and the row stopped forwarding `documents`. **284-05** (`6bfc47a77`): the then-unused optional `documents?` declaration and the `Document` type import are deleted; the suite pins the absence against the comment-stripped source.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **275-02**: one toggle `FilterChip` right of Version: `Include archived` / `Archived: included` + labelled ✕
+
+CLAUDE.md FIRING row: none before — ADDED by 284-05 (3 phases).
+
+### `frontend/src/components/library/find/StructurePopovers.tsx` — Phase 284 close
+
+**`5 / 3 / 746` (was `3 / 2 / 686`).** **284-01** (`a928b8ccd`): the summary-fed editors withhold only the summary-derived options while loading / failed. **284-04** (`7d7562093`): the Relationship editor runs `LinkTargetCombobox` in server mode (it reports its query and never re-filters the answer). ⛔ Binding (unchanged): one popover idiom.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> young (271-04). **276-07**: the date label reads "Added to Syrel". ⛔ one popover idiom
+
+CLAUDE.md FIRING row: none before — ADDED by 284-05 (3 phases).
+
+### `frontend/src/components/metadata/DocumentChunksSection.tsx` — Phase 284 close
+
+**`4 / 3 / 265` (was `2 / 2 / 161`).** **284-03** (`bbd666006`): the section reads one page of 200 and loads the next when the sentinel inside the 283-03 bounded region becomes visible; the region's label reads "Chunk list, {M} chunks, {N} loaded"; an empty next page sets the total to what is loaded so the sentinel cannot loop (T-284-21). ⛔ Binding (283-03, unchanged): no `overscroll-*`, one Tab stop on the region, count in the section header only. ⚠ The 283 planning bullet "Above 1,000 chunks the header count is the PostgREST cap" is now FALSE and is corrected in place in this file's section above (struck, not deleted).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-03** (FIX-08): ONE bounded `role="region"` wrapper (`max-h-96`) around the chunk list. ⛔ no overscroll
+
+CLAUDE.md FIRING row: none before — ADDED by 284-05 (3 phases).
+
+### `frontend/src/components/metadata/DocumentImagesSection.tsx` — Phase 284 close
+
+**`2 / 2 / 148` (was `1 / 1 / 136`).** **284-03** (`bbd666006`). 2 phases — no FIRING row owed. ⛔ Binding: the description IS the image; owner-only RLS (migration 108).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent — row added 284 planning. **284-03**: one bounded page (100) + exact total; the "N of M" line renders only when N < M
+
+### `frontend/src/components/metadata/DocumentTablesSection.tsx` — Phase 284 close
+
+**`2 / 2 / 167` (was `1 / 1 / 155`).** **284-03** (`bbd666006`). 2 phases — no FIRING row owed. ⛔ Binding: a shared-folder document reads 0 tables here, correctly (migration 108).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent — row added 284 planning. **284-03**: one bounded page (50) + exact total; the "N of M" line renders only when N < M
+
+### `frontend/src/components/metadata/TakeoffSection.tsx` — Phase 284 close
+
+**`3 / 2 / 438` (was `2 / 1 / 412`).** **284-04** (`7d7562093`): one bounded spreadsheet page instead of the whole library filtered in the browser; the stale-`selectedRateDocId` effect dependency went away (eslint 2 → 1). Its suite (8) was in NEITHER count-gate knob and is adopted by 284-05. 2 phases — no FIRING row owed.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent — row added 284 planning. **284-04**: rate sheets = one bounded `GET /documents?kind=spreadsheet` page of 50 (R-05); a failed read says so
+
+### `frontend/src/components/relationships/CreateLinkDialog.tsx` — Phase 284 close
+
+**`5 / 3 / 267` (was `4 / 2 / 236`).** **284-04** (`7d7562093`): `useDocumentFind` replaces the documents prop. **284-05** used this file as the D-16 fence's scratch RED plant (an `import { listDocuments }` + call, named by the fence, restored byte-identically — never committed). ⛔ Binding (unchanged): create stays outgoing-only (D-117-1).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **271-03**: the combobox body EXTRACTED to `LinkTargetCombobox`; chips, note, preview, footer stay. ⛔ create stays outgoing-only (D-117-1)
+
+CLAUDE.md FIRING row: none before — ADDED by 284-05 (3 phases).
+
+### `frontend/src/components/relationships/LinkTargetCombobox.tsx` — Phase 284 close
+
+**`2 / 2 / 235` (was `1 / 1 / 177`).** **284-04** (`7d7562093`). 2 phases — no FIRING row owed.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> young (271-03, extracted). ⛔ one combobox, two mounts. 271-05 drove it in the Relationship editor (latest-only candidates)
+
+### `frontend/src/components/retention/LegalHoldDialog.tsx` — Phase 284 close
+
+**`4 / 2 / 427` (was `1 / 1 / 306`).** **284-04** (`7d7562093`): `MAX_SUGGESTIONS = 8` is gone (UI-SPEC S13). 2 phases — no FIRING row owed. ⛔ Binding (275-04, unchanged): the server count, never a fake 0 (D-35).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> young (275-04). Row added AT CREATION. S3 place/add, direct (protective); server count, never a fake 0 (D-35); failure keeps fields
+
+### `frontend/src/hooks/useDocuments.ts` — Phase 284 close
+
+**`10 / 5 / 164` (was `8 / 3 / 120`).** **284-03** (`59a4b1259`): Realtime is a hint (D-v2.5-03) — INSERT / DELETE / terminal UPDATE ask the caller to refetch (coalesced per 500 ms by `useLibraryDocuments`), and only an UPDATE for a row on the caller's page merges. Upload returns the created document. ⛔ Binding: the `{ ...d, ...newDoc }` merge keeps `tables_stage_applies` / `images_stage_applies`.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> ⚠ absent at 3 phases. Realtime is a hint, not truth
+
+### `frontend/src/hooks/useLibraryDocuments.ts` — Phase 284 close
+
+**`3 / 1 / 390` (was `0 / 0 / 0`).** **284-01** (`f0f6428b2`) created it over `useDocuments`; **284-03** (`59a4b1259`) replaced the body: `GET /documents` (one page), `GET /library/summary` (every number), `GET /documents/{id}` (a selection on neither the page nor Find's rows), list state derived in render from one settled-request record. 1 phase — young.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> young (created 284-01). The D-24 seam: every Library number and row derived from documents; 284-03 re-points it at the server
+
+### `frontend/src/lib/api.ts` — Phase 284 close
+
+**`210 / 125 / 530` (was `208 / 124 / 523`).** Quick-task buckets subtracted: 260405, 260814. **284-01** (`8347ac705`): `listDocumentsPage`, `getDocument`, `DocumentListError`, the four per-document page clients and `getLibrarySummary`. **284-05** (`6bfc47a77`): `listDocuments`, `fetchDocumentVersions`, `listDocumentChunks`, `listDocumentTables`, `listDocumentImages` removed from the barrel (deletions only — honoured by construction).
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ STALE (`207/123/519`). **271-03**: re-exports `searchDocuments` + `DocumentSearchError` (the gated `apiBarrel.test.ts` requires it), nothing else
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> ⚠ STALE · last touch 271-03
+
+### `frontend/src/lib/api/documents.ts` — Phase 284 close
+
+**`10 / 9 / 595` (was `8 / 8 / 503`).** **284-01** (`8347ac705`): `listDocumentsPage` (offset and limit required by type), `getDocument`, `DocumentListError`, `listDocumentChunksPage` / `TablesPage` / `ImagesPage`, `fetchDocumentVersionsPage`. **284-05** (`6bfc47a77`): the five whole-list clients are deleted — deletions only, honoured by construction. ⛔ Binding: each page client still accepts a legacy ARRAY body (`total = rows.length`) for one release, because one push may land the frontend before the backend; remove it one release after Phase 284's production deploy. It is not a whole-list call and the D-16 fence does not forbid it.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **275-02**: deleteDocument / deleteFolder `throw await refusalOf(...)`; imports refusal.ts, exports nothing new (barrel contract)
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> last touch 275-02
+
+### `frontend/src/lib/api/knowledge.ts` — Phase 284 close
+
+**`6 / 5 / 841` (was `5 / 4 / 825`).** **284-01** (`8347ac705`): additive options. ⛔ Binding: a `count_only` call (every sidebar / card / rules badge) produces the SAME URL and body it did before 284. Still NOT covered by the `lib/api.ts` BARREL row.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **281-02** (`fa08ee6f1`): ONE optional `reason_code?: string \| null` on `GenerateResult` ok:false, additive. honoured by construction. NOT covered by the `lib/api.ts` BARREL row
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> ⚠ FIRES, absent here — row added 281-04 · honoured by construction
+
+### `frontend/src/lib/api/library.ts` — Phase 284 close
+
+**`3 / 2 / 96` (was `2 / 1 / 85`).** **284-01** (`8347ac705`). 2 phases — no FIRING row owed.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ absent — row added 284 planning. **284-01**: `getLibrarySummary()` beside `getIndexSummary()` (`cache: "no-store"`), re-exported from the barrel
+
+### `frontend/src/pages/LibraryPage.tsx` — Phase 284 close
+
+**`63 / 20 / 1344` (was `57 / 19 / 1297`).** **284-01** (`f0f6428b2`, `a928b8ccd`) took the D-24 extraction: every whole-library derivation (rows, totals, archived-hidden, in-flight, the summary numbers, the selected-document resolution) moved into `hooks/useLibraryDocuments.ts`; the page's `.folder_id` reads went 7 → 0 (R-11 pin). **284-03** (`765b30bf7`) wired the four states (cold skeleton, cold / warm failure, warm `aria-busy`, silent refetch, S8 open-by-id) and the exact pager. Measured: the page derives NOTHING from documents (its one `.documents` read is `retention.documents[id]`, a retention-state map). ⛔ **G-5 is NOT discharged:** the plan's bar was "the line count fell and no derivation remains", and the line count ROSE (1302 at PHASE_BASE `f8659ac2d` → 1344; the old cells’ 1297 was already stale; the plain recipe without `--follow` reads `37 / 11 / 1344`). OWED, and the seam the next phase on this file takes first: the page-UI state (pager offset / size, selection, Find wiring and the states composition) still lives in the page. Invariants unchanged: `SHED_COLUMNS_3_TO_5`, `const canUploadToFolder =` once, no `useSourceAttention()` call, no `max-w-*`.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **275-04**: `useRetentionStates` (ONE batched read), folder line under FolderDetail, `splitArchived` + hidden line on Find's include_archived. Extraction OWED
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> last touch 275-04 · Extraction OWED
+
+### `frontend/src/types/index.ts` — Phase 284 close
+
+**`100 / 79 / 1656` (was `99 / 78 / 1546`).** Quick-task buckets subtracted: 260405. **284-01** (`8347ac705`): +110 lines, additive types only; no existing type changed.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> **281-03** (`0b9841e55`): `EmitFailure` gains `template_fields_missing`, one union member, additive. Seam OWED
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> **281-03**: `EmitFailure` +1 member, additive. Seam OWED
+
+### `frontend/src/test-utils/fakeLibraryApi.ts` — Phase 284 close
+
+**`1 / 1 / 255` (was `0 / 0 / 0`).** **284-03** (`59a4b1259`). Not exempt by the gate's regexes (`test-utils/` is not `__tests__/`), so it keeps a row. The D-16 fence (`libraryListFence.test.ts`) excludes `test-utils/` from its product sweep. 1 phase — young.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> young (created 284-03). Test-only fake: page / summary / single read from ONE fixture array. ⛔ never imported outside a test
+
+### `scripts/vitest-count-gate.cjs` — Phase 284 close
+
+**`308 / 68 / 6483` (was `298 / 66 / 6443`).** Quick-task buckets subtracted: 260807, 260808, 260814. **284-01** (`294ed57b1`…`a928b8ccd`): `libraryPaging284` 22, `useLibraryDocuments` 13, `FolderDetail284` 5, `LibraryStatTiles` 13 → 16, `StructurePopovers` 22 → 27, `FindQuickAdd` 22 → 26. **284-05** (`30ea18d40`): raised useLibraryDocuments 13 → 24, IngestionTab 42 → 50, LibraryHeaderBar 13 → 16, DetailSections.tables 15 → 18, DocumentDetailPanel.images 3 → 4, CreateLinkDialog 8 → 14, LinkTargetCombobox 9 → 17, LegalHolds 25 → 29, FindQuickAdd 26 → 27, StructurePopovers 27 → 30; adopted `LibraryPage.states284` 15, `DocumentChunksSection.paging284` 8, `DocumentRow.versions284` 3, `libraryListFence` 3, `TakeoffSection` 8 — each read from a real `npx vitest run` on the merged tree. `scripts/` is gate-EXEMPT; this row is kept by hand.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> last touch **282-04**: `ModelRegistryTab.test.tsx` 33 → 36 (the 3 Add-form Timeout cases), measured in a targeted run
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> last touch 282-04 (ModelRegistryTab pin 33 → 36)
+
+### `scripts/full-schema-supplement.sql` — Phase 284 close
+
+**`21 / 14 / 838` (was `15 / 10 / 690`).** **284-02** (`d540f6f8d`): +8 lines. ⛔ Binding (unchanged): `scripts/` is gate-EXEMPT, so this row is kept by hand; the supplement mirrors every migration's grants in the same commit.
+
+Scan-list disposition cell before 284-05 (replaced):
+
+> ⚠ row STALE at `11/6/653`. **266-01**: mig 195's `expert_installs` ACL mirrored (REVOKE PUBLIC/anon/authenticated, GRANT SELECT). ⛔ `scripts/` is gate-EXEMPT: kept by hand
+
+CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
+
+> ⚠ row STALE · last touch 266-01 · ⛔

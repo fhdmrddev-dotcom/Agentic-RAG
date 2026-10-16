@@ -31,8 +31,10 @@ beforeEach(() => {
   })
 })
 import { FindQuickAdd } from "@/components/library/find/FindQuickAdd"
+import QUICK_ADD_SOURCE from "@/components/library/find/FindQuickAdd.tsx?raw"
+import { stripComments } from "@/lib/stripComments.testutil"
 import { initialFindState, type FindState } from "@/pages/findState"
-import type { Document, Folder, ViewFilter } from "@/types"
+import type { Folder, ViewFilter } from "@/types"
 
 const EMPTY: ViewFilter = { op: "and", conditions: [] }
 
@@ -40,24 +42,9 @@ const FOLDERS: Folder[] = [
   { id: "f1", user_id: "u1", name: "Contracts", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
 ]
 
-const DOCS = [
-  {
-    id: "a",
-    user_id: "u1",
-    folder_id: null,
-    filename: "Acme MSA 2019.pdf",
-    file_path: "p",
-    file_size: 1,
-    mime_type: "application/pdf",
-    status: "completed",
-    created_at: "",
-    updated_at: "",
-    metadata: { document_type: "Contract" },
-  },
-] as unknown as Document[]
-
-// 284-01 (D-07 / R-03): the Added by and Document type options are the SUMMARY's lists (here the
-// one DOCS row's type); `documents` now feeds only the Relationship editor and is optional.
+// 284-01 (D-07 / R-03): the Added by and Document type options are the SUMMARY's lists.
+// 284-05 (D-16): the row takes no `documents` prop at all — the Relationship editor searches the
+// server (284-04), so the old documents fixture is gone with the prop.
 const DOC_TYPES = [{ value: "Contract", count: 1 }]
 
 function renderQA(
@@ -74,7 +61,6 @@ function renderQA(
       dispatch={dispatch}
       filter={filter}
       onFilterChange={onFilterChange}
-      documents={DOCS}
       folders={FOLDERS}
       connections={[]}
       documentTypes={DOC_TYPES}
@@ -299,17 +285,19 @@ describe("FindQuickAdd — the summary lists, not the documents", () => {
     expect(screen.getByRole("radio", { name: "Drive Finance (connected source)" })).toBeInTheDocument()
   })
 
-  it("284-04: the Relationship editor's candidates come from the server search, never the documents prop", async () => {
-    renderQA() // DOCS is still handed to the row (284-05 deletes the prop)…
+  it("284-04: the Relationship editor's candidates come from the server search", async () => {
+    renderQA()
     fireEvent.click(screen.getByRole("button", { name: "＋ Relationship" }))
-    // …but the editor offers the SERVER's answer, and never the prop's "Acme MSA 2019.pdf".
+    // The editor offers the SERVER's answer — the row has no documents of its own to offer.
     expect(await screen.findByRole("option", { name: "From the server.pdf" })).toBeInTheDocument()
-    expect(screen.queryByRole("option", { name: "Acme MSA 2019.pdf" })).toBeNull()
+    expect(screen.getAllByRole("option")).toHaveLength(1)
     expect(m.searchDocuments).toHaveBeenCalledWith(expect.objectContaining({ version: "latest", limit: 20 }))
   })
 
-  it("renders with no documents prop at all (it is optional now)", () => {
-    renderQA({}, EMPTY, { documents: undefined })
+  it("284-05: the row takes no documents prop at all, and still lists the summary's types", () => {
+    // The declaration is gone from the source (comments stripped), not merely unused.
+    expect(stripComments(QUICK_ADD_SOURCE)).not.toMatch(/\bdocuments\??\s*:/)
+    renderQA()
     fireEvent.click(screen.getByRole("button", { name: "＋ Document type" }))
     expect(screen.getByRole("checkbox", { name: "Contract" })).toBeInTheDocument()
   })

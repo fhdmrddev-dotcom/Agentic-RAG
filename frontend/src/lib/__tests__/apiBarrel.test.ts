@@ -62,14 +62,16 @@ describe("lib/api.ts barrel re-exports — documents domain (Phase 217, D-207-06
   })
 
   it("exports the five Phase 217 detail reads by name", () => {
+    // 284-05 (D-16): the three whole-list detail reads (chunks / tables / images) are deleted; the
+    // five names are now their paged successors plus the two reads that were never lists.
     // Named individually as well as covered by the loop above: the loop proves the barrel
     // is COMPLETE, these prove the five this plan shipped are the ones present. A future
     // rename would pass the loop and fail here, which is the split we want.
     for (const fn of [
       "getDocumentContent",
-      "listDocumentChunks",
-      "listDocumentTables",
-      "listDocumentImages",
+      "listDocumentChunksPage",
+      "listDocumentTablesPage",
+      "listDocumentImagesPage",
       "listDocumentQueries",
     ] as const) {
       expect(typeof (ApiBarrel as Record<string, unknown>)[fn]).toBe("function")

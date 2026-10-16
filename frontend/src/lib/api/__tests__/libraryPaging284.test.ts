@@ -34,11 +34,6 @@ import {
   fetchDocumentVersionsPage,
   resolveView,
   resolveAdHoc,
-  listDocuments,
-  listDocumentChunks,
-  listDocumentTables,
-  listDocumentImages,
-  fetchDocumentVersions,
 } from "@/lib/api"
 
 function doc(id: string): Document {
@@ -273,33 +268,36 @@ describe("paged view resolve (D-01 / R-06)", () => {
   })
 })
 
-describe("the legacy array clients keep their signatures across the deploy window", () => {
-  it("listDocuments returns an array from either shape", async () => {
+// 284-05 (D-16): the five whole-list array clients are DELETED. These three cases moved IN PLACE
+// to what replaced them: the one-release deploy-window tolerance now lives ONLY inside the page
+// clients (kept until one release after the production deploy — see lib/api/documents.ts).
+describe("the deploy window lives in the page clients (the legacy array clients are gone)", () => {
+  it("listDocumentsPage yields the same rows from either shape", async () => {
     const a = doc("a")
     fetchSpy.mockResolvedValueOnce(ok([a]))
     fetchSpy.mockResolvedValueOnce(ok({ documents: [a], total: 1, offset: 0, limit: 25 }))
-    expect(await listDocuments()).toEqual([a])
-    expect(await listDocuments()).toEqual([a])
+    expect((await listDocumentsPage({ offset: 0, limit: 25 })).documents).toEqual([a])
+    expect((await listDocumentsPage({ offset: 0, limit: 25 })).documents).toEqual([a])
   })
 
-  it("the chunk, table, image and version clients unwrap an envelope body", async () => {
+  it("the chunk, table, image and version page clients keep the server's exact total", async () => {
     const chunk = { id: "c1", chunk_index: 0, content: "x" }
     const table = { id: "t1", table_index: 0, headers: [], rows: [] }
     const image = { id: "i1", image_index: 0, description: "d" }
     const v = doc("v1")
-    fetchSpy.mockResolvedValueOnce(ok({ chunks: [chunk], total: 1, offset: 0, limit: 200 }))
-    fetchSpy.mockResolvedValueOnce(ok({ tables: [table], total: 1, offset: 0, limit: 50 }))
-    fetchSpy.mockResolvedValueOnce(ok({ images: [image], total: 1, offset: 0, limit: 100 }))
-    fetchSpy.mockResolvedValueOnce(ok({ versions: [v], total: 1, offset: 0, limit: 50 }))
-    expect(await listDocumentChunks("d1")).toEqual([chunk])
-    expect(await listDocumentTables("d1")).toEqual([table])
-    expect(await listDocumentImages("d1")).toEqual([image])
-    expect(await fetchDocumentVersions("d1")).toEqual([v])
+    fetchSpy.mockResolvedValueOnce(ok({ chunks: [chunk], total: 2500, offset: 0, limit: 200 }))
+    fetchSpy.mockResolvedValueOnce(ok({ tables: [table], total: 1200, offset: 0, limit: 50 }))
+    fetchSpy.mockResolvedValueOnce(ok({ images: [image], total: 1100, offset: 0, limit: 100 }))
+    fetchSpy.mockResolvedValueOnce(ok({ versions: [v], total: 1001, offset: 0, limit: 50 }))
+    expect(await listDocumentChunksPage("d1")).toMatchObject({ chunks: [chunk], total: 2500 })
+    expect(await listDocumentTablesPage("d1")).toMatchObject({ tables: [table], total: 1200 })
+    expect(await listDocumentImagesPage("d1")).toMatchObject({ images: [image], total: 1100 })
+    expect(await fetchDocumentVersionsPage("d1")).toMatchObject({ versions: [v], total: 1001 })
   })
 
-  it("and still return a legacy array body as-is", async () => {
+  it("a legacy array body claims no more than its own length", async () => {
     const chunk = { id: "c1", chunk_index: 0, content: "x" }
     fetchSpy.mockResolvedValue(ok([chunk]))
-    expect(await listDocumentChunks("d1")).toEqual([chunk])
+    expect(await listDocumentChunksPage("d1")).toEqual({ chunks: [chunk], total: 1, offset: 0, limit: 1 })
   })
 })

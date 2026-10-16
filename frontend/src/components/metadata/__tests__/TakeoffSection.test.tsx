@@ -12,10 +12,10 @@ vi.mock("@/lib/api/takeoff", () => ({
 }))
 
 // 284-04 (D-15 R-05 exception / UI-SPEC S14): the rate-sheet list is ONE bounded server page of
-// spreadsheets — never the whole library filtered in the browser. `listDocuments` stays mocked so a
-// regression back to it is SEEN.
+// spreadsheets — never the whole library filtered in the browser. 284-05 (D-16): the whole-list
+// client no longer exists, so a regression back to it fails to compile and fails
+// `libraryListFence.test.ts`; this suite pins that every read it makes is a bounded page.
 vi.mock("@/lib/api", () => ({
-  listDocuments: vi.fn(),
   listDocumentsPage: vi.fn(),
 }))
 
@@ -208,7 +208,9 @@ describe("TakeoffSection Component (Phase 220, TAKEOFF-04)", () => {
     render(<TakeoffSection doc={mockDoc} />)
     await waitFor(() => expect(api.listDocumentsPage).toHaveBeenCalledTimes(1))
     expect(api.listDocumentsPage).toHaveBeenCalledWith({ kind: "spreadsheet", offset: 0, limit: 50 })
-    expect(api.listDocuments).not.toHaveBeenCalled()
+    for (const [params] of vi.mocked(api.listDocumentsPage).mock.calls) {
+      expect(params.limit).toBeLessThanOrEqual(50)
+    }
   })
 
   it("while loading the select is disabled and reads 'Loading rate sheets…'", () => {

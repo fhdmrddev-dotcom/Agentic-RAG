@@ -81,7 +81,6 @@ export type {
 
 // ── documents ─────────────────────────────────────────────────────────
 export {
-  listDocuments,
   uploadDocument,
   uploadWorkspaceTemplate,
   attachConnectionFileToThread,
@@ -89,22 +88,19 @@ export {
   downloadSandboxOutput,
   downloadWorkspaceFile,
   deleteDocument,
-  fetchDocumentVersions,
   restoreDocumentVersion,
   listFolders,
   createFolder,
   renameFolder,
   deleteFolder,
   toggleFolderOrgShared,
-  // Phase 217 (LIB-04 / D-217-04) — the five document-detail reads. ⚠ These MUST be here:
+  // Phase 217 (LIB-04 / D-217-04) — the document-detail reads (284-05 deleted the whole-list
+  // chunks / tables / images three; their paged successors are below). ⚠ These MUST be here:
   // a symbol exported from `api/documents.ts` and forgotten in this barrel typechecks
   // perfectly and is invisible to every consumer, because everything outside `lib/`
   // imports `@/lib/api` (D-207-06). `apiBarrel.test.ts` now guards that mechanically for
   // this module, so the omission reds instead of shipping silently.
   getDocumentContent,
-  listDocumentChunks,
-  listDocumentTables,
-  listDocumentImages,
   listDocumentQueries,
   // Phase 240 (SRC-05 SC#3) — the conversation read. Same rule as the five above: a symbol
   // missing from this barrel typechecks perfectly and is invisible to every consumer.
@@ -115,7 +111,8 @@ export {
   // consumer imports these from `@/lib/api/documents`, never from here (196-08).
   searchDocuments,
   DocumentSearchError,
-  // Phase 284 (FIX-11 / D-01 / D-11 / D-16 / D-17) — the paged reads. Same barrel rule.
+  // Phase 284 (FIX-11 / D-01 / D-11 / D-16 / D-17) — the paged reads. Same barrel rule. 284-05
+  // deleted the five whole-list clients these replace (libraryListFence.test.ts keeps them out).
   listDocumentsPage,
   getDocument,
   DocumentListError,
