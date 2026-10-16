@@ -3,9 +3,9 @@ seed_id: SEED-359
 title: One branded loader (the Syrel Iris mark) wherever the app waits for data
 created: 2026-10-16
 surface: Agentic-RAG
-status: planted
-partial: false
-status_note:
+status: partially-answered
+partial: true
+status_note: "Part A (swap existing page/panel/section/dialog loaders to one SyrelLoader) DONE in quick task 261016-u3w, 2026-10-16 — 23 sites; 88 button/inline spinners kept by design. Part B (add loaders where none exist) still open."
 trigger_when: Any phase touching a frontend surface that waits for data (a list, panel, page or dialog that fetches), or any phase that inserts the Syrel logo into the app. Also at the next /gsd:new-milestone as a UI-polish candidate.
 trigger_paths: ["frontend/src/components/**", "frontend/src/pages/**", "frontend/src/components/chat/IrisAvatar.tsx", "frontend/src/index.css"]
 trigger_surfaces: []
