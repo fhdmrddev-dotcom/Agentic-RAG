@@ -409,6 +409,63 @@ async def test_modify_arm_new_bytes_is_minted(mock_pool, mock_supabase, adapter)
     assert m.upsert.call_args_list[-1][1]["minted"] is True
 
 
+# ── 285-REVIEW CR-01: the error arm's marker must describe the document it links ────────────────
+# Before the fix the error arm passed no `minted` (None = keep), so an item that had minted X and
+# was re-linked by the error arm to a dedup-matched hand upload H kept `minted = true`. M-2 then
+# kept that stale marker on every later sync (H is now the item's own document), and both purge
+# doors deleted H's row and bytes — the exact FIX-13 bug.
+
+@pytest.mark.asyncio
+async def test_cr01_retry_dedup_upsert_raises_error_arm_marks_link_not_minted(
+    mock_pool, mock_supabase, adapter, doc_query
+):
+    x, h = uuid4(), uuid4()
+    _, m, _ = await _sync(
+        mock_pool, mock_supabase, adapter, [_file()],
+        items=[_item(state="failed", document_id=x, minted=True, failed_attempts=1)],
+        mint=_mint(h, dup=True),
+        upsert_side_effect=[RuntimeError("db blip"), {"id": uuid4()}],
+    )
+
+    assert m.upsert.await_count == 2
+    up = m.upsert.call_args_list[-1][1]
+    assert up["state"] == "failed"
+    assert UUID(str(up["document_id"])) == h
+    assert up.get("minted") is False, "the error arm re-linked a hand upload but kept minted=true (CR-01)"
+    assert _failed_doc_writes(doc_query) == []
+
+
+@pytest.mark.asyncio
+async def test_cr01_modify_arm_dedup_upsert_raises_error_arm_marks_link_not_minted(
+    mock_pool, mock_supabase, adapter
+):
+    x, h = uuid4(), uuid4()
+    _, m, _ = await _sync(
+        mock_pool, mock_supabase, adapter, [_file(version="v2")],
+        items=[_item(state="present", source_version="v1", document_id=x, minted=True)],
+        mint=_mint(h, dup=True),
+        upsert_side_effect=[RuntimeError("db blip"), {"id": uuid4()}],
+    )
+
+    up = m.upsert.call_args_list[-1][1]
+    assert UUID(str(up["document_id"])) == h
+    assert up.get("minted") is False, "the modify arm's error path kept minted=true on a hand upload (CR-01)"
+
+
+@pytest.mark.asyncio
+async def test_cr01_error_arm_after_own_doc_dedup_keeps_the_marker(mock_pool, mock_supabase, adapter):
+    """M-2 still holds in the error arm: the minter returned the item's OWN document."""
+    own = uuid4()
+    _, m, _ = await _sync(
+        mock_pool, mock_supabase, adapter, [_file()],
+        items=[_item(state="failed", document_id=own, minted=True, failed_attempts=1)],
+        mint=_mint(own, dup=True),
+        upsert_side_effect=[RuntimeError("db blip"), {"id": uuid4()}],
+    )
+
+    assert m.upsert.call_args_list[-1][1].get("minted") is None
+
+
 # ── D-03: the summary's shape and bound ─────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
