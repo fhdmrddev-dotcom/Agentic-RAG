@@ -354,7 +354,7 @@ Plans:
   7. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. opening a 10,000-document folder, paging to the end, picking a document in the link dialog), and Chrome MCP drives each one (FIX-11).
 
 **How we'd know this failed**: the list pages, but folder totals or the tiles are still counted from the page in the browser (so they read 50, not 10,000); the 1,000-row cap is "fixed" by raising `max_rows`; the batching stays and simply runs 100+ round-trips; Find still loads every match before slicing; a picker still downloads the whole library; the RLS boundary loosens because a new aggregate function runs as `SECURITY DEFINER` (or keeps the default `PUBLIC` EXECUTE grant).
-**Plans**: 5 plans in 3 waves (D-25 / G-8; 01 is frontend-only and 02 holds the local-DB lock, so they run in parallel worktrees; in wave 2 only 04 holds the lock; 03 and 04 share no file — 01 owns every wire type and client; the after-measurement, the production `max_rows` read, the G-4 drive and the close are orchestrator-owned, recorded in `284-MEASUREMENTS.md` / `284-LIVE-EVIDENCE.md`)
+**Plans**: 6 plans in 4 waves (5 planned in 3 waves per D-25 / G-8; 06 added 2026-10-16 at the operator's request for SEED-357; 01 is frontend-only and 02 holds the local-DB lock, so they run in parallel worktrees; in wave 2 only 04 holds the lock; 03 and 04 share no file — 01 owns every wire type and client; the after-measurement, the production `max_rows` read, the G-4 drive and the close are orchestrator-owned, recorded in `284-MEASUREMENTS.md` / `284-LIVE-EVIDENCE.md`)
 
 Plans:
 **Wave 1**
@@ -369,7 +369,8 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 284-05-PLAN.md — wave 3 (TDD guards + orchestrator checkpoint, DB lock): D-23 layer 2 request recorder (unit + live) and the D-16 whole-list fence, each driven RED, legacy array clients deleted; merged-tree gates, count-gate pins, ledger + CLAUDE.md close; AFTER measurement at 10k / 50k, production `max_rows` read (read-only), G-4 A-E, evidence-gated bug / seed / requirement flips (FIX-11; D-16, D-18, D-21..D-23, D-25..D-27, R-09)
+- [x] 284-05-PLAN.md — wave 3 (TDD guards + orchestrator checkpoint, DB lock): D-23 layer 2 request recorder (unit + live) and the D-16 whole-list fence, each driven RED, legacy array clients deleted; merged-tree gates, count-gate pins, ledger + CLAUDE.md close; AFTER measurement at 10k / 50k, production `max_rows` read (read-only), G-4 A-E, evidence-gated bug / seed / requirement flips (FIX-11; D-16, D-18, D-21..D-23, D-25..D-27, R-09)
+- [ ] 284-06-PLAN.md — wave 4 (TDD, DB lock; added 2026-10-16 at the operator's request, SEED-357): locate where the 50k first-page time goes, migration **208** (the Library page index; the view rewritten as UNION ALL only if EXPLAIN demands it), applied by script, AFTER at 10k / 50k so Root and Find page 1 stay within 1.5x (FIX-11; SC#1, D-22)
 **Flags**: ⛔ **G-5: `frontend/src/pages/LibraryPage.tsx` FIRES and its extraction is OWED — taken first.** Also FIRING: `backend/app/api/documents.py`, `backend/app/services/document_search_service.py`, `frontend/src/components/ingestion/DocumentList.tsx`, `frontend/src/lib/api/documents.ts`, `frontend/src/types/index.ts`; `frontend/src/hooks/useDocuments.ts` and `DocumentsPager.tsx` read their ledger sections first. **security_enforcement**: any new SQL function is `SECURITY INVOKER`, revoked from `PUBLIC`, and proven as `authenticated`, never through the service role. **measure first**: record today's figures at 10k/50k before changing anything. Supabase Realtime stays a hint: a document-change event refetches the current page, never patches a full in-memory list. **G-2**: the pager exists (`DocumentsPager`), so the sketch skip is recorded unless discuss changes the Library layout. Cross-check `BUG-261014-06` / `-07` at discuss.
 **UI hint**: yes
 
@@ -384,7 +385,7 @@ Plans:
 | 281. A Refusal Names Its Cause | 4/4 | Complete (owed by operator decision: G-4 rows A, C, D; WR-02 kept by design) | 2026-10-15 |
 | 282. The Slow Run and the Paused Run | 4/4 | Complete (verified 5/5, self-verified; review CR-01 + WR-02..05 fixed, WR-01 partial; owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through, SC#10 rows 2/8 on credit) | 2026-10-15 |
 | 283. Every Member Reaches Their Own Settings | 3/3 | Complete (verified 4/4 SCs; review CR-01 + WR-01/02 + 4 info fixed, IN-04/IN-06 skipped by decision; G-4 driven live, Tab row confirmed by operator) | 2026-10-16 |
-| 284. Library at Scale | 4/5 | In Progress | - |
+| 284. Library at Scale | 5/6 | In Progress | - |
 
 ---
 
