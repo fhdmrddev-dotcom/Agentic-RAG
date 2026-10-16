@@ -130,6 +130,20 @@ identical for all 43 users and the service role still reads 0 rows.
 The first apply (12/12 PASS) logged the policy transition from 154's text to the wrapped one.
 After the regen, ACL parity read `349/349`, and 208's six table statements were recognised.
 
+⚠ **CORRECTED 2026-10-16 (284-REVIEW WR-R2-02) — what the parity above actually covered.** The final
+run's BEFORE was taken with the policy **already wrapped** (the PGRST200 revert kept it), so its
+"43 users, all same" compares the **207 view against the 208 view under ONE policy**. It does not
+compare policy 154 with policy 208, and a view fingerprint cannot see the connection arm at all
+(the view excludes connection-visible documents). The 154→208 transition was proved separately,
+in one rolled-back transaction, by `apply_migration_208.py --parity-policy`: the documents
+**TABLE** and the view, policy 154 vs 208, for every local user plus a no-uid caller, as
+`authenticated` with `request.jwt.claims` only, `app.agent_read` off and on, in two data states
+(as-is, and with 179 connection documents flipped to `org` + 60 made non-retrievable, so the
+connection arm decided 696 rows). **Same for every caller in all 8 combinations: 42/42 at 325 and 44/44 at
+50,545 documents (all users plus a no-uid caller).** A planted "208" without the connection arm FAILED it for 4 callers (the view
+fingerprint stayed 42/42 same — exactly the blind spot). Full output: 284-MEASUREMENTS.md
+"WR-R2-02". The VERIFY above is now 16 rows (284-REVIEW-FIX-R2.md).
+
 ## EXPLAIN before / after (as `authenticated`, real token claims)
 
 | statement | 10k BEFORE | 50k BEFORE | 10k AFTER | 50k AFTER |
@@ -196,7 +210,7 @@ the statement read a steady 13.4-15.6 / 20.3-23.6 ms throughout.
 **1. [Rule 3 - Blocking] The documents SELECT policy's `auth.uid()` wrapped in a SELECT**
 - **Found during:** Task 1
 - **Issue:** Even with an ordered page, the exact count was 138 / 223 ms at 50k. Each row re-parsed the JWT claims, so D-22 could not be met with an index and a view alone.
-- **Fix:** DROP + CREATE the policy with `(SELECT auth.uid())`. The predicate is the same, the guard refuses on drift, and parity was checked for all 43 users. The RLS / leak suites pass (below).
+- **Fix:** DROP + CREATE the policy with `(SELECT auth.uid())`. The predicate is the same, the guard refuses on drift, and ~~parity was checked for all 43 users~~ the VIEW was row-for-row identical for all 43 users under the wrapped policy (207 view vs 208 view). **CORRECTED 2026-10-16 (WR-R2-02):** that run did not cross the policy change; the 154-vs-208 parity of the documents TABLE was proved later by `--parity-policy` (every user plus a no-uid caller, agent_read off/on, two data states, 325 and 50,545 documents — see above). The RLS / leak suites pass (below).
 - **Files:** `supabase/migrations/208_library_page_index.sql` · **Commit:** `2bd13fda9`
 
 **2. [Rule 1 - Bug] A UNION ALL view broke every PostgREST embed (PGRST200)**
@@ -236,7 +250,7 @@ the statement read a steady 13.4-15.6 / 20.3-23.6 ms throughout.
 Plain CREATE INDEX is fine at production's 178 documents. Above ~100k, run the three as `CONCURRENTLY` first.
 
 **Owed:**
-- The production apply and its VERIFY (14/14).
+- The production apply and its VERIFY (~~14/14~~ **16/16** since 284-REVIEW-FIX-R2). On `canceling statement due to lock timeout`, re-paste; never widen the 3 s timeout.
 - `graphify update .`, not run in the worktree because `graphify-out/` is tracked and would churn under a parallel merge.
 - The summary ratio, which needs a counter or cache, not an index.
 - Indexes for the other list shapes, if they matter.

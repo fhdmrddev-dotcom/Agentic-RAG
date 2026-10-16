@@ -430,3 +430,66 @@ maintained counter or a cached summary, not an index. Second, any list whose fil
 matching index. These are IngestionTab's status lists, the `kind=spreadsheet` read, the
 unfiltered GET /documents, and Find sorted by anything but `added_desc`. The policy wrap roughly
 halves their statement time, but their page is still a full sort.
+
+
+## WR-R2-02 — the documents SELECT policy, 154 vs 208 (2026-10-16, 284-REVIEW-FIX-R2)
+
+What it covers: ONE rolled-back transaction (`scripts/apply_migration_208.py --parity-policy`). It
+installs 154's policy, then 208's (each confirmed by its deparsed text). For every user in
+`auth.users`, plus a no-uid caller, it reads the documents **TABLE** (row count + md5 of the sorted
+ids) and the view. It reads as `authenticated` with `request.jwt.claims` ONLY
+(`request.jwt.claim.sub` is empty, which is PostgREST's branch of `auth.uid()`), with
+`app.agent_read` off and on. There are two data states: as-is, and "widened". Widened means,
+inside the same transaction, every connection document set to `ingest_visibility = 'org'` and 60
+documents set to `source_state = 'missing_at_source'`, so the generated `retrievable` is false. In
+the as-is data no local row is reachable through the connection arm (all 179 connection documents
+are `private`), which is why the widened state exists. Nothing was committed, and the live policy
+reads 208's text afterwards.
+
+### 325 documents (scale account not seeded)
+
+```
+STATE as-is: arms over (member, document) pairs: {'connection_arm_only': 0, 'shared_folder_arm': 109, 'own_arm': 325, 'not_retrievable_member_rows': 10}
+WIDENED (inside the transaction): 179 connection documents -> ingest_visibility 'org'; 60 documents -> source_state 'missing_at_source' (retrievable is GENERATED, so this makes it false)
+STATE widened: arms over (member, document) pairs: {'connection_arm_only': 696, 'shared_folder_arm': 109, 'own_arm': 325, 'not_retrievable_member_rows': 288}
+PARITY — documents TABLE and library_documents VIEW, policy 154 vs policy 208:
+  state=as-is    agent_read=off  callers=42 (incl. <no uid>)  table rows Σ=   434  view rows Σ=   434  table same=42/42  view same=42/42
+  state=as-is    agent_read=on   callers=42 (incl. <no uid>)  table rows Σ=   432  view rows Σ=   432  table same=42/42  view same=42/42
+  state=as-is    agent_read on vs off changes the table for 1 caller(s)
+  state=widened  agent_read=off  callers=42 (incl. <no uid>)  table rows Σ=  1130  view rows Σ=   434  table same=42/42  view same=42/42
+  state=widened  agent_read=on   callers=42 (incl. <no uid>)  table rows Σ=   918  view rows Σ=   354  table same=42/42  view same=42/42
+  state=widened  agent_read on vs off changes the table for 12 caller(s)
+rolled back; live policy == 208's again: True
+PARITY PROVED — for all 41 users and a no-uid caller, in both data states, with app.agent_read off and on, policy 154 and policy 208 admit the SAME documents rows (count + md5 of sorted ids) and the SAME view rows.
+```
+
+### 50,545 documents (scale account at 50k)
+
+```
+STATE as-is: arms over (member, document) pairs: {'connection_arm_only': 0, 'shared_folder_arm': 129, 'own_arm': 50545, 'not_retrievable_member_rows': 610}
+WIDENED (inside the transaction): 179 connection documents -> ingest_visibility 'org'; 60 documents -> source_state 'missing_at_source' (retrievable is GENERATED, so this makes it false)
+STATE widened: arms over (member, document) pairs: {'connection_arm_only': 696, 'shared_folder_arm': 129, 'own_arm': 50545, 'not_retrievable_member_rows': 730}
+PARITY — documents TABLE and library_documents VIEW, policy 154 vs policy 208:
+  state=as-is    agent_read=off  callers=44 (incl. <no uid>)  table rows Σ= 50674  view rows Σ= 50674  table same=44/44  view same=44/44
+  state=as-is    agent_read=on   callers=44 (incl. <no uid>)  table rows Σ= 50372  view rows Σ= 50372  table same=44/44  view same=44/44
+  state=as-is    agent_read on vs off changes the table for 2 caller(s)
+  state=widened  agent_read=off  callers=44 (incl. <no uid>)  table rows Σ= 51370  view rows Σ= 50674  table same=44/44  view same=44/44
+  state=widened  agent_read=on   callers=44 (incl. <no uid>)  table rows Σ= 51000  view rows Σ= 50312  table same=44/44  view same=44/44
+  state=widened  agent_read on vs off changes the table for 6 caller(s)
+rolled back; live policy == 208's again: True
+PARITY PROVED — for all 43 users and a no-uid caller, in both data states, with app.agent_read off and on, policy 154 and policy 208 admit the SAME documents rows (count + md5 of sorted ids) and the SAME view rows.
+```
+
+### RED drive of the parity check itself (325 documents)
+
+With `--plant-drop-connection-arm`, the "208" side is a policy WITHOUT the connection arm. The
+TABLE fingerprint catches it for 4 callers. The VIEW fingerprint stays 42/42 "same", which is the
+blind spot the review named: the view cannot see that arm.
+
+```
+  state=widened  agent_read=off  callers=42 (incl. <no uid>)  table rows Σ=  1130  view rows Σ=   434  table same=38/42  view same=42/42
+  state=widened  agent_read=on   callers=42 (incl. <no uid>)  table rows Σ=   918  view rows Σ=   354  table same=38/42  view same=42/42
+*** FAILED ***
+  · widened agent_read=False: table differs for [4 callers: 1f13dc7b…, cdaa02a1…, d9e4f4e7…, e6dc45ca…], view for []
+  · widened agent_read=True: table differs for [the same 4 callers], view for []
+```
