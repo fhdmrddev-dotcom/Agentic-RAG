@@ -15,8 +15,8 @@ Seeds folded at intake: **SEED-221** (into FIX-10), **SEED-328** (into SEAM-01),
 - [x] **FIX-03**: A watched OneDrive/SharePoint folder larger than one page imports every page, or fails loudly — it never silently restarts the listing at page 1. — `onedrive-adapter-…` WR-02
 - [x] **FIX-04**: A OneDrive search query cannot alter the Microsoft Graph request path. — `onedrive-adapter-…` WR-01
 - [x] **FIX-05**: Folder paths minted by the OneDrive adapter use one encoding, so a filing rule written against the displayed path matches. — `onedrive-adapter-…` WR-03
-- [ ] **FIX-06**: A per-model timeout is the timeout the provider call actually gets, up to the maximum the UI accepts; a value above a real ceiling is refused with the reason; `max_retries` is chosen deliberately, not inherited from the SDK default. — `BUG-260916-01`
-- [ ] **FIX-07**: One `ask_user` pause shows one answer input; the draft is the same wherever it appears; option selection is not conveyed by colour alone; no dead button remains. — `BUG-260918-01`
+- [x] **FIX-06**: A per-model timeout is the timeout the provider call actually gets, up to the maximum the UI accepts; a value above a real ceiling is refused with the reason; `max_retries` is chosen deliberately, not inherited from the SDK default. — `BUG-260916-01`
+- [x] **FIX-07**: One `ask_user` pause shows one answer input; the draft is the same wherever it appears; option selection is not conveyed by colour alone; no dead button remains. — `BUG-260918-01`
 - [x] **FIX-08**: Expanding the Chunks section on a 1,000-chunk document leaves every section below it reachable. — `BUG-260908-01`
 - [x] **FIX-09**: When an emit step fails, the reported cause is the check that actually failed — never "citations" when citation coverage was 100%. — `BUG-260730-02`
 - [x] **FIX-10**: A publish-gauntlet refusal shows the author the precise reason recorded in `harness_audit`, in plain words, never a machine code. — `BUG-260815-06` + `SEED-221`
@@ -26,7 +26,7 @@ Seeds folded at intake: **SEED-221** (into FIX-10), **SEED-328** (into SEAM-01),
 
 - [x] **DEBT-07**: The harness freshness validator (`harness/freshness.py`) excludes archived (`retrievable=false`) documents. — W-1
 - [x] **DEBT-08**: A recorded decision states what happens to `message_artifacts` rows when their source document is disposed by retention, and the code enforces it if the decision requires. — W-2
-- [ ] **DEBT-09**: The date-word→column map and the topics-is-a-list rule each have one home, imported by `retrieval_scope.py`, `document_search_service.py` and `view_filter_compiler.py`; a test fails if they diverge. — W-3
+- [x] **DEBT-09**: The date-word→column map and the topics-is-a-list rule each have one home, imported by `retrieval_scope.py`, `document_search_service.py` and `view_filter_compiler.py`; a test fails if they diverge. — W-3
 - [x] **DEBT-10**: Both watch purge paths remove the stored file bytes as well as the document rows. — W-5 / `BUG-261012-01`
 - [x] **DEBT-11**: `DELETE /documents/{id}` answers 404, not 500, when the caller owns no such row. — W-5 / `BUG-261012-02`
 
@@ -34,9 +34,9 @@ Seeds folded at intake: **SEED-221** (into FIX-10), **SEED-328** (into SEAM-01),
 
 Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not exceeded and the frontend count gate shows no per-file decrease.
 
-- [ ] **SEAM-01**: `backend/app/services/expert_scope.py` is extracted along its named seam (`docs/HOT-FILE-LEDGER.md`); every `SEED-328` item is fixed or recorded with a reason.
-- [ ] **SEAM-02**: `backend/app/services/retrieval_service.py` is extracted along its named seam (`SEED-224`, owed since Phase 231).
-- [ ] **SEAM-03**: `backend/app/services/tool_dispatcher.py` is split into registry and handlers (`OV-273-02`); the closed core stays at 30 tools and the registry is pinned identical before and after.
+- [x] **SEAM-01**: `backend/app/services/expert_scope.py` is extracted along its named seam (`docs/HOT-FILE-LEDGER.md`); every `SEED-328` item is fixed or recorded with a reason.
+- [x] **SEAM-02**: `backend/app/services/retrieval_service.py` is extracted along its named seam (`SEED-224`, owed since Phase 231).
+- [x] **SEAM-03**: `backend/app/services/tool_dispatcher.py` is split into registry and handlers (`OV-273-02`); the closed core stays at 30 tools and the registry is pinned identical before and after.
 
 ### Register hygiene (REG)
 
@@ -66,20 +66,20 @@ Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not excee
 | FIX-03 | Phase 280 | Complete |
 | FIX-04 | Phase 280 | Complete |
 | FIX-05 | Phase 280 | Complete |
-| FIX-06 | Phase 282 | Pending |
-| FIX-07 | Phase 282 | Pending |
+| FIX-06 | Phase 282 | Complete |
+| FIX-07 | Phase 282 | Complete |
 | FIX-08 | Phase 283 | Complete |
 | FIX-09 | Phase 281 | Complete |
 | FIX-10 | Phase 281 | Complete |
 | FIX-11 | Phase 284 | Complete |
 | DEBT-07 | Phase 281 | Complete |
 | DEBT-08 | Phase 280 | Complete |
-| DEBT-09 | Phase 278 | Pending |
+| DEBT-09 | Phase 278 | Complete |
 | DEBT-10 | Phase 280 | Complete |
 | DEBT-11 | Phase 280 | Complete |
-| SEAM-01 | Phase 279 | Pending |
-| SEAM-02 | Phase 278 | Pending |
-| SEAM-03 | Phase 278 | Pending |
+| SEAM-01 | Phase 279 | Complete |
+| SEAM-02 | Phase 278 | Complete |
+| SEAM-03 | Phase 278 | Complete |
 | REG-04 | Phase 277 | Complete |
 | REG-05 | Phase 277 | Complete |
 
