@@ -44,7 +44,9 @@ UI surface. Per A2/D-113-10: the optional `stale_fields` resolve-warning is
 deferred wholesale to Phase 119 (not shipped here).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from supabase import Client
 
 from app.dependencies import get_current_user, get_user_supabase_client
@@ -203,10 +205,20 @@ async def delete_view(
 async def resolve_view(
     view_id: str,
     count_only: bool = False,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=200)] = 25,
+    include_archived: bool = True,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Resolve a view to its complete listing of matching latest-version docs.
+    """Resolve a view to one PAGE of its matching latest-version docs, with an exact total.
+
+    Phase 284 (D-10): ``offset`` / ``limit`` (1..200, default 25) select the page of the
+    newest-first set; the answer is ``{documents, total, offset, limit}``. ``include_archived``
+    (default ``True`` — today's behaviour) hides archived documents when ``False``, for the count
+    too. The read is ONE ranged ``count="exact"`` query over migration 207's
+    ``library_documents`` (the view strategy), run on THIS route's user-JWT client, so neither the
+    listing nor the count is cut at PostgREST's max_rows any more.
 
     THE per-viewer leak-safe core (VIEW-06 / T-113-09): every documents query leg
     is scoped from the CALLER, NEVER from `view["user_id"]`. A seeded global view
@@ -255,6 +267,10 @@ async def resolve_view(
             folder_scope=view.get("folder_scope"),
             count_only=count_only,
             supabase=supabase,
+            via_view=True,  # the user-JWT client: one paged read of library_documents (D-10)
+            offset=offset,
+            limit=limit,
+            include_archived=include_archived,
         )
     except ResolveError as e:
         raise HTTPException(status_code=e.status, detail=e.detail)
@@ -280,7 +296,8 @@ async def resolve_adhoc(
     SHARED ``resolve_filter`` core, extracted to document_view_resolver in 115) —
     with NO ``document_views`` write and NO audit entry. ``count_only`` returns
     ``{total}`` (the live "N documents match" preview + the page's list resolve share
-    THIS one path now); otherwise ``{documents, total}``.
+    THIS one path now); otherwise ``{documents, total, offset, limit}`` — one PAGE (Phase 284,
+    D-10: the body's ``offset`` / ``limit`` ≤ 200 / ``include_archived``) with an exact total.
 
     Leak-safety (VIEW-06) is preserved by construction: ``resolve_filter`` scopes
     every leg from the CALLER, never a view owner (there IS no view here — the caller
@@ -295,6 +312,10 @@ async def resolve_adhoc(
             folder_scope=str(body.folder_scope) if body.folder_scope is not None else None,
             count_only=body.count_only,
             supabase=supabase,
+            via_view=True,  # the user-JWT client: one paged read of library_documents (D-10)
+            offset=body.offset,
+            limit=body.limit,
+            include_archived=body.include_archived,
         )
     except ResolveError as e:
         raise HTTPException(status_code=e.status, detail=e.detail)

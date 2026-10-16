@@ -39,6 +39,8 @@ import asyncpg
 import pytest
 import pytest_asyncio
 
+from tests.integration._284_route_users import RouteUsers, as_user
+
 
 _POSTGRES_TEST_DSN = os.environ.get(
     "POSTGRES_DSN",
@@ -149,50 +151,33 @@ async def pg_pool():
 
 @pytest_asyncio.fixture
 async def test_user(pg_pool):
-    """Seed a throwaway auth.users row; FK-safe teardown (docs + views + audit + user)."""
-    user_id = uuid4()
+    """A REAL signed-in user (GoTrue); FK-safe teardown (docs + views + audit + user + org).
+
+    284-04 (D-10 / R-02): the resolve route reads ``library_documents`` through the CALLER's JWT,
+    and a service-role caller reads 0 rows from it (fail-closed), so the route is driven with
+    ``as_user(...)``. Seeding and ``create_view`` still go through the service role.
+    """
+    users = RouteUsers(pg_pool)
     try:
-        await pg_pool.execute(
-            "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
-            user_id, f"phase-114-resolve-{user_id}@test.local",
-        )
+        user_id = await users.create("114-resolve")
     except Exception as e:
+        await users.drop_all()
         pytest.skip(f"test_user fixture setup failed: {type(e).__name__}: {e}")
     yield user_id
-    for sql in (
-        ("DELETE FROM public.documents WHERE user_id = $1", user_id),
-        ("DELETE FROM public.document_views WHERE user_id = $1", user_id),
-        ("DELETE FROM audit_log WHERE user_id = $1", user_id),
-        ("DELETE FROM auth.users WHERE id = $1", user_id),
-    ):
-        try:
-            await pg_pool.execute(*sql)
-        except Exception:
-            pass
+    await users.drop_all()
 
 
 @pytest_asyncio.fixture
 async def second_user(pg_pool):
-    """A second isolated user for the VIEW-06 two-user leak-safety test."""
-    user_id = uuid4()
+    """A second isolated REAL user for the VIEW-06 two-user leak-safety test (it resolves too)."""
+    users = RouteUsers(pg_pool)
     try:
-        await pg_pool.execute(
-            "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
-            user_id, f"phase-114-resolve-2-{user_id}@test.local",
-        )
+        user_id = await users.create("114-resolve-2")
     except Exception as e:
+        await users.drop_all()
         pytest.skip(f"second_user fixture setup failed: {type(e).__name__}: {e}")
     yield user_id
-    for sql in (
-        ("DELETE FROM public.documents WHERE user_id = $1", user_id),
-        ("DELETE FROM public.document_views WHERE user_id = $1", user_id),
-        ("DELETE FROM audit_log WHERE user_id = $1", user_id),
-        ("DELETE FROM auth.users WHERE id = $1", user_id),
-    ):
-        try:
-            await pg_pool.execute(*sql)
-        except Exception:
-            pass
+    await users.drop_all()
 
 
 async def _seed_doc(pool, user_id, *, metadata, created_at, is_latest=True, version=1):
@@ -350,7 +335,7 @@ async def test_custom_leg_title_eq_case_insensitive_live(pg_pool, test_user):
         body=ViewCreate(name="ByTitle", filter_expr=_filter("title", "eq", value="quarterly brief")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
     ids = {d["id"] for d in out["documents"]}
     assert str(match) in ids, "case-insensitive ILIKE matches the mixed-case title"
     assert out["total"] == len(out["documents"]) == 1
@@ -374,7 +359,7 @@ async def test_custom_leg_contains_substring_live(pg_pool, test_user):
         body=ViewCreate(name="HasReport", filter_expr=_filter("title", "contains", value="report")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
     ids = {d["id"] for d in out["documents"]}
     assert str(match) in ids, "substring ILIKE matches 'report' inside 'Annual Report 2025'"
     assert out["total"] == 1
@@ -399,7 +384,7 @@ async def test_custom_leg_is_empty_live(pg_pool, test_user):
         body=ViewCreate(name="MissingAuthor", filter_expr=_filter("author", "is_empty")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
     ids = {d["id"] for d in out["documents"]}
     assert str(absent) in ids and str(blank) in ids, "absent and blank both count as empty (D-114-12)"
     assert str(has) not in ids, "a doc WITH an author must NOT match is_empty"
@@ -429,14 +414,14 @@ async def test_view06_leak_safety_two_user_custom_leg_live(pg_pool, test_user, s
         body=ViewCreate(name="A-view", filter_expr=_filter("title", "eq", value="Shared Name")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    out_a = await resolve_view(view_id=str(view_a["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out_a = await resolve_view(view_id=str(view_a["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
     ids_a = {d["id"] for d in out_a["documents"]}
     assert str(doc_a) in ids_a, "A sees A's own doc"
     assert str(doc_b) not in ids_a, "A must NEVER see B's doc (VIEW-06 leak-safety)"
 
     # user B can't even READ A's view id → 404-not-403 (no existence leak)
     with pytest.raises(Exception) as exc:
-        await resolve_view(view_id=str(view_a["id"]), current_user={"id": str(second_user)}, supabase=sb)
+        await resolve_view(view_id=str(view_a["id"]), current_user={"id": str(second_user)}, supabase=as_user(second_user))
     assert getattr(exc.value, "status_code", None) == 404, "cross-user view read is 404, never 403"
 
 
@@ -467,7 +452,7 @@ async def test_typed_leg_document_type_eq_case_insensitive_live(pg_pool, test_us
         body=ViewCreate(name="Invoices", filter_expr=_filter("document_type", "eq", value="Invoice")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
     ids = {d["id"] for d in out["documents"]}
     assert str(match) in ids, "'Invoice' (mixed) matches stored 'invoice' via document_type_norm"
     assert out["total"] == 1
@@ -500,7 +485,7 @@ async def test_typed_leg_within_next_excludes_overdue_live(pg_pool, test_user):
         body=ViewCreate(name="Expiring", filter_expr=_filter("date", "within_next", value=90, unit="days")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
     ids = {d["id"] for d in out["documents"]}
     assert str(soon) in ids, "a doc due in 45 days is within the 90-day window (crosses a month)"
     assert str(overdue) not in ids, "an overdue doc is EXCLUDED (D-114-5 .gte(today) lower bound)"
@@ -534,7 +519,7 @@ async def test_typed_leg_older_than_boundary_is_strict_live(pg_pool, test_user):
         body=ViewCreate(name="Stale", filter_expr=_filter("date", "older_than", value=30, unit="days")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
     ids = {d["id"] for d in out["documents"]}
     assert str(just_older) in ids, "a doc dated today-31 IS older than 30 days (included)"
     assert str(boundary) not in ids, "a doc dated EXACTLY today-30 is NOT older than 30 (strict <, WR-03)"

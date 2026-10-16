@@ -72,6 +72,7 @@ from app.services.document_relationship_service import (
 )
 from app.services.document_vocabulary import TIMESTAMP_DATE_COLUMNS as _DATE_COLUMN
 from app.services.document_view_resolver import (
+    LIBRARY_ROW_COLUMNS,
     ResolveError,
     _relative_window,
     apply_fragments,
@@ -88,14 +89,7 @@ log = logging.getLogger(__name__)
 #: never returned). ``full_markdown`` is not in the view at all (up to ~267 KB per row; Find
 #: used to send it to the browser). Pinned to the migration's own column list by
 #: ``tests/unit/test_284_find_sql.py``, so a column added to the view must be added here too.
-FIND_SELECT = (
-    "id,user_id,filename,file_path,file_size,mime_type,status,error_message,chunk_count,"
-    "created_at,updated_at,content_hash,metadata,folder_id,version_number,is_latest,"
-    "ingestion_step,extractor,document_type_norm,date_typed,org_id,source_connection_id,"
-    "ingest_visibility,source_state,thread_key,page_count,source_created_at,source_modified_at,"
-    "source_author,archived_at,archived_policy_id,archived_policy_name,retrievable,"
-    "version_count,has_earlier"
-)
+FIND_SELECT = LIBRARY_ROW_COLUMNS + ",version_count,has_earlier"
 
 #: D-14 / T-284-25 — a relationship allow-list is bounded by ONE document's edges, not by the
 #: library. Above this many edges the search refuses (503) instead of PostgREST cutting the edge

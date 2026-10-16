@@ -185,9 +185,24 @@ async def test_the_agent_legs_read_top_n_and_the_total_is_exact(glob):
 # ─────────────────────────────── the byte-identity oracle (PLAN_BASE) ───────────────────────────────
 
 
-async def _pre284_resolve_filter(*, caller, flt, folder_scope, count_only, supabase, retrievable_only=False):
+async def _pre284_resolve_filter(*, caller, flt, folder_scope, count_only, supabase, retrievable_only=False,
+                                  **post284_kwargs):
     """VERBATIM copy of ``resolve_filter`` at PLAN_BASE ``0ae58d8bd`` (docstring and comments trimmed;
-    every executable line unchanged). The oracle the agent's answer is compared against."""
+    every executable line unchanged). The oracle the agent's answer is compared against.
+
+    The handler now passes ``via_view=False, limit=N`` and no longer slices; at PLAN_BASE it passed
+    neither and sliced ``full["documents"][:limit]`` itself. So the oracle ignores the new keywords
+    and applies THAT slice on the way out — oracle = the PRE-284 resolver + the PRE-284 handler.
+    """
+    out = await _pre284_core(caller=caller, flt=flt, folder_scope=folder_scope, count_only=count_only,
+                             supabase=supabase, retrievable_only=retrievable_only)
+    limit = post284_kwargs.get("limit")
+    if not count_only and limit is not None:
+        out = {**out, "documents": (out.get("documents") or [])[:limit]}
+    return out
+
+
+async def _pre284_core(*, caller, flt, folder_scope, count_only, supabase, retrievable_only=False):
     import app.services.document_view_resolver as r
 
     fragments = await r.validate_and_compile(caller, flt, supabase)
