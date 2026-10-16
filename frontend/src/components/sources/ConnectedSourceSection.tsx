@@ -35,13 +35,14 @@
  * right and is preserved in `sourceCapability.ts`.
  */
 import { useEffect, useMemo, useState } from "react"
-import { Loader2, Plug } from "lucide-react"
+import { Plug } from "lucide-react"
 
 import { listConnectorConnections, listSourceFamilies } from "@/lib/api"
 import type { ConnectorConnection } from "@/lib/api/org"
 import { isSourceCapable } from "./sourceCapability"
 import { SourceFolderPicker, type SelectedFolder } from "./SourceFolderPicker"
 import { SourcePreviewPanel } from "./SourcePreviewPanel"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 export interface ConnectedSourceSectionProps {
   /** The Library folder the person chose in the sibling upload picker. `null` = root. */
@@ -98,10 +99,7 @@ export function ConnectedSourceSection({
       </div>
 
       {connections === null ? (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Looking for connected sources…
-        </div>
+        <SyrelLoader size="section" label="Looking for connected sources…" className="text-xs text-muted-foreground" />
       ) : (
         <>
           {/* ⭐ SKETCH 231-A — ONE CARD, TWO COLUMNS. The connection picker rides in the card

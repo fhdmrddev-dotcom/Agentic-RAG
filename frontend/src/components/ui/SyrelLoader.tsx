@@ -14,10 +14,12 @@ import { IrisAvatar } from "@/components/chat/IrisAvatar"
 import { cn } from "@/lib/utils"
 
 export type SyrelLoaderSize = "section" | "panel" | "page"
+/** Local alias, so a grep for the JSX call sites never also matches these maps. */
+type Size = SyrelLoaderSize
 
-const PX: Record<SyrelLoaderSize, number> = { section: 20, panel: 32, page: 48 }
+const PX: Record<Size, number> = { section: 20, panel: 32, page: 48 }
 
-const LAYOUT: Record<SyrelLoaderSize, string> = {
+const LAYOUT: Record<Size, string> = {
   section: "flex items-center gap-2",
   panel: "flex flex-col items-center justify-center gap-3",
   page: "flex h-full w-full flex-col items-center justify-center gap-3",

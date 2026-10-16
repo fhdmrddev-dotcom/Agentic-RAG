@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils"
 // two different sentences; and `sourceFailureSentence` is also what keeps a provider's raw
 // dict off this screen (it passes a string through only on positive proof of plainness).
 import { sourceFailureSentence } from "./sourceHealthVocabulary"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 export interface SelectedFolder {
   folderId: string
@@ -311,8 +312,7 @@ export function SourceFolderPicker({
   if (loadingRoots) {
     return (
       <div className={cn("flex flex-col items-center justify-center py-8 text-muted-foreground", className)} data-testid="folder-picker-loading">
-        <Loader2 className="w-5 h-5 animate-spin mb-2" />
-        <span className="text-xs">Loading folders…</span>
+        <SyrelLoader size="panel" label="Loading folders…" className="text-xs" />
       </div>
     )
   }

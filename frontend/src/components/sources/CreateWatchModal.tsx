@@ -22,6 +22,7 @@ import { useFolders } from "@/hooks/useFolders"
 import { isSourceCapable } from "./sourceCapability"
 import { SourceFolderPicker, type SelectedFolder } from "./SourceFolderPicker"
 import { cn } from "@/lib/utils"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 export interface CreateWatchModalProps {
   open: boolean
@@ -137,10 +138,7 @@ export function CreateWatchModal({
               1. Connected Account
             </label>
             {loadingConnections ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading connections...
-              </div>
+              <SyrelLoader size="section" label="Loading connections..." className="text-sm text-muted-foreground py-2" />
             ) : !connections || connections.length === 0 ? (
               <div className="p-3 text-sm text-muted-foreground border border-dashed rounded-lg bg-card/50">
                 No Google Drive connections found. Please connect Google Drive in{" "}

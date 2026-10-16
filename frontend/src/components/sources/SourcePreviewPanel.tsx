@@ -67,6 +67,7 @@ import {
   SCANNING,
   CANCEL_LABEL,
 } from "./previewVocabulary"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 export interface SourcePreviewPanelProps {
   connectionId: string
@@ -337,10 +338,7 @@ export function SourcePreviewPanel({
         </div>
         {headerSlot}
         {loading && (
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            {SCANNING}
-          </span>
+          <SyrelLoader size="section" label={SCANNING} className="text-xs text-muted-foreground" />
         )}
         {!loading && preview && (
           <span className="shrink-0 text-xs text-muted-foreground">{total} files</span>
