@@ -215,10 +215,16 @@ async def test_publish_cancel_sentinel_publishes_to_all_channels(redis_client):
 
 
 @pytest.mark.asyncio
-async def test_broadcast_shutdown_sentinel_to_all_publishes_everywhere(redis_client):
-    """Test 7: broadcast_shutdown_sentinel SCANs all ``ask_user:channels:*`` keys
-    and PUBLISHes ``{"kind": "shutdown"}`` to every channel."""
+async def test_broadcast_shutdown_sentinel_to_all_publishes_everywhere(redis_client, monkeypatch):
+    """Test 7: the shutdown sentinel reaches every channel THIS process waits on.
+
+    BUG-261015-06: scope changed from ``SCAN ask_user:channels:*`` (every process sharing the
+    Redis) to the process-local registry; the channels are registered as a live subscriber would.
+    """
+    import app.services.ask_user_service as svc
     from app.services.ask_user_service import broadcast_shutdown_sentinel_to_all
+
+    monkeypatch.setattr(svc, "_LOCAL_CHANNELS", set())
 
     run_a = uuid4()
     run_b = uuid4()
@@ -229,6 +235,8 @@ async def test_broadcast_shutdown_sentinel_to_all_publishes_everywhere(redis_cli
 
     await redis_client.sadd(set_a, ch_a)
     await redis_client.sadd(set_b, ch_b)
+    svc.register_local_channel(ch_a)
+    svc.register_local_channel(ch_b)
 
     pubsub = redis_client.pubsub()
     try:
@@ -583,9 +591,13 @@ async def test_handle_ask_user_shutdown_sentinel_returns_shutdown_text(redis_cli
 
 
 @pytest.mark.asyncio
-async def test_handle_ask_user_timeout_returns_timed_out(redis_client):
+async def test_handle_ask_user_timeout_returns_timed_out(redis_client, monkeypatch):
     """Test T2-6: no PUBLISH → ToolResult containing 'timed out' and timeout value."""
+    from app.config import settings
     from app.services.tool_dispatcher import _handle_ask_user
+
+    # BUG-261015-03: the production floor is 300 s; lower it so this test waits 1 s.
+    monkeypatch.setattr(settings, "ask_user_min_timeout_seconds", 1)
 
     ctx = _build_ctx(redis_client, tool_call_id="tcid-timeout")
     with patch("app.services.tools.agent_control.aexec", AsyncMock(return_value=MagicMock(data=[]))):

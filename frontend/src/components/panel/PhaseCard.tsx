@@ -245,6 +245,14 @@ const EMIT_FAILURE_COPY: Record<EmitFailure, { reason: string; where: string }> 
       "No template is bound to this workflow phase and no usable template was found, so nothing could be filled.",
     where: "emit · no template bound",
   },
+  // Phase 281-03 (D-30): a keys-only miss — the field-map's citations were fine, some template
+  // fields were simply absent. Its copy never says "citation", which is the whole point of the
+  // split from `citation_gate_rejected`.
+  template_fields_missing: {
+    reason:
+      "The model filled the template, but some of its fields were missing. Rejected before render; the cited data is preserved.",
+    where: "emit · template fields missing",
+  },
 }
 
 function classifyFailure(phase: Phase): ClassifiedFailure {
@@ -280,9 +288,16 @@ function classifyFailure(phase: Phase): ClassifiedFailure {
 
   // GAP-C (D-11): a typed emit-failure value takes precedence — it is the closed-taxonomy
   // failed-as-failed render (never the generic gate copy, never an empty 'done').
+  // 281-REVIEW CR-01 (D-04): the server's composed cause (live `gate_failed.error`, or the
+  // recorded `_failure_reason`) IS the reason whenever one reached the client; the fixed copy
+  // is only the never-empty fallback (e.g. the no-validator `phase_failed`, which has no text).
   if (phase.emitFailure && phase.emitFailure in EMIT_FAILURE_COPY) {
     const copy = EMIT_FAILURE_COPY[phase.emitFailure]
-    return { kind: phase.emitFailure, reason: copy.reason, where: `phase: ${slug} · ${copy.where}` }
+    return {
+      kind: phase.emitFailure,
+      reason: raw.length > 0 ? raw : copy.reason,
+      where: `phase: ${slug} · ${copy.where}`,
+    }
   }
 
   // reason_unknown — MANDATORY fallback when the error/reason is empty. Never an
@@ -770,7 +785,7 @@ export function PhaseCard({ phase, position, timing, runLive }: PhaseCardProps) 
             >
               {FAILED_REASON_LABEL}
             </span>
-            <span className="text-[12px] font-semibold text-[hsl(0_80%_80%)]">{failure.reason}</span>
+            <span className="whitespace-pre-line text-[12px] font-semibold text-[hsl(0_80%_80%)]">{failure.reason}</span>
             <span className="font-mono text-[11px] text-panel-muted-foreground">{failure.where}</span>
           </div>
         )}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { easedProgress, formatDisplayNumber, parseDisplayNumber } from "./animatedNumberProgress"
 
 export interface AnimatedNumberProps {
   value: number | string
@@ -51,19 +52,16 @@ function AnimatedNumberInner({
       return
     }
 
-    const cleanStr = String(value).replace(/,/g, "")
-    const match = cleanStr.match(/^([^0-9.-]*)([0-9]+(?:\.[0-9]+)?)(.*)$/)
-    if (!match) {
+    // 284-REVIEW IN-05: parsed with the LOCALE's group separator (a de-DE "10.000" is ten
+    // thousand, not 10.000 with three decimals), and each frame is written the same way.
+    const parsed = parseDisplayNumber(value)
+    if (!parsed) {
       prevValueRef.current = value
       setDisplay(value)
       return
     }
 
-    const prefix = match[1]
-    const targetNum = parseFloat(match[2])
-    const suffix = match[3]
-    const hasCommas = String(value).includes(",")
-    const decimalPlaces = match[2].includes(".") ? match[2].split(".")[1].length : 0
+    const targetNum = parsed.num
 
     // If mount: animate from 0 to targetNum.
     // If real value change: animate from prevNum to targetNum.
@@ -84,29 +82,12 @@ function AnimatedNumberInner({
     let rafId: number
 
     const step = (now: number) => {
-      const elapsed = now - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      const ease = 1 - Math.pow(1 - progress, 3)
+      const ease = easedProgress(now - startTime, duration)
       const rawCurrent = startNum + (targetNum - startNum) * ease
 
-      let formattedNum: string
-      if (decimalPlaces > 0) {
-        const factor = Math.pow(10, decimalPlaces)
-        const current = Math.round(rawCurrent * factor) / factor
-        formattedNum = hasCommas
-          ? current.toLocaleString(undefined, {
-              minimumFractionDigits: decimalPlaces,
-              maximumFractionDigits: decimalPlaces,
-            })
-          : current.toFixed(decimalPlaces)
-      } else {
-        const current = Math.round(rawCurrent)
-        formattedNum = hasCommas ? current.toLocaleString() : current.toString()
-      }
+      setDisplay(formatDisplayNumber(rawCurrent, parsed))
 
-      setDisplay(`${prefix}${formattedNum}${suffix}`)
-
-      if (progress < 1) {
+      if (now - startTime < duration) {
         rafId = requestAnimationFrame(step)
       } else {
         completed = true

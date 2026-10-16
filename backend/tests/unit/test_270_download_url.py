@@ -97,15 +97,15 @@ def _setup(mode="owner", file_path=FILE_PATH, version=1, sign_result=None, ttl=6
     }
 
     def resolve(q):
-        if q.table_name != "documents":
-            return None
         if mode == "invisible":
             return None
-        if q.cols == "id, filename, user_id, folder_id":  # visibility gate
-            if mode == "owner" and "user_id" in q.eqs:
+        if q.table_name == "library_documents" and q.cols == "id, filename, user_id, folder_id":
+            # Phase 284: the visibility gate is ONE read of the Library view (migration 207) —
+            # the owner and the shared-folder colleague both reach the row through it.
+            if mode in ("owner", "colleague") and q.eqs.get("id") == DOC_ID:
                 return {k: row[k] for k in ("id", "filename", "user_id", "folder_id")}
-            if mode == "colleague" and q.has_in:
-                return {k: row[k] for k in ("id", "filename", "user_id", "folder_id")}
+            return None
+        if q.table_name != "documents":
             return None
         if q.cols == "id, file_path, filename, version_number":
             return {k: row[k] for k in ("id", "file_path", "filename", "version_number")}
@@ -122,9 +122,8 @@ def _post(client, ttl_setting=60, folders=("ffffffff-ffff-ffff-ffff-ffffffffffff
     async def _settings():
         return SimpleNamespace(document_download_url_ttl_seconds=ttl_setting)
 
-    with patch("app.api.documents.get_globally_visible_folder_ids", return_value=list(folders)), patch(
-        "app.api.documents.load_app_settings_async", _settings
-    ):
+    del folders  # Phase 284: the shared-folder leg is SQL in the view; nothing to stub
+    with patch("app.api.documents.load_app_settings_async", _settings):
         return client.post(f"/documents/{DOC_ID}/download-url")
 
 

@@ -38,7 +38,7 @@
  * source fence greps the whole file for the literal and cannot tell a use from a mention.
  */
 import { useCallback, useEffect, useState } from "react"
-import { listDocumentTables } from "@/lib/api"
+import { listDocumentTablesPage } from "@/lib/api"
 import { DataTableView } from "@/components/panel/DataTableView"
 import type { Document, DocumentTableRow } from "@/types"
 
@@ -53,6 +53,9 @@ export interface DocumentTablesSectionProps {
 }
 
 type LoadState = "loading" | "ready" | "error"
+
+/** 284-03 (D-17 / UI-SPEC S10): ONE bounded page, with the server's exact total. */
+const TABLE_PAGE = 50
 
 /** The three empty claims, kept together so it is visible that they differ. */
 export const TABLES_EMPTY_NOT_APPLICABLE = "This file type has no tables"
@@ -77,6 +80,7 @@ export function tablesEmptyMessage(doc?: Pick<Document, "tables_stage_applies" |
 
 export function DocumentTablesSection({ docId, doc, onTotalChange }: DocumentTablesSectionProps) {
   const [rows, setRows] = useState<DocumentTableRow[]>([])
+  const [total, setTotal] = useState(0)
   const [state, setState] = useState<LoadState>("loading")
 
   /** Keyed on `docId` — switching documents re-reads rather than leaving the previous
@@ -85,10 +89,11 @@ export function DocumentTablesSection({ docId, doc, onTotalChange }: DocumentTab
     setState("loading")
     setRows([])
     try {
-      const res = await listDocumentTables(docId)
-      setRows(res)
+      const res = await listDocumentTablesPage(docId, { offset: 0, limit: TABLE_PAGE })
+      setRows(res.tables)
+      setTotal(res.total)
       setState("ready")
-      onTotalChange?.(res.length)
+      onTotalChange?.(res.total)
     } catch {
       setState("error")
     }
@@ -126,6 +131,13 @@ export function DocumentTablesSection({ docId, doc, onTotalChange }: DocumentTab
         // Calm, and a DIFFERENT claim from the error above (D-117-10). Which of the three
         // sentences is printed is decided by the data, not by convenience.
         <p className="py-1 text-sm text-panel-muted-foreground">{tablesEmptyMessage(doc)}</p>
+      )}
+
+      {/* 284-03 (S10): said only when the page shows part — otherwise the section is unchanged. */}
+      {state === "ready" && rows.length > 0 && rows.length < total && (
+        <p className="text-xs text-panel-muted-foreground">
+          {`${total.toLocaleString()} tables in this document, showing the first ${rows.length.toLocaleString()}`}
+        </p>
       )}
 
       {state === "ready" &&

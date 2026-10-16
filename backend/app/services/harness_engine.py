@@ -1077,6 +1077,9 @@ async def _run_phase_with_gates(
 
     attempt = 0
     last_output = None
+    # Phase 281 (FIX-09 / D-05): every sealed-shot cause record an emit executor returned
+    # across THIS phase's engine attempts — the composed cause counts model calls (D-25).
+    emit_records: list = []
     # 200 (D-10): bound ONCE here rather than per-attempt, and LAZILY — a top-level
     # import of anything under ``app.services.harness`` runs that package's __init__ →
     # ``phase_types.register_all()`` → imports back from THIS module before the registry
@@ -1084,6 +1087,10 @@ async def _run_phase_with_gates(
     # loaded. The name is needed as an ``except`` clause target, which is why it cannot
     # stay inside the helper that raises it.
     from app.services.harness.human_input import HumanInputTimeout  # noqa: PLC0415
+    # Phase 281: the ONE emit-cause composer and the ONE author-name scrub (D-32), lazy
+    # for the same package cycle.
+    from app.services.harness.emit_cause import compose_emit_failure  # noqa: PLC0415
+    from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
     while True:
         # Execute under the wall-clock cap. A hanging phase fails cleanly at the
         # timeout and drives the SAME on_failure routing as a gate failure (D-12).
@@ -1127,6 +1134,8 @@ async def _run_phase_with_gates(
             # disposition heuristic (skip_to_phase-bearing validator else first).
             return _route_on_failure(phase, gate_error, attempt, failed_idx)
 
+        if isinstance(output, dict):
+            emit_records.extend(output.get("attempt_causes") or [])
         gate = await run_gates(phase, output, ctx, timing="post")
         if gate.passed:
             if validators:
@@ -1148,15 +1157,39 @@ async def _run_phase_with_gates(
 
         # Consecutive-identical short-circuit: re-running produced the SAME output,
         # so retrying cannot help — treat as exhausted (T-091-16, the SC#3 net).
-        identical = output == last_output
+        # Phase 281 (Pitfall 4): compared on a projection that ignores the diagnostic
+        # keys, so the per-invocation cause text never buys an extra (paid) attempt.
+        identical = _attempt_identity(output) == _attempt_identity(last_output)
         last_output = output
+
+        # ── Phase 281 (FIX-09 / D-05) — THE EXECUTOR'S DIAGNOSIS WINS ─────────────
+        # An emit executor that diagnosed its own failure returns ``failure`` plus its
+        # per-shot ``attempt_causes``. The post-gate validator only sees that output's
+        # SHAPE (``no field_map on output`` / a false ``invented=N``) — the least
+        # informative error used to win by being last. The composed cause is used for
+        # the audit/SSE error, the retry feedback (D-26) and the final reason, written
+        # WITHOUT the engine prefix (``reason_is_final``) so one string never carries
+        # two attempt totals (D-25). Every non-diagnosed failure is byte-identical.
+        diagnosed = (
+            isinstance(output, dict)
+            and bool(output.get("failure"))
+            and isinstance(output.get("attempt_causes"), list)
+        )
+        cause = (
+            compose_emit_failure(
+                emit_records, step_name=_clean_label(getattr(phase, "name", None))
+            )
+            or output.get("text")
+            or gate.error_message
+        ) if diagnosed else gate.error_message
 
         await write_audit(
             pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
-            metadata={"phase": phase.slug, "attempt": attempt, "error": gate.error_message},
+            metadata={"phase": phase.slug, "attempt": attempt, "error": cause,
+                      "validator_error": gate.error_message},
         )
         await _emit(redis, stream_run_id, "gate_failed",
-            phase=phase.slug, attempt=attempt, error=gate.error_message,
+            phase=phase.slug, attempt=attempt, error=cause,
         )
 
         exhausted = identical or attempt >= phase_max_retries
@@ -1164,9 +1197,11 @@ async def _run_phase_with_gates(
             attempt += 1
             # PRODUCER side: feed the validator error into the next attempt's prompt
             # (the Plan 03 executors append ctx.retry_feedback). D-08 visible.
+            # Phase 281 (D-26): a DELIBERATE model-input change — the executor's true
+            # cause, not the validator's shape message, is what the model is told.
             try:
                 ctx.retry_feedback = (
-                    f"Previous output failed validation: {gate.error_message}. Fix it."
+                    f"Previous output failed validation: {cause}. Fix it."
                 )
             except (AttributeError, TypeError):
                 pass  # immutable stub ctx in some unit tests
@@ -1180,25 +1215,56 @@ async def _run_phase_with_gates(
         # (byte-identical for every non-ask_user phase).
         _clear_retry_feedback(ctx)
         return await _resolve_failure_with_ask_user(
-            phase, gate.error_message, attempt, failed_idx,
+            phase, cause, attempt, failed_idx,
             run_id=run_id, pool=pool, redis=redis, ctx=ctx,
             _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
             produced_output=output, is_pre=False,
             # Never armed: the checkpoint is hoisted out of ``phase.validators``, so no
             # POST gate can be it (D-187-01).
+            reason_is_final=diagnosed,
         )
 
 
+#: Phase 281 (Pitfall 4): the diagnostic keys an emit failure output carries that differ
+#: between invocations without the attempt being any different.
+_ATTEMPT_DIAGNOSTIC_KEYS = frozenset({"text", "attempt_causes"})
+
+
+def _attempt_identity(output):
+    """What the consecutive-identical short-circuit compares (Phase 281, T-281-05).
+
+    An output carrying ``attempt_causes`` is compared without its ``text`` and
+    ``attempt_causes`` — its per-invocation cause wording and records — so two narrated
+    invocations still exhaust at engine attempt 2. Every other output is compared
+    whole, exactly as before.
+    """
+    return (
+        {k: v for k, v in output.items() if k not in _ATTEMPT_DIAGNOSTIC_KEYS}
+        if isinstance(output, dict) and "attempt_causes" in output
+        else output
+    )
+
+
 def _route_on_failure(
-    phase, error_message: str, attempt: int, failed_idx: int | None = None
+    phase,
+    error_message: str,
+    attempt: int,
+    failed_idx: int | None = None,
+    *,
+    reason_is_final: bool = False,
 ) -> PhaseOutcome:
     """Map an exhausted/timed-out gate failure to a :class:`PhaseOutcome`.
 
     ``failed_idx`` (WR-03) is the index of the validator that failed — both the
     retry bound and this routing disposition derive from that same validator.
+
+    ``reason_is_final`` (Phase 281, D-25): the message is an executor's composed cause,
+    which already names the step and counts its model calls — it is the reason
+    verbatim, never prefixed with the engine's ``Phase N (slug) … attempt(s)`` (two
+    totals in one string). Default False keeps every other caller byte-identical.
     """
     disposition = _parse_on_failure(_failing_on_failure(phase, failed_idx))
-    reason = (
+    reason = error_message if reason_is_final else (
         f"Phase {phase.phase_index + 1} ({phase.slug}) gate failed after "
         f"{attempt + 1} attempt(s): {error_message}"
     )
@@ -1333,6 +1399,7 @@ async def _resolve_failure_with_ask_user(
     produced_output: dict | None = None,
     is_pre: bool = False,
     is_action_risk: bool = False,
+    reason_is_final: bool = False,
 ) -> PhaseOutcome | None:
     """Resolve a failing validator's disposition, pausing for a human choice when
     the disposition is ``ask_user`` (D-11).
@@ -1364,6 +1431,10 @@ async def _resolve_failure_with_ask_user(
     hand an unrelated freshness gate all four. Every non-armed caller leaves it at its
     ``False`` default and every branch below evaluates to exactly the expression that
     shipped.
+
+    ``reason_is_final`` (Phase 281, D-25) — TRUE only when ``error_message`` is an emit
+    executor's composed cause: it is used verbatim as the reason (no ``Phase N (slug)``
+    prefix) on every route. Default False is byte-identical.
     """
     # ── D-187-01 / RESEARCH Pitfall 4 — THE DISPOSITION SHORT-CIRCUIT ────────────
     # An armed checkpoint has NO index into ``phase.validators`` (after the hoist it is
@@ -1378,14 +1449,18 @@ async def _resolve_failure_with_ask_user(
         disp = _parse_on_failure(_failing_on_failure(phase, failed_idx))
         if disp.kind != "ask_user":
             # fail_run / skip_to_phase — the sync mapper handles it byte-identical.
-            return _route_on_failure(phase, error_message, attempt, failed_idx)
+            return _route_on_failure(
+                phase, error_message, attempt, failed_idx, reason_is_final=reason_is_final
+            )
 
     # ── ask_user pause (copy _exec_llm_human_input ordering VERBATIM) ──
     # The pause needs a live redis transport + a run_id channel; without them the
     # disposition cannot pause (a unit/minimal ctx) → fail safe to fail_run, never
     # a hung run.
     if redis is None or run_id is None:
-        return _route_on_failure(phase, error_message, attempt, failed_idx)
+        return _route_on_failure(
+            phase, error_message, attempt, failed_idx, reason_is_final=reason_is_final
+        )
 
     from uuid import uuid4
 
@@ -1522,7 +1597,7 @@ async def _resolve_failure_with_ask_user(
             "for the boot-time resume sweep (096-09 precedent)"
         )
 
-    reason_base = (
+    reason_base = error_message if reason_is_final else (
         f"Phase {phase.phase_index + 1} ({phase.slug}) validation flagged: {error_message}"
     )
 
@@ -2513,7 +2588,22 @@ async def run_workflow(
             # 101.1 review WR-02: persist the FULL failure output (incl. the cited
             # field_map states b/c/d carry) on the phase row — fail_phase merges it
             # under _failure_reason, so the extracted data survives durably (D-08).
-            await fail_phase(pool, phase_id, str(_emit_failure), output=durable_output)
+            # Phase 281 (FIX-09 / D-04 / D-32): the reason is the ONE composed cause
+            # (headed by the author-set name only), never the raw taxonomy code the run
+            # page used to render verbatim; the code stays the fallback and the
+            # transition code below. Lazy imports: the same package cycle as above.
+            from app.services.harness.emit_cause import compose_emit_failure  # noqa: PLC0415
+            from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
+
+            await fail_phase(
+                pool,
+                phase_id,
+                compose_emit_failure(
+                    output.get("attempt_causes") or [],
+                    step_name=_clean_label(getattr(phase, "name", None)),
+                ) or str(_emit_failure),
+                output=durable_output,
+            )
         elif _recorded_intent:
             await record_phase_not_sent(pool, phase_id, durable_output)
         else:

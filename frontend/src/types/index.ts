@@ -729,6 +729,9 @@ export interface DocumentSearchRequest {
     | "name_asc"
   offset: number
   limit: number
+  /** Phase 284 (RESEARCH A6) — the server already accepts this (`models/document_search.py`)
+   *  and defaults it to false; a picker that must offer archived documents passes true. */
+  include_archived?: boolean
 }
 
 /** One Find result row: the full document plus its visible lineage size and whether it has
@@ -777,6 +780,113 @@ export interface DocumentTableRow {
   headers: string[]
   rows: string[][]
   extractor?: string | null
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────────
+// Phase 284 (FIX-11 / D-01, D-02, D-11, D-16, D-17, R-03..R-06, R-08) — the Library-at-scale
+// wire contract. The server envelopes 284-02 / 284-04 build, mirrored name for name. Additive
+// only: nothing above changes shape.
+// ──────────────────────────────────────────────────────────────────────────────────────
+
+/** `GET /documents` query. ⛔ `offset` and `limit` are REQUIRED by type (D-16): a caller
+ *  cannot ask for the whole library by forgetting them. The server caps `limit` at 200. */
+export interface DocumentListParams {
+  offset: number
+  limit: number
+  /** A folder id, `"root"` for documents in no folder, or absent for every folder. */
+  folder_id?: string | "root"
+  /** Server default false (archived rows hidden, Phase 275 D-04). */
+  include_archived?: boolean
+  /** `in_flight` = pending | processing (R-04); `done` = completed | failed (History). */
+  status?: "in_flight" | "completed" | "failed" | "done"
+  /** Default `created_desc`; History asks `updated_desc` (R-08). */
+  order?: "created_desc" | "updated_desc"
+  /** R-05 — only spreadsheet-type documents. */
+  kind?: "spreadsheet"
+}
+
+/** `GET /documents` answer. `total` is the server's exact count — never the page length. */
+export interface DocumentListResponse {
+  documents: Document[]
+  total: number
+  offset: number
+  limit: number
+}
+
+/** One bucket of `LibrarySummary`: the root, or one folder. `count` INCLUDES archived. */
+export interface LibraryCount {
+  count: number
+  size_bytes: number
+  archived: number
+}
+
+/** `GET /library/summary` (D-02 / D-07) — every number the Library shows without listing a
+ *  row. `total`, `root` and `folders` INCLUDE archived documents (today's semantics). */
+export interface LibrarySummary {
+  total: number
+  archived: number
+  chunks: number
+  root: LibraryCount
+  folders: Record<string, LibraryCount>
+  /** `paused` is always 0 — it is not a document status (R-04); kept for wire compatibility. */
+  status: { pending: number; processing: number; paused: number; completed: number; failed: number }
+  /** Processing documents per `ingestion_step`. */
+  steps: Record<string, number>
+  /** In-flight documents whose error mentions a rate limit / 429 / quota. */
+  rate_limited_in_flight: number
+  /** Distinct connections that placed documents, with counts (the Find Added-by options). */
+  connections: Array<{ id: string; name: string | null; count: number }>
+  /** Distinct non-empty `metadata.document_type` values, with counts (the Find type options). */
+  document_types: Array<{ value: string; count: number }>
+  /** True when the server cut `document_types` short. */
+  document_types_truncated: boolean
+}
+
+/** Offset/limit for a per-document page (chunks, tables, images, versions). */
+export interface PageParams {
+  offset: number
+  limit: number
+}
+
+/** `GET /documents/{id}/chunks` answer (default 200, max 500). */
+export interface DocumentChunkPage {
+  chunks: DocumentChunkRow[]
+  total: number
+  offset: number
+  limit: number
+}
+
+/** `GET /documents/{id}/tables` answer (default 50, max 200). */
+export interface DocumentTablePage {
+  tables: DocumentTableRow[]
+  total: number
+  offset: number
+  limit: number
+}
+
+/** `GET /documents/{id}/images` answer (default 100, max 200). */
+export interface DocumentImagePage {
+  images: DocumentImageRow[]
+  total: number
+  offset: number
+  limit: number
+}
+
+/** `GET /documents/{id}/versions` answer (default 50, max 200). */
+export interface DocumentVersionPage {
+  versions: Document[]
+  total: number
+  offset: number
+  limit: number
+}
+
+/** A paged view resolve (`GET /document-views/{id}/resolve` or `POST /document-views/resolve`).
+ *  `count_only` answers `{total}` alone, so every other field is optional. */
+export interface ViewResolvePage {
+  documents?: Document[]
+  total: number
+  offset?: number
+  limit?: number
 }
 
 /** One extracted image.
@@ -1322,15 +1432,19 @@ export type EmitSubStep =
    *  run's model. The ONE member a non-`llm_emit` phase can carry. */
   | "model_fallback"
 
-/** Phase 101.1-04 (GAP-C / D-11) — the 5 distinguishable emit failure states the harness
+/** Phase 101.1-04 (GAP-C / D-11) — the 6 distinguishable emit failure states the harness
  *  streams via `phase_substep` (failure field). Each renders failed-as-failed on the rail
- *  (closed taxonomy + reason_unknown fallback) — never an empty "done" card (RC-4). */
+ *  (closed taxonomy + reason_unknown fallback) — never an empty "done" card (RC-4).
+ *  Phase 281 (2026-10-14, D-30): was 5 — `template_fields_missing` is split from
+ *  `citation_gate_rejected`, so a fill that only left template fields empty no longer reads
+ *  as an uncited or invented value. */
 export type EmitFailure =
   | "model_failed_to_emit"
   | "citation_gate_rejected"
   | "render_failed"
   | "integrity_failed"
   | "no_template_bound"
+  | "template_fields_missing"
 
 export interface Phase {
   slug: string

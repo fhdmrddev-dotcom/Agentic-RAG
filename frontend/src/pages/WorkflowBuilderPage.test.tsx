@@ -48,6 +48,14 @@ vi.mock("@/lib/api", () => ({
 }))
 
 import { WorkflowBuilderPage } from "./WorkflowBuilderPage"
+import { TechnicalNamesProvider, useTechnicalNames } from "@/providers/TechnicalNamesProvider"
+// 281-REVIEW WR-03 — only the TYPED entitlement refusal may render its own words.
+import { EntitlementRefusalError } from "@/lib/api/_core"
+import {
+  REFUSAL_FALLBACK,
+  REFUSAL_FOR_KEY,
+  describeRefusal,
+} from "@/components/workflows/describeRefusalVocabulary"
 
 /** A 3-phase definition the mocked generate returns. */
 const draft3 = {
@@ -211,7 +219,10 @@ describe("WorkflowBuilderPage — single state transition + honest failure", () 
   })
 
   it("ok:false generate → honest error surface, NO phase nodes (no broken draft)", async () => {
-    mockGenerate.mockResolvedValue({ ok: false, error: "could not generate", detail: "model failed twice" })
+    // Phase 281 (D-11/D-12, SEED-221): the refusal now renders through describeRefusalVocabulary;
+    // re-captured on purpose. The mock was a free-text "could not generate" that matched the old
+    // raw print; it is now the REAL server code, and the assertion reads the table's sentence.
+    mockGenerate.mockResolvedValue({ ok: false, error: "could_not_generate", detail: "model failed twice" })
     const { default: userEvent } = await import("@testing-library/user-event")
     const user = userEvent.setup()
     render(<WorkflowBuilderPage />)
@@ -221,7 +232,8 @@ describe("WorkflowBuilderPage — single state transition + honest failure", () 
     // The error surface renders.
     const err = await screen.findByTestId("generate-error")
     expect(err).toBeInTheDocument()
-    expect(within(err).getByText(/could not generate/i)).toBeInTheDocument()
+    expect(within(err).getByText(REFUSAL_FOR_KEY.could_not_generate.sentence)).toBeInTheDocument()
+    expect(err.textContent ?? "").not.toContain("could_not_generate")
     // And NO phase nodes / graph render (never a partial draft).
     expect(screen.queryByTestId("spine-node-gather")).not.toBeInTheDocument()
     // ⚠ RE-POINTED BY 200-05 (BS-MNR-01) — same reason as the two probes above.
@@ -342,5 +354,139 @@ describe("WorkflowBuilderPage — fresh build Save (no initial) creates ONCE the
       expect(mockUpdate).toHaveBeenCalledWith("created-1", expect.anything(), "tok-from-create"),
     )
     expect(mockCreate).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 281 (FIX-10, D-11/D-12/D-24, SEED-221) — THE REFUSAL REACHES THE SCREEN AS A SENTENCE
+//
+// Before 281 the error block printed the server's code after a dash. These cases drive the
+// rendered block and read its WORDS: with technical names OFF the sentence and the next step are
+// there and the code, the sub-reason and the slug-bearing detail are NOT; with the reveal ON the
+// code appears, small and in mono, beside a sentence that did not go anywhere. Every expected
+// word is read off `describeRefusalVocabulary`, never retyped.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+/** Flips the app-wide reveal through its REAL accessor (the ProblemsTray.test.tsx idiom). */
+function RevealToggle() {
+  const { toggle } = useTechnicalNames()
+  return (
+    <button type="button" data-testid="reveal-toggle" onClick={toggle}>
+      technical names
+    </button>
+  )
+}
+
+const NO_SERVICE_DETAIL =
+  "phase 'tell-the-team' acts outside the app, but no connected service was chosen for this workflow."
+
+async function draftAndRefuse(withReveal: boolean) {
+  const { default: userEvent } = await import("@testing-library/user-event")
+  const user = userEvent.setup()
+  render(
+    withReveal ? (
+      <TechnicalNamesProvider>
+        <RevealToggle />
+        <WorkflowBuilderPage />
+      </TechnicalNamesProvider>
+    ) : (
+      <WorkflowBuilderPage />
+    ),
+  )
+  await user.type(screen.getByRole("textbox"), "tell the team every Monday")
+  await user.click(screen.getByRole("button", { name: /draft/i }))
+  return { user, err: await screen.findByTestId("generate-error") }
+}
+
+describe("281 (FIX-10) — a describe refusal renders as one sentence and one next step", () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it("technical names OFF: the sentence and next step show; the code, sub-reason and slug do not", async () => {
+    mockGenerate.mockResolvedValue({
+      ok: false,
+      error: "connection_not_allowed",
+      reason_code: "no_service_chosen",
+      detail: NO_SERVICE_DETAIL,
+    })
+    const { err } = await draftAndRefuse(false)
+    const words = REFUSAL_FOR_KEY["connection_not_allowed:no_service_chosen"]
+    const text = err.textContent ?? ""
+    expect(text).toContain(words.sentence)
+    expect(text).toContain(words.next)
+    expect(text).toContain("Nothing was saved.")
+    for (const hidden of ["connection_not_allowed", "no_service_chosen", "tell-the-team", "Couldn't generate —"]) {
+      expect(text, hidden).not.toContain(hidden)
+    }
+    expect(err.querySelector(".font-mono")).toBeNull()
+  })
+
+  it("technical names ON: the code shows small in mono beside the sentence, with the server detail", async () => {
+    mockGenerate.mockResolvedValue({
+      ok: false,
+      error: "connection_not_allowed",
+      reason_code: "no_service_chosen",
+      detail: NO_SERVICE_DETAIL,
+    })
+    const { user, err } = await draftAndRefuse(true)
+    expect(err.textContent ?? "").not.toContain("connection_not_allowed")
+    await user.click(screen.getByTestId("reveal-toggle"))
+    const block = screen.getByTestId("generate-error")
+    const mono = block.querySelector(".font-mono")
+    expect(mono).not.toBeNull()
+    const expected = describeRefusal("connection_not_allowed:no_service_chosen", NO_SERVICE_DETAIL)
+    expect(mono!.textContent ?? "").toContain(expected.technical!)
+    expect(mono!.textContent ?? "").toContain(NO_SERVICE_DETAIL)
+    // The reveal ADDS the technical name; the sentence is still there.
+    expect(block.textContent ?? "").toContain(expected.sentence)
+  })
+
+  it("an unknown code renders the fallback sentence, never the code", async () => {
+    mockGenerate.mockResolvedValue({ ok: false, error: "totally_new_code", detail: "server words" })
+    const { err } = await draftAndRefuse(false)
+    const text = err.textContent ?? ""
+    expect(text).toContain(REFUSAL_FALLBACK.sentence)
+    expect(text).toContain(REFUSAL_FALLBACK.next)
+    expect(text).not.toContain("totally_new_code")
+    expect(text).not.toContain("server words")
+  })
+
+  it("a thrown request carrying a server sentence renders that sentence as is (D-24 catch arm)", async () => {
+    const ENTITLEMENT = "Your plan doesn't include workflows. It is part of the Team plan."
+    // 281-REVIEW WR-03: the server-worded sentence now arrives as a TYPED signal.
+    mockGenerate.mockRejectedValue(new EntitlementRefusalError(ENTITLEMENT))
+    const { err } = await draftAndRefuse(false)
+    expect(err.querySelector("p.font-medium")?.textContent).toBe(ENTITLEMENT)
+    expect(err.textContent ?? "").not.toContain("request_failed")
+  })
+
+  // 281-REVIEW WR-03 — any OTHER thrown text is machine-flavoured: it never becomes the
+  // author's sentence. The table's request-failed words render; the raw text is reveal-only.
+  it.each([
+    ["a network error", () => new TypeError("Failed to fetch"), "Failed to fetch"],
+    [
+      "a non-entitlement status",
+      () => new Error("Failed to generate workflow (status 502)"),
+      "Failed to generate workflow (status 502)",
+    ],
+  ])("281-REVIEW WR-03: %s reads the table's sentence + next step, never the raw text", async (_l, make, raw) => {
+    mockGenerate.mockRejectedValue(make())
+    const { err } = await draftAndRefuse(false)
+    const text = err.textContent ?? ""
+    expect(err.querySelector("p.font-medium")?.textContent).toBe(REFUSAL_FALLBACK.sentence)
+    expect(text).toContain(REFUSAL_FALLBACK.next)
+    expect(text).not.toContain(raw)
+    expect(err.querySelector(".font-mono")).toBeNull()
+  })
+
+  it("281-REVIEW WR-03: with technical names ON the raw thrown text shows small, beside the sentence", async () => {
+    mockGenerate.mockRejectedValue(new TypeError("Failed to fetch"))
+    const { user, err } = await draftAndRefuse(true)
+    expect(err.textContent ?? "").not.toContain("Failed to fetch")
+    await user.click(screen.getByTestId("reveal-toggle"))
+    const block = screen.getByTestId("generate-error")
+    expect(block.querySelector(".font-mono")?.textContent ?? "").toContain("Failed to fetch")
+    expect(block.querySelector("p.font-medium")?.textContent).toBe(REFUSAL_FALLBACK.sentence)
   })
 })

@@ -4,10 +4,10 @@ title: Both watch purge paths delete the document rows but never remove the stor
 reported: 2026-10-12
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed   # closed 2026-10-14 by Phase 280 plan 04 on live evidence
 affected_areas: [backend/watch, backend/connectors, storage, data-protection]
-folded_into: null
-verified_closed_by: null
+folded_into: "280"
+verified_closed_by: "280 (d1d9747b7 — 280-LIVE-EVIDENCE.md SC#3)"
 related_seeds: [SEED-210, SEED-072]
 re_open_trigger: null
 reproduces_on:
@@ -86,3 +86,7 @@ could be refused by a hold), and pin it with a source fence like
 - `backend/app/api/sources.py:328-344`, `:474-489`
 - `.planning/phases/275-retention-legal-hold/275-02-SUMMARY.md:194`, `:210`
 - `backend/app/api/documents.py:1868`, `:1883` (the ordering the fix should copy)
+
+## Closed 2026-10-14 (Phase 280, plan 04)
+
+Both watch purge doors now go through `document_purge.purge_documents` (hold check, then rows, then bytes; fix `d1d9747b7`, extraction `663511155`). Live, per path: `test_280_purge_bytes_live.py` showed each purged document's `storage.objects` row go 1 -> 0 on door 1 and door 2, a held document refuse with 409 and keep its row and object on both doors, and a planted no-op bytes step leave a visible orphan (the check can fail). Evidence: `.planning/phases/280-in-once-out-clean/280-LIVE-EVIDENCE.md` SC#3.

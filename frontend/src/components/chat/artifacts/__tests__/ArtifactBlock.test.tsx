@@ -13,7 +13,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 import { ArtifactBlock } from "../ArtifactBlock"
 import { ARTIFACT_COMPONENTS, lazyChartFrom, rendererFor } from "../artifactRegistry"
 import { ArtifactErrorBoundary } from "../ArtifactErrorBoundary"
-import { chartBar, table16, metricWithDelta, missing, mutable } from "./fixtures"
+import { chartBar, table16, metricWithDelta, missing, mutable, clone } from "./fixtures"
 
 const flags = vi.hoisted(() => ({ throwTable: false }))
 
@@ -183,5 +183,45 @@ describe("ArtifactBlock", () => {
     )
     assertNoSpecLeak(container.textContent ?? "")
     expect(container.textContent).not.toContain("dynamically")
+  })
+})
+
+/**
+ * Phase 280 (DEBT-08 / D-06 / D-07, SC#5's failure mode) — retention KEEPS chat artifacts.
+ *
+ * Retention may delete the document a chart was built from; the artifact row stays (it is a
+ * conversation record, immutable, with no document_id). The failure this pins is "says keep, and the
+ * artifact then renders a broken reference with no explanation". Decision record:
+ * docs/RETENTION-AND-ARTIFACTS.md.
+ *
+ * ⚠ 280-REVIEW IN-06 — WHAT THIS CAN AND CANNOT SEE, stated rather than implied. The client holds no
+ *   signal that a source was disposed, so there is no "disposed" record to build: the fixture below is
+ *   an ORDINARY artifact whose caption names `contract.pdf` (it used to be called `disposed`, which
+ *   claimed a distinction the test cannot draw). What it pins is the property that makes disposal
+ *   harmless for EVERY artifact: the source is plain caption text and nothing in the block is a link,
+ *   so nothing can render as a broken reference. If a future caption ever links its source, this test
+ *   is where that change must answer for a disposed document.
+ *   The caption is asserted in pieces, not as one string glued across adjacent text nodes, so markup
+ *   that is irrelevant to D-06 (the label chip sitting beside "Data:") cannot break it.
+ */
+describe("an artifact's source is plain text, so a disposed source cannot break it (DEBT-08)", () => {
+  it("names the source file as caption text and renders no link anywhere in the block", () => {
+    const sourceNamedArtifact = {
+      ...clone(table16),
+      id: "a_r7t280d0c8",
+      caption: {
+        row_count: 16,
+        sources: [{ tool: "query_tables", document: "contract.pdf", page: null }],
+        source_count: 1,
+        lineage: null,
+      },
+    }
+    render(<ArtifactBlock artifacts={[sourceNamedArtifact]} />)
+    const figure = screen.getByTestId("artifact-block")
+    const caption = within(figure).getByTestId("artifact-caption")
+    expect(caption).toHaveTextContent(/Data: query_tables · contract.pdf · 16 rows/)
+    expect(within(figure).getByTestId("artifact-label-chip")).toHaveTextContent("table 1")
+    expect(within(figure).queryByRole("link")).toBeNull()
+    expect(figure.querySelector("a")).toBeNull()
   })
 })

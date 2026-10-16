@@ -33,6 +33,8 @@ import asyncpg
 import pytest
 import pytest_asyncio
 
+from tests.integration._284_route_users import RouteUsers, as_user
+
 
 _POSTGRES_TEST_DSN = os.environ.get(
     "POSTGRES_DSN",
@@ -142,27 +144,20 @@ async def pg_pool():
 
 @pytest_asyncio.fixture
 async def test_user(pg_pool):
-    """Throwaway auth.users row; FK-safe teardown (docs + folders + views + audit + user)."""
-    user_id = uuid4()
+    """A REAL signed-in user (GoTrue); FK-safe teardown (docs + folders + views + audit + user + org).
+
+    284-04 (D-10 / R-02): the resolve route reads ``library_documents`` through the CALLER's JWT,
+    and a service-role caller reads 0 rows from it (fail-closed), so the route is driven with
+    ``as_user(test_user)``. ``other_user`` only OWNS rows, so it stays a plain seeded user.
+    """
+    users = RouteUsers(pg_pool)
     try:
-        await pg_pool.execute(
-            "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
-            user_id, f"phase-114-count-{user_id}@test.local",
-        )
+        user_id = await users.create("114-count")
     except Exception as e:
+        await users.drop_all()
         pytest.skip(f"test_user fixture setup failed: {type(e).__name__}: {e}")
     yield user_id
-    for sql in (
-        ("DELETE FROM public.documents WHERE user_id = $1", user_id),
-        ("DELETE FROM public.document_views WHERE user_id = $1", user_id),
-        ("DELETE FROM public.folders WHERE user_id = $1", user_id),
-        ("DELETE FROM audit_log WHERE user_id = $1", user_id),
-        ("DELETE FROM auth.users WHERE id = $1", user_id),
-    ):
-        try:
-            await pg_pool.execute(*sql)
-        except Exception:
-            pass
+    await users.drop_all()
 
 
 @pytest_asyncio.fixture
@@ -241,8 +236,8 @@ async def test_count_only_equals_full_resolve_length(pg_pool, test_user):
         body=ViewCreate(name="English", filter_expr=_filter_eq("language", "en")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    full = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
-    count = await resolve_view(view_id=str(view["id"]), count_only=True, current_user={"id": str(test_user)}, supabase=sb)
+    full = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
+    count = await resolve_view(view_id=str(view["id"]), count_only=True, current_user={"id": str(test_user)}, supabase=as_user(test_user))
 
     assert "documents" not in count, "count_only must NOT materialize full rows"
     assert count["total"] == len(full["documents"]) == full["total"] == 3, \
@@ -267,8 +262,8 @@ async def test_count_only_empty_filter_counts_full_visible_set(pg_pool, test_use
         body=ViewCreate(name="All", filter_expr=_empty_filter()),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    full = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
-    count = await resolve_view(view_id=str(view["id"]), count_only=True, current_user={"id": str(test_user)}, supabase=sb)
+    full = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
+    count = await resolve_view(view_id=str(view["id"]), count_only=True, current_user={"id": str(test_user)}, supabase=as_user(test_user))
 
     assert count["total"] == len(full["documents"]), "empty filter counts the full visible set"
     assert count["total"] >= 4
@@ -304,8 +299,8 @@ async def test_count_only_own_global_overlap_deduped(pg_pool, test_user, other_u
         body=ViewCreate(name="English", filter_expr=_filter_eq("language", "en")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    full = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
-    count = await resolve_view(view_id=str(view["id"]), count_only=True, current_user={"id": str(test_user)}, supabase=sb)
+    full = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
+    count = await resolve_view(view_id=str(view["id"]), count_only=True, current_user={"id": str(test_user)}, supabase=as_user(test_user))
 
     ids = [d["id"] for d in full["documents"]]
     assert ids.count(str(overlap_doc)) == 1, "the overlap doc appears ONCE in full resolve (dedupe)"
@@ -334,7 +329,7 @@ async def test_count_only_leak_safe_from_caller(pg_pool, test_user, other_user):
         body=ViewCreate(name="English", filter_expr=_filter_eq("language", "en")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    count = await resolve_view(view_id=str(view["id"]), count_only=True, current_user={"id": str(test_user)}, supabase=sb)
+    count = await resolve_view(view_id=str(view["id"]), count_only=True, current_user={"id": str(test_user)}, supabase=as_user(test_user))
     # Only test_user's own doc is counted — other_user's private docs are invisible.
     assert count["total"] == 1, "count is caller-scoped — never counts another user's docs (VIEW-06)"
 
@@ -364,6 +359,6 @@ async def test_count_only_typed_leg_equals_full(pg_pool, test_user):
         body=ViewCreate(name="Invoices", filter_expr=_filter_eq("document_type", "Invoice")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
-    full = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
-    count = await resolve_view(view_id=str(view["id"]), count_only=True, current_user={"id": str(test_user)}, supabase=sb)
+    full = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
+    count = await resolve_view(view_id=str(view["id"]), count_only=True, current_user={"id": str(test_user)}, supabase=as_user(test_user))
     assert count["total"] == len(full["documents"]) == 2

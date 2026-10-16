@@ -82,6 +82,26 @@ _SELF_HOSTED_PROVIDERS: dict[str, dict[str, object]] = {
     "custom":   {"url_field": "custom_base_url",   "key_field": "custom_api_key",   "append_v1": False, "dummy_key": "not-needed"},
 }
 
+# Phase 282 (D-03 as ratified by D-19, BUG-260916-01 §2) — how many times a provider SDK retries
+# one LLM call, chosen ON PURPOSE per provider class instead of inherited from the SDK (2).
+#   * Self-hosted → 0. A local model that timed out is busy, not flaky: a retry re-queues the SAME
+#     prompt on the SAME GPU and multiplies the operator's wait by up to 3.
+#   * Cloud → 2. The app's own retry (agent_loop's provider-error retry) covers only 502/503/529
+#     and "upstream" messages, NOT 429/500/504/connection errors/timeouts, so the SDK's short
+#     retries are the only ones those failures get. Stacking on 502/503/529 is bounded (they fail
+#     fast) and accepted.
+# Google is built with an explicit single attempt in google_service._google_client.
+LLM_MAX_RETRIES_SELF_HOSTED: int = 0
+LLM_MAX_RETRIES_CLOUD: int = 2
+
+
+def llm_max_retries_for(provider: str | None) -> int:
+    """The SDK ``max_retries`` for a provider — read from ``_SELF_HOSTED_PROVIDERS``, the ONE
+    self-hosted predicate (mig 180). Never a second list of names."""
+    if (provider or "").lower() in _SELF_HOSTED_PROVIDERS:
+        return LLM_MAX_RETRIES_SELF_HOSTED
+    return LLM_MAX_RETRIES_CLOUD
+
 
 def resolve_self_hosted_base_url(provider: str, raw: str) -> str:
     """Turn a STORED self-hosted base_url into the URL the OpenAI client is given.
@@ -741,13 +761,51 @@ def get_model_capability(
 # genuinely hung streams.
 DEFAULT_LLM_CALL_TIMEOUT_SECONDS: int = 300
 
+# Phase 282 D-27: the unknown-model fallback for a SELF-HOSTED provider (mig 180's
+# `_SELF_HOSTED_PROVIDERS`). Local models are slower: G-4 row 4 measured an LM Studio model the
+# Registry had never seen running at the 300 s cloud default with no hint on screen. A stored,
+# env or registered value still wins; this only replaces the last-resort number.
+DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED: int = 900
+
 # T-066-05 mitigation: lower / upper bounds for the
-# LLM_CALL_TIMEOUT_OVERRIDES env-var parser. Operator misconfiguration
-# to 0 / negative integer would cause the per-call timer to fire
-# instantly, making all runs `timed_out` (DoS). 3600s upper bound is a
-# soft sanity cap.
+# LLM_CALL_TIMEOUT_OVERRIDES env-var parser, the Model Registry PATCH and the
+# resolver's DB tier. Operator misconfiguration to 0 / negative integer would
+# cause the per-call timer to fire instantly, making all runs `timed_out` (DoS).
+#
+# Phase 282 D-21: the upper bound is 1800, not 3600, because 3600 could not be
+# honoured. The run watchdog (`run_stale_sweep_timeout_seconds`, 2400 s) ends a
+# run whose stream has been silent that long, and nothing writes while a model
+# call is silent — so a 3000 s setting was accepted and then killed at 2400 s
+# with no word about why. 1800 leaves the watchdog's tick of margin; a boot check
+# (`_validate_llm_timeout_ceiling_vs_watchdog`) keeps the two apart. Measured live
+# rows at the change: local max 900, production max 1200 — nothing above 1800.
+# The frontend mirror (`admin.ts` MODEL_CAP_INT_BOUNDS) is the only other copy.
 _LLM_CALL_TIMEOUT_MIN_S: int = 1
-_LLM_CALL_TIMEOUT_MAX_S: int = 3600
+_LLM_CALL_TIMEOUT_MAX_S: int = 1800
+
+# Phase 282 D-02: `connect` stays short while read/write/pool equal the budget.
+# 5.0 s is both SDKs' shipped connect default, so the no-budget path is
+# value-identical to what every client had by omission.
+LLM_CONNECT_TIMEOUT_S: float = 5.0
+
+# Phase 282 D-03 / D-23: callers with NO per-model budget (get_llm_client /
+# get_embedding_client called without one) get today's effective SDK values,
+# made explicit and named instead of inherited by omission.
+NO_BUDGET_LLM_TIMEOUT_S: float = 600.0
+NO_BUDGET_LLM_MAX_RETRIES: int = 2
+
+
+def llm_call_timeout_ceiling_reason(settings_obj: "Settings | None" = None) -> str:
+    """Why the timeout ceiling is where it is, in operator words (Phase 282 D-07 / D-21).
+
+    The watchdog's seconds are READ from the setting, never typed — so the Model Registry's
+    refusal can never quote a number the platform no longer uses.
+    """
+    s = settings_obj or settings
+    return (
+        "a longer call would outlast the run watchdog, which ends a run that has been "
+        f"silent for {s.run_stale_sweep_timeout_seconds} s"
+    )
 
 # WR-02 (Phase 145 review): the minimum periodic stale-sweep tick. A near-zero
 # interval (an operator env typo like RUN_STALE_SWEEP_INTERVAL_SECONDS=0) would spin
@@ -756,7 +814,17 @@ _LLM_CALL_TIMEOUT_MAX_S: int = 3600
 _RUN_STALE_SWEEP_INTERVAL_MIN_S: int = 5
 
 
-def get_per_call_timeout(model_id: str, settings_obj: "Settings | None" = None) -> int:
+def _default_llm_call_timeout(provider: str | None) -> int:
+    """Phase 282 D-27: the last-resort timeout, chosen by provider class from the ONE self-hosted
+    predicate (mig 180). Never a second list of names."""
+    if (provider or "").lower() in _SELF_HOSTED_PROVIDERS:
+        return DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED
+    return DEFAULT_LLM_CALL_TIMEOUT_SECONDS
+
+
+def get_per_call_timeout(
+    model_id: str, settings_obj: "Settings | None" = None, *, provider: str | None = None
+) -> int:
     """Resolve the per-LLM-call deadline (seconds) for a given model.
 
     Phase 066 D-066-03. Lookup precedence:
@@ -784,8 +852,8 @@ def get_per_call_timeout(model_id: str, settings_obj: "Settings | None" = None) 
     if "llm_call_timeout_seconds" in cap:
         return cap["llm_call_timeout_seconds"]  # type: ignore[typeddict-item]
 
-    # 3. Unknown-model fallback
-    return DEFAULT_LLM_CALL_TIMEOUT_SECONDS
+    # 3. Unknown-model fallback (Phase 282 D-27: 900 s for a self-hosted provider)
+    return _default_llm_call_timeout(provider or cap.get("provider"))
 
 
 def _parse_llm_call_timeout_overrides(raw: str) -> dict[str, int]:
@@ -797,7 +865,9 @@ def _parse_llm_call_timeout_overrides(raw: str) -> dict[str, int]:
     ``minimax/minimax-m2.5:free``).
 
     T-066-05 mitigation: every value is integer-coerced and bounded to
-    ``[1, 3600]``. Out-of-range values are dropped with a logged warning.
+    ``[_LLM_CALL_TIMEOUT_MIN_S, _LLM_CALL_TIMEOUT_MAX_S]`` (1..1800 since Phase 282 D-21).
+    Values below the minimum are dropped and values above the maximum are clamped to it
+    (282-REVIEW WR-04, matching the DB tier), each with a logged warning.
     """
     out: dict[str, int] = {}
     if not raw or not raw.strip():
@@ -817,13 +887,21 @@ def _parse_llm_call_timeout_overrides(raw: str) -> dict[str, int]:
                 model_id, val_str,
             )
             continue
-        if val < _LLM_CALL_TIMEOUT_MIN_S or val > _LLM_CALL_TIMEOUT_MAX_S:
+        if val < _LLM_CALL_TIMEOUT_MIN_S:
             logger.warning(
                 "LLM_CALL_TIMEOUT_OVERRIDES: ignoring out-of-range value for %r: %d "
                 "(must be in [%d, %d])",
                 model_id, val, _LLM_CALL_TIMEOUT_MIN_S, _LLM_CALL_TIMEOUT_MAX_S,
             )
             continue
+        if val > _LLM_CALL_TIMEOUT_MAX_S:
+            # 282-REVIEW WR-04: clamp, as the DB tier does (D-08) — the operator chose a long
+            # timeout, so the nearest legal one honours it. Dropping it fell back to 300/900 s.
+            logger.warning(
+                "LLM_CALL_TIMEOUT_OVERRIDES: %r=%d exceeds %d; using %d",
+                model_id, val, _LLM_CALL_TIMEOUT_MAX_S, _LLM_CALL_TIMEOUT_MAX_S,
+            )
+            val = _LLM_CALL_TIMEOUT_MAX_S
         if val < 30:
             logger.warning(
                 "LLM_CALL_TIMEOUT_OVERRIDES: tight per-call budget for %r: %ds "
@@ -837,7 +915,7 @@ def _parse_llm_call_timeout_overrides(raw: str) -> dict[str, int]:
 # ── Phase 081.1: Async 4-tier resolution (DB > env CSV > static > default) ──
 
 async def get_per_call_timeout_async(
-    model_id: str, settings_obj: "Settings | None" = None
+    model_id: str, settings_obj: "Settings | None" = None, *, provider: str | None = None
 ) -> int:
     """Async counterpart of :func:`get_per_call_timeout` with DB tier (D-11/D-12).
 
@@ -845,17 +923,33 @@ async def get_per_call_timeout_async(
       1. DB ``model_capabilities_overrides`` row ``llm_call_timeout_seconds``
       2. Env ``LLM_CALL_TIMEOUT_OVERRIDES`` CSV (same as sync tier 1)
       3. Static ``MODEL_CAPABILITIES`` dict (same as sync tier 2)
-      4. ``DEFAULT_LLM_CALL_TIMEOUT_SECONDS`` (300s)
+      4. ``DEFAULT_LLM_CALL_TIMEOUT_SECONDS`` (300s), or 900 s for a self-hosted provider
+         (Phase 282 D-27) — the ``provider`` kwarg, else the DB row's, else the registered one.
     """
     # Tier 1 — DB overrides
     from app.models.user_settings import _load_model_overrides  # lazy import
+    _row_provider: str | None = None
     try:
         db_overrides = await _load_model_overrides()
         db_cap = db_overrides.get(model_id)
         if db_cap is not None:
+            _row_provider = db_cap.get("provider")
             db_timeout = db_cap.get("llm_call_timeout_seconds")
             if db_timeout is not None:
-                return int(db_timeout)
+                # Phase 282 D-08: the stored value gets the SAME bound the PATCH and the env
+                # parser enforce. A row written before the bound existed is clamped (not
+                # dropped — the operator chose a long/short timeout, so the nearest legal one
+                # honours that) and logged so the drift is visible.
+                raw_timeout = int(db_timeout)
+                clamped = min(max(raw_timeout, _LLM_CALL_TIMEOUT_MIN_S), _LLM_CALL_TIMEOUT_MAX_S)
+                if clamped != raw_timeout:
+                    logger.warning(
+                        "get_per_call_timeout_async: stored llm_call_timeout_seconds=%s for "
+                        "model_id=%s is outside [%d, %d]; using %d",
+                        raw_timeout, model_id,
+                        _LLM_CALL_TIMEOUT_MIN_S, _LLM_CALL_TIMEOUT_MAX_S, clamped,
+                    )
+                return clamped
     except Exception:
         logger.warning(
             "get_per_call_timeout_async: DB tier failed for model_id=%s; falling through",
@@ -876,8 +970,8 @@ async def get_per_call_timeout_async(
     if "llm_call_timeout_seconds" in cap:
         return cap["llm_call_timeout_seconds"]  # type: ignore[typeddict-item]
 
-    # Tier 4 — Default
-    return DEFAULT_LLM_CALL_TIMEOUT_SECONDS
+    # Tier 4 — Default (Phase 282 D-27: 900 s for a self-hosted provider)
+    return _default_llm_call_timeout(provider or _row_provider or cap.get("provider"))
 
 
 async def get_model_capability_async(
@@ -1249,7 +1343,8 @@ class Settings(BaseSettings):
     # Phase 066 D-066-03: optional per-model per-LLM-call timeout overrides.
     # Syntax: model-id=seconds,model-id=seconds (rsplit on '=' handles model
     # ids containing ':' like ``minimax/minimax-m2.5:free``). Bounded to
-    # [1, 3600]. Mirrors MODEL_CONTEXT_LIMITS / MODEL_OUTPUT_LIMITS pattern.
+    # [1, 1800] (_LLM_CALL_TIMEOUT_MAX_S, Phase 282 D-21). Mirrors the
+    # MODEL_CONTEXT_LIMITS / MODEL_OUTPUT_LIMITS pattern.
     # Example: LLM_CALL_TIMEOUT_OVERRIDES=claude-opus-4-7=900,gpt-5.4=300
     llm_call_timeout_overrides: str = ""
 
@@ -1315,6 +1410,10 @@ class Settings(BaseSettings):
     # task_per_run_concurrency: asyncio.Semaphore size per top-level run (in-process).
     # task_global_concurrency: Redis tasks:global:active counter cap (cross-worker).
     ask_user_max_timeout_seconds: int = 1800
+    # BUG-261015-03: the floor on a model-chosen wait. timeout_seconds is REQUIRED in the strict
+    # schema, so models must pick a value, and without a floor they picked ~60 s and the question
+    # expired before a person could answer. Equal to the null default (300 s).
+    ask_user_min_timeout_seconds: int = 300
     task_max_steps: int = 10
     task_per_run_concurrency: int = 3
     task_global_concurrency: int = 20
@@ -1463,6 +1562,24 @@ class Settings(BaseSettings):
                 "must be >= ask_user_max_timeout_seconds "
                 f"({self.ask_user_max_timeout_seconds}) — a lower threshold would "
                 "false-kill a legitimately-waiting ask_user run (D-145-07)."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_llm_timeout_ceiling_vs_watchdog(self) -> "Settings":
+        """Phase 282 D-21 — the run watchdog must outlast the longest LLM call the Model
+        Registry accepts, plus one sweep tick. Otherwise an operator can save a timeout the
+        platform cannot honour: a silent call of that length writes nothing to the run's
+        stream, and the watchdog ends the run as dead before the call's own timeout fires.
+        """
+        floor = _LLM_CALL_TIMEOUT_MAX_S + self.run_stale_sweep_interval_seconds
+        if self.run_stale_sweep_timeout_seconds <= floor:
+            raise ValueError(
+                f"run_stale_sweep_timeout_seconds ({self.run_stale_sweep_timeout_seconds}) "
+                f"must be greater than the LLM call timeout maximum ({_LLM_CALL_TIMEOUT_MAX_S}) "
+                f"plus run_stale_sweep_interval_seconds ({self.run_stale_sweep_interval_seconds}) "
+                f"= {floor} — a lower watchdog would end a run while a model call that the "
+                "Model Registry allows is still legitimately silent (Phase 282 D-21)."
             )
         return self
 

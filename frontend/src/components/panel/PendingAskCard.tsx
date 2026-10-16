@@ -33,7 +33,7 @@
  * not active" answer) flips the card to the expired state with a visible
  * constant message; other failures show a retryable error line — never silence.
  */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { cn } from "@/lib/utils"
 // ── Phase 214-11 Task 2 (STEP-04 / D-214-16) — the shared identity element, the FIFTH surface.
 // It takes props; this card resolves nothing and reaches for no connection list.
@@ -51,6 +51,9 @@ import {
 // Phase 244-15 (G-8): the STORE, deliberately — not a provider hook. See `settleAnswered`
 // in `PendingAskStack` for the measured reason (eight suites mock the provider module).
 import { useStreamsStore } from "@/stores/streamsStore"
+// Phase 282-02 (FIX-07 / D-12): the ONE draft home. A plain module, not a provider hook, so the
+// eight suites that mock `@/providers/StreamsProvider` with an allow-list are unaffected.
+import { useAskDraft, useAskDraftStore, useAskSettled, usePanelHomeMounted } from "@/stores/askDraftStore"
 import { answerAskUser, ApiError } from "@/lib/api"
 import type { PendingAsk } from "@/types"
 import {
@@ -269,6 +272,13 @@ interface PendingAskCardProps {
    * and `StepIdentity` knows about the map.
    */
   shape?: StepIdentityProps["shape"]
+  /**
+   * Phase 282-02 (D-10 / D-14) — which `PendingAskStack` home rendered this card. It is written
+   * onto the pending root as `data-ask-home` beside `data-ask-card={tool_call_id}`, so the chat
+   * pointer's `Answer in panel →` can find the PANEL card for its ask. Omitted (no attribute) for
+   * a direct mount such as WorkflowRunPage's.
+   */
+  home?: "chat" | "panel"
 }
 
 type CardState = "pending" | "answered" | "expired"
@@ -281,6 +291,7 @@ export function PendingAskCard({
   action = null,
   service = null,
   shape,
+  home,
 }: PendingAskCardProps) {
   const { tool_call_id, prompt, timeout_seconds, run_id, draft } = ask
   // ask_user with no choices → backend stores options=null (free-text path).
@@ -288,8 +299,17 @@ export function PendingAskCard({
   // crashed the whole panel — there is no error boundary). See BUG-260529-03.
   const options = ask.options ?? []
 
-  const [choiceIndex, setChoiceIndex] = useState<number | null>(null)
-  const [freeText, setFreeText] = useState("")
+  // ── Phase 282-02 (FIX-07 / D-12) — the draft is READ, not owned. ──
+  // It used to be two `useState`s here, so the chat card and the panel card for ONE pause held
+  // two drafts that disagreed (BUG-260918-01 B). Now every rendering reads the one draft keyed by
+  // `tool_call_id`; the two setters keep their old names so every downstream read is unchanged.
+  const { choiceIndex, freeText } = useAskDraft(tool_call_id)
+  const setChoice = useAskDraftStore((s) => s.setChoice)
+  const setFreeTextAction = useAskDraftStore((s) => s.setFreeText)
+  const markSettled = useAskDraftStore((s) => s.markSettled)
+  const setChoiceIndex = (i: number | null) => setChoice(tool_call_id, i)
+  const setFreeText = (t: string) => setFreeTextAction(tool_call_id, t)
+  const chipRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [state, setState] = useState<CardState>("pending")
   const [submitting, setSubmitting] = useState(false)
   const [answeredValue, setAnsweredValue] = useState<string>("")
@@ -330,11 +350,13 @@ export function PendingAskCard({
     if (state !== "pending") return
     if (remaining <= 0) {
       setState("expired")
+      // 282-02 (D-12): the draft dies with the ask, and the pointer learns it is settled.
+      markSettled(tool_call_id)
       return
     }
     const t = setTimeout(() => setRemaining((r) => r - 1), 1000)
     return () => clearTimeout(t)
-  }, [remaining, state, hasDeadline])
+  }, [remaining, state, hasDeadline, markSettled, tool_call_id])
 
   // A2 / Pitfall 1: a pure-SSE prompt lacks run_id. Trigger ONE reconcile on
   // mount-if-missing so the GET-reconciled prompt (carrying run_id) replaces it
@@ -377,6 +399,8 @@ export function PendingAskCard({
       // removes the prompt from the store, reactively unmounting this card.
       setAnsweredValue(valueForDisplay)
       setState("answered")
+      // 282-02 (D-12): SUCCESS ONLY — clear the one draft and record the settle in one write.
+      markSettled(tool_call_id)
       // ── Phase 244-15 (G-8) — SUCCESS ONLY, and after the optimistic flip. ──────────
       //
       // The comment two lines up describes the SSE path and is still true THERE. On the
@@ -407,6 +431,7 @@ export function PendingAskCard({
         // the calm expired state instead of a dead-but-submittable card.
         setExpiredMessage("This prompt has expired — the run is no longer active")
         setState("expired")
+        markSettled(tool_call_id)
       } else if (status === 409) {
         // ⚠ THE RUN IS OVER, AND THE SERVER IS THE ONLY PARTY THAT KNOWS.
         //
@@ -428,6 +453,7 @@ export function PendingAskCard({
         // can act on — offering a retry on it is the defect this replaces.
         setExpiredMessage("This run has already ended — your answer was not saved")
         setState("expired")
+        markSettled(tool_call_id)
       } else if (status !== null && status >= 500) {
         // ⚠ NAMED, NOT "try again". A 500 means the answer was NOT recorded, and clicking
         // the same button again will do the same thing. Saying which half failed is the
@@ -578,6 +604,9 @@ export function PendingAskCard({
       className="flex flex-col gap-2 rounded-md border border-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.12)] p-3"
       role="group"
       aria-labelledby={labelId}
+      // 282-02 (D-14): how the chat pointer's `Answer in panel →` finds THIS ask's panel card.
+      data-ask-card={tool_call_id}
+      data-ask-home={home}
     >
       {/* Assertive announce — "blocked on me" must reach a screen reader. */}
       <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--warning))]">
@@ -626,27 +655,68 @@ export function PendingAskCard({
         {prompt}
       </p>
 
-      {/* Choice chips (optional) — radiogroup of role=radio buttons (D3). */}
+      {/* Choice chips (optional) — radiogroup of role=radio buttons (D3).
+          282-02 (D-13 / D-24) completes the APG radio pattern: ONE tab stop (roving tabindex —
+          the selected chip, else the first), arrows move AND select with wrap, Space selects
+          only (never deselects), while Enter and click keep the D-13 toggle through `onClick`.
+          The aria-hidden mark + its dot make selection a SHAPE as well as a colour. */}
       {options.length > 0 && (
         <div role="radiogroup" aria-labelledby={labelId} className="flex flex-col gap-1.5">
           {options.map((opt, i) => {
             const selected = choiceIndex === i
+            const onChipKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+              let target: number | null = null
+              if (e.key === "ArrowDown" || e.key === "ArrowRight") target = (i + 1) % options.length
+              else if (e.key === "ArrowUp" || e.key === "ArrowLeft")
+                target = (i - 1 + options.length) % options.length
+              else if (e.key === " ") {
+                e.preventDefault()
+                if (!selected) setChoiceIndex(i)
+                return
+              }
+              if (target === null) return
+              e.preventDefault()
+              setChoiceIndex(target)
+              chipRefs.current[target]?.focus()
+            }
             return (
               <button
                 key={i}
+                ref={(el) => {
+                  chipRefs.current[i] = el
+                }}
                 type="button"
                 role="radio"
                 aria-checked={selected}
+                tabIndex={(choiceIndex ?? 0) === i ? 0 : -1}
                 onClick={() => setChoiceIndex(selected ? null : i)}
+                onKeyDown={onChipKeyDown}
                 className={cn(
-                  "rounded-md border px-3 py-2 text-left text-[13px] transition-colors",
-                  "min-h-[44px] focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  "flex items-center gap-2 rounded-md border px-3 py-2 text-left text-[13px] transition-colors",
+                  "min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   selected
                     ? "border-[hsl(var(--warning))] bg-[hsl(var(--warning))] font-semibold text-[hsl(var(--warning-foreground))]"
                     : "border-border bg-card text-foreground hover:border-[hsl(var(--warning))] hover:bg-[hsl(var(--warning)/0.12)]",
                 )}
               >
-                {opt}
+                <span
+                  aria-hidden="true"
+                  data-testid="ask-radio-mark"
+                  className={cn(
+                    "flex h-4 w-4 flex-none items-center justify-center rounded-full border-2",
+                    selected
+                      ? "border-[hsl(var(--warning-foreground))]"
+                      : "border-[hsl(var(--muted-foreground-dim))]",
+                  )}
+                >
+                  {selected && (
+                    <span
+                      data-testid="ask-radio-dot"
+                      className="h-2 w-2 rounded-full bg-[hsl(var(--warning-foreground))]"
+                    />
+                  )}
+                </span>
+                <span>{opt}</span>
               </button>
             )
           })}
@@ -725,8 +795,15 @@ export function PendingAskCard({
  * Pinned stack of pending asks. Consumes the Phase 086 hook and renders the
  * full PendingAsk[] newest-first, each its own sticky amber card (D-03). Mounted
  * by WorkspacePanel (Plan 02) at the very top, regardless of section order.
+ *
+ * Phase 282-02 (FIX-07 / D-10, D-11) — `home` says which of the two mounts this is. The panel
+ * mount passes `home="panel"` and registers its presence for the thread; the chat column's
+ * unconditional mount keeps the default `"chat"` and, WHILE a panel home is mounted for the same
+ * thread, renders a one-line `AskPointer` per ask instead of a second card — so one pause shows
+ * one answer input. With no panel home it renders the full card, exactly as before (the
+ * BUG-260828-07 reachability). Neither mount's CONDITION changes; only what the chat one renders.
  */
-export function PendingAskStack() {
+export function PendingAskStack({ home = "chat" }: { home?: "chat" | "panel" } = {}) {
   const threadId = useViewingThread()
   const { data: asks, reconcile } = useAskUserPrompt(threadId)
   // Phase 194.1 Plan 05 (R7(b)) — the run-is-over signal, DERIVED from two hooks
@@ -802,6 +879,19 @@ export function PendingAskStack() {
     useStreamsStore.getState().actions.releaseSettledWorkflowLock(threadId)
   }
 
+  // ── Phase 282-02 (D-11 / D-24) — the panel-home presence registry. ──
+  // A LAYOUT effect, not a passive one: the chat stack's switch to the pointer must land before
+  // the browser paints, or one frame shows two inputs (Pitfall 7). Mount presence equals
+  // visibility, because WorkspacePanel renders its body only while the desktop panel is open or
+  // the mobile Sheet is open — so `ChatLayout.tsx`'s panel state is never read.
+  useLayoutEffect(() => {
+    if (home !== "panel" || !threadId) return
+    const { addPanelHome, removePanelHome } = useAskDraftStore.getState()
+    addPanelHome(threadId)
+    return () => removePanelHome(threadId)
+  }, [home, threadId])
+  const panelMounted = usePanelHomeMounted(threadId)
+
   if (asks.length === 0) return null
 
   // Newest pinned on top (D-03). created_at is GET-only; fall back to the array
@@ -818,17 +908,104 @@ export function PendingAskStack() {
           key={ask.tool_call_id}
           className="sticky top-0 z-[4]"
         >
-          <PendingAskCard
-            ask={ask}
-            reconcile={reconcile}
-            runIsOver={runIsOver}
-            onAnswered={settleAnswered}
-            action={pausedAction}
-            service={pausedStep?.serviceName ?? null}
-            shape={stepMarkShape(pausedStep?.capability, pausedStep?.toolName)}
-          />
+          {home === "chat" && panelMounted ? (
+            <AskPointer ask={ask} runIsOver={runIsOver} />
+          ) : (
+            <PendingAskCard
+              ask={ask}
+              reconcile={reconcile}
+              runIsOver={runIsOver}
+              onAnswered={settleAnswered}
+              action={pausedAction}
+              service={pausedStep?.serviceName ?? null}
+              shape={stepMarkShape(pausedStep?.capability, pausedStep?.toolName)}
+              home={home}
+            />
+          )}
         </div>
       ))}
+    </div>
+  )
+}
+
+/** The arrival flash on the panel card after `Answer in panel →` (UI-SPEC Surface 1, step 4). */
+const ARRIVAL_FLASH = ["outline", "outline-2", "outline-offset-4", "outline-[hsl(var(--warning))]"]
+const ARRIVAL_FLASH_MS = 900
+
+/**
+ * Phase 282-02 (FIX-07 / D-10, D-14 · sketch 282 variant A) — the chat column's one-line pointer
+ * to the panel card, rendered while a panel home shows the pause. It is NOT an input: it shows
+ * the question, the ONE draft (read from the store, never copied) and a working
+ * `Answer in panel →` that moves focus into the panel card.
+ *
+ * - Renders nothing once the ask is settled (answered or expired in any rendering) or retired, so
+ *   it never reads "No answer yet" for an answered ask; the panel card carries the receipt.
+ * - No live region: the panel card's `aria-live="assertive"` "Needs you" already announces the
+ *   pause, and a live draft line would chatter on every keystroke.
+ * - Prompt and draft are plain React text (T-087-11).
+ */
+function AskPointer({ ask, runIsOver }: { ask: PendingAsk; runIsOver: boolean }) {
+  const { tool_call_id: id, prompt } = ask
+  const options = ask.options ?? []
+  const settled = useAskSettled(id)
+  const { choiceIndex, freeText } = useAskDraft(id)
+  if (settled || runIsOver) return null
+
+  // Copywriting Contract: the option wins (the card's own `selectedValue` rule), then trimmed
+  // free text in curly quotes, else "No answer yet". The full string is in the DOM; only CSS
+  // truncates it.
+  const option = choiceIndex !== null ? options[choiceIndex] : undefined
+  const typed = freeText.trim()
+  const draftLine =
+    option !== undefined ? `Draft: ${option}` : typed ? `Draft: “${typed}”` : "No answer yet"
+  const questionId = `ask-${id}-pointer-q`
+
+  // D-14: always a handler. It finds THIS ask's panel card by its data attributes (iterated and
+  // compared, not a built selector — no CSS.escape needed), focuses its first control (the chip
+  // holding the roving tab stop, else the textarea) and flashes a static outline. If the card is
+  // gone (a race with the panel collapsing) it does nothing and throws nothing.
+  const goToPanel = () => {
+    const card = Array.from(document.querySelectorAll<HTMLElement>('[data-ask-home="panel"]')).find(
+      (el) => el.dataset.askCard === id,
+    )
+    if (!card) return
+    const target =
+      card.querySelector<HTMLElement>('[role="radio"][tabindex="0"]') ??
+      card.querySelector<HTMLElement>("textarea")
+    target?.focus()
+    card.classList.add(...ARRIVAL_FLASH)
+    window.setTimeout(() => card.classList.remove(...ARRIVAL_FLASH), ARRIVAL_FLASH_MS)
+  }
+
+  return (
+    <div
+      role="group"
+      aria-labelledby={questionId}
+      data-testid="ask-pointer"
+      data-tool-call-id={id}
+      className="flex items-center gap-3 rounded-md border border-dashed border-[hsl(var(--warning))] px-3 py-2"
+    >
+      <span className="flex flex-none items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--warning))]">
+        <span className="h-2 w-2 rounded-full bg-[hsl(var(--warning))]" aria-hidden="true" />
+        Needs you
+      </span>
+      <span id={questionId} title={prompt} className="min-w-0 flex-1 truncate text-[13px] leading-5 text-foreground">
+        {prompt}
+      </span>
+      <span
+        data-testid="ask-pointer-draft"
+        className="flex-none max-w-[12rem] truncate text-[12px] leading-5 text-[hsl(var(--muted-foreground-dim))]"
+      >
+        {draftLine}
+      </span>
+      <button
+        type="button"
+        data-testid="ask-pointer-go"
+        onClick={goToPanel}
+        className="flex-none min-h-[32px] rounded-md border border-[hsl(var(--warning))] px-3 py-1 text-[12px] font-semibold text-[hsl(var(--warning))] hover:bg-[hsl(var(--warning)/0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        Answer in panel <span aria-hidden="true">→</span>
+      </button>
     </div>
   )
 }

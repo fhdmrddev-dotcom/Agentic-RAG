@@ -25,7 +25,7 @@ import {
   listThreads,
   createThread,
   getMessages,
-  listDocuments,
+  listDocumentsPage,
   uploadDocument,
   deleteDocument,
   listFolders,
@@ -152,7 +152,9 @@ describe("getMessages", () => {
   })
 })
 
-describe("listDocuments", () => {
+// 284-05 (D-16): the whole-list `listDocuments()` is deleted; this case moved IN PLACE to its
+// paged successor (one page, with offset / limit in the URL — never an unparameterised list).
+describe("listDocumentsPage", () => {
   beforeEach(() => {
     vi.stubEnv("VITE_API_BASE_URL", API_BASE)
   })
@@ -162,14 +164,14 @@ describe("listDocuments", () => {
     vi.unstubAllGlobals()
   })
 
-  it("makes GET /documents with Authorization header", async () => {
-    const fetchMock = mockFetch([])
+  it("makes GET /documents?offset&limit with Authorization header", async () => {
+    const fetchMock = mockFetch({ documents: [], total: 0, offset: 0, limit: 25 })
     vi.stubGlobal("fetch", fetchMock)
 
-    await listDocuments()
+    await listDocumentsPage({ offset: 0, limit: 25 })
 
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toContain("/documents")
+    expect(url).toContain("/documents?offset=0&limit=25")
     expect((options?.headers as Record<string, string>)?.Authorization).toBe("Bearer mock-token")
   })
 })

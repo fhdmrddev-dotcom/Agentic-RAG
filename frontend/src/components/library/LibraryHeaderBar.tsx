@@ -49,6 +49,14 @@ export interface LibraryHeaderBarProps {
   inFlight: number
   /** Total documents, shown at rest so the row is never empty on the right. */
   totalDocuments?: number
+  /**
+   * 284-03 (D-07 / D-12 / UI-SPEC S3) — whether the count above has been ANSWERED. While the
+   * summary loads the pill says it is still counting; after it fails, that the count is not known
+   * — both in the idle style, with no spinner, and never "0 documents" before there is an answer
+   * (UI-SPEC S3 copy, verbatim, in the render below). Absent ⇒ the
+   * shipped behaviour (every caller other than `LibraryPage` renders byte-identically).
+   */
+  totalState?: "loading" | "ready" | "error"
   /** Where the pill lands. It must go somewhere — a control that lights up and goes nowhere is
    *  what sketch 231 fixed in its own variant C. */
   onOpenQueue: () => void
@@ -92,6 +100,7 @@ export function LibraryHeaderBar({
   subtitle,
   inFlight,
   totalDocuments,
+  totalState,
   onOpenQueue,
   listTestId,
   attention,
@@ -232,14 +241,19 @@ export function LibraryHeaderBar({
               {/* ⛔ "Reading", never "added". A file that is still being read is not in the Library
                   yet, and the whole point of this row is to stop the surface saying it is. */}
               <span>
-                Reading {inFlight} file{inFlight === 1 ? "" : "s"}
+                {/* 284-REVIEW IN-05: grouped like every Library count (UI-SPEC Numbers). */}
+                Reading {inFlight.toLocaleString()} file{inFlight === 1 ? "" : "s"}
               </span>
             </>
           ) : (
             <span>
-              {typeof totalDocuments === "number"
-                ? `${totalDocuments} document${totalDocuments === 1 ? "" : "s"}`
-                : "Nothing reading"}
+              {totalState === "loading"
+                ? "Counting…"
+                : totalState === "error"
+                  ? "Count not known yet"
+                  : typeof totalDocuments === "number"
+                    ? `${totalDocuments.toLocaleString()} document${totalDocuments === 1 ? "" : "s"}`
+                    : "Nothing reading"}
             </span>
           )}
         </button>

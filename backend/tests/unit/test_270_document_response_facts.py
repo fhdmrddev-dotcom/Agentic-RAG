@@ -108,7 +108,7 @@ class _Q:
     def __init__(self, rec, name):
         self.rec, self.name, self.cols, self.in_ids = rec, name, None, None
 
-    def select(self, cols="*"):
+    def select(self, cols="*", count=None):  # Phase 284: the list asks for count="exact"
         self.cols = cols
         return self
 
@@ -128,11 +128,10 @@ class _Q:
 
 
 def _get(rec):
+    # Phase 284: the list is ONE ranged read of the `library_documents` view (migration 207) —
+    # the folder-id leg is SQL now, so there is no `get_globally_visible_folder_ids` to stub.
     app.dependency_overrides[get_supabase] = lambda: rec
-    from unittest.mock import patch
-
-    with patch("app.api.documents.get_globally_visible_folder_ids", return_value=[]):
-        return TestClient(app).get("/documents")
+    return TestClient(app).get("/documents")
 
 
 def test_list_batches_one_connection_read_and_names_connector_docs():
@@ -140,7 +139,7 @@ def test_list_batches_one_connection_read_and_names_connector_docs():
     d2 = _row(source_connection_id=CONN_ID)
     d3 = _row()
     rec = _Recorder(
-        {"documents": [d1, d2, d3], "connector_connections": [{"id": CONN_ID, "name": "Team Drive"}]}
+        {"library_documents": [d1, d2, d3], "connector_connections": [{"id": CONN_ID, "name": "Team Drive"}]}
     )
     res = _get(rec)
     assert res.status_code == 200, res.text
@@ -148,21 +147,21 @@ def test_list_batches_one_connection_read_and_names_connector_docs():
     assert len(conn_reads) == 1
     assert conn_reads[0][1] == "id, name"
     assert conn_reads[0][2] == [CONN_ID]
-    by_id = {d["id"]: d for d in res.json()}
+    by_id = {d["id"]: d for d in res.json()["documents"]}
     assert by_id[d1["id"]]["source_connection_name"] == "Team Drive"
     assert by_id[d2["id"]]["source_connection_name"] == "Team Drive"
     assert by_id[d3["id"]]["source_connection_name"] is None
 
 
 def test_list_survives_connection_read_failure():
-    rec = _Recorder({"documents": [_row(source_connection_id=CONN_ID)]}, conn_raises=True)
+    rec = _Recorder({"library_documents": [_row(source_connection_id=CONN_ID)]}, conn_raises=True)
     res = _get(rec)
     assert res.status_code == 200, res.text
-    assert res.json()[0]["source_connection_name"] is None
+    assert res.json()["documents"][0]["source_connection_name"] is None
 
 
 def test_list_without_connector_docs_issues_no_connection_read():
-    rec = _Recorder({"documents": [_row()]})
+    rec = _Recorder({"library_documents": [_row()]})
     res = _get(rec)
     assert res.status_code == 200, res.text
     assert not [c for c in rec.calls if c[0] == "connector_connections"]

@@ -31,6 +31,7 @@ import userEvent from "@testing-library/user-event"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, Folder } from "@/types"
+import { installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
 import pageSource from "@/pages/LibraryPage.tsx?raw"
 
 const {
@@ -83,10 +84,19 @@ const {
   mockUseAuth: vi.fn(),
 }))
 
+// 284-03 (D-24): the page reads ONE page + the summary from the server. The fake answers both
+// from the SAME fixture this suite used to hand `useDocuments` whole (see `mockLibrary`).
+const libraryApi = vi.hoisted(() => ({
+  listDocumentsPage: vi.fn(),
+  getLibrarySummary: vi.fn(),
+  getDocument: vi.fn(),
+}))
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return {
     ...actual,
+    ...libraryApi,
     listViews: mockListViews,
     resolveView: mockResolveView,
     resolveAdHoc: mockResolveAdHoc,
@@ -190,6 +200,13 @@ const CLOUD_FILES = [
   { id: "cf-2", name: "Terms.pdf", size: 91_000, modified_at: "2026-09-02T00:00:00Z" },
 ]
 
+/** 284-03 (D-24): the ONE wiring swap — the fixture feeds the fake server, and `useDocuments`
+ *  keeps only its doors (upload / delete / uploading). */
+function mockLibrary({ documents, ...doors }: { documents: Document[] } & Record<string, unknown>) {
+  installFakeLibraryApi(libraryApi, documents)
+  mockUseDocuments.mockReturnValue(doors)
+}
+
 function renderPage(ui: React.ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>)
 }
@@ -217,7 +234,7 @@ beforeEach(() => {
   if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {}
   if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
   mockUseAuth.mockReturnValue({ user: { id: OWNER } })
-  mockUseDocuments.mockReturnValue({
+  mockLibrary({
     documents: sampleDocuments,
     uploading: false,
     uploadingCount: 0,
@@ -379,7 +396,12 @@ describe("the Library's cloud door — what the page must NOT grow", () => {
     // five LINES, and one of them (`counts[d.folder_id] = (counts[d.folder_id] ?? 0) + 1`)
     // carries three occurrences. ⛔ A LINE count is not an OCCURRENCE count, and the fence
     // needs the second. Pinned so an EIGHTH is a diff a reviewer sees.
-    expect(pageSource.match(/\.folder_id\b/g)?.length).toBe(7)
+    // 284-01 (R-11), 2026-10-16: the seven `.folder_id` reads moved into `useLibraryDocuments` with
+    // the derivations (D-24); the property this pin guards — no `folder_id:` body key on the page —
+    // is asserted unchanged above. 7 → 0: the page now reads no document field at all (the
+    // last read left with FolderDetail's array input, 284-01 Task 3). `?? 0` because a regex with
+    // no match answers `null`, not an empty list.
+    expect(pageSource.match(/\.folder_id\b/g)?.length ?? 0).toBe(0)
   })
 
   it("the door reads the SHIPPED permission predicate, and no second one is introduced", () => {

@@ -35,6 +35,7 @@ from app.services.skill_lint import lint_description
 # set (Plan 01 defines it in tool_dispatcher). No circular import — tool_dispatcher does
 # NOT import app.api.skills.
 from app.services.tool_dispatcher import SCRIPT_EXTS
+from app.utils.db import maybe_row
 
 logger = logging.getLogger(__name__)
 
@@ -517,7 +518,7 @@ async def toggle_enabled(
         .maybe_single()
         .execute()
     )
-    if not current.data:
+    if not maybe_row(current):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Skill not found or you are not the owner",
@@ -563,7 +564,7 @@ async def toggle_global(
         .maybe_single()
         .execute()
     )
-    if not current.data:
+    if not maybe_row(current):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Skill not found or you are not the owner",
@@ -686,7 +687,7 @@ async def list_skill_files(
         .maybe_single()
         .execute()
     )
-    if not skill.data:
+    if not maybe_row(skill):
         raise HTTPException(status_code=404, detail="Skill not found")
 
     result = (
@@ -730,7 +731,7 @@ async def upload_skill_file(
         .maybe_single()
         .execute()
     )
-    if not skill.data:
+    if not maybe_row(skill):
         raise HTTPException(status_code=403, detail="Skill not found or not owned by you")
 
     # 3. Storage path: user_id/skill_id/filename (FILE-03)
@@ -785,7 +786,7 @@ async def delete_skill_file(
         .maybe_single()
         .execute()
     )
-    if not file_row.data:
+    if not maybe_row(file_row):
         raise HTTPException(status_code=404, detail="File not found")
 
     # 2. Remove from storage (best-effort)
@@ -815,7 +816,7 @@ async def export_skill(
         .maybe_single()
         .execute()
     )
-    if not skill.data:
+    if not maybe_row(skill):
         raise HTTPException(status_code=404, detail="Skill not found")
     skill_row = skill.data[0] if isinstance(skill.data, list) else skill.data
     slug = re.sub(r'[^a-z0-9-]+', '-', skill_row["name"].lower()).strip('-')

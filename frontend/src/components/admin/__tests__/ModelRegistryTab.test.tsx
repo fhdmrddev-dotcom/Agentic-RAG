@@ -20,6 +20,7 @@ import type { ReactElement } from "react"
 
 import { ADD_PROVIDER_ROSTER, ModelRegistryTab } from "../ModelRegistryTab"
 import { ApiError, type ModelRegistryRow } from "@/lib/api"
+import { MODEL_TIMEOUT_HELP_LINE } from "@/lib/api/admin"
 
 afterEach(() => {
   cleanup()
@@ -753,5 +754,163 @@ describe("ModelRegistryTab — provider sections are FOLDED on arrival", () => {
     expect(
       screen.queryByRole("button", { name: /edit context for claude-opus-4-8/i }),
     ).not.toBeInTheDocument()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 282 Plan 01 (FIX-06; D-07, D-21, D-22) — the Timeout cell's help line and the
+// server's refusal. The client never pre-blocks: 1801 is SENT, and the 422 sentence the
+// server writes is what the operator reads, in the same in-row slot as every refusal.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("ModelRegistryTab (282) — the Timeout help line and the 422 refusal", () => {
+  it("renders a rejected 422 detail in the row's role=alert slot", async () => {
+    const user = userEvent.setup()
+    const sentence =
+      "Timeout must be between 1 and 1800 seconds, because a longer call would outlast the run watchdog, which ends a run that has been silent for 2400 s. 1801 was not saved."
+    const onSet = vi.fn().mockRejectedValue(new ApiError(sentence, 422))
+    const { container } = renderTab(
+      <ModelRegistryTab rows={[makeRow()]} onSetCapability={onSet} onLock={noop} showTechnical={false} />,
+    )
+
+    await user.click(screen.getByRole("button", { name: /edit timeout for gpt-5\.6-sol/i }))
+    const input = screen.getByRole("spinbutton", { name: /^timeout for gpt-5\.6-sol/i })
+    await user.clear(input)
+    await user.type(input, "1801")
+    await user.keyboard("{Enter}")
+
+    expect(onSet).toHaveBeenCalledWith("gpt-5.6-sol", { llm_call_timeout_seconds: 1801 })
+    const slot = await waitFor(() => {
+      const el = container.querySelector('[data-model-error="gpt-5.6-sol"]')
+      expect(el).not.toBeNull()
+      return el as HTMLElement
+    })
+    expect(within(slot).getByRole("alert")).toHaveTextContent(sentence)
+  })
+
+  it("shows the help line while the Timeout cell edits, wired by aria-describedby, gone after Escape", async () => {
+    const user = userEvent.setup()
+    renderTab(
+      <ModelRegistryTab rows={[makeRow()]} onSetCapability={noop} onLock={noop} showTechnical={false} />,
+    )
+
+    expect(screen.queryByTestId("timeout-help")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /edit timeout for gpt-5\.6-sol/i }))
+
+    const help = screen.getByTestId("timeout-help")
+    expect(help.textContent).toBe(MODEL_TIMEOUT_HELP_LINE)
+    expect(help.textContent).toContain("Between 1 and 1800 seconds.")
+    expect(help.id).toBe("timeout-help-gpt-5.6-sol")
+    const input = screen.getByRole("spinbutton", { name: /^timeout for gpt-5\.6-sol/i })
+    expect(input).toHaveAttribute("aria-describedby", "timeout-help-gpt-5.6-sol")
+
+    await user.keyboard("{Escape}")
+    expect(screen.queryByTestId("timeout-help")).not.toBeInTheDocument()
+  })
+
+  it("does not show the help line while another numeric cell edits", async () => {
+    const user = userEvent.setup()
+    renderTab(
+      <ModelRegistryTab rows={[makeRow()]} onSetCapability={noop} onLock={noop} showTechnical={false} />,
+    )
+    await user.click(screen.getByRole("button", { name: /edit context for gpt-5\.6-sol/i }))
+    expect(screen.queryByTestId("timeout-help")).not.toBeInTheDocument()
+    const input = screen.getByRole("spinbutton", { name: /^context for gpt-5\.6-sol/i })
+    expect(input).not.toHaveAttribute("aria-describedby")
+  })
+
+  it("sends an out-of-range timeout to the server (no client pre-block)", async () => {
+    const user = userEvent.setup()
+    const onSet = vi.fn().mockResolvedValue(undefined)
+    renderTab(
+      <ModelRegistryTab rows={[makeRow()]} onSetCapability={onSet} onLock={noop} showTechnical={false} />,
+    )
+    await user.click(screen.getByRole("button", { name: /edit timeout for gpt-5\.6-sol/i }))
+    const input = screen.getByRole("spinbutton", { name: /^timeout for gpt-5\.6-sol/i })
+    await user.clear(input)
+    await user.type(input, "1801")
+    await user.keyboard("{Enter}")
+    expect(onSet).toHaveBeenCalledWith("gpt-5.6-sol", { llm_call_timeout_seconds: 1801 })
+  })
+})
+
+// ── Phase 282 Plan 04 (D-29) — a Timeout on the + Add model by ID form ──
+// Local models are slower (operator, 2026-10-15). The field's placeholder names the default that
+// applies when it is left blank (900 s self-hosted, 300 s otherwise — config.py D-27), blank sends
+// NO key (so nothing is stored and the resolver default applies), and a typed value is a number.
+describe("ModelRegistryTab (282-04) — Timeout on the Add model by ID form", () => {
+  async function openForm(onAddModel = vi.fn().mockResolvedValue(undefined)) {
+    const user = userEvent.setup()
+    renderTab(
+      <ModelRegistryTab
+        rows={[makeRow()]}
+        onSetCapability={noop}
+        onLock={noop}
+        onAddModel={onAddModel}
+        showTechnical={false}
+      />,
+    )
+    await user.click(screen.getByRole("button", { name: /add model by id/i }))
+    return { user, onAddModel }
+  }
+
+  it("shows a Timeout input whose placeholder is the provider's default (300 cloud → 900 self-hosted)", async () => {
+    const { user } = await openForm()
+    const t = screen.getByRole("spinbutton", { name: /^timeout seconds$/i })
+    expect(t).toHaveDisplayValue("")
+    expect(t).toHaveAttribute("placeholder", "300")
+    await user.selectOptions(screen.getByRole("combobox", { name: /provider/i }), "lmstudio")
+    expect(screen.getByRole("spinbutton", { name: /^timeout seconds$/i })).toHaveAttribute("placeholder", "900")
+  })
+
+  it("blank Timeout sends no llm_call_timeout_seconds key", async () => {
+    const { user, onAddModel } = await openForm()
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "spark-x2.5-4b")
+    await user.selectOptions(screen.getByRole("combobox", { name: /provider/i }), "lmstudio")
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+    await waitFor(() => expect(onAddModel).toHaveBeenCalledTimes(1))
+    expect(onAddModel.mock.calls[0][0]).not.toHaveProperty("llm_call_timeout_seconds")
+  })
+
+  it("a typed Timeout is sent as a number", async () => {
+    const { user, onAddModel } = await openForm()
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "spark-x2.5-4b")
+    await user.selectOptions(screen.getByRole("combobox", { name: /provider/i }), "lmstudio")
+    await user.type(screen.getByRole("spinbutton", { name: /^timeout seconds$/i }), "1200")
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+    await waitFor(() => expect(onAddModel).toHaveBeenCalledTimes(1))
+    expect(onAddModel.mock.calls[0][0]).toMatchObject({
+      model_id: "spark-x2.5-4b",
+      provider: "lmstudio",
+      llm_call_timeout_seconds: 1200,
+    })
+  })
+
+  // Found driving the live form (2026-10-15): a native max=1800 made the BROWSER block 1801 with
+  // "Value must be less than or equal to 1800." — no request, and no reason on screen.
+  it("1801 reaches the server (no client pre-block) and its refusal shows in the form's alert", async () => {
+    const sentence =
+      "Timeout must be between 1 and 1800 seconds, because a longer call would outlast the run watchdog, which ends a run that has been silent for 2400 s. 1801 was not saved."
+    const { user, onAddModel } = await openForm(vi.fn().mockRejectedValue(new ApiError(sentence, 422)))
+    const t = screen.getByRole("spinbutton", { name: /^timeout seconds$/i })
+    expect(t).not.toHaveAttribute("max")
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "spark-x2.5-4b")
+    await user.type(t, "1801")
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+    await waitFor(() => expect(onAddModel).toHaveBeenCalledTimes(1))
+    expect(onAddModel.mock.calls[0][0]).toMatchObject({ llm_call_timeout_seconds: 1801 })
+    const form = screen.getByRole("form", { name: /add model by id/i })
+    expect(await within(form).findByRole("alert")).toHaveTextContent(sentence)
+  })
+
+  // 282-REVIEW WR-05: parseInt turned "1e3" into a 1-second timeout and "900.5" into 900 — both
+  // legal, so the server accepted a number the operator never typed. Refuse in the form instead.
+  it.each(["1e3", "900.5"])("a non-whole Timeout (%s) is refused in the form and nothing is sent", async (typed) => {
+    const { user, onAddModel } = await openForm()
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "spark-x2.5-4b")
+    fireEvent.change(screen.getByRole("spinbutton", { name: /^timeout seconds$/i }), { target: { value: typed } })
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+    const form = screen.getByRole("form", { name: /add model by id/i })
+    expect(await within(form).findByRole("alert")).toHaveTextContent("Timeout must be a whole number of seconds.")
+    expect(onAddModel).not.toHaveBeenCalled()
   })
 })

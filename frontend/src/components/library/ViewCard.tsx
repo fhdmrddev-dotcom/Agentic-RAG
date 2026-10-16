@@ -206,7 +206,7 @@ export function ViewCard({
             zeroMatch ? "text-amber-400" : "text-foreground",
           ].join(" ")}
         >
-          {total == null ? "…" : <AnimatedNumber value={total} />}
+          {total == null ? "…" : <AnimatedNumber value={total.toLocaleString()} />}
         </span>
       </div>
 
@@ -227,9 +227,9 @@ export function ViewCard({
           ) : view.is_system_global ? (
             "Built in · shared with everyone"
           ) : total === null ? (
-            <><AnimatedNumber value={corpusCount} /> documents</>
+            <><AnimatedNumber value={corpusCount.toLocaleString()} /> documents</>
           ) : (
-            <><AnimatedNumber value={total} /> of <AnimatedNumber value={corpusCount} /> documents</>
+            <><AnimatedNumber value={total.toLocaleString()} /> of <AnimatedNumber value={corpusCount.toLocaleString()} /> documents</>
           )}
         </span>
         <span className="relative inline-flex items-center">

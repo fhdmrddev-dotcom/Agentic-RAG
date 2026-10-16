@@ -185,7 +185,18 @@ UNMOVED: tuple[str, ...] = (
 PER_MODULE: frozenset[str] = frozenset({"logger"})
 
 # name → the reason it is no longer compared. EMPTY in 278 — a pure move changes nothing on purpose.
-RETIRED: dict[str, str] = {}
+RETIRED: dict[str, str] = {
+    "_handle_ask_user": (
+        "BUG-261015-03 (2026-10-15): deliberate post-move edit. The wait clamp moved into "
+        "_resolve_ask_timeout with a 300 s floor; pinned by test_bug_261015_03_ask_user_floor.py."
+    ),
+    "_handle_query_documents_by_view": (
+        "Phase 284 (284-04, R-02, 2026-10-16): deliberate post-move edit. The full resolve passes "
+        "via_view=False + limit (the service role reads 0 rows from library_documents) instead of "
+        "slicing a whole list; its JSON output is pinned BYTE-IDENTICAL to the pre-284 algorithm by "
+        "test_284_view_resolve.py::test_the_agent_answer_is_byte_identical_to_pre_284."
+    ),
+}
 
 _EXPECTED_FAMILY_COUNTS = {
     "base.py": 2,

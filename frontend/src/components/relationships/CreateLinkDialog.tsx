@@ -7,7 +7,7 @@
  * loading confirm + the error line + reset-on-open) and SWAPS only its plain `Select`
  * (which dies past ~30 docs — D-117-3) for a bespoke TYPE-FIRST typeahead:
  *   1. rel-type segmented chips on top (the 4 closed RelType values), then
- *   2. a searchable typeahead over the caller's visible docs (listDocuments).
+ *   2. a searchable typeahead over the caller's visible docs (server search since 284-04).
  * A live "this references → X" preview; confirm disabled until a target is chosen.
  *
  * Authoring is OUTGOING-ONLY (D-117-1): the open document is always the source. The
@@ -27,6 +27,14 @@
  * there so the Find Relationship filter mounts the same combobox (never a fork). This
  * dialog keeps the rel-type chips, the exclusion note, the preview and the footer, and
  * passes `maxVisible={Infinity}` so its candidate list stays uncapped as shipped.
+ *
+ * Phase 284-04 (D-15 / R-05 / UI-SPEC S11) — the candidates come from the SERVER. Opening the
+ * dialog no longer downloads the library (at 50,000 documents that read was cut at 1,000 and
+ * offered an arbitrary 1,000): it type-aheads against `POST /document-search` through
+ * `useDocumentFind` — latest versions, archived included (today's candidate set), 20 rows, 250 ms
+ * debounce, an empty query being the 20 most recent. The combobox runs in server mode (no client
+ * re-filter). The chosen document is kept as an OBJECT, so the preview line still names it after
+ * a later search stops returning it (a `candidates.find` lookup would lose it).
  */
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -37,7 +45,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { listDocuments, createRelationship, ApiError } from "@/lib/api"
+import { createRelationship, ApiError } from "@/lib/api"
+import { useDocumentFind } from "@/hooks/useDocumentFind"
 import type { Document, RelType, RelationshipRow } from "@/types"
 import { cn } from "@/lib/utils"
 import { OUTGOING_LABEL, REL_TYPES } from "./relationshipLabels"
@@ -66,24 +75,41 @@ export function CreateLinkDialog({
   onCreated,
 }: Props) {
   const [relType, setRelType] = useState<RelType>("references")
-  const [candidates, setCandidates] = useState<Document[]>([])
-  const [target, setTarget] = useState<string>("") // the chosen target doc id
+  // 284-04: the chosen target as an OBJECT (id + name), never a lookup into the latest answer.
+  const [chosenDoc, setChosenDoc] = useState<Document | null>(null)
+  const target = chosenDoc?.id ?? "" // the chosen target doc id
+  const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputId = useRef(`rel-target-input-${Math.random().toString(36).slice(2)}`).current
 
-  // Reset-on-open + load the candidate source (the MoveToFolderDialog posture). The
-  // combobox's own query and active option reset with it: the dialog content unmounts on
-  // close, so a reopen mounts a fresh combobox.
+  // Reset-on-open (the MoveToFolderDialog posture). The combobox's own query and active option
+  // reset with it: the dialog content unmounts on close, so a reopen mounts a fresh combobox.
   useEffect(() => {
     if (!open) return
     setRelType("references")
-    setTarget("")
+    setChosenDoc(null)
+    setQuery("")
     setError(null)
-    listDocuments()
-      .then(setCandidates)
-      .catch(() => setError("Could not load documents."))
   }, [open])
+
+  // 284-04 (D-15 / R-05): the candidate source is ONE server search per (debounced) query.
+  const name = query.trim()
+  const find = useDocumentFind({
+    request: open
+      ? {
+          filter_expr: { op: "and", conditions: [] },
+          name: name === "" ? null : name,
+          version: "latest",
+          sort: "added_desc",
+          offset: 0,
+          limit: 20,
+          include_archived: true,
+        }
+      : null,
+    debounceMs: 250,
+  })
+  const candidates = find.rows
 
   /** Doc ids already linked OUTGOING with the CURRENTLY-selected rel_type — the
    *  per-type exclusion set (D-117-4). Re-derived whenever relType changes. */
@@ -104,7 +130,7 @@ export function CreateLinkDialog({
     [sourceDocId, excludedByType],
   )
 
-  const targetDoc = candidates.find((d) => d.id === target) ?? null
+  const targetDoc = chosenDoc
 
   async function handleConfirm() {
     if (!target) return
@@ -159,7 +185,7 @@ export function CreateLinkDialog({
                     setRelType(t)
                     // Per-type re-derive: a now-excluded chosen target must clear.
                     // (The combobox resets its own active option when the excluded set changes.)
-                    setTarget("")
+                    setChosenDoc(null)
                   }}
                   className={cn(
                     "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
@@ -188,10 +214,15 @@ export function CreateLinkDialog({
               candidates={candidates}
               excludeIds={excludeIds}
               value={target === "" ? null : target}
-              onChoose={(doc) => setTarget(doc ? doc.id : "")}
+              onChoose={(doc) => setChosenDoc(doc)}
               placeholder="Search documents…"
               listboxLabel="Target document candidates"
               maxVisible={Number.POSITIVE_INFINITY}
+              onQueryChange={setQuery}
+              loading={find.loading}
+              error={find.error !== null}
+              hasMore={find.total !== null && find.total > find.rows.length}
+              onRetry={find.retry}
             />
             {/* Honest per-type exclusion note (panel-AA token). */}
             {howManyExcluded > 0 && (

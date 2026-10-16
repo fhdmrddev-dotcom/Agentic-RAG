@@ -1326,7 +1326,9 @@ async def _emit_phase_substep(ctx, phase, *, status: str | None = None, failure:
         logger.warning("llm_emit: phase_substep emit failed run=%s", stream_id)
 
 
-def _emit_failure_output(failure: str, message: str, *, field_map=None) -> dict:
+def _emit_failure_output(
+    failure: str, message: str, *, field_map=None, attempt_causes: list | None = None
+) -> dict:
     """The phase output for an honest emit failure (state a-e). Carries ``text`` (the real
     reason — never an empty 'done', RC-4), the ``failure`` taxonomy value (GAP-C, the
     frontend's closed-taxonomy render), and — when available — the cited ``field_map`` as
@@ -1338,14 +1340,25 @@ def _emit_failure_output(failure: str, message: str, *, field_map=None) -> dict:
     (one writer, one message — closes the duplicate-honest-failure-message bug). Deep
     never returns a ``_surfaced`` final_output (Deep does not run ``_exec_llm_emit``), so
     the engine guard is a literal no-op on the shared path.
+
+    Phase 281 (D-30): ``attempt_causes`` is the invocation's per-shot cause records (the
+    ``emit_cause`` leaf's shape), so the engine can compose ONE cause across its retries.
+    ⛔ This output NEVER carries the success return's retrieved-id set or placeholder
+    keys: with them the post-gate ``citations_required`` validator would PASS and a
+    failed run would end ``completed``.
     """
     out: dict = {"text": message, "failure": failure, "_surfaced": True}
     if field_map is not None:
         out["field_map"] = field_map
+    if attempt_causes is not None:
+        out["attempt_causes"] = attempt_causes
     return out
 
 
-async def _emit_unexpected_failure(phase, *, definition, emitter, run_id, pool, ctx, exc) -> dict:
+async def _emit_unexpected_failure(
+    phase, *, definition, emitter, run_id, pool, ctx, exc, records: list | None = None,
+    calls: int = 0,
+) -> dict:
     """Phase 101.1-07 (gap 1b — the executor half of the D-08 layer-6 backstop).
 
     The single seam the ``_exec_llm_emit`` catch-all calls on ANY unexpected raise (the
@@ -1356,19 +1369,35 @@ async def _emit_unexpected_failure(phase, *, definition, emitter, run_id, pool, 
     a silent run-crash that strands the ``workflow_phases`` row in ``active`` forever
     (UAT Test 2, runs 575e7345 / a7f415ad). Logs identifier-only (T-073-04 — never the
     message/args content).
+
+    Phase 281 (FIX-09 / D-32): ``records`` is the invocation's cause trail so far; the
+    backstop adds one ``unexpected`` record and surfaces the ONE composed cause, headed by
+    the step's author-set name only (never the slug).
+
+    281-REVIEW WR-01 (D-25): ``calls`` is the number of model calls the invocation made.
+    The ``unexpected`` cause rides the in-flight call's record when one exists (never a
+    second count for one call), and with ``calls == 0`` it is an ``attempt`` 0 record, so
+    the composed message claims no attempt.
     """
-    logger.exception("llm_emit: unexpected failure run=%s", run_id)
-    msg = (
-        "The deliverable could not be produced due to an unexpected error in the emit "
-        "pipeline; no Markdown stand-in is delivered as the artifact."
+    from app.services.harness.emit_cause import (  # noqa: PLC0415 — the harness package cycle
+        KIND_UNEXPECTED,
+        compose_emit_failure,
+        record_terminal,
     )
+    from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
+
+    logger.exception("llm_emit: unexpected failure run=%s", run_id)
+    step_name = _clean_label(getattr(phase, "name", None))
+    causes = list(records or [])
+    record_terminal(causes, max(int(calls or 0), 0), KIND_UNEXPECTED)
+    msg = compose_emit_failure(causes, step_name=step_name)
     await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
         definition=definition, phase=phase, emitter=emitter, result=None, gate=None,
         render_verdict={"failure": "render_failed", "reason": "unexpected"}, output_file=None,
     ))
     await _emit_phase_substep(ctx, phase, failure="render_failed")
     await _surface_failure_message(ctx, run_id, msg, pool)
-    return _emit_failure_output("render_failed", msg)
+    return _emit_failure_output("render_failed", msg, attempt_causes=causes)
 
 
 class _ProducerStreamCtx:
@@ -1453,6 +1482,28 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     # the WR-02-persisted field-map and DELIVER — via the deterministic driver, NO new
     # emit shot (the strict path never touches emit_policy).
     citation_policy = getattr(phase.config, "citation_policy", "strict")
+    # Phase 281 (FIX-09 / D-30): one cause record per sealed shot or terminal arm, and ONE
+    # composer for the message every surface reads (D-04). Function-local, like
+    # emit_policy below: the harness package cycle. D-32: the head names the step ONLY by
+    # its author-set name, scrubbed by the one server scrub — never the slug, never a
+    # derived title (``_clean_label`` returns None for a missing or blank name).
+    from app.services.harness.emit_cause import (  # noqa: PLC0415
+        KIND_INTEGRITY_FAILED,
+        KIND_NO_TEMPLATE,
+        KIND_RENDER_FAILED,
+        classify_forced_failure,
+        classify_rejection,
+        compose_emit_failure,
+        record_terminal,
+        shot_record,
+        terminal_failure_value,
+    )
+    from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
+
+    step_name = _clean_label(getattr(phase, "name", None))
+    records: list[dict] = []
+    # 281-REVIEW WR-01 (D-25): model calls made so far — the backstop's attempt count.
+    calls_made = 0
 
     try:
         # ── 1. GAP-B inject (D-10) — resolve the bound template SERVER-SIDE ──────────
@@ -1475,17 +1526,16 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         )
         if not src.get("bytes"):
             # State (e): no template bound AND no ephemeral upload resolved — honest fail.
-            msg = (
-                "No template is bound to this workflow phase and no usable template was "
-                f"found: {src.get('error') or 'no template available'}."
-            )
+            # 281-REVIEW WR-01: no model call was made — an ``attempt`` 0 record, no count.
+            records.append(shot_record(0, [KIND_NO_TEMPLATE], detail=src.get("error") or None))
+            msg = compose_emit_failure(records, step_name=step_name)
             await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
                 definition=definition, phase=phase, emitter=emitter, result=None, gate=None,
                 render_verdict={"failure": "no_template_bound"}, output_file=None,
             ))
             await _emit_phase_substep(ctx, phase, failure="no_template_bound")  # state (e)
             await _surface_failure_message(ctx, run_id, msg, pool)
-            return _emit_failure_output("no_template_bound", msg)
+            return _emit_failure_output("no_template_bound", msg, attempt_causes=records)
 
         # ── 2. Forced shot (D-08 layers 1-4) — the SEALED single call, never the loop ─
         # 099 WFSKILL-01 (D-05/D-06): compose the skill framing; F8 retry feedback consumed
@@ -1558,6 +1608,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             await _emit_audit(ctx, event_type="emit_forced", metadata=forced_md)
 
             await _emit_phase_substep(ctx, phase, status="emitting")  # the forced LLM call is in flight (atomic)
+            calls_made = attempt
             result = await forced_emit(
                 messages=messages,
                 model=model,
@@ -1595,18 +1646,21 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
 
             if result.get("failure"):
                 # State (a): the model never emitted (after Plan 02 recovery + truncation guard).
-                msg = (
-                    "The model did not emit a structured field-map for the template "
-                    "(it narrated prose or was truncated) and the deliverable was NOT produced. "
-                    "This is an honest failure — no Markdown stand-in is delivered as the artifact."
-                )
-                await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+                # Phase 281 (Pitfall 9): narrated, cut off and a provider error are three
+                # causes; the failure VALUE stays model_failed_to_emit.
+                records.append(shot_record(attempt, [
+                    classify_forced_failure(result.get("failure"), bool(result.get("truncated")))
+                ]))
+                msg = compose_emit_failure(records, step_name=step_name)
+                failed_md = _emit_audit_metadata(
                     definition=definition, phase=phase, emitter=emitter, result=result,
                     gate=None, render_verdict=None, output_file=None,
-                ))
+                )
+                failed_md["attempt"] = attempt  # Phase 281 (T-281-03): additive
+                await _emit_audit(ctx, event_type="emit_failed", metadata=failed_md)
                 await _emit_phase_substep(ctx, phase, failure="model_failed_to_emit")  # state (a)
                 await _surface_failure_message(ctx, run_id, msg, pool)
-                return _emit_failure_output("model_failed_to_emit", msg)
+                return _emit_failure_output("model_failed_to_emit", msg, attempt_causes=records)
 
             emitted: EmitFieldMap = result["emitted"]
 
@@ -1650,7 +1704,21 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 gate=gate, render_verdict=None, output_file=None,
             )
             rejected_md["attempt"] = attempt
+            rejected_md["missing_keys"] = missing_keys  # Phase 281 (T-281-03): additive
             await _emit_audit(ctx, event_type="emit_rejected", metadata=rejected_md)
+            # Phase 281 (D-30): record EVERY rejected shot, before the retry ``continue``.
+            records.append(shot_record(
+                attempt,
+                classify_rejection(
+                    uncited=gate["uncited_value_count"],
+                    invented=gate["invented_citation_count"],
+                    missing=missing_keys,
+                    oracle_present=bool(oracle),
+                ),
+                missing=missing_keys,
+                uncited=gate["uncited_value_count"],
+                invented=gate["invented_citation_count"],
+            ))
 
             if retrieved_ids and attempt < _EMIT_MAX_ATTEMPTS:
                 offenders = ", ".join(
@@ -1673,17 +1741,18 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             # or attempts exhausted). The DISPOSITION is governed by citation_policy
             # (D-01) — the verdict above is unchanged; only what happens NOW differs.
             if citation_policy == "strict":
-                # strict (the default) — BYTE-IDENTICAL to today's honest fail. The
-                # deliverable is NOT produced; the cited field-map is preserved.
-                msg = (
-                    "The emitted field-map has uncited or invented values or is missing required "
-                    "template keys — every non-null value must cite a source that was actually "
-                    "retrieved, and every template placeholder must be present. The deliverable "
-                    "was NOT produced; the cited field-map is preserved in the run's phase record."
-                )
-                await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")  # state (b)
+                # strict (the default) — the deliverable is NOT produced; the cited
+                # field-map is preserved. Phase 281 (D-30): the failure VALUE is the
+                # classification of the shot that ended the invocation — a shot refused
+                # ONLY for missing template keys is ``template_fields_missing``, never a
+                # citation failure; the message names every distinct cause it met.
+                failure_value = terminal_failure_value(records[-1]["kinds"])
+                msg = compose_emit_failure(records, step_name=step_name)
+                await _emit_phase_substep(ctx, phase, failure=failure_value)  # state (b)
                 await _surface_failure_message(ctx, run_id, msg, pool)
-                return _emit_failure_output("citation_gate_rejected", msg, field_map=legacy_map)
+                return _emit_failure_output(
+                    failure_value, msg, field_map=legacy_map, attempt_causes=records
+                )
 
             # NON-strict (flag/partial/draft) — DELIVER off the WR-02 persisted field-map
             # with marks/blanks/label (SEED-082: every non-strict mode MARKS or BLANKS,
@@ -1698,16 +1767,15 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             # Route through the EXISTING strict honest-fail path (byte-identical) and do
             # NOT set citation_policy_applied (the render gate stays strict).
             if not applied.get("delivered", True):
-                msg = (
-                    "The emitted field-map has uncited or invented values that the "
-                    f"'{citation_policy}' citation policy could not safely mark or blank "
-                    f"({applied.get('reason') or 'no matching leaves'}); failing back to "
-                    "strict. The deliverable was NOT produced; the cited field-map is "
-                    "preserved in the run's phase record."
-                )
+                # Phase 281: the value stays citation_gate_rejected (this fallback is the
+                # citation path); the message is the ONE composed cause, so a shot refused
+                # for missing keys is not reworded as "uncited or invented" here either.
+                msg = compose_emit_failure(records, step_name=step_name)
                 await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")
                 await _surface_failure_message(ctx, run_id, msg, pool)
-                return _emit_failure_output("citation_gate_rejected", msg, field_map=legacy_map)
+                return _emit_failure_output(
+                    "citation_gate_rejected", msg, field_map=legacy_map, attempt_causes=records
+                )
 
             legacy_map = applied["field_map"]  # the marked/blanked/as-is map to render
             policy_summary = applied.get("coverage_summary") or applied.get("draft_label") or ""
@@ -1754,14 +1822,18 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         entry = resolve_emitter(emitter)
         if entry.post_processor is None:
             # Defensive: a registered emitter with no driver cannot produce a deliverable.
-            msg = f"The emitter {emitter!r} has no render driver registered."
+            record_terminal(records, attempt, KIND_RENDER_FAILED,
+                            detail=f"the emitter {emitter!r} has no render driver registered")
+            msg = compose_emit_failure(records, step_name=step_name)
             await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
                 definition=definition, phase=phase, emitter=emitter, result=result,
                 gate=gate, render_verdict={"failure": "render_failed"}, output_file=None,
             ))
             await _emit_phase_substep(ctx, phase, failure="render_failed")  # state (c) — no driver
             await _surface_failure_message(ctx, run_id, msg, pool)
-            return _emit_failure_output("render_failed", msg, field_map=legacy_map)
+            return _emit_failure_output(
+                "render_failed", msg, field_map=legacy_map, attempt_causes=records
+            )
 
         await _emit_phase_substep(ctx, phase, status="rendering")  # sealed-sandbox render in flight
 
@@ -1852,11 +1924,8 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         reason = (render_out or {}).get("reason")
         if status == "failed" and reason in ("integrity", "residual_tokens", "harvest_failed", "no_verdict"):
             # State (d): the rendered file won't open / has residual tokens — NEVER persisted.
-            msg = (
-                "The filled file failed the integrity re-open (it will not open cleanly or "
-                "still contains unsubstituted placeholders) and was NOT delivered. The cited "
-                "field-map is preserved in the run's phase record as fallback."
-            )
+            record_terminal(records, attempt, KIND_INTEGRITY_FAILED)
+            msg = compose_emit_failure(records, step_name=step_name)
             await _emit_audit(ctx, event_type="emit_integrity_failed", metadata=_emit_audit_metadata(
                 definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
                 render_verdict=(render_out or {}).get("verdict") or {"failure": "integrity_failed"},
@@ -1864,22 +1933,26 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             ))
             await _emit_phase_substep(ctx, phase, failure="integrity_failed")  # state (d)
             await _surface_failure_message(ctx, run_id, msg, pool)
-            return _emit_failure_output("integrity_failed", msg, field_map=legacy_map)
+            return _emit_failure_output(
+                "integrity_failed", msg, field_map=legacy_map, attempt_causes=records
+            )
 
         # State (c): a render error (sandbox error / bad asset / resolution) — honest fail.
-        msg = (
-            "The template render failed: "
-            + str((render_out or {}).get("message") or reason or "unknown render error")
-            + ". The deliverable was NOT produced; the cited field-map is preserved in "
-            "the run's phase record."
-        )
+        # 281-REVIEW WR-01: a terminal cause rides the call it belongs to (a non-strict
+        # policy delivers the last REJECTED shot, whose record already exists).
+        record_terminal(records, attempt, KIND_RENDER_FAILED, detail=str(
+            (render_out or {}).get("message") or reason or "unknown render error"
+        ))
+        msg = compose_emit_failure(records, step_name=step_name)
         await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
             definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
             render_verdict={"failure": "render_failed", "reason": reason}, output_file=None,
         ))
         await _emit_phase_substep(ctx, phase, failure="render_failed")  # state (c)
         await _surface_failure_message(ctx, run_id, msg, pool)
-        return _emit_failure_output("render_failed", msg, field_map=legacy_map)
+        return _emit_failure_output(
+            "render_failed", msg, field_map=legacy_map, attempt_causes=records
+        )
     except Exception as _emit_exc:  # noqa: BLE001 — D-08 layer-6 executor backstop
         # gap 1b: ANY raise inside the ladder (render dispatch throwing, an
         # unexpected error) is converted to an honest receipt + ONE surfaced
@@ -1887,7 +1960,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         # run-failed catch (which would strand the workflow_phases row in active).
         return await _emit_unexpected_failure(
             phase, definition=definition, emitter=emitter, run_id=run_id,
-            pool=pool, ctx=ctx, exc=_emit_exc,
+            pool=pool, ctx=ctx, exc=_emit_exc, records=records, calls=calls_made,
         )
 
 

@@ -19,7 +19,7 @@
  * Esc and Apply both return focus to the chip that opened it.
  */
 import { useRef, useState, type ReactElement } from "react"
-import type { Document, Folder, ViewCondition, ViewFilter } from "@/types"
+import type { Folder, ViewCondition, ViewFilter } from "@/types"
 import { FilterChip } from "@/components/ingestion/FilterBar"
 import { folderPathOf } from "@/components/chat/scopeCopy"
 import { RELATIONSHIP_FILTER_VERBS } from "@/components/relationships/relationshipLabels"
@@ -40,6 +40,7 @@ import {
   VERSION_OPTIONS,
   VersionEditor,
   WHICH_DATE_OPTIONS,
+  type EditorListState,
 } from "./StructurePopovers"
 
 export interface FindQuickAddProps {
@@ -47,8 +48,15 @@ export interface FindQuickAddProps {
   dispatch: (action: FindAction) => void
   filter: ViewFilter
   onFilterChange: (filter: ViewFilter) => void
-  documents: readonly Document[]
   folders: readonly Folder[]
+  /** Phase 284-01 (D-07 / R-03) — the Added by options (`LibrarySummary.connections`). */
+  connections: readonly { id: string; name: string | null; count: number }[]
+  /** Phase 284-01 (D-07 / R-03) — the Document type options (`LibrarySummary.document_types`). */
+  documentTypes: readonly { value: string; count: number }[]
+  /** The summary read's state, threaded to the two editors that read its lists. */
+  listState: EditorListState
+  /** The two editors' "Try again". */
+  onRetry: () => void
 }
 
 /** Which editor is open. A date chip being edited carries its `which`. */
@@ -129,8 +137,11 @@ export function FindQuickAdd({
   dispatch,
   filter,
   onFilterChange,
-  documents,
   folders,
+  connections,
+  documentTypes,
+  listState,
+  onRetry,
 }: FindQuickAddProps) {
   const [open, setOpen] = useState<OpenEditor | null>(null)
   // The chip each editor was opened from, so closing it returns focus there.
@@ -180,7 +191,9 @@ export function FindQuickAdd({
     editor = (
       <DocumentTypeEditor
         initial={docTypeCondition}
-        documents={documents}
+        documentTypes={documentTypes}
+        listState={listState}
+        onRetry={onRetry}
         onCancel={cancel}
         onApply={(c) => {
           onFilterChange(withCondition(filter, c))
@@ -192,7 +205,9 @@ export function FindQuickAdd({
     editor = (
       <AddedByEditor
         initial={find.addedBy}
-        documents={documents}
+        connections={connections}
+        listState={listState}
+        onRetry={onRetry}
         onCancel={cancel}
         onApply={(addedBy) => {
           dispatch({ type: "SET_ADDED_BY", addedBy })
@@ -236,7 +251,6 @@ export function FindQuickAdd({
     editor = (
       <RelationshipEditor
         initial={find.relationship}
-        documents={documents}
         onCancel={cancel}
         onApply={(relationship) => {
           dispatch({ type: "SET_RELATIONSHIP", relationship })

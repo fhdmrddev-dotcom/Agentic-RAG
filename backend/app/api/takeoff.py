@@ -14,6 +14,7 @@ from app.services.takeoff.matcher import (
     match_takeoff_to_rates,
     resolve_takeoff_item,
 )
+from app.utils.db import maybe_row
 
 log = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ async def get_document_takeoff(
         .maybe_single()
         .execute()
     )
-    if not resp.data:
+    if not maybe_row(resp):
         raise HTTPException(status_code=404, detail="Document not found")
 
     meta = resp.data.get("metadata") or {}
@@ -75,7 +76,7 @@ async def match_document_takeoff(
         .maybe_single()
         .execute()
     )
-    if not cad_resp.data:
+    if not maybe_row(cad_resp):
         raise HTTPException(status_code=404, detail="CAD Document not found")
 
     cad_doc = cad_resp.data
@@ -112,7 +113,7 @@ async def match_document_takeoff(
         .maybe_single()
         .execute()
     )
-    if not rate_resp.data:
+    if not maybe_row(rate_resp):
         raise HTTPException(status_code=404, detail="Rate sheet document not found")
 
     rate_doc = rate_resp.data
@@ -172,7 +173,7 @@ async def resolve_document_takeoff_item(
         .maybe_single()
         .execute()
     )
-    if not cad_resp.data:
+    if not maybe_row(cad_resp):
         raise HTTPException(status_code=404, detail="CAD Document not found")
 
     meta = dict(cad_resp.data.get("metadata") or {})
@@ -195,7 +196,7 @@ async def resolve_document_takeoff_item(
         .maybe_single()
         .execute()
     )
-    if not rate_resp.data or not rate_resp.data.get("file_path"):
+    if not maybe_row(rate_resp) or not rate_resp.data.get("file_path"):
         raise HTTPException(status_code=404, detail="Underlying rate sheet not found")
 
     rate_bytes = await run_in_threadpool(

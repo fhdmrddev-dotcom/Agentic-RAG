@@ -3,7 +3,10 @@ seed_id: SEED-248
 title: "A surface that is still loading must SAY so — `useDocuments` exposes no loading flag at all, so the Library's empty list is indistinguishable from \"you have no documents\"; and the thread skeleton only fires on a COLD load, so a revisit shows stale content with no sign it is refreshing"
 created: 2026-09-06
 planted_during: "2026-09-05/06 ingest-repair session — the operator asked for it directly after a Drive import made the app feel dead: \"I just captured as a seed, for anything that is still loading we should add a loader, especially in threads\""
-status: planted
+status: folded
+partial: true
+status_note: "Library half SHIPPED by Phase 284 (284-03, 2026-10-16): useLibraryDocuments exposes loading / failed / warm; the empty state renders only after a successful answer; proven live at 10k and 50k (no empty-state frame before data, 284-LIVE-EVIDENCE.md G-4 A). Thread cold-load-only skeleton half still open."
+folded_into: "284"
 surface: Agentic-RAG
 severity: medium
 category: ux / honesty / loading-states

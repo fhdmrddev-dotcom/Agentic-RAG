@@ -5,12 +5,12 @@ section: administer
 audience: admin
 status: written
 release: shipped
-updated: v4.5
+updated: v4.6
 covers: [A46, E23, router:retention]
 summary: >-
   Retention policies and legal holds in org admin: archive or delete documents on a schedule you
   preview first, and stop chosen documents from being deleted at all.
-reviewed: 2026-10-12
+reviewed: 2026-10-14
 ---
 
 Retention arrived in v4.5. **Scheduled sweeps are off by default:** until your operator turns them on, no policy archives or queues anything, and documents stay in the Library until someone deletes them. Preview and legal holds work either way.
@@ -101,6 +101,12 @@ Every action writes one record: archived, queued, deleted, did not delete, kept,
 - **A watched source can bring a deleted file back.** If the file still exists in a watched Google Drive folder and changes there, the next sync can add it again.
 - **Archiving a large share of the Library** can make some searches return fewer passages than usual. Your operator can turn on the iterative search setting (`hnsw_iterative_scan`) to fill them.
 - Retention covers Library documents only. Chat messages, attachments and files made in chat are not covered.
+
+## What retention does not remove
+
+Retention deletes Library documents and their stored files. It does not remove chat history. If the assistant quoted a document in a reply, or showed a chart or table built from it, that reply and that chart stay in the conversation until the thread is deleted, or the account is.
+
+A chart or table whose source document has been deleted keeps naming that file in its caption, as plain text. The caption is not a link, and nothing opens from it.
 
 ## Related
 

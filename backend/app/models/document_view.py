@@ -27,7 +27,7 @@ re-triggering that regression.
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ── filter AST (stored shape — reject-unknown-op by Literal discriminator) ─────
@@ -103,8 +103,17 @@ class AdHocResolve(BaseModel):
     but performs NO DB write and NO audit. ``count_only`` returns just ``{total}``;
     otherwise ``{documents, total}``. ``folder_scope`` is optional (parity with a
     saved view's scope).
+
+    Phase 284 (D-10): the listing PAGES — ``offset`` / ``limit`` (1..200, default 25) select one
+    page of the newest-first set and the answer is ``{documents, total, offset, limit}`` with an
+    EXACT total. ``include_archived`` (default ``True``, today's behaviour) hides archived
+    documents when ``False``; it applies to ``count_only`` too, so a caller can count the hidden
+    ones as ``count(include_archived=True) - count(include_archived=False)``.
     """
 
     filter_expr: ViewFilter
     count_only: bool = False
     folder_scope: UUID | None = None
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=25, ge=1, le=200)
+    include_archived: bool = True

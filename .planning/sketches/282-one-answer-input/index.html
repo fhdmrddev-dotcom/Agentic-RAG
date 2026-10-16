@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 282 — One Answer Input</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base);display:flex;flex-direction:column}
+#vnav,#states{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+#vnav .sk,#states .lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:8px}
+.vtab,.stab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.stab.active{background:var(--color-accent);color:var(--color-text)}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft)}
+#note b{color:var(--color-text)}
+#frame{flex:1;min-height:0;display:grid;grid-template-columns:1fr 360px;margin:16px;border:1px solid var(--color-border);border-radius:12px;overflow:hidden}
+#frame.rail{grid-template-columns:1fr 44px}
+.chat{display:flex;flex-direction:column;min-height:0;overflow:auto;padding:16px;gap:12px}
+.msg{max-width:640px;font-size:var(--text-sm);line-height:1.5;color:var(--color-text-muted)}
+.msg.user{align-self:flex-end;background:var(--color-muted);padding:8px 12px;border-radius:10px;color:var(--color-text)}
+.runcard{border:1px solid var(--color-warning);box-shadow:0 0 24px var(--color-warning-dim);border-radius:10px;padding:10px 12px;font-size:var(--text-xs);font-family:var(--font-mono);color:var(--color-warning)}
+.runcard .step{margin-top:6px;color:var(--color-text-muted)}
+.composer{margin-top:auto;border:1px solid var(--color-border);border-radius:10px;padding:10px 12px;opacity:.5;font-size:var(--text-sm);display:flex}
+.composer .hint{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--color-warning)}
+.panel{border-left:1px solid var(--color-border);background:var(--color-bg-elev1);overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
+.panel .sec{border:1px solid var(--color-border-soft);border-radius:8px;padding:10px;font-size:var(--text-xs);color:var(--color-text-dim)}
+.railbar{border-left:1px solid var(--color-border);background:var(--color-bg-elev1);display:flex;flex-direction:column;align-items:center;padding-top:12px;gap:10px}
+.railbar .dot{width:9px;height:9px;border-radius:50%;background:var(--color-warning);animation:pulse 1.4s infinite}
+.railbar button{background:none;border:1px solid var(--color-border);color:var(--color-text-muted);border-radius:6px;width:28px;height:28px;cursor:pointer}
+@keyframes pulse{50%{opacity:.35}}
+/* the ONE input */
+.ask{background:var(--color-warning-dim);border:1px solid var(--color-warning);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.ask.flash{outline:2px solid var(--color-warning);outline-offset:3px}
+.qlbl{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--color-warning);font-family:var(--font-mono);display:flex;gap:6px;align-items:center}
+.qlbl .pip{width:7px;height:7px;border-radius:50%;background:var(--color-warning)}
+.qtext{font-size:var(--text-base);line-height:1.5}
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{text-align:left;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;padding:9px 12px;color:var(--color-text);font-size:var(--text-sm);cursor:pointer;display:flex;gap:8px;align-items:center;font-family:inherit}
+.opt .mark{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--color-text-dim);flex-shrink:0}
+.opt[aria-checked="true"]{border-color:var(--color-warning);background:var(--color-warning);color:#06061a;font-weight:600}
+.opt[aria-checked="true"] .mark{border-color:#06061a;background:radial-gradient(#06061a 40%,transparent 45%)}
+.or{font-size:10px;text-align:center;color:var(--color-text-dim);text-transform:uppercase}
+textarea{background:var(--color-bg);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text);padding:8px;font-family:inherit;font-size:var(--text-sm);resize:vertical;min-height:52px}
+.send{align-self:flex-end;background:var(--color-warning);color:#06061a;border:none;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer}
+.send:disabled{opacity:.4;cursor:not-allowed}
+/* the pointer (never an input) */
+.pointer{display:flex;align-items:center;gap:10px;border:1px dashed var(--color-warning);border-radius:10px;padding:10px 12px;font-size:var(--text-sm)}
+.pointer .q{flex:1;color:var(--color-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pointer .draft{font-size:var(--text-xs);color:var(--color-text-dim)}
+.pointer button{background:none;border:1px solid var(--color-warning);color:var(--color-warning);border-radius:6px;padding:6px 10px;cursor:pointer;font-family:inherit;font-size:var(--text-xs);white-space:nowrap}
+.answered{border-color:var(--color-success);background:var(--color-success-dim)}
+.answered .qlbl{color:var(--color-success)}
+.threads{display:flex;gap:6px;padding:0 16px 0;margin-top:8px}
+.threads button{font-size:var(--text-xs)}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="sk">282</span>
+  <button class="vtab active" data-v="A">A · Input follows the open panel ★</button>
+  <button class="vtab" data-v="B">B · Chat always holds the input</button>
+  <button class="vtab" data-v="C">C · Pause opens the panel</button>
+</div>
+<div id="states"><span class="lbl">state</span>
+  <button class="stab active" data-s="open">Deep pause · panel open</button>
+  <button class="stab" data-s="rail">Deep pause · panel on rail</button>
+  <button class="stab" data-s="wfopen">Workflow pause · panel open</button>
+  <button class="stab" data-s="wfrail">Workflow pause · panel on rail (BUG-260828-07)</button>
+  <button class="stab" data-s="answered">Answered</button>
+</div>
+<div class="threads"><span class="lbl" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim)">viewing</span>
+  <button class="stab active" data-t="A">Thread A (paused)</button>
+  <button class="stab" data-t="B">Thread B (paused too)</button>
+</div>
+<div id="note"></div>
+<div id="frame"></div>
+
+<script>
+// ONE draft per ask, held once. Every rendering reads it; none copies it.
+const asks = {
+  A: {q:"Which dataset should I use for the Q3 rollup?", opts:["prod_sales_2026","staging_sales"]},
+  B: {q:"Approve this step? It will email the report to 14 recipients.", opts:["Approve this step","Do not run it"]},
+};
+const drafts = {A:{choice:null,text:""}, B:{choice:null,text:""}};
+let V="A", S="open", T="A";
+
+const NOTES = {
+  A:"<b>A (recommended):</b> exactly one input. When the panel is open, the panel card is the input and chat shows a <b>pointer</b> whose button moves focus to it. When the panel is on the rail, the same chat-column mount renders the full card. The mount never changes, only what it renders. Toggle the panel mid-draft: the selection stays.",
+  B:"<b>B:</b> chat always holds the input and the panel shows a pointer. Reachable in every state, but it reverses sketch 006 (the panel is the calm home) and pushes the question into a long transcript.",
+  C:"<b>C:</b> a pause forces the panel open, so the panel card is always the input. Sketch 006 rejected this takeover (variant A there). On mobile it covers the chat with a sheet on every routine question.",
+};
+
+function card(t, compact){
+  const a=asks[t], d=drafts[t];
+  if(S==="answered") return `<div class="ask answered"><div class="qlbl"><span class="pip" style="background:var(--color-success)"></span>Answered · agent resumed</div><div class="qtext">${a.q}</div><div style="font-size:var(--text-sm)"><b style="color:var(--color-success)">You:</b> ${d.choice!==null?a.opts[d.choice]:(d.text||"prod_sales_2026")}</div></div>`;
+  return `<div class="ask" id="ask-${t}"><div class="qlbl"><span class="pip"></span>Needs you</div>
+   <div class="qtext">${a.q}</div>
+   <div class="opts" role="radiogroup" aria-label="Answer options">${a.opts.map((o,i)=>`<button class="opt" role="radio" aria-checked="${d.choice===i}" tabindex="${(d.choice===null?i===0:d.choice===i)?0:-1}" data-i="${i}" data-t="${t}"><span class="mark"></span>${o}</button>`).join("")}</div>
+   <div class="or">or</div>
+   <textarea data-t="${t}" placeholder="Reason or answer…">${d.text}</textarea>
+   <button class="send" ${d.choice===null&&!d.text?"disabled":""}>Send Answer</button></div>`;
+}
+function pointer(t, where){
+  const a=asks[t], d=drafts[t];
+  const dr = d.choice!==null ? `Draft: ${a.opts[d.choice]}` : (d.text?`Draft: “${d.text.slice(0,24)}”`:"No answer yet");
+  if(S==="answered") return "";
+  return `<div class="pointer"><span class="qlbl" style="margin:0"><span class="pip"></span>Needs you</span><span class="q">${a.q}</span><span class="draft">${dr}</span><button data-go="${where}">Answer in ${where} →</button></div>`;
+}
+
+function render(){
+  const wf = S.startsWith("wf");
+  let panelOpen = (S==="open"||S==="wfopen"||S==="answered");
+  if(V==="C") panelOpen = true;
+  const fr=document.getElementById("frame"); fr.className = panelOpen?"":"rail";
+  // chat column
+  let chat = `<div class="msg user">Build me the Q3 rollup from the sales data.</div>`;
+  if(!wf) chat += `<div class="runcard">⏸ Paused · deep run<div class="step">⏸ ask_user · awaiting your answer — Agent is paused</div></div>`;
+  else chat += `<div class="msg">Workflow <b>Q3 report</b> is running. Step 3 of 5 — <i>no message row for this pause (role=system)</i>.</div>`;
+  // the ONE chat-column mount (list level)
+  if(V==="A") chat += panelOpen ? pointer(T,"panel") : card(T);
+  if(V==="B") chat += card(T);
+  if(V==="C") chat += pointer(T,"panel");
+  chat += `<div class="composer">Message…<span class="hint">Agent is paused</span></div>`;
+  let side;
+  if(panelOpen){
+    let top = "";
+    if(V==="A"||V==="C") top = card(T);
+    if(V==="B") top = pointer(T,"chat");
+    side = `<div class="panel">${top}<div class="sec">${wf?"Phase spine · step 3 of 5":"Todos"}</div><div class="sec">Files</div></div>`;
+  } else {
+    side = `<div class="railbar"><span class="dot" title="Needs you"></span><button id="expand" aria-label="Open panel">⟨</button></div>`;
+  }
+  fr.innerHTML = `<div class="chat">${chat}</div>${side}`;
+  document.getElementById("note").innerHTML = NOTES[V] + (V==="A"&&!panelOpen&&wf?" <b>This is the BUG-260828-07 case: no row to anchor to, panel closed — the chat-column mount still gives a full input.</b>":"");
+  bind();
+}
+function bind(){
+  document.querySelectorAll(".opt").forEach(b=>{
+    b.onclick=()=>{const d=drafts[b.dataset.t];const i=+b.dataset.i;d.choice=d.choice===i?null:i;render();};
+    b.onkeydown=e=>{ if(!["ArrowDown","ArrowUp","ArrowLeft","ArrowRight"].includes(e.key))return; e.preventDefault();
+      const n=asks[b.dataset.t].opts.length; const dir=(e.key==="ArrowDown"||e.key==="ArrowRight")?1:-1;
+      drafts[b.dataset.t].choice=((+b.dataset.i)+dir+n)%n; render();
+      document.querySelector(`.opt[data-t="${b.dataset.t}"][aria-checked="true"]`)?.focus(); };
+  });
+  document.querySelectorAll("textarea").forEach(t=>{t.oninput=()=>{drafts[t.dataset.t].text=t.value; const s=t.parentElement.querySelector(".send"); s.disabled=drafts[t.dataset.t].choice===null&&!t.value;
+    document.querySelectorAll(".pointer .draft").forEach(x=>x.textContent=t.value?`Draft: “${t.value.slice(0,24)}”`:"No answer yet");};});
+  document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{const c=document.getElementById("ask-"+T); if(!c)return; c.classList.add("flash"); c.querySelector(".opt,textarea").focus(); setTimeout(()=>c.classList.remove("flash"),900);});
+  const ex=document.getElementById("expand"); if(ex) ex.onclick=()=>{S=S.startsWith("wf")?"wfopen":"open"; syncTabs(); render();};
+}
+function syncTabs(){document.querySelectorAll(".stab[data-s]").forEach(x=>x.classList.toggle("active",x.dataset.s===S));}
+document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>{V=b.dataset.v;document.querySelectorAll(".vtab").forEach(x=>x.classList.toggle("active",x===b));render();});
+document.querySelectorAll(".stab[data-s]").forEach(b=>b.onclick=()=>{S=b.dataset.s;syncTabs();render();});
+document.querySelectorAll(".stab[data-t]").forEach(b=>b.onclick=()=>{T=b.dataset.t;document.querySelectorAll(".stab[data-t]").forEach(x=>x.classList.toggle("active",x===b));render();});
+render();
+</script>
+</body>
+</html>

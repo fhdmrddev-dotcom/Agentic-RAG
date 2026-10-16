@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-218
 title: The describe door's refusal offers a *connect* button that does nothing — `onOpenSettings` is threaded and lands on no handler
-status: planted
+status: answered
+status_note: "ANSWERED by Phase 281 (2026-10-15, `33886624f` (drives HEAD; source `3931b0978`)) — 281-LIVE-EVIDENCE.md row C: the describe door's DOOR_REFUSAL `Connect Linear` click landed on the Connections page (rail aria-current = Connections). ⚠ Residual: the governed DOOR_REFUSAL sentence (doorVocabulary.ts:535) still says 'connect it in Settings' while the control opens Connections; doorVocabulary.ts was not edited in 281. WAS: folded into Phase 281 at /gsd:plan-phase 281 (2026-10-14, operator) — 281-CONTEXT.md D-27."
 planted: 2026-08-28
 planted_by: Claude, 2026-08-28, measured by plan `214-13` and recorded at the phase close; owner named, wiring not done
 surface: Agentic-RAG
@@ -58,3 +59,14 @@ rather than left for the operator to find.
 `214-13` owns the refusal component and does not own the page; `214-04` owns the page and did not
 know the prop existed. **Neither plan owned the seam**, which is the same cross-plan-seam failure
 mode the 204 pre-flight recorded: both sides green, the join unowned.
+
+## 2026-10-15 — answered by Phase 281 (281-04, G-4 row C)
+
+Driven live at `33886624f` (drives HEAD; source `3931b0978`): typing *"Every Friday, create a Linear issue listing the week's new security
+policy documents."* on the describe door rendered *"Linear is not connected — connect it in Settings,
+or describe this step without it."* with `Connect Linear` and `Revise the description`. Clicking
+`Connect Linear` opened the **Connections** page (heading "Connections", rail `aria-current` =
+Connections). The button is no longer a no-op. ⚠ **Residual, recorded rather than fixed:** the
+sentence still says *"in Settings"* while the destination is Connections. `doorVocabulary.ts` is a G-5
+hot file and was not edited in 281, so the wording is owed to the next phase that touches it.
+Evidence: `.planning/phases/281-a-refusal-names-its-cause/281-LIVE-EVIDENCE.md` § Row C.

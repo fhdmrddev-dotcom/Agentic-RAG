@@ -242,7 +242,11 @@ async def test_out_of_range_int_is_422_before_any_write(monkeypatch, col, factor
         )
 
     assert ei.value.status_code == 422
-    assert col in ei.value.detail
+    if col == "llm_call_timeout_seconds":
+        # Phase 282 UI-SPEC Surface 3: the timeout refusal is a plain sentence, no raw engine name.
+        assert ei.value.detail.startswith("Timeout must be between")
+    else:
+        assert col in ei.value.detail
     assert str(lo) in ei.value.detail and str(hi) in ei.value.detail
     assert not pool.calls, "the bounds guard must 422 BEFORE any capability write"
 

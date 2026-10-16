@@ -105,6 +105,9 @@ const FAILURES: EmitFailure[] = [
   "render_failed",
   "integrity_failed",
   "no_template_bound",
+  // Phase 281-03 (D-30): split from `citation_gate_rejected` — a keys-only miss. Added here
+  // deliberately: this array is meant to be the WHOLE union, like SUBSTEPS above.
+  "template_fields_missing",
 ]
 
 describe("PhaseCard — GAP-C emit sub-steps (D-11)  [owner: 101.1-04]", () => {
@@ -191,7 +194,10 @@ describe("PhaseCard — GAP-C 5 emit failure states (D-11 / RC-4)  [owner: 101.1
       unmount()
     }
     // 5 distinguishable failure states → 5 distinct rendered reasons.
-    expect(reasons.size).toBe(5)
+    // Phase 281-03 (D-30): re-pinned on purpose from the literal 5 to the union's size — the
+    // union gained `template_fields_missing`, and the claim (one distinct reason per member)
+    // is unchanged.
+    expect(reasons.size).toBe(FAILURES.length)
   })
 
   it("a typed emit failure renders failed-as-failed even before status flips to 'failed' (RC-4)", () => {
@@ -1116,5 +1122,134 @@ describe("PhaseCard — 252-04: a dead run's phase card stops claiming running",
     dead.unmount()
     const live = render(<PhaseCard phase={fillPhase({ status: "retrying" })} position={0} />)
     expect(statusAtomOf(live.container)).toStrictEqual(["↻", "Attempt"])
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// Phase 281-03 (FIX-09 · D-30 / D-04) — a keys-only emit miss has its OWN words, and the
+// server's composed multi-line cause renders as lines.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+describe("PhaseCard 281-03 — template_fields_missing never reads as a citation failure", () => {
+  it("renders a reason that names missing template fields and never says 'citation'", () => {
+    render(
+      <PhaseCard
+        phase={fillPhase({ status: "failed", emitFailure: "template_fields_missing" })}
+        position={0}
+      />,
+    )
+    const alert = screen.getByRole("alert")
+    const text = alert.textContent ?? ""
+    // BOTH strings of the copy entry (reason + where-line) are inside the alert.
+    expect(text).not.toMatch(/citation/i)
+    expect(text).toMatch(/template/i)
+    expect(text).toMatch(/fields/i)
+    expect(text).toMatch(/missing/i)
+    // …and it is the typed copy, not the sentinel a missing taxonomy entry falls to.
+    expect(text).not.toContain(FAILED_REASON_UNKNOWN)
+  })
+
+  it("the uncited / invented case keeps its own copy, unchanged", () => {
+    render(
+      <PhaseCard
+        phase={fillPhase({ status: "failed", emitFailure: "citation_gate_rejected" })}
+        position={0}
+      />,
+    )
+    expect(screen.getByRole("alert").textContent).toMatch(
+      /The emitted field-map had uncited or invented values/,
+    )
+  })
+
+  it("a reconciled run's composed two-line cause renders VERBATIM, with whitespace-pre-line", () => {
+    const CAUSE =
+      'Step "Write the summary" failed after 2 attempt(s):\n• 2 attempt(s) — the model left template fields empty.'
+    render(
+      <PhaseCard
+        phase={fillPhase({ status: "failed", error: undefined, failureReason: CAUSE })}
+        position={0}
+      />,
+    )
+    const alert = screen.getByRole("alert")
+    const reason = Array.from(alert.querySelectorAll("span")).find((s) => s.textContent === CAUSE)
+    expect(reason, "the composed cause must render verbatim as one text child").toBeDefined()
+    expect(reason!.className.split(/\s+/)).toContain("whitespace-pre-line")
+    expect(reason!.children).toHaveLength(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 281-REVIEW CR-01 (D-04) — THE LIVE STATE: `emitFailure` AND a composed reason are BOTH set.
+// Every executor failure arm emits `phase_substep` with a failure value, so on a streaming run
+// `emitFailure` is always present. The server's composed sentence must win; the fixed
+// closed-taxonomy copy is only the never-empty fallback when no sentence reached the client.
+// The strings below are the composer's REAL output shape (`emit_cause.compose_emit_failure`).
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+describe("PhaseCard 281-REVIEW CR-01 — the composed cause wins over the fixed copy on a live run", () => {
+  const PROVIDER_CAUSE =
+    "This step failed after 1 attempt:\n• 1 attempt — the model provider returned an error. Check that this step's model provider is reachable."
+  const GOLDEN_CAUSE =
+    'Step "Write the report" failed after 9 attempts:\n• 7 attempts — filled the template, but these fields were missing: rows. Check that the template\'s field names match what this step produces.\n• 2 attempts — the model wrote prose instead of filling the template. Check which model this step uses.'
+
+  it("a live provider error reads the provider cause, never the narration copy", () => {
+    render(
+      <PhaseCard
+        phase={fillPhase({
+          status: "failed",
+          emitFailure: "model_failed_to_emit",
+          error: PROVIDER_CAUSE,
+        })}
+        position={0}
+      />,
+    )
+    const text = screen.getByRole("alert").textContent ?? ""
+    expect(text).toContain("the model provider returned an error")
+    expect(text).not.toMatch(/narrated/i)
+  })
+
+  it("the golden-run shape names `rows` even though the LAST invocation narrated", () => {
+    render(
+      <PhaseCard
+        phase={fillPhase({
+          status: "failed",
+          emitFailure: "model_failed_to_emit",
+          error: GOLDEN_CAUSE,
+        })}
+        position={0}
+      />,
+    )
+    const alert = screen.getByRole("alert")
+    const reason = Array.from(alert.querySelectorAll("span")).find(
+      (s) => s.textContent === GOLDEN_CAUSE,
+    )
+    expect(reason, "the composed cause must render verbatim").toBeDefined()
+    expect(reason!.className.split(/\s+/)).toContain("whitespace-pre-line")
+    expect(alert.textContent).toContain("these fields were missing: rows")
+  })
+
+  it("a reconciled record (failureReason only) also wins over the typed copy", () => {
+    render(
+      <PhaseCard
+        phase={fillPhase({
+          status: "failed",
+          emitFailure: "template_fields_missing",
+          error: undefined,
+          failureReason: GOLDEN_CAUSE,
+        })}
+        position={0}
+      />,
+    )
+    expect(screen.getByRole("alert").textContent).toContain("these fields were missing: rows")
+  })
+
+  it("with NO reason, the fixed copy is the fallback (and a keys-only miss never says citation)", () => {
+    render(
+      <PhaseCard
+        phase={fillPhase({ status: "failed", emitFailure: "template_fields_missing", error: "" })}
+        position={0}
+      />,
+    )
+    const text = screen.getByRole("alert").textContent ?? ""
+    expect(text).toContain("The model filled the template, but some of its fields were missing.")
+    expect(text).not.toMatch(/citation/i)
   })
 })

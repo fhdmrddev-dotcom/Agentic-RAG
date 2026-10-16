@@ -39,6 +39,7 @@ from app.config import (
     API_SURFACES,
     MODEL_CAPABILITIES,
     _infer_provider_for,
+    llm_call_timeout_ceiling_reason,
     settings,
 )
 from app.dependencies import (
@@ -234,6 +235,15 @@ _MODEL_CAP_INT_BOUNDS: dict[str, tuple[int, int]] = {
     # so on screen. The SQL CHECK (migration 190) carries the same `> 0`.
     "max_tools": (1, 512),
 }
+
+
+def _timeout_out_of_range_detail(lo: int, hi: int, val: int) -> str:
+    """Phase 282 D-07 / D-21 / D-29: the ONE operator sentence for a refused timeout, shared by
+    the capability PATCH and Add model by ID so the two doors can never word it differently."""
+    return (
+        f"Timeout must be between {lo} and {hi} seconds, because "
+        f"{llm_call_timeout_ceiling_reason(settings)}. {val} was not saved."
+    )
 
 # The single load-bearing security line: default-deny at the router (Pattern 1).
 router = APIRouter(
@@ -1213,6 +1223,10 @@ class AddModelRequest(BaseModel):
     native_tools: bool | None = None
     deprecated: bool = False
     deprecated_reason: str | None = None
+    # Phase 282 D-29: an optional Timeout at add time — local models are slower, and before this
+    # an added model ran at the default until a second edit. Blank (None) stores nothing, so the
+    # resolver default applies (900 s self-hosted, 300 s cloud — D-27).
+    llm_call_timeout_seconds: int | None = None
 
 
 # The capability columns add-by-ID may pre-fill — a CODE-CONSTANT ordered subset of
@@ -1220,6 +1234,7 @@ class AddModelRequest(BaseModel):
 # never a body field). Column names reach the upsert ONLY from this constant — a client value
 # never becomes an identifier (T-159-02, the same SQLi wall as set_model_capability).
 _ADD_MODEL_CAP_COLUMNS = (
+    "llm_call_timeout_seconds",  # Phase 282 D-29
     "context_window_tokens",
     "max_output_tokens",
     "native_tools",
@@ -1292,6 +1307,21 @@ async def add_model_by_id(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"'{col}' must be an integer or null.",
             )
+    # Phase 282 D-29: the Timeout gets the SAME range and the SAME sentence as the PATCH,
+    # refused before any DB touch.
+    if body.llm_call_timeout_seconds is not None:
+        _t = body.llm_call_timeout_seconds
+        if isinstance(_t, bool) or not isinstance(_t, int):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="'llm_call_timeout_seconds' must be an integer or null.",
+            )
+        _lo, _hi = _MODEL_CAP_INT_BOUNDS["llm_call_timeout_seconds"]
+        if not (_lo <= _t <= _hi):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=_timeout_out_of_range_detail(_lo, _hi, _t),
+            )
     if body.native_tools is not None and not isinstance(body.native_tools, bool):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1344,6 +1374,7 @@ async def add_model_by_id(
     # ``enabled`` column is ALWAYS written as the literal False (never taken from the body — there
     # is no body.enabled — so an add can never auto-enable, SC#3).
     cap_values = {
+        "llm_call_timeout_seconds": body.llm_call_timeout_seconds,
         "context_window_tokens": body.context_window_tokens,
         "max_output_tokens": body.max_output_tokens,
         "native_tools": body.native_tools,
@@ -1490,6 +1521,13 @@ async def set_model_capability(
             # fires the per-call timer instantly (every run `timed_out` — the T-066-05 DoS)
             # and a 0 context window is not a smaller model, it is a broken row.
             _lo, _hi = _MODEL_CAP_INT_BOUNDS[col]
+            if not (_lo <= val <= _hi) and col == "llm_call_timeout_seconds":
+                # Phase 282 D-07 / D-21: the timeout refusal is an operator sentence naming
+                # WHY the ceiling is there (the run watchdog), never a raw engine column name.
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=_timeout_out_of_range_detail(_lo, _hi, val),
+                )
             if not (_lo <= val <= _hi):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

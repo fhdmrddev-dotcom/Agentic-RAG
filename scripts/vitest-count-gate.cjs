@@ -126,7 +126,18 @@ const BASELINE = {
   // the defect: `expect(...getAllByRole("option")).toHaveLength(8)` pinned the 8-cloud roster
   // that made every self-hosted model unaddable (SEED-172). A fence outside the gate that
   // pins a bug is worse than no fence — it reads as coverage.
-  "ModelRegistryTab.test.tsx": 29,
+  // Phase 282-03 — 29 -> 33, measured on the merged tree's one gate run (2026-10-15, 33/33 passed).
+  // The +4 are 282-01's Registry timeout cases (the 422 detail in the row's role=alert slot, the
+  // help line while the Timeout cell edits, no help line on another cell, no client pre-block).
+  // Raised here, not in 282-01, because this file was
+  // single-owner for wave 2 (D-25). A pin is a floor.
+  // Phase 282-04 — 33 -> 36, measured 2026-10-15 (36/36 passed in a targeted run): the +3 are the
+  // Add-form Timeout cases (placeholder 300 -> 900 by provider, blank sends no key, typed is a number).
+  // 36 -> 37 the same day: the live drive found the browser's native max=1800 hiding the
+  // server's refusal sentence; the +1 fences 1801 reaching the server and its alert in the form.
+  // 282-REVIEW WR-05 — 37 -> 39, measured 2026-10-15 (39/39 passed in a targeted run): "1e3" and
+  // "900.5" are refused in the form instead of parseInt sending 1 and 900.
+  "ModelRegistryTab.test.tsx": 39,
   "addProviderRoster.lockstep.test.ts": 4,
   "hideControlLegibility.test.tsx": 6,
   // Phase 249 Plan 02 (MODEL-05) — the pick-time chip, its negative arm, its consequence text,
@@ -1736,6 +1747,13 @@ const BASELINE = {
   "SettingsPage.a11y.test.tsx": 4,
   "SettingsPage.sourceCeiling.test.tsx": 9,
   "SettingsPage.changedFields.test.tsx": 17,
+  // Phase 283-01 (D-14) — the Settings tab registry suite. Registered in BOTH knobs in one commit.
+  "settingsTabs.test.ts": 11,
+  // Phase 283-02 (FIX-01 / D-12) — a member's and an operator's Settings page as rendered content
+  // (tab strips, landing tab, moved blocks, Reset, zero gated calls + the operator positive
+  // control). Registered in BOTH knobs in one commit.
+  // 283-REVIEW: 16 → 20 (+2 WR-02 features-loading window, +2 IN-02 Reset keys on the shown tab).
+  "SettingsPage.member283.test.tsx": 20,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
@@ -3136,14 +3154,14 @@ const BASELINE = {
   // suite (a directory TARGETS entry reaches it) and guarded NOTHING. It could have lost
   // every case and the gate would still have said OK. The twelfth suite found in this
   // state in a week — see SEED-229, which proposes the gate self-check that would end it.
-  "PendingAskCard.test.tsx": 45,
+  "PendingAskCard.test.tsx": 54, // RE-PINNED 45 → 54 at 282-02 (radio keyboard, non-colour mark, the shared draft: answer/expiry settle, 500 keeps it)
   // SEED-227 — pinned at 3 in the SAME COMMIT that creates the file and its TARGETS line,
   // from this script's own printed `actual` column (`— 3 new`), not booked ahead. An
   // unpinned file is not a lightly-guarded one, it is an UNGUARDED one: the count could
   // fall to 1 and the gate would report OK. The load-bearing case is the ABSENCE one —
   // `_images` is stamped only on truncation — and an absence assertion is the easiest kind
   // to delete without anyone noticing.
-  "DocumentDetailPanel.images.test.tsx": 3,
+  "DocumentDetailPanel.images.test.tsx": 4, // RAISED 3 → 4 at 284-03 (images N of M)
 
   // ── Phase 240 (SRC-05 / D-240-19) — pinned at the counts measured at this phase's close.
   // ⚠ Captured from a GREEN run, never while red, and matched 1:1 with the TARGETS entries
@@ -3164,7 +3182,7 @@ const BASELINE = {
   // "never pin from a red run" rule is honoured where it binds: on the files being pinned.
   // ⬆ RAISED 2 → 5 at `262-05`: the catalog's entry action (present / ungoverned / the
   //   eighth-entry count). ⛔ An EXTENSION, never a lowering — the D-07 pair above is intact.
-  "nav-items.test.ts": 5,
+  "nav-items.test.ts": 6, // 283-02: +1 (the Settings door stands for a member, FIX-01)
   "navItemsConnections.test.ts": 6,
   "activeViewReachability.test.ts": 11,
 
@@ -3547,13 +3565,14 @@ const BASELINE = {
   // The fence was doing its job; what it caught was a real drift. +1 case is 233's own positive
   // control for the now-NAMED exclusion.
   "IngestionStrip.test.tsx": 31,
-  "DetailSections.lazy.test.tsx": 14,
+  "DetailSections.lazy.test.tsx": 20, // 283-03: +6 (the bounded, labelled, one-Tab-stop chunk list, FIX-08)
   "CR01.reset.test.tsx": 2,
-  "DetailSections.tables.test.tsx": 15,
+  "DetailSections.tables.test.tsx": 18, // RAISED 15 → 18 at 284-03 (Tables / Images say N of M)
   "tabsContrast.test.ts": 14,
   "LibraryPage.test.tsx": 12,
   "librarySelection.test.ts": 25,
-  "useDocuments.test.ts": 7,
+  "useDocuments.test.ts": 14, // RAISED 7 → 14 at 284-REVIEW WR-01 (a membership-changing Realtime UPDATE refetches; a cosmetic one merges)
+  "useLibraryDocuments.test.ts": 25, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint) · RAISED 24 → 25 at 284-REVIEW WR-01 (the on-page rows reach useDocuments)
   "DocumentList.test.tsx": 7,
   "DocumentList.moveToFolder.test.tsx": 4,
   "ViewsGroup.test.tsx": 10,
@@ -3594,9 +3613,11 @@ const BASELINE = {
   // trailing orphans close 217's deferred-§3 re-open trigger.
   "sketchComposition.test.tsx": 47,
   "ingestionFailureCopy.test.ts": 25,
-  "IngestionTab.test.tsx": 42, // +2 BUG-260923-02 History paging
+  "IngestionTab.test.tsx": 52, // +2 BUG-260923-02 History paging · RAISED 42 → 50 at 284-03 (the summary + three paged status lists) · RAISED 50 → 52 at 284-REVIEW CR-01 (a shrinking list clamps the page)
   "pipelineGroups.test.ts": 7,
-  "LibraryStatTiles.test.tsx": 13,
+  "LibraryStatTiles.test.tsx": 16, // RAISED 13 → 16 at 284-01 Task 3 (+3 CHUNKS arm cases; the 13 converted in place to number props)
+  "FolderDetail284.test.tsx": 6, // 284-01 Task 3 — the folder band takes numbers; 284-05 checkpoint +1 (grouped counts). BOTH KNOBS, SAME COMMIT.
+  "AnimatedNumber.progress.test.ts": 7, // 284-05 checkpoint — the eased fraction never leaves [0, 1] (G-4 saw "-17,721"). BOTH KNOBS, SAME COMMIT. · RAISED 3 → 7 at 284-REVIEW IN-05 (locale-grouped count-ups)
   "viewRulePhrase.test.ts": 4,
   "ViewCardGrid.test.tsx": 14,
   "IndexFoldersTable.test.tsx": 6,
@@ -3714,7 +3735,7 @@ const BASELINE = {
   // rather than fail. Phase 214's `WorkflowScheduleModal` finding, avoided by looking.
   // ⬆ RAISED 9 → 13 at 271-04, recording 271-02's Filing-rules header-link cases (measured `13`
   //   on the wave-1 gate run at ff4b98f01).
-  "LibraryHeaderBar.test.tsx": 13,
+  "LibraryHeaderBar.test.tsx": 17, // RAISED 13 → 16 at 284-03 (Counting… / Count not known yet) · RAISED 16 → 17 at 284-REVIEW IN-05 (Reading 1,200 files)
   // 22 → 30: per-file selection (operator: "how can I select individual files") and the
   // two-column body that puts the folder tree inside the card it feeds.
   "SourcePreviewPanel.test.tsx": 30,
@@ -4116,15 +4137,16 @@ const BASELINE = {
   "DocumentRow.download270.test.tsx": 4, // 270-04
   // ── Phase 271-03 — adopted BEFORE the combobox extraction so a regression is visible (they
   // were in neither knob; SEED-280). Measured at PHASE_BASE 20050816d: 8 / 11 / 6 passed. ──
-  "CreateLinkDialog.test.tsx": 8, // 271-03
+  "CreateLinkDialog.test.tsx": 14, // 271-03 · RAISED 8 → 14 at 284-04 (server type-ahead on POST /document-search)
   "RelationshipsSection.test.tsx": 11, // 271-03
   "RelationshipsSection.a11y.test.tsx": 6, // 271-03
   // ── Phase 271-03 — every suite this plan CREATED, at its measured passing count. BOTH KNOBS, SAME COMMIT. ──
   "findState.test.ts": 54, // 271-03 (2026-10-03) · RE-PINNED 49 → 54 at 275-02 (+5 Include archived cases, D-04)
   "documents.search271.test.ts": 3, // 271-03
+  "libraryPaging284.test.ts": 22, // 284-01 Task 1 — the paged wire contract. BOTH KNOBS, SAME COMMIT.
   "useDocumentFind.test.tsx": 11, // 271-03
   "relationshipLabels.test.ts": 5, // 271-03
-  "LinkTargetCombobox.test.tsx": 9, // 271-03
+  "LinkTargetCombobox.test.tsx": 17, // 271-03 · RAISED 9 → 17 at 284-04 (server mode)
   "documentAddedBy.test.ts": 6, // 271-03
   "DocumentRow.find271.test.tsx": 19, // 271-03 · RAISED 17 → 19 at 271-REVIEW-FIX (F-2: older-row actions)
   // ── Phase 271-04 — ADOPTED, not raised: in NEITHER knob before (RESEARCH Wave 0). Measured
@@ -4134,8 +4156,8 @@ const BASELINE = {
   "ConditionPopover.test.tsx": 13, // 271-04 (2026-10-03)
   // ── Phase 271-04 Task 1 — every suite it CREATED, at its measured passing count. BOTH KNOBS. ──
   "FilterBar.find271.test.tsx": 11, // 271-04 (3 are the Views-tab DOM snapshot pins)
-  "StructurePopovers.test.tsx": 22, // 271-04
-  "FindQuickAdd.test.tsx": 22, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03) · RE-PINNED 18 → 22 at 275-02 (+4 Include archived chip cases)
+  "StructurePopovers.test.tsx": 30, // 271-04 · RAISED 22 → 27 at 284-01 Task 3 (+5 summary-list arm cases) · RAISED 27 → 30 at 284-04 (server-mode relationship picker)
+  "FindQuickAdd.test.tsx": 27, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03) · RE-PINNED 18 → 22 at 275-02 (+4 Include archived chip cases) · RAISED 22 → 26 at 284-01 Task 3 (+4 summary-list cases) · RAISED 26 → 27 at 284-04 (Relationship editor searches the server)
   // ── Phase 271-04 Task 2 — the Find results surface and the exact pager. BOTH KNOBS. ──
   "DocumentsFindBody.test.tsx": 26, // 271-04
   "DocumentsPager.exact271.test.tsx": 3, // 271-04
@@ -4205,7 +4227,7 @@ const BASELINE = {
   // plan's tree (0 failing), each RED before its module existed. What each proves:
   "libraryRetention.test.tsx": 16, // RE-PINNED 15 → 16 at 275-REVIEW frontend fix pass · RE-PINNED 12 → 15 at 275-05 (G-4 fast-fixes: two-stage folder line + its rule_text ?raw fence, fully-archived list not claimed empty) · 275-04 — S6 one chip + one source chip, S7 admin vs member line (D-17), ONE batched document-states read (flag 2), hidden line = Find's include-archived state (D-04), S10 pre-open refusal
   "RetentionSection.test.tsx": 24, // RE-PINNED 18 → 24 at 275-REVIEW frontend fix pass · 275-04 — every S8 sentence, member payload with no hold_names renders no matter (D-17), B-NEW-1 snapshot name, Un-archive receipt/failure (D-19), placed after File
-  "LegalHolds.test.tsx": 25, // RE-PINNED 16 → 25 at 275-REVIEW frontend fix pass · 275-04 — S3 card anatomy, Place hold held back with a visible reason, server count / "Couldn't count the documents yet." never 0 (D-05/D-35), release victim-naming not red
+  "LegalHolds.test.tsx": 29, // RE-PINNED 16 → 25 at 275-REVIEW frontend fix pass · 275-04 — S3 card anatomy, Place hold held back with a visible reason, server count / "Couldn't count the documents yet." never 0 (D-05/D-35), release victim-naming not red · RAISED 25 → 29 at 284-04 (server type-ahead, 20 suggestions)
   "WaitingForYou.test.tsx": 22, // RE-PINNED 13 → 22 at 275-REVIEW frontend fix pass · 275-04 — S4 type-the-count (D-03 / T-275-31): ticked start, untick clears the count, Enter only when enabled, late-hold drop named; review undecided by default (D-10)
   "RetentionTab.test.tsx": 18, // RE-PINNED 12 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 11 → 12 at 275-05 ("1 policy") · 275-04 — S1 posture incl. sweeps-off (D-29), Waiting pill red only at N > 0 (D-01), roving tabs, sweep time from sweep_hour_utc, editor in place
   "RetentionPolicyEditor.test.tsx": 28, // RE-PINNED 16 → 28 at 275-REVIEW frontend fix pass · 275-04 — S2 Preview gate (D-02 / T-275-32): aria-disabled + on-screen reason, stale re-lock, 409 rendered, save failure keeps preview; two clocks (D-22); stage 2 (D-20)
@@ -4213,6 +4235,21 @@ const BASELINE = {
   // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
   // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
   "OrgAdminShell.test.tsx": 12, // RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
+  // Phase 282-02 — the one ask-draft home (FIX-07 / D-12): one draft per ask, GC on the ask slice, panel-home refcount, the global reset
+  "askDraftStore.test.ts": 7,
+  // Phase 282-02 — the D-15 fences: one input per pause across both homes, the pointer, the rail handoff, BUG-260828-07 reachability
+  "PendingAskStack.oneInput.test.tsx": 11,
+  // ── Phase 284 (FIX-11) — every suite 284-03 / 284-05 CREATED, plus TakeoffSection, which was in
+  // NEITHER knob (284-04 rewrote it to one bounded spreadsheet page). Each read from a real
+  // `npx vitest run <file>` on the merged tree (284-05 Task 2). BOTH KNOBS, SAME COMMIT. ──
+  "LibraryPage.states284.test.tsx": 15, // 284-03 — cold / warm / failed / empty are four states (SEED-248 Library half)
+  "DocumentChunksSection.paging284.test.tsx": 8, // 284-03 — chunks page by scroll sentinel, N of M
+  "DocumentRow.versions284.test.tsx": 3, // 284-03 — versions say N of M
+  "libraryListFence.test.ts": 3, // 284-05 — D-16: no product code asks for the whole library (planted-source self-test)
+  "TakeoffSection.test.tsx": 13, // 284-04 — ADOPTED at 284-05: ONE bounded spreadsheet page, never the whole library · RAISED 8 → 13 at 284-REVIEW WR-04 (the saved rate sheet is always shown)
+  // 284-REVIEW CR-01 / IN-07 — the review-fix suites. BOTH KNOBS, SAME COMMIT.
+  "LibraryPage.review284.test.tsx": 5, // 284-REVIEW CR-01 + IN-07 — never a page past the end; the pager describes the rows shown
+  "pageClamp.test.ts": 3, // 284-REVIEW CR-01 — the ONE clamp for every paged list
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4874,6 +4911,11 @@ const TARGETS = [
   // BOTH knobs in the SAME commit: a BASELINE key naming a file that does not exist makes the
   // gate exit 2 and halts every agent.
   "src/pages/__tests__/SettingsPage.changedFields.test.tsx",
+  // Phase 283-02 (FIX-01 / D-12) — the member/operator Settings fence. BASELINE pin in the same commit.
+  "src/pages/__tests__/SettingsPage.member283.test.tsx",
+  // Phase 283-01 (D-14) — the tab-registration seam's own suite (registry rule + source-order
+  // fence tying the literal <TabsTrigger> order to SETTINGS_TABS). BASELINE pin in the same commit.
+  "src/components/settings/__tests__/settingsTabs.test.ts",
   // Added in 188-10 — and this one is an ADOPTION, not a new file, which is the case the
   // panel-directory comment above explicitly reserved: "a later phase that wants
   // WorkspacePanel inside the gate should adopt it deliberately, with its own measured
@@ -5540,6 +5582,8 @@ const TARGETS = [
   // — so its G-5 obligation is not triggered by a code change here. What changes is that
   // its two suites stop being invisible to this gate.
   "src/__tests__/hooks/useDocuments.test.ts",
+  // Phase 284-01 Task 2 — the D-24 Library data hook. FILE-LEVEL.
+  "src/__tests__/hooks/useLibraryDocuments.test.ts",
   "src/__tests__/components/DocumentList.moveToFolder.test.tsx",
   "src/components/ingestion/DocumentList.test.tsx",
   "src/components/ingestion/ViewsGroup.test.tsx",
@@ -5569,6 +5613,10 @@ const TARGETS = [
   "src/components/library/__tests__/IngestionTab.test.tsx",
   "src/components/library/ingestion/__tests__/pipelineGroups.test.ts",
   "src/components/library/__tests__/LibraryStatTiles.test.tsx",
+  // Phase 284-01 Task 3 — the folder band takes numbers. FILE-LEVEL.
+  "src/components/ingestion/__tests__/FolderDetail284.test.tsx",
+  // Phase 284-05 checkpoint — AnimatedNumber never paints a negative mid-animation. FILE-LEVEL.
+  "src/components/ui/__tests__/AnimatedNumber.progress.test.ts",
   "src/components/library/__tests__/viewRulePhrase.test.ts",
   "src/components/library/__tests__/ViewCardGrid.test.tsx",
   "src/components/library/__tests__/IndexFoldersTable.test.tsx",
@@ -6089,6 +6137,8 @@ const TARGETS = [
   // Phase 271-03 — every suite this plan created. FILE-LEVEL.
   "src/pages/__tests__/findState.test.ts",
   "src/lib/api/__tests__/documents.search271.test.ts",
+  // Phase 284-01 Task 1 — the paged wire contract. FILE-LEVEL.
+  "src/lib/api/__tests__/libraryPaging284.test.ts",
   "src/hooks/__tests__/useDocumentFind.test.tsx",
   "src/components/relationships/relationshipLabels.test.ts",
   "src/components/relationships/LinkTargetCombobox.test.tsx",
@@ -6146,6 +6196,20 @@ const TARGETS = [
   // Phase 275-04 — the org shell's suite goes by FILE path (no `src/components/org` entry): it
   // carries the deliberately retired locked-Retention fence and its replacement.
   "src/components/org/OrgAdminShell.test.tsx",
+  // Phase 282-02 — the ask-draft store's suite goes by FILE path (no `src/stores` entry).
+  "src/stores/__tests__/askDraftStore.test.ts",
+  // Phase 282-02 — panel __tests__ entries are FILE-level, so the new suite is named here.
+  "src/components/panel/__tests__/PendingAskStack.oneInput.test.tsx",
+  // Phase 284 (FIX-11) — FILE-LEVEL: `src/pages`, `src/components/metadata`, `src/components/ingestion`
+  // and `src/lib` have no bare-directory entry. TakeoffSection was in NEITHER knob before 284-05.
+  "src/pages/__tests__/LibraryPage.states284.test.tsx",
+  "src/components/metadata/__tests__/DocumentChunksSection.paging284.test.tsx",
+  "src/components/ingestion/__tests__/DocumentRow.versions284.test.tsx",
+  "src/lib/__tests__/libraryListFence.test.ts",
+  "src/components/metadata/__tests__/TakeoffSection.test.tsx",
+  // 284-REVIEW CR-01 / IN-07 — FILE-LEVEL (no `src/pages` / `src/lib` directory entry).
+  "src/pages/__tests__/LibraryPage.review284.test.tsx",
+  "src/lib/__tests__/pageClamp.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -13,6 +13,10 @@ import { render, screen } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 
 import { PublishBlockedStepCard } from "@/components/workflows/PublishBlockedStepCard"
+import {
+  BLOCKED_STEP_NEXT,
+  BLOCKED_STEP_NEXT_NO_RUN,
+} from "@/components/workflows/publishBlockedStep"
 import type { DefShape } from "@/components/workflows/soulData"
 
 const LIVE_CAUSE =
@@ -92,6 +96,37 @@ describe("PublishBlockedStepCard", () => {
     render(<PublishBlockedStepCard step={{ ...LIVE_STEP, step_name: "Survey the library" }} />)
     expect(screen.getByTestId("blocked-step-headline")).toHaveTextContent("Survey the library")
     expect(screen.getByTestId("blocked-step-cause")).toHaveTextContent(LIVE_CAUSE)
+  })
+
+  // ── Phase 281-03 (D-28) — the next line follows the link, never the other way round ──
+  it("281-03: with canOpenRun the next line points at the run (the link exists)", () => {
+    render(<PublishBlockedStepCard step={LIVE_STEP} definition={LIVE_DEF} canOpenRun />)
+    expect(screen.getByTestId("blocked-step-next").textContent).toBe(BLOCKED_STEP_NEXT)
+  })
+
+  it("281-03: without canOpenRun (false or absent) the next line names no run to open", () => {
+    for (const canOpenRun of [false, undefined]) {
+      const { unmount } = render(
+        <PublishBlockedStepCard step={LIVE_STEP} definition={LIVE_DEF} canOpenRun={canOpenRun} />,
+      )
+      const next = screen.getByTestId("blocked-step-next").textContent ?? ""
+      expect(next).toBe(BLOCKED_STEP_NEXT_NO_RUN)
+      expect(next).not.toMatch(/open the trial run/i)
+      unmount()
+    }
+  })
+
+  // ── Phase 281-03 (D-04 render half) — the composed multi-line cause renders as LINES ──
+  it("281-03: a multi-line cause renders verbatim as a text child, with whitespace-pre-line", () => {
+    const twoLine = "A:\n• 1 attempt — x"
+    render(
+      <PublishBlockedStepCard step={{ ...LIVE_STEP, cause: twoLine }} definition={LIVE_DEF} />,
+    )
+    const cause = screen.getByTestId("blocked-step-cause")
+    expect(cause.textContent).toBe(twoLine)
+    expect(cause.className.split(/\s+/)).toContain("whitespace-pre-line")
+    // A text child — no element was injected for the line break.
+    expect(cause.children).toHaveLength(0)
   })
 
   it("does not blow up on a malformed definition", () => {

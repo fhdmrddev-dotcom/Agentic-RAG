@@ -5,11 +5,36 @@
  * Version default is always visible (a filter that hides rows by default must show that it
  * does). These cases assert the WORDS on each chip and the ACTION each editor dispatches.
  */
-import { describe, it, expect, vi } from "vitest"
+import type { ComponentProps } from "react"
+import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
+
+// 284-04 (D-15): the Relationship editor type-aheads against POST /document-search; the row no
+// longer forwards `documents` to it. The search is mocked so opening that editor never reaches
+// the network, and so a case can prove where its candidates come from.
+const m = vi.hoisted(() => ({ searchDocuments: vi.fn() }))
+vi.mock("@/lib/api/documents", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/documents")>("@/lib/api/documents")
+  return { ...actual, searchDocuments: m.searchDocuments }
+})
+beforeEach(() => {
+  m.searchDocuments.mockReset()
+  m.searchDocuments.mockResolvedValue({
+    documents: [
+      { id: "srv", filename: "From the server.pdf", version_count: 1, has_earlier: false },
+    ],
+    total: 1,
+    older_matches: 0,
+    sort: "added_desc",
+    offset: 0,
+    limit: 20,
+  })
+})
 import { FindQuickAdd } from "@/components/library/find/FindQuickAdd"
+import QUICK_ADD_SOURCE from "@/components/library/find/FindQuickAdd.tsx?raw"
+import { stripComments } from "@/lib/stripComments.testutil"
 import { initialFindState, type FindState } from "@/pages/findState"
-import type { Document, Folder, ViewFilter } from "@/types"
+import type { Folder, ViewFilter } from "@/types"
 
 const EMPTY: ViewFilter = { op: "and", conditions: [] }
 
@@ -17,36 +42,34 @@ const FOLDERS: Folder[] = [
   { id: "f1", user_id: "u1", name: "Contracts", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
 ]
 
-const DOCS = [
-  {
-    id: "a",
-    user_id: "u1",
-    folder_id: null,
-    filename: "Acme MSA 2019.pdf",
-    file_path: "p",
-    file_size: 1,
-    mime_type: "application/pdf",
-    status: "completed",
-    created_at: "",
-    updated_at: "",
-    metadata: { document_type: "Contract" },
-  },
-] as unknown as Document[]
+// 284-01 (D-07 / R-03): the Added by and Document type options are the SUMMARY's lists.
+// 284-05 (D-16): the row takes no `documents` prop at all — the Relationship editor searches the
+// server (284-04), so the old documents fixture is gone with the prop.
+const DOC_TYPES = [{ value: "Contract", count: 1 }]
 
-function renderQA(find: Partial<FindState> = {}, filter: ViewFilter = EMPTY) {
+function renderQA(
+  find: Partial<FindState> = {},
+  filter: ViewFilter = EMPTY,
+  extra: Partial<ComponentProps<typeof FindQuickAdd>> = {},
+) {
   const dispatch = vi.fn()
   const onFilterChange = vi.fn()
+  const onRetry = vi.fn()
   render(
     <FindQuickAdd
       find={{ ...initialFindState, ...find }}
       dispatch={dispatch}
       filter={filter}
       onFilterChange={onFilterChange}
-      documents={DOCS}
       folders={FOLDERS}
+      connections={[]}
+      documentTypes={DOC_TYPES}
+      listState="ready"
+      onRetry={onRetry}
+      {...extra}
     />,
   )
-  return { dispatch, onFilterChange }
+  return { dispatch, onFilterChange, onRetry }
 }
 
 describe("FindQuickAdd — resting", () => {
@@ -251,5 +274,45 @@ describe("FindQuickAdd — Include archived (275-02, D-04)", () => {
   it("never changes without a click: rendering and re-rendering dispatch nothing", () => {
     const { dispatch } = renderQA({ include_archived: true })
     expect(dispatch).not.toHaveBeenCalled()
+  })
+})
+
+// ── 284-01 (D-07 / R-03 / UI-SPEC S12) — the row threads the summary lists to the editors ──
+describe("FindQuickAdd — the summary lists, not the documents", () => {
+  it("Added by offers the connections it is handed", () => {
+    renderQA({}, EMPTY, { connections: [{ id: "c1", name: "Drive Finance", count: 3 }] })
+    fireEvent.click(screen.getByRole("button", { name: "＋ Added by" }))
+    expect(screen.getByRole("radio", { name: "Drive Finance (connected source)" })).toBeInTheDocument()
+  })
+
+  it("284-04: the Relationship editor's candidates come from the server search", async () => {
+    renderQA()
+    fireEvent.click(screen.getByRole("button", { name: "＋ Relationship" }))
+    // The editor offers the SERVER's answer — the row has no documents of its own to offer.
+    expect(await screen.findByRole("option", { name: "From the server.pdf" })).toBeInTheDocument()
+    expect(screen.getAllByRole("option")).toHaveLength(1)
+    expect(m.searchDocuments).toHaveBeenCalledWith(expect.objectContaining({ version: "latest", limit: 20 }))
+  })
+
+  it("284-05: the row takes no documents prop at all, and still lists the summary's types", () => {
+    // The declaration is gone from the source (comments stripped), not merely unused.
+    expect(stripComments(QUICK_ADD_SOURCE)).not.toMatch(/\bdocuments\??\s*:/)
+    renderQA()
+    fireEvent.click(screen.getByRole("button", { name: "＋ Document type" }))
+    expect(screen.getByRole("checkbox", { name: "Contract" })).toBeInTheDocument()
+  })
+
+  it("a loading list reaches the editor as Loading…", () => {
+    renderQA({}, EMPTY, { listState: "loading", documentTypes: [] })
+    fireEvent.click(screen.getByRole("button", { name: "＋ Document type" }))
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…")
+  })
+
+  it("a failed list reaches the editor, and its Try again is the row's onRetry", () => {
+    const { onRetry } = renderQA({}, EMPTY, { listState: "error", connections: [] })
+    fireEvent.click(screen.getByRole("button", { name: "＋ Added by" }))
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn’t load this list.")
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,12 +1,20 @@
 /**
  * Tests for the useDocuments hook.
  *
+ * ⭐ Phase 284-03 (D-08 / D-24): the hook no longer fetches or holds the library. The caller owns
+ * the ON-PAGE rows and hands the hook their setter; Realtime merges an UPDATE into a row already
+ * on the page and turns every other event into `onChange()` (the caller's debounced refetch).
+ * The harness below gives the hook a real `useState` for those rows, so `result.current.documents`
+ * is exactly what the caller would render.
+ *
  * Mocks:
  * - @/lib/api – API functions
  * - @/lib/supabase – Supabase Realtime (channel subscription)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { renderHook, waitFor, act } from "@testing-library/react"
+import { useState } from "react"
+import type { Document } from "@/types"
 
 // ── Mock API module ────────────────────────────────────────────────────────────
 // vi.mock is hoisted to the top of the file by Vitest, so we use vi.hoisted()
@@ -52,6 +60,15 @@ vi.mock("@/lib/supabase", () => ({
 
 import { useDocuments } from "@/hooks/useDocuments"
 
+/** The caller's side: the on-page rows, and the refetch request. */
+const onChange = vi.fn()
+function useHarness(initial: Document[] = []) {
+  const [documents, setRows] = useState<Document[]>(initial)
+  // 284-REVIEW WR-01: the hook reads the on-page rows to tell a cosmetic UPDATE from one that
+  // changes which list the row belongs to.
+  return { documents, ...useDocuments({ rows: documents, setRows, onChange }) }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("useDocuments", () => {
@@ -67,14 +84,16 @@ describe("useDocuments", () => {
   })
 
   it("has correct initial state", () => {
-    const { result } = renderHook(() => useDocuments())
+    const { result } = renderHook(() => useHarness())
     expect(result.current.documents).toEqual([])
     expect(result.current.uploading).toBe(false)
     expect(typeof result.current.upload).toBe("function")
     expect(typeof result.current.deleteDoc).toBe("function")
   })
 
-  it("fetches documents on mount", async () => {
+  // 284-03 (D-24): REWRITTEN IN PLACE. This case used to assert the hook fetched the whole
+  // library on mount; the Library now pages on the server, so the property is the inverse.
+  it("never fetches a list of its own — the caller's page is the list", async () => {
     const docs = [
       {
         id: "d1",
@@ -89,14 +108,16 @@ describe("useDocuments", () => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
-    ]
-    mockListDocuments.mockResolvedValue(docs)
+    ] as Document[]
+    mockListDocuments.mockResolvedValue([...docs, ...docs])
 
-    const { result } = renderHook(() => useDocuments())
+    const { result } = renderHook(() => useHarness(docs))
 
     await waitFor(() => {
-      expect(result.current.documents).toHaveLength(1)
+      expect(mockOn).toHaveBeenCalled()
     })
+    expect(mockListDocuments).not.toHaveBeenCalled()
+    expect(result.current.documents).toHaveLength(1)
     expect(result.current.documents[0].filename).toBe("notes.txt")
   })
 
@@ -122,10 +143,10 @@ describe("useDocuments", () => {
       }),
     )
 
-    const { result } = renderHook(() => useDocuments())
+    const { result } = renderHook(() => useHarness())
 
     // Start upload
-    let uploadPromise!: Promise<void>
+    let uploadPromise!: Promise<unknown>
     act(() => {
       uploadPromise = result.current.upload(new File(["content"], "upload.txt"))
     })
@@ -144,7 +165,10 @@ describe("useDocuments", () => {
     expect(result.current.uploading).toBe(false)
   })
 
-  it("adds document to list after upload", async () => {
+  // 284-03 (D-08): REWRITTEN IN PLACE. Upload used to prepend the row to the whole list. The
+  // CALLER now decides whether the new row belongs on the page it shows (page 1 of its folder);
+  // this hook returns the document and asks for the refetch that reconciles it.
+  it("upload returns the created document and asks for a refetch — no list patch", async () => {
     const uploadedDoc = {
       id: "d3",
       user_id: "user-1",
@@ -160,25 +184,27 @@ describe("useDocuments", () => {
     }
     mockUploadDocument.mockResolvedValue({ doc: uploadedDoc, isDuplicate: false })
 
-    const { result } = renderHook(() => useDocuments())
+    const { result } = renderHook(() => useHarness())
 
+    let answer: unknown
     await act(async () => {
-      await result.current.upload(new File(["content"], "new.txt"))
+      answer = await result.current.upload(new File(["content"], "new.txt"))
     })
 
-    expect(result.current.documents.some((d) => d.id === "d3")).toBe(true)
+    expect(answer).toEqual({ isDuplicate: false, doc: uploadedDoc })
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(result.current.documents.some((d) => d.id === "d3")).toBe(false)
   })
 
   // ── Phase 217 (D-217-24) — THE REALTIME SEAM THE INGESTION STRIP SITS ON ──────────────
   //
   // `tables_stage_applies` / `images_stage_applies` are pydantic `@computed_field`s off
   // `mime_type` — there are no such DB columns, so they do NOT ride `payload.new`. They behave
-  // exactly like `table_count`: the UPDATE arm's spread-merge preserves them, and the INSERT arm
-  // (which does no merge) cannot supply them at all.
+  // exactly like `table_count`: the UPDATE arm's spread-merge preserves them.
   //
-  // ⚠ M-1 STAYS OWED AND IS NOT CLOSED HERE. No test that mocks `listDocuments` can prove the
-  // cold-load case (a file already mid-ingest when the Library opens). These two cases cover the
-  // MERGE, not the LOAD — Realtime is a hint, never a source of truth (D-v2.5-03).
+  // ⚠ M-1 STAYS OWED AND IS NOT CLOSED HERE. No test of this hook can prove the cold-load case
+  // (a file already mid-ingest when the Library opens). These cases cover the MERGE, not the
+  // LOAD — Realtime is a hint, never a source of truth (D-v2.5-03).
 
   /** Fire one Realtime event through the callback the hook registered on the channel. */
   const emitRealtime = (payload: unknown) => {
@@ -208,11 +234,10 @@ describe("useDocuments", () => {
       images_stage_applies: true,
       table_count: 2,
     }
-    mockListDocuments.mockResolvedValue([fetched])
 
-    const { result } = renderHook(() => useDocuments())
+    const { result } = renderHook(() => useHarness([fetched as Document]))
     await waitFor(() => {
-      expect(result.current.documents).toHaveLength(1)
+      expect(mockOn).toHaveBeenCalled()
     })
     // non-vacuity: the flags really were there before the event
     expect(result.current.documents[0].tables_stage_applies).toBe(true)
@@ -245,9 +270,25 @@ describe("useDocuments", () => {
     expect(merged.table_count).toBe(2)
   })
 
-  it("Realtime INSERT — no merge, so the derived flags arrive undefined (and that is renderable)", async () => {
-    mockListDocuments.mockResolvedValue([])
-    const { result } = renderHook(() => useDocuments())
+  // 284-03 (D-08 / T-284-16 / T-284-17): REWRITTEN IN PLACE. This case used to pin that an
+  // INSERT was PREPENDED with its derived flags undefined. An INSERT or DELETE no longer patches
+  // any list — it asks for a refetch, and the refetch's server row carries the flags. A payload
+  // row is never shown, so a row the page does not hold cannot arrive through this door.
+  it("Realtime INSERT / DELETE — no list patch, each asks the caller for a refetch", async () => {
+    const onPage = {
+      id: "d7",
+      user_id: "user-1",
+      filename: "on-page.pdf",
+      status: "completed" as const,
+      file_path: "user-1/d7/on-page.pdf",
+      file_size: 10,
+      mime_type: "application/pdf",
+      error_message: null,
+      chunk_count: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Document
+    const { result } = renderHook(() => useHarness([onPage]))
     await waitFor(() => {
       expect(mockOn).toHaveBeenCalled()
     })
@@ -269,13 +310,13 @@ describe("useDocuments", () => {
         updated_at: new Date().toISOString(),
       },
     })
+    expect(result.current.documents.find((d) => d.id === "d6")).toBeUndefined()
+    expect(onChange).toHaveBeenCalledTimes(1)
 
-    const inserted = result.current.documents.find((d) => d.id === "d6")
-    expect(inserted).toBeDefined()
-    // ⚠ THE DEFECT THIS PINS: undefined, not false. A `false` here would make the strip strike
-    // out two stages it has no evidence were skipped.
-    expect(inserted?.tables_stage_applies).toBeUndefined()
-    expect(inserted?.images_stage_applies).toBeUndefined()
+    emitRealtime({ eventType: "DELETE", old: { id: "d7" } })
+    // The page is the server's to re-answer: the row stays until the refetch lands.
+    expect(result.current.documents.map((d) => d.id)).toEqual(["d7"])
+    expect(onChange).toHaveBeenCalledTimes(2)
   })
 
   it("removes document from list after deleteDoc", async () => {
@@ -292,10 +333,9 @@ describe("useDocuments", () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
-    mockListDocuments.mockResolvedValue([existingDoc])
     mockDeleteDocument.mockResolvedValue(undefined)
 
-    const { result } = renderHook(() => useDocuments())
+    const { result } = renderHook(() => useHarness([existingDoc as Document]))
 
     await waitFor(() => {
       expect(result.current.documents).toHaveLength(1)
@@ -306,5 +346,72 @@ describe("useDocuments", () => {
     })
 
     expect(result.current.documents.find((d) => d.id === "d4")).toBeUndefined()
+    // …and the page is re-asked, so what slides up into the gap is the server's answer.
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
+
+  // ── 284-REVIEW WR-01 — an UPDATE that changes which LIST a row belongs to is a refetch, not a
+  // merge. A move (`folder_id`), an archive (`archived_at`), a version flip (`is_latest`) or a
+  // status change takes the row off this page's list and moves the summary's buckets; merging it
+  // in place left it on its OLD folder's page wearing its new folder_id. A pure field update
+  // (a stage advancing, a rename) still merges in place and asks for nothing. ──
+  /** The row Postgres replicates: real columns only — the server-derived `table_count` is absent. */
+  const replicatedRow = (row: Document): Partial<Document> => {
+    const copy: Partial<Document> = { ...row }
+    delete copy.table_count
+    return copy
+  }
+  const onPageRow = (): Document =>
+    ({
+      id: "m1",
+      user_id: "user-1",
+      folder_id: "folder-a",
+      filename: "moving.pdf",
+      status: "processing",
+      file_path: "user-1/m1/moving.pdf",
+      file_size: 10,
+      mime_type: "application/pdf",
+      error_message: null,
+      ingestion_step: "extracting",
+      chunk_count: null,
+      is_latest: true,
+      archived_at: null,
+      created_at: "2026-10-01T00:00:00Z",
+      updated_at: "2026-10-01T00:00:00Z",
+      table_count: 3,
+    }) as Document
+
+  it.each([
+    ["folder_id", { folder_id: "folder-b" }],
+    ["folder_id → Root", { folder_id: null }],
+    ["archived_at", { archived_at: "2026-10-16T00:00:00Z" }],
+    ["is_latest", { is_latest: false }],
+    ["status (processing → pending)", { status: "pending" }],
+  ])("an UPDATE changing %s asks for ONE refetch", async (_label, change) => {
+    const row = onPageRow()
+    renderHook(() => useHarness([row]))
+    await waitFor(() => expect(mockOn).toHaveBeenCalled())
+    const replicated = replicatedRow(row)
+    emitRealtime({ eventType: "UPDATE", new: { ...replicated, ...change } })
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
+
+  it("a pure field UPDATE (a stage advancing) merges in place and asks for no refetch", async () => {
+    const row = onPageRow()
+    const { result } = renderHook(() => useHarness([row]))
+    await waitFor(() => expect(mockOn).toHaveBeenCalled())
+    const replicated = replicatedRow(row)
+    emitRealtime({ eventType: "UPDATE", new: { ...replicated, ingestion_step: "embedding", filename: "renamed.pdf" } })
+    expect(onChange).not.toHaveBeenCalled()
+    expect(result.current.documents[0]).toMatchObject({ ingestion_step: "embedding", filename: "renamed.pdf", table_count: 3 })
+  })
+
+  it("a terminal status still refetches exactly once (never twice for one event)", async () => {
+    const row = onPageRow()
+    renderHook(() => useHarness([row]))
+    await waitFor(() => expect(mockOn).toHaveBeenCalled())
+    const replicated = replicatedRow(row)
+    emitRealtime({ eventType: "UPDATE", new: { ...replicated, status: "completed" } })
+    expect(onChange).toHaveBeenCalledTimes(1)
   })
 })

@@ -3,9 +3,9 @@ seed_id: SEED-317
 title: The Library's "from <Expert>" provenance note is read once per mount and does not follow an org switch or a finished install
 created: 2026-09-25
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Reviewed at Phase 284 discuss (2026-10-16): fires on LibraryPage.tsx, but the Library still has no active-org handle; 284 D-24 data hook is the natural home for an org key once one exists. Re-open when the Library gains an org handle."
 trigger_when: Any phase that gives LibraryPage an active-org handle, or touches org switching or Library refresh.
 trigger_paths: ["frontend/src/pages/LibraryPage.tsx"]
 trigger_surfaces: []

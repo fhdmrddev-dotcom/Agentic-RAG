@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: executing
-last_updated: "2026-10-13T20:00:00.000Z"
-last_activity: 2026-10-13 -- 279-04 complete (G-4 drives, SEED-328 record, seed answered); 279 pending verification
+status: milestone_phases_complete
+last_updated: 2026-10-16T12:00:00.000Z
+last_activity: 2026-10-16 -- Phase 284 CLOSED (6/6 plans, verified 7/7, self-verified); every v4.6 phase (277-284) complete
 progress:
-  total_phases: 14
-  completed_phases: 2
-  total_plans: 10
-  completed_plans: 8
-  percent: 14
+  total_phases: 8
+  completed_phases: 8
+  total_plans: 31
+  completed_plans: 31
+  percent: 100
+stopped_at: Phase 284 closed — v4.6 phases all complete; next /gsd:audit-milestone
 ---
 
 # Project State
@@ -32,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 279 — the-expert-scope-seam
+**Current focus:** v4.6 close — every phase (277-284) complete; milestone audit next
 
 ---
 
@@ -54,12 +55,36 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 
 ## Current Position
 
+**Phase 284 CLOSED (2026-10-16) — Library at Scale (FIX-11).** 6 plans / 4 waves. 284-06 was added at the operator's request for SEED-357 (the page index). Verification `284-VERIFICATION.md`: **passed 7/7**, `self-verified`. The one human item (the browser at scale on the 208 view) was driven by the orchestrator: A/B @50k and A @10k PASS, click → rows 2.77 s / 2.65 s = 1.05x (dev build). Measured (`284-MEASUREMENTS.md`): every total = `count(*)` at 10k / 50k; Find page 1 at 50k 16.9 s → ~70 ms; Root page 1 2.54x → 1.14-1.38x and Find 2.59x → 1.32-1.42x after migration 208 (one host-noise pair 1.57x). The summary is 1.85-1.93x and < 500 ms, recorded. G-4 A-F PASS (`284-LIVE-EVIDENCE.md`); F was amended (folder conditions cannot be saved as views). The drive found and fixed, test-first: ungrouped counts `c96a0909e`, and AnimatedNumber painting "-17,721 documents" `bb47f34ce`. Review R1: CR-01 (offset past the end → 500) + WR-01/02/04 + IN-05/07 fixed test-first, merged `138fee3d9`; WR-03 accepted by the orchestrator. Review R2 (migration 208): WR-R2-01..05 fixed `34443231b` (VERIFY proves content, lock_timeout, policy 154-vs-208 parity, disjoint-legs fence). Flips: BUG-261014-07 → closed; BUG-261014-06 note; SEED-248 Library half shipped; SEED-357 → answered. New seeds: SEED-355/356 (R-10), SEED-358 (older paged routes 500 past the end). Gates on the merged tree: backend 71 = base set (7,688 passed), count gate OK 449/449, tsc 63 = 63. Local incident: for ~3 min during 284-06, the first 208 view broke PostgREST embeds on the operator's local :8000; reverted and fixed, no production impact. **Not pushed. Migrations 207 + 208 are LOCAL only.** Production order: paste 207 → paste 208 (VERIFY 16/16; production's policy text was confirmed by a read to equal the guard's v154) → `get_advisors(security)` → backend → frontend. Next: `/gsd:audit-milestone` (v4.6), then close v4.6 by hand.
+
+**Phase 284 PLANNED (2026-10-16, `--auto`).** 5 plans / 3 waves (01 FE extraction ∥ 02 seed+baseline+view 207+paged API · 03 Library on server ∥ 04 Find SQL+pickers+route guard · 05 request recorder+fence+close checkpoint). RESEARCH `249efeab5`, UI-SPEC approved, checker PASSED 0 blockers. Owed by decision: v4.6 changelog line for the `GET /documents` envelope (R-06; owner: v4.6 close); legacy-array tolerance in page clients (owner: first prod deploy after 284 — remove once production runs the envelope). **Context:** `284-CONTEXT.md` D-01..D-27: envelope `GET /documents` (breaking, documented), one SQL summary for every count, Find paged in SQL, pickers on `POST /document-search`, per-document lists bounded, synthetic 10k/50k account + baseline first, two-layer guard, LibraryPage data-hook extraction first, sketch skipped by decision, G-4 A-E. Seeds: 248 folded (Library half), 317 / 352 deferred. Next: plan-phase 284.
+
+**Post-282 bug fixes (2026-10-15), all closed on live re-drives, not pushed:** BUG-261015-03 `ee0f4beaf` (ask_user 300 s floor + null-guidance schema text; 7/7 rows paused past 100 s and answered), -04 `5358a243a` (credit 400 / 402 → billing copy; Anthropic row live), -05 `bdf18576e` (run linked to its reply at save time + live-copy-wins reload merge; Spark 1 bubble through a forced mid-window reload; cloud row not driven), -06 `b77aade1e` (NEW, major: the shutdown sentinel was Redis-wide, so the unit suite / another worker interrupted live pauses; now per-process). 278 pins changed deliberately: `_handle_ask_user` RETIRED from the pure-move fence; schema digests re-captured (only the ask_user description changed, proven). Backend gate: failing set == base (71) after the pin re-capture. `spark-x2.5-4b` enabled by the operator.
+
+**Phase 282 CLOSED (2026-10-15).** Review `3268b6228`: 1 critical / 5 warnings / 4 info; fixed `817cc2b3b`..`d78f3c93b` test-first (CR-01 retries now key on the routing provider; WR-02/04/05 fixed; WR-01 partial — an in-flight cloud open keeps running; WR-03 timeout label deferred; IN-01..04 left). Verification `64a0a2c06`: **passed 5/5**, `self-verified`. Backend baseline after fixes 71 failed / 7546 passed / 0 errors, failing SET == base `d1ba70553`. Owed by decision: G4-4 (max 356 s), G4-6, A1, Add-form click-through, SC#10 rows 2/8 once credit exists; operator to enable `spark-x2.5-4b`. Open bugs from the phase: BUG-261015-03 (major), -04, -05. Hot-file ledger triples for the 6 review-fix files not re-derived (presence gate green). **Not pushed.** Next: `/gsd:discuss-phase 283`.
+
+**Phase 282 executed 4/4 + operator sign-off `approved` (2026-10-15).** 282-03: SC#10 board 6 PASS / 2 ⛔ billing / 0 FAIL; G4-1/2/3/5 PASS on DOM state; BUG-260918-01 + BUG-261015-02 closed; BUG-261015-03 (ask_user required timeout → models pick ~60 s, major) + BUG-261015-04 (Anthropic credit 400 shown as model-parameter error, minor) filed, open. 282-04 (`f173d3a4a`, `8fb2bb684`, operator-requested): self-hosted models default to 900 s; Timeout on Add model by ID; live-verified; backend 71 = base set; ModelRegistryTab pin 37. **Owed by decision:** G4-4 (> 600 s; measured max 356 s), G4-6 (needs approved write), A1 LangSmith nesting, fixed Add-form click-through; operator to enable `spark-x2.5-4b` (added rows start disabled). Not pushed. Next: `/gsd:code-review 282` → gsd-verifier.
+
+**Phase 282 wave 1 (2026-10-15):** 282-01 (FIX-06) + 282-02 (FIX-07) executed in parallel worktrees, merged `fdcfde57d`, worktrees torn down (venv/node_modules intact). 01: backend gate 71 failed / 7508 passed / 0 errors, failing SET == base; loop stall 2.970 s → 0.065 s. 02: count gate 1 failing — `WorkflowBuilderPage.canvas.test.tsx` STACK_TRACE_ERROR timeout, file untouched by the phase, same failure in 280-04, green alone (inherited-vs-new to settle at 282-03 Task 1 by re-running at base). Merged-tree tsc set == base (58). Next: 282-03.
+
+**Phase 282 planned (2026-10-15, autonomous):** 3 plans / 2 waves (01 FIX-06 + 02 FIX-07 parallel → 03 board + G-4, non-autonomous). Research amendments D-19..D-26: ceiling **1800** (run watchdog 2400 s; prod max stored 1200), shared open+drain deadline + off-loop open (BUG-261015-02 measured 3.8 s loop stall), retries local/Google 0 · cloud 2. UI-SPEC approved (rev 1). Checker PASSED 0 blockers / 3 warnings (W2, W3 fixed in plan; W1 accepted). Ledger rows added for 5 files. 37 path-matched seeds reviewed, none folded.
+
+**Phase 282 (2026-10-15):** discuss done AUTONOMOUSLY (operator: "take best decisions") — `.planning/phases/282-the-slow-run-and-the-paused-run/282-CONTEXT.md` (D-01..D-18). G-2 sketch `282-one-answer-input` written + Chrome-driven; winner A (input follows the open panel) — **operator confirmation OWED at G-4**. Folded BUG-260916-01, BUG-260918-01, SEED-172 #2/#3, new BUG-261015-02 (conditional). SEED-289 → deferred. No migration expected. Next: `/gsd:plan-phase 282`.
+
+**Phase 281 executed 4/4 plans (2026-10-15) — G-4 sign-off (281-04 Task 4) PENDING.** Rows in `.planning/phases/281-a-refusal-names-its-cause/281-LIVE-EVIDENCE.md`, driven at `33886624f`: **A ⛔ OWED** (model passed: golden run `e4b3625a…` completed, emit passed on its first call, and publish was refused by the JUDGE, so there was no emit cause to read; the draft had to be KB-bound to publish, then restored to unbound) · **B ✅ PASS** (no "coming soon"; link opened the judged run, 3 ids equal; failed-step-reason sub-check not exercisable) · **C ⛔ OWED** (drafting model returned `could_not_generate` twice, so `connection_not_allowed` never rendered; the SEED-218 `Connect Linear` click ✅ landed on Connections) · **D ⛔ OWED** (archive write not approved; folder docs all 2026-06-08 vs `max_age_days 2`, so no decisive arrangement without a fresh upload). Flips: BUG-260815-06 → closed (row B); SEED-218 → answered (residual: DOOR_REFUSAL still says "in Settings"); BUG-260730-02 and SEED-221 unchanged, with dated notes. Guardrail overrides: OV-281-01 only (below). **Owed rows, run first: A** (a live emit refusal also unlocks B's sub-check and the D-32 chat half), then C (needs a healthy drafting model), then D (needs operator approval + one fresh upload).
+
+**Phase 281 planned (2026-10-14):** 4 plans / 3 waves (01+02 → 03 → 04 non-autonomous G-4 drives A-D). Research corrected 4 CONTEXT premises → amendments D-24..D-32 (operator). SEED-218 folded; SEED-350/339 deferred. Checker PASSED (iteration 2, 0 blockers). Ledger rows added for emit_cause.py, freshness.py, describeRefusalVocabulary.ts, runVocabulary.ts. Next: `/gsd:execute-phase 281`.
+
+**Phase 281 (2026-10-14):** discuss done — `.planning/phases/281-a-refusal-names-its-cause/281-CONTEXT.md` (D-01..D-23). G-2 sketch skip RECORDED (D-21). Folded: BUG-260730-02, BUG-260815-06 (#4), SEED-221. Left open: BUG-260828-05. G-4 scenarios A-D operator-named. No migration expected. Next: `/gsd:plan-phase 281` (re-run the seeds sweep there).
+
+**Phase 280 (2026-10-14):** discuss done — `.planning/phases/280-in-once-out-clean/280-CONTEXT.md`. No migration expected. 4 bugs folded (BUG-261005-01, BUG-260910-04, BUG-261012-01, BUG-261012-02). Owed to operator: upload the generated `Team Docs` folder to OneDrive before the live re-drive (D-14). Next: `/gsd:plan-phase 280`.
+
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
-Phase: 279 (the-expert-scope-seam) — EXECUTED 4/4, reviewed (`279-REVIEW.md`, 6 warnings fixed — `279-REVIEW-FIX.md`), **verified 4/4** (`279-VERIFICATION.md`, self-verified)
-Next: deploy proposal (operator-gated) — D-18 cloud READ done: 0. Record: `279-SEED-328-RECORD.md`; UAT: `279-UAT-LOG.md` (rows 1a-5 ✅) + REVIEW-FIX WR-05 live row ✅; 4-axis: `279-VALIDATION.md`. SEED-328 → `status: answered`.
-Plan: 4 of 4 (279-01 move `fa164ef3e`; 279-02 `d55e0ef6a`..`11a73af35`; 279-03 `9ac6d12f6`..`10d7e2d5e`; 279-04 close)
-Status: Phase 279 complete — verified, not pushed
-Last activity: 2026-10-13 -- 279-04 close: G-4 ×4 + two-org CR-03(b) drive passed; record + seed + ledger + CLAUDE.md rows
+Phase: 284
+Next: `/gsd:discuss-phase 282` (G-2 sketch first for FIX-07). Deploy of 277-281 + BUG-261014-06 stays operator-gated.
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-15
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.
 
 **279-03 (2026-10-13):** "Won't use" → "Won't search" (29 hits / 13 files measured, not 30), swap-card
@@ -98,6 +123,11 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 |---|-------------|------|--------|-----------|
 | 261012-x1l | fix 277-REVIEW WR-01 (size hook leads with STOP/WARNING when ledger findings exist) + WR-08 (uniform `· ⛔` marker on 66 moved FIRING cells + legend) | 2026-10-12 | 30d659415 | [261012-x1l-fix-review-warnings-wr-01-and-wr-08-from](./quick/261012-x1l-fix-review-warnings-wr-01-and-wr-08-from/) |
 | fast 2026-10-13 | landing drift: `facts.ts` BUILTIN_TOOL_COUNT 29 → 30 (+ `Artifacts` group for `show_artifact`); landing vitest 53/53 | 2026-10-13 | 6ba316b6a | — |
+| fast 2026-10-14 | BUG-261014-06: Library read 0 documents at 286 (`414 URI too long`) — `list_documents` count reads batched at 100 ids. **Stopgap, develop only**: the operator held the prod hotfix ("a sustainable solution not a batch"); Phase 284 replaces it | 2026-10-14 | e422066ca | — |
+
+### Roadmap Evolution
+
+- Phase 284 added 2026-10-14: **Library at Scale** (FIX-11) — server-paged list, server-side counts, no growing id lists; from BUG-261014-06 + BUG-261014-07 (every document list silently capped at 1,000 rows).
 
 ### Owed to the operator (carried from v4.5)
 
@@ -121,12 +151,27 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 | 5 | Phase-review leftovers (owed, non-blocking) | `279-REVIEW.md` IN-01..IN-06 (stale `workflow-lock-error-banner` testid on every send 409; folder-arm 409 wording; vacuous `--exclude-prefix ""` CLEAR; WR-06 alert outlives a later load; transient org-check failure shows the org sentence; WR-08 note `ls` default) + WR-02 NULL-org continuation residual (operator ruling 2026-10-14) + catalog subtitle no longer literally true for managers + `ExpertDetailModal` copy unpinned + `test_264_born_for_carrier.py` changed outside 279-02's list. The two 409 test titles: ✅ fixed by WR-06 `16e355582`. List: `279-VALIDATION.md` § Still owed |
 | 6 | `graphify update .` after the close | run at 279-04 close; `graphify-out/` is never committed |
 
+### Owed from Phase 284 (2026-10-16)
+
+| # | Item | Notes |
+|---|---|---|
+| 1 | Production: paste **207**, then **208**, into the cloud SQL editor (each an approval-gated write), then `get_advisors(security)`, then deploy backend → frontend | 208's VERIFY must read 16/16, run together with its `SET search_path` line; on a lock timeout re-paste, never widen it. 208's guard was confirmed against production's policy text by a read on 2026-10-16 |
+| 2 | v4.6 public changelog entry for the `GET /documents` breaking change (envelope) | R-06; owner: v4.6 close |
+| 3 | Remove the legacy-array tolerance in `frontend/src/lib/api/documents.ts` | one release after the production deploy (WR-03 accepted on that basis) |
+| 4 | Hot-file ledger triples for the files touched after 284-05's ledger close (`58b4bc367`) | review fixes + 284-06; the presence gate is green, the triples are not re-derived |
+| 5 | SEED-355 / 356 / 358 | planted with structured triggers; out of 284's Library scope |
+
 ### Guardrail overrides (v4.6)
 
 - **279:** none written. OV-279-01 (threads.py IN-05) was pre-written in the plan and NOT required —
   279-02-SUMMARY row D route proof: event=None rides `if event is not None:` then the existing
   `elif update_data:` arm (test `test_IN05_a_non_member_clear_writes_no_event_through_the_plain_update_arm`).
   Every touched FIRING file is recorded honoured by construction in `279-SEED-328-RECORD.md` § G-5.
+
+- **OV-281-01 (G-5, `harness_engine.py`):** 281-01's plan capped the engine at "≤ 4 new conditional
+  nodes"; measured AST delta is If 106→107, IfExp 34→38 = **5**. The 5th lives inside the new
+  `_attempt_identity` helper the plan itself asked for; no new branching kind. Recorded by the
+  orchestrator 2026-10-14 as a call-out, still honoured by construction (281-01-SUMMARY).
 
 ### Carry into the next milestone's scoping (✅ consumed by v4.6 intake 2026-10-12 — kept as the record)
 

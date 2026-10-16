@@ -12,26 +12,153 @@
 
 import type {
   Document,
+  DocumentChunkPage,
   DocumentChunkRow,
   DocumentContentResponse,
   DocumentDownloadUrl,
+  DocumentImagePage,
   DocumentImageRow,
+  DocumentListParams,
+  DocumentListResponse,
   DocumentQueryRow,
   DocumentSearchRequest,
   DocumentSearchResponse,
   ConversationResponse,
+  DocumentTablePage,
   DocumentTableRow,
+  DocumentVersionPage,
   Folder,
+  PageParams,
   WorkspaceFile,
 } from "../../types"
 import { API_BASE, getAuthHeaders, getAuthToken } from "./_core"
 // Phase 275 (S10): imported, never re-exported — the barrel contract (apiBarrel.test.ts).
 import { refusalOf } from "./refusal"
-export async function listDocuments(): Promise<Document[]> {
+
+// Phase 284-05 (D-16): the five whole-list clients (the whole library, and a document's every
+// chunk / table / image / version) are DELETED. Every caller reads a page below, and
+// `src/lib/__tests__/libraryListFence.test.ts` fails on any call, import or re-export of their
+// names and on an unparameterised `GET /documents` fetch anywhere in product code.
+
+// ──────────────────────────────────────────────────────────────────────────────────────
+// Phase 284 (FIX-11 / D-01 / D-11 / D-16 / D-17) — the paged reads.
+//
+// ⚠ D-01 IS A BREAKING CHANGE to `GET /documents`: it answers ONE page in an envelope rather
+// than the whole library as an array. The frontend and the backend deploy separately, so for
+// ONE RELEASE every client here also accepts the legacy array body (RESEARCH Pitfall 3) and
+// converts it with `total = rows.length` — honest for the array it was handed, and the only
+// number that array can support. 284-05 deleted the legacy whole-list clients but KEPT this
+// tolerance branch on purpose: one push may land the frontend before the backend, so it is
+// removed ONE RELEASE AFTER the production deploy of Phase 284 (it is not a whole-list call, and
+// the D-16 fence does not forbid it).
+//
+// T-284-01: only typed params reach the URL (offsets, limits, literal unions, a folder id or
+// "root") — never an id list. The server re-validates every one of them (422).
+// ──────────────────────────────────────────────────────────────────────────────────────
+
+/** The paged-read failure, carrying the HTTP status (`DocumentSearchError`'s shape) so a 404
+ *  (not visible) can be told apart from a server or network failure (`status: null`). */
+export class DocumentListError extends Error {
+  readonly status: number | null
+  constructor(status: number | null, message: string) {
+    super(message)
+    this.status = status
+    this.name = "DocumentListError"
+  }
+}
+
+async function getJson(url: string, message: string): Promise<unknown> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents`, { headers })
-  if (!res.ok) throw new Error("Failed to list documents")
-  return res.json() as Promise<Document[]>
+  let res: Response
+  try {
+    res = await fetch(url, { headers })
+  } catch {
+    throw new DocumentListError(null, message)
+  }
+  if (!res.ok) throw new DocumentListError(res.status, message)
+  return res.json()
+}
+
+function pageQuery(page?: Partial<PageParams>): string {
+  const params = new URLSearchParams()
+  if (page?.offset != null) params.set("offset", String(page.offset))
+  if (page?.limit != null) params.set("limit", String(page.limit))
+  const qs = params.toString()
+  return qs ? `?${qs}` : ""
+}
+
+/** GET /documents — ONE page of the caller's visible latest documents, with the exact total.
+ *  Keys are serialised in a fixed order; an omitted optional key is absent from the URL. */
+export async function listDocumentsPage(params: DocumentListParams): Promise<DocumentListResponse> {
+  const qs = new URLSearchParams()
+  qs.set("offset", String(params.offset))
+  qs.set("limit", String(params.limit))
+  if (params.folder_id !== undefined) qs.set("folder_id", params.folder_id)
+  if (params.include_archived !== undefined) qs.set("include_archived", String(params.include_archived))
+  if (params.status !== undefined) qs.set("status", params.status)
+  if (params.order !== undefined) qs.set("order", params.order)
+  if (params.kind !== undefined) qs.set("kind", params.kind)
+  const body = (await getJson(`${API_BASE}/documents?${qs.toString()}`, "Couldn't load documents.")) as
+    | Document[]
+    | DocumentListResponse
+  if (Array.isArray(body)) {
+    // Legacy whole-list body (one release only — see the block comment above).
+    return { documents: body, total: body.length, offset: 0, limit: body.length }
+  }
+  return body
+}
+
+/** GET /documents/{id} — one document the caller can see (D-11). 404 when it is not visible. */
+export async function getDocument(id: string): Promise<Document> {
+  return (await getJson(`${API_BASE}/documents/${id}`, "Couldn't load this document.")) as Document
+}
+
+/** GET /documents/{id}/chunks — one page of chunks (server default 200, max 500). */
+export async function listDocumentChunksPage(
+  id: string,
+  page?: Partial<PageParams>,
+): Promise<DocumentChunkPage> {
+  const body = (await getJson(
+    `${API_BASE}/documents/${id}/chunks${pageQuery(page)}`,
+    "Failed to load document chunks",
+  )) as DocumentChunkRow[] | DocumentChunkPage
+  return Array.isArray(body) ? { chunks: body, total: body.length, offset: 0, limit: body.length } : body
+}
+
+/** GET /documents/{id}/tables — one page of tables (server default 50, max 200). */
+export async function listDocumentTablesPage(
+  id: string,
+  page?: Partial<PageParams>,
+): Promise<DocumentTablePage> {
+  const body = (await getJson(
+    `${API_BASE}/documents/${id}/tables${pageQuery(page)}`,
+    "Failed to load document tables",
+  )) as DocumentTableRow[] | DocumentTablePage
+  return Array.isArray(body) ? { tables: body, total: body.length, offset: 0, limit: body.length } : body
+}
+
+/** GET /documents/{id}/images — one page of image descriptions (server default 100, max 200). */
+export async function listDocumentImagesPage(
+  id: string,
+  page?: Partial<PageParams>,
+): Promise<DocumentImagePage> {
+  const body = (await getJson(
+    `${API_BASE}/documents/${id}/images${pageQuery(page)}`,
+    "Failed to load document images",
+  )) as DocumentImageRow[] | DocumentImagePage
+  return Array.isArray(body) ? { images: body, total: body.length, offset: 0, limit: body.length } : body
+}
+
+/** GET /documents/{id}/versions — one page of the version lineage (server default 50, max 200). */
+export async function fetchDocumentVersionsPage(
+  id: string,
+  page?: Partial<PageParams>,
+): Promise<DocumentVersionPage> {
+  const body = (await getJson(
+    `${API_BASE}/documents/${id}/versions${pageQuery(page)}`,
+    "Failed to fetch document versions",
+  )) as Document[] | DocumentVersionPage
+  return Array.isArray(body) ? { versions: body, total: body.length, offset: 0, limit: body.length } : body
 }
 
 export async function uploadDocument(file: File, folderId?: string | null): Promise<{ doc: Document; isDuplicate: boolean }> {
@@ -334,13 +461,6 @@ export async function deleteDocument(id: string, scope?: "version" | "all"): Pro
   if (!res.ok) throw await refusalOf(res, "Failed to delete document")
 }
 
-export async function fetchDocumentVersions(documentId: string): Promise<Document[]> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents/${documentId}/versions`, { headers })
-  if (!res.ok) throw new Error("Failed to fetch document versions")
-  return res.json() as Promise<Document[]>
-}
-
 export async function restoreDocumentVersion(documentId: string): Promise<Document> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/documents/${documentId}/restore`, {
@@ -414,6 +534,10 @@ export async function toggleFolderOrgShared(id: string): Promise<Folder> {
 // and each throws a DISTINCT message, so a section's error arm can say which read failed
 // rather than sharing one anonymous "Failed to load".
 //
+// Phase 284-05 (D-16): the chunks / tables / images reads of this block were whole-list reads
+// (silently cut at 1,000 rows) and are deleted; their paged successors live above, next to
+// `listDocumentsPage`, and keep the same distinct error messages.
+//
 // ⚠ Every one of these MUST also be re-exported from `lib/api.ts`. A symbol exported from
 // this module and forgotten in the barrel typechecks perfectly and is invisible to every
 // consumer (D-207-06) — `apiBarrel.test.ts` now guards that for this module, not only for
@@ -446,17 +570,6 @@ export async function getDocumentContent(
   return res.json() as Promise<DocumentContentResponse>
 }
 
-/** GET /documents/{id}/chunks — the chunks the agent actually searches, in `chunk_index`
- *  order. `embedding_model` / `embedding_dimensions` are per-CHUNK because their variation
- *  mid-re-embed is the whole point (D-217-08): a half-re-embedded document is a fact only
- *  this list can show. */
-export async function listDocumentChunks(id: string): Promise<DocumentChunkRow[]> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents/${id}/chunks`, { headers })
-  if (!res.ok) throw new Error("Failed to load document chunks")
-  return res.json() as Promise<DocumentChunkRow[]>
-}
-
 /** GET /documents/{id}/conversation — the other messages of this document's mail thread,
  *  oldest first.
  *
@@ -469,27 +582,6 @@ export async function fetchDocumentConversation(id: string): Promise<Conversatio
   const res = await fetch(`${API_BASE}/documents/${id}/conversation`, { headers })
   if (!res.ok) throw new Error("Failed to load conversation")
   return res.json() as Promise<ConversationResponse>
-}
-
-/** GET /documents/{id}/tables — the extracted tables, in `table_index` order.
- *  ⚠ Owner-only by migration 108: a document reached through SOMEONE ELSE'S globally
- *  visible folder returns an empty list here, and that is correct rather than a failure
- *  (the row's `table_count` badge, computed through the same client, already reads 0). */
-export async function listDocumentTables(id: string): Promise<DocumentTableRow[]> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents/${id}/tables`, { headers })
-  if (!res.ok) throw new Error("Failed to load document tables")
-  return res.json() as Promise<DocumentTableRow[]>
-}
-
-/** GET /documents/{id}/images — the image DESCRIPTIONS.
- *  ⚠ There is no picture on this wire and there never can be: `document_images` stores no
- *  bytes, so the description IS the image. Same owner-only asymmetry as tables. */
-export async function listDocumentImages(id: string): Promise<DocumentImageRow[]> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents/${id}/images`, { headers })
-  if (!res.ok) throw new Error("Failed to load document images")
-  return res.json() as Promise<DocumentImageRow[]>
 }
 
 /** GET /documents/{id}/queries — the searches that returned this document, within the

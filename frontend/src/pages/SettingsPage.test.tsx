@@ -74,9 +74,14 @@ function renderSettings(features: Record<string, boolean> = { model_management: 
   )
 }
 
-/** A caller whose map does NOT carry `model_management` — the shape a member has. */
+/** ~~A caller whose map does NOT carry `model_management` — the shape a member has.~~
+ *
+ *  ⚠ CORRECTED (283-REVIEW IN-03; struck rather than deleted): `{}` is NOT a member's shape.
+ *  `/features` returns `{ model_management: false }` for a member; `{}` means "not told yet",
+ *  a different state that the page also fails closed on, so a `{}` fixture could pass for the
+ *  wrong reason. This helper now passes the explicit member map. */
 function renderAsMember() {
-  return renderSettings({})
+  return renderSettings({ model_management: false })
 }
 
 function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
@@ -309,20 +314,23 @@ describe("a member reaching Settings, and the retired Connections tab", () => {
    * render: the redirect is about a tab that no longer EXISTS, not about permission, so
    * scoping it inside the `!canManageModels` arm would leave every operator who last
    * clicked Connections staring at an empty page.
+   *
+   * 283-02 (D-05): the redirect now lands on the caller's FIRST VISIBLE tab rather than on Memory
+   * for everyone — AI Model for an operator, Preferences for a member.
    */
-  it("lands an operator with a persisted Connections tab on Memory, not a blank panel", async () => {
+  it("lands an operator with a persisted Connections tab on AI Model, not a blank panel", async () => {
     localStorage.setItem("settings_active_tab", "5")
     renderSettings()
-    expect(await screen.findByRole("tab", { name: /memory/i })).toHaveAttribute(
+    expect(await screen.findByRole("tab", { name: /^ai model$/i })).toHaveAttribute(
       "aria-selected",
       "true",
     )
   })
 
-  it("lands a member with a persisted Connections tab on Memory", async () => {
+  it("lands a member with a persisted Connections tab on Preferences", async () => {
     localStorage.setItem("settings_active_tab", "5")
     renderAsMember()
-    expect(await screen.findByRole("tab", { name: /memory/i })).toHaveAttribute(
+    expect(await screen.findByRole("tab", { name: /preferences/i })).toHaveAttribute(
       "aria-selected",
       "true",
     )

@@ -598,10 +598,31 @@ export interface ModelCapabilityPatch {
  *  into a failed write. Keep it in sync with the backend dict; a drift here can only ever make
  *  the client send something the server then refuses honestly, never the reverse. */
 export const MODEL_CAP_INT_BOUNDS: Readonly<Record<string, readonly [number, number]>> = {
-  llm_call_timeout_seconds: [1, 3600],
+  // Phase 282 D-21: 1800, not 3600 — the run watchdog ends a run that has been silent for
+  // 2400 s, so a longer per-call timeout could never be honoured. Mirrors
+  // `backend/app/config.py:_LLM_CALL_TIMEOUT_MAX_S`, the only other copy.
+  llm_call_timeout_seconds: [1, 1800],
   context_window_tokens: [1, 10_000_000],
   max_output_tokens: [1, 1_000_000],
 }
+
+const [MODEL_TIMEOUT_MIN_S, MODEL_TIMEOUT_MAX_S] = MODEL_CAP_INT_BOUNDS.llm_call_timeout_seconds
+
+/** Phase 282 D-22 — the Model Registry's help line while the Timeout cell edits. The range is
+ *  READ from the mirror above, never typed (no third copy of the bound). The retry wording
+ *  follows `config.llm_max_retries_for` + `google_service._google_client`: self-hosted and
+ *  Google are tried once, other cloud providers keep `LLM_MAX_RETRIES_CLOUD` (2) — a backend
+ *  test reads that constant and asserts this sentence carries the same count. */
+export const MODEL_TIMEOUT_HELP_LINE =
+  `Between ${MODEL_TIMEOUT_MIN_S} and ${MODEL_TIMEOUT_MAX_S} seconds. ` +
+  "Local models and Google models are tried once. Other cloud providers retry quick failures up to 2 times."
+
+/** Phase 282 D-27 / D-29 — the timeout a model gets when none is stored, by provider class.
+ *  Mirrors `backend/app/config.py` `DEFAULT_LLM_CALL_TIMEOUT_SECONDS` (300) and
+ *  `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` (900); a backend test reads both lines. Shown as
+ *  the Add form's Timeout placeholder so a blank field says what it will mean. */
+export const MODEL_TIMEOUT_DEFAULT_S = 300
+export const MODEL_TIMEOUT_DEFAULT_SELF_HOSTED_S = 900
 
 /** True when `value` is a legal write for `column` — non-integer / out-of-range reads false.
  *  A column with no declared bound (every non-integer column) is always legal here; its own
@@ -628,6 +649,8 @@ export interface AddModelBody {
   native_tools?: boolean | null
   deprecated?: boolean
   deprecated_reason?: string | null
+  /** Phase 282 D-29 — optional; omitted when blank so the resolver default applies. */
+  llm_call_timeout_seconds?: number | null
 }
 
 // ── Plan-07 shape reconciliation (149-06 SUMMARY handoff) ─────────────────────

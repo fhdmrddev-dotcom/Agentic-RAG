@@ -8,7 +8,7 @@
  * without blurring the input first.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { LinkTargetCombobox } from "./LinkTargetCombobox"
@@ -127,5 +127,111 @@ describe("LinkTargetCombobox — keyboard and pointer", () => {
     const user = userEvent.setup()
     await user.type(input, "a")
     expect(onChoose).toHaveBeenCalledWith(null)
+  })
+})
+
+// ── 284-04 (D-15 / R-05 / UI-SPEC "Pickers on server search") — server mode ─────────────────
+//
+// With `onQueryChange` the owner searches on the SERVER: the box reports what is typed, shows the
+// candidates it is handed as the answer (no client name filter — RESEARCH Pitfall 10: a typed `*`
+// is a server wildcard the client filter would drop), and says what the search is doing in a line
+// AFTER the listbox, never inside it.
+
+function renderServer(props: Partial<React.ComponentProps<typeof LinkTargetCombobox>> = {}) {
+  const onChoose = vi.fn()
+  const onQueryChange = vi.fn()
+  const onRetry = vi.fn()
+  const view = render(
+    <LinkTargetCombobox
+      candidates={docs}
+      excludeIds={new Set<string>()}
+      value={null}
+      onChoose={onChoose}
+      placeholder="Type a document name"
+      onQueryChange={onQueryChange}
+      onRetry={onRetry}
+      {...props}
+    />,
+  )
+  return { onChoose, onQueryChange, onRetry, input: screen.getByRole("combobox"), ...view }
+}
+
+describe("LinkTargetCombobox — server mode (284-04)", () => {
+  it("reports every keystroke and does NOT filter the answer by name on the client", async () => {
+    const { input, onQueryChange } = renderServer()
+    const user = userEvent.setup()
+    await user.type(input, "zz*")
+    expect(onQueryChange).toHaveBeenLastCalledWith("zz*")
+    // Nothing is named "zz*", yet the server's answer is shown as given (capped at maxVisible).
+    expect(screen.getAllByRole("option")).toHaveLength(8)
+  })
+
+  it("still never offers an excluded id", () => {
+    renderServer({ excludeIds: new Set(["d0", "d1"]) })
+    const names = screen.getAllByRole("option").map((o) => o.textContent)
+    expect(names).not.toContain("report-00.pdf")
+    expect(names).not.toContain("report-01.pdf")
+  })
+
+  it("searching with no rows yet: no options, no 'No matching documents', a Searching… status after the list", () => {
+    const { container } = renderServer({ candidates: [], loading: true })
+    const listbox = screen.getByRole("listbox")
+    expect(within(listbox).queryAllByRole("option")).toHaveLength(0)
+    expect(screen.queryByText("No matching documents")).toBeNull()
+    expect(listbox).toHaveAttribute("aria-busy", "true")
+    const status = screen.getByRole("status")
+    expect(status).toHaveTextContent("Searching…")
+    expect(listbox.contains(status)).toBe(false)
+    // the status line is the listbox's NEXT sibling, never a child of it
+    expect(listbox.nextElementSibling).toBe(status)
+    expect(container.querySelectorAll('[role="listbox"] [role="status"]')).toHaveLength(0)
+  })
+
+  it("searching with rows on screen keeps them, dimmed and aria-busy", () => {
+    renderServer({ loading: true })
+    const listbox = screen.getByRole("listbox")
+    expect(within(listbox).getAllByRole("option")).toHaveLength(8)
+    expect(listbox).toHaveAttribute("aria-busy", "true")
+    expect(listbox.className).toContain("opacity-60")
+    expect(screen.getByRole("status")).toHaveTextContent("Searching…")
+  })
+
+  it("more matches than shown: one plain line, no number", () => {
+    renderServer({ hasMore: true })
+    const listbox = screen.getByRole("listbox")
+    expect(listbox).not.toHaveAttribute("aria-busy")
+    const status = screen.getByRole("status")
+    expect(status).toHaveTextContent("More documents match. Type more of the name to narrow.")
+    expect(status.textContent).not.toMatch(/\d/)
+    expect(listbox.nextElementSibling).toBe(status)
+  })
+
+  it("'No matching documents' only after a completed empty answer", () => {
+    renderServer({ candidates: [], loading: false })
+    expect(screen.getByText("No matching documents")).toBeInTheDocument()
+    expect(screen.queryByRole("status")).toBeNull()
+  })
+
+  it("a failed search says so after the list, keeps the previous options, and Try again retries", async () => {
+    const { onRetry } = renderServer({ error: true })
+    expect(screen.getAllByRole("option")).toHaveLength(8)
+    const alert = screen.getByRole("alert")
+    expect(alert).toHaveTextContent("Couldn’t search documents.")
+    expect(screen.getByRole("listbox").contains(alert)).toBe(false)
+    await userEvent.setup().click(within(alert).getByRole("button", { name: "Try again" }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText("No matching documents")).toBeNull()
+  })
+
+  it("choosing reports the chosen name as the new query, and the keyboard walk is unchanged", async () => {
+    const { input, onChoose, onQueryChange } = renderServer()
+    const user = userEvent.setup()
+    input.focus()
+    await user.keyboard("{ArrowDown}{ArrowDown}")
+    const options = screen.getAllByRole("option")
+    expect(input).toHaveAttribute("aria-activedescendant", options[1].id)
+    await user.keyboard("{Enter}")
+    expect(onChoose).toHaveBeenLastCalledWith(docs[1])
+    expect(onQueryChange).toHaveBeenLastCalledWith(docs[1].filename)
   })
 })

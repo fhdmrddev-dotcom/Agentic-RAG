@@ -38,6 +38,8 @@ import pytest
 import pytest_asyncio
 from fastapi import HTTPException
 
+from tests.integration._284_route_users import RouteUsers, as_user
+
 
 _POSTGRES_TEST_DSN = os.environ.get(
     "POSTGRES_DSN",
@@ -139,13 +141,19 @@ async def pg_pool():
         await pool.close()
 
 
-async def _seed_user(pool, label):
-    user_id = uuid4()
-    await pool.execute(
-        "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
-        user_id, f"phase-113-leak-{label}-{user_id}@test.local",
-    )
-    return user_id
+async def _seed_user(users: RouteUsers, label, *, reads_views_of=None):
+    """A REAL signed-in user (284-04: the route reads ``library_documents`` through the caller's
+    JWT; a service-role caller reads 0 rows from it, R-02).
+
+    ``reads_views_of``: the user whose org this one joins, so the seeded system-global view —
+    which lives in that owner's org — is readable under RLS. Joining the SAME org makes the leak
+    assertions below STRONGER, not weaker: RLS then admits the other user's documents by org, and
+    only the Library's own-or-shared-folder rule (the view) keeps them out.
+    """
+    uid = await users.create(f"113-leak-{label}")
+    if reads_views_of is not None:
+        await users.join_org_of(uid, reads_views_of)
+    return uid
 
 
 async def _seed_doc(pool, user_id, *, metadata, created_at, is_latest=True, version=1):
@@ -188,8 +196,9 @@ async def two_users_global_view(pg_pool):
 
     base = datetime(2025, 6, 1, tzinfo=timezone.utc)
 
-    user_a = await _seed_user(pg_pool, "a")
-    user_b = await _seed_user(pg_pool, "b")
+    users = RouteUsers(pg_pool)
+    user_a = await _seed_user(users, "a")
+    user_b = await _seed_user(users, "b", reads_views_of=user_a)
     # The global view is OWNED by A (the seeding owner) but is_system_global=true → B can read it.
     view_id = await _seed_global_view(pg_pool, user_a, field="document_type", value="invoice")
 
@@ -203,24 +212,14 @@ async def two_users_global_view(pg_pool):
     b_memo = await _seed_doc(pg_pool, user_b, metadata={"document_type": "memo", "title": "B-memo"}, created_at=base)
 
     ctx = {
-        "user_a": user_a, "user_b": user_b, "view_id": view_id,
+        "user_a": user_a, "user_b": user_b, "view_id": view_id, "users": users,
         "a_inv": {str(a_inv1), str(a_inv2)}, "a_report": str(a_report),
         "b_inv": {str(b_inv1)}, "b_memo": str(b_memo),
     }
     try:
         yield ctx
     finally:
-        for uid in (user_a, user_b):
-            for sql in (
-                ("DELETE FROM public.documents WHERE user_id = $1", uid),
-                ("DELETE FROM public.document_views WHERE user_id = $1", uid),
-                ("DELETE FROM audit_log WHERE user_id = $1", uid),
-                ("DELETE FROM auth.users WHERE id = $1", uid),
-            ):
-                try:
-                    await pg_pool.execute(*sql)
-                except Exception:
-                    pass
+        await users.drop_all()  # documents, views, audit rows, users and their orgs
 
 
 @pytest.mark.asyncio
@@ -238,8 +237,8 @@ async def test_global_view_resolves_per_viewer_no_cross_user_leak(pg_pool, two_u
     view_id = str(ctx["view_id"])
 
     # Both callers resolve the SAME global view id.
-    out_a = await resolve_view(view_id=view_id, current_user={"id": str(ctx["user_a"])}, supabase=sb)
-    out_b = await resolve_view(view_id=view_id, current_user={"id": str(ctx["user_b"])}, supabase=sb)
+    out_a = await resolve_view(view_id=view_id, current_user={"id": str(ctx["user_a"])}, supabase=as_user(ctx["user_a"]))
+    out_b = await resolve_view(view_id=view_id, current_user={"id": str(ctx["user_b"])}, supabase=as_user(ctx["user_b"]))
 
     a_ids = {d["id"] for d in out_a["documents"]}
     b_ids = {d["id"] for d in out_b["documents"]}
@@ -291,26 +290,14 @@ async def test_global_view_zero_match_caller_gets_empty_not_leak(pg_pool, two_us
     view_id = str(ctx["view_id"])
 
     # A brand-new third user with NO documents at all resolves the shared global view.
-    user_c = await _seed_user(pg_pool, "c")
-    try:
-        out_c = await resolve_view(view_id=view_id, current_user={"id": str(user_c)}, supabase=sb)
-        # Empty, honest, and NOT another user's rows.
-        assert out_c["documents"] == [], "a zero-match caller must get an empty list"
-        assert out_c["total"] == 0, "a zero-match caller must get total=0"
-        c_ids = {d["id"] for d in out_c["documents"]}
-        assert c_ids.isdisjoint(ctx["a_inv"]), "zero-match caller must NOT receive A's docs"
-        assert c_ids.isdisjoint(ctx["b_inv"]), "zero-match caller must NOT receive B's docs"
-    finally:
-        for sql in (
-            ("DELETE FROM public.documents WHERE user_id = $1", user_c),
-            ("DELETE FROM public.document_views WHERE user_id = $1", user_c),
-            ("DELETE FROM audit_log WHERE user_id = $1", user_c),
-            ("DELETE FROM auth.users WHERE id = $1", user_c),
-        ):
-            try:
-                await pg_pool.execute(*sql)
-            except Exception:
-                pass
+    user_c = await _seed_user(ctx["users"], "c", reads_views_of=ctx["user_a"])  # torn down by the fixture
+    out_c = await resolve_view(view_id=view_id, current_user={"id": str(user_c)}, supabase=as_user(user_c))
+    # Empty, honest, and NOT another user's rows.
+    assert out_c["documents"] == [], "a zero-match caller must get an empty list"
+    assert out_c["total"] == 0, "a zero-match caller must get total=0"
+    c_ids = {d["id"] for d in out_c["documents"]}
+    assert c_ids.isdisjoint(ctx["a_inv"]), "zero-match caller must NOT receive A's docs"
+    assert c_ids.isdisjoint(ctx["b_inv"]), "zero-match caller must NOT receive B's docs"
 
 
 @pytest.mark.asyncio
@@ -328,7 +315,7 @@ async def test_global_view_nonexistent_or_unseeable_id_404(pg_pool, two_users_gl
 
     # (1) A nonexistent random id → 404.
     with pytest.raises(HTTPException) as ei_missing:
-        await resolve_view(view_id=str(uuid4()), current_user={"id": str(ctx["user_a"])}, supabase=sb)
+        await resolve_view(view_id=str(uuid4()), current_user={"id": str(ctx["user_a"])}, supabase=as_user(ctx["user_a"]))
     assert ei_missing.value.status_code == 404, "nonexistent id must be 404, not 403"
 
     # (2) An id that exists but is PRIVATE to another user (unseeable) → 404, not 403.
@@ -342,5 +329,5 @@ async def test_global_view_nonexistent_or_unseeable_id_404(pg_pool, two_users_gl
         supabase=sb,
     )
     with pytest.raises(HTTPException) as ei_unseeable:
-        await resolve_view(view_id=str(a_private["id"]), current_user={"id": str(ctx["user_b"])}, supabase=sb)
+        await resolve_view(view_id=str(a_private["id"]), current_user={"id": str(ctx["user_b"])}, supabase=as_user(ctx["user_b"]))
     assert ei_unseeable.value.status_code == 404, "an unseeable private view must be 404, not 403"

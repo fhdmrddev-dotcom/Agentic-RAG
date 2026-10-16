@@ -42,7 +42,7 @@ import { ChevronDown, ChevronRight, Trash2, Loader2, RefreshCw, FolderInput, Che
 import { DocumentStatusBadge } from "./DocumentStatusBadge"
 import { IngestionStrip } from "./IngestionStrip"
 import {
-  fetchDocumentVersions,
+  fetchDocumentVersionsPage,
   restoreDocumentVersion,
   acceptClassification,
   dismissClassification,
@@ -162,6 +162,8 @@ function VersionHistoryPanel({
   currentUserId: string
 }) {
   const [versions, setVersions] = useState<Document[]>([])
+  // 284-03 (D-17 / UI-SPEC S10): the lineage's exact size — the page shows at most 50 of it.
+  const [versionTotal, setVersionTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [restoreTarget, setRestoreTarget] = useState<Document | null>(null)
@@ -169,8 +171,11 @@ function VersionHistoryPanel({
   const [restoreError, setRestoreError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchDocumentVersions(documentId)
-      .then(setVersions)
+    fetchDocumentVersionsPage(documentId, { offset: 0, limit: 50 })
+      .then((res) => {
+        setVersions(res.versions)
+        setVersionTotal(res.total)
+      })
       .catch(() => setFetchError("Could not load version history."))
       .finally(() => setLoading(false))
   }, [documentId])
@@ -260,6 +265,9 @@ function VersionHistoryPanel({
             ))}
           </tbody>
         </table>
+        {versions.length < versionTotal && (
+          <p className="mt-2 text-xs text-muted-foreground">{`${versionTotal.toLocaleString()} versions, showing ${versions.length.toLocaleString()}`}</p>
+        )}
       </div>
 
       {/* Restore confirmation dialog */}

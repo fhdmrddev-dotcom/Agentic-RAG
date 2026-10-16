@@ -29,7 +29,7 @@
 - ✅ **v4.3 What You Can Actually Sell** — Phases **255-264** (shipped 2026-09-23, git tag `v4.3`). 10 phases (255-260 scoped; 261-264 added in-milestone), **39 plans**, migrations **182-192**, 6 days. **31/32 requirements delivered · PACK-05 carried to SEED-304 by decision.** Extension contract, token metering + USD, enforceable tiers, Experts as data.
 - ✅ **v4.4 Experts That Actually Work** — Phases **265-269** (shipped 2026-09-29, git tag `v4.4`). 5 phases, **24 plans**, migrations **194-198**, 7 days. **17/17 requirements satisfied** (audit `tech_debt`, no blockers). A client installs an Expert and gets grounded answers from its own knowledge in their own org — proven by live drives as a real user, never by a mocked test. ✅ **DEPLOYED 2026-09-29** — production `82babd8d0`; migrations 195-198 applied to production (194 already was). Operator smoke test owed.
 - ✅ **v4.5 Find It, Show It** — Phases **270-276** (shipped 2026-10-12, git tag `v4.5`). 7 phases, **38 plans**, migrations **199-206**, 14 days. **25/25 requirements satisfied** (audit `tech_debt`, no blockers). Find a document by what it IS and get the file back out, an agent that answers with interactive artifacts from a closed registry, thread-scoped attachments, retention with legal hold, and public docs. ✅ 270-274 + 276 **LIVE 2026-10-05** (prod `bd9e126c3`); ✅ **275 deployed 2026-10-12** (prod `784647e2d`, migrations 204-206).
-- 🚧 **v4.6 Pay It Down** — Phases 277-283 (started 2026-10-12). Repair only: 10 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extractions, 2 register-hygiene items (20 requirements).
+- 🚧 **v4.6 Pay It Down** — Phases 277-284 (started 2026-10-12; 284 added 2026-10-14). Repair only: 11 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extractions, 2 register-hygiene items (21 requirements).
 
 ---
 
@@ -87,6 +87,7 @@ capability", applied milestone-wide).
 | 281 | A Refusal Names Its Cause | When a workflow step or a publish is refused, the author reads the check that actually failed, in plain words, and the freshness check ignores archived documents | FIX-09, FIX-10, DEBT-07 | 5 | closed core recount · **G-4** · G-2 skip recorded (copy on shipped layouts) · `SEED-221` folded · G-5 (`phase_types.py`, `validator_kinds.py`, `PublishGauntlet.tsx`, `doorVocabulary.ts`, `WorkflowBuilderPage.tsx`) · UI hint |
 | 282 | The Slow Run and the Paused Run | A slow model gets the timeout the operator set, and a paused run asks its question in one place with one draft | FIX-06, FIX-07 | 5 | **G-2 sketch** (FIX-07) · **G-4** · **SC#10 four-axis UAT, full 8-row roster** · G-5 (`openai_service.py`, `MessageList.tsx`, `PendingAskCard.tsx`, `WorkspacePanel.tsx`, `streamsStore.ts`) · UI hint |
 | 283 | Every Member Reaches Their Own Settings | An ordinary member reaches their own settings, and a large document's detail panel stays navigable | FIX-01, FIX-08 | 4 | ⛔ **G-5: `SettingsPage.tsx` tab seam OWED — taken first** · **G-4** · security_enforcement (two-role fence) · G-2 skip recorded unless discuss opens a new door · UI hint |
+| 284 | Library at Scale | The Library, Find and every picker stay correct and fast at tens of thousands of documents: server pages, server counts, no growing id lists | FIX-11 | 7 | ⛔ **G-5: `LibraryPage.tsx` extraction OWED — taken first** · **measure first** (10k/50k seeded) · migration **207** only if needed · security_enforcement (INVOKER, revoke PUBLIC) · **G-4** · G-5 (`documents.py`, `document_search_service.py`, `DocumentList.tsx`) · UI hint |
 
 **Dependency order:** 277 → 278 → 279 → 280 → 281 → 282 → 283. The real constraints are narrower,
 and are stated so a phase can run early when its files are free:
@@ -130,10 +131,11 @@ and are stated so a phase can run early when its files are free:
 - [x] **Phase 277: Registers Back Inside the Band** (completed 2026-10-12): split CLAUDE.md by function into `docs/` below 120k with nothing deleted; repair the v4.5 bookkeeping drift (REG-04, REG-05)
 - [x] **Phase 278: One Home for Tools and Filters**: `tool_dispatcher.py` registry/handler split pinned at 30 tools; `retrieval_service.py` seam measured and closed; one home for the filter vocabulary (SEAM-02, SEAM-03, DEBT-09)
 - [x] **Phase 279: The Expert Scope Seam**: `expert_scope.py` extracted along its named seam; every `SEED-328` item fixed or recorded with a reason (SEAM-01)
-- [ ] **Phase 280: In Once, Out Clean**: same-bytes upload never retires the in-flight copy; Graph adapter pages, encodes and decodes honestly; purge and delete remove bytes and answer 404; a recorded decision for artifact rows on disposal (FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11)
-- [ ] **Phase 281: A Refusal Names Its Cause**: emit failure names the check that failed; publish and describe-door refusals in plain words; freshness ignores archived documents (FIX-09, FIX-10, DEBT-07)
-- [ ] **Phase 282: The Slow Run and the Paused Run**: per-model timeout reaches the provider call with deliberate retries; one `ask_user` input with one draft (FIX-06, FIX-07)
-- [ ] **Phase 283: Every Member Reaches Their Own Settings**: Settings reachable by members with operator tabs hidden and refused; bounded Chunks section (FIX-01, FIX-08)
+- [x] **Phase 280: In Once, Out Clean**: same-bytes upload never retires the in-flight copy; Graph adapter pages, encodes and decodes honestly; purge and delete remove bytes and answer 404; a recorded decision for artifact rows on disposal (FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11)
+- [x] **Phase 281: A Refusal Names Its Cause**: emit failure names the check that failed; publish and describe-door refusals in plain words; freshness ignores archived documents (FIX-09, FIX-10, DEBT-07)
+- [x] **Phase 282: The Slow Run and the Paused Run**: per-model timeout reaches the provider call with deliberate retries; one `ask_user` input with one draft (FIX-06, FIX-07)
+- [x] **Phase 283: Every Member Reaches Their Own Settings**: Settings reachable by members with operator tabs hidden and refused; bounded Chunks section (FIX-01, FIX-08) — completed 2026-10-16
+- [x] **Phase 284: Library at Scale**: the Library, Find and every picker page and count on the server (envelope `GET /documents`, `GET /library/summary`, Find in SQL, pickers on `POST /document-search`), migrations 207 (visible-set view) + 208 (page index), guards driven RED, G-4 A-F at 10k/50k (FIX-11) — completed 2026-10-16
 
 ### Phase Details
 
@@ -229,7 +231,21 @@ Plans:
   5. A **recorded decision** (CONTEXT `<decisions>` and `docs/`) states what happens to `message_artifacts` rows when retention disposes their source document. If the decision requires enforcement, disposition enforces it, with a test that drives RED first and a dry-run that names the affected artifact count (DEBT-08).
 
 **How we'd know this failed**: the dedup fix swallows the second upload's error but still retires the first; the minter is made atomic for the upload door only and the watch path still races; the OneDrive row reads "pass" on doubles alone; bytes are removed **before** the row delete, so a hold refusal leaves a row with no file; a purge of a held document removes bytes; the 404 distinguishes "exists in another org" from "does not exist" (an existence oracle); DEBT-08's decision says "delete" and no code does it, or says "keep" and the artifact then renders a broken reference with no explanation.
-**Plans**: TBD (target 4: same-bytes minter · Graph adapter measure + live re-drive · purge bytes + delete 404 · DEBT-08 decision + enforcement + close)
+**Plans**: 4 plans in 3 waves (D-23 target kept; the OneDrive live re-drive moved from the Graph plan into the close plan because it needs the fixed minter and an operator checkpoint, and a checkpoint plan must not carry implementation)
+
+Plans:
+**Wave 1**
+
+- [x] 280-01-PLAN.md — wave 1 (TDD): phase base failing set; `sources.py` purge extraction FIRST into `document_purge.py` (G-5, D-12), then bytes after the row delete (DEBT-10, D-11/D-31); `maybe_row` + AST fence + 22-site 404 sweep (DEBT-11, D-08/D-09/D-29); dead `main.py` patch deleted (D-30)
+- [x] 280-02-PLAN.md — wave 1 (TDD, stubbed, parallel with 01): 238 pins re-driven RED/GREEN (measure first); `_item_segment` so client ids cannot shape the Graph path (FIX-04, D-28); stale comment (D-17); `Team Docs` 105-file folder generated outside the repo (D-27)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 280-03-PLAN.md — wave 2 (TDD, live DB, lock): live RED drives; same-bytes minter — in-flight leg, insert-then-retire, 23505→winner, `already_in_library` (FIX-02, D-01..D-04, D-24/D-25); CR-01 filed first if it reproduces, then fixed without an oracle (D-05/D-26)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 280-04-PLAN.md — wave 3 (operator checkpoint at the end): live per-path purge + delete 404 evidence (SC#3/SC#4); DEBT-08 KEEP record in two homes + caption test (D-06/D-07); ledger + CLAUDE.md rows, seeds, full gates; then the OneDrive re-drive (SC#2) — pass, or OWED/⛔ with reason
 **Flags**: **Measure first** for FIX-03/04/05: the work left may be only the live re-drive the report names (`238-VERIFICATION.md` M-9). **Migration `207`** only if FIX-02's atomicity needs a database function (a unique-index-aware upsert or one-statement retire+insert) or DEBT-08's decision needs a constraint. Apply it via the SQL editor, regenerate `full-schema.sql` (no reset), mirror any REVOKE in `scripts/full-schema-supplement.sql`, and run `get_advisors(security)`. **security_enforcement**: purge and delete are data-protection actions; the 275 hold guard runs before any delete, and its order (guard → rows → bytes, D-38) is binding. ⚠ The unmeasured CR-01 note in `BUG-261005-01` (the minter's folder check compares `user_id`, never the folder's org) is **driven once here**. If it reproduces, file it as a new bug and do not fold it silently. **G-5 audit at discuss**: `backend/app/api/documents.py` (FIRES, 36 phases), `backend/app/services/ingest_splice.py` (FIRES), `backend/app/api/sources.py` (FIRES), `backend/app/services/sources/adapters/microsoft_graph.py`, `backend/app/services/retention/disposition.py`. Each change is honoured by construction or recorded. **Deploy parity**: migration before backend; `WATCH_PROCESS_ENABLED` and `RETENTION_SWEEP_ENABLED` stay as they are in production.
 
 #### Phase 281: A Refusal Names Its Cause
@@ -246,7 +262,21 @@ Plans:
   5. **G-4**: the operator defines the lived-experience scenarios at scope time ("I'd recognise failure if…"), and Chrome MCP drives each refusal to the screen. The assertions read the rendered **words**, not the presence of a block.
 
 **How we'd know this failed**: a new validator kind or phase type appears (closed core broken); the client invents its own cause table and starts overclaiming, trading the honesty 192/193.2 fought for against legibility; the translation table covers `connection_not_allowed` and nothing else; "coming soon" is replaced by "later" or another unowned promise; the freshness fix is a fourth copy of the retrievable predicate; the emit cause is right in `harness_audit` but the gauntlet still renders the last validator's message ("the least informative error wins by being last").
-**Plans**: TBD (target 3-4: emit cause precedence · gauntlet + describe-door copy · freshness · G-4 drive + close)
+**Plans**: 4 plans in 3 waves (D-23 target kept; freshness rides the emit plan; the gauntlet render waits on the emit contract and a second test-running agent slot)
+
+Plans:
+**Wave 1**
+
+- [x] 281-01-PLAN.md — wave 1 (TDD, backend): phase base failing set; new pure leaf `harness/emit_cause.py` (one composer, per-shot records, `template_fields_missing` split); engine precedence + `reason_is_final` + identity projection + true retry feedback (FIX-09, D-01..D-06, D-25, D-26, D-30); `freshness.py` imports `RETRIEVABLE_COLUMN`, RED-first (DEBT-07, D-16)
+- [x] 281-02-PLAN.md — wave 1 (TDD, parallel with 01): additive `reason_code` on the 3 `connection_not_allowed` arms; new leaf `describeRefusalVocabulary.ts` (4 codes + subs + fallback, `SERVICES_LABEL` imported); describe door renders sentence + next step, code only on reveal; S-7 inverted (FIX-10 / SEED-221, D-11..D-15, D-24)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 281-03-PLAN.md — wave 2 (TDD, frontend): golden-run link by `onOpenRun` presence + leave guard, no "coming soon" (D-07/D-08/D-28/D-29); gated next line; pre-line cause; `template_fields_missing` copy on PhaseCard / runVocabulary; SEED-218 connect control → Connections (D-27)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 281-04-PLAN.md — wave 3 (operator checkpoints): merged-tree gates + closed-core recount + ledger/CLAUDE.md rows + seeds sweep; G-4 Chrome drives A-D (D-17..D-20) matched to the DB; evidence-gated bug/seed closes; STATE
 **Flags**: **Closed-core recount** (7 / 1 / 30) against the phase base. A cause-precedence change is data inside the existing executor, never a new one. **G-2**: the refusals sit on shipped layouts (the gauntlet's worded verdict, the describe door), so no layout decision is open. The skip is **recorded as a decision** at discuss (OV-266-01 is what an unrecorded skip cost). **G-4** fires. **G-5 audit at discuss**: `backend/app/services/harness/phase_types.py` (FIRES), `backend/app/services/harness/validator_kinds.py` (FIRES), `backend/app/services/template_render_service.py`, `backend/app/services/workflow_authoring.py` (FIRES), `frontend/src/components/workflows/PublishGauntlet.tsx` (FIRES), `doorVocabulary.ts` (FIRES), `WorkflowBuilderPage.tsx` (FIRES ×6), `backend/app/services/harness/freshness.py`. Seeds: `SEED-221` (folded). Read the sketch-findings skill for the gauntlet's worded-verdict vocabulary before writing copy.
 **UI hint**: yes
 
@@ -264,7 +294,21 @@ Plans:
   5. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. panel open, panel closed, two threads paused at once, a slow local model on GPU), and Chrome MCP drives each one. The draft-agreement check reads both renderings' DOM state, not a screenshot (FIX-07).
 
 **How we'd know this failed**: the timeout reaches `get_llm_client` but the Anthropic, Google or Responses-surface client still binds the SDK default; the UI accepts 3600 while the httpx pool or read timeout still binds at 600; retries stay at the SDK default "by omission"; `PendingAskStack`'s mount condition is narrowed and a workflow pause becomes unreachable with the panel closed (the SHELL-03 failure, a third time); the draft is "shared" by copying state between two cards so they can still diverge; the board lists only the rows that passed.
-**Plans**: TBD (target 4: client timeout + retries across providers + registry refusal · sketch-approved single-input `ask_user` with one shared draft · a11y + dead control · 8-row board + G-4 drive)
+**Plans**: 4 plans in 3 waves (282-04 added at sign-off, D-27..D-30; D-18 / G-8; 01 and 02 share no files and run in parallel worktrees; the a11y + dead-control work rides plan 02)
+
+Plans:
+**Wave 1**
+
+- [x] 282-01-PLAN.md — wave 1 (TDD, backend + Registry): ceiling 1800 + boot check + DB-tier clamp, explicit timeout/max_retries on all four client families via `GatewayRequest.timeout_s`, off-loop OpenAI-family open under one shared deadline (BUG-261015-02), the 422 watchdog sentence + help line, the `did not answer within N s` run-failure text, SCALED 2 s < 3 s stub proof (FIX-06; D-01..D-09, D-19..D-23)
+- [x] 282-02-PLAN.md — wave 1 (TDD, frontend): new `stores/askDraftStore.ts` (one draft per `tool_call_id`, GC on the ask slice, panel-home refcount), card reads it, radio keyboard + non-colour mark, `PendingAskStack home` prop + chat pointer (sketch 282 variant A), `home="panel"` on the panel mount, D-15 fences, global test reset (FIX-07; D-10..D-15, D-24)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 282-03-PLAN.md — wave 2 (operator checkpoints): merged-tree gates + ledger/CLAUDE.md rows; SC#10 8-row board (3 axes); G-4 rows 1-4 in Chrome on DOM state + Registry refusal on screen; operator confirms sketch A; evidence-gated bug/seed flips + STATE (FIX-06, FIX-07; D-16, D-17, D-25, D-26)
+
+**Wave 3** *(operator-approved at the G-4 sign-off, 2026-10-15)*
+
+- [x] 282-04-PLAN.md — wave 3 (TDD, backend + Registry): self-hosted models default to 900 s when no timeout is set (resolver takes the provider), Timeout field on "Add model by ID" bound 1..1800 with the shared refusal sentence (FIX-06 follow-up; D-27..D-30)
 **Flags**: ⛔ **G-2 FIRES for FIX-07, and a sketch is genuinely needed.** Sketch 006 option C (calm panel card plus chat **pointer**) conflicts with 244-12's chat-column mount, which exists for reachability when the panel is closed. Where the single input lives in each panel state is an **open layout decision**, and the operator-approved mockup is the acceptance bar. Run `/gsd:sketch` before plan and read the sketch-findings skill (`references/pending-question.md`). **Provider-docs-first** for FIX-06: read each provider SDK's own timeout and retry documentation (OpenAI, Anthropic native, Google), and keep provider-specific handling at the service boundary. **G-5 audit at discuss**: `backend/app/services/openai_service.py` (FIRES, 36 phases), `backend/app/services/anthropic_service.py` (FIRES), `backend/app/config.py` (FIRES; `MODEL_CAPABILITIES` seam owed), `backend/app/api/admin.py`, `frontend/src/components/admin/ModelRegistryTab.tsx` (FIRES), `MessageList.tsx`, `MessageItem.tsx`, `PendingAskCard.tsx` (FIRES), `WorkspacePanel.tsx` (FIRES), `streamsStore.ts` (FIRES), `PausedRunCue.tsx`. ⛔ The FIX-06 change stays a constructor argument at the client boundary, and the agent loop's `per_call_budget` call sites do not move (`agent_loop.py` prompt-assembly seam OV-273-03 is owed and not taken here). Seeds: `SEED-289` / `SEED-172` (sibling local-model findings; the 13 rowless local models on the 300 s inferred default are **noted, not fixed**, unless discuss shows they are the same defect).
 **UI hint**: yes
 
@@ -281,8 +325,54 @@ Plans:
   4. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. a member's first visit, an operator's view unchanged, a 1,000-chunk document), and Chrome MCP drives each one as the real role (FIX-01, FIX-08).
 
 **How we'd know this failed**: the fix widens `model_management` (the documented workaround) so members also see model management; a member sees an operator tab that 403s on first click; the Settings door appears but the page renders empty for a member; the client hides a tab whose API still accepts a member's write; Chunks gets a "Show first 20 / Show all" button (which the report rules out as a fix); the bounded list traps keyboard focus or wheel scroll; a filter box for finding a chunk arrives (a capability, out of scope).
-**Plans**: TBD (target 3-4: `SettingsPage.tsx` tab seam (behaviour-preserving) · per-tab + API gating with two-role fence · bounded Chunks section · G-4 drive + close)
+**Plans**: 3 plans in 2 waves (D-23 / G-8; 01 and 03 share no files and run in parallel worktrees; the G-4 drive, the D-13 live two-role check and the close are orchestrator-owned, recorded in `283-LIVE-EVIDENCE.md`)
+
+Plans:
+**Wave 1**
+
+- [x] 283-01-PLAN.md — wave 1 (TDD, frontend): `settingsTabs.ts` tab-registration seam reproducing today's rule exactly + source-order fence, SettingsPage asks the registry with literal JSX triggers, `AuditLogSection.tsx` extracted; existing SettingsPage suites unedited (FIX-01; D-03, D-14, D-15)
+- [x] 283-03-PLAN.md — wave 1 (TDD, frontend): the Chunks list bounded at `max-h-96` inside a labelled `role=region` with one Tab stop and no overscroll containment, fences driven RED by plants (FIX-08; D-16..D-20)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 283-02-PLAN.md — wave 2 (TDD, backend fences + frontend): D-10 two-role fence on the real gate + D-11 route inventory (driven RED), Preferences tab `"6"` with the toggle + default model moved verbatim, derived first-visible fallback, Reset and operator panels gated, zero gated calls, Settings rail door un-gated, docs/landing facts in the same commit, phase ledger close on the merged tree (FIX-01; D-01..D-13, D-15, D-21..D-23)
 **Flags**: ⛔ **G-5: `frontend/src/pages/SettingsPage.tsx` FIRES (24 phases) and its tab seam is OWED**. FIX-01 is a per-tab gating change, which is exactly that seam, so wave 1 takes it behaviour-preserving before any gate moves. Also FIRING: `frontend/src/lib/nav-items.ts`, `backend/app/api/settings.py`, `backend/app/dependencies.py` (access-gate module seam named: `app/security/access.py`), `DocumentDetailPanel.tsx`. **security_enforcement**: the change is a permission boundary, so the API gate is the authority and the UI only reflects it. **G-2**: FIX-08's layout is settled by its own report (bound the list using the per-chunk `max-h` pattern already in the file), and FIX-01 reuses the existing rail entry or profile menu. The sketch skip is **recorded as a decision** unless discuss decides a new door is needed, in which case `/gsd:sketch` runs first. The dev account is in two orgs, so prove the active org before every drive. Read the sketch-findings skill for the Settings and document-detail-panel contracts.
+**UI hint**: yes
+
+#### Phase 284: Library at Scale
+
+**Goal**: The Library, Find and every document picker stay correct and fast for an account with **tens of thousands of documents**: the server returns one page at a time, the server does the counting, and no request ever carries an ever-growing list of ids.
+**Depends on**: Phase 280 (it edited `documents.py`); after Phase 283 in sequence. Added 2026-10-14 from `BUG-261014-06` (Library read 0 documents at 286, `414 URI too long`) and `BUG-261014-07` (every list silently cut at 1,000 rows).
+**Requirements**: FIX-11
+**Success Criteria** (what must be TRUE):
+
+  1. With **10,000** and **50,000** documents seeded locally for one account, the Library opens Root and a folder showing the **correct total** and the first page; the page's response size and load time are **measured and recorded** for both sizes, and neither grows with the library (FIX-11).
+  2. **Nothing is silently missing:** an account with more than 1,000 documents reaches every one by paging, and the total shown equals `count(*)` in the database. No list request depends on the API's 1,000-row cap (FIX-11).
+  3. Folder counts, the CHUNKS / VECTORS tiles and each row's table / image counts come from **server-side aggregates** and equal the database counts at 10,000 documents. No request carries an id list that grows with the library; the `BUG-261014-06` batching stopgap is removed (FIX-11).
+  4. **Find pages in the database** (limit / offset in SQL), not by loading every match and slicing (`document_search_service.py:573` today) (FIX-11).
+  5. Every screen that loads the whole document list just to pick one (`CreateLinkDialog`, `TakeoffSection`, `LegalHoldDialog` and the rest of the `listDocuments()` callers) **searches on the server** instead (FIX-11).
+  6. A guard test fails if any list endpoint returns an unbounded result or any query is built from an unbounded id list, and it is **driven RED** against a planted regression (FIX-11).
+  7. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. opening a 10,000-document folder, paging to the end, picking a document in the link dialog), and Chrome MCP drives each one (FIX-11).
+
+**How we'd know this failed**: the list pages, but folder totals or the tiles are still counted from the page in the browser (so they read 50, not 10,000); the 1,000-row cap is "fixed" by raising `max_rows`; the batching stays and simply runs 100+ round-trips; Find still loads every match before slicing; a picker still downloads the whole library; the RLS boundary loosens because a new aggregate function runs as `SECURITY DEFINER` (or keeps the default `PUBLIC` EXECUTE grant).
+**Plans**: 6 plans in 4 waves (5 planned in 3 waves per D-25 / G-8; 06 added 2026-10-16 at the operator's request for SEED-357; 01 is frontend-only and 02 holds the local-DB lock, so they run in parallel worktrees; in wave 2 only 04 holds the lock; 03 and 04 share no file — 01 owns every wire type and client; the after-measurement, the production `max_rows` read, the G-4 drive and the close are orchestrator-owned, recorded in `284-MEASUREMENTS.md` / `284-LIVE-EVIDENCE.md`)
+
+Plans:
+**Wave 1**
+
+- [x] 284-01-PLAN.md — wave 1 (TDD, frontend, no DB): the paged wire contract (`listDocumentsPage` / `getDocument` / `getLibrarySummary` / per-document pages / paged resolves, legacy-shape tolerant), the `useLibraryDocuments` extraction over `useDocuments` with the screen byte-identical (G-5 seam TAKEN), stat tiles / folder band / Find editors take numbers, R-11 `.folder_id` re-pin (FIX-11; D-01, D-02, D-07, D-11, D-12, D-16, D-17, D-24, R-03..R-06, R-08, R-11)
+- [x] 284-02-PLAN.md — wave 1 (TDD, backend, DB lock): synthetic 10k / 50k account + BEFORE figures at base, migration **207** `library_documents` security_invoker view (SELECT-only, closed to anon / service role, supplement mirror, applied by script, regen) proven by leak / fail-closed / parity / drift live tests, `GET /library/summary` (one GROUPING SETS read), `GET /documents` envelope + `GET /documents/{id}` + bounded per-document lists, `BUG-261014-06` stopgap removed, public OpenAPI + pagination.md (FIX-11; D-01..D-07, D-11, D-13, D-17..D-21, R-01..R-08, R-11)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 284-03-PLAN.md — wave 2 (TDD, frontend, no DB): hook body on the server, Realtime INSERT / DELETE → debounced refetch, single-document read, `fakeLibraryApi` keeps the nine suites' cases, loading / failed / warm states (SEED-248 Library half), exact pager with the ROW_CAP arm deleted, IngestionTab on the summary + paged lists, Chunks scroll-sentinel paging, Tables / Images / Versions "N of M" (FIX-11; D-07..D-13, D-17, D-24, R-04, R-08, R-11)
+- [x] 284-04-PLAN.md — wave 2 (TDD, backend + frontend, DB lock): Find paged in SQL over the view (lineage batching gone), saved views / filters paged with the agent tool on its two-leg path (byte-identical output), D-23 layer 1 route inventory driven RED + SEED-355 / SEED-356 planted, CreateLinkDialog / RelationshipEditor / LegalHoldDialog typeahead on `POST /document-search`, Takeoff one bounded spreadsheet page (FIX-11; D-10, D-14, D-15, D-16, D-18, D-23, R-02, R-05, R-10..R-12)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 284-05-PLAN.md — wave 3 (TDD guards + orchestrator checkpoint, DB lock): D-23 layer 2 request recorder (unit + live) and the D-16 whole-list fence, each driven RED, legacy array clients deleted; merged-tree gates, count-gate pins, ledger + CLAUDE.md close; AFTER measurement at 10k / 50k, production `max_rows` read (read-only), G-4 A-E, evidence-gated bug / seed / requirement flips (FIX-11; D-16, D-18, D-21..D-23, D-25..D-27, R-09)
+- [x] 284-06-PLAN.md — wave 4 (TDD, DB lock; added 2026-10-16 at the operator's request, SEED-357): locate where the 50k first-page time goes, migration **208** (the Library page index; the view rewritten as UNION ALL only if EXPLAIN demands it), applied by script, AFTER at 10k / 50k so Root and Find page 1 stay within 1.5x (FIX-11; SC#1, D-22)
+**Flags**: ⛔ **G-5: `frontend/src/pages/LibraryPage.tsx` FIRES and its extraction is OWED — taken first.** Also FIRING: `backend/app/api/documents.py`, `backend/app/services/document_search_service.py`, `frontend/src/components/ingestion/DocumentList.tsx`, `frontend/src/lib/api/documents.ts`, `frontend/src/types/index.ts`; `frontend/src/hooks/useDocuments.ts` and `DocumentsPager.tsx` read their ledger sections first. **security_enforcement**: any new SQL function is `SECURITY INVOKER`, revoked from `PUBLIC`, and proven as `authenticated`, never through the service role. **measure first**: record today's figures at 10k/50k before changing anything. Supabase Realtime stays a hint: a document-change event refetches the current page, never patches a full in-memory list. **G-2**: the pager exists (`DocumentsPager`), so the sketch skip is recorded unless discuss changes the Library layout. Cross-check `BUG-261014-06` / `-07` at discuss.
 **UI hint**: yes
 
 ### Progress
@@ -292,10 +382,11 @@ Plans:
 | 277. Registers Back Inside the Band | 2/2 | Complete | 2026-10-12 |
 | 278. One Home for Tools and Filters | 4/4 | Complete | 2026-10-13 |
 | 279. The Expert Scope Seam | 4/4 | Complete (verified 4/4; owed: D-18 cloud read, 4-axis rows, review leftovers) | 2026-10-14 |
-| 280. In Once, Out Clean | 0/TBD | Not started | - |
-| 281. A Refusal Names Its Cause | 0/TBD | Not started | - |
-| 282. The Slow Run and the Paused Run | 0/TBD | Not started | - |
-| 283. Every Member Reaches Their Own Settings | 0/TBD | Not started | - |
+| 280. In Once, Out Clean | 4/4 | Complete | 2026-10-14 |
+| 281. A Refusal Names Its Cause | 4/4 | Complete (owed by operator decision: G-4 rows A, C, D; WR-02 kept by design) | 2026-10-15 |
+| 282. The Slow Run and the Paused Run | 4/4 | Complete (verified 5/5, self-verified; review CR-01 + WR-02..05 fixed, WR-01 partial; owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through, SC#10 rows 2/8 on credit) | 2026-10-15 |
+| 283. Every Member Reaches Their Own Settings | 3/3 | Complete (verified 4/4 SCs; review CR-01 + WR-01/02 + 4 info fixed, IN-04/IN-06 skipped by decision; G-4 driven live, Tab row confirmed by operator) | 2026-10-16 |
+| 284. Library at Scale | 6/6 | Complete (verified 7/7 SCs, self-verified; review R1 CR-01 + WR-01/02/04 + IN-05/07 and R2 WR-R2-01..05 fixed test-first, WR-03 accepted; G-4 A-F driven live, A/B re-driven on 208; migrations 207 + 208 LOCAL only — production apply owed) | 2026-10-16 |
 
 ---
 

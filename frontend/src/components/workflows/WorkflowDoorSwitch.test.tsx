@@ -37,6 +37,10 @@ import templateFirstDraftSource from "./useTemplateFirstDraft?raw"
 // joins it for a reason stated on `SWEPT_SOURCES` below, and it is the higher-risk of the two.
 import describeTemplateRowSource from "./DescribeTemplateRow?raw"
 import templateFirstVocabularySource from "./templateFirstVocabulary?raw"
+// Phase 281 (D-11): the SEVENTH swept source, added in the SAME COMMIT that creates the module —
+// the describe refusal table is a vocabulary module on this surface AND a real `doorVocabulary`
+// consumer (it imports `SERVICES_LABEL`), so it joins under both rules stated on SWEPT_SOURCES.
+import describeRefusalVocabularySource from "./describeRefusalVocabulary?raw"
 import * as doorVocabulary from "./doorVocabulary"
 
 // The govern door mounts the real WorkflowBuilderPage, which fetches folders + skills
@@ -604,6 +608,14 @@ describe("WorkflowDoorSwitch — THE ROUND TRIP: a loose-door workflow can be bo
  * Going to six is therefore a STRENGTHENING of the plan's stated criterion, never a departure
  * from its intent, and both new entries were driven RED against a real planted literal in
  * their own file before being trusted. Six is the honest count and the count is asserted below.
+ *
+ * ⚠ **THE SEVENTH ENTRY (2026-10-14, Phase 281, D-11) — the describe refusal table.**
+ * `describeRefusalVocabulary.ts` is where every describe-door refusal code becomes words, and it
+ * joins under BOTH rules above at once: it is a vocabulary module on this surface (re-typing
+ * strings is what the file is for), and it is a real `doorVocabulary` consumer — two of its next
+ * steps name the service picker, and the picker's label must be the imported constant, never a
+ * second copy. It joins in the commit that creates it, and it was driven RED against a planted
+ * literal in its own file before being trusted.
  */
 const SWEPT_SOURCES: { path: string; source: string }[] = [
   { path: "./WorkflowDoorSwitch.tsx", source: workflowDoorSwitchSource },
@@ -612,6 +624,7 @@ const SWEPT_SOURCES: { path: string; source: string }[] = [
   { path: "./useTemplateFirstDraft.ts", source: templateFirstDraftSource },
   { path: "./DescribeTemplateRow.tsx", source: describeTemplateRowSource },
   { path: "./templateFirstVocabulary.ts", source: templateFirstVocabularySource },
+  { path: "./describeRefusalVocabulary.ts", source: describeRefusalVocabularySource },
 ]
 
 /**
@@ -651,7 +664,8 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
     // string, with the property holding and NOTHING guarding it.
     // 193.1-05 (D-14): 3 → 4. 193.1-06 (D-14): 4 → 6. Bumped DELIBERATELY, in the same commit
     // as the entries — a count that moved on its own is a list nobody checked.
-    expect(SWEPT_SOURCES).toHaveLength(6)
+    // 2026-10-14 Phase 281 (D-11): the describe refusal table joins — 6 → 7, same commit as the entry.
+    expect(SWEPT_SOURCES).toHaveLength(7)
     for (const { path, source } of SWEPT_SOURCES) {
       // ⚠ The 1000-CHARACTER FLOOR IS A REAL CONSTRAINT ON A NEW ENTRY, and it was MEASURED
       // before the fourth was added rather than assumed: `wc -c useTemplateFirstDraft.ts` →

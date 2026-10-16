@@ -122,6 +122,13 @@ import {
 // the `TemplateReadAnswer` mistake in a second place — two homes for one server answer.
 import type { GenerateReadiness } from "@/lib/api"
 import type { BuilderPhase, BuilderStore, TemplateAssetDescriptor } from "./builderStore"
+// Phase 281 (FIX-10) — the describe refusal table's KEY builders. A leaf module: it imports
+// only the door vocabulary, so no cycle back to the page or the door shell can form here.
+import { REQUEST_FAILED_KEY, refusalKey } from "./describeRefusalVocabulary"
+import { ENTITLEMENT_REFUSED_KEY } from "./describeRefusalVocabulary"
+// Imported from `_core` directly (not the `@/lib/api` barrel), so suites that mock the
+// barrel wholesale still see the real class.
+import { EntitlementRefusalError } from "@/lib/api/_core"
 import type { TemplatePlaceholdersState } from "@/hooks/useTemplatePlaceholders"
 
 /**
@@ -620,11 +627,15 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
         onDraftedRef.current(def, result.readiness)
       } else {
         // ok:false is an HONEST failure — never a renderable broken draft.
-        store.getState().setErrorState(result.error, result.detail)
+        // Phase 281 (D-11/D-13, SEED-221): the store holds the table KEY (the code joined to its
+        // additive sub-reason), never words; the page turns it into a sentence + next step.
+        store.getState().setErrorState(refusalKey(result.error, result.reason_code), result.detail)
       }
     } catch (e) {
+      // Phase 281 (D-24) / 281-REVIEW WR-03: only a TYPED entitlement refusal carries a server
+      // SENTENCE; any other throw rides REQUEST_FAILED_KEY and its text stays reveal-only.
       store.getState().setErrorState(
-        "Couldn't generate the workflow.",
+        e instanceof EntitlementRefusalError ? ENTITLEMENT_REFUSED_KEY : REQUEST_FAILED_KEY,
         e instanceof Error ? e.message : undefined,
       )
     }

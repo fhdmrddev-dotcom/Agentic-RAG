@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
 from app.services.file_facts import read_file_facts
 from app.services.transient_errors import is_transient
+from app.utils.db import maybe_row
 
 log = logging.getLogger(__name__)
 
@@ -146,32 +147,87 @@ def mint_document_row(
     3. Deduplication: user-scoped, and org-scoped when org_id is passed, check for
        status='completed' on the content hash (the unique index's predicate).
        If match found, returns MintResult(is_duplicate=True) without inserting.
+       ⚠ CORRECTED (Phase 280, FIX-02): that leg alone could not see a `pending`/`processing`
+       copy. A second, IN-FLIGHT leg now follows it: user + hash + status <> 'failed' +
+       is_latest (+ org when passed), ANY folder (D-24). A hit is returned as the duplicate.
     4. Versioning: user-scoped, and org-scoped when org_id is passed, by filename. If prior
        versions exist, retires them (is_latest=False) and increments version_number.
+       ⚠ CORRECTED (Phase 280, FIX-02): the version is only READ here. The retire runs AFTER
+       a successful insert (step 6b), never before it (D-03 / D-25, BUG-261005-01).
     5. Storage path: canonical f"{user_id}/{document_id}/{filename}".
     6. Row creation: inserts status='pending', omitting created_at/updated_at to
        preserve Postgres column clock defaults.
+    6b. (Phase 280) Retire: only after the insert, only when a prior version existed, scoped
+       .neq("id", new_id).lt("version_number", next_version), org from the inserted row when
+       none was passed. A retire failure is logged; the minted row is still returned.
     7. Unique index collision (23505 on documents_dedup_idx):
        - on_conflict="raise": raises HTTP 409 Conflict.
        - on_conflict="link": re-queries the non-failed document and returns it as
          is_duplicate=True.
+       ⚠ CORRECTED (Phase 280, FIX-02 / D-02): BOTH modes now re-query the winner, scoped
+       exactly as documents_dedup_idx, and return it as the duplicate. The 409 survives only
+       as the "winner not found" fallback.
+
+    ⚠ ``on_conflict`` IS INERT since Phase 280 (280-REVIEW IN-02). No branch reads it: "raise" and
+    "link" take the identical path above. It stays in the signature only so the seven callers that
+    pass it (``test_280_minter_sequence``'s caller inventory) need no change; a value passed here
+    decides nothing. Removing it is a caller sweep, not a behaviour change.
     """
     # 1. Folder ownership validation (G-1: owner-only parity with documents.py:610-617)
     if folder_id:
-        folder_check = (
+        folder = maybe_row(
             supabase.table("folders")
-            .select("id, user_id")
+            .select("id, user_id, org_id")
             .eq("id", folder_id)
             .maybe_single()
             .execute()
         )
-        if not folder_check.data:
+        if not folder:
             raise HTTPException(status_code=404, detail="Folder not found")
-        if folder_check.data["user_id"] != user_id:
+        # Phase 280 (CR-01 / BUG-261014-01, D-05 / D-26) — a folder files a document only into
+        # ITS OWN org. Before this, only `user_id` was compared, so:
+        #   * /upload (org_id=None) let the autofill trigger pick the document's org with
+        #     `LIMIT 1` and no ORDER BY — a two-org person uploading into their other org's folder
+        #     got a document whose org differed from its folder's (measured live);
+        #   * a caller passing org_id could file an org A document into an org B folder.
+        # ⛔ Every refusal below is the IDENTICAL 404 a nonexistent folder gets: "this folder is
+        #   in an org you are not in" must not be distinguishable from "no such folder".
+        # ⚠ The membership read runs under the client the minter was given. A user-JWT client may
+        #   read its own memberships (`org_members_self_select`: user_id = auth.uid()); the
+        #   service role reads all. No new client, no new status code.
+        # ⚠ Answers only the FOLDER arm of SEED-313: a /upload with no folder still lands in the
+        #   trigger's org. SEED-318 (same-named /upload retiring an Expert install copy) unchanged.
+        # ⚠ CORRECTED (280-REVIEW WR-05): the "IDENTICAL 404" above held only under user-JWT RLS,
+        #   because the owner comparison (403) used to run FIRST. Under the service-role client (the
+        #   watch sync), RLS hides nothing, so a foreign-org folder owned by someone else answered
+        #   403 while a missing one answered 404. The org/membership arm now runs BEFORE the owner
+        #   arm, so a folder outside the minting org always reaches the 404 first; the 403 is left
+        #   only for a folder in the caller's own org that someone else owns.
+        folder_org = folder.get("org_id")
+        if not folder_org:
+            raise HTTPException(status_code=404, detail="Folder not found")
+        if org_id:
+            if str(folder_org) != str(org_id):
+                raise HTTPException(status_code=404, detail="Folder not found")
+        else:
+            membership = (
+                supabase.table("org_members")
+                .select("org_id")
+                .eq("user_id", user_id)
+                .eq("org_id", folder_org)
+                .limit(1)
+                .execute()
+            )
+            if not membership.data:
+                raise HTTPException(status_code=404, detail="Folder not found")
+        if folder["user_id"] != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cannot upload to a folder you do not own",
             )
+        if not org_id:
+            # Mint with the folder's org explicitly; the autofill trigger then no-ops.
+            org_id = str(folder_org)
 
     # 2. Content hashing
     content_hash = hashlib.sha256(raw).hexdigest()
@@ -238,6 +294,43 @@ def mint_document_row(
             version_number=existing_doc.get("version_number", 1),
         )
 
+    # 3b. Phase 280 (FIX-02 / BUG-261005-01, D-24) — the IN-FLIGHT leg.
+    #
+    # ⛔ The leg above sees only `completed` copies, while documents_dedup_idx is
+    #   WHERE status <> 'failed'. So the same bytes uploaded again while the first copy was still
+    #   pending/processing passed it, retired the in-flight copy (the retire ran BEFORE the insert)
+    #   and then hit 23505 — a 409 on /upload, and on "link" a copy it had just retired.
+    #
+    # ⚠ FOLDER-AGNOSTIC ON PURPOSE. A folder-scoped check would let the same bytes into ANOTHER
+    #   folder insert fine (documents_dedup_idx is per folder) and then fail at COMPLETION on
+    #   documents_completed_hash_unique_idx, which has no folder column. This is the live leg of
+    #   `workspace_promote.find_existing_copy`, kept in ONE home here; that pre-check is now
+    #   redundant but harmless.
+    # ⚠ SIDE EFFECT, STATED: expert_install raises ExpertInstallConflict for an in-flight copy in
+    #   another folder, exactly as it already did for a completed one.
+    # ⚠ ACCEPTED RESIDUAL (D-24 / T-280-18): two TRULY concurrent inserts into DIFFERENT folders
+    #   both pass every pre-check and both insert; the one that completes second fails at
+    #   completion. Closing that needs a DB constraint — a migration, out of scope.
+    inflight_query = (
+        supabase.table("documents")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("content_hash", content_hash)
+        .neq("status", "failed")
+        .eq("is_latest", True)
+    )
+    if org_id:
+        inflight_query = inflight_query.eq("org_id", org_id)
+    inflight = inflight_query.order("created_at", desc=True).limit(1).execute()
+    if inflight.data:
+        inflight_doc = inflight.data[0]
+        return MintResult(
+            document=inflight_doc,
+            is_duplicate=True,
+            storage_path=inflight_doc.get("file_path", ""),
+            version_number=inflight_doc.get("version_number", 1),
+        )
+
     # 4. Versioning (user-scoped, and org-scoped when org_id is passed — D-266-18; filename matching)
     versions_query = (
         supabase.table("documents")
@@ -257,18 +350,11 @@ def mint_document_row(
             versions_query.eq("folder_id", folder_id) if folder_id else versions_query.is_("folder_id", "null")
         )
     existing_versions = versions_query.order("version_number", desc=True).limit(1).execute()
-    if existing_versions.data:
-        next_version = existing_versions.data[0]["version_number"] + 1
-        retire_query = supabase.table("documents").update({"is_latest": False}).eq("user_id", user_id).eq("filename", filename)
-        if org_id:
-            retire_query = retire_query.eq("org_id", org_id)
-        if folder_scoped:
-            retire_query = (
-                retire_query.eq("folder_id", folder_id) if folder_id else retire_query.is_("folder_id", "null")
-            )
-        retire_query.execute()
-    else:
-        next_version = 1
+    # Phase 280 (FIX-02 / D-03): READ only. The retire that used to sit here ran BEFORE the insert,
+    # so a same-bytes second mint retired the in-flight copy and then failed on 23505. It now runs
+    # after a successful insert (below).
+    has_prior_version = bool(existing_versions.data)
+    next_version = existing_versions.data[0]["version_number"] + 1 if has_prior_version else 1
 
     # 5. Insert new documents row with status='pending'
     document_id = str(uuid4())
@@ -306,48 +392,170 @@ def mint_document_row(
 
     try:
         result = supabase.table("documents").insert(doc_data).execute()
-        doc = result.data[0]
-        return MintResult(
-            document=doc,
-            is_duplicate=False,
-            storage_path=storage_path,
-            version_number=next_version,
-        )
     except Exception as exc:
         exc_str = str(exc)
         if "23505" in exc_str:
-            if on_conflict == "link":
-                # G-2: Attachment collision or concurrent ingest race.
-                # documents_dedup_idx is UNIQUE WHERE status <> 'failed'.
-                # Since migration 196 (266 review WR-04) its key is (org_id, user_id, content_hash,
-                # COALESCE(folder_id, …)), so this org-scoped re-query matches the row that fired.
-                link_query = (
-                    supabase.table("documents")
-                    .select("*")
-                    .eq("user_id", user_id)
-                    .eq("content_hash", content_hash)
-                    .neq("status", "failed")
+            # G-2: Attachment collision or concurrent ingest race.
+            # documents_dedup_idx is UNIQUE WHERE status <> 'failed'.
+            # Since migration 196 (266 review WR-04) its key is (org_id, user_id, content_hash,
+            # COALESCE(folder_id, …)), so this org-scoped re-query matches the row that fired.
+            # ⚠ Phase 280 (FIX-02 / D-02): run for BOTH on_conflict modes. A concurrent insert of
+            #   the same bytes is the same document, so /upload and import get the winner as a
+            #   duplicate instead of a 409. on_conflict now decides nothing here; it is kept in the
+            #   signature so no caller changes.
+            link_query = (
+                supabase.table("documents")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("content_hash", content_hash)
+                .neq("status", "failed")
+            )
+            if org_id:
+                link_query = link_query.eq("org_id", org_id)
+            if folder_id:
+                link_query = link_query.eq("folder_id", folder_id)
+            else:
+                link_query = link_query.is_("folder_id", "null")
+            # ⚠ 280-REVIEW WR-01 — NEVER A RETIRED ROW. The index has no is_latest predicate, so the
+            #   row that fired can be a RETIRED earlier version (bytes A as x.pdf v1, bytes B as v2
+            #   retires v1, bytes A again → 23505 on v1). Returning it would report a document
+            #   retrieval cannot see as the live copy. So: the live (is_latest) match is the winner;
+            #   with only a retired match, a SAME-NAMED one is restored exactly as
+            #   `POST /documents/{id}/restore` does (promote it, then retire its siblings), and a
+            #   differently-named one has no live winner here — the 409 below.
+            # ⚠ No `.limit(1)`: without an org (/upload at the root) one row per org can match, and
+            #   the live one must be preferred over a newer retired one. With an org the unique index
+            #   leaves at most one row.
+            link_rows = link_query.order("created_at", desc=True).execute().data or []
+            linked_doc = next((r for r in link_rows if r.get("is_latest")), None)
+            if linked_doc is None and link_rows and link_rows[0].get("filename") == filename:
+                retired = link_rows[0]
+                promoted = (
+                    supabase.table("documents").update({"is_latest": True}).eq("id", retired["id"]).execute()
                 )
-                if org_id:
-                    link_query = link_query.eq("org_id", org_id)
-                if folder_id:
-                    link_query = link_query.eq("folder_id", folder_id)
-                else:
-                    link_query = link_query.is_("folder_id", "null")
-                link_match = link_query.order("created_at", desc=True).limit(1).execute()
-                if link_match.data:
-                    linked_doc = link_match.data[0]
-                    return MintResult(
-                        document=linked_doc,
-                        is_duplicate=True,
-                        storage_path=linked_doc.get("file_path", ""),
-                        version_number=linked_doc.get("version_number", 1),
+                if promoted.data:
+                    linked_doc = promoted.data[0]
+                    sibling_query = (
+                        supabase.table("documents")
+                        .update({"is_latest": False})
+                        .eq("user_id", user_id)
+                        .eq("filename", filename)
                     )
+                    sibling_org = org_id or linked_doc.get("org_id")
+                    if sibling_org:
+                        sibling_query = sibling_query.eq("org_id", sibling_org)
+                    if folder_scoped:
+                        sibling_query = (
+                            sibling_query.eq("folder_id", folder_id)
+                            if folder_id
+                            else sibling_query.is_("folder_id", "null")
+                        )
+                    sibling_query.neq("id", linked_doc["id"]).execute()
+            if linked_doc is not None:
+                return MintResult(
+                    document=linked_doc,
+                    is_duplicate=True,
+                    storage_path=linked_doc.get("file_path", ""),
+                    version_number=linked_doc.get("version_number", 1),
+                )
+            # No live winner is visible (another org's row, already failed, or only a retired
+            # earlier version of ANOTHER file — restoring that would flip its current version
+            # behind the person's back): the only 409 left.
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="File already exists in this folder",
             ) from exc
         raise
+    doc = result.data[0]
+
+    # 6b. Phase 280 (FIX-02 / D-03 / D-25) — retire the previous latest, AFTER the insert.
+    #
+    # ⚠ `.lt("version_number", next_version)`, not merely `.neq("id", new_id)`: two concurrent
+    #   new versions both read the same max and both insert the same next_version; excluding only
+    #   your own id lets each retire the other, leaving ZERO latest rows (T-280-14). The neq stays
+    #   as a belt. ~~A brief window in which two rows read is_latest = true is accepted
+    #   (documents_latest_idx is NOT unique, measured 2026-10-14).~~
+    # ⚠ CORRECTED (280-REVIEW WR-02) — that window was NOT brief: both v2 rows retired only v1 and
+    #   neither ever retired the other, so two latest rows stayed until the next version arrived
+    #   (retrieval served both). Same for two concurrent FIRST uploads of one name (two v1 rows,
+    #   and no retire ran at all on that path). The SETTLE step below closes it with no migration:
+    #   the rows are totally ordered by (version_number, created_at, id) and the greatest one is
+    #   latest. After its own insert, every mint reads the other latest rows of this name at or
+    #   above its version, retires those that rank BELOW it, and retires ITSELF if one ranks above.
+    #   Why that leaves exactly one latest once both mints settle: the greatest row G never ranks
+    #   below anything, so nothing retires it. Any other row X either was visible to G's retire or
+    #   settle read (G retired it), or committed after those ran — so after G committed — and X's
+    #   own settle read then sees G and X retires itself.
+    #   ⚠ RESIDUALS, recorded rather than built around: the two rows still share one
+    #   version_number (only a constraint, i.e. a migration, prevents that), and the guarantee
+    #   holds only when every settle write succeeds (a failure is logged at ERROR, below).
+    # ⚠ The org is the INSERTED row's when none was passed: /upload's row is stamped by the
+    #   autofill trigger, and an unscoped retire touched same-named files in every org the person
+    #   belongs to (T-280-15).
+    # ⚠ A retire failure must never lose the row that was already minted — log it and return.
+    from datetime import datetime, timezone
+
+    retire_org = org_id or doc.get("org_id")
+
+    def _same_name(query):
+        query = query.eq("user_id", user_id).eq("filename", filename)
+        if retire_org:
+            query = query.eq("org_id", retire_org)
+        if folder_scoped:
+            query = query.eq("folder_id", folder_id) if folder_id else query.is_("folder_id", "null")
+        return query
+
+    def _rank(row: dict, version: int | None = None) -> tuple:
+        try:
+            created = datetime.fromisoformat(str(row.get("created_at") or "").replace("Z", "+00:00"))
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+        except ValueError:
+            created = datetime.min.replace(tzinfo=timezone.utc)
+        return (int(row.get("version_number") if version is None else version), created, str(row.get("id")))
+
+    try:
+        if has_prior_version:
+            _same_name(supabase.table("documents").update({"is_latest": False})).neq("id", doc["id"]).lt(
+                "version_number", next_version
+            ).execute()
+        # The settle READ — rival latest rows of this name at or above our version.
+        rivals = (
+            _same_name(supabase.table("documents").select("id, version_number, created_at"))
+            .eq("is_latest", True)
+            .neq("id", doc["id"])
+            .gte("version_number", next_version)
+            .execute()
+        ).data or []
+        mine = _rank(doc, next_version)
+        below = [str(r["id"]) for r in rivals if _rank(r) < mine]
+        if below:
+            _same_name(supabase.table("documents").update({"is_latest": False})).in_("id", below).execute()
+        if any(_rank(r) > mine for r in rivals):
+            supabase.table("documents").update({"is_latest": False}).eq("id", doc["id"]).execute()
+            doc = {**doc, "is_latest": False}
+    except Exception as retire_exc:  # noqa: BLE001 — the minted row stands either way
+        # 280-REVIEW IN-01: ERROR with the traceback, not a one-line WARNING. A failed retire
+        # leaves two latest rows, and this catch also receives programming errors
+        # (AttributeError/TypeError) — a fake without `.lt` once kept a suite green while the
+        # retire never ran. Re-raising is NOT the narrower choice: the row is already inserted
+        # and its bytes not yet stored, so raising here would strand a `pending` row.
+        log.error(
+            "mint_document_row: retiring earlier versions of %r failed after minting document %s "
+            "(v%s); the new row is kept: %s",
+            filename,
+            doc.get("id"),
+            next_version,
+            retire_exc,
+            exc_info=True,
+        )
+
+    return MintResult(
+        document=doc,
+        is_duplicate=False,
+        storage_path=storage_path,
+        version_number=next_version,
+    )
 
 
 async def async_mint_document_row(
@@ -420,7 +628,7 @@ async def splice_document(
     if not (filename and mime_type and user_id and storage_path):
         try:
             res = supabase.table("documents").select("*").eq("id", document_id).maybe_single().execute()
-            doc = res.data or {}
+            doc = maybe_row(res) or {}
         except Exception as e:
             log.warning("Could not fetch document %s row: %s", document_id, e)
         filename = filename or doc.get("filename", "")

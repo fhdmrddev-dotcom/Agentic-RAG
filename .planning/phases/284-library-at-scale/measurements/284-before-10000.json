@@ -1,0 +1,147 @@
+{
+  "label": "before",
+  "size": 10000,
+  "base_url": "http://127.0.0.1:8000",
+  "measured_at": "2026-10-15T23:31:37.021004+00:00",
+  "provenance": {
+    "worktree_head": "f8659ac2d56f8cf3b93174e1ee834f383eb192c6",
+    "plan_base": "f8659ac2d56f8cf3b93174e1ee834f383eb192c6",
+    "main_checkout_head": "refs/heads/develop @ f8659ac2d56f8cf3b93174e1ee834f383eb192c6",
+    "tracked_backend_files_compared": 1318,
+    "identical": true
+  },
+  "ground_truth": {
+    "owner": "10f191c6-fa85-416c-8bf4-a0b3c88a9ac5",
+    "big_folder_id": "ea595fbd-6880-5816-a543-c6eab092279c",
+    "owner_latest_all": 10020,
+    "root_latest_all": 6000,
+    "root_latest_unarchived": 5816,
+    "big_latest_all": 3000,
+    "big_latest_unarchived": 2918,
+    "owner_latest_unarchived": 9720,
+    "legacy_visible_latest": 10020
+  },
+  "surfaces": [
+    {
+      "surface": "GET /documents (whole list)",
+      "method": "GET",
+      "url": "/documents",
+      "status": 200,
+      "bytes": 1065537,
+      "median_ms": 435.1,
+      "max_ms": 462.5,
+      "rows": 1000,
+      "reported_total": 1000,
+      "db_count": 10020,
+      "equal": false,
+      "samples_ms": [
+        462.5,
+        435.1,
+        342.8,
+        436.3,
+        264.8
+      ]
+    },
+    {
+      "surface": "Root total as the Library derives it (array, folder_id null)",
+      "method": "GET",
+      "url": "/documents",
+      "status": 200,
+      "bytes": 1065537,
+      "median_ms": 321.9,
+      "max_ms": 439.6,
+      "rows": 1000,
+      "reported_total": 592,
+      "db_count": 6000,
+      "equal": false,
+      "samples_ms": [
+        292.2,
+        367.9,
+        321.9,
+        286.4,
+        439.6
+      ]
+    },
+    {
+      "surface": "Big folder total as the Library derives it (array, folder_id = Big)",
+      "method": "GET",
+      "url": "/documents",
+      "status": 200,
+      "bytes": 1065537,
+      "median_ms": 499.2,
+      "max_ms": 834.3,
+      "rows": 1000,
+      "reported_total": 294,
+      "db_count": 3000,
+      "equal": false,
+      "samples_ms": [
+        414.6,
+        515.2,
+        834.3,
+        444.3,
+        499.2
+      ]
+    },
+    {
+      "surface": "Picker read (whole list, as CreateLink/LegalHold/Takeoff download it)",
+      "method": "GET",
+      "url": "/documents",
+      "status": 200,
+      "bytes": 1065537,
+      "median_ms": 361.2,
+      "max_ms": 551.2,
+      "rows": 1000,
+      "reported_total": 1000,
+      "db_count": 10020,
+      "equal": false,
+      "samples_ms": [
+        420.2,
+        261.7,
+        361.2,
+        551.2,
+        273.5
+      ]
+    },
+    {
+      "surface": "POST /document-search page 1 (limit 25)",
+      "method": "POST",
+      "url": "/document-search",
+      "status": 200,
+      "bytes": 27524,
+      "median_ms": 1038.2,
+      "max_ms": 1117.1,
+      "rows": 25,
+      "reported_total": 9720,
+      "db_count": 9720,
+      "equal": true,
+      "samples_ms": [
+        1031.5,
+        974.8,
+        1073.2,
+        1038.2,
+        1117.1
+      ]
+    },
+    {
+      "surface": "Library open request set (GET /documents + GET /folders, parallel)",
+      "method": "SET",
+      "url": "GET /documents + GET /folders",
+      "status": "200/200",
+      "bytes": 1068390,
+      "median_ms": 349.7,
+      "max_ms": 459.8,
+      "rows": null,
+      "reported_total": null,
+      "db_count": null,
+      "equal": null,
+      "samples_ms": [
+        349.7,
+        342.6,
+        447.9,
+        459.8,
+        304.4
+      ],
+      "note": ""
+    }
+  ]
+}

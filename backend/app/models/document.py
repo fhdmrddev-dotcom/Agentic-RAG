@@ -96,6 +96,11 @@ class DocumentResponse(BaseModel):
     archived_policy_name: str | None = None
     retrievable: bool | None = None
 
+    # Phase 280 (FIX-02 / D-01) — `/upload` answers 200 with the EXISTING document (in flight or
+    # completed) when the same bytes are already in the Library. NOT a column; DEFAULTED for the
+    # 217 reason, and declared at all because response_model filtering strips an undeclared key.
+    already_in_library: bool | None = None
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def tables_stage_applies(self) -> bool:
@@ -209,6 +214,60 @@ class DocumentContentResponse(BaseModel):
     start_line: int | None = None
     end_line: int | None = None
     has_more: bool = False
+
+
+# ── Phase 284 · the page envelopes (FIX-11, D-01 / D-17) ──────────────────────
+#
+# ONE paging vocabulary for every Library list: the rows, the database's exact `total` of the
+# same predicate, and the `offset` / `limit` that produced the page. Page until
+# `offset >= total`. ⚠ `total` INCLUDES rows beyond the page — it is a `count(*)`, never the
+# length of anything fetched (PostgREST's max_rows cuts an unranged read at 1,000 silently,
+# which is the defect these envelopes exist to make impossible).
+
+
+class DocumentListResponse(BaseModel):
+    """`GET /documents` — one page of the caller's Library. `total` INCLUDES rows beyond the page."""
+
+    documents: list[DocumentResponse] = []
+    total: int = 0
+    offset: int = 0
+    limit: int = 25
+
+
+class DocumentChunkPage(BaseModel):
+    """`GET /documents/{id}/chunks` — one page. `total` INCLUDES rows beyond the page."""
+
+    chunks: list[DocumentChunkRow] = []
+    total: int = 0
+    offset: int = 0
+    limit: int = 200
+
+
+class DocumentTablePage(BaseModel):
+    """`GET /documents/{id}/tables` — one page. `total` INCLUDES rows beyond the page."""
+
+    tables: list[DocumentTableRow] = []
+    total: int = 0
+    offset: int = 0
+    limit: int = 50
+
+
+class DocumentImagePage(BaseModel):
+    """`GET /documents/{id}/images` — one page. `total` INCLUDES rows beyond the page."""
+
+    images: list[DocumentImageRow] = []
+    total: int = 0
+    offset: int = 0
+    limit: int = 100
+
+
+class DocumentVersionPage(BaseModel):
+    """`GET /documents/{id}/versions` — one page, newest first. `total` INCLUDES rows beyond the page."""
+
+    versions: list[DocumentResponse] = []
+    total: int = 0
+    offset: int = 0
+    limit: int = 50
 
 
 # ⚠ `DocumentQueryRow` is deliberately NOT here — it lives in

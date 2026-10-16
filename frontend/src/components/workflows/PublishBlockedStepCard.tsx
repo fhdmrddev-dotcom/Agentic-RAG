@@ -30,6 +30,7 @@
  */
 import {
   BLOCKED_STEP_NEXT,
+  BLOCKED_STEP_NEXT_NO_RUN,
   BLOCKED_STEP_TITLE,
   blockedStepFace,
   blockedStepHeadline,
@@ -44,6 +45,10 @@ export interface PublishBlockedStepCardProps {
   /** The authored definition, when the caller holds one. ⚠ ABSENT ⇒ the face falls to the
    *  server's `step_name` and then to the step's ordinal — never to the slug. */
   definition?: DefShape | null
+  /** Phase 281-03 (D-28) — whether the surface around this card offers the golden-run link.
+   *  `true` ⇒ the next line points at the run; false or ABSENT ⇒ `BLOCKED_STEP_NEXT_NO_RUN`,
+   *  which names no link. The next line follows the link, never the other way round. */
+  canOpenRun?: boolean
 }
 
 /**
@@ -51,7 +56,7 @@ export interface PublishBlockedStepCardProps {
  * judge block, a pre-fix server, a crash before any phase ran. So every stage the golden run
  * did not reach is byte-for-byte the surface that shipped.
  */
-export function PublishBlockedStepCard({ step, definition }: PublishBlockedStepCardProps) {
+export function PublishBlockedStepCard({ step, definition, canOpenRun }: PublishBlockedStepCardProps) {
   const blocked = blockedStepOf(step)
   if (!blocked) return null
 
@@ -82,10 +87,13 @@ export function PublishBlockedStepCard({ step, definition }: PublishBlockedStepC
       {/* THE SERVER'S OWN SENTENCE, VERBATIM AND UNSTYLED-BY-MEANING. It is rendered as a
           text child — there is no `dangerouslySetInnerHTML` anywhere on this path — and it is
           not truncated, not clamped and not re-worded, because it is the only line on this
-          surface that knows anything specific. */}
+          surface that knows anything specific.
+          Phase 281-03 (D-04): the server now composes a MULTI-LINE cause (a header, then one
+          bullet per distinct failure, `\n`-separated). `whitespace-pre-line` renders those
+          breaks as lines; the client still parses and classifies nothing. */}
       <p
         data-testid="blocked-step-cause"
-        className="px-3 py-2.5 text-[13px] font-semibold leading-relaxed text-foreground"
+        className="whitespace-pre-line px-3 py-2.5 text-[13px] font-semibold leading-relaxed text-foreground"
       >
         {blocked.cause}
       </p>
@@ -94,7 +102,7 @@ export function PublishBlockedStepCard({ step, definition }: PublishBlockedStepC
         data-testid="blocked-step-next"
         className="border-t border-border px-3 py-2 text-[12px] leading-relaxed text-muted-foreground"
       >
-        {BLOCKED_STEP_NEXT}
+        {canOpenRun ? BLOCKED_STEP_NEXT : BLOCKED_STEP_NEXT_NO_RUN}
       </p>
     </section>
   )

@@ -1037,3 +1037,260 @@ async def test_emit_success_output_carries_retrieved_ids_for_post_phase_validato
         f"post-phase output_file_valid must honor the engine's opened=True verdict for a "
         f"workspace-inline file; got: {ofv.error_message}"
     )
+
+
+# ── Phase 281 (FIX-09 / BUG-260730-02) — the emit failure names the check that failed ──
+#
+# The golden run 43b34171 (Compliance Gap Report) failed with 100.0% citation coverage
+# and ONE missing template key, ``rows`` (the model emitted the collection under another
+# name). Every rejection went out as ``citation_gate_rejected`` with a message naming all
+# three possible causes, so the author read "citations" when citations were perfect.
+# These cases reproduce that SHAPE as a fixture (D-06, fixture half of SC#1).
+
+_COMPLIANCE_ORACLE = {
+    "scalars": ["report_date", "report_title", "scope"],
+    "collections": ["rows"],
+    "columns": {"rows": ["current_state", "gap", "owner", "requirement", "severity", "source_clause"]},
+}
+
+
+def _compliance_fm_wrong_collection():
+    """Every value cited to a RETRIEVED id; the collection emitted as ``obligations``."""
+    from app.services.template_render_service import EmitFieldMap
+
+    def _cell(key, value):
+        return {"key": key, "value": value, "source_chunk_id": _LIVE_COMPOSITE,
+                "source_doc": "Project-Meridian-Charter-Excerpt.docx", "source_page": 1}
+
+    return EmitFieldMap.model_validate({
+        "scalars": [
+            _cell("report_date", "2026-10-14"),
+            _cell("report_title", "Compliance Gap Report"),
+            _cell("scope", "Project Meridian"),
+        ],
+        "rows": [{
+            "collection": "obligations",  # the template wants "rows"
+            "cells": [_cell(c, "x") for c in _COMPLIANCE_ORACLE["columns"]["rows"]],
+        }],
+    })
+
+
+def _compliance_setup(bag, monkeypatch):
+    from app.services.harness import phase_types
+
+    monkeypatch.setattr(phase_types, "_template_oracle", lambda src: _COMPLIANCE_ORACLE)
+    bag["forced_queue"] = [_forced_ok(_compliance_fm_wrong_collection()) for _ in range(3)]
+
+
+@pytest.mark.asyncio
+async def test_281_sc1_fixture_names_the_missing_field_not_citations(_patch_executor, monkeypatch):
+    """D-06: the key-coverage cause names ``rows``; the word "citation" never appears."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    _compliance_setup(bag, monkeypatch)
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(_fake_phase(), _live_shape_accumulated(), ctx)
+
+    assert out["failure"] == "template_fields_missing"
+    assert "rows" in out["text"]
+    assert "citation" not in out["text"].lower()
+    assert len(out["attempt_causes"]) == 3
+    assert out["text"].startswith("This step failed after 3 attempts:")
+    # D-04: the chat failure message IS the output text — one string.
+    assert bag["surface_calls"][-1] == out["text"]
+    assert out["_surfaced"] is True
+    # D-30 ⛔: the failure output never gains the keys that would let the post-gate pass.
+    assert "retrieved_ids" not in out
+    assert "placeholder_keys" not in out
+    # T-281-03: the rejection receipts now name the missing keys (additive).
+    rejected = [m for k, m in bag["audit"] if k == "emit_rejected"]
+    assert [m.get("missing_keys") for m in rejected] == [["rows"]] * 3
+
+
+@pytest.mark.asyncio
+async def test_281_provider_error_is_worded_as_a_provider_error(_patch_executor):
+    """Pitfall 9: a provider outage is not "the model narrated prose"."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    _patch_executor["forced_result"] = {
+        "emitted": None, "tier": "TIER-FORCE", "provider": "deepseek",
+        "forced": True, "recovered_from_narration": False, "truncated": False,
+        "failure": "provider_error",
+    }
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor["audit"])
+    out = await _exec_llm_emit(_fake_phase(), {}, ctx)
+
+    assert "provider returned an error" in out["text"]
+    assert "prose" not in out["text"]
+    assert out["failure"] == "model_failed_to_emit"  # the failure VALUE is unchanged
+    failed = [m for k, m in _patch_executor["audit"] if k == "emit_failed"]
+    assert failed and failed[-1].get("attempt") == 1
+
+
+@pytest.mark.asyncio
+async def test_281_d32_named_step_leads_with_its_author_set_name(_patch_executor, monkeypatch):
+    """D-32: an author-named step is named in the header; the slug never appears."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    _compliance_setup(bag, monkeypatch)
+    phase = _fake_phase(slug="write-report")
+    phase.name = "Write the report"
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(phase, _live_shape_accumulated(), ctx)
+
+    assert out["text"].startswith('Step "Write the report" failed after 3 attempts:')
+    assert bag["surface_calls"][-1] == out["text"]
+    assert "write-report" not in out["text"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("blank", [None, "  "])
+async def test_281_d32_unnamed_step_never_falls_back_to_the_slug(_patch_executor, monkeypatch, blank):
+    """D-32: no author name → "This step"; the slug is never a fallback."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    _compliance_setup(bag, monkeypatch)
+    phase = _fake_phase(slug="write-report")
+    phase.name = blank
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(phase, _live_shape_accumulated(), ctx)
+
+    assert out["text"].startswith("This step failed after 3 attempts:")
+    assert "write-report" not in out["text"]
+
+
+# ── 281-REVIEW WR-01 (D-25) — the header total equals the model calls actually made ──
+#
+# An attempt is ONE model call. A non-strict policy (flag/partial/draft) DELIVERS the last
+# rejected shot to the render; when that render then fails, the render cause belongs to the
+# SAME call and must not be counted as a further attempt. A path that made NO model call
+# must not claim "1 attempt" at all.
+
+
+def _uncited_fm():
+    from app.services.template_render_service import EmitFieldMap
+
+    return EmitFieldMap.model_validate({
+        "scalars": [{"key": "project_name", "value": "Meridian",
+                     "source_chunk_id": None, "source_doc": None, "source_page": None}],
+        "rows": [],
+    })
+
+
+@pytest.mark.asyncio
+async def test_281_wr01_nonstrict_render_failure_counts_each_model_call_once(_patch_executor):
+    """The reviewer's probe: flag policy, 3 uncited shots, render fails → 3, never 4."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["forced_queue"] = [_forced_ok(_uncited_fm()) for _ in range(3)]
+    bag["render_result"] = {"status": "failed", "reason": "sandbox_error", "message": "boom"}
+    phase = _fake_phase()
+    phase.config.citation_policy = "flag"
+    ctx = _fake_ctx(_fake_definition([_fake_asset_ref()]), audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(phase, _retrieved_accumulated("chunk-1"), ctx)
+
+    assert len(bag["forced_calls"]) == 3
+    lines = out["text"].split("\n")
+    assert lines[0] == "This step failed after 3 attempts:"
+    assert lines[1].startswith("• 3 attempts — the citation check failed")
+    assert lines[2].startswith("• 1 attempt — the template could not be filled in: boom")
+    assert out["failure"] == "render_failed"
+
+
+@pytest.mark.asyncio
+async def test_281_wr01_backstop_after_a_delivered_shot_counts_that_call_once(
+    _patch_executor, monkeypatch
+):
+    """An exception raised by the render of a delivered (rejected) shot is the same call."""
+    from app.services.harness import emitters
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    async def _boom_render(validated_map, resolved_template, ctx):
+        raise RuntimeError("docxtpl crashed mid-render")
+
+    entry = emitters.EMITTER_REGISTRY["render_template"]
+    monkeypatch.setitem(
+        emitters.EMITTER_REGISTRY, "render_template",
+        emitters.EmitterEntry(schema_builder=entry.schema_builder, post_processor=_boom_render),
+    )
+    bag = _patch_executor
+    bag["forced_queue"] = [_forced_ok(_uncited_fm()) for _ in range(3)]
+    phase = _fake_phase()
+    phase.config.citation_policy = "flag"
+    ctx = _fake_ctx(_fake_definition([_fake_asset_ref()]), audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(phase, _retrieved_accumulated("chunk-1"), ctx)
+
+    assert len(bag["forced_calls"]) == 3
+    assert out["text"].split("\n")[0] == "This step failed after 3 attempts:"
+
+
+@pytest.mark.asyncio
+async def test_281_wr01_gate_passed_then_render_failed_is_one_attempt(_patch_executor):
+    """Control: a cited shot that passed the gate, then failed to render, is ONE call."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["render_result"] = {"status": "failed", "reason": "sandbox_error", "message": "boom"}
+    ctx = _fake_ctx(_fake_definition([_fake_asset_ref()]), audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(_fake_phase(), _retrieved_accumulated("chunk-1"), ctx)
+
+    assert len(bag["forced_calls"]) == 1
+    assert out["text"].split("\n")[0] == "This step failed after 1 attempt:"
+
+
+@pytest.mark.asyncio
+async def test_281_wr01_no_template_made_no_model_call_and_claims_no_attempt(_patch_executor):
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["resolve_result"] = {
+        "bytes": None, "filename": None, "provenance": "template_input",
+        "mime": None, "error": "No template uploaded to this thread.",
+    }
+    ctx = _fake_ctx(_fake_definition([]), audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(_fake_phase(), {}, ctx)
+
+    assert bag["forced_calls"] == []
+    assert out["failure"] == "no_template_bound"
+    assert out["text"].split("\n")[0] == "This step failed:"
+    assert "attempt" not in out["text"]
+    assert "No template is attached to this step: No template uploaded to this thread." in out["text"]
+    assert bag["surface_calls"][-1] == out["text"]
+
+
+@pytest.mark.asyncio
+async def test_281_wr01_exception_before_any_model_call_claims_no_attempt(
+    _patch_executor, monkeypatch
+):
+    from app.services.harness import phase_types
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    async def _boom_resolve(**kwargs):
+        raise RuntimeError("storage unreachable")
+
+    monkeypatch.setattr(phase_types, "resolve_template_source", _boom_resolve)
+    bag = _patch_executor
+    phase = _fake_phase()
+    phase.name = "Write the report"
+    ctx = _fake_ctx(_fake_definition([_fake_asset_ref()]), audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(phase, {}, ctx)
+
+    assert bag["forced_calls"] == []
+    assert out["text"].split("\n")[0] == 'Step "Write the report" failed:'
+    assert "attempt" not in out["text"]

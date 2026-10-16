@@ -121,4 +121,5 @@ def open_anthropic_stream(request: "GatewayRequest") -> Generator[dict, None, No
         max_tokens=_ant_max_tokens,
         force_no_tools=request.force_no_tools,
         tool_choice=_ant_tool_choice,
+        timeout_s=request.timeout_s,  # Phase 282 FIX-06: the budget reaches the client
     )
