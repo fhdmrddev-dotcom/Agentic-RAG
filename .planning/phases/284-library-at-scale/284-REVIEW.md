@@ -413,3 +413,15 @@ In the header, say: "if a CONCURRENTLY build fails, `DROP INDEX CONCURRENTLY <na
 _Round 2 reviewed: 2026-10-16_
 _Reviewer: Claude (gsd-code-reviewer, fresh context)_
 _Depth: standard (security-focused) · independent_review: self_
+
+### Fix status (round 2) — 2026-10-16
+
+| Finding | Status | Commit | Proof |
+|---|---|---|---|
+| WR-R2-01 | **fixed** | `d0a11ec71` | VERIFY is now 16 rows under a pinned `search_path`: the policy USING text is matched exactly, the SELECT policies are counted and named, the view md5 is checked, and row 8's label is honest, with a real 0-row read next to it. Each of the 8 plants (`OR true`, AND→OR, a 2nd permissive policy, the restrictive one dropped, leg 2 without `IS DISTINCT FROM`, without `f.user_id <>`, an INVALID index, a not-READY index) flips its row to FAIL in a rolled-back transaction. The OLD VERIFY passed all 8. The real objects read 16/16 |
+| WR-R2-02 | **fixed** | `d0a11ec71` (`--parity-policy`) + docs commit | One rolled-back transaction compares the documents TABLE and the view under policy 154 vs 208, for every user plus a no-uid caller, claims only, `app.agent_read` off and on, in two data states. The connection arm decides 696 rows when widened. Result: same for 42/42 (325 docs) and 44/44 (50,545 docs). A planted policy without the connection arm FAILS it (table 38/42), while the view stays 42/42. The SUMMARY claim is corrected (struck through) |
+| WR-R2-03 | **fixed** | `d0a11ec71` | `SET LOCAL lock_timeout = '3s'`. The guard runs first and DROP/CREATE POLICY runs last, before COMMIT. The header says to retry on timeout and never widen it |
+| WR-R2-04 | **fixed** | `d0a11ec71` | Index rows require `indisvalid AND indisready`. The header covers the CONCURRENTLY recovery: drop the invalid index, then rebuild |
+| WR-R2-05 | **fixed** | `1ec242a84` | `test_284_view_disjoint_live.py`. RED with a planted view: *"listed 2 times"*. Restored with `apply_migration_208.py --apply` (16/16 twice). The view md5 is back to `9d2b4cf5…`. All `test_284_*` passed: 44, 0 skipped |
+
+Details and pasted output: `284-REVIEW-FIX-R2.md`. IN-R2-01..05 are not addressed (info).
