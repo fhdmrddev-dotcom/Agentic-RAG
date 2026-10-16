@@ -359,9 +359,27 @@ describe("§7 the per-category breakdown", () => {
 
     expect(screen.getByTestId("sources-run-partial")).toBeInTheDocument()
     expect(screen.getByTestId("sources-run-count-errors")).toHaveTextContent("2")
-    // ⛔ NO INVENTED REASON. `last_error` is null on such a row, so a sentence here would be
-    //    the unknown-failure prose attached to a run that did not fail.
+    // ⛔ NO INVENTED REASON. Since Phase 285 (D-03) such a row's `last_error` carries a
+    //    run-level failure summary ("1 file failed: x.txt (ConnectError)"). It is deliberately
+    //    NOT rendered: the `failed && …` gate is what keeps a raw string out of JSX (T-235-12),
+    //    and a sentence here would be the unknown-failure prose attached to a run that did not fail.
     expect(screen.queryByTestId("sources-fail-reason")).toBeNull()
+  })
+
+  it("a success row carrying a run-level failure summary renders the partial register, never the summary (D-03, T-235-12)", () => {
+    // Phase 285 D-03: the run row's last_error now names still-failed files on a success tick.
+    // Regression pin (M-5): the render guarantee already exists; this proves it holds for the
+    // exact string shape the watch loop writes.
+    mountOne({
+      status: "success",
+      count_errors: 1,
+      last_error: "1 file failed: x.txt (ConnectError)",
+    })
+
+    expect(screen.getByTestId("sources-run-partial")).toBeInTheDocument()
+    expect(screen.queryByTestId("sources-fail-reason")).toBeNull()
+    expect(rowText()).not.toContain("x.txt (ConnectError)")
+    expect(document.body.textContent ?? "").not.toContain("x.txt")
   })
 
   it("⚠ a clean check gets no partial mark — the marker must not be always-on", () => {
