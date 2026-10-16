@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { easedProgress } from "./animatedNumberProgress"
 
 export interface AnimatedNumberProps {
   value: number | string
@@ -84,9 +85,7 @@ function AnimatedNumberInner({
     let rafId: number
 
     const step = (now: number) => {
-      const elapsed = now - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      const ease = 1 - Math.pow(1 - progress, 3)
+      const ease = easedProgress(now - startTime, duration)
       const rawCurrent = startNum + (targetNum - startNum) * ease
 
       let formattedNum: string
@@ -106,7 +105,7 @@ function AnimatedNumberInner({
 
       setDisplay(`${prefix}${formattedNum}${suffix}`)
 
-      if (progress < 1) {
+      if (now - startTime < duration) {
         rafId = requestAnimationFrame(step)
       } else {
         completed = true

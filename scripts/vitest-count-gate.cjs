@@ -3617,6 +3617,7 @@ const BASELINE = {
   "pipelineGroups.test.ts": 7,
   "LibraryStatTiles.test.tsx": 16, // RAISED 13 → 16 at 284-01 Task 3 (+3 CHUNKS arm cases; the 13 converted in place to number props)
   "FolderDetail284.test.tsx": 6, // 284-01 Task 3 — the folder band takes numbers; 284-05 checkpoint +1 (grouped counts). BOTH KNOBS, SAME COMMIT.
+  "AnimatedNumber.progress.test.ts": 3, // 284-05 checkpoint — the eased fraction never leaves [0, 1] (G-4 saw "-17,721"). BOTH KNOBS, SAME COMMIT.
   "viewRulePhrase.test.ts": 4,
   "ViewCardGrid.test.tsx": 14,
   "IndexFoldersTable.test.tsx": 6,
@@ -5611,6 +5612,8 @@ const TARGETS = [
   "src/components/library/__tests__/LibraryStatTiles.test.tsx",
   // Phase 284-01 Task 3 — the folder band takes numbers. FILE-LEVEL.
   "src/components/ingestion/__tests__/FolderDetail284.test.tsx",
+  // Phase 284-05 checkpoint — AnimatedNumber never paints a negative mid-animation. FILE-LEVEL.
+  "src/components/ui/__tests__/AnimatedNumber.progress.test.ts",
   "src/components/library/__tests__/viewRulePhrase.test.ts",
   "src/components/library/__tests__/ViewCardGrid.test.tsx",
   "src/components/library/__tests__/IndexFoldersTable.test.tsx",
