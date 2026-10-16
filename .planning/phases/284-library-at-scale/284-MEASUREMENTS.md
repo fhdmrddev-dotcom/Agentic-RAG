@@ -176,3 +176,106 @@ Ground truth (asyncpg as postgres): `{"big_folder_id": "ea595fbd-6880-5816-a543-
 **Find before / after at 50k: 16,869 ms → 499.4 ms (quiet) for page 1 (34x).** Deep pages are linear in the offset: `POST /document-search` at offset 49,700 measured 1,444 ms (contended).
 
 **Browser render time is not a D-22 figure.** In the Vite dev build, the Library open at 50k showed its rows ~3.2 s after the click while every API response had landed by ~1.9 s. A performance trace (`trace_library_open_50k.json`, evidence dir) puts most of the main-thread time in React's DEV instrumentation (`performance.measure` 2,610 ms self, JSX dev validation, StrictMode double render); the app's own components total about 0.8 s inclusive under the trace. Not measured on a production build.
+
+## SEED-357 — where the 50k time goes
+
+284-06 Task 1, 2026-10-16 (local, PLAN_BASE `59a0337fb`, migration 207 applied, no 208). Host CPU
+before the capture: 16.1 / 18.1 / 7.6 % (`typeperf "\Processor(_Total)\% Processor Time"`, the same
+counter as `Get-Counter`; PowerShell is not runnable from this executor).
+
+**Method.** `pg_stat_statements` is preloaded locally. The capture snapshots it, makes 5 real API
+calls against the operator's backend on :8000 as the scale owner, snapshots again, and diffs per
+`queryid` (no reset, so other sessions' stats are untouched). Then each captured statement is run
+again by hand, with EXPLAIN (ANALYZE, BUFFERS), as `authenticated`, with `request.jwt.claims` set to
+the decoded payload of a real GoTrue access token (443 bytes). That is the one claims GUC PostgREST
+14 sets. Full plans: `measurements/284-06-explain-before-{10000,50000}.txt`.
+
+**Where it goes (statement level).** Each request runs exactly one SQL statement that matters (plus
+PostgREST's 0.02 ms `set_config` preamble):
+
+| size | surface | HTTP median | that one statement (`pg_stat_statements` mean) | everything else |
+|---|---|---|---|---|
+| 10,020 | Root page 1 | 135.3 ms | 89.8 ms | 45.5 ms |
+| 10,020 | Find page 1 | 154.7 ms | 97.4 ms | 57.3 ms |
+| 50,020 | Root page 1 | 445.6 ms | **407.9 ms** | 37.7 ms |
+| 50,020 | Find page 1 | 465.7 ms | **417.2 ms** | 48.5 ms |
+
+The API side is flat at roughly 40-60 ms. **All of the growth is inside the one statement**
+(SQL 4.54x / 4.28x from 10k to 50k). So "~250 ms of API-side handling" (284-04) is refuted: that
+time is in Postgres, and the earlier EXPLAINs could not see it, for the reason under cause 2 below.
+
+**The statement.** PostgREST sends one CTE statement: `pgrst_source` (the page: select list,
+embeds, ORDER BY, LIMIT 25) and `pgrst_source_count` (`SELECT 1 FROM library_documents WHERE …`,
+the exact count). Two causes, both linear in the library:
+
+1. **The page has no ordered path, and the embeds run for every row.** The view's
+   `user_id = auth.uid() OR folder_id IN (shared folders not own)` can only be served by a BitmapOr.
+   That has no order, so the planner sorts the whole matched set. Root's `document_tables(count)` /
+   `document_images(count)` embeds are LEFT JOIN LATERALs *below* that sort. At 50k they ran
+   **29,808 loops each** (157 ms of the 209 ms page). For Root, the LIST_SELECT comment ("the two
+   embedded counts are evaluated for the PAGE only") was false. Find selects no embeds, and its
+   `version_count` / `has_earlier` already run after the sort (25 loops). Its page cost is the
+   bitmap heap scan plus the sort.
+2. **`auth.uid()` is evaluated per row and re-parses the whole JWT each time.** The documents
+   SELECT policy (migration 154) calls `auth.uid()` bare, so it is inlined into the per-row filter.
+   PostgREST sets only `request.jwt.claims`, so every evaluation casts 443 bytes of JSON to jsonb.
+   The same statement with a 45-byte claims blob runs 302 / 175 ms (Root / Find, 50k). With the full
+   token it runs **494 / 474 ms** (EXPLAIN ANALYZE; 396 / 435 ms un-instrumented, which matches
+   `pg_stat_statements`). The exact count alone costs **138 ms (Root) / 223 ms (Find)** at 50k
+   (~4.5 µs/row).
+   ⚠ **Why the 207 EXPLAIN above read 27-37 ms for the same count:** its own text says it ran under
+   `_apply_rls_user_context`, which also sets `request.jwt.claim.sub`. That is the first,
+   parse-free branch of `auth.uid()`'s COALESCE, so the measurement took a path PostgREST never
+   takes. The 284-05 verdict's 10k figures (count 25.2 ms, page 22.8 ms) match that path, not
+   PostgREST's: measured here at 10k, PostgREST's statement is 89.8 ms.
+
+| 50,020 · `authenticated` + real token claims | top node | rows | execution |
+|---|---|---|---|
+| Root, full PostgREST statement | `Aggregate` ← `Limit` ← `Sort` (top-N) ← 2 × `Nested Loop Left Join` ← `Bitmap Heap Scan on documents` (BitmapOr) | 29,808 + 2 × 29,808 lateral loops | **494.4 ms** |
+| Root count CTE | `Bitmap Heap Scan on documents` (BitmapOr; 20,412 removed by filter) | 29,808 | 138.2 ms |
+| Find, full PostgREST statement | `Aggregate` ← `Limit` ← `Result` ← `Sort` ← `Bitmap Heap Scan` (BitmapOr) | 49,720 | **473.9 ms** |
+| Find count CTE | `Bitmap Heap Scan on documents` (BitmapOr) | 49,720 | 223.0 ms |
+
+At 10,020 the same four read 92.2 / 27.0 / 96.3 / 42.9 ms.
+
+**What it takes to make page 1 flat.** Each piece was measured in a rolled-back transaction at 50k,
+as `authenticated` with the real claims:
+
+| change | Root statement | Find statement |
+|---|---|---|
+| none (base, 207) | 494 ms | 474 ms |
+| index `(user_id, …, created_at DESC, id DESC)` only, view unchanged | 429 ms | 437 ms — the OR still forces a BitmapOr, so the index is not walked in order |
+| + a naive `UNION ALL` of the two legs | 466 ms | 956 ms (worse: each leg is planned as a separate subquery, so the version subqueries run for 49,720 rows) |
+| documents policy `auth.uid()` → `(SELECT auth.uid())` only | 211 ms | 72 ms |
+| the 208 view + its two indexes, policy unchanged | 126 ms (page 0.9 ms) | 212 ms (page 1.1 ms, Merge Append) |
+| **all three (migration 208)** | **15.0 ms** (page 0.7 ms) | **25.4 ms** (page 1.2 ms) |
+
+**Why a naive UNION ALL does not work (Postgres 17.6, measured).** A UNION ALL leg with a WHERE
+clause cannot be flattened into an appendrel (`is_safe_append_member`: "the child can't have any
+WHERE quals"). It is planned as an isolated subquery that never sees the outer ORDER BY, so no
+Merge Append is possible. The working shape has no WHERE in either leg, a constant discriminator
+column `leg`, and every predicate in the outer WHERE. Postgres pushes that WHERE into each
+appendrel child and const-folds it per leg (`leg = 1` folds the shared arm away). The own leg's
+`user_id = (SELECT auth.uid())` must also reach the child's index pathkeys as an *equivalence
+class*, and a child-only qual never forms one. So both legs expose `scope_key` (leg 1:
+`d.user_id`, leg 2: `auth.uid()`), and the outer `scope_key = (SELECT auth.uid())` is one
+parent-level equality that makes the index's leading `user_id` redundant for ordering.
+
+**RED** (`backend/tests/integration/test_284_page_index_live.py`, 8 failed at both sizes, before 208):
+```
+50,020:
+E   AssertionError: root page 1 (custom plan) visits the library (50020 latest documents): nodes producing > 100 rows:
+E       /Limit/Sort/Nested Loop/Nested Loop/Bitmap Heap Scan[documents]: 29808 rows x 1 loops
+E       /Limit/Sort/Nested Loop/Nested Loop/Aggregate: 1 rows x 29808 loops          (the embed, per row)
+E   AssertionError: root page 1 (generic plan) visits the library …  (same)
+E   AssertionError: find page 1 (custom plan) visits the library (50020 latest documents): nodes producing > 100 rows:
+E       /Limit/Result/Sort/Bitmap Heap Scan[documents]: 49720 rows x 1 loops
+E   AssertionError: find page 1 (generic plan) visits the library …  (same)
+E   AssertionError: root page 1 took 279.2 ms as authenticated (PostgREST claims) at 50020 latest documents; the bound is 20.0 ms at any size
+E   AssertionError: find page 1 took 233.0 ms … the bound is 20.0 ms at any size
+E   AssertionError: root: the full PostgREST statement (page + exact count over 29808 rows) took 413.9 ms; the bound is 89.6 ms (30 ms + 2 µs/row)
+E   AssertionError: find: the full PostgREST statement (page + exact count over 49720 rows) took 440.2 ms; the bound is 129.4 ms (30 ms + 2 µs/row)
+8 failed
+10,020: the same 8 fail — Root scans 5,816, Find 9,720; page 64.1 / 51.6 ms; statement 89.5 / 92.4 ms
+        against bounds of 41.6 / 49.4 ms.
+```
