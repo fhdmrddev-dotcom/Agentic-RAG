@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { getAuditLogs, exportAuditLogs } from "@/lib/api"
 import type { AuditEntry } from "@/lib/api"
 import { Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 /**
  * The Audit Log tab body. Phase 283-01 (D-14) moved it VERBATIM out of `pages/SettingsPage.tsx`
@@ -171,9 +172,7 @@ export function AuditLogSection() {
             Failed to load audit log. Refresh the page to try again.
           </p>
         ) : loading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
+          <SyrelLoader size="panel" className="py-8" />
         ) : (
           <table className="w-full text-sm">
             <thead>

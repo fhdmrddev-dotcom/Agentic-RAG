@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { RefreshCw, Check, X, CircleDashed, Loader2, Bot } from "lucide-react"
+import { RefreshCw, Check, X, CircleDashed, Bot } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { providerLogo } from "@/lib/providerLogo"
@@ -11,6 +11,7 @@ import type {
   EvalRunReadout,
 } from "@/types"
 import { RunCaseDetail } from "@/components/skills/studio/RunCaseDetail"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 /**
  * Phase 137.1 Plan 10 (EVAL-05 / sketch 060-A winner: A) — the engine-health tile
@@ -213,10 +214,7 @@ export function EngineHealthCard() {
         data-testid="engine-health-card"
         className="rounded-lg border border-border bg-card/60 p-5 shadow-sm"
       >
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading engine health…
-        </div>
+        <SyrelLoader size="section" label="Loading engine health…" className="text-sm text-muted-foreground" />
       </div>
     )
   }
@@ -431,10 +429,7 @@ function EngineTileDetail({
       className="mt-3 rounded-md border border-primary/20 bg-primary/5 p-3"
     >
       {loading ? (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Loading smoke run…
-        </div>
+        <SyrelLoader size="section" label="Loading smoke run…" className="text-xs text-muted-foreground" />
       ) : error ? (
         <p data-testid="engine-tile-detail-error" className="text-xs text-destructive">
           {error}

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Brain, Loader2, Pencil, Trash2, Check, X } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 interface MemoryEntry {
   id: string
@@ -131,9 +132,7 @@ export function MemorySection() {
 
           {/* Loading state */}
           {!error && loading && (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
+            <SyrelLoader size="panel" className="py-8" />
           )}
 
           {/* Empty state */}

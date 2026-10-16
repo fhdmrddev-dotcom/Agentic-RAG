@@ -63,6 +63,7 @@ import { cn } from "@/lib/utils"
 import { ExpertCard } from "./ExpertCard"
 import { ExpertDetailModal } from "./ExpertDetailModal"
 import { ALL_CATEGORIES, categoriesOf, decodeEntities, filterExperts } from "./expertCatalog"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 /** How often the page re-reads the list while an install is running (T-266-28: only then). */
 export const INSTALL_POLL_MS = 4000
@@ -281,10 +282,7 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
       )}
 
       {loading && (
-        <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted-foreground">
-          <Sparkles className="h-4 w-4 animate-spin text-primary" />
-          Loading the expert catalog...
-        </div>
+        <SyrelLoader size="panel" label="Loading the expert catalog..." className="py-16 text-xs text-muted-foreground" />
       )}
 
       {startError && (

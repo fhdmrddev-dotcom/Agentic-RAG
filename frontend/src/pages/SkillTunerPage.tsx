@@ -23,7 +23,7 @@
  * (useSkills().updateSkill) — NEVER auto-applied (042-A / D-03).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, Target, RefreshCw, AlertTriangle } from "lucide-react"
+import { ChevronLeft, Target, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useSkills } from "@/hooks/useSkills"
@@ -51,6 +51,7 @@ import {
 } from "@/lib/api"
 import { DescriptionProposalCard } from "@/components/skills/studio/DescriptionProposalCard"
 import type { Skill, SkillProposal } from "@/types"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 interface Props {
   /** The skill being tuned. App holds this selection (per-view state); a null id
@@ -679,10 +680,7 @@ export function SkillTunerPage({ skillId, onBack, embedded, onVersionPromoted }:
             rehydrates on open). The editor stays mounted so the author can re-edit + re-run. */}
         <div className="flex-1 overflow-y-auto">
           {skillsLoading && !skill ? (
-            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground" role="status">
-              <RefreshCw className="h-4 w-4 animate-spin mr-2" aria-hidden="true" />
-              Loading skill…
-            </div>
+            <SyrelLoader size="panel" label="Loading skill…" className="py-16 text-sm text-muted-foreground" />
           ) : !skill ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
               <p className="text-sm text-destructive">This skill isn&apos;t available.</p>

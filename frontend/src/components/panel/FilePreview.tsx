@@ -24,13 +24,14 @@
  * FilePreview itself never injects raw file content as HTML.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { ChevronLeft, Copy, Download, Loader2 } from "lucide-react"
+import { ChevronLeft, Copy, Download } from "lucide-react"
 import { downloadWorkspaceFile, getWorkspaceFileContent, DownloadError } from "@/lib/api"
 import { useResolvedFileId } from "@/hooks/useResolvedFileId"
 import type { WorkspaceFile, WorkspaceFileContent } from "@/types"
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer"
 import { ShikiCode } from "@/components/chat/tool-bodies/ShikiCode"
 import { CsvTablePreview } from "./CsvTablePreview"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 interface FilePreviewProps {
   threadId: string
@@ -253,9 +254,7 @@ function FilePreviewContent({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-10">
-        <Loader2 className="h-4 w-4 animate-spin text-panel-muted-foreground" aria-hidden="true" />
-      </div>
+      <SyrelLoader size="panel" className="py-10 text-panel-muted-foreground" />
     )
   }
 
