@@ -2802,61 +2802,134 @@ CREATE TABLE public.legal_holds (
 --
 
 CREATE VIEW public.library_documents WITH (security_invoker='true') AS
- SELECT id,
-    user_id,
-    filename,
-    file_path,
-    file_size,
-    mime_type,
-    status,
-    error_message,
-    chunk_count,
-    created_at,
-    updated_at,
-    content_hash,
-    metadata,
-    folder_id,
-    version_number,
-    is_latest,
-    ingestion_step,
-    extractor,
-    document_type_norm,
-    date_typed,
-    org_id,
-    source_connection_id,
-    ingest_visibility,
-    source_state,
-    thread_key,
-    page_count,
-    source_created_at,
-    source_modified_at,
-    source_author,
-    archived_at,
-    archived_policy_id,
-    archived_policy_name,
-    retrievable,
-    (lower(filename) COLLATE "C") AS filename_key,
+ SELECT o.id,
+    u.user_id,
+    u.filename,
+    u.file_path,
+    u.file_size,
+    u.mime_type,
+    u.status,
+    u.error_message,
+    u.chunk_count,
+    u.created_at,
+    u.updated_at,
+    u.content_hash,
+    u.metadata,
+    u.folder_id,
+    u.version_number,
+    u.is_latest,
+    u.ingestion_step,
+    u.extractor,
+    u.document_type_norm,
+    u.date_typed,
+    u.org_id,
+    u.source_connection_id,
+    u.ingest_visibility,
+    u.source_state,
+    u.thread_key,
+    u.page_count,
+    u.source_created_at,
+    u.source_modified_at,
+    u.source_author,
+    u.archived_at,
+    u.archived_policy_id,
+    u.archived_policy_name,
+    u.retrievable,
+    (lower(u.filename) COLLATE "C") AS filename_key,
     ( SELECT (count(*))::integer AS count
            FROM public.documents e
-          WHERE ((e.user_id = d.user_id) AND (e.filename = d.filename) AND ((e.user_id = ( SELECT auth.uid() AS uid)) OR ((e.folder_id IS NOT NULL) AND (e.folder_id IN ( SELECT f.id
+          WHERE ((e.user_id = u.user_id) AND (e.filename = u.filename) AND ((e.user_id = ( SELECT auth.uid() AS uid)) OR ((e.folder_id IS NOT NULL) AND (e.folder_id IN ( SELECT f.id
                    FROM public.folders f
                   WHERE ((f.user_id <> ( SELECT auth.uid() AS uid)) AND public.folder_is_org_shared(f.id)))))))) AS version_count,
     (EXISTS ( SELECT 1
            FROM public.documents e
-          WHERE ((e.user_id = d.user_id) AND (e.filename = d.filename) AND (e.version_number < d.version_number) AND ((e.user_id = ( SELECT auth.uid() AS uid)) OR ((e.folder_id IS NOT NULL) AND (e.folder_id IN ( SELECT f.id
+          WHERE ((e.user_id = u.user_id) AND (e.filename = u.filename) AND (e.version_number < u.version_number) AND ((e.user_id = ( SELECT auth.uid() AS uid)) OR ((e.folder_id IS NOT NULL) AND (e.folder_id IN ( SELECT f.id
                    FROM public.folders f
                   WHERE ((f.user_id <> ( SELECT auth.uid() AS uid)) AND public.folder_is_org_shared(f.id))))))))) AS has_earlier
-   FROM public.documents d
-  WHERE ((user_id = ( SELECT auth.uid() AS uid)) OR ((folder_id IS NOT NULL) AND (folder_id IN ( SELECT f.id
+   FROM (( SELECT 1 AS leg,
+            d.user_id AS scope_key,
+            d.id,
+            d.user_id,
+            d.filename,
+            d.file_path,
+            d.file_size,
+            d.mime_type,
+            d.status,
+            d.error_message,
+            d.chunk_count,
+            d.created_at,
+            d.updated_at,
+            d.content_hash,
+            d.metadata,
+            d.folder_id,
+            d.version_number,
+            d.is_latest,
+            d.ingestion_step,
+            d.extractor,
+            d.document_type_norm,
+            d.date_typed,
+            d.org_id,
+            d.source_connection_id,
+            d.ingest_visibility,
+            d.source_state,
+            d.thread_key,
+            d.page_count,
+            d.source_created_at,
+            d.source_modified_at,
+            d.source_author,
+            d.archived_at,
+            d.archived_policy_id,
+            d.archived_policy_name,
+            d.retrievable
+           FROM public.documents d
+        UNION ALL
+         SELECT 2 AS leg,
+            auth.uid() AS scope_key,
+            d.id,
+            d.user_id,
+            d.filename,
+            d.file_path,
+            d.file_size,
+            d.mime_type,
+            d.status,
+            d.error_message,
+            d.chunk_count,
+            d.created_at,
+            d.updated_at,
+            d.content_hash,
+            d.metadata,
+            d.folder_id,
+            d.version_number,
+            d.is_latest,
+            d.ingestion_step,
+            d.extractor,
+            d.document_type_norm,
+            d.date_typed,
+            d.org_id,
+            d.source_connection_id,
+            d.ingest_visibility,
+            d.source_state,
+            d.thread_key,
+            d.page_count,
+            d.source_created_at,
+            d.source_modified_at,
+            d.source_author,
+            d.archived_at,
+            d.archived_policy_id,
+            d.archived_policy_name,
+            d.retrievable
+           FROM public.documents d) u
+     LEFT JOIN public.documents o ON ((o.id = u.id)))
+  WHERE ((u.scope_key = ( SELECT auth.uid() AS uid)) AND ((u.leg = 1) OR ((u.leg = 2) AND (u.user_id IS DISTINCT FROM ( SELECT auth.uid() AS uid)) AND (u.folder_id = ANY (ARRAY( SELECT f.id
            FROM public.folders f
-          WHERE ((f.user_id <> ( SELECT auth.uid() AS uid)) AND public.folder_is_org_shared(f.id))))));
+          WHERE ((f.user_id <> ( SELECT auth.uid() AS uid)) AND public.folder_is_org_shared(f.id))))))));
 
 
 --
 -- Name: VIEW library_documents; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON VIEW public.library_documents IS 'Phase 284 (mig 207): the Library visible set — own documents ∪ documents in org-shared folders the caller does not own. security_invoker: RLS on documents/folders applies beneath it. Keyed on auth.uid(): the service role reads 0 rows. SELECT-only.';
+COMMENT ON VIEW public.library_documents IS 'Phase 284 (mig 207, rewritten by 208): the Library visible set — own documents ∪ documents in org-shared folders the caller does not own, as a UNION ALL an index walks in order. security_invoker: RLS on documents/folders applies beneath it. Keyed on auth.uid(): the service role reads 0 rows. SELECT-only.';
 
 
 --
@@ -5243,6 +5316,27 @@ CREATE INDEX documents_folder_id_idx ON public.documents USING btree (folder_id)
 --
 
 CREATE INDEX documents_latest_idx ON public.documents USING btree (user_id, filename, is_latest) WHERE (is_latest = true);
+
+
+--
+-- Name: documents_library_added_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX documents_library_added_idx ON public.documents USING btree (user_id, is_latest, created_at DESC NULLS LAST, id);
+
+
+--
+-- Name: documents_library_folder_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX documents_library_folder_created_idx ON public.documents USING btree (user_id, is_latest, folder_id, created_at DESC, id DESC) WHERE (folder_id IS NOT NULL);
+
+
+--
+-- Name: documents_library_root_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX documents_library_root_created_idx ON public.documents USING btree (user_id, is_latest, created_at DESC, id DESC) WHERE (folder_id IS NULL);
 
 
 --
@@ -8570,7 +8664,7 @@ CREATE POLICY "Users can view own ingestion jobs" ON public.ingestion_jobs FOR S
 -- Name: documents Users can view own or global-folder documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own or global-folder documents" ON public.documents FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR ((folder_id IS NOT NULL) AND public.folder_is_org_shared(folder_id)) OR public.connection_doc_is_visible(source_connection_id, ingest_visibility))));
+CREATE POLICY "Users can view own or global-folder documents" ON public.documents FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((( SELECT auth.uid() AS uid) = user_id) OR ((folder_id IS NOT NULL) AND public.folder_is_org_shared(folder_id)) OR public.connection_doc_is_visible(source_connection_id, ingest_visibility))));
 
 
 --
@@ -10720,6 +10814,7 @@ REVOKE EXECUTE ON FUNCTION public.retention_policies_folder_same_org() FROM PUBL
 REVOKE EXECUTE ON FUNCTION public.documents_inherit_family_archive() FROM PUBLIC, anon, authenticated;
 
 -- migration 207 — library_documents: the Library's visible set (security_invoker); READ-only to authenticated and service_role, nothing to anon / PUBLIC.
+-- migration 208 — the same view, REPLACED as an ordered UNION ALL (SEED-357); its grants are re-asserted unchanged, so these six lines mirror both.
 REVOKE ALL ON TABLE public.library_documents FROM PUBLIC;
 REVOKE ALL ON TABLE public.library_documents FROM anon;
 REVOKE ALL ON TABLE public.library_documents FROM authenticated;

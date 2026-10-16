@@ -830,6 +830,7 @@ REVOKE EXECUTE ON FUNCTION public.retention_policies_folder_same_org() FROM PUBL
 REVOKE EXECUTE ON FUNCTION public.documents_inherit_family_archive() FROM PUBLIC, anon, authenticated;
 
 -- migration 207 — library_documents: the Library's visible set (security_invoker); READ-only to authenticated and service_role, nothing to anon / PUBLIC.
+-- migration 208 — the same view, REPLACED as an ordered UNION ALL (SEED-357); its grants are re-asserted unchanged, so these six lines mirror both.
 REVOKE ALL ON TABLE public.library_documents FROM PUBLIC;
 REVOKE ALL ON TABLE public.library_documents FROM anon;
 REVOKE ALL ON TABLE public.library_documents FROM authenticated;
