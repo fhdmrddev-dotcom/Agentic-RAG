@@ -26,11 +26,18 @@ it inside the threadpool. This keeps call sites symmetric with the sync
 """
 
 import logging
+from types import SimpleNamespace
 from uuid import UUID
 
+from postgrest.exceptions import APIError
 from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
+
+#: PostgREST's answer to a ``count=exact`` read whose offset is past the end: HTTP 416, code
+#: PGRST103, "An offset of X was requested, but there are only Y rows." (measured live —
+#: ``tests/integration/test_284_offset_past_end_live.py``). ``offset == total`` is a plain 200.
+RANGE_NOT_SATISFIABLE = "PGRST103"
 
 
 def coerce_uid(user_id) -> str:
@@ -74,3 +81,31 @@ async def aexec(query):
         typically with `.data` (list[dict] or dict) and `.count` (int|None).
     """
     return await run_in_threadpool(query.execute)
+
+
+async def aexec_page(build, *, offset: int, limit: int):
+    """One page of a ``count="exact"`` read: ``build().range(offset, offset + limit - 1)``.
+
+    284-REVIEW CR-01. A page past the end is a valid question — the list shrank under an open
+    page (Include archived turned off, a Realtime delete, a re-chunk) — and its answer is "no
+    rows, and here is the total". PostgREST instead answers 416 / ``PGRST103``, which postgrest-py
+    raises as ``APIError`` and every paged route used to turn into a 500 (so "Try again" re-asked
+    the same impossible page forever). This is the ONE home of that answer:
+
+      * ``build`` is a zero-argument factory returning a FRESH builder with the select
+        (``count="exact"``), every filter and the order, but NO range — builders mutate in
+        place, so the count re-read needs its own;
+      * on ``PGRST103`` the same filters are re-read with ``.limit(1)`` (offset 0 is always
+        satisfiable) for the exact count, and the result is ``data=[]`` with that count;
+      * any other error is raised unchanged.
+
+    Returns the response ``aexec`` would (``.data`` / ``.count``), or a ``SimpleNamespace`` of
+    the same two attributes for the past-the-end page.
+    """
+    try:
+        return await aexec(build().range(offset, offset + limit - 1))
+    except APIError as e:
+        if getattr(e, "code", None) != RANGE_NOT_SATISFIABLE:
+            raise
+    head = await aexec(build().limit(1))
+    return SimpleNamespace(data=[], count=getattr(head, "count", None))

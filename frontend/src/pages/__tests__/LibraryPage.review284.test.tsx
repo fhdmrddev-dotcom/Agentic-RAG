@@ -189,7 +189,9 @@ describe("CR-01 — the browse list never sits on a page past the end", () => {
     docs.splice(0, 3)
     act(() => wired.onChange())
     await waitFor(() => expect(tfoot()).toHaveTextContent("26–49 of 49"), { timeout: 2000 })
-    expect(screen.getByText("d27.pdf")).toBeInTheDocument()
+    // d51 … d03 remain, newest id first: page 2 is d26 … d03.
+    expect(await screen.findByText("d26.pdf")).toBeInTheDocument()
+    expect(screen.getByText("d03.pdf")).toBeInTheDocument()
     expect(screen.queryByText("No root documents yet.")).toBeNull()
   })
 

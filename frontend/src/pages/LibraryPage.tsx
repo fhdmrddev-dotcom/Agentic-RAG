@@ -62,6 +62,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useCitationNavOptional } from "@/lib/citationNav"
+import { clampPageOffset } from "@/lib/pageClamp"
 import { cn } from "@/lib/utils"
 import { EMPTY_FILTER } from "@/types"
 import type { MetadataFieldDef, SavedView, ViewFilter } from "@/types"
@@ -359,9 +360,11 @@ export function LibraryPage({
   // STAYS here; the data hook below takes it as arguments and answers that page (284-01).
   const [pageOffset, setPageOffset] = useState(0)
   const [pageSize, setPageSize] = useState(25)
+  // 284-REVIEW CR-01: include-archived changes the SET being paged (60 → 40), so it resets the
+  // page too — page 3 of the larger set need not exist in the smaller one.
   useEffect(() => {
     setPageOffset(0)
-  }, [selectedFolderId, listTarget])
+  }, [selectedFolderId, listTarget, find.include_archived])
 
   // ⭐ Phase 284-01 (D-24) — the page's documents, as rows and numbers. Named `libDocs` because
   // `lib` is the selection reducer's state above. 284-03: the hook reads the server.
@@ -375,6 +378,16 @@ export function LibraryPage({
   })
   const { upload, deleteDoc, uploading, uploadingCount } = libDocs
   const loadDocuments = libDocs.refresh
+  // 284-REVIEW CR-01: a list that shrank under the open page (a Realtime delete, the retention
+  // sweep) answers that page as `[]` + the exact total — move to the last page that exists, so
+  // the pager never reads "51–49 of 49" and "Try again" never re-asks an impossible page. Only
+  // on a READY answer: its total is the one for THIS offset.
+  const listTotal = libDocs.listState === "ready" ? libDocs.total : null
+  useEffect(() => {
+    if (listTotal === null) return
+    const clamped = clampPageOffset(pageOffset, listTotal, pageSize)
+    if (clamped !== pageOffset) setPageOffset(clamped)
+  }, [listTotal, pageOffset, pageSize])
 
   // Load the field defs (for the operator menu) + the saved views once.
   useEffect(() => {
@@ -962,7 +975,12 @@ export function LibraryPage({
               <ArchivedHiddenLine
                 count={libDocs.archivedHidden ?? 0}
                 included={find.include_archived}
-                onChange={(include) => findDispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: include })}
+                onChange={(include) => {
+                  // 284-REVIEW CR-01: reset in the SAME event, so no request is sent for the old
+                  // page of the new set (the effect above stays as the guard for other paths).
+                  setPageOffset(0)
+                  findDispatch({ type: "SET_INCLUDE_ARCHIVED", include_archived: include })
+                }}
               />
             )}
             {/* Phase 217.1-06 — the pager (the sketch's table footer). ⭐ 284-03 (D-09 / D-10): for

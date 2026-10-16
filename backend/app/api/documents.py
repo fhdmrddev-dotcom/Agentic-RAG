@@ -38,7 +38,7 @@ from app.services.email_attachments import ingest_email_attachments
 from app.services.ingest_enrich import enrich_for_ingest
 from app.services.extraction_service import ExtractedDocument
 from app.services.retention import hold_guard  # Phase 275 (D-14 / D-32): the one hold check
-from app.utils.db import aexec, maybe_row
+from app.utils.db import aexec, aexec_page, maybe_row
 
 
 def _parse_engines_hint(s: str | None) -> dict[str, str] | None:
@@ -855,29 +855,28 @@ async def list_documents(
     if folder_id is not None and folder_id != "root":
         folder_id = _uuid_or_422(folder_id, "folder_id")
 
-    q = (
-        supabase.table("library_documents")
-        .select(LIST_SELECT, count="exact")
-        .eq("is_latest", True)
-    )
-    if folder_id == "root":
-        q = q.is_("folder_id", "null")
-    elif folder_id is not None:
-        q = q.eq("folder_id", folder_id)
-    if not include_archived:
-        q = q.is_("archived_at", "null")
-    if status_ in _STATUS_SETS:
-        q = q.in_("status", _STATUS_SETS[status_])
-    elif status_ is not None:
-        q = q.eq("status", status_)
-    if kind == "spreadsheet":
-        q = q.or_(SPREADSHEET_OR)
-    q = (
-        q.order(_ORDER_COLUMN[order], desc=True)
-        .order("id", desc=True)
-        .range(offset, offset + limit - 1)
-    )
-    res = await aexec(q)
+    def build():
+        q = (
+            supabase.table("library_documents")
+            .select(LIST_SELECT, count="exact")
+            .eq("is_latest", True)
+        )
+        if folder_id == "root":
+            q = q.is_("folder_id", "null")
+        elif folder_id is not None:
+            q = q.eq("folder_id", folder_id)
+        if not include_archived:
+            q = q.is_("archived_at", "null")
+        if status_ in _STATUS_SETS:
+            q = q.in_("status", _STATUS_SETS[status_])
+        elif status_ is not None:
+            q = q.eq("status", status_)
+        if kind == "spreadsheet":
+            q = q.or_(SPREADSHEET_OR)
+        return q.order(_ORDER_COLUMN[order], desc=True).order("id", desc=True)
+
+    # 284-REVIEW CR-01: a page past the end is `[]` + the exact total, never PostgREST's 416.
+    res = await aexec_page(build, offset=offset, limit=limit)
     rows = [_flatten_counts(r) for r in (res.data or [])]
     await _decorate_connection_names(supabase, rows)
     total = _exact_total(res, rows)
@@ -905,13 +904,14 @@ async def list_document_versions(
     if not found:
         raise HTTPException(status_code=404, detail="Document not found")
     # 2. One page of the sibling versions, with the exact count of all of them
-    result = await aexec(
-        supabase.table("documents")
+    result = await aexec_page(
+        lambda: supabase.table("documents")
         .select(LIST_SELECT, count="exact")
         .eq("user_id", current_user["id"])
         .eq("filename", found["filename"])
-        .order("version_number", desc=True)
-        .range(offset, offset + limit - 1)
+        .order("version_number", desc=True),
+        offset=offset,
+        limit=limit,
     )
     rows = [_flatten_counts(r) for r in (result.data or [])]
     total = _exact_total(result, rows)
@@ -1177,12 +1177,13 @@ async def list_document_chunks(
     await _assert_document_visible(document_id, current_user["id"], supabase)
     # 2. One page of the chunks with the exact total (Phase 284, D-17) — an empty result is
     #    200 + [], never a 404. Unranged, this read was silently cut at 1,000 chunks.
-    res = await aexec(
-        supabase.table("document_chunks")
+    res = await aexec_page(
+        lambda: supabase.table("document_chunks")
         .select("id, chunk_index, content, embedding_model, embedding_dimensions", count="exact")
         .eq("document_id", document_id)
-        .order("chunk_index")
-        .range(offset, offset + limit - 1)
+        .order("chunk_index"),
+        offset=offset,
+        limit=limit,
     )
     rows = res.data or []
     total = _exact_total(res, rows)
@@ -1292,12 +1293,13 @@ async def list_document_tables(
     await _assert_document_visible(document_id, current_user["id"], supabase)
     # 2. One page of the tables with the exact total (Phase 284, D-17) — an empty result is
     #    200 + [], never a 404. Default 50: `rows` jsonb is heavy.
-    res = await aexec(
-        supabase.table("document_tables")
+    res = await aexec_page(
+        lambda: supabase.table("document_tables")
         .select("id, page, table_index, headers, rows, extractor", count="exact")
         .eq("document_id", document_id)
-        .order("table_index")
-        .range(offset, offset + limit - 1)
+        .order("table_index"),
+        offset=offset,
+        limit=limit,
     )
     rows = res.data or []
     total = _exact_total(res, rows)
@@ -1322,12 +1324,13 @@ async def list_document_images(
     await _assert_document_visible(document_id, current_user["id"], supabase)
     # 2. One page of the image descriptions with the exact total (Phase 284, D-17) — an empty
     #    result is 200 + [], never a 404.
-    res = await aexec(
-        supabase.table("document_images")
+    res = await aexec_page(
+        lambda: supabase.table("document_images")
         .select("id, page, image_index, description", count="exact")
         .eq("document_id", document_id)
-        .order("image_index")
-        .range(offset, offset + limit - 1)
+        .order("image_index"),
+        offset=offset,
+        limit=limit,
     )
     rows = res.data or []
     total = _exact_total(res, rows)

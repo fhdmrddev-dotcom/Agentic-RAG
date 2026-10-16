@@ -40,6 +40,7 @@ import {
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import { classifyIngestionError } from "@/components/library/ingestionErrorVocabulary"
 import { formatBytes } from "@/lib/formatBytes"
+import { clampPageOffset } from "@/lib/pageClamp"
 import { listDocumentsPage, reingestDocument } from "@/lib/api"
 import type { Document, DocumentListParams, LibrarySummary } from "@/types"
 import type { LibraryLoadState } from "@/hooks/useLibraryDocuments"
@@ -394,8 +395,12 @@ function usePagedStatusList(status: ListStatus, changeTick: number) {
     listDocumentsPage(params).then(
       (res) => {
         if (myReq !== reqRef.current) return
-        if (res.total > 0 && offset >= res.total) {
-          setOffset(Math.floor((res.total - 1) / LIST_PAGE_SIZE) * LIST_PAGE_SIZE)
+        // 284-REVIEW CR-01: a page past the end is now an empty 200 with the exact total (it was
+        // a 416 → 500, so this clamp never ran). ONE clamp, shared with the browse pager; an
+        // emptied list goes back to page 1 rather than sitting at an offset past nothing.
+        const clamped = clampPageOffset(offset, res.total, LIST_PAGE_SIZE)
+        if (clamped !== offset) {
+          setOffset(clamped)
           return
         }
         setRows(res.documents)

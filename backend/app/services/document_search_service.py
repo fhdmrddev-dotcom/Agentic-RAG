@@ -79,7 +79,7 @@ from app.services.document_view_resolver import (
     validate_and_compile,
 )
 from app.services.harness.scope import resolve_project_subtree
-from app.utils.db import aexec
+from app.utils.db import aexec, aexec_page
 from app.utils.folder_utils import fetch_visible_folders
 
 log = logging.getLogger(__name__)
@@ -475,11 +475,13 @@ async def search_documents(*, caller: str, req: DocumentSearchRequest, supabase:
 
     # (d) the page — ONE ranged read; order, total and slice are all the database's.
     col, desc = _SORT[req.sort]
-    res = await aexec(
-        query(FIND_SELECT, req.version, id_allow)
+    #     284-REVIEW CR-01: a page past the end is `[]` + the exact total, never PostgREST's 416.
+    res = await aexec_page(
+        lambda: query(FIND_SELECT, req.version, id_allow)
         .order(col, desc=desc, nullsfirst=False)
-        .order("id")
-        .range(req.offset, req.offset + req.limit - 1)
+        .order("id"),
+        offset=req.offset,
+        limit=req.limit,
     )
     documents = list(res.data or [])
     count = getattr(res, "count", None)
