@@ -100,7 +100,7 @@ function PipelineCard({
         )}
       </div>
       <span className={cn("font-mono text-lg font-bold tabular-nums", isPopulated ? "text-primary" : "text-foreground")}>
-        {count === null ? unknown : <AnimatedNumber value={count} />}
+        {count === null ? unknown : <AnimatedNumber value={count.toLocaleString()} />}
       </span>
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {count === 1 ? "file here now" : "files here now"}

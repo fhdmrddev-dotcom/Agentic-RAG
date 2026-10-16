@@ -1057,7 +1057,7 @@ export function LibraryPage({
           <>
             <h2 className="text-lg font-semibold leading-tight">Root</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Documents not assigned to a folder · {rootDocumentCount === undefined ? "…" : <AnimatedNumber value={rootDocumentCount} />}{" "}
+              Documents not assigned to a folder · {rootDocumentCount === undefined ? "…" : <AnimatedNumber value={rootDocumentCount.toLocaleString()} />}{" "}
               {rootDocumentCount === 1 ? "document" : "documents"}
             </p>
           </>

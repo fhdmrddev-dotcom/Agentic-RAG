@@ -246,7 +246,7 @@ export function NavRow({
         {/* Count slot — rendered on EVERY row (D-114-8/13). */}
         {count !== undefined && !isEditing && (
           <span className="shrink-0 text-xs text-muted-foreground ml-auto tabular-nums">
-            <AnimatedNumber value={count} />
+            <AnimatedNumber value={count.toLocaleString()} />
           </span>
         )}
 

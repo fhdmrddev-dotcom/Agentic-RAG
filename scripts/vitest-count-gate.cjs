@@ -3616,7 +3616,7 @@ const BASELINE = {
   "IngestionTab.test.tsx": 50, // +2 BUG-260923-02 History paging · RAISED 42 → 50 at 284-03 (the summary + three paged status lists)
   "pipelineGroups.test.ts": 7,
   "LibraryStatTiles.test.tsx": 16, // RAISED 13 → 16 at 284-01 Task 3 (+3 CHUNKS arm cases; the 13 converted in place to number props)
-  "FolderDetail284.test.tsx": 5, // 284-01 Task 3 — the folder band takes numbers. BOTH KNOBS, SAME COMMIT.
+  "FolderDetail284.test.tsx": 6, // 284-01 Task 3 — the folder band takes numbers; 284-05 checkpoint +1 (grouped counts). BOTH KNOBS, SAME COMMIT.
   "viewRulePhrase.test.ts": 4,
   "ViewCardGrid.test.tsx": 14,
   "IndexFoldersTable.test.tsx": 6,

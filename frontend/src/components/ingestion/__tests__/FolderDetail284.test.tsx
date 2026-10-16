@@ -12,6 +12,9 @@
 import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { FolderDetail } from "@/components/ingestion/FolderDetail"
+import { NavRow } from "@/components/ingestion/NavRow"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { Folder as FolderIcon } from "lucide-react"
 import type { Folder } from "@/types"
 
 const SHARED: Folder = {
@@ -46,6 +49,18 @@ describe("FolderDetail — numbers in, three honest arms (UI-SPEC S5)", () => {
     render(<FolderDetail folder={SHARED} count={0} sizeBytes={0} state="ready" subfolderCount={0} />)
     expect(band()).toContain("0 documents")
     expect(band()).toContain("0 B")
+  })
+
+  // 284-05 checkpoint (G-4 at 50k): the band and the folder tree printed "30000" / "10000". UI-SPEC
+  // "Numbers": every count of 1,000 or more renders grouped, via `n.toLocaleString()`.
+  it("counts of 1,000 or more render grouped in the band and on the folder row", () => {
+    render(<FolderDetail folder={SHARED} count={10000} sizeBytes={0} state="ready" subfolderCount={1200} />)
+    expect(band()).toContain("10,000 documents")
+    expect(band()).toContain("1,200 subfolders")
+    expect(band()).not.toContain("10000")
+    render(<TooltipProvider><NavRow icon={FolderIcon} name="Big" count={30000} /></TooltipProvider>)
+    expect(band()).toContain("30,000")
+    expect(band()).not.toContain("30000")
   })
 
   it("loading renders … in both number slots and no number at all", () => {

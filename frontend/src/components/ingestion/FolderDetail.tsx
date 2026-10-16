@@ -56,7 +56,7 @@ export function FolderDetail({ folder, count, sizeBytes, state, subfolderCount }
             <FileText className="h-3.5 w-3.5" />
             {known ? (
               <>
-                <AnimatedNumber value={count} /> {count === 1 ? "document" : "documents"}
+                <AnimatedNumber value={count.toLocaleString()} /> {count === 1 ? "document" : "documents"}
               </>
             ) : (
               "…"
@@ -71,7 +71,7 @@ export function FolderDetail({ folder, count, sizeBytes, state, subfolderCount }
       {subfolderCount > 0 && (
         <span className="inline-flex items-center gap-1">
           <FolderIcon className="h-3.5 w-3.5" />
-          <AnimatedNumber value={subfolderCount} /> {subfolderCount === 1 ? "subfolder" : "subfolders"}
+          <AnimatedNumber value={subfolderCount.toLocaleString()} /> {subfolderCount === 1 ? "subfolder" : "subfolders"}
         </span>
       )}
       <span className="inline-flex items-center gap-1">
