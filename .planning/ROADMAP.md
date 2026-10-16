@@ -137,7 +137,7 @@ and are stated so a phase can run early when its files are free:
 - [x] **Phase 282: The Slow Run and the Paused Run**: per-model timeout reaches the provider call with deliberate retries; one `ask_user` input with one draft (FIX-06, FIX-07)
 - [x] **Phase 283: Every Member Reaches Their Own Settings**: Settings reachable by members with operator tabs hidden and refused; bounded Chunks section (FIX-01, FIX-08) — completed 2026-10-16
 - [x] **Phase 284: Library at Scale**: the Library, Find and every picker page and count on the server (envelope `GET /documents`, `GET /library/summary`, Find in SQL, pickers on `POST /document-search`), migrations 207 (visible-set view) + 208 (page index), guards driven RED, G-4 A-F at 10k/50k (FIX-11) — completed 2026-10-16
-- [ ] **Phase 285: Watch and Re-upload Close Out**: a failed watch download is retried and stays visible until it lands; a purge deletes only documents the watch minted; a stuck `pending` row never absorbs same-bytes re-uploads (FIX-12, FIX-13, FIX-14)
+- [x] **Phase 285: Watch and Re-upload Close Out**: a failed watch download is retried and stays visible until it lands; a purge deletes only documents the watch minted; a stuck `pending` row never absorbs same-bytes re-uploads (FIX-12, FIX-13, FIX-14) (completed 2026-10-16)
 
 ### Phase Details
 
@@ -426,7 +426,7 @@ Plans:
 | 282. The Slow Run and the Paused Run | 4/4 | Complete (verified 5/5, self-verified; review CR-01 + WR-02..05 fixed, WR-01 partial; owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through, SC#10 rows 2/8 on credit) | 2026-10-15 |
 | 283. Every Member Reaches Their Own Settings | 3/3 | Complete (verified 4/4 SCs; review CR-01 + WR-01/02 + 4 info fixed, IN-04/IN-06 skipped by decision; G-4 driven live, Tab row confirmed by operator) | 2026-10-16 |
 | 284. Library at Scale | 6/6 | Complete (verified 7/7 SCs, self-verified; review R1 CR-01 + WR-01/02/04 + IN-05/07 and R2 WR-R2-01..05 fixed test-first, WR-03 accepted; G-4 A-F driven live, A/B re-driven on 208; migrations 207 + 208 LOCAL only — production apply owed) | 2026-10-16 |
-| 285. Watch and Re-upload Close Out | 0/3 | Planned | - |
+| 285. Watch and Re-upload Close Out | 3/3 | Complete (verified 5/5, self-verified; review CR-01 + CR-02 + WR-01 marker fixed test-first, rest accepted/deferred; SC#5 OneDrive 105/105 live; migration 209 LOCAL only, production paste owed BEFORE backend deploy) | 2026-10-16 |
 
 ---
 
