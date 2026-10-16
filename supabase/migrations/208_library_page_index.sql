@@ -86,6 +86,23 @@
 --   Plain CREATE INDEX (no CONCURRENTLY) is right at production's size (178 documents on
 --   2026-10-16): it takes a SHARE lock on documents for milliseconds. Above ~100k documents, run
 --   the three CREATE INDEX statements first, on their own, as CREATE INDEX CONCURRENTLY.
+-- ⚠ THE CONCURRENTLY PATH (284-REVIEW WR-R2-04): a CREATE INDEX CONCURRENTLY that fails or is
+--   cancelled LEAVES an INVALID index under the same name. This file's `CREATE INDEX IF NOT
+--   EXISTS` would then SKIP it, and the planner never uses an invalid index. So if a CONCURRENTLY
+--   build fails: `DROP INDEX CONCURRENTLY IF EXISTS public.<name>;`, rebuild it, and only then
+--   paste 208. VERIFY's three index rows require `indisvalid AND indisready` (pg_index), so an
+--   INVALID leftover reads FAIL rather than PASS.
+-- ⚠ LOCKS (284-REVIEW WR-R2-03): DROP/CREATE POLICY takes ACCESS EXCLUSIVE on public.documents,
+--   which blocks every read of documents until COMMIT, and the request itself queues behind any
+--   open transaction on documents (an ingestion worker, a long Find, an idle Studio tab), making
+--   every later read queue behind IT. So:
+--     * `SET LOCAL lock_timeout = '3s'` bounds that wait. On `canceling statement due to lock
+--       timeout` the whole transaction has rolled back cleanly: wait a moment and PASTE AGAIN.
+--       ⛔ Do NOT widen the timeout — a longer wait is a longer app-wide stall, not a fix.
+--     * The policy block runs LAST (after the indexes, the view and the grants), immediately
+--       before COMMIT, so ACCESS EXCLUSIVE on documents is held for the shortest possible time.
+--       The guard still runs FIRST, so a drifted policy refuses before anything is built.
+--       Execution order: guard → 1 indexes → 3 view → 4 grants → 2 policy → COMMIT.
 -- ============================================================================
 
 BEGIN;
@@ -93,20 +110,10 @@ BEGIN;
 -- The policy guard compares deparsed text, which depends on search_path. Pin it for this
 -- transaction (every object below is schema-qualified anyway).
 SET LOCAL search_path TO public, extensions;
+-- Bound every lock wait (WR-R2-03 — see the header). Retry on timeout; never widen it.
+SET LOCAL lock_timeout = '3s';
 
--- ── 1. The three first-page indexes ─────────────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS documents_library_root_created_idx
-  ON public.documents (user_id, is_latest, created_at DESC, id DESC)
-  WHERE folder_id IS NULL;
-
-CREATE INDEX IF NOT EXISTS documents_library_added_idx
-  ON public.documents (user_id, is_latest, created_at DESC NULLS LAST, id);
-
-CREATE INDEX IF NOT EXISTS documents_library_folder_created_idx
-  ON public.documents (user_id, is_latest, folder_id, created_at DESC, id DESC)
-  WHERE folder_id IS NOT NULL;
-
--- ── 2. The documents SELECT policy: auth.uid() once per statement, not once per row ───────────
+-- ── 2a. The policy guard, FIRST: refuse a drifted policy before anything is built ────────────
 DO $guard$
 DECLARE
   v_qual text;
@@ -134,17 +141,17 @@ BEGIN
 END
 $guard$;
 
-DROP POLICY IF EXISTS "Users can view own or global-folder documents" ON public.documents;
-CREATE POLICY "Users can view own or global-folder documents" ON public.documents
-  FOR SELECT TO authenticated
-  USING (
-    (org_id IN (SELECT public.current_user_org_ids()))
-    AND (
-      ((SELECT auth.uid()) = user_id)
-      OR ((folder_id IS NOT NULL) AND public.folder_is_org_shared(folder_id))
-      OR public.connection_doc_is_visible(source_connection_id, ingest_visibility)
-    )
-  );
+-- ── 1. The three first-page indexes ─────────────────────────────────────────────────────────────
+CREATE INDEX IF NOT EXISTS documents_library_root_created_idx
+  ON public.documents (user_id, is_latest, created_at DESC, id DESC)
+  WHERE folder_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS documents_library_added_idx
+  ON public.documents (user_id, is_latest, created_at DESC NULLS LAST, id);
+
+CREATE INDEX IF NOT EXISTS documents_library_folder_created_idx
+  ON public.documents (user_id, is_latest, folder_id, created_at DESC, id DESC)
+  WHERE folder_id IS NOT NULL;
 
 -- ── 3. The view, as a UNION ALL an index can walk in order ────────────────────────────────────
 CREATE OR REPLACE VIEW public.library_documents WITH (security_invoker = true) AS
@@ -250,6 +257,21 @@ REVOKE ALL ON public.library_documents FROM service_role;
 GRANT SELECT ON public.library_documents TO authenticated;
 GRANT SELECT ON public.library_documents TO service_role;
 
+-- ── 2. The documents SELECT policy: auth.uid() once per statement, not once per row ───────────
+-- LAST, on purpose (WR-R2-03): ACCESS EXCLUSIVE on public.documents is held from here to COMMIT
+-- only. The guard (2a) already ran at the top of the transaction.
+DROP POLICY IF EXISTS "Users can view own or global-folder documents" ON public.documents;
+CREATE POLICY "Users can view own or global-folder documents" ON public.documents
+  FOR SELECT TO authenticated
+  USING (
+    (org_id IN (SELECT public.current_user_org_ids()))
+    AND (
+      ((SELECT auth.uid()) = user_id)
+      OR ((folder_id IS NOT NULL) AND public.folder_is_org_shared(folder_id))
+      OR public.connection_doc_is_visible(source_connection_id, ingest_visibility)
+    )
+  );
+
 COMMIT;
 
 NOTIFY pgrst, 'reload schema';
@@ -257,15 +279,25 @@ NOTIFY pgrst, 'reload schema';
 -- ============================================================================================
 -- VERIFY — run after applying. Every row must read PASS.
 --
+-- It proves CONTENT, not presence (284-REVIEW WR-R2-01): the policy's USING text is compared
+-- EXACTLY to 208's, the documents policies that apply to SELECT are counted and named, the view
+-- definition is fingerprinted, and each index must be VALID and READY. The deparsed texts depend
+-- on search_path, so the first statement pins it — run BOTH statements together.
+-- ⚠ The fingerprint and the policy text were captured on Postgres 17.6 (local == production on
+-- 2026-10-16). On a different major version a FAIL on those two rows means "compare the text",
+-- not "the wall is gone": print pg_get_viewdef('public.library_documents'::regclass, true) and
+-- the policy's pg_get_expr, and diff them against this file before concluding anything.
+--
+--   SET search_path TO public, extensions;
 --   with checks(what, ok) as (values
 --     ('library_documents exists and is security_invoker',
 --      coalesce((select 'security_invoker=true' = any(c.reloptions) from pg_class c
 --                 join pg_namespace n on n.oid = c.relnamespace
 --                where n.nspname = 'public' and c.relname = 'library_documents' and c.relkind = 'v'),
 --               false)),
---     ('the view is the 208 UNION ALL (scope_key legs)',
---      coalesce(pg_get_viewdef('public.library_documents'::regclass) like '%UNION ALL%'
---               and pg_get_viewdef('public.library_documents'::regclass) like '%scope_key%', false)),
+--     ('the view definition is exactly 208''s (md5 of pg_get_viewdef(..., true) = 9d2b4cf5…)',
+--      coalesce(md5(pg_get_viewdef('public.library_documents'::regclass, true))
+--               = '9d2b4cf53068ecc42342fdafd7816165', false)),
 --     ('the view omits full_markdown and exposes neither leg nor scope_key',
 --      not exists (select 1 from information_schema.columns where table_schema = 'public'
 --                    and table_name = 'library_documents'
@@ -282,35 +314,52 @@ NOTIFY pgrst, 'reload schema';
 --      not has_table_privilege('authenticated', 'public.library_documents', 'INSERT')
 --      and not has_table_privilege('authenticated', 'public.library_documents', 'UPDATE')
 --      and not has_table_privilege('authenticated', 'public.library_documents', 'DELETE')),
---     ('service_role can SELECT it (and reads 0 rows: auth.uid() is NULL)',
+--     ('service_role has SELECT and not INSERT on it (privileges only — the next row is the read)',
 --      has_table_privilege('service_role', 'public.library_documents', 'SELECT')
 --      and not has_table_privilege('service_role', 'public.library_documents', 'INSERT')),
---     ('documents_library_root_created_idx exists (partial: folder_id IS NULL)',
---      exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'documents'
---                and indexname = 'documents_library_root_created_idx'
---                and indexdef like '%(user_id, is_latest, created_at DESC, id DESC) WHERE (folder_id IS NULL)%')),
---     ('documents_library_added_idx exists',
---      exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'documents'
---                and indexname = 'documents_library_added_idx'
---                and indexdef like '%(user_id, is_latest, created_at DESC NULLS LAST, id)%')),
---     ('documents_library_folder_created_idx exists (partial: folder_id IS NOT NULL)',
---      exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'documents'
---                and indexname = 'documents_library_folder_created_idx'
---                and indexdef like '%(user_id, is_latest, folder_id, created_at DESC, id DESC) WHERE (folder_id IS NOT NULL)%')),
+--     ('a caller with no uid (this session: auth.uid() IS NULL, BYPASSRLS like the service role) reads 0 rows',
+--      coalesce(auth.uid() is null and (select count(*) = 0 from public.library_documents), false)),
+--     ('documents_library_root_created_idx exists, is VALID and READY (partial: folder_id IS NULL)',
+--      exists (select 1 from pg_indexes x join pg_index i on i.indexrelid = (x.schemaname || '.' || x.indexname)::regclass
+--                where x.schemaname = 'public' and x.tablename = 'documents'
+--                  and x.indexname = 'documents_library_root_created_idx'
+--                  and x.indexdef like '%(user_id, is_latest, created_at DESC, id DESC) WHERE (folder_id IS NULL)%'
+--                  and i.indisvalid and i.indisready)),
+--     ('documents_library_added_idx exists, is VALID and READY',
+--      exists (select 1 from pg_indexes x join pg_index i on i.indexrelid = (x.schemaname || '.' || x.indexname)::regclass
+--                where x.schemaname = 'public' and x.tablename = 'documents'
+--                  and x.indexname = 'documents_library_added_idx'
+--                  and x.indexdef like '%(user_id, is_latest, created_at DESC NULLS LAST, id)%'
+--                  and i.indisvalid and i.indisready)),
+--     ('documents_library_folder_created_idx exists, is VALID and READY (partial: folder_id IS NOT NULL)',
+--      exists (select 1 from pg_indexes x join pg_index i on i.indexrelid = (x.schemaname || '.' || x.indexname)::regclass
+--                where x.schemaname = 'public' and x.tablename = 'documents'
+--                  and x.indexname = 'documents_library_folder_created_idx'
+--                  and x.indexdef like '%(user_id, is_latest, folder_id, created_at DESC, id DESC) WHERE (folder_id IS NOT NULL)%'
+--                  and i.indisvalid and i.indisready)),
 --     ('the view reads id from the joined documents row (PostgREST embeds need its origin)',
 --      coalesce(pg_get_viewdef('public.library_documents'::regclass) like '%LEFT JOIN %documents o ON %o.id = u.id%', false)),
---     ('the documents SELECT policy evaluates auth.uid() once (wrapped in a SELECT)',
---      exists (select 1 from pg_policy p where p.polrelid = 'public.documents'::regclass
---                and p.polname = 'Users can view own or global-folder documents'
---                and p.polcmd = 'r' and p.polpermissive
---                and pg_get_expr(p.polqual, p.polrelid) like '%( SELECT auth.uid() AS uid) = user_id%'
---                and pg_get_expr(p.polqual, p.polrelid) not like '%(auth.uid() = user_id)%')),
---     ('the documents SELECT policy keeps its three arms and its org gate',
---      exists (select 1 from pg_policy p where p.polrelid = 'public.documents'::regclass
---                and p.polname = 'Users can view own or global-folder documents'
---                and pg_get_expr(p.polqual, p.polrelid) like '%current_user_org_ids()%'
---                and pg_get_expr(p.polqual, p.polrelid) like '%folder_is_org_shared(folder_id)%'
---                and pg_get_expr(p.polqual, p.polrelid) like '%connection_doc_is_visible(source_connection_id, ingest_visibility)%'))
+--     ('the documents SELECT policy''s USING is EXACTLY 208''s (permissive, FOR SELECT, TO authenticated only)',
+--      coalesce((select pg_get_expr(p.polqual, p.polrelid) from pg_policy p
+--                 where p.polrelid = 'public.documents'::regclass
+--                   and p.polname = 'Users can view own or global-folder documents'
+--                   and p.polcmd = 'r' and p.polpermissive
+--                   and p.polroles = array['authenticated'::regrole::oid])
+--               = '((org_id IN ( SELECT current_user_org_ids() AS current_user_org_ids)) AND ((( SELECT auth.uid() AS uid) = user_id) '
+--                 'OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) '
+--                 'OR connection_doc_is_visible(source_connection_id, ingest_visibility)))', false)),
+--     ('exactly ONE permissive policy on documents applies to SELECT for authenticated, and it is 208''s',
+--      coalesce((select array_agg(p.polname::text order by p.polname) from pg_policy p
+--                 where p.polrelid = 'public.documents'::regclass and p.polcmd in ('r', '*')
+--                   and p.polpermissive
+--                   and (p.polroles @> array['authenticated'::regrole::oid] or p.polroles @> array[0::oid]))
+--               = array['Users can view own or global-folder documents'], false)),
+--     ('exactly ONE restrictive policy on documents applies to SELECT for authenticated: documents_agent_read_retrievable',
+--      coalesce((select array_agg(p.polname::text order by p.polname) from pg_policy p
+--                 where p.polrelid = 'public.documents'::regclass and p.polcmd in ('r', '*')
+--                   and not p.polpermissive
+--                   and (p.polroles @> array['authenticated'::regrole::oid] or p.polroles @> array[0::oid]))
+--               = array['documents_agent_read_retrievable'], false))
 --   )
 --   select case when ok then 'PASS' else '*** FAIL ***' end as status, what from checks;
 -- ============================================================================================
