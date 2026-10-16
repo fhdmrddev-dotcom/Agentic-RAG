@@ -268,6 +268,46 @@ async def _rls_intersect(user_id: str, ids: Sequence[str]) -> list[str]:
     return [str(r["id"]) for r in rows]
 
 
+_PAGE = 1000
+
+
+async def _fetch_all(build) -> list[dict]:
+    """Read EVERY row a filter matches: ``count="exact"`` + a ``.range()`` walk.
+
+    Moved here VERBATIM from ``document_search_service`` in Phase 284 (284-04), when Find stopped
+    walking its candidates (it now reads one ranged page of ``library_documents``). This step-1
+    proposer is the only remaining caller and runs on the SERVICE ROLE, which reads zero rows
+    from that view — so it keeps the ``documents`` walk, and its behaviour is unchanged.
+
+    ``build(count)`` returns a FRESH builder (select first, then every filter) for each
+    page — the folder_utils ``fetch_all_folders(strict=True)`` precedent. Ordered by ``id``
+    so pages cannot overlap or skip. The ``isinstance(total, int)`` guard is load-bearing:
+    a missing / non-int count (a test double's MagicMock) is never evidence of truncation.
+    """
+    import logging  # noqa: PLC0415
+
+    # Function-local on purpose: a module-level import of the Find modules re-opens the
+    # tool_dispatcher cycle (Pitfall 5, pinned by test_272_scope_resolver).
+    from app.services.document_search_service import SearchTruncatedError  # noqa: PLC0415
+    from app.utils.db import aexec  # noqa: PLC0415
+
+    first = await aexec(build(True).order("id").range(0, _PAGE - 1))
+    rows = list(first.data or [])
+    total = getattr(first, "count", None)
+    if not isinstance(total, int):
+        return rows
+    while len(rows) < total:
+        page = await aexec(build(False).order("id").range(len(rows), len(rows) + _PAGE - 1))
+        batch = page.data or []
+        if not batch:
+            break
+        rows.extend(batch)
+    if len(rows) < total:
+        logging.getLogger(__name__).warning("document scope read TRUNCATED: %s of %s rows", len(rows), total)
+        raise SearchTruncatedError()
+    return rows
+
+
 async def resolve_document_scope(
     *,
     user_id: str,
@@ -295,7 +335,7 @@ async def resolve_document_scope(
 
     from app.models.document_search import DocumentSearchRequest
     from app.models.document_view import ViewCondition, ViewFilter
-    from app.services.document_search_service import _apply_dates, _fetch_all
+    from app.services.document_search_service import _apply_dates
     from app.services.document_view_resolver import ResolveError, apply_fragments, validate_and_compile
 
     applied = [dict(c) for c in conditions]
