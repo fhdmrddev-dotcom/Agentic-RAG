@@ -466,6 +466,29 @@ async def test_cr01_error_arm_after_own_doc_dedup_keeps_the_marker(mock_pool, mo
     assert m.upsert.call_args_list[-1][1].get("minted") is None
 
 
+# ── 285-REVIEW WR-01 (marker half): a new item whose mint landed but a later step failed ────────
+# The error arm INSERTED the item with `minted` at its default `false`, so the watch's own failed
+# document read as "linked" and a purge before the retry kept it. The orphan-on-re-mint half of
+# WR-01 is deferred (285-REVIEW.md Fix Log).
+
+@pytest.mark.asyncio
+async def test_wr01_new_item_storage_upload_fails_is_marked_minted(
+    mock_pool, mock_supabase, adapter, doc_query
+):
+    minted = uuid4()
+    mock_supabase.storage.from_.return_value.upload.side_effect = RuntimeError("storage down")
+    _, m, _ = await _sync(
+        mock_pool, mock_supabase, adapter, [_file(name="a.txt")], items=[], mint=_mint(minted),
+    )
+
+    m.enqueue.assert_not_awaited()
+    up = m.upsert.call_args_list[-1][1]
+    assert up["state"] == "failed"
+    assert UUID(str(up["document_id"])) == minted
+    assert up.get("minted") is True, "the watch's own failed document was inserted as linked (WR-01)"
+    assert len(_failed_doc_writes(doc_query)) == 1
+
+
 # ── D-03: the summary's shape and bound ─────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
