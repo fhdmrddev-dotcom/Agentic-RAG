@@ -409,7 +409,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 285-03-PLAN.md — FIX-14 enqueue-failure refusal in /upload, heal verified live, 280 guarantees re-pinned, SC#5 OneDrive re-drive (operator OK), bug closes + ledger
+- [x] 285-03-PLAN.md — FIX-14 enqueue-failure refusal in /upload, heal verified live, 280 guarantees re-pinned, SC#5 OneDrive re-drive (operator OK), bug closes + ledger
 
 **Flags**: added at the milestone audit · **security_enforcement** (destructive purge path) · ⛔ G-5: `backend/app/services/ingest_splice.py`, `backend/app/api/documents.py` and `backend/app/api/sources.py` FIRE, so read their ledger sections before planning; `watch_service.py` and `db/ingestion_jobs.py` need a ledger presence check · **measure first**: re-read each bug's cited lines against HEAD before fixing · migration only if needed (next free after **208**, run `ls` first) · repair only: no new user capability, and no retry *policy UI* · cross-check `BUG-261014-05` (minor, `remove_document_bytes` counts) at discuss as a fold candidate.
 **UI hint**: no

@@ -21,9 +21,9 @@ Seeds folded at intake: **SEED-221** (into FIX-10), **SEED-328** (into SEAM-01),
 - [x] **FIX-09**: When an emit step fails, the reported cause is the check that actually failed — never "citations" when citation coverage was 100%. — `BUG-260730-02`
 - [x] **FIX-10**: A publish-gauntlet refusal shows the author the precise reason recorded in `harness_audit`, in plain words, never a machine code. — `BUG-260815-06` + `SEED-221`
 - [x] **FIX-11**: The Library, Find and every document picker stay correct and fast for an account with tens of thousands of documents — the server pages and counts, no request carries a growing id list, and no list is silently cut at the API's 1,000-row cap. — `BUG-261014-06` + `BUG-261014-07` (added 2026-10-14)
-- [ ] **FIX-12**: A watched file whose download fails once is fetched again on a later sync, and until it lands the failure stays visible with its cause; a later sync never reports a clean success over a skipped file. — `BUG-261014-02` (added 2026-10-16)
+- [x] **FIX-12**: A watched file whose download fails once is fetched again on a later sync, and until it lands the failure stays visible with its cause; a later sync never reports a clean success over a skipped file. — `BUG-261014-02` (added 2026-10-16)
 - [x] **FIX-13**: Purging a watch's documents deletes only the documents that watch minted; a hand-uploaded document the watch only dedup-linked to keeps its row and its stored bytes. — `BUG-261014-03` (added 2026-10-16)
-- [ ] **FIX-14**: A document whose ingest never started (no ingestion job) does not absorb later uploads of the same bytes; a re-upload gets the file ingested. — `BUG-261014-04` (added 2026-10-16)
+- [x] **FIX-14**: A document whose ingest never started (no ingestion job) does not absorb later uploads of the same bytes; a re-upload gets the file ingested. — `BUG-261014-04` (added 2026-10-16)
 
 ### v4.5 audit debt (DEBT)
 
@@ -75,9 +75,9 @@ Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not excee
 | FIX-09 | Phase 281 | Complete |
 | FIX-10 | Phase 281 | Complete |
 | FIX-11 | Phase 284 | Complete |
-| FIX-12 | Phase 285 | Pending |
+| FIX-12 | Phase 285 | Complete |
 | FIX-13 | Phase 285 | Complete |
-| FIX-14 | Phase 285 | Pending |
+| FIX-14 | Phase 285 | Complete |
 | DEBT-07 | Phase 281 | Complete |
 | DEBT-08 | Phase 280 | Complete |
 | DEBT-09 | Phase 278 | Complete |
