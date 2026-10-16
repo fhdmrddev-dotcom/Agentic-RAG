@@ -212,7 +212,11 @@ async def test_failed_item_again_failing_increments_attempts(mock_pool, mock_sup
     up = m.upsert.call_args_list[-1][1]
     assert up["state"] == "failed"
     assert up["failed_attempts"] == 2
-    assert up.get("minted") is None  # M-4: the error arm never touches the marker
+    # Amended for 285-REVIEW CR-01: this pin used to read "the error arm never touches the
+    # marker", which agreed with the bug. The error arm now writes the marker whenever the minter
+    # answered (see the test_cr01_* pins); it keeps the stored value ONLY because the read failed
+    # before any mint here, so the item's link is unchanged.
+    assert up.get("minted") is None
     assert up["last_error"] == "ReadTimeout: timed out"
     assert res["counts"]["errors"] == 1
     assert rel["run_error"] == "1 file failed: team-note-058.txt (ReadTimeout)"

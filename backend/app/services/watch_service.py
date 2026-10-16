@@ -116,7 +116,9 @@ def _minted_marker(mint_res: MintResult, existing: dict | None) -> bool | None:
       bump with unchanged bytes, or a retry against a live doc) → `None`, which keeps the stored
       marker. Writing `False` here would downgrade the watch's OWN document to "linked".
     * M-3 — `is_duplicate=True` with another id (a hand upload or another source) → `False`.
-    (M-4: the rename arm, the error arm and `update_item_state` never pass a marker.)
+    (M-4: the rename arm and `update_item_state` never pass a marker. The error arm passes one
+    only when the minter answered this iteration — 285-REVIEW CR-01 — and keeps the stored value
+    otherwise, because only then is its link unchanged.)
     """
     if not mint_res.is_duplicate:
         return True
@@ -619,6 +621,15 @@ class WatchService:
                         state="failed",
                         last_error=err_text,
                         failed_attempts=prior_attempts + 1,
+                        # ⛔ 285-REVIEW CR-01 / WR-01: the marker must describe the document the
+                        # item now points at. When the minter answered this iteration, `doc_id`
+                        # is ITS document — possibly a dedup-matched hand upload — so the same
+                        # M-1..M-3 rule applies here: a fresh mint → True (the watch's own failed
+                        # doc stays purgeable), another doc → False, the item's own doc → None.
+                        # Keeping the stored value is right only when no mint answered, because
+                        # only then is the link unchanged. Before this, a re-link to a hand upload
+                        # kept a stale `true`, M-2 preserved it forever, and a purge deleted it.
+                        minted=_minted_marker(mint_res, existing) if mint_res is not None else None,
                     )
                     # ⛔ ORCHESTRATOR RULING 4 — mark a document failed ONLY when THIS iteration
                     # minted it. Before 285 the fallback id was the item's PREVIOUS document, so a
