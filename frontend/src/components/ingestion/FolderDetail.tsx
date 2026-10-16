@@ -1,10 +1,20 @@
 import { Globe, FileText, FolderIcon, Calendar, HardDrive } from "lucide-react"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
-import type { Folder, Document } from "@/types"
+import type { Folder } from "@/types"
 
+/**
+ * Phase 284-01 (D-07 / D-12 / UI-SPEC S5) — the band takes NUMBERS, not the folder's documents:
+ * the summary's count and size, plus the summary read's state. `null` is "not answered", never 0.
+ *   ready   — the shipped "N document(s)" + formatted size
+ *   loading — `…` in each of the two number slots
+ *   error   — ONE span of UI-SPEC S5's failure copy in place of both; the badge, subfolders and Created date
+ *             stay, because they come from the folder and not the summary.
+ */
 interface FolderDetailProps {
   folder: Folder
-  documents: Document[]
+  count: number | null
+  sizeBytes: number | null
+  state: "loading" | "ready" | "error"
   subfolderCount: number
 }
 
@@ -24,9 +34,8 @@ function formatDate(iso: string): string {
   })
 }
 
-export function FolderDetail({ folder, documents, subfolderCount }: FolderDetailProps) {
-  const docCount = documents.length
-  const totalSize = documents.reduce((sum, d) => sum + (d.file_size ?? 0), 0)
+export function FolderDetail({ folder, count, sizeBytes, state, subfolderCount }: FolderDetailProps) {
+  const known = state === "ready" && count !== null && sizeBytes !== null
 
   return (
     <div className="flex items-center gap-4 px-4 py-2.5 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
@@ -36,14 +45,29 @@ export function FolderDetail({ folder, documents, subfolderCount }: FolderDetail
           Shared with org
         </span>
       )}
-      <span className="inline-flex items-center gap-1">
-        <FileText className="h-3.5 w-3.5" />
-        <AnimatedNumber value={docCount} /> {docCount === 1 ? "document" : "documents"}
-      </span>
-      <span className="inline-flex items-center gap-1">
-        <HardDrive className="h-3.5 w-3.5" />
-        {formatBytes(totalSize)}
-      </span>
+      {state === "error" ? (
+        <span className="inline-flex items-center gap-1">
+          <FileText className="h-3.5 w-3.5" />
+          Count not known yet
+        </span>
+      ) : (
+        <>
+          <span className="inline-flex items-center gap-1">
+            <FileText className="h-3.5 w-3.5" />
+            {known ? (
+              <>
+                <AnimatedNumber value={count} /> {count === 1 ? "document" : "documents"}
+              </>
+            ) : (
+              "…"
+            )}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <HardDrive className="h-3.5 w-3.5" />
+            {known ? formatBytes(sizeBytes) : "…"}
+          </span>
+        </>
+      )}
       {subfolderCount > 0 && (
         <span className="inline-flex items-center gap-1">
           <FolderIcon className="h-3.5 w-3.5" />

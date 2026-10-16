@@ -115,6 +115,14 @@ export {
   // consumer imports these from `@/lib/api/documents`, never from here (196-08).
   searchDocuments,
   DocumentSearchError,
+  // Phase 284 (FIX-11 / D-01 / D-11 / D-16 / D-17) — the paged reads. Same barrel rule.
+  listDocumentsPage,
+  getDocument,
+  DocumentListError,
+  listDocumentChunksPage,
+  listDocumentTablesPage,
+  listDocumentImagesPage,
+  fetchDocumentVersionsPage,
 } from "./api/documents"
 
 // ── skills ─────────────────────────────────────────────────────────
@@ -257,6 +265,8 @@ export type {
 // ── library ─────────────────────────────────────────────────────────
 export {
   getIndexSummary,
+  // Phase 284 (FIX-11 / D-02) — every Library number without listing a row.
+  getLibrarySummary,
   listCheckedQueries,
   createCheckedQuery,
   triggerCheck,
