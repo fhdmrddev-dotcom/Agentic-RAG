@@ -3,9 +3,9 @@ seed_id: SEED-289
 title: Tool calling is OFF by default for local/self-hosted models on a GUESS — and all three providers can be ASKED instead
 created: 2026-09-16
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Reviewed at Phase 282 discuss (2026-10-15) and left: sibling defect on the same 13 rowless local models, but a capability-resolution change, not the client-boundary timeout 282 fixes. Re-open at the next phase touching model capability resolution or discovery."
 trigger_when: Any phase touching model capability resolution, model discovery, or the Model Registry. ⛔ ALSO fires at the next milestone scoping — the operator directed this outcome on 2026-09-16 after seeing the measured 15.
 trigger_paths: ["backend/app/config.py", "backend/app/services/model_discovery_service.py", "backend/app/api/admin.py", "backend/app/api/settings.py", "frontend/src/components/admin/ModelRegistryTab.tsx", "**/llm_service.py"]
 trigger_surfaces: ["settings", "admin", "chat", "provider-routing"]

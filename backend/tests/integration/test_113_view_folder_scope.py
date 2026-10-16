@@ -28,6 +28,8 @@ import asyncpg
 import pytest
 import pytest_asyncio
 
+from tests.integration._284_route_users import RouteUsers, as_user
+
 
 _POSTGRES_TEST_DSN = os.environ.get(
     "POSTGRES_DSN",
@@ -129,27 +131,20 @@ async def pg_pool():
 
 @pytest_asyncio.fixture
 async def test_user(pg_pool):
-    """Seed a throwaway auth.users row; FK-safe teardown (docs + folders + views + user)."""
-    user_id = uuid4()
+    """A REAL signed-in user (GoTrue); FK-safe teardown (docs + folders + views + user + org).
+
+    284-04 (D-10 / R-02): the resolve route reads ``library_documents`` through the CALLER's JWT,
+    and a service-role caller reads 0 rows from it (fail-closed), so the route is driven with
+    ``as_user(test_user)``. Seeding and ``create_view`` still go through the service role.
+    """
+    users = RouteUsers(pg_pool)
     try:
-        await pg_pool.execute(
-            "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
-            user_id, f"phase-113-scope-{user_id}@test.local",
-        )
+        user_id = await users.create("113-scope")
     except Exception as e:
+        await users.drop_all()
         pytest.skip(f"test_user fixture setup failed: {type(e).__name__}: {e}")
     yield user_id
-    for sql in (
-        ("DELETE FROM public.documents WHERE user_id = $1", user_id),
-        ("DELETE FROM public.document_views WHERE user_id = $1", user_id),
-        ("DELETE FROM public.folders WHERE user_id = $1", user_id),
-        ("DELETE FROM audit_log WHERE user_id = $1", user_id),
-        ("DELETE FROM auth.users WHERE id = $1", user_id),
-    ):
-        try:
-            await pg_pool.execute(*sql)
-        except Exception:
-            pass
+    await users.drop_all()
 
 
 async def _seed_folder(pool, user_id, name, parent_id=None):
@@ -200,7 +195,7 @@ async def test_folder_scope_narrows_to_subtree(pg_pool, test_user):
         user_id=test_user, name="Scoped", filter_expr=ViewFilter(op="and", conditions=[]).model_dump(),
         folder_scope=root, supabase=sb,
     )
-    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user))
     ids = {d["id"] for d in out["documents"]}
 
     assert str(doc_root) in ids, "root-folder doc must be in the subtree"
@@ -244,7 +239,7 @@ async def test_unreachable_scope_contributes_no_narrowing(pg_pool, test_user):
             folder_scope=other_folder, supabase=sb,
         )
         out = await resolve_view(
-            view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb
+            view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=as_user(test_user)
         )
         ids = {d["id"] for d in out["documents"]}
 

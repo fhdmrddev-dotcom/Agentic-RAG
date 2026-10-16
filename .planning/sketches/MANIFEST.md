@@ -2964,3 +2964,9 @@ reuses 267-B's event-card shape.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 275 | retention-legal-hold | Retention tab layout, policy editor + dry run, human-approved delete queue, Library visibility of retention/hold/archive | ★ 1B sub-tabs · 2B Preview-gated form · 3A batch + type-the-count · 4B chips + folder line (operator, 2026-10-12) | phase-275, retention, legal-hold, dry-run, org-admin |
+
+## Sketch 282 — One Answer Input (Phase 282, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 282 | one-answer-input | Where the ONE ask_user input lives per panel state (open / rail / workflow pause), with one shared draft | ★ A input follows the open panel (autonomous pick 2026-10-15; operator confirmation owed at G-4) | phase-282, fix-07, ask_user, a11y |

@@ -9,7 +9,7 @@ affected_areas: [frontend/navigation, frontend/layout, frontend/settings, fronte
 folded_into: null
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Reviewed at Phase 283 discuss (2026-10-15), left open: an IA reorganisation (settings into the user menu) belongs with SEED-166 / SEED-196, not a FIX phase. Re-open when a phase takes configuration-homes IA."
 reproduces_on:
   branch: production
   commit: dea7f5539

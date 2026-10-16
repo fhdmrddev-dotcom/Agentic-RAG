@@ -70,7 +70,8 @@ async def test_well_formed_inline_filter_routes_to_resolve(make_tool_context, mo
 
     called = {}
 
-    async def _spy_resolve(*, caller, flt, folder_scope, count_only, supabase, retrievable_only=False):  # 275-02: the agent handler passes retrievable_only=True (D-36)
+    async def _spy_resolve(*, caller, flt, folder_scope, count_only, supabase, retrievable_only=False,
+                           via_view=False, limit=None):  # 275-02: retrievable_only=True (D-36); 284-04: via_view=False + limit (R-02)
         called["hit"] = True
         called["caller"] = caller
         if count_only:
@@ -95,7 +96,8 @@ async def test_bad_limit_string_does_not_raise_into_loop(make_tool_context, monk
     import app.services.tools.documents as td
     from app.services.tool_dispatcher import ToolResult, _handle_query_documents_by_view
 
-    async def _spy_resolve(*, caller, flt, folder_scope, count_only, supabase, retrievable_only=False):  # 275-02: the agent handler passes retrievable_only=True (D-36)
+    async def _spy_resolve(*, caller, flt, folder_scope, count_only, supabase, retrievable_only=False,
+                           via_view=False, limit=None):  # 275-02: retrievable_only=True (D-36); 284-04: via_view=False + limit (R-02)
         return {"total": 0} if count_only else {"documents": [], "total": 0}
 
     monkeypatch.setattr(td, "resolve_filter", _spy_resolve, raising=False)

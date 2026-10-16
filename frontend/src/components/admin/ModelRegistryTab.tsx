@@ -33,6 +33,11 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, Check, ChevronDown, Loader2, Lock, Plus, RotateCcw, Trash2, Unlock } from "lucide-react"
 
 import { ApiError, type AddModelBody, type ModelCapabilityPatch, type ModelRegistryRow } from "@/lib/api"
+import {
+  MODEL_TIMEOUT_DEFAULT_S,
+  MODEL_TIMEOUT_DEFAULT_SELF_HOSTED_S,
+  MODEL_TIMEOUT_HELP_LINE,
+} from "@/lib/api/admin"
 import { familyDefaults } from "@/lib/model-defaults"
 import { providerLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
@@ -583,7 +588,23 @@ function ModelRow({
         </td>
       </tr>
 
-      {/* The in-row 409 plain-language refusal — never a silent failure (D-149-09). */}
+      {/* Phase 282 D-22: the Timeout help line — only while that cell edits (a table-fixed
+          10% column has no room for a permanent line). Sits ABOVE the refusal slot. */}
+      {editing === "llm_call_timeout_seconds" && (
+        <tr>
+          <td colSpan={NUM_FIELDS.length + 6} className="border-t-0 px-4 pb-2">
+            <span
+              id={`timeout-help-${id}`}
+              data-testid="timeout-help"
+              className="text-[11px] leading-4 text-muted-foreground"
+            >
+              {MODEL_TIMEOUT_HELP_LINE}
+            </span>
+          </td>
+        </tr>
+      )}
+
+      {/* The in-row 409/422 plain-language refusal — never a silent failure (D-149-09). */}
       {errorDetail && (
         <tr data-model-error={id}>
           <td colSpan={NUM_FIELDS.length + 6} className="border-t-0 px-4 pb-2">
@@ -737,6 +758,7 @@ function NumericCell({
         ref={inputRef}
         type="number"
         aria-label={`${field.label} for ${modelId}`}
+        aria-describedby={field.key === "llm_call_timeout_seconds" ? `timeout-help-${modelId}` : undefined}
         defaultValue={value === null ? "" : String(value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -1448,6 +1470,8 @@ function AddModelForm({
   const [toolsDraft, setToolsDraft] = useState<"unknown" | "native" | "none">("unknown")
   const [touched, setTouched] = useState({ ctx: false, out: false, tools: false })
   const [note, setNote] = useState("")
+  // Phase 282 D-29: blank = store nothing, so the resolver default (the placeholder) applies.
+  const [timeoutDraft, setTimeoutDraft] = useState("")
   const [busy, setBusy] = useState(false)
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
 
@@ -1484,6 +1508,14 @@ function AddModelForm({
       setErrorDetail("Enter a model id.")
       return
     }
+    // 282-REVIEW WR-05: send exactly what was typed. parseInt read "1e3" as 1 and "900.5" as 900 —
+    // both legal, so the server saved a timeout the operator never chose. A whole number (sign
+    // allowed, so 0 / -5 still reach the server's range sentence) or blank; anything else stops here.
+    const timeoutTyped = timeoutDraft.trim()
+    if (timeoutTyped !== "" && !/^-?\d+$/.test(timeoutTyped)) {
+      setErrorDetail("Timeout must be a whole number of seconds.")
+      return
+    }
     setBusy(true)
     setErrorDetail(null)
     // Build by conditional inclusion — start from {model_id, provider}; NEVER add `enabled`.
@@ -1492,6 +1524,7 @@ function AddModelForm({
     if (ctx !== undefined) body.context_window_tokens = ctx
     const out = numOrUndef(outValue)
     if (out !== undefined) body.max_output_tokens = out
+    if (timeoutTyped !== "") body.llm_call_timeout_seconds = Number(timeoutTyped)
     if (toolsValue === "native") body.native_tools = true
     else if (toolsValue === "none") body.native_tools = false
     // OMIT native_tools entirely on "unknown" (never a bare false).
@@ -1610,6 +1643,24 @@ function AddModelForm({
             <option value="none">none</option>
           </select>
           <CapSourceTag source={toolsSource} />
+        </CapField>
+        {/* Phase 282 D-29: local models are slower, so the Timeout can be set at add time. The
+            placeholder is the default a blank field means — read from the admin.ts mirror. */}
+        <CapField label="Timeout">
+          {/* ⚠ No native min/max: the browser would block 1801 with its own generic bubble and the
+              operator would never read WHY (the run watchdog). The server's sentence shows in this
+              form's role=alert instead — the same rule the table cell follows (no client pre-block). */}
+          <input
+            type="number"
+            value={timeoutDraft}
+            placeholder={String(
+              SELF_HOSTED_PROVIDERS.has(provider) ? MODEL_TIMEOUT_DEFAULT_SELF_HOSTED_S : MODEL_TIMEOUT_DEFAULT_S,
+            )}
+            aria-label="Timeout seconds"
+            onChange={(e) => setTimeoutDraft(e.target.value)}
+            className="w-24 rounded-[6px] border border-border bg-background px-2 py-1 font-mono text-xs text-foreground placeholder:text-muted-foreground/50"
+          />
+          <span className="text-[10px] text-muted-foreground">s · blank = default</span>
         </CapField>
       </div>
 

@@ -23,9 +23,10 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { Check, Folder as FolderIcon } from "lucide-react"
-import type { Document, Folder, ViewCondition } from "@/types"
+import type { Folder, ViewCondition } from "@/types"
 import { cn } from "@/lib/utils"
 import { LinkTargetCombobox } from "@/components/relationships/LinkTargetCombobox"
+import { useDocumentFind } from "@/hooks/useDocumentFind"
 import {
   RELATIONSHIP_FILTER_VERBS,
   type RelVerbKey,
@@ -231,15 +232,15 @@ export function VersionEditor({
 
 const NO_EXCLUDED: ReadonlySet<string> = new Set()
 
+/** How many candidates the Find relationship picker shows (271 UI-SPEC S6). */
+const RELATIONSHIP_VISIBLE = 8
+
 export function RelationshipEditor({
   initial,
-  documents,
   onApply,
   onCancel,
 }: {
   initial?: FindRelationshipCondition | null
-  /** The documents the person can see. Only LATEST versions are offered as the target. */
-  documents: readonly Document[]
   onApply: (relationship: FindRelationshipCondition) => void
   onCancel: () => void
 }) {
@@ -249,9 +250,25 @@ export function RelationshipEditor({
   )
   const name = useId()
   const inputId = useId()
-  // The target is a DOCUMENT, so only its latest version is offered (UI-SPEC S6): an older
-  // upload is reached through Version, never through a relationship.
-  const candidates = useMemo(() => documents.filter((d) => d.is_latest !== false), [documents])
+  // 284-04 (D-15 / R-05 / UI-SPEC S12): the candidates are ONE server search per debounced query —
+  // never the page's documents. The target is a DOCUMENT, so only its latest version is offered
+  // (UI-SPEC S6, now the server's `version: "latest"`): an older upload is reached through Version,
+  // never through a relationship. Archived documents stay offered (today's candidate set).
+  const [query, setQuery] = useState(initial?.documentName ?? "")
+  const typed = query.trim()
+  const find = useDocumentFind({
+    request: {
+      filter_expr: { op: "and", conditions: [] },
+      name: typed === "" ? null : typed,
+      version: "latest",
+      sort: "added_desc",
+      offset: 0,
+      limit: 20,
+      include_archived: true,
+    },
+    debounceMs: 250,
+  })
+  const shown = Math.min(find.rows.length, RELATIONSHIP_VISIBLE)
 
   return (
     <EditorShell
@@ -283,7 +300,7 @@ export function RelationshipEditor({
           …this document
         </label>
         <LinkTargetCombobox
-          candidates={candidates}
+          candidates={find.rows}
           excludeIds={NO_EXCLUDED}
           value={target?.id ?? null}
           onChoose={(d) => setTarget(d ? { id: d.id, filename: d.filename } : null)}
@@ -291,6 +308,12 @@ export function RelationshipEditor({
           maxVisible={8}
           inputId={inputId}
           initialQuery={initial?.documentName ?? ""}
+          onQueryChange={setQuery}
+          loading={find.loading}
+          error={find.error !== null}
+          hasMore={find.total !== null && find.total > shown}
+          onRetry={find.retry}
+          statusClassName="text-muted-foreground"
         />
       </div>
       <p className="text-xs text-muted-foreground">
@@ -400,38 +423,66 @@ export function FolderEditor({
 
 // ── ADDED BY (T-271-11: never an email) ───────────────────────────────────────────────
 
+/** Phase 284-01 (D-07 / R-03 / UI-SPEC S12) — the state of a summary list an editor reads. */
+export type EditorListState = "loading" | "ready" | "error"
+
+/** The two honest arms a summary-fed editor shows in place of its list (UI-SPEC S12): a
+ *  `role="status"` "Loading…" while the summary loads, and a `role="alert"` with "Try again"
+ *  after it failed — never the empty state, which would claim there is nothing to offer. */
+function ListStateLine({ state, onRetry }: { state: EditorListState; onRetry?: () => void }) {
+  if (state === "loading") {
+    return (
+      <p role="status" aria-live="polite" className="mt-1 text-xs text-muted-foreground">
+        Loading…
+      </p>
+    )
+  }
+  if (state === "error") {
+    return (
+      <p role="alert" className="mt-1 text-xs text-muted-foreground">
+        Couldn’t load this list.{" "}
+        <button type="button" onClick={onRetry} className="text-xs text-primary hover:underline">
+          Try again
+        </button>
+      </p>
+    )
+  }
+  return null
+}
+
 export function AddedByEditor({
   initial,
-  documents,
+  connections,
+  listState = "ready",
+  onRetry,
   onApply,
   onCancel,
 }: {
   initial?: FindAddedByCondition | null
-  /** The connections offered are the distinct ones that placed these documents. */
-  documents: readonly Document[]
+  /** The distinct connections that placed the caller's documents (`LibrarySummary.connections`). */
+  connections: readonly { id: string; name: string | null; count: number }[]
+  listState?: EditorListState
+  onRetry?: () => void
   onApply: (addedBy: FindAddedByCondition) => void
   onCancel: () => void
 }) {
   const options = useMemo<FindAddedByCondition[]>(() => {
-    const connections = new Map<string, string>()
-    for (const d of documents) {
-      if (d.source_connection_id && !connections.has(d.source_connection_id)) {
-        // The connection's NAME, never a person's address (270 P-02).
-        connections.set(
-          d.source_connection_id,
-          `${d.source_connection_name ?? "Unnamed connection"} (connected source)`,
-        )
-      }
-    }
-    const connectionOptions = [...connections.entries()]
-      .sort((a, b) => a[1].localeCompare(b[1]))
-      .map(([id, label]): FindAddedByCondition => ({ kind: "connection", connectionId: id, label }))
+    // 284-01: the distinct-connection derivation moved to `summarizeDocuments` / the server;
+    // the label format and the sort are unchanged. The connection's NAME, never a person's
+    // address (270 P-02).
+    const connectionOptions =
+      listState === "ready"
+        ? connections
+            .map((c) => ({ id: c.id, label: `${c.name ?? "Unnamed connection"} (connected source)` }))
+            .sort((a, b) => a.label.localeCompare(b.label))
+            .map(({ id, label }): FindAddedByCondition => ({ kind: "connection", connectionId: id, label }))
+        : []
     return [
       { kind: "me", connectionId: null, label: "You" },
       ...connectionOptions,
       { kind: "others", connectionId: null, label: "Anyone else" },
     ]
-  }, [documents])
+  }, [connections, listState])
 
   const keyOf = (o: FindAddedByCondition) => `${o.kind}:${o.connectionId ?? ""}`
   const [choice, setChoice] = useState<string | null>(initial ? keyOf(initial) : null)
@@ -459,6 +510,7 @@ export function AddedByEditor({
           />
         ))}
       </div>
+      <ListStateLine state={listState} onRetry={onRetry} />
     </EditorShell>
   )
 }
@@ -626,26 +678,33 @@ function typesOf(condition: ViewCondition | undefined): string[] {
 
 export function DocumentTypeEditor({
   initial,
-  documents,
+  documentTypes,
+  listState = "ready",
+  onRetry,
   onApply,
   onCancel,
 }: {
   /** The filter's existing `document_type` condition, when there is one. */
   initial?: ViewCondition
-  documents: readonly Document[]
+  /** The distinct recorded document types (`LibrarySummary.document_types`). */
+  documentTypes: readonly { value: string; count: number }[]
+  listState?: EditorListState
+  onRetry?: () => void
   onApply: (condition: ViewCondition) => void
   onCancel: () => void
 }) {
   const options = useMemo(() => {
     // A type the filter already holds is always offered, even if no loaded document carries
     // it now — otherwise the person could not untick the condition they are looking at.
+    // 284-01: the distinct-type derivation moved to `summarizeDocuments` / the server.
     const set = new Set<string>(typesOf(initial))
-    for (const d of documents) {
-      const t = d.metadata?.document_type
-      if (typeof t === "string" && t.trim() !== "") set.add(t)
+    if (listState === "ready") {
+      for (const t of documentTypes) {
+        if (t.value.trim() !== "") set.add(t.value)
+      }
     }
     return [...set].sort((a, b) => a.localeCompare(b))
-  }, [documents, initial])
+  }, [documentTypes, initial, listState])
   const [picked, setPicked] = useState<string[]>(() => typesOf(initial))
 
   // Keep the person's pick order stable by reading it through the option order.
@@ -665,8 +724,9 @@ export function DocumentTypeEditor({
       }}
     >
       <Heading>Document type</Heading>
+      {listState !== "ready" && <ListStateLine state={listState} onRetry={onRetry} />}
       {options.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No document types recorded yet.</p>
+        listState === "ready" && <p className="text-xs text-muted-foreground">No document types recorded yet.</p>
       ) : (
         <div className="max-h-56 space-y-1 overflow-y-auto">
           {options.map((o) => (

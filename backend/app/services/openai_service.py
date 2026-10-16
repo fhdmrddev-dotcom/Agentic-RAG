@@ -4,9 +4,15 @@ import logging
 from enum import Enum
 from typing import TYPE_CHECKING
 
+import httpx
 from openai import OpenAI
 
 from app.config import settings, get_model_capability, API_SURFACES, MODEL_CAPABILITIES
+from app.config import (
+    LLM_CONNECT_TIMEOUT_S,
+    NO_BUDGET_LLM_MAX_RETRIES,
+    NO_BUDGET_LLM_TIMEOUT_S,
+)
 # Phase 273 (I-1) — the show_artifact enums are derived from the closed Literals (pydantic +
 # stdlib only; no cycle).
 from app.models.artifact import ARTIFACT_COMPONENTS, CHART_KINDS
@@ -1126,7 +1132,16 @@ ASK_USER_TOOL = {
                     "items": {"type": "string"},
                     "description": "Optional. Multiple-choice options. If provided, panel renders as buttons; user can still type free-text.",
                 },
-                "timeout_seconds": {"type": ["integer", "null"], "description": "Optional. Maximum seconds to wait. Server clamps."},
+                "timeout_seconds": {
+                    "type": ["integer", "null"],
+                    # BUG-261015-03: required by strict mode, so the text must say what to pass.
+                    "description": (
+                        "Pass null unless the user asked for a specific deadline. null waits "
+                        f"{settings.ask_user_min_timeout_seconds} seconds. The server raises any value "
+                        f"below {settings.ask_user_min_timeout_seconds} to {settings.ask_user_min_timeout_seconds} "
+                        f"and caps it at {settings.ask_user_max_timeout_seconds}."
+                    ),
+                },
             },
             "required": ["prompt", "options", "timeout_seconds"],
         },
@@ -1445,7 +1460,17 @@ def get_explorer_tools() -> list[dict]:
     return [LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL]
 
 
-def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
+def get_llm_client(
+    user_settings: UserEffectiveSettings | None = None,
+    *,
+    timeout_s: float | None = None,
+    max_retries: int | None = None,
+) -> OpenAI:
+    # Phase 282 (FIX-06, D-01/D-02/D-03): the per-model budget goes into the CONSTRUCTOR —
+    # read/write/pool = the budget, connect short — and the retry count is chosen, never
+    # inherited. Callers with no budget get the NAMED no-budget constants (today's values).
+    # ⛔ Set here, BEFORE wrap_openai — never by re-deriving a client after the wrap (the
+    # derived copy is unwrapped and drops LangSmith tracing).
     # Phase 075.1 Plan 04 (B-260519-04 second half) — capture provider context
     # so the LangSmith wrap can distinguish OpenRouter / Ollama (both routed
     # via the OpenAI-compatible API) from native OpenAI traces.
@@ -1459,6 +1484,9 @@ def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI
         if settings.llm_base_url:
             kwargs["base_url"] = settings.llm_base_url
         provider = "openai"
+    _t = NO_BUDGET_LLM_TIMEOUT_S if timeout_s is None else float(timeout_s)
+    kwargs["timeout"] = httpx.Timeout(_t, connect=min(LLM_CONNECT_TIMEOUT_S, _t))
+    kwargs["max_retries"] = NO_BUDGET_LLM_MAX_RETRIES if max_retries is None else max_retries
     client = OpenAI(**kwargs)
     # Auto-trace all LLM calls (inputs, system prompt, tools, outputs) via LangSmith
     # when a LangSmith API key is configured. Best-effort — never blocks startup.
@@ -1496,6 +1524,12 @@ def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> 
     kwargs: dict = {"api_key": api_key}
     if base_url:
         kwargs["base_url"] = base_url
+    # Phase 282 D-23: no per-model budget on the embedding path — the named no-budget values,
+    # explicit instead of inherited by omission (value-identical to the SDK defaults).
+    kwargs["timeout"] = httpx.Timeout(
+        NO_BUDGET_LLM_TIMEOUT_S, connect=min(LLM_CONNECT_TIMEOUT_S, NO_BUDGET_LLM_TIMEOUT_S)
+    )
+    kwargs["max_retries"] = NO_BUDGET_LLM_MAX_RETRIES
     return OpenAI(**kwargs)
 
 
@@ -2205,6 +2239,8 @@ def create_adaptive_streaming_chat(
     max_tokens: int | None = None,
     force_tool_name: str | None = None,
     strict_response_format: bool = False,
+    timeout_s: float | None = None,
+    max_retries: int | None = None,
 ) -> tuple:
     """Returns (stream, calling_mode). calling_mode indicates how to parse the response.
 
@@ -2215,8 +2251,14 @@ def create_adaptive_streaming_chat(
     (strict ``response_format`` built from the forced tool's parameters). Both are
     ADDITIVE — the defaults (None / False) preserve the byte-identical ``"auto"`` path
     (Deep + every pre-101.1 caller unchanged). This is the openai-compat ADAPTER's own
-    request construction — NOT the shared chunk/SSE path (the D-14 RED LINE)."""
-    client = get_llm_client(user_settings)
+    request construction — NOT the shared chunk/SSE path (the D-14 RED LINE).
+
+    Phase 282 (FIX-06): ``timeout_s`` / ``max_retries`` are forwarded to the client ONLY when
+    a budget is set, so a caller (or a test fake) that never passes one is byte-identical."""
+    if timeout_s is None:
+        client = get_llm_client(user_settings)
+    else:
+        client = get_llm_client(user_settings, timeout_s=timeout_s, max_retries=max_retries)
     effective_model = model or (user_settings.llm_model if user_settings else None) or settings.llm_model
     # Phase 149 D-149-15 (BUG-260620-01): clamp against the EFFECTIVE model actually
     # sent + an operator's DB-edited max_output_tokens. The DB cap is read sync from

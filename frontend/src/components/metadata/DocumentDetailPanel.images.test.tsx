@@ -11,7 +11,7 @@
  * warning on every document in the library and teach people to ignore it.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, cleanup } from "@testing-library/react"
+import { render, screen, cleanup, fireEvent, within } from "@testing-library/react"
 import type { Document, MetadataFieldDef } from "@/types"
 
 vi.mock("@/lib/supabase", () => ({
@@ -30,6 +30,8 @@ const listMetadataFields = vi.fn<() => Promise<MetadataFieldDef[]>>()
 const updateDocumentMetadata = vi.fn<() => Promise<Document>>()
 const listRelationships = vi.fn()
 const listDocuments = vi.fn()
+// 284-03 (D-17): the Images section reads ONE page through the page client.
+const listDocumentImagesPage = vi.fn()
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
   return {
@@ -38,6 +40,7 @@ vi.mock("@/lib/api", async () => {
     updateDocumentMetadata: (...a: unknown[]) => updateDocumentMetadata(...(a as [])),
     listRelationships: (...a: unknown[]) => listRelationships(...(a as [])),
     listDocuments: (...a: unknown[]) => listDocuments(...(a as [])),
+    listDocumentImagesPage: (...a: unknown[]) => listDocumentImagesPage(...a),
   }
 })
 
@@ -134,5 +137,28 @@ describe("DocumentDetailPanel — unread images (SEED-227)", () => {
     const notice = await screen.findByText(/were read/i)
     expect(notice).toBeInTheDocument()
     expect(notice.textContent).toMatch(/re-upload/i)
+  })
+
+  // 284-03 (D-17 / UI-SPEC S10): the Images SECTION is bounded too, and says when it shows part.
+  // A different fact from the SEED-227 notice above (descriptions written vs images read).
+  it("the Images section counts the server's total and names how many it shows", async () => {
+    listDocumentImagesPage.mockResolvedValue({
+      images: Array.from({ length: 100 }, (_, i) => ({ id: `i${i}`, page: 1, image_index: i, description: `d${i}` })),
+      total: 340,
+      offset: 0,
+      limit: 100,
+    })
+    render(<DocumentDetailPanel doc={makeDoc({ title: "Site drawings" })} onClose={() => {}} />)
+    expect(await screen.findByText("Site drawings")).toBeInTheDocument()
+    const head = screen
+      .getAllByRole("button")
+      .find((b) => b.hasAttribute("aria-expanded") && (b.textContent ?? "").startsWith("Images"))
+    if (!head) throw new Error("no Images section head")
+    fireEvent.click(head)
+    expect(
+      await screen.findByText("340 image descriptions in this document, showing the first 100"),
+    ).toBeInTheDocument()
+    expect(within(head).getByText("340")).toBeInTheDocument()
+    expect(listDocumentImagesPage).toHaveBeenCalledWith("doc-images-1", { offset: 0, limit: 100 })
   })
 })

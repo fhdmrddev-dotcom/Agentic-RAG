@@ -61,6 +61,17 @@ export function entitlementRefusalMessage(body: unknown): string | null {
     : typeof d.upgrade_hint === "string" ? d.upgrade_hint : `Your plan doesn't include ${cap}.`
 }
 
+/** 281-REVIEW WR-03 (D-24): a TYPED signal that the thrown message is the sentence
+ *  `entitlementRefusalMessage` wrote for a person. A surface that renders a thrown message as
+ *  words (the describe door) trusts ONLY this; every other throw (`Failed to fetch`, a status
+ *  line) is machine-flavoured and is worded by the surface's own table. */
+export class EntitlementRefusalError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "EntitlementRefusalError"
+  }
+}
+
 /** Phase 092 (092-06 / F3): a status-carrying error so the send path can
  *  distinguish a 409 lock-refusal (MODE-02 server-side Harness→Deep refusal)
  *  from a generic failure. Mirrors the existing DownloadError idiom (status +

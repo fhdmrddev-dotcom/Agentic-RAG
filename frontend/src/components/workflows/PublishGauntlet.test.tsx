@@ -65,6 +65,9 @@ import {
   STAGE_NOT_REACHED,
   STAGE_PASSED,
 } from "./publishRefusalVocabulary"
+// Phase 281-03 (D-28): the two next-step lines, IMPORTED — the card picks one by whether the
+// run link exists, and a re-typed sentence would go green against a re-worded constant.
+import { BLOCKED_STEP_NEXT, BLOCKED_STEP_NEXT_NO_RUN } from "./publishBlockedStep"
 import type { PublishOutcome } from "@/lib/api"
 import { publishWorkflow } from "@/lib/api"
 
@@ -202,7 +205,9 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
       kind: "verdict",
       verdict: { published: true, version: 2, golden_run_id: "a7f3c1d2-run", blocked_stage: null, named_failures: [] },
     } satisfies PublishOutcome)
-    render(<PublishGauntlet definitionId="def-1" />)
+    // Phase 281 (D-28): the run link now renders only when onOpenRun is present — the flag-off
+    // arm renders none; re-pinned on purpose, not quietly edited.
+    render(<PublishGauntlet definitionId="def-1" onOpenRun={vi.fn()} />)
     await doPublish()
 
     await waitFor(() => expect(screen.getByTestId("publish-success")).toBeInTheDocument())
@@ -800,7 +805,9 @@ describe("PublishGauntlet — a draft that moved mid-gauntlet blocks at the Comm
 
   it("blocks AT the Commit node, passes every check before it, and leads with a plain sentence", async () => {
     mockedPublish.mockResolvedValue(draftChangedBlock)
-    render(<PublishGauntlet definitionId="def-1" />)
+    // Phase 281 (D-28): the run link now renders only when onOpenRun is present — the flag-off
+    // arm renders none; re-pinned on purpose, not quietly edited.
+    render(<PublishGauntlet definitionId="def-1" onOpenRun={vi.fn()} />)
     await doPublish()
 
     await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
@@ -1924,5 +1931,135 @@ describe("PublishGauntlet 214.1-03 — BUG-260828-04 diagnosed against the LIVE 
     const text = screen.getByTestId("publish-modal").textContent ?? ""
     expect(text).toContain("declares no matching input")
     expect(text).not.toContain(LIVE_SENTENCE)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// Phase 281-03 (FIX-10 · BUG-260815-06 #4 · D-07 / D-08 / D-28 / D-29 / D-04) — THE GOLDEN-RUN
+// LINK EXISTS ONLY WHERE THE RUN SURFACE DOES.
+//
+// The link used to be a disabled button reading "(view coming soon)" — a promise on a surface
+// that refuses to publish. It now renders by PROP PRESENCE (the SEED-190 `RunLogPanel`
+// precedent): `onOpenRun` present ⇒ an enabled control that opens the exact run that was judged;
+// absent ⇒ nothing, and no promise in its place. The words are the deliverable, so every case
+// below asserts rendered CONTENT, never presence by testid alone.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+describe("PublishGauntlet 281-03 — the golden-run link opens the run, or is absent", () => {
+  const GOLDEN_RUN_ID = "a7f3c1d2-9e8b-4c1a-b2d3-000000000281"
+  /** The 281-01 composed cause shape: a header line, then one bullet per distinct failure. */
+  const COMPOSED_CAUSE =
+    'Step "Write the summary" failed after 2 attempt(s):\n• 2 attempt(s) — the model left template fields empty. Check the step\'s prompt.'
+
+  function blockedWithRun(): PublishOutcome {
+    return {
+      kind: "verdict",
+      verdict: {
+        published: false,
+        version: null,
+        golden_run_id: GOLDEN_RUN_ID,
+        blocked_stage: "structural_gate",
+        named_failures: [],
+        blocked_step: {
+          step_slug: "write-summary",
+          step_index: 0,
+          step_name: "Write the summary",
+          reason: `Phase 1 (write-summary) gate failed after 2 attempt(s): ${COMPOSED_CAUSE}`,
+          cause: COMPOSED_CAUSE,
+        },
+      },
+    } as PublishOutcome
+  }
+
+  it("flag off (no onOpenRun): no run link, and no 'coming soon' promise ANYWHERE on the surface", async () => {
+    mockedPublish.mockResolvedValue(blockedWithRun())
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+
+    expect(screen.queryByTestId("run-link")).not.toBeInTheDocument()
+    const modal = screen.getByTestId("publish-modal")
+    expect(modal.textContent ?? "").not.toMatch(/coming soon/i)
+    expect(modal.textContent ?? "").not.toMatch(/view coming/i)
+    // …nor hidden in a tooltip.
+    for (const el of Array.from(modal.querySelectorAll("[title]"))) {
+      expect(el.getAttribute("title") ?? "").not.toMatch(/soon/i)
+    }
+    // The id is NOT lost — it stays in the raw-verdict disclosure, verbatim.
+    expect(screen.getByTestId("verdict-golden_run_id")).toHaveTextContent(GOLDEN_RUN_ID)
+  })
+
+  it("flag on: an ENABLED control, exactly the D-08 label, no id fragment, no 'soon' title", async () => {
+    const onOpenRun = vi.fn()
+    mockedPublish.mockResolvedValue(blockedWithRun())
+    render(<PublishGauntlet definitionId="def-1" onOpenRun={onOpenRun} />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+
+    const link = screen.getByTestId("run-link")
+    expect(link.tagName).toBe("BUTTON")
+    expect(link).toBeEnabled()
+    expect(link.textContent).toBe("▦ Open the golden run that was judged ›")
+    expect(link.textContent ?? "").not.toContain(GOLDEN_RUN_ID.slice(0, 8))
+    expect(link.getAttribute("title") ?? "").not.toMatch(/soon/i)
+    expect(screen.getByTestId("publish-modal").textContent ?? "").not.toMatch(/coming soon/i)
+  })
+
+  it("a click hands onOpenRun the verdict's EXACT golden_run_id, once", async () => {
+    const onOpenRun = vi.fn()
+    mockedPublish.mockResolvedValue(blockedWithRun())
+    render(<PublishGauntlet definitionId="def-1" onOpenRun={onOpenRun} />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId("run-link"))
+    expect(onOpenRun).toHaveBeenCalledTimes(1)
+    expect(onOpenRun).toHaveBeenCalledWith(GOLDEN_RUN_ID)
+  })
+
+  it("a pre-run block (golden_run_id null) keeps the unchanged no-run note, with or without the prop", async () => {
+    const preRun: PublishOutcome = {
+      kind: "verdict",
+      verdict: {
+        published: false,
+        version: null,
+        golden_run_id: null,
+        blocked_stage: "lint",
+        named_failures: [{ code: "orphan_phase", phase: "draft-summary", message: "phase is unreachable" }],
+      },
+    }
+    for (const onOpenRun of [undefined, vi.fn()]) {
+      mockedPublish.mockResolvedValue(preRun)
+      const { unmount } = render(<PublishGauntlet definitionId="def-1" onOpenRun={onOpenRun} />)
+      await doPublish()
+      await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+      expect(screen.queryByTestId("run-link")).not.toBeInTheDocument()
+      expect(screen.getByTestId("no-run-note")).toHaveTextContent(/there is no run to open/i)
+      unmount()
+    }
+  })
+
+  it("the next-step line names the run link ONLY when the link exists (D-28)", async () => {
+    mockedPublish.mockResolvedValue(blockedWithRun())
+    const { unmount } = render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-blocked-step")).toBeInTheDocument())
+    expect(screen.getByTestId("blocked-step-next").textContent).toBe(BLOCKED_STEP_NEXT_NO_RUN)
+    expect(screen.getByTestId("blocked-step-next").textContent ?? "").not.toMatch(/open the trial run/i)
+    unmount()
+
+    mockedPublish.mockResolvedValue(blockedWithRun())
+    render(<PublishGauntlet definitionId="def-1" onOpenRun={vi.fn()} />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-blocked-step")).toBeInTheDocument())
+    expect(screen.getByTestId("blocked-step-next").textContent).toBe(BLOCKED_STEP_NEXT)
+  })
+
+  it("the server's multi-line cause renders VERBATIM, line breaks honoured (D-04 render half)", async () => {
+    mockedPublish.mockResolvedValue(blockedWithRun())
+    render(<PublishGauntlet definitionId="def-1" onOpenRun={vi.fn()} />)
+    await doPublish()
+    const cause = await screen.findByTestId("blocked-step-cause")
+    expect(cause.textContent).toBe(COMPOSED_CAUSE)
+    expect(cause.className.split(/\s+/)).toContain("whitespace-pre-line")
   })
 })

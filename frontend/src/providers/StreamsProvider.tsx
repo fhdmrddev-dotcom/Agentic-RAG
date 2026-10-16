@@ -99,6 +99,7 @@ import {
   type StreamsState,
   type WorkflowLock,
 } from "@/stores/streamsStore"
+import { liveStreamingRunIds, withoutLiveTwins } from "@/lib/liveRunTwin"
 import { makeThrottle, makeAccumulatingCoalescer } from "@/lib/throttle"
 import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
 import { makeToolKey } from "@/lib/toolKey"
@@ -2168,7 +2169,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // threadId) return` at L:1316 — same intent, narrower scope
             // (preserve untyped temps instead of bailing completely).
             useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
-              const dbRunIds = new Set(snapshot.messages.filter((m) => m.runId).map((m) => m.runId))
+              // BUG-261015-05: a still-streaming live run keeps its live copy; its saved twin
+              // (linked at save time) is hidden until the run ends. Shared with loadMessages.
+              const fetched = withoutLiveTwins(
+                snapshot.messages,
+                liveStreamingRunIds(prev, (id) => subscriptionsRef.current.has(id)),
+              )
+              const dbRunIds = new Set(fetched.filter((m) => m.runId).map((m) => m.runId))
               // SEED-055: per-thread send-in-flight check (was
               // `isSendingRef.current && streamingThreadIdRef.current === threadId`).
               // Each thread's optimistic temps are now preserved on its OWN send,
@@ -2227,7 +2234,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   )
                 return sendInFlightOnThisThread && !supersededByPersisted
               })
-              return [...snapshot.messages, ...liveTempPlaceholders]
+              return [...fetched, ...liveTempPlaceholders]
             })
 
             // Phase 075 D-075-01: seed lastSeenOffsetRef from server cursors
@@ -3397,7 +3404,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // temp placeholders. Predicate (BYTE-IDENTICAL from useMessages.ts:644-649):
               //   m.id.startsWith('temp-') && m.runId && !dbRunIds.has(m.runId)
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
-                const dbRunIds = new Set(data.filter((m) => m.runId).map((m) => m.runId))
+                // BUG-261015-05: see the snapshot merge — the live copy of a streaming run wins.
+                const fetched = withoutLiveTwins(
+                  data,
+                  liveStreamingRunIds(prev, (id) => subscriptionsRef.current.has(id)),
+                )
+                const dbRunIds = new Set(fetched.filter((m) => m.runId).map((m) => m.runId))
                 const liveTempPlaceholders = prev.filter(
                   (m) =>
                     m.id.startsWith("temp-") &&
@@ -3422,7 +3434,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     ((subscriptionsRef.current.has(m.runId) && !dbRunIds.has(m.runId)) ||
                       (!dbRunIds.has(m.runId) && m.runStatus === "streaming")),
                 )
-                return [...data, ...liveTempPlaceholders]
+                return [...fetched, ...liveTempPlaceholders]
               })
               // Phase 068.5: clear any prior banner state on success (handles
               // transient outage recovery — first attempt fails, retry succeeds,

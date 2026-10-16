@@ -16,6 +16,20 @@
  * a11y — the APG roles are wired BY HAND (there is no cmdk dep): the combobox role +
  * aria-expanded / aria-controls / aria-activedescendant / aria-autocomplete="list" on the
  * input, role="listbox" on the list, role="option" + a unique id per candidate.
+ *
+ * Phase 284-04 (D-15 / R-05 / UI-SPEC "Pickers on server search") — SERVER MODE, switched on by
+ * `onQueryChange`. The owner searches `POST /document-search` and hands the answer in as
+ * `candidates`; the box then:
+ *   - reports every keystroke (and a pick's name) through `onQueryChange`, and does NOT filter
+ *     the candidates by name — the server's match IS the answer (RESEARCH Pitfall 10: a typed
+ *     `*` is a server wildcard a client `includes` would drop). Exclusion still applies;
+ *   - says what the search is doing in ONE line AFTER the listbox, never inside it, so the
+ *     listbox gains no non-option children: "Searching…" (`role="status"`) while `loading`, the
+ *     previous options kept with `aria-busy` + `opacity-60`; "More documents match. Type more of
+ *     the name to narrow." when `hasMore`; a `role="alert"` "Couldn’t search documents." with
+ *     "Try again" (`onRetry`) on `error`, previous options kept. "No matching documents" shows
+ *     only after a completed empty answer.
+ * Client mode (no `onQueryChange`) is unchanged, byte for byte.
  */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
@@ -43,6 +57,19 @@ interface Props<T extends LinkTargetCandidate> {
   listboxLabel?: string
   /** The text the input opens with (e.g. the name of an already-picked document). */
   initialQuery?: string
+  /** 284-04 SERVER MODE: the typed text (and a pick's name). Present → no client name filter. */
+  onQueryChange?: (query: string) => void
+  /** Server mode: a search for the current text is in flight. */
+  loading?: boolean
+  /** Server mode: the last search failed (the previous options stay on screen). */
+  error?: boolean
+  /** Server mode: the server matched more documents than are shown. */
+  hasMore?: boolean
+  /** Server mode: "Try again" after a failed search. */
+  onRetry?: () => void
+  /** Server mode: the status line's text colour — the panel/dialog token by default; a page
+   *  popover passes its own muted token. */
+  statusClassName?: string
 }
 
 export function LinkTargetCombobox<T extends LinkTargetCandidate>({
@@ -55,19 +82,27 @@ export function LinkTargetCombobox<T extends LinkTargetCandidate>({
   inputId,
   listboxLabel = "Document candidates",
   initialQuery = "",
+  onQueryChange,
+  loading = false,
+  error = false,
+  hasMore = false,
+  onRetry,
+  statusClassName = "text-panel-muted-foreground",
 }: Props<T>) {
   const [query, setQuery] = useState(initialQuery)
   const [activeIndex, setActiveIndex] = useState(-1)
   const listboxId = useRef(`rel-target-listbox-${Math.random().toString(36).slice(2)}`).current
+  const serverMode = onQueryChange !== undefined
 
-  /** The actionable candidate set: drop excluded ids, then filter by the typed name. */
+  /** The actionable candidate set: drop excluded ids, then (client mode only) filter by the
+   *  typed name — in server mode the candidates ARE the server's name match. */
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return candidates
       .filter((d) => !excludeIds.has(d.id))
-      .filter((d) => (q === "" ? true : d.filename.toLowerCase().includes(q)))
+      .filter((d) => (serverMode || q === "" ? true : d.filename.toLowerCase().includes(q)))
       .slice(0, maxVisible)
-  }, [candidates, excludeIds, query, maxVisible])
+  }, [candidates, excludeIds, query, maxVisible, serverMode])
 
   // Keep the active descendant in range as the filtered set changes.
   useEffect(() => {
@@ -86,6 +121,7 @@ export function LinkTargetCombobox<T extends LinkTargetCandidate>({
   function choose(doc: T) {
     onChoose(doc)
     setQuery(doc.filename)
+    onQueryChange?.(doc.filename) // server mode: the owner's query follows the input
     setActiveIndex(-1)
   }
 
@@ -125,6 +161,7 @@ export function LinkTargetCombobox<T extends LinkTargetCandidate>({
         value={query}
         onChange={(e) => {
           setQuery(e.target.value)
+          onQueryChange?.(e.target.value) // server mode: the owner searches for it
           onChoose(null) // typing invalidates a prior pick
           setActiveIndex(-1)
         }}
@@ -140,9 +177,13 @@ export function LinkTargetCombobox<T extends LinkTargetCandidate>({
           id={listboxId}
           role="listbox"
           aria-label={listboxLabel}
-          className="mt-1 max-h-44 overflow-y-auto rounded-md border border-border/60"
+          aria-busy={serverMode && loading ? true : undefined}
+          className={cn(
+            "mt-1 max-h-44 overflow-y-auto rounded-md border border-border/60",
+            serverMode && loading && "transition-opacity opacity-60",
+          )}
         >
-          {filtered.length === 0 ? (
+          {serverMode && filtered.length === 0 && (loading || error) ? null : filtered.length === 0 ? (
             <li className="px-3 py-2 text-xs text-panel-muted-foreground">
               No matching documents
             </li>
@@ -170,6 +211,23 @@ export function LinkTargetCombobox<T extends LinkTargetCandidate>({
           )}
         </ul>
       )}
+      {/* Server mode: what the search is doing — AFTER the listbox, never inside it. */}
+      {serverMode && listVisible && error ? (
+        <p role="alert" className="mt-1 text-xs text-destructive">
+          Couldn’t search documents.{" "}
+          <button type="button" onClick={onRetry} className="text-xs text-primary hover:underline">
+            Try again
+          </button>
+        </p>
+      ) : serverMode && listVisible && loading ? (
+        <p role="status" aria-live="polite" className={cn("mt-1 text-xs", statusClassName)}>
+          Searching…
+        </p>
+      ) : serverMode && listVisible && hasMore ? (
+        <p role="status" aria-live="polite" className={cn("mt-1 text-xs", statusClassName)}>
+          More documents match. Type more of the name to narrow.
+        </p>
+      ) : null}
     </>
   )
 }

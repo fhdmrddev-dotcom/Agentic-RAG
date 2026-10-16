@@ -26,6 +26,7 @@ from uuid import UUID
 
 from app.utils.db import aexec
 from app.config import settings
+from app.services.ask_user_service import register_local_channel, unregister_local_channel
 from app.services.tools.base import ToolContext, ToolResult
 
 logger = logging.getLogger(__name__)
@@ -276,6 +277,22 @@ async def _handle_write_todos(args: dict, ctx: ToolContext) -> ToolResult:
     }))
 
 
+def _resolve_ask_timeout(timeout_arg) -> int | None:
+    """The wait for one ask_user call: null -> the floor; an integer -> clamped to
+    [floor, cap]; anything else -> None (the caller refuses it).
+
+    BUG-261015-03: the floor stops a model-picked ~60 s from expiring the question before a
+    person can answer it. The floor equals the null default, so null and "too short" agree.
+    """
+    floor = settings.ask_user_min_timeout_seconds
+    if timeout_arg is None:
+        return floor
+    try:
+        return max(floor, min(int(timeout_arg), settings.ask_user_max_timeout_seconds))
+    except (TypeError, ValueError):
+        return None
+
+
 async def _handle_ask_user(args: dict, ctx: ToolContext) -> ToolResult:
     """Phase 085 D-085-01..07 — ask_user pause/resume via Redis pub/sub.
 
@@ -315,20 +332,13 @@ async def _handle_ask_user(args: dict, ctx: ToolContext) -> ToolResult:
     if not prompt:
         return ToolResult(result="ask_user requires a non-empty prompt")
 
-    # Per-call timeout override; server clamps to settings.ask_user_max_timeout_seconds
-    # (default 1800s = 30min). Default when omitted is 300s (D-085-03).
-    timeout_arg = args.get("timeout_seconds")
-    if timeout_arg is None:
-        timeout_seconds = 300
-    else:
-        try:
-            timeout_seconds = max(
-                1, min(int(timeout_arg), settings.ask_user_max_timeout_seconds)
-            )
-        except (TypeError, ValueError):
-            return ToolResult(
-                result="ask_user timeout_seconds must be a positive integer"
-            )
+    # Per-call timeout override, clamped to [ask_user_min_timeout_seconds,
+    # ask_user_max_timeout_seconds]; null waits the floor (D-085-03, BUG-261015-03).
+    timeout_seconds = _resolve_ask_timeout(args.get("timeout_seconds"))
+    if timeout_seconds is None:
+        return ToolResult(
+            result="ask_user timeout_seconds must be a positive integer"
+        )
 
     options = args.get("options")
 
@@ -352,6 +362,7 @@ async def _handle_ask_user(args: dict, ctx: ToolContext) -> ToolResult:
     try:
         # ── Step 1: SUBSCRIBE first ───────────────────────────────────────
         await pubsub.subscribe(channel)
+        register_local_channel(channel)  # BUG-261015-06: the shutdown sentinel is per process
         # ── Step 2: advertise to cancel + shutdown sweep paths ────────────
         await ctx.redis.sadd(channels_set_key, channel)
         await ctx.redis.expire(channels_set_key, 3600)  # safety TTL
@@ -458,6 +469,7 @@ async def _handle_ask_user(args: dict, ctx: ToolContext) -> ToolResult:
         # the others. SREM keeps the channels:set honest (only LIVE
         # subscribers should be there); the safety TTL above is the
         # eventual-consistency safety net.
+        unregister_local_channel(channel)
         try:
             await pubsub.unsubscribe(channel)
         except Exception:  # noqa: BLE001

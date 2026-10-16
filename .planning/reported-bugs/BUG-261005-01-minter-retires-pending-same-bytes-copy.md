@@ -4,10 +4,10 @@ title: The shared document minter retires a still-indexing copy of the same byte
 reported: 2026-10-05
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed   # closed 2026-10-14 by Phase 280 plan 04 on live evidence
 affected_areas: [backend/ingestion, documents, library, search]
-folded_into: null
-verified_closed_by: null
+folded_into: "280"
+verified_closed_by: "280 (89d41fd79 — 280-LIVE-EVIDENCE.md SC#1)"
 related_seeds: [SEED-247]
 re_open_trigger: null
 reproduces_on:
@@ -53,3 +53,7 @@ minting — 274-REVIEW.md fix log). The Library upload door and every other mint
 CR-01 in the same review: the minter's folder check compares only `user_id`, never the folder's org. Phase 274 guards the promote route
 (D-29). Whether `POST /documents/upload` lets a two-org user mint into another org's folder is **not yet measured** — drive it
 before filing it.
+
+## Closed 2026-10-14 (Phase 280, plan 04)
+
+The minter returns an in-flight same-bytes copy, retires only after a successful insert (`neq id`, `lt version`), and resolves a 23505 to the winner for every caller (fix `89d41fd79`). Live: `test_280_same_bytes_live.py` 18/18 re-run at `b794a40c5` (concurrent gather rounds, all 7 caller shapes). Evidence: `.planning/phases/280-in-once-out-clean/280-LIVE-EVIDENCE.md` SC#1. CR-01 from the related note was measured and filed separately as BUG-261014-01.

@@ -91,15 +91,18 @@ def _route_org_members(mock_builder):
 
 
 def _list_documents_sequence(rows):
-    """The four ordered executes `GET /documents` makes:
-    own docs · global folder ids · document_tables count rows · document_images count rows.
+    """The ONE execute `GET /documents` makes since Phase 284: a ranged read of the
+    `library_documents` view (migration 207) with the table / image counts embedded.
+    (Before 284 it was four: own docs · global folder ids · table rows · image rows.)
     """
-    return [
-        _make_result(rows),
-        _make_result([]),
-        _make_result([]),
-        _make_result([]),
-    ]
+    return [_make_result(rows)]
+
+
+def _docs(res):
+    """The rows of the Phase 284 `{documents, total, offset, limit}` envelope."""
+    body = res.json()
+    assert set(body) == {"documents", "total", "offset", "limit"}, body
+    return body["documents"]
 
 
 # ── Case 1 — the D-217-10 fix, on the wire ────────────────────────────────────
@@ -121,7 +124,7 @@ def test_list_documents_serializes_ingestion_step_and_extractor(
     )
     res = client.get("/documents", headers=auth_headers)
     assert res.status_code == 200
-    body = res.json()
+    body = _docs(res)
     assert len(body) == 1
     assert body[0]["ingestion_step"] == "embedding"
     assert body[0]["extractor"] == "docling"
@@ -136,7 +139,7 @@ def test_list_documents_serializes_nulls_without_500(client, auth_headers, mock_
     mock_builder.execute.side_effect = _list_documents_sequence([_doc_row()])
     res = client.get("/documents", headers=auth_headers)
     assert res.status_code == 200
-    body = res.json()
+    body = _docs(res)
     assert body[0]["ingestion_step"] is None
     assert body[0]["extractor"] is None
 
@@ -160,7 +163,7 @@ def test_stage_applicability_populated_for_three_mimes_in_one_response(
     mock_builder.execute.side_effect = _list_documents_sequence(rows)
     res = client.get("/documents", headers=auth_headers)
     assert res.status_code == 200
-    body = res.json()
+    body = _docs(res)
     assert len(body) == 3
     by_mime = {row["mime_type"]: row for row in body}
 
@@ -198,7 +201,9 @@ def test_applicability_booleans_agree_with_the_service_predicates(
     mock_builder.execute.side_effect = _list_documents_sequence(rows)
     res = client.get("/documents", headers=auth_headers)
     assert res.status_code == 200
-    for row in res.json():
+    rows_out = _docs(res)
+    assert len(rows_out) == len(mimes)
+    for row in rows_out:
         mime = row["mime_type"]
         assert row["tables_stage_applies"] is tables_stage_applies(mime), mime
         assert row["images_stage_applies"] is images_stage_applies(mime), mime
@@ -265,7 +270,9 @@ def test_no_field_promises_image_bytes(client, auth_headers, mock_builder):
     )
     res = client.get("/documents", headers=auth_headers)
     assert res.status_code == 200
-    for row in res.json():
+    rows_out = _docs(res)  # ⚠ iterating the envelope itself would pass vacuously over its keys
+    assert rows_out
+    for row in rows_out:
         for key in row:
             assert not any(f in key.lower() for f in forbidden), key
 

@@ -515,6 +515,8 @@ describe("runVocabulary 194-04 — V-19: no cancel path enters the failed or ski
       "render_failed",
       "integrity_failed",
       "no_template_bound",
+      // Phase 281-03 (D-30) — the union's sixth member, swept like the rest.
+      "template_fields_missing",
     ] as const) {
       expect(stopped, `collapsed into the failed sentence at ${f}`).not.toBe(
         runReadingLabel("failed", f),
@@ -566,5 +568,17 @@ describe("runVocabulary 194-04 — V-19: no cancel path enters the failed or ski
     expect(Object.keys(RUN_READING_BORDER).sort()).toEqual(
       ["failed", "running", "waiting-for-you"].sort(),
     )
+  })
+})
+
+// Phase 281-03 (FIX-09 / D-30) — the new failure value is a VISIBLE decision in the
+// exhaustive switch, not a silent fall to the weakest clause.
+describe("runVocabulary 281-03 — template_fields_missing reads as a failed check", () => {
+  it("joins the 'did not pass the required checks' group, beside citation_gate_rejected", () => {
+    const clause = runReadingClause("failed", "template_fields_missing")
+    expect(clause).toBe(runReadingClause("failed", "citation_gate_rejected"))
+    expect(clause).toContain("did not pass the required checks")
+    // …and is NOT the default arm's "did not finish", which is what an unrouted member reads.
+    expect(clause).not.toBe(runReadingClause("failed", null))
   })
 })

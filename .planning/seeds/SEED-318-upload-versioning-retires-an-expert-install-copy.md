@@ -39,3 +39,11 @@ Fixing it means changing `/upload`'s versioning semantics for everyone (versioni
 per filename across the account), or teaching the default retirement to skip Expert install folders. Both
 touch a behaviour every upload depends on. Only the installing admin can trigger it, and only with an
 exact filename match.
+
+## 2026-10-14 - Phase 280 touched the trigger path and left this open
+
+Phase 280 plan 03 moved the minter's retire to AFTER a successful insert and narrowed it (`neq("id", new_id)`,
+`lt("version_number", next_version)`, the inserted row's org). That stops two concurrent mints retiring each
+other. It does **not** stop this seed's case: the installing admin's same-named `/upload` in the same org is a
+legitimate new version under the default `version_scope="user"`, so it still retires the Expert's install copy.
+Status stays `planted`; the trigger is unchanged.

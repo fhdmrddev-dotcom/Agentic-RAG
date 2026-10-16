@@ -166,22 +166,48 @@ async def test_rls_alone_fences_when_the_app_leg_is_widened(pg_pool, fence, monk
     folder) and the request still runs through S's real JWT: only RLS can stop it now.
     The plant was driven against the service-role client at 271-05 and DID return B's row
     (recorded in the SUMMARY), so this case is not vacuous.
+
+    284-04 (D-14): the app leg is no longer a Python folder list — it is migration 207's
+    ``library_documents`` view, so there is no ``get_globally_visible_folder_ids`` to widen. The
+    widening is now the WIDEST possible one: the core's view read is redirected to the BASE
+    ``documents`` table (no Library predicate at all, only the conditions and RLS), through S's
+    real JWT. If RLS were off, that read would return B's row; only RLS can stop it.
     """
+    import sys
+
     from app.services import document_search_service as core
 
     assert await memberships(pg_pool, fence["s"][0]) == {fence["org_a"]}
-    widened = [fence["a"]["folder_id"], fence["b"]["folder_id"]]
 
-    async def _widened(_supabase, _uid):
-        return list(widened)
+    class _BaseTable:
+        """S's real client, with the view read redirected to the base table (the widening)."""
 
-    monkeypatch.setattr(core, "get_globally_visible_folder_ids", _widened)
+        def __init__(self, inner):
+            self._inner = inner
+
+        def table(self, name):
+            if name == "library_documents":
+                redirected.append(name)
+                name = "documents"
+            return self._inner.table(name)
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    redirected: list[str] = []
+    real_user_client = user_client
+    monkeypatch.setattr(sys.modules[__name__], "user_client",
+                        lambda token: _BaseTable(real_user_client(token)))
+    # The base table has no lineage columns; select the rest so the widened read is valid SQL.
+    monkeypatch.setattr(core, "FIND_SELECT",
+                        core.FIND_SELECT.replace(",version_count,has_earlier", ""))
     body = {"name": f"271-fence-{fence['marker']}", "version": "latest"}
     s_ids = _ids(await _find(*fence["s"], **body))
     t_ids = _ids(await _find(*fence["t"], **body))
     assert fence["b"]["doc_id"] not in s_ids, "LEAK: RLS did not stop a widened app leg"
     assert s_ids == {fence["a"]["doc_id"]}
     assert t_ids == {fence["b"]["doc_id"]}, "positive control under the same widening"
+    assert redirected, "the widening never reached the core — this case would be vacuous"
 
 
 async def test_relationship_target_in_org_b_is_the_zero_shape_for_s(pg_pool, fence):

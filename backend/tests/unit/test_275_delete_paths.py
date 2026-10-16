@@ -548,10 +548,14 @@ def test_watch_delete_with_purge_unheld_deletes_documents_then_the_watch(monkeyp
     log: list = []
     _patch_watch(monkeypatch, log)
     monkeypatch.setattr(hold_guard, "assert_none_held", _guard(log))
-    sb = _FakeSupabase(log)
+    # Phase 280 (DEBT-10 / D-31): the purge now removes bytes after the row delete — amended
+    # deliberately, BUG-261012-01. The delete returns rows carrying file_path, so bytes exist.
+    sb = _FakeSupabase(log, answers={("documents", "delete"): [
+        {"id": DOC, "file_path": f"{USER}/{DOC}/a.pdf"}, {"id": SIB, "file_path": f"{USER}/{SIB}/b.pdf"},
+    ]})
     _run(_delete_watch_purge(sb, _Pool(log, [])))
     order = [e[0] if e[0] in ("guard", "watch") else f"{e[0]}.{e[1]}" for e in log]
-    assert order == ["guard", "documents.delete", "watch"]
+    assert order == ["guard", "documents.delete", "storage.remove", "watch"]
 
 
 def _missing_items():
@@ -599,11 +603,15 @@ def test_purge_missing_unheld_counts_only_after_the_delete_succeeded(monkeypatch
     log: list = []
     _patch_watch(monkeypatch, log)
     monkeypatch.setattr(hold_guard, "assert_none_held", _guard(log))
-    sb = _FakeSupabase(log)
+    # Phase 280 (DEBT-10 / D-31): the purge now removes bytes after the row delete — amended
+    # deliberately, BUG-261012-01. The delete returns rows carrying file_path, so bytes exist.
+    sb = _FakeSupabase(log, answers={("documents", "delete"): [
+        {"id": DOC, "file_path": f"{USER}/{DOC}/a.pdf"}, {"id": SIB, "file_path": f"{USER}/{SIB}/b.pdf"},
+    ]})
     resp = _run(_purge_missing(sb, _Pool(log, _missing_items())))
     assert resp.purged_count == 2
     order = [e[0] if e[0] in ("guard", "pool") else f"{e[0]}.{e[1]}" for e in log]
-    assert order == ["guard", "documents.delete", "pool"]
+    assert order == ["guard", "documents.delete", "storage.remove", "pool"]
 
 
 # ── source fences ────────────────────────────────────────────────────────────────────────

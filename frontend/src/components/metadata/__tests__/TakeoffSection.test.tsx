@@ -11,9 +11,19 @@ vi.mock("@/lib/api/takeoff", () => ({
   resolveDocumentTakeoffItem: vi.fn(),
 }))
 
+// 284-04 (D-15 R-05 exception / UI-SPEC S14): the rate-sheet list is ONE bounded server page of
+// spreadsheets — never the whole library filtered in the browser. 284-05 (D-16): the whole-list
+// client no longer exists, so a regression back to it fails to compile and fails
+// `libraryListFence.test.ts`; this suite pins that every read it makes is a bounded page.
 vi.mock("@/lib/api", () => ({
-  listDocuments: vi.fn(),
+  listDocumentsPage: vi.fn(),
+  // 284-REVIEW WR-04: the saved rate sheet is read by id when it is not on the page.
+  getDocument: vi.fn(),
 }))
+
+function page(documents: Document[], total = documents.length) {
+  return { documents, total, offset: 0, limit: 50 }
+}
 
 describe("TakeoffSection Component (Phase 220, TAKEOFF-04)", () => {
   const mockDoc: Document = {
@@ -112,7 +122,7 @@ describe("TakeoffSection Component (Phase 220, TAKEOFF-04)", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(api.listDocuments).mockResolvedValue(mockRateDocs)
+    vi.mocked(api.listDocumentsPage).mockResolvedValue(page(mockRateDocs))
     vi.mocked(takeoffApi.fetchDocumentTakeoff).mockResolvedValue(mockDoc.metadata?._takeoff as any)
   })
 
@@ -190,5 +200,122 @@ describe("TakeoffSection Component (Phase 220, TAKEOFF-04)", () => {
 
     expect(await screen.findByText((content) => content.includes("Drawing Declares No Units"))).toBeInTheDocument()
     expect(screen.getByText((content) => content.includes("Refusing to convert lengths"))).toBeInTheDocument()
+  })
+
+  // ── 284-04 (UI-SPEC S14): the five arms of the rate-sheet select ─────────────────────────
+  const sheet = (i: number): Document => ({ ...mockRateDocs[0], id: `rates-${i}`, filename: `Rates ${i}.xlsx` })
+  const rateSelect = () => screen.getByLabelText("Select reference rate sheet") as HTMLSelectElement
+
+  it("reads ONE bounded spreadsheet page — never the whole library", async () => {
+    render(<TakeoffSection doc={mockDoc} />)
+    await waitFor(() => expect(api.listDocumentsPage).toHaveBeenCalledTimes(1))
+    expect(api.listDocumentsPage).toHaveBeenCalledWith({ kind: "spreadsheet", offset: 0, limit: 50 })
+    for (const [params] of vi.mocked(api.listDocumentsPage).mock.calls) {
+      expect(params.limit).toBeLessThanOrEqual(50)
+    }
+  })
+
+  it("while loading the select is disabled and reads 'Loading rate sheets…'", () => {
+    vi.mocked(api.listDocumentsPage).mockReturnValue(new Promise(() => {}))
+    render(<TakeoffSection doc={mockDoc} />)
+    expect(rateSelect()).toBeDisabled()
+    expect(rateSelect()).toHaveTextContent("Loading rate sheets…")
+    expect(screen.queryByText("No Excel rate sheets found in Library")).toBeNull()
+  })
+
+  it("an answered empty page reads the shipped 'No Excel rate sheets found in Library'", async () => {
+    vi.mocked(api.listDocumentsPage).mockResolvedValue(page([]))
+    render(<TakeoffSection doc={mockDoc} />)
+    expect(await screen.findByText("No Excel rate sheets found in Library")).toBeInTheDocument()
+    expect(rateSelect()).toBeDisabled()
+  })
+
+  it("loaded: options in server order, the first auto-selected; more than 50 says how many exist", async () => {
+    vi.mocked(api.listDocumentsPage).mockResolvedValue(page([sheet(1), sheet(2)], 73))
+    render(<TakeoffSection doc={mockDoc} />)
+    await screen.findByRole("option", { name: "Rates 1.xlsx" })
+    expect(Array.from(rateSelect().options).map((o) => o.textContent)).toEqual(["Rates 1.xlsx", "Rates 2.xlsx"])
+    expect(rateSelect()).toHaveValue("rates-1")
+    expect(screen.getByText("Showing the 50 most recent of 73 spreadsheets.")).toBeInTheDocument()
+  })
+
+  it("a failed read is disabled with 'Couldn’t load rate sheets' and a Try again that reads again", async () => {
+    vi.mocked(api.listDocumentsPage).mockRejectedValueOnce(new Error("down"))
+    render(<TakeoffSection doc={mockDoc} />)
+    expect(await screen.findByRole("option", { name: "Couldn’t load rate sheets" })).toBeInTheDocument()
+    expect(rateSelect()).toBeDisabled()
+    expect(screen.queryByText("No Excel rate sheets found in Library")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+    expect(await screen.findByRole("option", { name: "Master_Rate_Sheet.xlsx" })).toBeInTheDocument()
+    expect(api.listDocumentsPage).toHaveBeenCalledTimes(2)
+  })
+
+  // ── 284-REVIEW WR-04: the SAVED rate sheet is always shown, and Match only ever uses what the
+  // select shows. The page is the 50 newest non-archived spreadsheets; the sheet a takeoff was
+  // matched against can be older, or archived — before this, the select matched no option (blank
+  // in Chrome, the first option elsewhere) while Match still sent the hidden saved id. ──
+  const savedTakeoffDoc = (savedId: string): Document => ({
+    ...mockDoc,
+    metadata: {
+      _takeoff: { ...(mockDoc.metadata?._takeoff as object), rate_sheet_document_id: savedId },
+    },
+  })
+
+  it("a saved sheet outside the page is read by id, shown first and selected — and Match uses it", async () => {
+    vi.mocked(api.listDocumentsPage).mockResolvedValue(page([sheet(1), sheet(2)], 73))
+    vi.mocked(api.getDocument).mockResolvedValue({ ...mockRateDocs[0], id: "saved-old", filename: "Rates 2019.xlsx" })
+    vi.mocked(takeoffApi.matchDocumentTakeoff).mockResolvedValue(
+      (mockDoc.metadata?._takeoff as { boq: never }).boq,
+    )
+    render(<TakeoffSection doc={savedTakeoffDoc("saved-old")} />)
+    await screen.findByRole("option", { name: "Rates 2019.xlsx" })
+    expect(api.getDocument).toHaveBeenCalledWith("saved-old")
+    expect(Array.from(rateSelect().options).map((o) => o.textContent)).toEqual([
+      "Rates 2019.xlsx",
+      "Rates 1.xlsx",
+      "Rates 2.xlsx",
+    ])
+    expect(rateSelect()).toHaveValue("saved-old")
+    fireEvent.click(screen.getByRole("button", { name: /Re-Match/ }))
+    await waitFor(() => expect(takeoffApi.matchDocumentTakeoff).toHaveBeenCalledWith("doc-cad-1", "saved-old"))
+  })
+
+  it("an archived saved sheet says so in its option", async () => {
+    vi.mocked(api.getDocument).mockResolvedValue({
+      ...mockRateDocs[0],
+      id: "saved-arch",
+      filename: "Old Rates.xlsx",
+      archived_at: "2026-09-01T00:00:00Z",
+    })
+    render(<TakeoffSection doc={savedTakeoffDoc("saved-arch")} />)
+    expect(await screen.findByRole("option", { name: "Old Rates.xlsx (archived)" })).toBeInTheDocument()
+    expect(rateSelect()).toHaveValue("saved-arch")
+  })
+
+  it("a saved sheet that is gone (404) says so, and the select and Match move to a shown sheet", async () => {
+    const { DocumentListError } = await vi.importActual<typeof import("@/lib/api/documents")>("@/lib/api/documents")
+    vi.mocked(api.getDocument).mockRejectedValue(new DocumentListError(404, "Couldn't load this document."))
+    vi.mocked(takeoffApi.matchDocumentTakeoff).mockResolvedValue(
+      (mockDoc.metadata?._takeoff as { boq: never }).boq,
+    )
+    render(<TakeoffSection doc={savedTakeoffDoc("deleted-sheet")} />)
+    expect(await screen.findByText("The saved rate sheet is no longer available.")).toBeInTheDocument()
+    expect(rateSelect()).toHaveValue("rates-1")
+    fireEvent.click(screen.getByRole("button", { name: /Re-Match/ }))
+    await waitFor(() => expect(takeoffApi.matchDocumentTakeoff).toHaveBeenCalledWith("doc-cad-1", "rates-1"))
+  })
+
+  it("a saved sheet ON the page costs no extra read", async () => {
+    render(<TakeoffSection doc={savedTakeoffDoc("rates-1")} />)
+    await screen.findByRole("option", { name: "Master_Rate_Sheet.xlsx" })
+    expect(rateSelect()).toHaveValue("rates-1")
+    expect(api.getDocument).not.toHaveBeenCalled()
+  })
+
+  it("Match is disabled while the select cannot show the sheet it would use", () => {
+    vi.mocked(api.listDocumentsPage).mockReturnValue(new Promise(() => {}))
+    render(<TakeoffSection doc={savedTakeoffDoc("saved-old")} />)
+    expect(rateSelect()).toHaveTextContent("Loading rate sheets…")
+    expect(screen.getByRole("button", { name: /Re-Match/ })).toBeDisabled()
   })
 })

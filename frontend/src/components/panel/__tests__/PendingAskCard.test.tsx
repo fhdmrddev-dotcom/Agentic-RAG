@@ -90,6 +90,9 @@ import {
   PendingAskCard,
   PendingAskStack,
 } from "../PendingAskCard"
+// Phase 282-02 (D-12): the one draft home — read directly so a case can assert what the card wrote.
+// The global afterEach in setupTests.ts resets it between cases (D-24).
+import { useAskDraftStore } from "@/stores/askDraftStore"
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
 import cardSource from "../PendingAskCard.tsx?raw"
@@ -840,5 +843,160 @@ describe("PendingAskCard (194.1-05) — the four retirement sentences are pairwi
       s.split(/[—.!?]/).map((x) => x.trim().toLowerCase()).filter((x) => x.length > 8)
     const [x, y] = collapsed.map(sentences)
     expect(x.filter((s) => y.includes(s))).not.toHaveLength(0)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 282-02 (FIX-07 / D-12, D-13, D-24) — the card reads ONE shared draft and completes the
+// radio pattern. Selection rides three channels (fill, a filled radio dot, weight), the group has
+// ONE tab stop (roving tabindex), arrows move AND select with wrap, Space selects only (APG — D-24
+// supersedes the UI-SPEC's "Space deselects"), and Enter / click keep the D-13 toggle.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const threeOptionAsk: PendingAsk = {
+  ...mockPendingAskWithRunId,
+  tool_call_id: "tc-kb",
+  options: ["alpha", "beta", "gamma"],
+}
+
+describe("PendingAskCard (282-02) — radio keyboard, non-colour mark, one shared draft", () => {
+  it("Test 1: exactly one chip is tabbable — the first with nothing selected, then the selected one", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={threeOptionAsk} reconcile={noopReconcile} />)
+    const radios = screen.getAllByRole("radio")
+    const tabbable = () => radios.filter((r) => r.getAttribute("tabindex") === "0")
+    expect(tabbable()).toEqual([radios[0]])
+    expect(radios.slice(1).every((r) => r.getAttribute("tabindex") === "-1")).toBe(true)
+    await user.click(radios[1])
+    expect(tabbable()).toEqual([radios[1]])
+  })
+
+  it("Test 2: Arrow keys move focus AND select, wrapping both ways", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={threeOptionAsk} reconcile={noopReconcile} />)
+    const radios = screen.getAllByRole("radio")
+    act(() => radios[0].focus())
+
+    await user.keyboard("{ArrowDown}")
+    expect(radios[1]).toHaveAttribute("aria-checked", "true")
+    expect(document.activeElement).toBe(radios[1])
+
+    await user.keyboard("{ArrowDown}")
+    await user.keyboard("{ArrowDown}")
+    // wrap last → first
+    expect(radios[0]).toHaveAttribute("aria-checked", "true")
+    expect(document.activeElement).toBe(radios[0])
+
+    // wrap first → last
+    await user.keyboard("{ArrowUp}")
+    expect(radios[2]).toHaveAttribute("aria-checked", "true")
+    expect(document.activeElement).toBe(radios[2])
+
+    await user.keyboard("{ArrowRight}")
+    expect(radios[0]).toHaveAttribute("aria-checked", "true")
+    expect(document.activeElement).toBe(radios[0])
+
+    await user.keyboard("{ArrowLeft}")
+    expect(radios[2]).toHaveAttribute("aria-checked", "true")
+    expect(document.activeElement).toBe(radios[2])
+    expect(radios.filter((r) => r.getAttribute("aria-checked") === "true")).toHaveLength(1)
+  })
+
+  it("Test 3: Space selects and never deselects (D-24); Enter and click keep the toggle (D-13)", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={threeOptionAsk} reconcile={noopReconcile} />)
+    const radios = screen.getAllByRole("radio")
+    act(() => radios[0].focus())
+
+    await user.keyboard(" ")
+    expect(radios[0]).toHaveAttribute("aria-checked", "true")
+    await user.keyboard(" ")
+    expect(radios[0]).toHaveAttribute("aria-checked", "true")
+
+    await user.keyboard("{Enter}")
+    expect(radios[0]).toHaveAttribute("aria-checked", "false")
+
+    await user.click(radios[1])
+    expect(radios[1]).toHaveAttribute("aria-checked", "true")
+    await user.click(radios[1])
+    expect(radios[1]).toHaveAttribute("aria-checked", "false")
+  })
+
+  it("Test 4: every chip leads with an aria-hidden radio mark; only the selected one holds the dot", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={threeOptionAsk} reconcile={noopReconcile} />)
+    const radios = screen.getAllByRole("radio")
+    for (const r of radios) {
+      const mark = r.firstElementChild as HTMLElement | null
+      expect(mark).not.toBeNull()
+      expect(mark).toHaveAttribute("data-testid", "ask-radio-mark")
+      expect(mark).toHaveAttribute("aria-hidden", "true")
+      expect(within(r).queryByTestId("ask-radio-dot")).toBeNull()
+    }
+    await user.click(radios[2])
+    expect(within(radios[2]).getByTestId("ask-radio-dot")).toBeInTheDocument()
+    expect(within(radios[0]).queryByTestId("ask-radio-dot")).toBeNull()
+    expect(within(radios[1]).queryByTestId("ask-radio-dot")).toBeNull()
+  })
+
+  it("Test 5: two cards for one ask read ONE draft — a choice or text in one shows in the other", async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <PendingAskCard ask={threeOptionAsk} reconcile={noopReconcile} />
+        <PendingAskCard ask={threeOptionAsk} reconcile={noopReconcile} />
+      </>,
+    )
+    const groups = screen.getAllByRole("radiogroup")
+    expect(groups).toHaveLength(2)
+    await user.click(within(groups[0]).getAllByRole("radio")[1])
+    expect(within(groups[1]).getAllByRole("radio")[1]).toHaveAttribute("aria-checked", "true")
+
+    const boxes = screen.getAllByPlaceholderText("Type an answer…")
+    await user.type(boxes[1], "because")
+    expect(boxes[0]).toHaveValue("because")
+    expect(useAskDraftStore.getState().drafts["tc-kb"]).toEqual({ choiceIndex: 1, freeText: "because" })
+  })
+
+  it("Test 6a: a successful answer clears the draft and records the settle", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={threeOptionAsk} reconcile={noopReconcile} />)
+    await user.click(screen.getAllByRole("radio")[0])
+    expect(useAskDraftStore.getState().drafts["tc-kb"]).toEqual({ choiceIndex: 0, freeText: "" })
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+    expect(await screen.findByText(/answered · agent resumed/i)).toBeInTheDocument()
+    expect(useAskDraftStore.getState().drafts["tc-kb"]).toBeUndefined()
+    expect(useAskDraftStore.getState().settled["tc-kb"]).toBe(true)
+  })
+
+  it("Test 6b: a refused (500) answer KEEPS the draft — the card stays answerable", async () => {
+    const user = userEvent.setup()
+    vi.mocked(answerAskUser).mockRejectedValueOnce(new ApiError("Failed to submit ask_user answer", 500))
+    render(<PendingAskCard ask={threeOptionAsk} reconcile={noopReconcile} />)
+    await user.click(screen.getAllByRole("radio")[0])
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+    expect(await screen.findByRole("alert")).toBeInTheDocument()
+    expect(useAskDraftStore.getState().drafts["tc-kb"]).toEqual({ choiceIndex: 0, freeText: "" })
+    expect(useAskDraftStore.getState().settled["tc-kb"]).toBeUndefined()
+  })
+
+  it("Test 6c: expiry clears the draft and records the settle", async () => {
+    useAskDraftStore.getState().setChoice("tc-kb", 1)
+    render(
+      <PendingAskCard
+        ask={{ ...threeOptionAsk, created_at: new Date(Date.now() - 400_000).toISOString() }}
+        reconcile={noopReconcile}
+      />,
+    )
+    expect(await screen.findByText(/no response within/i)).toBeInTheDocument()
+    expect(useAskDraftStore.getState().drafts["tc-kb"]).toBeUndefined()
+    expect(useAskDraftStore.getState().settled["tc-kb"]).toBe(true)
+  })
+
+  it("Test 7: a pending card with a selection has no axe violations", async () => {
+    const user = userEvent.setup()
+    const { container } = render(<PendingAskCard ask={threeOptionAsk} reconcile={noopReconcile} />)
+    await user.click(screen.getAllByRole("radio")[1])
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

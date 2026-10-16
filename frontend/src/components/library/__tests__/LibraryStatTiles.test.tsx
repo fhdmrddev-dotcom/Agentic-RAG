@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { LibraryStatTiles } from "../LibraryStatTiles"
 import { LibraryBreadcrumb } from "../LibraryBreadcrumb"
-import type { Document, Folder } from "@/types"
+import type { Folder } from "@/types"
 
 // ── Mock API ──────────────────────────────────────────────────────────────────
 const { mockGetReembedProgress, mockGetHealthOverview } = vi.hoisted(() => ({
@@ -27,41 +27,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
 })
 
 // ── Sample data ───────────────────────────────────────────────────────────────
-const sampleDocs: Document[] = [
-  {
-    id: "doc-1",
-    user_id: "u1",
-    folder_id: "f1",
-    filename: "a.pdf",
-    file_path: "/a.pdf",
-    file_size: 100,
-    mime_type: "application/pdf",
-    status: "completed",
-    error_message: null,
-    chunk_count: 10,
-    content_hash: "abc",
-    metadata: null,
-    created_at: "2026-01-01T00:00:00Z",
-    updated_at: "2026-01-01T00:00:00Z",
-  },
-  {
-    id: "doc-2",
-    user_id: "u1",
-    folder_id: null,
-    filename: "b.txt",
-    file_path: "/b.txt",
-    file_size: 50,
-    mime_type: "text/plain",
-    status: "completed",
-    error_message: null,
-    chunk_count: 2,
-    content_hash: "def",
-    metadata: null,
-    created_at: "2026-01-01T00:00:00Z",
-    updated_at: "2026-01-01T00:00:00Z",
-  },
-]
-
+// 284-01 (D-07): the tiles take NUMBERS. The two documents this suite used to hand in carried
+// chunk counts 10 + 2 = 12 across 2 documents; those are now the props.
 const sampleFolders: Folder[] = [
   {
     id: "folder-1",
@@ -99,37 +66,37 @@ describe("LibraryStatTiles", () => {
   })
 
   // ── CHUNKS ──────────────────────────────────────────────────────────────────
-  it("CHUNKS renders the sum of chunk_count across documents", async () => {
-    render(<LibraryStatTiles documents={sampleDocs} />)
+  it("CHUNKS renders the summary chunk count it is handed", async () => {
+    render(<LibraryStatTiles chunks={12} documents={2} state="ready" />)
     // 10 + 2 = 12
     expect(await screen.findByText("12")).toBeInTheDocument()
   })
 
   it("CHUNKS renders 'across N documents' description", async () => {
-    render(<LibraryStatTiles documents={sampleDocs} />)
+    render(<LibraryStatTiles chunks={12} documents={2} state="ready" />)
     expect(await screen.findByText("across 2 documents")).toBeInTheDocument()
   })
 
   it("CHUNKS renders with the label 'Chunks'", async () => {
-    render(<LibraryStatTiles documents={sampleDocs} />)
+    render(<LibraryStatTiles chunks={12} documents={2} state="ready" />)
     expect(await screen.findByText("Chunks")).toBeInTheDocument()
   })
 
   // ── VECTORS ─────────────────────────────────────────────────────────────────
   it("VECTORS renders the vector count from getReembedProgress", async () => {
-    render(<LibraryStatTiles documents={sampleDocs} />)
+    render(<LibraryStatTiles chunks={12} documents={2} state="ready" />)
     // 224 total vectors/chunks
     expect(await screen.findByText("224")).toBeInTheDocument()
   })
 
   it("VECTORS renders the model name as description", async () => {
-    render(<LibraryStatTiles documents={sampleDocs} />)
+    render(<LibraryStatTiles chunks={12} documents={2} state="ready" />)
     expect(await screen.findByText("text-embedding-3-small")).toBeInTheDocument()
   })
 
   it("VECTORS when fetch is unreachable renders the honest-unknown arm, never 0", async () => {
     mockGetReembedProgress.mockRejectedValue(new Error("network error"))
-    render(<LibraryStatTiles documents={sampleDocs} />)
+    render(<LibraryStatTiles chunks={12} documents={2} state="ready" />)
     expect(await screen.findByText("Not known yet")).toBeInTheDocument()
     // The value should NOT be 0
     expect(screen.queryByText("0")).not.toBeInTheDocument()
@@ -137,19 +104,19 @@ describe("LibraryStatTiles", () => {
 
   // ── FOUND BY A SEARCH ───────────────────────────────────────────────────────
   it("FOUND BY A SEARCH renders retrieved_this_month", async () => {
-    render(<LibraryStatTiles documents={sampleDocs} />)
+    render(<LibraryStatTiles chunks={12} documents={2} state="ready" />)
     expect(await screen.findByText("15")).toBeInTheDocument()
   })
 
   it("FOUND BY A SEARCH renders 'last 30 days' description", async () => {
-    render(<LibraryStatTiles documents={sampleDocs} />)
+    render(<LibraryStatTiles chunks={12} documents={2} state="ready" />)
     expect(await screen.findByText("last 30 days")).toBeInTheDocument()
   })
 
   it("FOUND BY A SEARCH when fetch is unreachable renders the honest-unknown arm, never 0", async () => {
     mockGetHealthOverview.mockRejectedValue(new Error("network error"))
     mockGetReembedProgress.mockRejectedValue(new Error("network error"))
-    render(<LibraryStatTiles documents={sampleDocs} />)
+    render(<LibraryStatTiles chunks={12} documents={2} state="ready" />)
     // "Not known yet" should appear (at least once across all tiles)
     const unknowns = await screen.findAllByText("Not known yet")
     expect(unknowns.length).toBeGreaterThanOrEqual(1)
@@ -159,7 +126,7 @@ describe("LibraryStatTiles", () => {
 
   // ── NO SPARKLINE ────────────────────────────────────────────────────────────
   it("no sparkline element (svg, polyline, or chart) is present in any tile", async () => {
-    render(<LibraryStatTiles documents={sampleDocs} />)
+    render(<LibraryStatTiles chunks={12} documents={2} state="ready" />)
     // Wait for the async tiles to settle
     await screen.findByText("Chunks")
     // No SVG elements
@@ -169,6 +136,36 @@ describe("LibraryStatTiles", () => {
     expect(container).not.toBeNull()
     expect(container!.querySelector("svg")).toBeNull()
     expect(container!.querySelector("polyline")).toBeNull()
+  })
+
+  // ── 284-01 (D-07 / D-12 / UI-SPEC S6) — the CHUNKS tile's three honest arms ─────────────
+  /** The CHUNKS tile's value and description, read from inside that tile only (VECTORS and
+   *  FOUND carry the same "…" / "Not known yet" words while their own fetches settle). */
+  function chunksTile(): { value: string; description: string } {
+    const tile = screen.getByText("Chunks").closest("[data-stat-tile]") as HTMLElement
+    const spans = tile.querySelectorAll(":scope > span")
+    return { value: spans[0]?.textContent ?? "", description: spans[1]?.textContent ?? "" }
+  }
+
+  it("CHUNKS ready groups both numbers (12,345 across 10,000 documents; 1 document)", async () => {
+    const { unmount } = render(<LibraryStatTiles chunks={12345} documents={10000} state="ready" />)
+    await screen.findByText("Chunks")
+    expect(chunksTile()).toEqual({ value: "12,345", description: "across 10,000 documents" })
+    unmount()
+    render(<LibraryStatTiles chunks={3} documents={1} state="ready" />)
+    expect(chunksTile()).toEqual({ value: "3", description: "across 1 document" })
+  })
+
+  it("CHUNKS loading renders … in both slots, never 0", async () => {
+    render(<LibraryStatTiles chunks={null} documents={null} state="loading" />)
+    await screen.findByText("Chunks")
+    expect(chunksTile()).toEqual({ value: "…", description: "…" })
+  })
+
+  it("CHUNKS failed renders Not known yet and —, never 0", async () => {
+    render(<LibraryStatTiles chunks={null} documents={null} state="error" />)
+    await screen.findByText("Chunks")
+    expect(chunksTile()).toEqual({ value: "Not known yet", description: "—" })
   })
 })
 

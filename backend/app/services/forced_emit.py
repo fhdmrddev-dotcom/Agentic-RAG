@@ -46,7 +46,7 @@ from typing import Any
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from app.config import get_model_capability, settings
+from app.config import get_model_capability, get_per_call_timeout_async, settings
 from app.services.provider_gateway import CallingMode, GatewayRequest, open_stream
 from app.services.template_render_service import EmitFieldMap, is_truncated
 from app.services.tool_parser import parse_structured_tool_calls
@@ -223,6 +223,9 @@ def _failure(
     a reader who trusted it would thread the totals twice and look for a second site
     that does not exist. ⛔ A SECOND call site would have to thread the totals again;
     adding one without doing so silently re-opens the hole.
+
+    ⚠ 282-REVIEW WR-03 ADDED that second call site: the timed-out-rung arm, which ends the
+    ladder. It passes both ladder totals explicitly, like the floor.
     """
     return {
         "emitted": None,
@@ -277,6 +280,7 @@ def _build_request(
     forced: bool,
     strict_schema: bool,
     schema_model: type[BaseModel] | None = None,
+    timeout_s: float | None = None,
 ) -> GatewayRequest:
     """Assemble the per-rung ``GatewayRequest`` — the EXISTING FORCE/COERCE request
     assembly (live ``:294-330``), parameterized by the rung. ``forced=True`` names the
@@ -296,6 +300,7 @@ def _build_request(
             tool_choice="auto",  # ignored on the forced path — force_tool_name drives it
             force_tool_name=emitter,
             strict_schema=strict_schema,
+            timeout_s=timeout_s,
         )
     # TIER-COERCE rung (Kimi/Moonshot — genuinely unforceable): keep tool_choice="auto"
     # + an explicit directive, then hard-validate (D-05). NEVER a model-written-code
@@ -315,6 +320,7 @@ def _build_request(
         user_settings=user_settings,
         max_tokens=max_tokens,
         tool_choice="auto",
+        timeout_s=timeout_s,
     )
 
 
@@ -497,6 +503,10 @@ async def forced_emit(
     # report the cumulative spend of runs 1..N.
     ladder_in_tok: int | None = None
     ladder_out_tok: int | None = None
+    # Phase 282 (FIX-06, D-01): the per-model budget reaches every rung's client constructor
+    # and the OpenAI-family open guard. A TimeoutError from that guard ENDS the ladder
+    # (282-REVIEW WR-03) — it never descends a rung like other provider raises.
+    _timeout_s = await get_per_call_timeout_async(model, settings, provider=provider)
     for rung_name, forced, rung_strict in _RUNGS_BY_TIER[emit_tier]:
         # Phase 103 strict override: an explicit ``strict=False`` demotes the
         # strict_force rung (skip it — it would be a redundant non-strict duplicate);
@@ -518,6 +528,7 @@ async def forced_emit(
             forced=forced,
             strict_schema=effective_strict,
             schema_model=schema_model,
+            timeout_s=_timeout_s,
         )
 
         # Phase 101.1-07 (gap 1b / D-08 layer 6 — the substrate half): a provider call
@@ -530,6 +541,25 @@ async def forced_emit(
             stream, calling_mode = await open_stream(provider, req)
             content, tool_calls, finish_reason, _rung_in, _rung_out = (
                 await run_in_threadpool(_drain, stream)
+            )
+        except TimeoutError:
+            # 282-REVIEW WR-03: a per-call timeout is TERMINAL for the ladder. Descending would
+            # re-queue the same prompt on a model that is busy (the previous rung's request may
+            # still be in flight) and stack silent budgets past the run watchdog (D-21). The
+            # failure keeps the existing provider_error value; a distinct timed_out label is
+            # deferred (it needs a new emit_cause kind + copy). Ladder totals threaded (S-5).
+            logger.info(
+                "forced_emit: rung=%s timed out; ending the ladder emit_tier=%s provider=%s",
+                rung_name, emit_tier, provider,
+            )
+            return _failure(
+                emit_tier,
+                provider,
+                forced=False,
+                truncated=False,
+                failure_override="provider_error",
+                input_tokens=ladder_in_tok,
+                output_tokens=ladder_out_tok,
             )
         except Exception:  # noqa: BLE001 — a provider raise → descend to the next rung
             logger.info(

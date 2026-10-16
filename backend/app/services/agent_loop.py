@@ -93,7 +93,7 @@ from app.services.retrieval_service import _call_as_user, _vector_literal
 from app.services.provider_gateway import classify_provider_error, message_for_kind
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
-from app.db.runs import insert_assistant_message
+from app.db.runs import insert_assistant_message, link_run_message
 from app.models.message import TRANSCRIPT_EVENT_KINDS
 from app.services.scope_note import SCOPE_CHANGED_KIND, ScopeNoteFold
 from app.utils.folder_utils import fetch_visible_folders
@@ -552,6 +552,11 @@ async def _drain_stream_with_close_on_cancel(
     producer_exception: list[BaseException] = []
 
     loop = asyncio.get_running_loop()
+    # Phase 282 D-20: ONE deadline across open + drain — the dispatcher stamps it on an
+    # OpenAI-family stream after its off-loop open; call sites are unchanged.
+    _deadline = getattr(stream, "budget_deadline", None)
+    if isinstance(_deadline, (int, float)):
+        timeout_seconds = max(0.0, _deadline - loop.time())
 
     def _producer():
         # Sync producer — drives _TracedStream.__iter__ to completion.
@@ -2043,6 +2048,17 @@ async def run_agent_loop(
             _cached_id = str(_inserted_id) if _inserted_id else None
         except Exception as e:
             logger.error("Failed to persist assistant message: %s", e)
+        if _cached_id and run_id:
+            # BUG-261015-05: link now, not at finalize, so a fetch during the post-answer work
+            # (suggestions) returns the reply WITH its run id and the chat shows one copy.
+            try:
+                await link_run_message(
+                    await get_pg_pool(),
+                    run_id=UUID(str(run_id)),
+                    message_id=UUID(_cached_id),
+                )
+            except Exception as e:
+                logger.warning("early runs.message_id link failed for run %s: %s", run_id, e)
         _persist_assistant_message._cached_id = _cached_id  # type: ignore[attr-defined]
         return _cached_id
 
@@ -2533,7 +2549,7 @@ async def run_agent_loop(
                         # producer-shell classifier reads (loop machinery, not
                         # stream construction).
                         _model_id = body.model or user_settings.llm_model
-                        per_call_budget = await get_per_call_timeout_async(_model_id, settings)
+                        per_call_budget = await get_per_call_timeout_async(_model_id, settings, provider=active_provider_name)
                         # Phase 066 D-066-07: capture for outer-except error format
                         _last_iteration = iteration
                         _last_model_id = _model_id
@@ -2559,6 +2575,7 @@ async def run_agent_loop(
                             force_no_tools=force_no_tools,
                             user_settings=user_settings,
                             tool_choice=tool_choice,
+                            timeout_s=per_call_budget,
                         )
                         _stream, _calling_mode = await open_stream(
                             active_provider_name, _gw_request
@@ -2601,7 +2618,7 @@ async def run_agent_loop(
                         # (DB > env > static > default). STAYS consumer-side — loop
                         # machinery, not stream construction.
                         _model_id = body.model or user_settings.llm_model
-                        per_call_budget = await get_per_call_timeout_async(_model_id, settings)
+                        per_call_budget = await get_per_call_timeout_async(_model_id, settings, provider=active_provider_name)
                         # Phase 066 D-066-07: capture for outer-except error format
                         _last_iteration = iteration
                         _last_model_id = _model_id
@@ -2643,6 +2660,7 @@ async def run_agent_loop(
                             force_no_tools=force_no_tools,
                             user_settings=user_settings,
                             tool_choice=tool_choice,
+                            timeout_s=per_call_budget,
                         )
                         stream, calling_mode = await open_stream(
                             active_provider_name, _gw_request

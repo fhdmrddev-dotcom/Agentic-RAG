@@ -46,6 +46,18 @@ const listDocumentChunks = vi.fn()
 const listDocumentTables = vi.fn<(id: string) => Promise<DocumentTableRow[]>>()
 const listDocumentImages = vi.fn<(id: string) => Promise<DocumentImageRow[]>>()
 const listDocumentQueries = vi.fn<(id: string) => Promise<DocumentQueryRow[]>>()
+// 284-03 (D-17): the sections read the PAGE clients. By default each case's array fixture is
+// served as ONE exact page (total = its length), so every shipped case keeps its intent; the
+// "N of M" cases below override one answer with a partial page.
+type Page = { offset?: number; limit?: number }
+const listDocumentTablesPage = vi.fn(async (id: string, page?: Page) => {
+  const rows = await listDocumentTables(id)
+  return { tables: rows, total: rows.length, offset: page?.offset ?? 0, limit: page?.limit ?? 50 }
+})
+const listDocumentImagesPage = vi.fn(async (id: string, page?: Page) => {
+  const rows = await listDocumentImages(id)
+  return { images: rows, total: rows.length, offset: page?.offset ?? 0, limit: page?.limit ?? 100 }
+})
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
@@ -55,9 +67,12 @@ vi.mock("@/lib/api", async () => {
     listRelationships: (...a: unknown[]) => listRelationships(...(a as [])),
     listDocuments: (...a: unknown[]) => listDocuments(...(a as [])),
     getDocumentContent: (...a: unknown[]) => getDocumentContent(...(a as [])),
-    listDocumentChunks: (...a: unknown[]) => listDocumentChunks(...(a as [])),
-    listDocumentTables: (...a: unknown[]) => listDocumentTables(...(a as [string])),
-    listDocumentImages: (...a: unknown[]) => listDocumentImages(...(a as [string])),
+    listDocumentChunksPage: async (...a: unknown[]) => {
+      const rows = (await listDocumentChunks(...(a as []))) as unknown[]
+      return { chunks: rows, total: rows.length, offset: 0, limit: 200 }
+    },
+    listDocumentTablesPage: (...a: unknown[]) => listDocumentTablesPage(...(a as [string, Page?])),
+    listDocumentImagesPage: (...a: unknown[]) => listDocumentImagesPage(...(a as [string, Page?])),
     listDocumentQueries: (...a: unknown[]) => listDocumentQueries(...(a as [string])),
   }
 })
@@ -282,6 +297,29 @@ describe("Tables section — the extracted tables render AS TABLES", () => {
     expect(seen).toContain("No tables were extracted")
     expect(seen).toContain("No tables")
   })
+
+  // ── 284-03 (D-17 / UI-SPEC S10): one bounded page, and an honest "N of M" ──
+  it("reads ONE page of 50; with 80 in the document the header says 80 and the body says which 50", async () => {
+    const fifty = Array.from({ length: 50 }, (_, i) => table({ id: `t${i}`, table_index: i }))
+    listDocumentTablesPage.mockResolvedValueOnce({ tables: fifty, total: 80, offset: 0, limit: 50 })
+    render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
+    expect(await screen.findByText("The quarterly")).toBeInTheDocument()
+    const head = openSection("Tables")
+    const line = await screen.findByText("80 tables in this document, showing the first 50")
+    expect(line.className).toContain("text-xs")
+    expect(line.className).toContain("text-panel-muted-foreground")
+    expect(listDocumentTablesPage).toHaveBeenCalledWith("doc-tbl-1", { offset: 0, limit: 50 })
+    expect(within(head).getByText("80")).toBeInTheDocument()
+  })
+
+  it("renders no 'N of M' line when every table is shown", async () => {
+    listDocumentTables.mockResolvedValue([table()])
+    render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
+    expect(await screen.findByText("The quarterly")).toBeInTheDocument()
+    openSection("Tables")
+    expect(await screen.findByText("EMEA")).toBeInTheDocument()
+    expect(screen.queryByText(/tables in this document, showing/)).toBeNull()
+  })
 })
 
 describe("Images section — descriptions, and nothing that implies a picture", () => {
@@ -325,6 +363,23 @@ describe("Images section — descriptions, and nothing that implies a picture", 
     openSection("Images")
     expect(await screen.findByText(payload)).toBeInTheDocument()
     expect(container.querySelector("img")).toBeNull()
+  })
+
+  // ── 284-03 (D-17 / UI-SPEC S10) ──
+  it("reads ONE page of 100; with 340 descriptions the header says 340 and the body says which 100", async () => {
+    const hundred = Array.from({ length: 100 }, (_, i) => ({
+      id: `i${i}`,
+      page: 1,
+      image_index: i,
+      description: `Figure text ${i}`,
+    }))
+    listDocumentImagesPage.mockResolvedValueOnce({ images: hundred, total: 340, offset: 0, limit: 100 })
+    render(<DocumentDetailPanel doc={makeDoc()} onClose={() => {}} />)
+    expect(await screen.findByText("The quarterly")).toBeInTheDocument()
+    const head = openSection("Images")
+    expect(await screen.findByText("340 image descriptions in this document, showing the first 100")).toBeInTheDocument()
+    expect(listDocumentImagesPage).toHaveBeenCalledWith("doc-tbl-1", { offset: 0, limit: 100 })
+    expect(within(head).getByText("340")).toBeInTheDocument()
   })
 })
 

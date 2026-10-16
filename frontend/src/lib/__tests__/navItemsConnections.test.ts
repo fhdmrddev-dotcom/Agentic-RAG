@@ -15,6 +15,13 @@
  * which entry provides the door or what it is called — only that a fail-closed map still
  * leaves one. Renaming the entry keeps this green; re-governing it goes red, which is the
  * only behaviour worth pinning.
+ *
+ * ⚠ FLIPPED IN PLACE 2026-10-15 (Phase 283, FIX-01 / BUG-261004-02). The third case below used to
+ * assert that a member does NOT see Settings ("still hides the model_management Settings entry").
+ * Its premise — a member reaching the page meets a 403 on mount — stopped being true when
+ * SettingsPage skipped `getSettings` for a member and gated its tabs, and Phase 283 gave members a
+ * Preferences tab of their own. The Settings entry is now ungoverned like Connections; the case
+ * asserts the member keeps the door. The case count is unchanged (6), by design.
  */
 import { describe, it, expect } from "vitest"
 import { NAV_ITEMS, visibleNavItems } from "@/lib/nav-items"
@@ -48,11 +55,15 @@ describe("connections reachability for a non-operator", () => {
     expect(entry?.feature).toBeUndefined()
   })
 
-  it("still hides the model_management Settings entry from a member", () => {
-    // The original decision is not reverted: Settings itself stays operator-only,
-    // because GET/PUT /settings carry require_visible("model_management").
-    const visible = visibleNavItems(MEMBER)
-    expect(visible.some((i) => i.view === "settings")).toBe(false)
+  it("now leaves a member the Settings door too (Phase 283, FIX-01)", () => {
+    // Was: "Settings itself stays operator-only, because GET/PUT /settings carry
+    // require_visible('model_management')". The ROUTES still do — that is the wall, fenced by
+    // backend/tests/unit/test_283_settings_two_role_fence.py — but the DOOR no longer needs to
+    // be hidden: a member's Settings page shows only Preferences, Memory and Audit Log.
+    // ⚠ The explicit deny is passed because `MEMBER` is derived from the TAGGED entries, and
+    // the Settings entry no longer carries a tag — without it this would pass over nothing.
+    const visible = visibleNavItems({ ...MEMBER, model_management: false } as EffectiveFeatures)
+    expect(visible.some((i) => i.view === "settings")).toBe(true)
   })
 
   it("shows both entries to an operator", () => {

@@ -3,9 +3,9 @@ seed_id: SEED-339
 title: "`{{prior_run.*}}` is never filled in for an `llm_emit` step — the step that writes the deliverable sends the literal placeholder to the model"
 created: 2026-10-04
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Reviewed at /gsd:plan-phase 281 (2026-10-14): path match only (runVocabulary.ts / phase_types.py), different defect from refusal-cause wording — deferred, trigger unchanged."
 trigger_when: "Any phase whose files_modified names backend/app/services/harness/phase_types.py or forced_emit.py; OR any phase that picks up SEED-167 (living register / update-in-place); OR a stateful workflow's deliverable mentions '{{prior_run' or ignores last run's output."
 trigger_paths: ["backend/app/services/harness/phase_types.py", "backend/app/services/forced_emit.py", "backend/app/services/harness_engine.py"]
 trigger_surfaces: ["harness", "workflow"]

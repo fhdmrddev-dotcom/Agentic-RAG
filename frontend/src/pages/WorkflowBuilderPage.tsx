@@ -248,6 +248,9 @@ import {
   HINT_FRAG2,
   HINT_FRAG3,
 } from "@/components/workflows/doorVocabulary"
+// Phase 281 (D-11, SEED-221) — the ONE place a describe refusal code becomes words. The page
+// renders what it returns and never prints the stored key itself.
+import { describeRefusal } from "@/components/workflows/describeRefusalVocabulary"
 import type { CanvasNode } from "@/components/workflows/canvasModel"
 // TYPE-ONLY, and that is load-bearing: `WorkflowCanvas` is `React.lazy` so the chunk is
 // never requested with the flag off, and a value import of anything from that module
@@ -2180,11 +2183,24 @@ export function WorkflowBuilderPage({
               role="alert"
               className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-[13px] text-foreground"
             >
-              <p className="font-medium">Couldn't generate — {errorMessage}</p>
-              {errorDetail && <p className="mt-1 text-[12px] text-muted-foreground">{errorDetail}</p>}
-              <p className="mt-1 text-[12px] text-muted-foreground">
-                Nothing was saved. Adjust your description and try again.
-              </p>
+              {/* Phase 281 (D-11/D-12, FIX-10 / SEED-221) — ONE sentence + ONE next step from the
+                  describe refusal table; the code and the slug-bearing detail only under the
+                  technical-names reveal. Computed inline: no hook, no state, no effect. */}
+              {(() => {
+                const refusal = describeRefusal(errorMessage, errorDetail)
+                return (
+                  <>
+                    <p className="font-medium">{refusal.sentence}</p>
+                    <p className="mt-1 text-[12px] text-muted-foreground">{refusal.next}</p>
+                    <p className="mt-1 text-[12px] text-muted-foreground">Nothing was saved.</p>
+                    {showTechnical && (refusal.technical || refusal.technicalDetail) ? (
+                      <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                        {[refusal.technical, refusal.technicalDetail].filter(Boolean).join(" · ")}
+                      </span>
+                    ) : null}
+                  </>
+                )
+              })()}
             </div>
           )}
         </div>

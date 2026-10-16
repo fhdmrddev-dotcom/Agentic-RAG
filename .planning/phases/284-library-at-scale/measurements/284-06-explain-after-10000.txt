@@ -1,0 +1,377 @@
+C:\Vibe Apps/Agentic RAG/.claude/worktrees/agent-a306a723b9721317f/backend\tests\integration\_rls_harness.py:64: RuntimeWarning: coroutine 'pg_reachable' was never awaited
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+
+######## root
+Aggregate  (cost=4007.61..4007.62 rows=1 width=48) (actual time=3.605..3.614 rows=1 loops=1)
+  Buffers: shared hit=789
+  InitPlan 12
+    ->  Aggregate  (cost=1784.60..1784.61 rows=1 width=8) (actual time=2.596..2.599 rows=1 loops=1)
+          Buffers: shared hit=570
+          InitPlan 1
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.007..0.007 rows=1 loops=1)
+          InitPlan 2
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+          InitPlan 5
+            ->  Seq Scan on folders f  (cost=7.80..42.74 rows=4 width=16) (never executed)
+                  Filter: ((ANY (org_id = (hashed SubPlan 4).col1)) AND (user_id <> (InitPlan 3).col1) AND (((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = user_id) OR folder_is_org_shared(id)) AND folder_is_org_shared(id))
+                  InitPlan 3
+                    ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+                  SubPlan 4
+                    ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                          ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+          InitPlan 7
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+          InitPlan 9
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=1)
+          InitPlan 11
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+          ->  Index Scan using documents_library_root_created_idx on documents d_1  (cost=8.17..1740.08 rows=130 width=16) (actual time=0.256..2.394 rows=5816 loops=1)
+                Index Cond: ((user_id = (InitPlan 1).col1) AND (is_latest = true))
+                Filter: ((archived_at IS NULL) AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 8).col1)) AND (((InitPlan 9).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+                Rows Removed by Filter: 184
+                Buffers: shared hit=570
+                SubPlan 8
+                  ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.198..0.223 rows=1 loops=1)
+                        Buffers: shared hit=1
+                        ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+  ->  Limit  (cost=193.82..2222.87 rows=25 width=544) (actual time=0.812..0.820 rows=25 loops=1)
+        Buffers: shared hit=219
+        InitPlan 13
+          ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.014..0.014 rows=1 loops=1)
+        InitPlan 14
+          ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+        InitPlan 17
+          ->  Seq Scan on folders f_1  (cost=7.80..42.74 rows=4 width=16) (never executed)
+                Filter: ((ANY (org_id = (hashed SubPlan 16).col1)) AND (user_id <> (InitPlan 15).col1) AND (((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = user_id) OR folder_is_org_shared(id)) AND folder_is_org_shared(id))
+                InitPlan 15
+                  ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+                SubPlan 16
+                  ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                        ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+        InitPlan 19
+          ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=1)
+        InitPlan 21
+          ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.005..0.005 rows=1 loops=1)
+        InitPlan 23
+          ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+        ->  Incremental Sort  (cost=150.92..10701.97 rows=130 width=544) (actual time=0.811..0.816 rows=25 loops=1)
+              Sort Key: d.created_at DESC, o.id DESC
+              Presorted Key: d.created_at
+              Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 37kB  Peak Memory: 37kB
+              Buffers: shared hit=219
+              ->  Nested Loop Left Join  (cost=69.16..10696.12 rows=130 width=544) (actual time=0.584..0.792 rows=26 loops=1)
+                    Buffers: shared hit=219
+                    ->  Nested Loop Left Join  (cost=47.14..7829.06 rows=130 width=512) (actual time=0.576..0.717 rows=26 loops=1)
+                          Buffers: shared hit=167
+                          ->  Nested Loop Left Join  (cost=16.35..3823.41 rows=130 width=480) (actual time=0.563..0.637 rows=26 loops=1)
+                                Buffers: shared hit=115
+                                ->  Index Scan using documents_library_root_created_idx on documents d  (cost=8.17..1740.08 rows=130 width=480) (actual time=0.319..0.336 rows=26 loops=1)
+                                      Index Cond: ((user_id = (InitPlan 13).col1) AND (is_latest = true))
+                                      Filter: ((archived_at IS NULL) AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 20).col1)) AND (((InitPlan 21).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+                                      Rows Removed by Filter: 2
+                                      Buffers: shared hit=10
+                                      SubPlan 20
+                                        ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.242..0.268 rows=1 loops=1)
+                                              Buffers: shared hit=1
+                                              ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+                                ->  Index Scan using documents_pkey on documents o  (cost=8.18..16.03 rows=1 width=16) (actual time=0.011..0.011 rows=1 loops=26)
+                                      Index Cond: (id = d.id)
+                                      Filter: (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 18).col1)) AND (((InitPlan 19).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+                                      Buffers: shared hit=105
+                                      SubPlan 18
+                                        ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.192..0.216 rows=1 loops=1)
+                                              Buffers: shared hit=1
+                                              ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+                          ->  Aggregate  (cost=30.79..30.80 rows=1 width=32) (actual time=0.003..0.003 rows=1 loops=26)
+                                Buffers: shared hit=52
+                                ->  Subquery Scan on t1  (cost=30.76..30.78 rows=1 width=24) (actual time=0.001..0.002 rows=1 loops=26)
+                                      Buffers: shared hit=52
+                                      ->  Aggregate  (cost=30.76..30.77 rows=1 width=8) (actual time=0.001..0.001 rows=1 loops=26)
+                                            Buffers: shared hit=52
+                                            ->  Bitmap Heap Scan on document_tables dt  (cost=12.08..30.76 rows=1 width=802) (actual time=0.001..0.001 rows=0 loops=26)
+                                                  Recheck Cond: (document_id = o.id)
+                                                  Filter: (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR document_is_retrievable(document_id)) AND (ANY (org_id = (hashed SubPlan 24).col1)) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                                                  Buffers: shared hit=52
+                                                  ->  Bitmap Index Scan on document_tables_document_idx  (cost=0.00..4.31 rows=5 width=0) (actual time=0.001..0.001 rows=0 loops=26)
+                                                        Index Cond: (document_id = o.id)
+                                                        Buffers: shared hit=52
+                                                  SubPlan 24
+                                                    ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                                                          ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+                    ->  Aggregate  (cost=22.03..22.04 rows=1 width=32) (actual time=0.002..0.002 rows=1 loops=26)
+                          Buffers: shared hit=52
+                          ->  Subquery Scan on i1  (cost=22.00..22.02 rows=1 width=24) (actual time=0.001..0.001 rows=1 loops=26)
+                                Buffers: shared hit=52
+                                ->  Aggregate  (cost=22.00..22.01 rows=1 width=8) (actual time=0.001..0.001 rows=1 loops=26)
+                                      Buffers: shared hit=52
+                                      ->  Bitmap Heap Scan on document_images di  (cost=12.06..22.00 rows=1 width=169) (actual time=0.001..0.001 rows=0 loops=26)
+                                            Recheck Cond: (document_id = o.id)
+                                            Filter: (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR document_is_retrievable(document_id)) AND (ANY (org_id = (hashed SubPlan 25).col1)) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                                            Buffers: shared hit=52
+                                            ->  Bitmap Index Scan on document_images_document_idx  (cost=0.00..4.30 rows=3 width=0) (actual time=0.001..0.001 rows=0 loops=26)
+                                                  Index Cond: (document_id = o.id)
+                                                  Buffers: shared hit=52
+                                            SubPlan 25
+                                              ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                                                    ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+Planning Time: 1.493 ms
+Execution Time: 3.796 ms
+
+######## find
+Aggregate  (cost=10432.84..10432.85 rows=1 width=48) (actual time=6.529..6.542 rows=1 loops=1)
+  Buffers: shared hit=959
+  InitPlan 12
+    ->  Aggregate  (cost=4740.32..4740.33 rows=1 width=8) (actual time=5.101..5.104 rows=1 loops=1)
+          Buffers: shared hit=639
+          InitPlan 1
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.006..0.006 rows=1 loops=1)
+          InitPlan 2
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+          InitPlan 5
+            ->  Seq Scan on folders f  (cost=7.80..42.74 rows=4 width=16) (actual time=0.293..0.293 rows=0 loops=1)
+                  Filter: ((ANY (org_id = (hashed SubPlan 4).col1)) AND (user_id <> (InitPlan 3).col1) AND (((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = user_id) OR folder_is_org_shared(id)) AND folder_is_org_shared(id))
+                  Rows Removed by Filter: 61
+                  Buffers: shared hit=3
+                  InitPlan 3
+                    ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.005..0.005 rows=1 loops=1)
+                  SubPlan 4
+                    ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.234..0.260 rows=1 loops=1)
+                          Buffers: shared hit=1
+                          ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+          InitPlan 7
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+          InitPlan 9
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.005..0.005 rows=1 loops=1)
+          InitPlan 11
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+          ->  Append  (cost=209.63..4696.52 rows=360 width=0) (actual time=0.779..4.759 rows=9720 loops=1)
+                Buffers: shared hit=639
+                ->  Bitmap Heap Scan on documents d_2  (cost=209.63..2647.73 rows=217 width=16) (actual time=0.779..3.995 rows=9720 loops=1)
+                      Recheck Cond: ((user_id = (InitPlan 1).col1) AND is_latest)
+                      Filter: ((archived_at IS NULL) AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 8).col1)) AND (((InitPlan 9).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+                      Rows Removed by Filter: 300
+                      Heap Blocks: exact=466
+                      Buffers: shared hit=636
+                      ->  Bitmap Index Scan on documents_library_added_idx  (cost=0.00..201.81 rows=940 width=0) (actual time=0.444..0.444 rows=10020 loops=1)
+                            Index Cond: ((user_id = (InitPlan 1).col1) AND (is_latest = true))
+                            Buffers: shared hit=169
+                      SubPlan 8
+                        ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.242..0.268 rows=1 loops=1)
+                              Buffers: shared hit=1
+                              ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+                ->  Result  (cost=55.85..2043.39 rows=143 width=16) (actual time=0.306..0.307 rows=0 loops=1)
+                      One-Time Filter: ((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = (InitPlan 1).col1)
+                      Buffers: shared hit=3
+                      ->  Bitmap Heap Scan on documents d_3  (cost=55.85..2043.39 rows=143 width=16) (actual time=0.297..0.298 rows=0 loops=1)
+                            Recheck Cond: (folder_id = ANY ((InitPlan 5).col1))
+                            Filter: (is_latest AND (archived_at IS NULL) AND (user_id IS DISTINCT FROM (InitPlan 2).col1) AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 10).col1)) AND (((InitPlan 11).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+                            Buffers: shared hit=3
+                            ->  Bitmap Index Scan on documents_folder_id_idx  (cost=0.00..48.02 rows=694 width=0) (actual time=0.296..0.296 rows=0 loops=1)
+                                  Index Cond: (folder_id = ANY ((InitPlan 5).col1))
+                                  Buffers: shared hit=3
+                            SubPlan 10
+                              ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                                    ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+  ->  Limit  (cost=2148.74..5692.38 rows=25 width=606) (actual time=1.109..1.217 rows=25 loops=1)
+        Buffers: shared hit=320
+        InitPlan 27
+          ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.012..0.012 rows=1 loops=1)
+        InitPlan 28
+          ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+        InitPlan 31
+          ->  Seq Scan on folders f_3  (cost=7.80..42.74 rows=4 width=16) (actual time=0.235..0.236 rows=0 loops=1)
+                Filter: ((ANY (org_id = (hashed SubPlan 30).col1)) AND (user_id <> (InitPlan 29).col1) AND (((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = user_id) OR folder_is_org_shared(id)) AND folder_is_org_shared(id))
+                Rows Removed by Filter: 61
+                Buffers: shared hit=3
+                InitPlan 29
+                  ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=1)
+                SubPlan 30
+                  ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.192..0.217 rows=1 loops=1)
+                        Buffers: shared hit=1
+                        ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+        InitPlan 33
+          ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=1)
+        InitPlan 35
+          ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.004..0.005 rows=1 loops=1)
+        InitPlan 37
+          ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+        ->  Result  (cost=2105.84..53134.26 rows=360 width=606) (actual time=1.108..1.212 rows=25 loops=1)
+              Buffers: shared hit=320
+              ->  Incremental Sort  (cost=2105.84..10268.16 rows=360 width=601) (actual time=0.852..0.856 rows=25 loops=1)
+                    Sort Key: d.created_at DESC NULLS LAST, o.id
+                    Presorted Key: d.created_at
+                    Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 37kB  Peak Memory: 37kB
+                    Buffers: shared hit=119
+                    ->  Nested Loop Left Join  (cost=2064.87..10257.56 rows=360 width=601) (actual time=0.763..0.839 rows=26 loops=1)
+                          Buffers: shared hit=119
+                          ->  Merge Append  (cost=2056.69..4824.66 rows=360 width=601) (actual time=0.534..0.553 rows=26 loops=1)
+                                Sort Key: d.created_at DESC NULLS LAST
+                                Buffers: shared hit=14
+                                ->  Index Scan using documents_library_added_idx on documents d  (cost=8.18..2772.18 rows=217 width=601) (actual time=0.288..0.304 rows=26 loops=1)
+                                      Index Cond: ((user_id = (InitPlan 27).col1) AND (is_latest = true))
+                                      Filter: ((archived_at IS NULL) AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 34).col1)) AND (((InitPlan 35).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+                                      Rows Removed by Filter: 1
+                                      Buffers: shared hit=11
+                                      SubPlan 34
+                                        ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.226..0.252 rows=1 loops=1)
+                                              Buffers: shared hit=1
+                                              ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+                                ->  Sort  (cost=2048.51..2048.86 rows=143 width=601) (actual time=0.245..0.246 rows=0 loops=1)
+                                      Sort Key: d_1.created_at DESC NULLS LAST
+                                      Sort Method: quicksort  Memory: 25kB
+                                      Buffers: shared hit=3
+                                      ->  Result  (cost=55.85..2043.39 rows=143 width=601) (actual time=0.243..0.244 rows=0 loops=1)
+                                            One-Time Filter: ((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = (InitPlan 27).col1)
+                                            Buffers: shared hit=3
+                                            ->  Bitmap Heap Scan on documents d_1  (cost=55.85..2043.39 rows=143 width=601) (actual time=0.239..0.239 rows=0 loops=1)
+                                                  Recheck Cond: (folder_id = ANY ((InitPlan 31).col1))
+                                                  Filter: (is_latest AND (archived_at IS NULL) AND (user_id IS DISTINCT FROM (InitPlan 28).col1) AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 36).col1)) AND (((InitPlan 37).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+                                                  Buffers: shared hit=3
+                                                  ->  Bitmap Index Scan on documents_folder_id_idx  (cost=0.00..48.02 rows=694 width=0) (actual time=0.237..0.237 rows=0 loops=1)
+                                                        Index Cond: (folder_id = ANY ((InitPlan 31).col1))
+                                                        Buffers: shared hit=3
+                                                  SubPlan 36
+                                                    ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                                                          ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+                          ->  Index Scan using documents_pkey on documents o  (cost=8.18..15.09 rows=1 width=16) (actual time=0.011..0.011 rows=1 loops=26)
+                                Index Cond: (id = d.id)
+                                Filter: (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 32).col1)) AND (((InitPlan 33).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+                                Buffers: shared hit=105
+                                SubPlan 32
+                                  ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.182..0.206 rows=1 loops=1)
+                                        Buffers: shared hit=1
+                                        ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+              SubPlan 19
+                ->  Aggregate  (cost=59.52..59.54 rows=1 width=4) (actual time=0.012..0.012 rows=1 loops=25)
+                      Buffers: shared hit=101
+                      InitPlan 13
+                        ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=1)
+                      InitPlan 18
+                        ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.004..0.005 rows=1 loops=1)
+                      ->  Index Scan using documents_user_filename_idx on documents e  (cost=50.92..59.46 rows=1 width=0) (actual time=0.011..0.011 rows=1 loops=25)
+                            Index Cond: ((user_id = d.user_id) AND (filename = d.filename))
+                            Filter: (((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 17).col1)) AND (((InitPlan 18).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)) AND ((user_id = (InitPlan 13).col1) OR ((folder_id IS NOT NULL) AND (ANY (folder_id = (hashed SubPlan 16).col1)))))
+                            Buffers: shared hit=101
+                            SubPlan 17
+                              ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.185..0.210 rows=1 loops=1)
+                                    Buffers: shared hit=1
+                                    ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+                            SubPlan 16
+                              ->  Seq Scan on folders f_1  (cost=7.80..42.74 rows=4 width=16) (never executed)
+                                    Filter: ((ANY (org_id = (hashed SubPlan 15).col1)) AND (user_id <> (InitPlan 14).col1) AND (((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = user_id) OR folder_is_org_shared(id)) AND folder_is_org_shared(id))
+                                    InitPlan 14
+                                      ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+                                    SubPlan 15
+                                      ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                                            ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+              SubPlan 26
+                ->  Index Scan using documents_user_filename_idx on documents e_1  (cost=50.99..59.52 rows=1 width=0) (actual time=0.001..0.001 rows=0 loops=25)
+                      Index Cond: ((user_id = d.user_id) AND (filename = d.filename))
+                      Filter: ((version_number < d.version_number) AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 24).col1)) AND (((InitPlan 25).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)) AND ((user_id = (InitPlan 20).col1) OR ((folder_id IS NOT NULL) AND (ANY (folder_id = (hashed SubPlan 23).col1)))))
+                      Rows Removed by Filter: 1
+                      Buffers: shared hit=100
+                      InitPlan 20
+                        ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+                      InitPlan 25
+                        ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+                      SubPlan 24
+                        ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                              ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+                      SubPlan 23
+                        ->  Seq Scan on folders f_2  (cost=7.80..42.74 rows=4 width=16) (never executed)
+                              Filter: ((ANY (org_id = (hashed SubPlan 22).col1)) AND (user_id <> (InitPlan 21).col1) AND (((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = user_id) OR folder_is_org_shared(id)) AND folder_is_org_shared(id))
+                              InitPlan 21
+                                ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+                              SubPlan 22
+                                ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                                      ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+Planning Time: 1.996 ms
+Execution Time: 6.707 ms
+
+######## rootcount
+Aggregate  (cost=1784.60..1784.61 rows=1 width=8) (actual time=2.523..2.525 rows=1 loops=1)
+  Buffers: shared hit=570
+  InitPlan 1
+    ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.010..0.010 rows=1 loops=1)
+  InitPlan 2
+    ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+  InitPlan 5
+    ->  Seq Scan on folders f  (cost=7.80..42.74 rows=4 width=16) (never executed)
+          Filter: ((ANY (org_id = (hashed SubPlan 4).col1)) AND (user_id <> (InitPlan 3).col1) AND (((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = user_id) OR folder_is_org_shared(id)) AND folder_is_org_shared(id))
+          InitPlan 3
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+          SubPlan 4
+            ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                  ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+  InitPlan 7
+    ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+  InitPlan 9
+    ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.005..0.005 rows=1 loops=1)
+  InitPlan 11
+    ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+  ->  Index Scan using documents_library_root_created_idx on documents d  (cost=8.17..1740.08 rows=130 width=16) (actual time=0.282..2.323 rows=5816 loops=1)
+        Index Cond: ((user_id = (InitPlan 1).col1) AND (is_latest = true))
+        Filter: ((archived_at IS NULL) AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 8).col1)) AND (((InitPlan 9).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+        Rows Removed by Filter: 184
+        Buffers: shared hit=570
+        SubPlan 8
+          ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.224..0.250 rows=1 loops=1)
+                Buffers: shared hit=1
+                ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+Planning Time: 0.501 ms
+Execution Time: 2.562 ms
+
+######## findcount
+Aggregate  (cost=4740.32..4740.33 rows=1 width=8) (actual time=4.972..4.975 rows=1 loops=1)
+  Buffers: shared hit=639
+  InitPlan 1
+    ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.009..0.010 rows=1 loops=1)
+  InitPlan 2
+    ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+  InitPlan 5
+    ->  Seq Scan on folders f  (cost=7.80..42.74 rows=4 width=16) (actual time=0.303..0.304 rows=0 loops=1)
+          Filter: ((ANY (org_id = (hashed SubPlan 4).col1)) AND (user_id <> (InitPlan 3).col1) AND (((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = user_id) OR folder_is_org_shared(id)) AND folder_is_org_shared(id))
+          Rows Removed by Filter: 61
+          Buffers: shared hit=3
+          InitPlan 3
+            ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.005..0.005 rows=1 loops=1)
+          SubPlan 4
+            ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.251..0.278 rows=1 loops=1)
+                  Buffers: shared hit=1
+                  ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+  InitPlan 7
+    ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+  InitPlan 9
+    ->  Result  (cost=0.00..0.03 rows=1 width=16) (actual time=0.004..0.005 rows=1 loops=1)
+  InitPlan 11
+    ->  Result  (cost=0.00..0.03 rows=1 width=16) (never executed)
+  ->  Append  (cost=209.63..4696.52 rows=360 width=0) (actual time=0.669..4.635 rows=9720 loops=1)
+        Buffers: shared hit=639
+        ->  Bitmap Heap Scan on documents d  (cost=209.63..2647.73 rows=217 width=16) (actual time=0.669..3.846 rows=9720 loops=1)
+              Recheck Cond: ((user_id = (InitPlan 1).col1) AND is_latest)
+              Filter: ((archived_at IS NULL) AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 8).col1)) AND (((InitPlan 9).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+              Rows Removed by Filter: 300
+              Heap Blocks: exact=466
+              Buffers: shared hit=636
+              ->  Bitmap Index Scan on documents_library_added_idx  (cost=0.00..201.81 rows=940 width=0) (actual time=0.381..0.381 rows=10020 loops=1)
+                    Index Cond: ((user_id = (InitPlan 1).col1) AND (is_latest = true))
+                    Buffers: shared hit=169
+              SubPlan 8
+                ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (actual time=0.213..0.239 rows=1 loops=1)
+                      Buffers: shared hit=1
+                      ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.000..0.000 rows=1 loops=1)
+        ->  Result  (cost=55.85..2043.39 rows=143 width=16) (actual time=0.322..0.323 rows=0 loops=1)
+              One-Time Filter: ((COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid = (InitPlan 1).col1)
+              Buffers: shared hit=3
+              ->  Bitmap Heap Scan on documents d_1  (cost=55.85..2043.39 rows=143 width=16) (actual time=0.309..0.309 rows=0 loops=1)
+                    Recheck Cond: (folder_id = ANY ((InitPlan 5).col1))
+                    Filter: (is_latest AND (archived_at IS NULL) AND (user_id IS DISTINCT FROM (InitPlan 2).col1) AND ((current_setting('app.agent_read'::text, true) IS DISTINCT FROM 'on'::text) OR retrievable) AND (ANY (org_id = (hashed SubPlan 10).col1)) AND (((InitPlan 11).col1 = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))
+                    Buffers: shared hit=3
+                    ->  Bitmap Index Scan on documents_folder_id_idx  (cost=0.00..48.02 rows=694 width=0) (actual time=0.307..0.307 rows=0 loops=1)
+                          Index Cond: (folder_id = ANY ((InitPlan 5).col1))
+                          Buffers: shared hit=3
+                    SubPlan 10
+                      ->  ProjectSet  (cost=0.00..5.27 rows=1000 width=16) (never executed)
+                            ->  Result  (cost=0.00..0.01 rows=1 width=0) (never executed)
+Planning Time: 0.507 ms
+Execution Time: 5.020 ms

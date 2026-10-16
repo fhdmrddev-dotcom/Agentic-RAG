@@ -2,7 +2,7 @@
  * Phase 217.1 plan 06 (LIB-01 / D-217.1 sparkline-drop) — three stat tiles for the
  * Documents tab, modeled on `HealthStatBar.tsx`'s label / big-number / description shape.
  *
- *   CHUNKS            — sum of `chunk_count` over the currently loaded documents (no fetch)
+ *   CHUNKS            — the summary's Σ chunk_count (284, D-07); the page passes numbers, never documents
  *   VECTORS           — `total` from `getReembedProgress()`; description = model name
  *   FOUND BY A SEARCH — `retrieved_this_month` from `getHealthOverview()`; `last 30 days`
  *
@@ -15,7 +15,6 @@
 import { useEffect, useState } from "react"
 import { getReembedProgress, getHealthOverview } from "@/lib/api"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
-import type { Document } from "@/types"
 
 const UNKNOWN = "Not known yet"
 
@@ -49,7 +48,7 @@ function Tile({
   description: React.ReactNode
 }) {
   return (
-    <div className="group relative flex min-w-0 flex-1 flex-col gap-1 rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm p-4 shadow-sm card-interactive overflow-hidden">
+    <div data-stat-tile className="group relative flex min-w-0 flex-1 flex-col gap-1 rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm p-4 shadow-sm card-interactive overflow-hidden">
       {/* Subtle top accent gradient */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       
@@ -67,10 +66,20 @@ function Tile({
   )
 }
 
-export function LibraryStatTiles({ documents }: { documents: Document[] }) {
-  // CHUNKS — derived from the already-held documents, zero fetch.
-  const chunkSum = documents.reduce((s, d) => s + (d.chunk_count ?? 0), 0)
-  const docCount = documents.length
+export function LibraryStatTiles({
+  chunks,
+  documents,
+  state,
+}: {
+  /** The summary's Σ chunk_count; `null` until it has answered (never coerced to 0). */
+  chunks: number | null
+  /** The summary's document total; `null` until it has answered. */
+  documents: number | null
+  /** The summary read's state — the VECTORS tri-state, verbatim. */
+  state: "loading" | "ready" | "error"
+}) {
+  // CHUNKS — the summary's numbers (284-01, D-07). Same three arms as VECTORS below.
+  const chunksKnown = state === "ready" && chunks !== null && documents !== null
 
   // VECTORS — total chunk/vector count + model name from the re-embed progress endpoint.
   const vectors = useAsyncValue(async () => {
@@ -91,8 +100,16 @@ export function LibraryStatTiles({ documents }: { documents: Document[] }) {
     >
       <Tile
         label="Chunks"
-        value={chunkSum.toLocaleString()}
-        description={<>across <AnimatedNumber value={docCount} /> document{docCount === 1 ? "" : "s"}</>}
+        value={state === "error" ? UNKNOWN : chunksKnown ? chunks.toLocaleString() : "…"}
+        description={
+          state === "error" ? (
+            "—"
+          ) : chunksKnown ? (
+            <>across <AnimatedNumber value={documents.toLocaleString()} /> document{documents === 1 ? "" : "s"}</>
+          ) : (
+            "…"
+          )
+        }
       />
       <Tile
         label="Vectors"

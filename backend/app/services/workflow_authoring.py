@@ -378,6 +378,17 @@ def _render_vocabulary_block(vocabulary: dict[str, dict]) -> str:
     return _VOCABULARY_ALLOWED_FRAME.format(lines=lines)
 
 
+# ── Phase 281 (D-13, FIX-10 / SEED-221) — WHICH connection situation refused the draft ─────────
+# ``connection_not_allowed`` is returned by THREE different arms below, and before 281 the client
+# could tell them apart only by parsing ``detail`` — prose carrying the step slug. Each arm now adds
+# ONE additive ``reason_code`` beside the unchanged ``error`` and ``detail`` (the
+# ``api/connectors.py`` ``reason_code``-beside-``message`` precedent), so the describe door can give
+# each situation its own sentence. Tests import these names; the client table keys on the values.
+CONNECTION_REFUSAL_NO_SERVICE = "no_service_chosen"
+CONNECTION_REFUSAL_SERVICE_NOT_ALLOWED = "service_not_allowed"
+CONNECTION_REFUSAL_ACTION_NOT_ALLOWED = "action_not_allowed"
+
+
 def _check_allowed_connections(
     wd: WorkflowDefinition,
     allowed: list[str] | None,
@@ -418,6 +429,7 @@ def _check_allowed_connections(
             return {
                 "ok": False,
                 "error": "connection_not_allowed",
+                "reason_code": CONNECTION_REFUSAL_NO_SERVICE,
                 "detail": (
                     f"phase '{phase.slug}' acts outside the app, but no connected service was "
                     "chosen for this workflow."
@@ -427,6 +439,7 @@ def _check_allowed_connections(
             return {
                 "ok": False,
                 "error": "connection_not_allowed",
+                "reason_code": CONNECTION_REFUSAL_SERVICE_NOT_ALLOWED,
                 "detail": (
                     f"phase '{phase.slug}' names a service that was not chosen for this "
                     "workflow."
@@ -447,6 +460,7 @@ def _check_allowed_connections(
             return {
                 "ok": False,
                 "error": "connection_not_allowed",
+                "reason_code": CONNECTION_REFUSAL_ACTION_NOT_ALLOWED,
                 "detail": (
                     f"phase '{phase.slug}' uses an action that is not allowed on the chosen "
                     "service."
@@ -667,6 +681,15 @@ async def generate_workflow_definition(
     ``builderPhase: "error"`` with the message and detail; ``WorkflowBuilderPage.tsx:2151``
     renders it. Plan ``214-14``'s seam **S-7** drives that path end to end — this docstring
     names it so a *"covered by the audit"* claim can be checked rather than believed.
+
+    ⚠ CORRECTED 2026-10-14 (Phase 281, D-13) — THE "NEEDS NO CLIENT CHANGE" SENTENCE ABOVE IS NOW
+    FALSE, and it is kept rather than deleted so the correction is visible. It was true of the
+    PATH (the code string did reach the screen untouched) and that was the defect: SEED-221's
+    *"a refusal reaches the screen as a machine code"*. The three ``connection_not_allowed``
+    returns now carry an additive ``reason_code`` (``CONNECTION_REFUSAL_*``), and the client turns
+    ``error`` + ``reason_code`` into one sentence and one next step through
+    ``frontend/src/components/workflows/describeRefusalVocabulary.ts``; the hook stores the KEY,
+    not the code, and the raw code shows only under the technical-names reveal.
 
     Provider-call budget (REQ-2 a/b): EXACTLY one call on a valid first emit; EXACTLY two
     (attempt 1 then 2, no third) on a first-pass ValidationError; each call emits one

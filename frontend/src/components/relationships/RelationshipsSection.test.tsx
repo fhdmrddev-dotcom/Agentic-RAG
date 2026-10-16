@@ -30,7 +30,10 @@ vi.mock("@/lib/supabase", () => ({
 const listRelationships = vi.fn<() => Promise<RelatedDocumentsResponse>>()
 const deleteRelationship = vi.fn<() => Promise<void>>()
 const createRelationship = vi.fn()
-const listDocuments = vi.fn().mockResolvedValue([])
+// 284-04 (D-15): the Add-link dialog type-aheads against POST /document-search, not the list client.
+const searchDocuments = vi.fn().mockResolvedValue({
+  documents: [], total: 0, older_matches: 0, sort: "added_desc", offset: 0, limit: 20,
+})
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
   return {
@@ -38,8 +41,11 @@ vi.mock("@/lib/api", async () => {
     listRelationships: (...a: unknown[]) => listRelationships(...(a as [])),
     deleteRelationship: (...a: unknown[]) => deleteRelationship(...(a as [])),
     createRelationship: (...a: unknown[]) => createRelationship(...(a as [])),
-    listDocuments: (...a: unknown[]) => listDocuments(...(a as [])),
   }
+})
+vi.mock("@/lib/api/documents", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/documents")>("@/lib/api/documents")
+  return { ...actual, searchDocuments: (...a: unknown[]) => searchDocuments(...(a as [])) }
 })
 
 import { RelationshipsSection } from "./RelationshipsSection"

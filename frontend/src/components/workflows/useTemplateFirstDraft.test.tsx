@@ -49,6 +49,10 @@ import { useTemplateFirstDraft, type TemplateFirstDefinition } from "./useTempla
 // scope fence (`canvasModel.purity.test.ts:14-17`, `DoorHeaderStrip.test.tsx:250-256`).
 import templateFirstDraftSource from "./useTemplateFirstDraft?raw"
 import { createBuilderStore, type BuilderPhase, type BuilderStore } from "./builderStore"
+import { REQUEST_FAILED_KEY, refusalKey } from "./describeRefusalVocabulary"
+// 281-REVIEW WR-03 — the typed entitlement signal and its client-only key.
+import { ENTITLEMENT_REFUSED_KEY } from "./describeRefusalVocabulary"
+import { EntitlementRefusalError } from "@/lib/api/_core"
 import {
   generateWorkflow,
   readTemplatePlaceholdersFromFile,
@@ -421,9 +425,11 @@ describe("useTemplateFirstDraft — the readiness verdict at the hook's output b
   it("raises NOTHING on an `ok:false` response, so no verdict can be read off a failure", async () => {
     // The failure arm carries no `readiness` member on the type at all (T-197-07). This is the
     // RUNTIME half of that fence: the callback is not reached, so there is no argument to read.
+    // Phase 281 (D-11/D-12, SEED-221): the refusal now renders through describeRefusalVocabulary;
+    // re-captured on purpose — the mock is a REAL server code rather than free text.
     mockedGenerate.mockResolvedValue({
       ok: false,
-      error: "Couldn't generate — the model refused.",
+      error: "could_not_generate",
     } as GenerateResult)
     const { view, onDraftedSpy } = mountHook()
     act(() => view.result.current.setDescribe("a weekly status report"))
@@ -459,9 +465,12 @@ describe("useTemplateFirstDraft — the readiness verdict at the hook's output b
 
 describe("useTemplateFirstDraft — an honest failure", () => {
   it("on {ok:false} sets the store's error state and raises `onDrafted` ZERO times", async () => {
+    // Phase 281 (D-11/D-12, SEED-221): the refusal now renders through describeRefusalVocabulary;
+    // re-captured on purpose. The mock was free text standing in for a code; it is now a REAL
+    // server code, and the store holds the table KEY that `refusalKey` builds from it.
     mockedGenerate.mockResolvedValue({
       ok: false,
-      error: "Couldn't generate — the model refused.",
+      error: "could_not_generate",
       detail: "a detail line",
     } as GenerateResult)
     const { view, store, drafted } = mountHook()
@@ -471,7 +480,7 @@ describe("useTemplateFirstDraft — an honest failure", () => {
     })
     expect(drafted).toHaveLength(0)
     expect(store.getState().builderPhase).toBe("error")
-    expect(store.getState().errorMessage).toBe("Couldn't generate — the model refused.")
+    expect(store.getState().errorMessage).toBe(refusalKey("could_not_generate"))
     expect(store.getState().errorDetail).toBe("a detail line")
     // …and NO phases were rendered — never a renderable broken draft (T-103-04-01).
     expect(store.getState().phases).toEqual([])
@@ -486,7 +495,60 @@ describe("useTemplateFirstDraft — an honest failure", () => {
     })
     expect(drafted).toHaveLength(0)
     expect(store.getState().builderPhase).toBe("error")
+    // Phase 281 (D-11/D-12, SEED-221): the refusal now renders through describeRefusalVocabulary;
+    // re-captured on purpose — the catch arm stores the client-only REQUEST_FAILED_KEY.
+    expect(store.getState().errorMessage).toBe(REQUEST_FAILED_KEY)
     expect(store.getState().errorDetail).toBe("Failed to generate workflow (status 502)")
+  })
+
+  it("281 (D-13): an {ok:false} with a reason_code stores the code JOINED to its sub-reason", async () => {
+    mockedGenerate.mockResolvedValue({
+      ok: false,
+      error: "connection_not_allowed",
+      reason_code: "no_service_chosen",
+      detail: "phase 'tell-the-team' acts outside the app",
+    } as GenerateResult)
+    const { view, store, drafted } = mountHook()
+    act(() => view.result.current.setDescribe("tell the team every Monday"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    expect(drafted).toHaveLength(0)
+    expect(store.getState().errorMessage).toBe(refusalKey("connection_not_allowed", "no_service_chosen"))
+    expect(store.getState().errorDetail).toBe("phase 'tell-the-team' acts outside the app")
+  })
+
+  it("281 (D-24): a THROWN server sentence is kept whole as the detail of REQUEST_FAILED_KEY", async () => {
+    mockedGenerate.mockRejectedValue(new Error("Your plan doesn't include workflows."))
+    const { view, store } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    expect(store.getState().errorMessage).toBe(REQUEST_FAILED_KEY)
+    expect(store.getState().errorDetail).toBe("Your plan doesn't include workflows.")
+  })
+
+  it("281-REVIEW WR-03: a TYPED entitlement refusal is stored under ENTITLEMENT_REFUSED_KEY", async () => {
+    mockedGenerate.mockRejectedValue(new EntitlementRefusalError("Your plan doesn't include workflows."))
+    const { view, store } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    expect(store.getState().errorMessage).toBe(ENTITLEMENT_REFUSED_KEY)
+    expect(store.getState().errorDetail).toBe("Your plan doesn't include workflows.")
+  })
+
+  it("281-REVIEW WR-03: a network TypeError stays on REQUEST_FAILED_KEY (never trusted as words)", async () => {
+    mockedGenerate.mockRejectedValue(new TypeError("Failed to fetch"))
+    const { view, store } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    expect(store.getState().errorMessage).toBe(REQUEST_FAILED_KEY)
+    expect(store.getState().errorDetail).toBe("Failed to fetch")
   })
 })
 

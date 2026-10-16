@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { NAV_ITEMS } from "./nav-items"
+import { NAV_ITEMS, visibleNavItems } from "./nav-items"
+import type { EffectiveFeatures } from "@/lib/api"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 146 (ADMIN-01 / D-07) — the NAV_ITEMS byte-identity regression lock.
@@ -62,5 +63,35 @@ describe("NAV_ITEMS — the Expert catalog entry (Phase 262 / PACK-11)", () => {
     // ⛔ Exact, not `>=`: a lower bound could not see the retired entry come back.
     expect(NAV_ITEMS.length).toBe(7)
     expect(NAV_ITEMS.some((item) => (item.view as string) === "classification-rules")).toBe(false)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 283 plan 02 (FIX-01 / BUG-261004-02, D-01 / D-12 a) — the Settings door stands for
+// a member.
+//
+// Settings now holds three tabs that are the member's own (Preferences, Memory, Audit Log);
+// the operator tabs are gated per tab in the page and refused per route at the API
+// (`require_visible("model_management")`, fenced by
+// `backend/tests/unit/test_283_settings_two_role_fence.py`). So the door carries no `feature`
+// key — exactly like `connections`, `skills` and `experts`.
+//
+// ⛔ THE MAP IS THE REAL MEMBER SHAPE, NEVER `{}`. `visibleNavItems` is fail-OPEN for an
+// unknown key, so `{}` shows Settings at HEAD too and this case could never go red. A member's
+// `/features` answer carries every governed key with an explicit boolean.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("NAV_ITEMS — the Settings door (Phase 283 / FIX-01)", () => {
+  it("is UNGOVERNED, so a member whose map denies model_management still sees it", () => {
+    const entry = NAV_ITEMS.find((i) => i.view === "settings")
+    expect(entry).toBeDefined()
+    expect(entry?.feature).toBeUndefined()
+    expect(Object.prototype.hasOwnProperty.call(entry ?? {}, "feature")).toBe(false)
+    const member = {
+      model_management: false,
+      workflow_authoring: true,
+      skill_studio: false,
+      governance_health: true,
+    } as unknown as EffectiveFeatures
+    expect(visibleNavItems(member).some((i) => i.view === "settings")).toBe(true)
   })
 })

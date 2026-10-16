@@ -19,6 +19,7 @@ import { createWorkflowDraft, generateWorkflow, publishWorkflow, updateWorkflowD
 import { triggerSchedule } from "../schedules"
 import { createThread, handoffThread, postMessage, setThreadActiveExpert } from "../threads"
 import { ApiError } from "../_core"
+import { EntitlementRefusalError } from "../_core"
 
 const REFUSAL = {
   detail: {
@@ -67,6 +68,20 @@ describe("workflow surfaces carry the plan, not a status code", () => {
   it("generate", async () => {
     reply403()
     await expect(generateWorkflow({} as never)).rejects.toThrow("It is part of the Enterprise plan.")
+  })
+  // 281-REVIEW WR-03: the describe door renders a thrown message verbatim ONLY when it is this
+  // typed signal; every other throw stays a plain Error the table words itself.
+  it("generate's tier refusal is a TYPED EntitlementRefusalError; a 502 is not", async () => {
+    reply403()
+    await expect(generateWorkflow({} as never)).rejects.toBeInstanceOf(EntitlementRefusalError)
+    vi.restoreAllMocks()
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ detail: "upstream" }), { status: 502, headers: { "Content-Type": "application/json" } }),
+    )
+    const err = await generateWorkflow({} as never).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(Error)
+    expect(err).not.toBeInstanceOf(EntitlementRefusalError)
+    expect((err as Error).message).toBe("Failed to generate workflow (status 502)")
   })
   // UAT-265-258-c: schedule create / patch / run-now share readScheduleFailure.
   it("schedule run-now", async () => {

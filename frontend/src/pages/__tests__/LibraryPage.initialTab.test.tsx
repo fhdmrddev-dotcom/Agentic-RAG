@@ -34,6 +34,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, Folder } from "@/types"
+import { installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
 // Phase 235 plan 15 (gap-closure round 1 · G5) — the clearing rule under test, and the
 // App wiring that has to actually USE it. `?raw` is TEXT: importing App this way evaluates
 // no module, so none of this suite's mocks have to cover App's own import graph.
@@ -86,10 +87,19 @@ const {
   mockGetSourceHealth: vi.fn(),
 }))
 
+// 284-03 (D-24): the page reads ONE page + the summary from the server. The fake answers both
+// from the SAME fixture this suite used to hand `useDocuments` whole (see `mockLibrary`).
+const libraryApi = vi.hoisted(() => ({
+  listDocumentsPage: vi.fn(),
+  getLibrarySummary: vi.fn(),
+  getDocument: vi.fn(),
+}))
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return {
     ...actual,
+    ...libraryApi,
     listViews: mockListViews,
     resolveView: mockResolveView,
     resolveAdHoc: mockResolveAdHoc,
@@ -176,6 +186,13 @@ const sampleDocuments: Document[] = [
   },
 ]
 
+/** 284-03 (D-24): the ONE wiring swap — the fixture feeds the fake server, and `useDocuments`
+ *  keeps only its doors (upload / delete / uploading). */
+function mockLibrary({ documents, ...doors }: { documents: Document[] } & Record<string, unknown>) {
+  installFakeLibraryApi(libraryApi, documents)
+  mockUseDocuments.mockReturnValue(doors)
+}
+
 function renderPage(ui: React.ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>)
 }
@@ -188,7 +205,7 @@ function selectedTabName(): string | null {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockUseDocuments.mockReturnValue({
+  mockLibrary({
     documents: sampleDocuments,
     uploading: false,
     uploadingCount: 0,

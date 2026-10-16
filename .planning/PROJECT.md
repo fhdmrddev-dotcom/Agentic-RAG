@@ -24,6 +24,8 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 **Out of scope (decided at intake):** the owed operator UAT/sign-offs (stay in STATE.md "Owed") · any new capability · SEED-354 · Open Platform (SEED-013).
 
+**Progress (2026-10-15):** 277-281 complete (5 of 8 phases). 281 closed with G-4 rows A, C, D owed by operator decision; an all-archived freshness scope passes like an empty one (WR-02, kept by design). Phase 284 Library at Scale (FIX-11) added 2026-10-14. Next: 282. 277-279 live; 280-281 not pushed.
+
 ---
 
 ## Last Shipped: v4.5 Find It, Show It (2026-10-12)
@@ -1463,6 +1465,6 @@ This document evolves at phase transitions and milestone boundaries.
 
 *Last updated: 2026-10-12 — **Phase 275 DEPLOYED** (prod `784647e2d`; migrations 204 → 205 → 206 applied, advisors 0 ERROR). All of v4.5 is live.*
 
-*Last updated: 2026-10-12 — **milestone v4.6 Pay It Down STARTED** (8 major bugs + v4.5 tech debt + three G-5 extractions; phases from 277, migrations from 207).*
+*Last updated: 2026-10-15 — Phase 281 closed (5 of 8 v4.6 phases complete). Previously: 2026-10-12 — **milestone v4.6 Pay It Down STARTED** (8 major bugs + v4.5 tech debt + three G-5 extractions; phases from 277, migrations from 207).*
 
 *Last updated: 2026-10-12 — **Phase 277 complete** (REG-04, REG-05 → Validated): CLAUDE.md split by function 121,650 → 89,171 chars, nothing lost (mechanical proof), FIRING-table cell cap bound at 80; v4.5 archive repaired by hand. Verification passed 4/4; review 0 critical / 8 warning (guard hardening, untriaged).*

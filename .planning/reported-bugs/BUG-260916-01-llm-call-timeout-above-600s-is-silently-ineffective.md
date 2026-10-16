@@ -4,9 +4,9 @@ title: A per-model timeout above 600s is accepted by the UI and silently cannot 
 reported: 2026-09-16
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/provider-routing, backend/agent-loop, admin/model-registry, local-models]
-folded_into: null
+folded_into: "282"
 verified_closed_by: null
 related_seeds: ["SEED-289", "SEED-172"]
 re_open_trigger: null

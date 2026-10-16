@@ -23,6 +23,7 @@ import userEvent from "@testing-library/user-event"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, DocumentSearchRow, Folder } from "@/types"
+import { installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
 
 const {
   mockUseDocuments,
@@ -44,10 +45,19 @@ const {
   mockResolveAdHoc: vi.fn(),
 }))
 
+// 284-03 (D-24): the page reads ONE page + the summary from the server. The fake answers both
+// from the SAME fixture this suite used to hand `useDocuments` whole (see `mockLibrary`).
+const libraryApi = vi.hoisted(() => ({
+  listDocumentsPage: vi.fn(),
+  getLibrarySummary: vi.fn(),
+  getDocument: vi.fn(),
+}))
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return {
     ...actual,
+    ...libraryApi,
     listViews: vi.fn().mockResolvedValue([]),
     resolveView: vi.fn().mockResolvedValue({ documents: [], total: 0 }),
     resolveAdHoc: mockResolveAdHoc,
@@ -133,6 +143,13 @@ import { LibraryPage } from "@/pages/LibraryPage"
 import { DocumentSearchError } from "@/lib/api/documents"
 
 // Radix Select (the sort control) needs the standard jsdom shims to open.
+/** 284-03 (D-24): the ONE wiring swap — the fixture feeds the fake server, and `useDocuments`
+ *  keeps only its doors (upload / delete / uploading). */
+function mockLibrary({ documents, ...doors }: { documents: Document[] } & Record<string, unknown>) {
+  installFakeLibraryApi(libraryApi, documents)
+  mockUseDocuments.mockReturnValue(doors)
+}
+
 beforeEach(() => {
   if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
   if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
@@ -189,7 +206,7 @@ const ANSWER = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockUseDocuments.mockReturnValue({
+  mockLibrary({
     documents: DOCUMENTS,
     uploading: false,
     uploadingCount: 0,
@@ -236,7 +253,7 @@ describe("LibraryPage — Find at rest costs nothing (D-01 / T-271-17)", () => {
     expect(within(group).getByRole("radio", { name: "Find documents" })).toHaveAttribute("aria-checked", "true")
     expect(nameInput()).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Version: Latest" })).toBeInTheDocument()
-    expect(screen.getByText("browse-only.pdf")).toBeInTheDocument()
+    expect(await screen.findByText("browse-only.pdf")).toBeInTheDocument()
     expect(screen.getByText(/Documents not assigned to a folder/)).toBeInTheDocument()
     await sleep(500)
     expect(mockSearchDocuments).not.toHaveBeenCalled()
@@ -391,7 +408,7 @@ describe("LibraryPage — Save as view and the Views tab (Pitfall 9 / D-114-1)",
   it("with only a metadata condition the shipped Save as view stays", async () => {
     renderPage()
     fireEvent.click(screen.getByRole("button", { name: "＋ Document type" }))
-    fireEvent.click(screen.getByRole("checkbox", { name: "Contract" }))
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Contract" }))
     fireEvent.click(screen.getByRole("button", { name: "Apply" }))
     await waitFor(() =>
       expect(mockSearchDocuments).toHaveBeenLastCalledWith(
@@ -427,7 +444,7 @@ describe("LibraryPage — 271 review fixes", () => {
     })
     renderPage()
     fireEvent.click(screen.getByRole("button", { name: "＋ Document type" }))
-    fireEvent.click(screen.getByRole("checkbox", { name: "Contract" }))
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Contract" }))
     fireEvent.click(screen.getByRole("button", { name: "Apply" }))
     await waitFor(() => expect(mockSearchDocuments).toHaveBeenCalled())
     // The Find path itself still never runs the browse resolver.
@@ -437,11 +454,19 @@ describe("LibraryPage — 271 review fixes", () => {
     expect(await screen.findByTestId("views-tab")).toBeInTheDocument()
     await waitFor(() => expect(screen.getByText("contract-hit.pdf")).toBeInTheDocument())
     expect(screen.queryByText("browse-only.pdf")).toBeNull()
-    expect(mockResolveAdHoc).toHaveBeenCalledTimes(1)
-    expect(mockResolveAdHoc).toHaveBeenCalledWith({
-      op: "and",
-      conditions: [{ field: "document_type", op: "eq", value: "Contract" }],
-    })
+    // 284-03 (D-24): the resolve now asks the server for ONE page (with the archived flag) and
+    // makes ONE count read for the archived-hidden line — so "one resolve" is counted on the
+    // page reads, and the count read is pinned to exactly one beside it.
+    const pageReads = mockResolveAdHoc.mock.calls.filter((c) => !(c[1] as { count_only?: boolean })?.count_only)
+    expect(pageReads).toHaveLength(1)
+    expect(mockResolveAdHoc).toHaveBeenCalledTimes(2)
+    expect(mockResolveAdHoc).toHaveBeenCalledWith(
+      {
+        op: "and",
+        conditions: [{ field: "document_type", op: "eq", value: "Contract" }],
+      },
+      { offset: 0, limit: 25, include_archived: false },
+    )
   })
 
   it("CR-01: opening the Views tab with no filter change since the last resolve costs no request", async () => {

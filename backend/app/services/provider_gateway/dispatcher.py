@@ -25,7 +25,10 @@ stay passed-in callables consumer-side).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+import asyncio
+import logging
+import threading
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, AsyncIterator
 
 # Re-export the EXISTING CallingMode enum — do NOT define a new one (Pitfall 3).
@@ -36,6 +39,8 @@ from .events import GatewayEvent
 
 if TYPE_CHECKING:  # consumer-side type only; never imported at runtime (no cycle)
     from app.models.user_settings import UserEffectiveSettings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -82,6 +87,24 @@ class GatewayRequest:
     # leaks into the consumer).
     force_tool_name: str | None = None
     strict_schema: bool = False
+    # Phase 282 (FIX-06, D-01): the per-model per-call budget the consumer resolved
+    # (``get_per_call_timeout_async``). Each adapter builds its client with it, and the
+    # OpenAI-family open is guarded by it. ``None`` = a no-budget caller — byte-identical.
+    timeout_s: float | None = None
+    # 282-REVIEW CR-01: the provider that chose the ENDPOINT — ``open_stream``'s first argument,
+    # stamped there. ``active_provider_name`` is the REGISTRY vendor of the model id (it keys
+    # <think>/usage normalisation) and names ``openrouter`` for an LM Studio slug like
+    # ``qwen/qwen3-30b-a3b``, so it must never pick the self-hosted retry count.
+    routing_provider: str | None = None
+
+    def retries_provider(self) -> str | None:
+        """The provider whose SDK retry count applies: the routing provider, else the one the
+        client's endpoint is built from (``user_settings.active_provider``), else the adapter's."""
+        return (
+            self.routing_provider
+            or (getattr(self.user_settings, "active_provider", None) if self.user_settings else None)
+            or self.active_provider_name
+        )
 
 
 # ⭐ THE EXTENSION CONTRACT FOR WIRE PROTOCOLS, made literal (Phase 262).
@@ -128,6 +151,104 @@ def _open_surface_stream(surface: str, request: "GatewayRequest"):
     return getattr(module, f"open_{module_name}_stream")(request)
 
 
+def _open_openai_family(request: GatewayRequest):
+    """The OpenAI-family open, SYNC — the dispatcher's else-branch body moved verbatim
+    (Phase 282 D-20). It runs in a worker thread via ``_open_off_loop``: the SDK's
+    ``create(...)`` does not return until response headers arrive, so on the event loop
+    it froze every request on the worker for the whole header wait (BUG-261015-02)."""
+    # OpenAI-compat else-branch (OpenAI / OpenRouter / Ollama / native-7
+    # fallbacks) — Phase 092.5 Wave 4 (D-04, the entangled unit). The adapter
+    # wraps create_adaptive_streaming_chat and SURFACES the calling_mode it
+    # returns (Pitfall 3 / L-3 — never buried). It keys its internal
+    # <think>/usage/boundary logic on ``request.active_provider_name`` (the
+    # consumer populates that with the registry-derived provider for this
+    # branch — agent_loop.py:1667-1668 — so the move is byte-identical).
+    # ⚠ ONE FORK BEFORE THE COMPAT ADAPTER — the OpenAI ``/v1/responses`` surface.
+    #
+    # The ``gpt-5.6`` reasoning family CANNOT carry a native ``tools`` param on
+    # ``chat.completions``: OpenAI hard-400s the combination and names ``/v1/responses``
+    # as the fix. Phase 175 answered by routing them STRUCTURED (tools as XML prose),
+    # which avoided the 400 by giving up native tool calling entirely. This fork takes
+    # the door the error actually names, where reasoning AND native tools coexist.
+    #
+    # ⛔ The predicate checks the RESOLVED provider, not the registry flag alone —
+    # ``/v1/responses`` is OpenAI's own surface and an OpenRouter / Ollama / LM Studio
+    # endpoint serving the same model id does not implement it. Those copies stay on
+    # the compat adapter and keep the STRUCTURED downgrade, which is still correct for
+    # them. A model with no ``api_surface`` row is byte-identical to today (D-14).
+    from app.config import settings as _settings
+    from app.services.openai_service import resolve_api_surface
+
+    _effective_model = (
+        request.model
+        or (request.user_settings.llm_model if request.user_settings else None)
+        or _settings.llm_model
+    )
+    _surface = resolve_api_surface(_effective_model, request.user_settings)
+    if _surface is not None:
+        return _open_surface_stream(_surface, request)
+
+    from .openai_compat import open_openai_compat_stream
+
+    return open_openai_compat_stream(request)
+
+
+class _OpenAbandoned(Exception):
+    """The run gave up on this open before its thread started; nothing was sent (WR-01)."""
+
+
+def _close_late_stream(task: "asyncio.Future") -> None:
+    """Done-callback for an open that finished AFTER its guard fired: close the stream it
+    returned instead of leaking the httpx response (a cloud provider would keep generating
+    and billing). Non-fatal by design — the run has already been classified ``timed_out``."""
+    if task.cancelled() or task.exception() is not None:
+        return
+    try:
+        task.result()[0].close()
+    except Exception:  # noqa: BLE001 — the agent_loop drain-cancel close precedent
+        logger.debug("late stream close after the open guard fired raised — non-fatal", exc_info=True)
+
+
+async def _open_off_loop(request: GatewayRequest):
+    """Phase 282 D-20 (option A) — open the OpenAI-family stream OFF the event loop, under the
+    request's per-call budget, and stamp the deadline on the stream for the drain to share.
+
+    ``asyncio.to_thread`` copies the current contextvars (a bare executor hop would not), so
+    the LangSmith parent run ``wrap_openai`` attaches to at ``create`` time survives the hop.
+    The thread is shielded: when the guard fires (or the run is cancelled) it keeps running to
+    completion, and ``_close_late_stream`` closes whatever it returns. The TimeoutError
+    re-raises unchanged — the agent loop carries it into run_producer's ``timed_out`` arm
+    exactly like a drain timeout. ``timeout_s=None`` (a no-budget caller) sets no deadline.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = None if request.timeout_s is None else loop.time() + request.timeout_s
+    # 282-REVIEW WR-01: the hop can sit queued behind busy drains in the default executor. If
+    # the guard fires (or the run is cancelled) first, the queued work item must not start a
+    # request nobody will read. An open ALREADY inside ``create()`` is not stopped by this —
+    # see the deferral recorded in 282-REVIEW.md.
+    abandoned = threading.Event()
+
+    def _open_unless_abandoned(req: GatewayRequest):
+        if abandoned.is_set():
+            raise _OpenAbandoned()
+        return _open_openai_family(req)
+
+    task = asyncio.ensure_future(asyncio.to_thread(_open_unless_abandoned, request))
+    try:
+        async with asyncio.timeout_at(deadline):
+            stream, mode = await asyncio.shield(task)
+    except BaseException:
+        abandoned.set()
+        task.add_done_callback(_close_late_stream)
+        raise
+    if deadline is not None:
+        try:
+            stream.budget_deadline = deadline
+        except AttributeError:
+            pass  # a bare generator (a test double) carries no attribute; the drain falls back
+    return stream, mode
+
+
 async def open_stream(
     provider: str,
     request: GatewayRequest,
@@ -146,6 +267,14 @@ async def open_stream(
     so the consumer's ``_drain_stream_with_close_on_cancel`` drives + closes it
     byte-identically). The openai_compat ``else`` branch stays a stub until
     Wave 4.
+
+    Phase 282 (D-20, BUG-261015-02): the OpenAI-family ``else`` branch no longer runs on the
+    event loop. Its synchronous open (``_open_openai_family``) blocked until the provider sent
+    response headers, freezing every request on the uvicorn worker, and sat OUTSIDE the
+    per-call budget. ``_open_off_loop`` runs it in a thread under ``request.timeout_s`` and
+    stamps ``budget_deadline`` on the stream, so open + drain share ONE deadline. The
+    anthropic/google branches are unchanged: their generators are lazy and first run inside
+    the drain's producer thread.
     """
     if provider == "anthropic":
         # Lazy import: keep the raw-SDK service module out of the dispatcher's
@@ -159,38 +288,6 @@ async def open_stream(
 
         return open_google_stream(request), CallingMode.NATIVE
     else:
-        # OpenAI-compat else-branch (OpenAI / OpenRouter / Ollama / native-7
-        # fallbacks) — Phase 092.5 Wave 4 (D-04, the entangled unit). The adapter
-        # wraps create_adaptive_streaming_chat and SURFACES the calling_mode it
-        # returns (Pitfall 3 / L-3 — never buried). It keys its internal
-        # <think>/usage/boundary logic on ``request.active_provider_name`` (the
-        # consumer populates that with the registry-derived provider for this
-        # branch — agent_loop.py:1667-1668 — so the move is byte-identical).
-        # ⚠ ONE FORK BEFORE THE COMPAT ADAPTER — the OpenAI ``/v1/responses`` surface.
-        #
-        # The ``gpt-5.6`` reasoning family CANNOT carry a native ``tools`` param on
-        # ``chat.completions``: OpenAI hard-400s the combination and names ``/v1/responses``
-        # as the fix. Phase 175 answered by routing them STRUCTURED (tools as XML prose),
-        # which avoided the 400 by giving up native tool calling entirely. This fork takes
-        # the door the error actually names, where reasoning AND native tools coexist.
-        #
-        # ⛔ The predicate checks the RESOLVED provider, not the registry flag alone —
-        # ``/v1/responses`` is OpenAI's own surface and an OpenRouter / Ollama / LM Studio
-        # endpoint serving the same model id does not implement it. Those copies stay on
-        # the compat adapter and keep the STRUCTURED downgrade, which is still correct for
-        # them. A model with no ``api_surface`` row is byte-identical to today (D-14).
-        from app.config import settings as _settings
-        from app.services.openai_service import resolve_api_surface
-
-        _effective_model = (
-            request.model
-            or (request.user_settings.llm_model if request.user_settings else None)
-            or _settings.llm_model
-        )
-        _surface = resolve_api_surface(_effective_model, request.user_settings)
-        if _surface is not None:
-            return _open_surface_stream(_surface, request)
-
-        from .openai_compat import open_openai_compat_stream
-
-        return open_openai_compat_stream(request)
+        if request.routing_provider is None and provider:
+            request = replace(request, routing_provider=provider)  # CR-01; caller's object untouched
+        return await _open_off_loop(request)
