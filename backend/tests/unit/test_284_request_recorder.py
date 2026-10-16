@@ -102,6 +102,13 @@ def violations(requests, page_limit: int, *, exempt=None) -> list[str]:
     return out
 
 
+def assert_clean(requests, page_limit: int, label: str = "", *, exempt=None) -> None:
+    """Fail with every DISTINCT violation named (the URL tail dropped, so one line per shape)."""
+    found = violations(requests, page_limit, exempt=exempt)
+    distinct = sorted({v.split(": http", 1)[0] for v in found})
+    assert not found, f"{label} -- {len(found)} violation(s):\n" + "\n".join(distinct)
+
+
 def largest_in_list(requests) -> int:
     """The longest ``in.()`` list of ANY column seen (reported by the live suite)."""
     best = 0
@@ -259,9 +266,9 @@ async def test_list_documents_is_one_bounded_read(recorded, sb):
     out = await list_documents(limit=25, offset=0, folder_id=None, include_archived=False,
                                status_=None, order="created_desc", kind=None,
                                current_user=USER, supabase=sb)
+    assert_clean(recorded, 25, "GET /documents")
     assert out["total"] == LIBRARY_TOTAL and len(out["documents"]) == 25
-    assert 1 <= len(recorded) <= 3, [str(r.url) for r in recorded]
-    assert violations(recorded, 25) == []
+    assert 1 <= len(recorded) <= 3, [str(r.url)[:120] for r in recorded]
 
 
 async def test_list_documents_root_and_last_page_are_bounded(recorded, sb):
@@ -271,7 +278,7 @@ async def test_list_documents_root_and_last_page_are_bounded(recorded, sb):
         await list_documents(limit=25, offset=offset, folder_id=folder_id, include_archived=True,
                              status_="in_flight", order="updated_desc", kind=None,
                              current_user=USER, supabase=sb)
-    assert violations(recorded, 25) == []
+    assert_clean(recorded, 25, "GET /documents root, Big, last page")
 
 
 @pytest.mark.parametrize(
@@ -284,14 +291,14 @@ async def test_the_per_document_routes_are_bounded(recorded, sb, route, limit):
 
     out = await getattr(documents, route)(DOC_ID, limit=limit, offset=0, current_user=USER, supabase=sb)
     assert out["total"] == LIBRARY_TOTAL
-    assert violations(recorded, limit) == []
+    assert_clean(recorded, limit, route)
 
 
 async def test_get_document_is_a_single_read(recorded, sb):
     from app.api.documents import get_document
 
     await get_document(DOC_ID, current_user=USER, supabase=sb)
-    assert violations(recorded, 25) == []
+    assert_clean(recorded, 25, "GET /documents/{id}")
 
 
 async def test_search_documents_is_bounded(recorded, sb):
@@ -301,7 +308,7 @@ async def test_search_documents_is_bounded(recorded, sb):
     for body in ({}, {"name": "f1"}, {"offset": LIBRARY_TOTAL - 25}):
         out = await search_documents(caller=CALLER, req=DocumentSearchRequest(**body), supabase=sb)
         assert out["total"] == LIBRARY_TOTAL
-    assert violations(recorded, 25) == []
+    assert_clean(recorded, 25, "POST /document-search")
 
 
 async def test_search_documents_relationship_is_bounded_by_its_edges(recorded, sb):
@@ -316,7 +323,7 @@ async def test_search_documents_relationship_is_bounded_by_its_edges(recorded, s
     # Without the waiver the lineage read IS unbounded — the exemption is real, not decorative.
     assert any("unbounded select on documents" in v for v in violations(recorded, 25))
     exempt = relationship_exemption(REL_EDGE_CAP)
-    assert violations(recorded, 25, exempt=exempt) == [], RELATIONSHIP_EXEMPTION
+    assert_clean(recorded, 25, RELATIONSHIP_EXEMPTION, exempt=exempt)
     page = [r for r in recorded if _parts(r)[0] == "library_documents"]
     assert page and all("limit" in dict(_parts(r)[1]) for r in page)  # the page is still ranged
     assert largest_in_list(recorded) <= REL_EDGE_CAP
@@ -334,7 +341,7 @@ async def test_both_resolve_routes_are_bounded(recorded, sb):
     body = AdHocResolve(filter_expr={"op": "and", "conditions": []}, offset=LIBRARY_TOTAL - 25, limit=25)
     await resolve_adhoc(body, current_user=USER, supabase=sb)
     assert sum(_parts(r)[0] == "library_documents" for r in recorded) == 3  # non-vacuity
-    assert violations(recorded, 25) == []
+    assert_clean(recorded, 25, "both resolve routes")
 
 
 async def test_the_summary_reads_the_view_and_sends_no_id_list(monkeypatch):

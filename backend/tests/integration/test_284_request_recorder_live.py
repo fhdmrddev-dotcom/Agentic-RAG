@@ -43,7 +43,7 @@ from tests.integration._284_scale_account import (
     sign_in,
     uid_for_email,
 )
-from tests.unit.test_284_request_recorder import DOC_TABLES, largest_in_list, violations
+from tests.unit.test_284_request_recorder import DOC_TABLES, assert_clean, largest_in_list
 
 DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
@@ -124,7 +124,7 @@ def _check(w, label: str, page_limit: int) -> int:
     w["seen"].clear()
     rest = [r for r in batch if "/rest/v1/" in str(r.url)]
     assert rest, f"{label}: non-vacuity — the handler sent no PostgREST request through the recorder"
-    assert violations(rest, page_limit) == [], label
+    assert_clean(rest, page_limit, label)
     biggest = largest_in_list(rest)
     assert biggest <= page_limit, f"{label}: an in.() list of {biggest} > {page_limit}"
     print(f"[284-05] {label}: {len(rest)} request(s), largest in.() = {biggest}")
@@ -148,50 +148,50 @@ async def test_every_library_read_is_bounded_at_50k(world):
         return await list_documents(**args, current_user=user, supabase=w["sb"])
 
     page = await _list(folder_id="root")
-    assert page["total"] > 1_000 and len(page["documents"]) == 25
     sizes["list root"] = _check(w, "GET /documents root", 25)
+    assert page["total"] > 1_000 and len(page["documents"]) == 25
 
     first = await _list(folder_id=w["big"], limit=200, include_archived=True)
-    assert first["total"] == w["truth"]["big_all"]
     sizes["list big first"] = _check(w, "GET /documents Big page 1", 200)
+    assert first["total"] == w["truth"]["big_all"]
 
     last_offset = (w["truth"]["big_all"] - 1) // 200 * 200
     last = await _list(folder_id=w["big"], limit=200, offset=last_offset, include_archived=True)
-    assert len(last["documents"]) == w["truth"]["big_all"] - last_offset
     sizes["list big last"] = _check(w, "GET /documents Big LAST page", 200)
+    assert len(last["documents"]) == w["truth"]["big_all"] - last_offset
 
     everything = await _list(include_archived=True)
-    assert everything["total"] >= 50_000
     sizes["list all"] = _check(w, "GET /documents whole library", 25)
+    assert everything["total"] >= 50_000
 
     found = await search_documents(caller=w["owner"], req=DocumentSearchRequest(), supabase=w["sb"])
-    assert found["total"] >= 49_000 and len(found["documents"]) == 25
     sizes["find empty"] = _check(w, "POST /document-search (empty)", 25)
+    assert found["total"] >= 49_000 and len(found["documents"]) == 25
 
     fragment = w["truth"]["named"].rsplit(".", 1)[0][-10:]
     named = await search_documents(caller=w["owner"], req=DocumentSearchRequest(name=fragment),
                                    supabase=w["sb"])
-    assert named["total"] >= 1
     sizes["find name"] = _check(w, "POST /document-search (name)", 25)
+    assert named["total"] >= 1
 
     view = await resolve_view(w["view_id"], count_only=False, offset=0, limit=200,
                               include_archived=True, current_user=user, supabase=w["sb"])
     assert view["total"] == w["truth"]["big_all"]
     count = await resolve_view(w["view_id"], count_only=True, offset=0, limit=25,
                                include_archived=True, current_user=user, supabase=w["sb"])
-    assert count == {"total": w["truth"]["big_all"]}
     sizes["resolve view"] = _check(w, "GET /document-views/{id}/resolve", 200)
+    assert count == {"total": w["truth"]["big_all"]}
 
     adhoc = await resolve_adhoc(
         AdHocResolve(filter_expr={"op": "and", "conditions": []}, offset=49_000, limit=200),
         current_user=user, supabase=w["sb"])
-    assert adhoc["total"] >= 50_000 and adhoc["documents"]
     sizes["resolve adhoc"] = _check(w, "POST /document-views/resolve", 200)
+    assert adhoc["total"] >= 50_000 and adhoc["documents"]
 
     chunks = await list_document_chunks(w["truth"]["chunky"], limit=200, offset=0,
                                         current_user=user, supabase=w["sb"])
-    assert chunks["total"] == 2_500 and len(chunks["chunks"]) == 200
     sizes["chunks"] = _check(w, "GET /documents/{id}/chunks", 200)
+    assert chunks["total"] == 2_500 and len(chunks["chunks"]) == 200
 
     print(f"[284-05] largest in.() per handler: {sizes}; overall max = {max(sizes.values())}")
 
