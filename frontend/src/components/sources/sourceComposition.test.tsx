@@ -52,6 +52,7 @@ import { MessageSquare, FileText, Plug, Workflow } from "lucide-react"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, Folder, SavedView } from "@/types"
+import { installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
 import type { NavItem } from "@/lib/nav-items"
 import type { ConnectorWatch } from "@/lib/api/sources"
 
@@ -114,10 +115,19 @@ const {
   mockGetSourceHealth: vi.fn(),
 }))
 
+// 284-03 (D-24): the page reads ONE page + the summary from the server. The fake answers both
+// from the SAME fixture this suite used to hand `useDocuments` whole (see `mockLibrary`).
+const libraryApi = vi.hoisted(() => ({
+  listDocumentsPage: vi.fn(),
+  getLibrarySummary: vi.fn(),
+  getDocument: vi.fn(),
+}))
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return {
     ...actual,
+    ...libraryApi,
     listViews: mockListViews,
     resolveView: mockResolveView,
     resolveAdHoc: mockResolveAdHoc,
@@ -408,7 +418,7 @@ function renderUI(ui: React.ReactElement) {
 
 function primeMocks() {
   vi.clearAllMocks()
-  mockUseDocuments.mockReturnValue({
+  mockLibrary({
     documents: sampleDocuments,
     uploading: false,
     uploadingCount: 0,
@@ -590,6 +600,13 @@ async function mountScreen(screenName: string) {
 }
 
 // ══ §1 THE CONTRACT ITSELF — the non-vacuity floor ═════════════════════════════════════
+/** 284-03 (D-24): the ONE wiring swap — the fixture feeds the fake server, and `useDocuments`
+ *  keeps only its doors (upload / delete / uploading). */
+function mockLibrary({ documents, ...doors }: { documents: Document[] } & Record<string, unknown>) {
+  installFakeLibraryApi(libraryApi, documents)
+  mockUseDocuments.mockReturnValue(doors)
+}
+
 describe("source-composition fence — §1 the contract itself", () => {
   // ⚠ THE NON-VACUITY CONTROL. A moved or misnamed JSON import can resolve to an empty
   // object rather than throwing, and an empty contract makes every case below vacuously

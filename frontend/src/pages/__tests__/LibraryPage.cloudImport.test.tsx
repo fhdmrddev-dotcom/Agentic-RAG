@@ -31,6 +31,7 @@ import userEvent from "@testing-library/user-event"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, Folder } from "@/types"
+import { installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
 import pageSource from "@/pages/LibraryPage.tsx?raw"
 
 const {
@@ -83,10 +84,19 @@ const {
   mockUseAuth: vi.fn(),
 }))
 
+// 284-03 (D-24): the page reads ONE page + the summary from the server. The fake answers both
+// from the SAME fixture this suite used to hand `useDocuments` whole (see `mockLibrary`).
+const libraryApi = vi.hoisted(() => ({
+  listDocumentsPage: vi.fn(),
+  getLibrarySummary: vi.fn(),
+  getDocument: vi.fn(),
+}))
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return {
     ...actual,
+    ...libraryApi,
     listViews: mockListViews,
     resolveView: mockResolveView,
     resolveAdHoc: mockResolveAdHoc,
@@ -190,6 +200,13 @@ const CLOUD_FILES = [
   { id: "cf-2", name: "Terms.pdf", size: 91_000, modified_at: "2026-09-02T00:00:00Z" },
 ]
 
+/** 284-03 (D-24): the ONE wiring swap — the fixture feeds the fake server, and `useDocuments`
+ *  keeps only its doors (upload / delete / uploading). */
+function mockLibrary({ documents, ...doors }: { documents: Document[] } & Record<string, unknown>) {
+  installFakeLibraryApi(libraryApi, documents)
+  mockUseDocuments.mockReturnValue(doors)
+}
+
 function renderPage(ui: React.ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>)
 }
@@ -217,7 +234,7 @@ beforeEach(() => {
   if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {}
   if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
   mockUseAuth.mockReturnValue({ user: { id: OWNER } })
-  mockUseDocuments.mockReturnValue({
+  mockLibrary({
     documents: sampleDocuments,
     uploading: false,
     uploadingCount: 0,

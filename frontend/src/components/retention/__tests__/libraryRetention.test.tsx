@@ -17,6 +17,7 @@ import userEvent from "@testing-library/user-event"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, Folder } from "@/types"
+import { fakeLibraryApi, installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
 import type { DocumentStatesResponse, RetentionDocumentState, RetentionFolderState } from "@/lib/api/retention"
 
 const {
@@ -31,10 +32,19 @@ const {
   mockGetDocumentStates: vi.fn(),
 }))
 
+// 284-03 (D-24): the page reads ONE page + the summary from the server. The fake answers both
+// from the SAME fixture this suite used to hand `useDocuments` whole (see `mockLibrary`).
+const libraryApi = vi.hoisted(() => ({
+  listDocumentsPage: vi.fn(),
+  getLibrarySummary: vi.fn(),
+  getDocument: vi.fn(),
+}))
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return {
     ...actual,
+    ...libraryApi,
     listViews: vi.fn().mockResolvedValue([]),
     resolveView: vi.fn().mockResolvedValue({ documents: [], total: 0 }),
     resolveAdHoc: vi.fn().mockResolvedValue({ documents: [], total: 0 }),
@@ -112,6 +122,13 @@ import { listViews, resolveView } from "@/lib/api"
 import { RetentionRowChips } from "../RetentionChip"
 import { RetentionFolderLine } from "../RetentionFolderLine"
 
+/** 284-03 (D-24): the ONE wiring swap — the fixture feeds the fake server, and `useDocuments`
+ *  keeps only its doors (upload / delete / uploading). */
+function mockLibrary({ documents, ...doors }: { documents: Document[] } & Record<string, unknown>) {
+  installFakeLibraryApi(libraryApi, documents)
+  mockUseDocuments.mockReturnValue(doors)
+}
+
 beforeEach(() => {
   if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
   if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
@@ -158,7 +175,7 @@ const MEMBER_STATES: DocumentStatesResponse = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockUseDocuments.mockReturnValue({
+  mockLibrary({
     documents: [HELD, PLAIN, ARCHIVED],
     uploading: false,
     uploadingCount: 0,
@@ -342,7 +359,7 @@ describe("LibraryPage — retention in browse (S9 / S10 / planning flag 2)", () 
   // 275-05 G-4 OBS-2: a fully archived folder read "No documents in this folder" directly above
   // "3 archived documents hidden · Show". The empty state must not claim emptiness (S9).
   it("a list whose every document is archived does not claim to be empty; the hidden line carries it", async () => {
-    mockUseDocuments.mockReturnValue({
+    mockLibrary({
       documents: [ARCHIVED],
       uploading: false,
       uploadingCount: 0,
@@ -367,14 +384,20 @@ describe("LibraryPage — retention in browse (S9 / S10 / planning flag 2)", () 
       },
     ])
     // Persistent for this case: the view's own count read calls resolveView too.
-    vi.mocked(resolveView).mockResolvedValue({ documents: [PLAIN, ARCHIVED], total: 2 })
+    // 284-03 (D-24): the view resolves its page ON THE SERVER now, honouring include_archived —
+    // so the resolve is the fake's, which evaluates that flag over the view's two rows.
+    vi.mocked(resolveView).mockImplementation(
+      fakeLibraryApi([], { views: { "view-inv": [PLAIN, ARCHIVED] } }).resolveView,
+    )
     onTestFinished(() => {
       vi.mocked(resolveView).mockResolvedValue({ documents: [], total: 0 })
     })
     renderPage()
     await userEvent.click(screen.getByRole("tab", { name: /^Views/ }))
     await userEvent.click((await screen.findAllByText("Invoices view"))[0])
-    await waitFor(() => expect(resolveView).toHaveBeenCalledWith("view-inv"))
+    await waitFor(() =>
+      expect(resolveView).toHaveBeenCalledWith("view-inv", { offset: 0, limit: 25, include_archived: false }),
+    )
     expect(await screen.findByText("Atlas kickoff deck.pdf")).toBeInTheDocument()
     // Include archived is OFF: the view's archived row is hidden, exactly as Find would hide it.
     expect(screen.queryByText("Invoice INV-0412.pdf")).toBeNull()

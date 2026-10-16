@@ -22,6 +22,7 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest"
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, Folder, SavedView } from "@/types"
+import { installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
 
 // ── Mock hooks ─────────────────────────────────────────────────────────────────
 const {
@@ -43,6 +44,13 @@ const {
   mockGetReembedProgress: vi.fn(),
   mockGetIndexSummary: vi.fn(),
 }))
+// 284-03 (D-24): the page reads ONE page + the summary from the server. The fake answers both
+// from the SAME fixture this suite used to hand `useDocuments` whole (see `mockLibrary`).
+const libraryApi = vi.hoisted(() => ({
+  listDocumentsPage: vi.fn(),
+  getLibrarySummary: vi.fn(),
+  getDocument: vi.fn(),
+}))
 
 // ⚠ PARTIAL mock. `@/lib/api` is a re-export barrel with ~12 domain modules behind it; a
 // full replacement would have to declare every symbol the page's children import, and the
@@ -58,6 +66,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
     listMetadataFields: mockListMetadataFields,
     getReembedProgress: mockGetReembedProgress,
     getIndexSummary: mockGetIndexSummary,
+    ...libraryApi,
   }
 })
 
@@ -168,6 +177,13 @@ const sampleViews: SavedView[] = [
   },
 ]
 
+/** 284-03 (D-24): the ONE wiring swap — the fixture feeds the fake server, and `useDocuments`
+ *  keeps only its doors (upload / delete / uploading). */
+function mockLibrary({ documents, ...doors }: { documents: Document[] } & Record<string, unknown>) {
+  installFakeLibraryApi(libraryApi, documents)
+  mockUseDocuments.mockReturnValue(doors)
+}
+
 function renderPage(ui: React.ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>)
 }
@@ -188,7 +204,7 @@ beforeAll(async () => { await import("@/pages/LibraryPage") }, 30_000)
 describe("LibraryPage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseDocuments.mockReturnValue({
+    mockLibrary({
       documents: sampleDocuments,
       uploading: false,
       uploadingCount: 0,
@@ -275,8 +291,8 @@ describe("LibraryPage", () => {
     // Default state: selectedFolderId = null → Root → show folder_id === null docs
     const { LibraryPage } = await import("@/pages/LibraryPage")
     renderPage(<LibraryPage />)
-    // root-doc.txt has folder_id null so it should show
-    expect(screen.getByText("root-doc.txt")).toBeInTheDocument()
+    // root-doc.txt has folder_id null so it should show (284-03: once the page has answered)
+    expect(await screen.findByText("root-doc.txt")).toBeInTheDocument()
     // research.pdf is in folder-1, not root, should not show
     expect(screen.queryByText("research.pdf")).not.toBeInTheDocument()
   })
@@ -448,7 +464,7 @@ describe("LibraryPage", () => {
    * plan 08's work invisible again.
    */
   it("the Ingestion tab MOUNTS the stage strip for an in-flight document", async () => {
-    mockUseDocuments.mockReturnValue({
+    mockLibrary({
       documents: [
         ...sampleDocuments,
         {
@@ -475,7 +491,7 @@ describe("LibraryPage", () => {
     // "In progress" sub-tab, not the default "Add files" one.
     fireEvent.mouseDown(within(ingestion).getByRole("tab", { name: "In progress" }))
 
-    expect(within(ingestion).getByText("in-flight.pdf")).toBeInTheDocument()
+    expect(await within(ingestion).findByText("in-flight.pdf")).toBeInTheDocument()
     const strips = within(ingestion).getAllByTestId("ingestion-strip")
     expect(strips.length).toBeGreaterThan(0)
     expect(strips[0].getAttribute("data-status")).toBe("processing")
@@ -489,7 +505,7 @@ describe("LibraryPage", () => {
 describe("LibraryPage — plan 06 furniture (LIB-01)", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseDocuments.mockReturnValue({
+    mockLibrary({
       documents: sampleDocuments,
       uploading: false,
       uploadingCount: 0,
@@ -521,7 +537,7 @@ describe("LibraryPage — plan 06 furniture (LIB-01)", () => {
     renderPage(<LibraryPage />)
     const tiles = await screen.findByTestId("documents-stat-tiles")
     // CHUNKS sums chunk_count over the two sample docs (10 + 2 = 12).
-    expect(within(tiles).getByText("12")).toBeInTheDocument()
+    expect(await within(tiles).findByText("12")).toBeInTheDocument()
     // VECTORS from re-embed progress (total 224).
     expect(await within(tiles).findByText("224")).toBeInTheDocument()
   })
@@ -561,7 +577,7 @@ describe("LibraryPage — plan 06 furniture (LIB-01)", () => {
       id: `many-${i}`,
       filename: `doc-${i}.txt`,
     }))
-    mockUseDocuments.mockReturnValue({
+    mockLibrary({
       documents: many,
       uploading: false,
       uploadingCount: 0,

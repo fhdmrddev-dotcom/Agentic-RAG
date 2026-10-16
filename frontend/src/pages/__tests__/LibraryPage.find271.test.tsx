@@ -23,6 +23,7 @@ import userEvent from "@testing-library/user-event"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, DocumentSearchRow, Folder } from "@/types"
+import { installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
 
 const {
   mockUseDocuments,
@@ -44,10 +45,19 @@ const {
   mockResolveAdHoc: vi.fn(),
 }))
 
+// 284-03 (D-24): the page reads ONE page + the summary from the server. The fake answers both
+// from the SAME fixture this suite used to hand `useDocuments` whole (see `mockLibrary`).
+const libraryApi = vi.hoisted(() => ({
+  listDocumentsPage: vi.fn(),
+  getLibrarySummary: vi.fn(),
+  getDocument: vi.fn(),
+}))
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return {
     ...actual,
+    ...libraryApi,
     listViews: vi.fn().mockResolvedValue([]),
     resolveView: vi.fn().mockResolvedValue({ documents: [], total: 0 }),
     resolveAdHoc: mockResolveAdHoc,
@@ -133,6 +143,13 @@ import { LibraryPage } from "@/pages/LibraryPage"
 import { DocumentSearchError } from "@/lib/api/documents"
 
 // Radix Select (the sort control) needs the standard jsdom shims to open.
+/** 284-03 (D-24): the ONE wiring swap — the fixture feeds the fake server, and `useDocuments`
+ *  keeps only its doors (upload / delete / uploading). */
+function mockLibrary({ documents, ...doors }: { documents: Document[] } & Record<string, unknown>) {
+  installFakeLibraryApi(libraryApi, documents)
+  mockUseDocuments.mockReturnValue(doors)
+}
+
 beforeEach(() => {
   if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
   if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
@@ -189,7 +206,7 @@ const ANSWER = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockUseDocuments.mockReturnValue({
+  mockLibrary({
     documents: DOCUMENTS,
     uploading: false,
     uploadingCount: 0,
