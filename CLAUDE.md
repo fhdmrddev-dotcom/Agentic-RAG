@@ -462,15 +462,15 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
-| `frontend/src/lib/api.ts` | 208 / 124 / 523 (was `207 / 123 / 519`) | ⚠ STALE · last touch 271-03 |
-| `frontend/src/types/index.ts` | 99 / 78 / 1546 (was `98 / 77 / 1542`) | **281-03**: `EmitFailure` +1 member, additive. Seam OWED |
+| `frontend/src/lib/api.ts` | 210 / 125 / 530 (was `208 / 124 / 523`) | 284-05: five whole-list re-exports deleted (D-16) |
+| `frontend/src/types/index.ts` | 100 / 79 / 1656 (was `99 / 78 / 1546`) | 284-01: paged wire types, additive. Seam OWED |
 | `backend/app/main.py` | 90 / 65 / 977 (was `89 / 64 / 1002`) | honoured by construction (280-01: dead postgrest patch deleted) · ⛔ |
 | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 43 / 17 / 2051 (was `42 / 17 / 2024`) | honoured by construction (282-04: one refusal helper, add timeout) · ⛔ |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (249-02/03) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `backend/app/api/documents.py` | 96 / 37 / 2531 (was `95 / 37 / 2534`) | last touch BUG-261014-06 (`.in_` batched) · honoured by construction |
-| `scripts/vitest-count-gate.cjs` | 298 / 66 / 6443 (was `290 / 65 / 6428`) | last touch 282-04 (ModelRegistryTab pin 33 → 36) |
+| `backend/app/api/documents.py` | 97 / 38 / 2653 (was `96 / 37 / 2531`) | honoured by construction (284-02: one ranged view read, stopgap gone) · ⛔ |
+| `scripts/vitest-count-gate.cjs` | 308 / 68 / 6483 (was `298 / 66 / 6443`) | last touch 284-05 (10 pins raised, 5 suites adopted) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
 | `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ NOW FIRES at 3 phases · last touch 256-03 |
 | `frontend/src/components/panel/PhaseCard.tsx` | 18 / 12 / 796 (was `17 / 11 / 788`) | honoured by construction (281-03: one copy entry + one className) |
@@ -522,14 +522,14 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
-| `frontend/src/pages/LibraryPage.tsx` | 57 / 19 / 1297 (was `57 / 21 / 1297`) | last touch 275-04 · Extraction OWED |
+| `frontend/src/pages/LibraryPage.tsx` | 63 / 20 / 1344 (was `57 / 19 / 1297`) | seam TAKEN (284-01 hook); lines rose → G-5 NOT discharged · ⛔ |
 | `backend/app/services/retrieval_service.py` | 24 / 13 / 176 (was `19 / 11 / 456`) | ~~⛔ extraction still OWED (SEED-224, since 231)~~ ✅ DISCHARGED 272-01 (278) |
-| `backend/app/services/retrieval_scope.py` | 6 / 4 / 463 (was `5 / 3 / 463`) | last touch 279-01 (comment only) · extraction FIRST next · ⛔ |
-| `backend/app/services/document_search_service.py` | 5 / 3 / 584 (was `4 / 2 / 587`) | ⚠ now FIRES · 278-02 vocabulary import (one home) · ⛔ |
+| `backend/app/services/retrieval_scope.py` | 7 / 5 / 503 (was `6 / 4 / 463`) | 284-04: `_fetch_all` moved in verbatim · extraction FIRST next · ⛔ |
+| `backend/app/services/document_search_service.py` | 8 / 4 / 505 (was `5 / 3 / 584`) | 284-04: one view read; two-legs invariant RETIRED deliberately · ⛔ |
 | `backend/app/services/view_filter_compiler.py` | 7 / 6 / 302 (was `6 / 5 / 300`) | ⚠ FIRES, absent here — row added 278-04 · 278-02 vocabulary import |
 | `backend/app/services/recall_eval.py` | 4 / 3 / 1070 | ⚠ FIRES (3 phases) · safe as-is (D-246-12) |
 | `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 16 / 11 / 666 (was `15 / 10 / 654`) | **275-04**: ONE optional `retention` prop → Retention section after File |
-| `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
+| `frontend/src/hooks/useDocuments.ts` | 10 / 5 / 164 (was `8 / 3 / 120`) | 284-03: no list of its own; Realtime only asks for a refetch · ⛔ |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
 | `backend/app/services/agent_loop.py` | 69 / 33 / 3682 (was `68 / 33 / 3682`) | honoured by construction (282-04: provider kwarg ×2) · seam OWED · ⛔ |
@@ -539,12 +539,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |
 | `frontend/src/components/panel/CsvTablePreview.tsx` | 3 / 3 / 134 | ⚠ absent for its ENTIRE LIFE |
 | `frontend/src/components/workflows/verdictModel.ts` | 6 / 3 / 355 | ⚠ absent for its ENTIRE LIFE |
-| `frontend/src/components/library/IngestionTab.tsx` | 17 / 6 / 512 | ⚠ row was STALE at `13 / 4 / 456` |
+| `frontend/src/components/library/IngestionTab.tsx` | 20 / 7 / 706 (was `17 / 6 / 512`) | 284-03: summary + three paged status lists; layout unchanged · ⛔ |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
 | `frontend/src/components/layout/NavPanel.tsx` | 26 / 14 / 420 (was `25 / 14 / 416`) | last touch 276-01 / 276-06 (D-27) |
 | `frontend/src/App.tsx` | 36 / 27 / 418 (was `35 / 26 / 412`) | last touch 276-06 |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06) · ⛔ |
-| `frontend/src/components/library/LibraryHeaderBar.tsx` | 4 / 3 / 249 (was `2 / 1 / 204`) | now FIRES (3 phases) · last touch 271-02 / 271-05 |
+| `frontend/src/components/library/LibraryHeaderBar.tsx` | 5 / 4 / 262 (was `4 / 3 / 249`) | 284-03: optional `totalState`; never 0 before an answer |
 | `frontend/src/lib/nav-items.ts` | 13 / 9 / 173 (was `12 / 8 / 153`) | last touch 283-02: Settings door ungoverned (FIX-01) |
 | `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold |
 | `frontend/src/components/classification/RuleBuilderPanel.tsx` | 6 / 5 / 501 (was `4 / 3 / 502`) | ⚠ STALE · last touch 271-02 · ⛔ |
@@ -560,7 +560,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/sources/SourceFolderPicker.tsx` | 2 / 2 / 375 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE · G-5 fires (252-03) · Seam OWED |
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
-| `scripts/full-schema-supplement.sql` | 15 / 10 / 690 | ⚠ row STALE · last touch 266-01 · ⛔ |
+| `scripts/full-schema-supplement.sql` | 21 / 14 / 838 (was `15 / 10 / 690`) | 284-02: mig 207 view grants mirrored (ACL parity) · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
 | `backend/app/services/forced_emit.py` | 13 / 8 / 724 (was `12 / 8 / 724`) | honoured by construction (282-04: provider kwarg) · ⛔ |
 | `backend/app/services/template_asset_service.py` | 4 / 3 / 344 | ⚠ absent its ENTIRE LIFE — row added 274-REVIEW WR-01 |
@@ -596,13 +596,13 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 7 / 5 / 531 (was `6 / 4 / 531`) | honoured by construction (279-03: ONE copy change) |
 | `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ 0/0/0 AT PLANNING · measured at 262-04 · ⛔ |
 | `backend/app/services/ingest_splice.py` | 22 / 8 / 1043 (was `19 / 7 / 930`) | honoured by construction (280: minter-only hunks) · ⛔ |
-| `frontend/src/components/ingestion/FolderTree.tsx` | 13 / 8 / 213 (was `12 / 7 / 207`) | last touch 275-02 · ⛔ |
-| `frontend/src/components/ingestion/FolderNode.tsx` | 13 / 7 / 303 (was `12 / 6 / 272`) | last touch 275-02 · ⛔ |
+| `frontend/src/components/ingestion/FolderTree.tsx` | 14 / 9 / 213 (was `13 / 8 / 213`) | 284-03: Root count passes through, no `?? 0` · ⛔ |
+| `frontend/src/components/ingestion/FolderNode.tsx` | 15 / 8 / 316 (was `13 / 7 / 303`) | 284-03: no counts yet → slot omitted, never 0 · ⛔ |
 | `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05 · ⛔ |
-| `backend/app/models/document.py` | 13 / 10 / 221 (was `12 / 9 / 216`) | last touch 280-03 (one optional field) · ⛔ |
-| `frontend/src/components/ingestion/DocumentRow.tsx` | 10 / 5 / 583 (was `8 / 4 / 564`) | **275-04**: ONE `retention` prop + ONE `<RetentionRowChips>`; still seven `<td>` |
+| `backend/app/models/document.py` | 14 / 11 / 275 (was `13 / 10 / 221`) | 284-02: five paged envelopes, additive · ⛔ |
+| `frontend/src/components/ingestion/DocumentRow.tsx` | 11 / 6 / 591 (was `10 / 5 / 583`) | 284-03: one versions page, N of M; still seven `<td>` |
 | `frontend/src/components/org/OrgAdminShell.tsx` | 7 / 5 / 454 (was `3 / 5 / 442`) | ⚠ now FIRES · last touch 275-04 · extraction FIRST next · ⛔ |
-| `frontend/src/lib/api/documents.ts` | 8 / 8 / 503 (was `7 / 7 / 499`) | last touch 275-02 |
+| `frontend/src/lib/api/documents.ts` | 10 / 9 / 595 (was `8 / 8 / 503`) | 284-05: five whole-list clients deleted (D-16) · ⛔ |
 | `backend/app/api/folders.py` | 14 / 9 / 277 (was `12 / 8 / 277`) | last touch 280-01 (2 maybe_row guards) |
 | `backend/app/api/kb.py` | 14 / 9 / 515 (was `13 / 8 / 504`) | last touch 275-02 · ⛔ |
 | `backend/app/services/audit_service.py` | 8 / 8 / 96 | ⚠ absent its ENTIRE LIFE — row added 275-01 · ⛔ |
@@ -610,17 +610,25 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/document_relationship_service.py` | 6 / 4 / 465 (was `5 / 3 / 457`) | honoured by construction |
 | `backend/app/api/sources.py` | 10 / 4 / 698 (was `9 / 3 / 706`) | ✅ G-5 extraction FIRST DISCHARGED (280-01: document_purge) · ⛔ |
 | `backend/app/models/document_search.py` | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ now FIRES · last touch 275-03 · ⛔ |
-| `backend/app/services/document_view_resolver.py` | 5 / 5 / 412 (was `4 / 4 / 403`) | ⚠ FIRES since 271 — row added 275-05 · last touch 275-02 |
+| `backend/app/services/document_view_resolver.py` | 6 / 6 / 486 (was `5 / 5 / 412`) | 284-04: two read strategies, ONE fragment walk · ⛔ |
 | `backend/app/services/retrieval_documents.py` | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ now FIRES · last touch 275-02 |
 | `frontend/src/pages/findState.ts` | 3 / 3 / 374 (was `2 / 2 / 361`) | ⚠ now FIRES · last touch 275-02 · STRICT LEAF · ⛔ |
 | `frontend/src/components/chat/expertEventCopy.ts` | 5 / 3 / 315 | ⚠ now FIRES (279) — row added 279-04 · extraction FIRST · ⛔ |
 | `frontend/src/components/experts/ScopeLedger.tsx` | 6 / 3 / 126 | ⚠ now FIRES (279) — row added 279-04 · extraction FIRST · ⛔ |
 | `backend/app/services/sources/adapters/microsoft_graph.py` | 8 / 5 / 507 (was `3 / 2 / 376`) | ⚠ now FIRES (5 phases) — row added 280-04 · honoured by construction |
 | `frontend/src/components/workflows/runVocabulary.ts` | 10 / 5 / 662 | ⚠ FIRES, absent here — row added 281-04 · honoured by construction |
-| `frontend/src/lib/api/knowledge.ts` | 5 / 4 / 825 | ⚠ FIRES, absent here — row added 281-04 · honoured by construction |
+| `frontend/src/lib/api/knowledge.ts` | 6 / 5 / 841 (was `5 / 4 / 825`) | 284-01: optional resolve page params, additive · ⛔ |
 | `backend/app/services/google_service.py` | 12 / 8 / 661 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE builder · ⛔ |
 | `backend/app/services/provider_gateway/anthropic.py` | 5 / 5 / 125 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE kwarg · ⛔ |
 | `backend/app/services/provider_gateway/google.py` | 4 / 4 / 107 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE kwarg · ⛔ |
+| `backend/app/api/document_views.py` | 13 / 6 / 323 | ⚠ FIRES, absent here — row added 284-05 · honoured by construction · ⛔ |
+| `backend/app/models/document_view.py` | 6 / 4 / 119 | ⚠ FIRES, absent here — row added 284-05 · additive fields (284-04) |
+| `frontend/src/components/ingestion/FolderDetail.tsx` | 4 / 3 / 83 | ⚠ now FIRES (284) — row added 284-05 · number props (284-01) |
+| `frontend/src/components/library/DocumentsPager.tsx` | 4 / 3 / 101 | ⚠ now FIRES (284) — row added 284-05 · ROW_CAP arm deleted · ⛔ |
+| `frontend/src/components/library/find/FindQuickAdd.tsx` | 5 / 3 / 394 | ⚠ now FIRES (284) — row added 284-05 · `documents` prop deleted |
+| `frontend/src/components/library/find/StructurePopovers.tsx` | 5 / 3 / 746 | ⚠ now FIRES (284) — row added 284-05 · server-mode picker · ⛔ |
+| `frontend/src/components/metadata/DocumentChunksSection.tsx` | 4 / 3 / 265 | ⚠ now FIRES (284) — row added 284-05 · sentinel paging · ⛔ |
+| `frontend/src/components/relationships/CreateLinkDialog.tsx` | 5 / 3 / 267 | ⚠ now FIRES (284) — row added 284-05 · server type-ahead · ⛔ |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
