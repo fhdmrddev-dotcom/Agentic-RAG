@@ -11557,6 +11557,16 @@ cells rot within days.
 | [`frontend/src/hooks/useLibraryDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuselibrarydocumentsts) | 3 / 1 / 390 (was `0 / 0 / 0`) | no (young) | young (created 284-01). The D-24 seam. **284-03**: one page + one summary + one read by id; source = browse, view or filter; numbers `null` until answered. ⛔ never 0 |
 | [`frontend/src/test-utils/fakeLibraryApi.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctest-utilsfakelibraryapits) | 1 / 1 / 255 (was `0 / 0 / 0`) | no (young) | young (created 284-03). Test-only fake: page / summary / single read from ONE fixture array, answering like the server. ⛔ never imported by product code |
 | [`backend/app/models/document_view.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_viewpy) | 6 / 4 / 119 (was `5 / 3 / 110`) | ⚠ **FIRES** | ⚠ FIRES (4 phases). **284-04**: `AdHocResolve` gains `offset` / `limit` (≤ 200) / `include_archived` (default True); honoured by construction (additive, `extra` unchanged) |
+| [`frontend/src/components/panel/FilePreview.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilepreviewtsx) | 7 / 4 / 406 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 4 phases — row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader` (panel); honoured by construction |
+| [`frontend/src/components/settings/EngineHealthCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsenginehealthcardtsx) | 5 / 2 / 464 | no (2 phases) | row added quick-261016-u3w (gate demanded). Two loading rows → `SyrelLoader` (section); `engine-health-card` testid wrapper kept |
+| [`frontend/src/components/settings/MemorySection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmemorysectiontsx) | 5 / 2 / 284 | no (2 phases) | row added quick-261016-u3w (gate demanded). List loading arm → `SyrelLoader` (panel); entry-action spinners untouched |
+| [`frontend/src/components/skills/PublishGateDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillspublishgatedialogtsx) | 4 / 3 / 175 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 3 phases — row added quick-261016-u3w. Gate-check loading line → `SyrelLoader` (section); honoured by construction |
+| [`frontend/src/components/skills/SkillTestCasesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskilltestcasessectiontsx) | 4 / 2 / 218 | no (2 phases) | row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader` (section), words verbatim |
+| [`frontend/src/components/skills/studio/CaseEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsstudiocaseeditortsx) | 3 / 2 / 274 | no (2 phases) | row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader` (section), words verbatim |
+| [`frontend/src/components/skills/studio/VersionsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsstudioversionstabtsx) | 4 / 3 / 322 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 3 phases — row added quick-261016-u3w. Loading arm → `SyrelLoader` (section); honoured by construction |
+| [`frontend/src/components/ui/SyrelLoader.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsuisyrelloadertsx) | 2 / 0 / 50 | no (young) | young (created quick-261016-u3w, SEED-359 A). The ONE branded loader; renders IrisAvatar `thinking`, never forks it. ⛔ one polite status per block |
+| [`frontend/src/components/workflows/library/WorkflowDeleteSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowdeletesheettsx) | 3 / 1 / 339 | no (1 phase) | row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader`; ⛔ never-guess rule kept: no count, no destructive control while loading |
+| [`frontend/src/pages/SkillTunerPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesskilltunerpagetsx) | 21 / 5 / 921 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 5 phases — row added quick-261016-u3w. Skill loading arm → `SyrelLoader` (panel); honoured by construction |
 
 
 
@@ -21722,3 +21732,45 @@ Scan-list disposition cell before 285-03 (replaced):
 > young (235) — ✅ **G1a CLOSED (235-16)**: the summed one number replaced by the per-category breakdown. ⚠ It mounts BEHIND A CLICK; five fence reds are a harness finding
 
 CLAUDE.md FIRING row: none before — ADDED by 285-03 (3 phases).
+
+---
+
+### `frontend/src/components/panel/FilePreview.tsx` — quick-261016-u3w (2026-10-16)
+
+`7 / 4 / 406` (phases 087, 088, 101.1, 200). The file had NO scan-list row for its entire life, so G-5 could never fire on it at 4 phases; added because `check-hot-file-ledger.cjs` failed `[no-row]` on quick-261016-u3w. That task swapped one loading arm (a centred spinner, no words) for `<SyrelLoader size="panel">` and dropped the now-unused spinner import. Honoured by construction: a 3-line loading-arm swap, no state or effect touched. Seam: none proposed.
+
+### `frontend/src/components/settings/EngineHealthCard.tsx` — quick-261016-u3w (2026-10-16)
+
+`5 / 2 / 464` (phases 137.1, 155). Row added by quick-261016-u3w because the ledger gate failed `[no-row]`. Two loading rows ("Loading engine health…", "Loading smoke run…") became section-size `SyrelLoader`s; the outer card keeps `data-testid="engine-health-card"`. The sweep button's spinning RefreshCw is a running-action indicator and was left byte-unchanged. Does not fire.
+
+### `frontend/src/components/settings/MemorySection.tsx` — quick-261016-u3w (2026-10-16)
+
+`5 / 2 / 284` (phases 34, 155). Row added by quick-261016-u3w (gate `[no-row]`). The list loading arm became `<SyrelLoader size="panel" className="py-8" />`; the two per-entry action spinners are button-level and stayed. Does not fire.
+
+### `frontend/src/components/skills/PublishGateDialog.tsx` — quick-261016-u3w (2026-10-16)
+
+`4 / 3 / 175` (phases 136, 137, 165). ⚠ Absent from the scan list at 3 phases, so G-5 was silent on it. Row added by quick-261016-u3w (gate `[no-row]`). The "Checking the publish gate…" line became a section-size `SyrelLoader`; the sole spinner import was removed. Honoured by construction (a loading-arm swap). Seam: none proposed.
+
+### `frontend/src/components/skills/SkillTestCasesSection.tsx` — quick-261016-u3w (2026-10-16)
+
+`4 / 2 / 218` (phases 132, 155). Row added by quick-261016-u3w (gate `[no-row]`). "Loading test cases…" became a section-size `SyrelLoader`, words verbatim. Does not fire.
+
+### `frontend/src/components/skills/studio/CaseEditor.tsx` — quick-261016-u3w (2026-10-16)
+
+`3 / 2 / 274` (phases 137, 155). Row added by quick-261016-u3w (gate `[no-row]`). "Loading test cases…" became a section-size `SyrelLoader`, words verbatim. Does not fire.
+
+### `frontend/src/components/skills/studio/VersionsTab.tsx` — quick-261016-u3w (2026-10-16)
+
+`4 / 3 / 322` (phases 137, 155, 176). ⚠ Absent from the scan list at 3 phases. Row added by quick-261016-u3w (gate `[no-row]`). "Loading version history…" became a section-size `SyrelLoader`. Honoured by construction (a loading-arm swap). Seam: none proposed.
+
+### `frontend/src/components/ui/SyrelLoader.tsx` — quick-261016-u3w (2026-10-16)
+
+Young (created quick-261016-u3w, SEED-359 part A). The one shared branded loader: `IrisAvatar` in its `thinking` state at 20 / 32 / 48 px (section / panel / page), inside ONE `role="status" aria-live="polite"` root whose accessible name is the visible label or "Loading". ⛔ Reuse the Iris, never fork or restyle it (the 276-iris-avatar sketch is the approved visual). ⛔ Exactly one status per loading block: a caller that wraps it must not add its own role. Fenced by `SyrelLoader.test.tsx` (both count-gate knobs).
+
+### `frontend/src/components/workflows/library/WorkflowDeleteSheet.tsx` — quick-261016-u3w (2026-10-16)
+
+`3 / 1 / 339` (phase 192). Row added by quick-261016-u3w (gate `[no-row]`). The preview-loading `<p role="status">` became a section-size `SyrelLoader` (a div cannot sit in a p, so the whole p was replaced). ⛔ The never-guess rule is unchanged: the loading arm renders the fixed sentence only — no count, no placeholder, no destructive control. `PublishedCardDelete.test.tsx` re-captured the `loading` literal only (Iris gradient ids normalised like the radix id); the other six captures are byte-identical. The "Deleting…" running-action spinner stayed.
+
+### `frontend/src/pages/SkillTunerPage.tsx` — quick-261016-u3w (2026-10-16)
+
+`21 / 5 / 921` (phases 123, 123.1, 137, 139, 176). ⚠ Absent from the scan list at 5 phases — G-5 has been firing silently. Row added by quick-261016-u3w (gate `[no-row]`). The "Loading skill…" arm became a panel-size `SyrelLoader` (it used a spinning RefreshCw, whose import became unused and was removed). Honoured by construction (a loading-arm swap). ⚠ A refactor-first audit is owed before the next FEATURE phase here; no seam has been named yet.
