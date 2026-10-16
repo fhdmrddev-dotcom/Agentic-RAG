@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
 status: executing
-last_updated: "2026-10-16T16:02:22.350Z"
+last_updated: "2026-10-16T16:32:41.933Z"
 last_activity: 2026-10-16
 progress:
   total_phases: 16
   completed_phases: 8
   total_plans: 34
-  completed_plans: 32
+  completed_plans: 33
   percent: 50
 ---
 
@@ -85,7 +85,7 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 Milestone: **v4.6 Pay It Down** (started 2026-10-12)
 Phase: 285 (Watch and Re-upload Close Out) — EXECUTING
 Next: `/gsd:discuss-phase 282` (G-2 sketch first for FIX-07). Deploy of 277-281 + BUG-261014-06 stays operator-gated.
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-10-16
 Gates at close (HEAD `aef68af4a` + 279-04 docs): backend unit **71 failed, 7277 passed, 0 collection errors**, failing SET == `279-base-failed.txt`; root-level `backend/tests/*.py` (45 files, test_096 skipped, test_harness_gates hangs at BOTH revs) **46 failed / 503 passed at `a5a94ba67` and at HEAD, sets equal**; frontend typecheck 66 errors / 40 groups, set == base; vitest count gate **OK** (10210 total, 0 failing, no per-file decrease); ledger gate + CLAUDE.md size gate exit 0.

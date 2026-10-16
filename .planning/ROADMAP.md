@@ -405,7 +405,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 285-02-PLAN.md — FIX-13 purge scope (minted and unshared only, honest receipt) + BUG-261014-05 bytes receipt
+- [x] 285-02-PLAN.md — FIX-13 purge scope (minted and unshared only, honest receipt) + BUG-261014-05 bytes receipt
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
