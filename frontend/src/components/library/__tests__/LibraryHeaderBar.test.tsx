@@ -158,6 +158,13 @@ describe("⭐ the reclaimed corner does a job", () => {
     expect(screen.getByTestId("library-queue-pill").textContent).toBe("10,000 documents")
   })
 
+  it("284-REVIEW IN-05: an in-flight count of 1,000 or more is grouped too ('Reading 1,200 files')", () => {
+    renderBar({ inFlight: 1200 })
+    const text = screen.getByTestId("library-queue-pill").textContent ?? ""
+    expect(text).toContain(`Reading ${(1200).toLocaleString()} files`)
+    expect(text).not.toContain("Reading 1200 files")
+  })
+
   it("⛔ the pill LANDS somewhere — a control that lights up and goes nowhere is the defect", () => {
     const onOpenQueue = vi.fn()
     renderBar({ inFlight: 3, onOpenQueue })

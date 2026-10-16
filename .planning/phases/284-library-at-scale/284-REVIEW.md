@@ -56,6 +56,17 @@ findings:
   info: 7
   total: 12
 status: issues_found
+fix_round: 2026-10-16 (284-REVIEW-FIX.md)
+fixed:
+  CR-01: "775fe5a16 (RED) -> 369279f28 (GREEN), lint 547df85e7"
+  WR-01: "1c9e35532 (RED) -> d158ec9b6 (GREEN), lint 547df85e7"
+  WR-02: "5461e4caf (RED) -> a5b6e2ffd (GREEN)"
+  WR-04: "5e9791b69 (RED) -> fdb2d8a88 (GREEN)"
+  IN-05: "b10484562 (RED) -> 4c87a102b (GREEN)"
+  IN-07: "578b603de (RED) -> 232b2bf03 (GREEN)"
+accepted:
+  WR-03: "deploy order is backend-first (284-LIVE-EVIDENCE), so the legacy-array fallback is unreachable; the tolerance is deleted one release after deploy"
+not_addressed_info: [IN-01, IN-02, IN-03, IN-04, IN-06]
 ---
 
 # Phase 284: Code Review Report
@@ -92,6 +103,8 @@ Known, recorded items were not re-reported: SEED-355/356/357, the per-page redun
 ## Critical Issues
 
 ### CR-01: An offset past the end is a 500, not an empty page. This strands browse, saved views, Find, Chunks and the IngestionTab lists
+
+> **FIXED 2026-10-16** — RED `775fe5a16` → GREEN `369279f28` (+ lint `547df85e7`). One helper, `app.utils.db.aexec_page`; PGRST103 proven live (`tests/integration/test_284_offset_past_end_live.py`). See `284-REVIEW-FIX.md`.
 
 **Files:**
 - `backend/app/api/documents.py:878` (also `:914`, `:1185`, `:1300`, `:1330`)
@@ -133,6 +146,8 @@ Then clamp on the client, as IngestionTab intends. Reset `pageOffset` when `find
 
 ### WR-01: A Realtime UPDATE that changes which list a row belongs to is merged in place. The row stays where it no longer belongs, and the counts go stale
 
+> **FIXED 2026-10-16** — RED `1c9e35532` → GREEN `d158ec9b6`. See `284-REVIEW-FIX.md`.
+
 **File:** `frontend/src/hooks/useDocuments.ts:105-110`
 
 **Issue:** Only a terminal-status UPDATE (`completed` / `failed`) calls `onChange()`. Any other UPDATE is spread-merged into the on-page rows. That includes UPDATEs that change list membership or the summary's buckets:
@@ -158,6 +173,8 @@ setDocuments((rows) => {
 
 ### WR-02: `REL_EDGE_CAP = 500` sits above the measured 414 threshold, so a large relationship hub returns a 500 (URI Too Long) instead of the promised 503 refusal
 
+> **FIXED 2026-10-16** — RED `5461e4caf` → GREEN `a5b6e2ffd`. ⚠ The suggested 200 would still 414: the FIND page read at 200 ids is ~8.5 KB against a measured 8,192-byte request line. The cap is **100**. See `284-REVIEW-FIX.md`.
+
 **Files:**
 - `backend/app/services/document_search_service.py:97`
 - `backend/app/services/document_search_service.py:338`
@@ -173,6 +190,8 @@ Concrete failure: a document with 300 `references` edges. Find with *"…referen
 **Fix:** Keep the cap below the measured threshold, for example `REL_EDGE_CAP = 200`, with a comment citing the 286-id measurement. Better still, move the allow-list into SQL: filter the view with an `EXISTS` against `document_relationships` in a view or RPC, so no id list rides the URL at all. Either way, add a live test at the cap.
 
 ### WR-03: The legacy-array fallback shows the whole library as a folder's page, and every page shows the same rows
+
+> **ACCEPTED, not fixed (operator, 2026-10-16)** — the recorded deploy order is backend-first, so the legacy-array fallback is unreachable; the tolerance is deleted one release after deploy.
 
 **Files:**
 - `frontend/src/lib/api/documents.ts:104-107`
@@ -191,6 +210,8 @@ The comment calls this *"honest for the array it was handed"*. It is not honest 
 
 ### WR-04: Takeoff's saved rate sheet can be outside the 50-sheet page. The select then shows nothing (or the wrong sheet) while Match uses the hidden one
 
+> **FIXED 2026-10-16** — RED `5e9791b69` → GREEN `fdb2d8a88`. See `284-REVIEW-FIX.md`.
+
 **Files:**
 - `frontend/src/components/metadata/TakeoffSection.tsx:62-63`
 - `frontend/src/components/metadata/TakeoffSection.tsx:95`, `:101`, `:286`
@@ -203,11 +224,15 @@ The comment calls this *"honest for the array it was handed"*. It is not honest 
 
 ### IN-01: Every navigation away from a deep page fires one wasted request with the old offset against the new source
 
+> **Not addressed (info)** in the 2026-10-16 fix round — recorded, not scheduled.
+
 **File:** `frontend/src/pages/LibraryPage.tsx:362-364` and `frontend/src/hooks/useLibraryDocuments.ts:220-241`
 
 `setPageOffset(0)` runs in an effect, in the same commit as the hook's fetch effect. The first request for the new folder therefore goes out at the old offset; it is dropped by `reqIdRef`, then re-asked at 0. That costs one extra request per navigation, and with CR-01 it is a server-logged 500 whenever the new folder is smaller than the old offset. Fix: key the offset on the source (`const [page, setPage] = useState({ key: sourceKey, offset: 0 })`, read as 0 when `key !== sourceKey`), or reset during render.
 
 ### IN-02: `_exact_total` falls back to `len(rows)`, the exact "length of anything fetched" D-03 forbids
+
+> **Not addressed (info)** in the 2026-10-16 fix round — recorded, not scheduled.
 
 **Files:** `backend/app/api/documents.py:787-791` and `backend/app/services/document_view_resolver.py:69-74`
 
@@ -215,11 +240,15 @@ If `count` is ever missing (a proxy dropping `Content-Range`, or a client upgrad
 
 ### IN-03: `/documents/{id}/versions` still sends an unvalidated id to PostgREST
 
+> **Not addressed (info)** in the 2026-10-16 fix round — recorded, not scheduled.
+
 **File:** `backend/app/api/documents.py:900`
 
 Its sibling routes now get `_uuid_or_422` / `_uuid_or_404`, but this one does not. A malformed id produces a 22P02 → 500. Use `_uuid_or_404(document_id)`.
 
 ### IN-04: The in-flight count and the queue disagree when an in-flight document is archived
+
+> **Not addressed (info)** in the 2026-10-16 fix round — recorded, not scheduled.
 
 **Files:** `frontend/src/components/library/IngestionTab.tsx:171`, `:479`, `:492`, with `backend/app/api/library.py` `LIBRARY_SUMMARY_SQL`
 
@@ -227,17 +256,23 @@ The pill and cards count archived rows: the summary's `status.*` includes `archi
 
 ### IN-05: Two number renders still break UI-SPEC's grouping rule
 
+> **FIXED 2026-10-16** — RED `b10484562` → GREEN `4c87a102b`.
+
 **Files:** `frontend/src/components/library/LibraryHeaderBar.tsx:244` and `frontend/src/components/ui/AnimatedNumber.tsx`
 
 `Reading {inFlight} files` is not grouped, so it reads "Reading 1200 files". Separately, numbers rendered as `toLocaleString()` strings are parsed with a comma-only strip. In `de-DE`, "10.000" is read as 10.000 with three decimals, so the count-up frames show "3.142…" before landing on the right value. Fix: use `inFlight.toLocaleString()`, and strip the locale's group separator, or pass the number and a formatter.
 
 ### IN-06: The `document_types` cap (T-284-12) bounds the response, not the query
 
+> **Not addressed (info)** in the 2026-10-16 fix round — recorded, not scheduled.
+
 **File:** `backend/app/api/library.py:272`
 
 The `(doc_type)` grouping set returns every distinct value. The 200-value cap is applied in Python after `conn.fetch`. A pathological `metadata.document_type` with one value per document still returns N rows from SQL. To cap it in SQL, compute the doc-type list in a separate `... GROUP BY 1 ORDER BY count(*) DESC LIMIT 201`.
 
 ### IN-07: A failed page change leaves the pager's range and the rows out of step
+
+> **FIXED 2026-10-16** — RED `578b603de` → GREEN `232b2bf03`.
 
 **Files:** `frontend/src/hooks/useLibraryDocuments.ts:228-238` and `LibraryPage.tsx:971-981`
 

@@ -7,7 +7,8 @@
  *
  *   · UPDATE to a row on the page → spread-merged in place (the block below, kept verbatim);
  *     a row that is not on the page is never inserted (T-284-17).
- *   · UPDATE to a terminal status, INSERT, DELETE → `onChange()`. The caller debounces it into
+ *   · UPDATE that changes a MEMBERSHIP field (`folder_id`, `archived_at`, `is_latest`, `status` —
+ *     284-REVIEW WR-01) or reaches a terminal status, INSERT, DELETE → `onChange()`. The caller debounces it into
  *     ONE refetch of the page and the summary. Realtime is a HINT, never a source of truth
  *     (D-v2.5-03): a missed event is reconciled by the next fetch, not by this callback.
  *   · upload → the created document is returned, so the caller can show it on page 1 until
@@ -19,7 +20,26 @@ import { supabase } from "@/lib/supabase"
 import { uploadDocument, deleteDocument } from "@/lib/api"
 import type { Document } from "@/types"
 
+/**
+ * 284-REVIEW WR-01 — the columns that decide WHICH LIST a row is on (a folder's page, archived
+ * hidden or shown, latest versions only, IngestionTab's status lists) and which bucket of
+ * `/library/summary` counts it. An UPDATE that changes one of them is not cosmetic: merged in
+ * place it left a moved / archived row on its OLD folder's page wearing its new values, with
+ * stale counts. Such an UPDATE asks for the refetch instead.
+ */
+export const MEMBERSHIP_FIELDS = ["folder_id", "archived_at", "is_latest", "status"] as const
+
+/** Did `next` (a Realtime `payload.new`) change any membership field of `cur`? A key absent from
+ *  the payload is "not sent", never "changed"; `null` and `undefined` are the same absence. */
+export function changesMembership(cur: Document, next: Partial<Document>): boolean {
+  return MEMBERSHIP_FIELDS.some(
+    (k) => k in next && (next[k] ?? null) !== (cur[k] ?? null),
+  )
+}
+
 export interface UseDocumentsArgs {
+  /** The caller's ON-PAGE rows, read to tell a cosmetic UPDATE from a membership one (WR-01). */
+  rows: readonly Document[]
   /** The caller's ON-PAGE rows. Realtime merges an UPDATE only into a row already here. */
   setRows: Dispatch<SetStateAction<Document[]>>
   /** Something changed that a merge cannot express: refetch (the caller debounces). */
@@ -33,16 +53,18 @@ interface UseDocuments {
   deleteDoc: (id: string, scope?: "version" | "all") => Promise<void>
 }
 
-export function useDocuments({ setRows, onChange }: UseDocumentsArgs): UseDocuments {
+export function useDocuments({ rows, setRows, onChange }: UseDocumentsArgs): UseDocuments {
   const [uploadingCount, setUploadingCount] = useState(0)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  // The latest callbacks, read by the ONE channel subscription (it is not re-made per render).
+  // The latest callbacks and rows, read by the ONE channel subscription (not re-made per render).
   const onChangeRef = useRef(onChange)
   const setRowsRef = useRef(setRows)
+  const rowsRef = useRef(rows)
   useEffect(() => {
     onChangeRef.current = onChange
     setRowsRef.current = setRows
-  }, [onChange, setRows])
+    rowsRef.current = rows
+  }, [onChange, setRows, rows])
 
   useEffect(() => {
     let cancelled = false
@@ -102,10 +124,16 @@ export function useDocuments({ setRows, onChange }: UseDocumentsArgs): UseDocume
               // fetch reconciles it. That is why plan 01 put `ingestion_step` on the
               // DocumentResponse wire (D-217-10) — the list load, not this callback,
               // is what makes a mid-ingest file honest when the Library first opens.
+              // 284-REVIEW WR-01: decided OUTSIDE the state updater (an updater may run twice under
+              // StrictMode, and lazily), against the rows the caller last rendered.
+              const cur = rowsRef.current.find((d) => d.id === newDoc.id)
+              const membership = cur !== undefined && changesMembership(cur, newDoc)
               setDocuments((prev) =>
                 prev.map((d) => (d.id === newDoc.id ? { ...d, ...newDoc } : d)),
               )
-              if (newDoc.status === "completed" || newDoc.status === "failed") {
+              // A membership change, or a terminal status (fresh server-side counts): ONE hint.
+              // The caller coalesces hints into one refetch of the page and the summary (D-08).
+              if (membership || newDoc.status === "completed" || newDoc.status === "failed") {
                 onChangeRef.current()
               }
             } else if (payload.eventType === "INSERT" || payload.eventType === "DELETE") {

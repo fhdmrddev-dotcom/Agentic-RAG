@@ -768,3 +768,51 @@ describe("IngestionTab — summary numbers and paged lists (284-03)", () => {
     expect(screen.getByTestId("ingestion-pause-banner")).toBeInTheDocument()
   })
 })
+
+// ── 284-REVIEW CR-01 — a list that shrank under an open page lands on a real page. The server
+// answers a past-the-end page with `{documents: [], total}` (it used to 416 → 500, so this clamp
+// never ran); the ONE clamp (`lib/pageClamp`) then moves the page back into range. ──
+describe("IngestionTab — a shrinking list clamps the page (284-REVIEW CR-01)", () => {
+  const history = (n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      doc({
+        id: `s${i}`,
+        status: "completed",
+        filename: `kept-${String(i).padStart(3, "0")}.pdf`,
+        updated_at: new Date(Date.UTC(2026, 8, 1) - i * 60_000).toISOString(),
+      }),
+    )
+
+  async function toPageThree(user: ReturnType<typeof userEvent.setup>) {
+    await openSubTab(user, "History")
+    await user.click(screen.getByRole("button", { name: /Next/ }))
+    await screen.findByText("Showing 26–50 of 60")
+    await user.click(screen.getByRole("button", { name: /Next/ }))
+    await screen.findByText("Showing 51–60 of 60")
+  }
+
+  it("shrinking by more than one page boundary lands on the last real page", async () => {
+    const user = userEvent.setup()
+    const documents = history(60)
+    const { rerender } = renderPlain({ documents })
+    await toPageThree(user)
+    documents.splice(20) // 20 remain: offset 50 is two pages past the end
+    rerender(<IngestionTab {...defaultProps} summary={summarizeDocuments(documents)} changeTick={1} />)
+    await waitFor(() => expect(screen.getByText("kept-000.pdf")).toBeInTheDocument())
+    expect(listDocumentsPage).toHaveBeenLastCalledWith({ status: "done", order: "updated_desc", offset: 0, limit: 25 })
+    expect(screen.queryByText("Nothing has been ingested yet.")).toBeNull()
+  })
+
+  it("a list that emptied under an open page goes back to page 1", async () => {
+    const user = userEvent.setup()
+    const documents = history(60)
+    const { rerender } = renderPlain({ documents })
+    await toPageThree(user)
+    documents.splice(0)
+    rerender(<IngestionTab {...defaultProps} summary={summarizeDocuments(documents)} changeTick={1} />)
+    expect(await screen.findByText("Nothing has been ingested yet.")).toBeInTheDocument()
+    await waitFor(() =>
+      expect(listDocumentsPage).toHaveBeenLastCalledWith({ status: "done", order: "updated_desc", offset: 0, limit: 25 }),
+    )
+  })
+})

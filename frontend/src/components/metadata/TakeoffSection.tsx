@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useState } from "react"
 import { Calculator, Download, AlertTriangle, CheckCircle2, Loader2, FileSpreadsheet } from "lucide-react"
-import { listDocumentsPage } from "@/lib/api"
+import { getDocument, listDocumentsPage } from "@/lib/api"
 import {
   fetchDocumentTakeoff,
   matchDocumentTakeoff,
@@ -113,8 +113,55 @@ export function TakeoffSection({ doc, onTotalChange, onRefresh }: TakeoffSection
 
   const retrySheets = useCallback(() => setSheetsAttempt((n) => n + 1), [])
 
+  // ── 284-REVIEW WR-04: the SAVED rate sheet is always an option ────────────────────────────
+  // The page is the 50 newest non-archived spreadsheets; the sheet this takeoff was matched
+  // against can be older, or archived. When the selected id is not on the page it is read ONCE
+  // by id and shown first, so the select always shows what Match will send.
+  const [offPage, setOffPage] = useState<{ id: string; doc: Document | null; gone: boolean } | null>(null)
+  const [savedGone, setSavedGone] = useState(false)
+  const offPageId =
+    sheetsState === "ready" && selectedRateDocId !== "" && !rateDocs.some((r) => r.id === selectedRateDocId)
+      ? selectedRateDocId
+      : null
+  useEffect(() => {
+    if (offPageId === null || offPage?.id === offPageId) return
+    let alive = true
+    getDocument(offPageId).then(
+      (found) => {
+        if (alive) setOffPage({ id: offPageId, doc: found, gone: false })
+      },
+      (e: unknown) => {
+        if (!alive) return
+        const notVisible = typeof e === "object" && e !== null && (e as { status?: unknown }).status === 404
+        setOffPage({ id: offPageId, doc: null, gone: notVisible })
+      },
+    )
+    return () => {
+      alive = false
+    }
+  }, [offPageId, offPage?.id])
+  // A saved sheet that no longer exists (404): say so, and select a sheet the select shows.
+  useEffect(() => {
+    if (!offPage?.gone || offPage.id !== selectedRateDocId) return
+    setSavedGone(true)
+    setSelectedRateDocId(rateDocs[0]?.id ?? "")
+  }, [offPage, selectedRateDocId, rateDocs])
+  const savedOption =
+    offPageId === null
+      ? null
+      : {
+          id: offPageId,
+          label:
+            offPage?.id === offPageId && offPage.doc
+              ? `${offPage.doc.filename}${offPage.doc.archived_at ? " (archived)" : ""}`
+              : "Saved rate sheet",
+        }
+  const sheetOptions = savedOption
+    ? [savedOption, ...rateDocs.map((r) => ({ id: r.id, label: r.filename }))]
+    : rateDocs.map((r) => ({ id: r.id, label: r.filename }))
+
   const handleMatch = async () => {
-    if (!selectedRateDocId) return
+    if (!selectedRateDocId || sheetsState !== "ready") return
     try {
       setMatching(true)
       setError(null)
@@ -285,7 +332,7 @@ export function TakeoffSection({ doc, onTotalChange, onRefresh }: TakeoffSection
           <select
             value={sheetsState === "ready" ? selectedRateDocId : ""}
             onChange={(e) => setSelectedRateDocId(e.target.value)}
-            disabled={matching || sheetsState !== "ready" || rateDocs.length === 0}
+            disabled={matching || sheetsState !== "ready" || sheetOptions.length === 0}
             className="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             aria-label="Select reference rate sheet"
           >
@@ -293,12 +340,12 @@ export function TakeoffSection({ doc, onTotalChange, onRefresh }: TakeoffSection
               <option value="">Loading rate sheets…</option>
             ) : sheetsState === "error" ? (
               <option value="">Couldn’t load rate sheets</option>
-            ) : rateDocs.length === 0 ? (
+            ) : sheetOptions.length === 0 ? (
               <option value="">No Excel rate sheets found in Library</option>
             ) : (
-              rateDocs.map((r) => (
+              sheetOptions.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.filename}
+                  {r.label}
                 </option>
               ))
             )}
@@ -307,7 +354,8 @@ export function TakeoffSection({ doc, onTotalChange, onRefresh }: TakeoffSection
           <button
             type="button"
             onClick={handleMatch}
-            disabled={matching || !selectedRateDocId}
+            // 284-REVIEW WR-04: never send an id the select is not showing.
+            disabled={matching || !selectedRateDocId || sheetsState !== "ready"}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-medium text-xs hover:bg-primary/90 disabled:opacity-50 transition-colors flex-none"
           >
             {matching ? (
@@ -328,6 +376,9 @@ export function TakeoffSection({ doc, onTotalChange, onRefresh }: TakeoffSection
           <button type="button" onClick={retrySheets} className="text-xs text-primary hover:underline">
             Try again
           </button>
+        )}
+        {savedGone && (
+          <p className="text-xs text-muted-foreground">The saved rate sheet is no longer available.</p>
         )}
         {sheetsState === "ready" && sheetsTotal > RATE_SHEET_PAGE && (
           <p className="text-xs text-muted-foreground">

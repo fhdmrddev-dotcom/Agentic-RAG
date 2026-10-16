@@ -43,7 +43,7 @@ from app.models.document_view import ViewFilter
 from app.services import metadata_field_service, view_filter_compiler
 from app.services.harness.scope import resolve_project_subtree
 from app.services.retrieval_scope import RETRIEVABLE_COLUMN
-from app.utils.db import aexec
+from app.utils.db import aexec, aexec_page
 from app.utils.folder_utils import fetch_visible_folders, get_globally_visible_folder_ids
 
 
@@ -336,8 +336,9 @@ async def resolve_filter(
       * ``via_view=True`` — the ROUTES (user JWT). ONE read of migration 207's
         ``public.library_documents`` (the Library visible set in SQL, ``security_invoker``):
         latest only, archived hidden unless ``include_archived``, ``created_at desc, id desc``,
-        ``.range(offset, offset + limit - 1)`` with ``count="exact"`` →
-        ``{documents, total, offset, limit}``. ``count_only`` is ONE ``count="exact"`` head read →
+        one ranged page (``aexec_page``: rows ``offset`` .. ``offset + limit - 1``) with
+        ``count="exact"`` → ``{documents, total, offset, limit}``; a page past the end is ``[]``
+        with the exact total (284-REVIEW CR-01). ``count_only`` is ONE ``count="exact"`` head read →
         ``{total}``. Neither is cut at PostgREST's max_rows any more (the old count_only topped out
         near 1,000 per leg).
       * ``via_view=False`` (the DEFAULT) — the AGENT tool (SERVICE ROLE). The view is keyed on
@@ -414,11 +415,11 @@ async def resolve_filter(
             head = await aexec(_view("id").limit(1))
             return {"total": _exact_total(head)}
         page_limit = limit if limit is not None else VIEW_PAGE_DEFAULT
-        res = await aexec(
-            _view(LIBRARY_ROW_COLUMNS)
-            .order("created_at", desc=True)
-            .order("id", desc=True)
-            .range(offset, offset + page_limit - 1)
+        # 284-REVIEW CR-01: a page past the end is `[]` + the exact total, never PostgREST's 416.
+        res = await aexec_page(
+            lambda: _view(LIBRARY_ROW_COLUMNS).order("created_at", desc=True).order("id", desc=True),
+            offset=offset,
+            limit=page_limit,
         )
         rows = res.data or []
         return {"documents": rows, "total": _exact_total(res, rows), "offset": offset,
