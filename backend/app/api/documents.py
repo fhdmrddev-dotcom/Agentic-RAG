@@ -8,7 +8,7 @@ import time
 import zipfile
 from datetime import datetime, timezone
 from typing import Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from pydantic import BaseModel
@@ -19,14 +19,16 @@ from supabase import Client
 from app.api.kb import read_path
 from app.dependencies import get_current_user, get_supabase, get_user_supabase_client
 from app.models.document import (
-    DocumentChunkRow,
+    DocumentChunkPage,
     DocumentContentResponse,
     DocumentDownloadUrl,
-    DocumentImageRow,
+    DocumentImagePage,
+    DocumentListResponse,
     DocumentMetadata,
     DocumentMoveRequest,
     DocumentResponse,
-    DocumentTableRow,
+    DocumentTablePage,
+    DocumentVersionPage,
 )
 from app.models.document import ConversationMessage, ConversationResponse  # Phase 240
 from app.models.user_settings import load_app_settings, load_app_settings_async
@@ -37,7 +39,6 @@ from app.services.ingest_enrich import enrich_for_ingest
 from app.services.extraction_service import ExtractedDocument
 from app.services.retention import hold_guard  # Phase 275 (D-14 / D-32): the one hold check
 from app.utils.db import aexec, maybe_row
-from app.utils.folder_utils import get_globally_visible_folder_ids
 
 
 def _parse_engines_hint(s: str | None) -> dict[str, str] | None:
@@ -738,111 +739,213 @@ async def upload_document(
     return doc
 
 
-_ID_BATCH = 100  # ids per `.in_()` — 100 UUIDs keep the PostgREST URL ~3.7 KB
+# ── Phase 284 · FIX-11 — the Library pages on the server ───────────────────────────────────
+#
+# Every Library list reads `public.library_documents` (migration 207): ONE SQL home of the
+# visible set (own documents ∪ documents in org-shared folders the caller does not own), a
+# security_invoker view, so RLS still applies beneath it. One ranged read with `count="exact"`:
+# PostgREST's max_rows (1,000) cannot cut a `.range()` read, the total is the database's own
+# `count(*)` of the same predicate, and no folder-id or document-id list rides the URL. The
+# BUG-261014-06 batching stopgap (an `in_` loop over EVERY document id) is deleted.
+
+#: The DocumentResponse columns, named — never `*`: `select("*")` drags `full_markdown` (up to
+#: ~267 KB per row) through every list read, and the view omits it anyway. The two embedded
+#: counts are evaluated for the PAGE only (D-05). ⚠ document_tables / document_images RLS is
+#: owner-only (migration 108), so a shared-folder document's embedded counts read 0 — the same
+#: asymmetry the per-document routes below document.
+LIST_SELECT = (
+    "id,user_id,folder_id,filename,file_path,file_size,mime_type,status,error_message,"
+    "chunk_count,content_hash,version_number,is_latest,metadata,created_at,updated_at,"
+    "extractor,source_connection_id,ingestion_step,page_count,source_created_at,"
+    "source_modified_at,source_author,archived_at,archived_policy_id,archived_policy_name,"
+    "retrievable,document_tables(count),document_images(count)"
+)
+
+#: R-05 — the Takeoff rate-sheet read needs SPREADSHEETS, not "pick by name". A CONSTANT filter
+#: (mirrors TakeoffSection's client test: .xlsx / .xls / .csv, or a spreadsheet / csv MIME type);
+#: no user value is ever interpolated into it.
+SPREADSHEET_OR = (
+    "filename.ilike.*.xlsx,filename.ilike.*.xls,filename.ilike.*.csv,"
+    "mime_type.ilike.*spreadsheet*,mime_type.ilike.*csv*"
+)
+
+#: Status buckets. R-04: `paused` is not a document status, so `in_flight` = pending|processing;
+#: `done` is IngestionTab History's set. Constant lists — never ids.
+_STATUS_SETS = {"in_flight": ["pending", "processing"], "done": ["completed", "failed"]}
+_ORDER_COLUMN = {"created_desc": "created_at", "updated_desc": "updated_at"}
 
 
-@router.get("", response_model=list[DocumentResponse])
+def _uuid_or_422(value: str, what: str = "document_id") -> str:
+    """A path/query id must be a UUID BEFORE it reaches PostgREST: a malformed one would come
+    back as `22P02` → a 500 that is also an existence oracle (T-284-10, the WR-01 lesson)."""
+    try:
+        return str(UUID(str(value)))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=422, detail=f"{what} must be a UUID")
+
+
+def _exact_total(res, rows: list) -> int:
+    """The database's `count="exact"` for the read. Only a response that carries NO usable
+    count (a test double; a server that ignored the header) falls back to the page length."""
+    count = getattr(res, "count", None)
+    return count if isinstance(count, int) else len(rows)
+
+
+def _flatten_counts(row: dict) -> dict:
+    """`document_tables(count)` arrives as `[{"count": n}]` — flatten to `table_count` / `image_count`."""
+    for embedded, key in (("document_tables", "table_count"), ("document_images", "image_count")):
+        val = row.pop(embedded, None)
+        if isinstance(val, list) and val and isinstance(val[0], dict):
+            row[key] = int(val[0].get("count") or 0)
+        else:
+            row[key] = 0
+    return row
+
+
+async def _decorate_connection_names(supabase: Client, rows: list[dict]) -> None:
+    """Phase 270 (P-02): the connection NAME for connector-placed documents — ONE user-JWT read,
+    bounded by the PAGE's distinct connection ids (≤ limit, D-05). connector_connections is
+    org-RLS'd and `name` is column-granted to `authenticated`. The name is decoration: a failure
+    leaves it None, never a 500."""
+    conn_ids = sorted({d["source_connection_id"] for d in rows if d.get("source_connection_id")})
+    conn_names: dict[str, str] = {}
+    if conn_ids:
+        try:
+            conn_res = await aexec(
+                supabase.table("connector_connections").select("id, name").in_("id", conn_ids)
+            )
+            conn_names = {r["id"]: r.get("name") for r in (conn_res.data or [])}
+        except Exception:
+            log.debug("connection-name lookup failed; names stay None")
+    for doc in rows:
+        sid = doc.get("source_connection_id")
+        doc["source_connection_name"] = conn_names.get(sid) if sid else None
+
+
+@router.get("", response_model=DocumentListResponse)
 async def list_documents(
+    limit: int = Query(25, ge=1, le=200, description="Page size (1-200)."),
+    offset: int = Query(0, ge=0, description="Rows to skip. Page until offset >= total."),
+    folder_id: str | None = Query(
+        None, description="A folder id, or `root` for documents in no folder. Omitted = every folder."
+    ),
+    include_archived: bool = Query(False, description="Include archived documents."),
+    status_: Literal["in_flight", "completed", "failed", "done"] | None = Query(
+        None, alias="status",
+        description="`in_flight` = pending or processing; `done` = completed or failed.",
+    ),
+    order: Literal["created_desc", "updated_desc"] = Query(
+        "created_desc", description="Newest first by creation (default) or by last update."
+    ),
+    kind: Literal["spreadsheet"] | None = Query(
+        None, description="`spreadsheet` = .xlsx / .xls / .csv or a spreadsheet / CSV MIME type."
+    ),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    # Own documents — only show latest versions (VER-03)
-    own_result = (
-        supabase.table("documents")
-        .select("*")
-        .eq("user_id", current_user["id"])
+    """Returns one page `{documents, total, offset, limit}` (breaking change in v4.6: this endpoint
+    used to return a JSON array that was silently cut at 1,000 rows). Page with `offset` and
+    `limit` (≤ 200) until `offset >= total`.
+
+    The caller's Library documents (latest versions). `total` is the database's exact count of
+    the same filter, never the length of the page. The visible set is your own documents plus
+    documents in folders shared with your organization; order is newest first with the id as a
+    stable tiebreaker.
+    """
+    if folder_id is not None and folder_id != "root":
+        folder_id = _uuid_or_422(folder_id, "folder_id")
+
+    q = (
+        supabase.table("library_documents")
+        .select(LIST_SELECT, count="exact")
         .eq("is_latest", True)
-        .execute()
     )
-    own_docs = own_result.data or []
-
-    # Documents in globally visible folders (not owned by current user)
-    global_folder_ids = await get_globally_visible_folder_ids(supabase, current_user["id"])
-    global_docs = []
-    if global_folder_ids:
-        global_result = (
-            supabase.table("documents")
-            .select("*")
-            .in_("folder_id", global_folder_ids)
-            .eq("is_latest", True)
-            .execute()
-        )
-        global_docs = global_result.data or []
-
-    # Merge, deduplicate by id, sort by created_at desc
-    seen: set[str] = set()
-    merged: list[dict] = []
-    for doc in own_docs + global_docs:
-        if doc["id"] not in seen:
-            seen.add(doc["id"])
-            merged.append(doc)
-    merged.sort(key=lambda d: d["created_at"], reverse=True)
-
-    # D-09: aggregate table_count / image_count from document_tables and document_images
-    # Pitfall 4: supabase-py has no native GROUP BY — fetch document_id rows, count in Python
-    if merged:
-        from collections import Counter  # noqa: PLC0415
-        doc_ids = [d["id"] for d in merged]
-        # BUG-261014-06: `in.(...)` rides the URL — 286 ids came back 414, so batch it.
-        tc: Counter = Counter()
-        ic: Counter = Counter()
-        for i in range(0, len(doc_ids), _ID_BATCH):
-            batch = doc_ids[i : i + _ID_BATCH]
-            for table, counter in (("document_tables", tc), ("document_images", ic)):
-                res = supabase.table(table).select("document_id").in_("document_id", batch).execute()
-                counter.update(r["document_id"] for r in (res.data or []))
-        for doc in merged:
-            doc["table_count"] = tc.get(doc["id"], 0)
-            doc["image_count"] = ic.get(doc["id"], 0)
-
-        # Phase 270 (P-02): the connection NAME for connector-placed documents — ONE batched
-        # user-JWT read. connector_connections is org-RLS'd and `name` is column-granted to
-        # `authenticated`. The name is decoration: a failure leaves it None, never a 500.
-        conn_ids = sorted({d["source_connection_id"] for d in merged if d.get("source_connection_id")})
-        conn_names: dict[str, str] = {}
-        if conn_ids:
-            try:
-                conn_res = await aexec(
-                    supabase.table("connector_connections").select("id, name").in_("id", conn_ids)
-                )
-                conn_names = {r["id"]: r.get("name") for r in (conn_res.data or [])}
-            except Exception:
-                log.debug("connection-name lookup failed; names stay None")
-        for doc in merged:
-            sid = doc.get("source_connection_id")
-            doc["source_connection_name"] = conn_names.get(sid) if sid else None
-
-    return merged
+    if folder_id == "root":
+        q = q.is_("folder_id", "null")
+    elif folder_id is not None:
+        q = q.eq("folder_id", folder_id)
+    if not include_archived:
+        q = q.is_("archived_at", "null")
+    if status_ in _STATUS_SETS:
+        q = q.in_("status", _STATUS_SETS[status_])
+    elif status_ is not None:
+        q = q.eq("status", status_)
+    if kind == "spreadsheet":
+        q = q.or_(SPREADSHEET_OR)
+    q = (
+        q.order(_ORDER_COLUMN[order], desc=True)
+        .order("id", desc=True)
+        .range(offset, offset + limit - 1)
+    )
+    res = await aexec(q)
+    rows = [_flatten_counts(r) for r in (res.data or [])]
+    await _decorate_connection_names(supabase, rows)
+    total = _exact_total(res, rows)
+    return {"documents": rows, "total": total, "offset": offset, "limit": limit}
 
 
-@router.get("/{document_id}/versions", response_model=list[DocumentResponse])
+@router.get("/{document_id}/versions", response_model=DocumentVersionPage)
 async def list_document_versions(
     document_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Return all versions of a document ordered by version_number descending."""
-    # 1. Verify doc exists and user has access
-    doc = (
+    """Every version of a document, newest first, one page at a time (`total` is exact)."""
+    # 1. Verify doc exists and user has access (the owner's own lineage — unchanged rule)
+    doc = await aexec(
         supabase.table("documents")
         .select("filename, user_id, folder_id")
         .eq("id", document_id)
         .eq("user_id", current_user["id"])
         .maybe_single()
-        .execute()
     )
-    if not maybe_row(doc):
+    found = maybe_row(doc)
+    if not found:
         raise HTTPException(status_code=404, detail="Document not found")
-    # 2. Fetch all sibling versions
-    result = (
+    # 2. One page of the sibling versions, with the exact count of all of them
+    result = await aexec(
         supabase.table("documents")
-        .select("*")
+        .select(LIST_SELECT, count="exact")
         .eq("user_id", current_user["id"])
-        .eq("filename", doc.data["filename"])
+        .eq("filename", found["filename"])
         .order("version_number", desc=True)
-        .execute()
+        .range(offset, offset + limit - 1)
     )
-    return result.data or []
+    rows = [_flatten_counts(r) for r in (result.data or [])]
+    total = _exact_total(result, rows)
+    return {"versions": rows, "total": total, "offset": offset, "limit": limit}
+
+
+# ⚠ ROUTE ORDER: a single-segment `GET /documents/{document_id}` matches ANY literal
+#   `GET /documents/<word>` declared after it. None exists today; a literal route added later
+#   must be declared ABOVE this one (test_284_list_contract walks app.routes and fails otherwise).
+@router.get("/{document_id}", response_model=DocumentResponse)
+async def get_document(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """One document of the caller's Library, by id (latest or not).
+
+    The same visible set as `GET /documents` (one read of the Library view). An invisible
+    document is a 404 — never an empty 200, which would confirm the id exists (T-217-04/05).
+    A malformed id is a 422.
+    """
+    doc_id = _uuid_or_422(document_id)
+    res = await aexec(
+        supabase.table("library_documents")
+        .select(LIST_SELECT)
+        .eq("id", doc_id)
+        .maybe_single()
+    )
+    row = maybe_row(res)
+    if not row:
+        raise HTTPException(status_code=404, detail="Document not found")
+    row = _flatten_counts(dict(row))
+    await _decorate_connection_names(supabase, [row])
+    return row
 
 
 # ── Phase 270 · FIND-04 — the download mint ───────────────────────────────────────────
@@ -951,38 +1054,39 @@ async def _assert_document_visible(document_id: str, user_id: str, supabase: Cli
     T-217-04 / T-217-05: `document_id` is never trusted as an authorization claim. It
     selects a row the ownership filter must ALSO match, and an invisible document is a
     404 — never an empty 200, which would confirm the id exists.
+
+    Phase 284: ONE read of `public.library_documents`. The global-folder leg that used to be a
+    second query over a Python-computed folder-id list now lives in migration 207's view
+    predicate — the same SQL home `list_documents` reads, so the two cannot disagree. `user_id`
+    is kept in the signature (every caller passes it); RLS + the view's `auth.uid()` scope the
+    read, so a malformed or invisible id is the same uniform 404.
     """
+    del user_id  # the view is keyed on the caller's JWT, not on a parameter
     try:
         res = await aexec(
-            supabase.table("documents")
+            supabase.table("library_documents")
             .select("id, filename, user_id, folder_id")
-            .eq("id", document_id)
-            .eq("user_id", user_id)
+            .eq("id", _uuid_or_404(document_id))
             .maybe_single()
         )
+    except HTTPException:
+        raise
     except Exception:
-        log.debug("visibility check raised on the owner arm for document %s", document_id)
+        log.debug("visibility check raised for document %s", document_id)
         res = None
-    if res is not None and getattr(res, "data", None):
-        return res.data
-
-    global_folder_ids = await get_globally_visible_folder_ids(supabase, user_id)
-    if global_folder_ids:
-        try:
-            res = await aexec(
-                supabase.table("documents")
-                .select("id, filename, user_id, folder_id")
-                .eq("id", document_id)
-                .in_("folder_id", global_folder_ids)
-                .maybe_single()
-            )
-        except Exception:
-            log.debug("visibility check failed for document %s (global-folder arm)", document_id)
-            res = None
-        if res is not None and getattr(res, "data", None):
-            return res.data
-
+    row = maybe_row(res)
+    if row:
+        return row
     raise HTTPException(status_code=404, detail="Document not found")
+
+
+def _uuid_or_404(document_id: str) -> str:
+    """The gate's id check. A malformed id on a per-document route is a 404 like any other
+    invisible document (the shipped detail string), never a PostgREST 22P02 500."""
+    try:
+        return str(UUID(str(document_id)))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=404, detail="Document not found")
 
 
 @router.get("/{document_id}/content", response_model=DocumentContentResponse)
@@ -1055,9 +1159,11 @@ async def get_document_content(
     )
 
 
-@router.get("/{document_id}/chunks", response_model=list[DocumentChunkRow])
+@router.get("/{document_id}/chunks", response_model=DocumentChunkPage)
 async def list_document_chunks(
     document_id: str,
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
@@ -1069,14 +1175,18 @@ async def list_document_chunks(
     """
     # 1. Verify doc exists and user has access
     await _assert_document_visible(document_id, current_user["id"], supabase)
-    # 2. Fetch the chunks — an empty result is 200 + [], never a 404.
+    # 2. One page of the chunks with the exact total (Phase 284, D-17) — an empty result is
+    #    200 + [], never a 404. Unranged, this read was silently cut at 1,000 chunks.
     res = await aexec(
         supabase.table("document_chunks")
-        .select("id, chunk_index, content, embedding_model, embedding_dimensions")
+        .select("id, chunk_index, content, embedding_model, embedding_dimensions", count="exact")
         .eq("document_id", document_id)
         .order("chunk_index")
+        .range(offset, offset + limit - 1)
     )
-    return res.data or []
+    rows = res.data or []
+    total = _exact_total(res, rows)
+    return {"chunks": rows, "total": total, "offset": offset, "limit": limit}
 
 
 #: Phase 240 (TM-240-14). How many siblings one conversation read returns.
@@ -1165,9 +1275,11 @@ async def get_document_conversation(
 # Widening those two policies is a migration and a security decision — out of this phase.
 
 
-@router.get("/{document_id}/tables", response_model=list[DocumentTableRow])
+@router.get("/{document_id}/tables", response_model=DocumentTablePage)
 async def list_document_tables(
     document_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
@@ -1178,19 +1290,25 @@ async def list_document_tables(
     """
     # 1. Verify doc exists and user has access
     await _assert_document_visible(document_id, current_user["id"], supabase)
-    # 2. Fetch the tables — an empty result is 200 + [], never a 404.
+    # 2. One page of the tables with the exact total (Phase 284, D-17) — an empty result is
+    #    200 + [], never a 404. Default 50: `rows` jsonb is heavy.
     res = await aexec(
         supabase.table("document_tables")
-        .select("id, page, table_index, headers, rows, extractor")
+        .select("id, page, table_index, headers, rows, extractor", count="exact")
         .eq("document_id", document_id)
         .order("table_index")
+        .range(offset, offset + limit - 1)
     )
-    return res.data or []
+    rows = res.data or []
+    total = _exact_total(res, rows)
+    return {"tables": rows, "total": total, "offset": offset, "limit": limit}
 
 
-@router.get("/{document_id}/images", response_model=list[DocumentImageRow])
+@router.get("/{document_id}/images", response_model=DocumentImagePage)
 async def list_document_images(
     document_id: str,
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
@@ -1202,14 +1320,18 @@ async def list_document_images(
     """
     # 1. Verify doc exists and user has access
     await _assert_document_visible(document_id, current_user["id"], supabase)
-    # 2. Fetch the image descriptions — an empty result is 200 + [], never a 404.
+    # 2. One page of the image descriptions with the exact total (Phase 284, D-17) — an empty
+    #    result is 200 + [], never a 404.
     res = await aexec(
         supabase.table("document_images")
-        .select("id, page, image_index, description")
+        .select("id, page, image_index, description", count="exact")
         .eq("document_id", document_id)
         .order("image_index")
+        .range(offset, offset + limit - 1)
     )
-    return res.data or []
+    rows = res.data or []
+    total = _exact_total(res, rows)
+    return {"images": rows, "total": total, "offset": offset, "limit": limit}
 
 
 @router.post("/{document_id}/restore", response_model=DocumentResponse)
