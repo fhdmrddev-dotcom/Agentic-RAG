@@ -106,7 +106,7 @@ async def _list(sb, uid, *, limit=25, offset=0, folder_id=None, include_archived
     from app.api.documents import list_documents
 
     return await list_documents(limit=limit, offset=offset, folder_id=folder_id,
-                                include_archived=include_archived, status=status, order=order,
+                                include_archived=include_archived, status_=status, order=order,
                                 kind=kind, current_user={"id": uid}, supabase=sb)
 
 

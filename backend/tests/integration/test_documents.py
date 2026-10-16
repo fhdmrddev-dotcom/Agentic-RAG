@@ -90,33 +90,30 @@ class TestListDocuments:
             app.dependency_overrides[get_current_user] = lambda: mock_user_data
 
     def test_returns_200_with_auth(self, client, auth_headers, mock_builder):
-        # own docs, global folder ids, document_tables rows, document_images rows
+        # Phase 284: ONE ranged read of the library_documents view (migration 207)
         mock_builder.execute.side_effect = [
             _make_result([_doc_row()]),
-            _make_result([]),
-            _make_result([]),
-            _make_result([]),
         ]
         response = client.get("/documents", headers=auth_headers)
         assert response.status_code == 200
 
     def test_returns_list(self, client, auth_headers, mock_builder):
-        # own docs, global folder ids, document_tables rows, document_images rows
+        # Phase 284: the body is the paged envelope; its `documents` is the list
         mock_builder.execute.side_effect = [
             _make_result([_doc_row()]),
-            _make_result([]),
-            _make_result([]),
-            _make_result([]),
         ]
         response = client.get("/documents", headers=auth_headers)
-        data = response.json()
+        body = response.json()
+        assert set(body) == {"documents", "total", "offset", "limit"}
+        data = body["documents"]
         assert isinstance(data, list)
         assert len(data) == 1
 
     def test_returns_empty_list_when_no_documents(self, client, auth_headers, mock_execute_result):
         mock_execute_result.data = []
         response = client.get("/documents", headers=auth_headers)
-        assert response.json() == []
+        assert response.json()["documents"] == []
+        assert response.json()["total"] == 0
 
     def test_list_documents_includes_modal_counts(self, client, auth_headers, mock_builder):
         """MODAL-03/D-09: GET /documents includes table_count and image_count fields."""
@@ -125,27 +122,16 @@ class TestListDocuments:
         doc_id = str(uuid4())
         doc = {**_doc_row(doc_id=doc_id), "version_number": 1, "is_latest": True, "content_hash": "h1"}
 
-        # Side effects for list_documents query chain:
-        # 1st execute: own documents query
-        # 2nd execute: get_globally_visible_folder_ids (returns [])
-        # 3rd execute: document_tables .in_ query → 2 rows for this doc
-        # 4th execute: document_images .in_ query → 3 rows for this doc
+        # Phase 284: ONE read; the counts arrive EMBEDDED (`document_tables(count)`) for the
+        # page only (D-05) — the `document_id in.(…)` count loop over every id is gone.
+        doc["document_tables"] = [{"count": 2}]
+        doc["document_images"] = [{"count": 3}]
         mock_builder.execute.side_effect = [
-            _make_result([doc]),          # own docs
-            _make_result([]),             # global folder ids
-            _make_result([              # document_tables rows
-                {"document_id": doc_id},
-                {"document_id": doc_id},
-            ]),
-            _make_result([              # document_images rows
-                {"document_id": doc_id},
-                {"document_id": doc_id},
-                {"document_id": doc_id},
-            ]),
+            _make_result([doc]),          # the one page read on library_documents
         ]
         response = client.get("/documents", headers=auth_headers)
         assert response.status_code == 200
-        data = response.json()
+        data = response.json()["documents"]
         assert len(data) == 1
         assert data[0]["table_count"] == 2
         assert data[0]["image_count"] == 3

@@ -56,6 +56,7 @@ def _make_builder():
     b.maybe_single.return_value = b
     b.is_.return_value = b
     b.or_.return_value = b
+    b.range.return_value = b  # Phase 284: the list and versions routes page with .range()
     b.execute.return_value = _make_result([])
     return b
 
@@ -374,35 +375,34 @@ class TestDocumentVersioningUI:
         return base
 
     def test_list_documents_filters_is_latest(self):
-        """GET /documents returns only is_latest=True documents; eq('is_latest', True) called."""
+        """GET /documents returns only is_latest=True documents; eq('is_latest', True) called.
+
+        Phase 284: ONE ranged read of the `library_documents` view (migration 207) answers the
+        page — the two legs and the table/image count loop are gone — and the body is the
+        `{documents, total, offset, limit}` envelope.
+        """
         builder = _make_builder()
         supabase = _make_supabase(builder)
 
-        latest_doc = self._base_doc()
+        latest_doc = self._base_doc(document_tables=[{"count": 0}], document_images=[{"count": 0}])
 
-        # list_documents: own docs, then document_tables and document_images aggregation queries
         builder.execute.side_effect = [
-            _make_result([latest_doc]),   # own docs
-            _make_result([]),             # document_tables rows
-            _make_result([]),             # document_images rows
+            _make_result([latest_doc]),   # the one page read on library_documents
         ]
 
         app.dependency_overrides[get_current_user] = lambda: MOCK_USER
         app.dependency_overrides[get_supabase] = lambda: supabase
 
-        with patch(
-            "app.api.documents.get_globally_visible_folder_ids",
-            return_value=[],
-        ):
-            with TestClient(app) as client:
-                resp = client.get(
-                    "/documents",
-                    headers={"Authorization": "Bearer test-token"},
-                )
+        with TestClient(app) as client:
+            resp = client.get(
+                "/documents",
+                headers={"Authorization": "Bearer test-token"},
+            )
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
-        data = resp.json()
+        data = resp.json()["documents"]
         assert len(data) == 1, f"Expected 1 document, got {len(data)}"
+        assert [c.args[0] for c in supabase.table.call_args_list] == ["library_documents"]
 
         # Verify .eq("is_latest", True) was called at least once
         eq_calls = builder.eq.call_args_list
@@ -435,7 +435,7 @@ class TestDocumentVersioningUI:
             )
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
-        data = resp.json()
+        data = resp.json()["versions"]  # Phase 284: the paged envelope
         assert len(data) == 2, f"Expected 2 versions, got {len(data)}"
         assert data[0]["version_number"] == 2, f"Expected first item version_number=2, got {data[0]}"
 

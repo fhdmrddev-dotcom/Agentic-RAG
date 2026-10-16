@@ -1256,28 +1256,153 @@
           "documents"
         ],
         "summary": "List Documents",
+        "description": "Returns one page `{documents, total, offset, limit}` (breaking change in v4.6: this endpoint used to return a JSON array that was silently cut at 1,000 rows). Page with `offset` and `limit` (≤ 200) until `offset >= total`.",
         "operationId": "list_documents_documents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Page size (1-200).",
+              "default": 25,
+              "title": "Limit"
+            },
+            "description": "Page size (1-200)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Rows to skip. Page until offset >= total.",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Rows to skip. Page until offset >= total."
+          },
+          {
+            "name": "folder_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A folder id, or `root` for documents in no folder. Omitted = every folder.",
+              "title": "Folder Id"
+            },
+            "description": "A folder id, or `root` for documents in no folder. Omitted = every folder."
+          },
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include archived documents.",
+              "default": false,
+              "title": "Include Archived"
+            },
+            "description": "Include archived documents."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "in_flight",
+                    "completed",
+                    "failed",
+                    "done"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`in_flight` = pending or processing; `done` = completed or failed.",
+              "title": "Status"
+            },
+            "description": "`in_flight` = pending or processing; `done` = completed or failed."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "created_desc",
+                "updated_desc"
+              ],
+              "type": "string",
+              "description": "Newest first by creation (default) or by last update.",
+              "default": "created_desc",
+              "title": "Order"
+            },
+            "description": "Newest first by creation (default) or by last update."
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "spreadsheet",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`spreadsheet` = .xlsx / .xls / .csv or a spreadsheet / CSV MIME type.",
+              "title": "Kind"
+            },
+            "description": "`spreadsheet` = .xlsx / .xls / .csv or a spreadsheet / CSV MIME type."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/DocumentResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Documents Documents Get"
+                  "$ref": "#/components/schemas/DocumentListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/documents/{document_id}/versions": {
@@ -1286,8 +1411,79 @@
           "documents"
         ],
         "summary": "List Document Versions",
-        "description": "Return all versions of a document ordered by version_number descending.",
+        "description": "Every version of a document, newest first, one page at a time (`total` is exact).",
         "operationId": "list_document_versions_documents__document_id__versions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentVersionPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{document_id}": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get Document",
+        "description": "One document of the caller's Library, by id (latest or not).",
+        "operationId": "get_document_documents__document_id__get",
         "security": [
           {
             "HTTPBearer": []
@@ -1310,14 +1506,59 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DocumentResponse"
-                  },
-                  "title": "Response List Document Versions Documents  Document Id  Versions Get"
+                  "$ref": "#/components/schemas/DocumentResponse"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Delete Document",
+        "operationId": "delete_document_documents__document_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(version|all)$",
+              "default": "version",
+              "title": "Scope"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -1482,6 +1723,29 @@
               "type": "string",
               "title": "Document Id"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
           }
         ],
         "responses": {
@@ -1490,11 +1754,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DocumentChunkRow"
-                  },
-                  "title": "Response List Document Chunks Documents  Document Id  Chunks Get"
+                  "$ref": "#/components/schemas/DocumentChunkPage"
                 }
               }
             }
@@ -1582,6 +1842,29 @@
               "type": "string",
               "title": "Document Id"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
           }
         ],
         "responses": {
@@ -1590,11 +1873,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DocumentTableRow"
-                  },
-                  "title": "Response List Document Tables Documents  Document Id  Tables Get"
+                  "$ref": "#/components/schemas/DocumentTablePage"
                 }
               }
             }
@@ -1634,6 +1913,29 @@
               "type": "string",
               "title": "Document Id"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
           }
         ],
         "responses": {
@@ -1642,11 +1944,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DocumentImageRow"
-                  },
-                  "title": "Response List Document Images Documents  Document Id  Images Get"
+                  "$ref": "#/components/schemas/DocumentImagePage"
                 }
               }
             }
@@ -1833,57 +2131,6 @@
                 }
               }
             }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/documents/{document_id}": {
-      "delete": {
-        "tags": [
-          "documents"
-        ],
-        "summary": "Delete Document",
-        "operationId": "delete_document_documents__document_id__delete",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "document_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Document Id"
-            }
-          },
-          {
-            "name": "scope",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "pattern": "^(version|all)$",
-              "default": "version",
-              "title": "Scope"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -11365,6 +11612,33 @@
         ]
       }
     },
+    "/library/summary": {
+      "get": {
+        "tags": [
+          "library"
+        ],
+        "summary": "Get Library Summary",
+        "description": "The Library's numbers, aggregated in SQL over the caller's visible set.",
+        "operationId": "get_library_summary_library_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibrarySummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/checked-queries": {
       "get": {
         "tags": [
@@ -14566,6 +14840,36 @@
         "title": "DeletePreview",
         "description": "Defaults to 0 so an older client that ignores it is unaffected (additive field)."
       },
+      "DocumentChunkPage": {
+        "properties": {
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentChunkRow"
+            },
+            "type": "array",
+            "title": "Chunks",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 200
+          }
+        },
+        "type": "object",
+        "title": "DocumentChunkPage",
+        "description": "`GET /documents/{id}/chunks` — one page. `total` INCLUDES rows beyond the page."
+      },
       "DocumentChunkRow": {
         "properties": {
           "id": {
@@ -14726,6 +15030,36 @@
         ],
         "title": "DocumentEntry"
       },
+      "DocumentImagePage": {
+        "properties": {
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentImageRow"
+            },
+            "type": "array",
+            "title": "Images",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 100
+          }
+        },
+        "type": "object",
+        "title": "DocumentImagePage",
+        "description": "`GET /documents/{id}/images` — one page. `total` INCLUDES rows beyond the page."
+      },
       "DocumentImageRow": {
         "properties": {
           "id": {
@@ -14760,6 +15094,36 @@
           "image_index"
         ],
         "title": "DocumentImageRow"
+      },
+      "DocumentListResponse": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentResponse"
+            },
+            "type": "array",
+            "title": "Documents",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 25
+          }
+        },
+        "type": "object",
+        "title": "DocumentListResponse",
+        "description": "`GET /documents` — one page of the caller's Library. `total` INCLUDES rows beyond the page."
       },
       "DocumentMetadata": {
         "properties": {
@@ -15562,6 +15926,36 @@
         "type": "object",
         "title": "DocumentStatesRequest"
       },
+      "DocumentTablePage": {
+        "properties": {
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentTableRow"
+            },
+            "type": "array",
+            "title": "Tables",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 50
+          }
+        },
+        "type": "object",
+        "title": "DocumentTablePage",
+        "description": "`GET /documents/{id}/tables` — one page. `total` INCLUDES rows beyond the page."
+      },
       "DocumentTableRow": {
         "properties": {
           "id": {
@@ -15639,6 +16033,36 @@
           "count"
         ],
         "title": "DocumentTypeOut"
+      },
+      "DocumentVersionPage": {
+        "properties": {
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentResponse"
+            },
+            "type": "array",
+            "title": "Versions",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 50
+          }
+        },
+        "type": "object",
+        "title": "DocumentVersionPage",
+        "description": "`GET /documents/{id}/versions` — one page, newest first. `total` INCLUDES rows beyond the page."
       },
       "DraftCreateResponse": {
         "properties": {
@@ -18245,6 +18669,74 @@
         ],
         "title": "InputFieldSpec"
       },
+      "LibraryConnection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "count"
+        ],
+        "title": "LibraryConnection"
+      },
+      "LibraryCount": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "default": 0
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes",
+            "default": 0
+          },
+          "archived": {
+            "type": "integer",
+            "title": "Archived",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "LibraryCount"
+      },
+      "LibraryDocType": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "count"
+        ],
+        "title": "LibraryDocType"
+      },
       "LibraryLinkInfo": {
         "properties": {
           "document_id": {
@@ -18305,6 +18797,103 @@
           "files"
         ],
         "title": "LibraryLinksResponse"
+      },
+      "LibraryStatus": {
+        "properties": {
+          "pending": {
+            "type": "integer",
+            "title": "Pending",
+            "default": 0
+          },
+          "processing": {
+            "type": "integer",
+            "title": "Processing",
+            "default": 0
+          },
+          "paused": {
+            "type": "integer",
+            "title": "Paused",
+            "default": 0
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "LibraryStatus"
+      },
+      "LibrarySummary": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "archived": {
+            "type": "integer",
+            "title": "Archived",
+            "default": 0
+          },
+          "chunks": {
+            "type": "integer",
+            "title": "Chunks",
+            "default": 0
+          },
+          "root": {
+            "$ref": "#/components/schemas/LibraryCount"
+          },
+          "folders": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/LibraryCount"
+            },
+            "type": "object",
+            "title": "Folders"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LibraryStatus"
+          },
+          "steps": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Steps"
+          },
+          "rate_limited_in_flight": {
+            "type": "integer",
+            "title": "Rate Limited In Flight",
+            "default": 0
+          },
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/LibraryConnection"
+            },
+            "type": "array",
+            "title": "Connections"
+          },
+          "document_types": {
+            "items": {
+              "$ref": "#/components/schemas/LibraryDocType"
+            },
+            "type": "array",
+            "title": "Document Types"
+          },
+          "document_types_truncated": {
+            "type": "boolean",
+            "title": "Document Types Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "LibrarySummary",
+        "description": "Every Library number over the caller's visible set (latest versions; archived INCLUDED in total / root / folders, as the Library has always counted them)."
       },
       "LlmAgentPhaseConfig": {
         "properties": {

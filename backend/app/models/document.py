@@ -216,6 +216,60 @@ class DocumentContentResponse(BaseModel):
     has_more: bool = False
 
 
+# ── Phase 284 · the page envelopes (FIX-11, D-01 / D-17) ──────────────────────
+#
+# ONE paging vocabulary for every Library list: the rows, the database's exact `total` of the
+# same predicate, and the `offset` / `limit` that produced the page. Page until
+# `offset >= total`. ⚠ `total` INCLUDES rows beyond the page — it is a `count(*)`, never the
+# length of anything fetched (PostgREST's max_rows cuts an unranged read at 1,000 silently,
+# which is the defect these envelopes exist to make impossible).
+
+
+class DocumentListResponse(BaseModel):
+    """`GET /documents` — one page of the caller's Library. `total` INCLUDES rows beyond the page."""
+
+    documents: list[DocumentResponse] = []
+    total: int = 0
+    offset: int = 0
+    limit: int = 25
+
+
+class DocumentChunkPage(BaseModel):
+    """`GET /documents/{id}/chunks` — one page. `total` INCLUDES rows beyond the page."""
+
+    chunks: list[DocumentChunkRow] = []
+    total: int = 0
+    offset: int = 0
+    limit: int = 200
+
+
+class DocumentTablePage(BaseModel):
+    """`GET /documents/{id}/tables` — one page. `total` INCLUDES rows beyond the page."""
+
+    tables: list[DocumentTableRow] = []
+    total: int = 0
+    offset: int = 0
+    limit: int = 50
+
+
+class DocumentImagePage(BaseModel):
+    """`GET /documents/{id}/images` — one page. `total` INCLUDES rows beyond the page."""
+
+    images: list[DocumentImageRow] = []
+    total: int = 0
+    offset: int = 0
+    limit: int = 100
+
+
+class DocumentVersionPage(BaseModel):
+    """`GET /documents/{id}/versions` — one page, newest first. `total` INCLUDES rows beyond the page."""
+
+    versions: list[DocumentResponse] = []
+    total: int = 0
+    offset: int = 0
+    limit: int = 50
+
+
 # ⚠ `DocumentQueryRow` is deliberately NOT here — it lives in
 # `backend/app/api/document_queries.py` (plan 03) so the service-role carve-out keeps
 # ONE auditable rationale, next to the code that needs it.

@@ -116,14 +116,14 @@ def install_client():
 def no_global_folders(monkeypatch):
     """Default: the caller sees no shared folders.
 
-    Patched at BOTH import sites — `documents.py`'s visibility gate and `kb.py`'s
-    `read_path` each hold their own reference. A test that wants the shared-folder case
-    re-patches both explicitly.
+    Patched at `kb.py`'s `read_path` (the content route's slicer). Phase 284: `documents.py`'s
+    visibility gate no longer holds a reference — it is ONE read of the `library_documents`
+    view (migration 207), whose SQL predicate carries the shared-folder leg. A test that wants
+    the shared-folder case re-patches kb explicitly and answers the view read.
     """
     async def _none(supabase, user_id):
         return []
 
-    monkeypatch.setattr("app.api.documents.get_globally_visible_folder_ids", _none)
     monkeypatch.setattr("app.api.kb.get_globally_visible_folder_ids", _none)
 
 
@@ -132,6 +132,10 @@ def no_global_folders(monkeypatch):
 def _owned_doc(markdown, filename="report.md"):
     """Every read the four routes make on an OWNED document, keyed by (table, select)."""
     def resolve(b):
+        if b.table == "library_documents":  # Phase 284: the visibility gate (the view)
+            if ("eq", "id", DOC_ID) not in b.filters:
+                return None
+            return {"id": DOC_ID, "filename": filename, "user_id": OWNER, "folder_id": None}
         if b.table == "documents":
             owned = ("eq", "user_id", OWNER) in b.filters
             targeted = ("eq", "id", DOC_ID) in b.filters
@@ -258,6 +262,12 @@ def test_content_rejects_a_zero_start_line(client, auth_headers, install_client)
 
 def _with_children(chunks=(), tables=(), images=(), visible_as="owner"):
     def resolve(b):
+        if b.table == "library_documents":
+            # Phase 284: the gate is ONE read of the view; the owner and the shared-folder
+            # reader both reach the row through its SQL predicate (migration 207).
+            if ("eq", "id", DOC_ID) not in b.filters:
+                return None
+            return {"id": DOC_ID, "filename": "shared.pdf", "user_id": OWNER, "folder_id": "f-1"}
         if b.table == "documents":
             if visible_as == "owner":
                 if ("eq", "user_id", OWNER) not in b.filters:
@@ -290,7 +300,8 @@ def test_chunks_200_shape_carries_embedding_lineage(client, auth_headers, instal
     c = install_client(_with_children(chunks=[CHUNK]))
     res = client.get(f"/documents/{DOC_ID}/chunks", headers=auth_headers)
     assert res.status_code == 200, res.text
-    assert res.json() == [CHUNK]
+    assert res.json()["chunks"] == [CHUNK]  # Phase 284: the paged envelope
+    assert res.json()["total"] == 1
     chunk_read = [b for b in c.calls if b.table == "document_chunks"][0]
     assert ("eq", "document_id", DOC_ID) in chunk_read.filters
     assert chunk_read.ordered == "chunk_index"
@@ -300,7 +311,7 @@ def test_chunks_empty_is_200_empty_list(client, auth_headers, install_client):
     install_client(_with_children(chunks=[]))
     res = client.get(f"/documents/{DOC_ID}/chunks", headers=auth_headers)
     assert res.status_code == 200
-    assert res.json() == []
+    assert res.json()["chunks"] == []
 
 
 def test_chunks_foreign_document_is_404(client, auth_headers, install_client):
@@ -316,7 +327,7 @@ def test_tables_200_shape(client, auth_headers, install_client):
     c = install_client(_with_children(tables=[TABLE]))
     res = client.get(f"/documents/{DOC_ID}/tables", headers=auth_headers)
     assert res.status_code == 200, res.text
-    assert res.json() == [TABLE]
+    assert res.json()["tables"] == [TABLE]
     assert [b for b in c.calls if b.table == "document_tables"][0].ordered == "table_index"
 
 
@@ -325,7 +336,7 @@ def test_tables_empty_is_200_empty_list(client, auth_headers, install_client):
     install_client(_with_children(tables=[]))
     res = client.get(f"/documents/{DOC_ID}/tables", headers=auth_headers)
     assert res.status_code == 200
-    assert res.json() == []
+    assert res.json()["tables"] == []
 
 
 def test_tables_foreign_document_is_404(client, auth_headers, install_client):
@@ -341,7 +352,7 @@ def test_images_200_shape(client, auth_headers, install_client):
     c = install_client(_with_children(images=[IMAGE]))
     res = client.get(f"/documents/{DOC_ID}/images", headers=auth_headers)
     assert res.status_code == 200, res.text
-    assert res.json() == [IMAGE]
+    assert res.json()["images"] == [IMAGE]
     assert [b for b in c.calls if b.table == "document_images"][0].ordered == "image_index"
 
 
@@ -350,7 +361,7 @@ def test_images_wire_shape_promises_no_picture(client, auth_headers, install_cli
     DISCARDED. Asserted over the SERIALIZED keys, which a source grep cannot see."""
     install_client(_with_children(images=[IMAGE]))
     body = client.get(f"/documents/{DOC_ID}/images", headers=auth_headers).json()
-    assert set(body[0]) == {"id", "page", "image_index", "description"}
+    assert set(body["images"][0]) == {"id", "page", "image_index", "description"}
 
 
 def test_images_foreign_document_is_404(client, auth_headers, install_client):
@@ -387,20 +398,19 @@ def test_globally_visible_folder_document_yields_chunks_but_no_tables_or_images(
     async def _shared(supabase, user_id):
         return ["f-1"]
 
-    monkeypatch.setattr("app.api.documents.get_globally_visible_folder_ids", _shared)
     monkeypatch.setattr("app.api.kb.get_globally_visible_folder_ids", _shared)
     install_client(_with_children(chunks=[CHUNK], tables=[], images=[], visible_as="folder"))
 
     chunks = client.get(f"/documents/{DOC_ID}/chunks", headers=auth_headers)
-    assert chunks.status_code == 200 and chunks.json() == [CHUNK]
+    assert chunks.status_code == 200 and chunks.json()["chunks"] == [CHUNK]
 
     tables = client.get(f"/documents/{DOC_ID}/tables", headers=auth_headers)
     assert tables.status_code == 200, "an owner-only child table must not 404 the parent"
-    assert tables.json() == []
+    assert tables.json()["tables"] == []
 
     images = client.get(f"/documents/{DOC_ID}/images", headers=auth_headers)
     assert images.status_code == 200
-    assert images.json() == []
+    assert images.json()["images"] == []
 
     content = client.get(f"/documents/{DOC_ID}/content", headers=auth_headers)
     assert content.status_code == 200 and content.json()["total_lines"] == 2
@@ -411,14 +421,20 @@ def test_globally_visible_folder_document_yields_chunks_but_no_tables_or_images(
 def test_visibility_gate_filters_on_the_caller_id(client, auth_headers, install_client):
     """T-217-04 — `document_id` is never an authorization claim on its own.
 
-    Read from the client's own call log rather than from the source, and pinned
-    POSITIONALLY so a future edit cannot demote the owner filter below the id filter.
+    Read from the client's own call log rather than from the source. Phase 284: the gate is
+    ONE single-row read of `library_documents` (migration 207), a security_invoker view whose
+    predicate is keyed on the caller's JWT (`auth.uid()`) — the caller scoping moved from a
+    `user_id` filter in Python into SQL, beneath which RLS still applies. So the gate must
+    read the VIEW (never the RLS-wide base table, which would also admit connection-visible
+    rows), target the id, and be a single-row lookup — and it must run FIRST.
     """
     c = install_client(_with_children(chunks=[CHUNK]))
     assert client.get(f"/documents/{DOC_ID}/chunks", headers=auth_headers).status_code == 200
-    gate = [b for b in c.calls if b.table == "documents"][0]
-    assert ("eq", "user_id", OWNER) in gate.filters, gate.filters
+    assert c.calls[0].table == "library_documents", [b.table for b in c.calls]
+    gate = c.calls[0]
+    assert ("eq", "id", DOC_ID) in gate.filters, gate.filters
     assert gate.is_single, "the parent check must be a single-row lookup"
+    assert not [b for b in c.calls if b.table == "documents"], "the gate must not read the base table"
 
 
 # ── The source fence, with its own non-vacuity control ────────────────────────────────
