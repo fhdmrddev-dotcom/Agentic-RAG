@@ -68,6 +68,9 @@ export interface UseLibraryDocumentsArgs {
 export interface UseLibraryDocuments {
   /** The server's page, in the server's order — never sliced here. */
   rows: Document[]
+  /** Which page `rows` are (offset / limit of the request that answered them); `null` until
+   *  answered. After a failed page change this is still the page ON SCREEN (284-REVIEW IN-07). */
+  rowsPage: { offset: number; limit: number } | null
   /** The server's exact total for this list; `null` until answered. */
   total: number | null
   /** Archived rows in this scope, shown or hidden (`ArchivedHiddenLine`'s count); `null` until known. */
@@ -115,6 +118,9 @@ interface SettledList extends ListAnswer {
   attempt: number
   /** The source the ROWS belong to — kept from the previous answer when a request fails. */
   answeredKey: string | null
+  /** The page the ROWS are (offset / limit of the request that answered them) — kept, like
+   *  `answeredKey`, when a later request fails (284-REVIEW IN-07). */
+  answeredPage: { offset: number; limit: number } | null
   error: Error | null
 }
 
@@ -227,13 +233,14 @@ export function useLibraryDocuments({
     readList(JSON.parse(sourceKey) as LibrarySource, includeArchived, offset, limit).then(
       (answer) => {
         if (myReq !== reqIdRef.current) return
-        setSettled({ ...request, answeredKey: sourceKey, ...answer, error: null })
+        setSettled({ ...request, answeredKey: sourceKey, answeredPage: { offset, limit }, ...answer, error: null })
       },
       (e: unknown) => {
         if (myReq !== reqIdRef.current) return
         // Rows (if any) are deliberately left as they were: an error never swaps the list.
         setSettled((prev) => ({
           answeredKey: prev?.answeredKey ?? null,
+          answeredPage: prev?.answeredPage ?? null,
           rows: prev?.rows ?? [],
           total: prev?.total ?? 0,
           archived: prev?.archived ?? null,
@@ -260,6 +267,7 @@ export function useLibraryDocuments({
         ? "error"
         : "ready"
   const rows = onScreen ? settled.rows : NO_ROWS
+  const rowsPage = onScreen ? settled.answeredPage : null
   const total = onScreen ? settled.total : null
   const listArchived = onScreen ? settled.archived : null
   const error = isCurrent ? settled.error : null
@@ -371,6 +379,7 @@ export function useLibraryDocuments({
 
   return {
     rows,
+    rowsPage,
     total,
     archivedHidden,
     inFlight,

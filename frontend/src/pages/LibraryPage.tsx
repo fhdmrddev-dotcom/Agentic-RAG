@@ -383,6 +383,11 @@ export function LibraryPage({
   // the pager never reads "51–49 of 49" and "Try again" never re-asks an impossible page. Only
   // on a READY answer: its total is the one for THIS offset.
   const listTotal = libDocs.listState === "ready" ? libDocs.total : null
+  // 284-REVIEW IN-07: the page the pager describes — the rows on screen when a page change failed.
+  const shownPage =
+    libDocs.listState === "error" && libDocs.rowsPage !== null
+      ? libDocs.rowsPage
+      : { offset: pageOffset, limit: pageSize }
   useEffect(() => {
     if (listTotal === null) return
     const clamped = clampPageOffset(pageOffset, listTotal, pageSize)
@@ -990,9 +995,16 @@ export function LibraryPage({
               <div data-testid="documents-tfoot">
                 <DocumentsPager
                   total={libDocs.total}
-                  offset={pageOffset}
-                  limit={pageSize}
+                  // 284-REVIEW IN-07: after a failed page change the rows on screen are still the
+                  // previous page's, so the range describes THOSE rows, not the page that failed.
+                  offset={shownPage.offset}
+                  limit={shownPage.limit}
                   onChange={(off, lim) => {
+                    // Asking again for the page that failed is a retry, not a no-op state set.
+                    if (off === pageOffset && lim === pageSize) {
+                      libDocs.retry()
+                      return
+                    }
                     setPageOffset(off)
                     setPageSize(lim)
                   }}
