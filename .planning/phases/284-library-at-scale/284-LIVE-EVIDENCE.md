@@ -9,7 +9,7 @@
 | Account | Chrome context | Proof |
 |---|---|---|
 | `scale284@example.com` (synthetic, 50k then 10k) | isolated context `scale284`, so the operator's own session in the default context was never signed out | `localStorage["active-org-id"]` = `567f87e8-d78b-5ea1-a89a-66fb11981a6b`, the seeded "Scale 284" org. The owner is org-admin there (`seed-scale-284.py --status` memberships). Every API request carried `x-org-id: 567f87e8-…`. |
-| `fhdmrd@gmail.com` (dev account) | default context (already signed in), read-only | `GET /org/me` → `org_id 22f9c615-0eec-440a-8804-ed4784d6f57f`, role org-admin, **one** membership ("fhdmrd@gmail.com's Organization"). ⚠ The memory note says this account is in TWO orgs. It is in one today. |
+| `fhdmrd@gmail.com` (dev account) | default context (already signed in), read-only | `GET /org/me` → `org_id 22f9c615-0eec-440a-8804-ed4784d6f57f`, role org-admin, **one** membership ("fhdmrd@gmail.com's Organization"). (The two-org account in project memory is `fhdmrd.dev@gmail.com`, a different user; this one is in one org, as measured.) |
 
 ## G-4 scenarios (CONTEXT D-27, plus F from the plan checker)
 
