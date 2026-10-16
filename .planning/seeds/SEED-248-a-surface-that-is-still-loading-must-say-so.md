@@ -5,7 +5,7 @@ created: 2026-09-06
 planted_during: "2026-09-05/06 ingest-repair session — the operator asked for it directly after a Drive import made the app feel dead: \"I just captured as a seed, for anything that is still loading we should add a loader, especially in threads\""
 status: folded
 partial: true
-status_note: "Library half folded into Phase 284 (D-12: useLibraryDocuments exposes loading/error; empty state only after a successful load). Thread cold-load-only skeleton half still open."
+status_note: "Library half SHIPPED by Phase 284 (284-03, 2026-10-16): useLibraryDocuments exposes loading / failed / warm; the empty state renders only after a successful answer; proven live at 10k and 50k (no empty-state frame before data, 284-LIVE-EVIDENCE.md G-4 A). Thread cold-load-only skeleton half still open."
 folded_into: "284"
 surface: Agentic-RAG
 severity: medium

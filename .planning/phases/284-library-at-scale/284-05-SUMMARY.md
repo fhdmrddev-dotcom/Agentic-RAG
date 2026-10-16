@@ -73,7 +73,7 @@ completed: 2026-10-16
 |---|------|---------|
 | 1 | The runtime guard and the whole-list fence, each driven RED; the legacy array clients deleted | RED `23029ca74` · recorder refinement `cc209e798` · GREEN `6bfc47a77` |
 | 2 | Merged-tree gates, count-gate pins, the ledger / CLAUDE.md close | pins `30ea18d40` · ledger close `58b4bc367` · pagination doc `6c66cbbc5` |
-| 3 | AFTER measurement, R-09, G-4 drive A-F, evidence-gated close | **pending — orchestrator checkpoint** |
+| 3 | AFTER measurement, R-09, G-4 drive A-F, evidence-gated close | **done (orchestrator, 2026-10-16)** — see §Task 3 below |
 
 ## Task 1 — the guards
 
@@ -248,6 +248,22 @@ None.
 ## Threat Flags
 
 None. Task 1 adds tests and deletes client functions; Task 2 touches pins and docs. T-284-30 (recorder, unit + live, two RED drives) and T-284-31 (fence, permanent self-test + scratch-import RED drive, legacy clients deleted) are mitigated as planned; T-284-33 is covered by the 27 live `test_284_*` cases re-run together on the merged tree.
+
+## Task 3 (orchestrator checkpoint) — done 2026-10-16
+
+- **AFTER measurement:** `284-MEASUREMENTS.md` → "AFTER — verdict per D-22 criterion". Totals = `count(*)` at both sizes on every surface: MET. Bytes flat: MET. Summary < 500 ms: MET. First-page time within 1.5x: **PARTIAL** (Big 1.45x / 1.39x and summary 1.45x met; **Root 2.54x and Find 2.59x missed**, because the exact count and the top-25 sort both scan every latest row the user owns). Planted as **SEED-357**. First page < 500 ms at 50k: 470.7 ms quiet, 622-680 ms under host contention.
+- **R-09:** production `max_rows` is not readable through SQL (dashboard-only PostgREST setting); not changed. Production `authenticated` has an 8 s statement timeout. Migration 207 is not in production (owed).
+- **G-4 A-F:** all PASS (`284-LIVE-EVIDENCE.md`). F was amended: a Folder condition cannot be saved as a view, so F used a saved Document-type view of 8,289 matches paged to its oldest match.
+- **Two defects found by the drive, fixed in-checkpoint, each driven RED:**
+  - `c96a0909e`: Library counts of 1,000 or more were not grouped (UI-SPEC Numbers). FolderDetail284 pin 5 → 6.
+  - `bb47f34ce`: AnimatedNumber painted "-17,721 documents" mid-animation. The rAF timestamp preceded the effect's start, giving negative eased progress; it is now clamped in `animatedNumberProgress.ts`. New suite pinned (3).
+  - Both touch files after the ledger close `58b4bc367`, so the triples of `NavRow.tsx`, `FolderDetail.tsx`, `IngestionTab.tsx`, `LibraryPage.tsx` and `AnimatedNumber.tsx` are one commit stale. `ViewCard.tsx` (no ledger row) was touched too.
+- **Flips on evidence:**
+  - BUG-261014-07 → `closed` (its re_open_trigger, SC#1-#3 measured at 10k/50k, is satisfied).
+  - BUG-261014-06 gains the stopgap-removed note.
+  - SEED-248 `status_note`: the Library half SHIPPED.
+  - FIX-11 is left for the verifier, because SC#1's "load time does not grow" is only partly met.
+- **Teardown:** `--teardown` removed both synthetic users. Dev account rows 294 before and after. Lock released.
 
 ## Owed to Task 3 (orchestrator)
 

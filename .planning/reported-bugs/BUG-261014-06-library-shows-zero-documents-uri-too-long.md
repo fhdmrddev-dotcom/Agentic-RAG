@@ -43,3 +43,10 @@ Batching clears the 414 only. The list is still unpaginated and the API silently
 rows — see `BUG-261014-07`. The batching ships on `develop` only (the production hotfix was held by
 the operator) and is to be **removed** by Phase 284 (FIX-11), which replaces it with server-side
 aggregates and a server-paged list.
+
+## Note — Phase 284 (2026-10-16)
+
+The batching stopgap this report shipped (`_ID_BATCH`, `test_261014_list_documents_batches_in.py`)
+was removed by 284-02 and replaced by server paging over the `library_documents` view (migration
+207). No list request now carries an id list that grows with the library: the request recorder
+measured the largest `in.()` at 1 against the 50k account. The `re_open_trigger` above stands.
