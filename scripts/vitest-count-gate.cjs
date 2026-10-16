@@ -3161,7 +3161,7 @@ const BASELINE = {
   // fall to 1 and the gate would report OK. The load-bearing case is the ABSENCE one —
   // `_images` is stamped only on truncation — and an absence assertion is the easiest kind
   // to delete without anyone noticing.
-  "DocumentDetailPanel.images.test.tsx": 3,
+  "DocumentDetailPanel.images.test.tsx": 4, // RAISED 3 → 4 at 284-03 (images N of M)
 
   // ── Phase 240 (SRC-05 / D-240-19) — pinned at the counts measured at this phase's close.
   // ⚠ Captured from a GREEN run, never while red, and matched 1:1 with the TARGETS entries
@@ -3567,12 +3567,12 @@ const BASELINE = {
   "IngestionStrip.test.tsx": 31,
   "DetailSections.lazy.test.tsx": 20, // 283-03: +6 (the bounded, labelled, one-Tab-stop chunk list, FIX-08)
   "CR01.reset.test.tsx": 2,
-  "DetailSections.tables.test.tsx": 15,
+  "DetailSections.tables.test.tsx": 18, // RAISED 15 → 18 at 284-03 (Tables / Images say N of M)
   "tabsContrast.test.ts": 14,
   "LibraryPage.test.tsx": 12,
   "librarySelection.test.ts": 25,
   "useDocuments.test.ts": 7,
-  "useLibraryDocuments.test.ts": 13, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT.
+  "useLibraryDocuments.test.ts": 24, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint)
   "DocumentList.test.tsx": 7,
   "DocumentList.moveToFolder.test.tsx": 4,
   "ViewsGroup.test.tsx": 10,
@@ -3613,7 +3613,7 @@ const BASELINE = {
   // trailing orphans close 217's deferred-§3 re-open trigger.
   "sketchComposition.test.tsx": 47,
   "ingestionFailureCopy.test.ts": 25,
-  "IngestionTab.test.tsx": 42, // +2 BUG-260923-02 History paging
+  "IngestionTab.test.tsx": 50, // +2 BUG-260923-02 History paging · RAISED 42 → 50 at 284-03 (the summary + three paged status lists)
   "pipelineGroups.test.ts": 7,
   "LibraryStatTiles.test.tsx": 16, // RAISED 13 → 16 at 284-01 Task 3 (+3 CHUNKS arm cases; the 13 converted in place to number props)
   "FolderDetail284.test.tsx": 5, // 284-01 Task 3 — the folder band takes numbers. BOTH KNOBS, SAME COMMIT.
@@ -3734,7 +3734,7 @@ const BASELINE = {
   // rather than fail. Phase 214's `WorkflowScheduleModal` finding, avoided by looking.
   // ⬆ RAISED 9 → 13 at 271-04, recording 271-02's Filing-rules header-link cases (measured `13`
   //   on the wave-1 gate run at ff4b98f01).
-  "LibraryHeaderBar.test.tsx": 13,
+  "LibraryHeaderBar.test.tsx": 16, // RAISED 13 → 16 at 284-03 (Counting… / Count not known yet)
   // 22 → 30: per-file selection (operator: "how can I select individual files") and the
   // two-column body that puts the folder tree inside the card it feeds.
   "SourcePreviewPanel.test.tsx": 30,
@@ -4136,7 +4136,7 @@ const BASELINE = {
   "DocumentRow.download270.test.tsx": 4, // 270-04
   // ── Phase 271-03 — adopted BEFORE the combobox extraction so a regression is visible (they
   // were in neither knob; SEED-280). Measured at PHASE_BASE 20050816d: 8 / 11 / 6 passed. ──
-  "CreateLinkDialog.test.tsx": 8, // 271-03
+  "CreateLinkDialog.test.tsx": 14, // 271-03 · RAISED 8 → 14 at 284-04 (server type-ahead on POST /document-search)
   "RelationshipsSection.test.tsx": 11, // 271-03
   "RelationshipsSection.a11y.test.tsx": 6, // 271-03
   // ── Phase 271-03 — every suite this plan CREATED, at its measured passing count. BOTH KNOBS, SAME COMMIT. ──
@@ -4145,7 +4145,7 @@ const BASELINE = {
   "libraryPaging284.test.ts": 22, // 284-01 Task 1 — the paged wire contract. BOTH KNOBS, SAME COMMIT.
   "useDocumentFind.test.tsx": 11, // 271-03
   "relationshipLabels.test.ts": 5, // 271-03
-  "LinkTargetCombobox.test.tsx": 9, // 271-03
+  "LinkTargetCombobox.test.tsx": 17, // 271-03 · RAISED 9 → 17 at 284-04 (server mode)
   "documentAddedBy.test.ts": 6, // 271-03
   "DocumentRow.find271.test.tsx": 19, // 271-03 · RAISED 17 → 19 at 271-REVIEW-FIX (F-2: older-row actions)
   // ── Phase 271-04 — ADOPTED, not raised: in NEITHER knob before (RESEARCH Wave 0). Measured
@@ -4155,8 +4155,8 @@ const BASELINE = {
   "ConditionPopover.test.tsx": 13, // 271-04 (2026-10-03)
   // ── Phase 271-04 Task 1 — every suite it CREATED, at its measured passing count. BOTH KNOBS. ──
   "FilterBar.find271.test.tsx": 11, // 271-04 (3 are the Views-tab DOM snapshot pins)
-  "StructurePopovers.test.tsx": 27, // 271-04 · RAISED 22 → 27 at 284-01 Task 3 (+5 summary-list arm cases)
-  "FindQuickAdd.test.tsx": 26, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03) · RE-PINNED 18 → 22 at 275-02 (+4 Include archived chip cases) · RAISED 22 → 26 at 284-01 Task 3 (+4 summary-list cases)
+  "StructurePopovers.test.tsx": 30, // 271-04 · RAISED 22 → 27 at 284-01 Task 3 (+5 summary-list arm cases) · RAISED 27 → 30 at 284-04 (server-mode relationship picker)
+  "FindQuickAdd.test.tsx": 27, // 271-04 · RE-PINNED 12 → 18 at 271-REVIEW-FIX: the suite already ran 18 (pinned low, measured 2026-10-03) · RE-PINNED 18 → 22 at 275-02 (+4 Include archived chip cases) · RAISED 22 → 26 at 284-01 Task 3 (+4 summary-list cases) · RAISED 26 → 27 at 284-04 (Relationship editor searches the server)
   // ── Phase 271-04 Task 2 — the Find results surface and the exact pager. BOTH KNOBS. ──
   "DocumentsFindBody.test.tsx": 26, // 271-04
   "DocumentsPager.exact271.test.tsx": 3, // 271-04
@@ -4226,7 +4226,7 @@ const BASELINE = {
   // plan's tree (0 failing), each RED before its module existed. What each proves:
   "libraryRetention.test.tsx": 16, // RE-PINNED 15 → 16 at 275-REVIEW frontend fix pass · RE-PINNED 12 → 15 at 275-05 (G-4 fast-fixes: two-stage folder line + its rule_text ?raw fence, fully-archived list not claimed empty) · 275-04 — S6 one chip + one source chip, S7 admin vs member line (D-17), ONE batched document-states read (flag 2), hidden line = Find's include-archived state (D-04), S10 pre-open refusal
   "RetentionSection.test.tsx": 24, // RE-PINNED 18 → 24 at 275-REVIEW frontend fix pass · 275-04 — every S8 sentence, member payload with no hold_names renders no matter (D-17), B-NEW-1 snapshot name, Un-archive receipt/failure (D-19), placed after File
-  "LegalHolds.test.tsx": 25, // RE-PINNED 16 → 25 at 275-REVIEW frontend fix pass · 275-04 — S3 card anatomy, Place hold held back with a visible reason, server count / "Couldn't count the documents yet." never 0 (D-05/D-35), release victim-naming not red
+  "LegalHolds.test.tsx": 29, // RE-PINNED 16 → 25 at 275-REVIEW frontend fix pass · 275-04 — S3 card anatomy, Place hold held back with a visible reason, server count / "Couldn't count the documents yet." never 0 (D-05/D-35), release victim-naming not red · RAISED 25 → 29 at 284-04 (server type-ahead, 20 suggestions)
   "WaitingForYou.test.tsx": 22, // RE-PINNED 13 → 22 at 275-REVIEW frontend fix pass · 275-04 — S4 type-the-count (D-03 / T-275-31): ticked start, untick clears the count, Enter only when enabled, late-hold drop named; review undecided by default (D-10)
   "RetentionTab.test.tsx": 18, // RE-PINNED 12 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 11 → 12 at 275-05 ("1 policy") · 275-04 — S1 posture incl. sweeps-off (D-29), Waiting pill red only at N > 0 (D-01), roving tabs, sweep time from sweep_hour_utc, editor in place
   "RetentionPolicyEditor.test.tsx": 28, // RE-PINNED 16 → 28 at 275-REVIEW frontend fix pass · 275-04 — S2 Preview gate (D-02 / T-275-32): aria-disabled + on-screen reason, stale re-lock, 409 rendered, save failure keeps preview; two clocks (D-22); stage 2 (D-20)
@@ -4238,6 +4238,14 @@ const BASELINE = {
   "askDraftStore.test.ts": 7,
   // Phase 282-02 — the D-15 fences: one input per pause across both homes, the pointer, the rail handoff, BUG-260828-07 reachability
   "PendingAskStack.oneInput.test.tsx": 11,
+  // ── Phase 284 (FIX-11) — every suite 284-03 / 284-05 CREATED, plus TakeoffSection, which was in
+  // NEITHER knob (284-04 rewrote it to one bounded spreadsheet page). Each read from a real
+  // `npx vitest run <file>` on the merged tree (284-05 Task 2). BOTH KNOBS, SAME COMMIT. ──
+  "LibraryPage.states284.test.tsx": 15, // 284-03 — cold / warm / failed / empty are four states (SEED-248 Library half)
+  "DocumentChunksSection.paging284.test.tsx": 8, // 284-03 — chunks page by scroll sentinel, N of M
+  "DocumentRow.versions284.test.tsx": 3, // 284-03 — versions say N of M
+  "libraryListFence.test.ts": 3, // 284-05 — D-16: no product code asks for the whole library (planted-source self-test)
+  "TakeoffSection.test.tsx": 8, // 284-04 — ADOPTED at 284-05: ONE bounded spreadsheet page, never the whole library
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6186,6 +6194,13 @@ const TARGETS = [
   "src/stores/__tests__/askDraftStore.test.ts",
   // Phase 282-02 — panel __tests__ entries are FILE-level, so the new suite is named here.
   "src/components/panel/__tests__/PendingAskStack.oneInput.test.tsx",
+  // Phase 284 (FIX-11) — FILE-LEVEL: `src/pages`, `src/components/metadata`, `src/components/ingestion`
+  // and `src/lib` have no bare-directory entry. TakeoffSection was in NEITHER knob before 284-05.
+  "src/pages/__tests__/LibraryPage.states284.test.tsx",
+  "src/components/metadata/__tests__/DocumentChunksSection.paging284.test.tsx",
+  "src/components/ingestion/__tests__/DocumentRow.versions284.test.tsx",
+  "src/lib/__tests__/libraryListFence.test.ts",
+  "src/components/metadata/__tests__/TakeoffSection.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
