@@ -77,11 +77,24 @@ async def purge_documents(
 
 
 async def remove_document_bytes(storage, paths: list[str], removed: list[str], not_removed: list[str]) -> None:
+    """Remove ``paths`` from the documents bucket; split them by what Storage CONFIRMED deleted.
+
+    Phase 285 D-10 / BUG-261014-05: storage3 2.29's ``remove()`` returns the objects it actually
+    deleted and silently omits a path that did not exist (measured against local storage, RESEARCH
+    §9). A path Storage did not confirm is reported in ``not_removed`` — never assumed removed.
+
+    ⚠ Accepted effect on the other caller, retention disposition (orchestrator ruling 7): a path
+    that was ALREADY absent from storage (e.g. a BUG-260905-08 row whose bytes never landed) now
+    lands in ``bytes_not_removed``. That over-reports in the safe direction: Storage did not
+    confirm a deletion, so none is claimed.
+    """
     if not paths or storage is None:
         return
     try:
-        await run_in_threadpool(lambda: storage.storage.from_(STORAGE_BUCKET).remove(paths))
-        removed.extend(paths)
+        res = await run_in_threadpool(lambda: storage.storage.from_(STORAGE_BUCKET).remove(paths))
+        confirmed = {o.get("name") for o in (res or []) if isinstance(o, dict)}
+        removed.extend(p for p in paths if p in confirmed)
+        not_removed.extend(p for p in paths if p not in confirmed)
     except Exception:
         # 280-REVIEW IN-04: a NEUTRAL prefix — this step is shared by retention disposition and both
         # watch purge doors, so "retention:" misattributed every watch-purge failure. (The lift was
