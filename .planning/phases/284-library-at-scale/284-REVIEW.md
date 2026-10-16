@@ -283,3 +283,133 @@ A warm request that fails keeps the previous page's rows, which is correct. But 
 _Reviewed: 2026-10-16_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+
+## Review round 2 — migration 208 (2026-10-16)
+
+**Scope:** `git diff 59a0337fb 572d90f42`, security-focused. Files: `supabase/migrations/208_library_page_index.sql`, `scripts/apply_migration_208.py`, `scripts/full-schema-supplement.sql`, `supabase/full-schema.sql` (the regenerated hunks), `backend/tests/integration/test_284_page_index_live.py`, `.planning/phases/284-library-at-scale/284-06-SUMMARY.md`. Compared against `supabase/migrations/207_library_documents_view.sql` and `supabase/migrations/154_connection_scoped_visibility.sql:109-119`. Consumers checked: `backend/app/api/documents.py`, `backend/app/api/library.py`, `backend/app/services/document_search_service.py`, `backend/app/services/document_view_resolver.py`, `backend/app/services/tools/documents.py`, `backend/tests/integration/test_284_view_live.py`, `backend/tests/integration/_284_scale_account.py`. This review was read-only: no DB access, no Supabase MCP, nothing on :8000.
+
+**Findings (round 2):** critical 0 · warning 5 · info 5 · total 10
+
+**Verdict:** The SQL is correct. The policy rewrite is equivalent to 154's, the view returns exactly 207's rows, and I could not find an input that leaks a row or a column. All five warnings are about the **proof**, not the change. VERIFY checks that pieces are present, not that the result is right. The parity run that shipped did not cover the policy change. No standing test protects the one invariant that makes the UNION ALL exact. The production apply also needs a lock timeout.
+
+### Answers to the five questions
+
+**Q1 — Policy equivalence. Equivalent, with no other text changed.**
+- **Text.** 208:113-120 (`v_154` / `v_208`) and the regenerated `full-schema.sql` policy line differ in one place only: `(auth.uid() = user_id)` becomes `(( SELECT auth.uid() AS uid) = user_id)`. The name, `FOR SELECT`, `TO authenticated`, PERMISSIVE, the org gate, the shared-folder arm and the connection arm are byte-identical to 154:110-119.
+- **Semantics.** `auth.uid()` is STABLE and has no arguments. It reads only `request.jwt.claim.sub` / `request.jwt.claims`. An uncorrelated InitPlan evaluates it once per statement execution, where the bare form evaluates it once per row, and both read the same GUCs. They differ only if a GUC changes *inside* one statement. `grep set_config.*request.jwt` over `supabase/migrations/` finds nothing, so no SQL path does that. Realtime's `apply_rls` sets the claims and then runs a separate statement, so it gets a fresh InitPlan each time. This is also Supabase's documented pattern.
+- **NULL uid.** `NULL = user_id` is NULL in both forms, so both fail closed.
+- **Per role.** *authenticated*: same predicate, so the same rows. *anon*: the policy is `TO authenticated`, both before and after, so it never applies to anon. 208 changes no anon grant or policy. *service_role*: BYPASSRLS, so no policy is consulted. The table owner is the same, since `documents` is ENABLE and not FORCE RLS (full-schema.sql:9092).
+- **Restrictive policy.** `documents_agent_read_retrievable` (the `app.agent_read` / `retrievable` gate, mig 205) is a separate policy. 208 does not touch it. It is still ANDed with the permissive one.
+- **The guard (208:110-135).** It compares `pg_get_expr(polqual)` as full text under a pinned `search_path` (208:95). It also requires `polcmd='r'`, `polpermissive`, and `polroles = {authenticated}` exactly. A SELECT policy cannot have a WITH CHECK (`polwithcheck` is always NULL), so USING is the whole expression. A production policy that differs in any token, role, command or permissiveness makes the guard raise, which is fail-closed. Text equality under a fixed search_path pins the expression tree, so I found no way it could pass on a policy that means something different. What it does not check is the *bodies* of `folder_is_org_shared` and `connection_doc_is_visible`. That is irrelevant here, because the recreated policy calls the same functions. See IN-R2-03 for the PG-version caveat.
+- **Other policies.** The INSERT, UPDATE and DELETE policies on `documents` (full-schema.sql:8278 / 8411 / 8537) are unchanged. The regen diff touches only line 8667.
+
+**Q2 — View rewrite. Same row set, no new exposure.**
+- **Rows.** Leg 1 gives `scope_key = d.user_id = uid`, which is the caller's own documents (207's first disjunct). Leg 2 gives `scope_key = auth.uid() = uid`. That is a pseudo-constant gate: true for a real caller, NULL when there is no uid. It is ANDed with `user_id IS DISTINCT FROM uid` and `folder_id = ANY(shared folders with f.user_id <> uid)`. That is 207's second disjunct minus the rows already in leg 1. `= ANY` with a NULL `folder_id` is NULL, so 207's `folder_id IS NOT NULL` is implied. The union is exactly 207's set, and the legs are disjoint.
+- **Shared leg.** Own-folder rows: other users' documents in a shared folder the caller owns are excluded by `f.user_id <> uid` (208:236-237), as in 207. Other-org rows: `documents` RLS (the org gate) and `folders` RLS still apply beneath, because security_invoker is kept (208:150; VERIFY row 1).
+- **Duplicates.** A caller-owned document in *another user's* org-shared folder satisfies both legs' folder conditions. `u.user_id IS DISTINCT FROM uid` (208:234) removes it from leg 2, so it appears once. No standing test covers this shape (WR-R2-05).
+- **Bypassing the outer WHERE.** PostgREST filters, `or=`, and ordering are ANDed onto the view's own qual. They cannot replace it. `leg` and `scope_key` are not output columns, so they cannot be selected, filtered or ordered on (a request naming them gets PGRST/42703). The view is not `security_barrier`, so a client predicate could in principle run before the view's WHERE. But every row reachable that way is one `documents` RLS already admits, and the caller can read the base table directly. That is the same as 207, which already recorded "the predicate is the DEFINITION, RLS is the WALL".
+- **The LEFT JOIN.** `o` is `public.documents` under the same RLS, in the same snapshot and statement. The `u` row passed that RLS, so `o` always matches and `o.id = u.id`. Only `o.id` is projected, so the join exposes no column.
+- **Grants (208:246-251).** REVOKE ALL from PUBLIC, anon, authenticated and service_role, then GRANT SELECT to authenticated and service_role. PUBLIC is revoked explicitly, so the PUBLIC trap does not apply. CREATE OR REPLACE also keeps the existing ACL. The six lines are unchanged in `full-schema-supplement.sql` (+1 comment line only).
+- **Service role.** BYPASSRLS, and `auth.uid()` is NULL, so leg 1 gives `NULL = d.user_id` and leg 2 gives `NULL = NULL`. Both are NULL, so 0 rows.
+- **The agent path.** `resolve_filter` defaults to `via_view=False` (document_view_resolver.py:324). `tools/documents.py:513-525` uses that default for the count and passes `via_view=False` explicitly for the page. `query_documents_by_view` never reads the view.
+
+**Q3 — Indexes.** No security risk. They are plain btrees on existing columns and change no visibility. See WR-R2-03 (locking inside the transaction) and WR-R2-04 (the CONCURRENTLY path can leave an INVALID index that VERIFY passes). Plain CREATE INDEX is right at production's 178 rows.
+
+**Q4 — Apply script.** The loopback guard (apply_migration_208.py:42, 57-60) checks a hard-coded constant, and no environment variable is read. It cannot reach cloud, though the guard is tautological (IN-R2-05). Idempotency is properly proven: the script applies twice and compares the VERIFY rows, the viewdef and the policy text (146-160). The per-user md5 fingerprint (84-108, 163-169) is a strong row-for-row check **of the view**. **VERIFY itself proves only presence** (WR-R2-01). The parity that shipped did not cover the policy transition (WR-R2-02).
+
+**Q5 — Columns.** The same 36 columns, in the same order (33 base columns plus `filename_key`, `version_count`, `has_earlier`). I checked them name by name against 207:50-104. Every union column is the same `d.<col>` in both legs, so its type, typmod and collation are unchanged. `o.id` is `documents.id` (uuid). `CREATE OR REPLACE VIEW` refuses to change a column's name, type, typmod or collation, so the clean apply is itself proof. PostgREST clients are unaffected. Only FK traceability changed (IN-R2-02).
+
+### Warnings
+
+#### WR-R2-01: VERIFY's policy and view checks are substring checks, so they PASS on a widened policy or a leaky leg 2
+
+**File:** `supabase/migrations/208_library_page_index.sql:266-268, 285-287, 302-313`
+**Issue:** VERIFY is the one check the operator runs in production after the paste. Rows 13-14 pass when the policy text *contains* the wrapped uid and the three arm names. Concrete failing input: a policy whose qual is 208's text with `OR true` appended inside the disjunction. Another: the org gate turned from `AND` into `OR`. Both still contain `( SELECT auth.uid() AS uid) = user_id`, `current_user_org_ids()`, `folder_is_org_shared(folder_id)` and `connection_doc_is_visible(...)`, and neither contains `(auth.uid() = user_id)`, so both read **PASS** while the wall is gone. Row 2 passes any view containing `UNION ALL` and `scope_key`, including one whose leg 2 has lost `IS DISTINCT FROM` (duplicates) or `f.user_id <> uid` (other users' documents in the caller's own shared folder, which 207 excludes on purpose). Row 8's label says "(and reads 0 rows: auth.uid() is NULL)", but it checks only privileges, so the label claims something no row checks. The DO guard (110-135) is exact and runs *before* the change. Nothing exact runs *after* it.
+**Fix:** Make the post-apply proof exact, using the guard's own constant.
+```sql
+('the documents SELECT policy is exactly 208''s',
+ (select pg_get_expr(p.polqual, p.polrelid) from pg_policy p
+   where p.polrelid = 'public.documents'::regclass
+     and p.polname = 'Users can view own or global-folder documents'
+     and p.polcmd = 'r' and p.polpermissive
+     and p.polroles = array['authenticated'::regrole::oid])
+ = '((org_id IN ( SELECT current_user_org_ids() AS current_user_org_ids)) AND ((( SELECT auth.uid() AS uid) = user_id) OR ((folder_id IS NOT NULL) AND folder_is_org_shared(folder_id)) OR connection_doc_is_visible(source_connection_id, ingest_visibility)))'),
+('exactly one permissive SELECT policy on documents',
+ (select count(*) = 1 from pg_policy where polrelid = 'public.documents'::regclass
+    and polcmd in ('r','*') and polpermissive)),
+```
+Run VERIFY with `SET search_path TO public, extensions` first, so the deparse matches. For the view, compare `md5(pg_get_viewdef('public.library_documents'::regclass, true))` to the value recorded at the local apply, or at least add `like '%IS DISTINCT FROM%'` and `like '%f.user_id <> ( SELECT auth.uid()%'`. Drop "reads 0 rows" from row 8's label, or prove it with a separate `SET LOCAL ROLE service_role; SELECT count(*) …` step.
+
+#### WR-R2-02: The parity run that shipped did not cover the policy change, and a view fingerprint cannot see the connection arm
+
+**File:** `scripts/apply_migration_208.py:133-137, 163-169`; `.planning/phases/284-library-at-scale/284-06-SUMMARY.md:130, 199, 204`
+**Issue:** SUMMARY:204 records that after the PGRST200 revert, *"the indexes and the policy stayed"*. So the final run's `fp_before` was taken with the policy **already wrapped**. Its "207 → 208, all 43 users same" result compares the 207 view against the 208 view under one policy. It does not compare policy 154 against policy 208. That transition was logged only by an earlier run of a different script (SUMMARY:130, "12/12"), and its output is not in the record. Even a run that crossed the transition fingerprints `library_documents`, not `documents`. The view excludes connection-visible documents, so the policy's `connection_doc_is_visible` arm, and any row reachable only through it, is outside what the fingerprint can see. SUMMARY:199's *"parity was checked for all 43 users"* is therefore stronger than the evidence. The change is still correct (Q1 proves it from first principles), and the 86-test RLS suite is real evidence. But the claim in the record is overstated, and this is the threat flag the summary itself raised.
+**Fix:** Before the production paste, run one local, rolled-back proof that fingerprints the **base table** under both policies.
+```python
+# inside ONE transaction, then ROLLBACK
+for policy_sql in (POLICY_154, POLICY_208):
+    await conn.execute('DROP POLICY "Users can view own or global-folder documents" ON public.documents')
+    await conn.execute(policy_sql)
+    for uid in users:  # SET LOCAL ROLE authenticated + request.jwt.claims ONLY (PostgREST's branch)
+        fp[policy][uid] = await conn.fetchrow(
+            "SELECT count(*), md5(string_agg(id::text, ',' ORDER BY id)) FROM public.documents")
+assert fp[154] == fp[208]
+```
+Do the same for `app.agent_read = 'on'`. Make sure at least one local user has a `connection_doc_is_visible` row. Then correct SUMMARY:199 to say what was actually proven.
+
+#### WR-R2-03: The production apply holds ACCESS EXCLUSIVE on `public.documents` with no `lock_timeout`
+
+**File:** `supabase/migrations/208_library_page_index.sql:91-147`
+**Issue:** The transaction first takes SHARE on `documents` (three CREATE INDEX statements, 98-107). `DROP POLICY` / `CREATE POLICY` (137-138) then upgrade that to ACCESS EXCLUSIVE, held until COMMIT. 207 locked only the view, so 208 is the first migration in this phase to lock the hot table this way. Without `lock_timeout`, an AEL request queued behind any open transaction on `documents` makes every later read and write of `documents` queue behind *it*. Examples of such a transaction: an ingestion worker, a long Find, a Studio tab left in a transaction. That stalls the whole app (chat retrieval, Library, ingestion) for as long as the blocker lives. Row count does not matter here, so this applies even at 178 documents. The SHARE→AEL upgrade can also deadlock against a session that holds ACCESS SHARE and then wants ROW EXCLUSIVE. Postgres aborts one side; if that side is the migration, it rolls back cleanly.
+**Fix:** Add `SET LOCAL lock_timeout = '3s';` next to the `SET LOCAL search_path` (208:95), and re-paste on a timeout. Optionally move the policy block before the indexes, so the transaction asks for its strongest lock first and no upgrade is needed.
+
+#### WR-R2-04: The documented CONCURRENTLY path can leave an INVALID index that `IF NOT EXISTS` skips and VERIFY passes
+
+**File:** `supabase/migrations/208_library_page_index.sql:86-88, 98-107, 288-299`
+**Issue:** The header tells the operator to run the three indexes `CONCURRENTLY` first above ~100k documents. A cancelled or failed `CREATE INDEX CONCURRENTLY` leaves a catalog entry with `indisvalid = false` under the same name. The migration's `CREATE INDEX IF NOT EXISTS` then skips it. VERIFY rows 9-11 read `pg_indexes`, which lists invalid indexes with a perfect `indexdef`, so they PASS. The result is an index the planner never uses, reported as present. It is not a security issue, but VERIFY would certify a state that is not real.
+**Fix:** Have VERIFY join `pg_index` and require validity.
+```sql
+exists (select 1 from pg_index i join pg_class c on c.oid = i.indexrelid
+         where c.relname = 'documents_library_root_created_idx' and i.indisvalid and i.indisready)
+```
+In the header, say: "if a CONCURRENTLY build fails, `DROP INDEX CONCURRENTLY <name>` and rebuild before pasting 208."
+
+#### WR-R2-05: No standing test protects the legs' disjointness, so deleting `IS DISTINCT FROM` breaks nothing red
+
+**File:** `supabase/migrations/208_library_page_index.sql:234`; `backend/tests/integration/test_284_view_live.py:87-100, 103-118, 207-225`
+**Issue:** "The legs are disjoint and UNION ALL is exact" (208:44-45) rests on one predicate. The standing suites cannot see that predicate fail. The fixture has the peer own nothing, and both shared folders belong to the owner. So no caller has a document of their own inside **another user's** org-shared folder, which is the only shape both legs match. `test_view_latest_set_equals_the_legacy_rule` collects ids into a `set` (`out.update`, line 116), and a set silently removes duplicates. Concrete failing input: user B moves one of B's own documents into A's org-shared folder, and 208:234 is deleted. B's Library then lists that document twice and B's `count=exact` is +1, and every 284 live test stays green. Only the throwaway `apply_migration_208.py` would catch it, and only if the local data happened to contain that shape.
+**Fix:** In the seed or fixture, give the peer one latest document in `Shared 284` (owned by the owner). Then in `test_view_latest_set_equals_the_legacy_rule`, also assert that the plain `SELECT count(*) … WHERE is_latest` equals `len(view)`. In the peer leak test, assert `count == 21` and that ids are unique.
+
+### Info
+
+#### IN-R2-01: The other `documents` policies still call `auth.uid()` bare
+
+**File:** `supabase/full-schema.sql:8278, 8411, 8537`
+**Issue:** These are the INSERT, UPDATE and DELETE policies. They are untouched, which is correct for this change's scope. The SELECT policies on `document_chunks`, `document_tables` and `document_images` (154:121ff) are also bare, and they sit under every chunk search. **Fix:** If a later phase profiles them, apply the same wrap under the same exact-text guard. It is not needed for 284.
+
+#### IN-R2-02: PostgREST can no longer trace FK columns through the UNION, so a future embed via them would PGRST200
+
+**File:** `supabase/migrations/208_library_page_index.sql:152-185`
+**Issue:** Only `id` is traceable, via `o`. `user_id`, `folder_id`, `org_id`, `source_connection_id` and `archived_policy_id` come from `u`, through the UNION. So `library_documents?select=…,folders(name)` or `connector_connections(name)` would fail the way `document_tables(count)` did at the first apply. I found no current consumer: I checked `LIST_SELECT`, `FIND_SELECT`, `LIBRARY_ROW_COLUMNS`, `documents.py:1067`, and grepped the frontend for `library_documents` (0 hits). **Fix:** Add a header line naming this. The fix pattern, if one is ever needed, is to project the FK column from `o`.
+
+#### IN-R2-03: The guard's text constant depends on how the production Postgres major version deparses
+
+**File:** `supabase/migrations/208_library_page_index.sql:113-120`
+**Issue:** The constants were captured on local PG 17.6. If the production major version deparses `IN (SELECT …)` differently, the guard raises. That is fail-closed, so the risk is a blocked deploy, not a weakened one. **Fix:** Before the paste, as a free read in the SQL editor, run `SET search_path TO public, extensions; SELECT pg_get_expr(polqual, polrelid) FROM pg_policy WHERE polname = 'Users can view own or global-folder documents';` and compare it with `v_154`.
+
+#### IN-R2-04: Adding a column to the view now means editing three places
+
+**File:** `supabase/migrations/208_library_page_index.sql:151-228`
+**Issue:** A new `documents` column must go in leg 1, leg 2 and the outer list. Mismatched legs fail at CREATE, and the P-2 fence (`test_284_view_live.py:123-140`) catches a missing output column. So drift is caught, just in more places. **Fix:** Update 207's "COLUMN DRIFT" note to say three places.
+
+#### IN-R2-05: The apply script's loopback guard tests a constant
+
+**File:** `scripts/apply_migration_208.py:42, 57-60`
+**Issue:** `DSN` is a literal, so `_refuse_non_local` can never fire. It is harmless and documents intent. It would matter only if someone later made the DSN configurable. **Fix:** Leave it as is, or assert on `conn.get_server_pid()` / `inet_server_addr()` after connecting, so the check is against the live connection.
+
+---
+
+_Round 2 reviewed: 2026-10-16_
+_Reviewer: Claude (gsd-code-reviewer, fresh context)_
+_Depth: standard (security-focused) · independent_review: self_
