@@ -58,3 +58,8 @@ See `284-MEASUREMENTS.md` → "AFTER — verdict per D-22 criterion". Summary:
 - The v4.6 public changelog entry for the `GET /documents` breaking change (R-06).
 - Remove the legacy-array tolerance in `lib/api/documents.ts` one release after the production deploy.
 - **SEED-357** (Root / Find page-1 time grows with the library) — operator decision: accept for now (production's largest library is 178), or add the index as follow-up work.
+
+## After migration 208 (orchestrator, 2026-10-16)
+
+- **E re-checked under the 208 view** (default Chrome context, `fhdmrd@gmail.com`, active org `22f9c615-…`): header "200 documents", pager "1–25 of 200", CHUNKS "8,042 across 286 documents", 25 rows, no failure copy. These are the same numbers as before 208.
+- **Local incident during 284-06 (recorded, no production impact):** the executor's first version of the 208 view broke PostgREST embeds (`PGRST200`), so the Library list on the operator's local :8000 returned 500 for about 3 minutes. It reverted to 207's view, fixed the cause (`id` read through `LEFT JOIN documents o`) and re-applied. The final view is row-for-row identical to 207 for all 43 local users (row count plus an md5 over every column). The 284 live suites pass (43).
