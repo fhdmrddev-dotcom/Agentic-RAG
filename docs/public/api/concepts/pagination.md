@@ -62,6 +62,7 @@ while True:
 | `GET /documents/{document_id}/tables` | 50 | 200 |
 | `GET /documents/{document_id}/images` | 100 | 200 |
 | `GET /documents/{document_id}/versions` | 50 | 200 |
+| `GET /document-views/{view_id}/resolve` and `POST /document-views/resolve` (in the body) | 25 | 200 |
 
 `offset` must be 0 or more. A `limit` above the maximum, or below 1, is a `422`.
 
