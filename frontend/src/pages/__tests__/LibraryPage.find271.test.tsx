@@ -253,7 +253,7 @@ describe("LibraryPage — Find at rest costs nothing (D-01 / T-271-17)", () => {
     expect(within(group).getByRole("radio", { name: "Find documents" })).toHaveAttribute("aria-checked", "true")
     expect(nameInput()).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Version: Latest" })).toBeInTheDocument()
-    expect(screen.getByText("browse-only.pdf")).toBeInTheDocument()
+    expect(await screen.findByText("browse-only.pdf")).toBeInTheDocument()
     expect(screen.getByText(/Documents not assigned to a folder/)).toBeInTheDocument()
     await sleep(500)
     expect(mockSearchDocuments).not.toHaveBeenCalled()
@@ -408,7 +408,7 @@ describe("LibraryPage — Save as view and the Views tab (Pitfall 9 / D-114-1)",
   it("with only a metadata condition the shipped Save as view stays", async () => {
     renderPage()
     fireEvent.click(screen.getByRole("button", { name: "＋ Document type" }))
-    fireEvent.click(screen.getByRole("checkbox", { name: "Contract" }))
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Contract" }))
     fireEvent.click(screen.getByRole("button", { name: "Apply" }))
     await waitFor(() =>
       expect(mockSearchDocuments).toHaveBeenLastCalledWith(
@@ -444,7 +444,7 @@ describe("LibraryPage — 271 review fixes", () => {
     })
     renderPage()
     fireEvent.click(screen.getByRole("button", { name: "＋ Document type" }))
-    fireEvent.click(screen.getByRole("checkbox", { name: "Contract" }))
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Contract" }))
     fireEvent.click(screen.getByRole("button", { name: "Apply" }))
     await waitFor(() => expect(mockSearchDocuments).toHaveBeenCalled())
     // The Find path itself still never runs the browse resolver.
@@ -454,11 +454,19 @@ describe("LibraryPage — 271 review fixes", () => {
     expect(await screen.findByTestId("views-tab")).toBeInTheDocument()
     await waitFor(() => expect(screen.getByText("contract-hit.pdf")).toBeInTheDocument())
     expect(screen.queryByText("browse-only.pdf")).toBeNull()
-    expect(mockResolveAdHoc).toHaveBeenCalledTimes(1)
-    expect(mockResolveAdHoc).toHaveBeenCalledWith({
-      op: "and",
-      conditions: [{ field: "document_type", op: "eq", value: "Contract" }],
-    })
+    // 284-03 (D-24): the resolve now asks the server for ONE page (with the archived flag) and
+    // makes ONE count read for the archived-hidden line — so "one resolve" is counted on the
+    // page reads, and the count read is pinned to exactly one beside it.
+    const pageReads = mockResolveAdHoc.mock.calls.filter((c) => !(c[1] as { count_only?: boolean })?.count_only)
+    expect(pageReads).toHaveLength(1)
+    expect(mockResolveAdHoc).toHaveBeenCalledTimes(2)
+    expect(mockResolveAdHoc).toHaveBeenCalledWith(
+      {
+        op: "and",
+        conditions: [{ field: "document_type", op: "eq", value: "Contract" }],
+      },
+      { offset: 0, limit: 25, include_archived: false },
+    )
   })
 
   it("CR-01: opening the Views tab with no filter change since the last resolve costs no request", async () => {

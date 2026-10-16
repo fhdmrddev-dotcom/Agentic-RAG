@@ -50,8 +50,6 @@ import { useAuth } from "@/hooks/useAuth"
 import {
   listMetadataFields,
   listViews,
-  resolveView,
-  resolveAdHoc,
   updateView,
 } from "@/lib/api"
 import { listExpertInstalls } from "@/lib/api/experts"
@@ -66,7 +64,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useCitationNavOptional } from "@/lib/citationNav"
 import { cn } from "@/lib/utils"
 import { EMPTY_FILTER } from "@/types"
-import type { Document, MetadataFieldDef, SavedView, ViewFilter } from "@/types"
+import type { MetadataFieldDef, SavedView, ViewFilter } from "@/types"
 import type { ActiveView } from "@/App"
 // Phase 244 plan 04 (SHELL-05 · BUG-260911-03) — the shell's ALREADY-RESOLVED conditions and
 // the strict leaf that buckets them. ⛔ A TYPE and a PURE FUNCTION only: this page must never
@@ -328,15 +326,13 @@ export function LibraryPage({
   // ── Phase 114: the filter bar + Views group state ───────────────────────────
   const [customFields, setCustomFields] = useState<MetadataFieldDef[]>([])
   const [views, setViews] = useState<SavedView[]>([])
-  // The documents resolved by the active filter / selected view (drives the list
-  // when a filter is active; null = "no active filter, show the folder view").
-  // ⛔ NOT in the reducer, by decision: this is an ASYNC RESULT, not a selection.
-  const [filteredDocs, setFilteredDocs] = useState<Document[] | null>(null)
-  // The own+global DISTINCT-deduped match count from the SAME resolve that fills the
-  // list (114 CR-01: the page and the FilterBar share ONE resolve per filter change —
-  // the bar no longer fires its own separate count round-trip). null while unknown.
-  const [matchCount, setMatchCount] = useState<number | null>(null)
-  const filterReqId = useRef(0)
+  // The active filter / selected view the list resolves (null = "no active filter, show the
+  // folder view"). ⛔ NOT in the reducer, by decision: it names what the list ASKS the server
+  // for, and the hook owns the answer (284-03 moved the resolve itself into `useLibraryDocuments`,
+  // which resolves ONE page — this page holds no resolved rows any more).
+  const [listTarget, setListTarget] = useState<
+    { kind: "view"; viewId: string } | { kind: "filter"; filter: ViewFilter } | null
+  >(null)
 
   // Phase 217.1-06 (LIB-01) — the Documents tab's pager state. The offset keys off (folder,
   // view, filter) changes so a navigation never strands a stale page. ⛔ It is UI state and
@@ -345,13 +341,12 @@ export function LibraryPage({
   const [pageSize, setPageSize] = useState(25)
   useEffect(() => {
     setPageOffset(0)
-  }, [selectedFolderId, filteredDocs])
+  }, [selectedFolderId, listTarget])
 
   // ⭐ Phase 284-01 (D-24) — the page's documents, as rows and numbers. Named `libDocs` because
-  // `lib` is the selection reducer's state above.
+  // `lib` is the selection reducer's state above. 284-03: the hook reads the server.
   const libDocs = useLibraryDocuments({
-    folderId: selectedFolderId,
-    filteredDocs,
+    source: listTarget ?? { kind: "browse", folderId: selectedFolderId },
     includeArchived: find.include_archived,
     offset: pageOffset,
     limit: pageSize,
@@ -488,32 +483,24 @@ export function LibraryPage({
   // consumes (it no longer fires its own count round-trip). An empty filter clears
   // the override so the folder view shows again. ───────────────────────────────
   // 271-REVIEW CR-01: set when Find changes the shared filter WITHOUT resolving it (see
-  // `handleFindFilterChange`). Any resolve brings `filteredDocs` back in line, so it clears.
+  // `handleFindFilterChange`). Any resolve brings the list target back in line, so it clears.
   const viewsListStale = useRef(false)
+  // ⭐ 284-03 (D-24): the resolve itself moved into `useLibraryDocuments` — it asks the server for
+  // ONE page of the view / filter (with its exact total) and drops a stale answer there. This
+  // function only names WHAT to resolve. ⚠ A failed resolve no longer falls back to the
+  // unfiltered folder list (T-271-14's hazard): the hook keeps the error on screen instead.
   const resolveFilterIntoList = useCallback(async (f: ViewFilter, savedViewId?: string) => {
     viewsListStale.current = false
     if (f.conditions.length === 0) {
-      setFilteredDocs(null)
-      setMatchCount(null)
+      setListTarget(null)
       return
     }
-    const myReq = ++filterReqId.current
-    try {
-      const { documents: d, total } = savedViewId
-        ? await resolveView(savedViewId)
-        : await resolveAdHoc(f)
-      // Ignore a stale resolve if a newer filter change superseded it.
-      if (myReq === filterReqId.current) {
-        setFilteredDocs(d ?? [])
-        setMatchCount(total)
-      }
-    } catch {
-      if (myReq === filterReqId.current) {
-        setFilteredDocs(null)
-        setMatchCount(null)
-      }
-    }
+    setListTarget(savedViewId ? { kind: "view", viewId: savedViewId } : { kind: "filter", filter: f })
   }, [])
+  // The own+global DISTINCT-deduped match count from the SAME resolve that fills the list
+  // (114 CR-01: the page and the FilterBar share ONE resolve per filter change — the bar fires
+  // no count round-trip of its own). null while unknown.
+  const matchCount = listTarget !== null ? libDocs.total : null
 
   // ── View / filter selection handlers ────────────────────────────────────────
   // ⭐ Each is now ONE dispatch plus, where the shipped handler also kicked an async
@@ -524,7 +511,7 @@ export function LibraryPage({
     // search and browses that folder — the shipped SELECT_FOLDER rule, applied to Find too.
     findDispatch({ type: "CLEAR_SEARCH" })
     dispatch({ type: "SELECT_FOLDER", folderId: id })
-    setFilteredDocs(null)
+    setListTarget(null)
   }, [])
 
   const handleSelectView = useCallback((view: SavedView) => {
@@ -554,8 +541,7 @@ export function LibraryPage({
   // UNFILTERED folder list (T-271-14). The Views tab keeps `handleFilterChange` as shipped.
   const handleFindFilterChange = useCallback((next: ViewFilter) => {
     dispatch({ type: "CHANGE_FILTER", filter: next })
-    setFilteredDocs(null)
-    setMatchCount(null)
+    setListTarget(null)
     viewsListStale.current = next.conditions.length > 0
   }, [])
 
@@ -575,8 +561,7 @@ export function LibraryPage({
   const handleClearSearch = useCallback(() => {
     findDispatch({ type: "CLEAR_SEARCH" })
     dispatch({ type: "CHANGE_FILTER", filter: EMPTY_FILTER })
-    setFilteredDocs(null)
-    setMatchCount(null)
+    setListTarget(null)
   }, [])
 
   // UI-SPEC (pre-seeded folder): when a search STARTS while a sidebar folder is selected, it is
@@ -616,7 +601,7 @@ export function LibraryPage({
   const handleDeletedView = useCallback((id: string) => {
     setViews((prev) => prev.filter((v) => v.id !== id))
     dispatch({ type: "DELETE_VIEW", viewId: id })
-    if (selectedViewId === id) setFilteredDocs(null)
+    if (selectedViewId === id) setListTarget(null)
   }, [selectedViewId])
 
   // The sidebar groups (Folders + Views) are rendered identically on desktop
@@ -661,7 +646,7 @@ export function LibraryPage({
   // When a filter/view is active the list shows the resolved set (folderId undefined →
   // DocumentList does no further folder filtering).
   const pagedDocuments = libDocs.rows
-  const listFolderId = filteredDocs !== null ? undefined : selectedFolderId
+  const listFolderId = listTarget !== null ? undefined : selectedFolderId
 
   // Phase 275 (planning flag 2): ONE `POST /retention/document-states` for what is on screen — the
   // browse page, Find's page and the open document — plus the selected folder. Passed DOWN.
@@ -921,7 +906,7 @@ export function LibraryPage({
             />
             {/* Phase 217.1-06 — the client-side pager (the sketch's table footer). Shown on
                 the folder view only; a filter/view resolve carries its own server count. */}
-            {filteredDocs === null && libDocs.total !== null && (
+            {listTarget === null && libDocs.total !== null && (
               <div data-testid="documents-tfoot">
                 <DocumentsPager
                   total={libDocs.total}

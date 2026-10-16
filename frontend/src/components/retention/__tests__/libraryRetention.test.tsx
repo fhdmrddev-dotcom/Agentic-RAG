@@ -341,7 +341,7 @@ describe("LibraryPage — retention in browse (S9 / S10 / planning flag 2)", () 
   it("hides archived rows behind '1 archived document hidden · Show', and Show is the SAME state as Find's chip", async () => {
     renderPage()
     expect(screen.queryByText("Invoice INV-0412.pdf")).toBeNull()
-    const line = screen.getByTestId("archived-hidden-line")
+    const line = await screen.findByTestId("archived-hidden-line")
     expect(line).toHaveTextContent("1 archived document hidden · Show")
     expect(screen.getByRole("button", { name: "Include archived" })).toBeInTheDocument()
 
@@ -368,7 +368,7 @@ describe("LibraryPage — retention in browse (S9 / S10 / planning flag 2)", () 
       loadDocuments: vi.fn().mockResolvedValue(undefined),
     })
     renderPage()
-    expect(screen.getByTestId("archived-hidden-line")).toHaveTextContent("1 archived document hidden · Show")
+    expect(await screen.findByTestId("archived-hidden-line")).toHaveTextContent("1 archived document hidden · Show")
     expect(screen.queryByText("No root documents yet.")).toBeNull()
     expect(screen.queryByText("No documents in this folder")).toBeNull()
     expect(screen.queryByText("Upload files above to add them here.")).toBeNull()
@@ -412,6 +412,7 @@ describe("LibraryPage — retention in browse (S9 / S10 / planning flag 2)", () 
 
   it("a held document's Delete opens straight into the refusal — the member sentence, one Close, no Delete", async () => {
     renderPage()
+    await screen.findByText("Halvorsen Supply Agreement.pdf")
     const row = rowOf("Halvorsen Supply Agreement.pdf")
     await waitFor(() => expect(within(row).getByText("On hold")).toBeInTheDocument())
     await userEvent.click(within(row).getByRole("button", { name: "Delete document" }))
@@ -428,6 +429,7 @@ describe("LibraryPage — retention in browse (S9 / S10 / planning flag 2)", () 
 
   it("a calm document's Delete still opens the normal confirm", async () => {
     renderPage()
+    await screen.findByText("Atlas kickoff deck.pdf")
     const row = rowOf("Atlas kickoff deck.pdf")
     await waitFor(() => expect(mockGetDocumentStates).toHaveBeenCalled())
     await userEvent.click(within(row).getByRole("button", { name: "Delete document" }))
