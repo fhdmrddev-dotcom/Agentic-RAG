@@ -54,12 +54,16 @@ See `284-MEASUREMENTS.md` → "AFTER — verdict per D-22 criterion". Summary:
 
 ## Owed
 
-- **Production, in this order:** apply migration **207** → `get_advisors(security)` → deploy the backend → deploy the frontend (284-03 must ship with the backend: the frontend reads the envelope, and the page clients keep the legacy-array tolerance for one release).
+- **Production, in this order:** apply migration **207** → migration **208** (VERIFY must read 16/16, run with its `SET search_path` line; on a lock timeout re-paste, never widen it) → `get_advisors(security)` → deploy the backend → deploy the frontend (284-03 must ship with the backend: the frontend reads the envelope, and the page clients keep the legacy-array tolerance for one release).
 - The v4.6 public changelog entry for the `GET /documents` breaking change (R-06).
 - Remove the legacy-array tolerance in `lib/api/documents.ts` one release after the production deploy.
-- **SEED-357** (Root / Find page-1 time grows with the library) — operator decision: accept for now (production's largest library is 178), or add the index as follow-up work.
+- ~~**SEED-357** — operator decision~~ → the operator chose to add the index in this phase: **answered by 284-06 (migration 208)**.
 
 ## After migration 208 (orchestrator, 2026-10-16)
 
 - **E re-checked under the 208 view** (default Chrome context, `fhdmrd@gmail.com`, active org `22f9c615-…`): header "200 documents", pager "1–25 of 200", CHUNKS "8,042 across 286 documents", 25 rows, no failure copy. These are the same numbers as before 208.
 - **Local incident during 284-06 (recorded, no production impact):** the executor's first version of the 208 view broke PostgREST embeds (`PGRST200`), so the Library list on the operator's local :8000 returned 500 for about 3 minutes. It reverted to 207's view, fixed the cause (`id` read through `LEFT JOIN documents o`) and re-applied. The final view is row-for-row identical to 207 for all 43 local users (row count plus an md5 over every column). The 284 live suites pass (43).
+
+## G-4 A and B re-driven on the 208 view (orchestrator, 2026-10-16)
+
+See `284-VERIFICATION.md` → "Human item — resolved". A @50k, B @50k and A @10k all PASS on 208. Browser click → rows medians: 2,772 ms (50k) and 2,646 ms (10k), a ratio of 1.05x, against ~3.2-3.47 s at 50k before 208. B's last page again ends on `scale284-00017.pdf`. Teardown 294 → 294.

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Pay It Down
-status: ready_to_execute
-last_updated: 2026-10-15T21:46:53.109Z
-last_activity: 2026-10-16 -- Phase 284 planned (5 plans, 3 waves)
+status: milestone_phases_complete
+last_updated: 2026-10-16T12:00:00.000Z
+last_activity: 2026-10-16 -- Phase 284 CLOSED (6/6 plans, verified 7/7, self-verified); every v4.6 phase (277-284) complete
 progress:
-  total_phases: 15
-  completed_phases: 6
-  total_plans: 25
-  completed_plans: 25
-  percent: 40
-stopped_at: Phase 284 planned — executing (284-01..05)
+  total_phases: 8
+  completed_phases: 8
+  total_plans: 31
+  completed_plans: 31
+  percent: 100
+stopped_at: Phase 284 closed — v4.6 phases all complete; next /gsd:audit-milestone
 ---
 
 # Project State
@@ -33,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 284 — library at scale
+**Current focus:** v4.6 close — every phase (277-284) complete; milestone audit next
 
 ---
 
@@ -54,6 +54,8 @@ seams, flows 3/3. Closed core 7 phase types / 1 emitter / **30 tools** (+`show_a
 ---
 
 ## Current Position
+
+**Phase 284 CLOSED (2026-10-16) — Library at Scale (FIX-11).** 6 plans / 4 waves. 284-06 was added at the operator's request for SEED-357 (the page index). Verification `284-VERIFICATION.md`: **passed 7/7**, `self-verified`. The one human item (the browser at scale on the 208 view) was driven by the orchestrator: A/B @50k and A @10k PASS, click → rows 2.77 s / 2.65 s = 1.05x (dev build). Measured (`284-MEASUREMENTS.md`): every total = `count(*)` at 10k / 50k; Find page 1 at 50k 16.9 s → ~70 ms; Root page 1 2.54x → 1.14-1.38x and Find 2.59x → 1.32-1.42x after migration 208 (one host-noise pair 1.57x). The summary is 1.85-1.93x and < 500 ms, recorded. G-4 A-F PASS (`284-LIVE-EVIDENCE.md`); F was amended (folder conditions cannot be saved as views). The drive found and fixed, test-first: ungrouped counts `c96a0909e`, and AnimatedNumber painting "-17,721 documents" `bb47f34ce`. Review R1: CR-01 (offset past the end → 500) + WR-01/02/04 + IN-05/07 fixed test-first, merged `138fee3d9`; WR-03 accepted by the orchestrator. Review R2 (migration 208): WR-R2-01..05 fixed `34443231b` (VERIFY proves content, lock_timeout, policy 154-vs-208 parity, disjoint-legs fence). Flips: BUG-261014-07 → closed; BUG-261014-06 note; SEED-248 Library half shipped; SEED-357 → answered. New seeds: SEED-355/356 (R-10), SEED-358 (older paged routes 500 past the end). Gates on the merged tree: backend 71 = base set (7,688 passed), count gate OK 449/449, tsc 63 = 63. Local incident: for ~3 min during 284-06, the first 208 view broke PostgREST embeds on the operator's local :8000; reverted and fixed, no production impact. **Not pushed. Migrations 207 + 208 are LOCAL only.** Production order: paste 207 → paste 208 (VERIFY 16/16; production's policy text was confirmed by a read to equal the guard's v154) → `get_advisors(security)` → backend → frontend. Next: `/gsd:audit-milestone` (v4.6), then close v4.6 by hand.
 
 **Phase 284 PLANNED (2026-10-16, `--auto`).** 5 plans / 3 waves (01 FE extraction ∥ 02 seed+baseline+view 207+paged API · 03 Library on server ∥ 04 Find SQL+pickers+route guard · 05 request recorder+fence+close checkpoint). RESEARCH `249efeab5`, UI-SPEC approved, checker PASSED 0 blockers. Owed by decision: v4.6 changelog line for the `GET /documents` envelope (R-06; owner: v4.6 close); legacy-array tolerance in page clients (owner: first prod deploy after 284 — remove once production runs the envelope). **Context:** `284-CONTEXT.md` D-01..D-27: envelope `GET /documents` (breaking, documented), one SQL summary for every count, Find paged in SQL, pickers on `POST /document-search`, per-document lists bounded, synthetic 10k/50k account + baseline first, two-layer guard, LibraryPage data-hook extraction first, sketch skipped by decision, G-4 A-E. Seeds: 248 folded (Library half), 317 / 352 deferred. Next: plan-phase 284.
 
@@ -148,6 +150,16 @@ StreamsProvider's workflow-lock arm (Pitfall 1); provider-doc check for IN-03 no
 | 4 | IN-03 provider-docs-first check | Anthropic tool_choice auto + Gemini function-calling mode AUTO docs; only those two receive the coerce rung's system text. SEED-327 untouched |
 | 5 | Phase-review leftovers (owed, non-blocking) | `279-REVIEW.md` IN-01..IN-06 (stale `workflow-lock-error-banner` testid on every send 409; folder-arm 409 wording; vacuous `--exclude-prefix ""` CLEAR; WR-06 alert outlives a later load; transient org-check failure shows the org sentence; WR-08 note `ls` default) + WR-02 NULL-org continuation residual (operator ruling 2026-10-14) + catalog subtitle no longer literally true for managers + `ExpertDetailModal` copy unpinned + `test_264_born_for_carrier.py` changed outside 279-02's list. The two 409 test titles: ✅ fixed by WR-06 `16e355582`. List: `279-VALIDATION.md` § Still owed |
 | 6 | `graphify update .` after the close | run at 279-04 close; `graphify-out/` is never committed |
+
+### Owed from Phase 284 (2026-10-16)
+
+| # | Item | Notes |
+|---|---|---|
+| 1 | Production: paste **207**, then **208**, into the cloud SQL editor (each an approval-gated write), then `get_advisors(security)`, then deploy backend → frontend | 208's VERIFY must read 16/16, run together with its `SET search_path` line; on a lock timeout re-paste, never widen it. 208's guard was confirmed against production's policy text by a read on 2026-10-16 |
+| 2 | v4.6 public changelog entry for the `GET /documents` breaking change (envelope) | R-06; owner: v4.6 close |
+| 3 | Remove the legacy-array tolerance in `frontend/src/lib/api/documents.ts` | one release after the production deploy (WR-03 accepted on that basis) |
+| 4 | Hot-file ledger triples for the files touched after 284-05's ledger close (`58b4bc367`) | review fixes + 284-06; the presence gate is green, the triples are not re-derived |
+| 5 | SEED-355 / 356 / 358 | planted with structured triggers; out of 284's Library scope |
 
 ### Guardrail overrides (v4.6)
 

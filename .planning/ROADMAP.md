@@ -135,6 +135,7 @@ and are stated so a phase can run early when its files are free:
 - [x] **Phase 281: A Refusal Names Its Cause**: emit failure names the check that failed; publish and describe-door refusals in plain words; freshness ignores archived documents (FIX-09, FIX-10, DEBT-07)
 - [x] **Phase 282: The Slow Run and the Paused Run**: per-model timeout reaches the provider call with deliberate retries; one `ask_user` input with one draft (FIX-06, FIX-07)
 - [x] **Phase 283: Every Member Reaches Their Own Settings**: Settings reachable by members with operator tabs hidden and refused; bounded Chunks section (FIX-01, FIX-08) — completed 2026-10-16
+- [x] **Phase 284: Library at Scale**: the Library, Find and every picker page and count on the server (envelope `GET /documents`, `GET /library/summary`, Find in SQL, pickers on `POST /document-search`), migrations 207 (visible-set view) + 208 (page index), guards driven RED, G-4 A-F at 10k/50k (FIX-11) — completed 2026-10-16
 
 ### Phase Details
 
@@ -370,7 +371,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 284-05-PLAN.md — wave 3 (TDD guards + orchestrator checkpoint, DB lock): D-23 layer 2 request recorder (unit + live) and the D-16 whole-list fence, each driven RED, legacy array clients deleted; merged-tree gates, count-gate pins, ledger + CLAUDE.md close; AFTER measurement at 10k / 50k, production `max_rows` read (read-only), G-4 A-E, evidence-gated bug / seed / requirement flips (FIX-11; D-16, D-18, D-21..D-23, D-25..D-27, R-09)
-- [ ] 284-06-PLAN.md — wave 4 (TDD, DB lock; added 2026-10-16 at the operator's request, SEED-357): locate where the 50k first-page time goes, migration **208** (the Library page index; the view rewritten as UNION ALL only if EXPLAIN demands it), applied by script, AFTER at 10k / 50k so Root and Find page 1 stay within 1.5x (FIX-11; SC#1, D-22)
+- [x] 284-06-PLAN.md — wave 4 (TDD, DB lock; added 2026-10-16 at the operator's request, SEED-357): locate where the 50k first-page time goes, migration **208** (the Library page index; the view rewritten as UNION ALL only if EXPLAIN demands it), applied by script, AFTER at 10k / 50k so Root and Find page 1 stay within 1.5x (FIX-11; SC#1, D-22)
 **Flags**: ⛔ **G-5: `frontend/src/pages/LibraryPage.tsx` FIRES and its extraction is OWED — taken first.** Also FIRING: `backend/app/api/documents.py`, `backend/app/services/document_search_service.py`, `frontend/src/components/ingestion/DocumentList.tsx`, `frontend/src/lib/api/documents.ts`, `frontend/src/types/index.ts`; `frontend/src/hooks/useDocuments.ts` and `DocumentsPager.tsx` read their ledger sections first. **security_enforcement**: any new SQL function is `SECURITY INVOKER`, revoked from `PUBLIC`, and proven as `authenticated`, never through the service role. **measure first**: record today's figures at 10k/50k before changing anything. Supabase Realtime stays a hint: a document-change event refetches the current page, never patches a full in-memory list. **G-2**: the pager exists (`DocumentsPager`), so the sketch skip is recorded unless discuss changes the Library layout. Cross-check `BUG-261014-06` / `-07` at discuss.
 **UI hint**: yes
 
@@ -385,7 +386,7 @@ Plans:
 | 281. A Refusal Names Its Cause | 4/4 | Complete (owed by operator decision: G-4 rows A, C, D; WR-02 kept by design) | 2026-10-15 |
 | 282. The Slow Run and the Paused Run | 4/4 | Complete (verified 5/5, self-verified; review CR-01 + WR-02..05 fixed, WR-01 partial; owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through, SC#10 rows 2/8 on credit) | 2026-10-15 |
 | 283. Every Member Reaches Their Own Settings | 3/3 | Complete (verified 4/4 SCs; review CR-01 + WR-01/02 + 4 info fixed, IN-04/IN-06 skipped by decision; G-4 driven live, Tab row confirmed by operator) | 2026-10-16 |
-| 284. Library at Scale | 5/6 | In Progress | - |
+| 284. Library at Scale | 6/6 | Complete (verified 7/7 SCs, self-verified; review R1 CR-01 + WR-01/02/04 + IN-05/07 and R2 WR-R2-01..05 fixed test-first, WR-03 accepted; G-4 A-F driven live, A/B re-driven on 208; migrations 207 + 208 LOCAL only — production apply owed) | 2026-10-16 |
 
 ---
 
