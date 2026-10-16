@@ -241,7 +241,8 @@ export function LibraryHeaderBar({
               {/* ⛔ "Reading", never "added". A file that is still being read is not in the Library
                   yet, and the whole point of this row is to stop the surface saying it is. */}
               <span>
-                Reading {inFlight} file{inFlight === 1 ? "" : "s"}
+                {/* 284-REVIEW IN-05: grouped like every Library count (UI-SPEC Numbers). */}
+                Reading {inFlight.toLocaleString()} file{inFlight === 1 ? "" : "s"}
               </span>
             </>
           ) : (

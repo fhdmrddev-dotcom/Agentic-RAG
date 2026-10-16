@@ -48,7 +48,7 @@ describe("parseDisplayNumber / formatDisplayNumber — locale-grouped counts", (
     expect(parseDisplayNumber("12.5 MB", "de-DE")).toMatchObject({ num: 12.5, suffix: " MB", grouped: false, decimals: 1 })
     expect(parseDisplayNumber("42%", "en-US")).toMatchObject({ num: 42, suffix: "%", grouped: false })
     expect(parseDisplayNumber(1536, "de-DE")).toMatchObject({ num: 1536, grouped: false, decimals: 0 })
-    expect(formatDisplayNumber(6.25, parseDisplayNumber("12.5 MB", "de-DE")!, "de-DE")).toBe("6.3")
+    expect(formatDisplayNumber(6.25, parseDisplayNumber("12.5 MB", "de-DE")!, "de-DE")).toBe("6.3 MB")
   })
 
   it("text with no number is not a number", () => {
