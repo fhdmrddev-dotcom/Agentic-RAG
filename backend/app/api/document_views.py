@@ -211,12 +211,14 @@ async def resolve_view(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Resolve a view to one PAGE of its matching latest-version docs, with an exact total.
+    """Resolve a view to one page of its matching latest-version documents, with an exact total.
 
-    Phase 284 (D-10): ``offset`` / ``limit`` (1..200, default 25) select the page of the
-    newest-first set; the answer is ``{documents, total, offset, limit}``. ``include_archived``
-    (default ``True`` — today's behaviour) hides archived documents when ``False``, for the count
-    too. The read is ONE ranged ``count="exact"`` query over migration 207's
+    Changed in v4.6: the listing is paged. Pass ``offset`` and ``limit`` (1 to 200, default 25)
+    and read ``{documents, total, offset, limit}``, newest first; ``total`` is the exact number of
+    matches. ``include_archived`` (default true) leaves archived documents out when false, and
+    applies to ``count_only`` too.
+
+    Phase 284 (D-10): the read is ONE ranged ``count="exact"`` query over migration 207's
     ``library_documents`` (the view strategy), run on THIS route's user-JWT client, so neither the
     listing nor the count is cut at PostgREST's max_rows any more.
 
