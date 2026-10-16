@@ -64,6 +64,68 @@ def _zero_counts() -> dict[str, int]:
     return {"new": 0, "modified": 0, "renamed": 0, "missing": 0, "restored": 0, "errors": 0}
 
 
+#: Phase 285 (FIX-12 / D-01): a `failed` item is read again on later syncs until it has failed
+#: this many times in a row. A version change at the source resets the count, so an edited file
+#: is always read again. Past the cap the item stays `failed` and every run still names it (D-02).
+WATCH_ITEM_MAX_FAILED_ATTEMPTS = 3
+
+_SUMMARY_MAX = 500
+_SUMMARY_NAME_MAX = 80
+
+
+def _typed_error(exc: BaseException) -> str:
+    """`ExcType: message`, or just `ExcType` when the message is empty (D-04).
+
+    An empty-message `httpx.ConnectError` used to be stored as `''`, which lost the only fact
+    that said what went wrong.
+    """
+    name = type(exc).__name__
+    msg = str(exc)
+    return (f"{name}: {msg}" if msg else name)[:_SUMMARY_MAX]
+
+
+def _failure_summary(failures: list[tuple[str, str]]) -> str | None:
+    """The run row's `last_error` for a successful tick that still has failed files (D-03).
+
+    `None` for no failures. Otherwise `1 file failed: a (T)` or
+    `N files failed: a (T), b (T), c (T) and K more` — the first three names, each capped at
+    80 characters, the whole string capped at 500.
+    """
+    if not failures:
+        return None
+    n = len(failures)
+
+    def _name(raw: str) -> str:
+        raw = raw or "unknown"
+        return raw if len(raw) <= _SUMMARY_NAME_MAX else raw[: _SUMMARY_NAME_MAX - 1] + "…"
+
+    shown = ", ".join(f"{_name(nm)} ({typ})" for nm, typ in failures[:3])
+    head = f"{n} file failed: " if n == 1 else f"{n} files failed: "
+    tail = f" and {n - 3} more" if n > 3 else ""
+    out = head + shown + tail
+    if len(out) > _SUMMARY_MAX:
+        out = out[: _SUMMARY_MAX - len(tail) - 1] + "…" + tail
+    return out
+
+
+def _minted_marker(mint_res: MintResult, existing: dict | None) -> bool | None:
+    """The D-06 minted/linked marker, written where the minter answers (M-1..M-3).
+
+    * M-1 — `is_duplicate=False`: this watch minted the document → `True`.
+    * M-2 — `is_duplicate=True` and the returned id IS the item's current document (a version
+      bump with unchanged bytes, or a retry against a live doc) → `None`, which keeps the stored
+      marker. Writing `False` here would downgrade the watch's OWN document to "linked".
+    * M-3 — `is_duplicate=True` with another id (a hand upload or another source) → `False`.
+    (M-4: the rename arm, the error arm and `update_item_state` never pass a marker.)
+    """
+    if not mint_res.is_duplicate:
+        return True
+    current = (existing or {}).get("document_id")
+    if current is not None and str(current) == str(mint_res.document["id"]):
+        return None
+    return False
+
+
 def _opt_uuid(val: Any) -> UUID | None:
     """Coerce a claimed-row ownership column to a UUID, or None if it is absent/unusable.
 
@@ -314,16 +376,49 @@ class WatchService:
 
         counts = _zero_counts()
         seen_ext_ids: set[str] = set()
+        # Phase 285 (D-02 / D-03): (name, exception type) for every file still failed after this
+        # tick — retried-and-failed here, or past the cap. Only files IN THIS LISTING are named
+        # (orchestrator ruling 6); a failed item absent from the listing is not counted.
+        failures: list[tuple[str, str]] = []
 
         # 5. Process present items from source listing
         for item in listing.files:
             seen_ext_ids.add(item.id)
             existing = items_by_ext_id.get(item.id)
             doc_id: UUID | None = None
+            mint_res: MintResult | None = None
+            # ⚠ Read against the STORED version, before this run writes anything (pitfall 6).
+            version_changed = existing is not None and str(item.modified_at or "") != (
+                existing.get("source_version") or ""
+            )
+            retry_failed = existing is not None and existing.get("state") == "failed"
+            # The count this tick continues: a version change starts it again (D-01).
+            prior_attempts = (
+                0 if (existing is None or version_changed or not retry_failed)
+                else int(existing.get("failed_attempts") or 0)
+            )
+
+            # D-01 / D-02: past the cap with an unchanged version — not read, but never silent.
+            if (
+                retry_failed
+                and int(existing.get("failed_attempts") or 0) >= WATCH_ITEM_MAX_FAILED_ATTEMPTS
+                and not version_changed
+            ):
+                counts["errors"] += 1
+                stored_type = (existing.get("last_error") or "").split(":", 1)[0].strip()
+                failures.append((item.name, stored_type or "unknown error"))
+                continue
 
             try:
-                if existing is None:
-                    # ── NEW FILE ──────────────────────────────────────────────────────────
+                # ⛔ FIX-12 / D-01 / D-05 (orchestrator ruling 5): a `failed` item is RE-MINTED
+                # through this SAME new-file body — read → mint → bytes → enqueue. It never
+                # reaches the restore/modify/rename `else:` below, which would flip it to
+                # `present` with no document. Re-minting is safe: the minter's dedup legs skip
+                # `failed` rows, so the item ends on exactly one non-failed document. Routing
+                # here (not a third call) keeps watch_service.py at exactly 2 minter call sites,
+                # which `test_280_minter_sequence.py` pins.
+                if existing is None or retry_failed:
+                    # ── NEW FILE (or a retry of a failed one) ────────────────────────────
                     filename, file_bytes, mime_type = await adapter.read_file(conn, item.id)
 
                     metadata = {
@@ -341,7 +436,7 @@ class WatchService:
                         }
                     }
 
-                    mint_res: MintResult = await async_mint_document_row(
+                    mint_res = await async_mint_document_row(
                         raw=file_bytes,
                         filename=filename or item.name,
                         mime_type=mime_type or item.mime_type or "application/octet-stream",
@@ -369,6 +464,8 @@ class WatchService:
                             source_version=str(item.modified_at or ""),
                             document_id=doc_id,
                             state="present",
+                            failed_attempts=0,
+                            minted=_minted_marker(mint_res, existing),
                         )
                     else:
                         # New content: Upload bytes to Supabase storage BEFORE enqueue
@@ -390,6 +487,8 @@ class WatchService:
                             source_version=str(item.modified_at or ""),
                             document_id=doc_id,
                             state="present",
+                            failed_attempts=0,
+                            minted=True,
                         )
                         await insert_ingestion_job(
                             self.pool,
@@ -419,6 +518,16 @@ class WatchService:
                     # Modification check: version/timestamp changed
                     if item_mod and existing_ver and item_mod != existing_ver:
                         filename, file_bytes, mime_type = await adapter.read_file(conn, item.id)
+                        # Orchestrator ruling 8 (SEED-253's "two writers" lesson): the modify
+                        # arm stamps the SAME provenance the new-file arm does.
+                        modify_metadata = {
+                            "source": {
+                                "system": (conn.get("service_id") or "connector").strip().lower(),
+                                "external_id": str(item.id),
+                                "version": item_mod,
+                                "path": item.path,
+                            }
+                        }
                         mint_res = await async_mint_document_row(
                             raw=file_bytes,
                             filename=filename or item.name,
@@ -426,6 +535,7 @@ class WatchService:
                             user_id=user_id,
                             supabase=supabase,
                             folder_id=library_folder_id,
+                            metadata=modify_metadata,
                             org_id=org_id,
                             source_connection_id=conn_id,
                             ingest_visibility=default_ingest_visibility,
@@ -457,6 +567,8 @@ class WatchService:
                             source_version=item_mod,
                             document_id=doc_id,
                             state="present",
+                            failed_attempts=0,
+                            minted=_minted_marker(mint_res, existing),
                         )
                         counts["modified"] += 1
 
@@ -485,12 +597,15 @@ class WatchService:
 
             except Exception as item_err:
                 counts["errors"] += 1
+                err_text = _typed_error(item_err)  # D-04: never '' for an empty message
+                failures.append((getattr(item, "name", "") or "unknown", type(item_err).__name__))
                 logger.error(
                     "Watch %s item %s (%s) sync failed: %s",
-                    watch_id, item.id, getattr(item, "name", ""), item_err, exc_info=True,
+                    watch_id, item.id, getattr(item, "name", ""), err_text, exc_info=True,
                 )
                 try:
-                    target_doc_id = doc_id or (UUID(str(existing["document_id"])) if (existing and existing.get("document_id")) else None)
+                    # The item KEEPS its link (this iteration's doc, else the one it had).
+                    link_doc_id = doc_id or (UUID(str(existing["document_id"])) if (existing and existing.get("document_id")) else None)
                     await upsert_watch_item(
                         self.pool,
                         watch_id=watch_id,
@@ -500,13 +615,19 @@ class WatchService:
                         org_id=UUID(org_id) if org_id else None,
                         path_hint=getattr(item, "drive_id", "") or "",
                         source_version=str(getattr(item, "modified_at", "") or ""),
-                        document_id=target_doc_id,
+                        document_id=link_doc_id,
                         state="failed",
-                        last_error=str(item_err),
+                        last_error=err_text,
+                        failed_attempts=prior_attempts + 1,
                     )
-                    if target_doc_id:
+                    # ⛔ ORCHESTRATOR RULING 4 — mark a document failed ONLY when THIS iteration
+                    # minted it. Before 285 the fallback id was the item's PREVIOUS document, so a
+                    # transient read error on an edited file marked the last good, is_latest copy
+                    # failed and took it out of retrieval over a network blip; and a raising
+                    # upsert in the dedup arm marked a hand upload failed. Neither is ours to fail.
+                    if mint_res is not None and not mint_res.is_duplicate:
                         await run_in_threadpool(
-                            lambda d_id=target_doc_id, err=item_err: supabase.table("documents")
+                            lambda d_id=mint_res.document["id"], err=err_text: supabase.table("documents")
                             .update({
                                 "status": "failed",
                                 "ingestion_step": "failed",
@@ -576,11 +697,16 @@ class WatchService:
         # `count_missing = 0` BY DESIGN rather than by observation. The flag is the only
         # thing that stops that zero being read as "nothing was deleted" — and defaulting it
         # would render a COMPLETE listing as incomplete, which is its own lie.
+        # Phase 285 (D-03, orchestrator ruling 3): files still failed after this tick are named on
+        # the RUN ROW only (`run_error`); the watch row's `last_error` stays NULL on success,
+        # because WatchRowCard's connection pill classifies that string unconditionally.
+        # `counts["errors"]` already equals `len(failures)`. No new status, no new counts key.
         await release_watch(
             self.pool,
             watch_id,
             status="success",
             error=None,
+            run_error=_failure_summary(failures),
             counts=counts,
             listing_complete=listing.complete,
             failure_cause=None,
