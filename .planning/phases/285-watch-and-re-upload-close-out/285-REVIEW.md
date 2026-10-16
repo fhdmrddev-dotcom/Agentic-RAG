@@ -33,7 +33,12 @@ findings:
   warning: 3
   info: 6
   total: 11
-status: issues_found
+status: partially_fixed
+fixes:
+  fixed: 3
+  accepted_or_deferred: 8
+  deferred_halves: [WR-01]
+  fixed_at: 2026-10-16
 ---
 
 # Phase 285: Code Review Report
@@ -41,7 +46,7 @@ status: issues_found
 **Reviewed:** 2026-10-16
 **Depth:** standard (diff against `c8c764e90`)
 **Files Reviewed:** 23
-**Status:** issues_found
+**Status:** partially_fixed (see Fix log)
 
 ## Narrative Findings (AI reviewer)
 
@@ -202,6 +207,106 @@ Either case is backfilled `minted = true`. In the second case, D-08 protects the
 **Issue:** Every assertion is a substring or ordering check on the SQL text, so it cannot detect a wrong predicate that keeps the same tokens. The real behaviour is covered only by `test_285_stuck_pending_live.py` (the heal) and `apply_migration_209.py` (idempotency). Nothing drives the **backfill** predicate against seeded rows.
 
 **Fix:** add a rolled-back live case that seeds the backfill's positive and negative rows (a dedup-linked import, a modified-version document, a document created before the watch) and runs section 1-3 inside a transaction.
+
+## Fix log
+
+Fixed 2026-10-16 on `develop`, base `21c06ebeb`. Scope: CR-01, CR-02 and the marker half of
+WR-01. Everything else is accepted or deferred below, with its reason. Each fix was first driven
+RED by a pin in `backend/tests/unit/services/test_285_watch_retry.py` that failed on the
+unmodified `watch_service.py`. The fix came after that, and the pin was then run green.
+`ingest_splice.py` is byte-unchanged against `c8c764e90`, and `watch_service.py` still has exactly
+2 `mint_document_row(` call sites (`test_280_minter_sequence.py` green).
+
+| Finding | Outcome | Commit(s) | What the RED test showed before the fix |
+|---|---|---|---|
+| CR-01 | **fixed** | RED `399580cca` · fix `9bb8faf9e` | A failed item (minted X, `minted=true`) whose retry dedup-matched hand upload H, with the dedup-arm upsert raising: the error-arm upsert linked H and passed **no** marker (`None` = keep `true`). Same from the modify arm. |
+| CR-02 | **fixed** | RED `4018f97ec` · fix `1b02e58df` | A `failed` item flipped to `unauthorized` by a 401 listing was **not read** on the next good listing (`read_file` awaited 0 times). The restore arm set it `present`. A past-cap one was restored too, and a `missing` row with no document was never read. |
+| WR-01 | **marker half fixed** · orphan half **deferred** | RED `8be87ec04` · fix `9bb8faf9e` | A new item whose mint landed but whose storage upload raised was inserted with no marker, so it defaulted to `minted=false`. |
+| WR-02 | **accepted** | — | — |
+| WR-03 | **accepted** | — | — |
+| IN-01..IN-06 | **accepted / deferred** (see below) | — | — |
+
+**CR-01.** When the minter answered this iteration, the error arm now writes
+`minted=_minted_marker(mint_res, existing)`, which applies the same M-1..M-3 rule as the success
+arms. A fresh mint gives `True`, a duplicate of another document gives `False`, and the item's
+own document gives `None` (keep). The stored value is kept only when no mint answered, because
+only then is the link unchanged. The pin in `test_failed_item_again_failing_increments_attempts`
+that read *"M-4: the error arm never touches the marker"* agreed with the bug. It was amended
+deliberately, with a comment naming CR-01. Its assertion still reads `None`, because the read
+fails before any mint in that test. A control pin holds M-2 in the error arm.
+
+**CR-02.** "Never landed" is now a property of the row. In the loop, an `existing` item in
+`missing` or `unauthorized` whose `failed_attempts > 0`, or which has no `document_id` at all,
+is first put back to `failed`. This uses `update_item_state(state="failed",
+error=<stored last_error>, clear_missing_since=True)` and clears the linked document's
+`source_state`. The write is best-effort: it is wrapped and logged, and the routing does not
+depend on it. The item then takes the **existing** retry path, under the same D-01 cap and reset
+rules: it is retried below the cap, and past the cap it is counted and named in the D-02 run
+summary but not read. A version change still resets the count. `_handle_unauthorized_watch` is
+unchanged (VIS-04 / SEAM 4). A control pin keeps the restore arm for a file that did land
+(attempts 0, with a document). The reviewer's two-sync drive is pinned too: sync 1 is a 401
+listing that flips the item, and sync 2 is a good listing in which the item is read again and
+lands.
+- ⚠ **Residual (accepted):** a **legacy** failed row (`failed_attempts = 0`, from before
+  migration 209) that **has** a `document_id` (a failed doc) and then passes through an auth
+  blip is still restored. Telling it apart needs a read of the document's status. Production
+  has 0 watch items (orchestrator read, 2026-10-16), and every row written since 209 carries the
+  counter, so this cannot arise for new failures.
+- ⚠ **Past-cap naming:** a past-cap item that went through an auth blip is named with the type
+  parsed from the `last_error` that `_handle_unauthorized_watch` overwrote. That type can be the
+  auth error's text rather than the original exception type. It is still counted and named.
+
+**WR-01.** **Fixed (marker half):** this was closed by the CR-01 change. A non-duplicate mint in
+the error arm writes `minted=True`, so a new item whose storage upload or enqueue failed points
+at its own failed document as **minted**, and a purge before the retry reaches it.
+**Deferred (orphan half):** a retry that re-mints Y leaves the earlier failed row X, and
+possibly its bytes, with no item pointing at it. Neither purge door can see X. The fix (delete X
+through `document_purge` once Y lands, when `existing.minted` and X is `failed`) adds a
+destructive call to the sync loop. That needs its own threat-model pass, not a review fix.
+Re-open when a watch's failed-retry count is observed above 0 in production, or when
+`watch_service.sync_watch`'s retry branch is next changed.
+
+**WR-02. Accepted.** 285-RESEARCH §10 assessed an insert that commits but then raises on the
+client as very low probability. It is also self-healing: the worker claims the job and
+`splice_document` overwrites the status through `processing` to `completed`, so no data is lost.
+The worst case is a transient `failed` badge, plus a possible second copy that the completed-hash
+unique index refuses. Re-open if a document is ever observed `failed` by D-12 that also has an
+`ingestion_jobs` row.
+
+**WR-03. Accepted.** The residual (a dedup-linked import, or a second watch's first sight, inside
+the 10-minute window) was measured at **0 rows** locally. Production has **0 watch items**
+(orchestrator read, 2026-10-16), and the backfill is one-shot, so it can never classify a
+production row. Re-open only if migration 209 is applied to an environment that already holds
+watch items.
+
+**Info:**
+- **IN-01: deferred.** The receipt under-reports items unlinked when the DELETE returns fewer
+  rows than requested. That needs a concurrent delete or an RLS-filtered row. Re-open when Door
+  2's receipt is next touched.
+- **IN-02: accepted.** The two-read race needs a sync to change an item's state between two
+  reads in the same purge request. A wrong partition can only keep a document, or delete the
+  item of a document that is being purged anyway. Re-open with IN-01.
+- **IN-03: deferred.** This is a copy change in the API message. Not a defect; the next copy pass
+  on Sources.
+- **IN-04: deferred.** A successful retry of a failed modify is counted as `new`. This is a
+  run-history label only, and the counts are still correct in total. Re-open when run-history
+  counts get a UI.
+- **IN-05: accepted as a deploy-parity note.** Migration 209 must be applied **before** the
+  backend push. This is recorded here for the deploy checklist; there is no code change.
+- **IN-06: deferred.** The backfill predicate is covered only by text-shape pins and the live
+  apply. Production has 0 watch items, so the backfill has nothing to classify there. Re-open
+  with WR-03.
+
+Verification (2026-10-16, after both fixes):
+- **Targeted:** `test_285_watch_retry.py`, `test_watch_service.py`, `test_watch_sync_runs.py`,
+  `test_280_minter_sequence.py` and `test_watches_db.py`: **99 passed**.
+- **Live** (under the local-DB lock): `test_285_watch_retry_live.py`,
+  `test_285_purge_scope_live.py` and `test_280_purge_bytes_live.py`: **11 passed**.
+- **Backend unit gate:** `pytest tests/unit -q --continue-on-collection-errors` gave **71 failed,
+  7749 passed**, 1 skipped, 2 xfailed, 2 xpassed. The failing SET is **identical** to
+  `base_failed.norm.txt`. The one textual difference is a warning path glued to
+  `test_sql_service.py::…::test_calls_query_user_documents_rpc` in the base file. It is the same
+  test.
 
 ---
 
