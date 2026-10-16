@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, timedelta
+from urllib.parse import quote
 
 from supabase import Client
 
@@ -94,7 +95,39 @@ FIND_SELECT = LIBRARY_ROW_COLUMNS + ",version_count,has_earlier"
 #: D-14 / T-284-25 — a relationship allow-list is bounded by ONE document's edges, not by the
 #: library. Above this many edges the search refuses (503) instead of PostgREST cutting the edge
 #: read at max_rows (1,000) and answering short without saying so.
-REL_EDGE_CAP = 500
+#:
+#: 284-REVIEW WR-02 — and it must fit the URL. The endpoints read and the page read's
+#: ``id in.()`` carry the allow-list in the request line, which the gateway caps at 8,192 bytes
+#: (414 "URI too long" → APIError → a 500, not the worded 503). Measured: BUG-261014-06 (cloud)
+#: 182 ids pass, 286 fail; local Kong, a ``select=id`` read, 208 ids (8,172 chars) pass, 209 fail.
+#: The FIND page read also carries ``FIND_SELECT`` and every filter: ~20 KB at 500 ids, ~8.5 KB
+#: (over the bound) at 200, ~4.6 KB at 100 — leaving room for a name, a folder subtree and
+#: dates. ``tests/unit/test_284_rel_edge_cap.py`` pins the built URLs to a 6,144-byte budget.
+REL_EDGE_CAP = 100
+
+#: The follow-to-latest read puts FILE NAMES in the URL (up to 255 chars each, percent-encoded);
+#: it is batched so each batch's ``filename=in.(…)`` stays under this many encoded bytes.
+_NAME_BATCH_URL_BYTES = 3072
+
+
+def _name_batches(names: list[str]) -> list[list[str]]:
+    """``names`` split into batches whose encoded ``in.(…)`` list fits ``_NAME_BATCH_URL_BYTES``.
+
+    A single name is never split (one name is far below the bound), so every batch is non-empty.
+    """
+    batches: list[list[str]] = []
+    cur: list[str] = []
+    size = 0
+    for name in names:
+        cost = len(quote(_pg_in_list([name]), safe="")) + 3  # + the encoded "," between members
+        if cur and size + cost > _NAME_BATCH_URL_BYTES:
+            batches.append(cur)
+            cur, size = [], 0
+        cur.append(name)
+        size += cost
+    if cur:
+        batches.append(cur)
+    return batches
 
 
 def _pg_in_list(values: list[str]) -> str:
@@ -341,19 +374,23 @@ async def _relationship_allow_list(
     latest_ids = {r["id"] for r in rows if r.get("is_latest")}
     older_ids = {r["id"] for r in rows if not r.get("is_latest")}
 
-    # Follow each non-latest endpoint to its lineage's latest row — ONE batched read.
+    # Follow each non-latest endpoint to its lineage's latest row — batched by URL size
+    # (284-REVIEW WR-02: file names ride the URL, so REL_EDGE_CAP long names in one read 414).
     stale = [r for r in rows if not r.get("is_latest") and r.get("user_id") and r.get("filename")]
     if stale:
         wanted = {(r["user_id"], r["filename"]) for r in stale}
-        heads = (
-            await aexec(
-                supabase.table("documents")
-                .select("id,user_id,filename")
-                .in_("user_id", sorted({k[0] for k in wanted}))
-                .filter("filename", "in", _pg_in_list(sorted({k[1] for k in wanted})))
-                .eq("is_latest", True)
-            )
-        ).data or []
+        owners = sorted({k[0] for k in wanted})
+        heads: list[dict] = []
+        for names in _name_batches(sorted({k[1] for k in wanted})):
+            heads += (
+                await aexec(
+                    supabase.table("documents")
+                    .select("id,user_id,filename")
+                    .in_("user_id", owners)
+                    .filter("filename", "in", _pg_in_list(names))
+                    .eq("is_latest", True)
+                )
+            ).data or []
         latest_ids |= {h["id"] for h in heads if (h.get("user_id"), h.get("filename")) in wanted}
 
     latest_ids.discard(p_row["id"])  # P's own lineage latest is never its own match
