@@ -209,7 +209,7 @@ describe("LegalHoldDialog — place a hold (D-05 / D-35)", () => {
 
   it("documents are picked by name as chips, each ✕ labelled 'Remove {doc} from the hold'", async () => {
     const dialog = await openNew()
-    await userEvent.type(within(dialog).getByLabelText("Documents"), "kess")
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Documents" }), "kess")
     await userEvent.click(await within(dialog).findByRole("button", { name: "Kessler Services Agreement.pdf" }))
     const remove = within(dialog).getByRole("button", { name: "Remove Kessler Services Agreement.pdf from the hold" })
     expect(remove).toBeInTheDocument()
@@ -268,7 +268,7 @@ describe("LegalHoldDialog — place a hold (D-05 / D-35)", () => {
     )
     const dialog = await openNew()
     await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalled())
-    await userEvent.type(within(dialog).getByLabelText("Documents"), "kess")
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Documents" }), "kess")
     expect(await within(dialog).findByRole("button", { name: "Kessler Services Agreement.pdf" })).toBeInTheDocument()
     expect(within(dialog).queryByRole("button", { name: "Kessler Other Org Lease.pdf" })).toBeNull()
     expect(m.getDocumentStates).toHaveBeenCalledWith({ document_ids: ["d1", "d2", "d-other"], folder_ids: [] })
@@ -296,7 +296,7 @@ describe("LegalHoldDialog — place a hold (D-05 / D-35)", () => {
     m.getDocumentStates.mockRejectedValue(new Error("down"))
     const dialog = await openNew()
     await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalled())
-    await userEvent.type(within(dialog).getByLabelText("Documents"), "kess")
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Documents" }), "kess")
     expect(within(dialog).queryByRole("button", { name: "Kessler Services Agreement.pdf" })).toBeNull()
     // 284-04 (S13): …and it SAYS so — the old silent catch offered nothing with no reason given.
     expect(await within(dialog).findByText("Couldn’t search documents.")).toBeInTheDocument()
@@ -417,7 +417,7 @@ describe("LegalHoldDialog — server typeahead (284-04)", () => {
   it("typing searches by name; the org check covers only that answer", async () => {
     const dialog = await openNew()
     await waitFor(() => expect(m.getDocumentStates).toHaveBeenCalledTimes(1))
-    await userEvent.type(within(dialog).getByLabelText("Documents"), "olsen")
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Documents" }), "olsen")
     await waitFor(() =>
       expect(m.searchDocuments).toHaveBeenLastCalledWith(expect.objectContaining({ name: "olsen" })),
     )

@@ -43,16 +43,14 @@ import {
   type EditorListState,
 } from "./StructurePopovers"
 
-/** A stable empty default, so an absent `documents` prop is not a new array every render. */
-const NO_DOCUMENTS: readonly Document[] = []
-
 export interface FindQuickAddProps {
   find: FindState
   dispatch: (action: FindAction) => void
   filter: ViewFilter
   onFilterChange: (filter: ViewFilter) => void
-  /** Phase 284-01: only the Relationship editor's candidates read this now (284-04 moves it to
-   *  server search); optional, default empty. */
+  /** UNUSED since Phase 284-04: the Relationship editor searches the server itself (D-15), so
+   *  nothing reads this any more. Kept declared only so LibraryPage (284-03) can stop passing it
+   *  in the same wave without a type error — removed by 284-05. */
   documents?: readonly Document[]
   folders: readonly Folder[]
   /** Phase 284-01 (D-07 / R-03) — the Added by options (`LibrarySummary.connections`). */
@@ -143,7 +141,6 @@ export function FindQuickAdd({
   dispatch,
   filter,
   onFilterChange,
-  documents = NO_DOCUMENTS,
   folders,
   connections,
   documentTypes,
@@ -258,7 +255,6 @@ export function FindQuickAdd({
     editor = (
       <RelationshipEditor
         initial={find.relationship}
-        documents={documents}
         onCancel={cancel}
         onApply={(relationship) => {
           dispatch({ type: "SET_RELATIONSHIP", relationship })

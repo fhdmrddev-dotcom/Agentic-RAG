@@ -153,13 +153,13 @@ function renderDialog(overrides?: Partial<React.ComponentProps<typeof CreateLink
 describe("CreateLinkDialog — candidate exclusion (D-117-4)", () => {
   it("never lists self (sourceDocId) as a candidate", async () => {
     renderDialog()
-    await screen.findByRole("listbox")
+    await screen.findAllByRole("option") // 284-04: the options are the server search's (debounced) answer
     expect(screen.queryByRole("option", { name: /subject\.pdf/i })).not.toBeInTheDocument()
   })
 
   it("excludes a doc already linked OUTGOING with the chosen rel_type", async () => {
     renderDialog()
-    await screen.findByRole("listbox")
+    await screen.findAllByRole("option") // 284-04: the options are the server search's (debounced) answer
     const user = userEvent.setup()
     // Default type is "references" — doc-2 (already-superseded) is NOT excluded yet.
     expect(screen.getByRole("option", { name: /already-superseded\.pdf/i })).toBeInTheDocument()
@@ -175,7 +175,7 @@ describe("CreateLinkDialog — candidate exclusion (D-117-4)", () => {
   it("switching the rel-type RE-OPENS an excluded doc as a candidate (per-type re-derive)", async () => {
     renderDialog()
     const user = userEvent.setup()
-    await screen.findByRole("listbox")
+    await screen.findAllByRole("option") // 284-04: the options are the server search's (debounced) answer
     // Under Supersedes, doc-2 is excluded.
     await user.click(screen.getByRole("button", { name: /^supersedes$/i }))
     await waitFor(() =>
@@ -191,7 +191,7 @@ describe("CreateLinkDialog — candidate exclusion (D-117-4)", () => {
   it("shows the honest per-type exclusion note when docs are hidden for the chosen type", async () => {
     renderDialog()
     const user = userEvent.setup()
-    await screen.findByRole("listbox")
+    await screen.findAllByRole("option") // 284-04: the options are the server search's (debounced) answer
     await user.click(screen.getByRole("button", { name: /^supersedes$/i }))
     expect(await screen.findByText(/already linked with this type/i)).toBeInTheDocument()
   })
@@ -200,7 +200,7 @@ describe("CreateLinkDialog — candidate exclusion (D-117-4)", () => {
 describe("CreateLinkDialog — confirm gating + create", () => {
   it("confirm is disabled until a target is chosen", async () => {
     renderDialog()
-    await screen.findByRole("listbox")
+    await screen.findAllByRole("option") // 284-04: the options are the server search's (debounced) answer
     const confirm = screen.getByRole("button", { name: /add link/i })
     expect(confirm).toBeDisabled()
     const user = userEvent.setup()
@@ -211,7 +211,7 @@ describe("CreateLinkDialog — confirm gating + create", () => {
   it("confirm calls createRelationship(source, target, type) then onCreated", async () => {
     const { onCreated } = renderDialog()
     const user = userEvent.setup()
-    await screen.findByRole("listbox")
+    await screen.findAllByRole("option") // 284-04: the options are the server search's (debounced) answer
     await user.click(screen.getByRole("option", { name: /free\.pdf/i }))
     await user.click(screen.getByRole("button", { name: /add link/i }))
     await waitFor(() =>
@@ -227,7 +227,7 @@ describe("CreateLinkDialog — error line (MoveToFolderDialog shape)", () => {
     createRelationship.mockRejectedValueOnce(new Error("network"))
     const { onCreated } = renderDialog()
     const user = userEvent.setup()
-    await screen.findByRole("listbox")
+    await screen.findAllByRole("option") // 284-04: the options are the server search's (debounced) answer
     await user.click(screen.getByRole("option", { name: /free\.pdf/i }))
     await user.click(screen.getByRole("button", { name: /add link/i }))
     const alert = await screen.findByRole("alert")
@@ -243,7 +243,7 @@ describe("CreateLinkDialog — error line (MoveToFolderDialog shape)", () => {
     createRelationship.mockRejectedValueOnce(new ApiError("Failed to create link", 422))
     const { onCreated } = renderDialog()
     const user = userEvent.setup()
-    await screen.findByRole("listbox")
+    await screen.findAllByRole("option") // 284-04: the options are the server search's (debounced) answer
     await user.click(screen.getByRole("option", { name: /free\.pdf/i }))
     await user.click(screen.getByRole("button", { name: /add link/i }))
     const alert = await screen.findByRole("alert")
