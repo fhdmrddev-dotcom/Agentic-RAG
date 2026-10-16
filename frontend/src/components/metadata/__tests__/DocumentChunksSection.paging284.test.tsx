@@ -9,7 +9,7 @@
  * ⛔ `IntersectionObserver` is stubbed FILE-LOCALLY and its callback is fired by hand — never in
  * `setupTests.ts` (the `mockReactFlow.ts` rule: a global stub would reach every suite).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest"
 import { act, render, screen, within } from "@testing-library/react"
 import type { DocumentChunkPage, DocumentChunkRow } from "@/types"
 
@@ -29,13 +29,13 @@ interface FakeObserver {
   callback: IntersectionObserverCallback
   options: IntersectionObserverInit | undefined
   targets: Element[]
-  disconnect: ReturnType<typeof vi.fn>
+  disconnect: Mock<() => void>
 }
 let observers: FakeObserver[] = []
 class StubIntersectionObserver {
   readonly record: FakeObserver
   constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
-    this.record = { callback, options, targets: [], disconnect: vi.fn() }
+    this.record = { callback, options, targets: [], disconnect: vi.fn<() => void>() }
     observers.push(this.record)
   }
   observe(el: Element) {
