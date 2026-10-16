@@ -229,7 +229,7 @@ def test_the_zero_result_keys_are_unchanged():
 async def test_a_relationship_above_the_edge_cap_fails_loud(patched):
     from app.services.document_search_service import REL_EDGE_CAP, SearchTruncatedError
 
-    assert REL_EDGE_CAP == 500
+    assert REL_EDGE_CAP == 100  # 284-REVIEW WR-02: below the measured 8 KB request-line bound
     hub = "eeeeeeee-0000-4000-8000-000000000000"
     sources = [f"eeeeeeee-0000-4000-8000-{i:012d}" for i in range(1, REL_EDGE_CAP + 2)]
     documents = [doc(hub, filename="hub.pdf")] + [doc(s, filename=f"{s}.pdf") for s in sources]
