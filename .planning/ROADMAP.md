@@ -29,14 +29,14 @@
 - ✅ **v4.3 What You Can Actually Sell** — Phases **255-264** (shipped 2026-09-23, git tag `v4.3`). 10 phases (255-260 scoped; 261-264 added in-milestone), **39 plans**, migrations **182-192**, 6 days. **31/32 requirements delivered · PACK-05 carried to SEED-304 by decision.** Extension contract, token metering + USD, enforceable tiers, Experts as data.
 - ✅ **v4.4 Experts That Actually Work** — Phases **265-269** (shipped 2026-09-29, git tag `v4.4`). 5 phases, **24 plans**, migrations **194-198**, 7 days. **17/17 requirements satisfied** (audit `tech_debt`, no blockers). A client installs an Expert and gets grounded answers from its own knowledge in their own org — proven by live drives as a real user, never by a mocked test. ✅ **DEPLOYED 2026-09-29** — production `82babd8d0`; migrations 195-198 applied to production (194 already was). Operator smoke test owed.
 - ✅ **v4.5 Find It, Show It** — Phases **270-276** (shipped 2026-10-12, git tag `v4.5`). 7 phases, **38 plans**, migrations **199-206**, 14 days. **25/25 requirements satisfied** (audit `tech_debt`, no blockers). Find a document by what it IS and get the file back out, an agent that answers with interactive artifacts from a closed registry, thread-scoped attachments, retention with legal hold, and public docs. ✅ 270-274 + 276 **LIVE 2026-10-05** (prod `bd9e126c3`); ✅ **275 deployed 2026-10-12** (prod `784647e2d`, migrations 204-206).
-- 🚧 **v4.6 Pay It Down** — Phases 277-284 (started 2026-10-12; 284 added 2026-10-14). Repair only: 11 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extractions, 2 register-hygiene items (21 requirements).
+- 🚧 **v4.6 Pay It Down** — Phases 277-285 (started 2026-10-12; 284 added 2026-10-14; 285 added 2026-10-16). Repair only: 14 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extractions, 2 register-hygiene items (24 requirements).
 
 ---
 
 ## v4.6 Pay It Down — 🚧 IN PROGRESS
 
 **Started:** 2026-10-12. **Roadmap created:** 2026-10-12.
-Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **20 v4.6 requirements, 20 mapped, 0 orphans.**
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **24 v4.6 requirements, 24 mapped, 0 orphans** (was 20 at roadmap creation; FIX-11 added 2026-10-14 with 284; FIX-12..14 added 2026-10-16 with 285 at the milestone audit).
 ⚠ The intake summary said *"19"*; the categories add to **20** (10 FIX + 5 DEBT + 3 SEAM + 2 REG), counted from `REQUIREMENTS.md`.
 
 **Goal:** Every open **major** bug fixed and the v4.5 tech debt cleared. **Repair only — no new user capability.**
@@ -88,6 +88,7 @@ capability", applied milestone-wide).
 | 282 | The Slow Run and the Paused Run | A slow model gets the timeout the operator set, and a paused run asks its question in one place with one draft | FIX-06, FIX-07 | 5 | **G-2 sketch** (FIX-07) · **G-4** · **SC#10 four-axis UAT, full 8-row roster** · G-5 (`openai_service.py`, `MessageList.tsx`, `PendingAskCard.tsx`, `WorkspacePanel.tsx`, `streamsStore.ts`) · UI hint |
 | 283 | Every Member Reaches Their Own Settings | An ordinary member reaches their own settings, and a large document's detail panel stays navigable | FIX-01, FIX-08 | 4 | ⛔ **G-5: `SettingsPage.tsx` tab seam OWED — taken first** · **G-4** · security_enforcement (two-role fence) · G-2 skip recorded unless discuss opens a new door · UI hint |
 | 284 | Library at Scale | The Library, Find and every picker stay correct and fast at tens of thousands of documents: server pages, server counts, no growing id lists | FIX-11 | 7 | ⛔ **G-5: `LibraryPage.tsx` extraction OWED — taken first** · **measure first** (10k/50k seeded) · migration **207** only if needed · security_enforcement (INVOKER, revoke PUBLIC) · **G-4** · G-5 (`documents.py`, `document_search_service.py`, `DocumentList.tsx`) · UI hint |
+| 285 | Watch and Re-upload Close Out | A watched file that fails once is fetched again, purging a watch removes only what it brought in, and a document whose ingest never started can be uploaded again | FIX-12, FIX-13, FIX-14 | 5 | added 2026-10-16 at the v4.6 audit (operator option B) · **security_enforcement** (purge is destructive: data loss of a hand upload) · G-5 FIRES (`ingest_splice.py`, `documents.py`, `sources.py`) — read their ledger sections first · migration only if needed (next free after **208**) · live OneDrive re-drive (⛔ if no credential) · no UI hint |
 
 **Dependency order:** 277 → 278 → 279 → 280 → 281 → 282 → 283. The real constraints are narrower,
 and are stated so a phase can run early when its files are free:
@@ -136,6 +137,7 @@ and are stated so a phase can run early when its files are free:
 - [x] **Phase 282: The Slow Run and the Paused Run**: per-model timeout reaches the provider call with deliberate retries; one `ask_user` input with one draft (FIX-06, FIX-07)
 - [x] **Phase 283: Every Member Reaches Their Own Settings**: Settings reachable by members with operator tabs hidden and refused; bounded Chunks section (FIX-01, FIX-08) — completed 2026-10-16
 - [x] **Phase 284: Library at Scale**: the Library, Find and every picker page and count on the server (envelope `GET /documents`, `GET /library/summary`, Find in SQL, pickers on `POST /document-search`), migrations 207 (visible-set view) + 208 (page index), guards driven RED, G-4 A-F at 10k/50k (FIX-11) — completed 2026-10-16
+- [ ] **Phase 285: Watch and Re-upload Close Out**: a failed watch download is retried and stays visible until it lands; a purge deletes only documents the watch minted; a stuck `pending` row never absorbs same-bytes re-uploads (FIX-12, FIX-13, FIX-14)
 
 ### Phase Details
 
@@ -375,6 +377,27 @@ Plans:
 **Flags**: ⛔ **G-5: `frontend/src/pages/LibraryPage.tsx` FIRES and its extraction is OWED — taken first.** Also FIRING: `backend/app/api/documents.py`, `backend/app/services/document_search_service.py`, `frontend/src/components/ingestion/DocumentList.tsx`, `frontend/src/lib/api/documents.ts`, `frontend/src/types/index.ts`; `frontend/src/hooks/useDocuments.ts` and `DocumentsPager.tsx` read their ledger sections first. **security_enforcement**: any new SQL function is `SECURITY INVOKER`, revoked from `PUBLIC`, and proven as `authenticated`, never through the service role. **measure first**: record today's figures at 10k/50k before changing anything. Supabase Realtime stays a hint: a document-change event refetches the current page, never patches a full in-memory list. **G-2**: the pager exists (`DocumentsPager`), so the sketch skip is recorded unless discuss changes the Library layout. Cross-check `BUG-261014-06` / `-07` at discuss.
 **UI hint**: yes
 
+#### Phase 285: Watch and Re-upload Close Out
+
+**Goal**: The three major bugs found during Phase 280 are closed: a watched file whose download fails once is fetched again on a later sync, purging a watch's documents removes only what that watch brought in, and a document whose ingest never started does not swallow every later upload of the same bytes.
+**Depends on**: Phase 284 (it last edited `documents.py`). Added 2026-10-16 at the v4.6 milestone audit (operator chose option B: close the open majors before closing the milestone). Source: `BUG-261014-02` (280 live re-drive, 104/105), `BUG-261014-03` (280 review WR-03), `BUG-261014-04` (280 review WR-04).
+**Requirements**: FIX-12, FIX-13, FIX-14
+**Success Criteria** (what must be TRUE):
+
+  1. A watch item left `failed` by a transient download error is read again on the next sync and imported. Until it lands, the run row shows the failure with the exception type and the file name, never `count_errors = 0` with `last_error = NULL` (FIX-12).
+  2. Both purge doors (`DELETE /sources/watches/{id}?purge_documents=true` and `POST /sources/watches/{id}/purge`) delete only documents the watch minted. A hand upload the watch only dedup-linked to survives the purge with its row AND its stored bytes. This is driven RED first against today's code (FIX-13).
+  3. When both enqueue paths fail, the upload does not leave a `pending` row with no ingestion job that the minter then treats as in flight. A later upload of the same bytes, in any folder, gets ingested. This is driven RED first against today's code (FIX-14).
+  4. The Phase 280 guarantees still hold: a same-bytes upload while the first copy is genuinely in flight still yields exactly one copy and no 409 (FIX-02), and purge still removes bytes (DEBT-10). The 280 suites stay green on the merged tree.
+  5. A live re-drive of the OneDrive watch reaches **105/105** after one forced transient failure, or is recorded ⛔ with the reason if no credential is available (FIX-12).
+
+**How we'd know this failed**: the retry runs forever on a file that will never download, and every sync re-reads it with no cap and no visible state; a purge still deletes a hand upload because the "minted by this watch" test reads `source_connection_id` but a dedup link copied it; the stuck-row fix marks a row `failed` that a live worker was about to process (a race with the enqueue); the in-flight leg is loosened so far that FIX-02's same-bytes guarantee comes back broken; or the fix lands with only a mocked test and no driven defect.
+**Plans**: TBD (G-8 target 2-3)
+
+Plans:
+- [ ] TBD (run /gsd:discuss-phase 285, then /gsd:plan-phase 285)
+**Flags**: added at the milestone audit · **security_enforcement** (destructive purge path) · ⛔ G-5: `backend/app/services/ingest_splice.py`, `backend/app/api/documents.py` and `backend/app/api/sources.py` FIRE, so read their ledger sections before planning; `watch_service.py` and `db/ingestion_jobs.py` need a ledger presence check · **measure first**: re-read each bug's cited lines against HEAD before fixing · migration only if needed (next free after **208**, run `ls` first) · repair only: no new user capability, and no retry *policy UI* · cross-check `BUG-261014-05` (minor, `remove_document_bytes` counts) at discuss as a fold candidate.
+**UI hint**: no
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -387,6 +410,7 @@ Plans:
 | 282. The Slow Run and the Paused Run | 4/4 | Complete (verified 5/5, self-verified; review CR-01 + WR-02..05 fixed, WR-01 partial; owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through, SC#10 rows 2/8 on credit) | 2026-10-15 |
 | 283. Every Member Reaches Their Own Settings | 3/3 | Complete (verified 4/4 SCs; review CR-01 + WR-01/02 + 4 info fixed, IN-04/IN-06 skipped by decision; G-4 driven live, Tab row confirmed by operator) | 2026-10-16 |
 | 284. Library at Scale | 6/6 | Complete (verified 7/7 SCs, self-verified; review R1 CR-01 + WR-01/02/04 + IN-05/07 and R2 WR-R2-01..05 fixed test-first, WR-03 accepted; G-4 A-F driven live, A/B re-driven on 208; migrations 207 + 208 LOCAL only — production apply owed) | 2026-10-16 |
+| 285. Watch and Re-upload Close Out | 0/0 | Not started | - |
 
 ---
 
