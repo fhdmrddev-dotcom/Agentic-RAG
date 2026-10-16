@@ -4,10 +4,10 @@ title: A permanently stuck pending document absorbs every re-upload of the same 
 reported: 2026-10-14
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/ingestion, backend/upload, backend/watch-sync]
-folded_into: null
-verified_closed_by: null
+folded_into: "285"
+verified_closed_by: "285 (521bf6491 — 285-LIVE-EVIDENCE.md SC#3 + D-14 heal)"
 related_seeds: []
 re_open_trigger: "The next phase whose files_modified names backend/app/api/documents.py's upload_document, backend/app/services/ingest_splice.py, or backend/app/db/ingestion_jobs.py, OR the first observed document stuck in 'pending' with no ingestion_jobs row (SELECT d.id FROM documents d LEFT JOIN ingestion_jobs j ON j.document_id = d.id WHERE d.status = 'pending' AND j.id IS NULL AND d.created_at < now() - interval '1 hour' returns any row)."
 reproduces_on:
@@ -74,3 +74,9 @@ and upload again.
 - `.planning/phases/280-in-once-out-clean/280-REVIEW.md` → WR-04 and its Fix log entry
 - `backend/app/api/documents.py` (`upload_document`, the enqueue block and the duplicate arm)
 - `backend/app/services/ingest_splice.py` (`mint_document_row`, step 3b, the in-flight leg)
+
+## Closed 2026-10-16 (Phase 285)
+
+Closed by Phase 285 plan 03 (`521bf6491`, FIX-14 / D-12). When both enqueue paths fail and the ingest worker is enabled, `/documents/upload` marks the document `failed` (guarded on `status='pending'`) and answers 201 `status: failed`, so it can no longer absorb a later same-bytes upload. The minter's in-flight leg is byte-unchanged (FIX-02). Migration 209's heal enqueues an existing >1 h stuck row whose bytes exist, and marks one with no bytes failed.
+
+Verified live, RED first. Before the fix: upload 1 `status='pending'`, 0 jobs, and the folder-B upload `already_in_library=True`. After: upload 1 `status='failed'`, then the folder-B upload got a new id with 1 job. The heal was run live in a rolled-back transaction. Evidence: `.planning/phases/285-watch-and-re-upload-close-out/285-LIVE-EVIDENCE.md` § SC#3, § D-14.

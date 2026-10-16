@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-077
 title: Durable ingestion job queue + throughput at scale (in-process BackgroundTask has no queue/cap/retry/resume)
-status: planted
+status: deferred
+status_note: "Reviewed at /gsd:discuss-phase 285 (2026-10-16) and deferred: 285 is repair-only (FIX-12, FIX-13, FIX-14); see 285-CONTEXT.md deferred section."
 planted: 2026-06-10
 phase_origin: "Phase 101 plan-phase — future-milestone alignment sweep 2026-06-10 (workflow wf_13ed5033)"
 category: scale / performance (ingestion) — a durability + admission-control seam on the document-ingestion pipeline, NOT a new feature

@@ -171,7 +171,7 @@ def test_purge_missing_door_removes_bytes_after_the_rows_and_before_the_items(mo
     order = [e[0] if e[0] in ("guard", "pool") else f"{e[0]}.{e[1]}" for e in log]
     assert order == ["guard", "documents.delete", "storage.remove", "pool"]
     assert [e[1] for e in log if e[0] == "guard"] == ["watch_purge"]
-    assert resp.purged_count == 2  # D-12: purged_count stays len(doc_ids) — behaviour preserved
+    assert resp.purged_count == 2  # D-09 (285): purged_count == len(rows the DELETE returned)
 
 
 def test_a_held_purge_door_keeps_every_byte(monkeypatch):

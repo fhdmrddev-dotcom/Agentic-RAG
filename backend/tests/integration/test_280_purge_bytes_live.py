@@ -95,7 +95,9 @@ class Subject:
         assert await _object_count(self.pool, path) == 1, f"the upload of {path} did not land"
         return {"id": str(doc["id"]), "path": path}
 
-    async def watch_with(self, docs: list[dict], *, state: str = "present") -> str:
+    async def watch_with(self, docs: list[dict], *, state: str = "present", minted: bool = True) -> str:
+        # FIX-13 (285), amended deliberately: these are the watch's OWN documents, so their items
+        # carry minted = true — the purge doors now delete only what the watch minted (D-06).
         watch_id = uuid4()
         await self.pool.execute(
             "INSERT INTO public.connector_watches (id, org_id, user_id, connection_id, "
@@ -107,9 +109,9 @@ class Subject:
         for i, d in enumerate(docs):
             await self.pool.execute(
                 "INSERT INTO public.connector_watch_items (org_id, watch_id, user_id, external_id, "
-                "name, document_id, state) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                "name, document_id, state, minted) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
                 UUID(self.org), watch_id, UUID(self.uid), f"ext-{i}-{uuid4().hex[:6]}",
-                f"item-{i}", UUID(d["id"]), state,
+                f"item-{i}", UUID(d["id"]), state, minted,
             )
         return str(watch_id)
 

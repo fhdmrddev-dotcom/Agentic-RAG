@@ -20,6 +20,7 @@ import {
 } from "@/lib/api/takeoff"
 import type { Document } from "@/types"
 import { cn } from "@/lib/utils"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 /** 284-04 (S14): the rate-sheet page — the 50 most recent spreadsheets. */
 const RATE_SHEET_PAGE = 50
@@ -224,10 +225,11 @@ export function TakeoffSection({ doc, onTotalChange, onRefresh }: TakeoffSection
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8 text-panel-muted-foreground text-xs gap-2">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Reading CAD geometry and block counts...
-      </div>
+      <SyrelLoader
+        size="panel"
+        label="Reading CAD geometry and block counts..."
+        className="py-8 text-panel-muted-foreground text-xs"
+      />
     )
   }
 

@@ -1783,6 +1783,9 @@ CREATE TABLE public.connector_watch_items (
     last_error text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    failed_attempts integer DEFAULT 0 NOT NULL,
+    minted boolean DEFAULT false NOT NULL,
+    CONSTRAINT connector_watch_items_failed_attempts_nonneg CHECK ((failed_attempts >= 0)),
     CONSTRAINT connector_watch_items_state_check CHECK ((state = ANY (ARRAY['present'::text, 'missing'::text, 'unauthorized'::text, 'skipped_type'::text, 'skipped_size'::text, 'failed'::text])))
 );
 
@@ -1820,6 +1823,20 @@ COMMENT ON COLUMN public.connector_watch_items.state IS 'Lifecycle state: presen
 --
 
 COMMENT ON COLUMN public.connector_watch_items.missing_since IS 'Timestamp when this item was first detected missing from a complete source listing (H-5).';
+
+
+--
+-- Name: COLUMN connector_watch_items.failed_attempts; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watch_items.failed_attempts IS 'Phase 285 (FIX-12): consecutive failed reads of this item. Reset to 0 on success or a source version change; reads stop at 3 while state stays failed.';
+
+
+--
+-- Name: COLUMN connector_watch_items.minted; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watch_items.minted IS 'Phase 285 (FIX-13): true only when THIS watch minted document_id (minter is_duplicate=false). Purge deletes minted, unshared documents only. Default false = kept.';
 
 
 --

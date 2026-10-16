@@ -3,7 +3,8 @@ seed_id: SEED-261
 title: An attachment that fails to ingest is invisible to every watch surface — it is in no run's count_errors and is not a watch item, so the only record is a JSON field inside its parent document
 created: 2026-09-09
 planted_during: Phase 240 (SRC-05), during UAT row M-2 — found by driving the operator's real Gmail watch
-status: planted
+status: deferred
+status_note: "Reviewed at /gsd:discuss-phase 285 (2026-10-16) and deferred: 285 is repair-only (FIX-12, FIX-13, FIX-14); see 285-CONTEXT.md deferred section."
 priority: medium
 surface: Agentic-RAG
 relates_to:

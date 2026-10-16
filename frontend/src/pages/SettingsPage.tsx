@@ -70,6 +70,7 @@ import {
   searchPayloadFrom,
   searchBodyFor,
 } from "./settingsSearchPayload"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 /**
  * `selfHosted` marks a provider whose ENDPOINT belongs to the operator rather than a vendor.
@@ -840,9 +841,7 @@ export function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
-      </div>
+      <SyrelLoader size="page" />
     )
   }
 

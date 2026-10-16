@@ -469,8 +469,23 @@ def _patch_watch(monkeypatch, log, *, items=None):
     async def _get_watch(pool, watch_id, user_id=None):
         return {"id": UUID(WATCH), "user_id": UUID(USER)}
 
+    watch_items = items if items is not None else [{"document_id": DOC}, {"document_id": SIB}]
+
     async def _get_watch_items(pool, watch_id):
-        return items if items is not None else [{"document_id": DOC}, {"document_id": SIB}]
+        return watch_items
+
+    async def _watch_purge_scope(pool, watch_id, *, user_id, states):
+        # FIX-13 / D-09 (285), amended deliberately: both doors now take their set from
+        # watch_purge_scope. Derived from the SAME fake items (door 1: the watch's items; door 2:
+        # the pool's missing items), every one minted and unshared, so these pins are unchanged.
+        from app.db.watches import WatchPurgeScope
+
+        rows = watch_items if states is None else pool.con.items
+        return WatchPurgeScope(
+            item_ids=[r["id"] for r in rows if "id" in r],
+            purge_doc_ids=[str(r["document_id"]) for r in rows if r.get("document_id")],
+            kept_doc_ids=[],
+        )
 
     async def _delete_watch(pool, watch_id, user_id=None):
         log.append(("watch", "delete", str(watch_id)))
@@ -478,6 +493,7 @@ def _patch_watch(monkeypatch, log, *, items=None):
 
     monkeypatch.setattr(sources, "get_watch", _get_watch)
     monkeypatch.setattr(sources, "get_watch_items", _get_watch_items)
+    monkeypatch.setattr(sources, "watch_purge_scope", _watch_purge_scope)
     monkeypatch.setattr(sources, "delete_watch", _delete_watch)
 
 

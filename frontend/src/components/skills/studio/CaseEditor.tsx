@@ -17,7 +17,7 @@
 // can never clobber the new skill's list.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react"
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react"
+import { Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -28,6 +28,7 @@ import {
   deleteTestCase,
 } from "@/lib/api"
 import type { TestCase } from "@/types"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 interface Props {
   skillId: string
@@ -142,9 +143,7 @@ export function CaseEditor({ skillId, onCasesChanged }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" /> Loading test cases…
-      </div>
+      <SyrelLoader size="section" label="Loading test cases…" className="text-xs text-muted-foreground" />
     )
   }
 

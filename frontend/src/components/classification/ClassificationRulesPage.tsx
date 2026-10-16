@@ -28,6 +28,7 @@ import { RuleBuilderPanel } from "./RuleBuilderPanel"
 import { listRules, listFolders, listMetadataFields } from "@/lib/api"
 import type { ClassificationRule, Folder, MetadataFieldDef } from "@/types"
 import { cn } from "@/lib/utils"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 type LoadState = "loading" | "ready" | "error"
 
@@ -168,14 +169,7 @@ export function ClassificationRulesPage({ onBack }: { onBack?: () => void } = {}
         {/* Rules list column. */}
         <div className="min-w-0 overflow-y-auto rounded-xl bg-card/50 ghost-border p-4">
           {state === "loading" && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="flex items-center gap-2 py-8 text-sm text-muted-foreground"
-            >
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              Loading rules…
-            </div>
+            <SyrelLoader size="panel" label="Loading rules…" className="py-8 text-sm text-muted-foreground" />
           )}
 
           {state === "error" && (

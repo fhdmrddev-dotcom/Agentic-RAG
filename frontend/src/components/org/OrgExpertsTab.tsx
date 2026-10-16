@@ -18,6 +18,7 @@ import { deleteExpert, listExperts, updateExpert } from "@/lib/api/experts"
 import { ExpertAuthoringStudio } from "@/components/experts/ExpertAuthoringStudio"
 import { ExpertIcon } from "@/components/experts/expertIcon"
 import { cn } from "@/lib/utils"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
 // Phase 262 (D-262-06): `ICON_MAP` + `renderExpertIcon` MOVED VERBATIM to
 // `@/components/experts/expertIcon`. This was the only correct reader of the `icon` column in
@@ -167,10 +168,7 @@ export function OrgExpertsTab() {
 
       {/* List / Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-xs text-muted-foreground">
-          <Sparkles className="h-4 w-4 animate-spin mr-2 text-primary" />
-          Loading organization experts...
-        </div>
+        <SyrelLoader size="panel" label="Loading organization experts..." className="py-16 text-xs text-muted-foreground" />
       ) : filteredExperts.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/80 p-12 text-center">
           <Sparkles className="mx-auto h-8 w-8 text-muted-foreground/60" />

@@ -4,10 +4,10 @@ title: A watched file whose download fails once is never retried, and the next s
 reported: 2026-10-14
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/connectors, backend/ingestion]
-folded_into: null
-verified_closed_by: null
+folded_into: "285"
+verified_closed_by: "285 (9e9af4a1e — 285-LIVE-EVIDENCE.md SC#1 + SC#5, 105/105 live 2026-10-16)"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -86,3 +86,9 @@ reads it. Or delete the watch item row so the next sync treats the file as new.
   `0aa5c6ac-062a-4ff6-9a63-4acfed09a5d6`, both run rows, item row).
 - Drive logs kept outside the repo: `C:/Users/fhdmr/AppData/Local/Temp/agentic-rag-280/drive_onedrive.log`,
   `resync_a.log`.
+
+## Closed 2026-10-16 (Phase 285)
+
+Closed by Phase 285 plan 01 (`9e9af4a1e`, FIX-12): a `failed` watch item is read again on later syncs (cap 3, reset on a source version change), its `last_error` keeps the exception type, and the run row names every still-failed file while `connector_watches.last_error` stays NULL.
+
+Verified live twice. **SC#1:** `test_285_watch_retry_live.py`, RED first, then green. **SC#5:** the real OneDrive re-drive of watch A on 2026-10-16, with the operator's explicit OK ("option-a"). `team-note-058.txt` was retried and landed, `completed`, so A 95 + B 10 = **105 / 105**. A forced empty-message `httpx.ConnectError` on a temporary watch first read `state='failed'`, `failed_attempts 1`, `last_error 'ConnectError'`, with the run row `'1 file failed: q3-plan-01.txt (ConnectError)'`, and landed on the next sync. Evidence: `.planning/phases/285-watch-and-re-upload-close-out/285-LIVE-EVIDENCE.md` § SC#1, § SC#5.
