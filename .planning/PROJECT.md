@@ -10,25 +10,27 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: v4.6 Pay It Down
+## Last Shipped: v4.6 Pay It Down (2026-10-16)
 
-**Started:** 2026-10-12 · phases resume at **277**, migrations at **207**.
+**Started:** 2026-10-12 · **Shipped:** 2026-10-16, git tag `v4.6` · 9 phases (277-285), 34 plans,
+migrations 207-209, 5 days. **24 / 24 requirements satisfied.** Integration 9/9. Audit `tech_debt`, no blockers.
+Deployed to production 2026-10-16 (`4e767a3a2`).
 
-**Goal:** Every open **major** bug fixed and the v4.5 tech debt cleared — repair only, no new user capability.
+Repair only, no new user capability. Every open major bug named at intake was fixed, and the v4.5 debt
+was cleared: members reach their own Settings (283); same-bytes uploads, the Graph adapter and watch
+purge behave honestly (280, 285); refusals name their cause (281); a per-model timeout reaches the
+provider and a pause shows one input (282); the Library, Find and pickers stay correct and fast at tens
+of thousands of documents (284); CLAUDE.md is back under its size band and three hot files were split
+along their named seams (277-279). Closed core unchanged: 7 phase types / 1 emitter / 30 tools.
 
-**Target features:**
-- **Major bugs (8):** BUG-261004-02 (Settings unreachable for ordinary users) · BUG-261005-01 (minter retires a still-indexing same-bytes copy) · OneDrive/Graph adapter (silent page-1 truncation, search-URL injection, unmatchable folder paths) · BUG-260916-01 (timeout > 600 s silently ineffective) · BUG-260918-01 (`ask_user` renders two disagreeing answer cards) · BUG-260908-01 (unbounded Chunks section) · BUG-260730-02 + BUG-260815-06 (emit/gauntlet refusals name the wrong or no cause), folded with SEED-221.
-- **v4.5 audit debt:** W-1 (`harness/freshness.py` counts archived docs) · W-2 (artifact rows outlive retention disposition — record a decision) · W-3 (filter vocabulary restated twice) · W-5 (BUG-261012-01 watch purge leaves storage bytes; BUG-261012-02 non-owned delete 500s). W-4 is already fixed.
-- **Owed G-5 extractions:** `expert_scope.py` (+ SEED-328) · `retrieval_service.py` (SEED-224) · `tool_dispatcher.py` registry split (OV-273-02).
-- **Register hygiene:** the CLAUDE.md split (past the 120k warn band) and the v4.5 bookkeeping drift.
+**Owed (operator):** Coolify rebuild confirmation and a logged-in production smoke; 282 G4-4 / G4-6 / A1;
+281 G-4 rows A, C, D. Medium/minor bugs not named in the requirements stay open in `.planning/reported-bugs/`.
 
-**Out of scope (decided at intake):** the owed operator UAT/sign-offs (stay in STATE.md "Owed") · any new capability · SEED-354 · Open Platform (SEED-013).
-
-**Progress (2026-10-15):** 277-281 complete (5 of 8 phases). 281 closed with G-4 rows A, C, D owed by operator decision; an all-archived freshness scope passes like an empty one (WR-02, kept by design). Phase 284 Library at Scale (FIX-11) added 2026-10-14. Next: 282. 277-279 live; 280-281 not pushed.
+**Next milestone:** not started. Run `/gsd:new-milestone` (sweep `node scripts/check-seeds-register.cjs` first).
 
 ---
 
-## Last Shipped: v4.5 Find It, Show It (2026-10-12)
+## Previously Shipped: v4.5 Find It, Show It (2026-10-12)
 
 **Started:** 2026-09-29 · **Shipped:** 2026-10-12, git tag `v4.5` · 7 phases (270-276), 38 plans,
 migrations 199-206, 14 days. **25 / 25 requirements satisfied.** Integration 8/8, flows 3/3. Audit `tech_debt`.
@@ -1468,3 +1470,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-15 — Phase 281 closed (5 of 8 v4.6 phases complete). Previously: 2026-10-12 — **milestone v4.6 Pay It Down STARTED** (8 major bugs + v4.5 tech debt + three G-5 extractions; phases from 277, migrations from 207).*
 
 *Last updated: 2026-10-12 — **Phase 277 complete** (REG-04, REG-05 → Validated): CLAUDE.md split by function 121,650 → 89,171 chars, nothing lost (mechanical proof), FIRING-table cell cap bound at 80; v4.5 archive repaired by hand. Verification passed 4/4; review 0 critical / 8 warning (guard hardening, untriaged).*
+
+*Last updated: 2026-10-18 — **milestone v4.6 Pay It Down CLOSED** (tag `v4.6`, 24/24, deployed `4e767a3a2`). Previously: 2026-10-15 — Phase 281 closed.*

@@ -1098,6 +1098,37 @@ code review, **254** was the review phase.
 
 ---
 
+## Milestone: v4.6 — Pay It Down
+
+**Shipped:** 2026-10-16
+**Phases:** 9 | **Plans:** 34
+
+### What Was Built
+Repair-only milestone: 14 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extractions, 2 register-hygiene items (see MILESTONES.md).
+
+### What Worked
+- Every fix proven by driving the defect RED first on the path the bug report named; live re-drives found bugs 13 green tests missed.
+- The milestone audit caught that "every open major fixed" was false (three majors filed during 280), and Phase 285 closed them before the close.
+- Review fixed test-first and merged per phase; backend gate held at the 71-failed ceiling throughout.
+
+### What Was Inefficient
+- The requirements count drifted (20 → 21 → 24) and the REQUIREMENTS coverage line and ROADMAP header were not revised each time.
+- Hot-file ledger triples for review-fix files were not re-derived (presence gate green only).
+- Six stale checkboxes and missing SUMMARY requirement fields had to be repaired at audit.
+
+### Patterns Established
+- Close by hand (no `milestone.complete` / `state.*` verbs); archive roadmap, requirements, audit, STATE and phases under `milestones/v4.6-*`.
+- Production order for migrations: paste migration, then advisors, then backend, then frontend.
+
+### Key Lessons
+- Audit before close, and let the audit add a phase rather than accept a false goal statement.
+- Poll Vercel through the operator's Chrome, never curl (bot checkpoint).
+
+### Cost Observations
+- Not measured this milestone.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -1129,6 +1160,7 @@ code review, **254** was the review phase.
 | v4.3 What You Can Actually Sell | 10 | 39 | 3.9 | 6 days |
 | v4.4 Experts That Actually Work | 5 | 24 | 4.8 | 7 days |
 | v4.5 Find It, Show It | 7 | 38 | 5.4 | 14 days |
+| v4.6 Pay It Down | 9 | 34 | 3.8 | 5 days |
 
 > ⚠ The v3.4 and v3.5 rows were **missing** from this table and were added at the v3.6 close —
 > both milestones shipped without a trends row. **v3.6 is the project's largest milestone by plan
