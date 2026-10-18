@@ -62,8 +62,11 @@ import { baseName, byNewestFirst } from "@/components/files/fileRowUtils"
 // chat run line consumes the shipped one instead of becoming a fourth copy. See the
 // docblock where it used to live (search `fmtElapsed NO LONGER LIVES HERE`).
 import { fmtElapsed } from "@/lib/fmtElapsed"
-import { downloadWorkspaceFile, getWorkflowRun, type WorkflowRunRead } from "@/lib/api"
-import { ApiError } from "@/lib/api"
+import { downloadWorkspaceFile } from "@/lib/api"
+// Phase 286-03 (D-09) — the run read and its 5 s beat live in one hook file now. The
+// read client and its error class moved there with them, imported under the same
+// `@/lib/api` specifier this page used.
+import { useWorkflowRun, useWorkflowRunPoll } from "@/hooks/useWorkflowRun"
 import {
   canvasReading,
   phaseStatusFromDb,
@@ -416,19 +419,19 @@ function readBand(status: string, claimedAt: string | null, failedStepTitle: str
  *  and announcing each renders the surface unusable for a screen-reader user. */
 const ALERTING_STATUSES = new Set(["failed", "cap_paused"])
 
-/** CR-01 — how often the RUN row itself is re-read while it is still live. */
-const RUN_POLL_MS = 5000
+/* Phase 286-03 (D-09, 2026-10-18) — `RUN_POLL_MS` (CR-01, the run row's 5 s re-read
+ * interval) MOVED to `hooks/useWorkflowRun.ts` with the poll, its only reader. */
 
 // ── The page ───────────────────────────────────────────────────────────────────
 
-type LoadPhase = "loading" | "ready" | "missing" | "broken"
+/* Phase 286-03 — `LoadPhase` (loading | ready | missing | broken) moved to
+ * `hooks/useWorkflowRun.ts`, beside the read that owns it. */
 
 export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
-  const [run, setRun] = useState<WorkflowRunRead | null>(null)
-  const [loadPhase, setLoadPhase] = useState<LoadPhase>("loading")
-  /** Bumped by "Try again" — a retry is a NEW read of the same id, never a mutation. */
-  const [retryNonce, setRetryNonce] = useState(0)
-  const currentRunRef = useRef(runId)
+  // Phase 286-03 (D-09, 2026-10-18) — the run READ: `run`, `loadPhase`, the Try-again
+  // nonce and the stale-response ref, the mount read and the CR-01 `refreshRun` all live
+  // in `useWorkflowRun` now, called HERE where their declarations used to sit.
+  const { run, loadPhase, setRetryNonce, refreshRun } = useWorkflowRun(runId)
 
   // The app-wide ⌥ reveal, READ (never owned) here. Null outside a provider — the page
   // then renders plain language, exactly like every other leaf reader. NO second toggle
@@ -439,67 +442,10 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   const technicalNames = useTechnicalNamesOptional()
   const showTechnical = technicalNames?.showTechnical ?? false
 
-  // ── The read (the SkillStudioPage:75-100 stale-response guard, verbatim in shape) ──
-  useEffect(() => {
-    currentRunRef.current = runId
-    // Reset on run switch — no prior run's payload, spine or verdict may leak onto a
-    // newly-opened run.
-    setRun(null)
-    if (!runId) {
-      setLoadPhase("loading")
-      return
-    }
-    setLoadPhase("loading")
-    const requested = runId
-    let cancelled = false
-    const alive = () => !cancelled && currentRunRef.current === requested
-    getWorkflowRun(requested)
-      .then((r) => {
-        if (!alive()) return
-        setRun(r)
-        setLoadPhase("ready")
-      })
-      .catch((err: unknown) => {
-        if (!alive()) return
-        // 404 is BOTH "no such run" and "not yours" — the server makes them
-        // indistinguishable on purpose (T-092-04), so the copy names both possibilities
-        // rather than asserting the one we cannot know.
-        const status = err instanceof ApiError ? err.status : 0
-        setLoadPhase(status === 404 ? "missing" : "broken")
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [runId, retryNonce])
-
-  /**
-   * ⚠ CR-01 — RE-READ THE RUN ITSELF. A run-level status is the ONE fact no other source
-   * on this surface carries: the phase slice knows about steps, the file list knows about
-   * artefacts, and neither can tell you the run finished. Before this, `setRun` had exactly
-   * one caller (the mount effect above, whose other key is bumped only by a button that
-   * renders on the broken screen), so `band`, `isTerminal`, `ticking` and the alert were
-   * all frozen at mount — the surface asserted a run was running at exactly the moment it
-   * was not, with a clock still counting to make the claim actively.
-   *
-   * TWO RULES, both load-bearing:
-   *   1. `loadPhase` is NEVER touched here. This is a refresh of a surface that already
-   *      resolved, so a blip must leave the run standing rather than replacing it with the
-   *      broken screen. Only the mount read owns the load phase.
-   *   2. The stale-response guard is re-applied per call. A poll in flight across a run
-   *      switch must not write the OLD run's payload over the new one — the same reason
-   *      the mount read carries it.
-   */
-  const refreshRun = useCallback(() => {
-    const requested = currentRunRef.current
-    if (!requested) return
-    getWorkflowRun(requested)
-      .then((r) => {
-        if (currentRunRef.current === requested) setRun(r)
-      })
-      .catch(() => {
-        /* a blip must not tear down a good surface — see rule 1 above */
-      })
-  }, [])
+  // ── The read (the SkillStudioPage:75-100 stale-response guard) and the CR-01 refresh ──
+  // Phase 286-03 tombstone: both moved VERBATIM to `useWorkflowRun` (called at the top
+  // of this component). `loadPhase` is still owned by the mount read alone; a refresh
+  // never touches it.
 
   // ── The live slice. This page is the ONLY component on this surface that touches the
   //    stream (067.5 Branch-D3): one subscription, one join, one lookup handed down. ──
@@ -1085,70 +1031,23 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   // CR-01: the run poll, sited HERE because it is gated on `isTerminal` and that is derived
   // just above. It runs ONLY while the run is non-terminal and the surface has resolved,
   // and it tears itself down the moment a read comes back terminal — `isTerminal` is a
-  // dependency, and the value it reads is the one this poll wrote. So a finished run is
-  // never re-read forever, and no interval survives a run switch.
+  // dependency, and the value it reads is the one this poll wrote.
   //
-  // 5s is a deliberate order of magnitude apart from the 1s clock above: the clock is a
-  // local render, the poll is a network read, and pinning them to the same beat would make
-  // a per-second request out of a per-second repaint.
-  // F1 (UAT 2026-08-05) — THE PHASE SLICE RIDES THIS SAME BEAT, and before it did the
-  // canvas froze at its mount-time paint while a person watched it.
-  //
-  // Measured live: a 3-phase run whose DB rows read `completed / active / pending` painted
-  // `Running / Not started / Not started` for 100 s on a VISIBLE tab. The reconcile
-  // machinery was never broken — dispatching a wake event snapped the readings straight to
-  // the truth. Nothing was DRIVING it. Two channels were meant to and neither could:
-  //
-  //   1. The STREAM. `reconcileStream` ran once, at mount — where the thread's
-  //      `latest_producer_run_id` is legitimately `null` on an `llm_human_input` phase,
-  //      because the producer run ends while the `workflow_run` stays active. One attempt
-  //      against a value that is not there yet is the same as no attempt, so it is retried
-  //      on the beat rather than assumed.
-  //   2. The WAKE handler above, which fires on `visibilitychange` / `online` — neither of
-  //      which happens to someone sitting and watching. "Watch a run" is this phase's goal
-  //      and the watching case is precisely the one with no wake event in it.
-  //
-  // This is also the shape the project already mandates: Realtime is a hint, not a source of
-  // truth — always reconcile via fetch (D-v2.5-03). The slice is now correct whether or not
-  // an SSE connection ever arms, which is why the fix is a poll and not a second stream.
-  useEffect(() => {
-    if (!runId || loadPhase !== "ready" || isTerminal) return
-    const threadId = run?.thread_id ?? null
-    const tick = () => {
-      refreshRun()
-      if (!threadId) return
-      void reconcile()
-      void reconcileStream(threadId)
-      // F5: the pending-ask slice rides the SAME beat. A step that starts waiting after
-      // mount is precisely the case with no wake event in it — someone sitting and
-      // watching — which is the F1 lesson applied to the second slice this page derives
-      // a reading from.
-      void reconcileAsks()
-    }
-    const id = window.setInterval(tick, RUN_POLL_MS)
-    return () => window.clearInterval(id)
-  }, [
+  // Phase 286-03 (D-09, 2026-10-18) tombstone: the poll effect and the terminal-EDGE effect
+  // moved VERBATIM, with their full comments, to `useWorkflowRunPoll` — called HERE, after
+  // the derivation, which is the ordering CR-01 depends on. Calling it any earlier would
+  // gate the beat on a terminal fact that does not exist yet.
+  useWorkflowRunPoll({
     runId,
     loadPhase,
     isTerminal,
+    run,
     refreshRun,
-    run?.thread_id,
     reconcile,
     reconcileAsks,
     reconcileStream,
-  ])
-
-  // The terminal EDGE. The poll above tears itself down on the read that observes the
-  // verdict, so that same tick is the last one — and the deliverable row is written as the
-  // run finishes. Without a read here the final per-node state and the file both land after
-  // the last poll and are never fetched. Gated on `isTerminal` so it fires once, on the
-  // transition, not on every render of a finished run.
-  useEffect(() => {
-    if (!runId || loadPhase !== "ready" || !isTerminal) return
-    if (!run?.thread_id) return
-    void reconcile()
-    void reconcileFiles()
-  }, [runId, loadPhase, isTerminal, run?.thread_id, reconcile, reconcileFiles])
+    reconcileFiles,
+  })
 
   /**
    * The elapsed slot: a number and the field it derives from, or NOTHING AT ALL.
