@@ -2463,7 +2463,13 @@ const BASELINE = {
   // argued. E-1's plant widened the real memo to `[rows, query]`: 1 failed / 117 passed.
   // ⚠ Both restores md5-CHECKED per the note above: fences `c1f2c17f53fe2fd8a75f07fed0c6d8f1`,
   // and `WorkflowsPage.tsx` left absent from `git status --porcelain`.
-  "librarySubtree.fences.test.ts": 118,
+  // ⚠ RAISED 118 → 133 at 286-05 (2026-10-18), read from this script's own `actual` column.
+  //   +5 is 286-04's: `./WorkflowCardMenu.tsx` joined `LIBRARY_SUBTREE_PATHS` (14 → 15) in the
+  //   commit that created it, and each path runs five `it.each` sweeps. The other +10 PREDATE
+  //   Phase 286 — the suite measured 128 at the phase base `d45bef9e2` (run on the base tree,
+  //   286-05-GATES.md), so the pin had been 10 behind its own suite before this phase began.
+  //   Folded in here because raising a pin only tightens it; the split is stated, not smoothed.
+  "librarySubtree.fences.test.ts": 133,
   // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
   // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
   // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).
@@ -4252,6 +4258,22 @@ const BASELINE = {
   // 284-REVIEW CR-01 / IN-07 — the review-fix suites. BOTH KNOBS, SAME COMMIT.
   "LibraryPage.review284.test.tsx": 5, // 284-REVIEW CR-01 + IN-07 — never a page past the end; the pager describes the rows shown
   "pageClamp.test.ts": 3, // 284-REVIEW CR-01 — the ONE clamp for every paged list
+  // ── Phase 286-05 (2026-10-18, REG-07) — the three characterization pins wave 1 wrote BEFORE
+  // each move, pinned at the gate's own printed actuals (`count gate OK`, failed 0). The two
+  // src/pages pins are also named in TARGETS (same commit); the card pin rides the
+  // `src/components/workflows` directory entry. Deleting a pin case now reds the gate.
+  "WorkflowBuilderPage.seam286.pin.test.tsx": 11, // 286-02 — export set, one call per name read, names never ids, both read-only arms, header DOM
+  "WorkflowRunPage.seam286.pin.test.tsx": 10, // 286-03 — load screens, 5 s cadence, terminal edge, stale guard, retry, refresh blip
+  "WorkflowCard.seam286.pin.test.tsx": 21, // 286-04 — menu roles, Schedules hands up the row id, arm-to-confirm grades, published-delete visibility
+  // ADOPTED at 286-05: the two SEED-222 suites that guard a file in THIS phase's diff, which is the
+  // re-open condition every earlier decline named. `toolReadOnlyMap.test.ts` — 286-02 retargeted
+  // its "THE JOIN" case onto `useBuilderNameMaps.ts` (the read-only banner's join, T-286-09); 7 at
+  // the phase base and 7 now (286-02 added an assertion inside an existing case, not a case).
+  // `automationFacts.test.ts` — reads `./WorkflowCard?raw` (row-answer-dot < row-automation <
+  // row-identity order), and 286-04 moved 307 lines out of that file. The other three SEED-222
+  // suites (`PromptVariableChips`, `RunHero`, `nodeEffectBanner`) read no 286 file: still unpinned.
+  "toolReadOnlyMap.test.ts": 7,
+  "automationFacts.test.ts": 11,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6213,6 +6235,13 @@ const TARGETS = [
   // 284-REVIEW CR-01 / IN-07 — FILE-LEVEL (no `src/pages` / `src/lib` directory entry).
   "src/pages/__tests__/LibraryPage.review284.test.tsx",
   "src/lib/__tests__/pageClamp.test.ts",
+  // Phase 286-05 (2026-10-18, REG-07) — the two characterization pins 286-02 and 286-03 wrote
+  // BEFORE their moves. FILE-LEVEL: `src/pages` is reached by named files only. The third pin,
+  // `library/__tests__/WorkflowCard.seam286.pin.test.tsx` (286-04), is already inside the
+  // `src/components/workflows` DIRECTORY entry, so it needs a BASELINE pin only. An unpinned
+  // characterization pin is an unguarded one: deleting a case would have read green.
+  "src/pages/__tests__/WorkflowBuilderPage.seam286.pin.test.tsx",
+  "src/pages/__tests__/WorkflowRunPage.seam286.pin.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

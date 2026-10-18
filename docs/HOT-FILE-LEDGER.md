@@ -7617,6 +7617,8 @@ Measured by 214-05 at execute time and reported as owed. A safety-gate predicate
 
 Mounts `LaunchInputFields`, the one renderer three doors share.
 
+**Phase 286 note (2026-10-18, 286-05).** Re-derived `1 / 1 / 157` (unchanged; does not fire at 1 phase). Scan-list disposition cell before 286-05 (replaced): *"young (214-12) — chat collects declared inputs BEFORE it creates anything"*. ⚠ **Path correction:** it lives under `components/layout/`, NOT `components/chat/` (286-CONTEXT named the wrong directory). ⚠ **The CLAUDE.md FIRING table had no row for it**, so a phase reading only that shortlist could not see the one launch form 287 must reuse; 286-05 ADDED the row (D-15) although the file does not fire, because the table is the collision shortlist for 287-293. **Expected change (287):** the in-thread workflow entry reuses this form through `ChatLayout.doRun` (its one caller today, mounted at `ChatLayout.tsx` `<ChatLaunchForm`); a second launch form anywhere is the failure. Its source stays fenced by `ChatLayout.launch.test.tsx` (`?raw`, T-214-12-01: the agent fills nothing).
+
 ### `frontend/src/components/workflows/ArgumentEditor.tsx`
 
 **Triple at Phase 214's close (2026-08-28): `1 / 1 / 226` — G-5: no (1 phase).** young (214-07) — the argument form; the raw-JSON surface it replaced was DELETED, not hidden
@@ -11077,22 +11079,22 @@ cells rot within days.
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 107 / 41 / 4991 (was `106 / 40 / 4982`) | ⚠ **FIRES** | honoured by construction (**279-03 C**, D-15): ONE constant + ONE widened 409 condition (`startsWith` lock prefix). ⛔ `onTurnBoundary` still FLUSHES before moving |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
-| [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
+| [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | 286 forecast (290): the team picture is a SEPARATE read-only view (VIS-01: never a second canvas); at most ONE gated mount here. honoured by construction (199 / 200 / 214) |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
-| [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 17 / 8 / 489 | **FIRES** | honoured by construction (199) — ⚠ the 200 canvas port is REVERTED here (2026-08-20) |
-| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 55 / 28 / 3014 (was `54 / 27 / 2954`) | **FIRES** | **281-01** (`0ab03994e`): `_exec_llm_emit` records per-shot causes and calls the emit_cause leaf; +1 `If`, 0 new def. honoured by construction · ⚠ G-5 obligation stays **OWED** |
-| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 45 / 18 / 1447 (was `43 / 17 / 1415`) | **FIRES** | the 192 / 192.1 extraction is TAKEN. **281-03**: `onOpenRun` + `onOpenConnections` pass-throughs, both via `canLeaveBuilderRef`; 0 new hooks. `onOpenSettings` now wired (`SEED-218`) |
-| [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 19 / 6 / 1616 | **FIRES** | ✅ **G-5 DISCHARGED (192.2-02)** |
-| [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 10 / 4 / 727 | ⚠ **FIRES** | no seam proposed |
+| [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 286 forecast (290): ONE prop; the chip words come from `libraryVocabulary`, never literals here. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
+| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 56 / 28 / 3027 (was `55 / 28 / 3014`) | **FIRES** | 286 forecast (289): ONE optional output field on the KB-reading types; no new phase type (closed core stays 7). ⚠ G-5 obligation stays OWED |
+| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 45 / 18 / 1447 (was `43 / 17 / 1415`) | **FIRES** | 286 forecast (287): starters are DATA; fork reuses the existing fork hook; ONE prop. The 192 / 192.1 extraction stays TAKEN |
+| [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 22 / 8 / 1354 (was `19 / 6 / 1616`) | **FIRES** | **286-04** seam TAKEN (named 3×): ⋯ menu + armed draft delete → `WorkflowCardMenu.tsx`; card holds 0 `useState`, drawing only. ⚠ compiler lint now covers the whole card |
+| [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 11 / 5 / 766 (was `10 / 4 / 727`) | ⚠ **FIRES** | 286 forecast (290): chip labels are added as vocabulary ENTRIES (data), no logic. No seam proposed |
 | [`frontend/src/components/workflows/library/libraryFilter.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryfilterts) | 6 / 4 / 435 | ⚠ **FIRES** | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | [`frontend/src/components/workflows/library/libraryRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryrowts) | 4 / 3 / 201 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 192.2) |
 | [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 18 / 12 / 1075 | **FIRES** | honoured by construction (193 / 193.1 / 199 / **214**) — 214-13 added the service picker and its refusal as CHILDREN |
-| [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 57 / 22 / 2993 (was `56 / 21 / 2977`) | **FIRES** | honoured by construction ×7 (193.1 / 193.2 / 197 / 200.3 / 214 / 214.1 / **281-02**) — 281-02: ONE import + ONE inline `describeRefusal(...)`; useState 21 → 21, useEffect 7 → 7 |
-| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 43 / 23 / 2261 | **FIRES** | honoured by construction (192.2 / **258-03**: two route dependencies, no new branch/handler; ⚠ extraction still OWED) |
-| [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
+| [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 58 / 23 / 2803 (was `57 / 22 / 2993`) | **FIRES** | **286-02** seam TAKEN: id-to-name maps + mount read → `useBuilderNameMaps.ts`; 8 copy constants → `builderCopy.ts` (page re-exports). `FLAG_OFF_HEADER_MARKUP` stayed; 288 lands by useDraftPersistence |
+| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 45 / 23 / 1647 (was `43 / 23 / 2261`) | **FIRES** | **286-01** seam TAKEN: 20 wire models/helpers → `workflow_wire.py`; generate + template doors → `workflow_authoring_doors.py` (same router). D-05 1,200-1,400 MISSED (1,647); split OWED |
+| [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 13 / 10 / 1108 (was `11 / 8 / 1003`) | **FIRES** | 286 forecast (289): the finished-run page reads the EXISTING run read (version, phase log, verdicts, sources); export = ONE projection of it behind the existing ownership gate |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 22 / 15 / 537 (was `21 / 14 / 537`) | ⚠ **FIRES** | **279-01**: docstring repoints to the new expert_scope homes only (OpenAPI regen). ⛔ a body touching both pairs is a 422 |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 61 / 31 / 1137 (was `60 / 30 / 1134`) | ⚠ **FIRES** | **281-03** (`2510ffdb7`): ONE prop `onOpenConnections={() => onNavigate("connections")}` after the pinned `onOpenRun` line; hooks 27 → 27, 0 branches. honoured by construction |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 61 / 31 / 1137 (was `60 / 30 / 1134`) | ⚠ **FIRES** | 286 forecast (287): the in-thread entry REUSES `ChatLaunchForm` and `doRun` (one caller today); ONE prop or ONE mount, never a second launch form |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 5 / 4 / 262 (was `4 / 3 / 249`) | ⚠ **FIRES** | **284-03**: optional `totalState`: "Counting…" while loading, "Count not known yet" on failure, never "0 documents" before an answer; numbers grouped |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
@@ -11102,14 +11104,14 @@ cells rot within days.
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 22 / 9 / 1417 (was `21 / 8 / 1414`) | ⚠ **FIRES** | **273-03**: the grounding offer subtracts CHAT_ONLY_TOOLS (1 import, 1 set difference). ⚠ extraction still OWED |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 52 / 26 / 2724 | **FIRES** | ⚠ row was STALE at `48 / 25 / 2585`. honoured by construction (193.2 / 194 / 192.2 / 200.1 / 214 / **256-05**) — 256-05 is **COMMENT-ONLY** |
-| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 29 / 13 / 1942 | **FIRES** | ⚠ STALE (`28/12/1939`). **268-REVIEW WR-06**: the golden shell carries the definition's org — one kwarg. ⛔ ctx still withholds org |
-| [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 17 / 11 / 1025 (was `16 / 10 / 1002`) | **FIRES** | **281-02** (`fa08ee6f1`): ONE additive `reason_code` on the 3 `connection_not_allowed` returns; 0 lines removed, `error`/`detail` byte-identical. honoured by construction (… / 214.1 / 281) |
+| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 29 / 13 / 1942 | **FIRES** | 286 forecast (288): the human pause = ONE admitted shape inside the existing interactive-phase check; the planted unbounded wait still refused. A 2nd concern in 288's plan = extract first (D-01) |
+| [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 17 / 11 / 1025 (was `16 / 10 / 1002`) | **FIRES** | 286 forecast (291): uploaded template / form / reference text = ONE more grounding input to the existing generate path; tools + phase types stay closed; asset text is untrusted |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
-| [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | honoured by construction (193.2 / 197 / **214.1**) — `setDeclaredInputs` is the sixth `meta` writer, the shape the five before it take |
+| [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | 286 forecast (288): draft config persistence rides `useDraftPersistence` (186-07); at most ONE store field. honoured by construction (193.2 / 197 / 214.1) |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 9 / 5 / 756 (was `8 / 4 / 748`) | **FIRES** | ⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id`/`expert_id` (+8 lines). ⛔ NOT the shape to copy (C-5) |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 41 / 19 / 1750 | **FIRES** | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches |
-| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 61 / 24 / 3387 (was `60 / 23 / 3297`) | **FIRES** | **281-01** (`7704bd0f6`): the executor's cause wins over the validator's shape text; one keyword-only `reason_is_final`, one `_attempt_identity` helper. 5 new conditionals vs cap 4 → **OV-281-01** |
+| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 61 / 24 / 3387 (was `60 / 23 / 3297`) | **FIRES** | 286 forecast (289): the confidence chat already computes rides onto KB-derived phase outputs as ONE field where the output is recorded; no new loop branch, no model call (TRUST-01 SC#5) |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
 | [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |
@@ -11122,7 +11124,7 @@ cells rot within days.
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 93 / 43 / 1186 (was `91 / 42 / 1171`) | **FIRES** | honoured by construction (**279-03 D/E**): ONE functional setActiveExpert + guarded catch; `&& !isStreaming`; 2 props. Zero new hooks. ⛔ no scope branch in send |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 17 / 9 / 1013 (was `15 / 8 / 836`) | **FIRES** | honoured by construction (**282-02**): draft moved to askDraftStore (useState 9 → 7); APG radio keys + mark; `home` prop; +`AskPointer` (+177 lines). ⚠ `SEED-219` still open |
-| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
+| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 30 / 11 / 1578 (was `28 / 9 / 1670`) | **FIRES** | **286-03** seam TAKEN: run read + 5 s poll + terminal edge → `hooks/useWorkflowRun.ts`, called after `isTerminal` (CR-01). OWED: phase/spec join, canvas mount. ⛔ invariant 8 tokens |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 210 / 125 / 530 (was `208 / 124 / 523`) | ⚠ **FIRES** | **284-01**: re-exports the paged clients. **284-05**: the five whole-list clients' barrel lines DELETED; `libraryListFence.test.ts` fails on any re-export of them |
@@ -11142,11 +11144,11 @@ cells rot within days.
 | [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 15 / 7 / 791 | ⚠ **FIRES** | ⚠ row STALE a 2nd time (`12 / 5 / 749`; CLAUDE.md read `14/6/762`). ⚠ absent at 5 phases (added 196). honoured by construction (255 / **256-05**) |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 19 / 7 / 1705 (was `17 / 7 / 1679`) | ⚠ **FIRES** | honoured by construction (**282-01** help line; **282-04** ONE Timeout field in `AddModelForm`, placeholder = provider default, blank sends no key). `AddModelForm` seam OWED |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 12 / 10 / 499 | ⚠ **FIRES** | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 phases |
-| [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 20 / 10 / 1372 (was `19 / 9 / 1343`) | ⚠ **FIRES** | **281-03** (`db9fa3cbd`): ONE optional `onOpenRun` prop; the run link renders only when present (D-28); "coming soon" deleted; `HardWall` untouched. honoured by construction (214 / 281) |
-| [`frontend/src/components/workflows/PhaseSpineGraph.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasespinegraphtsx) | 5 / 5 / 473 | ⚠ **FIRES** | honoured by construction (200) |
+| [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 20 / 10 / 1372 (was `19 / 9 / 1343`) | ⚠ **FIRES** | 286 forecast (288): ONE stage-reading row for the pause verdict; its words come from the server verdict, never composed here. honoured by construction (214 / 281) |
+| [`frontend/src/components/workflows/PhaseSpineGraph.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasespinegraphtsx) | 8 / 6 / 723 (was `5 / 5 / 473`) | ⚠ **FIRES** | 286 forecast (290): ONE optional prop for labelled chips. honoured by construction (200) |
 | [`frontend/src/components/workflows/phaseDuration.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasedurationts) | 5 / 1 / 525 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/receiptVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsreceiptvocabularyts) | 3 / 1 / 303 | no (1 phase) | young (200) |
-| [`frontend/src/components/workflows/RunReceipt.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunreceipttsx) | 3 / 1 / 241 | no (1 phase) | young (200) |
+| [`frontend/src/components/workflows/RunReceipt.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunreceipttsx) | 3 / 1 / 241 | no (1 phase) | young (200); does not fire (1 phase). 286 forecast (289): ONE confidence chip expected |
 | [`frontend/src/components/workflows/doorVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdoorvocabularyts) | 6 / 4 / 540 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape (214); ⚠ absent until 199, and it is no longer at threshold |
 | [`frontend/src/components/workflows/StepTypePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssteptypepickertsx) | 7 / 3 / 522 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (199) — ⚠ absent, on the boundary |
 | [`frontend/src/components/workflows/library/RunModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunmodaltsx) | 8 / 5 / 713 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ✅ **deferred extraction DISCHARGED (214-12)** — one declared-input renderer, shared with chat and the schedule door |
@@ -11169,7 +11171,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/decisionsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionsvocabularyts) | 1 / 1 / 226 | no (1 phase) | young (197) |
 | [`frontend/src/components/workflows/DecisionsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionslisttsx) | 4 / 2 / 413 | no (2 phases) | young (197, 199) |
 | [`frontend/src/components/workflows/DraftArrivalCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdraftarrivalcardtsx) | 1 / 1 / 338 | no (1 phase) | young (197) |
-| [`frontend/src/components/workflows/useTemplateFirstDraft.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsusetemplatefirstdraftts) | 7 / 4 / 677 (was `6 / 3 / 673`) | ⚠ **FIRES** | **281-02** (`57a668c06`): ONE import + two call-site swaps to `refusalKey(...)` / `REQUEST_FAILED_KEY`. honoured by construction (214 / 281) |
+| [`frontend/src/components/workflows/useTemplateFirstDraft.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsusetemplatefirstdraftts) | 8 / 4 / 684 (was `7 / 4 / 677`) | ⚠ **FIRES** | 286 forecast (291): forwards ONE more upload kind to the existing `/generate` call. honoured by construction (214 / 281) |
 | [`frontend/src/components/workflows/toolNames.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstoolnamests) | 1 / 1 / 128 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/StepCardSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepcardsectiontsx--stepcardsectioncontextts) | 1 / 1 / 95 | no (1 phase) | young (200) |
 | [`frontend/src/providers/ThemeProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersthemeprovidertsx) | 1 / 1 / 149 | no (1 phase) | young (200) |
@@ -11233,7 +11235,7 @@ cells rot within days.
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
 | [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 4 / 4 / 463 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** — row added 214; it is the home of this phase's safety-gate predicate |
 | [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 8 / 6 / 554 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **6 phases** — and 214-16 records that this invisibility is WHY the `ctx.inputs` mirror went unowned |
-| [`frontend/src/components/layout/ChatLaunchForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlaunchformtsx) | 1 / 1 / 157 | no (1 phase) | young (214-12) — chat collects declared inputs BEFORE it creates anything |
+| [`frontend/src/components/layout/ChatLaunchForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlaunchformtsx) | 1 / 1 / 157 | no (1 phase) | young (214-12); does not fire (1 phase). **286**: 287 reuses it through `ChatLayout.doRun` — never a second launch form. Path is `components/layout/`, not `components/chat/` |
 | [`frontend/src/components/workflows/ArgumentEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumenteditortsx) | 1 / 1 / 226 | no (1 phase) | young (214-07) — the argument form; the raw-JSON surface it replaced was DELETED, not hidden |
 | [`frontend/src/components/workflows/ArgumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentrowtsx) | 1 / 1 / 362 | no (1 phase) | young (214-07) — one row, one three-arm source picker, one gutter that WIDENS rather than inserts |
 | [`frontend/src/components/workflows/DescribeServicePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribeservicepickertsx) | 2 / 1 / 464 | no (1 phase) | young (214-13) — the describe door at the GRANT grain |
@@ -11567,6 +11569,12 @@ cells rot within days.
 | [`frontend/src/components/ui/SyrelLoader.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsuisyrelloadertsx) | 2 / 0 / 50 | no (young) | young (created quick-261016-u3w, SEED-359 A). The ONE branded loader; renders IrisAvatar `thinking`, never forks it. ⛔ one polite status per block |
 | [`frontend/src/components/workflows/library/WorkflowDeleteSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowdeletesheettsx) | 3 / 1 / 339 | no (1 phase) | row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader`; ⛔ never-guess rule kept: no count, no destructive control while loading |
 | [`frontend/src/pages/SkillTunerPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesskilltunerpagetsx) | 21 / 5 / 921 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 5 phases — row added quick-261016-u3w. Skill loading arm → `SyrelLoader` (panel); honoured by construction |
+| [`backend/app/api/workflow_wire.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_wirepy) | 1 / 1 / 418 | no (young) | young (286-01). Leaf: 20 wire models + pure helpers moved verbatim from `workflows.py` (AST-pinned). ⛔ imports nothing from `app.api.workflows` |
+| [`backend/app/api/workflow_authoring_doors.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_authoring_doorspy) | 1 / 1 / 403 | no (young) | young (286-01). `GenerateRequest` + the 4 authoring doors, registered on the SAME `/workflows` router. ⛔ placeholder door: no client, no pool; logger `app.api.workflows` |
+| [`frontend/src/components/workflows/useBuilderNameMaps.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsusebuildernamemapsts) | 1 / 1 / 141 | no (young) | young (286-02). The Builder's id-to-name maps + their ONE mount read. ⛔ names only, never ids (CONN-03 SC#4); each read in its own try |
+| [`frontend/src/components/workflows/builderCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuildercopyts) | 1 / 1 / 174 | no (young) | young (286-02). Leaf of the Builder's 8 copy constants; RE-EXPORTED by `WorkflowBuilderPage.tsx` so every import and `?raw` fence resolves |
+| [`frontend/src/hooks/useWorkflowRun.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseworkflowrunts) | 1 / 1 / 218 | no (young) | young (286-03). Run read + stale guard + `refreshRun`; 5 s poll + terminal edge. ⛔ poll called AFTER `isTerminal` (CR-01); invariant-8 tokens never appear here |
+| [`frontend/src/components/workflows/library/WorkflowCardMenu.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardmenutsx) | 1 / 1 / 473 | no (young) | young (286-04). ⋯ menu + armed draft delete + its prompt (`useDraftDelete`). ⛔ WR-03 five roles; D-18 endpoint rule; in `LIBRARY_SUBTREE_PATHS` |
 
 
 
@@ -21774,3 +21782,299 @@ Young (created quick-261016-u3w, SEED-359 part A). The one shared branded loader
 ### `frontend/src/pages/SkillTunerPage.tsx` — quick-261016-u3w (2026-10-16)
 
 `21 / 5 / 921` (phases 123, 123.1, 137, 139, 176). ⚠ Absent from the scan list at 5 phases — G-5 has been firing silently. Row added by quick-261016-u3w (gate `[no-row]`). The "Loading skill…" arm became a panel-size `SyrelLoader` (it used a spinning RefreshCw, whose import became unused and was removed). Honoured by construction (a loading-arm swap). ⚠ A refactor-first audit is owed before the next FEATURE phase here; no seam has been named yet.
+
+---
+
+## Phase 286 close (2026-10-18, 286-05)
+
+All triples below were re-derived on the merged wave-1 tree at `163da5717` with the CLAUDE.md recipe (six-digit quick-task buckets dropped; none of these files carries one). Phase base: `d45bef9e2`. Four files were EXTRACTED (286-01..04), six modules were CREATED by those extractions, and fifteen firing-or-forecast files carry a written expected change for the phase that edits them next (SC#1). Each subsection quotes the scan-list cell it replaced and, where the file has one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. `ChatLaunchForm.tsx`'s note is in its own existing section above, not here.
+
+### `backend/app/api/workflows.py` — Phase 286 (286-01) — seam taken
+
+**`45 / 23 / 1647` (was `43 / 23 / 2261`).**
+
+**What moved, and where.** 25 symbols (operator option-b, `286-01-BASE.md`). 20 wire models and pure helpers → `backend/app/api/workflow_wire.py` (a leaf). `GenerateRequest`, `generate_workflow`, `read_template_placeholders`, `upload_workflow_template` and `get_workflow_template_placeholders` → `backend/app/api/workflow_authoring_doors.py`, moved WITHOUT decorators and registered on the SAME `/workflows` router at their original positions with verbatim decorator args (no second `APIRouter`, no `include_router`, `main.py` unchanged). Every name is re-imported here, so `from app.api.workflows import X` resolves.
+
+**Lines: 2,273 → 1,647** (−626, ~28%). ⚠ **D-05's target was 1,200-1,400 and it was MISSED by ~250 lines**, in plain words: the move took every symbol no test pins here, and what is left is pinned here by tests. The plan expected ~1,550; the extra ~100 is the new module docblock paragraph, the 33-line re-import block and the four registration statements.
+
+**Pins and the empty-numstat proof.** `backend/tests/unit/test_286_workflows_seam_pins.py` + `backend/tests/fixtures/phase286/` (OpenAPI sub-document, ordered route table, `ast.dump` digest per moved symbol, re-export and logger-name checks) were committed at `9c3b548de`, BEFORE the move. `git diff --numstat 9c3b548de HEAD -- <pin> <fixtures>` prints nothing on the merged tree (re-run 286-05).
+
+**Tests edited (D-13), each with its reason:** `test_256_finish_run_unchanged.py` (`b519c4b13`) — line pin `api/workflows.py:1812` → `:1550`, line shift only, the per-file count of 1 unchanged; `test_193_workflow_template_upload.py`, `test_q5r_template_placeholders.py`, `test_103_nl_generate.py` (`232bfa7bc`) — patch target `app.api.workflows.get_pg_pool` → `app.api.workflow_authoring_doors.get_pg_pool` (and 103's never-persist trap), because the handler now looks the name up in its new module; `test_214_describe_vocabulary.py` (`232bfa7bc`) — the source sweep reads the doors module, needles byte-identical. Assertions, fixtures and counts unchanged in every one.
+
+**What stayed, and the test that keeps it here:** `PublishedWorkflow` + `DraftRow` (`test_library_run_facts` counts 2 `has_any_run` declarations in this file); the severity block + `_severity` (`test_187` reads this file's text); `validate_workflow` (`test_publish_service` asserts its `__module__`); `get_grounding_bundle` and every draft / publish / delete / cascade handler and the three feeds (tests patch `app.api.workflows.get_pg_pool` and friends — D-03).
+
+⚠ **Still OWED — and the re-open trigger FIRED.** 286-CONTEXT deferred the full sub-router split (handlers moved, ~44 test patch sites rewritten) with the trigger *"re-open if `workflows.py` is still > 1,500 lines after this phase and a later phase must edit it"*. It lands at **1,647** and **Phase 287 edits it**, so the trigger fires. Owed seams: draft CRUD, validate/lint (+ severity), grounding palette, publish gauntlet, delete/cascade, the three list feeds. 287's plan must propose the patched-handler split first, or record why its change is one call-out on an existing concern.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> honoured by construction (192.2 / **258-03**: two route dependencies, no new branch/handler; ⚠ extraction still OWED)
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> ⚠ extraction still OWED · honoured by construction (258-03)
+
+### `frontend/src/pages/WorkflowBuilderPage.tsx` — Phase 286 (286-02) — seam taken
+
+**`58 / 23 / 2803` (was `57 / 22 / 2993`).**
+
+**What moved, and where.** (a) The id-to-name lookup cluster — `folderNames`, `skillNames`, `connectionNames`, `mcpServerUrls`, `toolReadOnly` and their one mount read — → `frontend/src/components/workflows/useBuilderNameMaps.ts`, called once at the old state-block position. (b) Eight copy constants (`EMPTY_DRAFT_INVITATION`, `SAVING_PUBLISH_WAIT`, `UNBOUND_KB_INVITATION`, the `REQUIREMENT_*` set, `UNSAVED_LEAVE_PROMPT`, `UNNAMED_KB_OPTION`) → `frontend/src/components/workflows/builderCopy.ts`; the page re-exports seven, so every import and `?raw` fence resolves. `FLAG_OFF_HEADER_MARKUP` and the byte-exact band literals did NOT move.
+
+**Lines: 2,993 → 2,803** (−190). Its originally named seam (save/concurrency) was already taken in 186-07 (`useDraftPersistence`); 288's draft-config work now lands beside that hook in a smaller page.
+
+**Pin and empty numstat.** `frontend/src/pages/__tests__/WorkflowBuilderPage.seam286.pin.test.tsx` (+ its `.snap`; 11 cases: export set, one call per read, names-never-ids faces, both read-only banner arms, header/grid DOM flag on and off) committed at `fe3da3d7f`, before the move. `git diff --numstat fe3da3d7f HEAD -- <pin> <snap>` prints nothing. Adopted into BOTH count-gate knobs at 286-05.
+
+**Tests edited (D-13):** `toolReadOnlyMap.test.ts` "THE JOIN" (`756505396`) — the two needles that moved now read `useBuilderNameMaps?raw` behind length + identity guards, and the page → hook hop is ADDED; `WorkflowBuilderPage.canvas.test.tsx` "no second fetch" (`756505396`) — counts over page + hook source, expected value stays 3. Both retargets driven red by a planted `setToolReadOnly({})`.
+
+**One accepted deviation:** the hook's mount effect now registers before the page's other mount reads (see `useBuilderNameMaps.ts`). **Still OWED:** none named beyond 186-07's; `grep -cE "useState[<(]"` reads 15 on the page after the move (measured 286-05), and the next concern added should name its seam first.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> honoured by construction ×7 (193.1 / 193.2 / 197 / 200.3 / 214 / 214.1 / **281-02**) — 281-02: ONE import + ONE inline `describeRefusal(...)`; useState 21 → 21, useEffect 7 → 7
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction ×7 (… / 214.1 / 281-02: one import)
+
+### `frontend/src/pages/WorkflowRunPage.tsx` — Phase 286 (286-03) — seam taken
+
+**`30 / 11 / 1578` (was `28 / 9 / 1670`).**
+
+**What moved, and where.** Concern 1 of the four Phase 195 named — **the run read + its poll** — → `frontend/src/hooks/useWorkflowRun.ts`: the mount read with its stale-response guard and 404 wording, the CR-01 `refreshRun`, the 5 s poll and the terminal-edge reconcile. The page calls `useWorkflowRun(runId)` at the old state block and `useWorkflowRunPoll({...})` at the old effect site, AFTER `isTerminal` is derived (CR-01; line 1040 > 782).
+
+**Lines: 1,679 → 1,578** (−101); page `useEffect(` 7 → 4, `useState` 7 → 4; bytes 97,756 → 92,951 (`StopControl.baseline` needs > 20,000).
+
+**Pin and empty numstat.** `frontend/src/pages/__tests__/WorkflowRunPage.seam286.pin.test.tsx` (+ `.snap`; 10 cases, 5 DOM snapshots: load screens, poll cadence with fake timers, terminal edge, stale guard, retry, refresh blip) committed at `d84ff106d`. `git diff --numstat d84ff106d HEAD -- <pin> <snap>` prints nothing. Adopted into BOTH count-gate knobs at 286-05. **Tests edited: none.**
+
+**Still OWED (the three remaining concerns):** (2) the phase/spec join (`byIndex` / `spec.phase_index`); (4) the canvas mount (`<WorkflowCanvas` is still mounted here). (3) **the elapsed anchor STAYED** — `WorkflowRunPage.test.tsx:2110-2111` and `runStepCount.test.ts:229-235` pin `fmtElapsed(end - anchorMs)` / `fmtElapsed(nowMs - anchorMs)` in THIS file's source, so moving it is a fence edit, not a pure move. Phases 288/289 edit this file: a genuinely second concern owes one of those two seams first. ⛔ Invariant 8 binds the hook too.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (200 / 200.1 / 200.2 / **214**)
+
+### `frontend/src/components/workflows/library/WorkflowCard.tsx` — Phase 286 (286-04) — seam taken
+
+**`22 / 8 / 1354` (was `19 / 6 / 1616`).**
+
+**What moved, and where.** The `⋯` overflow menu, the draft's arm-to-confirm delete state machine (`confirmDeleteDraft`, `consequenceId`) and its prompt → `frontend/src/components/workflows/library/WorkflowCardMenu.tsx` (`useDraftDelete`, `WorkflowCardMenu`, `DraftDeletePrompt`). The seam this section named THREE times (197, 192.2, 204-03) is TAKEN. Stayed: the `WorkflowDeleteSheet` import/ref/mount, `owned`, `runnable`, the top-right wrapper and every face line.
+
+**Lines: 1,661 → 1,354** (−307); the card's `useState` count is now **0** — it draws, it holds no state.
+
+**Pins and empty numstat.** `library/__tests__/WorkflowCard.seam286.pin.test.tsx` (+ `.snap`; 21 cases, 13 snapshots) committed at `19edbd5fc`; `WorkflowCard.baseline.test.tsx` (29) unedited since base. `git diff --numstat 19edbd5fc HEAD -- library/__tests__/ WorkflowCard.baseline.test.tsx` prints nothing. The pin sits inside the gate's `src/components/workflows` directory entry and was pinned in BASELINE at 286-05.
+
+**Tests edited (D-13):** `librarySubtree.fences.test.ts` (in the move commit `01c87b9ff`, the fence's own same-commit rule) — `./WorkflowCardMenu.tsx` joins `LIBRARY_SUBTREE_PATHS`, length pin 14 → 15, +5 `it.each` cases; `PublishedCardDelete.test.tsx` (`78a66448e`) — the `published-delete` trigger assertion follows the trigger into the menu source, with a card → menu hop added; page negatives unchanged.
+
+⚠ **Unmasked lint, recorded for 290:** the React Compiler lint bailed on the whole card at base because of the delete `try/finally`; with it gone the lint now covers the card and `now = Date.now()` reports `react-hooks/purity` (suppressed with a written reason, behaviour unchanged). Phase 290's re-skin is linted more strictly than every earlier phase here. **Still OWED:** none named — the card is drawing only; 290 adds faces, not state.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> ✅ **G-5 DISCHARGED (192.2-02)**
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> ✅ **G-5 DISCHARGED (192.2-02)**
+
+### `backend/app/api/workflow_wire.py`
+
+**`1 / 1 / 418` — young (created 286-01, 2026-10-18).** Provenance: **286-01** (`315e2f211`), moved verbatim out of `backend/app/api/workflows.py`; every moved symbol's `ast.dump` digest is pinned against the phase base by `test_286_workflows_seam_pins.py` (non-vacuity driven in 286-01-BASE.md). It owns the 20 wire models and pure helpers: `_coerce_definition`, `_caller_uuid`, `_iso_or_none`, `DraftCreateResponse`, `Verdict`, `ValidateResponse`, `PaletteFolder`, `PaletteSkill`, `GroundingBundleResponse`, `PublishRequest`, `BlockedStep`, `PublishVerdict`, `_coerce_user_id`, `_ALREADY_PUBLISHED_DETAIL`, `DeletePreview`, `_owned_slug_or_404`, `_TEMPLATE_MIME_BY_EXT`, `TemplateAssetRef`, `TemplatePlaceholdersResponse`, `_TEMPLATE_MAX_UNCOMPRESSED_BYTES`. `workflows.py` re-imports every name, so `from app.api.workflows import X` still resolves. ⛔ **Inherited invariant: it imports NOTHING from `app.api.workflows`** (a leaf; a back-import would be a cycle). ⛔ OpenAPI component schema names carry no module path, so a model here keeps its schema name; the pinned OpenAPI document reds if that ever changes. `PublishedWorkflow` and `DraftRow` deliberately stayed in `workflows.py` (`test_library_run_facts` counts their `has_any_run` declarations there). Does not fire.
+
+### `backend/app/api/workflow_authoring_doors.py`
+
+**`1 / 1 / 403` — young (created 286-01, 2026-10-18).** Provenance: **286-01** (`315e2f211`, operator option-b). It owns `GenerateRequest`, `generate_workflow`, `read_template_placeholders`, `upload_workflow_template` and `get_workflow_template_placeholders`, moved WITHOUT their decorators; `workflows.py` registers each with `router.<verb>(<verbatim decorator args>)(handler)` at the def's original position, so paths, methods, dependencies, operation ids and route ORDER are unchanged (pinned: OpenAPI sub-document + ordered route table). ⛔ **Inherited invariants, verbatim:** (1) the stateless door `read_template_placeholders` injects no Supabase client and no pool — the cross-tenant class is unreachable by construction (`test_193_1_stateless_placeholders`, module-agnostic, unedited); (2) the `..` fence, the zip-bomb cap, and corrupt file = 422, never "no placeholders"; (3) the module binds `logging.getLogger("app.api.workflows")` — the LOGGER NAME LITERAL stays the old module's, so log records and caplog filters are unchanged (exactly one such line, pinned). ⚠ Tests now patch `app.api.workflow_authoring_doors.get_pg_pool` (three files retargeted in `232bfa7bc`); `test_103_nl_generate` had stayed GREEN without the retarget because the unpatched handler reached the real pool — a guarded case had silently become unguarded (T-286-07). Phase 291's AUTH-02 work lands here, not in `workflows.py`. Does not fire.
+
+### `frontend/src/components/workflows/useBuilderNameMaps.ts`
+
+**`1 / 1 / 141` — young (created 286-02, 2026-10-18).** Provenance: **286-02** (`5b52b1e0e`), moved verbatim from `WorkflowBuilderPage.tsx` (base lines 785-807 + 1590-1650, compared line by line). It owns `folderNames`, `skillNames`, `connectionNames`, `mcpServerUrls`, `toolReadOnly` and the one mount effect that fills them (`listFolders`, `listSkills`, `listConnectorConnections`, from the page's own `@/lib/api` specifier so every `vi.mock` still intercepts). ⛔ **Inherited invariants:** (1) **names only** — a face shows the resolved NAME and never an id (CONN-03 SC#4); the connection read stays unnarrowed and the effect body reads only `c.id`, `c.name`, `c.mcp_server_url` and the explicit `readOnlyHint` via `buildToolReadOnlyMap`; (2) **own-try isolation** — each read fails alone, so a refused connectors read keeps the skill and folder names (pinned); (3) **mount-order note** — the page calls the hook at the old state-block position, so its mount effect now registers BEFORE `useTemplateFirstDraft` / `useTemplatePlaceholders` / `useLiveValidation` / `useDraftPersistence` / `useGroundingBundle` / `useModelRegistry`. Accepted in 286-02: all are independent best-effort reads and no suite asserts cross-mock order; it cannot move later because `nameContext` reads its values. Exactly one call per read is pinned. `toolReadOnlyMap.test.ts` "THE JOIN" now reads this file `?raw` and asserts the page → hook hop. Does not fire.
+
+### `frontend/src/components/workflows/builderCopy.ts`
+
+**`1 / 1 / 174` — young (created 286-02, 2026-10-18).** Provenance: **286-02** (`5b52b1e0e`), base page lines 341-486 moved verbatim (the one change: `const UNNAMED_KB_OPTION` became `export const`). It owns `EMPTY_DRAFT_INVITATION`, `SAVING_PUBLISH_WAIT`, `UNBOUND_KB_INVITATION`, `REQUIREMENT_*`, `UNSAVED_LEAVE_PROMPT` and `UNNAMED_KB_OPTION`. ⛔ **Inherited invariant: it is re-exported by the page** (seven names; `UNNAMED_KB_OPTION` is imported by the page but NOT re-exported, so the page's export set is unchanged — pinned by the seam286 export-set case). A test or fence importing these names from the page keeps working; one that imports from here directly bypasses that pin. `FLAG_OFF_HEADER_MARKUP` and the byte-exact band literals did NOT move. Swept by `governanceVocabulary`'s `./*.{ts,tsx}` glob. Does not fire.
+
+### `frontend/src/hooks/useWorkflowRun.ts`
+
+**`1 / 1 / 218` — young (created 286-03, 2026-10-18).** Provenance: **286-03** (`80f24c5ba`), four line slices of `WorkflowRunPage.tsx` moved verbatim (checked against the base blob). It exports `useWorkflowRun(runId)` → `{ run, loadPhase, setRetryNonce, refreshRun }` (the mount read with its stale-response guard and 404 wording, and the CR-01 `refreshRun`) and `useWorkflowRunPoll({...})` (the 5 s beat and the terminal-edge reconcile). ⛔ **Inherited invariants:** (1) **CR-01 call position** — the page calls `useWorkflowRunPoll` AFTER it derives `isTerminal` from the value the poll wrote (page line 1040 > 782); the terminal-edge refetch depends on that order, and `TERMINAL_RUN_STATUSES` + the derivation stay in the page; (2) **invariant 8 of the run page** — the four identifiers the page's raw-source absence fences forbid (named in `WorkflowRunPage.test.tsx`) must not appear here either, and neither does `RunReceipt` (its whole-src single-importer fence). `RUN_POLL_MS` is module-private. Cadence, teardown, stale guard and edge counts are pinned with fake timers by `WorkflowRunPage.seam286.pin.test.tsx`. Does not fire.
+
+### `frontend/src/components/workflows/library/WorkflowCardMenu.tsx`
+
+**`1 / 1 / 473` — young (created 286-04, 2026-10-18).** Provenance: **286-04** (`01c87b9ff`); all 350 moved lines byte-identical to the base card (span compare). Exports `useDraftDelete`, `WorkflowCardMenu` and `DraftDeletePrompt` — the menu and the armed prompt render in different DOM positions, so the card calls the hook and mounts both. ⛔ **Inherited invariants:** (1) **WR-03 five roles** — the `DropdownMenuItem` structure the five-role sweep over `role="menu"` reads is unchanged (`WorkflowCard.test.tsx`, unedited); `onSchedule` hands up the row `id` (never the slug) and `onRunLog` the slug; (2) **D-18 endpoint rule** — the draft delete calls `deleteWorkflowDraft(id)` only, never the published cascade or preview (pinned on arm, confirm, resolve and reject); `published-delete` shows only when `runnable && owned`, with `owned` still derived in the card from `CHIP_PREDICATES.yours`; (3) **librarySubtree membership** — it joined `LIBRARY_SUBTREE_PATHS` (14 → 15) in the commit that created it, and it must never mention the F6 opaque draft field or any F7 creator-column identifier (those scoping controls assert exact module lists). `react-refresh/only-export-components` is disabled on the hook export with a reason. Does not fire.
+
+### `backend/app/services/harness_engine.py` — Phase 286 forecast (SC#1)
+
+**`61 / 24 / 3387` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 289, honoured by construction:** carries the confidence chat already computes onto KB-derived phase outputs, one field where the output is recorded; no new loop branch, no model call (TRUST-01 SC#5). A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> **281-01** (`7704bd0f6`): the executor's cause wins over the validator's shape text; one keyword-only `reason_is_final`, one `_attempt_identity` helper. 5 new conditionals vs cap 4 → **OV-281-01**
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> last touch 281-01 · OV-281-01 (5 new conditionals vs a cap of 4)
+
+### `backend/app/services/harness/phase_types.py` — Phase 286 forecast (SC#1)
+
+**`56 / 28 / 3027` (was `55 / 28 / 3014`).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 289, honoured by construction:** one optional output field on the KB-reading types; no new phase type (closed core stays 7). A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> **281-01** (`0ab03994e`): `_exec_llm_emit` records per-shot causes and calls the emit_cause leaf; +1 `If`, 0 new def. honoured by construction · ⚠ G-5 obligation stays **OWED**
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (281-01: one leaf call) · G-5 OWED
+
+### `backend/app/services/harness/publish_service.py` — Phase 286 forecast (SC#1)
+
+**`29 / 13 / 1942` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 288, honoured by construction:** the human pause becomes one admitted shape inside the existing interactive-phase check, with the planted unbounded wait still refused. Per D-01, a second concern in 288's plan means extraction first. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> ⚠ STALE (`28/12/1939`). **268-REVIEW WR-06**: the golden shell carries the definition's org — one kwarg. ⛔ ctx still withholds org
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> ⚠ STALE · last touch 268-REVIEW WR-06 · ⛔
+
+### `backend/app/api/workflow_runs.py` — Phase 286 forecast (SC#1)
+
+**`13 / 10 / 1108` (was `11 / 8 / 1003`).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 289, honoured by construction:** the finished-run page reads the existing run read (definition version, phase log, verdicts, sources); export is one projection of that read behind the existing ownership gate. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (200 / 200.1 / **214**)
+
+### `frontend/src/components/workflows/PublishGauntlet.tsx` — Phase 286 forecast (SC#1)
+
+**`20 / 10 / 1372` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 288, honoured by construction:** one stage-reading row for the pause verdict, words from the server verdict. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> **281-03** (`db9fa3cbd`): ONE optional `onOpenRun` prop; the run link renders only when present (D-28); "coming soon" deleted; `HardWall` untouched. honoured by construction (214 / 281)
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (281-03: ONE optional `onOpenRun` prop)
+
+### `frontend/src/components/workflows/builderStore.ts` — Phase 286 forecast (SC#1)
+
+**`14 / 8 / 968` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 288, honoured by construction:** draft config persistence rides useDraftPersistence (186-07); at most one store field. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> honoured by construction (193.2 / 197 / **214.1**) — `setDeclaredInputs` is the sixth `meta` writer, the shape the five before it take
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (193.2 / 197 / **214.1**)
+
+### `frontend/src/components/workflows/WorkflowCanvas.tsx` — Phase 286 forecast (SC#1)
+
+**`31 / 9 / 1708` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 290, honoured by construction:** the team picture is a separate read-only view (VIS-01: never a second canvas); at most one gated mount here. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (199 / 200 / **214**)
+
+### `frontend/src/components/workflows/PhaseSpineGraph.tsx` — Phase 286 forecast (SC#1)
+
+**`8 / 6 / 723` (was `5 / 5 / 473`).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 290, honoured by construction:** one optional prop for labelled chips. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> honoured by construction (200)
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (200)
+
+### `frontend/src/components/workflows/PhaseNodeCard.tsx` — Phase 286 forecast (SC#1)
+
+**`18 / 9 / 490` (was `17 / 8 / 489`).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 290, honoured by construction:** one prop; chip words come from libraryVocabulary. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> honoured by construction (199) — ⚠ the 200 canvas port is REVERTED here (2026-08-20)
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (199)
+
+### `frontend/src/components/workflows/library/libraryVocabulary.ts` — Phase 286 forecast (SC#1)
+
+**`11 / 5 / 766` (was `10 / 4 / 727`).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 290, honoured by construction:** chip labels added as vocabulary entries (data), no logic. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> no seam proposed
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> no seam proposed
+
+### `backend/app/services/workflow_authoring.py` — Phase 286 forecast (SC#1)
+
+**`17 / 11 / 1025` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 291, honoured by construction:** uploaded template / form / reference text is one more grounding input to the existing generate path; tools and phase types stay the closed set; asset text is untrusted. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> **281-02** (`fa08ee6f1`): ONE additive `reason_code` on the 3 `connection_not_allowed` returns; 0 lines removed, `error`/`detail` byte-identical. honoured by construction (… / 214.1 / 281)
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (281-02: one additive `reason_code`)
+
+### `frontend/src/components/workflows/useTemplateFirstDraft.ts` — Phase 286 forecast (SC#1)
+
+**`8 / 4 / 684` (was `7 / 4 / 677`).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 291, honoured by construction:** forwards one more upload kind to the existing /generate call. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> **281-02** (`57a668c06`): ONE import + two call-site swaps to `refusalKey(...)` / `REQUEST_FAILED_KEY`. honoured by construction (214 / 281)
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (281-02: one import, two call swaps)
+
+### `frontend/src/components/layout/ChatLayout.tsx` — Phase 286 forecast (SC#1)
+
+**`61 / 31 / 1137` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 287, honoured by construction:** the in-thread entry reuses ChatLaunchForm and doRun (one caller today); one prop or one mount, no second launch form. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> **281-03** (`2510ffdb7`): ONE prop `onOpenConnections={() => onNavigate("connections")}` after the pinned `onOpenRun` line; hooks 27 → 27, 0 branches. honoured by construction
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (281-03: ONE prop, 0 hooks)
+
+### `frontend/src/pages/WorkflowsPage.tsx` — Phase 286 forecast (SC#1)
+
+**`45 / 18 / 1447` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 287, honoured by construction:** starters are data; fork reuses the existing fork hook; one prop. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> the 192 / 192.1 extraction is TAKEN. **281-03**: `onOpenRun` + `onOpenConnections` pass-throughs, both via `canLeaveBuilderRef`; 0 new hooks. `onOpenSettings` now wired (`SEED-218`)
+
+CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
+
+> honoured by construction (281-03: two guarded props, 0 hooks)
+
+### `frontend/src/components/workflows/RunReceipt.tsx` — Phase 286 forecast (SC#1)
+
+**`3 / 1 / 241` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 289, honoured by construction:** does not fire (3 / 1 / 241); one confidence chip expected. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
+
+Scan-list disposition cell before 286-05 (replaced):
+
+> young (200)
+
+CLAUDE.md FIRING row: none — does not fire; the forecast lives here and in the scan-list cell only.
