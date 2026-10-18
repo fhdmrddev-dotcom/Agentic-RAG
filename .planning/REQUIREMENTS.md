@@ -55,6 +55,22 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| REG-07 | Phase 286 | Pending |
+| START-01 | Phase 287 | Pending |
+| START-03 | Phase 287 | Pending |
+| AUTH-03 | Phase 288 | Pending |
+| AUTH-01 | Phase 288 | Pending |
+| VIS-03 | Phase 289 | Pending |
+| TRUST-01 | Phase 289 | Pending |
+| VIS-04 | Phase 290 | Pending |
+| VIS-01 | Phase 290 | Pending |
+| AUTH-02 | Phase 291 | Pending |
+| VIS-02 | Phase 292 | Pending |
+| START-02 | Phase 293 | Pending |
+| START-04 | Phase 293 | Pending |
+| REG-06 | Phase 293 | Pending |
+
+Mapped: 14/14, no orphans, no duplicates.
 
 ---
 *Requirements defined: 2026-10-18*

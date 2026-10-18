@@ -30,6 +30,216 @@
 - ✅ **v4.4 Experts That Actually Work** — Phases **265-269** (shipped 2026-09-29, git tag `v4.4`). 5 phases, **24 plans**, migrations **194-198**, 7 days. **17/17 requirements satisfied** (audit `tech_debt`, no blockers). A client installs an Expert and gets grounded answers from its own knowledge in their own org — proven by live drives as a real user, never by a mocked test. ✅ **DEPLOYED 2026-09-29** — production `82babd8d0`; migrations 195-198 applied to production (194 already was). Operator smoke test owed.
 - ✅ **v4.5 Find It, Show It** — Phases **270-276** (shipped 2026-10-12, git tag `v4.5`). 7 phases, **38 plans**, migrations **199-206**, 14 days. **25/25 requirements satisfied** (audit `tech_debt`, no blockers). Find a document by what it IS and get the file back out, an agent that answers with interactive artifacts from a closed registry, thread-scoped attachments, retention with legal hold, and public docs. ✅ 270-274 + 276 **LIVE 2026-10-05** (prod `bd9e126c3`); ✅ **275 deployed 2026-10-12** (prod `784647e2d`, migrations 204-206).
 - ✅ **v4.6 Pay It Down** — Phases **277-285** (shipped 2026-10-16, git tag `v4.6`). 9 phases, **34 plans**, migrations **207-209**, 5 days. **24/24 requirements satisfied** (audit `tech_debt`, no blockers). Repair only: 14 major-bug fixes, 5 v4.5 debt items, 3 G-5 extractions, 2 register-hygiene items. ✅ **DEPLOYED 2026-10-16** (prod `4e767a3a2`).
+- 🚧 **v4.7 Workflows You Can See and Start Anywhere** — Phases **286-293** (started 2026-10-18). 8 phases, 14 requirements. Workflows become easier to start (from a thread, from a starter, from outside), easier to finish authoring, and show at a glance what a run did and on what evidence.
+
+---
+
+## v4.7 Workflows You Can See and Start Anywhere — 🚧 IN PROGRESS
+
+**Started:** 2026-10-18. **Roadmap created:** 2026-10-18.
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **14 v4.7 requirements, 14 mapped, 0 orphans** (4 START · 3 AUTH · 4 VIS · 1 TRUST · 2 REG).
+
+**Goal:** Workflows become easier to start, finish authoring and understand at a glance, with visuals that show what a run did.
+
+**Milestone rule (every phase):** a capability is proven by **driving it as a user** on the path the requirement names (DB row, request/response, screenshot, transcript). A mocked test alone does not close a requirement. ⛔ Presence assertions cannot see content drift: where the words are the deliverable (a receipt line, a trigger label, a refusal), assert the rendered **content**.
+⛔ **Measure before building.** Each seed behind a requirement is a claim about the tree at planting time. Re-measure the files, line counts and ledger triples at discuss.
+
+**Red line (every phase, the Extension Contract):** the closed core (**7 phase types / 1 emitter / 30 tools**) is re-counted against each phase's base commit with `test_259_closed_core_inventory.py`, never substring-matched. **No phase adds a tool, a phase type, an emitter or a validator kind** unless the phase flags it and the operator approves it explicitly. A new artifact component (VIS-02) is a registry entry, not a tool. An inbound trigger (START-02) is an API route, not a tool.
+
+**Baseline gates (every phase):** backend `pytest tests/unit -q --continue-on-collection-errors` at **<= 71 failed, 0 collection errors** (zero headroom); frontend `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` with no per-file decrease and 0 failing; frontend typecheck as `npx tsc -p tsconfig.app.json --noEmit` as a **set diff** against base; `node scripts/check-claude-md-size.cjs` with no warning.
+
+**Numbering:** Phases **286-293**. **Migrations resume at `210`**, measured at roadmap creation (`ls supabase/migrations | tail` ends at `209_watch_item_retry_and_purge_scope.sql`). No phase is pre-assigned a migration; likely candidates are 293 (START-02 inbound credentials) and 289 (TRUST-01 confidence column if the run model lacks one). Whichever phase needs one takes the next free number after re-running `ls`.
+
+**Solo running:** Claude builds and reviews. Phases close `verification_mode: self-verified`; review runs as a fresh-context `/gsd:code-review`.
+
+**Out of scope:** `SEED-347` canvas scale hardening · `SEED-013` Open Platform (v4.8) · new tools, phase types or emitters · the owed v4.6 operator verification (stays in `STATE.md` "Owed").
+
+### Phase Table
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 286 | Seams Before Features | The workflow files this milestone edits are split along their named seams first, with behaviour unchanged | REG-07 | 4 | ⛔ **G-5 extraction** · measure first (which rows truly fire) · behaviour-preserving, pin-first · no UI hint |
+| 287 | Start From a Thread, Fork a Starter | A user starts a workflow from inside a thread and from a curated starter without opening the builder | START-01, START-03 | 5 | **G-2 sketch** (thread entry, starter picker) · **G-4** · SC#10 axes · starters must pass the gauntlet · G-5 (`ChatLayout.tsx`, `WorkflowsPage.tsx`, `ChatArea.tsx`) · UI hint |
+| 288 | Drafts That Survive, Pauses That Publish | A draft keeps its configuration across navigation, and a workflow that pauses for a person can be published and shows who it waits on | AUTH-03, AUTH-01 | 4 | **G-2 sketch** (waiting-on moment) · **G-4** · publish-gauntlet semantics change (security-adjacent) · G-5 (`WorkflowBuilderPage.tsx`, `builderStore.ts`, `PublishGauntlet.tsx`, `publish_service.py`, `WorkflowRunPage.tsx`) · UI hint |
+| 289 | The Run Page and Its Evidence | A finished run has one read-only page with export, and each knowledge-base-derived phase output carries a confidence level | VIS-03, TRUST-01 | 5 | **G-2 sketch** · **G-4** · migration only if needed (next free after 209) · no new model call · G-5 (`WorkflowRunPage.tsx`, `workflow_runs.py`, `harness_engine.py`, `phase_types.py`) · UI hint |
+| 290 | The Card and the Team Picture | The library card matches its approved sketch, and a multi-agent workflow can be viewed as a truthful orchestrator / workers / judge picture | VIS-04, VIS-01 | 4 | **G-2 sketch FIRST for both** · **G-4** · no edges the schema lacks · G-5 (`WorkflowCard.tsx`, `PhaseSpineGraph.tsx`, `WorkflowCanvas.tsx`, `PhaseNodeCard.tsx`) · UI hint |
+| 291 | Describe It From Your Own Files | Describe-it authoring takes uploaded assets and derives inputs, phases and tools from the closed set | AUTH-02 | 4 | **provider-docs-first** (structured output, 8-row roster) · SC#10 four-axis · security_enforcement (untrusted asset content) · closed core recount · G-5 (`workflow_authoring.py`, `workflows.py`, `useTemplateFirstDraft.ts`) · UI hint |
+| 292 | More Ways to Show It | The agent can show artifact types beyond chart, table and metric, from a closed registry | VIS-02 | 4 | **G-2 sketch** (choose the set at sketch time) · closed registry only, no new tool · migration only if the message_artifacts constraint needs it · G-4 · UI hint |
+| 293 | Start From Outside, and Close Out | An external system starts a run and reads the result; every run shows how it began; seed statuses match reality | START-02, START-04, REG-06 | 6 | ⛔ **security_enforcement** (opens an external door) · anti-injection + egress · org-scoped, rate-limited, audited · migration likely (next free) · **G-4** · depends on 287 and 289 · UI hint |
+
+**Dependency order:** 286 → 287 → 288 → 289 → 290 → 291 → 292 → 293. The real constraints are narrower:
+
+- **286 comes first** (REG-07). G-5: refactors go before the feature phases that edit the same files. `workflows.py` extraction is recorded OWED, and `WorkflowBuilderPage.tsx` (2,993 lines), `WorkflowRunPage.tsx` (1,670) and `WorkflowCard.tsx` (1,616) are the largest workflow files later phases edit.
+- **288 before 289.** Both edit `WorkflowRunPage.tsx`; AUTH-01 adds the "waiting on" line, then 289 builds the page around it. Two phases must not edit it concurrently.
+- **289 before 293.** START-02 returns a result the caller reads back and START-04 labels how a run began; both are shown on the run page 289 builds.
+- **287 before 293.** START-04's last/next-run vocabulary sits beside the start entry points 287 adds.
+- **290 and 292** are independent of each other and of 291; they can swap order.
+- **291 after 288.** Both author through the builder / describe door; `useTemplateFirstDraft.ts` and the builder store settle in 288 first.
+
+### Phase Checklist
+
+- [ ] **Phase 286: Seams Before Features**: take the named G-5 seams on the workflow files this milestone edits, behaviour unchanged (REG-07)
+- [ ] **Phase 287: Start From a Thread, Fork a Starter**: launch a workflow from a thread with its form and run attached; fork one of 5+ curated, gauntlet-passing starters in one click (START-01, START-03)
+- [ ] **Phase 288: Drafts That Survive, Pauses That Publish**: draft configuration persists across navigation; a human-pause workflow publishes and the run shows who it waits on (AUTH-03, AUTH-01)
+- [ ] **Phase 289: The Run Page and Its Evidence**: one read-only finished-run page with export; confidence on KB-derived phase outputs (VIS-03, TRUST-01)
+- [ ] **Phase 290: The Card and the Team Picture**: card matches its approved sketch; truthful orchestrator / workers / judge view (VIS-04, VIS-01)
+- [ ] **Phase 291: Describe It From Your Own Files**: describe-it authoring from uploaded template, form and reference documents (AUTH-02)
+- [ ] **Phase 292: More Ways to Show It**: new artifact types from a closed registry, set chosen at sketch time (VIS-02)
+- [ ] **Phase 293: Start From Outside, and Close Out**: authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
+
+### Phase Details
+
+#### Phase 286: Seams Before Features
+
+**Goal**: The workflow files this milestone is about to edit are split along the seams their ledger sections name, so later phases add to small files instead of 1,600 to 3,000-line ones. Behaviour is unchanged.
+**Depends on**: Nothing (first phase of v4.7).
+**Requirements**: REG-07
+**Success Criteria** (what must be TRUE):
+
+  1. Before any extraction, `node scripts/check-hot-file-ledger.cjs` is run over the `files_modified` of phases 287-293 as sketched at roadmap time, and the list of files that actually fire G-5 is recorded in CONTEXT (re-derived with the ledger recipe, not copied from a row). Each firing file is either extracted in this phase or carries a written reason it can be honoured by construction.
+  2. `backend/app/api/workflows.py` (recorded "extraction still OWED") and the frontend files the measurement shows firing on 287-290 (candidates: `WorkflowBuilderPage.tsx`, `WorkflowRunPage.tsx`, `WorkflowCard.tsx`) are split along their ledger-named seams. Moved functions are AST-identical to the phase base, and no route path, response shape or rendered DOM changes.
+  3. The closed core counts 7 / 1 / 30 before and after, the backend unit gate stays <= 71 failed with 0 collection errors, the frontend count gate shows no per-file decrease, and the typecheck set diff is empty.
+  4. The ledger rows and their `docs/HOT-FILE-LEDGER.md` sections are updated in the same commit, and `check-claude-md-size.cjs` and `check-hot-file-ledger.cjs` pass.
+
+**How we'd know this failed**: a "pure move" changes a route or an import-time side effect and a test edited in the same commit hides it; the extraction is chosen from the roadmap's candidate list instead of the measurement; a later phase still has to edit a 2,900-line file because the seam taken was the easy one; a ledger row is updated without its section, or the reverse.
+**Plans**: TBD (target 3-4)
+**Flags**: ⛔ G-5 extraction, behaviour-preserving, TDD pin-first. Measure first. Never `rm -rf` a worktree. Files in play (ledger triples as of roadmap time): `workflows.py` 43/23/2261, `WorkflowBuilderPage.tsx` 57/22/2993, `WorkflowRunPage.tsx` 28/9/1670, `WorkflowCard.tsx` 19/6/1616.
+
+#### Phase 287: Start From a Thread, Fork a Starter
+
+**Goal**: A user can start a workflow without leaving the conversation, and can begin from a ready-made starter instead of a blank page.
+**Depends on**: Phase 286.
+**Requirements**: START-01, START-03
+**Success Criteria** (what must be TRUE):
+
+  1. From inside an open thread, the user can pick a workflow, fill the launch form that workflow declares, and start it; the run appears attached to that same thread, not a new one (START-01).
+  2. A required launch input left empty is refused with a plain message naming the field, and nothing is started (START-01).
+  3. At least 5 curated starter workflows are listed, each passes the publish gauntlet when the gauntlet is run against it (shown by running it, not asserted) (START-03).
+  4. One click on a starter creates the user's own draft copy, opened in the builder, and editing the draft never changes the starter or another user's copy (START-03).
+  5. The thread start path is driven on one native provider and OpenRouter with a two-tool prompt and a parallel-thread row (SC#10 axes; full roster run or recorded owed).
+
+**How we'd know this failed**: the form appears but the run starts in a new thread; the entry point is still reachable only from the Workflows page; a starter fails the gauntlet and the list still counts it; "fork" shares the row with the starter so an edit leaks; the starters are fixtures with no real content.
+**Plans**: TBD (target 3-5)
+**UI hint**: yes
+**Flags**: **G-2 sketch** the in-thread entry and the starter picker before discuss. **G-4**: the operator names the "I'd recognize failure here" scenarios at scope time. `ChatLaunchForm` already exists (214-12) and `ChatLayout.doRun` has one caller; reuse it, do not build a second launch form. Starters are workflow definitions (data), no new phase type. Seeds `SEED-232`, `SEED-084`.
+
+#### Phase 288: Drafts That Survive, Pauses That Publish
+
+**Goal**: An author's work in progress does not disappear, and a workflow that legitimately waits for a person is a normal publishable workflow.
+**Depends on**: Phase 286.
+**Requirements**: AUTH-03, AUTH-01
+**Success Criteria** (what must be TRUE):
+
+  1. An author configures a draft (including the name and node configuration the describe door produced), navigates to another page and back, and every setting is still there. Driven in a browser as the user (AUTH-03).
+  2. Closing a draft, opening a different one, and returning never shows the first draft's configuration inside the second (AUTH-03).
+  3. A workflow containing a human-input pause passes the publish gauntlet and can be published, where it was refused before; the gauntlet still refuses a planted unbounded wait (AUTH-01).
+  4. When a run of that workflow pauses, the run surface shows who the run is waiting on, in words, and the same line is present after reload (AUTH-01).
+
+**How we'd know this failed**: the draft persists only until a hard reload; two drafts overwrite each other; the gauntlet is loosened by removing a check rather than teaching it the pause; "waiting on" shows an id or nothing; a published pause workflow makes a run that never resumes and nothing says so.
+**Plans**: TBD (target 3-5)
+**UI hint**: yes
+**Flags**: **G-2 sketch** the waiting-on moment. **G-4**. The publish gauntlet is security-adjacent: driven RED against a planted unbounded wait. Hot files: `WorkflowBuilderPage.tsx`, `builderStore.ts`, `PublishGauntlet.tsx`, `publish_service.py`, `WorkflowRunPage.tsx`; read their ledger sections. Seeds `SEED-183`, `SEED-164`. Uses the existing `llm_human_input` phase type; no new phase type.
+
+#### Phase 289: The Run Page and Its Evidence
+
+**Goal**: Anyone with access can open one read-only page for a finished run that shows what it did and on what evidence, and can see how sure each knowledge-based answer was.
+**Depends on**: Phase 288 (both edit `WorkflowRunPage.tsx`).
+**Requirements**: VIS-03, TRUST-01
+**Success Criteria** (what must be TRUE):
+
+  1. A finished run opens a single read-only page listing the workflow definition version it ran, the phase log, each verdict, and the cited sources (VIS-03).
+  2. The page can be exported, and the export contains the same four sections, matching what the page shows (VIS-03).
+  3. A user without access to the run's organisation cannot open the page or export, driven as a second user (VIS-03).
+  4. Each phase output that came from the knowledge base carries a confidence level, shown on the run surface and in the receipt; a phase that did not use the knowledge base shows none (TRUST-01).
+  5. The confidence value is the one already computed for chat, carried onto the run; no new model call is added (TRUST-01).
+
+**How we'd know this failed**: the page shows the current workflow definition instead of the version the run used; export omits the cited sources; a phase with no KB use shows "high"; confidence is recomputed with a model call; the page is writable; a member of another org reads it.
+**Plans**: TBD (target 3-5)
+**UI hint**: yes
+**Flags**: **G-2 sketch** the page and the confidence chip. **G-4**. Migration only if the run model lacks a place for confidence (next free after 209). Hot files: `WorkflowRunPage.tsx`, `workflow_runs.py`, `harness_engine.py` (61/24/3387), `phase_types.py` (55/28/3014), `RunReceipt.tsx`. Seeds `SEED-348`, `SEED-152`.
+
+#### Phase 290: The Card and the Team Picture
+
+**Goal**: The workflow library card looks like the design the operator approved, and a multi-agent workflow can be seen as the team it is.
+**Depends on**: Phase 286.
+**Requirements**: VIS-04, VIS-01
+**Success Criteria** (what must be TRUE):
+
+  1. The library card shows labelled phase chips and the description no longer dominates, matching the approved sketch; checked by screenshot against the sketch and by asserting the rendered chip text (VIS-04).
+  2. A multi-agent workflow can be opened as a picture of its orchestrator, workers and judge, built from the workflow definition (VIS-01).
+  3. The picture contains no edge the schema lacks: for a planted workflow with no worker-to-worker link, none is drawn (VIS-01).
+  4. A single-agent workflow shows no team picture, or an honest single-node one, and never an invented worker (VIS-01).
+
+**How we'd know this failed**: the card still leads with a paragraph; chips show type ids instead of words; the team picture draws arrows that look right but are not in the definition; it looks good on the sketch's example and breaks on a real 7-phase workflow; the new view becomes a second runtime or second canvas.
+**Plans**: TBD (target 3-5)
+**UI hint**: yes
+**Flags**: **G-2 sketch FIRST for both** (the card has an approved sketch; VIS-01 needs a new one). **G-4**. Hot files: `WorkflowCard.tsx`, `PhaseSpineGraph.tsx`, `WorkflowCanvas.tsx`, `PhaseNodeCard.tsx`, `libraryVocabulary.ts`; read the card's ledger section. Canvas glyph vocabulary: `references/icon-convention.md` section 4. Seeds `SEED-155`, `SEED-086`.
+
+#### Phase 291: Describe It From Your Own Files
+
+**Goal**: An author can hand the describe door a template, a form or reference documents and get a draft whose inputs, phases and tools come from them.
+**Depends on**: Phase 288.
+**Requirements**: AUTH-02
+**Success Criteria** (what must be TRUE):
+
+  1. The describe door accepts an uploaded template, form and reference documents, and returns a draft whose declared inputs match the fields found in the uploaded form or template (AUTH-02).
+  2. Every tool and phase type in the draft comes from the existing closed set; a draft the model proposes with an unknown tool is refused, not saved (AUTH-02).
+  3. Instructions hidden inside an uploaded asset do not change the draft's tools or grants; driven with a planted injection in a reference document (AUTH-02).
+  4. The path is driven on the full native provider roster plus OpenRouter, with blocked rows recorded, never omitted (AUTH-02).
+
+**How we'd know this failed**: inputs are guessed from the prompt and ignore the form; the draft names a tool that does not exist; an uploaded document gains the power to grant a tool; only one provider was driven; the asset text is lost on reload.
+**Plans**: TBD (target 3-5)
+**UI hint**: yes
+**Flags**: **Provider-docs-first** (structured output per provider). **SC#10 four-axis UAT, full roster**. security_enforcement: asset content is untrusted. Closed core recount. Hot files: `workflow_authoring.py` (17/11/1025), `workflows.py`, `useTemplateFirstDraft.ts`. Seed `SEED-051`.
+
+#### Phase 292: More Ways to Show It
+
+**Goal**: The agent can answer with more kinds of interactive artifact than chart, table and metric, each from a closed, reviewed registry.
+**Depends on**: Phase 286 (no file overlap with 287-291; may run earlier).
+**Requirements**: VIS-02
+**Success Criteria** (what must be TRUE):
+
+  1. The new artifact set is chosen at sketch time, recorded in CONTEXT with the reason each type earns a place, and is a closed list (VIS-02).
+  2. In a real chat turn the agent shows each new type and it renders; a type name outside the registry is refused and shown as text, not rendered (VIS-02).
+  3. Reloading the thread shows the same artifacts, checked on at least two native providers (VIS-02).
+  4. The tool count stays 30; `show_artifact` is extended by registry entries only (VIS-02).
+
+**How we'd know this failed**: a component is added without a schema guard so model-supplied props render raw; the set grows because it was easy rather than chosen at sketch; artifacts vanish on reload; the tool count moves; sandboxed HTML (direction B in the seed) creeps in without its own operator decision.
+**Plans**: TBD (target 3-4)
+**UI hint**: yes
+**Flags**: **G-2 sketch**. Closed registry only; sandboxed HTML needs its own operator decision and is out of this phase. Files: `frontend/src/components/chat/artifacts/**`, `backend/app/models/artifact.py`, `backend/app/services/show_artifact_tool.py`. Migration only if the `message_artifacts` constraint needs a new literal. Seed `SEED-337`.
+
+#### Phase 293: Start From Outside, and Close Out
+
+**Goal**: An external system can start a workflow and read its result, every run shows how it was started, and the seed register matches what shipped.
+**Depends on**: Phase 287 (start entry points), Phase 289 (run page that shows provenance and result).
+**Requirements**: START-02, START-04, REG-06
+**Success Criteria** (what must be TRUE):
+
+  1. An authenticated inbound call starts a published workflow's run and returns an identifier; a second call with that identifier reads the status and result (START-02).
+  2. An unauthenticated call, a call with a credential from another organisation, and a call to an unpublished workflow are each refused, driven live (START-02).
+  3. Calls above the rate limit are refused with a clear response, and every call writes an audit row naming the credential and the run (START-02).
+  4. Inbound input is treated as untrusted data: a payload containing instructions cannot change the workflow's tools or grants (START-02).
+  5. A run started by a schedule or an inbound call says so on the run surface, and the workflow shows its last run and next run (START-04).
+  6. `SEED-163` reads delivered, every seed folded at intake carries its real status and where it went, and `node scripts/check-seeds-register.cjs` reports no folded seed still `planted` (REG-06).
+
+**How we'd know this failed**: the endpoint trusts a guessable id; a credential works across organisations; no rate limit; inbound payload text reaches a prompt as instructions; the run page says "manual" for an inbound run; next-run is blank for a scheduled workflow; a seed that shipped still reads `planted`.
+**Plans**: TBD (target 4-5)
+**UI hint**: yes
+**Flags**: ⛔ **security_enforcement**, opens an external door; read `docs/CONNECTOR-ARCHITECTURE.md` (MCP-first verdict; this is the inbound half, not Open Platform `SEED-013`), `app.security.egress`, and the TRUST-03 anti-injection discipline. Org-scoped, rate-limited, audited. Credentials stored hashed or encrypted per `secret_cipher.py`. Migration likely (next free after 209); apply by SQL editor, regenerate `full-schema.sql`, run `get_advisors(security)`; revoke from `PUBLIC` on any new function. **G-4**. SC#10 axes for the run-start path. Hot files: `workflow_runs.py`, `workflow_kickoff.py`, `scheduler_service.py`, `WorkflowRunPage.tsx`, `main.py`. Seeds `SEED-195`, `SEED-014`; REG-06 is the close-out step, by hand-editing seed frontmatter.
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 286. Seams Before Features | 0/TBD | Not started | - |
+| 287. Start From a Thread, Fork a Starter | 0/TBD | Not started | - |
+| 288. Drafts That Survive, Pauses That Publish | 0/TBD | Not started | - |
+| 289. The Run Page and Its Evidence | 0/TBD | Not started | - |
+| 290. The Card and the Team Picture | 0/TBD | Not started | - |
+| 291. Describe It From Your Own Files | 0/TBD | Not started | - |
+| 292. More Ways to Show It | 0/TBD | Not started | - |
+| 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
 
 ---
 
