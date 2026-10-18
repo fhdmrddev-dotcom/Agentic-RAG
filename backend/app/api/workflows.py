@@ -8,6 +8,27 @@ The endpoint is owner-scoped through ``list_published_workflows``' RLS-mirroring
 WHERE clause (``status='published' AND (is_system_global OR created_by=user)``) — a user
 never sees another user's unpublished or private definitions (T-092-07). The GET
 itself is a pure read (no writes).
+
+Phase 286 (REG-07, plan 286-01, 2026-10-18) — split along the G-5 seam owed since Phase 214.
+Two sibling modules hold what moved, and every route still registers on THIS module's ``router``:
+
+  * ``workflow_wire.py`` — the Pydantic wire models and pure helpers (20 symbols) that no source
+    fence pins inside this file. A leaf: it imports nothing from ``app.api``.
+  * ``workflow_authoring_doors.py`` — ``GenerateRequest`` + ``generate_workflow`` and the three
+    template doors, moved WITHOUT their decorators. Each is registered below as
+    ``router.<verb>(<verbatim decorator args>)(<handler>)`` at its original position, so the
+    path, dependencies and declaration order are unchanged — pinned by
+    ``tests/unit/test_286_workflows_seam_pins.py`` (OpenAPI, route table, AST identity),
+    committed before the move.
+
+What STAYED, and the fence or patch that keeps it here (full inventories: ``286-01-BASE.md``):
+every other handler, because tests patch ``app.api.workflows.<name>`` for it (D-03);
+``PublishedWorkflow`` / ``DraftRow`` (``test_library_run_facts.py`` counts their ``has_any_run``
+declarations in this file's text); the severity block and ``_severity``
+(``test_187_route_assigned_reach.py`` pins the block's prose in this file); ``validate_workflow``
+(``test_publish_service.py`` asserts its ``__module__``); and every import, including ones a
+staying handler no longer uses, because tests patch them by this module's path. Every moved
+name is re-imported below, so ``app.api.workflows.<Name>`` still resolves to the SAME object.
 """
 from __future__ import annotations
 
@@ -97,6 +118,39 @@ from app.services.template_render_service import (
     parse_docx_template_variables,
     placeholder_names_from_parsed,
 )
+# Phase 286 (REG-07 / 286-01) — the wire models, pure helpers and authoring doors moved to two
+# sibling modules. Re-imported HERE by name so every ``app.api.workflows.<Name>`` a test or a
+# module reads still resolves to the SAME object, and so the decorators and staying handlers
+# below resolve them at import time. Neither sibling imports this module, so there is no cycle.
+from app.api.workflow_wire import (
+    BlockedStep,
+    DeletePreview,
+    DraftCreateResponse,
+    GroundingBundleResponse,
+    PaletteFolder,
+    PaletteSkill,
+    PublishRequest,
+    PublishVerdict,
+    TemplateAssetRef,
+    TemplatePlaceholdersResponse,
+    ValidateResponse,
+    Verdict,
+    _ALREADY_PUBLISHED_DETAIL,
+    _TEMPLATE_MAX_UNCOMPRESSED_BYTES,
+    _TEMPLATE_MIME_BY_EXT,
+    _caller_uuid,
+    _coerce_definition,
+    _coerce_user_id,
+    _iso_or_none,
+    _owned_slug_or_404,
+)
+from app.api.workflow_authoring_doors import (
+    GenerateRequest,
+    generate_workflow,
+    get_workflow_template_placeholders,
+    read_template_placeholders,
+    upload_workflow_template,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -119,29 +173,6 @@ logger = logging.getLogger(__name__)
 #     delegates to the out-of-scope ``workflow_authoring`` service. Both keep service-role
 #     (``# service-role:`` at their Depends). The harness/eval async writers are widened in plan 09.
 router = APIRouter(prefix="/workflows", tags=["workflows"])
-
-
-def _coerce_definition(raw: object) -> dict | None:
-    """Decode the ``definition`` JSONB column to a dict for the wire.
-
-    asyncpg returns the JSONB column as a raw JSON string when no pool codec is
-    registered (db/workflows.py:278) — mirror publish_service's defensive decode
-    (:103-109): a string is ``json.loads``-ed, a dict passes through, anything
-    unparseable degrades to ``None`` (the client tolerates a missing definition).
-    """
-    if raw is None:
-        return None
-    if isinstance(raw, dict):
-        return raw
-    if isinstance(raw, str):
-        try:
-            import json
-
-            decoded = json.loads(raw)
-            return decoded if isinstance(decoded, dict) else None
-        except (ValueError, TypeError):
-            return None
-    return None
 
 
 class PublishedWorkflow(BaseModel):
@@ -287,75 +318,6 @@ class PublishedWorkflow(BaseModel):
     next_schedule_interval_seconds: int | None = None
     next_schedule_timezone: str | None = None
     next_schedule_count: int | None = None
-
-
-def _caller_uuid(current_user: dict) -> UUID | None:
-    """The authenticated caller's id as a ``UUID`` — the one coercion both feeds share.
-
-    Phase 192 (D-04): ``get_published_workflows`` already normalises ``current_user["id"]``
-    through ``UUID(...)`` when it is a ``str`` before handing it to the db layer. ``is_mine``
-    must be computed IDENTICALLY in ``/published`` and ``/starters``, so the coercion lives
-    in ONE place rather than being retyped per handler (a retyped coercion is how the two
-    endpoints silently disagree). Returns ``None`` when the id is absent or unparseable, so
-    ``is_mine`` degrades to ``False`` — never to a 500 on a read path the RUN CARVE-OUT
-    protects.
-    """
-    raw = current_user.get("id")
-    if isinstance(raw, UUID):
-        return raw
-    if isinstance(raw, str):
-        try:
-            return UUID(raw)
-        except ValueError:
-            return None
-    return None
-
-
-def _iso_or_none(raw: object) -> str | None:
-    """A row's ``updated_at`` as an ISO-8601 ``str`` — the ONE coercion all THREE feeds share.
-
-    Phase 192.1 (LIB-05 / D-15). It lives in one place for the reason ``_caller_uuid`` above
-    does: ``updated_at`` is serialized by ``/published``, ``/starters`` AND ``/drafts``, and a
-    coercion retyped per handler is how three endpoints silently come to disagree about the
-    same column. asyncpg decodes ``timestamptz`` to a ``datetime``, so the live path is
-    ``.isoformat()``.
-
-    TYPED ``str`` ON THE WAY OUT, NEVER ``datetime``, AND THAT IS BINDING — see the field
-    docblocks on ``PublishedWorkflow.updated_at`` and ``DraftRow.updated_at``. A
-    ``datetime``-typed model field re-serializes through Pydantic and DROPS the fractional
-    part when microseconds are 0, so the wire string's width would vary with the clock.
-    Formatting HERE makes the wire value exactly what the database returned.
-
-    Tolerates a ``str`` already (a hand-built row dict in a test, or a driver configured with
-    a text codec) and answers ``None`` for a missing/NULL column, so a caller degrades to "no
-    changed segment" rather than raising on a read path the RUN CARVE-OUT protects.
-    """
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        return raw
-    isoformat = getattr(raw, "isoformat", None)
-    return isoformat() if callable(isoformat) else None
-
-
-# ── Phase 103 (REQ-1 / WFAUTH-01) — draft CRUD response shapes ────────────────
-class DraftCreateResponse(BaseModel):
-    """The create/PATCH return — the new (or updated) draft id + its version.
-
-    Phase 186 (CONCUR-02 / D-186-07): ``token`` is the ADDITIVE opaque optimistic
-    concurrency token of the row AS OF THIS RESPONSE. On a PATCH it is the POST-write
-    value, so the client chains its next autosave with no extra read. Old callers that
-    ignore the field stay valid — nothing about ``id``/``version`` changed.
-
-    TYPED ``str``, NEVER ``datetime``, AND THAT IS BINDING. A ``datetime``-typed field
-    re-serializes through Pydantic, which DROPS the fractional part when microseconds are
-    0 — the token width would then vary with the clock and a save could compare unequal to
-    itself. The client echoes this string VERBATIM and must never parse it (a JS ``Date``
-    truncates to milliseconds; probed, it matches 0 rows)."""
-
-    id: UUID
-    version: int
-    token: str
 
 
 class DraftRow(BaseModel):
@@ -654,125 +616,6 @@ async def get_starter_workflows(
 # route below (the ``/drafts`` / ``/starters`` precedent), so no present or future path param
 # can shadow them. ``_coerce_user_id`` is defined further down at module level and resolved
 # at request time.
-class Verdict(BaseModel):
-    """One static-gauntlet finding, per-node (SC#4).
-
-    ``code`` is the machine literal, and every one of them is OWNED by the module that emits
-    it (WR-05): the 5 ``reachability.LINT_CODES`` values, the 3
-    ``grounding.GROUNDING_VERDICT_CODES`` values (``folder_scope`` / ``unregistered_tool`` /
-    ``unregistered_skill``), and the 3 ``_ROUTE_ASSIGNED_CODES`` this route mints itself
-    (``business_requirement`` / ``interactive_phase`` / ``unbound_retrieval``). ``phase`` is
-    the phase ``slug`` — the
-    node identity the canvas paints on (the 181/183 ``node id == phase.slug`` contract) — or
-    ``None`` for a workflow-global finding. ``severity`` is the ONLY net-new field (D-182-03):
-    an ORTHOGONAL UI hint (``error`` = broken/red, ``incomplete`` = still-building/grey), NOT
-    a pass/fail axis — both severities block a publish."""
-
-    code: str
-    phase: str | None = None
-    message: str
-    severity: Literal["error", "incomplete"]
-
-
-class ValidateResponse(BaseModel):
-    """The ``{ok, verdicts}`` envelope — vocabulary aligned with the existing
-    ``{ok, error, detail}`` grounding shape + the D-08 publish verdict (no new vocabulary).
-
-    ``ok == (verdicts == [])``: the FULL static gauntlet is clean, i.e. "this can pass the
-    static half of publish now". An ``incomplete``-only verdict set still sets ``ok False``
-    (an unfinished draft cannot publish either)."""
-
-    ok: bool
-    verdicts: list[Verdict] = Field(default_factory=list)
-
-
-class PaletteFolder(BaseModel):
-    """One KB folder the canvas may bind a ``project_folder_id`` / ``folder_scope`` to.
-
-    An EXPLICIT projection (CR-02). ``bundle.folders`` are raw
-    ``fetch_all_folders(supabase, fields="*")`` rows — i.e. EVERY column of ``public.folders``
-    (``id, user_id, name, parent_id, is_org_shared, created_at, updated_at, org_id``). Raw DB
-    rows must NEVER reach the wire on this surface:
-
-      * ``org_id`` is deliberately absent — ``FolderResponse`` does not expose it either, and a
-        tenant identifier is not a palette field.
-      * the owner ``user_id`` is deliberately absent — SEED-091 / D-164-05 (TEN-06): a
-        non-owner reader of an org-shared folder must not learn who seeded it. Omitting the
-        column outright is strictly stronger than nulling it.
-      * ``created_at`` / ``updated_at`` are noise the palette never renders.
-
-    ``id`` / ``name`` / ``parent_id`` is not a guess at what the canvas needs — it is exactly
-    what ``grounding._render_folder_tree`` consumes to build the tree, so the picker can render
-    the full hierarchy from this and nothing more."""
-
-    id: UUID
-    name: str
-    parent_id: UUID | None = None
-
-
-class PaletteSkill(BaseModel):
-    """One enabled skill eligible for a phase ``skill_ref`` — id + display name ONLY (CR-02).
-
-    ``bundle.skills`` rows carry the owner ``user_id`` (and, post-CR-01, ``org_id`` /
-    ``is_system`` / ``is_enabled``, which the org-gated visibility post-filter needs). None of
-    that is palette data. ``skill_ref`` binds to the ``id``; the name is the label
-    ``render_grounding_prompt`` also shows. ``name`` is Optional purely so a degenerate row can
-    never 500 a read-only palette."""
-
-    id: UUID
-    name: str | None = None
-
-
-class GroundingBundleResponse(BaseModel):
-    """The server-sourced PALETTE of valid building blocks (D-182-01).
-
-    This is what Phase 184's node-config dropdowns bind to — the tool names eligible for an
-    ``available_tools`` whitelist, the KB folder tree (name + id), the enabled owner/org-shared
-    skills eligible for ``skill_ref``, and (only when a ``template_asset_id`` is supplied) that
-    template's placeholder fields. **It is NEVER a frontend constant** (Pitfall 1 / SC#2): KB
-    content can never whitelist itself, so the valid sets are computed server-side by the ONE
-    shared ``grounding.assemble_grounding_bundle``.
-
-    Kept a SEPARATE cacheable ``GET`` rather than embedded in the ``/validate`` response
-    (D-182-01): ``/validate`` fires on every canvas edit; the palette is near-static."""
-
-    tools: list[str] = Field(default_factory=list)
-    # Phase 185 (D-185-09 / GOVERN-01) — the KB-READING tool names. The client intersects
-    # this with a phase's ``available_tools`` so the grounding dial, the strike-through on the
-    # loose side and the canvas seal all move on the SAME render as a tool chip: no debounce,
-    # no reload, and no network hop just to print a refusal reason.
-    #
-    # THE CLIENT NEVER ENFORCES. Req 4's run-time gate is unconditional and server-side, so a
-    # wrong client read is a DISPLAY bug by construction and never a safety hole. What the
-    # client must not do is own the LIST — a hardcoded frontend copy is a second copy of the
-    # safety-defining names, and the day a 6th KB tool lands backend-side the canvas silently
-    # stops marking it (the exact drift D-182-06's RED LINE was written against).
-    #
-    # NOT filtered by ``tools``, and NOT suppressed when ``degraded`` is non-empty: this is the
-    # safety-DEFINING list, not a per-caller registry read, and a degraded folder/skill read
-    # must never silently un-mark a locked step.
-    kb_tools: list[str] = Field(default_factory=list)
-    # CR-02: EXPLICIT per-row models, never ``list[dict]``. A bare ``list[dict]`` shipped the raw
-    # ``folders``/``skills`` DB rows verbatim — leaking ``org_id`` + the seeding owner's
-    # ``user_id`` on a brand-new surface, bypassing the projection every sibling read applies.
-    folders: list[PaletteFolder] = Field(default_factory=list)
-    skills: list[PaletteSkill] = Field(default_factory=list)
-    template_placeholders: list[str] = Field(default_factory=list)
-    # Round-3 CR-02 / verification Truth 8: the names of the registries that could NOT be
-    # resolved for this request (``"folders"`` / ``"skills"``), sorted for a stable payload.
-    # EMPTY is the only value that means "this palette is complete".
-    #
-    # Without this field the route was a LIAR AT SCALE, and specifically a liar this phase
-    # introduced: plan 182-11 moved the folders/skills read failure OUT of an exception
-    # (a loud 500 the canvas could not mistake for data) and INTO ``GroundingBundle.degraded``
-    # — a field this handler then never read. A PostgREST blip therefore rendered as
-    # ``{"folders": [], "skills": []}`` at HTTP 200: byte-indistinguishable from an author who
-    # genuinely owns nothing, on the exact surface whose whole job is to tell the canvas which
-    # building blocks are valid. The canvas would have drawn empty dropdowns and the author
-    # would have concluded their KB was gone. Degrading LOUDLY is the same contract
-    # ``/validate`` already keeps with ``grounding_unavailable`` — "we could not check" is a
-    # different sentence from "there is nothing", and the palette must be able to say it.
-    degraded: list[str] = Field(default_factory=list)
 
 
 # ══ The severity taxonomy (D-182-03) — COMPOSED from the owning modules ══════════
@@ -1231,66 +1074,6 @@ async def get_grounding_bundle(
 # api/threads.py (the hot-file ledger forbids growing threads.py). The publish flip
 # is the ONLY draft->published path; 103's Workflows page is just a client of this
 # endpoint (same server-enforced-invariant discipline as 092's mode lock).
-class PublishRequest(BaseModel):
-    """The publish body — the author-supplied representative kickoff prompt (D-05)
-    the golden run executes against the project KB."""
-
-    golden_input: str
-
-
-class BlockedStep(BaseModel):
-    """WHICH step of the AUTHOR'S OWN workflow stopped a publish, and why (BUG-260828-09).
-
-    ── WHY THIS IS A FIELD OF ITS OWN AND NOT ANOTHER ``named_failures`` ENTRY ────────────
-    ``named_failures`` is POLYMORPHIC across the gauntlet's stages and its consumers are
-    required to detect shape PER ENTRY, never to switch on ``blocked_stage``
-    (``PublishGauntlet.tsx`` docblock rule 4). Adding a sixth shape to that array would make
-    every consumer's detection set grow, and a refusal that leads the surface is exactly the
-    thing that must not be reachable only by a successful shape guess. So the array is
-    UNTOUCHED — every existing entry renders byte-for-byte as it did — and the step identity
-    rides its own optional field.
-
-    ⚠ **``step_name`` IS ``None`` WHEN THE AUTHOR NAMED NOTHING, AND IS NEVER THE SLUG.**
-    That is property (1) of the report — *by the author's step name, never a slug or a stage
-    index* — enforced at the producer rather than trusted at the consumer. The client resolves
-    the visible face through ``phaseVocabulary.nodeTitle``, the shipped four-tier ladder whose
-    stated floor is that the slug never appears in its output. ``step_slug`` and ``step_index``
-    are carried for correlation (a run link, a canvas focus), NOT for display.
-
-    ⚠ **``cause`` LEADS AND ``reason`` IS DEMOTED — BOTH ARE SENT.** ``reason`` is the engine's
-    verbatim sentence including its ``Phase {n} ({slug}) …:`` prefix; ``cause`` is that sentence
-    with the prefix removed. When the prefix does not match, ``cause`` IS ``reason``, so a
-    surface leading with ``cause`` can never render empty.
-    """
-
-    step_slug: str | None = None
-    step_index: int | None = None
-    step_name: str | None = None
-    reason: str | None = None
-    cause: str | None = None
-
-
-class PublishVerdict(BaseModel):
-    """The D-08 structured verdict. A block names the stage + the failures + the
-    golden run id (a real, browsable run); a success carries the published version.
-    Machine-renderable for 103 (nothing prose-only)."""
-
-    published: bool
-    version: int | None = None
-    golden_run_id: UUID | None = None
-    blocked_stage: str | None = None
-    named_failures: list = Field(default_factory=list)
-    # ── BUG-260828-09 — THE JOIN NOTHING PERFORMED ───────────────────────────────────────
-    # ``verdictModel.ts``'s ``structural_gate`` docblock records the gap from the client side
-    # verbatim: *"The precise cause lives in `workflow_phases` / `harness_audit` against the
-    # `golden_run_id` the response already carries, and NOTHING joins them today — that is the
-    # report's requirements 1 and 2 and it is a SERVER change."* This field is that change, and
-    # that paragraph is corrected in the same commit.
-    #
-    # ⚠ OPTIONAL, and every stage that cannot name a step sends ``None`` — a lint block, a
-    # judge block, a crash before any phase ran. A ``None`` renders as the surface that
-    # shipped, so no stage gains an empty card it has nothing to put in.
-    blocked_step: BlockedStep | None = None
 
 
 @router.post(
@@ -1367,22 +1150,6 @@ async def publish_workflow(
 # ── Phase 103 (REQ-1 / WFAUTH-01) — draft CRUD routes ─────────────────────────
 # G-5 RED LINE: these join THIS router (api/workflows.py), NEVER api/threads.py.
 # The Workflows page (Plan 06) + Builder (Plan 04) are clients of these routes.
-def _coerce_user_id(current_user: dict) -> UUID:
-    """The get_published_workflows boilerplate: the trusted owner id as a UUID."""
-    user_id = current_user["id"]
-    return UUID(user_id) if isinstance(user_id, str) else user_id
-
-
-# Phase 186 (D-186-09): the published-row 409 keeps its shipped, operator-verified
-# SENTENCE and its shipped STATUS; only its SHAPE changes, from a bare string to an
-# object, so the client can branch on a machine code instead of matching prose. One
-# constant because the same refusal is raised from two places (the ``already_published``
-# cause and the CheckViolationError race backstop) and two spellings of one locked string
-# is how a locked string stops being locked.
-_ALREADY_PUBLISHED_DETAIL = {
-    "code": "already_published",
-    "message": "workflow is published and cannot be modified",
-}
 
 
 # DRAFT ROUTES ARE DELIBERATELY NOT GROUNDING-GATED (Phase 182 plan 06 — a DECISION, not an
@@ -1640,35 +1407,6 @@ async def delete_draft(
 # the draft path would change its draft-only 404 contract and collide with the client
 # ``deleteWorkflowDraft``. Cancel-first (D-LOCK-05) lives HERE in the route/service
 # layer, never inside the db-helper transaction.
-class DeletePreview(BaseModel):
-    """The victim-naming sheet's exact Removed/Kept counts (D-LOCK-03). ``versions`` +
-    ``runs`` are Removed; ``threads`` are Kept (they become normal chats); ``in_flight``
-    is the count of runs STILL LIVE — the honest signal the sheet's amber cancel-first
-    banner gates on (D-LOCK-05). Defaults to 0 so an older client that ignores it is
-    unaffected (additive field)."""
-
-    name: str
-    versions: int
-    runs: int
-    threads: int
-    in_flight: int = 0
-
-
-async def _owned_slug_or_404(pool, definition_id: UUID, user_id: UUID) -> str:
-    """Resolve the slug of an OWNED definition, or raise a uniform 404.
-
-    Owner-gated (``created_by = $2``) — a non-owner / unknown id resolves to ``None`` →
-    404, indistinguishable from not-found (no existence leak; the ``get_definition``
-    404-collapse precedent). The service role bypasses RLS, so this WHERE is the ONLY
-    authorization boundary (T-152-02-01)."""
-    row = await pool.fetchrow(
-        "SELECT slug FROM workflow_definitions WHERE id = $1 AND created_by = $2",
-        definition_id,
-        user_id,
-    )
-    if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workflow not found")
-    return row["slug"]
 
 
 @router.get(
@@ -1842,75 +1580,17 @@ async def delete_workflow_cascade(
 # orchestration (grounding assembly + forced_emit + retry + fidelity) lives in the
 # workflow_authoring service — the route is delegation ONLY. The returned draft is
 # NOT persisted (persistence is REQ-1's explicit POST /workflows create).
-class GenerateRequest(BaseModel):
-    """The NL-authoring body (D-103-CONF-2). ``describe`` is the plain-language task;
-    template grounding is OPTIONAL — a library ``template_asset_id`` OR a direct
-    ``template_placeholders`` list (never both required)."""
-
-    describe: str
-    project_folder_id: UUID | None = None
-    template_asset_id: UUID | None = None
-    template_placeholders: list[str] | None = None
-    # Phase 214 (STEP-06 / D-214-20) — the connections the AUTHOR ticked on the describe door,
-    # which become the generator's whole vocabulary for `external_action` steps.
-    #
-    # ⚠ ABSENT AND EMPTY ARE DIFFERENT FACTS AND MUST NEVER COLLAPSE. `None` is today's
-    # UNCONSTRAINED behaviour (the author expressed no preference); `[]` is the author's
-    # DECISION that no external step may be emitted at all. `list[str] | None = None` carries
-    # both; a `Field(default_factory=list)` here would erase the distinction at the boundary
-    # and no amount of care downstream could get it back. The full semantics are stated where
-    # the service parameter is declared (`workflow_authoring.generate_workflow_definition`).
-    #
-    # ⚠ `str`, NOT `UUID`, and deliberately: `connector_connections.id` reaches the client as a
-    # string and is re-scoped by org at every read (D-14). A `UUID` here would 422 a whole
-    # generation on a malformed id the ENFORCEMENT below would otherwise simply refuse to
-    # honour — an unrecognised id constrains, it never widens.
-    allowed_connection_ids: list[str] | None = None
 
 
-@router.post(
+# Phase 286 (286-01): ``generate_workflow`` lives in ``workflow_authoring_doors.py``.
+# Registered HERE, on this router at its original position, decorator args verbatim.
+router.post(
     "/generate",
     dependencies=[
         Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
         Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
     ],
-)
-async def generate_workflow(
-    body: GenerateRequest,
-    current_user: dict = Depends(get_current_user),
-    # service-role: delegates to the out-of-scope workflow_authoring service (grounding
-    # assembly reads spanning folders/templates/assets — not audited for RLS-readiness here).
-    supabase=Depends(get_supabase),
-):
-    """Generate a grounded ``WorkflowDefinition`` DRAFT from an NL description (REQ-2).
-
-    Delegates to ``workflow_authoring.generate_workflow_definition`` (the orchestration
-    stays OUT of the route body). Returns the service result dict directly:
-      - ``{ok: True, definition}`` -> a draft object the Builder loads (NOT persisted);
-      - ``{ok: False, error, detail}`` -> an HONEST "could not generate" (the UI
-        distinguishes on ``ok``). A service ``ok=False`` is returned as 200 with the
-        structured error body — it is not an HTTP error, it is an honest failure surface.
-
-    ``project_folder_id`` / ``template_asset_id`` are path/body ``UUID``s -> FastAPI 422
-    on a malformed value (V5).
-    """
-    pool = await get_pg_pool()
-    user_id = current_user["id"]
-    result = await workflow_authoring.generate_workflow_definition(
-        describe=body.describe,
-        supabase=supabase,
-        user_id=str(user_id),
-        settings=settings,
-        pool=pool,
-        project_folder_id=body.project_folder_id,
-        template_asset_id=body.template_asset_id,
-        template_placeholders=body.template_placeholders,
-        # ⚠ FORWARDED VERBATIM — no `or None`, no `or []`, no `if body.allowed_connection_ids`.
-        # Every one of those collapses the absent arm into the empty one or the reverse, and
-        # the two mean opposite things (see the field's own declaration above).
-        allowed_connection_ids=body.allowed_connection_ids,
-    )
-    return result
+)(generate_workflow)
 
 
 # ── Phase 193 (AUTH-03, corrected wording) — author-time template binding ─────
@@ -1931,181 +1611,23 @@ async def generate_workflow(
 # accepts the widened 151/D-09 allowlist (text, scripts, images) because those are skill
 # assets the agent reads. A workflow template is a document to FILL and its bytes reach
 # the docxtpl/Jinja render engine, so this door accepts the OOXML three ONLY.
-_TEMPLATE_MIME_BY_EXT = {
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-}
-# Spelled out rather than derived from ``mimetypes.guess_type`` (workspace_service:99):
-# the stdlib map has no OOXML entries and falls back to the Windows registry, so the
-# guessed value varies by machine. The mime is persisted INTO the definition and read
-# back by the render path — it must be identical on every box.
 
 
-class TemplateAssetRef(BaseModel):
-    """The four keys ``resolve_template_source`` Branch 1 reads off an ``AssetRef``.
-
-    Field-for-field identical to ``app.models.harness.AssetRef`` (models/harness.py:512)
-    so the Builder can drop this object straight into ``definition.assets[]`` and the
-    ``extra='forbid'`` WorkflowDefinition will accept it unchanged. ``kind`` is a
-    single-value Literal — this door mints templates, never ``reference`` assets.
-    """
-
-    kind: Literal["template"] = "template"
-    asset_id: str
-    filename: str
-    mime: str
-
-
-class TemplatePlaceholdersResponse(BaseModel):
-    """What a bound template asks the step to fill in — and whether we could read it.
-
-    ``read`` is the whole point of the model. An empty ``placeholders`` list is
-    ambiguous on its own: it could mean *we opened the document and it carries no
-    fill-in fields*, or *we never opened it at all*. Collapsing those two into one
-    wire shape lets an author conclude their template is field-less when the read
-    simply failed — and they then ship a workflow that fills nothing. The two
-    states are therefore carried separately and rendered as different sentences on
-    different nodes by the client.
-
-    ``"not_requested"`` is deliberately NOT in this Literal: the route always
-    supplies an ``asset_id``, so that arm of the resolver is unreachable here.
-    """
-
-    read: Literal["ok", "unreadable"]
-    placeholders: list[str] = Field(default_factory=list)
-
-
-# Phase 193.1 (AUTH-03, D-05) — the uncompressed-size cap the SHIPPED doors do not have.
-# ``zipfile.ZipFile.read()`` decompresses without a bound: ``parse_docx_template_variables``
-# (``template_render_service.py:387``) calls ``zf.read(n)`` on ``word/document.xml`` plus
-# every header/footer, so a 10 MB OOXML container declaring a multi-GB ``document.xml``
-# passes BOTH size gates above and then materialises in RAM. 50 MB is ~5x the compressed
-# cap — far beyond any real brief, far below a bomb.
-_TEMPLATE_MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
-
-
-@router.post(
+# Phase 286 (286-01): ``read_template_placeholders`` lives in ``workflow_authoring_doors.py``.
+# Registered HERE, on this router at its original position, decorator args verbatim.
+router.post(
     "/template/placeholders",
     response_model=TemplatePlaceholdersResponse,
     dependencies=[
         Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
         Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
     ],
-)
-async def read_template_placeholders(
-    file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
-) -> TemplatePlaceholdersResponse:
-    """Read a template's fill-in fields from the BYTES, persisting nothing (D-05).
-
-    WHY THIS ROUTE EXISTS. The sibling upload door needs a saved workflow
-    (``POST /{definition_id}/template``), and at describe time there is no workflow yet
-    — so an author who wants the draft built to fit their template has a chicken-and-egg
-    problem. This door takes the bytes straight off their disk and answers with the field
-    names. **No row, no Storage object, no draft.** Rejected alternatives, recorded so the
-    shape reads as a decision: minting an empty draft up front (library rows the user
-    never asked for, and a second writer against Phase 186's concurrency token), and
-    stashing to a scratch Storage path (an orphan-cleanup problem nobody owns, on bytes
-    that are RLS-sensitive).
-
-    ⚠ **IT INJECTS NO SUPABASE CLIENT AND NO POOL, AND THAT IS A CLASS ELIMINATION
-    RATHER THAN A STYLE CHOICE.** Quick task ``260814-q5r`` had to write an owner-prefix
-    check AND a ``..`` traversal check on its read door, because that route resolves a
-    caller-supplied Storage PATH through a client sitting on a service-role pool which
-    bypasses RLS — a hand-written guard in front of a service-role read is the exact
-    shape of a prior credential-exposure defect in this codebase. This route accepts no
-    path and owns no row, so there is nothing for that class to attach to. Adding
-    ``supabase=Depends(get_supabase)`` "for symmetry" would REINTRODUCE it; the fence in
-    ``tests/unit/test_193_1_stateless_placeholders.py`` sweeps the body as well as the
-    signature so that edit reds.
-
-    THE GATES, in the sibling's exact order — each one load-bearing:
-
-      1. **The DECLARED part size, before the body is materialised** (the WR-04 fix) —
-         uvicorn/FastAPI impose no body cap, so ``.read()`` of a multi-GB part would
-         buffer it all in RAM.
-      2. **The extension**, before the body is read at all — a ``.png`` costs nothing.
-      3. **Empty / oversized actual body** — a lying or absent declared size stops here.
-      4. **The magic bytes** via the shipped ``validate_upload`` — ZIP EOCD +
-         ``[Content_Types].xml`` + a per-extension part marker, so a renamed binary
-         wearing a ``.docx`` name never reaches the parser.
-      5. **The uncompressed-total cap** — see ``_TEMPLATE_MAX_UNCOMPRESSED_BYTES``.
-         ⚠ This one is NOT inherited: gates 1-4 come from the shipped doors and do NOT
-         cover a zip bomb, so they must not be presented as though they did. Capping it
-         here does NOT close it on ``POST /{id}/template`` or on the q5r read door — the
-         exposure is inherited, flagged, and deliberately not widened. It caps the
-         DECLARED uncompressed total; a central directory that UNDER-declares its sizes
-         would still get past it, and closing that needs a bounded read inside the
-         shipped parser, which is out of this door's scope.
-
-    WHY THE ORDER IS THE HONESTY MECHANISM. ``parse_docx_template_variables`` returns
-    ``None`` for TWO different facts — *not a zip / corrupt / not a docx* (:390-391) and
-    *a real docx carrying no tokens* (:407-408). Here the bytes come straight off a
-    user's disk, so the ambiguity is live. With gate 4 ahead of the parse, a document
-    that never opened is a **422 refusal**, and ``read="ok"`` with ``[]`` can only ever
-    mean *we opened it and it carries no fill-in fields*. Those two facts may never merge
-    (``TemplateAttachSection.tsx:130-143`` carries the same warning on the client).
-
-    ⚠ ``read="unreadable"`` is UNREACHABLE on this route — the same idiom
-    ``TemplatePlaceholdersResponse`` already uses for ``"not_requested"``. A document that
-    cannot be opened is a refusal, not a degraded read. The field is kept for shape parity
-    with the bound-template door so the client derives its arms from ONE wire shape.
-
-    The response echoes NOTHING from the upload — no filename, no extension, no size —
-    which is why the sibling's WR-05 ``safe_name`` sanitisation is not carried across.
-    """
-    if file.size is not None and file.size > MAX_FILE_SIZE:  # WR-04 — before .read()
-        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
-
-    original = file.filename or ""
-    ext = "." + original.rsplit(".", 1)[-1].lower() if "." in original else ""
-    if ext not in _TEMPLATE_MIME_BY_EXT:
-        raise HTTPException(
-            422,
-            "A workflow template must be a .docx, .pptx or .xlsx document "
-            f"(got {ext or 'a file with no extension'}).",
-        )
-
-    raw = await file.read()
-    if len(raw) == 0:
-        raise HTTPException(422, "File is empty")
-    if len(raw) > MAX_FILE_SIZE:  # a lying/absent declared size does not get past this
-        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
-    validate_upload(original, raw)  # magic-byte / OOXML-container gate -> 422
-
-    try:
-        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-            uncompressed = sum(zi.file_size for zi in zf.infolist())
-    except Exception:  # noqa: BLE001 — gate 4 already proved it is a container
-        raise HTTPException(422, "File is not a valid Office document (its archive could not be read).")
-    if uncompressed > _TEMPLATE_MAX_UNCOMPRESSED_BYTES:
-        raise HTTPException(
-            422,
-            "This document expands to more than "
-            f"{_TEMPLATE_MAX_UNCOMPRESSED_BYTES // (1024 * 1024)} MB when opened and "
-            "was not read.",
-        )
-
-    try:
-        # CLAUDE.md / D-v2.5-01 — the parse is sync CPU work (zip inflate + regex over
-        # stripped XML). Bounded by the gates above, but it is user-triggerable, so it
-        # goes off the event loop exactly as the sibling wraps its Storage call (:1723).
-        parsed = await run_in_threadpool(parse_docx_template_variables, raw)
-    except Exception:
-        # Clean relay, never a traceback (the sibling's :1729-1736 posture).
-        logger.warning("Stateless template placeholder read failed (relaying clean error)", exc_info=True)
-        raise HTTPException(422, "The document could not be read.")
-
-    # ``parsed is None`` HERE — past gate 4 — is the honest empty state, not a failure.
-    # The assembly is the SHARED one so this door and the bound-template door can never
-    # show two different field lists for the same document.
-    return TemplatePlaceholdersResponse(
-        read="ok", placeholders=placeholder_names_from_parsed(parsed)
-    )
+)(read_template_placeholders)
 
 
-@router.post(
+# Phase 286 (286-01): ``upload_workflow_template`` lives in ``workflow_authoring_doors.py``.
+# Registered HERE, on this router at its original position, decorator args verbatim.
+router.post(
     "/{definition_id}/template",
     response_model=TemplateAssetRef,
     status_code=status.HTTP_201_CREATED,
@@ -2113,161 +1635,13 @@ async def read_template_placeholders(
         Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
         Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
     ],
-)
-async def upload_workflow_template(
-    definition_id: UUID,
-    file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
-    # The per-request user-JWT client (ANON key + Bearer), NOT the service role. The
-    # ``workspace_storage_insert_own`` policy (migration 054:91) requires the first path
-    # segment to equal ``auth.uid()``, so Storage RLS is a SECOND, database-enforced
-    # boundary underneath the owner-gate below — a service-role client would bypass it.
-    supabase: Client = Depends(get_user_supabase_client),
-) -> TemplateAssetRef:
-    """Upload a template and store it durably against a workflow the caller OWNS.
-
-    The order of the gates is load-bearing and each one is a decision:
-
-      1. **Owner-gate first** — ``_owned_slug_or_404`` is the SAME owner-scoped
-         ``created_by`` WHERE the delete/preview routes use, and its 404 is deliberately
-         indistinguishable from not-found: a 403 would confirm that a workflow exists
-         (no existence oracle). The workflow cluster reads through a service-role pool
-         which bypasses RLS, so this WHERE is the route's authorization boundary.
-      2. **The DECLARED part size, before the body is materialised** (workspace.py:250,
-         the WR-04 fix) — uvicorn/FastAPI impose no body cap, so ``.read()`` of a
-         multi-GB part would buffer it all in RAM.
-      3. **The extension**, before the body is read at all — a ``.png`` costs nothing.
-      4. **The magic bytes** via the shipped ``validate_upload`` — a renamed binary
-         wearing a ``.docx`` name never reaches Storage.
-
-    Nothing is persisted on any refusal: the single write is the LAST statement before
-    the return. The blocking supabase-py upload is ``run_in_threadpool``-wrapped
-    (CLAUDE.md / D-v2.5-01).
-    """
-    pool = await get_pg_pool()
-    user_id = _coerce_user_id(current_user)
-    await _owned_slug_or_404(pool, definition_id, user_id)  # 404 on non-owner / unknown
-
-    if file.size is not None and file.size > MAX_FILE_SIZE:  # WR-04 — before .read()
-        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
-
-    original = file.filename or ""
-    ext = "." + original.rsplit(".", 1)[-1].lower() if "." in original else ""
-    if ext not in _TEMPLATE_MIME_BY_EXT:
-        raise HTTPException(
-            422,
-            "A workflow template must be a .docx, .pptx or .xlsx document "
-            f"(got {ext or 'a file with no extension'}).",
-        )
-
-    raw = await file.read()
-    if len(raw) == 0:
-        raise HTTPException(422, "File is empty")
-    if len(raw) > MAX_FILE_SIZE:  # a lying/absent declared size does not get past this
-        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
-    validate_upload(original, raw)  # magic-byte / OOXML-container gate -> 422
-
-    # WR-05 (100-REVIEW) sanitisation, same shape as workspace.py:265 — ordinary names
-    # ("Q3 Report (final).docx", "P&L 2026.xlsx") must not 422 at a user who never typed
-    # a path, while '/' and '..' are stripped so the object can only ever land under the
-    # user-keyed prefix built below.
-    safe_name = re.sub(r"[^a-zA-Z0-9._\- ]", "_", original)
-    safe_name = re.sub(r"\.{2,}", ".", safe_name).strip() or f"template{ext}"
-    mime = _TEMPLATE_MIME_BY_EXT[ext]
-    # The layout the seeded library fixtures already use and Branch 1 already reads
-    # (RESEARCH Q1): {user_id}/_library/{workflow}/{uuid8}-{name}. The uuid8 makes a
-    # re-upload of the same filename a NEW object rather than an overwrite, so a draft
-    # still pointing at the old asset_id keeps rendering.
-    asset_id = f"{user_id}/_library/{definition_id}/{uuid4().hex[:8]}-{safe_name}"
-    try:
-        await run_in_threadpool(
-            supabase.storage.from_(BUCKET_NAME).upload,
-            asset_id,
-            raw,
-            {"content-type": mime, "upsert": "true"},
-        )
-    except Exception:
-        # Never surface a raw storage traceback (the D-05 clean-relay posture).
-        logger.warning(
-            "Workflow template upload failed for definition=%s (relaying clean error)",
-            definition_id,
-            exc_info=True,
-        )
-        raise HTTPException(502, "The template could not be stored. Please try again.")
-
-    return TemplateAssetRef(asset_id=asset_id, filename=safe_name, mime=mime)
+)(upload_workflow_template)
 
 
-@router.get(
+# Phase 286 (286-01): ``get_workflow_template_placeholders`` lives in ``workflow_authoring_doors.py``.
+# Registered HERE, on this router at its original position, decorator args verbatim.
+router.get(
     "/{definition_id}/template/placeholders",
     response_model=TemplatePlaceholdersResponse,
     dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
-)
-async def get_workflow_template_placeholders(
-    definition_id: UUID,
-    asset_id: str = Query(..., max_length=512),
-    current_user: dict = Depends(get_current_user),
-    # The per-request user-JWT client, NOT the service role — see gate 3 below.
-    supabase: Client = Depends(get_user_supabase_client),
-) -> TemplatePlaceholdersResponse:
-    """Read the fill-in fields of a template the caller OWNS (quick task 260814-q5r).
-
-    WHY THIS ROUTE EXISTS AT ALL, rather than a widened ``?template_asset_id=`` on
-    ``GET /workflows/grounding-bundle``. That parameter is typed ``UUID | None``, while
-    this feature's asset ids are Storage PATHS (``{user_id}/_library/{definition_id}/…``)
-    — so passing a real one is a **422 before the handler runs**, measured. The seam is
-    not merely unwired, it is unwirable as typed. And widening it would be worse than
-    useless: ``resolve_template_source`` Branch 1 does not scope by ``user_id`` at all,
-    and that route injects the **service-role** client, so the ``UUID`` coercion is
-    today's ONLY thing standing between a caller and any object in the bucket. Relaxing
-    an accidental guard into a hand-written one on a service-role Storage read is the
-    exact shape of a prior credential-exposure defect in this codebase. Two further
-    reasons: the palette route is ``require_canvas()``-gated, so placeholders would be
-    invisible on the Spine view (the surface most authors are on), and it would refetch
-    the whole palette — folder tree, skill registry, tool list — to read one document.
-
-    ⚠ **The asset is NOT required to be bound in the persisted definition, and that is a
-    decision, not an oversight.** The Builder writes a freshly-uploaded descriptor into
-    its store one statement before ``saveNow()``; requiring the binding would make this
-    fetch race that round trip and answer about the OLD template, or about none.
-    Ownership is proved by the gates below, never by the binding.
-
-    THE GATES, in order, each one load-bearing:
-
-      1. **Owner-gate on the definition** — ``_owned_slug_or_404``, the SAME owner-scoped
-         ``created_by`` WHERE the upload/delete/preview routes use. Its 404 is deliberately
-         indistinguishable from not-found: a 403 would confirm a workflow exists.
-      2. **Owner-prefix on the asset id** — it must start with ``{user_id}/``. The pool is
-         service-role and bypasses RLS, and gate 1 proves nothing about an asset id that
-         arrived in the query string, so without this a caller could pass their OWN
-         definition id and SOMEONE ELSE'S asset path.
-      3. **No ``..`` segment.** This is NOT belt-and-braces. ``workspace_storage_select_own``
-         (``supabase/migrations/054_workspace_files.sql:83-89``) keys on
-         ``(storage.foldername(name))[1]`` — the FIRST path segment — so
-         ``{uid}/../someone-else/x.docx`` satisfies gate 2 AND passes the database policy.
-         The traversal check is the only thing that stops it.
-
-    Both refusals raise the SAME 404 wording as a missing workflow — no existence oracle
-    for objects either.
-
-    The Storage read goes through the user-JWT client so ``workspace_storage_select_own``
-    is a second, database-enforced boundary underneath gate 2, exactly as the sibling
-    upload door documents for its write. A service-role client would silently remove it.
-    """
-    pool = await get_pg_pool()
-    user_id = _coerce_user_id(current_user)
-    await _owned_slug_or_404(pool, definition_id, user_id)  # 404 on non-owner / unknown
-
-    if not asset_id.startswith(f"{user_id}/") or ".." in asset_id.split("/"):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="template not found")
-
-    placeholders, read = await grounding.resolve_template_placeholders(
-        supabase=supabase,
-        pool=pool,
-        user_id=str(user_id),
-        template_asset_id=asset_id,
-        template_placeholders=None,
-    )
-    # ``read`` can only be "ok" or "unreadable" here — "not_requested" is unreachable
-    # because an ``asset_id`` is always supplied (it is a required query param).
-    return TemplatePlaceholdersResponse(read=read, placeholders=placeholders)
+)(get_workflow_template_placeholders)
