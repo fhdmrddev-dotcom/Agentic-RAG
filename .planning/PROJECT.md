@@ -10,6 +10,22 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
+## Current Milestone: v4.7 Workflows You Can See and Start Anywhere
+
+**Started:** 2026-10-18 · phases resume at **286**, migrations at **210**.
+
+**Goal:** Workflows become easier to start, finish authoring and understand at a glance, with visuals that show what a run did.
+
+**Target features:**
+- **Start anywhere:** launch a workflow from inside a thread (SEED-232), scheduled and inbound triggers (SEED-014, SEED-195), a fork-a-starter library (SEED-084).
+- **Authoring that finishes the job:** natural-language authoring proposes the blocking business field (SEED-163), a workflow that pauses for a person can be published (SEED-164), generalized describe-it authoring (SEED-051).
+- **Visuals:** multi-agent engine view (SEED-086), richer artifact vocabulary (SEED-337), per-run provenance receipt (SEED-348), workflow card matches its approved sketch (SEED-155), canvas scale hardening (SEED-347).
+- **Trust:** confidence on workflow phase outputs (SEED-152).
+
+**Out of scope (decided at intake):** Open Platform / public API / MCP server (SEED-013, planned as v4.8); anything not about workflows or visuals. Visual work is sketch-first (G-2); hot-file refactors first where G-5 fires.
+
+---
+
 ## Last Shipped: v4.6 Pay It Down (2026-10-16)
 
 **Started:** 2026-10-12 · **Shipped:** 2026-10-16, git tag `v4.6` · 9 phases (277-285), 34 plans,
@@ -1472,3 +1488,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-12 — **Phase 277 complete** (REG-04, REG-05 → Validated): CLAUDE.md split by function 121,650 → 89,171 chars, nothing lost (mechanical proof), FIRING-table cell cap bound at 80; v4.5 archive repaired by hand. Verification passed 4/4; review 0 critical / 8 warning (guard hardening, untriaged).*
 
 *Last updated: 2026-10-18 — **milestone v4.6 Pay It Down CLOSED** (tag `v4.6`, 24/24, deployed `4e767a3a2`). Previously: 2026-10-15 — Phase 281 closed.*
+
+*Last updated: 2026-10-18 — **milestone v4.7 Workflows You Can See and Start Anywhere STARTED** (phases from 286, migrations from 210).*

@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.6
-milestone_name: Pay It Down
-status: milestone_closed
+milestone: v4.7
+milestone_name: Workflows You Can See and Start Anywhere
+status: planning
 last_updated: 2026-10-18T00:00:00.000Z
 last_activity: 2026-10-18
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 34
-  completed_plans: 34
-  percent: 100
-stopped_at: Milestone v4.6 closed by hand; next is /gsd:new-milestone
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+stopped_at: Milestone v4.7 started; defining requirements
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Between milestones. Next: `/gsd:new-milestone`.
+**Current focus:** v4.7 Workflows You Can See and Start Anywhere. Defining requirements.
 
 ---
 
@@ -38,6 +38,12 @@ can be taught new behaviours (skills) that persist and can be shared.
 
 Gemini is OUT and the agent bus is RETIRED. Claude builds and reviews everything; no independent
 reviewer exists, so a phase closes `verification_mode: self-verified`, never `reviewed`.
+
+---
+
+## Current Position
+
+Phase: Not started (defining requirements). Last activity: 2026-10-18 — milestone v4.7 started.
 
 ---
 
