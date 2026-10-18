@@ -142,6 +142,9 @@ import builderSource from "./WorkflowBuilderPage?raw"
 // left this page for `useTemplateFirstDraft` under G-5, so a fence that reads ONE source can no
 // longer see the property it guards; it is RE-SCOPED to the seam rather than deleted or weakened.
 import templateFirstDraftSource from "@/components/workflows/useTemplateFirstDraft?raw"
+// 286-02 (2026-10-18, D-13) — the same re-scope for the name-map mount read, which moved to
+// `useBuilderNameMaps` under G-5. Read by the "no second fetch" count below.
+import nameMapsSource from "@/components/workflows/useBuilderNameMaps?raw"
 // Phase 193 fast-fix (AUTH-01): the CTA is queried by its GOVERNED id, never by a literal —
 // a hard-coded name here is what let the page's copy go stale without any suite reddening.
 import { DESCRIBE_CTA } from "@/components/workflows/doorVocabulary"
@@ -2368,7 +2371,13 @@ describe("WorkflowBuilderPage 187-15 — source guards for the thread", () => {
 
   it("no second fetch was added for the maps", () => {
     // The context is built from data the mount effect already fetched once.
-    expect(builderSource.match(/listFolders\(|listSkills\(/g) ?? []).toHaveLength(3)
+    // 286-02 (2026-10-18, D-13) — the mount read moved verbatim into `useBuilderNameMaps`
+    // (D-10a), so the count runs over page + hook TOGETHER. The expected value stays 3 (two
+    // calls, now in the hook, plus the page's one `listFolders()` comment): the assertion's
+    // strength is unchanged and only its scope follows the code.
+    expect(
+      (builderSource + nameMapsSource).match(/listFolders\(|listSkills\(/g) ?? [],
+    ).toHaveLength(3)
   })
 
   it("both announcement callbacks re-declared their dependencies", () => {
