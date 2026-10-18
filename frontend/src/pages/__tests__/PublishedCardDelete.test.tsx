@@ -740,11 +740,20 @@ describe("WorkflowDeleteSheet 192-08 — the cut has one direction", () => {
     const cardSource = (
       await import("@/components/workflows/library/WorkflowCard?raw")
     ).default as string
+    // 286-04 (2026-10-18, REG-07 / D-08): the `⋯` menu, whose item IS the trigger, moved out of
+    // the card into `WorkflowCardMenu.tsx`. So the trigger testid is read from the menu's
+    // source, and the card is asserted to mount the menu — the one hop the trigger now travels.
+    // The Sheet-import edge below and every page-side negative are unchanged.
+    const menuSource = (
+      await import("@/components/workflows/library/WorkflowCardMenu?raw")
+    ).default as string
 
     // NON-VACUITY FIRST: a `?raw` import that silently resolved to "" would satisfy every
     // negative below forever, and would look exactly like a clean cut.
     expect(pageSource.length).toBeGreaterThan(10000)
     expect(cardSource.length).toBeGreaterThan(5000)
+    expect(menuSource.length).toBeGreaterThan(2000)
+    expect(menuSource).toContain("WorkflowCardMenu")
 
     // The edge exists, and it points at the library module — from the card that mounts it.
     expect(cardSource).toMatch(
@@ -770,8 +779,10 @@ describe("WorkflowDeleteSheet 192-08 — the cut has one direction", () => {
 
     // The trigger survived BOTH cuts. `published-delete` is what every row above drives, and
     // `192-09` carried it across verbatim — which is why those rows are still green against a
-    // card that did not exist when they were written. It is now emitted by the card.
-    expect(cardSource).toContain('data-testid="published-delete"')
+    // card that did not exist when they were written. It is now emitted by the card's menu
+    // module (286-04), which the card mounts.
+    expect(menuSource).toContain('data-testid="published-delete"')
+    expect(cardSource).toContain("<WorkflowCardMenu")
     expect(pageSource).not.toContain('data-testid="published-delete"')
   })
 
