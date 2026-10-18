@@ -240,7 +240,8 @@ async def test_generate_route_delegates_and_does_not_persist(monkeypatch):
     async def _fake_pool():
         return object()
 
-    monkeypatch.setattr(wf_api, "get_pg_pool", _fake_pool)
+    # Phase 286 (286-01): handler moved to workflow_authoring_doors.py; patch target follows the name lookup
+    monkeypatch.setattr("app.api.workflow_authoring_doors.get_pg_pool", _fake_pool)
 
     # If the route ever tried to persist, this would be called — assert it is NOT.
     persisted: list = []
@@ -249,7 +250,10 @@ async def test_generate_route_delegates_and_does_not_persist(monkeypatch):
         persisted.append(1)
         return {"id": "00000000-0000-0000-0000-000000000000", "version": 1}
 
-    monkeypatch.setattr(wf_api, "create_workflow_definition", _boom_create, raising=False)
+    # Phase 286 (286-01): handler moved to workflow_authoring_doors.py; patch target follows the name lookup
+    monkeypatch.setattr(
+        "app.api.workflow_authoring_doors.create_workflow_definition", _boom_create, raising=False
+    )
 
     app = FastAPI()
     app.dependency_overrides[wf_api.get_current_user] = lambda: {"id": "u1"}
