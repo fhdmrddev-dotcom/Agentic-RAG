@@ -1,0 +1,127 @@
+{
+  "_coerce_definition": {
+    "kind": "function",
+    "body_sha256": "f175cdbfe26274764c2d75f8b1dbf20cd8eff4710ea0ca9e6033eb0243530d60",
+    "decorator_sha256": null
+  },
+  "_caller_uuid": {
+    "kind": "function",
+    "body_sha256": "a40f7f9c927509ebad050d60a410ec5e37baf8c646cc45b92f3d9955ff9c99ad",
+    "decorator_sha256": null
+  },
+  "_iso_or_none": {
+    "kind": "function",
+    "body_sha256": "9643ccbcfd1b534cf8328ef7c82218cd618600f46e792d81ba58dc18a1b27794",
+    "decorator_sha256": null
+  },
+  "DraftCreateResponse": {
+    "kind": "class",
+    "body_sha256": "c98c166d7be9b7538fb8e11a2726af91cd76c792b37138a84719edc99d781cec",
+    "decorator_sha256": null
+  },
+  "Verdict": {
+    "kind": "class",
+    "body_sha256": "1d0c23b299f03720bc92233efd457b8764ac7a82c1b9528ce3d69cf0befe5833",
+    "decorator_sha256": null
+  },
+  "ValidateResponse": {
+    "kind": "class",
+    "body_sha256": "2ea9934e44391fc601e54616cc69106c292c4cb49d1a9d477cc843f79f576808",
+    "decorator_sha256": null
+  },
+  "PaletteFolder": {
+    "kind": "class",
+    "body_sha256": "76c2f965b84d9a933080fd7b098300162f5b4b83817ca950da9f316f003e0011",
+    "decorator_sha256": null
+  },
+  "PaletteSkill": {
+    "kind": "class",
+    "body_sha256": "74ed7b70c9ce7f6444c8efc95d580fd7642e461ddedeb21b4731a9fa756b1432",
+    "decorator_sha256": null
+  },
+  "GroundingBundleResponse": {
+    "kind": "class",
+    "body_sha256": "bc3f03b25609c0e330051ba6ef4d739f74c01d7d6ef36a12c8c3215cd203c298",
+    "decorator_sha256": null
+  },
+  "PublishRequest": {
+    "kind": "class",
+    "body_sha256": "1c8f71c4528002b4e1259bf376038b4539b57e52f2ca26364f46ef61ceb86732",
+    "decorator_sha256": null
+  },
+  "BlockedStep": {
+    "kind": "class",
+    "body_sha256": "e04f6d5444dc6bbb5b561fe287ed22297479553d53b6e2552a0fad0675bf75f4",
+    "decorator_sha256": null
+  },
+  "PublishVerdict": {
+    "kind": "class",
+    "body_sha256": "7ed091d912b8771008c7125344d5894e4332ed45ef46a0e77e9d1f3a206cec63",
+    "decorator_sha256": null
+  },
+  "_coerce_user_id": {
+    "kind": "function",
+    "body_sha256": "e2860ed4b7c7ea6c833a75ee4b90cc26d648b5983193afd0d1bfe3f99e8b6734",
+    "decorator_sha256": null
+  },
+  "_ALREADY_PUBLISHED_DETAIL": {
+    "kind": "assign",
+    "body_sha256": "74315c3d22bf74ec834586146d7523208b3382b879e7f9bc278c1fd0542aa414",
+    "decorator_sha256": null
+  },
+  "DeletePreview": {
+    "kind": "class",
+    "body_sha256": "af4ab10a11d08bbc2d8ecef2d4aaa4db073dd84e59787ab32c95c814a586ac76",
+    "decorator_sha256": null
+  },
+  "_owned_slug_or_404": {
+    "kind": "async_function",
+    "body_sha256": "e12acee0ee7afad2dadb2dfd11fd671959e06fa3b272db77ac495e59a880d338",
+    "decorator_sha256": null
+  },
+  "_TEMPLATE_MIME_BY_EXT": {
+    "kind": "assign",
+    "body_sha256": "a4f174522a9449d8744c2539a73a1ae362a5e17a6a2a19be46637aabf8512d85",
+    "decorator_sha256": null
+  },
+  "TemplateAssetRef": {
+    "kind": "class",
+    "body_sha256": "0297c62bb641b1b1d693c825f62445d33ac2249a4f6018cd4805fa408d7e6555",
+    "decorator_sha256": null
+  },
+  "TemplatePlaceholdersResponse": {
+    "kind": "class",
+    "body_sha256": "2dc33a1362880733897763f086d4b8ee93a4d126ff454e35f7b05b641c57c7dd",
+    "decorator_sha256": null
+  },
+  "_TEMPLATE_MAX_UNCOMPRESSED_BYTES": {
+    "kind": "assign",
+    "body_sha256": "93197c4932315d24055ccf6e4da0c0dc45a895eb1ceed5bacb4bf4a02f4de329",
+    "decorator_sha256": null
+  },
+  "GenerateRequest": {
+    "kind": "class",
+    "body_sha256": "d029956884db7b033d8a34997c3dcd2d9cc73c4986fa73f4125c6dce6c62c366",
+    "decorator_sha256": null
+  },
+  "generate_workflow": {
+    "kind": "async_function",
+    "body_sha256": "a76071728446980d6c6f36f3a50b121f59f99b1c119d95aefee0d637d3625dce",
+    "decorator_sha256": "b0fff742aed104f68dec4549c96e2dd4d8acf65631c7f2cb8a69459e9e3b7e66"
+  },
+  "read_template_placeholders": {
+    "kind": "async_function",
+    "body_sha256": "39e2bc58b5bf792caead1d5c9cb785e798680216751b72d224a1bdda87bd5461",
+    "decorator_sha256": "ab2290c29516fa027160390ad635ea691e34400100f1a08cd78bc08a0fa6680e"
+  },
+  "upload_workflow_template": {
+    "kind": "async_function",
+    "body_sha256": "55b9ec815eaa8df7013985c430ffb429b6f9c705e2c4991b2d426e0ce9521f5c",
+    "decorator_sha256": "5321252cb017515a631be2ef54959f621c6658f7528ab7995d439c95b0beca9a"
+  },
+  "get_workflow_template_placeholders": {
+    "kind": "async_function",
+    "body_sha256": "58c955bfe4c52f10887632786921103e1e60837f7e1e36553d8a93905d13427f",
+    "decorator_sha256": "82abf42130c6f9b0cf3c6cc1330d56df5255a162cf2aec5d559af1a1315f703d"
+  }
+}
