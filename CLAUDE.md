@@ -415,31 +415,32 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
-| `frontend/src/components/workflows/WorkflowCanvas.tsx` | 31 / 9 / 1708 | honoured by construction (199 / 200 / **214**) |
+| `frontend/src/components/workflows/WorkflowCanvas.tsx` | 31 / 9 / 1708 | 286 forecast: 290 team picture is a separate view; ≤ 1 gated mount |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
-| `frontend/src/components/workflows/PhaseNodeCard.tsx` | 17 / 8 / 489 | honoured by construction (199) |
-| `backend/app/services/harness/phase_types.py` | 55 / 28 / 3014 (was `54 / 27 / 2954`) | honoured by construction (281-01: one leaf call) · G-5 OWED |
-| `frontend/src/pages/WorkflowsPage.tsx` | 45 / 18 / 1447 (was `43 / 17 / 1415`) | honoured by construction (281-03: two guarded props, 0 hooks) |
-| `frontend/src/components/workflows/library/WorkflowCard.tsx` | 19 / 6 / 1616 | ✅ **G-5 DISCHARGED (192.2-02)** |
-| `frontend/src/components/workflows/library/libraryVocabulary.ts` | 10 / 4 / 727 | no seam proposed |
+| `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 286 forecast: 290 adds one prop; chip words from libraryVocabulary |
+| `backend/app/services/harness/phase_types.py` | 56 / 28 / 3027 (was `55 / 28 / 3014`) | 286 forecast: 289 adds one optional output field, no new type · G-5 OWED |
+| `frontend/src/pages/WorkflowsPage.tsx` | 45 / 18 / 1447 (was `43 / 17 / 1415`) | 286 forecast: 287 starters are data, fork reuses its hook; one prop |
+| `frontend/src/components/workflows/library/WorkflowCard.tsx` | 22 / 8 / 1354 (was `19 / 6 / 1616`) | seam TAKEN (286-04): ⋯ menu + armed delete → WorkflowCardMenu |
+| `frontend/src/components/workflows/library/libraryVocabulary.ts` | 11 / 5 / 766 (was `10 / 4 / 727`) | 286 forecast: 290 chip labels are vocabulary entries (data), no logic |
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | `frontend/src/components/workflows/library/libraryRow.ts` | 4 / 3 / 201 | ⚠ absent, on the boundary (added 192.2) |
 | `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 18 / 12 / 1075 | honoured by construction (193 / 193.1 / 199 / **214**) |
-| `frontend/src/pages/WorkflowBuilderPage.tsx` | 57 / 22 / 2993 (was `56 / 21 / 2977`) | honoured by construction ×7 (… / 214.1 / 281-02: one import) |
-| `backend/app/api/workflows.py` | 43 / 23 / 2261 | ⚠ extraction still OWED · honoured by construction (258-03) |
-| `backend/app/api/workflow_runs.py` | 11 / 8 / 1089 | honoured by construction (200 / 200.1 / **214**) |
+| `frontend/src/pages/WorkflowBuilderPage.tsx` | 58 / 23 / 2803 (was `57 / 22 / 2993`) | seam TAKEN (286-02): name maps + copy → useBuilderNameMaps, builderCopy |
+| `backend/app/api/workflows.py` | 45 / 23 / 1647 (was `43 / 23 / 2261`) | seam TAKEN (286-01): wire + authoring doors out; split OWED (>1,500 L) |
+| `backend/app/api/workflow_runs.py` | 13 / 10 / 1108 (was `11 / 8 / 1089`) | 286 forecast: 289 export = one projection of the run read (by construction) |
 | `backend/app/models/thread.py` | 22 / 15 / 537 (was `21 / 14 / 537`) | last touch 279-01 (docstring repoint only) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
-| `frontend/src/components/layout/ChatLayout.tsx` | 61 / 31 / 1137 (was `60 / 30 / 1134`) | honoured by construction (281-03: ONE prop, 0 hooks) |
+| `frontend/src/components/layout/ChatLayout.tsx` | 61 / 31 / 1137 (was `60 / 30 / 1134`) | 286 forecast: 287 reuses ChatLaunchForm + doRun; one prop or one mount |
+| `frontend/src/components/layout/ChatLaunchForm.tsx` | 1 / 1 / 157 | young (214-12); 287 reuses it, no second launch form |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 52 / 26 / 2724 | honoured by construction (256-05) |
-| `backend/app/services/harness/publish_service.py` | 29 / 13 / 1942 | ⚠ STALE · last touch 268-REVIEW WR-06 · ⛔ |
-| `backend/app/services/workflow_authoring.py` | 17 / 11 / 1025 (was `15 / 9 / 989`) | honoured by construction (281-02: one additive `reason_code`) |
+| `backend/app/services/harness/publish_service.py` | 29 / 13 / 1942 | 286 forecast: 288 admits one pause shape; 2nd concern = extract first · ⛔ |
+| `backend/app/services/workflow_authoring.py` | 17 / 11 / 1025 (was `15 / 9 / 989`) | 286 forecast: 291 template text = one more grounding input (untrusted) |
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
-| `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
+| `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | 286 forecast: 288 draft config rides useDraftPersistence; ≤ 1 store field |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 17 / 11 / 646 (was `16 / 10 / 646`) | honoured by construction (194 / 194.1 / 282-02: one prop) |
 | `backend/app/services/run_lifecycle.py` | 9 / 5 / 756 | ⚠ STALE · last touch 268-01 · ⛔ |
 | `backend/app/db/runs.py` | 9 / 8 / 266 | ⚠ absent its ENTIRE LIFE — row added 268 · ⛔ |
@@ -449,7 +450,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02 (SEED-297) · ⛔ |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
 | `backend/app/api/runs.py` | 41 / 19 / 1750 | ⚠ STALE · last touch 268-REVIEW CR-01/WR-06 |
-| `backend/app/services/harness_engine.py` | 61 / 24 / 3387 (was `60 / 23 / 3297`) | last touch 281-01 · OV-281-01 (5 new conditionals vs a cap of 4) |
+| `backend/app/services/harness_engine.py` | 61 / 24 / 3387 (was `60 / 23 / 3297`) | 286 forecast: 289 adds one confidence field on KB outputs (by construction) |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE; does NOT fire yet · ⛔ |
 | `frontend/src/components/chat/RunCard.tsx` | 31 / 16 / 729 | last touch 276-06 (D-27) · ⛔ |
 | `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE · last touch 268-03 · ⛔ |
@@ -459,7 +460,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/stores/streamsStore.ts` | 22 / 14 / 572 | ⚠ row STALE · last touch 244-15 · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 17 / 9 / 1013 (was `15 / 8 / 836`) | G-5 FIRES · honoured by construction (282-02: draft moved out, +AskPointer) |
-| `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |
+| `frontend/src/pages/WorkflowRunPage.tsx` | 30 / 11 / 1578 (was `28 / 9 / 1670`) | seam TAKEN (286-03): run read + poll → useWorkflowRun · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
 | `frontend/src/lib/api.ts` | 210 / 125 / 530 (was `208 / 124 / 523`) | 284-05: five whole-list re-exports deleted (D-16) |
@@ -481,13 +482,13 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |
 | `frontend/src/components/workflows/soulData.ts` | 12 / 10 / 499 | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 p |
-| `frontend/src/components/workflows/PublishGauntlet.tsx` | 20 / 10 / 1372 (was `17 / 9 / 1289`) | honoured by construction (281-03: ONE optional `onOpenRun` prop) |
-| `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 5 / 5 / 473 | honoured by construction (200) |
+| `frontend/src/components/workflows/PublishGauntlet.tsx` | 20 / 10 / 1372 (was `17 / 9 / 1289`) | 286 forecast: 288 adds one pause-verdict row, words from the server |
+| `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 286 forecast: 290 adds one optional prop for labelled chips |
 | `frontend/src/components/workflows/doorVocabulary.ts` | 6 / 4 / 540 | no seam proposed |
 | `frontend/src/components/workflows/StepTypePicker.tsx` | 7 / 3 / 522 | honoured by construction (199) |
 | `frontend/src/components/workflows/library/RunModal.tsx` | 8 / 5 / 713 | ✅ **deferred extraction DISCHARGED (214-12)** |
 | `frontend/src/components/panel/PanelEmpty.tsx` | 4 / 4 / 52 | ⚠ absent at 4 phases |
-| `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 7 / 4 / 677 (was `6 / 3 / 673`) | honoured by construction (281-02: one import, two call swaps) |
+| `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 8 / 4 / 684 (was `7 / 4 / 677`) | 286 forecast: 291 forwards one more upload kind to /generate |
 | `frontend/src/components/workflows/RunSpine.tsx` | 5 / 3 / 426 | honoured by construction (**214**) |
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
