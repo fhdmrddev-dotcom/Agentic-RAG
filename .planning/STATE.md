@@ -3,15 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_plan
-last_updated: 2026-10-18T00:00:00.000Z
-last_activity: 2026-10-18
+last_updated: "2026-10-18T16:02:01.340Z"
 progress:
-  total_phases: 8
+  total_phases: 15
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
   percent: 0
-stopped_at: Roadmap created (phases 286-293); next /gsd:discuss-phase 286
 ---
 
 # Project State
