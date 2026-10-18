@@ -121,7 +121,8 @@ def _run(upload, *, owner_row=_DEFAULT, user_id: str = _OWNER_ID,
     definition_id = definition_id or uuid4()
 
     async def _go():
-        with patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=pool)):
+        # Phase 286 (286-01): handler moved to workflow_authoring_doors.py; patch target follows the name lookup
+        with patch("app.api.workflow_authoring_doors.get_pg_pool", AsyncMock(return_value=pool)):
             return await wf_api.upload_workflow_template(
                 definition_id=definition_id,
                 file=upload,
