@@ -78,7 +78,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **14 v4.7 requirements, 14 m
 
 ### Phase Checklist
 
-- [ ] **Phase 286: Seams Before Features**: take the named G-5 seams on the workflow files this milestone edits, behaviour unchanged (REG-07)
+- [x] **Phase 286: Seams Before Features**: take the named G-5 seams on the workflow files this milestone edits, behaviour unchanged (REG-07)
 - [ ] **Phase 287: Start From a Thread, Fork a Starter**: launch a workflow from a thread with its form and run attached; fork one of 5+ curated, gauntlet-passing starters in one click (START-01, START-03)
 - [ ] **Phase 288: Drafts That Survive, Pauses That Publish**: draft configuration persists across navigation; a human-pause workflow publishes and the run shows who it waits on (AUTH-03, AUTH-01)
 - [ ] **Phase 289: The Run Page and Its Evidence**: one read-only finished-run page with export; confidence on KB-derived phase outputs (VIS-03, TRUST-01)

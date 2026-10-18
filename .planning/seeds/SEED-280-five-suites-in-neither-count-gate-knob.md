@@ -1,8 +1,9 @@
 ---
 seed_id: SEED-280
 title: Five suites run by the count gate and guarded by nothing
-status: planted
+status: partially-answered
 status_note: |
+  ── 2026-10-18 · Phase 286-05 ANSWERED 2 OF 5 (status -> partially-answered): toolReadOnlyMap (7) and automationFacts (11) adopted into the count gate. STILL OPEN: PromptVariableChips (3), RunHero (18), nodeEffectBanner (8). Re-open trigger unchanged: the next phase that edits scripts/vitest-count-gate.cjs.
   ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED — AND GIVEN A SIXTH CASE THAT IS
   WORSE THAN THE FIVE (REG-02 sweep). Measured while scoping 252:
   `frontend/src/components/sources/WatchRowCard.tsx` had NO TEST FILE AT ALL, and

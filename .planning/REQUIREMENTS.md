@@ -35,7 +35,7 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 ### Register hygiene (REG)
 
 - [ ] **REG-06**: Seed statuses match reality: SEED-163 flipped, and each seed this milestone folds is updated.
-- [ ] **REG-07**: Hot-file refactors that guardrail G-5 requires are done before the feature phases that touch those files.
+- [x] **REG-07**: Hot-file refactors that guardrail G-5 requires are done before the feature phases that touch those files.
 
 ## Future Requirements (deferred)
 
@@ -55,7 +55,7 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REG-07 | Phase 286 | Pending |
+| REG-07 | Phase 286 | Complete |
 | START-01 | Phase 287 | Pending |
 | START-03 | Phase 287 | Pending |
 | AUTH-03 | Phase 288 | Pending |
