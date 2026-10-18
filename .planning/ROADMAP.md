@@ -109,7 +109,7 @@ Plans:
 - [x] 286-02-PLAN.md — `WorkflowBuilderPage.tsx`: id-to-name maps into `useBuilderNameMaps`, copy constants into `builderCopy` (re-exported)
 - [x] 286-03-PLAN.md — `WorkflowRunPage.tsx`: run read + poll into `useWorkflowRun` at the original call positions
 - [x] 286-04-PLAN.md — `WorkflowCard.tsx`: overflow menu + armed delete into `WorkflowCardMenu`
-- [ ] 286-05-PLAN.md — full gates against the base, count-gate adoption, ledger rows and SC#1 forecasts in one commit
+- [x] 286-05-PLAN.md — full gates against the base, count-gate adoption, ledger rows and SC#1 forecasts in one commit
 **Flags**: ⛔ G-5 extraction, behaviour-preserving, TDD pin-first. Measure first. Never `rm -rf` a worktree. Files in play (ledger triples as of roadmap time): `workflows.py` 43/23/2261, `WorkflowBuilderPage.tsx` 57/22/2993, `WorkflowRunPage.tsx` 28/9/1670, `WorkflowCard.tsx` 19/6/1616.
 
 #### Phase 287: Start From a Thread, Fork a Starter
