@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_plan
-last_updated: "2026-10-18T16:02:01.340Z"
+last_updated: "2026-10-18T16:34:48.996Z"
 progress:
   total_phases: 15
   completed_phases: 0
-  total_plans: 0
+  total_plans: 5
   completed_plans: 0
   percent: 0
 ---
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.7 Workflows You Can See and Start Anywhere. Roadmap created; phase 286 next.
+**Current focus:** Phase 286 — seams-before-features
 
 ---
 
@@ -41,7 +41,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 286 (Seams Before Features) — not started; roadmap created 2026-10-18 (8 phases, 286-293, 14/14 requirements mapped). Next: `/gsd:discuss-phase 286`. Migrations resume at 210.
+Phase: 286 (seams-before-features) — EXECUTING
+Plan: 1 of 5
 
 ---
 

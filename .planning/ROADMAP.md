@@ -105,10 +105,10 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **14 v4.7 requirements, 14 m
 **Plans**: 5 plans (4 parallel extractions in wave 1, gates + ledger in wave 2; the fifth is justified in 286-05: it owns the three files no wave-1 worktree can share)
 
 Plans:
-- [ ] 286-01-PLAN.md — split `backend/app/api/workflows.py`: wire models + pure helpers + authoring doors to siblings on the same router (operator picks the move set at a blocking checkpoint, measured D-03/D-05 conflict)
-- [ ] 286-02-PLAN.md — `WorkflowBuilderPage.tsx`: id-to-name maps into `useBuilderNameMaps`, copy constants into `builderCopy` (re-exported)
-- [ ] 286-03-PLAN.md — `WorkflowRunPage.tsx`: run read + poll into `useWorkflowRun` at the original call positions
-- [ ] 286-04-PLAN.md — `WorkflowCard.tsx`: overflow menu + armed delete into `WorkflowCardMenu`
+- [x] 286-01-PLAN.md — split `backend/app/api/workflows.py`: wire models + pure helpers + authoring doors to siblings on the same router (operator picks the move set at a blocking checkpoint, measured D-03/D-05 conflict)
+- [x] 286-02-PLAN.md — `WorkflowBuilderPage.tsx`: id-to-name maps into `useBuilderNameMaps`, copy constants into `builderCopy` (re-exported)
+- [x] 286-03-PLAN.md — `WorkflowRunPage.tsx`: run read + poll into `useWorkflowRun` at the original call positions
+- [x] 286-04-PLAN.md — `WorkflowCard.tsx`: overflow menu + armed delete into `WorkflowCardMenu`
 - [ ] 286-05-PLAN.md — full gates against the base, count-gate adoption, ledger rows and SC#1 forecasts in one commit
 **Flags**: ⛔ G-5 extraction, behaviour-preserving, TDD pin-first. Measure first. Never `rm -rf` a worktree. Files in play (ledger triples as of roadmap time): `workflows.py` 43/23/2261, `WorkflowBuilderPage.tsx` 57/22/2993, `WorkflowRunPage.tsx` 28/9/1670, `WorkflowCard.tsx` 19/6/1616.
 
