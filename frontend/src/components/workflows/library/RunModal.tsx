@@ -468,7 +468,7 @@ export function RunModal({
               substring match, so prose that merely SPELLS the sentence trips it; this paragraph
               deliberately does not (the same discipline `librarySubtree.fences.test.ts`'s
               T-192-04 note keeps about the prop IT forbids). Please do not tidy the indentation. */}
-          {(showTemplate || launchError) && (
+          {(showTemplate || launchError || requiredRefusal) && (
           <div className="flex flex-col gap-1.5">
             {showTemplate && (
             <>

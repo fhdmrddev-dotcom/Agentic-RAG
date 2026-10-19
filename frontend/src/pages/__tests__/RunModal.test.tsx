@@ -439,6 +439,26 @@ describe("RunModal 214-09 — declared inputs become real fields (STEP-02 / D-21
     expect(within(modal).queryByTestId("run-upload-error")).toBeNull()
   })
 
+  // 287-05 REGRESSION (found in the live G-4 drive): a workflow that does NOT admit a template
+  // (no llm_emit phase) hid the whole block the refusal sits in, so an empty required field was
+  // refused SILENTLY. The refusal must render regardless of template admission.
+  it("an empty REQUIRED field is refused by name on a template-less workflow too", async () => {
+    mockListPublished.mockResolvedValue([
+      {
+        ...declaredInputsPublished,
+        definition: {
+          ...declaredInputsPublished.definition,
+          phases: [{ slug: "w", phase_index: 0, config: { phase_type: "llm_single" } }],
+        },
+      },
+    ])
+    const { modal, onLaunch } = await openModal(folders)
+    fireEvent.click(within(modal).getByTestId("run-confirm"))
+    const refusal = await within(modal).findByTestId("run-required-refusal")
+    expect(refusal.textContent).toBe("Recipient email and subject_line are required")
+    expect(onLaunch).not.toHaveBeenCalled()
+  })
+
   it("a `required: false` field left empty is sent as an EMPTY STRING, key present", async () => {
     mockListPublished.mockResolvedValue([
       {
