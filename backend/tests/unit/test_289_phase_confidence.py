@@ -386,6 +386,44 @@ async def test_sub_agent_with_no_search_counts_zero():
     assert res["kb_search_calls"] == 0
 
 
+@pytest.mark.asyncio
+async def test_refused_searches_are_not_counted_as_searches(monkeypatch):
+    """289-REVIEW WR-04: `invalid_filter` and `refused_retry` run NO retrieval and set no
+    `retrieval_error`. Counting them made a phase whose only searches were refused store
+    `level: "none"`, and both surfaces then said "nothing matched" about a search that never ran.
+    The results here are the tool's OWN refusal arms, not hand-written lookalikes.
+    """
+    from app.services import search_documents_tool as sdt
+    from app.services.task_service import run_task_sub_agent
+    from app.services.tool_dispatcher import ToolResult
+
+    monkeypatch.setattr(sdt, "_write_search_audit", lambda *a, **k: None)
+    invalid = sdt._invalid_filter(
+        MagicMock(), "q", sdt.FilterRefusal(field="doc_type", message="no such type"), [], ToolResult
+    )
+    refused = sdt._refused_retry(MagicMock(), "q", {"doc_type"}, [], ToolResult)
+    results = iter([invalid, refused])
+
+    async def _fake_dispatch(name, args, ctx):
+        return next(results)
+
+    calls = [{"id": f"call_{i}", "name": "search_documents", "arguments": '{"query": "q"}'}
+             for i in range(2)]
+    with patch("app.services.task_service._stream_one_iteration",
+               AsyncMock(side_effect=[("thinking", calls), ("final answer", [])])),          patch("app.services.task_service.dispatch_tool", _fake_dispatch),          patch("app.services.task_service.insert_run", AsyncMock()),          patch("app.services.task_service.finalize_run", AsyncMock()):
+        res = await run_task_sub_agent(
+            parent_ctx=_parent_ctx(), description="Find revenue", instructions=None,
+            allowed_tools=["search_documents"], max_steps=3,
+        )
+
+    assert res["kb_search_calls"] == 0, "a refused search ran no retrieval"
+    from app.services.harness.phase_confidence import phase_confidence
+    assert phase_confidence(
+        res["similarity_scores"], searched=bool(res["kb_search_calls"]),
+        retrieval_error=res.get("retrieval_error"),
+    ) is None, "no 'nothing matched' line for a search that never ran"
+
+
 # ══ the two executors carry the key ═════════════════════════════════════════════════════════
 
 
