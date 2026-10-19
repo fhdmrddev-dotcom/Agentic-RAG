@@ -153,10 +153,10 @@ Plans:
 **Plans**: 4 plans (waves 1/1/1/2)
 
 Plans:
-- [ ] 288-01-PLAN.md - draft settings row: one optional DraftArrivalCard prop, neutral words, TWO-children pin re-baselined, no-bleed regression (SC#1, SC#2)
-- [ ] 288-02-PLAN.md - gauntlet: timeout lint in _interactive_phase_failures (RED on 0/-5/99999/1801), auto_answered verdict note, stale copy fixed (SC#3)
-- [ ] 288-03-PLAN.md - run read waiting_on (server sentence, owner vs non-owner, active and paused) + one render in WorkflowRunPage (SC#4)
-- [ ] 288-04-PLAN.md - live proof S1-S4 in Chrome, SC#10 roster in VALIDATION.md, full gates once, ledger/count-gate close-out
+- [x] 288-01-PLAN.md - draft settings row: one optional DraftArrivalCard prop, neutral words, TWO-children pin re-baselined, no-bleed regression (SC#1, SC#2)
+- [x] 288-02-PLAN.md - gauntlet: timeout lint in _interactive_phase_failures (RED on 0/-5/99999/1801), auto_answered verdict note, stale copy fixed (SC#3)
+- [x] 288-03-PLAN.md - run read waiting_on (server sentence, owner vs non-owner, active and paused) + one render in WorkflowRunPage (SC#4)
+- [x] 288-04-PLAN.md - live proof S1-S4 in Chrome, SC#10 roster in VALIDATION.md, full gates once, ledger/count-gate close-out
 **UI hint**: yes
 **Flags**: **G-2 sketch** the waiting-on moment. **G-4**. The publish gauntlet is security-adjacent: driven RED against a planted unbounded wait. Hot files: `WorkflowBuilderPage.tsx`, `builderStore.ts`, `PublishGauntlet.tsx`, `publish_service.py`, `WorkflowRunPage.tsx`; read their ledger sections. Seeds `SEED-183`, `SEED-164`. Uses the existing `llm_human_input` phase type; no new phase type.
 
@@ -254,7 +254,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 286. Seams Before Features | 0/TBD | Not started | - |
 | 287. Start From a Thread, Fork a Starter | 0/TBD | Not started | - |
-| 288. Drafts That Survive, Pauses That Publish | 0/TBD | Not started | - |
+| 288. Drafts That Survive, Pauses That Publish | 4/4 | human_needed (2026-10-19) | S1 generate arm and Anthropic row blocked on billing; late-answer resume and Expired card defects open (288-UAT.md) |
 | 289. The Run Page and Its Evidence | 0/TBD | Not started | - |
 | 290. The Card and the Team Picture | 0/TBD | Not started | - |
 | 291. Describe It From Your Own Files | 0/TBD | Not started | - |

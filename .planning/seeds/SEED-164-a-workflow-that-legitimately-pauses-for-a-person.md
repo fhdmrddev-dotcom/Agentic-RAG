@@ -1,11 +1,10 @@
 ---
 seed_id: SEED-164
 title: a workflow that legitimately pauses for a person, and can still be published
-status: planted
+status: partially-answered
+partial: true
 status_note: |
-  Phase 251 frontmatter migration: this file had NO frontmatter block at all, so no status was
-  ever recorded for it. `planted` here is a MIGRATION DEFAULT — it is a statement about the
-  absence, never a claim about the seed. Read the body and set it deliberately.
+  Phase 288 (2026-10-19) answered the publish half: a workflow with an llm_human_input pause publishes through the real gauntlet (driven live), a 0 / negative / above-1800 wait is refused with a named reason (RED at base, GREEN at head), the verdict carries auto_answered (server side; see the finding that the Builder closes the gauntlet on success), and the run surface says who the run waits on, same after reload. STILL OPEN: notification when a run pauses, batching, the judge scoring a pause workflow on the mock answer (3 of 4 live attempts blocked), the paused-then-answered re-drive stranding a run, and the Expired card offering no answer control (all in 288-04-SUMMARY.md findings).
 surface: Agentic-RAG
 trigger_when: unset
 ---
