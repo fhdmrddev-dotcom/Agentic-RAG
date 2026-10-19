@@ -41,6 +41,18 @@ SEARCH_DOCUMENTS_TOOL = {
                     "type": "string",
                     "description": "The semantic search query to find relevant document chunks.",
                 },
+                # Phase 294 (D-09): optional steering for the decision engines. A plain string,
+                # not required, no maxLength (the server clamps it); untrusted, so it only ever
+                # travels to an engine as data (D-10).
+                "instruction": {
+                    "type": "string",
+                    "description": (
+                        "Optional. What makes a passage useful for THIS question when it is not "
+                        "obvious from the query, e.g. 'prefer 2025 figures' or 'the signed "
+                        "version, not drafts'. Used only to reorder results; it never filters by "
+                        "itself."
+                    ),
+                },
                 # Phase 272 (FIND-07, D-03): Find's condition list as a tool ARGUMENT. The
                 # `op` enum EQUALS ViewCondition.op (pinned by test_272_tool_schema.py), and
                 # the subtree is provider-safe by construction: no anyOf/oneOf/allOf/

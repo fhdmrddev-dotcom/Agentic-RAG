@@ -320,7 +320,9 @@ async def test_rerank_cannot_drop_a_matched_document(monkeypatch, recorder):
     monkeypatch.setattr(settings, "rerank_enabled", True)
     seen: dict = {}
 
-    def _fake_rerank(query, documents, top_n=None, user_settings=None):
+    # **_kw: plan 294-01 passes keep_documents=True on this D-27 filtered path (the prune keeps
+    # every matched document's best passage). The assertions below are unchanged.
+    def _fake_rerank(query, documents, top_n=None, user_settings=None, **_kw):
         seen["top_n"] = top_n
         return list(documents)[: top_n or len(documents)]
 

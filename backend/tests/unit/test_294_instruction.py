@@ -245,7 +245,8 @@ def test_instruction_is_keyword_only_and_document_ids_stays_last_positional():
     params = list(inspect.signature(search_documents).parameters.values())
     positional = [p for p in params if p.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD]
     assert positional[-1].name == "document_ids"
-    (kwonly,) = [p for p in params if p.kind is inspect.Parameter.KEYWORD_ONLY]
+    # ``config`` is added to the visible signature by langsmith's @traceable wrapper, not by us.
+    (kwonly,) = [p for p in params if p.kind is inspect.Parameter.KEYWORD_ONLY and p.name != "config"]
     assert kwonly.name == "instruction" and kwonly.default is None
 
 
