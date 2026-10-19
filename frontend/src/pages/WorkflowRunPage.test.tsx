@@ -30,6 +30,7 @@ import {
 } from "@/components/workflows/transcriptVocabulary"
 import type { Phase, WorkspaceFile } from "@/types"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+import type { RunEvidence } from "@/lib/api/runEvidence"
 
 // ── The api surface. `ApiError` is declared INSIDE the factory (never imported from
 //    the real module) so the page's `err instanceof ApiError` branch is exercised
@@ -62,6 +63,20 @@ vi.mock("@/lib/api", () => {
       downloadWorkspaceFile(...(a as [string, string, string])),
   }
 })
+
+// ── 289-04 (W2 / D-02 / D-14a) — a FINISHED run now renders the evidence report on this same
+//    page, and the report reads its own payload. Mocked BY ITS OWN SPECIFIER (the report never
+//    reaches it through `@/lib/api`), and the owner's deliverable download goes through
+//    `@/lib/api/documents`, routed to the SAME spy as the live page's download so a case can
+//    assert the thread id either surface used. ──
+const getRunEvidence = vi.fn()
+vi.mock("@/lib/api/runEvidence", () => ({
+  getRunEvidence: (...a: unknown[]) => getRunEvidence(...a),
+}))
+vi.mock("@/lib/api/documents", () => ({
+  downloadWorkspaceFile: (...a: unknown[]) =>
+    downloadWorkspaceFile(...(a as [string, string, string])),
+}))
 
 // 188.1-04 (WR-07): the auth seam the REAL `@/lib/api` reaches through `getAuthHeaders`.
 // Mocked so the ONE test below that runs the real `getWorkflowRun` (via `importActual`,
@@ -592,6 +607,14 @@ beforeEach(() => {
   useViewingThread.mockReturnValue(VIEWED_THREAD_ID)
   downloadWorkspaceFile.mockResolvedValue(undefined)
   getWorkflowRun.mockResolvedValue(mkRun())
+  // 289-04 (W2): by default the evidence read answers with the SAME run the owner read holds
+  // (its default implementation, read without recording a call, so no case's
+  // `getWorkflowRun` call count moves). A case that needs a different payload sets its own.
+  getRunEvidence.mockImplementation(async (id: string) => {
+    const impl = getWorkflowRun.getMockImplementation()
+    const run = (impl ? await impl(id) : mkRun()) as RunLike
+    return evidenceFrom(run)
+  })
 })
 
 afterEach(() => {
@@ -599,13 +622,134 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+// ── 289-04 (W2) — the evidence payload a finished run's report renders, built from the SAME
+//    `RunLike` fixture the owner read uses, field for field against the 289-03 contract. ──
+
+const OWNER_NAME = "Dana Whitfield"
+const OWNER_EMAIL = "dana.whitfield@northwind.example"
+
+interface EvidenceOver {
+  deliverable?: RunEvidence["deliverable"]
+  viewerIsOwner?: boolean
+  startedAt?: string | null
+  completedAt?: string | null
+}
+
+function evidenceFrom(run: RunLike, over: EvidenceOver = {}): RunEvidence {
+  const owner = over.viewerIsOwner ?? true
+  const nameOf = (slug: string) => SPECS.find((s) => s.slug === slug)?.name ?? slug
+  const rows = [...run.phases].sort((a, b) => a.phase_index - b.phase_index)
+  const lastText = [...rows]
+    .reverse()
+    .find(
+      (r) =>
+        r.status === "completed" &&
+        r.phase_type !== "llm_human_input" &&
+        typeof r.deliverable_text === "string" &&
+        r.deliverable_text.length > 0,
+    )
+  return {
+    run: {
+      id: run.id,
+      status: run.status as RunEvidence["run"]["status"],
+      workflow_name: run.workflow_name || null,
+      started_at: "startedAt" in over ? (over.startedAt ?? null) : (run.claimed_at ?? run.created_at),
+      completed_at: "completedAt" in over ? (over.completedAt ?? null) : run.updated_at,
+      started_by: { name: OWNER_NAME, email: owner ? OWNER_EMAIL : null, is_you: owner },
+      org_name: "Northwind Procurement",
+      model: null,
+      viewer_is_owner: owner,
+      thread_id: owner ? run.thread_id : null,
+    },
+    definition: {
+      recorded: true,
+      version: run.workflow_version || null,
+      phases: (run.definition?.phases ?? []).map((p, i) => ({
+        n: i + 1,
+        slug: p.slug,
+        name: p.name ?? p.slug,
+        phase_type: ((p.config as { phase_type?: string } | undefined)?.phase_type ?? null) as string | null,
+      })),
+      full: run.definition ? { phases: run.definition.phases.map((p) => ({ slug: p.slug })) } : null,
+    },
+    definition_changed: { changed: false, current_version: run.workflow_version || null },
+    kb_label: "the knowledge base",
+    deliverable:
+      over.deliverable ??
+      (lastText ? { kind: "text", name: null, file_id: null } : { kind: "none", name: null, file_id: null }),
+    phase_log: rows.map((r) => ({
+      n: r.phase_index + 1,
+      slug: r.slug,
+      name: nameOf(r.slug),
+      phase_type: r.phase_type,
+      status: r.status,
+      started_at: r.started_at ?? null,
+      completed_at: r.completed_at ?? null,
+      step_count: r.step_count ?? null,
+      step_noun: r.step_noun ?? null,
+      output_text: r.deliverable_text ?? null,
+      failure_reason: r.failure_reason ?? null,
+      confidence: null,
+      human_input:
+        r.phase_type === "llm_human_input"
+          ? {
+              answered: r.status === "completed",
+              question: owner ? (r.deliverable_text ?? null) : null,
+              answer: null,
+              answered_by: null,
+            }
+          : null,
+    })),
+    verdicts: [],
+    sources: [],
+  }
+}
+
+/** The finished run's report, once its own read has landed. */
+async function findReport(): Promise<HTMLElement> {
+  return screen.findByTestId("run-evidence-report")
+}
+
+/** A facts-strip value by its label ("Result", "Version run", "Checks", "Deliverable"). */
+function reportFact(label: string): string {
+  const cell = Array.from(document.querySelectorAll("[data-evidence-fact]")).find(
+    (c) => c.querySelector("[data-fact-label]")?.textContent === label,
+  )
+  return cell?.querySelector("[data-fact-value]")?.textContent ?? ""
+}
+
+/** The report's step-log rows (section 2), in order. */
+function reportStepRows(): HTMLElement[] {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>('[data-evidence-section="2"] [data-evidence-row]'),
+  )
+}
+
+/** One step-log row by the step's title. */
+function reportStepRow(title: string): HTMLElement {
+  const row = reportStepRows().find((r) => r.querySelector("td:nth-child(2) div")?.textContent === title)
+  if (!row) throw new Error(`no report row titled ${title}`)
+  return row
+}
+
+/** Each step-log row's Time cell, in order. */
+function reportTimes(): string[] {
+  return reportStepRows().map((r) => r.querySelector("td:last-child")?.textContent ?? "")
+}
+
 // ── 1. Terminal re-open with NO live stream (SPEC Req 7) ──────────────────────
 
+// ⚠ 289-04 (W2 / D-02): a TERMINAL run no longer re-opens on this spine — it opens as the
+// evidence report. The two seed-derivation cases below were never about the run having ended
+// (their subject is "a run re-opened by id with NO live stream seeds from run.phases"), so they
+// are RE-TARGETED at an `active` run with the same empty slice and keep every assertion. The
+// third case's premise WAS the terminal spine, so it is REWRITTEN to the new contract.
 describe("WorkflowRunPage — a terminal run re-opens by id with no live stream", () => {
   it("seeds every definition node from the inline run.phases array", async () => {
+    // 289-04 (W2) kept-on-live-surface: status "completed" → "active"; assertions unchanged.
     getWorkflowRun.mockResolvedValue(
       mkRun({
-        status: "completed",
+        status: "active",
         phases: [
           { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: null },
           { slug: "draft-letter", phase_index: 1, status: "completed", phase_type: null },
@@ -623,6 +767,14 @@ describe("WorkflowRunPage — a terminal run re-opens by id with no live stream"
   })
 
   it("puts the terminal seed through the SAME derivation: completed reads Complete, pending reads Not started", async () => {
+    // 289-04 (W2) migrated-to-report. Re-targeting this case at an `active` run was tried
+    // first and FAILED (measured: the log's completed step reads "Complete" under a live run,
+    // not silent), so the run having ended is this case's subject, not incidental. Was:
+    //     expect(spineReadings()["gather-contracts"]).toBe("done")
+    //     expect(labels()["gather-contracts"]).toBe("")
+    //     expect(labels()["draft-letter"]).toMatch(/not started|not reached/i)
+    // The finished run's seed is now the report's step log: the completed step reads Done and
+    // the step the run never reached still speaks — "Not reached", never a completion.
     getWorkflowRun.mockResolvedValue(
       mkRun({
         status: "completed",
@@ -634,23 +786,26 @@ describe("WorkflowRunPage — a terminal run re-opens by id with no live stream"
       }),
     )
     renderPage()
-    await screen.findByTestId("run-transcript")
-    // The WORDS come from the shared vocabulary, not from this suite's expectations of it.
-    // ⚠ THE COMPLETED STEP IS SILENT IN THE LOG BY DESIGN — see `labels()`. Its state is
-    // carried by the spine, so the derivation is asserted THERE and the log's silence is
-    // asserted as the deliberate thing it is.
-    expect(spineReadings()["gather-contracts"]).toBe("done")
-    expect(labels()["gather-contracts"]).toBe("")
-    // A step the run never reached is NOT an ordinary completion, so it still speaks.
-    expect(labels()["draft-letter"]).toMatch(/not started|not reached/i)
+    await findReport()
+    expect(reportStepRow("Find the supplier contracts").textContent).toContain("✓ Done")
+    expect(reportStepRow("Draft the renewal letter").textContent).toMatch(/not started|not reached/i)
+    expect(reportStepRow("Draft the renewal letter").textContent).not.toContain("Done")
   })
 
   it("renders the spine with no stream at all — the live slice is empty and every node still has a reading", async () => {
+    // 289-04 (W2) REWRITTEN (D-02). It asserted the TERMINAL re-open painted the spine:
+    //     await screen.findByTestId("run-transcript")
+    //     for (const slug of SLUGS) expect(readings()[slug]).not.toBe("NONE")
+    // A finished run now re-opens as the evidence report, still with no stream: every step has
+    // a row there, read from the evidence payload, and no spine or log is painted.
     setLiveSlice([])
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
     renderPage()
-    await screen.findByTestId("run-transcript")
-    for (const slug of SLUGS) expect(readings()[slug]).not.toBe("NONE")
+    await findReport()
+    expect(reportStepRows()).toHaveLength(SLUGS.length)
+    for (const row of reportStepRows()) expect((row.textContent ?? "").trim()).not.toBe("")
+    expect(screen.queryByTestId("run-transcript")).toBeNull()
+    for (const slug of SLUGS) expect(screen.queryByTestId(`spine-step-${slug}`)).toBeNull()
   })
 
   it("the log offers nothing to edit and nothing to select — a read-only surface", async () => {
@@ -826,16 +981,19 @@ describe("WorkflowRunPage — the elapsed figure names the field it derives from
   })
 
   it("a terminal run reads `Ran for` and names both ends of the window", async () => {
+    // 289-04 (W2) migrated-to-report. The finished-run fact is "the figure is the measured
+    // window between two recorded instants, frozen". The live header's anchor sentence
+    // ("from when it started processing to its last update") is the LIVE surface's; the report
+    // states the same window as its outcome, from the evidence read's start and finish.
     getWorkflowRun.mockResolvedValue(
       mkRun({ status: "completed", claimed_at: CLAIMED, updated_at: UPDATED }),
     )
     renderPage()
-    await screen.findByTestId("run-transcript")
-    const slot = screen.getByTestId("run-elapsed").textContent ?? ""
-    expect(slot).toContain("Ran for")
-    expect(slot).toContain("from when it started processing to its last update")
+    await findReport()
+    const sub = screen.getByTestId("evidence-sub").textContent ?? ""
     // 14:03:11 → 14:09:52 is 6m 41s, frozen — never a live tick.
-    expect(slot).toContain("6m 41s")
+    expect(sub).toContain("Completed in 6m 41s")
+    expect(sub).not.toMatch(/so far/)
   })
 
   // ⚠ AMENDED by F3 (UAT 2026-08-05). This case originally asserted that a null `claimed_at`
@@ -897,10 +1055,20 @@ describe("WorkflowRunPage — the run band is total", () => {
     ["cancelled", "Cancelled"],
   ]
 
+  // 289-04 (W2) migrated-to-report, for the three TERMINAL arms only: a finished run renders
+  // the evidence report (D-02), so its result word is asserted on the report's Result fact —
+  // the same needle, the same function stays total. The three live arms are unchanged.
+  const TERMINAL = new Set(["completed", "failed", "cancelled"])
   for (const [status, needle] of cases) {
     it(`renders the ${status} band`, async () => {
       getWorkflowRun.mockResolvedValue(mkRun({ status }))
       renderPage()
+      if (TERMINAL.has(status)) {
+        await findReport()
+        expect(reportFact("Result")).toContain(needle)
+        expect(screen.queryByTestId("run-band")).toBeNull()
+        return
+      }
       await screen.findByTestId("run-transcript")
       expect(screen.getByTestId("run-band").textContent).toContain(needle)
     })
@@ -941,18 +1109,27 @@ describe("WorkflowRunPage — the run band is total", () => {
   })
 
   it("names the failing step by TITLE, never by slug or index", async () => {
+    // 289-04 (W2) migrated-to-report. The fact: the failed step is named by its author's
+    // TITLE. On the report the failed row's title cell carries the title and the Failed word;
+    // the slug appears only in the row's technical type line (sketch B), never as the name.
+    // The durable rows now say what the slice says (`phasesMatching`), because the report
+    // reads the evidence payload's phase log, not the live slice.
     setLiveSlice([
       mkPhase(0, "done", "gather-contracts"),
       mkPhase(1, "failed", "draft-letter"),
       mkPhase(2, "pending", "final-check"),
     ])
-    getWorkflowRun.mockResolvedValue(mkRun({ status: "failed" }))
+    getWorkflowRun.mockResolvedValue(
+      mkRun({ status: "failed", phases: phasesMatching(["completed", "failed", "pending"]) }),
+    )
     renderPage()
-    await screen.findByTestId("run-transcript")
-    const band = screen.getByTestId("run-band").textContent ?? ""
-    expect(band).toContain('Failed at "Draft the renewal letter"')
-    expect(band).not.toContain("draft-letter")
-    expect(band).not.toMatch(/\bPhase 1\b/)
+    await findReport()
+    const row = reportStepRow("Draft the renewal letter")
+    expect(row.textContent).toContain("✕ Failed")
+    const title = row.querySelector("td:nth-child(2) div")?.textContent ?? ""
+    expect(title).toBe("Draft the renewal letter")
+    expect(title).not.toContain("draft-letter")
+    expect(title).not.toMatch(/\bPhase 1\b/)
   })
 
   it("cap_paused states the fact and offers NO control — the band holds nothing focusable", async () => {
@@ -998,7 +1175,9 @@ describe("WorkflowRunPage — the polite region carries the sentence, not the cl
     // run surface permanently showed its status twice. The sibling test above does NOT
     // catch this — it passes whether or not the band is visible — so the guard has to
     // count on-screen renderings rather than inspect the announcement.
-    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", claimed_at: CLAIMED }))
+    // 289-04 (W2) kept-on-live-surface: status "completed" → "active" (the band lives on the
+    // live surface only now); assertions unchanged.
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", claimed_at: CLAIMED }))
     renderPage()
     await screen.findByTestId("run-transcript")
 
@@ -1025,13 +1204,20 @@ describe("WorkflowRunPage — the polite region carries the sentence, not the cl
   })
 
   it("a failed run raises exactly one assertive notice", async () => {
+    // 289-04 (W2) REWRITTEN (D-02). It asserted, on the live surface:
+    //     const alerts = screen.getAllByTestId("run-alert")
+    //     expect(alerts).toHaveLength(1)
+    //     expect(alerts[0].getAttribute("role")).toBe("alert")
+    //     await waitFor(() => expect(alerts[0].textContent ?? "").toContain("Failed"))
+    // A run OPENED after it failed now renders the read-only report, which states the failure
+    // once, as its Result fact, and raises no assertive notice (nothing is happening; it is a
+    // record). ⚠ The live surface's alert still fires for a run that is watched INTO `cap_paused`;
+    // a run watched into `failed` swaps to the report — recorded in 289-04-SUMMARY as a follow-up.
     getWorkflowRun.mockResolvedValue(mkRun({ status: "failed" }))
     renderPage()
-    await screen.findByTestId("run-transcript")
-    const alerts = screen.getAllByTestId("run-alert")
-    expect(alerts).toHaveLength(1)
-    expect(alerts[0].getAttribute("role")).toBe("alert")
-    await waitFor(() => expect(alerts[0].textContent ?? "").toContain("Failed"))
+    await findReport()
+    expect(reportFact("Result")).toBe("✕ Failed")
+    expect(screen.queryAllByTestId("run-alert")).toHaveLength(0)
   })
 
   it("a healthy run raises no assertive notice at all", async () => {
@@ -1047,11 +1233,17 @@ describe("WorkflowRunPage — the polite region carries the sentence, not the cl
     await screen.findByTestId("run-transcript")
     expect(screen.getByTestId("run-transcript-region").getAttribute("aria-busy")).toBe("true")
 
+    // 289-04 (W2) REWRITTEN (D-02), terminal half only. It asserted:
+    //     await screen.findByTestId("run-transcript")
+    //     expect(screen.getByTestId("run-transcript-region").getAttribute("aria-busy")).toBe("false")
+    // A terminal run now renders the report, which has no busy region at all: calm by
+    // construction rather than by attribute. The live half above is unchanged.
     cleanup()
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
     renderPage()
-    await screen.findByTestId("run-transcript")
-    expect(screen.getByTestId("run-transcript-region").getAttribute("aria-busy")).toBe("false")
+    await findReport()
+    expect(screen.queryByTestId("run-transcript-region")).toBeNull()
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull()
   })
 })
 
@@ -1075,11 +1267,18 @@ describe("WorkflowRunPage — loading and error states", () => {
   })
 
   it("a 404 renders the not-available copy and goes back", async () => {
+    // 289-04 (W2) migrated-to-report (D-05 / S4). The owner read's 404 now routes into the
+    // report, whose org-scoped evidence read decides; when that read ALSO refuses, the ONE
+    // not-available screen renders — same words for "gone" and "not yours", still no retry,
+    // still a way back. The words changed with the surface (D-14a / sketch B):
+    //     was  "That run isn't available." / "It may have been deleted, or it belongs to another account."
     getWorkflowRun.mockRejectedValue(new ApiError("nope", 404))
     const { onBack } = renderPage()
-    await screen.findByText("That run isn't available.")
+    await screen.findByText("This run isn't available")
     expect(
-      screen.getByText("It may have been deleted, or it belongs to another account."),
+      screen.getByText(
+        "It may not exist, or it belongs to an organisation you're not in. Nothing about it is shown here.",
+      ),
     ).toBeTruthy()
     // A 404 is BOTH "gone" and "not yours" — no retry is offered for either.
     expect(screen.queryByText("Try again")).toBeNull()
@@ -1140,25 +1339,38 @@ describe("WorkflowRunPage — loading and error states", () => {
   })
 
   it("renders the deliverable hero under its own landmark", async () => {
+    // 289-04 (W2) REWRITTEN (D-02 / D-14a). It asserted the hero landmark on a finished run:
+    //     const hero = screen.getByLabelText(HERO_LANDMARK)
+    //     expect(hero.textContent).toContain(HERO_HEADING_FILE)
+    // A finished run now renders the report, whose deliverable has ONE home: the Deliverable
+    // fact in the facts strip, named from the evidence read. The hero is not rendered.
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    getRunEvidence.mockResolvedValue(
+      evidenceFrom(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }), {
+        deliverable: { kind: "file", name: DELIVERABLE_NAME, file_id: DELIVERABLE.id ?? null },
+      }),
+    )
     setFiles([DELIVERABLE])
     renderPage()
-    await screen.findByTestId("run-transcript")
-    const hero = screen.getByLabelText(HERO_LANDMARK)
-    expect(hero).toBeInTheDocument()
-    expect(hero.textContent).toContain(HERO_HEADING_FILE)
+    await findReport()
+    expect(reportFact("Deliverable")).toBe(`◆ ${DELIVERABLE_NAME}`)
+    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
   })
 
   // ── Phase 195 Plan 06 (D-02, P5) — THE LABEL MUST NOT CLAIM AUTHORSHIP ───────────
   it("labels the hero with typed headings and never claims the run produced them", async () => {
+    // 289-04 (W2) migrated-to-report. The fact is P5's: no heading claims authorship of the
+    // files. On the report the deliverable's label is the fact name "Deliverable" and no
+    // heading anywhere on it says "this run produced/made/created". The hero's own heading
+    // assertions (`querySelector("h2")` → HERO_HEADING_FILE) no longer have a hero to read.
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
     setFiles([DELIVERABLE])
     renderPage()
-    await screen.findByTestId("run-transcript")
-    const heading = screen.getByLabelText(HERO_LANDMARK).querySelector("h2")
-    expect(heading).not.toBeNull()
-    expect(heading?.textContent ?? "").not.toMatch(/this run (produced|made|created)/i)
-    expect(heading?.textContent).toBe(HERO_HEADING_FILE)
+    const report = await findReport()
+    const headings = Array.from(report.querySelectorAll("h1, h2, dt")).map((h) => h.textContent ?? "")
+    expect(headings.length).toBeGreaterThan(0)
+    for (const h of headings) expect(h).not.toMatch(/this run (produced|made|created)/i)
+    expect(headings).toContain("Deliverable")
     for (const overclaim of [
       "What this run produced",
       "Files this run made",
@@ -1176,32 +1388,51 @@ describe("WorkflowRunPage — loading and error states", () => {
 // GET THE FILE IT MADE? Everything below measures that answer, and measures that the
 // answer is sourced from the run's OWN thread.
 
+// ⚠ 289-04 (W2 / D-02 / D-14a): every case below mounts a FINISHED run, which now renders the
+// evidence report. The report's deliverable has ONE home — the Deliverable fact, named by the
+// SERVER (the last completed step's file, 289-03 `compose_deliverable`) — plus, for the owner
+// only, one "Download the deliverable" control that downloads through the run's OWN thread.
+// The workspace file LIST (size, ordering, id-less rows) is the live surface's hero, which
+// renders only for a terminal run and therefore no longer renders at all; each case is
+// migrated where its fact has a report counterpart and rewritten where D-02 removed it.
+const REPORT_DOWNLOAD = "Download the deliverable"
+
 describe("WorkflowRunPage — the deliverable is listed and downloadable", () => {
   beforeEach(() => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    getRunEvidence.mockResolvedValue(
+      evidenceFrom(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }), {
+        deliverable: { kind: "file", name: DELIVERABLE_NAME, file_id: DELIVERABLE.id ?? null },
+      }),
+    )
     setFiles([DELIVERABLE])
   })
 
   it("lists the file the run produced, with its name and its size", async () => {
+    // 289-04 (W2) migrated-to-report: the NAME is the Deliverable fact. The size and the
+    // full-path `title` were the hero row's and have no report counterpart (the evidence
+    // payload carries no size) — recorded in 289-04-SUMMARY.
     renderPage()
-    const row = await screen.findByRole("button", { name: DOWNLOAD_LABEL })
-    expect(row.textContent).toContain(DELIVERABLE_NAME)
-    expect(row.textContent).toContain(DELIVERABLE_SIZE)
-    // The full path is available without being the visible label.
-    expect(row.getAttribute("title")).toBe(DELIVERABLE.path)
+    await findReport()
+    expect(reportFact("Deliverable")).toBe(`◆ ${DELIVERABLE_NAME}`)
+    expect(reportFact("Deliverable")).not.toContain(DELIVERABLE.path)
   })
 
   it("reads the list from the RUN's thread and never from the viewed thread", async () => {
+    // 289-04 (W2) migrated-to-report: the report's deliverable download goes through the
+    // RUN's thread (the evidence read's `thread_id`), never the viewed one.
     renderPage()
-    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
-    const args = useWorkspaceFiles.mock.calls.map((c) => c[0])
-    expect(args).toContain(RUN_THREAD_ID)
-    expect(args).not.toContain(VIEWED_THREAD_ID)
+    await findReport()
+    fireEvent.click(screen.getByRole("button", { name: REPORT_DOWNLOAD }))
+    expect(downloadWorkspaceFile.mock.calls[0][0]).toBe(RUN_THREAD_ID)
+    expect(downloadWorkspaceFile.mock.calls[0][0]).not.toBe(VIEWED_THREAD_ID)
   })
 
   it("downloads with the RUN's thread id, the file id and the bare filename", async () => {
+    // 289-04 (W2) migrated-to-report: same call, same three arguments, from the report.
     renderPage()
-    fireEvent.click(await screen.findByRole("button", { name: DOWNLOAD_LABEL }))
+    await findReport()
+    fireEvent.click(screen.getByRole("button", { name: REPORT_DOWNLOAD }))
     expect(downloadWorkspaceFile).toHaveBeenCalledWith(
       RUN_THREAD_ID,
       DELIVERABLE.id,
@@ -1212,17 +1443,17 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
   })
 
   it("offers NO preview for the .docx row — no pane, no frame, only the download", async () => {
+    // 289-04 (W2) migrated-to-report: the report previews nothing; its one deliverable control
+    // is the download.
     renderPage()
-    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
-    const region = screen.getByLabelText(HERO_LANDMARK)
+    const region = await findReport()
     expect(region.querySelector("iframe")).toBeNull()
     expect(region.querySelector("embed")).toBeNull()
     expect(region.querySelector("object")).toBeNull()
     expect(region.querySelector("[data-testid*='preview']")).toBeNull()
-    // Exactly one control in the region, and it is the download.
-    const buttons = region.querySelectorAll("button")
-    expect(buttons).toHaveLength(1)
-    expect(buttons[0].getAttribute("aria-label")).toBe(DOWNLOAD_LABEL)
+    const deliverableControls = screen.getAllByRole("button", { name: /deliverable/i })
+    expect(deliverableControls).toHaveLength(1)
+    expect(deliverableControls[0].textContent).toBe(REPORT_DOWNLOAD)
     // POSITIVE CONTROL — the probes really do find the shapes they forbid.
     const probe = document.createElement("div")
     probe.innerHTML = `<iframe></iframe><div data-testid="file-preview"></div>`
@@ -1231,25 +1462,30 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
   })
 
   it("renders the rows as a list, one row per file", async () => {
+    // 289-04 (W2) REWRITTEN (D-14a). It asserted one download button per workspace file:
+    //     expect(screen.getByRole("button", { name: DOWNLOAD_LABEL })).toBeTruthy()
+    //     expect(screen.getByRole("button", { name: "Download notes.md (512 B)" })).toBeTruthy()
+    // The report names ONE deliverable — the server's — so a second workspace file is not
+    // presented as a deliverable or offered as a download.
     setFiles([
       DELIVERABLE,
       { id: "file-2", path: "notes.md", size_bytes: 512, mime_type: "text/markdown" },
     ])
     renderPage()
-    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
-    const region = screen.getByLabelText(HERO_LANDMARK)
-    expect(region).not.toBeNull()
-    expect(screen.getByRole("button", { name: DOWNLOAD_LABEL })).toBeTruthy()
-    expect(screen.getByRole("button", { name: "Download notes.md (512 B)" })).toBeTruthy()
+    const report = await findReport()
+    expect(reportFact("Deliverable")).toBe(`◆ ${DELIVERABLE_NAME}`)
+    expect(report.textContent).not.toContain("notes.md")
+    expect(screen.getAllByRole("button", { name: /deliverable/i })).toHaveLength(1)
   })
 
   it("surfaces a failed download where the user clicked, instead of swallowing it", async () => {
+    // 289-04 (W2) migrated-to-report: a failed download is still said, beside the control,
+    // in the report's own words (it does not echo a server message).
     downloadWorkspaceFile.mockRejectedValueOnce(new Error("File not found."))
     renderPage()
-    fireEvent.click(await screen.findByRole("button", { name: DOWNLOAD_LABEL }))
-    expect((await screen.findByTestId("run-download-error")).textContent).toContain(
-      "File not found.",
-    )
+    await findReport()
+    fireEvent.click(screen.getByRole("button", { name: REPORT_DOWNLOAD }))
+    expect((await screen.findByRole("alert")).textContent).toContain("Download failed — try again.")
   })
 
   // ── Phase 195 Plan 06 (D-12, P4) — THE REGION RENDERS NEWEST FIRST ───────────────
@@ -1260,45 +1496,51 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
   // the deliverable arrives in the second one.
 
   it("orders the list newest first — the unsorted order and the rendered order DIFFER", async () => {
+    // 289-04 (W2) REWRITTEN (D-14a). It asserted the hero's newest-first ORDER:
+    //     const rel = newBtn.compareDocumentPosition(oldBtn)
+    //     expect(rel & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // The report lists no files; its deliverable is the one the SERVER names, so neither the
+    // slice's order nor its newest file decides what it says.
     setFiles([
       { id: "f-old", path: "old.md", size_bytes: 100, mime_type: "text/markdown", created_at: "2026-08-01T10:00:00Z" },
       { id: "f-new", path: "new.md", size_bytes: 200, mime_type: "text/markdown", created_at: "2026-08-17T10:00:00Z" },
     ])
     renderPage()
-    await screen.findByRole("button", { name: "Download new.md (200 B)" })
-    const region = screen.getByLabelText(HERO_LANDMARK)
-    expect(region.textContent).toContain("new.md")
-    expect(region.textContent).toContain("old.md")
-    const newBtn = screen.getByRole("button", { name: "Download new.md (200 B)" })
-    const oldBtn = screen.getByRole("button", { name: "Download old.md (100 B)" })
-    const rel = newBtn.compareDocumentPosition(oldBtn)
-    expect(rel & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const report = await findReport()
+    expect(reportFact("Deliverable")).toBe(`◆ ${DELIVERABLE_NAME}`)
+    expect(report.textContent).not.toContain("new.md")
+    expect(report.textContent).not.toContain("old.md")
   })
 
   it("⚠ the JUST-PRODUCED file — the one with NO created_at — renders FIRST", async () => {
+    // 289-04 (W2) REWRITTEN (D-14a). It asserted the just-produced file sorted ABOVE an older
+    // template in the hero. The property it protected — the run's own output, not a template
+    // that happens to share the workspace, is what the surface leads with — holds on the
+    // report by construction: the Deliverable fact is the run's output and the template is
+    // not named at all.
     setFiles([
       { id: "f-template", path: "Northwind-QBR-Template.docx", size_bytes: 38700, mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", created_at: "2026-08-17T09:00:00Z" },
       { id: "f-live", path: "output/renewal-letter.docx", size_bytes: 18841, mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
     ])
     renderPage()
-    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
-    const region = screen.getByLabelText(HERO_LANDMARK)
-    expect(region.textContent).toContain(DELIVERABLE_NAME)
-    expect(region.textContent).toContain("Northwind-QBR-Template.docx")
-    const liveBtn = screen.getByRole("button", { name: DOWNLOAD_LABEL })
-    const templateBtn = screen.getByRole("button", { name: "Download Northwind-QBR-Template.docx (37.8 KB)" })
-    const rel = liveBtn.compareDocumentPosition(templateBtn)
-    expect(rel & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const report = await findReport()
+    expect(reportFact("Deliverable")).toBe(`◆ ${DELIVERABLE_NAME}`)
+    expect(report.textContent).not.toContain("Northwind-QBR-Template.docx")
   })
 
   it("a row the listing gave with no id is shown as a fact, never as a dead control", async () => {
+    // 289-04 (W2) migrated-to-report: a deliverable with no file id is named as a fact and
+    // offered as NO control (the raw route would be built with an empty id segment and 404).
+    getRunEvidence.mockResolvedValue(
+      evidenceFrom(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }), {
+        deliverable: { kind: "file", name: "orphan.docx", file_id: null },
+      }),
+    )
     setFiles([{ path: "orphan.docx", size_bytes: 100, mime_type: "" }])
     renderPage()
-    await screen.findByTestId("run-transcript-region")
-    const region = screen.getByLabelText(HERO_LANDMARK)
-    expect(region.textContent).toContain("orphan.docx")
-    // No control — the raw route would be built with an empty id segment and 404.
-    expect(region.querySelectorAll("button")).toHaveLength(0)
+    await findReport()
+    expect(reportFact("Deliverable")).toBe("◆ orphan.docx")
+    expect(screen.queryByRole("button", { name: REPORT_DOWNLOAD })).toBeNull()
   })
 })
 
@@ -1313,46 +1555,63 @@ describe("195-02/195-06 — the id-less deliverable row: still no control, now N
   const ID_LESS_SIZE = "2.0 KB"
   const D08_COPY = "Download unavailable"
 
+  // ⚠ 289-04 (W2 / D-02): the id-less ROW was the hero's, which a finished run no longer
+  // renders. The report's counterpart is the Deliverable FACT for a file the server could not
+  // link (`file_id: null`): named, never a control. These cases now read that fact.
   function idLessRow(): HTMLElement | null {
-    const region = screen.getByLabelText(HERO_LANDMARK)
-    return region.querySelector('[title*="orphan-deliverable.docx"]')
+    const cell = Array.from(document.querySelectorAll("[data-evidence-fact]")).find(
+      (c) => c.querySelector("[data-fact-label]")?.textContent === "Deliverable",
+    )
+    return (cell as HTMLElement | undefined) ?? null
   }
 
   beforeEach(() => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    getRunEvidence.mockResolvedValue(
+      evidenceFrom(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }), {
+        deliverable: { kind: "file", name: ID_LESS_NAME, file_id: null },
+      }),
+    )
     setFiles([ID_LESS])
   })
 
   it("shows the name, the size and the full path in `title` — and the region holds ZERO buttons", async () => {
+    // 289-04 (W2) migrated-to-report: the name, never the folder prefix, and ZERO controls.
+    // The size and the `title` path were the hero row's (no report counterpart):
+    //     expect(row?.textContent).toContain(ID_LESS_SIZE)
+    //     expect(row?.getAttribute("title")).toBe(ID_LESS.path)
     renderPage()
-    await screen.findByTestId("run-transcript-region")
+    await findReport()
     const row = idLessRow()
     expect(row).not.toBeNull()
     expect(row?.tagName).toBe("DIV")
     expect(row?.textContent).toContain(ID_LESS_NAME)
-    expect(row?.textContent).toContain(ID_LESS_SIZE)
-    expect(row?.getAttribute("title")).toBe(ID_LESS.path)
     expect(row?.textContent).not.toContain("output/")
-    expect(screen.getByLabelText(HERO_LANDMARK).querySelectorAll("button")).toHaveLength(0)
+    expect(row?.querySelectorAll("button")).toHaveLength(0)
+    expect(screen.queryByRole("button", { name: /deliverable/i })).toBeNull()
+    expect(ID_LESS_SIZE).toBe("2.0 KB")
   })
 
   it(`the ROW now CARRIES "${D08_COPY}" — the absence plan 195-06 inverted`, async () => {
+    // 289-04 (W2) REWRITTEN (D-14a). It asserted the hero row's disabled affordance:
+    //     expect(row?.textContent ?? "").toContain(D08_COPY)
+    //     expect(affordance?.getAttribute("title")).toBe("Download unavailable — this file has no link")
+    // The report has no per-file row: an unlinked deliverable is the bare fact with no control
+    // and no dead affordance. The "say why there is no download" sentence does not exist on
+    // the report — recorded in 289-04-SUMMARY as a follow-up for the report's owner links.
     renderPage()
-    await screen.findByTestId("run-transcript-region")
+    await findReport()
     const row = idLessRow()
     expect(row).not.toBeNull()
-    expect(row?.textContent ?? "").toContain(D08_COPY)
-    const affordance = row?.querySelector('[aria-disabled="true"]')
-    expect(affordance).not.toBeNull()
-    expect(affordance?.getAttribute("title")).toContain(D08_COPY)
-    expect(affordance?.getAttribute("title")).toBe("Download unavailable — this file has no link")
-    expect(affordance?.tagName).toBe("SPAN")
+    expect(row?.textContent ?? "").toBe(`Deliverable◆ ${ID_LESS_NAME}`)
+    expect(row?.querySelector('[aria-disabled="true"]')).toBeNull()
     expect(row?.querySelectorAll("button")).toHaveLength(0)
   })
 
   it("POSITIVE CONTROL — the same needle IS found in a string that contains it", async () => {
+    // 289-04 (W2) migrated-to-report: the probe now runs over the report's Deliverable fact.
     renderPage()
-    await screen.findByTestId("run-transcript-region")
+    await findReport()
     const row = idLessRow()
     expect(row).not.toBeNull()
     expect((row?.textContent ?? "").length).toBeGreaterThan(0)
@@ -1377,19 +1636,31 @@ describe("WorkflowRunPage — the two empty states say different true things", (
   })
 
   it("a TERMINAL run with no files says it produced none — the tense is the fact", async () => {
+    // 289-04 (W2) migrated-to-report: a finished run with no deliverable SAYS so — the
+    // Deliverable fact reads "None" (the hero's sentence HERO_EMPTY_COMPLETED is not rendered).
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
     setFiles([])
     renderPage()
-    await screen.findByTestId("run-transcript")
-    expect(screen.getByLabelText(HERO_LANDMARK).textContent).toContain(HERO_EMPTY_COMPLETED)
+    await findReport()
+    expect(reportFact("Deliverable")).toBe("None")
+    expect(screen.queryByText(HERO_EMPTY_COMPLETED)).toBeNull()
   })
 
   it("claims NEITHER while the first read is still in flight", async () => {
+    // 289-04 (W2) REWRITTEN (D-02). It asserted the hero waited for the file slice:
+    //     expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
+    // The report claims nothing until ITS OWN read lands (its loading line), and once it lands
+    // its deliverable comes from that read, so a file slice still in flight changes nothing.
+    let land!: (v: RunEvidence) => void
+    getRunEvidence.mockReturnValue(new Promise<RunEvidence>((r) => (land = r)))
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
     setFiles([], true)
     renderPage()
-    await screen.findByTestId("run-transcript")
-    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
+    await screen.findByText("Opening the run record…")
+    expect(screen.queryByText("None")).toBeNull()
+    await act(async () => land(evidenceFrom(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))))
+    await findReport()
+    expect(reportFact("Deliverable")).toBe("None")
   })
 })
 
@@ -1438,47 +1709,71 @@ function runWithAnswer(overrides: Partial<RunLike> = {}): RunLike {
   })
 }
 
+// ⚠ 289-04 (W2 / D-02 / D-14a): every case in this describe mounts a FINISHED run, which now
+// renders the evidence report. The four arms survive as the report's Deliverable FACT
+// ("◆ <file>" / "Written answer" / "None") plus the answer text in the step that WROTE it
+// (section 2). `regionFor` returns the report and hands the evidence read the server's
+// deliverable: a file when the run left one (the server prefers it), else the last written
+// answer, else none. The hero's typed headings (HERO_HEADING_*) and its markdown rendering
+// do not exist on the report; each such case is marked REWRITTEN with the old assertion quoted.
 describe("WorkflowRunPage — the four deliverable renders", () => {
   async function regionFor(run: RunLike, files: typeof DELIVERABLE[]): Promise<HTMLElement> {
     getWorkflowRun.mockResolvedValue(run)
+    getRunEvidence.mockResolvedValue(
+      evidenceFrom(
+        run,
+        files.length > 0
+          ? { deliverable: { kind: "file", name: DELIVERABLE_NAME, file_id: DELIVERABLE.id ?? null } }
+          : {},
+      ),
+    )
     setFiles(files)
     renderPage()
-    await screen.findByTestId("run-transcript-region")
-    return screen.getByLabelText(HERO_LANDMARK)
+    return findReport()
   }
 
   it("FILE ONLY — renders single file heading and newest file in hero slot", async () => {
+    // 289-04 (W2) migrated-to-report: was `heading(2) === HERO_HEADING_FILE` + the name.
     const region = await regionFor(
       mkRun({ status: "completed", thread_id: RUN_THREAD_ID }),
       [DELIVERABLE],
     )
-    expect(within(region).getByRole("heading", { level: 2 }).textContent).toBe(HERO_HEADING_FILE)
+    expect(reportFact("Deliverable")).toBe(`◆ ${DELIVERABLE_NAME}`)
     expect(region.textContent).toContain(DELIVERABLE_NAME)
+    expect(region.textContent).not.toContain(HERO_HEADING_FILE)
   })
 
   it("TEXT ONLY — the answer renders, and the file heading does NOT", async () => {
+    // 289-04 (W2) migrated-to-report: was `heading(2) === HERO_HEADING_ANSWER` + the text.
     const region = await regionFor(runWithAnswer(), [])
-    expect(within(region).getByRole("heading", { level: 2 }).textContent).toBe(HERO_HEADING_ANSWER)
-    expect(region.textContent).toContain("Renewals are on track.")
+    expect(reportFact("Deliverable")).toBe("Written answer")
+    expect(reportStepRow("Draft the renewal letter").textContent).toContain("Renewals are on track.")
+    expect(region.textContent).not.toContain(HERO_HEADING_FILE)
     expect(screen.queryByText("This run produced no files.")).toBeNull()
   })
 
   it("BOTH — the deliverables heading, file, and answer beneath", async () => {
+    // 289-04 (W2) migrated-to-report: was `heading(2) === HERO_HEADING_BOTH` + file + answer.
     const region = await regionFor(runWithAnswer(), [DELIVERABLE])
-    expect(within(region).getByRole("heading", { level: 2 }).textContent).toBe(HERO_HEADING_BOTH)
+    expect(reportFact("Deliverable")).toBe(`◆ ${DELIVERABLE_NAME}`)
     expect(region.textContent).toContain(DELIVERABLE_NAME)
-    expect(region.textContent).toContain("Renewals are on track.")
+    expect(reportStepRow("Draft the renewal letter").textContent).toContain("Renewals are on track.")
+    expect(region.textContent).not.toContain(HERO_HEADING_BOTH)
   })
 
   it("GENUINELY NOTHING — D-16 completed run sentence", async () => {
-    const region = await regionFor(
+    // 289-04 (W2) migrated-to-report: was `toContain(HERO_EMPTY_COMPLETED)`; the report's
+    // absence is the Deliverable fact "None".
+    await regionFor(
       mkRun({ status: "completed", thread_id: RUN_THREAD_ID }),
       [],
     )
-    expect(region.textContent).toContain(HERO_EMPTY_COMPLETED)
+    expect(reportFact("Deliverable")).toBe("None")
   })
 
   it("the FOUR arms render FOUR DISTINCT texts — a fold is caught directly", async () => {
+    // 289-04 (W2) migrated-to-report: body unchanged; `regionFor` now returns the report, so
+    // the four texts compared are the four REPORTS, and a fold is still caught by set size.
     const texts: string[] = []
     for (const [run, files] of [
       [mkRun({ status: "completed", thread_id: RUN_THREAD_ID }), [DELIVERABLE]],
@@ -1505,19 +1800,29 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
   })
 
   it("claims NEITHER absence while the first file read is in flight", async () => {
+    // 289-04 (W2) REWRITTEN (D-02). It asserted the hero stayed away during the file read:
+    //     await screen.findByTestId("run-transcript-region")
+    //     expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
+    // The report does not read the file slice at all: its absence claim ("None") comes from
+    // the evidence read, so a file read still in flight neither delays nor contradicts it.
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
     setFiles([], true)
     renderPage()
-    await screen.findByTestId("run-transcript-region")
+    await findReport()
+    expect(reportFact("Deliverable")).toBe("None")
     expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
   })
 
   it("an ANSWER renders even while the file read is in flight — the two are independent", async () => {
+    // 289-04 (W2) REWRITTEN (D-02). It asserted, against the hero, `queryByLabelText(HERO_LANDMARK)
+    // toBeNull()` during the file read. On the report the answer and the file slice ARE
+    // independent: the written answer renders in its step row while the slice is in flight.
     getWorkflowRun.mockResolvedValue(runWithAnswer())
     setFiles([], true)
     renderPage()
-    await screen.findByTestId("run-transcript-region")
-    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
+    await findReport()
+    expect(reportFact("Deliverable")).toBe("Written answer")
+    expect(reportStepRow("Draft the renewal letter").textContent).toContain("Renewals are on track.")
   })
 
   it("the answer is the LAST row with text — not strictly the final row", async () => {
@@ -1550,7 +1855,11 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
       }),
       [],
     )
+    // 289-04 (W2) migrated-to-report: the answer is the LAST row that wrote text (the final
+    // programmatic row wrote none), and it reads in the row that wrote it.
     expect(region.textContent).toContain("Renewals are on track.")
+    expect(reportFact("Deliverable")).toBe("Written answer")
+    expect(reportStepRow("Draft the renewal letter").textContent).toContain("Renewals are on track.")
   })
 
   it("takes the LAST answer when several rows carry one — a confirm's QUESTION never wins", async () => {
@@ -1579,11 +1888,21 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
       }),
       [],
     )
+    // 289-04 (W2) REWRITTEN (D-14a). It asserted the question was nowhere in the hero:
+    //     expect(region.textContent).not.toContain(QUESTION)
+    // The report is a RECORD, so the confirm step's question IS shown — as that step's
+    // question (the owner's human-input lines), never as its output and never as the
+    // deliverable. The answer is the drafting step's, and the deliverable is "Written answer".
     expect(region.textContent).toContain("Renewals are on track.")
-    expect(region.textContent).not.toContain(QUESTION)
+    const confirm = reportStepRow("Find the supplier contracts")
+    expect(confirm.textContent).toContain(QUESTION)
+    expect(reportStepRow("Draft the renewal letter").textContent).not.toContain(QUESTION)
+    expect(reportFact("Deliverable")).toBe("Written answer")
   })
 
   it("an EMPTY-STRING answer is no answer at all", async () => {
+    // 289-04 (W2) migrated-to-report: was `not.toContain(HERO_HEADING_ANSWER)` and
+    // `toContain(HERO_EMPTY_COMPLETED)`; on the report the deliverable reads "None".
     const region = await regionFor(runWithAnswer({ phases: [
       { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
       {
@@ -1595,18 +1914,25 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
       },
     ] }), [])
     expect(region.textContent).not.toContain(HERO_HEADING_ANSWER)
-    expect(region.textContent).toContain(HERO_EMPTY_COMPLETED)
+    expect(reportFact("Deliverable")).toBe("None")
   })
 
   it("the answer renders as sanitised markdown, with its own line breaks kept", async () => {
-    const region = await regionFor(runWithAnswer(), [])
-    const block = region.querySelector('.markdown')
-    expect(block).not.toBeNull()
+    // 289-04 (W2) REWRITTEN (D-14a). It asserted a `.markdown` block with max-w-[72ch]:
+    //     const block = region.querySelector('.markdown')
+    //     expect(block!.className).toContain("max-w-[72ch]")
+    // The report renders a step's output VERBATIM as text (a record of what was written) with
+    // its own line breaks kept (pre-wrap). Markdown rendering on the report is a recorded
+    // follow-up in 289-04-SUMMARY.
+    await regionFor(runWithAnswer(), [])
+    const row = reportStepRow("Draft the renewal letter")
+    const out = Array.from(row.querySelectorAll("div")).find((d) => d.className.includes("whitespace-pre-wrap"))
+    expect(out).toBeDefined()
+    expect(out!.textContent).toBe(RUN_ANSWER)
     for (const line of RUN_ANSWER.split("\n").filter((l) => l.trim())) {
-      expect(block!.textContent).toContain(line.trim())
+      expect(out!.textContent).toContain(line.trim())
     }
-    expect(block!.className).toContain("max-w-[72ch]")
-    expect(block!.className).toContain("break-words")
+    expect(out!.className).toContain("break-words")
   })
 
   it("a confirm step's QUESTION is never mistaken for the run's answer (CR-02)", async () => {
@@ -1635,11 +1961,17 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
       }),
       [],
     )
-    const block = region.querySelector('[data-testid="run-deliverable-answer"] .markdown')
-    expect(block).not.toBeNull()
-    // ⚠ The later row wins ONLY among rows that actually wrote something.
-    expect(block!.textContent).not.toContain("Does this draft answer your question")
-    expect(block!.textContent).toContain(RUN_ANSWER.split("\n")[0].trim())
+    // 289-04 (W2) migrated-to-report. Was: the hero's answer block
+    //     region.querySelector('[data-testid="run-deliverable-answer"] .markdown')
+    // never contained the machine's question. On the report the drafting step's row carries
+    // the answer and NOT the question; the question sits only on the confirm step's row, as
+    // its question. The deliverable is the written answer, never the question.
+    expect(region).toBeTruthy()
+    const draft = reportStepRow("Draft the renewal letter")
+    expect(draft.textContent).not.toContain("Does this draft answer your question")
+    expect(draft.textContent).toContain(RUN_ANSWER.split("\n")[0].trim())
+    expect(reportStepRow("Check it over").textContent).toContain(MACHINE_QUESTION)
+    expect(reportFact("Deliverable")).toBe("Written answer")
   })
 
   it("a run whose ONLY text is a confirm question shows no answer at all (CR-02)", async () => {
@@ -1658,8 +1990,14 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
       }),
       [],
     )
+    // 289-04 (W2) REWRITTEN (D-14a). It asserted the question was absent from the hero:
+    //     expect(region.textContent).not.toContain("Does this draft answer your question")
+    // The report records the confirm step's question AS its question; what must not happen —
+    // the question being presented as the run's answer — is asserted on the deliverable:
+    // there is none.
     expect(region.textContent).not.toContain(COPY_ANSWER_HEADING)
-    expect(region.textContent).not.toContain("Does this draft answer your question")
+    expect(reportFact("Deliverable")).toBe("None")
+    expect(reportStepRow("Check it over").textContent).toContain("Does this draft answer your question")
   })
 
   it("markdown in the answer becomes real formatting, not literal asterisks", async () => {
@@ -1677,11 +2015,14 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
       }),
       [],
     )
-    const block = region.querySelector('[data-testid="run-deliverable-answer"] .markdown')
-    // The whole point of the change: emphasis is emphasis, and the markers are gone.
-    expect(block!.querySelector("strong")).not.toBeNull()
-    expect(block!.querySelector("strong")!.textContent).toBe("one correction")
-    expect(block!.textContent).not.toContain("**")
+    // 289-04 (W2) REWRITTEN (D-14a). It asserted the hero rendered markdown:
+    //     expect(block!.querySelector("strong")!.textContent).toBe("one correction")
+    //     expect(block!.textContent).not.toContain("**")
+    // The report is a record and renders the step output VERBATIM as text: the markers stay,
+    // and no element is created from them. (Follow-up recorded in 289-04-SUMMARY.)
+    const row = reportStepRow("Draft the renewal letter")
+    expect(region.querySelector("strong")).toBeNull()
+    expect(row.textContent).toContain("Approved with **one correction** before finalising.")
   })
 
   it("model-authored markup in the answer cannot execute — the refusal, re-asserted", async () => {
@@ -1702,23 +2043,27 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
       }),
       [],
     )
-    const block = region.querySelector('[data-testid="run-deliverable-answer"] .markdown')
-    expect(block).not.toBeNull()
-    // ⚠ THE PROPERTY THAT MATTERS: nothing here can run.
-    expect(block!.querySelector("script")).toBeNull()
-    for (const el of Array.from(block!.querySelectorAll("*"))) {
+    // 289-04 (W2) migrated-to-report. THE PROPERTY THAT MATTERS is unchanged: nothing here can
+    // run. It is asserted over the WHOLE report now (was the hero's `.markdown` block), and is
+    // stronger there: the report renders model text as text, so even the benign `<b>` is not
+    // markup (was `expect(block!.querySelector("b")).not.toBeNull()`).
+    const block = reportStepRow("Draft the renewal letter")
+    expect(region.querySelector("script")).toBeNull()
+    expect(region.querySelector("img")).toBeNull()
+    for (const el of Array.from(region.querySelectorAll("*"))) {
       for (const attr of Array.from(el.attributes)) {
         expect(attr.name.toLowerCase().startsWith("on")).toBe(false)
         expect(attr.value.toLowerCase().replace(/\s/g, "")).not.toContain("javascript:")
       }
     }
-    // The benign half is allowed to be markup now — that is the deliberate change.
-    expect(block!.querySelector("b")).not.toBeNull()
+    expect(block.querySelector("b")).toBeNull()
+    expect(block.textContent).toContain("<script>alert(2)</script>")
   })
 
   it("adds NO focus stop — the answer is prose, not a control", async () => {
-    // The region's shipped contract is one focus stop per downloadable row and nothing else.
-    const region = await regionFor(runWithAnswer(), [])
+    // 289-04 (W2) migrated-to-report: the answer's row on the report holds no control.
+    await regionFor(runWithAnswer(), [])
+    const region = reportStepRow("Draft the renewal letter")
     expect(region.querySelectorAll("button")).toHaveLength(0)
     expect(region.querySelectorAll("a")).toHaveLength(0)
     expect(region.querySelectorAll("[tabindex]")).toHaveLength(0)
@@ -1918,9 +2263,15 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000)
     })
-    expect(screen.getByTestId("run-band")).toHaveTextContent("✓ Complete")
-    // …and the clock is frozen rather than still counting.
-    expect(screen.getByTestId("run-elapsed")).toHaveTextContent("Ran for")
+    await settle()
+    // 289-04 (W2) REWRITTEN (D-02). It asserted the band and the frozen clock after the poll:
+    //     expect(screen.getByTestId("run-band")).toHaveTextContent("✓ Complete")
+    //     expect(screen.getByTestId("run-elapsed")).toHaveTextContent("Ran for")
+    // The poll still learns the run finished; what the surface does with that is now D-02's:
+    // it stops claiming "Running" by becoming the report, whose result reads Completed.
+    expect(screen.getByTestId("run-evidence-report")).toBeInTheDocument()
+    expect(reportFact("Result")).toBe("✓ Completed")
+    expect(screen.queryByText("● Running")).toBeNull()
   })
 
   // ── F1 (UAT 2026-08-05) — THE CANVAS FROZE WHILE A PERSON WATCHED IT. ──
@@ -1945,14 +2296,21 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
   //    while its first step was visibly Running. `created_at` is NOT NULL and is the
   //    honest fallback — a queued-anchored figure, labelled as one.
   it("a finished run with no claimed_at still shows a number, anchored on created_at and SAID so", async () => {
+    // 289-04 (W2) REWRITTEN (D-02). It asserted the live header's queued-anchored figure:
+    //     expect(el).toHaveTextContent("Ran for")
+    //     expect(el).toHaveTextContent("queued")
+    // A finished run opens as the report, whose figure is the evidence read's own recorded
+    // window (start → finish), still a number and never "Waiting to start". The queued-anchor
+    // disclosure belongs to the live header, which a finished run no longer shows.
     vi.useFakeTimers()
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", claimed_at: null }))
     renderPage()
     await settle()
-    const el = screen.getByTestId("run-elapsed")
-    expect(el).not.toHaveTextContent("Waiting to start")
-    expect(el).toHaveTextContent("Ran for")
-    expect(el).toHaveTextContent("queued")
+    await settle()
+    const sub = screen.getByTestId("evidence-sub").textContent ?? ""
+    expect(sub).not.toContain("Waiting to start")
+    // created 14:03:00 → updated 14:09:52.
+    expect(sub).toContain("Completed in 6m 52s")
   })
 
   it("an active run whose claimed_at is null still reads Running — the field cannot mean queued when nothing sets it", async () => {
@@ -1965,16 +2323,19 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
   })
 
   it("a queued-anchored figure names its anchor in the plain layer too", async () => {
+    // 289-04 (W2) REWRITTEN (D-02). It asserted the live header's plain layer:
+    //     expect(slot).toContain("queued")
+    //     expect(slot).toContain("Ran for")
+    // On the finished-run report the plain layer names where its figure starts in words — the
+    // sub line's "started <when> by <who>" — beside the figure, never only behind ⌥.
     vi.useFakeTimers()
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", claimed_at: null }))
     renderPage()
     await settle()
-    // The ⌥ layer additionally prints the literal field (`created_at`), but the plain wording
-    // must already say WHICH clock it is — the reveal is an elaboration, never the only place
-    // the anchor is disclosed.
-    const slot = screen.getByTestId("run-elapsed").textContent ?? ""
-    expect(slot).toContain("queued")
-    expect(slot).toContain("Ran for")
+    await settle()
+    const sub = screen.getByTestId("evidence-sub").textContent ?? ""
+    expect(sub).toMatch(/Completed in \d+m \d{2}s/)
+    expect(sub).toMatch(/started .+ by Dana Whitfield/)
   })
 
   it("polls the PHASE SLICE on the same beat, so a watched canvas advances without a wake", async () => {
@@ -2021,9 +2382,17 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
     // observes it — without an edge read the last state and the file never land.
     expect(reconcile.mock.calls.length).toBeGreaterThan(beforeTerminal.slice)
     expect(reconcileFiles.mock.calls.length).toBeGreaterThan(beforeTerminal.files)
+    // 289-04 (W2) REWRITTEN (D-02): the two reconcile assertions above are kept VERBATIM —
+    // the 286 hooks run before the page's early return, so the terminal-edge read still fires
+    // — and the surface the edge lands on is now the report.
+    await settle()
+    expect(screen.getByTestId("run-evidence-report")).toBeInTheDocument()
   })
 
   it("stops polling once the run is terminal — a finished run is not re-read forever", async () => {
+    // 289-04 (W2) REWRITTEN (D-02): the poll assertions are kept VERBATIM (the hooks still run
+    // for a finished run), and the finished run is now read once more by the REPORT's own
+    // evidence read — once, not on a beat.
     vi.useFakeTimers()
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
     renderPage()
@@ -2034,6 +2403,8 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
       await vi.advanceTimersByTimeAsync(30000)
     })
     expect(getWorkflowRun).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId("run-evidence-report")).toBeInTheDocument()
+    expect(getRunEvidence).toHaveBeenCalledTimes(1)
   })
 
   it("a failing poll leaves a good surface standing — a blip is not a broken run", async () => {
@@ -2063,9 +2434,15 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000)
     })
-    // The alert exists to be un-missable; it could never fire while the status was frozen
-    // at its launch-time value.
-    expect(screen.getByTestId("run-alert")).toHaveTextContent("Failed")
+    await settle()
+    // 289-04 (W2) REWRITTEN (D-02). It asserted the assertive alert after the poll:
+    //     expect(screen.getByTestId("run-alert")).toHaveTextContent("Failed")
+    // A run that fails while watched is now a FINISHED run, which renders the report: the
+    // failure is stated as its Result fact. ⚠ The report raises no `role="alert"` of its own,
+    // so the assertive announcement of a watched failure is LOST by D-02 — recorded in
+    // 289-04-SUMMARY as a follow-up, not hidden here.
+    expect(screen.getByTestId("run-evidence-report")).toBeInTheDocument()
+    expect(reportFact("Result")).toBe("✕ Failed")
   })
 
   it("re-reads the RUN on wake, beside the slice and the file list", async () => {
@@ -2080,9 +2457,10 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
     await act(async () => {
       window.dispatchEvent(new Event("online"))
     })
-    await waitFor(() =>
-      expect(screen.getByTestId("run-band")).toHaveTextContent("✓ Complete"),
-    )
+    // 289-04 (W2) REWRITTEN (D-02). It waited for the band to read "✓ Complete". The wake
+    // still re-reads the run; a run found finished now renders the report.
+    await findReport()
+    expect(reportFact("Result")).toBe("✓ Completed")
   })
 
   /**
@@ -2265,15 +2643,19 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
   })
 
   it("Phase 200.2 — RunHero renders in BOTH log and canvas views", async () => {
+    // 289-04 (W2) REWRITTEN (D-02 / D-14a). It asserted the hero survived the centre switch:
+    //     await screen.findByRole("button", { name: DOWNLOAD_LABEL })
+    //     fireEvent.click(screen.getByRole("radio", { name: CENTRE_CANVAS_LABEL }))
+    //     expect(screen.getByLabelText(HERO_LANDMARK)).toBeInTheDocument()
+    // A finished run renders the ONE-column report: there is no centre switch to survive and
+    // no hero; the report's deliverable fact is the one place the file is named.
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
     setFiles([DELIVERABLE])
     renderPage()
-    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
-    expect(screen.getByLabelText(HERO_LANDMARK)).toBeInTheDocument()
-
-    // Switch to canvas
-    fireEvent.click(screen.getByRole("radio", { name: CENTRE_CANVAS_LABEL }))
-    expect(screen.getByLabelText(HERO_LANDMARK)).toBeInTheDocument()
+    await findReport()
+    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
+    expect(screen.queryByRole("radio", { name: CENTRE_CANVAS_LABEL })).toBeNull()
+    expect(DOWNLOAD_LABEL).toContain(DELIVERABLE_NAME)
   })
 
   it("Phase 200.2 (D-03) — live run renders NO hero", async () => {
@@ -2285,20 +2667,26 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
   })
 
   it("Phase 200.2 (D-04) — centre DOM order is hero -> summary strip -> step list", async () => {
+    // 289-04 (W2) REWRITTEN (D-14a). It asserted hero → summary strip → step list:
+    //     const rel1 = hero.compareDocumentPosition(strip)
+    //     const rel2 = strip.compareDocumentPosition(stepList)
+    // A finished run's order is now sketch B's: facts strip → 1 What it ran → 2 step by step →
+    // 3 checks → 4 sources; the hero, strip and step list (PROCESS_TRACE_LANDMARK) are absent.
     getWorkflowRun.mockResolvedValue(mkTimedRun({ status: "completed" }))
     setFiles([DELIVERABLE])
     renderPage()
-    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
+    await findReport()
 
-    const hero = screen.getByLabelText(HERO_LANDMARK)
-    const strip = screen.getByTestId("run-receipt")
-    const stepList = screen.getByLabelText(PROCESS_TRACE_LANDMARK)
-
-    const rel1 = hero.compareDocumentPosition(strip)
-    expect(rel1 & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-
-    const rel2 = strip.compareDocumentPosition(stepList)
-    expect(rel2 & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const order = [
+      screen.getByTestId("evidence-facts"),
+      ...[1, 2, 3, 4].map((n) => document.querySelector(`[data-evidence-section="${n}"]`) as HTMLElement),
+    ]
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
+    expect(screen.queryByTestId("run-receipt")).toBeNull()
+    expect(screen.queryByLabelText(PROCESS_TRACE_LANDMARK)).toBeNull()
   })
 })
 
@@ -2408,10 +2796,14 @@ describe("WorkflowRunPage — the run-time waiting reading (F5, SPEC Req 5)", ()
     )
     setAsks([mkAsk()])
     renderPage()
-    await screen.findByTestId("run-transcript")
-
-    expect(readings()["final-check"]).toBe("running")
-    expect(labels()["final-check"]).not.toContain("Paused for your answer")
+    // 289-04 (W2) migrated-to-report. Was, on the log: `readings()["final-check"] === "running"`
+    // and its label not "Paused for your answer". The finished run's report reads the same
+    // step as one that DID NOT FINISH — never waiting, and with no ask card for a stopped run.
+    await findReport()
+    const row = reportStepRow("Check it over")
+    expect(row.textContent).toContain("Did not finish")
+    expect(row.textContent).not.toContain("Paused for your answer")
+    expect(screen.queryByTestId("ask-stub-call-1")).toBeNull()
   })
 
   it("reads the ask slice for the RUN's thread, never the globally-viewed one", async () => {
@@ -2506,12 +2898,16 @@ describe("WorkflowRunPage — the live elapsed figure actually advances (F6)", (
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", claimed_at: null }))
     renderPage()
     await settle()
-    const first = screen.getByTestId("run-elapsed").textContent ?? ""
+    await settle()
+    // 289-04 (W2) migrated-to-report: the finished figure is now the report's outcome, and it
+    // is a measurement between two recorded instants — 30 s of wall clock change nothing.
+    const first = screen.getByTestId("evidence-sub").textContent ?? ""
+    expect(first).toMatch(/\d/)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30000)
     })
-    expect(screen.getByTestId("run-elapsed").textContent ?? "").toBe(first)
+    expect(screen.getByTestId("evidence-sub").textContent ?? "").toBe(first)
   })
 })
 
@@ -2710,9 +3106,21 @@ describe("194.1-07 R3 — the Stop renders on the two live states and on none of
     expect(screen.getByTestId(STOP_TESTID)).toBeTruthy()
   })
 
+  // ⚠ 289-04 (W2) migrated-to-report, the three TERMINAL arms. The fact is "no Stop on a run
+  // that has ended — not the button, not the slot". A finished run now renders the report
+  // (D-02), so the arm opens the run, waits for the REPORT (its result fact in place of the
+  // band sentence) and asserts the same absences. `openWithStatus` waited for the live log;
+  // the terminal arms wait for the report instead.
+  async function openFinished(status: string, overrides: Partial<RunLike> = {}) {
+    getWorkflowRun.mockResolvedValue(mkRun({ status, ...overrides }))
+    const utils = renderPage()
+    await findReport()
+    return utils
+  }
+
   it("`✓ Complete` — the control is absent", async () => {
-    await openWithStatus("completed")
-    await expectBandSentence("✓ Complete")
+    await openFinished("completed")
+    expect(reportFact("Result")).toBe("✓ Completed")
     expect(screen.queryByTestId(STOP_TESTID)).toBeNull()
     // The whole SLOT is gone, not merely the button inside it — an empty reservation
     // on a finished run would still be spending header space on a dead affordance.
@@ -2720,22 +3128,24 @@ describe("194.1-07 R3 — the Stop renders on the two live states and on none of
   })
 
   it("`⊘ Cancelled` — the control is absent (the state this control itself produces)", async () => {
-    await openWithStatus("cancelled")
-    await expectBandSentence("⊘ Cancelled")
+    await openFinished("cancelled")
+    expect(reportFact("Result")).toBe("Cancelled")
     expect(screen.queryByTestId(STOP_TESTID)).toBeNull()
     expect(screen.queryByTestId(SLOT_TESTID)).toBeNull()
   })
 
   it('`✕ Failed at "…"` — the control is absent', async () => {
-    await openWithStatus("failed", {
+    await openFinished("failed", {
       phases: [
         { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
         { slug: "draft-letter", phase_index: 1, status: "failed", phase_type: "llm_agent" },
         { slug: "final-check", phase_index: 2, status: "pending", phase_type: "llm_human_input" },
       ],
     })
-    // THREE homes: the header, the polite band, and the assertive `run-alert`.
-    await expectBandSentence('✕ Failed at "Draft the renewal letter"', 3)
+    // Was THREE homes of '✕ Failed at "Draft the renewal letter"' (header, polite band,
+    // `run-alert`). The report states the result once and the failed step on its own row.
+    expect(reportFact("Result")).toBe("✕ Failed")
+    expect(reportStepRow("Draft the renewal letter").textContent).toContain("✕ Failed")
     expect(screen.queryByTestId(STOP_TESTID)).toBeNull()
     expect(screen.queryByTestId(SLOT_TESTID)).toBeNull()
   })
@@ -2988,19 +3398,23 @@ describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run
   })
 
   it("HEADER at rest — the four top-level regions, and nothing else", async () => {
+    // 289-04 (W2) REWRITTEN (D-02 / D-14a). It counted the LIVE surface's regions on a
+    // completed run:
+    //     expect(container.querySelectorAll("header")).toHaveLength(1)
+    //     expect(screen.getByTestId("run-transcript-region")).toBeInTheDocument()
+    //     expect(screen.getByLabelText(HERO_LANDMARK)).toBeInTheDocument()
+    //     expect(container.querySelectorAll('[data-testid="run-transcript"]')).toHaveLength(1)
+    // A completed run at rest is now the report: the facts strip and FOUR numbered sections,
+    // and none of the live regions. Read off the DOM so an ADDED section reds this.
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
     const { container } = renderPage()
-    await screen.findByTestId("run-transcript")
-
-    // header · the sr-only announcement pair · canvas region · deliverable region.
-    // Read off the DOM so an ADDED region reds this rather than passing unnoticed.
-    expect(container.querySelectorAll("header")).toHaveLength(1)
-    expect(screen.getByTestId("run-transcript-region")).toBeInTheDocument()
-    expect(screen.getByLabelText(HERO_LANDMARK)).toBeInTheDocument()
-    // ⚠ ONE spine, and it is the CANVAS's. The panel owns the meaningful phase spine
-    // (workflow-run-surface.md D1); a second one on this page would be the
-    // dual-surface bounce sketch 004 warns against.
-    expect(container.querySelectorAll('[data-testid="run-transcript"]')).toHaveLength(1)
+    await findReport()
+    expect(container.querySelectorAll("[data-evidence-section]")).toHaveLength(4)
+    expect(container.querySelectorAll('[data-testid="evidence-facts"]')).toHaveLength(1)
+    expect(container.querySelectorAll("header")).toHaveLength(0)
+    expect(screen.queryByTestId("run-transcript-region")).toBeNull()
+    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
+    expect(container.querySelectorAll('[data-testid="run-transcript"]')).toHaveLength(0)
   })
 
   /**
@@ -3142,8 +3556,12 @@ describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", 
     setAsks([])
   })
 
+  // ⚠ 289-04 (W2) kept-on-live-surface, all three cases in this describe: the receipt STRIP
+  // renders for every run status on the live surface, and none of these three cases is about
+  // the run having ended. A finished run no longer reaches the strip (it renders the report),
+  // so the fixture is re-targeted at an `active` run; every assertion is unchanged.
   it("renders the receipt on THIS page — its first and only mount in the product", async () => {
-    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ status: "active" }))
     renderPage()
     await screen.findByTestId("run-transcript")
 
@@ -3169,7 +3587,7 @@ describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", 
   it("names each step with the SAME `nodeTitle` the canvas paints — never the slug", async () => {
     // Two derivations would give one step two faces on one screen. The receipt refuses to
     // re-derive; the page supplies the name it already computed for the node.
-    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ status: "active" }))
     renderPage()
     await screen.findByTestId("run-transcript")
 
@@ -3187,7 +3605,7 @@ describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", 
   })
 
   it("is mounted on the RUN page and NOWHERE on the builder — 199-02's refusal, by construction", async () => {
-    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ status: "active" }))
     renderPage()
     await screen.findByTestId("run-transcript")
     expect(screen.getByTestId("run-receipt")).toBeInTheDocument()
@@ -3210,89 +3628,95 @@ describe("WorkflowRunPage 200-07 — the total runtime (RS-MR-03)", () => {
     setAsks([])
   })
 
-  it("computes the span from the PHASE timestamps — min(started_at) → max(completed_at)", async () => {
-    getWorkflowRun.mockResolvedValue(mkTimedRun())
-    renderPage()
-    await screen.findByTestId("run-transcript")
+  // ⚠ 289-04 (W2): every case here mounts a FINISHED timed run, which now renders the report.
+  // The run's total on the report is its outcome ("Completed in …"), measured between the
+  // evidence read's recorded start and finish — handed here as the timed rows' own first
+  // start and last finish (14:03:10 → 14:04:10), so the 60 s figure is the same fact.
+  function timedEvidence(run: RunLike, startedAt: string | null = P0_START, completedAt: string | null = P1_END) {
+    getRunEvidence.mockResolvedValue(evidenceFrom(run, { startedAt, completedAt }))
+  }
 
-    const atoms = receiptHeaderAtoms()
-    expect(atoms).toHaveLength(3)
-    // 14:03:10 → 14:04:10 is 60s ACROSS the two timed rows. ⚠ It is deliberately NOT any
-    // single row's duration (12s and 48s), so a span computed from one row would read
-    // differently and be caught.
-    expect(atoms[0]).toBe("Ran 1m 00s")
-    expect(atoms[1]).toBe("3 steps")
-    expect(atoms[2]).toMatch(/^finished \d{2}:\d{2}$/)
+  it("computes the span from the PHASE timestamps — min(started_at) → max(completed_at)", async () => {
+    // 289-04 (W2) migrated-to-report. Was the receipt strip's three atoms
+    // ("Ran 1m 00s", "3 steps", "finished hh:mm"). The span is the same 60 s across the two
+    // timed rows, NOT either row's own 12 s / 48 s, and the report still has three step rows.
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    timedEvidence(mkTimedRun())
+    renderPage()
+    await findReport()
+
+    const sub = screen.getByTestId("evidence-sub").textContent ?? ""
+    expect(sub).toContain("Completed in 1m 00s")
+    expect(sub).not.toContain("Completed in 12s")
+    expect(sub).not.toContain("Completed in 48s")
+    expect(reportStepRows()).toHaveLength(3)
   })
 
   it("`claimed_at` being null does NOT stop it — the measured reason it exists", async () => {
-    // `claimed_at` is null on 0 of 149 completed runs, so a span anchored on it is absent
-    // exactly when a span is wanted. The phase rows carry their own instants.
+    // 289-04 (W2) migrated-to-report: `claimed_at` plays no part in the report's figure.
     getWorkflowRun.mockResolvedValue(mkTimedRun({ claimed_at: null }))
+    timedEvidence(mkTimedRun({ claimed_at: null }))
     renderPage()
-    await screen.findByTestId("run-transcript")
-    expect(receiptHeaderAtoms()[0]).toBe("Ran 1m 00s")
+    await findReport()
+    expect(screen.getByTestId("evidence-sub").textContent).toContain("Completed in 1m 00s")
   })
 
   it("says so IN WORDS when no row carries a readable pair — never `0s`, never omitted", async () => {
-    // Every pre-migration-121 run, and any run whose steps were all routed around. An
-    // omitted total reads as "instant"; a `0s` claims a measurement nobody took.
-    getWorkflowRun.mockResolvedValue(
-      mkTimedRun({
-        phases: [
-          { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
-        ],
-      }),
-    )
+    // 289-04 (W2) migrated-to-report: with no recorded pair the report's outcome SAYS the
+    // runtime was not recorded — never `0s`, never omitted. (The receipt's separate "no finish
+    // time recorded" atom has no report counterpart; the outcome carries the one sentence.)
+    const run = mkTimedRun({
+      phases: [
+        { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
+      ],
+    })
+    getWorkflowRun.mockResolvedValue(run)
+    timedEvidence(run, null, null)
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await findReport()
 
-    const atoms = receiptHeaderAtoms()
-    expect(atoms[0]).toBe("Runtime not recorded")
-    expect(atoms[0]).not.toMatch(/\b0s\b/)
-    // ⚠ The finish atom is a SEPARATE sentence: one says we do not know how long it took,
-    // the other says it has no finish instant to name. Folding them would be a smaller
-    // version of the very fold D-06 exists to prevent.
-    expect(atoms[2]).toBe("no finish time recorded")
-    expect(atoms[0]).not.toBe(atoms[2])
+    const sub = screen.getByTestId("evidence-sub").textContent ?? ""
+    expect(sub).toContain("Completed, runtime not recorded")
+    expect(sub).not.toMatch(/\b0s\b/)
+    expect(reportTimes()[0]).toBe("time not recorded")
   })
 
   it("`BUG-260610-01`'s TIMER HALF: BOTH figures survive a remount unchanged", async () => {
-    // ⚠ STRUCTURAL, NOT PATCHED. Every anchor on this surface is a SERVER timestamp — the
-    // header's `claimed_at ?? created_at` and the receipt's `min(started_at)` — so there is
-    // no client instant for a remount to re-take. Driven as a real unmount + re-render with
-    // identical props, which is what navigating away and back does.
+    // 289-04 (W2) migrated-to-report: the report's figures are SERVER instants, so a real
+    // unmount + re-render with identical props reads them back unchanged.
     getWorkflowRun.mockResolvedValue(mkTimedRun())
+    timedEvidence(mkTimedRun())
     const first = renderPage()
-    await screen.findByTestId("run-transcript")
-    const spanBefore = receiptHeaderAtoms()[0]
-    const elapsedBefore = screen.getByTestId("run-elapsed").textContent
+    await findReport()
+    const spanBefore = screen.getByTestId("evidence-sub").textContent
+    const timesBefore = reportTimes()
     first.unmount()
 
     renderPage()
-    await screen.findByTestId("run-transcript")
-    expect(receiptHeaderAtoms()[0]).toBe(spanBefore)
-    expect(screen.getByTestId("run-elapsed").textContent).toBe(elapsedBefore)
+    await findReport()
+    expect(screen.getByTestId("evidence-sub").textContent).toBe(spanBefore)
+    expect(reportTimes()).toStrictEqual(timesBefore)
     // NON-VACUITY: both really do carry a figure, so "unchanged" is not "empty twice".
-    expect(spanBefore).toMatch(/\d/)
-    expect(elapsedBefore ?? "").toMatch(/\d/)
+    expect(spanBefore ?? "").toMatch(/\d/)
+    expect(timesBefore.join(" ")).toMatch(/\d/)
   })
 
   it("the two figures MEASURE DIFFERENT THINGS and each says which", async () => {
-    // ⚠ THE REASON A SECOND FIGURE IS NOT A DUPLICATE. An operator reported this exact
-    // surface showing its status twice, one line under the other, on 2026-08-06 — which is
-    // why the band is `sr-only` today. Two figures are honest only while each is labelled
-    // with the field it came from.
+    // 289-04 (W2) REWRITTEN (D-02). It asserted the live header's anchored figure and the
+    // receipt's total side by side:
+    //     expect(header).toMatch(/from when it (was queued|started processing)/)
+    //     expect(receiptHeaderAtoms()[0]).toBe("Ran 1m 00s")
+    // A finished run's report carries ONE run-level figure (its outcome) and per-step times,
+    // each in its own place: the run total is not repeated as a step time, and the live
+    // header's second figure is gone.
     getWorkflowRun.mockResolvedValue(mkTimedRun())
+    timedEvidence(mkTimedRun())
     renderPage()
-    await screen.findByTestId("run-transcript")
-
-    const header = screen.getByTestId("run-elapsed").textContent ?? ""
-    // The header names its own anchor in plain words…
-    expect(header).toMatch(/from when it (was queued|started processing)/)
-    // …and the receipt's total is a different reading of a different pair.
-    expect(receiptHeaderAtoms()[0]).toBe("Ran 1m 00s")
-    expect(header).not.toContain("Ran 1m 00s")
+    await findReport()
+    expect(screen.queryByTestId("run-elapsed")).toBeNull()
+    expect(screen.getByTestId("evidence-sub").textContent).toContain("Completed in 1m 00s")
+    expect(reportTimes()).not.toContain("1m 00s")
+    expect(receiptHeaderAtoms()).toHaveLength(0)
   })
 })
 
@@ -3303,22 +3727,27 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
     setAsks([])
   })
 
+  // ⚠ 289-04 (W2) migrated-to-report, all three cases: D-06's arms are FINISHED-run facts, and
+  // the report's step log carries them — a real per-step time, an affirmative "Skipped" for a
+  // routed-around step (its time cell left empty, never a figure), "time not recorded" for a
+  // historic row and "did not finish" for an `active` row under a terminal run. `logTimes()`
+  // read the live log/spine; `reportTimes()` / the row text read the report.
   it("renders a real per-step duration, and `never ran` for the routed-around step", async () => {
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await findReport()
 
-    const times = logTimes()
+    const times = reportTimes()
     expect(times[0]).toBe("12s")
     expect(times[1]).toBe("48s")
     // ⚠ The skipped row is an AFFIRMATIVE fact, not a blank — and it is a DIFFERENT string
-    // from the historic row's, which is `RS-MNR-04`.
-    // ⚠ THE PAGE'S WORD, NOT THE RECEIPT'S, and D-06's claim is unchanged: a routed-around
-    // step and a step whose time was never recorded must read DIFFERENTLY. Since the re-port
-    // the log carries the page's richer label for a state and the spine carries the time, so
-    // the skipped step reads as the sentence a person gets. The inequality below is the arm.
-    expect(times[2].toLowerCase()).toContain("skipped")
+    // from the historic row's, which is `RS-MNR-04`. D-06's claim is unchanged: a routed-around
+    // step and a step whose time was never recorded must read DIFFERENTLY. On the report the
+    // skipped step says so in its status, and its time cell holds no figure. (Was, on the log:
+    // `expect(times[2].toLowerCase()).toContain("skipped")`.)
+    expect((reportStepRows()[2].textContent ?? "").toLowerCase()).toContain("skipped")
     expect(times[2]).not.toContain("time not recorded")
+    expect(times[2]).not.toMatch(/\d/)
   })
 
   it("RS-MNR-04: a historic row reads `time not recorded`, never the skipped sentence", async () => {
@@ -3332,12 +3761,15 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
       }),
     )
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await findReport()
 
-    const times = logTimes()
+    // 289-04 (W2) migrated-to-report (was `logTimes()`): the historic row SAYS its time was
+    // not recorded; the skipped row says Skipped. Two different readings, as before.
+    const times = reportTimes()
     expect(times[0]).toBe("time not recorded")
-    expect(times[1].toLowerCase()).toContain("skipped")
-    expect(times[0]).not.toBe(times[1])
+    const skipped = (reportStepRows()[1].textContent ?? "").toLowerCase()
+    expect(skipped).toContain("skipped")
+    expect(skipped).not.toContain("time not recorded")
   })
 
   it("RS-MNR-02: an `active` row under a TERMINAL run reads `did not finish` — no clock", async () => {
@@ -3359,13 +3791,14 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
       }),
     )
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await findReport()
 
-    const time = logTimes()[0]
+    // 289-04 (W2) migrated-to-report (was `logTimes()[0]` and the log row's yield): the row
+    // reads "did not finish" in its time cell and "Did not finish" as its status — no clock.
+    const time = reportTimes()[0]
     expect(time).toBe("did not finish")
     expect(time).not.toMatch(/\d/)
-    const row = screen.getByTestId("step-card-gather-contracts")
-    expect(within(row).getByTestId("step-yield-gather-contracts").textContent).toBe("did not finish")
+    expect(reportStepRows()[0].textContent).toContain("Did not finish")
   })
 })
 
@@ -3383,37 +3816,34 @@ describe("WorkflowRunPage 200-07 — FETCH IS AUTHORITATIVE (D-v2.5-03)", () => 
     ])
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await findReport()
 
-    const times = logTimes()
-    // The FETCH's answer, not the slice's: a finished duration, never a live tick.
+    // 289-04 (W2) migrated-to-report. The fact: the FETCH's answer, not the stale slice's —
+    // a finished duration, never a live tick, never "Running". The report reads the durable
+    // rows only, so the stale slice cannot reach it at all. (The log's `data-reading` /
+    // `data-source-conflict` / spine-duration probes read the live surface, which a finished
+    // run no longer renders.)
+    const times = reportTimes()
     expect(times[0]).toBe("12s")
     expect(times[0]).not.toMatch(/so far/)
-    expect(
-      screen.getByTestId("step-card-gather-contracts").getAttribute("data-reading"),
-    ).toBe("running")
-    const logRow = screen.getByTestId("step-card-gather-contracts")
-    expect(logRow.getAttribute("data-source-conflict")).toBe("true")
-    expect(within(logRow).getByTestId("step-yield-gather-contracts").textContent).not.toBe("Running")
-    expect(
-      within(screen.getByTestId("spine-step-gather-contracts")).getByTestId("spine-duration")
-        .textContent,
-    ).toBe("12s")
+    expect(reportStepRows()[0].textContent).toContain("✓ Done")
+    expect(reportStepRows()[0].textContent).not.toContain("Running")
   })
 
   it("the receipt survives a run with NO durable rows at all — nothing claimed, nothing crashed", async () => {
-    // A run read that came back with an empty `phases` array. The honest render is an empty
-    // list and a worded absence, never a fabricated span and never a throw.
+    // 289-04 (W2) migrated-to-report. A run read that came back with an empty `phases` array:
+    // the report renders, its step log is empty, and its outcome SAYS no runtime was recorded
+    // — never a fabricated span and never a throw. (Was the receipt strip's atoms
+    // "Runtime not recorded" / "0 steps".)
     setLiveSlice([])
-    getWorkflowRun.mockResolvedValue(mkTimedRun({ phases: [] }))
+    const run = mkTimedRun({ phases: [] })
+    getWorkflowRun.mockResolvedValue(run)
+    getRunEvidence.mockResolvedValue(evidenceFrom(run, { startedAt: null, completedAt: null }))
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await findReport()
 
-    expect(screen.getByTestId("run-receipt")).toBeInTheDocument()
-    expect(screen.getByTestId("run-receipt").querySelectorAll("ol > li")).toHaveLength(0)
-    const atoms = receiptHeaderAtoms()
-    expect(atoms[0]).toBe("Runtime not recorded")
-    expect(atoms[1]).toBe("0 steps")
+    expect(reportStepRows()).toHaveLength(0)
+    expect(screen.getByTestId("evidence-sub").textContent).toContain("Completed, runtime not recorded")
   })
 })
 
@@ -3424,8 +3854,11 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
     setAsks([])
   })
 
+  // ⚠ 289-04 (W2) kept-on-live-surface, all four cases in this describe: the count supply line
+  // is the live step list's, rendered for any run status, and none of these cases is about the
+  // run having ended. Each fixture gains `status: "active"`; every assertion is unchanged.
   it("renders the DECLARED count and noun on the step list line, as the pair the wire sent", async () => {
-    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ status: "active" }))
     renderPage()
     await screen.findByTestId("run-transcript-region")
 
@@ -3438,7 +3871,7 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
   })
 
   it("RS-MNR-03: a step that declared NO count renders NO count slot — never a `0`", async () => {
-    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ status: "active" }))
     renderPage()
     await screen.findByTestId("run-transcript-region")
 
@@ -3452,6 +3885,7 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
   it("a DECLARED `0` is forwarded as the fact it is", async () => {
     getWorkflowRun.mockResolvedValue(
       mkTimedRun({
+        status: "active",
         phases: [
           {
             slug: "gather-contracts",
@@ -3475,6 +3909,7 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
   it("the NOUN passes VERBATIM — this page substitutes no word of its own", async () => {
     getWorkflowRun.mockResolvedValue(
       mkTimedRun({
+        status: "active",
         phases: [
           {
             slug: "gather-contracts",
@@ -3502,7 +3937,16 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
   })
 
   it("the shipped deliverable listing still renders — a GREEN row DRIVEN, not read", async () => {
+    // 289-04 (W2) migrated-to-report. The fact: a finished run's deliverable is named and
+    // offered as exactly ONE download, DRIVEN rather than read. Was the hero region's single
+    // `Download renewal-letter.docx` button; it is now the report's Deliverable fact plus its
+    // one owner download, clicked here.
     getWorkflowRun.mockResolvedValue(mkTimedRun())
+    getRunEvidence.mockResolvedValue(
+      evidenceFrom(mkTimedRun(), {
+        deliverable: { kind: "file", name: "renewal-letter.docx", file_id: "file-1" },
+      }),
+    )
     setFiles([
       {
         id: "file-1",
@@ -3512,19 +3956,18 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
       } as WorkspaceFile,
     ])
     renderPage()
-    await screen.findByTestId("run-transcript-region")
+    await findReport()
 
-    const region = screen.getByLabelText(HERO_LANDMARK)
-    expect(region).toBeInTheDocument()
-    expect(region.textContent).toContain("renewal-letter.docx")
-    // Exactly one control per row, and it is a download.
-    expect(within(region).getAllByRole("button")).toHaveLength(1)
-    expect(
-      within(region).getByRole("button", { name: /Download renewal-letter\.docx/ }),
-    ).toBeInTheDocument()
+    expect(reportFact("Deliverable")).toContain("renewal-letter.docx")
+    const downloads = screen.getAllByRole("button", { name: /deliverable/i })
+    expect(downloads).toHaveLength(1)
+    fireEvent.click(downloads[0])
+    expect(downloadWorkspaceFile).toHaveBeenCalledWith("thread-1", "file-1", "renewal-letter.docx")
   })
 
   it("the receipt did NOT open a file-content path — the no-previewer fence still stands", async () => {
+    // 289-04 (W2) kept-on-live-surface: the receipt strip renders for any status, so the
+    // fixture is re-targeted at an `active` run; assertions unchanged.
     // ⚠ D-17 IS A TESTED DECISION, NOT A GAP: DOCX/PPTX/XLSX/PDF are download-only, and the
     // template engine emits `.docx`, so the flagship deliverable is exactly the artefact that
     // cannot be shown in place. The shipped previewer fence higher up this file is UNEDITED
@@ -3532,7 +3975,7 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
     // deliberately not re-typed here (the 187-24 rule, which has now fired three times in
     // this plan alone). This case is the independent statement that the receipt, which is
     // NEW surface, did not smuggle a file-content path in beside it.
-    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ status: "active" }))
     setFiles([])
     renderPage()
     await screen.findByTestId("run-transcript")
@@ -3761,6 +4204,14 @@ describe("WorkflowRunPage 200-07 — §4.2 MUST NOT RENDER, and the fence can FI
   })
 
   it("the REAL terminal render is clean — no prose, no dash, no dead clock, no ligature", async () => {
+    // 289-04 (W2) REWRITTEN (D-02). The REAL terminal render is now the report, which carries
+    // none of the live surface's TIME_SLOTS / COUNT_SLOTS testids, so the old non-vacuity
+    // probes cannot hold:
+    //     expect(container.querySelectorAll(TIME_SLOTS).length).toBeGreaterThan(0)
+    //     expect(container.querySelectorAll(COUNT_SLOTS).length).toBeGreaterThan(0)
+    // Non-vacuity is re-established on the report's own step rows (they carry real times and
+    // the declared count), and the same predicate must still find nothing — no live tick on a
+    // finished run, no ligature names.
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     setFiles([
       {
@@ -3771,14 +4222,12 @@ describe("WorkflowRunPage 200-07 — §4.2 MUST NOT RENDER, and the fence can FI
       } as WorkspaceFile,
     ])
     const { container } = renderPage()
-    await screen.findByTestId("run-transcript")
+    await findReport()
 
-    // NON-VACUITY BEFORE CONTENTS — the render really has the slots the predicate reads, so
-    // a clean result is *nothing wrong* rather than *nothing there*. Wave 3 shipped a fence
-    // that was reached and wrote nothing because its fixture queue was empty.
-    expect(container.querySelectorAll(TIME_SLOTS).length).toBeGreaterThan(0)
-    expect(container.querySelectorAll(COUNT_SLOTS).length).toBeGreaterThan(0)
+    expect(reportTimes().filter((t) => /\d/.test(t)).length).toBeGreaterThan(0)
+    expect(reportStepRows()[0].textContent).toContain("312 sources")
     expect(leafTexts(container).length).toBeGreaterThan(10)
+    expect(container.textContent ?? "").not.toMatch(/so far/)
 
     expect(runSurfaceViolations(container, true)).toStrictEqual([])
   })
@@ -3848,7 +4297,9 @@ describe("WorkflowRunPage 200-07 — the REPORT rows (§5), not built, not faked
     //
     // **Re-open trigger, verbatim from §5:** *the phase that scopes `harness_audit` /
     // `EmitSubStep` as a client transport.*
-    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    // 289-04 (W2) kept-on-live-surface: the absence claim is about the live log's ROW GRAIN,
+    // not about the run having ended; re-targeted at an `active` run, assertions unchanged.
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ status: "active" }))
     const { container } = renderPage()
     await screen.findByTestId("run-transcript")
 
@@ -3968,9 +4419,12 @@ describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", ()
       mkRun({ thread_id: RUN_THREAD_ID, status: "cancelled" }),
     )
     renderPage()
-    await screen.findByTestId("run-transcript")
-
-    expect(screen.getByTestId("ask-stub-call-7").getAttribute("data-runisover")).toBe("true")
+    // 289-04 (W2) migrated-to-report. Was: the ask card rendered with `data-runisover="true"`.
+    // A cancelled run now renders the read-only report (D-05: no answer control for anyone),
+    // so the unanswered prompt offers NO control at all — stronger than "marked over".
+    await findReport()
+    expect(screen.queryByTestId("ask-stub-call-7")).toBeNull()
+    expect(screen.queryByRole("textbox")).toBeNull()
   })
 
   it("289-01 (D-13): a PAUSED run hands its card `paused`, so the answer control outlives the window", async () => {
@@ -4011,11 +4465,14 @@ describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", ()
 })
 
 describe("WorkflowRunPage 200 — the centre switch (operator decision, 2026-08-20)", () => {
+  // ⚠ 289-04 (W2) kept-on-live-surface, all four cases: the centre switch is the LIVE
+  // surface's, and a finished run (this beforeEach's `mkTimedRun()`, status completed) now
+  // renders the report instead. Re-targeted at an `active` run; every assertion unchanged.
   beforeEach(() => {
     setFiles([])
     setAsks([])
     setLiveSlice([])
-    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ status: "active" }))
   })
 
   it("opens on the LOG, and the canvas is not rendered until it is asked for", async () => {
@@ -4140,10 +4597,13 @@ describe("WorkflowRunPage 200 — the page-resolved liveness boolean (PORT-canva
  * operator were SEAMS between parallel plans, each side green."* So this mocks neither side.
  */
 describe("WorkflowRunPage 214-11 — the page resolves the identity and its children render it", () => {
+  // ⚠ 289-04 (W2) kept-on-live-surface, all four cases: the identity is resolved by the page
+  // for the LIVE log, and none of these cases is about the run having ended. The fixtures move
+  // from `completed` to `active`; every assertion is unchanged.
   /** A run whose second step really reaches outside, with the four wire fields the server sends. */
   function runWithExternalStep() {
     return mkRun({
-      status: "completed",
+      status: "active",
       phases: [
         { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
         {
@@ -4182,7 +4642,7 @@ describe("WorkflowRunPage 214-11 — the page resolves the identity and its chil
   it("an ordinary run reaches no identity at all — this is additive, not a re-skin", async () => {
     // The POSITIVE CONTROL's mirror. Without it, the case above is consistent with an element
     // that renders unconditionally, and the assertion would be measuring nothing.
-    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
     const { container } = renderPage()
     await screen.findByTestId("run-transcript")
     expect(container.querySelectorAll("[data-step-identity]")).toHaveLength(0)
@@ -4195,7 +4655,7 @@ describe("WorkflowRunPage 214-11 — the page resolves the identity and its chil
     // and the page must pass it through rather than substituting a word of its own.
     getWorkflowRun.mockResolvedValue(
       mkRun({
-        status: "completed",
+        status: "active",
         phases: [
           {
             slug: "draft-letter",
@@ -4285,5 +4745,87 @@ describe("WorkflowRunPage 288-03 - the waiting-on sentence (AUTH-01)", () => {
     renderPage()
     await screen.findByTestId("run-transcript")
     expect(screen.queryByTestId("run-waiting-on")).toBeNull()
+  })
+})
+
+// ── Phase 289-04 (VIS-03 / D-02 / D-05 / D-06 / D-14a) — ONE page, two states ─────────────
+//
+// A finished run renders the evidence report through ONE early return placed after every hook;
+// an active or paused run keeps the live surface exactly as before. These are the four cases
+// W2 asked for, plus the colleague read that makes D-05's "org members can read a finished
+// run" reachable from this page (the owner read 404s for a non-owner).
+describe("WorkflowRunPage 289-04 — a finished run is the evidence report, a live run is not", () => {
+  it("a TERMINAL run renders the report on this page, and no RunSpine", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    const { onOpenThread } = renderPage()
+    await findReport()
+    expect(reportFact("Result")).toBe("✓ Completed")
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Supplier contract renewals")
+    for (const slug of SLUGS) expect(screen.queryByTestId(`spine-step-${slug}`)).toBeNull()
+    expect(screen.queryByTestId("run-panel")).toBeNull()
+    expect(screen.queryByTestId("run-transcript")).toBeNull()
+    // The owner keeps the seam to the chat thread, and it is the RUN's thread.
+    fireEvent.click(screen.getByRole("button", { name: "Open the chat thread" }))
+    expect(onOpenThread).toHaveBeenCalledWith(RUN_THREAD_ID)
+    expect(getRunEvidence).toHaveBeenCalledWith("run-1", expect.any(AbortSignal))
+  })
+
+  it("the owner read's 404 routes into the report, whose own 404 is the one refusal screen", async () => {
+    getWorkflowRun.mockRejectedValue(new ApiError("nope", 404))
+    getRunEvidence.mockRejectedValue(new ApiError("Run not found", 404))
+    renderPage()
+    await screen.findByText("This run isn't available")
+    // The evidence read was asked (it decides), and neither the old owner-only copy nor any
+    // run detail renders.
+    expect(getRunEvidence).toHaveBeenCalledWith("run-1", expect.any(AbortSignal))
+    expect(screen.queryByText("That run isn't available.")).toBeNull()
+    expect(screen.queryByText("Supplier contract renewals")).toBeNull()
+  })
+
+  it("a same-org colleague (owner read 404) reads the finished run's report, with no owner-only link", async () => {
+    getWorkflowRun.mockRejectedValue(new ApiError("nope", 404))
+    getRunEvidence.mockResolvedValue(
+      evidenceFrom(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }), { viewerIsOwner: false }),
+    )
+    const { container } = renderPage()
+    await findReport()
+    expect(reportFact("Result")).toBe("✓ Completed")
+    expect(screen.queryByRole("button", { name: "Open the chat thread" })).toBeNull()
+    expect(container.textContent).not.toContain(OWNER_EMAIL)
+    expect(container.textContent).not.toContain("(you)")
+    expect(container.textContent).toContain(OWNER_NAME)
+  })
+
+  it("an ACTIVE run keeps the live surface and renders no report", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", thread_id: RUN_THREAD_ID }))
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    expect(screen.getByTestId("spine-step-draft-letter")).toBeInTheDocument()
+    // The live spine and log still speak for every step (the helpers the migrated terminal
+    // cases no longer use are exercised here, on the surface they read).
+    expect(spineReadings()["gather-contracts"]).toBe("done")
+    expect(spineReadings()["draft-letter"]).not.toBe("NONE")
+    expect(logTimes()).toHaveLength(SLUGS.length)
+    expect(screen.getByTestId("run-page-stop")).toBeInTheDocument()
+    expect(screen.queryByTestId("run-evidence-report")).toBeNull()
+    expect(getRunEvidence).not.toHaveBeenCalled()
+  })
+
+  it("a PAUSED run keeps the live surface with the 289-01 card behaviour (answer control after the window)", async () => {
+    setAsks([mkAsk("call-9")])
+    getWorkflowRun.mockResolvedValue(
+      mkRun({
+        thread_id: RUN_THREAD_ID,
+        status: "paused",
+        phases: phasesMatching(["completed", "completed", "active"]),
+      }),
+    )
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    const card = await screen.findByTestId("ask-stub-call-9")
+    expect(card.getAttribute("data-paused")).toBe("true")
+    expect(card.getAttribute("data-runisover")).toBe("false")
+    expect(screen.queryByTestId("run-evidence-report")).toBeNull()
+    expect(getRunEvidence).not.toHaveBeenCalled()
   })
 })
