@@ -543,7 +543,44 @@ async def publish_workflow(
             "golden_run_id": str(golden_run_id),
         },
     )
-    return {"published": True, "version": version, "golden_run_id": golden_run_id}
+    result = {"published": True, "version": version, "golden_run_id": golden_run_id}
+    # 288-02 (D-07 / A-04): say, in words, which pauses the golden run answered FOR the
+    # author. Derived from the run's PERSISTED phase outputs (``_golden_run_mock``), never
+    # a static scan -- a pause skipped by ``skip_to_phase`` has no mock output and so is
+    # never claimed answered. Pause-free workflows perform no read and gain no key.
+    pause_slugs = {
+        getattr(p, "slug", None): _clean_label(getattr(p, "name", None))
+        for p in getattr(definition, "phases", []) or []
+        if getattr(getattr(p, "config", None), "phase_type", None) == "llm_human_input"
+    }
+    if pause_slugs:
+        from app.db.workflows import load_run_phases  # function-local (file convention)
+        from app.models.thread import phase_output_object  # the ONE jsonb-scalar unwrap
+
+        try:
+            rows = await load_run_phases(pool, golden_run_id)
+        except Exception:  # noqa: BLE001 -- the note is advisory; never sink a publish
+            logger.warning("288-02: could not read golden-run phases for the note", exc_info=True)
+            rows = []
+        answered = []
+        for row in sorted(rows or [], key=lambda r: r.get("phase_index", 0)):
+            slug = row.get("slug")
+            out = phase_output_object(row.get("output"))
+            if slug in pause_slugs and isinstance(out, dict) and out.get("_golden_run_mock"):
+                label = pause_slugs[slug]
+                who = f'The pause step "{label}"' if label else "A pause step"
+                answered.append(
+                    {
+                        "phase": slug,
+                        "message": (
+                            f"{who} was answered automatically during validation and has "
+                            "not been exercised by a person."
+                        ),
+                    }
+                )
+        if answered:
+            result["auto_answered"] = answered
+    return result
 
 
 # Back-compat alias — the Wave-0 test stubs assert ``hasattr(publish_service, "publish_workflow")``;
