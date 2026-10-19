@@ -339,6 +339,13 @@ interface RunLike {
     service_name?: string | null
     failure_reason?: string | null
   }[]
+  // Phase 288 (AUTH-01) - optional: every case that predates the plan omits it.
+  waiting_on?: {
+    sentence: string
+    step_name?: string | null
+    prompt_line?: string | null
+    window_passed: boolean
+  } | null
 }
 
 const CLAIMED = "2026-08-05T14:03:11Z"
@@ -4199,5 +4206,53 @@ describe("WorkflowRunPage 214-11 — the page resolves the identity and its chil
     }
     // POSITIVE CONTROL — the sweep is worthless over an empty tree.
     expect(markup).toContain("Posts a message")
+  })
+})
+
+describe("WorkflowRunPage 288-03 - the waiting-on sentence (AUTH-01)", () => {
+  const WAIT = {
+    sentence: 'Waiting on Dana Whitfield (you) to answer "Is this renewal letter ready?".',
+    step_name: "Final check",
+    prompt_line: "Is this renewal letter ready?",
+    window_passed: false,
+  }
+
+  it("renders the server sentence beside the band for an ACTIVE run, independent of the asks slice", async () => {
+    setAsks([])
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", waiting_on: WAIT }))
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    expect(screen.getByTestId("run-waiting-on").textContent).toBe(WAIT.sentence)
+  })
+
+  it("renders it for a PAUSED run too, with the still-waiting wording", async () => {
+    const paused = { ...WAIT, sentence: "Still waiting on Dana Whitfield (you); the run continues as soon as they answer.", window_passed: true }
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "paused", waiting_on: paused }))
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    const el = screen.getByTestId("run-waiting-on")
+    expect(el.textContent).toBe(paused.sentence)
+    expect(el.textContent ?? "").not.toMatch(/expire/i)
+  })
+
+  it("is present again after a remount with the same run read (reload)", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", waiting_on: WAIT }))
+    const first = renderPage()
+    await screen.findByTestId("run-waiting-on")
+    first.unmount()
+    renderPage()
+    expect((await screen.findByTestId("run-waiting-on")).textContent).toBe(WAIT.sentence)
+  })
+
+  it("renders nothing extra when waiting_on is absent or null", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
+    const a = renderPage()
+    await screen.findByTestId("run-transcript")
+    expect(screen.queryByTestId("run-waiting-on")).toBeNull()
+    a.unmount()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", waiting_on: null }))
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    expect(screen.queryByTestId("run-waiting-on")).toBeNull()
   })
 })
