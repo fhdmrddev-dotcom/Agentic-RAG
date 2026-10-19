@@ -11807,6 +11807,29 @@ cells rot within days.
 | [`frontend/src/components/workflows/builderCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuildercopyts) | 1 / 1 / 174 | no (young) | young (286-02). Leaf of the Builder's 8 copy constants; RE-EXPORTED by `WorkflowBuilderPage.tsx` so every import and `?raw` fence resolves |
 | [`frontend/src/hooks/useWorkflowRun.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseworkflowrunts) | 1 / 1 / 218 | no (young) | young (286-03). Run read + stale guard + `refreshRun`; 5 s poll + terminal edge. ⛔ poll called AFTER `isTerminal` (CR-01); invariant-8 tokens never appear here |
 | [`frontend/src/components/workflows/library/WorkflowCardMenu.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardmenutsx) | 1 / 1 / 473 | no (young) | young (286-04). ⋯ menu + armed draft delete + its prompt (`useDraftDelete`). ⛔ WR-03 five roles; D-18 endpoint rule; in `LIBRARY_SUBTREE_PATHS` |
+| [`backend/app/services/rerank_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_servicepy) | 3 / 0 / 122 | no (0 phases) | ⚠ absent its ENTIRE LIFE — row added at 294 planning. 294-01: thin dispatcher over rerank_engines/; fallback == off ([:n]). ⛔ keeps rerank() positional signature |
+| [`backend/app/services/rerank_engines/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_engines__init__py) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). get_engine ("api"→cohere), resolve_credentials, citation_check_availability. ⛔ never logs or returns a key |
+| [`backend/app/services/rerank_engines/registry.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesregistrypy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). THE engine table + EngineId Literal (?raw parity with rerankEngines.ts). ⛔ data only, no I/O; prices are vendor facts |
+| [`backend/app/services/rerank_engines/prune.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesprunepy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). PURE D-07 prune: floor 0.1, keep ≥3, ≤top_n, never empty, keep_documents coverage. ⛔ probabilistic engines only |
+| [`backend/app/services/rerank_engines/cohere.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginescoherepy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). Verbatim move of _rerank_api; reorder + top_n only (D-08). ⛔ never thresholded |
+| [`backend/app/services/rerank_engines/local.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_engineslocalpy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). CrossEncoder rerank + (model_name, model) cache: load once per name, reload on change. ⛔ never per request; reorder only |
+| [`backend/app/services/rerank_engines/jev.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesjevpy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). OpenRouter /api/alpha/decisions: noul rerank (≤30 / ≤28 KB per call, ≤4 in flight) + post_decisions. ⛔ untrusted text only in state |
+| [`backend/app/services/rerank_engines/openai_decisions.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesopenai_decisionspy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). POST /v1/decisions gpt-6-luna: predicate rerank + post_decisions; raw httpx (SDK lacks decisions). ⛔ refusal → fallback |
+| [`backend/app/services/rerank_engines/tracing.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginestracingpy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). redact_inputs (process_inputs) + EngineCall capture for the harness. ⛔ user_settings / api_key / supabase never traced |
+| [`backend/app/services/decision_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdecision_evalpy) | 0 / 0 / 0 | no (young) | young (planned 294-02, row added at planning). D-18/D-19 harness over the REAL search_documents; reuses recall_eval. ⛔ refuses rather than invents; never writes app_settings |
+| [`backend/app/services/citation_claims.py`](docs/HOT-FILE-LEDGER.md#backendappservicescitation_claimspy) | 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). PURE claim extraction + marker ordinals + dedup_paragraphs port. ⛔ ordinals pinned to CitedMarkdown by a shared fixture |
+| [`backend/app/services/citation_check_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicescitation_check_servicepy) | 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). Runs the check (choice per claim, grouped by source) + the pool upsert. ⛔ ids bound from the message row; refusal → couldnt_check |
+| [`backend/app/models/citation_check.py`](docs/HOT-FILE-LEDGER.md#backendappmodelscitation_checkpy) | 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). Verdict + EngineId Literals, CitationCheckResult v1 (extra=forbid). ⛔ unknown label → couldnt_check before validation |
+| [`backend/app/api/citation_checks.py`](docs/HOT-FILE-LEDGER.md#backendappapicitation_checkspy) | 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). GET availability+checks, POST run (404 same body, 422, 409 in flight). ⛔ a route, NOT a tool (30 stays); never returns a key |
+| [`frontend/src/components/settings/rerankEngines.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsrerankenginests) | 0 / 0 / 0 | no (young) | young (planned 294-04, row added at planning). THE engine-card fact table + engineFor() own-property accessor. ⛔ ids pinned to registry.py via ?raw; no fact in component logic |
+| [`frontend/src/components/settings/RerankEngineBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsrerankengineblocktsx) | 0 / 0 / 0 | no (young) | young (planned 294-04, row added at planning). Sketch 294 B engine cards + keep-at-most + missing-key + egress lines. ⛔ props in, callbacks out; no fetch, no useState |
+| [`frontend/src/lib/api/citationChecks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapicitationchecksts) | 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). getCitationChecks / runCitationCheck + wire types. ⛔ own specifier; NOT re-exported through lib/api.ts |
+| [`frontend/src/stores/citationCheckStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstorescitationcheckstorets) | 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). byMessage + availability; microtask-batched ensure() → one GET. ⛔ never a slice of streamsStore.ts; reset in setupTests |
+| [`frontend/src/components/chat/citationVerdicts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationverdictsts) | 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). THE verdict vocabulary: glyph, word, class, fixed reason line. ⛔ labels pinned to models/citation_check.py; unknown → couldn't check |
+| [`frontend/src/components/chat/CitationCheckAction.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationcheckactiontsx) | 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). References-header action: Check → Checking N → count pills + Re-check + checked-by line, or the ⓘ reason. ⛔ sibling of the trigger button |
+| [`frontend/src/components/chat/CitedMarkdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitedmarkdowntsx) | 2 / 1 / 294 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added at 294 planning. 294-05: optional checkMessageId + data-citation-ordinal + verdict decoration in the existing layout effect. ⛔ effect owns innerHTML |
+| [`frontend/src/components/chat/CitationList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationlisttsx) | 4 / 3 / 73 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 3 phases — row added at 294 planning. 294-05: ONE optional checkMessageId prop + ONE CitationCheckAction mount. ⛔ label + defaultOpen=false pinned |
+| [`frontend/src/components/chat/CitationPeek.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationpeektsx) | 1 / 1 / 189 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added at 294 planning. 294-05: optional verdict section between body and footer; absent verdict → DOM unchanged |
 
 
 
@@ -22537,3 +22560,95 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 
 ### `frontend/src/index.css` — Phase 289 (289-04)
 
 **`34 / 18 / 1196`.** ⚠ **Absent from the ledger for its ENTIRE LIFE at 18 phases**: no scan-list row and no section until 289-05 measured it (289-04 flagged it). **289-04**: ONE `@media print` block (+40 L, 1156 → 1196): everything hidden except `[data-print-root]`, its ancestors unclipped through `*:has([data-print-root])`, theme tokens re-pointed to dark-on-white inside the root. Cosmetic only in print. ⛔ Any new global rule here is app-wide; a print rule must stay keyed on the print-root attribute.
+
+## `backend/app/services/rerank_service.py`
+
+**`3 / 0 / 122` — measured at 294 planning (2026-10-20).** ⚠ Absent from the ledger for its entire life (three commits, no phase-tagged subject). **294-01** turns it into a thin dispatcher: the engine logic moves into `backend/app/services/rerank_engines/`, the local-model singleton defect (caches the first model forever, ignores `rerank_model`) is fixed in `rerank_engines/local.py`, and the fallback returns `documents[:n]` so a failure equals rerank-off byte-for-byte (D-11 + D-12). ⛔ **Binding invariants:** `rerank(query, documents, top_n=None, user_settings=None, *, instruction=None, keep_documents=False)`: the first four parameters stay positional (fixed-signature fakes in `test_272_filtered_both_arms`, `test_260_*`, `test_267_cr02_*`); the new ones are keyword-only; `@traceable(name="rerank-documents")` carries `process_inputs=redact_inputs` so no key reaches LangSmith (SC#6). Plan 05 re-derives the triple.
+
+## `backend/app/services/rerank_engines/__init__.py`
+
+**`0 / 0 / 0` — planned (294-01); row and section added at planning.** The engine lookup and the one place a key is resolved (`resolve_credentials`: Cohere `rerank_api_key`, Jev the stored OpenRouter key, OpenAI Decisions the stored OpenAI key; env fallback only when `user_settings is None`) plus `citation_check_availability` (reasons `off` / `engine_reorders_only` / `key_missing`). ⛔ A key never enters a log line, an exception message, a traced argument or a return value other than the adapter call itself. Plan 05 re-derives the triple.
+
+## `backend/app/services/rerank_engines/registry.py`
+
+**`0 / 0 / 0` — planned (294-01); row and section added at planning.** The one engine table (`ENGINES`, `EngineSpec`), the `EngineId` `Literal` that `frontend/src/components/settings/rerankEngines.ts` pins through a `?raw` fence, the accepted provider ids for the Settings allowlist, both decision endpoints as constants (the Jev URL is never derived from the stored OpenRouter `base_url`), batch limits and per-engine timeouts. ⛔ No I/O; it is imported by `api/settings.py`, so it must stay import-cheap. Plan 05 re-derives the triple.
+
+## `backend/app/services/rerank_engines/prune.py`
+
+**`0 / 0 / 0` — planned (294-01); row and section added at planning.** `prune(scored, top_n, *, keep_documents=False)`, `PRUNE_FLOOR = 0.1`, `MIN_KEEP = 3` (D-07). ⛔ **Binding invariants:** pure (no I/O, no settings read); never returns `[]` for non-empty input; copies rows with every key (`low_similarity` must survive, `retrieval_service.py` depends on it); called for Jev and OpenAI Decisions only — never for Cohere or Local, whose scores are not calibrated probabilities (D-08). Plan 05 re-derives the triple.
+
+## `backend/app/services/rerank_engines/cohere.py`
+
+**`0 / 0 / 0` — planned (294-01); row and section added at planning.** `_rerank_api` moved out of `rerank_service.py` with behaviour unchanged (30 s timeout, `rerank-v3.5`), now behind a `_http_client()` factory so the off-path test can assert it is never constructed. ⛔ Reorder plus `[:top_n]` only: Cohere documents `relevance_score` as a ranking score, not a probability (D-08). Plan 05 re-derives the triple.
+
+## `backend/app/services/rerank_engines/local.py`
+
+**`0 / 0 / 0` — planned (294-01); row and section added at planning.** `_rerank_local` moved out of `rerank_service.py`, plus the fixed cache: one `(model_name, CrossEncoder)` resident, double-checked under a `threading.Lock` so two threadpool requests never double-load. ⛔ **Binding invariants:** never loads per request; reloads exactly once when `rerank_model` changes; reorder plus `[:top_n]` only (sigmoid output is not a calibrated probability, D-08). First use of `BAAI/bge-reranker-v2-m3` downloads about 2.3 GB (RESEARCH A1). Plan 05 re-derives the triple.
+
+## `backend/app/services/rerank_engines/jev.py`
+
+**`0 / 0 / 0` — planned (294-01; `post_decisions` reused by 294-03); row and section added at planning.** Jev via OpenRouter only (D-03). Per-passage `noul` (D-06), batched by count and serialised bytes, at most 4 calls in flight, `httpx.Timeout(5.0, connect=2.0)`, no retries. ⛔ **Binding invariants:** query, instruction and passages travel only inside `state` as JSON; question `instructions` are module constants naming ids only (D-10); any missing answer, non-[0,1] number or HTTP error raises so the dispatcher falls back (D-11); each call is a LangSmith `llm` span with tokens, vendor cost and latency, and its inputs are redacted. Plan 05 re-derives the triple.
+
+## `backend/app/services/rerank_engines/openai_decisions.py`
+
+**`0 / 0 / 0` — planned (294-01; `post_decisions` reused by 294-03); row and section added at planning.** One request per pool (≤ 200 questions), per-passage `predicate` (D-06), `httpx.Timeout(8.0, connect=2.0)`, no retries. Cost is computed through `pricing_service` (the AST single-home fence). ⛔ **Binding invariants:** untrusted text only inside `input` as JSON; constant question instructions (D-10); a `refusal` answer or any malformed body raises in rerank (fallback, D-11) and maps to `couldnt_check` in the citation check (D-17). Plan 05 re-derives the triple.
+
+## `backend/app/services/rerank_engines/tracing.py`
+
+**`0 / 0 / 0` — planned (294-01); row and section added at planning.** `redact_inputs` for `@traceable(process_inputs=...)` on `rerank-documents`, `search-documents` and every engine span (RESEARCH Pitfall 1: both traceables shipped every decrypted provider key to LangSmith); `EngineCall`, `record_engine_call` and `capture_engine_calls` so `decision_eval.py` can read per-call tokens, cost, latency and fallbacks without a second code path. ⛔ The redacted names are `user_settings`, `api_key` and `supabase`. Plan 05 re-derives the triple.
+
+## `backend/app/services/decision_eval.py`
+
+**`0 / 0 / 0` — planned (294-02); row and section added at planning.** Drives `retrieval_service.search_documents` in-process per arm (off, local, jev, openai_decisions), with arm settings applied by `model_copy`, identical cached query vectors, and the frozen held-out set checked by sha256. ⛔ **Binding invariants:** imports `EVAL_PROBES`, `compute_metrics`, `RecallUnmeasurable` and `describe_dsn` from `recall_eval.py` and never modifies it; an arm whose engine fell back on any search is refused, never reported as measured; no request-path side effects. Plan 05 re-derives the triple.
+
+## `backend/app/services/citation_claims.py`
+
+**`0 / 0 / 0` — planned (294-03); row and section added at planning.** A Python port of `messageText.ts::dedupParagraphs`, the code-span skip reused from `citation_markers.py` (`_CODE_RE`, `_MARKER_RE` imported, never re-typed), list-item / table-row / heading units, and 0-based marker ordinals in document order. ⛔ **Binding invariants:** pure and dependency-free (no `agent_loop` import, the cycle `citation_markers.py` documents); ordinals must equal the frontend's `data-citation-ordinal` for the same content, pinned by `backend/tests/unit/fixtures/citation_ordinals_v1.json` from both stacks. Plan 05 re-derives the triple.
+
+## `backend/app/services/citation_check_service.py`
+
+**`0 / 0 / 0` — planned (294-03); row and section added at planning.** Groups claims by source, asks one `choice` question per claim through `jev.post_decisions` / `openai_decisions.post_decisions` with the canonical label order, validates labels against the closed set, and upserts `message_citation_checks` through the pool. ⛔ **Binding invariants:** every SQL value is a `$N` placeholder; `user_id` / `org_id` / `thread_id` come from the message row, never the request; one source's failure marks only its claims `couldnt_check`; nothing ever defaults to `supported` (D-17). Plan 05 re-derives the triple.
+
+## `backend/app/models/citation_check.py`
+
+**`0 / 0 / 0` — planned (294-03); row and section added at planning.** The wire contract: `Verdict` (`supported`, `partly_supported`, `not_supported`, `contradicted`, `couldnt_check`), `CheckEngineId`, `CitationClaimResult`, `CitationCheckResult` (version 1), `CitationCheckAvailability`. Module-level `Literal`s so `frontend/src/components/chat/citationVerdicts.ts` can pin them through `?raw`. Plan 05 re-derives the triple.
+
+## `backend/app/api/citation_checks.py`
+
+**`0 / 0 / 0` — planned (294-03); row and section added at planning.** `GET /citation-checks?message_ids=` (≤ 100) and `POST /citation-checks/{message_id}`. ⛔ **Binding invariants:** reads go through the user-JWT client wrapped in `aexec` / `maybe_row` (RLS decides; not-found and not-yours share one 404 body); the write goes through the pool with ids from the message row; an in-flight Redis `SET NX EX 60` claim per message gives 409; no response carries a key or a base URL; it is an API route, so the closed core stays 7 / 1 / 30 (D-13). Plan 05 re-derives the triple.
+
+## `frontend/src/components/settings/rerankEngines.ts`
+
+**`0 / 0 / 0` — planned (294-04); row and section added at planning.** One exported table of engine-card facts (name, where it runs, vendor, model id, key source, price string, cuts / reorders, steering, citation check), the 024 rule: preset data never hardcoded in component logic. `engineFor(id)` resolves the legacy `"api"` and any unknown id to a declared row. ⛔ Engine ids pinned to `backend/app/services/rerank_engines/registry.py` through a `?raw` parity fence. Plan 05 re-derives the triple.
+
+## `frontend/src/components/settings/RerankEngineBlock.tsx`
+
+**`0 / 0 / 0` — planned (294-04); row and section added at planning.** The Reranking card body (sketch 294 B, the D-20a acceptance bar): a 2×2 radio grid of engine cards, the keep-at-most line bound to `retrieval_top_k` (orchestrator decision OQ1), the pool line bound to `rerank_top_n`, the missing-key line, the amber egress notice for hosted engines (D-05), and the organisation-scope save line (D-04). ⛔ **Binding invariants:** owns no fetch and no state; every fact comes from `rerankEngines.ts`; glyph plus word, never colour alone; it never rewrites `"api"` on mount (`SettingsPage.changedFields`). Plan 05 re-derives the triple.
+
+## `frontend/src/lib/api/citationChecks.ts`
+
+**`0 / 0 / 0` — planned (294-05); row and section added at planning.** The two clients and the wire types copied verbatim from `backend/app/models/citation_check.py`, pinned by `backend/tests/unit/fixtures/citation_check_result_v1.json` (`satisfies`). ⛔ Imported by its own specifier, never through the `lib/api.ts` barrel (the hottest file). Plan 05 re-derives the triple.
+
+## `frontend/src/stores/citationCheckStore.ts`
+
+**`0 / 0 / 0` — planned (294-05); row and section added at planning.** A small zustand store (the `askDraftStore.ts` precedent): `byMessage`, `availability`, `inFlight`, `ensure(id)` batched per microtask into one `GET /citation-checks?message_ids=`, and `run(id)`. ⛔ **Binding invariants:** its own module, never a slice of `streamsStore.ts` (G-5 FIRES there); stable empty references (zustand v5); `resetCitationChecks()` registered in `setupTests.ts`. Plan 05 re-derives the triple.
+
+## `frontend/src/components/chat/citationVerdicts.ts`
+
+**`0 / 0 / 0` — planned (294-05); row and section added at planning.** Five rows (✓ supported · ◐ partly supported · ○ not supported · ✕ contradicted · ? couldn't check), each with a fixed one-line reason (decision engines return no text), the ⓘ availability reasons, and an own-property-guarded accessor. ⛔ Labels pinned to `Verdict` in `backend/app/models/citation_check.py` through `?raw`; glyph plus word plus raw confidence, never colour alone. Plan 05 re-derives the triple.
+
+## `frontend/src/components/chat/CitationCheckAction.tsx`
+
+**`0 / 0 / 0` — planned (294-05); row and section added at planning.** The action of sketch 294 A in the References footer header. ⛔ **Binding invariants:** a sibling of the `CollapsibleTrigger` button (no nested buttons) and visible while the footer is folded; never renders for an unsettled message; reads only the store. Plan 05 re-derives the triple.
+
+## `frontend/src/components/chat/CitedMarkdown.tsx`
+
+**`2 / 1 / 294` — measured at 294 planning (2026-10-20).** ⚠ Absent from the ledger for its entire life (Phase 153). **294-05**: one optional `checkMessageId` prop; each upgraded in-range marker gains `data-citation-ordinal` from the existing `staggerIndex` count; after a check the marker gains the verdict glyph and class only when the claim's `n` equals the marker's `n` (RESEARCH Pitfall 7). ⛔ **Binding invariants:** the `useLayoutEffect` solely owns `innerHTML`, so the decoration lives inside it; verdicts are read through a ref so an arrival never tears down the listeners; an unchecked marker renders exactly as today. Plan 05 re-derives the triple.
+
+## `frontend/src/components/chat/CitationList.tsx`
+
+**`4 / 3 / 73` — measured at 294 planning (2026-10-20).** ⚠ Absent from the ledger for its entire life at three phases (041, 153, 224; the raw recipe also prints an ambiguous `27` bucket, not counted). **294-05**: one optional prop and one mount of `CitationCheckAction` beside the trigger. Honoured by construction. ⛔ **Binding invariants:** the `References · N sources` label is pinned by Phase 153 tests; `defaultOpen={false}` stays (224-05); no nested buttons. Plan 05 re-derives the triple.
+
+## `frontend/src/components/chat/CitationPeek.tsx`
+
+**`1 / 1 / 189` — measured at 294 planning (2026-10-20).** ⚠ Absent from the ledger for its entire life (Phase 153). **294-05**: one optional `verdict` prop rendering verdict word, raw confidence (2 decimals) and the fixed reason line between the body and the footer. ⛔ With no `verdict` the rendered DOM is byte-identical to today (existing peek tests stay green). Plan 05 re-derives the triple.

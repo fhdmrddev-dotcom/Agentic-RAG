@@ -288,7 +288,14 @@ Plans:
   6. Engine keys are stored encrypted and never returned to the browser, and the Settings copy says that candidate text leaves the server for hosted engines (DEC-01).
 
 **How we'd know this failed**: pruning silently drops the passage that held the answer; "off" still makes calls or changes the order; cost per chat goes up instead of down; Jev's listwise scores (ranks) are used as if they were absolute relevance; OpenAI's choice option-order bias is ignored; text in the cited answer steers the checker; the local model reloads on every request; only one engine was driven.
-**Plans**: TBD (target 3-5)
+**Plans:** 5 plans (3 waves)
+
+Plans:
+- [ ] 294-01-PLAN.md — rerank_engines package: Jev / OpenAI Decisions / Local / Cohere behind rerank(), D-07 prune, failure == off, local cache fix, trace redaction, steering instruction (wave 1)
+- [ ] 294-02-PLAN.md — frozen 50+ question held-out set, decision_eval harness + CLI, measurement report, SEED-020 routed (wave 2)
+- [ ] 294-03-PLAN.md — migration 211 message_citation_checks, claim extraction with shared ordinals, citation-check service + routes (wave 2, the only DB-mutating plan)
+- [ ] 294-04-PLAN.md — Settings engine cards (sketch 294 B) + server-side engine allowlist (wave 2)
+- [ ] 294-05-PLAN.md — verdicts on the citation markers (sketch 294 A), ledger re-derive, live evidence checkpoint per 294-VALIDATION.md (wave 3, not autonomous)
 **UI hint**: yes
 **Flags**: **Provider-docs-first**: Jev (`/api/alpha/decisions` on OpenRouter; TypeSafe direct; about 30 documents per call, about 32k tokens per call) and OpenAI Decisions (`POST /v1/decisions`, `gpt-6-luna`, 1-200 questions, refusal answers; SDK 2.28.0 may lack `client.decisions`, so raw `httpx` is acceptable). Local: Qwen3-Reranker (takes an instruction) or bge-reranker-v2-m3; check licences. **Extends the existing seam** `rerank_service.py` (Cohere / local today, off by default) instead of adding a second one. The steering instruction is an optional argument on the existing search tool, and the citation check is an API route, so the tool count stays 30. Migration only if settings need new columns (next free after 210; re-run `ls`). **G-2 sketch** for the Settings block and the citation-check view. **G-4**. Hot files: `retrieval_service.py`, `config.py`, `user_settings.py`, `api/settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`; read their ledger sections. Deferred to future requirements: model routing, chunk tagging at ingestion. Intake research and sources: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`; re-verify at discuss.
 
@@ -304,7 +311,7 @@ Plans:
 | 291. Describe It From Your Own Files | 0/TBD | Not started | - |
 | 292. More Ways to Show It | 0/TBD | Not started | - |
 | 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
-| 294. Decision Engine: Rerank and Citation Check | 0/TBD | Not started | - |
+| 294. Decision Engine: Rerank and Citation Check | 0/5 | Planned | - |
 
 ---
 
