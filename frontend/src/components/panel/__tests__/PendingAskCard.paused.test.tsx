@@ -14,7 +14,7 @@
  * be behaviourally unchanged — the last case pins that.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { render, screen, cleanup } from "@testing-library/react"
+import { act, render, screen, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { mockPendingAskWithRunId } from "./fixtures"
 import type { PendingAsk } from "@/types"
@@ -38,7 +38,7 @@ vi.mock("@/lib/api", async () => {
     answerAskUser: vi.fn().mockResolvedValue(undefined),
   }
 })
-import { answerAskUser } from "@/lib/api"
+import { answerAskUser, ApiError } from "@/lib/api"
 import { PAUSED_WAITING_LINE, PendingAskCard } from "../PendingAskCard"
 
 afterEach(() => {
@@ -89,6 +89,53 @@ describe("PendingAskCard paused (289-01 / D-13)", () => {
       tool_call_id: "tc-paused-1",
     })
     expect(await screen.findByText(/You answered/)).toBeInTheDocument()
+  })
+
+  it("289-REVIEW CR-02: a card that counted down to expired comes back when the run turns paused", () => {
+    // The live path: the person is watching the page, the client clock reaches 0 before the
+    // page's 5 s run poll reports `paused`, then the poll lands. The card is keyed on
+    // tool_call_id, so it keeps its local state across that re-render.
+    vi.useFakeTimers()
+    try {
+      const fresh: PendingAsk = {
+        ...PAST_WINDOW,
+        tool_call_id: "tc-paused-live",
+        timeout_seconds: 2,
+        created_at: new Date().toISOString(),
+      }
+      const { rerender } = render(<PendingAskCard ask={fresh} reconcile={noopReconcile} />)
+      // one tick per act: each second's timeout is scheduled by the previous render's effect
+      for (let i = 0; i < 4; i++) {
+        act(() => {
+          vi.advanceTimersByTime(1_000)
+        })
+      }
+      expect(screen.getByText(/agent stopped/i)).toBeInTheDocument()
+      expect(screen.queryByRole("button", { name: /send answer/i })).toBeNull()
+
+      rerender(<PendingAskCard ask={fresh} reconcile={noopReconcile} paused />)
+
+      expect(screen.getByRole("button", { name: /send answer/i })).toBeInTheDocument()
+      expect(screen.getByText(PAUSED_WAITING_LINE)).toBeInTheDocument()
+      expect(screen.queryByText(/agent stopped/i)).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("289-REVIEW CR-02: a server-driven expiry (404) is terminal and stays expired while paused", async () => {
+    vi.mocked(answerAskUser).mockRejectedValueOnce(new ApiError("gone", 404))
+    const user = userEvent.setup()
+    const ask: PendingAsk = { ...PAST_WINDOW, tool_call_id: "tc-paused-404" }
+    const { rerender } = render(<PendingAskCard ask={ask} reconcile={noopReconcile} paused />)
+
+    await user.click(screen.getAllByRole("radio")[0])
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+    expect(await screen.findByText(/the run is no longer active/i)).toBeInTheDocument()
+
+    rerender(<PendingAskCard ask={ask} reconcile={noopReconcile} paused />)
+    expect(screen.getByText(/the run is no longer active/i)).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /send answer/i })).toBeNull()
   })
 
   it("without `paused` (every existing caller) the same past-window card still expires as before", () => {
