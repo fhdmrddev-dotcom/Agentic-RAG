@@ -243,13 +243,16 @@ vi.mock("@/components/panel/PendingAskCard", () => ({
   PendingAskCard: ({
     ask,
     runIsOver,
+    paused,
   }: {
     ask: { tool_call_id: string; prompt: string }
     runIsOver?: boolean
+    paused?: boolean
   }) => (
     <div
       data-testid={`ask-stub-${ask.tool_call_id}`}
       data-runisover={String(runIsOver)}
+      data-paused={String(paused)}
     >
       {ask.prompt}
     </div>
@@ -3968,6 +3971,34 @@ describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", ()
     await screen.findByTestId("run-transcript")
 
     expect(screen.getByTestId("ask-stub-call-7").getAttribute("data-runisover")).toBe("true")
+  })
+
+  it("289-01 (D-13): a PAUSED run hands its card `paused`, so the answer control outlives the window", async () => {
+    // SEED-360 F-1: the card used to expire on its countdown and say "agent stopped" on a run
+    // that was paused and still waiting for this answer. The page holds the run row, so it is
+    // the surface that can tell the card. A paused run is not over.
+    setAsks([mkAsk("call-7")])
+    getWorkflowRun.mockResolvedValue(
+      mkRun({
+        thread_id: RUN_THREAD_ID,
+        status: "paused",
+        phases: phasesMatching(["completed", "completed", "active"]),
+      }),
+    )
+    renderPage()
+    await screen.findByTestId("run-transcript")
+
+    const card = await screen.findByTestId("ask-stub-call-7")
+    expect(card.getAttribute("data-paused")).toBe("true")
+    expect(card.getAttribute("data-runisover")).toBe("false")
+  })
+
+  it("289-01 (D-13): an ACTIVE run's card is not paused — the countdown still governs it", async () => {
+    setAsks([mkAsk("call-7")])
+    renderPage()
+    await screen.findByTestId("run-transcript")
+
+    expect(screen.getByTestId("ask-stub-call-7").getAttribute("data-paused")).toBe("false")
   })
 
   it("no ask means no card — never an empty frame", async () => {

@@ -561,6 +561,40 @@ class AskUserResponseBody(BaseModel):
     choice_index: "int | None" = None
 
 
+async def _fail_redrive(pool, run_id: UUID, owner_user_id) -> None:
+    """End a paused run whose re-drive could not continue: `failed`, with words (D-12 / SEED-360).
+
+    Before 289 a failing re-drive only logged, so the run was left `active` with no producer
+    behind it and the person's recorded answer led nowhere (F-3, captured live in
+    289-01-SUMMARY.md). Terminal is `failed`, NEVER re-paused: the answer row already exists,
+    so `/pending` omits the prompt and no surface could ever answer it again (research A4).
+    Same writer order as the engine's `fail_run` arm. Never raises; logs the run id only.
+    """
+    from app.db.workflows import (  # noqa: PLC0415
+        fail_phase,
+        finish_run,
+        get_active_phase,
+        write_audit,
+    )
+
+    try:
+        status = await pool.fetchval("SELECT status FROM workflow_runs WHERE id = $1", run_id)
+        if status != "active":
+            return  # already terminal (or re-paused by someone else): never rewritten here
+        phase = await get_active_phase(pool, run_id)
+        if phase is not None:
+            await fail_phase(
+                pool, phase["id"], "Your answer was saved, but the run could not continue."
+            )
+        await finish_run(pool, run_id, "failed")
+        await write_audit(
+            pool, run_id, user_id=owner_user_id, event_type="run_failed",
+            metadata={"reason": "ask_user re-drive failed"},
+        )
+    except Exception:
+        logger.exception("ask_user_response: could not end failed re-drive for run %s", run_id)
+
+
 async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -> bool:
     """Wake a `paused` workflow run in-process after its human gate has been answered.
 
@@ -650,8 +684,16 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
     # to remove. Narrower than `pause_run`: `AND status = 'paused'` only.
     await resume_run(pool, run_id)
 
-    ctx = await _build_resume_context(dict(row), redis, pool)
-    ctx.resume_answered_tool_call_id = tool_call_id
+    try:
+        ctx = await _build_resume_context(dict(row), redis, pool)
+        ctx.resume_answered_tool_call_id = tool_call_id
+    except Exception:
+        # The run is already `active` here, so a raise must not reach the route's belt and
+        # leave it stranded (D-12). The answer stays recorded; the run ends truthfully, and
+        # True is returned because the only caller ignores the value.
+        logger.exception("ask_user_response: re-drive context failed for run %s", run_id)
+        await _fail_redrive(pool, run_id, row["user_id"])
+        return True
 
     async def _wake():
         _failed = False
@@ -660,6 +702,7 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
         except Exception:
             _failed = True
             logger.exception("ask_user_response: re-drive failed for run %s", run_id)
+            await _fail_redrive(pool, run_id, row["user_id"])
         finally:
             _pid = getattr(ctx, "producer_run_id", None)
             if _pid is not None:

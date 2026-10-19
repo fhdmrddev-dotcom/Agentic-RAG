@@ -202,6 +202,17 @@ export const NO_DEADLINE_WAITING_LINE =
 export const RUN_STOPPED_RETIREMENT_LINE =
   "The run was stopped, so this question no longer needs an answer"
 
+/**
+ * Phase 289 (289-01, D-13 / SEED-360 F-1) — the line a PAUSED run's card shows where the clock
+ * was. The window has passed, but the run is paused and still waiting, so the card keeps its
+ * answer control instead of saying "agent stopped".
+ *
+ * ⚠ IT MAKES NO CLAIM THAT THE RUN CONTINUES. That sentence comes back only once the
+ * paused-then-answered path is driven green live (S5, plan 05).
+ */
+export const PAUSED_WAITING_LINE =
+  "The answer window has passed. The run is paused and still waiting for your answer."
+
 /** mm:ss from a non-negative seconds count. */
 function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds))
@@ -279,6 +290,16 @@ interface PendingAskCardProps {
    * a direct mount such as WorkflowRunPage's.
    */
   home?: "chat" | "panel"
+  /**
+   * Phase 289 (289-01, D-13) — true when the run this prompt belongs to is `paused` on its human
+   * gate. The countdown then never expires the card: it keeps the live-answer layout and shows
+   * PAUSED_WAITING_LINE where the clock was. Passed by `WorkflowRunPage`, which holds the run row.
+   *
+   * ⚠ OPTIONAL, defaulting to false, so every existing caller renders exactly the card it
+   * rendered before this prop existed. `PendingAskStack` cannot derive it (289-01-SUMMARY.md,
+   * "Named gap: PendingAskStack") and does not pass it.
+   */
+  paused?: boolean
 }
 
 type CardState = "pending" | "answered" | "expired"
@@ -292,6 +313,7 @@ export function PendingAskCard({
   service = null,
   shape,
   home,
+  paused = false,
 }: PendingAskCardProps) {
   const { tool_call_id, prompt, timeout_seconds, run_id, draft } = ask
   // ask_user with no choices → backend stores options=null (free-text path).
@@ -346,7 +368,8 @@ export function PendingAskCard({
     // No deadline → no tick, and the `remaining <= 0 → expired` transition below
     // is UNREACHABLE. Such a card can still reach `expired` through the 404 path
     // (expiredMessage), which is correct — there the run really is terminal.
-    if (!hasDeadline) return
+    // 289-01 (D-13): a PAUSED run is still waiting for this answer, so it never expires here.
+    if (!hasDeadline || paused) return
     if (state !== "pending") return
     if (remaining <= 0) {
       setState("expired")
@@ -356,7 +379,7 @@ export function PendingAskCard({
     }
     const t = setTimeout(() => setRemaining((r) => r - 1), 1000)
     return () => clearTimeout(t)
-  }, [remaining, state, hasDeadline, markSettled, tool_call_id])
+  }, [remaining, state, hasDeadline, paused, markSettled, tool_call_id])
 
   // A2 / Pitfall 1: a pure-SSE prompt lacks run_id. Trigger ONE reconcile on
   // mount-if-missing so the GET-reconciled prompt (carrying run_id) replaces it
@@ -615,7 +638,7 @@ export function PendingAskCard({
           aria-hidden="true"
         />
         <span aria-live="assertive">Needs you</span>
-        {hasDeadline && (
+        {hasDeadline && !paused && (
           <span className="ml-auto text-[hsl(var(--muted-foreground-dim))]">{formatClock(remaining)}</span>
         )}
       </div>
@@ -625,6 +648,12 @@ export function PendingAskCard({
       {!hasDeadline && (
         <p className="text-[12px] leading-relaxed text-[hsl(var(--muted-foreground-dim))]">
           {NO_DEADLINE_WAITING_LINE}
+        </p>
+      )}
+      {/* 289-01 (D-13): a paused run's window has passed; the clock gives way to this line. */}
+      {hasDeadline && paused && (
+        <p className="text-[12px] leading-relaxed text-[hsl(var(--muted-foreground-dim))]">
+          {PAUSED_WAITING_LINE}
         </p>
       )}
 

@@ -206,7 +206,10 @@ async def test_ask_user_answered_vs_pending_query(mock_asyncpg_pool):
     # WR-06 (091-08): run-scoped via a matching PROMPT row carrying run_id (the
     # response row stores no run_id) so a multi-run thread can't false-positive.
     assert "ask_user_prompt" in sql, "must join the prompt row that carries run_id"
-    assert "->>'run_id' = $1::text" in sql, "must scope the prompt by THIS run_id"
+    # Phase 289 (SEED-360): this line pinned `$1::text`, the cast Postgres refused with
+    # `uuid = text` against `WHERE wr.id = $1`. The scoping is unchanged; the cast is
+    # `$1::uuid::text` now, proven on real Postgres by tests/test_289_ask_user_sql.py.
+    assert "->>'run_id' = $1::uuid::text" in sql, "must scope the prompt by THIS run_id"
 
 
 @pytest.mark.asyncio
