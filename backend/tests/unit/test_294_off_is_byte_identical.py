@@ -198,6 +198,16 @@ def _forbid(mp: pytest.MonkeyPatch, calls: list[str]) -> list[str]:
     return patched
 
 
+def test_every_engine_entry_point_is_forbidden():
+    """Non-vacuity: all four adapters and the three hosted client factories are patched."""
+    with pytest.MonkeyPatch.context() as mp:
+        patched = _forbid(mp, [])
+    assert sorted(patched) == sorted([
+        "cohere.rerank", "cohere._http_client", "local.rerank", "jev.rerank", "jev._http_client",
+        "openai_decisions.rerank", "openai_decisions._http_client",
+    ])
+
+
 @pytest.mark.parametrize("provider", PROVIDERS)
 @pytest.mark.parametrize("case_id,hybrid,document_ids", CASES, ids=[c[0] for c in CASES])
 async def test_rerank_off_is_byte_identical_to_the_base_fixture(provider, case_id, hybrid, document_ids):
