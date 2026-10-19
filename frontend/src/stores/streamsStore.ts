@@ -343,6 +343,8 @@ export interface StreamsState {
          *  creates a workflow run + the producer drives run_workflow. Omitted on
          *  a Deep send (byte-identical). */
         workflowDefinitionId?: string
+        /** Phase 287 (A-01): the launch form's values, forwarded verbatim; omitted on Deep. */
+        inputs?: Record<string, string>
         /** Phase 216 (CHAT-05 / CHAT-06): active connector IDs for this turn. */
         activeConnectorIds?: string[]
       },
