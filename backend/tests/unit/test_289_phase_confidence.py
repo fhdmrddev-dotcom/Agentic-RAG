@@ -455,7 +455,11 @@ async def test_llm_agent_searched_nothing_carries_level_none():
 async def test_llm_agent_uses_the_owners_buckets():
     from app.services.agent_loop import _compute_confidence
 
-    settings = SimpleNamespace(confidence_bucket_high=0.9, confidence_bucket_medium=0.5)
+    # A MagicMock, not a SimpleNamespace: the executor's tool-budget path reads other settings
+    # attributes off the same object. Only the two buckets are pinned to real numbers.
+    settings = MagicMock()
+    settings.confidence_bucket_high = 0.9
+    settings.confidence_bucket_medium = 0.5
     out = await _agent(_sub([0.61, 0.49], [_cit("d1", 0), _cit("d2", 3)], 2), settings)
     assert out["confidence"]["level"] == _compute_confidence(0.55, settings) == "medium"
     assert out["confidence"]["passages"] == 2
