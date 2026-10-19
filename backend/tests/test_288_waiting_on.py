@@ -56,7 +56,12 @@ def test_paused_wording_says_still_waiting_and_never_expired():
     assert w["window_passed"] is True
     assert w["sentence"].startswith("Still waiting on Dana Whitfield (you)")
     assert w["sentence"].startswith("Still waiting on")
-    assert "continues" not in w["sentence"]  # CR-01: resume after answer is not guaranteed
+    # 289-05 (D-13): the CR-01 removal is reversed on evidence. 289-01 fixed the ask_user SQL
+    # cast that made every paused re-drive fail, and S5 drove a paused run answered from the run
+    # page card to `completed` (289-VALIDATION.md). The promise is true again, so it is back.
+    assert w["sentence"] == (
+        "Still waiting on Dana Whitfield (you); the run continues as soon as they answer."
+    )
     assert "expire" not in w["sentence"].lower()
 
 

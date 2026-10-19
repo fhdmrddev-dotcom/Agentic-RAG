@@ -816,7 +816,9 @@ def compose_waiting_on(
     who = f"{name} (you)" if is_owner and name != _WAITING_FALLBACK_NAME else name
     prompt_line = _first_line(prompt_text) if is_owner else None
     if window_passed:
-        sentence = f"Still waiting on {who}."
+        # 289-05 (D-13): restored only after S5 drove a paused run that was answered from
+        # the run page card and reached `completed` (289-VALIDATION.md S5, run 229f45ae).
+        sentence = f"Still waiting on {who}; the run continues as soon as they answer."
     elif prompt_line:
         sentence = f'Waiting on {who} to answer "{prompt_line}".'
     else:
