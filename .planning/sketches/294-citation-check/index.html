@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 294 — Citation Check</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+#vnav,#states{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.vtab,.stab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit;transition:all .15s ease}
+.vtab:hover,.stab:hover{border-color:var(--color-primary)}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.stab.active{background:var(--color-accent);color:var(--color-text)}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft)}
+#note b{color:var(--color-text)}
+#wrap{max-width:780px;margin:22px auto;padding:0 16px;transition:max-width .2s}
+
+.user{margin-left:auto;max-width:70%;background:var(--color-secondary);border-radius:14px;padding:10px 14px;font-size:var(--text-sm);margin-bottom:18px;width:fit-content}
+.asst{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px}
+.av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--color-primary-strong),var(--color-accent-violet))}
+.body{font-size:15px;line-height:1.7}
+.body p{margin:0 0 12px}
+.asst.gutter{grid-template-columns:28px 34px minmax(0,1fr)}
+
+/* the existing marker (074 winner A): superscript mono primary chip */
+.mk{position:relative;display:inline-flex;align-items:center;gap:2px;vertical-align:super;font-family:var(--font-mono);font-size:10px;line-height:1;color:var(--color-primary);background:var(--color-primary-dim);border-radius:4px;padding:1px 4px;margin-left:1px;cursor:pointer;transition:all .15s}
+.mk:hover{filter:brightness(1.2)}
+.mk.v-sup{color:var(--color-success);background:var(--color-success-dim)}
+.mk.v-part{color:var(--color-warning);background:var(--color-warning-dim)}
+.mk.v-not{color:var(--color-text-muted);background:var(--color-muted)}
+.mk.v-con{color:hsl(0 85% 75%);background:var(--color-danger-dim);box-shadow:0 0 0 1px hsl(0 72% 51% / .5)}
+.mk.v-unk{color:var(--color-text-dim);background:transparent;border:1px dashed var(--color-border)}
+
+/* B: sentence underline */
+.s{transition:all .15s;border-radius:3px}
+.s.u-sup{text-decoration:underline dotted var(--color-success);text-underline-offset:4px}
+.s.u-part{text-decoration:underline dashed var(--color-warning);text-underline-offset:4px}
+.s.u-not{text-decoration:underline dotted var(--color-text-dim);text-underline-offset:4px}
+.s.u-con{text-decoration:underline wavy hsl(0 72% 60%);text-underline-offset:4px}
+.s.u-unk{text-decoration:underline dotted var(--color-border);text-underline-offset:4px}
+.s.hl{background:var(--color-primary-dim)}
+.eg{font-family:var(--font-mono);font-size:11px;margin-left:3px;cursor:pointer}
+
+/* C: gutter */
+.gcol{display:flex;flex-direction:column;gap:0}
+.gp{min-height:20px;display:flex;flex-wrap:wrap;gap:3px;align-content:flex-start;padding-top:4px}
+.gg{width:15px;height:15px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-family:var(--font-mono);cursor:pointer;transition:all .15s}
+.gg:hover{transform:scale(1.15)}
+
+.g-sup{color:var(--color-success);background:var(--color-success-dim)}
+.g-part{color:var(--color-warning);background:var(--color-warning-dim)}
+.g-not{color:var(--color-text-muted);background:var(--color-muted)}
+.g-con{color:hsl(0 85% 75%);background:var(--color-danger-dim)}
+.g-unk{color:var(--color-text-dim);border:1px dashed var(--color-border)}
+
+/* popover (074/075 hover-peek → click-to-pin) */
+#pop{position:absolute;z-index:50;width:330px;background:var(--color-surface-hi);border:1px solid var(--color-border);border-radius:10px;padding:11px 12px;box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:var(--text-sm);display:none;opacity:0;transition:opacity .15s}
+#pop.show{display:block;opacity:1}
+#pop .vh{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#pop .vw{font-weight:600}
+#pop .cf{font-family:var(--font-mono);font-size:11px;color:var(--color-text-muted);margin-left:auto}
+#pop .src{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);margin-bottom:6px}
+#pop blockquote{margin:0;border-left:2px solid var(--color-border);padding:4px 8px;color:var(--color-text-muted);font-size:var(--text-xs);line-height:1.6}
+#pop .why{margin-top:7px;font-size:var(--text-xs);color:var(--color-text-muted)}
+#pop .pin{font-size:10px;color:var(--color-text-dim);margin-top:6px;font-family:var(--font-mono)}
+
+/* References footer (075 D5) */
+.refs{margin-top:8px;border:1px solid var(--color-border);border-radius:10px;overflow:hidden}
+.refs .hd{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--color-bg-elev1);font-size:var(--text-xs);color:var(--color-text-muted);flex-wrap:wrap}
+.refs .hd b{color:var(--color-text);font-weight:600}
+.refs .r{display:flex;gap:8px;align-items:center;padding:7px 12px;border-top:1px solid var(--color-border-soft);font-size:var(--text-xs);color:var(--color-text-muted)}
+.refs .r .n{font-family:var(--font-mono);color:var(--color-primary)}
+.refs .r .sim{font-family:var(--font-mono);margin-left:auto;color:var(--color-text-dim)}
+.cbtn{margin-left:auto;background:transparent;border:1px solid var(--color-border);color:var(--color-text);border-radius:999px;padding:4px 12px;font-size:var(--text-xs);cursor:pointer;font-family:inherit;transition:all .15s;display:inline-flex;gap:6px;align-items:center}
+.cbtn:hover{border-color:var(--color-primary);color:var(--color-primary)}
+.cbtn[disabled]{opacity:.6;cursor:default}
+.spin{width:10px;height:10px;border:2px solid var(--color-border);border-top-color:var(--color-primary);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.why-hidden{margin-left:auto;font-size:var(--text-xs);color:var(--color-text-dim);display:inline-flex;gap:6px;align-items:center}
+.sum{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pill{font-family:var(--font-mono);font-size:10px;border-radius:999px;padding:1px 7px}
+.legend{max-width:780px;margin:0 auto 28px;padding:0 16px;font-size:var(--text-xs);color:var(--color-text-dim);line-height:1.7}
+.legend b{color:var(--color-text-muted)}
+.key{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}
+#sketch-tools{position:fixed;bottom:12px;right:12px;z-index:9999;font-family:system-ui;font-size:12px;background:rgba(0,0,0,.7);color:#fff;padding:8px 12px;border-radius:8px;opacity:.4;transition:opacity .2s;display:flex;gap:6px;align-items:center}
+#sketch-tools:hover{opacity:1}
+#sketch-tools button,#sketch-tools select{background:#222;color:#fff;border:1px solid #444;border-radius:4px;font-size:11px;padding:2px 6px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="lbl">294 · citation check</span>
+  <button class="vtab active" data-v="A">★ A · The marker carries the verdict (winner)</button>
+  <button class="vtab" data-v="B">B · Sentence underline + end glyph</button>
+  <button class="vtab" data-v="C">C · Margin gutter</button>
+</div>
+<div id="states"><span class="lbl">state</span>
+  <button class="stab" data-s="before">Not checked yet</button>
+  <button class="stab" data-s="checking">Checking…</button>
+  <button class="stab active" data-s="done">Checked</button>
+  <button class="stab" data-s="cohere">Engine = Cohere / local</button>
+  <button class="stab" data-s="off">Reranking off</button>
+</div>
+<div id="note"></div>
+<div id="wrap">
+  <div class="user">What does our procurement policy require before we onboard a cloud vendor, and does Helix Cloud meet it?</div>
+  <div id="msg"></div>
+</div>
+<div id="pop"></div>
+<div class="legend">
+  <b>Verdict words (fixed, 294-CONTEXT specifics):</b>
+  <div class="key"><span class="pill g-sup">✓ supported</span><span class="pill g-part">◐ partly supported</span><span class="pill g-not">○ not supported</span><span class="pill g-con">✕ contradicted</span><span class="pill g-unk">? couldn't check</span></div>
+  Glyph + word + raw confidence, never colour alone (028 rule). A refusal or missing source is <b>couldn't check</b>, never supported (D-17). The check runs only when pressed (D-13), is saved with the message (D-15), and is offered only with Jev or OpenAI Decisions (D-16).
+  Hover a mark to peek; click to pin (075 pattern). Unmarked sentences stay plain: absence still means general knowledge (074 D3).
+</div>
+<div id="sketch-tools">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Default</option></select>
+  <button onclick="vw('375px')">Phone</button><button onclick="vw('768px')">Tablet</button><button onclick="vw('780px')">Desktop</button>
+</div>
+<script>
+const SRC = [
+  {f:"Procurement Policy v4.docx", c:"Chunk 7", sim:"0.71"},
+  {f:"SOC-2 Report — Helix Cloud.pdf", c:"Chunk 3", sim:"0.66"},
+  {f:"Vendor Incident Log Q3.xlsx", c:"Chunk 12", sim:"0.52"}
+];
+// paragraphs → sentences; cited ones carry {n, v, conf, quote, why}
+const PARAS = [
+  [
+    {t:"Before onboarding any cloud vendor, the policy requires a current SOC 2 Type II report and a signed data-processing agreement.", n:1, v:"sup", conf:0.93,
+      quote:"§4.2 — No cloud vendor may be onboarded without (a) a SOC 2 Type II report dated within the last 12 months and (b) an executed DPA.", why:"The passage states both requirements in the same words."},
+    {t:"It also asks for a named security contact, and Legal must approve any vendor that stores customer data.", n:1, v:"part", conf:0.61,
+      quote:"§4.3 — Vendors storing customer data require Legal approval prior to contract signature.", why:"Legal approval is in the source; a named security contact is not mentioned."}
+  ],
+  [
+    {t:"Helix Cloud's SOC 2 Type II report covers the period ending June 2026, so it is within the 12-month window.", n:2, v:"sup", conf:0.88,
+      quote:"Report period: 1 July 2025 – 30 June 2026. Type II.", why:"The report period ends June 2026; that is within 12 months of today."},
+    {t:"The report lists no exceptions in its access-control testing.", n:2, v:"con", conf:0.87,
+      quote:"CC6.1 — Exception noted: 2 of 25 sampled terminations were not deprovisioned within 24 hours.", why:"The source records an exception in access-control testing (CC6.1)."}
+  ],
+  [
+    {t:"Helix had no reportable incidents in Q3.", n:3, v:"unk", conf:null,
+      quote:null, why:"The engine declined to answer for this pair (refusal), so no verdict is given."},
+    {t:"Overall, Helix meets the documentary requirements, but the access-control exception should go to Legal before signing.", n:null}
+  ]
+];
+const VW = {sup:"Supported", part:"Partly supported", not:"Not supported", con:"Contradicted", unk:"Couldn't check"};
+const VG = {sup:"✓", part:"◐", not:"○", con:"✕", unk:"?"};
+let V="A", S="done", pinned=null;
+const checked = () => S==="done";
+
+function mark(s, i){
+  if(s.n==null) return "";
+  if(V==="A" && checked()) return `<span class="mk v-${s.v}" data-i="${i}">${s.n}<span>${VG[s.v]}</span></span>`;
+  return `<span class="mk" data-i="${i}" data-plain="1">${s.n}</span>`;
+}
+function sentence(s, i){
+  let cls = "s";
+  if(V==="B" && checked() && s.n!=null) cls += " u-" + s.v;
+  let tail = mark(s,i);
+  if(V==="B" && checked() && s.n!=null) tail += `<span class="eg g-${s.v}" style="padding:0 3px;border-radius:3px" data-i="${i}">${VG[s.v]}</span>`;
+  return `<span class="${cls}" id="s${i}">${s.t}</span>${tail} `;
+}
+function render(){
+  const NOTES = {
+    A:"<b>A · The marker carries the verdict.</b> The superscript chip you already know gains a glyph and takes the verdict's colour. Lightest touch: nothing new appears on the page, the existing marks just change. The verdict sits exactly where the claim is.",
+    B:"<b>B · Sentence underline + end glyph.</b> The whole sentence is underlined in the verdict's style (dotted = fine, wavy red = contradicted), and a glyph sits after the marker. You see how much text the verdict covers; the heaviest on the calm reading body.",
+    C:"<b>C · Margin gutter.</b> The text stays untouched; verdict glyphs line up in a column left of each paragraph. Hovering a glyph highlights its sentence. Calmest body, but the link between glyph and sentence is indirect when a paragraph has several claims."
+  };
+  document.getElementById("note").innerHTML = NOTES[V];
+  let idx = 0, paras = [], gut = [];
+  PARAS.forEach(p=>{
+    let html = "", g = "";
+    p.forEach(s=>{ const i=idx++; html += sentence(s,i); if(s.n!=null && checked()) g += `<span class="gg g-${s.v}" data-i="${i}">${VG[s.v]}</span>`; });
+    paras.push(`<p>${html}</p>`); gut.push(`<div class="gp" style="min-height:${p.length*27+12}px">${g}</div>`);
+  });
+  const isGut = V==="C";
+  const all = PARAS.flat().filter(s=>s.n!=null);
+  const counts = {}; all.forEach(s=>counts[s.v]=(counts[s.v]||0)+1);
+  let action;
+  if(S==="before") action = `<button class="cbtn" onclick="runCheck()">Check citations <span style="color:var(--color-text-dim)">· Jev</span></button>`;
+  else if(S==="checking") action = `<button class="cbtn" disabled><span class="spin"></span>Checking 5 citations…</button>`;
+  else if(S==="done") action = `<span class="sum" style="margin-left:auto">${["sup","part","not","con","unk"].filter(k=>counts[k]).map(k=>`<span class="pill g-${k}">${VG[k]} ${counts[k]} ${VW[k].toLowerCase()}</span>`).join("")}<button class="cbtn" style="margin-left:4px" onclick="runCheck()">Re-check</button></span>`;
+  else if(S==="cohere") action = `<span class="why-hidden">ⓘ Citation check needs Jev or OpenAI Decisions (Settings → Reranking).</span>`;
+  else action = `<span class="why-hidden">ⓘ Citation check is off while reranking is off.</span>`;
+  const checkedLine = S==="done" ? `<div style="font-size:10px;font-family:var(--font-mono);color:var(--color-text-dim);padding:0 12px 8px;background:var(--color-bg-elev1)">checked by Jev · saved with this answer · 2 min ago</div>` : "";
+  const refs = `<div class="refs"><div class="hd"><b>References</b><span>${SRC.length} sources</span>${action}</div>${checkedLine}
+    ${SRC.map((r,k)=>`<div class="r"><span class="n">[${k+1}]</span>${r.f} · ${r.c}<span class="sim">${r.sim}</span></div>`).join("")}</div>`;
+  document.getElementById("msg").innerHTML = isGut
+    ? `<div class="asst gutter"><div class="av"></div><div class="gcol">${gut.join("")}</div><div class="body">${paras.join("")}${refs}</div></div>`
+    : `<div class="asst"><div class="av"></div><div class="body">${paras.join("")}${refs}</div></div>`;
+  bind();
+}
+function sOf(i){ return PARAS.flat()[i]; }
+function showPop(el, i, pin){
+  const s = sOf(i), pop = document.getElementById("pop"), r = SRC[s.n-1];
+  if(!checked() || el.dataset.plain){
+    pop.innerHTML = `<div class="src">[${s.n}] ${r.f} · ${r.c} · ${r.sim}</div><blockquote>${(s.quote||"—")}</blockquote><div class="pin">${pin?"📌 pinned · click again to close":"click to pin"}</div>`;
+  } else {
+    pop.innerHTML = `<div class="vh"><span class="pill g-${s.v}">${VG[s.v]}</span><span class="vw">${VW[s.v]}</span><span class="cf">${s.conf!=null? "confidence "+s.conf.toFixed(2) : "no verdict"}</span></div>
+      <div class="src">[${s.n}] ${r.f} · ${r.c}</div>
+      ${s.quote?`<blockquote>${s.quote}</blockquote>`:""}<div class="why">${s.why}</div>
+      <div class="pin">${pin?"📌 pinned · click again to close":"click to pin"}</div>`;
+  }
+  const b = el.getBoundingClientRect();
+  pop.style.left = Math.min(window.scrollX + b.left, window.scrollX + document.documentElement.clientWidth - 345) + "px";
+  pop.style.top = (window.scrollY + b.bottom + 6) + "px";
+  pop.classList.add("show");
+  document.querySelectorAll(".s").forEach(x=>x.classList.remove("hl"));
+  document.getElementById("s"+i).classList.add("hl");
+}
+function hidePop(){ if(pinned!=null) return; document.getElementById("pop").classList.remove("show"); document.querySelectorAll(".s").forEach(x=>x.classList.remove("hl")); }
+function bind(){
+  document.querySelectorAll("[data-i]").forEach(el=>{
+    const i = +el.dataset.i;
+    el.onmouseenter = ()=>{ if(pinned==null) showPop(el,i,false); };
+    el.onmouseleave = hidePop;
+    el.onclick = (e)=>{ e.stopPropagation(); if(pinned===i){ pinned=null; hidePop(); } else { pinned=i; showPop(el,i,true); } };
+  });
+}
+document.addEventListener("click", ()=>{ if(pinned!=null){ pinned=null; hidePop(); } });
+function setState(s){ S=s; pinned=null; hidePop(); document.querySelectorAll(".stab").forEach(x=>x.classList.toggle("active", x.dataset.s===s)); render(); }
+function runCheck(){ setState("checking"); setTimeout(()=>setState("done"), 1400); }
+function vw(w){ document.getElementById("wrap").style.maxWidth=w; }
+document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".vtab").forEach(x=>x.classList.remove("active"));b.classList.add("active");V=b.dataset.v;pinned=null;hidePop();render();});
+document.querySelectorAll(".stab").forEach(b=>b.onclick=()=>setState(b.dataset.s));
+render();
+</script>
+</body>
+</html>
