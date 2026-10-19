@@ -291,11 +291,20 @@ Plans:
 **Plans:** 5 plans (3 waves)
 
 Plans:
+**Wave 1**
+
 - [ ] 294-01-PLAN.md — rerank_engines package: Jev / OpenAI Decisions / Local / Cohere behind rerank(), D-07 prune, failure == off, local cache fix, trace redaction, steering instruction (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 294-02-PLAN.md — frozen 50+ question held-out set, decision_eval harness + CLI, measurement report, SEED-020 routed (wave 2)
 - [ ] 294-03-PLAN.md — migration 211 message_citation_checks, claim extraction with shared ordinals, citation-check service + routes (wave 2, the only DB-mutating plan)
 - [ ] 294-04-PLAN.md — Settings engine cards (sketch 294 B) + server-side engine allowlist (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 294-05-PLAN.md — verdicts on the citation markers (sketch 294 A), ledger re-derive, live evidence checkpoint per 294-VALIDATION.md (wave 3, not autonomous)
+
 **UI hint**: yes
 **Flags**: **Provider-docs-first**: Jev (`/api/alpha/decisions` on OpenRouter; TypeSafe direct; about 30 documents per call, about 32k tokens per call) and OpenAI Decisions (`POST /v1/decisions`, `gpt-6-luna`, 1-200 questions, refusal answers; SDK 2.28.0 may lack `client.decisions`, so raw `httpx` is acceptable). Local: Qwen3-Reranker (takes an instruction) or bge-reranker-v2-m3; check licences. **Extends the existing seam** `rerank_service.py` (Cohere / local today, off by default) instead of adding a second one. The steering instruction is an optional argument on the existing search tool, and the citation check is an API route, so the tool count stays 30. Migration only if settings need new columns (next free after 210; re-run `ls`). **G-2 sketch** for the Settings block and the citation-check view. **G-4**. Hot files: `retrieval_service.py`, `config.py`, `user_settings.py`, `api/settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`; read their ledger sections. Deferred to future requirements: model routing, chunk tagging at ingestion. Intake research and sources: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`; re-verify at discuss.
 
