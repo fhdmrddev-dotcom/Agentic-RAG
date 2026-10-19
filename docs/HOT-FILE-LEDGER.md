@@ -11165,6 +11165,10 @@ cells rot within days.
 | [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 58 / 23 / 2803 (was `57 / 22 / 2993`) | **FIRES** | **286-02** seam TAKEN: id-to-name maps + mount read → `useBuilderNameMaps.ts`; 8 copy constants → `builderCopy.ts` (page re-exports). `FLAG_OFF_HEADER_MARKUP` stayed; 288 lands by useDraftPersistence |
 | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 45 / 23 / 1647 (was `43 / 23 / 2261`) | **FIRES** | **286-01** seam TAKEN: 20 wire models/helpers → `workflow_wire.py`; generate + template doors → `workflow_authoring_doors.py` (same router). D-05 1,200-1,400 MISSED (1,647); split OWED |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 14 / 11 / 1240 (was `13 / 10 / 1108`) | **FIRES** | **288-03**: `waiting_on` declared, selected (`user_id`, `is_golden_run`) and produced in lockstep; ONE pure composer + ONE producer; built after the ownership select; failure degrades to None |
+| [`backend/app/services/harness/phase_confidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_confidencepy) | 0 / 0 / 0 | no (young) | young (planned 289-02, row added at planning). Pure confidence helper + wire coercion + KB label read. ⛔ no provider import; chat's _compute_confidence only |
+| [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 0 / 0 / 0 | no (young) | young (planned 289-03, row added at planning). Pure composers for the four evidence sections. ⛔ no I/O; never ships passage/similarity |
+| [`backend/app/api/workflow_run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_run_evidencepy) | 0 / 0 / 0 | no (young) | young (planned 289-03, row added at planning). Org-scoped terminal-only evidence read. ⛔ ONE access query; 404 parity; require_canvas alone |
+| [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 8 / 5 / 391 | **FIRES** | ⚠ absent its ENTIRE LIFE (182/184/188/200.2/276) — row added at 289 planning. 289-03: ONE CANVAS_GATED_PATHS member |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 22 / 15 / 537 (was `21 / 14 / 537`) | ⚠ **FIRES** | **279-01**: docstring repoints to the new expert_scope homes only (OpenAPI regen). ⛔ a body touching both pairs is a 422 |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
 | [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 61 / 31 / 1137 (was `60 / 30 / 1134`) | ⚠ **FIRES** | 286 forecast (287): the in-thread entry REUSES `ChatLaunchForm` and `doRun` (one caller today); ONE prop or ONE mount, never a second launch form |
@@ -11199,6 +11203,12 @@ cells rot within days.
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 17 / 9 / 1013 (was `15 / 8 / 836`) | **FIRES** | honoured by construction (**282-02**): draft moved to askDraftStore (useState 9 → 7); APG radio keys + mark; `home` prop; +`AskPointer` (+177 lines). ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 31 / 12 / 1580 (was `30 / 11 / 1578`) | **FIRES** | **288-03**: ONE `<WaitingOnLine>` render beside `band.sentence`, no hook/state/effect; the five seam286 snapshots are unchanged. 289 also edits this page: leave it smaller. ⛔ invariants unchanged |
 | [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
+| [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 0 / 0 / 0 | no (young) | young (planned 289-02, row added at planning). Leaf: the KB evidence line or nothing. ⛔ no hook, no @/lib/api, never ConfidenceChip tiers |
+| [`frontend/src/components/workflows/evidenceVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidencevocabularyts) | 0 / 0 / 0 | no (young) | young (planned 289-02 + 289-04, row added at planning). Every evidence-line and report word and glyph. ⛔ lookups through own() |
+| [`frontend/src/components/workflows/evidenceView.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidenceviewts) | 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). Pure payload to view-model; one source for DOM and export check. ⛔ no React |
+| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). The finished-run report (sketch 289 B). ⛔ no write control; never imports RunReceipt |
+| [`frontend/src/lib/api/runEvidence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirunevidencets) | 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). getRunEvidence client + types. ⛔ not re-exported through lib/api.ts |
+| [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). ?run=<uuid> read/write/clear. ⛔ strict UUID only |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 210 / 125 / 530 (was `208 / 124 / 523`) | ⚠ **FIRES** | **284-01**: re-exports the paged clients. **284-05**: the five whole-list clients' barrel lines DELETED; `libraryListFence.test.ts` fails on any re-export of them |
@@ -22204,3 +22214,43 @@ CLAUDE.md FIRING row: young row added (cell cap 80).
 ## `frontend/src/stores/streamsStore.ts` — `287-03` (START-01)
 
 **`24 / 16 / 607` (was `22 / 14 / 572`; phase count RE-DERIVED at 287-04 with the recipe, was 15).** ONE passthrough field: optional `inputs?: Record<string, string>` on the `sendMessage` opts type. 0 branches.
+
+## `backend/app/services/harness/phase_confidence.py`
+
+**`0 / 0 / 0` — planned (289-02); row and section added at planning so G-5 can see it from its first commit.** Carries chat's retrieval confidence onto KB-derived phase outputs (TRUST-01, D-07/D-08). `phase_confidence` and `confidence_for_wire` are pure; `resolve_kb_label` is the one read (folder name, R-05) and never raises. ⛔ **Binding invariants:** the level comes only from `agent_loop._compute_confidence` with the owner's settings (lazy import, never at module top); no provider or model import; a non-KB phase yields None and a failed search yields None. Plan 05 re-derives the triple.
+
+## `backend/app/services/run_evidence.py`
+
+**`0 / 0 / 0` — planned (289-03); row and section added at planning.** Pure composers for the evidence read's four sections (definition, phase log, verdicts, sources) plus definition_changed, deliverable and started_by (VIS-03, D-01/D-04, R-01..R-04). ⛔ **Binding invariants:** no I/O; jsonb only through `phase_output_object` / `_coerce_definition` (imported, never copied); never ships a citation passage or similarity; non-owner masking fails closed. Plan 05 re-derives the triple.
+
+## `backend/app/api/workflow_run_evidence.py`
+
+**`0 / 0 / 0` — planned (289-03); row and section added at planning.** `GET /workflow-runs/{id}/evidence`, the first org-shared read on the run tables (SECURITY-BEARING, beside the library feeds). ⛔ **Binding invariants:** ONE pool SELECT carries id + terminal status + owner-or-org-member before any other read; every refusal is the same 404 `Run not found`, never 403; `require_canvas()` alone; the path is in `CANVAS_GATED_PATHS`; email, thread_id and file_id only for the owner. RLS on the four run tables is NOT widened (no migration). Plan 05 re-derives the triple.
+
+## `backend/app/middleware/canvas_gate.py`
+
+**`8 / 5 / 391` — ⚠ ABSENT FROM THE LEDGER FOR ITS ENTIRE LIFE** (phases 182, 184, 188, 200.2, 276), found when 289's plans named it and the ledger gate fired. It already FIRES at 5 phases. Every touch so far has been one `CANVAS_GATED_PATHS` member plus its comment; **289-03 adds one more** (`/workflow-runs/{workflow_run_id}/evidence`), honoured by construction. ⛔ `tests/test_182_canvas_gate.py` must not import `CANVAS_GATED_PATHS`; a new gated route lands in the same commit as its `include_router`. Plan 05 re-derives the triple after 289-03.
+
+## `frontend/src/components/workflows/StepEvidenceLine.tsx`
+
+**`0 / 0 / 0` — planned (289-02); row and section added at planning.** The sketch-289 B evidence line: "Answered from <KB> · N passages · ● Medium · 0.47", "Searched <KB> · nothing matched · ○ No match found", or nothing. Mounted once in `RunSpine.tsx` and once in `RunEvidenceReport.tsx` from the same wire object. ⛔ **Binding invariants:** LEAF (no hook, no `@/lib/api` import); renders nothing for a null confidence (D-09); never imports `ConfidenceChip`/`ConfidenceBadge` (metadata tiers). Plan 05 re-derives the triple.
+
+## `frontend/src/components/workflows/evidenceVocabulary.ts`
+
+**`0 / 0 / 0` — planned (289-02 creates, 289-04 appends); row and section added at planning.** One home for every word and glyph of the evidence line and the finished-run report. The glyphs live HERE, not in `receiptVocabulary.ts` (whose rule 2 bans glyphs). ⛔ lookups by level go through `own()` (WR-04). Plan 05 re-derives the triple.
+
+## `frontend/src/components/workflows/evidenceView.ts`
+
+**`0 / 0 / 0` — planned (289-04); row and section added at planning.** Pure payload → view-model for the report; `sectionStrings` is what the D-03 content test compares the DOM against and `exportPayload` returns the fetched payload unchanged, which is why the JSON matches the page by construction. ⛔ no React import. Plan 05 re-derives the triple.
+
+## `frontend/src/components/workflows/RunEvidenceReport.tsx`
+
+**`0 / 0 / 0` — planned (289-04); row and section added at planning.** The finished state of `WorkflowRunPage` (sketch 289 B): read-only mark, export buttons, facts strip, edited-since banner, four numbered sections, print via `[data-print-root]`. ⛔ **Binding invariants:** no write control for anyone; owner-only links only when `viewer_is_owner`; never imports `RunReceipt` (its importer pin); no `dangerouslySetInnerHTML`. Plan 05 re-derives the triple.
+
+## `frontend/src/lib/api/runEvidence.ts`
+
+**`0 / 0 / 0` — planned (289-04); row and section added at planning.** `getRunEvidence(runId, signal)` and the `RunEvidence` types (the plan 03 contract). ⛔ imported by its own specifier; NOT re-exported through `lib/api.ts`. Plan 05 re-derives the triple.
+
+## `frontend/src/lib/runDeepLink.ts`
+
+**`0 / 0 / 0` — planned (289-04); row and section added at planning.** `readRunDeepLink` / `writeRunDeepLink` / `clearRunDeepLink` for `/app?run=<uuid>` (the app has no router). ⛔ strict UUID validation; the boot read never strips the param (a reload must keep the run). Plan 05 re-derives the triple.

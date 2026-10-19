@@ -174,7 +174,14 @@ Plans:
   5. The confidence value is the one already computed for chat, carried onto the run; no new model call is added (TRUST-01).
 
 **How we'd know this failed**: the page shows the current workflow definition instead of the version the run used; export omits the cited sources; a phase with no KB use shows "high"; confidence is recomputed with a model call; the page is writable; a member of another org reads it.
-**Plans**: TBD (target 3-5)
+**Plans**: 5 plans (waves 1/1/2/2/3; G-8: the backend evidence read and the frontend report with its 45-case test migration cannot share one context budget)
+
+Plans:
+- [ ] 289-01-PLAN.md - SEED-360: D-11 live capture at base, ask_user SQL cast fix (DB-backed RED), _fail_redrive, paused card prop
+- [ ] 289-02-PLAN.md - TRUST-01: per-phase confidence from chat's function, one wire field + KB label, evidence line on the run spine (SC#4, SC#5)
+- [ ] 289-03-PLAN.md - VIS-03 server: org-scoped terminal-only evidence read, 404 parity, canvas-gated (SC#1, SC#3)
+- [ ] 289-04-PLAN.md - VIS-03 view: sketch-B report on the finished run page, JSON export + print by content, /app?run= deep link, terminal-case test migration (SC#1, SC#2, SC#4)
+- [ ] 289-05-PLAN.md - live proof S1-S5 as real users, four-axis roster, conditional 288 sentence restore, ledger + full gates once
 **UI hint**: yes
 **Flags**: **G-2 sketch** the page and the confidence chip. **G-4**. Migration only if the run model lacks a place for confidence (next free after 209). Hot files: `WorkflowRunPage.tsx`, `workflow_runs.py`, `harness_engine.py` (61/24/3387), `phase_types.py` (55/28/3014), `RunReceipt.tsx`. Seeds `SEED-348`, `SEED-152`.
 
