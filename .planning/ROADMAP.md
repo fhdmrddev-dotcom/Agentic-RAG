@@ -190,8 +190,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 289-03-PLAN.md - VIS-03 server: org-scoped terminal-only evidence read, 404 parity, canvas-gated (SC#1, SC#3)
-- [ ] 289-04-PLAN.md - VIS-03 view: sketch-B report on the finished run page, JSON export + print by content, /app?run= deep link, terminal-case test migration (SC#1, SC#2, SC#4)
+- [x] 289-03-PLAN.md - VIS-03 server: org-scoped terminal-only evidence read, 404 parity, canvas-gated (SC#1, SC#3)
+- [x] 289-04-PLAN.md - VIS-03 view: sketch-B report on the finished run page, JSON export + print by content, /app?run= deep link, terminal-case test migration (SC#1, SC#2, SC#4)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
