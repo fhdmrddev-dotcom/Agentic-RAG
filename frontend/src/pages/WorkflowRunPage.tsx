@@ -1541,6 +1541,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
                         ask={ask}
                         reconcile={reconcileAsks}
                         runIsOver={isTerminal}
+                        paused={runStatus === "paused"}
                         // ⚠ 214-11 — THE PAUSE IS THE FIFTH SURFACE AND IT IS FED HERE TOO,
                         // from the SAME resolvers the spine and the list read. The pause is
                         // rendered at `askAnchorSlug`, so its identity is that step's — a
