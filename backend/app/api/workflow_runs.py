@@ -90,6 +90,13 @@ from app import dependencies as deps
 from app.db import rates
 from app.db import workflows as workflows_db
 from app.services.pricing_service import compute_token_cost_usd
+# 289 (TRUST-01) — the read side of the per-step confidence: one allow-list, one label home.
+# Safe at module top: the helper lazy-imports `agent_loop` inside its bodies.
+from app.services.harness.phase_confidence import (
+    KB_LABEL_DEFAULT,
+    confidence_for_wire,
+    resolve_kb_label,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -257,6 +264,24 @@ class WorkflowRunPhaseRead(BaseModel):
         ),
     )
 
+    # ── 289 (TRUST-01 / D-08 / R-05) — chat's retrieval confidence on a KB step ─────────────
+    # ⚠ JOINS THE LOCKSTEP: declared here, read BY NAME off the same single parse in the
+    # serializer, populated in the same construction, fenced by `test_200_1`'s set equality.
+    # Does NOT join the two-wire-model rule — see D-289-02-A below the class.
+    confidence: dict | None = Field(
+        default=None,
+        description=(
+            "This step's retrieval confidence, computed ONCE at write time by chat's own "
+            "`_compute_confidence` over the similarity of this step's own `search_documents` "
+            "calls: `{level, avg_similarity, disclaimer, passages, kb_label}`. `level` is "
+            "high | medium | low | none, where `none` means the step searched and matched "
+            "nothing. ⚠ `null` MEANS THE STEP MADE NO KNOWLEDGE-BASE SEARCH (or its search "
+            "failed, or the run predates this field) — render nothing, never a low chip. "
+            "`kb_label` is the bound project folder's name, else `the knowledge base`, "
+            "resolved server-side once per read."
+        ),
+    )
+
 
 # ─── D-200.1-02-A — THE SECOND WIRE MODEL IS DELIBERATELY NOT WIDENED ────────────────────
 #
@@ -278,6 +303,18 @@ class WorkflowRunPhaseRead(BaseModel):
 #
 # ⚠ RE-OPEN TRIGGER, NAMED SO IT IS NOT A SILENCE: a chat-surface affordance that needs the
 # deliverable INDEPENDENTLY of the message stream.
+#
+# ─── D-289-02-A — `confidence` IS NOT ADDED TO THE SECOND WIRE MODEL EITHER ──────────────
+#
+# Same shape as D-200.1-02-A, and recorded HERE rather than in `models/thread.py` because that
+# file is not this phase's to edit. The chat surface already shows the RUN-LEVEL confidence on
+# the final assistant message (`harness_engine._finalize_run_grounding`), so a per-step chip on
+# the chat panel would be a second confidence claim on the same screen. Widening
+# `WorkflowPhaseState` would also widen `GET /threads/{id}/workflow`, which lives in
+# `api/threads.py` — the hottest backend route in the ledger — for no surface that reads it.
+# The per-step line lives on the run spine and the evidence report, both behind this route.
+#
+# ⚠ RE-OPEN TRIGGER: a chat-panel phase card that needs per-step evidence.
 #
 # ─── D-200.1-02-B — THE TEXT SHIPS WHOLE, ON EVERY ROW THAT HAS ONE, UNCLAMPED ───────────
 #
@@ -1024,6 +1061,10 @@ async def read_workflow_run(
             conn_name = conn_row.get("name")
             if isinstance(conn_name, str) and conn_name.strip():
                 conn_names[str(conn_row.get("id"))] = conn_name
+    # ── 289 (R-05 / T-289-10) — the KB label, resolved AT MOST ONCE PER READ and only when a
+    # row actually carries a confidence key (resolved lazily inside the loop, so the one parse
+    # per row stays one). A failure degrades to the default words and never fails the read.
+    kb_label: str | None = None
     phases = []
     for row in phase_rows:
         # ── 200.1 (RUN-04) — ONE parse per row, feeding BOTH reads ──
@@ -1059,6 +1100,16 @@ async def read_workflow_run(
             row["slug"], (None, None, None)
         )
         service_name = conn_names.get(connection_id) if connection_id else None
+        # ── 289 (TRUST-01 / D-08) — THE FOURTH FACT OFF THE SAME SINGLE PARSE, by name. The
+        # stored dict is coerced through `confidence_for_wire`'s allow-list (T-289-07); a row
+        # with no key is a step with no KB use and ships `None` (D-09).
+        raw_confidence = obj.get("confidence") if isinstance(obj, dict) else None
+        if raw_confidence is not None and kb_label is None:
+            try:
+                kb_label = await resolve_kb_label(await deps.get_pg_pool(), definition)
+            except Exception:  # noqa: BLE001 — the pool itself failed; degrade, never 500.
+                logger.warning("kb label pool unavailable for run %s", run["id"], exc_info=True)
+                kb_label = KB_LABEL_DEFAULT
         phases.append(
             WorkflowRunPhaseRead(
                 slug=row["slug"],
@@ -1080,6 +1131,8 @@ async def read_workflow_run(
                 tool_name=tool_name,
                 capability=capability,
                 service_name=service_name,
+                # 289 — POPULATED, not merely declared (the 214 rule above, one field over).
+                confidence=confidence_for_wire(raw_confidence, kb_label or KB_LABEL_DEFAULT),
             )
         )
 

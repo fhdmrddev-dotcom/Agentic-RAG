@@ -68,6 +68,11 @@ from app.services.harness.emitters import resolve_emitter
 # ``app.utils`` + starlette at module scope (everything heavier is function-local), so it
 # cannot close the harness_engine → harness → phase_types cycle.
 from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
+
+# 289 (TRUST-01 / D-07) — chat's retrieval confidence for a KB phase. Safe at module top:
+# the helper has NO module-level app import (it lazy-imports agent_loop in its bodies), so it
+# cannot close the harness_engine -> harness -> phase_types cycle. It owns every branch (D-16).
+from app.services.harness.phase_confidence import phase_confidence
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
 
 # 214.1-03 (BUG-260828-03) — ONE scrubber, TWO callers. ``_clean_label`` is the shipped
@@ -928,6 +933,15 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         "citations": result.get("citations") or [],
         "similarity_scores": result.get("similarity_scores") or [],
         "retrieval_error": result.get("retrieval_error"),
+        # 289 (TRUST-01 / D-08) — ONE optional key: chat's confidence over THIS phase's own
+        # searches, frozen at write time. None when the sub-agent never searched (D-09).
+        "confidence": phase_confidence(
+            result.get("similarity_scores"),
+            searched=bool(result.get("kb_search_calls")),
+            user_settings=getattr(ctx, "user_settings", None),
+            citations=result.get("citations"),
+            retrieval_error=result.get("retrieval_error"),
+        ),
         # 200 (D-07) — DECLARED measure, site 1 of 3. The number is a fact this executor
         # already produced: how many grounding sources the sub-agent actually gathered.
         # ⚠ ZERO IS EMITTED, NOT SUPPRESSED: a sub-agent that searched and found nothing
@@ -1059,6 +1073,15 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
         "citations": batch_citations,
         "similarity_scores": batch_similarity_scores,
         "retrieval_error": batch_retrieval_error,
+        # 289 (TRUST-01 / D-08) — the same ONE key over the merged branches: searched if any
+        # branch searched, scored over the union of every branch's per-call scores.
+        "confidence": phase_confidence(
+            batch_similarity_scores,
+            searched=any(r.get("kb_search_calls") for r in results),
+            user_settings=getattr(ctx, "user_settings", None),
+            citations=batch_citations,
+            retrieval_error=batch_retrieval_error,
+        ),
         # 200 (D-07) — DECLARED measure, site 2 of 3. How many parallel sub-agents this
         # phase actually fanned out to — one ``sub_run_id`` per branch that really ran, so
         # the number is the executor's own fact and not a re-derivation of the config's
