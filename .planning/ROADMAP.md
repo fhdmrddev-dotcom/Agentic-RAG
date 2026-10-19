@@ -37,7 +37,7 @@
 ## v4.7 Workflows You Can See and Start Anywhere — 🚧 IN PROGRESS
 
 **Started:** 2026-10-18. **Roadmap created:** 2026-10-18.
-Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **14 v4.7 requirements, 14 mapped, 0 orphans** (4 START · 3 AUTH · 4 VIS · 1 TRUST · 2 REG).
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 mapped, 0 orphans** (4 START · 3 AUTH · 4 VIS · 1 TRUST · 2 REG · 3 DEC). DEC-01..03 (Phase 294) were added 2026-10-20 by the operator, outside the workflow theme.
 
 **Goal:** Workflows become easier to start, finish authoring and understand at a glance, with visuals that show what a run did.
 
@@ -48,7 +48,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **14 v4.7 requirements, 14 m
 
 **Baseline gates (every phase):** backend `pytest tests/unit -q --continue-on-collection-errors` at **<= 71 failed, 0 collection errors** (zero headroom); frontend `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` with no per-file decrease and 0 failing; frontend typecheck as `npx tsc -p tsconfig.app.json --noEmit` as a **set diff** against base; `node scripts/check-claude-md-size.cjs` with no warning.
 
-**Numbering:** Phases **286-293**. **Migrations resume at `210`**, measured at roadmap creation (`ls supabase/migrations | tail` ends at `209_watch_item_retry_and_purge_scope.sql`). No phase is pre-assigned a migration; likely candidates are 293 (START-02 inbound credentials) and 289 (TRUST-01 confidence column if the run model lacks one). Whichever phase needs one takes the next free number after re-running `ls`.
+**Numbering:** Phases **286-294** (294 added 2026-10-20). **Migrations resume at `210`**, measured at roadmap creation (`ls supabase/migrations | tail` ends at `209_watch_item_retry_and_purge_scope.sql`). No phase is pre-assigned a migration; likely candidates are 293 (START-02 inbound credentials) and 289 (TRUST-01 confidence column if the run model lacks one). Whichever phase needs one takes the next free number after re-running `ls`.
 
 **Solo running:** Claude builds and reviews. Phases close `verification_mode: self-verified`; review runs as a fresh-context `/gsd:code-review`.
 
@@ -66,6 +66,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **14 v4.7 requirements, 14 m
 | 291 | Describe It From Your Own Files | Describe-it authoring takes uploaded assets and derives inputs, phases and tools from the closed set | AUTH-02 | 4 | **provider-docs-first** (structured output, 8-row roster) · SC#10 four-axis · security_enforcement (untrusted asset content) · closed core recount · G-5 (`workflow_authoring.py`, `workflows.py`, `useTemplateFirstDraft.ts`) · UI hint |
 | 292 | More Ways to Show It | The agent can show artifact types beyond chart, table and metric, from a closed registry | VIS-02 | 4 | **G-2 sketch** (choose the set at sketch time) · closed registry only, no new tool · migration only if the message_artifacts constraint needs it · G-4 · UI hint |
 | 293 | Start From Outside, and Close Out | An external system starts a run and reads the result; every run shows how it began; seed statuses match reality | START-02, START-04, REG-06 | 6 | ⛔ **security_enforcement** (opens an external door) · anti-injection + egress · org-scoped, rate-limited, audited · migration likely (next free) · **G-4** · depends on 287 and 289 · UI hint |
+| 294 | Decision Engine: Rerank and Citation Check | Knowledge-base search can rerank and prune its candidates with a fast decision model, and a user can check whether citations are supported; all behind a Settings switch | DEC-01, DEC-02, DEC-03 | 6 | **provider-docs-first** (Jev, OpenAI Decisions) · **G-2 sketch** (settings block, citation check) · **G-4** · measure before/after · migration likely (next free) · keys encrypted · no new tool · G-5 (`retrieval_service.py`, `config.py`, `user_settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`) · UI hint |
 
 **Dependency order:** 286 → 287 → 288 → 289 → 290 → 291 → 292 → 293. The real constraints are narrower:
 
@@ -75,6 +76,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **14 v4.7 requirements, 14 m
 - **287 before 293.** START-04's last/next-run vocabulary sits beside the start entry points 287 adds.
 - **290 and 292** are independent of each other and of 291; they can swap order.
 - **291 after 288.** Both author through the builder / describe door; `useTemplateFirstDraft.ts` and the builder store settle in 288 first.
+- **294 is independent of 290-293.** It touches retrieval, Settings and the chat message, not workflow files. It can run any time after 289; if it runs before 293, they must not take the same migration number.
 
 ### Phase Checklist
 
@@ -86,6 +88,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **14 v4.7 requirements, 14 m
 - [ ] **Phase 291: Describe It From Your Own Files**: describe-it authoring from uploaded template, form and reference documents (AUTH-02)
 - [ ] **Phase 292: More Ways to Show It**: new artifact types from a closed registry, set chosen at sketch time (VIS-02)
 - [ ] **Phase 293: Start From Outside, and Close Out**: authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
+- [ ] **Phase 294: Decision Engine: Rerank and Citation Check**: a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
 
 ### Phase Details
 
@@ -270,6 +273,25 @@ Plans:
 **UI hint**: yes
 **Flags**: ⛔ **security_enforcement**, opens an external door; read `docs/CONNECTOR-ARCHITECTURE.md` (MCP-first verdict; this is the inbound half, not Open Platform `SEED-013`), `app.security.egress`, and the TRUST-03 anti-injection discipline. Org-scoped, rate-limited, audited. Credentials stored hashed or encrypted per `secret_cipher.py`. Migration likely (next free after 209); apply by SQL editor, regenerate `full-schema.sql`, run `get_advisors(security)`; revoke from `PUBLIC` on any new function. **G-4**. SC#10 axes for the run-start path. Hot files: `workflow_runs.py`, `workflow_kickoff.py`, `scheduler_service.py`, `WorkflowRunPage.tsx`, `main.py`. Seeds `SEED-195`, `SEED-014`; REG-06 is the close-out step, by hand-editing seed frontmatter.
 
+#### Phase 294: Decision Engine: Rerank and Citation Check
+
+**Goal**: Knowledge-base search sends the main model fewer, more relevant chunks by reranking with a fast decision model, and a user can check whether an answer's citations are supported. Everything sits behind a Settings switch that is off by default.
+**Depends on**: Phase 289 (no file overlap with 290-293).
+**Requirements**: DEC-01, DEC-02, DEC-03
+**Success Criteria** (what must be TRUE):
+
+  1. With the switch off, search returns exactly what it returns today (pinned by a test) and no decision call is made (DEC-01).
+  2. Each engine (Jev, OpenAI Decisions, local) reranks a real knowledge-base search in a live chat, and each call's tokens, cost and latency are recorded in LangSmith (DEC-01, DEC-02).
+  3. On a held-out set of real questions, reranking sends fewer chunks to the main model while recall of the right passage stays within a margin stated in CONTEXT. This is measured, not asserted (DEC-02).
+  4. A forced engine failure (bad key, timeout, refusal) keeps the existing order and the chat answer still arrives (DEC-02).
+  5. The citation check labels each cited sentence with a verdict and a confidence, and a planted contradicting citation comes back as contradicted (DEC-03).
+  6. Engine keys are stored encrypted and never returned to the browser, and the Settings copy says that candidate text leaves the server for hosted engines (DEC-01).
+
+**How we'd know this failed**: pruning silently drops the passage that held the answer; "off" still makes calls or changes the order; cost per chat goes up instead of down; Jev's listwise scores (ranks) are used as if they were absolute relevance; OpenAI's choice option-order bias is ignored; text in the cited answer steers the checker; the local model reloads on every request; only one engine was driven.
+**Plans**: TBD (target 3-5)
+**UI hint**: yes
+**Flags**: **Provider-docs-first**: Jev (`/api/alpha/decisions` on OpenRouter; TypeSafe direct; about 30 documents per call, about 32k tokens per call) and OpenAI Decisions (`POST /v1/decisions`, `gpt-6-luna`, 1-200 questions, refusal answers; SDK 2.28.0 may lack `client.decisions`, so raw `httpx` is acceptable). Local: Qwen3-Reranker (takes an instruction) or bge-reranker-v2-m3; check licences. **Extends the existing seam** `rerank_service.py` (Cohere / local today, off by default) instead of adding a second one. The steering instruction is an optional argument on the existing search tool, and the citation check is an API route, so the tool count stays 30. Migration only if settings need new columns (next free after 210; re-run `ls`). **G-2 sketch** for the Settings block and the citation-check view. **G-4**. Hot files: `retrieval_service.py`, `config.py`, `user_settings.py`, `api/settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`; read their ledger sections. Deferred to future requirements: model routing, chunk tagging at ingestion. Intake research and sources: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`; re-verify at discuss.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -282,6 +304,7 @@ Plans:
 | 291. Describe It From Your Own Files | 0/TBD | Not started | - |
 | 292. More Ways to Show It | 0/TBD | Not started | - |
 | 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
+| 294. Decision Engine: Rerank and Citation Check | 0/TBD | Not started | - |
 
 ---
 

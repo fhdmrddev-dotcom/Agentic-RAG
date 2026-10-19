@@ -44,6 +44,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 Phase: 289 (the-run-page-and-its-evidence) — EXECUTING (all 5 plans complete; phase verification next)
 Plan: 5 of 5
 
+### Roadmap Evolution
+
+- Phase 294 added (2026-10-20, operator): Decision Engine: Rerank and Citation Check (DEC-01..03). It is outside the workflow theme, independent of 290-293, and can run any time after 289. Intake research: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`. `gsd-sdk query phase.add` wrote the entry under the v3.0 section; it was moved by hand into v4.7.
+
 ---
 
 ## Milestone close (2026-10-18)

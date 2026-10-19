@@ -37,7 +37,16 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 - [ ] **REG-06**: Seed statuses match reality: SEED-163 flipped, and each seed this milestone folds is updated.
 - [x] **REG-07**: Hot-file refactors that guardrail G-5 requires are done before the feature phases that touch those files.
 
+### Decision engine (DEC) — added 2026-10-20 by the operator, outside the milestone's workflow theme
+
+- [ ] **DEC-01**: A Settings switch turns the decision engine on or off and picks the engine: Jev (TypeSafe, direct or via OpenRouter), OpenAI Decisions (`gpt-6-luna`), or a local model. Off is the default and leaves retrieval exactly as it is today.
+- [ ] **DEC-02**: When on, knowledge-base search reranks its candidates with the chosen engine, accepts an optional steering instruction from the agent, and drops only candidates below a conservative threshold. Any engine failure falls back to the current order.
+- [ ] **DEC-03**: A user can check an answer's citations and see, for each cited sentence, whether its source supports it fully, partly, not at all, or contradicts it, with a confidence.
+
 ## Future Requirements (deferred)
+
+- Decision-engine model routing (simple turns to a cheaper model) — after DEC-02 is measured; needs the full provider roster.
+- Decision-engine chunk tagging at ingestion (table of contents, footer, signature, personal data) — through the classification splice (`ingest_splice.py`).
 
 - `SEED-347` canvas scale hardening — conditional on a real large workflow.
 - `SEED-013` Open Platform (public API, MCP server) — planned as v4.8.
@@ -69,6 +78,9 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 | START-02 | Phase 293 | Pending |
 | START-04 | Phase 293 | Pending |
 | REG-06 | Phase 293 | Pending |
+| DEC-01 | Phase 294 | Pending |
+| DEC-02 | Phase 294 | Pending |
+| DEC-03 | Phase 294 | Pending |
 
 Mapped: 14/14, no orphans, no duplicates.
 
