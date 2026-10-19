@@ -64,6 +64,25 @@ Seeds sweep (`check-seeds-register.cjs --phase 287`): the script fatals with "no
 - Whether the starter "what it produces" line is a vocabulary entry or comes from the definition's own `business_requirement`.
 </decisions>
 
+
+<amendments>
+## Amendments after research (2026-10-19, autonomous; supersede the decision they name)
+
+Source: `287-RESEARCH.md` contradictions table. Each was verified by the researcher against code.
+
+- **A-01 (supersedes D-04):** do NOT call raw `postMessage`. Use `StreamsProvider.sendMessage` (it already handles `workflowDefinitionId`/harness, seeds the lock, attaches the stream, shows the user bubble). Add `inputs` to its options type in `streamsStore.ts` and one passthrough line in `StreamsProvider.tsx` (it drops `inputs` today). **Stay in the thread**; no anchor read, no navigation (`sendMessage` awaits the whole stream, so "send then navigate" cannot work). The thread's existing run line/panel are the doors to the run.
+- **A-02 (supersedes D-02/D-03 ChatLayout parts):** no `doRun` extraction and **no ChatLayout edit**. The picker owns its own `ChatLaunchForm` instance. The existing source fences on `doRun` stay untouched.
+- **A-03 (refines D-01):** sketch 011 / three-homes removed a composer workflow door on purpose. The control is an **action button (not a mode pill)**, mounted ONCE in ChatArea's `inputBar`, not in MessageInput. Record the anti-pattern tension in the ledger note.
+- **A-04 (supersedes D-13):** keep the shipped, operator-ratified fork flow (⋯ "Make my own copy" then `ForkNameDialog`, 192.1-07 D-19). SC#4's "one click" is read as one action producing the draft; the deviation is recorded in the SUMMARY for operator review. No naming-dialog removal.
+- **A-05 (corrects D-12):** forks keep the `category` marker (shipped code says not to strip it); they stay off the shelf because the selector requires `is_system_global`, which fork creation binds false. Isolation = the fork is an INSERT. The test proves it by editing the copy and re-reading the starter.
+- **A-06 (refines D-10):** the DB-free static gauntlet stages (business requirement, lint, interactive, grounding) are asserted by test for **all 5** starters with the planted-defect counterfactuals the researcher drove. The live golden run + judge is run for the **3 new** starters only; the 3 old ones are recorded as passing the static stages.
+- **A-07 (refines D-09/D-11):** new starters are **template-less** (`llm_agent` then `llm_single`, answer in chat), subjects `meeting-notes-to-actions`, `policy-change-impact`, `stakeholder-update`. Migration `210_*` uses `is_system_global` (not `is_global`), fixed uuids + `ON CONFLICT (id) DO NOTHING`, `org_id` via the autofill trigger. Fix `scripts/seed-starters.py` crash on starters with no `assets`, and add the starter migrations to the OPERATOR.md seed list. A global `UNIQUE(slug, version)` clash in prod is checked with a READ-ONLY Supabase MCP query; prod writes stay operator-gated.
+- **A-08 (refines D-06):** the block helper lives in `soulData.ts`; `LaunchInputFields` stays non-blocking (fenced). Four existing cases go red deliberately and are **rewritten in place** with written reasons: `ChatLayout.launch.test.tsx` (3), `pages/__tests__/RunModal.test.tsx` (1). Count-gate pins (17 / 40) must not decrease.
+- **A-09:** the in-thread kickoff text is the fixed string `Run <workflow name>`; it is a visible user bubble and the first phase prompt. Nothing is read from the conversation.
+- **A-10 (G-4 scenario 2):** the 5 starters declare no required input, so scenario 2 is driven against a throwaway published fixture workflow with one required input, created in the dev DB and removed after (or clearly named as test data).
+- **Optional hardening deferred:** server-side enforcement of required launch inputs (the block is client-only for now); recorded as deferred.
+</amendments>
+
 <canonical_refs>
 ## Canonical References
 
