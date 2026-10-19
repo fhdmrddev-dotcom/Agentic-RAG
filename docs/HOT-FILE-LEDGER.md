@@ -3333,6 +3333,8 @@ fires G-5.
 
 ### `frontend/src/components/workflows/soulData.ts`
 
+**Phase 287-01 note (2026-10-19).** Re-derived `13 / 11 / 523` (was `12 / 10 / 499`). Adds two PURE helpers beside `EntryInputField`: `missingRequiredFields` (required absent reads true; trimmed-empty or missing key is missing) and `requiredFieldsMessage` (label else bare key, one sentence). Placed here, not in `LaunchInputFields.tsx` (one-export fence) nor `argumentVocabulary.ts` (FLAT/COMPOSED pins). CLAUDE.md verdict cell as of 2026-10-19 (replaced by 287-01): *"honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 p"*.
+
 **⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `11 / 9 / 465` → `12 commits / 10 phases / 499 L`** · no dated quick-task buckets. Recorded beside the figures below, never over them. **G-5 fires at 10 phases and 214.1-01 honoured it by construction:** it added `RESERVED_LAUNCH_INPUT_KEYS`, the CLIENT MIRROR of the backend's `RESERVED_RUN_INPUT_KEYS` (`kickoff_prompt`, `folder_id`).
 
 ⚠ **THE MIRROR IS ASSERTED BY ITERATING THE SHIPPED SET, NEVER BY RE-TYPING ITS MEMBERS**, so a third reserved key inherits the refusal with no edit here. That is the only property that makes a second spelling of a one-owner set acceptable: this one is an authoring-time REFUSAL that can be too strict but never too lax, and the server strips these values regardless. The authoritative half is `backend/app/models/message.py`; `workflow_authoring._declare_asked_arguments` (214.1-02) imports it rather than mirroring it, because a server-side derivation has no excuse for a copy.
@@ -6184,6 +6186,8 @@ carries the verdict — **honoured by construction (199) — ⚠ absent, on the 
 
 ### `frontend/src/components/workflows/library/RunModal.tsx`
 
+**Phase 287-01 note (2026-10-19).** Re-derived `9 / 6 / 732` (was `8 / 5 / 713`). `handleRun` now refuses an empty required launch input before `onRun` (testid `run-required-refusal`, distinct from the server-422 `run-upload-error`). CLAUDE.md verdict cell as of 2026-10-19 (replaced by 287-01): *"✅ **deferred extraction DISCHARGED (214-12)**"*.
+
 `4 / 3 / 526` · G-5 ⚠ **FIRES — EXACTLY AT THRESHOLD**
 
 **Disposition, moved verbatim out of the `CLAUDE.md` scan list (Phase 208 · 2026-08-25).** The table there now
@@ -7613,6 +7617,8 @@ Measured by 214-05 at execute time and reported as owed. A safety-gate predicate
 
 ### `frontend/src/components/layout/ChatLaunchForm.tsx`
 
+**Phase 287-01 note (2026-10-19).** Re-derived `2 / 2 / 172` (was `1 / 1 / 157`). `submit` now calls `soulData.missingRequiredFields` and refuses an empty required field by name (testid `chat-launch-required-refusal`) before `onConfirm`; a `required: false` field still sends `""`. The FORM_CODE source fence is unchanged and green. CLAUDE.md verdict cell as of 2026-10-19 (replaced by 287-01): *"287-01: required block, 1 helper import; reuse stays, no 2nd form"*. Next: plan 03 mounts this form from a thread; it adds no second launch form.
+
 **Triple at Phase 214's close (2026-08-28): `1 / 1 / 157` — G-5: no (1 phase).** young (214-12) — chat collects declared inputs BEFORE it creates anything
 
 Mounts `LaunchInputFields`, the one renderer three doors share.
@@ -7638,6 +7644,8 @@ The lane widens so a sourced and an unsourced row keep identical label offsets �
 ⚠ Its refusal reaches a screen showing the MACHINE CODE (`connection_not_allowed`) — `SEED-221`.
 
 ### `frontend/src/components/workflows/LaunchInputFields.tsx`
+
+**Phase 287-01 note (2026-10-19).** Re-derived `3 / 3 / 145` (was `2 / 2 / 152` at 214.1). Row ADDED to the CLAUDE.md scan list (it had a section but no row). The leaf is deliberately unchanged and non-blocking; only its two docblock paragraphs were rewritten. **The 214.1-01 re-open trigger (the next phase that touches a launcher's confirm control takes the block) is TAKEN**: the block lives in `ChatLaunchForm` and `RunModal` via `soulData.missingRequiredFields`. The schedule form is NOT yet blocked (deferred to 293).
 
 **Triple at Phase 214's close (2026-08-28): `1 / 1 / 91` — G-5: no (1 phase).** young (214-09 / 214-12) — **the ONE declared-input renderer three doors mount**
 

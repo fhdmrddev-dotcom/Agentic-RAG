@@ -431,7 +431,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/thread.py` | 22 / 15 / 537 (was `21 / 14 / 537`) | last touch 279-01 (docstring repoint only) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
 | `frontend/src/components/layout/ChatLayout.tsx` | 61 / 31 / 1137 (was `60 / 30 / 1134`) | 286 forecast: 287 reuses ChatLaunchForm + doRun; one prop or one mount |
-| `frontend/src/components/layout/ChatLaunchForm.tsx` | 1 / 1 / 157 | young (214-12); 287 reuses it, no second launch form |
+| `frontend/src/components/layout/ChatLaunchForm.tsx` | 2 / 2 / 172 (was `1 / 1 / 157`) | 287-01: required block, 1 helper import; reuse stays, no 2nd form |
+| `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
@@ -481,12 +482,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ FIRES · absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |
-| `frontend/src/components/workflows/soulData.ts` | 12 / 10 / 499 | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 p |
+| `frontend/src/components/workflows/soulData.ts` | 13 / 11 / 523 (was `12 / 10 / 499`) | 287-01: +2 pure required-field helpers · history in detail file |
 | `frontend/src/components/workflows/PublishGauntlet.tsx` | 20 / 10 / 1372 (was `17 / 9 / 1289`) | 286 forecast: 288 adds one pause-verdict row, words from the server |
 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 286 forecast: 290 adds one optional prop for labelled chips |
 | `frontend/src/components/workflows/doorVocabulary.ts` | 6 / 4 / 540 | no seam proposed |
 | `frontend/src/components/workflows/StepTypePicker.tsx` | 7 / 3 / 522 | honoured by construction (199) |
-| `frontend/src/components/workflows/library/RunModal.tsx` | 8 / 5 / 713 | ✅ **deferred extraction DISCHARGED (214-12)** |
+| `frontend/src/components/workflows/library/RunModal.tsx` | 9 / 6 / 732 (was `8 / 5 / 713`) | 287-01: handleRun refuses empty required field; 214-12 discharge stands |
 | `frontend/src/components/panel/PanelEmpty.tsx` | 4 / 4 / 52 | ⚠ absent at 4 phases |
 | `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 8 / 4 / 684 (was `7 / 4 / 677`) | 286 forecast: 291 forwards one more upload kind to /generate |
 | `frontend/src/components/workflows/RunSpine.tsx` | 5 / 3 / 426 | honoured by construction (**214**) |
