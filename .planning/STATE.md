@@ -3,14 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_plan
-last_updated: 2026-10-18T18:01:16.581Z
+last_updated: "2026-10-19T04:00:31.877Z"
 progress:
   total_phases: 15
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
   completed_plans: 5
-  percent: 0
-stopped_at: Phase 286 complete (5/5) — ready to discuss Phase 287
+  percent: 7
 ---
 
 # Project State
@@ -65,3 +64,8 @@ Live at `4e767a3a2` (2026-10-16): phases 280-285, migrations 207-209 in cloud. B
 - Pre-close artifact audit: 39 open entries, almost all pre-v4.6 (`gsd-sdk query audit-open`).
 - v4.6 public changelog line for the `GET /documents` envelope breaking change (R-06).
 - Open bugs not named in v4.6 requirements: see `.planning/reported-bugs/` (`status: open`).
+
+## Guardrail overrides
+
+- **Phase 287 — G-2 (sketch before plan for UX), 2026-10-19:** not run. The operator was away and asked for autonomous completion; both surfaces reuse shipped vocabulary (Run modal/ChatLaunchForm shell, Starters shelf card). The G-4 browser drive is the visual acceptance bar. No operator-approved mockup exists for the in-thread "Run a workflow" action.
+- **Phase 287 — sketch 011 anti-pattern tension:** the in-thread start is an action button (no aria-pressed, no composer state), not a mode pill. Recorded as a deliberate departure; the operator may reverse it.
