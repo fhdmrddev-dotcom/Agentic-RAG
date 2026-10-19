@@ -241,3 +241,39 @@ async def test_no_active_phase_still_finishes_the_run_failed(monkeypatch):
     assert _phase_fail_writes(pool) == []
     assert _run_finish_writes(pool) and _run_finish_writes(pool)[0][1] == (row["run_id"], "failed")
     assert len(_audit_writes(pool)) == 1
+
+
+# ── 289-REVIEW WR-01 — the minted producer shell is terminalized when the context build raises ──
+
+
+@pytest.mark.asyncio
+async def test_a_build_context_raise_after_the_shell_insert_finalizes_the_shell(monkeypatch):
+    """WR-01: `_build_resume_context` INSERTs a `streaming` producer shell, then can still raise
+    (`get_service_role_supabase` refuses a falsy org). The caller never gets `ctx`, so it cannot
+    finalize the shell; a stranded `streaming` row becomes the thread's latest runs row and
+    defeats the F2 self-heal. The builder must finalize its own shell before re-raising.
+    """
+    from app.services.harness_engine import _build_resume_context
+
+    inserted: list = []
+    finalized: list = []
+
+    async def _fake_insert_run(_pool, **kw):
+        inserted.append(kw)
+
+    async def _fake_finalize_run(_pool, **kw):
+        finalized.append(kw)
+
+    monkeypatch.setattr("app.db.runs.insert_run", _fake_insert_run)
+    monkeypatch.setattr("app.db.runs.finalize_run", _fake_finalize_run)
+
+    row = _paused_row(org_id=None)  # and the fake pool's org read answers None too
+    pool = _RedriveFakePool(row)
+
+    with pytest.raises(ValueError):
+        await _build_resume_context(dict(row), _NoopRedis(), pool)
+
+    assert len(inserted) == 1 and inserted[0]["status"] == "streaming", "precondition"
+    assert len(finalized) == 1, "the minted shell must be finalized on the raise"
+    assert finalized[0]["run_id"] == inserted[0]["run_id"]
+    assert finalized[0]["status"] == "failed"
