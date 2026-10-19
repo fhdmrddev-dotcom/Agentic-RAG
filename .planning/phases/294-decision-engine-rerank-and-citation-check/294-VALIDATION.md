@@ -3,12 +3,12 @@ phase: 294-decision-engine-rerank-and-citation-check
 type: validation
 status: pending
 created: 2026-10-20
-driven_in: 294-05 Task 3 (checkpoint:human-verify)
+driven_in: 294-05 Task 4 (checkpoint:human-verify)
 ---
 
 # Phase 294: Validation (automated map + live UAT rows)
 
-Per CLAUDE.md, UAT rows live here, not in PLAN.md tasks. Plan 294-05 Task 3 drives them and fills the
+Per CLAUDE.md, UAT rows live here, not in PLAN.md tasks. Plan 294-05 Task 4 drives them and fills the
 **Result** and **Evidence** columns. A row may be ⛔ blocked with its reason and the blocking id; a row is
 never deleted or silently skipped.
 
@@ -28,6 +28,8 @@ never deleted or silently skipped.
 | D-13 / D-16 / D-17 | Route 404 / 422 / 409, availability reasons, refusal → couldn't check, contradicted stays contradicted (fake engine) | `test_294_citation_check_route.py`, `test_294_citation_check_service.py` | 03 |
 | Ordinals | Backend claim ordinals == rendered marker order | `test_294_citation_claims.py`, `citationOrdinals.parity.test.tsx` | 03, 05 |
 | D-20a | Engine cards, key status, egress notice, off line, no hydrate diff | `RerankEngineBlock.test.tsx`, `SettingsPage.changedFields.test.tsx` | 04 |
+| D-22 enabler | Fault override honoured only for a loopback URL in a local environment; fault server modes fall back | `test_294_fault_base_guard.py` | 01 |
+| A2 / SC#6 | Canonical choice order on every check request; no un-redacted traceable in the check | `test_294_citation_check_service.py`, `test_294_citation_check_tracing.py` | 03 |
 | D-14 / D-20a | Verdict glyph on the marker, peek section, action states, MessageItem 3 / 0 / 5 | `CitedMarkdown.verdict.test.tsx`, `CitationPeek.verdict.test.tsx`, `CitationCheckAction.test.tsx` | 05 |
 
 ## Preconditions for the live rows
@@ -35,9 +37,10 @@ never deleted or silently skipped.
 1. Local infra up: `powershell -ExecutionPolicy Bypass -File scripts/start-local-infra.ps1` (54322 / 6379 / 54321 accept TCP).
 2. Migration 211 applied locally (`backend/venv/Scripts/python scripts/apply_migration_211.py --verify-only` → all PASS).
 3. The operator starts the backend and the frontend (memory: the user starts the backend). Check `:8000` is not held by a stale uvicorn first.
-4. Keys: OpenAI key saved (present locally); **OpenRouter key saved in Settings** (absent from the local DB at research time — operator action). LangSmith tracing on with a key.
-5. Settings → Search: Hybrid search ON, Reranking ON, "Score the best M candidates first" = 20, "Keep at most" = 5.
-6. A knowledge base with the dev user's documents (`d8a54002-…`).
+4. Fault server available for F3-F5: `scripts/decision-fault-server.py` (294-01), loopback only; `DECISION_ENGINE_FAULT_BASE_URL` is honoured only with ENVIRONMENT unset / local / dev / development / test.
+5. Keys: OpenAI key saved (present locally); **OpenRouter key saved in Settings** (absent from the local DB at research time — operator action). LangSmith tracing on with a key.
+6. Settings → Search: Hybrid search ON, Reranking ON, "Score the best M candidates first" = 20, "Keep at most" = 5.
+7. A knowledge base with the dev user's documents (`d8a54002-…`).
 
 ## Live UAT rows
 
@@ -45,7 +48,7 @@ never deleted or silently skipped.
 
 | ID | Row | Steps | Evidence to record | Result |
 |---|---|---|---|---|
-| E1 | Local (bge-reranker-v2-m3) | Select "On this server", save, ask a KB question in a new chat. First use downloads ~2.3 GB: warm it first (one search) and note the time | LangSmith `rerank.local` span with latency_ms; tool result passage count; answer arrives | pending |
+| E1 | Local (bge-reranker-v2-m3) | Select "On this server", save. First use downloads ~2.3 GB in the background while searches keep today's order (294-01): run `local.warm` (or one search, then wait for the load to finish in the backend log) and note the time; then ask a KB question in a new chat | LangSmith `rerank.local` span with latency_ms; tool result passage count; answer arrives; the warm-up time is recorded | pending |
 | E2 | Jev via OpenRouter | Select Jev, save, ask a KB question with a clear year preference ("… prefer 2025 figures") | LangSmith `decision.jev` span: input/output tokens, cost_usd, latency_ms; the tool call carries `instruction`; fewer passages than the pool; answer arrives | pending |
 | E3 | OpenAI Decisions (gpt-6-luna) | Select OpenAI Decisions, save, same question | LangSmith `decision.openai` span: tokens, cost_usd, latency_ms; fewer passages; answer arrives. A 403 "not enabled" is ⛔ with the verbatim error | pending |
 | E4 | Off makes no call | Reranking OFF, same question | No `decision.*` / `rerank.*` span under `search-documents`; tool result equals the pre-294 shape | pending |
@@ -55,11 +58,11 @@ never deleted or silently skipped.
 
 | ID | Row | Steps | Evidence | Result |
 |---|---|---|---|---|
-| F1 | Bad key (Jev) | Temporarily replace the OpenRouter key with an invalid one; ask a KB question | Backend log line `rerank engine jev failed (HTTPStatusError…)` with no key; answer arrives; passages in today's order | pending |
-| F2 | Bad key (OpenAI Decisions) | Same with the OpenAI key (restore afterwards) | Same | pending |
-| F3 | Timeout | Point the engine at an unroutable host via a test-only override, or block the host with a firewall rule for the drive; ask a question | Fallback log line naming the engine + timeout type; answer arrives within the engine timeout plus normal latency | pending |
-| F4 | Refusal | OpenAI Decisions: a query/passage the engine refuses (try a disallowed-content probe); Jev has no refusal type → record N/A with that reason | Fallback log line; answer arrives. If no refusal can be provoked, ⛔ with the attempts listed (unit test covers the shape) | pending |
-| F5 | 429 | Only if reproducible (many concurrent searches); otherwise ⛔ "not reproducible", covered by unit test | Fallback log line | pending |
+| F1 | Bad key (Jev) | Key custody (checker W7): FIRST save the current ciphertext of `app_settings.openrouter_api_key` from the LOCAL DB (`SELECT openrouter_api_key FROM app_settings`) into a session-scratchpad file (never the repo, never printed); then set an invalid OpenRouter key through Settings; ask a KB question; then write the saved ciphertext back with a local-DB `UPDATE app_settings SET openrouter_api_key = <saved>` and send one no-change `PUT /settings` (key sentinel `***`) so the settings-cache broadcast fires; verify `providers[openrouter].has_key` is true and one E2-style search reranks again; delete the scratchpad file | Backend log line `rerank engine jev failed (HTTPStatusError…)` with no key; answer arrives; passages in today's order; restoration verified (has_key true + a successful rerank) | pending |
+| F2 | Bad key (OpenAI Decisions) | The F1 custody procedure with `app_settings.openai_api_key` (save ciphertext → invalid key via Settings → question → write ciphertext back → no-change PUT → verify `has_key` true and one E3-style rerank succeeds → delete the scratchpad file). If the operator prefers, the operator performs the swap and the restore by hand and Claude only drives the question; record which | Same as F1, plus the restoration evidence | pending |
+| F3 | Timeout | Start `backend/venv/Scripts/python scripts/decision-fault-server.py --port 8765 --slow-seconds 12`; set `DECISION_ENGINE_FAULT_BASE_URL=http://127.0.0.1:8765/slow` in backend/.env (local environment only) and restart the backend; ask a KB question with Jev, then with OpenAI Decisions; remove the variable and restart afterwards | Backend log: `rerank engine jev failed (ReadTimeout)` / `openai_decisions failed (ReadTimeout)`; answer arrives within the engine timeout plus normal latency; the fault server log shows method + path only (no Authorization header) | pending |
+| F4 | Refusal | Same fault server with base `http://127.0.0.1:8765/refusal`; OpenAI Decisions answers every question with `{"type":"refusal"}`; Jev has no refusal type, so drive Jev with `/missing` (answers without the asked names), its nearest equivalent; then run one citation check through `/refusal` | Fallback log line per engine; answer arrives; the citation check shows ? couldn't check on every marker, never ✓ | pending |
+| F5 | 429 and malformed | Same fault server with base `http://127.0.0.1:8765/429`, then `/malformed`; one KB question per engine per mode | Fallback log lines naming the engine and `HTTPStatusError` / the validation error type; exactly one request per batch in the fault server log (no retry); answer arrives | pending |
 
 ### Cross-provider roster (D-21, CLAUDE.md SC#10) — one live `search_documents` call per provider with the new schema
 
@@ -94,6 +97,7 @@ Derive one representative per `provider` from `MODEL_CAPABILITIES` at drive time
 | C4 | Couldn't check renders as absence | A citation whose source has no passage (full-document citation) or a forced engine failure during the check | Marker shows ? couldn't check (dashed, dim), never ✓ | pending |
 | C5 | Hidden with a reason | Switch the engine to Cohere, then Local, then Reranking OFF; open the checked thread and an unchecked one | The action is replaced by the ⓘ line ("Citation check needs Jev or OpenAI Decisions (Settings → Reranking)." / "Citation check is off while reranking is off."); stored verdicts from C1 still render | pending |
 | C6 | OpenAI Decisions engine | Repeat C1 with OpenAI Decisions selected | Contradicted verdict; `decision.openai` span with tokens and cost | pending |
+| C7 | Option-order bias (assumption A2) | After C1 and C6, run `backend/venv/Scripts/python scripts/citation-order-probe.py --message-id <C1 message id>` once with Jev and once with OpenAI Decisions selected | The probe prints canonical vs reversed verdicts per claim; PASS only if no verdict flips (exit 0). A flip (exit 1) FAILS this row and is recorded as a finding against SC#5 | pending |
 
 ### Security (D-10)
 

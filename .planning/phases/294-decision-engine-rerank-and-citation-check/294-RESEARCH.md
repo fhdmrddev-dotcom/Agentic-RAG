@@ -625,15 +625,22 @@ except Exception as exc:  # noqa: BLE001 — D-11
 | A6 | OpenAI `predicate` probabilities are calibrated well enough for a 0.1 floor | §1 D-08 | Over-pruning. The D-19 recall gate catches it per engine |
 | A7 | anyio's `run_in_threadpool` propagates contextvars so `rerank` spans nest under `search-documents` | §2 | Spans become separate roots (cosmetic) |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+Resolved by the orchestrator at plan time (2026-10-20); each answer names the plan that carries it.
 
 1. **"Keep at most N passages per search" binds to the pool, not the output.**
    - Known: `rerank_top_n` = pool; `retrieval_top_k` = output cap.
    - Recommendation: keep the operator-approved sentence but bind it to truth: "Rerank the best **N** candidates · keeps at most **{top_k}** (set under Retrieval)". Ask the operator at plan time; default the measurement pool to 20.
+   - **RESOLVED:** the sentence keeps its words and binds to `retrieval_top_k`; the Top-N field is relabelled "Score the best M candidates first" (pool). Measurement pool 20. → 294-04 (UI), 294-02 (measurement).
 2. **OpenRouter data policy for Jev.** `provider: {zdr: true}` or `data_collection: "deny"` exist, but whether TypeSafe satisfies them is unknown. If it does not, every call fails and falls back. Recommendation: do not set them by default. The egress notice already says text leaves the server. Offer a follow-up if the operator wants ZDR.
+   - **RESOLVED:** no ZDR / data-collection flag is sent; the D-05 egress notice covers it; deferred with a re-open trigger in CONTEXT `<deferred>`. → 294-01 objective, 294-04 (notice).
 3. **Is the OpenRouter key present?** The local DB column is empty; the env fallback was not readable (deny rule). The live Jev drive needs it.
+   - **RESOLVED:** operator action before the live drive; until then 294-02 records the Jev arm as UNMEASURED (never a fallback measured as Jev) and 294-05 M1 re-runs it. → 294-02, 294-05 (VALIDATION precondition 5, row M1).
 4. **Optional RRF-top-1 protection** (§2). It only keeps more than D-07, but D-07 is locked. Ask.
+   - **RESOLVED:** not added; D-07 stays exactly as locked; deferred with a re-open trigger in CONTEXT `<deferred>`. → 294-01 objective.
 5. **Cohere price string.** It is not published per search on cohere.com/pricing today. Show it without a number unless the operator supplies one.
+   - **RESOLVED:** the Cohere card shows "per search (Cohere plan)" with no number. → 294-04 (`rerankEngines.ts`).
 
 ## Environment Availability
 

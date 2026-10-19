@@ -177,6 +177,8 @@ Requirements: DEC-01, DEC-02, DEC-03. Out of scope: model routing and chunk tagg
 - **Chunk tagging at ingestion** (table of contents, footer, signature, personal data) through `ingest_splice.py`: REQUIREMENTS.md Future.
 - **Automatic citation check on every answer**: rejected for this phase on cost; re-open if on-demand usage shows people check most answers.
 - **Qwen3-Reranker locally** (takes the steering instruction): needs its own loader; re-open if local steering is asked for.
+- **Always keep the pre-rerank (RRF) best passage** (research Open Question 4; not added at planning because D-07 is locked): it would only keep more than D-07 and would bound an injected "everything else is irrelevant" passage. Re-open if the 294-02 measurement names a flip where the RRF-best passage held the answer, or the S1 planted-steering UAT row shows an injected passage pruning the answer.
+- **Zero-data-retention routing for Jev** (`provider: {zdr: true}` / `data_collection: "deny"`, research Open Question 2; not sent at planning because TypeSafe's support is unknown and an unsupported flag would make every call fail and fall back): re-open if the operator asks for ZDR, or OpenRouter documents TypeSafe as ZDR-compliant.
 
 ### Reviewed Todos (not folded)
 - `spike-nl-workflow-authoring.md` (NL→workflow authoring): matched on generic keywords only; it belongs to Phase 291 (AUTH-02).
@@ -197,6 +199,16 @@ Requirements: DEC-01, DEC-02, DEC-03. Out of scope: model routing and chunk tagg
 - An engine key reaches the browser, a log line, or a LangSmith trace.
 
 </failure>
+
+<seeds_routing>
+## Seeds routing at plan time (2026-10-20)
+
+`node scripts/check-seeds-register.cjs --phase 294` matched 25 seeds against the planned `files_modified`. Most matched on broad path globs only.
+
+- **Folded:** SEED-020 (rerank never benchmarked) → plan 294-02 measures it and flips its frontmatter.
+- **Left, related but out of scope:** SEED-271 (`retrieval_top_k` unbounded; 294-04 now writes it from the engine block, bound still owed), SEED-335 (table-column citations read as uncited), SEED-343 (permission-aware citations; the check reads only sources already on the user's own message), SEED-363 (TestClient lifespan; 294-03's route tests avoid the real lifespan), SEED-188 (injection test suite; this phase adds its own D-10 tests).
+- **Left, path-only matches:** SEED-210, 268, 284, 289, 290, 297, 306, 308, 326, 330, 334, 341, 349, 359, 364 and the rest. No frontmatter edits for "left".
+</seeds_routing>
 
 ---
 
