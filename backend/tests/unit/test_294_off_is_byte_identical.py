@@ -221,6 +221,21 @@ async def test_rerank_off_is_byte_identical_to_the_base_fixture(provider, case_i
     assert _serialise(result) == _serialise(expected)
 
 
+
+# ── D-12 with a steering instruction (checker W4): still the SAME base fixture ───────────────
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+@pytest.mark.parametrize("case_id,hybrid,document_ids", CASES, ids=[c[0] for c in CASES])
+async def test_rerank_off_with_an_instruction_is_still_byte_identical(provider, case_id, hybrid, document_ids):
+    expected = json.loads(FIXTURE.read_text(encoding="utf-8"))[case_id]
+    calls: list[str] = []
+    with pytest.MonkeyPatch.context() as mp:
+        _install_fakes(mp, hybrid, provider)
+        _forbid(mp, calls)
+        result = await _run(document_ids, instruction="prefer 2025")
+    assert calls == []
+    assert _serialise(result) == _serialise(expected)
+
 if __name__ == "__main__":  # pragma: no cover — the one-time base capture
     if "--capture" in sys.argv:
         _capture()
