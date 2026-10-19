@@ -58,6 +58,13 @@ describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
     expect(VERBATIM_QUOTES).toHaveLength(6)
   })
 
+  it("288-02: the Pause stage no longer claims human-pause phases cannot validate", () => {
+    const pause = GAUNTLET_STAGES.find((s) => s.label === "Pause")
+    expect(pause).toBeDefined()
+    expect(pause!.what).not.toMatch(/can't validate|synchronously/i)
+    expect(pause!.what).toMatch(/answers it automatically/i)
+  })
+
   it("hero facts derive directly from component arrays", () => {
     expect(HERO_FACTS.checksCount).toBe(GAUNTLET_STAGES.length)
     expect(HERO_FACTS.toolsCount).toBe(BUILTIN_TOOL_COUNT)

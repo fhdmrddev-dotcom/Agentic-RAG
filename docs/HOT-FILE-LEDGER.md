@@ -1459,6 +1459,13 @@ carries the verdict — **honoured by construction (193.2 / 194 / 192.2 / **200.
 
 ## `backend/app/services/harness/publish_service.py`
 
+#### Phase 288 (288-02) -- publish_service.py
+
+Re-derived with the CLAUDE.md recipe (six-digit quick-task buckets subtracted): `31 / 14 / 2001`. Honoured by construction: 288-02 adds ONE admitted shape inside existing seams and removes no check.
+
+Scan-list cell replaced, verbatim: `\| 29 / 13 / 1942 \| **FIRES** \| 286 forecast (288): the human pause = ONE admitted shape inside the existing interactive-phase check; the planted unbounded wait still refused. A 2nd concern in 288's plan = extract first (D-01) \|`
+
+
 ### ⚠ Re-derived 2026-09-19 (Phase 256 gap-closure round 1, plan `256-05`) — the row was STALE a FOURTH time
 
 | | the row said | measured at this landing |
@@ -4154,6 +4161,13 @@ subtracted:
 | `ModelField.tsx` | 1 / 1 / 236 | **3 / 2 / 370** |
 
 ### frontend/src/components/workflows/PublishGauntlet.tsx
+
+#### Phase 288 (288-02) -- PublishGauntlet.tsx
+
+Re-derived with the CLAUDE.md recipe (six-digit quick-task buckets subtracted): `21 / 11 / 1385`. Honoured by construction: 288-02 adds ONE admitted shape inside existing seams and removes no check.
+
+Scan-list cell replaced, verbatim: `\| 20 / 10 / 1372 (was `19 / 9 / 1343`) \| ⚠ **FIRES** \| 286 forecast (288): ONE stage-reading row for the pause verdict; its words come from the server verdict, never composed here. honoured by construction (214 / 281) \|`
+
 
 The 8-stage publish gauntlet and the judge hard-wall. **Absent from the scan list for seven phases.**
 
@@ -7727,6 +7741,13 @@ Says what the step does, from data rather than a guess.
 
 ### `frontend/src/lib/api/knowledge.ts`
 
+#### Phase 288 (288-02) -- lib/api/knowledge.ts
+
+Re-derived with the CLAUDE.md recipe (six-digit quick-task buckets subtracted): `7 / 6 / 847`. Honoured by construction: 288-02 adds ONE admitted shape inside existing seams and removes no check.
+
+Scan-list cell replaced, verbatim: `\| 6 / 5 / 841 (was `5 / 4 / 825`) \| ⚠ **FIRES** \| **284-01**: `resolveView` / `resolveAdHoc` take an optional page (`offset`, `limit`, `include_archived`), each key sent only when given. ⛔ count_only URL / body byte-identical \|`
+
+
 **Triple at Phase 214's close (2026-08-28): `2 / 2 / 775` — G-5: no (2 phases).** young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL**
 
 One of the twelve domain modules the 207 split created. The barrel re-exports it; the barrel's row does not guard it.
@@ -11114,7 +11135,7 @@ cells rot within days.
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 22 / 9 / 1417 (was `21 / 8 / 1414`) | ⚠ **FIRES** | **273-03**: the grounding offer subtracts CHAT_ONLY_TOOLS (1 import, 1 set difference). ⚠ extraction still OWED |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 52 / 26 / 2724 | **FIRES** | ⚠ row was STALE at `48 / 25 / 2585`. honoured by construction (193.2 / 194 / 192.2 / 200.1 / 214 / **256-05**) — 256-05 is **COMMENT-ONLY** |
-| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 29 / 13 / 1942 | **FIRES** | 286 forecast (288): the human pause = ONE admitted shape inside the existing interactive-phase check; the planted unbounded wait still refused. A 2nd concern in 288's plan = extract first (D-01) |
+| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 31 / 14 / 2001 (was `29 / 13 / 1942`) | **FIRES** | 288-02: pause timeout refusal inside `_interactive_phase_failures`; `auto_answered` from the golden run's outputs. No new stage, no check removed |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 17 / 11 / 1025 (was `16 / 10 / 1002`) | **FIRES** | 286 forecast (291): uploaded template / form / reference text = ONE more grounding input to the existing generate path; tools + phase types stay closed; asset text is untrusted |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | 286 forecast (288): draft config persistence rides `useDraftPersistence` (186-07); at most ONE store field. honoured by construction (193.2 / 197 / 214.1) |
@@ -11154,7 +11175,7 @@ cells rot within days.
 | [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 15 / 7 / 791 | ⚠ **FIRES** | ⚠ row STALE a 2nd time (`12 / 5 / 749`; CLAUDE.md read `14/6/762`). ⚠ absent at 5 phases (added 196). honoured by construction (255 / **256-05**) |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 19 / 7 / 1705 (was `17 / 7 / 1679`) | ⚠ **FIRES** | honoured by construction (**282-01** help line; **282-04** ONE Timeout field in `AddModelForm`, placeholder = provider default, blank sends no key). `AddModelForm` seam OWED |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 12 / 10 / 499 | ⚠ **FIRES** | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 phases |
-| [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 20 / 10 / 1372 (was `19 / 9 / 1343`) | ⚠ **FIRES** | 286 forecast (288): ONE stage-reading row for the pause verdict; its words come from the server verdict, never composed here. honoured by construction (214 / 281) |
+| [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 21 / 11 / 1385 (was `20 / 10 / 1372`) | ⚠ **FIRES** | 288-02: ONE `auto-answered` block, server words verbatim; Pause stage copy corrected. honoured by construction |
 | [`frontend/src/components/workflows/PhaseSpineGraph.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasespinegraphtsx) | 8 / 6 / 723 (was `5 / 5 / 473`) | ⚠ **FIRES** | 286 forecast (290): ONE optional prop for labelled chips. honoured by construction (200) |
 | [`frontend/src/components/workflows/phaseDuration.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasedurationts) | 5 / 1 / 525 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/receiptVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsreceiptvocabularyts) | 3 / 1 / 303 | no (1 phase) | young (200) |
@@ -11264,7 +11285,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/publishRefusalVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusalvocabularyts) | 1 / 1 / 290 | no (1 phase) | young (214-10) — pinned at 41 |
 | [`frontend/src/components/workflows/stepActionWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepactionwordsts) | 2 / 1 / 91 | no (1 phase) | young (214) — the action half of a step's identity |
 | [`frontend/src/components/workflows/stepIdentityVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentityvocabularyts) | 1 / 1 / 206 | no (1 phase) | young (214-11) — ⚠ its six PAUSE sentences are consumed by NOTHING (`SEED-219`) |
-| [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 6 / 5 / 841 (was `5 / 4 / 825`) | ⚠ **FIRES** | **284-01**: `resolveView` / `resolveAdHoc` take an optional page (`offset`, `limit`, `include_archived`), each key sent only when given. ⛔ count_only URL / body byte-identical |
+| [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 7 / 6 / 847 (was `6 / 5 / 841`) | ⚠ **FIRES** | 288-02: optional `auto_answered` on `PublishVerdict`, additive |
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 19 / 11 / 1967 (was `16 / 10 / 1935`) | ⚠ **FIRES** | **273-05**: `onArtifact` SSE branch + `artifacts` carried through the mapper (Array.isArray guard), additive |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 6 / 4 / 748 | ⚠ **FIRES** | ⛔ row was STALE at `4/2/715` reading `no (2 phases)` — re-derived 263 planning. Holds `FullAppSettings`, not only skills. D-263-03 reuses its `POST /skills` caller, adds no endpoint. |
@@ -11557,7 +11578,7 @@ cells rot within days.
 | [`frontend/src/components/settings/settingsTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssettingstabsts) | 2 / 1 / 123 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-01; 283-02 added Preferences "6" + the first-visible fallback). ONE home of tab id / audience / order / fallback; labels stay literal JSX |
 | [`frontend/src/components/settings/AuditLogSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsauditlogsectiontsx) | 1 / 1 / 221 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-01). Row added AT CREATION. The Audit Log tab body, moved verbatim out of `SettingsPage.tsx`; imports the `@/lib/api` barrel |
 | [`frontend/src/components/settings/PreferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingspreferencessectiontsx) | 1 / 1 / 39 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-02). Preferences tab ("6") body: technical-names toggle + default model, moved verbatim from tab "0". ⛔ calls no gated endpoint |
-| [`frontend/src/landing/facts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclandingfactsts) | 5 / 2 / 546 (was `4 / 1 / 546`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-02**: `SURFACE_TABS.settings` gains "Preferences" in extracted strip order (6 tabs) |
+| [`frontend/src/landing/facts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclandingfactsts) | 6 / 3 / 546 (was `5 / 2 / 546`) | ⚠ **NOW FIRES** (3 phases) | 288-02: Pause stage `what` string corrected (one string, length unchanged) |
 | [`backend/app/api/document_views.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_viewspy) | 13 / 6 / 323 (was `11 / 5 / 300`) | ⚠ **FIRES** | ⚠ FIRES (6 phases). **284-04**: both resolve routes page (`offset`/`limit` ≤ 200/`include_archived`) via `resolve_filter(via_view=True)`; honoured by construction. ⛔ 404-not-403 gate |
 | [`backend/app/api/library.py`](docs/HOT-FILE-LEDGER.md#backendappapilibrarypy) | 2 / 2 / 299 (was `1 / 1 / 137`) | no (2 phases) | **284-02**: `GET /library/summary` = ONE `GROUPING SETS` scan over `library_documents` as `authenticated` + one bounded name read. ⛔ reads the VIEW; `id, name` only |
 | [`frontend/src/components/ingestion/FolderDetail.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfolderdetailtsx) | 4 / 3 / 83 (was `3 / 2 / 59`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-01**: number props (`count`, `sizeBytes`, load state): `…` while loading, ONE "Count not known yet" on failure (UI-SPEC S5). Layout unchanged |
@@ -11579,7 +11600,7 @@ cells rot within days.
 | [`frontend/src/components/ui/SyrelLoader.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsuisyrelloadertsx) | 2 / 0 / 50 | no (young) | young (created quick-261016-u3w, SEED-359 A). The ONE branded loader; renders IrisAvatar `thinking`, never forks it. ⛔ one polite status per block |
 | [`frontend/src/components/workflows/library/WorkflowDeleteSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowdeletesheettsx) | 3 / 1 / 339 | no (1 phase) | row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader`; ⛔ never-guess rule kept: no count, no destructive control while loading |
 | [`frontend/src/pages/SkillTunerPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesskilltunerpagetsx) | 21 / 5 / 921 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 5 phases — row added quick-261016-u3w. Skill loading arm → `SyrelLoader` (panel); honoured by construction |
-| [`backend/app/api/workflow_wire.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_wirepy) | 1 / 1 / 418 | no (young) | young (286-01). Leaf: 20 wire models + pure helpers moved verbatim from `workflows.py` (AST-pinned). ⛔ imports nothing from `app.api.workflows` |
+| [`backend/app/api/workflow_wire.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_wirepy) | 2 / 2 / 422 (was `1 / 1 / 418`) | no (2 phases) | 288-02: ONE optional `PublishVerdict` field (`auto_answered`) |
 | [`backend/app/api/workflow_authoring_doors.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_authoring_doorspy) | 1 / 1 / 403 | no (young) | young (286-01). `GenerateRequest` + the 4 authoring doors, registered on the SAME `/workflows` router. ⛔ placeholder door: no client, no pool; logger `app.api.workflows` |
 | [`frontend/src/components/workflows/useBuilderNameMaps.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsusebuildernamemapsts) | 1 / 1 / 141 | no (young) | young (286-02). The Builder's id-to-name maps + their ONE mount read. ⛔ names only, never ids (CONN-03 SC#4); each read in its own try |
 | [`frontend/src/components/workflows/builderCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuildercopyts) | 1 / 1 / 174 | no (young) | young (286-02). Leaf of the Builder's 8 copy constants; RE-EXPORTED by `WorkflowBuilderPage.tsx` so every import and `?raw` fence resolves |
@@ -21141,6 +21162,13 @@ What it owns. The member-visible Preferences tab body (`"6"`, D-02): the "Show t
 
 ## `frontend/src/landing/facts.ts`
 
+#### Phase 288 (288-02) -- landing/facts.ts
+
+Re-derived with the CLAUDE.md recipe (six-digit quick-task buckets subtracted): `6 / 3 / 546`. Honoured by construction: 288-02 adds ONE admitted shape inside existing seams and removes no check.
+
+Scan-list cell replaced, verbatim: `\| 5 / 2 / 546 (was `4 / 1 / 546`) \| no (2 phases) \| ⚠ absent its ENTIRE LIFE — row added 283 planning. **283-02**: `SURFACE_TABS.settings` gains "Preferences" in extracted strip order (6 tabs) \|`
+
+
 **`4 / 1 / 546`** at Phase 283 planning (phase bucket 226). ⚠ **Absent from the scan list for its entire life.**
 
 What it owns. The landing page's derived product facts, checked against the code by `scripts/check-landing-drift.cjs`. **283-02**: `SURFACE_TABS.settings` gains `"Preferences"` after `"Integrations"`, because the drift check compares it with the `<TabsTrigger>` labels extracted from `SettingsPage.tsx` in SOURCE order; `facts.test.ts` length 5 → 6 in the same commit.
@@ -21894,6 +21922,13 @@ CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
 > ✅ **G-5 DISCHARGED (192.2-02)**
 
 ### `backend/app/api/workflow_wire.py`
+
+#### Phase 288 (288-02) -- workflow_wire.py
+
+Re-derived with the CLAUDE.md recipe (six-digit quick-task buckets subtracted): `2 / 2 / 422`. Honoured by construction: 288-02 adds ONE admitted shape inside existing seams and removes no check.
+
+Scan-list cell replaced, verbatim: `\| 1 / 1 / 418 \| no (young) \| young (286-01). Leaf: 20 wire models + pure helpers moved verbatim from `workflows.py` (AST-pinned). ⛔ imports nothing from `app.api.workflows` \|`
+
 
 **`1 / 1 / 418` — young (created 286-01, 2026-10-18).** Provenance: **286-01** (`315e2f211`), moved verbatim out of `backend/app/api/workflows.py`; every moved symbol's `ast.dump` digest is pinned against the phase base by `test_286_workflows_seam_pins.py` (non-vacuity driven in 286-01-BASE.md). It owns the 20 wire models and pure helpers: `_coerce_definition`, `_caller_uuid`, `_iso_or_none`, `DraftCreateResponse`, `Verdict`, `ValidateResponse`, `PaletteFolder`, `PaletteSkill`, `GroundingBundleResponse`, `PublishRequest`, `BlockedStep`, `PublishVerdict`, `_coerce_user_id`, `_ALREADY_PUBLISHED_DETAIL`, `DeletePreview`, `_owned_slug_or_404`, `_TEMPLATE_MIME_BY_EXT`, `TemplateAssetRef`, `TemplatePlaceholdersResponse`, `_TEMPLATE_MAX_UNCOMPRESSED_BYTES`. `workflows.py` re-imports every name, so `from app.api.workflows import X` still resolves. ⛔ **Inherited invariant: it imports NOTHING from `app.api.workflows`** (a leaf; a back-import would be a cycle). ⛔ OpenAPI component schema names carry no module path, so a model here keeps its schema name; the pinned OpenAPI document reds if that ever changes. `PublishedWorkflow` and `DraftRow` deliberately stayed in `workflows.py` (`test_library_run_facts` counts their `has_any_run` declarations there). Does not fire.
 
