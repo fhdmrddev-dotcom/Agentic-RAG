@@ -190,15 +190,27 @@ def test_nothing_mutates_the_registry():
 #   (False, True, False): "52a324a98a5dc098dca7b02ed35d31d43c4016c9d65120acf6a9fb84eb4e9fb5",
 #   (False, False, True): "df266c3b425f6d3825e78b2ce1a91c2f38cdc8a253fcbf1c68b68e0491c6c4fb",
 #   (False, False, False): "dbee6dd9ee102b11b48ed1975344b158882e5990059542e67f8dce6db08605d6",
+# ⚠ RE-CAPTURED 2026-10-20 (Phase 294-01, D-09), outside 278, deliberately: SEARCH_DOCUMENTS_TOOL gained
+# ONE optional plain-string `instruction` property (the steering text for the decision engines). Proven
+# the ONLY byte change: with that property popped in memory, all 8 combos hashed to the BUG-261015-03
+# digests below. RENDER_TEMPLATE_TOOL is unchanged. The BUG-261015-03 digests, kept for the record:
+#   (True, True, True): "c883da9ac213135cbcf7d4f2a23534695e7ff27331a9eea20de9f197e65c12dd",
+#   (True, True, False): "9cc26986031aa0f6d981527470ac33960339744dffebf292686dfc94363a0b6b",
+#   (True, False, True): "b364e3e0245e4afb2789ed5800e2718681f4fe228cb1dc582e8f97dfbf2b53a9",
+#   (True, False, False): "96cca8475333eae0b8bbb6df725fa88626961db7e3bc830caa8b99483f6b474d",
+#   (False, True, True): "fd8f7276f1836e5ec5b396bfa4305f2df82e40c4b5cee6bd79abb3732ce229e5",
+#   (False, True, False): "9f734c1c0b2abcfe9fbf9de6ffb10087662e904906e726394c839998f1e675a1",
+#   (False, False, True): "d7ac152b38d4050751747370dc7a8c0a7a5856bc63d977e1bf14a2993ed795e6",
+#   (False, False, False): "39555dbd1ae1e6b339669182a50408cd7c462692d554949a21a649756fe6dd50",
 SCHEMA_SHA256: dict = {
-    (True, True, True): "c883da9ac213135cbcf7d4f2a23534695e7ff27331a9eea20de9f197e65c12dd",
-    (True, True, False): "9cc26986031aa0f6d981527470ac33960339744dffebf292686dfc94363a0b6b",
-    (True, False, True): "b364e3e0245e4afb2789ed5800e2718681f4fe228cb1dc582e8f97dfbf2b53a9",
-    (True, False, False): "96cca8475333eae0b8bbb6df725fa88626961db7e3bc830caa8b99483f6b474d",
-    (False, True, True): "fd8f7276f1836e5ec5b396bfa4305f2df82e40c4b5cee6bd79abb3732ce229e5",
-    (False, True, False): "9f734c1c0b2abcfe9fbf9de6ffb10087662e904906e726394c839998f1e675a1",
-    (False, False, True): "d7ac152b38d4050751747370dc7a8c0a7a5856bc63d977e1bf14a2993ed795e6",
-    (False, False, False): "39555dbd1ae1e6b339669182a50408cd7c462692d554949a21a649756fe6dd50",
+    (True, True, True): "0b18ce999b476843e00bb974b7d8b03b72a4422e429d9d35210bef8511538e70",
+    (True, True, False): "407b8187e2c8cfcc82ea25df3fcc1efed1353bd6fccbde4663a21a2deac1d3ad",
+    (True, False, True): "0524aceb6f74af270eb3874624b6372a9546f980c12906f98440fdc35a4703ec",
+    (True, False, False): "e14d0c8797620845660c00125c311f345a2a76f39f357b5dac81fcfcc2ce29df",
+    (False, True, True): "49abde1228de3f08c2a288e9fae58d4bdccdb20ee67958bdff97404e157fa958",
+    (False, True, False): "84e000e8319a8b2048cb989ba4a91f085b9dcabc7e481e8ab679eb360670d7b4",
+    (False, False, True): "d158c6eb0b2b0ae2dac8faa773ed9fdbe0c858ba46341957187c03e04d641bc6",
+    (False, False, False): "e8ffec20254a3a21addd97a77d673ee86d0b0726551a589fd76c6a1c4cf493ef",
     "RENDER_TEMPLATE_TOOL": "aa76bc5f0db6a685ab22e9b1bbfa1d2c628f14e9a2ccee08cfb474f048e13b0f",
 }
 

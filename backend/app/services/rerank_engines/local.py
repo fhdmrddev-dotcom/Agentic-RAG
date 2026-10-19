@@ -134,12 +134,10 @@ def _score(query: str, documents: list[dict], top_n: int, *, model_name: str, mo
         d["relevance_score"] = score
         reranked.append(d)
     latency_ms = (time.perf_counter() - started) * 1000
-    record_engine_call(EngineCall(
-        engine=ENGINE_ID, model=model_name, purpose="rerank", input_tokens=None, output_tokens=None,
-        cost_usd=Decimal("0"), latency_ms=latency_ms, ok=True, reason=None,
-    ))
-    return {"rows": reranked, **span_outputs(input_tokens=None, output_tokens=None,
-                                              cost_usd=Decimal("0"), latency_ms=latency_ms)}
+    # No tokens are counted on this server (unknown, None); the cost is a real $0 — no vendor bill.
+    record_engine_call(EngineCall(engine=ENGINE_ID, model=model_name, purpose="rerank",
+                                  latency_ms=latency_ms, ok=True, cost_usd=Decimal("0")))
+    return {"rows": reranked, **span_outputs(latency_ms=latency_ms, cost_usd=Decimal("0"))}
 
 
 def rerank(query: str, documents: list[dict], top_n: int, *, api_key: str | None = None, model: str,

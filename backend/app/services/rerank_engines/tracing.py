@@ -31,15 +31,18 @@ def redact_inputs(inputs: dict) -> dict:
 
 @dataclass(frozen=True)
 class EngineCall:
+    """One engine call. Token counts default to None = the engine reports none (Cohere, Local, a
+    fallback) — unknown, never coerced to 0 (the METER-01 honesty rule). This is an in-memory
+    measurement record for the harness, not a run-usage write."""
     engine: str
     model: str
     purpose: str                    # "rerank" | "citation_check"
-    input_tokens: int | None
-    output_tokens: int | None
-    cost_usd: Decimal | None        # Jev: vendor usage.cost; OpenAI: pricing helper; local: 0; cohere: None
     latency_ms: float
     ok: bool
-    reason: str | None
+    reason: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cost_usd: Decimal | None = None  # Jev: vendor usage.cost; OpenAI: pricing helper; local: 0; cohere: None
 
 
 _CAPTURE: ContextVar[list[EngineCall] | None] = ContextVar("rerank_engine_calls", default=None)
@@ -62,8 +65,8 @@ def capture_engine_calls() -> Iterator[list[EngineCall]]:
         _CAPTURE.reset(token)
 
 
-def span_outputs(*, input_tokens: int | None, output_tokens: int | None,
-                 cost_usd: Decimal | None, latency_ms: float, **extra: Any) -> dict:
+def span_outputs(*, latency_ms: float, input_tokens: int | None = None, output_tokens: int | None = None,
+                 cost_usd: Decimal | None = None, **extra: Any) -> dict:
     """The outputs dict an ``llm`` span returns so LangSmith can read usage and cost (D-19)."""
     usage = {
         "input_tokens": input_tokens or 0,

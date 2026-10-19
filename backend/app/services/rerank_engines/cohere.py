@@ -53,12 +53,11 @@ def _call(query: str, documents: list[dict], top_n: int, *, api_key: str, model:
         doc["relevance_score"] = result["relevance_score"]
         reranked.append(doc)
     latency_ms = (time.perf_counter() - started) * 1000
-    record_engine_call(EngineCall(
-        engine=ENGINE_ID, model=model, purpose="rerank", input_tokens=None, output_tokens=None,
-        cost_usd=None, latency_ms=latency_ms, ok=True, reason=None,
-    ))
-    return {"rows": reranked, **span_outputs(input_tokens=None, output_tokens=None, cost_usd=None,
-                                              latency_ms=latency_ms)}
+    # Cohere reports search units, not tokens, and publishes no per-search price we multiply:
+    # tokens and cost stay unknown (None), never $0.
+    record_engine_call(EngineCall(engine=ENGINE_ID, model=model, purpose="rerank",
+                                  latency_ms=latency_ms, ok=True))
+    return {"rows": reranked, **span_outputs(latency_ms=latency_ms)}
 
 
 def rerank(query: str, documents: list[dict], top_n: int, *, api_key: str, model: str,

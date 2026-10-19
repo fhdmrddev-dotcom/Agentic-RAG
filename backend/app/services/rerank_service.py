@@ -107,7 +107,8 @@ def rerank(
 
 
 def _record_fallback(engine: str, model: str, started: float, reason: str) -> None:
+    # A fallback sent nothing countable: tokens and cost stay unknown (the EngineCall defaults).
     record_engine_call(EngineCall(
-        engine=engine, model=model, purpose="rerank", input_tokens=None, output_tokens=None,
-        cost_usd=None, latency_ms=(time.perf_counter() - started) * 1000, ok=False, reason=reason,
+        engine=engine, model=model, purpose="rerank",
+        latency_ms=(time.perf_counter() - started) * 1000, ok=False, reason=reason,
     ))
