@@ -158,3 +158,77 @@ describe("RunSpine — the answer control sits at its own step", () => {
     expect(within(row("gather")).queryByTestId("the-ask")).toBeNull()
   })
 })
+
+describe("RunSpine — Phase 289 (TRUST-01 / D-10): the evidence line sits under a KB step only", () => {
+  // The wire rows carry `confidence` (WorkflowRunPhase); the spine reads it structurally.
+  const KB_ROWS = [
+    {
+      slug: "gather",
+      status: "completed",
+      started_at: s(0),
+      completed_at: s(12),
+      confidence: {
+        level: "medium" as const,
+        avg_similarity: 0.47,
+        disclaimer: null,
+        passages: 6,
+        kb_label: "Procurement KB",
+      },
+    },
+    { slug: "draft", status: "completed", started_at: s(14), completed_at: s(70), confidence: null },
+    { slug: "check", status: "pending" },
+  ]
+
+  it("a KB step shows the sketch-B line inside its own row", () => {
+    render(<RunSpine phases={KB_ROWS} titleOf={titleOf} now={T0} />)
+    expect(within(row("gather")).getByTestId("step-evidence-line").textContent).toBe(
+      "Answered from Procurement KB · 6 passages · ● Medium · 0.47",
+    )
+  })
+
+  it("a non-KB step (null or absent confidence) shows no line at all", () => {
+    render(<RunSpine phases={KB_ROWS} titleOf={titleOf} now={T0} />)
+    expect(within(row("draft")).queryByTestId("step-evidence-line")).toBeNull()
+    expect(within(row("check")).queryByTestId("step-evidence-line")).toBeNull()
+    expect(screen.getAllByTestId("step-evidence-line")).toHaveLength(1)
+  })
+
+  it("a low step carries chat's disclaimer under the line", () => {
+    const disclaimer =
+      "This answer is based on limited or weakly-matched evidence. Please verify with the source documents."
+    const low = [
+      {
+        slug: "gather",
+        status: "completed",
+        started_at: s(0),
+        completed_at: s(12),
+        confidence: {
+          level: "low" as const,
+          avg_similarity: 0.31,
+          disclaimer,
+          passages: 3,
+          kb_label: "the knowledge base",
+        },
+      },
+    ]
+    render(<RunSpine phases={low} titleOf={titleOf} now={T0} />)
+    expect(within(row("gather")).getByTestId("step-evidence-sentence").textContent).toBe(
+      "Answered from the knowledge base · 3 passages · ⚠ Low · 0.31",
+    )
+    expect(within(row("gather")).getByTestId("step-evidence-note").textContent).toBe(disclaimer)
+  })
+
+  it("the line comes before the step's answer control, not after it", () => {
+    render(
+      <RunSpine
+        phases={KB_ROWS}
+        titleOf={titleOf}
+        renderAsk={(slug) => (slug === "gather" ? <b data-testid="the-ask">answer me</b> : null)}
+        now={T0}
+      />,
+    )
+    const line = within(row("gather")).getByTestId("step-evidence-line")
+    const ask = within(row("gather")).getByTestId("the-ask")
+    expect(line.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
