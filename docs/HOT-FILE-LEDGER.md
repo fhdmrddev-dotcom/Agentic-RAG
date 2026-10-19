@@ -837,6 +837,12 @@ carries the verdict — **honoured by construction (193 / 193.1 / 199)** — and
 
 ## `frontend/src/pages/WorkflowBuilderPage.tsx`
 
+### Phase 288 (288-01) — ONE prop at the existing card call
+
+**Re-derived 2026-10-19: `59 commits / 24 phases / 2808 L`** (was `58 / 23 / 2803`). **G-5 fires and was honoured BY CONSTRUCTION:** the page gained ONE JSX prop (`settingsRow`) at the single existing `<DraftArrivalCard>` call plus a comment; zero new hooks (the 197-09 trap: hooks below the describe early return), zero `useState`, `showReceipt` and its single setter untouched. D-04 needs no published-gate code: the Builder holds only draft rows and `onGauntletPublished` returns to the library. `builderStore.ts` has an empty numstat diff (A-01: no keying fix; the store is per mount). One retired pin: `canvas.test.tsx` "dismissing takes the column down to TWO children" is rewritten to THREE with the reason in its body; only the `grid-flag-on` entry of the seam286 builder snapshot moved.
+
+**CLAUDE.md verdict cell as of 2026-10-19 (moved by 288-01):** `58 / 23 / 2803 (was 57 / 22 / 2993)` · `seam TAKEN (286-02): name maps + copy → useBuilderNameMaps, builderCopy`.
+
 **⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `55 / 20 / 2956` → `56 commits / 21 phases / 2977 L`** · quick-task buckets excluded: `260809`, `260814`. Recorded beside every previous value below, never over them. **G-5 fires at 21 phases and was honoured BY CONSTRUCTION for the SIXTH consecutive phase**, on a measurement rather than an argument:
 
 | probe | before 214.1 | after |
@@ -3372,6 +3378,12 @@ carries the verdict — **⚠ absent at 7 phases (added 197)** — and this is t
 
 ### `frontend/src/components/workflows/decisionsVocabulary.ts`
 
+#### Phase 288 (288-01) — three neutral words for the draft-settings row
+
+**Re-derived 2026-10-19: `4 commits / 3 phases / 327 L`** (was `1 / 1 / 226` above). **G-5 FIRES at 3 phases; honoured by construction:** three string constants only (`DRAFT_SETTINGS_HEADING`, `_OPEN_ACTION`, `_CLOSE_ACTION`), no function, no import. They stay under the module's rules: no value contains the gate-claim token, all are pairwise distinct from every other export, and none narrates the AI's past choices (a 288-01 case asserts it). `FUNCTION_EXPORTS` is unchanged at three.
+
+**CLAUDE.md verdict cell as of 2026-10-19 (moved by 288-01):** no CLAUDE.md FIRING row existed; the 288-01 row is `288-01: 3 string consts, no logic · ⛔`.
+
 > young (1 phase)
 
 **Measured 2026-08-18: `1 commit / 1 phase / 226 L`.** The ONE five-row decision vocabulary: the words
@@ -3409,6 +3421,12 @@ carries the verdict — **young (197, 199)** — and this is the cell it carried
 > young (197, 199) — the ONE decisions renderer. ⚠ **THREE ARMS, NEVER TWO**: an ABSENT readiness renders nothing affirmative, which is not a green one; a boolean re-introduces "unknown reads as satisfied"
 
 ### `frontend/src/components/workflows/DraftArrivalCard.tsx`
+
+#### Phase 288 (288-01) — ONE optional prop, a collapsed row in the closed branch
+
+**Re-derived 2026-10-19: `4 commits / 3 phases / 625 L`** (was `1 / 1 / 338` above; the `fix(arrival)` sketch-200 port is untagged and `200` is a phase, so the phase count is `197, 200, 288`). **G-5 FIRES at 3 phases and was honoured BY CONSTRUCTION:** one optional prop `settingsRow` (default false) and one closed-branch return. Two hooks added INSIDE the component (`settingsOpen`, one `useId`), local like its three siblings; no module-scope declaration was added, so the "two declarations" fence is unchanged. The receipt branch (`open` true) is byte-identical. The row is a different testid (`draft-settings-row`), so every `draft-arrival-card`-is-null case stays green. Words come from `decisionsVocabulary` (`DRAFT_SETTINGS_*`), present tense, never the arrival's "what I decided" narration (D-01). Next edit here: the row and the arrival body share `DecisionsList`; if a second disclosure lands, extract the row into its own leaf first.
+
+**CLAUDE.md verdict cell as of 2026-10-19 (moved by 288-01):** this file had no row in the CLAUDE.md FIRING table; the 288-01 row is `288-01: ONE prop, closed branch only · ⛔` (it carries the fences above).
 
 > young (1 phase)
 
@@ -11178,9 +11196,9 @@ cells rot within days.
 | [`frontend/src/components/workflows/modelFitness.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmodelfitnessts) | 1 / 1 / 130 | no (1 phase) | young (196) |
 | [`frontend/src/hooks/useComposerModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusecomposermodelts) | 3 / 2 / 407 | no (1 phase) | **249-02**: 3 state hooks fed by the ONE existing providers read — ⛔ no second fetch. THE composer's model machine; a derivation added to ChatArea instead would spend that file's G-5 discharge |
 | [`frontend/src/hooks/useModelRegistry.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemodelregistryts) | 1 / 1 / 109 | no (1 phase) | young (196) |
-| [`frontend/src/components/workflows/decisionsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionsvocabularyts) | 1 / 1 / 226 | no (1 phase) | young (197) |
+| [`frontend/src/components/workflows/decisionsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionsvocabularyts) | 4 / 3 / 327 | ⚠ **FIRES** | 288-01: 3 string consts, no logic (was `1 / 1 / 226`) |
 | [`frontend/src/components/workflows/DecisionsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionslisttsx) | 4 / 2 / 413 | no (2 phases) | young (197, 199) |
-| [`frontend/src/components/workflows/DraftArrivalCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdraftarrivalcardtsx) | 1 / 1 / 338 | no (1 phase) | young (197) |
+| [`frontend/src/components/workflows/DraftArrivalCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdraftarrivalcardtsx) | 4 / 3 / 625 | ⚠ **FIRES** | 288-01: ONE prop, closed branch only (was `1 / 1 / 338`) |
 | [`frontend/src/components/workflows/useTemplateFirstDraft.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsusetemplatefirstdraftts) | 8 / 4 / 684 (was `7 / 4 / 677`) | ⚠ **FIRES** | 286 forecast (291): forwards ONE more upload kind to the existing `/generate` call. honoured by construction (214 / 281) |
 | [`frontend/src/components/workflows/toolNames.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstoolnamests) | 1 / 1 / 128 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/StepCardSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepcardsectiontsx--stepcardsectioncontextts) | 1 / 1 / 95 | no (1 phase) | young (200) |
