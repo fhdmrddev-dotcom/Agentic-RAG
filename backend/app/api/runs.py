@@ -561,14 +561,28 @@ class AskUserResponseBody(BaseModel):
     choice_index: "int | None" = None
 
 
-async def _fail_redrive(pool, run_id: UUID, owner_user_id) -> None:
+_REDRIVE_FAILED_REASON = "Your answer was saved, but the run could not continue."
+
+
+async def _fail_redrive(
+    pool, run_id: UUID, owner_user_id, *, redis=None, stream_run_id=None
+) -> None:
     """End a paused run whose re-drive could not continue: `failed`, with words (D-12 / SEED-360).
 
     Before 289 a failing re-drive only logged, so the run was left `active` with no producer
     behind it and the person's recorded answer led nowhere (F-3, captured live in
     289-01-SUMMARY.md). Terminal is `failed`, NEVER re-paused: the answer row already exists,
     so `/pending` omits the prompt and no surface could ever answer it again (research A4).
-    Same writer order as the engine's `fail_run` arm. Never raises; logs the run id only.
+    Same writer order as the engine's `fail_run` arm, including its `run_failed` emit on
+    ``stream_run_id`` (the resumed producer's stream, else the run's own) when ``redis`` is
+    given. Never raises; logs the run id only.
+
+    289-REVIEW WR-02 — THE TERMINAL WRITE IS THE GUARD. This used to read the status and then
+    write three times, so a Stop landing between the read and ``finish_run`` left a
+    ``run_failed`` audit (and a failed phase) on a run that reports ``cancelled``. Now ONE
+    conditional ``UPDATE … WHERE status = 'active' RETURNING id`` decides: only the caller that
+    moves the run off ``active`` writes the phase failure, the audit and the emit. ``finish_run``
+    still runs after it (idempotent on ``failed``) for its thread-anchor clear.
     """
     from app.db.workflows import (  # noqa: PLC0415
         fail_phase,
@@ -578,14 +592,16 @@ async def _fail_redrive(pool, run_id: UUID, owner_user_id) -> None:
     )
 
     try:
-        status = await pool.fetchval("SELECT status FROM workflow_runs WHERE id = $1", run_id)
-        if status != "active":
+        won = await pool.fetchval(
+            "UPDATE workflow_runs SET status = 'failed' "
+            "WHERE id = $1 AND status = 'active' RETURNING id",
+            run_id,
+        )
+        if won is None:
             return  # already terminal (or re-paused by someone else): never rewritten here
         phase = await get_active_phase(pool, run_id)
         if phase is not None:
-            await fail_phase(
-                pool, phase["id"], "Your answer was saved, but the run could not continue."
-            )
+            await fail_phase(pool, phase["id"], _REDRIVE_FAILED_REASON)
         await finish_run(pool, run_id, "failed")
         await write_audit(
             pool, run_id, user_id=owner_user_id, event_type="run_failed",
@@ -593,6 +609,16 @@ async def _fail_redrive(pool, run_id: UUID, owner_user_id) -> None:
         )
     except Exception:
         logger.exception("ask_user_response: could not end failed re-drive for run %s", run_id)
+        return
+    if redis is not None:
+        try:
+            from app.services.harness_engine import _emit  # noqa: PLC0415
+
+            await _emit(
+                redis, stream_run_id or run_id, "run_failed", reason=_REDRIVE_FAILED_REASON
+            )
+        except Exception:  # noqa: BLE001 — the durable record is written; the hint is best-effort
+            logger.warning("ask_user_response: run_failed emit failed for run %s", run_id)
 
 
 async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -> bool:
@@ -692,7 +718,7 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
         # leave it stranded (D-12). The answer stays recorded; the run ends truthfully, and
         # True is returned because the only caller ignores the value.
         logger.exception("ask_user_response: re-drive context failed for run %s", run_id)
-        await _fail_redrive(pool, run_id, row["user_id"])
+        await _fail_redrive(pool, run_id, row["user_id"], redis=redis)
         return True
 
     async def _wake():
@@ -702,7 +728,10 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
         except Exception:
             _failed = True
             logger.exception("ask_user_response: re-drive failed for run %s", run_id)
-            await _fail_redrive(pool, run_id, row["user_id"])
+            await _fail_redrive(
+                pool, run_id, row["user_id"],
+                redis=redis, stream_run_id=getattr(ctx, "producer_run_id", None),
+            )
         finally:
             _pid = getattr(ctx, "producer_run_id", None)
             if _pid is not None:

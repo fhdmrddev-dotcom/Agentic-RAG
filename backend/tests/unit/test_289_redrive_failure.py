@@ -95,6 +95,12 @@ class _RedriveFakePool:
 
     async def fetchval(self, sql, *args):
         self.calls.append((sql, args))
+        if "UPDATE workflow_runs SET status = 'failed'" in sql:
+            # 289-REVIEW WR-02: the fail arm's conditional terminal write (the guard).
+            if self.run_status == "active":
+                self.run_status = "failed"
+                return args[0]
+            return None
         if "FROM workflow_runs" in sql and "status" in sql:
             return self.run_status
         return None
@@ -347,9 +353,11 @@ class _StopRacesPool(_RedriveFakePool):
     """
 
     async def fetchval(self, sql, *args):
+        if "UPDATE workflow_runs SET status = 'failed'" in sql:
+            self.run_status = "cancelled"  # the Stop landed just before the terminal write
         out = await super().fetchval(sql, *args)
         if "SELECT status FROM workflow_runs" in sql:
-            self.run_status = "cancelled"
+            self.run_status = "cancelled"  # ... or between a status read and the writes
         return out
 
     async def execute(self, sql, *args):

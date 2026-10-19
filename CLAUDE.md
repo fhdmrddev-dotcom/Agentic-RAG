@@ -452,7 +452,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/task_service.py` | 26 / 14 / 1018 (was `24 / 13 / 991`) | 289-02: kb_search_calls counter returned (+8 L) |
 | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02 (SEED-297) · ⛔ |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
-| `backend/app/api/runs.py` | 43 / 20 / 1798 (was `41 / 19 / 1750`) | 289-01: ONE _fail_redrive helper + 2 call sites |
+| `backend/app/api/runs.py` | 44 / 20 / 1827 (was `43 / 20 / 1798`) | 289-REVIEW WR-02: _fail_redrive's terminal write is the guard + run_failed emit |
 | `backend/app/middleware/canvas_gate.py` | 9 / 6 / 396 (was `8 / 5 / 391`) | 289-03: ONE gated path (…/evidence) · ⛔ test_182 never imports it |
 | `backend/app/services/harness_engine.py` | 62 / 25 / 3396 (was `61 / 24 / 3387`) | 289-REVIEW WR-01: resume shell INSERT moved last (no new code) · F3 owed |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE; does NOT fire yet · ⛔ |

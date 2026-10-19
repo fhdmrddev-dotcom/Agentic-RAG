@@ -1841,6 +1841,15 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 41 / 19 / 
 
 CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/api/runs.py` | 41 / 19 / 1750 | ⚠ STALE · last touch 268-REVIEW CR-01/WR-06 |
 
+
+### `backend/app/api/runs.py` — 289-REVIEW WR-02
+
+**`44 / 20 / 1827` (was `43 / 20 / 1798`).** Honoured by construction, +29 lines (1798 → 1827): the SAME helper, no new one. `_fail_redrive` read the status, then wrote three times; a Stop landing between the read and `finish_run` left a `run_failed` audit and a failed phase on a run that reports `cancelled`. Now ONE conditional `UPDATE workflow_runs SET status='failed' WHERE id=$1 AND status='active' RETURNING id` decides, and only its winner writes the phase failure, the audit and (new) the `run_failed` emit on the resumed producer's stream, mirroring the engine's fail arm. `finish_run` still follows (idempotent on `failed`) for its thread-anchor clear; its call count stays 1 (`test_256_finish_run_unchanged` position re-derived 589 → 605). Pinned by `test_289_redrive_failure.py` (Stop-race + emit, both RED at the RED commit).
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-REVIEW WR-02, moved verbatim): | `backend/app/api/runs.py` | 43 / 20 / 1798 (was `41 / 19 / 1750`) | 289-01: ONE _fail_redrive helper + 2 call sites |
+
+Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW WR-02, moved verbatim): 43 / 20 / 1798 (was `41 / 19 / 1750`) | **FIRES** | **289-01**: ONE `_fail_redrive` helper + 2 call sites (a failed paused re-drive ends `failed` with words + a `run_failed` audit row); answer-route scoping untouched
+
 ## `backend/app/services/harness_engine.py`
 
 ### ⚠ Re-derived 2026-09-19 (Phase 256 gap-closure round 1, plan `256-05`) — the row was STALE
@@ -11307,7 +11316,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | 286 forecast (288): draft config persistence rides `useDraftPersistence` (186-07); at most ONE store field. honoured by construction (193.2 / 197 / 214.1) |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 9 / 5 / 756 (was `8 / 4 / 748`) | **FIRES** | ⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id`/`expert_id` (+8 lines). ⛔ NOT the shape to copy (C-5) |
-| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 43 / 20 / 1798 (was `41 / 19 / 1750`) | **FIRES** | **289-01**: ONE `_fail_redrive` helper + 2 call sites (a failed paused re-drive ends `failed` with words + a `run_failed` audit row); answer-route scoping untouched |
+| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 44 / 20 / 1827 (was `43 / 20 / 1798`) | **FIRES** | **289-REVIEW WR-02**: `_fail_redrive`'s conditional `UPDATE … WHERE status='active' RETURNING id` gates the phase fail, audit and the new `run_failed` emit. No new helper |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 62 / 25 / 3396 (was `61 / 24 / 3387`) | **FIRES** | **289-REVIEW WR-01**: `_build_resume_context` mints the producer shell LAST, after every fallible step, so a raise never strands a `streaming` row. No new code path. F3 still owed |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
