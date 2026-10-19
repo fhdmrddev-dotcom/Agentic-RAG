@@ -1524,7 +1524,7 @@ const BASELINE = {
   // ⚠ AND THE SUITE ITSELF IS BYTE-UNCHANGED BY THE PASS THAT RAISES THE PIN — checked with
   //    `git diff --numstat` before the number was touched, because a pin raised in the same
   //    breath as an edit to its subject proves nothing about either.
-  "WorkflowRunPage.test.tsx": 177, // 288-04: 148 -> 177 (288-03 waiting-on cases; gate actual)
+  "WorkflowRunPage.test.tsx": 184, // 289-05: 177 -> 184 (289-01 paused cases +2, 289-04 report cases +5; gate actual). 288-04: 148 -> 177
   // ── Added in 195-02 task 3, in the SAME COMMIT as their TARGETS entries. Every ───────
   // ── number below is this script's own printed `actual` column across TWO agreeing ────
   // ── runs (`total 4044 · failed 0 · count gate OK` both times) — never hand-counted ───
@@ -2959,7 +2959,7 @@ const BASELINE = {
   // ticks and the tick DISCLOSES it is unfinished; that a STALE slice cannot pulse a finished
   // step, because liveness needs BOTH sources; and that the caller's ask renders inside the
   // row it was given for and nowhere else — which is the placement the whole re-port turns on.
-  "RunSpine.test.tsx": 11,
+  "RunSpine.test.tsx": 15, // 289-05: 11 -> 15 (289-02 evidence-line mount cases; gate actual)
   // ── SEED-190's run log, pinned in the commit that creates all three files ───────────────
   //
   // ⚠ THREE SUITES, THREE DIFFERENT THINGS, and none of them is coverage for its own sake:
@@ -3512,7 +3512,7 @@ const BASELINE = {
   "StepIdentity.coverage.test.tsx": 23,
   "WorkflowScheduleModal.test.tsx": 9,
   "argumentModel.test.ts": 26,
-  "argumentVocabulary.test.ts": 44,
+  "argumentVocabulary.test.ts": 45, // 289-05: 44 -> 45 (the export-format exemption's own scope case)
   "describeServiceMatch.test.ts": 15,
   "publishRefusalVocabulary.test.ts": 41,
   "stepIdentityVocabulary.test.ts": 34,
@@ -4289,6 +4289,17 @@ const BASELINE = {
   // suites (`PromptVariableChips`, `RunHero`, `nodeEffectBanner`) read no 286 file: still unpinned.
   "toolReadOnlyMap.test.ts": 7,
   "automationFacts.test.ts": 11,
+  // ── Phase 289-05 (2026-10-19) — the suites plans 289-01..05 created, adopted in BOTH knobs ──
+  // in one commit. Counts are the per-file actuals from a focused `--reporter=json` run at
+  // `GSD_VITEST_MAX_WORKERS=2`, never hand-counted. The three `src/components/workflows` suites
+  // are inside that DIRECTORY entry and need a pin only; the other four are FILE-LEVEL below.
+  "PendingAskCard.paused.test.tsx": 4, // 289-01 — the paused card keeps its answer control
+  "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
+  "evidenceView.test.ts": 29, // 289-04 — payload to view-model, privacy applied twice
+  "RunEvidenceReport.test.tsx": 26, // 289-04 — the report by content, button sets, 404 screen
+  "runDeepLink.test.ts": 12, // 289-04 — strict-UUID ?run= read/write/clear
+  "runEvidence.test.ts": 3, // 289-04 — the client: encodeURIComponent, ApiError(status)
+  "runEvidence.contract.test.ts": 3, // 289-05 I1 — RunEvidence vs the shared contract fixture
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6264,6 +6275,12 @@ const TARGETS = [
   "src/pages/__tests__/WorkflowRunPage.seam286.pin.test.tsx",
   // Phase 288-04 — FILE-LEVEL (no `src/pages` directory entry): the draft-settings page suite.
   "src/pages/__tests__/WorkflowBuilderPage.draftSettings.test.tsx",
+  // Phase 289-05 — FILE-LEVEL (no `src/lib` or `src/components/panel` directory entry), in the
+  // SAME commit as their BASELINE pins.
+  "src/components/panel/__tests__/PendingAskCard.paused.test.tsx",
+  "src/lib/runDeepLink.test.ts",
+  "src/lib/api/runEvidence.test.ts",
+  "src/lib/api/__tests__/runEvidence.contract.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
