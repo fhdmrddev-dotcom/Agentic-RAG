@@ -4226,7 +4226,7 @@ describe("WorkflowRunPage 288-03 - the waiting-on sentence (AUTH-01)", () => {
   })
 
   it("renders it for a PAUSED run too, with the still-waiting wording", async () => {
-    const paused = { ...WAIT, sentence: "Still waiting on Dana Whitfield (you); the run continues as soon as they answer.", window_passed: true }
+    const paused = { ...WAIT, sentence: "Still waiting on Dana Whitfield (you).", window_passed: true }
     getWorkflowRun.mockResolvedValue(mkRun({ status: "paused", waiting_on: paused }))
     renderPage()
     await screen.findByTestId("run-transcript")

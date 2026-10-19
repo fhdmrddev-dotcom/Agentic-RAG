@@ -779,7 +779,7 @@ def compose_waiting_on(
     who = f"{name} (you)" if is_owner and name != _WAITING_FALLBACK_NAME else name
     prompt_line = _first_line(prompt_text) if is_owner else None
     if window_passed:
-        sentence = f"Still waiting on {who}; the run continues as soon as they answer."
+        sentence = f"Still waiting on {who}."
     elif prompt_line:
         sentence = f'Waiting on {who} to answer "{prompt_line}".'
     else:

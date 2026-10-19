@@ -55,7 +55,8 @@ def test_paused_wording_says_still_waiting_and_never_expired():
     w = _compose(window_passed=True)
     assert w["window_passed"] is True
     assert w["sentence"].startswith("Still waiting on Dana Whitfield (you)")
-    assert "continues as soon as" in w["sentence"]
+    assert w["sentence"].startswith("Still waiting on")
+    assert "continues" not in w["sentence"]  # CR-01: resume after answer is not guaranteed
     assert "expire" not in w["sentence"].lower()
 
 

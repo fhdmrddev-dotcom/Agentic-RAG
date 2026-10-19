@@ -1318,7 +1318,7 @@ def _interactive_phase_failures(definition) -> list:
 
             wait = getattr(cfg, "timeout_seconds", None)
             ceiling = settings.ask_user_max_timeout_seconds
-            if not isinstance(wait, int) or wait <= 0 or wait > ceiling:
+            if isinstance(wait, bool) or not isinstance(wait, int) or wait <= 0 or wait > ceiling:
                 minutes = max(1, ceiling // 60)
                 who = f'the pause step "{label}"' if label else "one pause step"
                 failures.append(
