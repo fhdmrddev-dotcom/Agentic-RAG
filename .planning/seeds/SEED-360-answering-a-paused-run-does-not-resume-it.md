@@ -3,9 +3,9 @@ seed_id: SEED-360
 title: Answering a paused run returns 200 but the run never completes (and the expired card offers no answer control)
 created: 2026-10-19
 surface: Agentic-RAG
-status: folded
+status: partially-answered
 partial: true
-status_note: "F-1 + F-3 (+288 WR-01) folded into Phase 289 as D-11..D-13 (2026-10-19, operator instruction). F-2 (judge) and F-4 (auto_answered note unmounts) deferred: publish-surface, not run page."
+status_note: "F-1 + F-3 (+288 WR-01) folded into Phase 289 as D-11..D-13 (2026-10-19, operator instruction). F-2 (judge) and F-4 (auto_answered note unmounts) deferred: publish-surface, not run page. PARTIALLY ANSWERED by Phase 289 (2026-10-19): F-3 fixed (ask_user SQL cast, 289-01) and F-1 fixed on the run page (paused card keeps its answer control); S5 drove a paused run to completed and the paused sentence was restored (dd863ca5a). STILL OPEN: F-2 and F-4; the chat panel stack case is SEED-361."
 trigger_when: Next phase touching run resume, ask_user_response, or the pending-ask card; or Phase 289 (run page) if a paused run is to be answerable. Do not ship copy promising resume until fixed.
 trigger_paths: ["backend/app/api/runs.py", "backend/app/services/run_lifecycle.py", "backend/app/services/harness_engine.py", "frontend/src/components/panel/PendingAskCard.tsx"]
 trigger_surfaces: []

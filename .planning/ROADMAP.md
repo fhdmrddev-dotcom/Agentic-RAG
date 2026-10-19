@@ -195,7 +195,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 289-05-PLAN.md - live proof S1-S5 as real users, four-axis roster, conditional 288 sentence restore, ledger + full gates once
+- [x] 289-05-PLAN.md - live proof S1-S5 as real users, four-axis roster, conditional 288 sentence restore, ledger + full gates once
 
 **UI hint**: yes
 **Flags**: **G-2 sketch** the page and the confidence chip. **G-4**. Migration only if the run model lacks a place for confidence (next free after 209). Hot files: `WorkflowRunPage.tsx`, `workflow_runs.py`, `harness_engine.py` (61/24/3387), `phase_types.py` (55/28/3014), `RunReceipt.tsx`. Seeds `SEED-348`, `SEED-152`.
