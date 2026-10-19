@@ -4293,13 +4293,15 @@ const BASELINE = {
   // in one commit. Counts are the per-file actuals from a focused `--reporter=json` run at
   // `GSD_VITEST_MAX_WORKERS=2`, never hand-counted. The three `src/components/workflows` suites
   // are inside that DIRECTORY entry and need a pin only; the other four are FILE-LEVEL below.
-  "PendingAskCard.paused.test.tsx": 4, // 289-01 — the paused card keeps its answer control
+  "PendingAskCard.paused.test.tsx": 6, // 289-REVIEW CR-02: 4 -> 6 (pending -> expired -> paused re-render, 404 stays terminal). 289-01 — the paused card keeps its answer control
   "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
-  "evidenceView.test.ts": 29, // 289-04 — payload to view-model, privacy applied twice
+  "evidenceView.test.ts": 31, // 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
   "RunEvidenceReport.test.tsx": 26, // 289-04 — the report by content, button sets, 404 screen
   "runDeepLink.test.ts": 12, // 289-04 — strict-UUID ?run= read/write/clear
   "runEvidence.test.ts": 3, // 289-04 — the client: encodeURIComponent, ApiError(status)
   "runEvidence.contract.test.ts": 3, // 289-05 I1 — RunEvidence vs the shared contract fixture
+  // 289-REVIEW WR-05 (2026-10-20) — created by the review fix, adopted in BOTH knobs in one commit.
+  "ChatLayout.runDeepLink.test.tsx": 2, // ?run= is cleared when a LIVE run page is left
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6281,6 +6283,9 @@ const TARGETS = [
   "src/lib/runDeepLink.test.ts",
   "src/lib/api/runEvidence.test.ts",
   "src/lib/api/__tests__/runEvidence.contract.test.ts",
+  // 289-REVIEW WR-05 — FILE-LEVEL (no `src/components/layout` directory entry), in the SAME
+  // commit as its BASELINE pin.
+  "src/components/layout/__tests__/ChatLayout.runDeepLink.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

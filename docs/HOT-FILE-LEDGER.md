@@ -4863,6 +4863,15 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 61 / 31 / 
 
 CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 61 / 31 / 1137 (was `60 / 30 / 1134`) | 286 forecast: 287 reuses ChatLaunchForm + doRun; one prop or one mount |
 
+
+### `frontend/src/components/layout/ChatLayout.tsx` — 289-REVIEW WR-05
+
+**`63 / 32 / 1147` (was `62 / 32 / 1140`).** Honoured by construction, +7 lines (1140 → 1147): ONE `useEffect` and one import name. Only `RunEvidenceReport` wrote or cleared `?run=`, and a deep link to an ACTIVE or PAUSED run renders the live surface, which never mounts the report; "Back to Workflows" left the link and App's view initializer re-opened the run on the next reload. The effect clears it whenever `activeView !== "workflow-run"`, keeping every other param. Pinned by the new `ChatLayout.runDeepLink.test.tsx` (RED at the RED commit, adopted into both count-gate knobs). `ChatHistoryColumn.test.tsx` reds in the same directory run are inherited: that suite imports neither ChatLayout nor anything this fix touched, and both it and its subject are byte-unchanged.
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-REVIEW WR-05, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 62 / 32 / 1140 (was `61 / 31 / 1137`) | 289-04: ONE initializer readRunDeepLink() (+3 L) |
+
+Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW WR-05, moved verbatim): 62 / 32 / 1140 (was `61 / 31 / 1137`) | **FIRES** | **289-04**: ONE initializer `useState(() => readRunDeepLink())` (+3 L); hook counts unchanged (useState 5/4, useEffect 5)
+
 ## Phase 200.1 wave 2 (`200.1-02`, RUN-04) — the triples RE-DERIVED for every file the phase touched
 
 **Six non-test source files were touched by Phase 200.1 across its three plans.** All eight triples
@@ -11309,7 +11318,7 @@ cells rot within days.
 | [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 9 / 6 / 396 (was `8 / 5 / 391`) | **FIRES** | **289-03**: ONE CANVAS_GATED_PATHS member (`…/evidence`) + comment, same commit as its include_router. ⛔ test_182 never imports the set |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 22 / 15 / 537 (was `21 / 14 / 537`) | ⚠ **FIRES** | **279-01**: docstring repoints to the new expert_scope homes only (OpenAPI regen). ⛔ a body touching both pairs is a 422 |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 62 / 32 / 1140 (was `61 / 31 / 1137`) | **FIRES** | **289-04**: ONE initializer `useState(() => readRunDeepLink())` (+3 L); hook counts unchanged (useState 5/4, useEffect 5) |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 63 / 32 / 1147 (was `62 / 32 / 1140`) | **FIRES** | **289-REVIEW WR-05**: ONE `useEffect` clears `?run=` whenever `activeView` is not the run view (live runs never mount the report that cleared it). +7 L, 0 branches |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 5 / 4 / 262 (was `4 / 3 / 249`) | ⚠ **FIRES** | **284-03**: optional `totalState`: "Counting…" while loading, "Count not known yet" on failure, never "0 documents" before an answer; numbers grouped |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
@@ -11358,7 +11367,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 99 / 39 / 2698 (was `97 / 38 / 2653`) | ⚠ **FIRES** | Honoured by construction. **285-03** (D-12): both enqueue paths failed → the doc is marked `failed` (guard `status='pending'`) and 201 `failed` returned, like the storage-fail arm. Minter untouched |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 314 / 69 / 6539 (was `308 / 68 / 6483`) | ⚠ **FIRES** | last touch **287-04**: 6 suites adopted, 2 pins raised (detail below). |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 317 / 72 / 6568 (was `314 / 69 / 6539`) | ⚠ **FIRES** | last touch **289-REVIEW**: `ChatLayout.runDeepLink` adopted in both knobs; `PendingAskCard.paused` 4 → 6, `evidenceView` 29 → 31. ⚠ row was stale (`314 / 69 / 6539`) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 5 / 2 / 465 | no (2 phases) | **275-03**: `retention` tag in the Documents group (one line). ⛔ `scripts/` is gate-exempt |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 18 / 12 / 796 (was `17 / 11 / 788`) | ⚠ **FIRES** | **281-03** (`0b9841e55`): ONE `template_fields_missing` copy entry (never says "citation") + `whitespace-pre-line` on the reason. honoured by construction (200 / 214 / 281) |
@@ -21922,6 +21931,15 @@ Scan-list disposition cell before 284-05 (replaced):
 CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
 
 > ⚠ row STALE · last touch 266-01 · ⛔
+
+
+### `scripts/vitest-count-gate.cjs` — 289-REVIEW
+
+**`317 / 72 / 6568` (was `314 / 69 / 6539`).** +29 lines measured from the stale row (6539 → 6568; 289-05's own adoption is inside that delta). This commit: `ChatLayout.runDeepLink.test.tsx` (new, WR-05) pinned at 2 in BASELINE and listed FILE-LEVEL in TARGETS (no `src/components/layout` directory entry); `PendingAskCard.paused.test.tsx` 4 → 6 (CR-02) and `evidenceView.test.ts` 29 → 31 (WR-03), each the focused run's own count. ⚠ The row was stale: 289-05 adopted seven suites without re-deriving it.
+
+CLAUDE.md verdict cell as of 2026-10-19 or earlier (replaced by 289-REVIEW WR-05, moved verbatim): | `scripts/vitest-count-gate.cjs` | 314 / 69 / 6539 (was `308 / 68 / 6483`) | last touch 287-04 (6 suites adopted, 2 pins raised) |
+
+Scan-list cell as of 2026-10-19 or earlier (replaced by 289-REVIEW WR-05, moved verbatim): 314 / 69 / 6539 (was `308 / 68 / 6483`) | ⚠ **FIRES** | last touch **287-04**: 6 suites adopted, 2 pins raised (detail below).
 
 ## Phase 285 close (2026-10-16, 285-03)
 
