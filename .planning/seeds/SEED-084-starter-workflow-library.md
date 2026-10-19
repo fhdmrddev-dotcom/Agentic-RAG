@@ -2,10 +2,7 @@
 seed_id: SEED-084
 title: Starter / seed workflow library (fork-a-starter)
 status: folded
-status_note: |
-  Phase 251 frontmatter migration: this file had NO frontmatter block at all, so no status was
-  ever recorded for it. `planted` here is a MIGRATION DEFAULT — it is a statement about the
-  absence, never a claim about the seed. Read the body and set it deliberately.
+status_note: "Folded into Phase 287 (2026-10-19, autonomous discuss): START-03. Original body Status: dormant is superseded."
 surface: Agentic-RAG
 trigger_when: unset
 ---
