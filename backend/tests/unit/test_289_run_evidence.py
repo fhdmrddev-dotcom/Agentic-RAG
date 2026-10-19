@@ -372,3 +372,291 @@ def test_started_by_owner_and_colleague():
     }
     hostile = ev.started_by("Dana‮\nEvil", None, False)
     assert "‮" not in hostile["name"] and "\n" not in hostile["name"]
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════
+# The route (D-05 / D-06 / R-05 / W3a) — called as a coroutine against a fake pool.
+# ════════════════════════════════════════════════════════════════════════════════════════
+
+OWNER = "aaaaaaaa-0000-4000-8000-000000000001"
+COLLEAGUE = "aaaaaaaa-0000-4000-8000-000000000002"
+OUTSIDER = "aaaaaaaa-0000-4000-8000-000000000003"
+ORG = "bbbbbbbb-0000-4000-8000-000000000001"
+OTHER_ORG = "bbbbbbbb-0000-4000-8000-000000000002"
+RUN_DONE = "cccccccc-0000-4000-8000-000000000001"
+RUN_ACTIVE = "cccccccc-0000-4000-8000-000000000002"
+RUN_PAUSED = "cccccccc-0000-4000-8000-000000000003"
+RUN_MISSING = "cccccccc-0000-4000-8000-0000000000ff"
+THREAD = "dddddddd-0000-4000-8000-000000000001"
+DEF_ID = "eeeeeeee-0000-4000-8000-000000000001"
+FOLDER = "ffffffff-0000-4000-8000-000000000001"
+FILE_ID = "99999999-0000-4000-8000-000000000001"
+PRIVATE_FOLDER_NAME = "Owner's Private Folder"
+OWNER_EMAIL = "dana@example.com"
+
+_TERMINAL = ("completed", "failed", "cancelled")
+
+
+def _run_row(run_id: str, status: str) -> dict:
+    return {
+        "id": uuid.UUID(run_id), "thread_id": uuid.UUID(THREAD),
+        "definition_id": uuid.UUID(DEF_ID), "status": status, "org_id": uuid.UUID(ORG),
+        "user_id": uuid.UUID(OWNER),
+        "created_at": datetime(2026, 10, 19, 9, 59, tzinfo=timezone.utc),
+        "updated_at": datetime(2026, 10, 19, 10, 5, tzinfo=timezone.utc),
+        "definition_snapshot": json.dumps(_full(_definition(folder=FOLDER))),
+        "model": "gpt-5",
+    }
+
+
+class _FakePool:
+    """Records every (sql, args); emulates the access WHERE so a miss is a real miss."""
+
+    def __init__(self):
+        self.calls: list[tuple[str, tuple]] = []
+        self.runs = {
+            RUN_DONE: _run_row(RUN_DONE, "completed"),
+            RUN_ACTIVE: _run_row(RUN_ACTIVE, "active"),
+            RUN_PAUSED: _run_row(RUN_PAUSED, "paused"),
+        }
+        self.members = {ORG: {OWNER, COLLEAGUE}, OTHER_ORG: {OUTSIDER}}
+
+    def sqls(self) -> list[str]:
+        return [s for (s, _a) in self.calls]
+
+    async def fetchrow(self, sql, *args):
+        self.calls.append((sql, args))
+        if "FROM workflow_runs wr" in sql:
+            run = self.runs.get(str(args[0]))
+            viewer = str(args[1])
+            if run is None or run["status"] not in _TERMINAL:
+                return None
+            if str(run["user_id"]) != viewer and viewer not in self.members.get(
+                str(run["org_id"]), set()
+            ):
+                return None
+            return dict(run)
+        if "FROM workflow_definitions WHERE id" in sql:
+            return {"slug": "vendor-review", "version": 3, "name": "Vendor review",
+                    "status": "published", "definition": json.dumps(_definition(folder=FOLDER))}
+        raise AssertionError(f"unexpected fetchrow: {sql}")
+
+    async def fetch(self, sql, *args):
+        self.calls.append((sql, args))
+        if "FROM workflow_phases" in sql:
+            return _phase_rows()
+        if "FROM harness_audit" in sql:
+            return [
+                {"event_type": "gate_passed", "metadata": json.dumps({"phase": "gather"}),
+                 "created_at": "2026-10-19T10:01:00+00:00"},
+            ]
+        if "SELECT version FROM workflow_definitions" in sql:
+            return [{"version": 3}, {"version": 4}]
+        raise AssertionError(f"unexpected fetch: {sql}")
+
+    async def fetchval(self, sql, *args):
+        self.calls.append((sql, args))
+        if "FROM profiles" in sql:
+            return "Dana Owner"
+        if "FROM organizations" in sql:
+            return "Acme"
+        if "FROM workspace_files" in sql:
+            return uuid.UUID(FILE_ID)
+        if "FROM folders" in sql:
+            return PRIVATE_FOLDER_NAME
+        raise AssertionError(f"unexpected fetchval: {sql}")
+
+
+class _FakeConn:
+    def __init__(self, readable: set[str], folder_name):
+        self.readable = readable
+        self.folder_name = folder_name
+        self.calls: list[tuple[str, tuple]] = []
+
+    async def fetch(self, sql, *args):
+        self.calls.append((sql, args))
+        return [{"id": i} for i in args[0] if i in self.readable]
+
+    async def fetchval(self, sql, *args):
+        self.calls.append((sql, args))
+        return self.folder_name
+
+
+@pytest.fixture
+def wire(monkeypatch):
+    """Swap the pool and the RLS connection; return a handle for the case to steer."""
+    import app.dependencies as deps
+
+    state = {"pool": _FakePool(), "conn": _FakeConn({DOC_A, DOC_B}, None), "raise": False,
+             "opened": []}
+
+    async def _get_pool():
+        return state["pool"]
+
+    @asynccontextmanager
+    async def _rls(request, current_user):
+        state["opened"].append(current_user["id"])
+        if state["raise"]:
+            raise RuntimeError("RLS context failed")
+        yield state["conn"]
+
+    monkeypatch.setattr(deps, "get_pg_pool", _get_pool)
+    monkeypatch.setattr(deps, "get_user_pg_connection", _rls)
+    return state
+
+
+async def _read(run_id: str, viewer: str, email: str = "someone@example.com"):
+    from app.api.workflow_run_evidence import read_run_evidence
+
+    return await read_run_evidence(
+        workflow_run_id=uuid.UUID(run_id), current_user={"id": viewer, "email": email}
+    )
+
+
+@pytest.mark.asyncio
+async def test_owner_reads_the_full_record(wire):
+    out = await _read(RUN_DONE, OWNER, OWNER_EMAIL)
+    body = json.loads(out.model_dump_json())
+    assert body["run"]["viewer_is_owner"] is True
+    assert body["run"]["started_by"] == {"name": "Dana Owner", "email": OWNER_EMAIL,
+                                         "is_you": True}
+    assert body["run"]["thread_id"] == THREAD
+    assert body["run"]["org_name"] == "Acme"
+    assert body["run"]["status"] == "completed"
+    assert body["definition"]["recorded"] is True and body["definition"]["version"] == 3
+    assert body["definition_changed"] == {"changed": True, "current_version": 4}
+    assert body["deliverable"] == {"kind": "file", "name": "vendor-memo.docx",
+                                   "file_id": FILE_ID}
+    assert not any(s["masked"] for s in body["sources"])
+    assert {s["filename"] for s in body["sources"]} == {
+        "policy.pdf", "owner-private.docx", "pricing.xlsx",
+    }
+    # R-05: the owner's label comes from the pool, and every confidence carries it
+    assert body["kb_label"] == PRIVATE_FOLDER_NAME
+    confs = [p["confidence"] for p in body["phase_log"] if p["confidence"]]
+    assert confs and all(c["kb_label"] == PRIVATE_FOLDER_NAME for c in confs)
+    from app.services.harness.phase_confidence import confidence_for_wire
+    assert confs[0] == confidence_for_wire(_CONF, PRIVATE_FOLDER_NAME)
+    assert body["phase_log"][1]["human_input"]["question"] == "Approve the shortlist of three?"
+    assert body["verdicts"][0]["checked"] == ["citations_required", "regex_match"]
+    assert wire["opened"] == []  # the RLS check never runs for the owner
+    assert set(body) == {"run", "definition", "definition_changed", "kb_label", "deliverable",
+                         "phase_log", "verdicts", "sources"}
+
+
+@pytest.mark.asyncio
+async def test_a_colleague_reads_a_minimised_record(wire):
+    out = await _read(RUN_DONE, COLLEAGUE, "colleague@example.com")
+    text = out.model_dump_json()
+    body = json.loads(text)
+    assert body["run"]["viewer_is_owner"] is False
+    assert body["run"]["started_by"] == {"name": "Dana Owner", "email": None, "is_you": False}
+    assert body["run"]["thread_id"] is None
+    assert OWNER_EMAIL not in text and THREAD not in text
+    assert body["deliverable"] == {"kind": "file", "name": "vendor-memo.docx", "file_id": None}
+    # R-01: the document outside the colleague's RLS view is masked
+    masked = [s for s in body["sources"] if s["masked"]]
+    assert masked == [{"masked": True, "document_id": None, "filename": None,
+                       "locations": [], "cited_by": [1]}]
+    assert "owner-private.docx" not in text and DOC_HIDDEN not in text
+    # R-04
+    approve = body["phase_log"][1]
+    assert approve["human_input"] == {"answered": True, "question": None, "answer": None,
+                                      "answered_by": None}
+    assert approve["output_text"] is None
+    assert "Yes, go ahead" not in text
+    # accepted risk T-289-31, pinned rather than accidental
+    assert body["phase_log"][0]["output_text"] == "Three vendors meet the bar."
+    assert "SECRET PASSAGE" not in text and "similarity" not in text
+    # the RLS check ran once, as the colleague, over the cited ids only
+    assert wire["opened"] == [COLLEAGUE]
+    (rls_sql, rls_args), _label = wire["conn"].calls
+    assert "documents" in rls_sql
+    assert sorted(rls_args[0]) == sorted([DOC_A, DOC_HIDDEN, DOC_B])
+    # no owner-only reads on the pool
+    pool_sql = " ".join(wire["pool"].sqls())
+    assert "FROM workspace_files" not in pool_sql
+
+
+@pytest.mark.asyncio
+async def test_colleague_label_hidden_folder_reads_the_default_words(wire):
+    # (i) the viewer cannot read the folder: their RLS connection returns nothing for it,
+    # while the pool WOULD answer the private name.
+    wire["conn"] = _FakeConn({DOC_A, DOC_B}, None)
+    out = await _read(RUN_DONE, COLLEAGUE)
+    text = out.model_dump_json()
+    body = json.loads(text)
+    assert body["kb_label"] == "the knowledge base"
+    confs = [p["confidence"] for p in body["phase_log"] if p["confidence"]]
+    assert confs and all(c["kb_label"] == "the knowledge base" for c in confs)
+    assert PRIVATE_FOLDER_NAME not in text
+    assert not any("FROM folders" in s for s in wire["pool"].sqls())
+
+
+@pytest.mark.asyncio
+async def test_colleague_rls_failure_masks_everything_and_uses_the_default_words(wire):
+    # (ii)
+    wire["raise"] = True
+    out = await _read(RUN_DONE, COLLEAGUE)
+    body = json.loads(out.model_dump_json())
+    assert body["kb_label"] == "the knowledge base"
+    assert body["sources"] and all(s["masked"] for s in body["sources"])
+    assert not any("FROM folders" in s for s in wire["pool"].sqls())
+
+
+@pytest.mark.asyncio
+async def test_colleague_label_readable_folder_reads_its_name(wire):
+    # (iii)
+    wire["conn"] = _FakeConn({DOC_A, DOC_B}, "Shared Procurement")
+    out = await _read(RUN_DONE, COLLEAGUE)
+    assert out.kb_label == "Shared Procurement"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("run_id", "viewer"),
+    [
+        (RUN_DONE, OUTSIDER),     # another org
+        (RUN_MISSING, OWNER),     # does not exist
+        (RUN_ACTIVE, COLLEAGUE),  # not terminal, non-owner
+        (RUN_PAUSED, COLLEAGUE),  # not terminal, non-owner
+        (RUN_ACTIVE, OWNER),      # D-06: the owner keeps the live surface for an active run
+    ],
+)
+async def test_every_miss_is_the_same_404_from_one_query(wire, run_id, viewer):
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as exc:
+        await _read(run_id, viewer)
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Run not found"
+    calls = wire["pool"].calls
+    assert len(calls) == 1, "nothing may be read before the access row is found"
+    sql = calls[0][0]
+    assert "FROM workflow_runs wr" in sql
+    assert "wr.id = $1" in sql
+    assert "wr.status IN ('completed', 'failed', 'cancelled')" in sql
+    assert "org_members" in sql and "wr.user_id = $2" in sql
+    assert wire["opened"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_404_bodies_are_identical(wire):
+    from fastapi import HTTPException
+
+    seen = []
+    for run_id, viewer in [(RUN_DONE, OUTSIDER), (RUN_MISSING, OWNER), (RUN_PAUSED, COLLEAGUE)]:
+        with pytest.raises(HTTPException) as exc:
+            await _read(run_id, viewer)
+        seen.append((exc.value.status_code, exc.value.detail, exc.value.headers))
+    assert len(set(seen)) == 1
+
+
+def test_the_route_is_canvas_gated_and_mounted():
+    from app.main import app
+    from app.middleware.canvas_gate import CANVAS_GATED_PATHS
+
+    path = "/workflow-runs/{workflow_run_id}/evidence"
+    assert path in CANVAS_GATED_PATHS
+    routes = [r for r in app.routes if getattr(r, "path", None) == path]
+    assert len(routes) == 1 and routes[0].methods == {"GET"}
