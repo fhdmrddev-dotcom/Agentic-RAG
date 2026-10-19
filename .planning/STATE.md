@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_plan
-last_updated: "2026-10-19T22:44:37.437Z"
+last_updated: "2026-10-19T23:43:24.700Z"
 progress:
   total_phases: 16
   completed_phases: 4
   total_plans: 24
-  completed_plans: 19
+  completed_plans: 20
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 290 — the-card-and-the-team-picture
+**Current focus:** Phase 294 — decision-engine-rerank-and-citation-check
 
 ---
 
@@ -41,8 +41,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 290 (the-card-and-the-team-picture)
-Plan: Not started
+Phase: 294 (decision-engine-rerank-and-citation-check) — EXECUTING
+Plan: 2 of 5
 
 ### Roadmap Evolution
 

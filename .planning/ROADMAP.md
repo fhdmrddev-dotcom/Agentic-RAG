@@ -293,7 +293,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 294-01-PLAN.md — rerank_engines package: Jev / OpenAI Decisions / Local / Cohere behind rerank(), D-07 prune, failure == off, local cache fix, trace redaction, steering instruction (wave 1)
+- [x] 294-01-PLAN.md — rerank_engines package: Jev / OpenAI Decisions / Local / Cohere behind rerank(), D-07 prune, failure == off, local cache fix, trace redaction, steering instruction (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
