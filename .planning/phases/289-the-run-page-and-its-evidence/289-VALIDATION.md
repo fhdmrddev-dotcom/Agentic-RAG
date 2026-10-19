@@ -114,7 +114,7 @@ Setup through the LOCAL GoTrue admin API with the local service-role key (never 
 - Human step (R-04): `output_text: null`, `human_input = {"answered": true, "question": null, "answer": null, "answered_by": null}`. The owner's view of the same step carries the question and the answer.
 - Deliverable: `{"kind": "text", "name": null, "file_id": null}` (no file id, R-02).
 - ~~**Accepted risk T-289-31, observed:** C DOES receive the non-human steps' `output_text`, by decision.~~ First 80 characters of step 1 in C's raw response: `"**No documents matched this week, so I can't summarise it.** I searched with a d"`. Step 2 is present too.
-  - ⚠ **CORRECTED 2026-10-20 (289-REVIEW CR-01) — T-289-31 is now MITIGATED for masked citations; the original line is struck through rather than deleted.** The live S4 drive observed a step that matched nothing, so the leaking case (a step that cited a document C cannot read, whose output is the model's synthesis of it) was never observed. For a non-owner, a step whose citations include any document masked for that viewer now ships `output_text = "This step's output draws on a document you don't have access to."` (`run_evidence.WITHHELD_OUTPUT_SENTENCE`); an RLS-check failure withholds every citing step (fail closed). The owner path is unchanged, and a non-owner step with no masked citation keeps its output (the accepted remainder). Pinned by `test_289_run_evidence.py::test_a_masked_documents_content_never_reaches_the_colleague_through_output_text`, whose step output carries the private document's title and asserts it absent from the colleague's JSON. **Not re-driven live**: on this S4 run step 1's three cited documents were all masked for C, so C would now read the sentence in place of step 1's text. Residual, recorded rather than claimed closed: a later step that cites nothing but builds on a withheld step's output still ships its text.
+  - ⚠ **CORRECTED 2026-10-20 (289-REVIEW CR-01) — T-289-31 is now MITIGATED for masked citations; the original line is struck through rather than deleted.** The live S4 drive observed a step that matched nothing, so the leaking case (a step that cited a document C cannot read, whose output is the model's synthesis of it) was never observed. For a non-owner, a step whose citations include any document masked for that viewer now ships `output_text = "This step's output draws on a document you don't have access to."` (`run_evidence.WITHHELD_OUTPUT_SENTENCE`); an RLS-check failure withholds every citing step (fail closed). The owner path is unchanged, and a non-owner step with no masked citation keeps its output (the accepted remainder). Pinned by `test_289_run_evidence.py::test_a_masked_documents_content_never_reaches_the_colleague_through_output_text`, whose step output carries the private document's title and asserts it absent from the colleague's JSON. ~~**Not re-driven live**~~ (re-driven live 2026-10-20: PASS, see R1 under "Post-review live re-drive" below; the residual was observed live there too): on this S4 run step 1's three cited documents were all masked for C, so C would now read the sentence in place of step 1's text. Residual, recorded rather than claimed closed: a later step that cites nothing but builds on a withheld step's output still ships its text.
 - **KB label (W3a):** C sees `kb_label = "the knowledge base"` on the payload and inside step 1's confidence. The owner's view of the same run reads `"Weekly reports"`. C cannot read that folder under RLS (empty read above), so the default words are correct, and the private folder name is absent from C's JSON text.
 
 **C, page** (`evidence/s4_colleague_c.png`): the report renders; sub line `Completed in 2m 44s · started 19 Oct 2026, 22:50 by the person who started this run · fhdmrd@gmail.com's Organization`; KB row line `Answered from the knowledge base · 5 passages · ● Medium · 0.50`; non-KB rows 0 lines; §2 human row `Approve the note · Needs you · approve · Waited for an answer · answered · ✓ Done`; §4 three rows `A document you don't have access to · cited by step 1`; the S2 banner is shown to C too. Report buttons: `‹ Back to Workflows`, `Download JSON`, `Print / save as PDF` only (no thread link, no deliverable download, no answer or cancel). `(you)` on the page: **false**. Owner email in the page text: 1 hit, the org name in the sub line, same as the API.
@@ -189,3 +189,221 @@ Snapshot before: 84 tables, **46,184** ids. Created and deleted, in one transact
 | `auth.audit_log_entries` | 21 |
 
 Snapshot after: **46,184** ids. Diff against before: **0 new, 0 missing in every table except `connector_sync_runs` (2 new, 2 missing)**, which is the watch service's own rolling history and was not touched. One more blocked drive left no rows (the first M definition, `88e397a6-…`, was refused an UPDATE by the published-immutability trigger and deleted at once). Evidence screenshots stay in `evidence/`.
+
+## Post-review live re-drive (2026-10-20)
+
+**Why:** the eight `fix(289-REVIEW)` commits changed behaviour after S1-S5 were driven (`289-REVIEW-FIX.md`), and only unit tests covered them. This section drives them live. It is UAT evidence only: no code was changed, and nothing that failed would have been fixed here.
+
+**Driven:** 2026-10-19 20:35-20:45Z (00:35-00:45 local on the 20th). Against:
+- backend `:8000` on `develop` at `0e130f8f0`, `--reload` worker pid 14072, log `backend/logs/backend.14072.log`. The worker started at 00:21:50 local, after the newest backend source write (`search_documents_tool.py` / `task_service.py` at 00:21:32, the WR-04 fix), and `git status backend/app` was clean, so it served HEAD.
+- vite `localhost:5173`, local Supabase.
+
+**Driver:** headless Chromium (`frontend/node_modules/playwright`) through the real two-step login form, plus API calls through the routes the app uses. This is the same recorded deviation as 288 and 289-05: the claude-in-chrome tools were not available. Every UI claim reads the live DOM and is cross-checked with a local DB read. The DB clock and the host clock agree within 10 ms (measured three times), so log times and DB timestamps compare directly.
+
+**DB discipline:**
+- The local-DB lock (`agentic-rag-localdb.lock`) was taken at 20:35:04Z, once the orchestrator's baseline released it, and removed at 20:45:30Z.
+- Every `id` / `run_id` in 84 `public` + `auth` tables was snapshotted before the first write: **46,187 ids**.
+- No Supabase MCP call of any kind.
+- The two stranded runs `a77ed2c0` / `51924c91` were never touched. Their `claimed_at` (`20:17:51.733373Z` / `18:58:47.696143Z`) was identical before, mid-drive and after.
+
+**Fixture:** a fresh plant of the 289-05 fixture (`workflow_definitions 8f61c9f7-…`, slug `s289-ev-8f61c9f7`):
+- private folder "Weekly reports" (`is_org_shared = false`);
+- the same four steps: research (KB), draft (non-KB), approve (`llm_human_input`, 30 s), wrap.
+
+Its KB prompt asks each bullet to name the document it came from, so the KB step's output carries the private filenames. That is exactly the content CR-01 must withhold.
+
+**Users:**
+- Owner A: `fhdmrd@gmail.com`, org `22f9c615-…`, `org-admin`, one membership.
+- Same-org colleague B: `s289r-colleague-b@example.test`. Created through the local GoTrue admin API, then given an `org_members` row in `22f9c615-…` with role `member`. The password was random and is not recorded.
+- Canvas flag: `visual_workflow_canvas.audience = everyone`. B's `GET /workflow-runs` → **200**, so any refusal is the org scope, not the canvas gate.
+
+**Runs** (all owner kickoffs through `POST /threads` + `POST /threads/{id}/messages`, owner default model `deepseek-v4-flash`):
+- A `a052667d-8b51-4ef5-9b92-5fd24ae7932f`
+- C `4af6909f-5543-4d74-b094-5a00c89d0311`
+- D `d6f9c254-e9df-4e6e-b01c-e4451e9debe8`
+- E `b464d95d-a4fb-4332-a778-a95ec9255c36`
+
+| # | Item | Verdict | The deciding observation |
+|---|---|---|---|
+| R1 | CR-01: a colleague who cannot read a cited private document opens the finished run | **PASS** (residual observed live, see below) | On A and E, B's step 1 `output_text` is exactly `This step's output draws on a document you don't have access to.` The private filenames have **0** hits in B's raw JSON and **0** in B's full page `outerHTML`. The owner's JSON names them on both runs, and the owner's page shows the full step 1 text. |
+| R2 | CR-02: the card counts down to zero before the 5 s poll reports `paused` | **PASS** | Run E was watched continuously from 20:37:10Z. The card read `EXPIRED / Approve the note? / No response within 0:30 — agent stopped` at 20:38:03.759Z. The poll read `paused` at 20:38:06.424Z, and 54 ms later the card was back to the answer layout with `Send Answer`. |
+| R3 | S5 happy path on post-fix code | **PASS** (×2) | E (answered from the recovered card) and A (opened after the pause, answered from the card) both reached `completed`. Drive-window log: **0** `re-drive failed` / `paused re-drive raised` / `re-drive skipped`, and 0 of five other failure-arm strings. Both answers logged `consumed the durable answer on re-drive`. The sentence is still true (seen live on C's header). See the **new finding F-1** below about what the next step receives. |
+| R4a | WR-02 stop-first: cancel, then answer | **PASS** | C: cancel `204`, then answer `404 {"detail":"Run not found"}`. Final `cancelled`, **0** `run_failed` rows, no answer message persisted, no re-drive line, no `streaming` shell. |
+| R4a′ | WR-02, concurrent: answer and cancel fired at the same instant | **PASS** (supplementary) | D: cancel `204` and answer `200`. The answer won the anchor check and re-drove, then the engine logged `cancel signal observed at the phase boundary before approve — stopping the engine (L-01)`. Final `cancelled`, **0** `run_failed` rows, resume shell finalized (not stranded). |
+| R4b | WR-06: the definition cannot load | **⛔ blocked: needs fault injection** | Not reachable through data. Covered by unit test `test_289_redrive_failure.py::test_an_unloadable_definition_ends_the_answered_run_failed_with_words`. |
+| R4c | WR-01: the context build raises | **⛔ blocked: needs fault injection** | Not reachable through data. Covered by `test_289_redrive_failure.py::test_a_raising_build_context_ends_the_run_failed_and_still_returns`, `::test_a_build_context_raise_never_strands_a_streaming_shell`, `::test_a_raise_where_the_insert_used_to_precede_it_never_strands_a_shell` and `::test_the_success_path_still_mints_exactly_one_shell_in_the_runs_org`. |
+| R5 | WR-05: open `/app?run=<live run>`, then "Back to Workflows" | **PASS** | On D while `active` and on C while `paused`, clicking the run page's own back control (in the header; it reads `‹ Workflows` on the live page) turned `/app?run=<id>&keep=1` into `/app?keep=1`. A reload landed on Chats, not the run. |
+
+Not driven here (operator-owned, still owed): the G-4 print/export sign-off, and the Anthropic roster row (billing).
+
+### R1 (CR-01): PASS, with the residual seen live
+
+`GET /workflow-runs/{id}/evidence` with `X-Org-Id: 22f9c615-…`. Raw bodies were saved in the session scratchpad.
+
+| | Run A | Run E |
+|---|---|---|
+| Owner response | 200, 7,964 bytes, `viewer_is_owner: true` | 200, 8,484 bytes |
+| Colleague B response | 200, 5,707 bytes, `viewer_is_owner: false` | 200, 6,137 bytes |
+| Owner step 1 output names | `kb_doc1_project_updates.md`, `kb_doc2_team_highlights.md`, `SKILL_INSTRUCTIONS.md` | `kb_doc1_project_updates.md`, `kb_doc2_team_highlights.md` |
+| Owner sources (all `cited_by [1]`) | 4: `kb_doc1…`, `SKILL_INSTRUCTIONS.md`, `kb_doc2…`, `kb_doc3_metrics_decisions.md` | 4: `SKILL_INSTRUCTIONS.md`, `kb_doc1…`, `kb_doc2…`, `weekly_report_structure.md` |
+| B step 1 `output_text` | the withheld sentence, exactly | the withheld sentence, exactly |
+| B sources | 4 × `{filename: null, masked: true, cited_by: [1]}` | the same |
+| Title hits in B's raw JSON | **0** | **0** |
+| Title hits in the owner's raw JSON | 9 needles, 16 hits (including `Weekly reports` 2) | 9 needles, 16 hits (including `Weekly reports` 2) |
+
+The needles were the five filenames in the folder, the same five without their extensions, and the folder name `Weekly reports`.
+
+B's own RLS reads confirm B cannot read them: `GET /rest/v1/folders?id=eq.<Weekly reports>` → `[]`, and `GET /rest/v1/documents?folder_id=eq.<…>` → `[]`.
+
+**Pages:**
+- B's report on A and on E (`evidence/cr01_colleague_runA.png`, `evidence/cr01_colleague_runE.png`):
+  - step 1 row reads `This step's output draws on a document you don't have access to. · 20 sources · Answered from the knowledge base · 11 passages · ● Medium · 0.42` (A);
+  - §4 shows four `A document you don't have access to · cited by step 1`;
+  - buttons are `‹ Back to Workflows`, `Download JSON`, `Print / save as PDF` only;
+  - `(you)` is absent;
+  - the full `document.documentElement.outerHTML` has **0** hits for every needle (A 266,247 bytes, E 267,118 bytes).
+- The owner's report on A (`evidence/cr01_owner_runA.png`) shows step 1's full text, the four filenames in §4 and `Open the chat thread`.
+
+**Residual, observed live (recorded by the fixer as open; not a regression):** step 2 ("Draft the note") cites nothing, so its text is not withheld. It is built from step 1's output and ships the private documents' **substance** to B: project status, figures, and named people's hiring and departure news. Example: A's step 2 opens `For the week of April 7–11, Alpha Dashboard work is in progress but blocked on dark-mode b…`. No filename or folder name appeared in step 2 on either run, so the CR-01 criterion (the titles) holds. The content boundary is still open, one step downstream. This is the residual named in `289-REVIEW-FIX.md` CR-01. The live drive shows it is not theoretical: on this fixture the step that follows the KB step always restates it.
+
+### R2 (CR-02): PASS
+
+Run E: kicked off at 20:36:59Z. The watcher opened `/app?run=b464d95d-…` at 20:37:10Z and sampled the DOM every 200 ms; it logged every change and every poll status change. Abridged, from the watcher log:
+
+| Time (Z) | Source | Observed |
+|---|---|---|
+| 20:37:11.112 | poll | `active` |
+| 20:37:36.360 | DOM | card `NEEDS YOU / 0:27 / DRAFT · AWAITING YOUR REVIEW …`, `Send Answer` 1 |
+| 20:38:02.624 | `:8000` log | `phase approve paused on the human gate for run b464d95d-…: no answer after 30s — the run is paused and stays resumable` |
+| 20:38:03.759 | DOM | card `EXPIRED / Approve the note? / No response within 0:30 — agent stopped`, `Send Answer` 0 (`evidence/cr02_runE_clock_expired.png`). The spine header still read `● Running`. |
+| 20:38:06.424 | poll | `paused` |
+| 20:38:06.478 | DOM | card `NEEDS YOU / The answer window has passed. The run is paused and still waiting for your answer. / DRAFT …`, `Send Answer` 1, `agent stopped` false (`evidence/cr02_runE_recovered.png`). Header: `Paused for your answer · Still waiting on fhdmrd@gmail.com (you); the run continues as soon as they answer.` |
+
+The card spent **2.7 s** in the terminal-looking `EXPIRED … agent stopped` state, which is the pre-fix bug's state. It then returned to the answer layout on the first poll that read `paused`, as CR-02 requires. It did not stay expired.
+
+Not observed (not driven): the server-driven 404/409 expiry staying terminal. That arm is pinned by `PendingAskCard.paused.test.tsx`.
+
+Runs A and C do NOT count for R2. A's first watcher died on a regex error in the drive script (not the app), and C's watcher opened after C had already paused. Both are recorded, not used.
+
+### R3 (S5 re-run on post-fix code): PASS on two runs
+
+| | Run E (answered from the recovered card) | Run A (page opened after the pause) |
+|---|---|---|
+| Paused | `:8000` 20:38:02.624Z | `:8000` 20:36:21.394Z |
+| Card before answering | recovered layout (R2) | `NEEDS YOU / The answer window has passed …`, `Send Answer` 1, no `agent stopped` (`evidence/s5r_runA_paused_no_expiry.png`) |
+| Answer | radio `Yes` + `Send Answer` through the UI, 20:38:08.506Z | the same, 20:39:02.188Z |
+| Card right after | `ANSWERED · AGENT RESUMED / You answered Yes` | the same |
+| Log | `20:38:10,181 re-drove paused run b464d95d-… on tcid c902a188…` then `20:38:10,232 consumed the durable answer on re-drive` | `20:39:03,753 re-drove paused run a052667d-…` then `20:39:03,821 consumed the durable answer on re-drive` |
+| DB | `run_completed` at 20:38:12.239Z; approve `output.answer = "Yes"`; 1 answer message | `run_completed` at 20:39:06.566Z; approve `output.answer = "Yes"`; 1 answer message |
+| Poll / page | `completed` at 20:38:16.359Z; the report rendered at 20:38:16.630Z without a reload; the reload shows the report (`evidence/cr02_runE_after_answer.png`, `evidence/cr02_runE_reload.png`) | `completed` at 20:39:09.851Z; the report rendered; reload shows the report (`evidence/s5r_runA_after_answer.png`, `evidence/s5r_runA_reload.png`) |
+| Resume shell | `runs` row `model = unknown`, `completed` | the same |
+
+**Drive-window log** (`backend.14072.log`, lines after the 75 present at the start: 1,632 lines). Each of these strings has **0** hits:
+- `re-drive failed`, `paused re-drive raised`, `re-drive skipped` (the three named);
+- `re-drive context failed`, `could not end failed re-drive`, `no loadable definition`, `producer-shell finalize failed`, `run_failed emit failed`.
+
+`re-drove paused run` appears 3 times (E, A, D). The sentence `Still waiting on fhdmrd@gmail.com (you); the run continues as soon as they answer.` was seen live in E's header (R2) and in C's header (`evidence/wr05_runC_header_live_run_page.png`).
+
+**New finding F-1 (pre-existing, outside the fixes; recorded, not fixed): the person's answer never reaches the step after the human step.**
+- `phase_types._prior_output_text` feeds a downstream LLM step only each prior phase's `text`.
+- `human_input._exec_llm_human_input` returns `{"text": <the question>, "answer": <the answer>, …}` on all three of its return paths: timeout default (`:142`), re-drive (`:188`) and live (`:327`).
+- So the `wrap` step ("confirm whether the note was approved, based on the answer you are given") receives `Approve the note?` and never `Yes`.
+- Live: A's wrap wrote `I can't confirm the note was approved because no approval decision was provided.` E's wrap wrote `Approved — the note accurately summarizes …`. Both runs had `approve.output.answer = "Yes"`.
+- So E's wording, and 289-05 S5's `Yes — the note is approved because …`, were the model guessing, not reading the answer.
+- The run DOES continue as soon as they answer, so the restored sentence stays literally true. What the continuation does with the answer is a separate defect.
+- No seed or bug names it. The nearest is SEED-050 (workflow result quality, general). It should be filed.
+
+### R4: the re-drive arms
+
+**R4a, stop-first (cancel, then answer), run C: PASS.**
+- C paused at 20:36:29.710Z (`:8000`: `phase approve paused on the human gate for run 4af6909f-…`).
+- The owner's `DELETE /runs/4af6909f-…` → `204` at 20:39:34.378Z. The status read straight after was `cancelled`.
+- Then `POST /runs/4af6909f-…/ask_user_response` with the real tcid `f04ec061…` → `404 {"detail":"Run not found"}` at 20:39:34.618Z. The cancel had cleared the thread anchor, so the harness fallback misses and the route returns 404 before persisting anything.
+- Final DB:
+  - `workflow_runs.status = cancelled`; phases research completed / draft completed / approve **cancelled** / wrap pending;
+  - `harness_audit`: 9 rows, ending `policy_applied`. **`run_failed`: 0**;
+  - thread anchor `null`; answer messages **0**; `runs` rows on the thread all `completed`, none `streaming`;
+  - no `re-drove` line and no failure line for this run.
+- Observation: someone answering a run that was just cancelled gets 404 "Run not found" here, not 409 "This run has already been cancelled", because the anchor clear runs first.
+
+**R4a′, concurrent (answer and cancel fired together from two threads), run D: PASS, supplementary.** This is closer to WR-02's race than the sequential order. Timeline from `backend.14072.log` and the DB:
+1. D paused at 20:39:48.681Z.
+2. At 20:39:50.145-.159 the answer request passed the ownership and anchor checks and persisted its message (`POST /rest/v1/messages 201`).
+3. The cancel request read the anchor at 20:39:50.160. `workflow_runs.updated_at` reads 20:39:50.166538, which is `now()`, the transaction start.
+4. Both responses returned about 1 s later: cancel `204` at 20:39:51.167Z, answer `200 {"status":"ok"}` at 20:39:51.197Z.
+5. In between, the log shows `20:39:51,196 ask_user_response: re-drove paused run d6f9c254-…`, then `20:39:51,204 run d6f9c254-…: cancel signal observed at the phase boundary before approve — stopping the engine (L-01)`.
+
+Final DB:
+- `cancelled`; approve `cancelled`; **`run_failed`: 0**; anchor `null`;
+- the resume shell's `runs` row (`model = unknown`) finalized `completed`, not left `streaming`;
+- 1 answer message.
+
+The guard did what it is for: a Stop racing a re-drive left a cancelled run with no failure record. Observations, not failures:
+- (i) The answer was persisted and told `ok` for a run that ended cancelled.
+- (ii) The resume shell is finalized `completed` although the run it served was cancelled, because the shell's status only distinguishes `failed`.
+
+**What neither order reaches:** WR-02's exact window is a Stop landing between `resume_run` and `_fail_redrive`'s terminal write. It only opens when the re-drive itself fails, and no live re-drive failed (by design). That arm stays covered by `test_289_redrive_failure.py::test_a_stop_racing_the_fail_arm_leaves_no_failure_record` and `::test_the_fail_arm_emits_run_failed_like_the_engine`.
+
+**R4b, definition unloadable (WR-06): ⛔ BLOCKED, needs fault injection.** `_load_run_definition` returns `None` only when the join `workflow_runs.definition_id → workflow_definitions` finds no row, or the row's `definition` is empty. On local data neither can be produced without changing a guard. Measured read-only:
+- `workflow_runs_definition_id_fkey` is `FOREIGN KEY (definition_id) REFERENCES workflow_definitions(id) ON DELETE RESTRICT`;
+- `definition_id` is `NOT NULL`;
+- `workflow_definitions_block_published` refuses an UPDATE of a published definition.
+
+Disabling a trigger or the FK is fault injection. Covered by the unit test named in the table.
+
+**R4c, context build raises (WR-01): ⛔ BLOCKED, needs fault injection.** In `_build_resume_context` every fallible step except two is wrapped in its own `try/except`: scope resolution, folder-override resolution and owner-settings load.
+- The two uncaught raisers are `get_service_role_supabase(org_id)`, which refuses a falsy org, and the final `insert_run`.
+- `workflow_runs.org_id` is `NOT NULL` (measured), so the first cannot be reached through data.
+- The second needs a DB fault.
+
+Covered by the four unit tests named in the table.
+
+### R5 (WR-05): PASS
+
+The live run page's back control is the header button `‹ Workflows`, with the same `onBack` handler as the report's `‹ Back to Workflows`. The report and the not-found state carry the longer label. It was clicked by a selector scoped to `header button` (`inHeader: true`, chevron present, 1 match).
+
+| Run, state at click | URL before click | After click | After reload |
+|---|---|---|---|
+| D, `active` (DB `active` before and after the drive, click at 20:39:08.992Z) | `/app?run=d6f9c254-…&keep=1`, live spine shown, no report | `/app?keep=1`, Workflows page | `/app?keep=1`, Chats (not the run) |
+| C, `paused` (a live run page, not the report; click at 20:38:21.001Z) | `/app?run=4af6909f-…&keep=1` | `/app?keep=1` | `/app?keep=1`, Chats |
+
+The param was still present right after load (`urlAt0` kept `run=`), so the new `useEffect` does not strip a deep link before the run view mounts. Screenshots: `evidence/wr05_runD_active_header_{live_run_page,after_back,after_reload}.png`, `evidence/wr05_runC_header_{live_run_page,after_back,after_reload}.png`.
+
+Also recorded:
+- A first attempt on E clicked the **nav rail's** icon-only "Workflows" button, because an unscoped role match took the first of two matches. It also cleared `run=` and kept `keep=1` (`evidence/wr05_runE_*.png`), which is consistent with the fix's "any departure from the run view" rule. It is not counted as the back-button drive.
+- A first attempt on C timed out looking for the label "Back to Workflows" on the live page (`evidence/wr05_runC_live_run_page.png`). That is how the label difference was found.
+
+### Inherited noise in the drive window (not caused here)
+
+- The `:8000` log has 4 `ERROR app.services.audit_service audit write failed [action=thread.create …]: new row violates row-level security policy for table "audit_log"` lines, one per `POST /threads`. They are inherited: 289-05's own drive logs carry the same error (`backend.16012.log` 1, `backend.35560.log` 13).
+- 5 `runs.usage missing` warnings (sub-agent and resume shells), the known Phase 256 warning contract.
+
+### Cleanup
+
+Every new id in the mid-drive snapshot was attributed before deletion:
+- `threads` (4) and `workflow_runs` (4) were exactly this drive's;
+- `messages` 13, `workflow_phases` 16, `harness_audit` 49 and `runs` 16 all hang off those threads/runs (0 unattributable);
+- `audit_log` 18 = `search.query` rows, each naming one of this drive's threads;
+- `auth.sessions` 23 = 18 owner logins (8 `python-httpx`, 10 browser) + 5 for B, matching this drive's exact login count.
+
+Deleted, the public tables in one transaction, in dependency order:
+
+| Table | Deleted |
+|---|---|
+| `harness_audit` | 49 |
+| `workflow_phases` | 16 |
+| `audit_log` | 18 |
+| `messages` | 13 |
+| `workflow_runs` | 4 |
+| `runs` | 16 (9 sub-agent, then 7 top-level) |
+| `threads` | 4 |
+| `workflow_definitions` | 1 |
+| `org_members` | 1 (B in `22f9c615`); B's own row went with the user delete |
+| `auth.users` | 1 (B, through the GoTrue admin API; `identities` / `profiles` cascaded) |
+| `organizations` / `departments` | 1 / 1 (B's signup org) |
+| `auth.sessions` / `refresh_tokens` / `mfa_amr_claims` | 23 / 23 / 23 |
+| `auth.audit_log_entries` | 25 (23 logins, B's signup, and the `user_deleted` entry the admin delete wrote) |
+
+Snapshot after: **46,190** ids against **46,187** before. **0 missing in every table.** The only 3 new ids are not this drive's: one `auth.refresh_tokens` row plus its `token_refreshed` / `token_revoked` audit entries at 20:40:41Z. They belong to session `a598755c-…`, the owner's own browser session created 2026-10-13, which rotated its token during the drive. They were left alone.
+
+Evidence screenshots added under `evidence/`: `cr01_*` (3), `cr02_*` (5), `s5r_*` (3), `wr05_*` (10).
