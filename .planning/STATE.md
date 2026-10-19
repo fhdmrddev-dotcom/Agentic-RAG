@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_plan
-last_updated: "2026-10-19T17:39:19.569Z"
+last_updated: "2026-10-19T17:39:54.026Z"
 progress:
   total_phases: 15
   completed_phases: 3
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 288 — drafts that survive, pauses that publish
+**Current focus:** Phase 289 — the-run-page-and-its-evidence
 
 ---
 
@@ -41,8 +41,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 288
-Plan: 4 of 4 executed (human_needed)
+Phase: 289 (the-run-page-and-its-evidence) — EXECUTING
+Plan: 1 of 5
 
 ---
 
