@@ -178,8 +178,29 @@ function resultFact(status: string): EvidenceFact {
   return { label: FACT_RESULT, value: RESULT_CANCELLED, tone: "muted" }
 }
 
+// 289-REVIEW WR-03: every retry is its own audit row, so a step whose gate failed on attempt 0
+// and passed on attempt 1 read as "1 of 2 passed" in red. The facts strip counts each step's
+// FINAL attempt per check family; section 3 still lists every attempt.
+function checkFamily(kind: string): string {
+  if (kind.startsWith("gate_")) return "gate"
+  if (kind.startsWith("emit_")) return "emit"
+  return kind
+}
+
+function finalAttempts(checks: readonly RunEvidenceVerdict[]): RunEvidenceVerdict[] {
+  const last = new Map<string, RunEvidenceVerdict>()
+  const unkeyed: RunEvidenceVerdict[] = []
+  for (const v of checks) {
+    if (v.phase_slug === null) unkeyed.push(v)
+    else last.set(`${v.phase_slug}\u0000${checkFamily(v.kind)}`, v)
+  }
+  return [...last.values(), ...unkeyed]
+}
+
 function checksFact(verdicts: readonly RunEvidenceVerdict[]): EvidenceFact {
-  const checks = verdicts.filter((v) => v.result === "passed" || v.result === "failed")
+  const checks = finalAttempts(
+    verdicts.filter((v) => v.result === "passed" || v.result === "failed"),
+  )
   if (checks.length === 0) return { label: FACT_CHECKS, value: NO_CHECKS_RAN, tone: "muted" }
   const passed = checks.filter((v) => v.result === "passed").length
   return {

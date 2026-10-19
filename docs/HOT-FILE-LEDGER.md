@@ -11304,7 +11304,7 @@ cells rot within days.
 | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 45 / 23 / 1647 (was `43 / 23 / 2261`) | **FIRES** | **286-01** seam TAKEN: 20 wire models/helpers → `workflow_wire.py`; generate + template doors → `workflow_authoring_doors.py` (same router). D-05 1,200-1,400 MISSED (1,647); split OWED |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 17 / 12 / 1295 (was `14 / 11 / 1240`) | **FIRES** | **289-02** `confidence` read field in lockstep (+1 lazy label read); **289-05** paused sentence restored after S5. The 286 export forecast went to a new module |
 | [`backend/app/services/harness/phase_confidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_confidencepy) | 1 / 1 / 153 (was `0 / 0 / 0`) | no (young) | young (created 289-02). Pure confidence helper + wire allow-list + KB label read (duck-typed, never raises). ⛔ no provider import; chat's _compute_confidence only |
-| [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 2 / 1 / 492 (was `1 / 1 / 468`) | no (young) | **289-REVIEW CR-01**: a citing step's output withheld for a non-owner when a cited doc is masked. ⛔ no I/O; never ships passage/similarity; fails closed |
+| [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 3 / 1 / 509 (was `2 / 1 / 492`) | no (young) | **289-REVIEW WR-03**: a wall-clock `gate_failed` composes as `gate_timed_out` (recorded, no `checked`); CR-01 output withholding kept. ⛔ no I/O; never ships passage/similarity |
 | [`backend/app/api/workflow_run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_run_evidencepy) | 2 / 1 / 366 (was `1 / 1 / 358`) | no (young) | **289-REVIEW CR-01**: passes the readable set to the phase log (one decision). ⛔ ONE access query; 404 parity; require_canvas alone |
 | [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 9 / 6 / 396 (was `8 / 5 / 391`) | **FIRES** | **289-03**: ONE CANVAS_GATED_PATHS member (`…/evidence`) + comment, same commit as its include_router. ⛔ test_182 never imports the set |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 22 / 15 / 537 (was `21 / 14 / 537`) | ⚠ **FIRES** | **279-01**: docstring repoints to the new expert_scope homes only (OpenAPI regen). ⛔ a body touching both pairs is a 422 |
@@ -11342,8 +11342,8 @@ cells rot within days.
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 33 / 13 / 1594 (was `31 / 12 / 1580`) | **FIRES** | **289-01** one `paused` attribute; **289-04** ONE early return → RunEvidenceReport (+14 L). No new hook/state/effect. RunHero now dead here (F-D). ⛔ invariants unchanged |
 | [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
 | [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 1 / 1 / 93 (was `0 / 0 / 0`) | no (young) | young (created 289-02). Leaf: the KB evidence line or nothing; mounted in RunSpine and RunEvidenceReport. ⛔ no hook, no @/lib/api, never ConfidenceChip tiers |
-| [`frontend/src/components/workflows/evidenceVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidencevocabularyts) | 2 / 1 / 233 (was `0 / 0 / 0`) | no (young) | young (289-02 created, 289-04 appended). Every evidence-line and report word and glyph; ○ ◉ ⤓ ⎙ flagged as icon proposals, ◆ clash. ⛔ lookups through own() |
-| [`frontend/src/components/workflows/evidenceView.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidenceviewts) | 1 / 1 / 353 (was `0 / 0 / 0`) | no (young) | young (created 289-04). Pure payload → view-model; the DOM and the export read the same object. ⛔ no React |
+| [`frontend/src/components/workflows/evidenceVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidencevocabularyts) | 3 / 1 / 235 (was `2 / 1 / 233`) | no (young) | **289-REVIEW WR-03**: one `VERDICT_SENTENCE` entry, `gate_timed_out` → "The step timed out before its checks ran". Strings only |
+| [`frontend/src/components/workflows/evidenceView.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidenceviewts) | 2 / 1 / 374 (was `1 / 1 / 353`) | no (young) | **289-REVIEW WR-03**: the Checks fact counts each step's FINAL attempt per check family (gate / emit); section 3 still lists every attempt. Pure; no I/O |
 | [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 1 / 1 / 462 (was `0 / 0 / 0`) | no (young) | young (created 289-04). The finished-run report; S1-S4 driven live. ⛔ no write control; never imports RunReceipt. Follow-ups F-A..F-E open |
 | [`frontend/src/lib/api/runEvidence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirunevidencets) | 1 / 1 / 123 (was `0 / 0 / 0`) | no (young) | young (created 289-04). getRunEvidence + RunEvidence types; contract pinned both sides (289-05 I1). ⛔ not re-exported through lib/api.ts |
 | [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 1 / 1 / 63 (was `0 / 0 / 0`) | no (young) | young (created 289-04). ?run=<uuid> read/write/clear. ⛔ strict UUID only; the boot read never strips the param |
@@ -22388,6 +22388,13 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW CR-01, moved verbatim): 1 / 1 / 468 (was `0 / 0 / 0`) | no (young) | young (created 289-03). Pure composers for the four sections + definition_changed. ⛔ no I/O; never ships passage/similarity; non-owner masking fails closed
 
+
+### `backend/app/services/run_evidence.py` — 289-REVIEW WR-03
+
+**`3 / 1 / 509` (was `2 / 1 / 492`).** +17 lines (492 → 509). The engine's wall-clock arm writes `gate_failed` with `error: wall_clock_timeout after Ns` when the phase hung BEFORE its gates ran; `compose_verdicts` treated it as a post-gate failure and named every post validator as `checked`. It now composes as `gate_timed_out` (a composed kind, never an audit type, so `VERDICT_KINDS` is unchanged), result `recorded`, `checked` empty. The error text still never travels.
+
+Scan-list cell as of 2026-10-20 (replaced by 289-REVIEW WR-03, moved verbatim): 2 / 1 / 492 (was `1 / 1 / 468`) | no (young) | **289-REVIEW CR-01**: a citing step's output withheld for a non-owner when a cited doc is masked. ⛔ no I/O; never ships passage/similarity; fails closed
+
 ## `backend/app/api/workflow_run_evidence.py`
 
 **`0 / 0 / 0` — planned (289-03); row and section added at planning.** `GET /workflow-runs/{id}/evidence`, the first org-shared read on the run tables (SECURITY-BEARING, beside the library feeds). ⛔ **Binding invariants:** ONE pool SELECT carries id + terminal status + owner-or-org-member before any other read; every refusal is the same 404 `Run not found`, never 403; `require_canvas()` alone; the path is in `CANVAS_GATED_PATHS`; email, thread_id and file_id only for the owner. RLS on the four run tables is NOT widened (no migration). Plan 05 re-derives the triple.
@@ -22436,6 +22443,13 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-02 + 289-04, row added at planning). Every evidence-line and report word and glyph. ⛔ lookups through own()
 
+
+### `frontend/src/components/workflows/evidenceVocabulary.ts` — 289-REVIEW WR-03
+
+**`3 / 1 / 235` (was `2 / 1 / 233`).** +2 lines (233 → 235): one sentence for the server-composed `gate_timed_out` kind, so a wall-clock timeout no longer falls to the generic "A check was recorded".
+
+Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW WR-03, moved verbatim): 2 / 1 / 233 (was `0 / 0 / 0`) | no (young) | young (289-02 created, 289-04 appended). Every evidence-line and report word and glyph; ○ ◉ ⤓ ⎙ flagged as icon proposals, ◆ clash. ⛔ lookups through own()
+
 ## `frontend/src/components/workflows/evidenceView.ts`
 
 **`0 / 0 / 0` — planned (289-04); row and section added at planning.** Pure payload → view-model for the report; `sectionStrings` is what the D-03 content test compares the DOM against and `exportPayload` returns the fetched payload unchanged, which is why the JSON matches the page by construction. ⛔ no React import. Plan 05 re-derives the triple.
@@ -22445,6 +22459,13 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 
 **`1 / 1 / 353` (was `0 / 0 / 0`).** Created at 353 lines. Privacy is applied a second time on `viewer_is_owner`.
 
 Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). Pure payload to view-model; one source for DOM and export check. ⛔ no React
+
+
+### `frontend/src/components/workflows/evidenceView.ts` — 289-REVIEW WR-03
+
+**`2 / 1 / 374` (was `1 / 1 / 353`).** +21 lines (353 → 374). Every retry is its own audit row, so a step whose gate failed on attempt 0 and passed on attempt 1 read as a red "1 of 2 passed". `checksFact` now keeps the last verdict per (phase_slug, family); verdicts with no phase slug each still count. Section 3 is unchanged. Pinned by `evidenceView.test.ts` (RED at the RED commit).
+
+Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW WR-03, moved verbatim): 1 / 1 / 353 (was `0 / 0 / 0`) | no (young) | young (created 289-04). Pure payload → view-model; the DOM and the export read the same object. ⛔ no React
 
 ## `frontend/src/components/workflows/RunEvidenceReport.tsx`
 

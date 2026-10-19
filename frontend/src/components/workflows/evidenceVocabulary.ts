@@ -189,6 +189,8 @@ export const WAITED_NOT_ANSWERED = "Waited for an answer · not answered"
 export const VERDICT_SENTENCE: Record<string, string> = {
   gate_passed: "The step's checks passed",
   gate_failed: "The step's checks did not pass",
+  // 289-REVIEW WR-03: composed server-side for a wall-clock timeout (no validator ran).
+  gate_timed_out: "The step timed out before its checks ran",
   emit_validated: "The deliverable matched its required shape",
   emit_rejected: "The deliverable did not match its required shape",
   emit_integrity_failed: "The deliverable failed its integrity check",

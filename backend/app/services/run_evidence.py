@@ -68,6 +68,12 @@ _RECORDED_KINDS: frozenset[str] = frozenset(
 # happen to this run (R-03). Anything not named in the two lists above is dropped.
 VERDICT_KINDS: tuple[str, ...] = tuple(sorted(set(_CHECK_RESULT) | _RECORDED_KINDS))
 _GATE_KINDS = frozenset({"gate_passed", "gate_failed"})
+# 289-REVIEW WR-03: a COMPOSED kind (no audit row carries it) for a `gate_failed` the engine
+# wrote because the phase hit its wall clock before any validator ran (``harness_engine.py``,
+# ``gate_error = f"wall_clock_timeout after {wall_clock}s"``). It is a recorded decision, not
+# a check, so the report neither names validators as checked nor counts a failed check.
+_TIMED_OUT_KIND = "gate_timed_out"
+_WALL_CLOCK_TIMEOUT_PREFIX = "wall_clock_timeout"
 
 _HUMAN_INPUT = "llm_human_input"
 
@@ -318,7 +324,18 @@ def compose_verdicts(
         if not isinstance(slug, str) or not slug:
             slug = None
         checked: list[str] = []
-        if kind in _GATE_KINDS and slug is not None:
+        error = meta.get("error")
+        if (
+            kind == "gate_failed"
+            and isinstance(error, str)
+            and error.startswith(_WALL_CLOCK_TIMEOUT_PREFIX)
+        ):
+            # 289-REVIEW WR-03: the engine's wall-clock arm writes `gate_failed` when the phase
+            # hung BEFORE its gates ran. Naming the phase's validators as "checked" (or counting
+            # a failed check) would describe checks that never executed. Only the composed kind
+            # leaves; the error text itself still never travels.
+            kind, result = _TIMED_OUT_KIND, "recorded"
+        elif kind in _GATE_KINDS and slug is not None:
             timing = "pre" if meta.get("timing") == "pre" else "post"
             checked = [k for (k, t) in validators.get(slug, []) if t == timing]
         verdicts.append(
