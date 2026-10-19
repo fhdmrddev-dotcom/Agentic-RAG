@@ -54,6 +54,8 @@ Verdict: owed.
 
 Setup: user B in a NEW local org; user C added to the dev account's org; `visual_workflow_canvas` proven ON for both (Pitfall 2: a canvas 404 looks like an org 404).
 Evidence to record: B's page shows "This run isn't available"; B's evidence response body and a random uuid's body, verbatim, stated byte-identical; C's report text; C's button set (expected: Download JSON, Print / save as PDF only); a grep of C's raw response for the owner email (expected 0); masked rows for documents C cannot read (R-01); the human-input step reading "Waited for an answer · answered" with no question or answer text (R-04); C's POST to the run's answer and cancel routes refused.
+Accepted risk, observed live (T-289-31, plan 03, W3b): C DOES receive the `output_text` of the non-human steps (and `definition.full` and verdict `checked`, T-289-18). This is by decision, not by accident: the step output is the run's record and the page's purpose, and the owner ran it inside the org. Record the first 80 characters of one such output from C's raw response so the acceptance is seen, not assumed. It is a PASS condition, not a failure; a non-human step output being ABSENT for C would be the surprise to report.
+KB label (W3a, R-01 extended): record the label C sees on the KB step's evidence line beside the owner's. Expected: the folder's name only when C can read that folder under RLS, otherwise "the knowledge base". C seeing the owner's private folder name is a FAIL.
 Verdict: owed.
 
 ## Four-axis scoreboard (D-17, CLAUDE.md SC#10)
@@ -78,7 +80,7 @@ Per-row checks: (a) KB step `confidence.level` present; (b) non-KB step `confide
 
 ## Known gaps carried in (not failures of this phase; recorded so they are not mistaken for one)
 
-- The chat panel's `PendingAskStack` has no run status, so its card stays countdown-driven for a paused workflow run (research Open Q4); the run page is the surface D-13 fixes.
+- The chat panel's `PendingAskStack` has no run status, so its card stays countdown-driven for a paused workflow run (research Open Q4); the run page is the surface D-13 fixes. Decided at plan revision by reading the code, not assumed: the stack's only run signals are the thread lock and the phases (`PendingAskCard.tsx:828-830`); the lock has no status field (`streamsStore.ts:98-144`), `reconcilePhases` discards the wire's `run_status` (`StreamsProvider.tsx:4640-4641`), and a paused human step reads `running` (`phaseState.ts:61`). Deriving it needs a new store field or fetch on G-5 FIRING files, so plan 05 plants it as a seed. Full evidence: `289-01-SUMMARY.md` `## Named gap: PendingAskStack`.
 - A resumed segment runs on the owner's default model, not the run's per-request model (research "Not fixed"); row (d) records it.
 - The run-level confidence on the final chat message uses default buckets (research F3); per-phase confidence uses the owner's buckets, like chat.
 - SEED-360 F-2 (judge blocks the planted pause workflow) and F-4 (`auto_answered` note unmounts with the gauntlet) are deferred.
