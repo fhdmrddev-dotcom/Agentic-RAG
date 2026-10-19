@@ -565,8 +565,12 @@ async def test_a_colleague_reads_a_minimised_record(wire):
                                       "answered_by": None}
     assert approve["output_text"] is None
     assert "Yes, go ahead" not in text
-    # accepted risk T-289-31, pinned rather than accidental
-    assert body["phase_log"][0]["output_text"] == "Three vendors meet the bar."
+    # 289-REVIEW CR-01 (T-289-31 now MITIGATED for masked citations): step 1 cites the
+    # document the colleague cannot read, so its output is withheld behind the fixed sentence;
+    # step 3 cites only readable documents, so it keeps its output.
+    assert body["phase_log"][0]["output_text"] == ev.WITHHELD_OUTPUT_SENTENCE
+    assert "Three vendors meet the bar." not in text
+    assert body["phase_log"][2]["output_text"] == "Memo written."
     # (confidence's own `avg_similarity` is the step's aggregate, not a citation's score)
     assert "SECRET PASSAGE" not in text and '"similarity"' not in text
     assert '"passage"' not in text
@@ -578,6 +582,48 @@ async def test_a_colleague_reads_a_minimised_record(wire):
     # no owner-only reads on the pool
     pool_sql = " ".join(wire["pool"].sqls())
     assert "FROM workspace_files" not in pool_sql
+
+
+@pytest.mark.asyncio
+async def test_a_masked_documents_content_never_reaches_the_colleague_through_output_text(wire):
+    """289-REVIEW CR-01: the step that cited a private document synthesised its content.
+
+    Masking the source row but shipping the step's output would print the private title (and
+    what the document says) one row above the masked source. The owner still reads it whole.
+    """
+    secret_title = "Q4 Layoff Plan - CONFIDENTIAL"
+    rows = _phase_rows()
+    gather = next(r for r in rows if r["slug"] == "gather")
+    obj = json.loads(gather["output"])
+    obj["text"] = f"Per {secret_title}, three vendors meet the bar."
+    gather["output"] = json.dumps(obj)
+
+    async def _fetch(sql, *args, _orig=wire["pool"].fetch):
+        if "FROM workflow_phases" in sql:
+            wire["pool"].calls.append((sql, args))
+            return rows
+        return await _orig(sql, *args)
+
+    wire["pool"].fetch = _fetch
+
+    colleague = json.loads((await _read(RUN_DONE, COLLEAGUE)).model_dump_json())
+    colleague_text = json.dumps(colleague)
+    assert secret_title not in colleague_text
+    assert colleague["phase_log"][0]["output_text"] == ev.WITHHELD_OUTPUT_SENTENCE
+    # a step with no masked citation keeps its output
+    assert colleague["phase_log"][2]["output_text"] == "Memo written."
+
+    owner = json.loads((await _read(RUN_DONE, OWNER, OWNER_EMAIL)).model_dump_json())
+    assert owner["phase_log"][0]["output_text"] == f"Per {secret_title}, three vendors meet the bar."
+
+
+@pytest.mark.asyncio
+async def test_rls_failure_withholds_every_citing_steps_output(wire):
+    """Fail closed (R-01): when every source is masked, every citing step's output is too."""
+    wire["raise"] = True
+    body = json.loads((await _read(RUN_DONE, COLLEAGUE)).model_dump_json())
+    assert body["phase_log"][0]["output_text"] == ev.WITHHELD_OUTPUT_SENTENCE
+    assert body["phase_log"][2]["output_text"] == ev.WITHHELD_OUTPUT_SENTENCE
 
 
 @pytest.mark.asyncio
