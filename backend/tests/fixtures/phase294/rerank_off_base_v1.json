@@ -1,0 +1,267 @@
+{
+ "hybrid_filtered": [
+  [
+   {
+    "chunk_index": 0,
+    "content": "passage 0 of dA: v0w0 v0w1 v0w2 v0w3 v0w4 v0w5 v0w6 v0w7 v0w8 v0w9",
+    "document_id": "dA",
+    "filename": "dA.pdf",
+    "folder_id": null,
+    "metadata": {
+     "year": "2025"
+    },
+    "similarity": 0.91,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 2,
+    "content": "passage 2 of dB: v2w0 v2w1 v2w2 v2w3 v2w4 v2w5 v2w6 v2w7 v2w8 v2w9",
+    "document_id": "dB",
+    "filename": "dB.pdf",
+    "folder_id": null,
+    "similarity": 0.74,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 8,
+    "content": "passage 8 of dD: v8w0 v8w1 v8w2 v8w3 v8w4 v8w5 v8w6 v8w7 v8w8 v8w9",
+    "document_id": "dD",
+    "filename": "dD.pdf",
+    "folder_id": null,
+    "similarity": 0.016129032258064516,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 9,
+    "content": "passage 9 of dE: v9w0 v9w1 v9w2 v9w3 v9w4 v9w5 v9w6 v9w7 v9w8 v9w9",
+    "document_id": "dE",
+    "filename": "dE.pdf",
+    "folder_id": null,
+    "similarity": 0.015625,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 4,
+    "content": "passage 4 of dC: v4w0 v4w1 v4w2 v4w3 v4w4 v4w5 v4w6 v4w7 v4w8 v4w9",
+    "document_id": "dC",
+    "filename": "dC.pdf",
+    "folder_id": null,
+    "similarity": 0.51,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   }
+  ],
+  0.62
+ ],
+ "hybrid_unfiltered": [
+  [
+   {
+    "chunk_index": 0,
+    "content": "passage 0 of dA: v0w0 v0w1 v0w2 v0w3 v0w4 v0w5 v0w6 v0w7 v0w8 v0w9",
+    "document_id": "dA",
+    "filename": "dA.pdf",
+    "folder_id": null,
+    "metadata": {
+     "year": "2025"
+    },
+    "similarity": 0.91,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 2,
+    "content": "passage 2 of dB: v2w0 v2w1 v2w2 v2w3 v2w4 v2w5 v2w6 v2w7 v2w8 v2w9",
+    "document_id": "dB",
+    "filename": "dB.pdf",
+    "folder_id": null,
+    "similarity": 0.74,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 5,
+    "content": "passage 5 of dB: v5w0 v5w1 v5w2 v5w3 v5w4 v5w5 v5w6 v5w7 v5w8 v5w9",
+    "document_id": "dB",
+    "filename": "dB.pdf",
+    "folder_id": null,
+    "similarity": 0.42,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 1,
+    "content": "passage 1 of dA: v1w0 v1w1 v1w2 v1w3 v1w4 v1w5 v1w6 v1w7 v1w8 v1w9",
+    "document_id": "dA",
+    "filename": "dA.pdf",
+    "folder_id": null,
+    "metadata": {
+     "year": "2025"
+    },
+    "similarity": 0.82,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 8,
+    "content": "passage 8 of dD: v8w0 v8w1 v8w2 v8w3 v8w4 v8w5 v8w6 v8w7 v8w8 v8w9",
+    "document_id": "dD",
+    "filename": "dD.pdf",
+    "folder_id": null,
+    "similarity": 0.016129032258064516,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   }
+  ],
+  0.56875
+ ],
+ "vector_only_filtered": [
+  [
+   {
+    "chunk_index": 0,
+    "content": "passage 0 of dA: v0w0 v0w1 v0w2 v0w3 v0w4 v0w5 v0w6 v0w7 v0w8 v0w9",
+    "document_id": "dA",
+    "filename": "dA.pdf",
+    "folder_id": null,
+    "metadata": {
+     "year": "2025"
+    },
+    "similarity": 0.91,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 1,
+    "content": "passage 1 of dA: v1w0 v1w1 v1w2 v1w3 v1w4 v1w5 v1w6 v1w7 v1w8 v1w9",
+    "document_id": "dA",
+    "filename": "dA.pdf",
+    "folder_id": null,
+    "metadata": {
+     "year": "2025"
+    },
+    "similarity": 0.82,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 2,
+    "content": "passage 2 of dB: v2w0 v2w1 v2w2 v2w3 v2w4 v2w5 v2w6 v2w7 v2w8 v2w9",
+    "document_id": "dB",
+    "filename": "dB.pdf",
+    "folder_id": null,
+    "similarity": 0.74,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 4,
+    "content": "passage 4 of dC: v4w0 v4w1 v4w2 v4w3 v4w4 v4w5 v4w6 v4w7 v4w8 v4w9",
+    "document_id": "dC",
+    "filename": "dC.pdf",
+    "folder_id": null,
+    "similarity": 0.51,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 6,
+    "content": "passage 6 of dD: v6w0 v6w1 v6w2 v6w3 v6w4 v6w5 v6w6 v6w7 v6w8 v6w9",
+    "document_id": "dD",
+    "filename": "dD.pdf",
+    "folder_id": null,
+    "low_similarity": true,
+    "similarity": 0.28,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   }
+  ],
+  0.62
+ ],
+ "vector_only_unfiltered": [
+  [
+   {
+    "chunk_index": 0,
+    "content": "passage 0 of dA: v0w0 v0w1 v0w2 v0w3 v0w4 v0w5 v0w6 v0w7 v0w8 v0w9",
+    "document_id": "dA",
+    "filename": "dA.pdf",
+    "folder_id": null,
+    "metadata": {
+     "year": "2025"
+    },
+    "similarity": 0.91,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 1,
+    "content": "passage 1 of dA: v1w0 v1w1 v1w2 v1w3 v1w4 v1w5 v1w6 v1w7 v1w8 v1w9",
+    "document_id": "dA",
+    "filename": "dA.pdf",
+    "folder_id": null,
+    "metadata": {
+     "year": "2025"
+    },
+    "similarity": 0.82,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 2,
+    "content": "passage 2 of dB: v2w0 v2w1 v2w2 v2w3 v2w4 v2w5 v2w6 v2w7 v2w8 v2w9",
+    "document_id": "dB",
+    "filename": "dB.pdf",
+    "folder_id": null,
+    "similarity": 0.74,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 3,
+    "content": "passage 3 of dA: v3w0 v3w1 v3w2 v3w3 v3w4 v3w5 v3w6 v3w7 v3w8 v3w9",
+    "document_id": "dA",
+    "filename": "dA.pdf",
+    "folder_id": null,
+    "metadata": {
+     "year": "2025"
+    },
+    "similarity": 0.66,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   },
+   {
+    "chunk_index": 4,
+    "content": "passage 4 of dC: v4w0 v4w1 v4w2 v4w3 v4w4 v4w5 v4w6 v4w7 v4w8 v4w9",
+    "document_id": "dC",
+    "filename": "dC.pdf",
+    "folder_id": null,
+    "similarity": 0.51,
+    "source_connection_id": null,
+    "source_connection_name": null,
+    "version_number": 1
+   }
+  ],
+  0.56875
+ ]
+}
