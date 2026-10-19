@@ -138,7 +138,7 @@ describe("ThreadWorkflowPicker - the conversation is never read (D-07 / T-287-09
 
   it("the stripper really removes prose (positive control)", () => {
     expect(CODE.length).toBeLessThan(pickerSource.length + hookSource.length)
-    const planted = stripComments(`const keep = 1 // drop-me\n/* drop-me-too */\nconst x = 2`)
+    const planted = stripComments(`const keep = 1\n// drop-me\n/* drop-me-too */\nconst x = 2`)
     expect(planted).not.toMatch(/drop-me/)
     expect(planted).toMatch(/const keep = 1/)
   })
