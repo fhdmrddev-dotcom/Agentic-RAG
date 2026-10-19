@@ -10,7 +10,7 @@
  * no-fetch-on-mount claim.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, render, screen } from "@testing-library/react"
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import type { Thread } from "@/types"
 
@@ -127,14 +127,20 @@ describe("ChatArea - the ThreadWorkflowPicker mount", () => {
   })
 
   it("locked equals the existing workflowLocked value (a harness lock on this thread)", async () => {
-    useStreamsStore.setState({
-      workflowLockByThread: new Map([
-        ["thread-A", { runId: "r-1", mode: "harness", continuesUsed: 0, continuesRemaining: 3 } as never],
-      ]),
+    // The lock arrives the way it does in the product: the server's answer on mount.
+    h.getThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      locked: true,
+      active_workflow_run_id: "wr-live-1",
+      run_status: "running",
+      cap_paused: false,
+      continues_used: 0,
+      continues_remaining: 3,
+      latest_producer_run_id: null,
     })
     render(shell(<ChatArea thread={THREAD} onCreateThread={vi.fn()} folders={[]} />))
     const el = await screen.findByTestId("tw-stub")
-    expect(el).toHaveAttribute("data-locked", "true")
+    await waitFor(() => expect(el).toHaveAttribute("data-locked", "true"))
   })
 
   it("a lock on ANOTHER thread does not lock this one", async () => {

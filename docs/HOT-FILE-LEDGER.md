@@ -11080,11 +11080,13 @@ cells rot within days.
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 10 / 5 / 648 (was `4 / 4 / 614`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03**): ONE `message` field on the error state + ONE `onThread` prop; copy "Won't search". ⛔ the body stays a list |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
+| [`frontend/src/components/chat/ThreadWorkflowPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadworkflowpickertsx) | 1 / 1 / 91 | no (young) | young (created 287-03). Props are exactly thread + locked; own ChatLaunchForm instance; action button, never a mode pill. ⛔ reads nothing from the conversation (stripped-source fence) |
+| [`frontend/src/components/chat/useStartWorkflowInThread.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusestartworkflowinthreadts) | 1 / 1 / 85 | no (young) | young (created 287-03). list-on-open, form-or-start, UN-AWAITED sendMessage `Run <name>`. ⛔ no createThread, no conversation read (fence with positive control) |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 80 / 37 / 1036 (was `79 / 37 / 1029`) | ⚠ **FIRES** | **276-REVIEW B-WR-01**: the avatar's cap-pause argument also requires a Continue left (`!continueExhausted && continuesRemaining > 0`). No hook, no store read |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 271 / 91 / 2544 (was `265 / 90 / 2459`) | ⚠ **FIRES** | honoured by construction (**279-02**): ONE `_require_thread_org` at 4 doors; send stays 11 `if`s (pinned); OV-279-01 not required. ⛔ 0 new send-path branches |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 107 / 41 / 4991 (was `106 / 40 / 4982`) | ⚠ **FIRES** | honoured by construction (**279-03 C**, D-15): ONE constant + ONE widened 409 condition (`startsWith` lock prefix). ⛔ `onTurnBoundary` still FLUSHES before moving |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 109 / 42 / 5004 (was `107 / 41 / 4991`) | ⚠ **FIRES** | honoured by construction (**287-03**): ONE passthrough field `inputs: opts?.inputs`, 0 branches. ⛔ `onTurnBoundary` still FLUSHES before moving |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | 286 forecast (290): the team picture is a SEPARATE read-only view (VIS-01: never a second canvas); at most ONE gated mount here. honoured by construction (199 / 200 / 214) |
@@ -11130,7 +11132,7 @@ cells rot within days.
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 24 / 11 / 376 (was `21 / 9 / 307`) | **FIRES** | ⚠ row STALE (`21/9/307`). honoured by construction (**267-04**): the turn index skips system rows via ONE module-level helper; no prop added |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
-| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 93 / 43 / 1186 (was `91 / 42 / 1171`) | **FIRES** | honoured by construction (**279-03 D/E**): ONE functional setActiveExpert + guarded catch; `&& !isStreaming`; 2 props. Zero new hooks. ⛔ no scope branch in send |
+| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 17 / 9 / 1013 (was `15 / 8 / 836`) | **FIRES** | honoured by construction (**282-02**): draft moved to askDraftStore (useState 9 → 7); APG radio keys + mark; `home` prop; +`AskPointer` (+177 lines). ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 30 / 11 / 1578 (was `28 / 9 / 1670`) | **FIRES** | **286-03** seam TAKEN: run read + 5 s poll + terminal edge → `hooks/useWorkflowRun.ts`, called after `isTerminal` (CR-01). OWED: phase/spec join, canvas mount. ⛔ invariant 8 tokens |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
@@ -11365,7 +11367,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
 | [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 3 / 2 / 183 (was `2 / 1 / 183`) | no (2 phases) | Both attach doors' state + verbs. **274-03**: ONE edit — the composer uploads with `lifetime "thread"`. ⛔ it CANNOT reach `setValue` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
-| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 22 / 14 / 572 | **FIRES** | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253; re-derived under CR-08. **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
+| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 24 / 15 / 607 (was `22 / 14 / 572`) | **FIRES** | honoured by construction (**287-03**): ONE optional `inputs` type field on sendMessage opts, 0 branches. **244-13**: `WorkflowLock.mode` is a REAL discriminator |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
 | [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 21 / 14 / 838 (was `15 / 10 / 690`) | ⚠ **FIRES** | **284-02**: mig 207's `library_documents` grant block mirrored (SELECT-only, closed to PUBLIC / anon; ACL parity 349/349). ⛔ `scripts/` is gate-EXEMPT: kept by hand |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
@@ -22086,3 +22088,31 @@ Scan-list disposition cell before 286-05 (replaced):
 > young (200)
 
 CLAUDE.md FIRING row: none — does not fire; the forecast lives here and in the scan-list cell only.
+
+## `frontend/src/components/chat/ThreadWorkflowPicker.tsx`
+
+**`1 / 1 / 91` — young (created 287-03, START-01).** G-5 does not fire. Row added AT CREATION so the gate sees it.
+
+The in-thread "Run a workflow" action: a plain button, a list popover and its OWN `ChatLaunchForm` instance. Props are exactly `thread` and `locked`; `ChatArea` mounts it ONCE above the composer. **Anti-pattern tension, recorded:** sketch 011 removed a composer workflow door because a mode pill holds state the composer must honour. This is an ACTION BUTTON — no `aria-pressed`, no composer state, every launch posts `workflow_definition_id`, and the server lock (409) is the authority. ⛔ **Binding invariants:** reads nothing from the conversation (D-07, T-287-09; stripped-source fence with positive control in `ThreadWorkflowPicker.test.tsx`); never creates a thread; no mount-time fetch. A second concern here is the signal to extract first.
+
+CLAUDE.md FIRING row: young row added (cell cap 80).
+
+## `frontend/src/components/chat/useStartWorkflowInThread.ts`
+
+**`1 / 1 / 85` — young (created 287-03, START-01).** G-5 does not fire.
+
+Owns open/list/loading/error/pending/starting state. `openPicker` is the ONLY fetch (`listPublishedWorkflows`); `pick` decides form-or-start from `launchInputFields`; `start` calls `useStreamActions().sendMessage(thread.id, "Run <name>", {workflowDefinitionId, inputs, surfaceId:"chat"})` **UN-AWAITED** (`sendMessage` resolves only when the whole stream ends). A `startingRef` guards the same-tick double fire. ⛔ **Binding invariants:** the kickoff text is the fixed `Run <name>`; inputs are only what the person typed; no `createThread`; the counterfactual (planting the forbidden token in this file) was driven and trips the fence.
+
+CLAUDE.md FIRING row: young row added (cell cap 80).
+
+## `frontend/src/components/chat/ChatArea.tsx` — `287-03` (START-01)
+
+**`94 / 44 / 1189` (was `93 / 43 / 1186`).** Honoured by construction: ONE import, ONE JSX sibling above `MessageInput` rendered only when `thread` exists, passing `thread` and `locked={workflowLocked}` (the existing value, no second derivation). Zero new hooks, zero logic, zero new network calls on mount (`ChatArea.threadWorkflowPicker.test.tsx`). `ChatLayout.tsx`, `MessageInput.tsx` and `doRun` were NOT edited (A-02). The anti-pattern tension (sketch 011 removed a composer workflow door) is recorded in the `ThreadWorkflowPicker.tsx` section: action button, not a mode pill. Extraction remains the strongest frontend case after `StreamsProvider.tsx`.
+
+## `frontend/src/providers/StreamsProvider.tsx` — `287-03` (START-01)
+
+**`109 / 42 / 5004` (was `107 / 41 / 4991`).** Honoured by construction (A-01): ONE passthrough line `inputs: opts?.inputs` in the `postMessage` call. No branch, no navigation, no await change. `postMessage` already omits an empty inputs map, so a Deep send is byte-identical (asserted in `StreamsProvider.inputs.test.tsx`). Known and accepted (T-287-13): a failed send puts the harmless `Run <name>` text in `failedSendDrafts`.
+
+## `frontend/src/stores/streamsStore.ts` — `287-03` (START-01)
+
+**`24 / 15 / 607` (was `22 / 14 / 572`).** ONE passthrough field: optional `inputs?: Record<string, string>` on the `sendMessage` opts type. 0 branches.

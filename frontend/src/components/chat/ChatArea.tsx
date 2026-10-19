@@ -33,6 +33,7 @@ import type { Folder, Thread, ExpertBundle } from "@/types"
 import { Clock, Menu, PanelLeftOpen } from "lucide-react"
 // Phase 276-06 (D-24 / D-27): the empty-chat hero is the static Iris (idle: nothing is working).
 import { IrisAvatar } from "./IrisAvatar"
+import { ThreadWorkflowPicker } from "./ThreadWorkflowPicker"
 
 interface Props {
   thread: Thread | null
@@ -803,6 +804,8 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
         {expertChangeError}
       </div>
     )}
+    {/* Phase 287-03 (D-02): the ONE mount - an action button, not a mode; locked = workflowLocked */}
+    {thread && <ThreadWorkflowPicker thread={thread} locked={workflowLocked} />}
     <MessageInput
       activeExpert={activeExpert}
       onActiveExpertChange={(exp) => void applyExpertChange(exp)}

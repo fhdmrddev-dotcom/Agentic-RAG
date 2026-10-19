@@ -411,7 +411,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 80 / 37 / 1036 (was `79 / 37 / 1029`) | last touch 276-REVIEW B-WR-01 |
 | `backend/app/api/threads.py` | 271 / 91 / 2544 (was `265 / 90 / 2459`) | honoured by construction (279-02: ONE org helper) · ⛔ |
-| `frontend/src/providers/StreamsProvider.tsx` | 107 / 41 / 4991 (was `104 / 38 / 4948`) | honoured by construction (279-03: ONE widened 409 condition) · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 109 / 42 / 5004 (was `107 / 41 / 4991`) | honoured by construction (287-03: ONE passthrough field) · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -457,8 +457,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE · last touch 268-03 · ⛔ |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent its ENTIRE LIFE — row added 244-05 |
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
-| `frontend/src/components/chat/ChatArea.tsx` | 93 / 43 / 1186 (was `91 / 42 / 1171`) | honoured by construction (279-03: chip clear, 0 new hooks) · ⛔ |
-| `frontend/src/stores/streamsStore.ts` | 22 / 14 / 572 | ⚠ row STALE · last touch 244-15 · ⛔ |
+| `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
+| `frontend/src/stores/streamsStore.ts` | 24 / 15 / 607 (was `22 / 14 / 572`) | honoured by construction (287-03: ONE type field) · ⛔ |
+| `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 1 / 1 / 91 | young (created 287-03) · reads no conversation · ⛔ |
+| `frontend/src/components/chat/useStartWorkflowInThread.ts` | 1 / 1 / 85 | young (created 287-03) · no createThread · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 17 / 9 / 1013 (was `15 / 8 / 836`) | G-5 FIRES · honoured by construction (282-02: draft moved out, +AskPointer) |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 30 / 11 / 1578 (was `28 / 9 / 1670`) | seam TAKEN (286-03): run read + poll → useWorkflowRun · ⛔ |
