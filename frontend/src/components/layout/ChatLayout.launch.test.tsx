@@ -158,6 +158,17 @@ const DEF_WITH_INPUTS = {
   },
 }
 
+// 287-01 — a definition whose second field is EXPLICITLY optional (`required: false`), so the
+// "absent and empty are different facts on the wire" property stays alive now that an empty
+// REQUIRED field is refused. `to` stays required (absent reads required).
+const DEF_WITH_OPTIONAL = {
+  id: "pub-5",
+  name: "Send optional summary",
+  definition: {
+    inputs: [{ key: "to", label: "Recipient address" }, { key: "subject", required: false }],
+  },
+}
+
 /** The shape `WorkflowsPage.tsx:1351` produces after plan 214-09 — ALREADY COLLECTED. */
 const LIBRARY_COLLECTED = { to: "already@typed.test", subject: "Q3 numbers" }
 
@@ -197,6 +208,13 @@ vi.mock("@/pages/WorkflowsPage", () => ({
           onClick={() => record(onLaunch(DEF_WITH_INPUTS, "send it"))}
         >
           launch declared
+        </button>
+        {/* 287-01 — declared inputs where one field is explicitly `required: false`. */}
+        <button
+          data-testid="drive-launch-optional"
+          onClick={() => record(onLaunch(DEF_WITH_OPTIONAL, "send it"))}
+        >
+          launch optional
         </button>
         {/* 214-12 — THE LIBRARY DOOR: `RunModal` already collected, so `opts.inputs` is
             PRESENT. This is the double-prompt case's driver. */}
@@ -613,6 +631,11 @@ describe("ChatLayout — chat collects declared inputs BEFORE anything is create
     expect(mockCreateThread).not.toHaveBeenCalled()
     expect(mockPostMessage).not.toHaveBeenCalled()
 
+    // 287-01 REWRITE (reason: both declared fields are REQUIRED — absent reads true — and the
+    // confirm control now refuses an empty one, so the "confirmed" half of this case must
+    // fill them first. The no-thread-before-confirm half is unchanged.)
+    fireEvent.change(screen.getByTestId("run-input-to"), { target: { value: "a@b.test" } })
+    fireEvent.change(screen.getByTestId("run-input-subject"), { target: { value: "Hi" } })
     fireEvent.click(screen.getByTestId("chat-launch-confirm"))
     await waitFor(() => expect(mockCreateThread).toHaveBeenCalledTimes(1))
   })
@@ -670,18 +693,33 @@ describe("ChatLayout — chat collects declared inputs BEFORE anything is create
     })
   })
 
-  it("an untouched field sends an empty string — every declared key is PRESENT", async () => {
+  // 287-01 REWRITE IN PLACE (reason: the old case asserted an untouched REQUIRED field posts
+  // `""`. START-01 / D-06 reverses that for required fields, so the case now asserts the refusal;
+  // the "absent and empty are different" property moves to the `required: false` sibling below).
+  it("an untouched REQUIRED field is REFUSED by name — nothing is created or posted", async () => {
     renderLayout()
     fireEvent.click(screen.getByTestId("drive-launch-declared"))
     await screen.findByTestId("chat-launch-form")
     fireEvent.change(screen.getByTestId("run-input-to"), { target: { value: "a@b.test" } })
     fireEvent.click(screen.getByTestId("chat-launch-confirm"))
 
+    const refusal = await screen.findByTestId("chat-launch-required-refusal")
+    expect(refusal.textContent).toBe("subject is required")
+    expect(screen.getByTestId("chat-launch-form")).toBeInTheDocument()
+    expect(mockCreateThread).not.toHaveBeenCalled()
+    expect(mockPostMessage).not.toHaveBeenCalled()
+  })
+
+  it("a `required: false` field left empty still sends an empty string — the key is PRESENT", async () => {
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-optional"))
+    await screen.findByTestId("chat-launch-form")
+    fireEvent.change(screen.getByTestId("run-input-to"), { target: { value: "a@b.test" } })
+    fireEvent.click(screen.getByTestId("chat-launch-confirm"))
+
     await waitFor(() => expect(mockPostMessage).toHaveBeenCalledTimes(1))
     const sent = mockPostMessage.mock.calls[0][2] as { inputs: Record<string, string> }
-    // No required-ness is validated at any launcher (the publish gate already refuses an
-    // undeclared `ask` key). `""` is a real answer, and PRESENCE is asserted rather than the
-    // value alone: absent and empty are DIFFERENT facts on the wire.
+    // PRESENCE is asserted rather than the value alone: absent and empty are DIFFERENT facts.
     expect(Object.prototype.hasOwnProperty.call(sent.inputs, "subject")).toBe(true)
     expect(sent.inputs.subject).toBe("")
   })
@@ -755,6 +793,10 @@ describe("ChatLayout — ONE collection point per launch (the double-prompt fenc
     expect(await screen.findByTestId("chat-launch-form")).toBeInTheDocument()
     expect(mockCreateThread).not.toHaveBeenCalled()
 
+    // 287-01 REWRITE (reason: both fields are required, so the form must be filled before the
+    // confirm can proceed; the point of this case — the form OPENS on this door — is unchanged).
+    fireEvent.change(screen.getByTestId("run-input-to"), { target: { value: "a@b.test" } })
+    fireEvent.change(screen.getByTestId("run-input-subject"), { target: { value: "Hi" } })
     fireEvent.click(screen.getByTestId("chat-launch-confirm"))
     await waitFor(() => expect(mockPostMessage).toHaveBeenCalledTimes(1))
     expect(mockPostMessage.mock.calls[0][1]).toBe("")
