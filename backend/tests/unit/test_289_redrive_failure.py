@@ -243,18 +243,10 @@ async def test_no_active_phase_still_finishes_the_run_failed(monkeypatch):
     assert len(_audit_writes(pool)) == 1
 
 
-# ── 289-REVIEW WR-01 — the minted producer shell is terminalized when the context build raises ──
+# ── 289-REVIEW WR-01 — no minted producer shell is left un-finalized when the context build raises ──
 
 
-@pytest.mark.asyncio
-async def test_a_build_context_raise_after_the_shell_insert_finalizes_the_shell(monkeypatch):
-    """WR-01: `_build_resume_context` INSERTs a `streaming` producer shell, then can still raise
-    (`get_service_role_supabase` refuses a falsy org). The caller never gets `ctx`, so it cannot
-    finalize the shell; a stranded `streaming` row becomes the thread's latest runs row and
-    defeats the F2 self-heal. The builder must finalize its own shell before re-raising.
-    """
-    from app.services.harness_engine import _build_resume_context
-
+def _shell_spies(monkeypatch):
     inserted: list = []
     finalized: list = []
 
@@ -266,14 +258,70 @@ async def test_a_build_context_raise_after_the_shell_insert_finalizes_the_shell(
 
     monkeypatch.setattr("app.db.runs.insert_run", _fake_insert_run)
     monkeypatch.setattr("app.db.runs.finalize_run", _fake_finalize_run)
+    return inserted, finalized
 
+
+def _stranded(inserted, finalized):
+    done = {f["run_id"] for f in finalized}
+    return [i["run_id"] for i in inserted if i["status"] == "streaming" and i["run_id"] not in done]
+
+
+@pytest.mark.asyncio
+async def test_a_build_context_raise_never_strands_a_streaming_shell(monkeypatch):
+    """WR-01: `get_service_role_supabase` refuses a falsy org and used to raise AFTER the shell
+    INSERT. The caller never gets `ctx`, so it cannot finalize the shell; a stranded
+    `streaming` row becomes the thread's latest runs row and defeats the F2 self-heal.
+    (RED at `test(289-REVIEW): WR-01 RED`: one shell inserted, none finalized.)
+    """
+    from app.services.harness_engine import _build_resume_context
+
+    inserted, finalized = _shell_spies(monkeypatch)
     row = _paused_row(org_id=None)  # and the fake pool's org read answers None too
     pool = _RedriveFakePool(row)
 
     with pytest.raises(ValueError):
         await _build_resume_context(dict(row), _NoopRedis(), pool)
 
-    assert len(inserted) == 1 and inserted[0]["status"] == "streaming", "precondition"
-    assert len(finalized) == 1, "the minted shell must be finalized on the raise"
-    assert finalized[0]["run_id"] == inserted[0]["run_id"]
-    assert finalized[0]["status"] == "failed"
+    assert _stranded(inserted, finalized) == []
+
+
+@pytest.mark.asyncio
+async def test_a_raise_where_the_insert_used_to_precede_it_never_strands_a_shell(monkeypatch):
+    """WR-01, the other fallible step after the old INSERT point: the ctx-model resolution."""
+    from app.services.harness_engine import _build_resume_context
+
+    inserted, finalized = _shell_spies(monkeypatch)
+    monkeypatch.setattr("app.dependencies.get_service_role_supabase", lambda _org: object())
+    monkeypatch.setattr("app.models.user_settings.load_user_settings", lambda _uid: None)
+
+    def _boom(_settings):
+        raise RuntimeError("planted ctx-model failure")
+
+    monkeypatch.setattr("app.services.sub_agent_models.resolve_workflow_ctx_model", _boom)
+    row = _paused_row(org_id=uuid.uuid4())
+    pool = _RedriveFakePool(row)
+
+    with pytest.raises(RuntimeError):
+        await _build_resume_context(dict(row), _NoopRedis(), pool)
+
+    assert _stranded(inserted, finalized) == []
+
+
+@pytest.mark.asyncio
+async def test_the_success_path_still_mints_exactly_one_shell_in_the_runs_org(monkeypatch):
+    """The move must not drop the shell: one `streaming` INSERT, id == ctx.producer_run_id."""
+    from app.services.harness_engine import _build_resume_context
+
+    inserted, _finalized = _shell_spies(monkeypatch)
+    monkeypatch.setattr("app.dependencies.get_service_role_supabase", lambda _org: object())
+    monkeypatch.setattr("app.models.user_settings.load_user_settings", lambda _uid: None)
+    org = uuid.uuid4()
+    row = _paused_row(org_id=org)
+    pool = _RedriveFakePool(row)
+
+    ctx = await _build_resume_context(dict(row), _NoopRedis(), pool)
+
+    assert len(inserted) == 1
+    assert inserted[0]["status"] == "streaming"
+    assert inserted[0]["run_id"] == ctx.producer_run_id
+    assert inserted[0]["org_id"] == str(org)

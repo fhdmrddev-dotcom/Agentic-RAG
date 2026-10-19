@@ -1919,6 +1919,15 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 61 / 24 / 
 
 CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/services/harness_engine.py` | 61 / 24 / 3387 (was `60 / 23 / 3297`) | 286 forecast: 289 adds one confidence field on KB outputs (by construction) |
 
+
+### `backend/app/services/harness_engine.py` — 289-REVIEW WR-01
+
+**`62 / 25 / 3396` (was `61 / 24 / 3387`).** Honoured by construction, +9 lines (3387 → 3396): ONE `insert_run` call moved, no new branch. `_build_resume_context` INSERTed the `streaming` producer shell and could then raise (`get_service_role_supabase` refuses a falsy org); the caller never got `ctx`, so the shell stranded and became the thread's latest runs row (defeats the F2 self-heal). The INSERT now runs after every fallible step, just before `return`; the org is still resolved before it (268-REVIEW WR-06). Pinned by `tests/unit/test_289_redrive_failure.py` (two raise cases RED at the RED commit, plus the success path still mints exactly one shell in the run's org). Resume suites A/B'd against HEAD: 0 new failures (23 inherited).
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-REVIEW WR-01, moved verbatim): | `backend/app/services/harness_engine.py` | 61 / 24 / 3387 | Phase 289 NOT EDITED (confidence rode phase_types) · F3 owed |
+
+Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW WR-01, moved verbatim): 61 / 24 / 3387 | **FIRES** | **Phase 289 NOT EDITED**: the 286 forecast's confidence field landed in phase_types (289-02), so the engine needed no change. F3 (run-level buckets) still OWED here
+
 ## `frontend/src/components/chat/ThinkingBlock.tsx`
 
 **Created 2026-09-11 (Phase 243, plan `243-02`):** `1 commit / 1 phase / 117 L` · **G-5 does NOT fire** (1 phase against a threshold of 3).
@@ -11299,7 +11308,7 @@ cells rot within days.
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 9 / 5 / 756 (was `8 / 4 / 748`) | **FIRES** | ⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id`/`expert_id` (+8 lines). ⛔ NOT the shape to copy (C-5) |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 43 / 20 / 1798 (was `41 / 19 / 1750`) | **FIRES** | **289-01**: ONE `_fail_redrive` helper + 2 call sites (a failed paused re-drive ends `failed` with words + a `run_failed` audit row); answer-route scoping untouched |
-| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 61 / 24 / 3387 | **FIRES** | **Phase 289 NOT EDITED**: the 286 forecast's confidence field landed in phase_types (289-02), so the engine needed no change. F3 (run-level buckets) still OWED here |
+| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 62 / 25 / 3396 (was `61 / 24 / 3387`) | **FIRES** | **289-REVIEW WR-01**: `_build_resume_context` mints the producer shell LAST, after every fallible step, so a raise never strands a `streaming` row. No new code path. F3 still owed |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
 | [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |

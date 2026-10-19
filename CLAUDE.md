@@ -454,7 +454,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
 | `backend/app/api/runs.py` | 43 / 20 / 1798 (was `41 / 19 / 1750`) | 289-01: ONE _fail_redrive helper + 2 call sites |
 | `backend/app/middleware/canvas_gate.py` | 9 / 6 / 396 (was `8 / 5 / 391`) | 289-03: ONE gated path (…/evidence) · ⛔ test_182 never imports it |
-| `backend/app/services/harness_engine.py` | 61 / 24 / 3387 | Phase 289 NOT EDITED (confidence rode phase_types) · F3 owed |
+| `backend/app/services/harness_engine.py` | 62 / 25 / 3396 (was `61 / 24 / 3387`) | 289-REVIEW WR-01: resume shell INSERT moved last (no new code) · F3 owed |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE; does NOT fire yet · ⛔ |
 | `frontend/src/components/chat/RunCard.tsx` | 31 / 16 / 729 | last touch 276-06 (D-27) · ⛔ |
 | `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE · last touch 268-03 · ⛔ |
