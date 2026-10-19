@@ -413,3 +413,45 @@ async def test_the_fail_arm_emits_run_failed_like_the_engine(monkeypatch):
     assert len(failed) == 1
     assert failed[0][0] == f"run:{row['run_id']}"
     assert failed[0][1]["reason"] == REASON
+
+
+# ── 289-REVIEW WR-06 — an answered paused run whose definition cannot load ends failed ──
+
+DEFINITION_REASON = "Your answer was saved, but the workflow could not be loaded."
+
+
+@pytest.mark.asyncio
+async def test_an_unloadable_definition_ends_the_answered_run_failed_with_words(monkeypatch):
+    """WR-06: the `definition is None` arm returned False with the run still `paused` and the
+    lease claimed. The answer row exists, so `/pending` omits the prompt and no surface can
+    answer again, while the server's waiting-on sentence promises the run continues as soon as
+    they answer. The run must end `failed` with a worded reason instead.
+    """
+    from app.api import runs as runs_api
+
+    row = _paused_row()
+    pool = _RedriveFakePool(row, run_status="paused")
+
+    async def _fake_get_pool():
+        return pool
+
+    async def _no_definition(_pool, _run_id):
+        return None
+
+    monkeypatch.setattr("app.dependencies.get_pg_pool", _fake_get_pool)
+    monkeypatch.setattr("app.services.harness_engine._load_run_definition", _no_definition)
+
+    redis = _RecordingRedis()
+    ok = await runs_api._redrive_paused_workflow_run(row["run_id"], "tc-answered", redis)
+
+    assert ok is False, "no re-drive was spawned"
+    assert pool.run_status == "failed", "the answered run must not stay paused"
+    phase = _phase_fail_writes(pool)
+    assert len(phase) == 1 and phase[0][1][1]["_failure_reason"] == DEFINITION_REASON
+    finish = _run_finish_writes(pool)
+    assert len(finish) == 1 and finish[0][1] == (row["run_id"], "failed")
+    assert len(_audit_writes(pool)) == 1
+    failed = [e for _k, e in redis.events if e.get("type") == "run_failed"]
+    assert failed and failed[0]["reason"] == DEFINITION_REASON
+    resumes = [s for s, _a in pool.calls if "UPDATE workflow_runs SET status = 'active'" in s]
+    assert resumes == [], "an unloadable run is never flipped to active"
