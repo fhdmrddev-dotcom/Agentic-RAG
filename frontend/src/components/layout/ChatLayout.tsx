@@ -34,6 +34,7 @@ import { OrgAdminShell } from "@/components/org/OrgAdminShell"
 // Phase 188 Plan 09 (RUNVIZ-03): the run's own room mounts here as a full-surface
 // branch (the SkillStudioPage precedent — entered WITH an id, returned via callbacks).
 import { WorkflowRunPage } from "@/pages/WorkflowRunPage"
+import { readRunDeepLink } from "@/lib/runDeepLink"
 // Phase 257 (METER-07): Operator Spend & Metering cockpit
 import { AdminSpendPage } from "@/pages/admin/AdminSpendPage"
 // Phase 262 plan 05 (PACK-11 / PACK-13 / D-262-03): the Expert catalog, and the ordered
@@ -301,7 +302,9 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   //    shape; this one stays local because only doRun and the branch below read it.
   //    ⚠ This is a `workflow_runs.id`, NEVER a producer `runs.run_id`. Set by doRun
   //    from the thread's run anchor — see the tail of doRun for the id trap. ──
-  const [activeRunId, setActiveRunId] = useState<string | null>(null)
+  //    Phase 289-04 (SC#3): seeded once from `/app?run=<uuid>` so a shared or reloaded run
+  //    address opens that run (App's view initializer reads the same link).
+  const [activeRunId, setActiveRunId] = useState<string | null>(() => readRunDeepLink())
 
   // ── CR-05 (Phase 188 review): the run home is CANVAS-ERA SURFACE, so the operator's
   //    kill switch owns it exactly as it owns the Builder's canvas
