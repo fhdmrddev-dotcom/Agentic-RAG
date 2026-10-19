@@ -83,7 +83,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 m
 - [x] **Phase 286: Seams Before Features**: take the named G-5 seams on the workflow files this milestone edits, behaviour unchanged (REG-07)
 - [x] **Phase 287: Start From a Thread, Fork a Starter** (closed 2026-10-19, `human_needed`: SC#4 one-click ruling, Anthropic/OpenRouter rows after credit, cloud mig 210 paste): launch a workflow from a thread with its form and run attached; fork one of 5+ curated, gauntlet-passing starters in one click (START-01, START-03)
 - [ ] **Phase 288: Drafts That Survive, Pauses That Publish**: draft configuration persists across navigation; a human-pause workflow publishes and the run shows who it waits on (AUTH-03, AUTH-01)
-- [ ] **Phase 289: The Run Page and Its Evidence**: one read-only finished-run page with export; confidence on KB-derived phase outputs (VIS-03, TRUST-01)
+- [x] **Phase 289: The Run Page and Its Evidence** (closed 2026-10-20, operator-approved; Anthropic row blocked on billing; BUG-261020-01/02 filed): one read-only finished-run page with export; confidence on KB-derived phase outputs (VIS-03, TRUST-01)
 - [ ] **Phase 290: The Card and the Team Picture**: card matches its approved sketch; truthful orchestrator / workers / judge view (VIS-04, VIS-01)
 - [ ] **Phase 291: Describe It From Your Own Files**: describe-it authoring from uploaded template, form and reference documents (AUTH-02)
 - [ ] **Phase 292: More Ways to Show It**: new artifact types from a closed registry, set chosen at sketch time (VIS-02)
@@ -299,7 +299,7 @@ Plans:
 | 286. Seams Before Features | 0/TBD | Not started | - |
 | 287. Start From a Thread, Fork a Starter | 0/TBD | Not started | - |
 | 288. Drafts That Survive, Pauses That Publish | 4/4 | human_needed (2026-10-19) | S1 generate arm and Anthropic row blocked on billing; late-answer resume and Expired card defects open (288-UAT.md) |
-| 289. The Run Page and Its Evidence | 0/TBD | Not started | - |
+| 289. The Run Page and Its Evidence | 5/5 | Complete (2026-10-20) | Operator approved G-4; Anthropic row blocked on billing; BUG-261020-01 (human answer not passed on) and BUG-261020-02 (CR-01 residual) open |
 | 290. The Card and the Team Picture | 0/TBD | Not started | - |
 | 291. Describe It From Your Own Files | 0/TBD | Not started | - |
 | 292. More Ways to Show It | 0/TBD | Not started | - |
