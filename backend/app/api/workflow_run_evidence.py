@@ -26,9 +26,14 @@ RLS connection, so a private folder's name never crosses (W3a). If that RLS bloc
 source is masked and the label is the default words: fail closed. The human-input step reports
 only whether it was answered.
 
-**Accepted, stated rather than silent (T-289-18 / T-289-31):** a same-org colleague receives
-each non-human step's ``output_text``, the full definition and the gate rows' validator kinds.
-That is the record of what ran, which is this page's purpose.
+**T-289-31, MITIGATED for masked citations (289-REVIEW CR-01):** a step that cited any document
+the colleague cannot read has its ``output_text`` replaced by a fixed sentence, because that
+text is the model's synthesis of the masked passages. Fail closed applies here too.
+
+**Accepted, stated rather than silent (T-289-18 / T-289-31 remainder):** a same-org colleague
+receives the ``output_text`` of a non-human step whose citations are all readable to them (or
+that cited nothing), the full definition and the gate rows' validator kinds. That is the record
+of what ran, which is this page's purpose.
 
 The path template is registered in ``middleware/canvas_gate.py``'s ``CANVAS_GATED_PATHS`` in
 the same commit that mounts this router.
@@ -318,7 +323,10 @@ async def read_run_evidence(
             viewer_id, ev.cited_document_ids(phase_rows), full
         )
 
-    phase_log = ev.compose_phase_log(phase_rows, full, viewer_is_owner, who["name"], kb_label)
+    # CR-01: the same readable set gates each citing step's output_text (one decision).
+    phase_log = ev.compose_phase_log(
+        phase_rows, full, viewer_is_owner, who["name"], kb_label, readable
+    )
     steps = ev.step_numbers(phase_log)
 
     file_id = None

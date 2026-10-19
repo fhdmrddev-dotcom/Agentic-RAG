@@ -26,8 +26,9 @@ The four sections and their one source each:
                    ``WorkflowRunCitationRead`` allow-list precedent).
 
 Privacy for a same-org colleague (A-06, R-01..R-04): no owner email, no passage, no score; a
-document the colleague cannot read under their own RLS is masked down to its step numbers; the
-human-input step reports only whether it was answered.
+document the colleague cannot read under their own RLS is masked down to its step numbers, AND
+the output of any step that cited it is withheld behind ``WITHHELD_OUTPUT_SENTENCE`` (CR-01);
+the human-input step reports only whether it was answered.
 """
 from __future__ import annotations
 
@@ -69,6 +70,14 @@ VERDICT_KINDS: tuple[str, ...] = tuple(sorted(set(_CHECK_RESULT) | _RECORDED_KIN
 _GATE_KINDS = frozenset({"gate_passed", "gate_failed"})
 
 _HUMAN_INPUT = "llm_human_input"
+
+# 289-REVIEW CR-01 (T-289-31 MITIGATED for masked citations). A step's ``output_text`` is the
+# model's synthesis of the passages it cited, so masking a source row while shipping that text
+# would print the private document's content one row above "A document you don't have access
+# to". For a non-owner, a step that cited ANY document they cannot read gets this sentence in
+# place of its output. Same vocabulary as the masked source (``MASKED_SOURCE`` in
+# ``frontend/src/components/workflows/evidenceVocabulary.ts``).
+WITHHELD_OUTPUT_SENTENCE = "This step's output draws on a document you don't have access to."
 
 
 def _phase_specs(definition: Any) -> list[dict]:
@@ -198,8 +207,15 @@ def compose_phase_log(
     viewer_is_owner: bool,
     owner_name: str | None,
     kb_label: str,
+    readable_ids: set[str] | None = None,
 ) -> list[dict]:
-    """One entry per durable phase row, numbered from 1 in ``phase_index`` order."""
+    """One entry per durable phase row, numbered from 1 in ``phase_index`` order.
+
+    ``readable_ids`` follows ``compose_sources``: ``None`` for the owner (nothing withheld);
+    for anyone else, a step citing a document outside the set has its ``output_text``
+    replaced by ``WITHHELD_OUTPUT_SENTENCE`` (CR-01). An EMPTY set (the RLS check failed)
+    withholds every citing step's output: fail closed.
+    """
     names = _name_by_slug(definition)
     types = _slug_to_phase_type(_coerce_definition(definition))
     log: list[dict] = []
@@ -232,6 +248,13 @@ def compose_phase_log(
                     "answered": answered, "question": None, "answer": None, "answered_by": None,
                 }
                 output_text = None
+        if (
+            not viewer_is_owner
+            and readable_ids is not None
+            and output_text is not None
+            and any(c["document_id"] not in readable_ids for c in _citations_of(row))
+        ):
+            output_text = WITHHELD_OUTPUT_SENTENCE
         log.append(
             {
                 "n": n,
@@ -455,6 +478,7 @@ def started_by(display_name: Any, owner_email: Any, viewer_is_owner: bool) -> di
 
 __all__ = [
     "VERDICT_KINDS",
+    "WITHHELD_OUTPUT_SENTENCE",
     "cited_document_ids",
     "compose_definition",
     "compose_deliverable",

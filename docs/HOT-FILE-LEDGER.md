@@ -11268,8 +11268,8 @@ cells rot within days.
 | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 45 / 23 / 1647 (was `43 / 23 / 2261`) | **FIRES** | **286-01** seam TAKEN: 20 wire models/helpers → `workflow_wire.py`; generate + template doors → `workflow_authoring_doors.py` (same router). D-05 1,200-1,400 MISSED (1,647); split OWED |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 17 / 12 / 1295 (was `14 / 11 / 1240`) | **FIRES** | **289-02** `confidence` read field in lockstep (+1 lazy label read); **289-05** paused sentence restored after S5. The 286 export forecast went to a new module |
 | [`backend/app/services/harness/phase_confidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_confidencepy) | 1 / 1 / 153 (was `0 / 0 / 0`) | no (young) | young (created 289-02). Pure confidence helper + wire allow-list + KB label read (duck-typed, never raises). ⛔ no provider import; chat's _compute_confidence only |
-| [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 1 / 1 / 468 (was `0 / 0 / 0`) | no (young) | young (created 289-03). Pure composers for the four sections + definition_changed. ⛔ no I/O; never ships passage/similarity; non-owner masking fails closed |
-| [`backend/app/api/workflow_run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_run_evidencepy) | 1 / 1 / 358 (was `0 / 0 / 0`) | no (young) | young (created 289-03). Org-scoped terminal-only read; S4 driven live (byte-identical 404). ⛔ ONE access query; 404 parity; require_canvas alone |
+| [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 2 / 1 / 492 (was `1 / 1 / 468`) | no (young) | **289-REVIEW CR-01**: a citing step's output withheld for a non-owner when a cited doc is masked. ⛔ no I/O; never ships passage/similarity; fails closed |
+| [`backend/app/api/workflow_run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_run_evidencepy) | 2 / 1 / 366 (was `1 / 1 / 358`) | no (young) | **289-REVIEW CR-01**: passes the readable set to the phase log (one decision). ⛔ ONE access query; 404 parity; require_canvas alone |
 | [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 9 / 6 / 396 (was `8 / 5 / 391`) | **FIRES** | **289-03**: ONE CANVAS_GATED_PATHS member (`…/evidence`) + comment, same commit as its include_router. ⛔ test_182 never imports the set |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 22 / 15 / 537 (was `21 / 14 / 537`) | ⚠ **FIRES** | **279-01**: docstring repoints to the new expert_scope homes only (OpenAPI regen). ⛔ a body touching both pairs is a 422 |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
@@ -22346,6 +22346,12 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-03, row added at planning). Pure composers for the four evidence sections. ⛔ no I/O; never ships passage/similarity
 
+### `backend/app/services/run_evidence.py` — 289-REVIEW CR-01
+
+**`2 / 1 / 492` (was `1 / 1 / 468`).** `compose_phase_log` takes the same `readable_ids` as `compose_sources`; for a non-owner, a step citing any document outside it ships `WITHHELD_OUTPUT_SENTENCE` in place of `output_text` (an empty set withholds every citing step: fail closed). T-289-31 moves from accepted to mitigated for masked citations. ⛔ The owner path stays whole; a step with no masked citation keeps its text.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW CR-01, moved verbatim): 1 / 1 / 468 (was `0 / 0 / 0`) | no (young) | young (created 289-03). Pure composers for the four sections + definition_changed. ⛔ no I/O; never ships passage/similarity; non-owner masking fails closed
+
 ## `backend/app/api/workflow_run_evidence.py`
 
 **`0 / 0 / 0` — planned (289-03); row and section added at planning.** `GET /workflow-runs/{id}/evidence`, the first org-shared read on the run tables (SECURITY-BEARING, beside the library feeds). ⛔ **Binding invariants:** ONE pool SELECT carries id + terminal status + owner-or-org-member before any other read; every refusal is the same 404 `Run not found`, never 403; `require_canvas()` alone; the path is in `CANVAS_GATED_PATHS`; email, thread_id and file_id only for the owner. RLS on the four run tables is NOT widened (no migration). Plan 05 re-derives the triple.
@@ -22355,6 +22361,12 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 
 **`1 / 1 / 358` (was `0 / 0 / 0`).** Created at 358 lines. SECURITY-BEARING: the first org-shared read on the run tables. Live (289-05 S4): another org's user got `404 {"detail":"Run not found"}` byte-identical to a random uuid's; a same-org colleague got the minimised record, with the KB label resolved on the colleague's own RLS connection ("the knowledge base"). Observation: `run.org_name` carries the org's display name, which for an auto-created org embeds the founder's email; every member already receives it from `GET /org/me`.
 
 Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-03, row added at planning). Org-scoped terminal-only evidence read. ⛔ ONE access query; 404 parity; require_canvas alone
+
+### `backend/app/api/workflow_run_evidence.py` — 289-REVIEW CR-01
+
+**`2 / 1 / 366` (was `1 / 1 / 358`).** The `readable` set from `_viewer_reads` now also feeds `compose_phase_log`, so the masking of a source and the withholding of the step output that synthesised it are ONE decision. Docblock: T-289-31 mitigated for masked citations, accepted for the remainder.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW CR-01, moved verbatim): 1 / 1 / 358 (was `0 / 0 / 0`) | no (young) | young (created 289-03). Org-scoped terminal-only read; S4 driven live (byte-identical 404). ⛔ ONE access query; 404 parity; require_canvas alone
 
 ## `backend/app/middleware/canvas_gate.py`
 
