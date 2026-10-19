@@ -11215,7 +11215,7 @@ cells rot within days.
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on resolve_document_id / resolve_document / fetch_full_document; 272 pins retired by name |
 | [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 7 / 5 / 503 (was `6 / 4 / 463`) | ⚠ **FIRES** | **284-04**: `_fetch_all` moved in VERBATIM from the Find core (its only remaining caller); function-local imports (Pitfall 5). Honoured by construction. ⛔ ids/counts RLS-intersected |
-| [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 4 / 1 / 1163 (was `0 / 0 / 0`) | no (young) | young (272-01 move; 272-04 kinds, D-09 lock, ONE audit writer, vocabulary). **272-REVIEW WR-01**: vocabulary values checked + JSON-quoted, note capped (2000). Split OWED → 273 |
+| [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 10 / 2 / 1522 (was `4 / 1 / 1163`) | no (young) | **289-REVIEW WR-04**: + `REFUSED_SEARCH_ERRORS` and a pure `ran_retrieval(tr)` naming the two arms that refuse without retrieving. ⚠ row was stale (`4 / 1 / 1163`) |
 | [`frontend/src/components/chat/StepRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatsteprowtsx) | 3 / 2 / 253 (was `2 / 1 / 249`) | no (2 phases) | 273-05: `refused` node state (UI-D-02 amber pair). ⛔ derived from the result marker in toolStepDerivation, never from a tool name |
 | [`frontend/src/components/chat/ToolCallDetails.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcalldetailstsx) | 3 / 2 / 181 (was `2 / 1 / 171`) | no (2 phases) | 273-05: ToolArgsBlock hidden for show_artifact (L-2); dispatched BEFORE the `parsed.error` arm (L-3/L-4). ⛔ `detail` never rendered |
 | [`frontend/src/components/chat/tool-bodies/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesindexts) | 2 / 2 / 79 (was `1 / 1 / 59`) | no (2 phases) | 273-05: ShowArtifactBody + `ARGS_HIDDEN`, the ONE home both rail readers import. ⛔ do not widen livePanel beyond execute_code + show_artifact |
@@ -11589,7 +11589,7 @@ cells rot within days.
 | [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
 | [`.claude/settings.json`](docs/HOT-FILE-LEDGER.md#claudesettingsjson) | 9 / 4 / 202 | ⚠ **FIRES** | ⚠ **absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** `.claude/` is EXEMPT: no gate could ask. The ONE hook dispatch table; a too-narrow `matcher` fires NEVER, in silence |
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
-| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 26 / 14 / 1018 (was `24 / 13 / 991`) | **FIRES** | **289-02**: `kb_search_calls` counter returned (+8 L), so 'never searched' is told apart from 'searched, nothing matched'. Honoured by construction |
+| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 27 / 14 / 1023 (was `26 / 14 / 1018`) | **FIRES** | **289-REVIEW WR-04**: `kb_search_calls` skips a refused search (`ran_retrieval`), so a step whose only searches were refused shows no 'nothing matched' line. +5 L |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 13 / 8 / 724 (was `12 / 8 / 724`) | ⚠ **FIRES** | honoured by construction (**282-01** budget per rung; **282-04** `provider=provider` on the one lookup). ⛔ accumulators init `None` never `0` |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 2 / 1 / 103 | no (new) | young (created 257-01). The single home of token-to-USD conversion (METER-02 / D-257-13). CostResult with Decimal arithmetic and None on unrated. |
@@ -16351,6 +16351,15 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 24 / 13 / 
 
 CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/services/task_service.py` | 24 / 13 / 991 (was `23 / 13 / 991`) | honoured by construction (282-04: provider kwarg) |
 
+
+### `backend/app/services/task_service.py` — 289-REVIEW WR-04
+
+**`27 / 14 / 1023` (was `26 / 14 / 1018`).** Honoured by construction, +5 lines (1018 → 1023): ONE condition on the existing counter. `invalid_filter` / `refused_retry` results run no retrieval and set no `retrieval_error`, so a phase whose only searches were refused stored `level: "none"` and both surfaces said "nothing matched" (D-09's own named false sentence). The counter now increments only when `search_documents_tool.ran_retrieval(tr)` is true (lazy import, the file's pattern). Pinned by `test_289_phase_confidence.py` against the tool's REAL refusal arms (RED at the RED commit). 23 related unit suites A/B'd: 0 new failures.
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-REVIEW WR-04, moved verbatim): | `backend/app/services/task_service.py` | 26 / 14 / 1018 (was `24 / 13 / 991`) | 289-02: kb_search_calls counter returned (+8 L) |
+
+Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW WR-04, moved verbatim): 26 / 14 / 1018 (was `24 / 13 / 991`) | **FIRES** | **289-02**: `kb_search_calls` counter returned (+8 L), so 'never searched' is told apart from 'searched, nothing matched'. Honoured by construction
+
 ## `backend/app/services/run_reconciler.py` — row added 2026-09-18 (Phase 256, plan `256-02`)
 
 **Re-derived 2026-09-18 at `902701e89`: `3 commits / 2 phases / 325 L`.** Below the G-5 threshold;
@@ -18896,6 +18905,13 @@ Every triple below was re-derived with the CLAUDE.md recipe AFTER the phase's la
 ### `frontend/src/components/chat/ToolCallPanel.tsx` — Phase 272
 
 **`54 / 22 / 407`** at 272 close (was `51 / 23 / 351`). 272-02: the filter line rendered as visible text in both card branches. ⚠ The recipe now reads 22 phases where the row said 23; the recipe's reading is recorded, not the old figure.
+
+
+### `backend/app/services/search_documents_tool.py` — 289-REVIEW WR-04
+
+**`10 / 2 / 1522` (was `4 / 1 / 1163`).** +16 lines (1506 → 1522). The module that writes the `invalid_filter` / `refused_retry` tokens now also owns the one predicate that reads them back, so `task_service`'s KB-search counter does not parse tool JSON itself. No arm changed. ⚠ The scan-list row was stale (`4 / 1 / 1163`, set at Phase 272's planning) and is re-derived here: 10 commits, phases 272 and 289.
+
+Scan-list cell as written at Phase 272 (replaced by 289-REVIEW WR-04, moved verbatim): 4 / 1 / 1163 (was `0 / 0 / 0`) | no (young) | young (272-01 move; 272-04 kinds, D-09 lock, ONE audit writer, vocabulary). **272-REVIEW WR-01**: vocabulary values checked + JSON-quoted, note capped (2000). Split OWED → 273
 
 ## Phase 272 — post-ruling re-derivation (2026-10-03, plan `272-05` Task 4 rulings)
 

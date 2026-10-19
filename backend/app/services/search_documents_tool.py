@@ -913,6 +913,22 @@ def _refused_retry(
     )
 
 
+# 289-REVIEW WR-04 — the two arms above REFUSE a search without running any retrieval, and set
+# no `retrieval_error`. A caller counting "did this step search the KB" (task_service's
+# `kb_search_calls`, which feeds TRUST-01's "searched, nothing matched" line) must not count them.
+# Pinned against the REAL arms by `test_289_phase_confidence.py`, so a renamed token goes red.
+REFUSED_SEARCH_ERRORS = frozenset({"invalid_filter", "refused_retry"})
+
+
+def ran_retrieval(tool_result: Any) -> bool:
+    """False only for a result from ``_invalid_filter`` / ``_refused_retry``; True otherwise."""
+    try:
+        body = json.loads(getattr(tool_result, "result", None) or "")
+    except (ValueError, TypeError):
+        return True
+    return not (isinstance(body, dict) and body.get("error") in REFUSED_SEARCH_ERRORS)
+
+
 def _no_documents(
     ctx: Any,
     query: str,

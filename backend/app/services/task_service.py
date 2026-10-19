@@ -791,7 +791,12 @@ async def run_task_sub_agent(
 
                 tr = await dispatch_tool(tc.get("name") or "", parsed_args, sub_ctx)
                 if tc.get("name") == "search_documents":
-                    sub_kb_search_calls += 1
+                    # 289-REVIEW WR-04: a refused search (invalid filter / refused retry) ran no
+                    # retrieval, so it is not a search that "matched nothing".
+                    from app.services.search_documents_tool import ran_retrieval  # noqa: PLC0415
+
+                    if ran_retrieval(tr):
+                        sub_kb_search_calls += 1
                 tool_results_to_append.append({
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),

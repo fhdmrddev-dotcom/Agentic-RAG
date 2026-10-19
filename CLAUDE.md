@@ -449,7 +449,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/db/runs.py` | 9 / 8 / 266 | ⚠ absent its ENTIRE LIFE — row added 268 · ⛔ |
 | `frontend/src/pages/admin/AdminSpendPage.tsx` | 9 / 3 / 974 | ⚠ NOW FIRES (crossed in 268) · extraction FIRST next · ⛔ |
 | `backend/app/services/run_producer.py` | 23 / 11 / 1145 (was `21 / 10 / 1117`) | honoured by construction (282-01: ONE `_timed_out_error` helper) |
-| `backend/app/services/task_service.py` | 26 / 14 / 1018 (was `24 / 13 / 991`) | 289-02: kb_search_calls counter returned (+8 L) |
+| `backend/app/services/task_service.py` | 27 / 14 / 1023 (was `26 / 14 / 1018`) | 289-REVIEW WR-04: refused searches no longer count as KB searches |
 | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02 (SEED-297) · ⛔ |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
 | `backend/app/api/runs.py` | 45 / 20 / 1845 (was `44 / 20 / 1827`) | 289-REVIEW WR-06: unloadable-definition answer ends failed (same helper) |
