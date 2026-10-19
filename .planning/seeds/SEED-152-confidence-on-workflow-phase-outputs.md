@@ -1,7 +1,9 @@
 ---
 seed_id: SEED-152
 title: Workflow phase outputs carry NO confidence score — chat messages carry three. The operator's own "citation AND confidence" rule is satisfied in chat and silently unmet in workflows
-status: planted
+status: folded
+folded_into: "289"
+status_note: "Folded into Phase 289 (TRUST-01), 2026-10-19."
 planted: 2026-08-12
 planted_by: External review 2026-08-12 (finding F7, marked UNVERIFIED by the reviewer) — VERIFIED against the tree the same day
 surface: Agentic-RAG

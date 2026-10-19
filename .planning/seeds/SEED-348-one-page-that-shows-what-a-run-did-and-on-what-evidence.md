@@ -3,15 +3,15 @@ seed_id: SEED-348
 title: Per-run provenance receipt — one read-only page (and export) showing what a workflow run did and on what evidence; v2.9 STRETCH Phase 107 (GOV-02) never built
 created: 2026-10-04
 surface: Agentic-RAG
-status: planted
+status: folded
 partial: false
-status_note:
+status_note: "Folded into Phase 289 (VIS-03), 2026-10-19."
 trigger_when: "The first customer or auditor request for a per-run evidence export; OR a compliance question cannot be answered from the Control Room audit ledger; OR any governance-adjacent phase whose files_modified names RunReceipt.tsx, WorkflowRunPage.tsx or the audit tab."
 trigger_paths: ["frontend/src/components/workflows/RunReceipt.tsx", "frontend/src/components/workflows/receiptVocabulary.ts", "frontend/src/pages/WorkflowRunPage.tsx", "frontend/src/components/admin/AuditTab.tsx", "backend/app/api/workflow_runs.py"]
 trigger_surfaces: ["workflow", "admin", "harness"]
 migration_note:
 relates_to: [".planning/v2.9-STRETCH-CARRYFORWARD.md § 107", "docs/history/v2.9-workflow-studio.md", "docs/history/v2.2-trust-and-compliance.md (citation export, deferred)", "SEED-223"]
-folded_into: null
+folded_into: "289"
 renumbered_from: null
 renumbered_because: null
 ---
