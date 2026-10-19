@@ -46,6 +46,33 @@ describe("toEvidenceView: the facts strip", () => {
     expect(toEvidenceView(p).facts[1].value).toBe("Not recorded")
   })
 
+  it("289-REVIEW WR-03: counts a step's final attempt, not every retry, as its check", () => {
+    // A step whose gate failed on attempt 0 and passed on attempt 1 ended passing.
+    const p = ownerPayload()
+    p.verdicts = [
+      { step_n: 2, phase_slug: "research", kind: "gate_failed", result: "failed",
+        checked: ["min_sources"], at: "2026-10-19T09:10:00Z" },
+      { step_n: 2, phase_slug: "research", kind: "gate_passed", result: "passed",
+        checked: ["min_sources"], at: "2026-10-19T09:11:00Z" },
+    ]
+    const fact = toEvidenceView(p).facts[2]
+    expect(fact.value).toBe("1 of 1 passed")
+    expect(fact.tone).toBe("success")
+    // section 3 still records every attempt
+    expect(toEvidenceView(p).verdicts).toHaveLength(2)
+  })
+
+  it("289-REVIEW WR-03: a step that timed out before its checks ran says so, and is not a check", () => {
+    const p = ownerPayload()
+    p.verdicts = [
+      { step_n: 2, phase_slug: "research", kind: "gate_timed_out", result: "recorded",
+        checked: [], at: "2026-10-19T09:10:00Z" },
+    ]
+    const v = toEvidenceView(p)
+    expect(v.verdicts[0].sentence).toBe("The step timed out before its checks ran")
+    expect(v.facts[2].value).toBe("No checks ran")
+  })
+
   it("counts only passed and failed verdicts as checks (recorded decisions are not checks)", () => {
     const p = ownerPayload()
     p.verdicts = [p.verdicts[2]]

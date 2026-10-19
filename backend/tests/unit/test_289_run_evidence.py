@@ -286,6 +286,28 @@ def test_verdicts_map_checks_and_records_and_drop_the_judge():
     assert not any(v["kind"] == "judge_verdict" for v in out)
 
 
+def test_a_wall_clock_timeout_is_not_reported_as_checks_that_ran():
+    """289-REVIEW WR-03: the engine writes `gate_failed` with `error: wall_clock_timeout ...` when
+    the phase hung BEFORE its gates ran. It carries no `timing`, so it read as a post-gate
+    failure and `checked` listed every post validator on the phase, none of which ran.
+    """
+    snap = _full(_definition())
+    steps = {"gather": 1, "approve": 2, "write": 3}
+    audit = [
+        {"event_type": "gate_failed",
+         "metadata": json.dumps({"phase": "gather", "attempt": 0,
+                                 "error": "wall_clock_timeout after 300s"}),
+         "created_at": "2026-10-19T10:01:00+00:00"},
+    ]
+    out = ev.compose_verdicts(audit, snap, steps)
+    assert len(out) == 1
+    assert out[0]["checked"] == [], "no validator ran, so none may be named as checked"
+    assert out[0]["kind"] == "gate_timed_out"
+    assert out[0]["result"] == "recorded", "a timeout is not a check that failed"
+    assert out[0]["step_n"] == 1
+    assert "300s" not in json.dumps(out)
+
+
 def test_every_verdict_kind_is_classified_once():
     assert set(ev.VERDICT_KINDS) == {
         "gate_passed", "gate_failed", "emit_validated", "emit_rejected", "emit_integrity_failed",
