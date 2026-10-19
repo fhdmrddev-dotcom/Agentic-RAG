@@ -53,6 +53,15 @@ _FINISH_RUN_MD5 = "2a3a1c4543f5a80c55d25a8d0e1bd1e0"
 # the assertion that actually guards D-256-05, and it is stable under edits
 # elsewhere in the same file.
 _EXPECTED_CALL_COUNTS = {
+    # ⚠ A NEW CALLER, ADDED DELIBERATELY at Phase 289 Plan 01 (SEED-360 F-3, D-12) and pinned
+    #   here at 289-05. `api/runs.py::_fail_redrive` ends a paused run whose answer re-drive
+    #   failed as `failed`: the answer row already exists, so no surface could answer again,
+    #   and leaving it `active` with no producer is the stranded state 288 found live. This IS
+    #   a contract change, not bookkeeping: finish_run's terminal write and thread-anchor clear
+    #   are now relied on from the answer route. 289-03's summary listed this failure as
+    #   inherited; measured against the PHASE base `dcf6ba649` it is not (green there, red
+    #   after 289-01), so it is recorded as the phase's own change rather than waved through.
+    "api/runs.py": 1,
     "api/workflows.py": 1,
     "services/harness_engine.py": 3,
     "services/run_lifecycle.py": 1,
@@ -81,6 +90,9 @@ _EXPECTED_CALL_COUNTS = {
 # bookkeeping costume. Re-derive with ``grep -rn "await finish_run(" backend/app/``
 # and confirm (a) is green BEFORE touching the set below.
 _EXPECTED_CALL_SITES = {
+    # Phase 289 Plan 01: `_fail_redrive`'s one call (see the COUNTS note above).
+    #   Re-derived with `grep -n "await finish_run(" backend/app/api/runs.py`.
+    "api/runs.py:589",
     # ⚠ RE-DERIVED at Phase 258 Plan 03: +7 line shift in api/workflows.py (import + decorators)
     #   api/workflows.py:1802 → 1809 → 1812 (v4.3 audit: +3 lines, require_capability on authoring writes; the call itself unchanged)
     # ⚠ RE-DERIVED at Phase 286 Plan 01: check (a), the per-file COUNTS, stayed identical
