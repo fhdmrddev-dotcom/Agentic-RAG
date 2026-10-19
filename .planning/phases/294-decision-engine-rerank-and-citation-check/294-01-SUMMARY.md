@@ -72,7 +72,7 @@ patterns-established:
   - "Off-path byte-identity: capture a JSON fixture from the BASE code with the test module's own --capture mode, commit it with the RED test"
   - "Fake LangSmith client (decision_engine_fakes.FakeLangSmithClient + tracing_into) with a non-vacuity probe proving it does see an unredacted key"
 
-requirements-completed: [DEC-01, DEC-02]
+requirements-completed: [DEC-01, DEC-02]  # this plan's share only; REQUIREMENTS.md stays Pending until plans 02, 04 and 05 land
 
 duration: 60min
 completed: 2026-10-20
