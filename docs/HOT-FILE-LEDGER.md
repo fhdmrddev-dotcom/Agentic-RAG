@@ -926,6 +926,12 @@ carries the verdict — **honoured by construction ×4 (193.1 / 193.2 / 197 / **
 
 ## `backend/app/api/workflow_runs.py`
 
+### Phase 288 (288-03) — backend/app/api/workflow_runs.py
+
+**`14 / 11 / 1240 (was `13 / 10 / 1108`)`.** 288-03: ONE field + composer + producer, in lockstep
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 288-03, moved verbatim): triple `13 / 10 / 1108 (was `11 / 8 / 1089`)` — 286 forecast: 289 export = one projection of the run read (by construction)
+
 **⚠ ADDED 2026-08-19 by Phase 200 plan `200-02` (D-16) — BECAUSE IT WAS ABSENT, NOT BECAUSE IT WAS NEW.** Before this commit the file had **no row in `CLAUDE.md`'s scan list and no section here**, so **G-5 could never have fired on it at any count**. Wave 1 (`200-01`) found it at `3 commits / 3 phases / 260 L` — **EXACTLY AT THE G-5 THRESHOLD**, which is the `libraryRow.ts` / `doorVocabulary.ts` state where a missing row costs most: the guardrail is due to fire on the very next phase and there is nothing for it to fire on. Wave 1 identified **four** files owing rows; this plan owns **one** of them and deliberately did not absorb the other three (`FlowEdge.tsx` → `200-06`, `PhaseTimeline.tsx` and `phaseStatusMeta.ts` → `200-07`).
 
 **Re-derived at this commit: `4 commits / 4 phases / 330 L`** · buckets: `188`, `189`, `194.1`, `200` · no quick-task buckets to exclude · **G-5 FIRES** (4 phases vs threshold 3). ⚠ **The figure is published as it stands AFTER this commit, not before it.** Wave 1's `3 / 3 / 260` was correct when measured and was stale the moment this plan touched the file — which is this ledger's own most-repeated finding, so the row is written forward rather than being born stale. Re-derive with `git log --oneline -- backend/app/api/workflow_runs.py | wc -l` and `wc -l <file>`.
@@ -1352,6 +1358,12 @@ carries the verdict — **young (200)** — and this is the cell it carried befo
 > young (200) — sheet c4's card shell, paired with its `stepCardSectionContext.ts` leaf (`1 / 1 / 89`) because they are ONE concern split by a lint rule. ⚠ **The shell holds NO state** (the panel's ABSOLUTE-ZERO pin) and the cards **do not collapse** — two of three carry DECISIONS, which SEED-184 rule 3 forbids folding. ⚠ **`data-card`, never `data-rail`**: the D-14 guard requires zero `[data-rail]` in a rails-absent render and these ship on BOTH surfaces. ⚠ The `Context` suffix is load-bearing (TS1149 on this box)
 
 ## `backend/app/db/workflows.py`
+
+### Phase 288 (288-03) — backend/app/db/workflows.py
+
+**`53 / 27 / 2767 (was `52 / 26 / 2724`)`.** 288-03: ONE function (unanswered-prompt read), no refactor
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 288-03, moved verbatim): triple `52 / 26 / 2724` — honoured by construction (256-05)
 
 ### ⚠ Re-derived 2026-09-19 (Phase 256 gap-closure round 1, plan `256-05`) — the row was STALE
 
@@ -2141,6 +2153,12 @@ carries the verdict — **honoured by construction (194.1)** — and this is the
 ⚠ row was STALE at `14/7/765`; G-5 FIRES at 8 phases. honoured by construction (**244-15**): ONE optional prop, ONE composed callback in the STACK, `useState` 9→9 — no new state on a 3-home shell
 
 ## `frontend/src/pages/WorkflowRunPage.tsx`
+
+### Phase 288 (288-03) — frontend/src/pages/WorkflowRunPage.tsx
+
+**`31 / 12 / 1580 (was `30 / 11 / 1578`)`.** 288-03: ONE WaitingOnLine render, no hook · seam286 snaps same · ⛔
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 288-03, moved verbatim): triple `30 / 11 / 1578 (was `28 / 9 / 1670`)` — seam TAKEN (286-03): run read + poll → useWorkflowRun · ⛔
 
 **RE-DERIVED 2026-08-17 AT PHASE 195 CLOSE (plan `195-08`):** `14 commits / 4 phases / 1156 L` · **G-5 FIRES** (4 phases vs threshold 3) — **PAST the threshold now, not at it** — honoured by construction (194.1, **195**). **⚠ ONE SEAM OF THE FIVE THIS SECTION NAMED HAS BEEN TAKEN — see "The seam, TAKEN" below.**
 
@@ -7833,6 +7851,12 @@ ledger's own rule that a cell is measured and never copied.
 trigger to revisit is it beginning to **branch on source family** rather than merely list endpoints.
 ### `frontend/src/lib/api/workflows.ts`
 
+### Phase 288 (288-03) — frontend/src/lib/api/workflows.ts
+
+**`9 / 9 / 1111 (was `4 / 4 / 1081`)`.** 288-03: one optional run-read field + its type; no behaviour
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 288-03, moved verbatim): triple `4 / 4 / 1081` — ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t
+
 **Triple at Phase 214's close (2026-08-28): `3 / 3 / 1055` — G-5: ⚠ **FIRES — EXACTLY AT THRESHOLD**.** ⚠ absent for its entire life; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules**
 
 Buckets `207` `210` `214`. It crossed the threshold with no row in place, so G-5 could not have fired on it at any count.
@@ -11140,7 +11164,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 18 / 12 / 1075 | **FIRES** | honoured by construction (193 / 193.1 / 199 / **214**) — 214-13 added the service picker and its refusal as CHILDREN |
 | [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 58 / 23 / 2803 (was `57 / 22 / 2993`) | **FIRES** | **286-02** seam TAKEN: id-to-name maps + mount read → `useBuilderNameMaps.ts`; 8 copy constants → `builderCopy.ts` (page re-exports). `FLAG_OFF_HEADER_MARKUP` stayed; 288 lands by useDraftPersistence |
 | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 45 / 23 / 1647 (was `43 / 23 / 2261`) | **FIRES** | **286-01** seam TAKEN: 20 wire models/helpers → `workflow_wire.py`; generate + template doors → `workflow_authoring_doors.py` (same router). D-05 1,200-1,400 MISSED (1,647); split OWED |
-| [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 13 / 10 / 1108 (was `11 / 8 / 1003`) | **FIRES** | 286 forecast (289): the finished-run page reads the EXISTING run read (version, phase log, verdicts, sources); export = ONE projection of it behind the existing ownership gate |
+| [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 14 / 11 / 1240 (was `13 / 10 / 1108`) | **FIRES** | **288-03**: `waiting_on` declared, selected (`user_id`, `is_golden_run`) and produced in lockstep; ONE pure composer + ONE producer; built after the ownership select; failure degrades to None |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 22 / 15 / 537 (was `21 / 14 / 537`) | ⚠ **FIRES** | **279-01**: docstring repoints to the new expert_scope homes only (OpenAPI regen). ⛔ a body touching both pairs is a 422 |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
 | [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 61 / 31 / 1137 (was `60 / 30 / 1134`) | ⚠ **FIRES** | 286 forecast (287): the in-thread entry REUSES `ChatLaunchForm` and `doRun` (one caller today); ONE prop or ONE mount, never a second launch form |
@@ -11152,7 +11176,7 @@ cells rot within days.
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 5 / 3 / 65 (was `4 / 2 / 64`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/64`), now FIRES. **267-04**: `newThread` takes an optional Expert id, so an invite on a brand-new chat reaches the row (D-267-21; live G4-1). ⛔ `selectThread` stays a bare setState |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 22 / 9 / 1417 (was `21 / 8 / 1414`) | ⚠ **FIRES** | **273-03**: the grounding offer subtracts CHAT_ONLY_TOOLS (1 import, 1 set difference). ⚠ extraction still OWED |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 52 / 26 / 2724 | **FIRES** | ⚠ row was STALE at `48 / 25 / 2585`. honoured by construction (193.2 / 194 / 192.2 / 200.1 / 214 / **256-05**) — 256-05 is **COMMENT-ONLY** |
+| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 53 / 27 / 2767 (was `52 / 26 / 2724`) | **FIRES** | **288-03**: ONE function, `get_unanswered_ask_user` (NOT EXISTS variant of the pending read, run-scoped); `get_pending_ask_user` byte-unchanged. No refactor. Extraction still OWED |
 | [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 31 / 14 / 2001 (was `29 / 13 / 1942`) | **FIRES** | 288-02: pause timeout refusal inside `_interactive_phase_failures`; `auto_answered` from the golden run's outputs. No new stage, no check removed |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 17 / 11 / 1025 (was `16 / 10 / 1002`) | **FIRES** | 286 forecast (291): uploaded template / form / reference text = ONE more grounding input to the existing generate path; tools + phase types stay closed; asset text is untrusted |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
@@ -11173,7 +11197,8 @@ cells rot within days.
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 17 / 9 / 1013 (was `15 / 8 / 836`) | **FIRES** | honoured by construction (**282-02**): draft moved to askDraftStore (useState 9 → 7); APG radio keys + mark; `home` prop; +`AskPointer` (+177 lines). ⚠ `SEED-219` still open |
-| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 30 / 11 / 1578 (was `28 / 9 / 1670`) | **FIRES** | **286-03** seam TAKEN: run read + 5 s poll + terminal edge → `hooks/useWorkflowRun.ts`, called after `isTerminal` (CR-01). OWED: phase/spec join, canvas mount. ⛔ invariant 8 tokens |
+| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 31 / 12 / 1580 (was `30 / 11 / 1578`) | **FIRES** | **288-03**: ONE `<WaitingOnLine>` render beside `band.sentence`, no hook/state/effect; the five seam286 snapshots are unchanged. 289 also edits this page: leave it smaller. ⛔ invariants unchanged |
+| [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 210 / 125 / 530 (was `208 / 124 / 523`) | ⚠ **FIRES** | **284-01**: re-exports the paged clients. **284-05**: the five whole-list clients' barrel lines DELETED; `libraryListFence.test.ts` fails on any re-export of them |
@@ -11307,7 +11332,7 @@ cells rot within days.
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 19 / 11 / 1967 (was `16 / 10 / 1935`) | ⚠ **FIRES** | **273-05**: `onArtifact` SSE branch + `artifacts` carried through the mapper (Array.isArray guard), additive |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 6 / 4 / 748 | ⚠ **FIRES** | ⛔ row was STALE at `4/2/715` reading `no (2 phases)` — re-derived 263 planning. Holds `FullAppSettings`, not only skills. D-263-03 reuses its `POST /skills` caller, adds no endpoint. |
-| [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
+| [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 9 / 9 / 1111 (was `4 / 4 / 1081`) | ⚠ **FIRES** | **288-03**: `WorkflowRunRead.waiting_on?` + `WorkflowRunWaitingOn` interface (two declarations, no logic). The run read type lives here, not in `types/index.ts` |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 15 / 372 (was `31 / 16 / 372`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<td>` kept |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 63 / 20 / 1344 (was `57 / 19 / 1297`) | ⚠ **FIRES** | **284-01**: extraction TAKEN (`useLibraryDocuments.ts`); the page derives nothing from documents. **284-03**: states + exact pager. Lines ROSE 1302 → 1344: G-5 NOT discharged |
@@ -21896,6 +21921,10 @@ Scan-list disposition cell before 286-05 (replaced):
 CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
 
 > honoured by construction ×7 (… / 214.1 / 281-02: one import)
+
+### `frontend/src/components/workflows/WaitingOnLine.tsx`
+
+**`1 / 1 / 26` — young (created 288-03, 2026-10-19).** A leaf: it takes the optional `waiting_on` object from the run read and renders its `sentence` as a plain text child under `data-testid="run-waiting-on"`, using the run band's own `waiting` tone token. The SERVER composes the sentence from the unanswered prompt row, the owner's display name and the viewer's relationship to it (email only for the owner, `prompt_line` withheld from others, paused wording never says expired). ⛔ **Binding:** no id formatting, no sentence building, no `@/lib/api` import and no hook here, so `WorkflowRunPage.tsx` gains none. Does not fire.
 
 ### `frontend/src/pages/WorkflowRunPage.tsx` — Phase 286 (286-03) — seam taken
 

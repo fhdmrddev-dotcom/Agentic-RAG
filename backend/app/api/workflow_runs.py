@@ -88,6 +88,7 @@ from app.utils.db import aexec
 # time, when it is still None — the reason is written out at `api/admin.py:243`.
 from app import dependencies as deps
 from app.db import rates
+from app.db import workflows as workflows_db
 from app.services.pricing_service import compute_token_cost_usd
 
 logger = logging.getLogger(__name__)
@@ -297,6 +298,18 @@ class WorkflowRunPhaseRead(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────────────────
 
 
+class WorkflowRunWaitingOn(BaseModel):
+    """Phase 288 (D-09): who a paused-on-a-person run is waiting on, composed SERVER-side.
+
+    The client renders ``sentence`` verbatim and never builds it from an id.
+    """
+
+    sentence: str
+    step_name: str | None = None
+    prompt_line: str | None = None
+    window_passed: bool = False
+
+
 class WorkflowRunRead(BaseModel):
     """One run + the definition version that RAN + the run's phase spine (D-188-14).
 
@@ -353,6 +366,9 @@ class WorkflowRunRead(BaseModel):
         ),
     )
     token_coverage: list[str] | None = None
+    # Phase 288 (AUTH-01) - DECLARED here, SELECTED via `user_id` + `is_golden_run` in the
+    # ownership select, PRODUCED by `_read_waiting_on`: the same lockstep as the fields above.
+    waiting_on: WorkflowRunWaitingOn | None = None
     phases: list[WorkflowRunPhaseRead] = Field(default_factory=list)
 
 
@@ -719,6 +735,120 @@ async def list_workflow_runs(
     )
 
 
+_WAITING_FALLBACK_NAME = "the person who started this run"
+
+
+def _first_line(raw: object) -> str | None:
+    """The first non-blank line of a prompt, scrubbed and clamped (V5), or None."""
+    from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
+
+    if not isinstance(raw, str):
+        return None
+    for line in raw.splitlines():
+        cleaned = _clean_label(line)
+        if cleaned:
+            return cleaned
+    return None
+
+
+def compose_waiting_on(
+    *,
+    owner_id: object,
+    viewer_id: object,
+    viewer_email: object,
+    display_name: object,
+    step_name: object,
+    prompt_text: object,
+    window_passed: bool,
+) -> dict[str, Any]:
+    """Phase 288 (D-09/D-10/D-11, A-06): the waiting-on sentence, as a pure function.
+
+    Name chain: scrubbed ``display_name``; else the viewer's email ONLY when the viewer is the
+    owner; else the words "the person who started this run". "(you)" only for the owner. A
+    non-owner gets no email and no prompt line (A-06). The paused wording says the run is
+    still waiting and continues when answered; it never says "expired".
+    """
+    from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
+
+    is_owner = str(owner_id) == str(viewer_id)
+    name = _clean_label(display_name)
+    if name is None and is_owner:
+        name = _clean_label(viewer_email)
+    if name is None:
+        name = _WAITING_FALLBACK_NAME
+    who = f"{name} (you)" if is_owner and name != _WAITING_FALLBACK_NAME else name
+    prompt_line = _first_line(prompt_text) if is_owner else None
+    if window_passed:
+        sentence = f"Still waiting on {who}; the run continues as soon as they answer."
+    elif prompt_line:
+        sentence = f'Waiting on {who} to answer "{prompt_line}".'
+    else:
+        sentence = f"Waiting on {who} to answer."
+    return {
+        "sentence": sentence,
+        "step_name": _clean_label(step_name),
+        "prompt_line": prompt_line,
+        "window_passed": window_passed,
+    }
+
+
+async def _read_waiting_on(
+    run: dict[str, Any],
+    phase_rows: list[dict[str, Any]],
+    definition: dict[str, Any] | None,
+    slug_to_type: dict[str, str],
+    current_user: dict,
+) -> WorkflowRunWaitingOn | None:
+    """Phase 288 (A-05/A-07): built AFTER the id+user_id ownership select, keyed by that row.
+
+    ``None`` for a terminal run, a golden run, no unanswered prompt, or ANY failure: a pure
+    read never 500s over an additional affordance (the cost lookup's rule).
+    """
+    if run.get("status") not in ("active", "paused") or run.get("is_golden_run"):
+        return None
+    try:
+        pool = await deps.get_pg_pool()
+        prompt = await workflows_db.get_unanswered_ask_user(pool, run["id"])
+        if not prompt:
+            return None
+        active_slug = next(
+            (
+                r.get("slug")
+                for r in phase_rows
+                if r.get("status") == "active"
+                and slug_to_type.get(r.get("slug")) == "llm_human_input"
+            ),
+            None,
+        )
+        step_name = next(
+            (
+                p.get("name")
+                for p in ((definition or {}).get("phases") or [])
+                if isinstance(p, dict) and p.get("slug") == active_slug
+            ),
+            None,
+        )
+        display_name = await pool.fetchval(
+            "SELECT display_name FROM profiles WHERE id = $1", run["user_id"]
+        )
+        return WorkflowRunWaitingOn(
+            **compose_waiting_on(
+                owner_id=run["user_id"],
+                viewer_id=current_user["id"],
+                viewer_email=current_user.get("email"),
+                display_name=display_name,
+                step_name=step_name,
+                prompt_text=prompt.get("prompt"),
+                window_passed=run.get("status") == "paused",
+            )
+        )
+    except Exception:  # noqa: BLE001 - degrade to None, never 500 a pure read.
+        logger.warning(
+            "workflow_run waiting_on lookup failed for run %s", run.get("id"), exc_info=True
+        )
+        return None
+
+
 @router.get(
     "/{workflow_run_id}",
     response_model=WorkflowRunRead,
@@ -768,7 +898,7 @@ async def read_workflow_run(
             # fence red. ⭐ A fence that counts occurrences is a fence a COMMENT can break,
             # which is the mirror image of this repo's other standing lesson that a text
             # fence cannot tell code from a comment. Say "star read" in prose; never type it.
-            "model, input_tokens, output_tokens, token_coverage"
+            "model, input_tokens, output_tokens, token_coverage, user_id, is_golden_run"
         )
         .eq("id", str(workflow_run_id))
         .eq("user_id", current_user["id"])
@@ -1002,6 +1132,7 @@ async def read_workflow_run(
             run_cost_usd = None
 
     _coverage = run.get("token_coverage")
+    waiting_on = await _read_waiting_on(run, phase_rows, definition, slug_to_type, current_user)
 
     return WorkflowRunRead(
         id=run["id"],
@@ -1024,6 +1155,7 @@ async def read_workflow_run(
         cost_usd=run_cost_usd,
         is_rated=run_is_rated,
         token_coverage=list(_coverage) if isinstance(_coverage, list) else None,
+        waiting_on=waiting_on,
         phases=phases,
     )
 

@@ -1782,6 +1782,49 @@ async def get_pending_ask_user(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
     }
 
 
+async def get_unanswered_ask_user(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
+    """Phase 288 (A-05): the run's latest ask_user_prompt that has NO response row yet.
+
+    ``get_pending_ask_user`` above returns the newest prompt whether or not it was answered;
+    that is right for resume and wrong for "who is this run waiting on" on a run with two
+    pause steps where the first is answered (Pitfall 4). The prompt row carries ``run_id`` at
+    ``tool_calls->0->>'run_id'`` and the response row carries the matching ``tool_call_id``,
+    so the scope is the WHERE clause (pool reads bypass RLS): the caller has already passed
+    the id+user_id ownership select for this run.
+    """
+    row = await pool.fetchrow(
+        """
+        SELECT m.tool_calls
+        FROM messages m
+        JOIN workflow_runs wr ON wr.thread_id = m.thread_id
+        WHERE wr.id = $1
+          AND m.role = 'system'
+          AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+          AND m.tool_calls->0->>'run_id' = $1::text
+          AND NOT EXISTS (
+              SELECT 1 FROM messages r
+              WHERE r.thread_id = m.thread_id
+                AND r.role = 'system'
+                AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
+                AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
+          )
+        ORDER BY m.created_at DESC
+        LIMIT 1
+        """,
+        run_id,
+    )
+    if row is None:
+        return None
+    tcs = row["tool_calls"] or []
+    payload = tcs[0] if tcs else {}
+    return {
+        "tool_call_id": payload.get("tool_call_id"),
+        "prompt": payload.get("prompt"),
+        "options": payload.get("options"),
+        "timeout_seconds": payload.get("timeout_seconds"),
+    }
+
+
 # ── workflow_phases writes (PHASE-KEYED → id) ────────────────────────────────
 async def mark_phase_active(pool: asyncpg.Pool, phase_id: UUID) -> datetime | None:
     """Flip a phase to ``active`` BEFORE its work runs (Pitfall 1: durable-first).
