@@ -96,8 +96,9 @@ class _RedriveFakePool:
     async def fetchval(self, sql, *args):
         self.calls.append((sql, args))
         if "UPDATE workflow_runs SET status = 'failed'" in sql:
-            # 289-REVIEW WR-02: the fail arm's conditional terminal write (the guard).
-            if self.run_status == "active":
+            # 289-REVIEW WR-02: the fail arm's conditional terminal write (the guard);
+            # WR-06 widened its admitted statuses to a list ($2).
+            if self.run_status in args[1]:
                 self.run_status = "failed"
                 return args[0]
             return None

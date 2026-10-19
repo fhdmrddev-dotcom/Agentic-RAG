@@ -562,10 +562,19 @@ class AskUserResponseBody(BaseModel):
 
 
 _REDRIVE_FAILED_REASON = "Your answer was saved, but the run could not continue."
+# 289-REVIEW WR-06: the paused run's definition could not be loaded, so it was never re-driven.
+_REDRIVE_NO_DEFINITION_REASON = "Your answer was saved, but the workflow could not be loaded."
 
 
 async def _fail_redrive(
-    pool, run_id: UUID, owner_user_id, *, redis=None, stream_run_id=None
+    pool,
+    run_id: UUID,
+    owner_user_id,
+    *,
+    redis=None,
+    stream_run_id=None,
+    from_statuses: tuple[str, ...] = ("active",),
+    reason: str = _REDRIVE_FAILED_REASON,
 ) -> None:
     """End a paused run whose re-drive could not continue: `failed`, with words (D-12 / SEED-360).
 
@@ -583,6 +592,9 @@ async def _fail_redrive(
     conditional ``UPDATE … WHERE status = 'active' RETURNING id`` decides: only the caller that
     moves the run off ``active`` writes the phase failure, the audit and the emit. ``finish_run``
     still runs after it (idempotent on ``failed``) for its thread-anchor clear.
+
+    289-REVIEW WR-06: ``from_statuses`` widens the guard to ``paused`` for the one caller that
+    fails a run BEFORE ``resume_run`` (the definition would not load), with its own ``reason``.
     """
     from app.db.workflows import (  # noqa: PLC0415
         fail_phase,
@@ -594,14 +606,15 @@ async def _fail_redrive(
     try:
         won = await pool.fetchval(
             "UPDATE workflow_runs SET status = 'failed' "
-            "WHERE id = $1 AND status = 'active' RETURNING id",
+            "WHERE id = $1 AND status = ANY($2::text[]) RETURNING id",
             run_id,
+            list(from_statuses),
         )
         if won is None:
             return  # already terminal (or re-paused by someone else): never rewritten here
         phase = await get_active_phase(pool, run_id)
         if phase is not None:
-            await fail_phase(pool, phase["id"], _REDRIVE_FAILED_REASON)
+            await fail_phase(pool, phase["id"], reason)
         await finish_run(pool, run_id, "failed")
         await write_audit(
             pool, run_id, user_id=owner_user_id, event_type="run_failed",
@@ -614,9 +627,7 @@ async def _fail_redrive(
         try:
             from app.services.harness_engine import _emit  # noqa: PLC0415
 
-            await _emit(
-                redis, stream_run_id or run_id, "run_failed", reason=_REDRIVE_FAILED_REASON
-            )
+            await _emit(redis, stream_run_id or run_id, "run_failed", reason=reason)
         except Exception:  # noqa: BLE001 — the durable record is written; the hint is best-effort
             logger.warning("ask_user_response: run_failed emit failed for run %s", run_id)
 
@@ -698,10 +709,17 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
 
     definition = await _load_run_definition(pool, run_id)
     if definition is None:
-        # Mirrors the sweep's WR-02 posture: skip THIS run rather than raise; it
-        # re-becomes claimable after the lease expires.
+        # ~~Mirrors the sweep's WR-02 posture: skip THIS run rather than raise; it
+        # re-becomes claimable after the lease expires.~~ 289-REVIEW WR-06: skipping left an
+        # ANSWERED run `paused` with no prompt any surface could answer (the answer row exists,
+        # so `/pending` omits it), while `compose_waiting_on` promises the run continues as soon
+        # as they answer. It ends `failed` with words instead (D-12), still without raising.
         logger.warning(
-            "ask_user_response: run %s has no loadable definition — not re-driven", run_id
+            "ask_user_response: run %s has no loadable definition — ended failed", run_id
+        )
+        await _fail_redrive(
+            pool, run_id, row["user_id"], redis=redis,
+            from_statuses=("paused",), reason=_REDRIVE_NO_DEFINITION_REASON,
         )
         return False
 

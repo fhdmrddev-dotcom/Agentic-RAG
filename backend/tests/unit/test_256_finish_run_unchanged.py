@@ -96,7 +96,10 @@ _EXPECTED_CALL_SITES = {
     #   ("api/runs.py": 1). Only the position shifted (+16), when `_fail_redrive` gained its
     #   conditional terminal write (the guard) and its docblock above the same call.
     #   api/runs.py:589 → 605
-    "api/runs.py:605",
+    # ⚠ RE-DERIVED at 289-REVIEW WR-06: (a) the COUNTS stayed identical again; +13 when
+    #   `_fail_redrive` gained `from_statuses` / `reason` and the second reason constant.
+    #   api/runs.py:605 → 618
+    "api/runs.py:618",
     # ⚠ RE-DERIVED at Phase 258 Plan 03: +7 line shift in api/workflows.py (import + decorators)
     #   api/workflows.py:1802 → 1809 → 1812 (v4.3 audit: +3 lines, require_capability on authoring writes; the call itself unchanged)
     # ⚠ RE-DERIVED at Phase 286 Plan 01: check (a), the per-file COUNTS, stayed identical
