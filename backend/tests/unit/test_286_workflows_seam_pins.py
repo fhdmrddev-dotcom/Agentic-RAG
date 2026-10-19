@@ -30,6 +30,12 @@ What each pin proves (D-07):
 CAPTURE MODE: ``PIN286_CAPTURE=1`` writes the three fixtures instead of asserting. It was run
 exactly once, at the phase base recorded in ``286-01-BASE.md``, and must never be run again —
 a re-capture after the move would bless whatever the move did.
+
+DELIBERATE RE-BASELINE (Phase 288-04, 2026-10-19): plan 288-02 added ONE optional field,
+``auto_answered``, to ``PublishVerdict`` (the "answered automatically during validation" note).
+The OpenAPI fixture and the ``PublishVerdict`` body hash were recaptured for that field alone;
+the diff was checked to be exactly +5 lines (the one property) and one hash. The route table
+fixture is byte-unchanged. A further change to either needs its own written reason here.
 """
 
 from __future__ import annotations

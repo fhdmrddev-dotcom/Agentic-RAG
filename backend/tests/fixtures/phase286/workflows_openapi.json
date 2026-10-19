@@ -2115,6 +2115,11 @@
                 "type": "null"
               }
             ]
+          },
+          "auto_answered": {
+            "items": {},
+            "type": "array",
+            "title": "Auto Answered"
           }
         },
         "type": "object",

@@ -24510,6 +24510,11 @@
         "type": "null"
        }
       ]
+     },
+     "auto_answered": {
+      "items": {},
+      "type": "array",
+      "title": "Auto Answered"
      }
     },
     "type": "object",
@@ -30428,6 +30433,16 @@
       ],
       "title": "Token Coverage"
      },
+     "waiting_on": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/WorkflowRunWaitingOn"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "phases": {
       "items": {
        "$ref": "#/components/schemas/WorkflowRunPhaseRead"
@@ -30448,6 +30463,47 @@
     ],
     "title": "WorkflowRunRead",
     "description": "One run + the definition version that RAN + the run's phase spine (D-188-14).\n\nEverything the run surface needs in ONE round trip. ``definition`` is the raw\n``workflow_definitions.definition`` JSONB of the row this run's ``definition_id`` points\nat \u2014 the version that EXECUTED, not whatever is published now."
+   },
+   "WorkflowRunWaitingOn": {
+    "properties": {
+     "sentence": {
+      "type": "string",
+      "title": "Sentence"
+     },
+     "step_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step Name"
+     },
+     "prompt_line": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Prompt Line"
+     },
+     "window_passed": {
+      "type": "boolean",
+      "title": "Window Passed",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "sentence"
+    ],
+    "title": "WorkflowRunWaitingOn",
+    "description": "Phase 288 (D-09): who a paused-on-a-person run is waiting on, composed SERVER-side.\n\nThe client renders ``sentence`` verbatim and never builds it from an id."
    },
    "WorkflowScheduleCreate": {
     "properties": {

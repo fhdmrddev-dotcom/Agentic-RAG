@@ -21673,6 +21673,11 @@
                 "type": "null"
               }
             ]
+          },
+          "auto_answered": {
+            "items": {},
+            "type": "array",
+            "title": "Auto Answered"
           }
         },
         "type": "object",
@@ -27416,6 +27421,16 @@
             ],
             "title": "Token Coverage"
           },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowRunWaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "phases": {
             "items": {
               "$ref": "#/components/schemas/WorkflowRunPhaseRead"
@@ -27436,6 +27451,47 @@
         ],
         "title": "WorkflowRunRead",
         "description": "Everything the run surface needs in ONE round trip. ``definition`` is the raw ``workflow_definitions.definition`` JSONB of the row this run's ``definition_id`` points at — the version that EXECUTED, not whatever is published now."
+      },
+      "WorkflowRunWaitingOn": {
+        "properties": {
+          "sentence": {
+            "type": "string",
+            "title": "Sentence"
+          },
+          "step_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Name"
+          },
+          "prompt_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Line"
+          },
+          "window_passed": {
+            "type": "boolean",
+            "title": "Window Passed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "sentence"
+        ],
+        "title": "WorkflowRunWaitingOn",
+        "description": "The client renders ``sentence`` verbatim and never builds it from an id."
       },
       "WorkflowScheduleCreate": {
         "properties": {

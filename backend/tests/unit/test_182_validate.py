@@ -293,20 +293,48 @@ async def test_business_requirement_verdict_is_incomplete_and_global(monkeypatch
 
 @pytest.mark.asyncio
 async def test_interactive_phase_verdict_is_incomplete_and_per_node(monkeypatch):
-    """An `llm_human_input` phase (WR-04) -> `interactive_phase`, keyed to the phase, incomplete."""
+    """The still-refused interactive shapes -> `interactive_phase`, keyed to the phase, incomplete.
+
+    RE-POINTED in 288-04. This used to assert that ANY `llm_human_input` phase was refused
+    (WR-04); Phase 200.3 deliberately stopped refusing a pause with a legal wait, so that
+    expectation had been red since then (INHERITED at base 266e344c9, not caused by 288). The
+    two shapes the gauntlet still refuses are an `on_failure == "ask_user"` validator and a
+    human-input pause whose wait is outside 1..1800 s (Phase 288-02).
+    """
     _patch_bundle(monkeypatch)
 
-    human = {
+    asking_validator = {
+        "slug": "answer",
+        "phase_index": 0,
+        "config": {"phase_type": "llm_single", "prompt": "Answer the question."},
+        "validators": [
+            {"kind": "regex_match", "config": {"pattern": "x"}, "on_failure": "ask_user"}
+        ],
+    }
+    resp = await _validate(_definition([asking_validator]))
+    verdict = _by_code(resp, "interactive_phase")
+    assert verdict.phase == "answer"
+    assert verdict.severity == "incomplete"
+
+    unbounded_wait = {
+        "slug": "confirm",
+        "phase_index": 0,
+        "config": {"phase_type": "llm_human_input", "prompt": "Confirm?", "timeout_seconds": 0},
+        "validators": [],
+    }
+    resp = await _validate(_definition([unbounded_wait]))
+    verdict = _by_code(resp, "interactive_phase")
+    assert verdict.phase == "confirm"
+    assert verdict.severity == "incomplete"
+
+    legal_pause = {
         "slug": "confirm",
         "phase_index": 0,
         "config": {"phase_type": "llm_human_input", "prompt": "Confirm?"},
         "validators": [],
     }
-    resp = await _validate(_definition([human]))
-
-    verdict = _by_code(resp, "interactive_phase")
-    assert verdict.phase == "confirm"
-    assert verdict.severity == "incomplete"
+    resp = await _validate(_definition([legal_pause]))
+    assert not [v for v in resp.verdicts if v.code == "interactive_phase"]
 
 
 # ── 5) the severity split — the no_terminal empty-vs-broken case (Pitfall 2) ───
