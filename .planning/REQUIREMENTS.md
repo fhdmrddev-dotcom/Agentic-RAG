@@ -10,9 +10,9 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 
 ### Start (START)
 
-- [ ] **START-01**: From inside a thread, a user can start a workflow, fill its launch form, and see the run attached to that thread. — `SEED-232`
+- [x] **START-01**: From inside a thread, a user can start a workflow, fill its launch form, and see the run attached to that thread. — `SEED-232`
 - [ ] **START-02**: An external system can start a workflow run through an authenticated inbound call and read the result back. Org-scoped, rate-limited, audited. — `SEED-195`
-- [ ] **START-03**: A user can fork a starter workflow into their own draft in one click; at least 5 curated starters ship, each passing the publish gauntlet. — `SEED-084`
+- [x] **START-03**: A user can fork a starter workflow into their own draft in one click; at least 5 curated starters ship, each passing the publish gauntlet. — `SEED-084` (287: fork is menu + name dialog, not literal one click; operator to rule)
 - [ ] **START-04**: A run started by a schedule or an inbound call shows how it was started, and its last and next run are visible. — `SEED-014`
 
 ### Author (AUTH)
@@ -56,8 +56,8 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | REG-07 | Phase 286 | Complete |
-| START-01 | Phase 287 | Pending |
-| START-03 | Phase 287 | Pending |
+| START-01 | Phase 287 | Complete |
+| START-03 | Phase 287 | Complete |
 | AUTH-03 | Phase 288 | Pending |
 | AUTH-01 | Phase 288 | Pending |
 | VIS-03 | Phase 289 | Pending |

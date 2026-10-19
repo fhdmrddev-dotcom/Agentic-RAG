@@ -79,7 +79,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **14 v4.7 requirements, 14 m
 ### Phase Checklist
 
 - [x] **Phase 286: Seams Before Features**: take the named G-5 seams on the workflow files this milestone edits, behaviour unchanged (REG-07)
-- [ ] **Phase 287: Start From a Thread, Fork a Starter**: launch a workflow from a thread with its form and run attached; fork one of 5+ curated, gauntlet-passing starters in one click (START-01, START-03)
+- [x] **Phase 287: Start From a Thread, Fork a Starter** (closed 2026-10-19, `human_needed`: SC#4 one-click ruling, Anthropic/OpenRouter rows after credit, cloud mig 210 paste): launch a workflow from a thread with its form and run attached; fork one of 5+ curated, gauntlet-passing starters in one click (START-01, START-03)
 - [ ] **Phase 288: Drafts That Survive, Pauses That Publish**: draft configuration persists across navigation; a human-pause workflow publishes and the run shows who it waits on (AUTH-03, AUTH-01)
 - [ ] **Phase 289: The Run Page and Its Evidence**: one read-only finished-run page with export; confidence on KB-derived phase outputs (VIS-03, TRUST-01)
 - [ ] **Phase 290: The Card and the Team Picture**: card matches its approved sketch; truthful orchestrator / workers / judge view (VIS-04, VIS-01)
@@ -126,7 +126,14 @@ Plans:
   5. The thread start path is driven on one native provider and OpenRouter with a two-tool prompt and a parallel-thread row (SC#10 axes; full roster run or recorded owed).
 
 **How we'd know this failed**: the form appears but the run starts in a new thread; the entry point is still reachable only from the Workflows page; a starter fails the gauntlet and the list still counts it; "fork" shares the row with the starter so an edit leaks; the starters are fixtures with no real content.
-**Plans**: TBD (target 3-5)
+**Plans**: 5 plans (waves 1/1/2/3/4)
+
+Plans:
+- [x] 287-01-PLAN.md - required launch inputs blocked at ChatLaunchForm + RunModal (SC#2)
+- [x] 287-02-PLAN.md - migration 210: 3 template-less starters (6 total) + static gauntlet test with counterfactuals (SC#3)
+- [x] 287-03-PLAN.md - in-thread "Run a workflow" action via StreamsProvider.sendMessage, one ChatArea mount (SC#1)
+- [x] 287-04-PLAN.md - fork isolation proof, full gates, ledger/seeds (SC#4)
+- [x] 287-05-PLAN.md - live proof: G-4 3/3 pass, 6 of 8 roster rows pass, 2 billing-blocked (SC#5)
 **UI hint**: yes
 **Flags**: **G-2 sketch** the in-thread entry and the starter picker before discuss. **G-4**: the operator names the "I'd recognize failure here" scenarios at scope time. `ChatLaunchForm` already exists (214-12) and `ChatLayout.doRun` has one caller; reuse it, do not build a second launch form. Starters are workflow definitions (data), no new phase type. Seeds `SEED-232`, `SEED-084`.
 
