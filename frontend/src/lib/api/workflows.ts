@@ -698,6 +698,15 @@ export interface WorkflowRunPhase {
  * `definition: null` rather than 404ing. Treat an empty `workflow_name` as "definition
  * unavailable", never render the empty string.
  */
+/** Phase 288 (D-09): who a run waiting on a person is waiting on. The SERVER composes
+ *  `sentence`; render it verbatim and never build one from an id. */
+export interface WorkflowRunWaitingOn {
+  sentence: string
+  step_name?: string | null
+  prompt_line?: string | null
+  window_passed: boolean
+}
+
 export interface WorkflowRunRead {
   /** `workflow_runs.id` — NOT `PostMessageResponse.run_id`. See the docblock. */
   id: string
@@ -725,6 +734,8 @@ export interface WorkflowRunRead {
   is_rated?: boolean
   token_coverage?: string[] | null
   model?: string | null
+  /** Phase 288 (AUTH-01): present only while the run waits on a human-input step. */
+  waiting_on?: WorkflowRunWaitingOn | null
 }
 
 /**
