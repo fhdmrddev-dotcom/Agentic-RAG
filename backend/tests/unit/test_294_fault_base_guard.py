@@ -93,7 +93,7 @@ REJECTED = [
     "http://[0:0:0:0:0:0:0:1]:8765", "http://localhost.:8765", "http://127.0.0.1@evil.com",
     "http://evil.com#@127.0.0.1", "http://127.0.0.1:8765?x=1", "http://127.0.0.1:8765/#f",
     "http://127.0.0.1:8765/?", "http:\\\\127.0.0.1:8765", "http://127.0.0.1:8765\\x",
-    "http://127.0.0.1:8765/a b", "http://127.0.0.1:8765/\tx", "http://127.0.0.1:8765/\x00",
+    "http://127.0.0.1:8765/a b", "http://127.0.0.1:8765/\tx", "http://127.0.0.1:8765/\x01",
     "http://127.0.0.1:99999", "http://127.0.0.1:port", "http://127.0.0.1:0",
     "http://ｌｏｃａｌｈｏｓｔ:8765", "http://xn--lcalhost-8za:8765",
     "ftp://127.0.0.1:8765", "http://:8765", "127.0.0.1:8765", "http://127.0.0.1",
@@ -111,6 +111,14 @@ def test_rejected_urls_fall_back_to_the_vendor(guard, caplog, url):
         ep = _resolve("jev")
     assert (ep.url, ep.fault) == (JEV_DECISIONS_URL, False)
     assert IGNORED in caplog.text
+
+
+@pytest.mark.parametrize("url", REJECTED + ["http://127.0.0.1:8765/\x00", "http://127.0.0.1:8765/\x7f"])
+def test_the_validator_rejects_every_form_directly(url):
+    """An environment variable cannot hold NUL (the OS refuses it), so NUL is driven here."""
+    from app.services.rerank_engines import _validated_fault_base
+
+    assert _validated_fault_base(url) is None
 
 
 @pytest.mark.parametrize("url,jev,oai", [

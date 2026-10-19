@@ -11816,6 +11816,7 @@ cells rot within days.
 | [`backend/app/services/rerank_engines/jev.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesjevpy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). OpenRouter /api/alpha/decisions: noul rerank (≤30 / ≤28 KB per call, ≤4 in flight) + post_decisions. ⛔ untrusted text only in state |
 | [`backend/app/services/rerank_engines/openai_decisions.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesopenai_decisionspy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). POST /v1/decisions gpt-6-luna: predicate rerank + post_decisions; raw httpx (SDK lacks decisions). ⛔ refusal → fallback |
 | [`backend/app/services/rerank_engines/tracing.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginestracingpy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). redact_inputs (process_inputs) + EngineCall capture for the harness. ⛔ user_settings / api_key / supabase never traced |
+| [`backend/app/utils/environment.py`](docs/HOT-FILE-LEDGER.md#backendapputilsenvironmentpy) | 1 / 1 / 21 | no (young) | young (created 294-01). current_environment(): the ONE ENVIRONMENT reader (A-IN-11), shared by api_docs and the fault guard. ⛔ per call; never os.getenv |
 | [`backend/app/services/decision_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdecision_evalpy) | 0 / 0 / 0 | no (young) | young (planned 294-02, row added at planning). D-18/D-19 harness over the REAL search_documents; reuses recall_eval. ⛔ refuses rather than invents; never writes app_settings |
 | [`backend/app/services/citation_claims.py`](docs/HOT-FILE-LEDGER.md#backendappservicescitation_claimspy) | 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). PURE claim extraction + marker ordinals + dedup_paragraphs port. ⛔ ordinals pinned to CitedMarkdown by a shared fixture |
 | [`backend/app/services/citation_check_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicescitation_check_servicepy) | 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). Runs the check (choice per claim, grouped by source) + the pool upsert. ⛔ ids bound from the message row; refusal → couldnt_check |
@@ -19280,6 +19281,8 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 
 **`1 / 1 / 111`** measured in 276-01's own creating commit. One router-level dependency (`require_api_docs_access`) over four `include_in_schema=False` routes; the token check is the existing `get_current_user` called directly, so no auth code is duplicated. `/openapi.json` returns `request.app.openapi()`, which keeps the Phase 182 canvas filter.
 
+**294-01 (Task 4):** `_environment()` now delegates to `app.utils.environment.current_environment()` (same normalisation, same per-request read); the `settings` import is replaced by that one. No route, gate value or log line changes; `test_276_api_docs_gate` green.
+
 ### `backend/app/main.py` — Phase 276, honoured by construction
 
 **`85 / 62 / 968`** after 276-01 (was `84 / 61 / 952`). G-5 FIRES; honoured by construction: one constructor kwarg change (`docs_url=None, redoc_url=None, openapi_url=None`), one import, one `include_router(api_docs.router)`, one boot log line (`API docs: GATED/OPEN`, D-20), and the Phase 182 `/docs` comment struck through with a dated correction (D-03) rather than deleted. `app.openapi = build_canvas_aware_openapi(app)` is byte-unchanged. 0 new branches outside lifespan's one log if/else.
@@ -22596,6 +22599,10 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 
 ## `backend/app/services/rerank_engines/tracing.py`
 
 **`0 / 0 / 0` — planned (294-01); row and section added at planning.** `redact_inputs` for `@traceable(process_inputs=...)` on `rerank-documents`, `search-documents` and every engine span (RESEARCH Pitfall 1: both traceables shipped every decrypted provider key to LangSmith); `EngineCall`, `record_engine_call` and `capture_engine_calls` so `decision_eval.py` can read per-call tokens, cost, latency and fallbacks without a second code path. ⛔ The redacted names are `user_settings`, `api_key` and `supabase`. Plan 05 re-derives the triple.
+
+## `backend/app/utils/environment.py`
+
+**`1 / 1 / 21` — created 294-01 (Task 4).** Not in the plan's `files_modified`: the plan checker asked for a shared ENVIRONMENT reader rather than a second copy of `api_docs`'s normalisation, because `api_docs._environment()` called itself "the ONE reader of ENVIRONMENT (A-IN-11)". `current_environment()` is `(settings.environment or "").strip().lower()`, read per call; `api_docs._environment()` now delegates to it and `rerank_engines.resolve_endpoint` calls it. Each caller keeps its OWN allowlist: the docs explorer opens for unset / local / development / dev / test, the decision-engine fault path only for an EXPLICIT local / development / dev / test (unset rejected, 294 N1). ⛔ **Binding invariants:** never cached at import (tests and restarts must see the current value); never `os.getenv("ENVIRONMENT")` (misses `backend/.env`, the A-IN-11 defect, pinned by `test_276_api_docs_gate`).
 
 ## `backend/app/services/decision_eval.py`
 

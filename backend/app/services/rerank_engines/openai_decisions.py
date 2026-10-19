@@ -28,9 +28,9 @@ from langsmith.run_helpers import get_current_run_tree
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.services.pricing_service import ModelRate, compute_token_cost_usd_unquantized
-from app.services.rerank_engines import DecisionMalformed, DecisionRefused
+from app.services.rerank_engines import DecisionMalformed, DecisionRefused, target_for
 from app.services.rerank_engines.prune import prune
-from app.services.rerank_engines.registry import ENGINES, OPENAI_DECISIONS_URL, OPENAI_MAX_QUESTIONS, EngineSpec
+from app.services.rerank_engines.registry import ENGINES, OPENAI_MAX_QUESTIONS, EngineSpec
 from app.services.rerank_engines.tracing import EngineCall, record_engine_call, redact_inputs, span_outputs
 
 ENGINE_ID = "openai_decisions"
@@ -89,8 +89,12 @@ def _http_client(timeout: httpx.Timeout) -> httpx.Client:
 
 
 def _target(spec: EngineSpec, api_key: str) -> tuple[str, str]:
-    """(url, bearer token) — the ONE place the endpoint and the token are chosen."""
-    return OPENAI_DECISIONS_URL, api_key
+    """(url, bearer token) — the ONE place the endpoint and the token are chosen.
+
+    The vendor endpoint and the stored key, unless the dev-only fault override passes every guard
+    (``rerank_engines.resolve_endpoint``): then a loopback URL and a DUMMY token, never the key.
+    """
+    return target_for(spec, api_key)
 
 
 def _rate(model: str) -> ModelRate:

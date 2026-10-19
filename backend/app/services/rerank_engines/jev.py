@@ -31,10 +31,10 @@ from langsmith import traceable
 from langsmith.run_helpers import get_current_run_tree
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.services.rerank_engines import DecisionMalformed, DecisionTimeout
+from app.services.rerank_engines import DecisionMalformed, DecisionTimeout, target_for
 from app.services.rerank_engines import registry
 from app.services.rerank_engines.prune import prune
-from app.services.rerank_engines.registry import ENGINES, JEV_DECISIONS_URL, EngineSpec
+from app.services.rerank_engines.registry import ENGINES, EngineSpec
 from app.services.rerank_engines.tracing import EngineCall, record_engine_call, redact_inputs, span_outputs
 
 ENGINE_ID = "jev"
@@ -87,8 +87,12 @@ def _http_client(timeout: httpx.Timeout) -> httpx.Client:
 
 
 def _target(spec: EngineSpec, api_key: str) -> tuple[str, str]:
-    """(url, bearer token) — the ONE place the endpoint and the token are chosen."""
-    return JEV_DECISIONS_URL, api_key
+    """(url, bearer token) — the ONE place the endpoint and the token are chosen.
+
+    The vendor endpoint and the stored key, unless the dev-only fault override passes every guard
+    (``rerank_engines.resolve_endpoint``): then a loopback URL and a DUMMY token, never the key.
+    """
+    return target_for(spec, api_key)
 
 
 def _tag_model(model: str) -> None:
