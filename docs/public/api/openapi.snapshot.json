@@ -8261,6 +8261,55 @@
     }
    }
   },
+  "/workflow-runs/{workflow_run_id}/evidence": {
+   "get": {
+    "tags": [
+     "workflow-runs"
+    ],
+    "summary": "Read Run Evidence",
+    "description": "PURE READ \u2014 a finished run's evidence for its owner or a member of its org. Writes nothing.",
+    "operationId": "read_run_evidence_workflow_runs__workflow_run_id__evidence_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "workflow_run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Workflow Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunEvidenceRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/metadata-fields": {
    "get": {
     "tags": [
@@ -25506,6 +25555,645 @@
     "type": "object",
     "title": "RuleUpdate"
    },
+   "RunEvidenceConfidence": {
+    "properties": {
+     "level": {
+      "type": "string",
+      "title": "Level"
+     },
+     "avg_similarity": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Similarity"
+     },
+     "disclaimer": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Disclaimer"
+     },
+     "passages": {
+      "type": "integer",
+      "title": "Passages",
+      "default": 0
+     },
+     "kb_label": {
+      "type": "string",
+      "title": "Kb Label"
+     }
+    },
+    "type": "object",
+    "required": [
+     "level",
+     "kb_label"
+    ],
+    "title": "RunEvidenceConfidence"
+   },
+   "RunEvidenceDefinition": {
+    "properties": {
+     "recorded": {
+      "type": "boolean",
+      "title": "Recorded",
+      "description": "False only when the run predates version recording."
+     },
+     "version": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version"
+     },
+     "phases": {
+      "items": {
+       "$ref": "#/components/schemas/RunEvidenceDefinitionPhase"
+      },
+      "type": "array",
+      "title": "Phases"
+     },
+     "full": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Full"
+     }
+    },
+    "type": "object",
+    "required": [
+     "recorded"
+    ],
+    "title": "RunEvidenceDefinition"
+   },
+   "RunEvidenceDefinitionChanged": {
+    "properties": {
+     "changed": {
+      "type": "boolean",
+      "title": "Changed",
+      "default": false
+     },
+     "current_version": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Current Version"
+     }
+    },
+    "type": "object",
+    "title": "RunEvidenceDefinitionChanged"
+   },
+   "RunEvidenceDefinitionPhase": {
+    "properties": {
+     "n": {
+      "type": "integer",
+      "title": "N"
+     },
+     "slug": {
+      "type": "string",
+      "title": "Slug"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "phase_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phase Type"
+     }
+    },
+    "type": "object",
+    "required": [
+     "n",
+     "slug",
+     "name"
+    ],
+    "title": "RunEvidenceDefinitionPhase"
+   },
+   "RunEvidenceDeliverable": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "title": "Kind",
+      "description": "\"file\" | \"text\" | \"none\""
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "file_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "File Id",
+      "description": "Workspace file id; owner only."
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "title": "RunEvidenceDeliverable"
+   },
+   "RunEvidenceHumanInput": {
+    "properties": {
+     "answered": {
+      "type": "boolean",
+      "title": "Answered"
+     },
+     "question": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Question"
+     },
+     "answer": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Answer"
+     },
+     "answered_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Answered By"
+     }
+    },
+    "type": "object",
+    "required": [
+     "answered"
+    ],
+    "title": "RunEvidenceHumanInput"
+   },
+   "RunEvidenceLogEntry": {
+    "properties": {
+     "n": {
+      "type": "integer",
+      "title": "N"
+     },
+     "slug": {
+      "type": "string",
+      "title": "Slug"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "phase_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phase Type"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "completed_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Completed At"
+     },
+     "step_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step Count"
+     },
+     "step_noun": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step Noun"
+     },
+     "output_text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Output Text"
+     },
+     "failure_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Failure Reason"
+     },
+     "confidence": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RunEvidenceConfidence"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "human_input": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RunEvidenceHumanInput"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "n",
+     "slug",
+     "name",
+     "status"
+    ],
+    "title": "RunEvidenceLogEntry"
+   },
+   "RunEvidenceRead": {
+    "properties": {
+     "run": {
+      "$ref": "#/components/schemas/RunEvidenceRun"
+     },
+     "definition": {
+      "$ref": "#/components/schemas/RunEvidenceDefinition"
+     },
+     "definition_changed": {
+      "$ref": "#/components/schemas/RunEvidenceDefinitionChanged"
+     },
+     "kb_label": {
+      "type": "string",
+      "title": "Kb Label"
+     },
+     "deliverable": {
+      "$ref": "#/components/schemas/RunEvidenceDeliverable"
+     },
+     "phase_log": {
+      "items": {
+       "$ref": "#/components/schemas/RunEvidenceLogEntry"
+      },
+      "type": "array",
+      "title": "Phase Log"
+     },
+     "verdicts": {
+      "items": {
+       "$ref": "#/components/schemas/RunEvidenceVerdict"
+      },
+      "type": "array",
+      "title": "Verdicts"
+     },
+     "sources": {
+      "items": {
+       "$ref": "#/components/schemas/RunEvidenceSource"
+      },
+      "type": "array",
+      "title": "Sources"
+     }
+    },
+    "type": "object",
+    "required": [
+     "run",
+     "definition",
+     "definition_changed",
+     "kb_label",
+     "deliverable"
+    ],
+    "title": "RunEvidenceRead"
+   },
+   "RunEvidenceRun": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "workflow_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Workflow Name"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "completed_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Completed At"
+     },
+     "started_by": {
+      "$ref": "#/components/schemas/RunEvidenceStartedBy"
+     },
+     "org_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Org Name"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "viewer_is_owner": {
+      "type": "boolean",
+      "title": "Viewer Is Owner"
+     },
+     "thread_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Thread Id",
+      "description": "The owner's thread; null for anyone else."
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "status",
+     "started_by",
+     "viewer_is_owner"
+    ],
+    "title": "RunEvidenceRun"
+   },
+   "RunEvidenceSource": {
+    "properties": {
+     "masked": {
+      "type": "boolean",
+      "title": "Masked"
+     },
+     "document_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Document Id"
+     },
+     "filename": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Filename"
+     },
+     "locations": {
+      "items": {
+       "type": "integer"
+      },
+      "type": "array",
+      "title": "Locations"
+     },
+     "cited_by": {
+      "items": {
+       "type": "integer"
+      },
+      "type": "array",
+      "title": "Cited By"
+     }
+    },
+    "type": "object",
+    "required": [
+     "masked"
+    ],
+    "title": "RunEvidenceSource"
+   },
+   "RunEvidenceStartedBy": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "is_you": {
+      "type": "boolean",
+      "title": "Is You",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "RunEvidenceStartedBy"
+   },
+   "RunEvidenceVerdict": {
+    "properties": {
+     "step_n": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step N"
+     },
+     "phase_slug": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phase Slug"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "result": {
+      "type": "string",
+      "title": "Result",
+      "description": "\"passed\" | \"failed\" | \"recorded\""
+     },
+     "checked": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Checked"
+     },
+     "at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind",
+     "result"
+    ],
+    "title": "RunEvidenceVerdict"
+   },
    "ScheduleTriggerResult": {
     "properties": {
      "launched": {
@@ -30279,6 +30967,19 @@
       ],
       "title": "Service Name",
       "description": "The SERVICE a person would name \u2014 the bound connection row's display `name`, resolved at READ time. \u26a0 **COMPUTED, NEVER STORED** (D-213-02 / D-214-14): a stored copy goes stale the moment the connection is renamed. \u26a0 `null` is a LEGITIMATE value and means the connection could not be resolved (deleted, another org's, or none bound) \u2014 the surface then renders the ACTION ALONE. **Never a substitute string**: not \"Unknown service\", not the capability id, not the connection id. `grounding.py`'s shipped rule, unchanged on a new surface: never draw a name the system cannot know."
+     },
+     "confidence": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Confidence",
+      "description": "This step's retrieval confidence, computed ONCE at write time by chat's own `_compute_confidence` over the similarity of this step's own `search_documents` calls: `{level, avg_similarity, disclaimer, passages, kb_label}`. `level` is high | medium | low | none, where `none` means the step searched and matched nothing. \u26a0 `null` MEANS THE STEP MADE NO KNOWLEDGE-BASE SEARCH (or its search failed, or the run predates this field) \u2014 render nothing, never a low chip. `kb_label` is the bound project folder's name, else `the knowledge base`, resolved server-side once per read."
      }
     },
     "type": "object",
