@@ -103,3 +103,16 @@ No success criterion is unmet. All five SCs and all six failure conditions check
 
 _Verified: 2026-10-20_
 _Verifier: Claude (gsd-verifier)_
+
+## Post-review-fix full gates (orchestrator, 2026-10-20)
+
+Run after the 16 `test/fix(289-REVIEW)` commits, at HEAD of develop, because those fixes came after plan 05's gate runs.
+
+| Gate | Verdict |
+|---|---|
+| Backend `pytest tests/unit -q --continue-on-collection-errors` (local-DB lock, `-p no_run_sweeps`) | **79 failed, 7871 passed**, 1 skipped, 2 xfailed, 2 xpassed |
+| Failing-test SET vs phase base `dcf6ba649` (plan 05's `drive/gate_base.txt`, 78 ids; trailing-warning artifacts normalised) | only-HEAD: **1**, `test_email_ingestion.py::test_ingest_email_populates_metadata_and_attachments`; only-base: 0 |
+| That one id | **classified flaky, not a phase regression.** It passes in isolation at HEAD. The phase diff touches no email or ingestion file. It failed the same way in 289-03's full run (before the review fixes) and passed in both of plan 05's full runs on the same code paths. It reads as an order- or timing-dependent title-extraction leak. |
+| 71 ceiling | Not raised (operator-only). The excess (78) is inherited, as plan 05 established. |
+| Vitest count gate | **count gate OK**: 471/471 pinned files present, no per-file decrease, 0 failing (10,743 tests) |
+| Frontend typecheck (`tsc -p tsconfig.app.json`) | 63 errors, the same set as base (per 289-REVIEW-FIX) |
