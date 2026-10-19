@@ -194,7 +194,7 @@ COMMIT;
 --   with checks(what, ok) as (values
 --     ('3 new starters are published, global, category starter', (select count(*) from public.workflow_definitions where slug in ('meeting-notes-to-actions','policy-change-impact','stakeholder-update') and version = 1 and status = 'published' and is_system_global and definition->>'category' = 'starter') = 3),
 --     ('the shelf lists at least 6 starters', (select count(*) from public.workflow_definitions where status = 'published' and is_system_global and definition->>'category' = 'starter') >= 6),
---     ('new starters declare no assets', not exists(select 1 from public.workflow_definitions where slug in ('meeting-notes-to-actions','policy-change-impact','stakeholder-update') and jsonb_array_length(coalesce(definition->'assets','[]'::jsonb)) > 0)),
+--     ('new starters declare no assets', not exists(select 1 from public.workflow_definitions where slug in ('meeting-notes-to-actions','policy-change-impact','stakeholder-update') and definition->'assets' is not null)),
 --     ('new starters carry an org_id', not exists(select 1 from public.workflow_definitions where slug in ('meeting-notes-to-actions','policy-change-impact','stakeholder-update') and org_id is null)),
 --     ('new starters have no folder binding', not exists(select 1 from public.workflow_definitions where slug in ('meeting-notes-to-actions','policy-change-impact','stakeholder-update') and definition::text like '%folder%'))
 --   ) select case when ok then 'PASS' else 'FAIL' end as status, what from checks;
