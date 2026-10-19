@@ -56,6 +56,19 @@ Requirements: AUTH-03, AUTH-01. Seeds: SEED-183, SEED-164.
 - **D-18 (reported bugs).** No open `surface: Agentic-RAG` report is folded. `BUG-260610-01` (run nav timer reset and duplicate avatar) stays open: the timer half went to 200 and the avatar half is not this phase.
 </decisions>
 
+
+<amendments>
+## Amendments from research (2026-10-19, supersede the decisions they name)
+
+- **A-01 (D-05):** bleed cannot be reproduced by reading (store created per mount; Builder unmounts between drafts). No keying fix. Ship a regression test plus the S2 browser drive; fix only if the drive reproduces it.
+- **A-02 (D-02):** one optional prop on `DraftArrivalCard`; its closed branch renders one collapsed "Draft settings" row with a new testid and neutral new words. The existing pin "dismissing takes the column down to TWO children" is retired deliberately and re-baselined, with the reason written in the test.
+- **A-03 (D-08):** the timeout lint lives in `_interactive_phase_failures`, not `lint_workflow`. Message states the 30-minute ceiling. Backend tests for it run explicitly (some sit outside `tests/unit`).
+- **A-04 (D-07):** `PublishVerdict` gains one optional field for "answered automatically during validation", filled from the golden run's `_golden_run_mock` outputs. Stale copy at `PublishGauntlet.tsx:212` and `landing/facts.ts:144` is corrected in the same plan.
+- **A-05 (D-09):** no pending-prompt table exists; the prompt is a `messages` row. Use a NOT-EXISTS variant of the pending read and take the step name from the active phase row. Field: `waiting_on {sentence, step_name, prompt_line, window_passed}`, composed server-side. Name from `profiles.display_name` via a pool read after the ownership select.
+- **A-06 (D-10, operator-free ruling):** the email fallback applies only when the viewer is the owner. For anyone else the sentence says "the person who started this run", and `prompt_line` is withheld.
+- **A-07 (D-11):** the line covers BOTH states: run `active` (band says Running, node says waiting) and `paused` (window passed). Both show the same sentence.
+</amendments>
+
 <deferred>
 ## Deferred Ideas
 
