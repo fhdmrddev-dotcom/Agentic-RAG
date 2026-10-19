@@ -150,7 +150,13 @@ Plans:
   4. When a run of that workflow pauses, the run surface shows who the run is waiting on, in words, and the same line is present after reload (AUTH-01).
 
 **How we'd know this failed**: the draft persists only until a hard reload; two drafts overwrite each other; the gauntlet is loosened by removing a check rather than teaching it the pause; "waiting on" shows an id or nothing; a published pause workflow makes a run that never resumes and nothing says so.
-**Plans**: TBD (target 3-5)
+**Plans**: 4 plans (waves 1/1/1/2)
+
+Plans:
+- [ ] 288-01-PLAN.md - draft settings row: one optional DraftArrivalCard prop, neutral words, TWO-children pin re-baselined, no-bleed regression (SC#1, SC#2)
+- [ ] 288-02-PLAN.md - gauntlet: timeout lint in _interactive_phase_failures (RED on 0/-5/99999/1801), auto_answered verdict note, stale copy fixed (SC#3)
+- [ ] 288-03-PLAN.md - run read waiting_on (server sentence, owner vs non-owner, active and paused) + one render in WorkflowRunPage (SC#4)
+- [ ] 288-04-PLAN.md - live proof S1-S4 in Chrome, SC#10 roster in VALIDATION.md, full gates once, ledger/count-gate close-out
 **UI hint**: yes
 **Flags**: **G-2 sketch** the waiting-on moment. **G-4**. The publish gauntlet is security-adjacent: driven RED against a planted unbounded wait. Hot files: `WorkflowBuilderPage.tsx`, `builderStore.ts`, `PublishGauntlet.tsx`, `publish_service.py`, `WorkflowRunPage.tsx`; read their ledger sections. Seeds `SEED-183`, `SEED-164`. Uses the existing `llm_human_input` phase type; no new phase type.
 
