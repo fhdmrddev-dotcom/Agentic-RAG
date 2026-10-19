@@ -20,9 +20,9 @@ import { useStartWorkflowInThread } from "./useStartWorkflowInThread"
  * Its own `ChatLaunchForm` instance collects the declared inputs; nothing is read from the
  * conversation (D-07). Props are exactly the thread and the lock.
  */
-export function ThreadWorkflowPicker({ thread, locked }: { thread: Thread; locked: boolean }) {
+export function ThreadWorkflowPicker({ thread, locked, busy = false }: { thread: Thread; locked: boolean; busy?: boolean }) {
   const s = useStartWorkflowInThread(thread.id)
-  const disabled = locked || s.starting
+  const disabled = locked || busy || s.starting
 
   return (
     <div className="relative mx-4 mb-1 flex flex-wrap items-center gap-2" data-testid="thread-workflow-picker">

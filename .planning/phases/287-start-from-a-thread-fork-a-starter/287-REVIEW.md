@@ -87,3 +87,9 @@ No blockers. The migration is data-only, idempotent (fixed ids + `ON CONFLICT (i
 
 **File:** `supabase/migrations/210_starter_workflows_v2.sql` (VERIFY block), `frontend/src/components/chat/ThreadWorkflowPicker.tsx:41`
 **Issue:** The VERIFY check "shelf lists at least 6 starters" is `>= 6`, so it passes on a DB with other starters even if one of the three new rows were skipped by an id conflict. The first check (count = 3 by slug/version) does cover the new rows, so this is only a redundancy. Separately, the open picker list has no outside-click or Escape dismissal (only the form does), and it stays open over the composer until the trigger is clicked again.
+
+## Disposition (2026-10-19, orchestrator; G-7 triage, no gap round)
+- **WR-01 FIXED inline (fast-fix):** `ThreadWorkflowPicker` takes `busy`, ChatArea passes `isStreaming`; test added in `ThreadWorkflowPicker.test.tsx`.
+- **WR-02 DEFERRED:** rejected-start recovery (hook owns the error + Retry with the definition id and inputs; 409 wording). Not a success-criterion failure; the user sees a banner and nothing starts. Re-open trigger: next phase touching `useStartWorkflowInThread` or the composer retry path.
+- **WR-03 DEFERRED:** strengthen `test_287_fork_isolation.py` with non-owner update refusals (needs a user-JWT/RLS connection, not the superuser pool). Re-open trigger: next phase touching fork/ownership paths.
+- IN-01..IN-04: accepted, recorded.

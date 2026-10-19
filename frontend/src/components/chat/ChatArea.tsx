@@ -805,7 +805,7 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
       </div>
     )}
     {/* Phase 287-03 (D-02): the ONE mount - an action button, not a mode; locked = workflowLocked */}
-    {thread && <ThreadWorkflowPicker thread={thread} locked={workflowLocked} />}
+    {thread && <ThreadWorkflowPicker thread={thread} locked={workflowLocked} busy={isStreaming} />}
     <MessageInput
       activeExpert={activeExpert}
       onActiveExpertChange={(exp) => void applyExpertChange(exp)}

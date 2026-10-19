@@ -116,6 +116,13 @@ describe("ThreadWorkflowPicker", () => {
     expect(mockCreateThread).not.toHaveBeenCalled()
   })
 
+  it("busy (a normal turn is streaming): disabled, because sendMessage would drop the start (287 review WR-01)", () => {
+    render(<ThreadWorkflowPicker thread={THREAD} locked={false} busy={true} />)
+    expect(screen.getByTestId("thread-workflow-trigger")).toBeDisabled()
+    // Not the workflow-lock sentence: nothing is "already running" as a workflow here.
+    expect(screen.queryByTestId("thread-workflow-locked-reason")).toBeNull()
+  })
+
   it("locked: disabled with the stated reason, and opening is impossible", () => {
     render(<ThreadWorkflowPicker thread={THREAD} locked={true} />)
     const btn = screen.getByTestId("thread-workflow-trigger")
