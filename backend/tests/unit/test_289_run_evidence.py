@@ -567,7 +567,9 @@ async def test_a_colleague_reads_a_minimised_record(wire):
     assert "Yes, go ahead" not in text
     # accepted risk T-289-31, pinned rather than accidental
     assert body["phase_log"][0]["output_text"] == "Three vendors meet the bar."
-    assert "SECRET PASSAGE" not in text and "similarity" not in text
+    # (confidence's own `avg_similarity` is the step's aggregate, not a citation's score)
+    assert "SECRET PASSAGE" not in text and '"similarity"' not in text
+    assert '"passage"' not in text
     # the RLS check ran once, as the colleague, over the cited ids only
     assert wire["opened"] == [COLLEAGUE]
     (rls_sql, rls_args), _label = wire["conn"].calls
