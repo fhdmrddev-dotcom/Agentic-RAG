@@ -41,6 +41,19 @@ vi.mock("@/lib/api", () => {
   }
 })
 
+// Phase 289-04 (D-02): a finished run — and the owner read's 404 — now renders the evidence
+// report through ONE early return, and the report reads its own payload. Mocked by the report's
+// own specifiers. By default the read stays in flight (the report's loading line), which is all
+// the beat and edge pins need to see; the missing pin answers it with the 404 every refusal is.
+const getRunEvidence = vi.fn()
+vi.mock("@/lib/api/runEvidence", () => ({
+  getRunEvidence: (...a: unknown[]) => getRunEvidence(...a),
+}))
+vi.mock("@/lib/api/documents", () => ({
+  downloadWorkspaceFile: (...a: unknown[]) =>
+    downloadWorkspaceFile(...(a as [string, string, string])),
+}))
+
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: {
@@ -165,8 +178,12 @@ async function flush() {
 }
 
 const COPY_LOADING = "Opening the run…"
-const COPY_MISSING_HEAD = "That run isn't available."
+// 289-04 (D-05 / D-14a): was "That run isn't available." — the owner read's 404 now routes into
+// the evidence report, whose org-scoped read decides and whose ONE refusal screen this is.
+const COPY_MISSING_HEAD = "This run isn't available"
 const COPY_BROKEN_HEAD = "We couldn't load this run."
+/** 289-04: the evidence report's own loading line — proof the finished run reached the report. */
+const COPY_REPORT_LOADING = "Opening the run record…"
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -183,6 +200,7 @@ beforeEach(() => {
     skills: [],
   })
   getWorkflowRun.mockResolvedValue(mkRun())
+  getRunEvidence.mockImplementation(() => new Promise(() => {}))
 })
 
 afterEach(() => {
@@ -222,9 +240,12 @@ describe("286-03 pin — the four load screens", () => {
 
   it("missing: a 404 is the not-available screen, with no Try again", async () => {
     getWorkflowRun.mockRejectedValue(new ApiError("not found", 404))
+    // 289-04: the report's evidence read refuses too (every refusal is the same 404).
+    getRunEvidence.mockRejectedValue(new ApiError("Run not found", 404))
     const { container } = render(page())
     await flush()
-    expect(screen.getByText(COPY_MISSING_HEAD)).toBeInTheDocument()
+    expect(await screen.findByText(COPY_MISSING_HEAD)).toBeInTheDocument()
+    expect(getRunEvidence).toHaveBeenCalledWith("run-1", expect.any(AbortSignal))
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull()
     expect(container.innerHTML).toMatchSnapshot()
   })
@@ -271,7 +292,10 @@ describe("286-03 pin — the 5 s run poll", () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
     await advance(5000)
     expect(getWorkflowRun).toHaveBeenCalledTimes(3)
-    expect(screen.getByTestId("run-band")).toHaveTextContent("✓ Complete")
+    // 289-04 (D-02): was `run-band` → "✓ Complete". A finished run renders the evidence report
+    // (its loading line here); the beat's teardown below is unchanged.
+    expect(screen.getByText(COPY_REPORT_LOADING)).toBeInTheDocument()
+    expect(screen.queryByTestId("run-band")).toBeNull()
 
     await advance(15000)
     expect(getWorkflowRun).toHaveBeenCalledTimes(3)
@@ -312,7 +336,9 @@ describe("286-03 pin — the terminal edge", () => {
       terminalRead.resolve(mkRun({ status: "completed" }))
       await vi.advanceTimersByTimeAsync(0)
     })
-    expect(screen.getByTestId("run-band")).toHaveTextContent("✓ Complete")
+    // 289-04 (D-02): was `run-band` → "✓ Complete". The edge now lands on the evidence report;
+    // the 286 hooks run before the page's early return, so the one-shot reconcile below holds.
+    expect(screen.getByText(COPY_REPORT_LOADING)).toBeInTheDocument()
     expect(reconcile.mock.calls.length).toBe(r1 + 1)
     expect(reconcileFiles.mock.calls.length).toBe(f1 + 1)
 

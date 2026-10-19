@@ -83,6 +83,7 @@ import { nodeTitle, waitsForYou, type PhaseSpecJSON } from "@/components/workflo
 // had never rendered in the product. It is mounted HERE and must never be mounted on
 // `WorkflowBuilderPage.tsx`; that absence is asserted by grep, on both files.
 import { RunReceipt } from "@/components/workflows/RunReceipt"
+import { RunEvidenceReport } from "@/components/workflows/RunEvidenceReport"
 // The ONE resolver's read shape. ⚠ A TYPE ONLY, and that absence is the point: the page
 // derives NO duration and NO span of its own. `min(started_at) → max(completed_at)` has
 // exactly one home (`phaseDuration.runSpan`) and exactly one call site (the receipt), so
@@ -152,8 +153,9 @@ interface Props {
 // ── Copy (188-UI-SPEC § Copywriting Contract — verbatim, single-sourced) ────────
 
 const COPY_LOADING = "Opening the run…"
-const COPY_MISSING_HEAD = "That run isn't available."
-const COPY_MISSING_BODY = "It may have been deleted, or it belongs to another account."
+// 289-04 (D-05 / D-14a): the not-available pair ("That run isn't available." / "It may have
+// been deleted, or it belongs to another account.") is retired here; a 404 now renders the
+// evidence report's ONE refusal screen, whose words live in `evidenceVocabulary.ts`.
 const COPY_BROKEN_HEAD = "We couldn't load this run."
 const COPY_BROKEN_BODY = "Something went wrong on our side. Nothing about the run has changed."
 const COPY_BACK = "‹ Back to Workflows"
@@ -1132,22 +1134,33 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
     )
   }
 
-  if (loadPhase === "missing" || loadPhase === "broken") {
-    const missing = loadPhase === "missing"
+  // ── Phase 289-04 (VIS-03 / D-02 / D-06 / D-14a) — a FINISHED run IS the evidence report ──
+  // ONE early return, placed after every hook: the 286 hooks above still run, so the terminal
+  // edge's one-shot reconcile still fires and the poll still tears down. Same page, same route
+  // (D-02); an active or paused run never gets here (D-06). The owner read's 404 ("missing")
+  // routes here too, because the report's ORG-scoped evidence read is the one that decides: a
+  // same-org colleague reaches the record, and every refusal is that read's one 404 screen
+  // (D-05 / T-289-24). The thread seam is offered only when this page holds the run (owner).
+  if (loadPhase === "missing" || (loadPhase === "ready" && run && isTerminal)) {
+    return (
+      <RunEvidenceReport
+        runId={runId}
+        onBack={onBack}
+        onOpenThread={loadPhase === "ready" ? onOpenThread : undefined}
+      />
+    )
+  }
+
+  // 289-04: this screen now serves "broken" only — "missing" is the report's (above).
+  if (loadPhase === "broken") {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-12 text-center">
-        <h1 className="font-headline text-xl font-semibold text-foreground">
-          {missing ? COPY_MISSING_HEAD : COPY_BROKEN_HEAD}
-        </h1>
-        <p className="max-w-md text-sm text-muted-foreground">
-          {missing ? COPY_MISSING_BODY : COPY_BROKEN_BODY}
-        </p>
+        <h1 className="font-headline text-xl font-semibold text-foreground">{COPY_BROKEN_HEAD}</h1>
+        <p className="max-w-md text-sm text-muted-foreground">{COPY_BROKEN_BODY}</p>
         <div className="flex items-center gap-2">
-          {missing ? null : (
-            <Button size="sm" onClick={() => setRetryNonce((n) => n + 1)}>
-              Try again
-            </Button>
-          )}
+          <Button size="sm" onClick={() => setRetryNonce((n) => n + 1)}>
+            Try again
+          </Button>
           <Button variant="ghost" size="sm" onClick={onBack}>
             {COPY_BACK}
           </Button>
