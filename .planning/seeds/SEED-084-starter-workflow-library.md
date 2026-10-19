@@ -1,8 +1,8 @@
 ---
 seed_id: SEED-084
 title: Starter / seed workflow library (fork-a-starter)
-status: folded
-status_note: "Folded into Phase 287 (2026-10-19, autonomous discuss): START-03. Original body Status: dormant is superseded."
+status: shipped
+status_note: "Shipped by Phase 287 (2026-10-19): START-03 fork isolation proven (test_287_fork_isolation.py). SC#4 one-click DEVIATED (menu + ForkNameDialog kept, A-04), operator to rule. Original body Status: dormant is superseded."
 surface: Agentic-RAG
 trigger_when: unset
 ---

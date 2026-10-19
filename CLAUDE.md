@@ -458,7 +458,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent its ENTIRE LIFE — row added 244-05 |
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
 | `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
-| `frontend/src/stores/streamsStore.ts` | 24 / 15 / 607 (was `22 / 14 / 572`) | honoured by construction (287-03: ONE type field) · ⛔ |
+| `frontend/src/stores/streamsStore.ts` | 24 / 16 / 607 (was `22 / 14 / 572`) | honoured by construction (287-03: ONE type field) · ⛔ |
 | `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 1 / 1 / 91 | young (created 287-03) · reads no conversation · ⛔ |
 | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 1 / 1 / 85 | young (created 287-03) · no createThread · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
@@ -474,7 +474,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (249-02/03) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
-| `scripts/vitest-count-gate.cjs` | 308 / 68 / 6483 (was `298 / 66 / 6443`) | last touch 284-05 (10 pins raised, 5 suites adopted) |
+| `scripts/vitest-count-gate.cjs` | 314 / 69 / 6539 (was `308 / 68 / 6483`) | last touch 287-04 (6 suites adopted, 2 pins raised) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
 | `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ NOW FIRES at 3 phases · last touch 256-03 |
 | `frontend/src/components/panel/PhaseCard.tsx` | 18 / 12 / 796 (was `17 / 11 / 788`) | honoured by construction (281-03: one copy entry + one className) |

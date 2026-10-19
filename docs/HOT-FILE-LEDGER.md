@@ -11145,7 +11145,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 99 / 39 / 2698 (was `97 / 38 / 2653`) | ⚠ **FIRES** | Honoured by construction. **285-03** (D-12): both enqueue paths failed → the doc is marked `failed` (guard `status='pending'`) and 201 `failed` returned, like the storage-fail arm. Minter untouched |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 308 / 68 / 6483 (was `298 / 66 / 6443`) | ⚠ **FIRES** | last touch **284-05**: 10 pins raised to measured actuals (284-03 / 284-04 growth) + 5 suites adopted in BOTH knobs (incl. TakeoffSection, in neither before). No pin lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 314 / 69 / 6539 (was `308 / 68 / 6483`) | ⚠ **FIRES** | last touch **287-04**: 6 suites adopted, 2 pins raised (detail below). |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 5 / 2 / 465 | no (2 phases) | **275-03**: `retention` tag in the Documents group (one line). ⛔ `scripts/` is gate-exempt |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 18 / 12 / 796 (was `17 / 11 / 788`) | ⚠ **FIRES** | **281-03** (`0b9841e55`): ONE `template_fields_missing` copy entry (never says "citation") + `whitespace-pre-line` on the reason. honoured by construction (200 / 214 / 281) |
@@ -11367,7 +11367,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
 | [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 3 / 2 / 183 (was `2 / 1 / 183`) | no (2 phases) | Both attach doors' state + verbs. **274-03**: ONE edit — the composer uploads with `lifetime "thread"`. ⛔ it CANNOT reach `setValue` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
-| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 24 / 15 / 607 (was `22 / 14 / 572`) | **FIRES** | honoured by construction (**287-03**): ONE optional `inputs` type field on sendMessage opts, 0 branches. **244-13**: `WorkflowLock.mode` is a REAL discriminator |
+| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 24 / 16 / 607 (was `22 / 14 / 572`) | **FIRES** | honoured by construction (**287-03**): ONE optional `inputs` type field on sendMessage opts, 0 branches. **244-13**: `WorkflowLock.mode` is a REAL discriminator |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
 | [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 21 / 14 / 838 (was `15 / 10 / 690`) | ⚠ **FIRES** | **284-02**: mig 207's `library_documents` grant block mirrored (SELECT-only, closed to PUBLIC / anon; ACL parity 349/349). ⛔ `scripts/` is gate-EXEMPT: kept by hand |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
@@ -21649,6 +21649,12 @@ Scan-list disposition cell before 284-05 (replaced):
 
 > young (created 284-03). Test-only fake: page / summary / single read from ONE fixture array. ⛔ never imported outside a test
 
+### `scripts/vitest-count-gate.cjs` — Phase 287-04
+
+**`314 / 69 / 6539` (was `308 / 68 / 6483`), RE-DERIVED with the recipe.** Adopted ThreadWorkflowPicker 9, useStartWorkflowInThread 7, ChatArea.threadWorkflowPicker 5, StreamsProvider.inputs 3 (FILE-LEVEL TARGETS: neither chat nor providers has a directory entry), soulData.requiredFields 7 and starterFork.287 3 (under the workflows directory entry), all pinned in BASELINE in the same commit. Raised, never lowered: ChatLayout.launch 17→38, RunModal 40→55. Count gate verdict: 461/461 pinned files present, no per-file decrease, 0 failing.
+
+CLAUDE.md verdict cell before 287-04: last touch 284-05 (10 pins raised, 5 suites adopted)
+
 ### `scripts/vitest-count-gate.cjs` — Phase 284 close
 
 **`308 / 68 / 6483` (was `298 / 66 / 6443`).** Quick-task buckets subtracted: 260807, 260808, 260814. **284-01** (`294ed57b1`…`a928b8ccd`): `libraryPaging284` 22, `useLibraryDocuments` 13, `FolderDetail284` 5, `LibraryStatTiles` 13 → 16, `StructurePopovers` 22 → 27, `FindQuickAdd` 22 → 26. **284-05** (`30ea18d40`): raised useLibraryDocuments 13 → 24, IngestionTab 42 → 50, LibraryHeaderBar 13 → 16, DetailSections.tables 15 → 18, DocumentDetailPanel.images 3 → 4, CreateLinkDialog 8 → 14, LinkTargetCombobox 9 → 17, LegalHolds 25 → 29, FindQuickAdd 26 → 27, StructurePopovers 27 → 30; adopted `LibraryPage.states284` 15, `DocumentChunksSection.paging284` 8, `DocumentRow.versions284` 3, `libraryListFence` 3, `TakeoffSection` 8 — each read from a real `npx vitest run` on the merged tree. `scripts/` is gate-EXEMPT; this row is kept by hand.
@@ -22115,4 +22121,4 @@ CLAUDE.md FIRING row: young row added (cell cap 80).
 
 ## `frontend/src/stores/streamsStore.ts` — `287-03` (START-01)
 
-**`24 / 15 / 607` (was `22 / 14 / 572`).** ONE passthrough field: optional `inputs?: Record<string, string>` on the `sendMessage` opts type. 0 branches.
+**`24 / 16 / 607` (was `22 / 14 / 572`; phase count RE-DERIVED at 287-04 with the recipe, was 15).** ONE passthrough field: optional `inputs?: Record<string, string>` on the `sendMessage` opts type. 0 branches.

@@ -200,6 +200,16 @@ const BASELINE = {
   "ScopeChip.test.tsx": 7,
   "ScopePicker.test.tsx": 15,
   "ChatArea.scopeChange.test.tsx": 15, // +3 268-REVIEW WR-01 (thread-switch gating) · +3 iter-2 WR-01 (409 reconcile)
+  // ── Phase 287-04 (START-01/03) — adopted suites, both knobs, same commit. Counts are the
+  //    printed `actual` of the suites run together, never hand-counted. soulData.requiredFields,
+  //    starterFork.287 live under the `src/components/workflows` directory TARGETS entry;
+  //    the chat + providers ones are named FILE-LEVEL below (no bare directory entry exists).
+  "ThreadWorkflowPicker.test.tsx": 9,
+  "useStartWorkflowInThread.test.tsx": 7,
+  "ChatArea.threadWorkflowPicker.test.tsx": 5,
+  "StreamsProvider.inputs.test.tsx": 3,
+  "soulData.requiredFields.test.ts": 7,
+  "starterFork.287.test.tsx": 3,
   "HandoffCard.test.tsx": 3,
   "MessageItem.transcriptEvent.test.tsx": 8,
   "InviteExpertDialog.test.tsx": 23, // 267-REVIEW WR-06 +1, IN-02 +1; 267-UI-REVIEW #3 +1
@@ -1721,7 +1731,7 @@ const BASELINE = {
   // reported the kill switch as "deleted, or belongs to another account". Four of the five
   // cases were observed RED; the fifth is the flag-ON positive control. This also
   // discharges the render-guard assertion `revertByteIdentical.test.tsx` deferred in 181.
-  "ChatLayout.launch.test.tsx": 17,
+  "ChatLayout.launch.test.tsx": 38, // 287-04: raised 17 -> 38, the gate's own printed `actual` (287-01/02 rewrote it)
   // ⚠ ADOPTED 2026-09-01, pinned at the gate's OWN printed `new` column (13), never counted
   // by hand — `221-CARRY-FORWARD.md` §E2 records the session where a hand-split pin was
   // caught doing exactly that. TARGETS was added in the same commit; a suite in one knob
@@ -2276,7 +2286,7 @@ const BASELINE = {
   // description; unpinned, the whole guard sat in eight cases of slack.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`RunModal.test.tsx 32 40 +8`).
-  "RunModal.test.tsx": 40,
+  "RunModal.test.tsx": 55, // 287-04: raised 40 -> 55, the gate's own printed `actual` (287-01/02 rewrote it)
   // 193-07 (AUTH-03 / D-18), pinned by 193-10's sweep: 16 → 20. An EXTENSION, never a lowering.
   // The +4 guard that D-18's `Template to fill` is a TEXT NODE and not a `<label htmlFor>` bound
   // to a hidden input — the a11y half of naming the control — plus the D-19 provenance sentence
@@ -4741,6 +4751,11 @@ const TARGETS = [
   "src/components/chat/__tests__/IrisAvatar.test.tsx",
   "src/components/chat/__tests__/irisMotion.test.ts",
   "src/components/chat/__tests__/ChatArea.scopeChange.test.tsx",
+  // Phase 287-04 — FILE-LEVEL (no bare chat/providers directory entry); pinned in BASELINE, same commit.
+  "src/components/chat/__tests__/ThreadWorkflowPicker.test.tsx",
+  "src/components/chat/__tests__/useStartWorkflowInThread.test.tsx",
+  "src/components/chat/__tests__/ChatArea.threadWorkflowPicker.test.tsx",
+  "src/providers/__tests__/StreamsProvider.inputs.test.tsx",
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,
   // matching how its two siblings below are already reached. Both knobs, same commit.
