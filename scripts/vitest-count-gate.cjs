@@ -438,7 +438,7 @@ const BASELINE = {
   "ChatArea.model.test.tsx": 2,
   // Phase 226 — src/landing (pinned at the merge commit; pre-flight F-6 kept the phase off this file while 224-05 edited it)
   "landingBundleFence.test.ts": 2,
-  "facts.test.ts": 5,
+  "facts.test.ts": 6, // 288-04: 5 -> 6 (the corrected pause-stage copy; gate actual)
   "cssClasses.test.ts": 1,
   "scenes.test.tsx": 9,
   "LandingPage.test.tsx": 7,
@@ -645,8 +645,8 @@ const BASELINE = {
   // began (the file ran 78 at wave 1's start), so it was leaving 37 cases deletable in
   // silence on the gauntlet — the publish surface. Reasons + the full six-pin table live in
   // the 214.1-02 block beside `declaredInputs.test.ts`.
-  "PublishGauntlet.test.tsx": 83,
-  "WorkflowBuilderPage.canvas.test.tsx": 128,
+  "PublishGauntlet.test.tsx": 91, // 288-04: 83 -> 91 (288-02 auto_answered block + pause stage copy; read from the gate's own actual column)
+  "WorkflowBuilderPage.canvas.test.tsx": 154, // 288-04: 128 -> 154 (the retired TWO-children pin rewritten to THREE; gate actual)
   // ⚠ 193.1-08 (D-24): 19 → 30 (+11). Read from THIS SCRIPT'S OWN `actual` column
   // (`WorkflowBuilderPage.describe.test.tsx 19 30 +11`), never counted by hand.
   //
@@ -1524,7 +1524,7 @@ const BASELINE = {
   // ⚠ AND THE SUITE ITSELF IS BYTE-UNCHANGED BY THE PASS THAT RAISES THE PIN — checked with
   //    `git diff --numstat` before the number was touched, because a pin raised in the same
   //    breath as an edit to its subject proves nothing about either.
-  "WorkflowRunPage.test.tsx": 148,
+  "WorkflowRunPage.test.tsx": 177, // 288-04: 148 -> 177 (288-03 waiting-on cases; gate actual)
   // ── Added in 195-02 task 3, in the SAME COMMIT as their TARGETS entries. Every ───────
   // ── number below is this script's own printed `actual` column across TWO agreeing ────
   // ── runs (`total 4044 · failed 0 · count gate OK` both times) — never hand-counted ───
@@ -2773,9 +2773,9 @@ const BASELINE = {
   //     in the suite sweeps the targeted handles in the source and asserts the set is exactly
   //     those four. ⚠ G-4 row **U1 is still owed** on the appearance half: jsdom applies no
   //     CSS, so the one-card composition is proved here by SOURCE assertion only.
-  "decisionsVocabulary.test.ts": 22,
+  "decisionsVocabulary.test.ts": 24, // 288-04: 22 -> 24 (draft-settings words; gate actual)
   "DecisionsList.test.tsx": 54,
-  "DraftArrivalCard.test.tsx": 35,
+  "DraftArrivalCard.test.tsx": 61, // 288-04: 35 -> 61 (288-01 settingsRow cases plus earlier unpinned growth; gate actual)
   // ── Added in 192.2-10 (WR-02), in the SAME COMMIT that creates the file ──────────────
   //
   // ⚠ THE TWO-KNOB TRAP, AND `src/lib/` IS WHERE THIS SCRIPT ALREADY RECORDS IT FOUR TIMES.
@@ -4274,6 +4274,11 @@ const BASELINE = {
   // `src/components/workflows` directory entry. Deleting a pin case now reds the gate.
   "WorkflowBuilderPage.seam286.pin.test.tsx": 11, // 286-02 — export set, one call per name read, names never ids, both read-only arms, header DOM
   "WorkflowRunPage.seam286.pin.test.tsx": 10, // 286-03 — load screens, 5 s cadence, terminal edge, stale guard, retry, refresh blip
+  // Phase 288-04 — ADOPTED: the two suites 288 created. `WaitingOnLine.test.tsx` rides the
+  // `src/components/workflows` directory entry (BASELINE pin only); `WorkflowBuilderPage.draftSettings.test.tsx`
+  // is in `src/pages/__tests__`, reached by named files only, so it is ALSO named in TARGETS below.
+  "WaitingOnLine.test.tsx": 4, // 288-03 — sentence is a text child, absent field renders nothing, no id/email leak
+  "WorkflowBuilderPage.draftSettings.test.tsx": 6, // 288-01 — re-open shows the row not the card, rename reaches the PATCH, flag off, three children, A-B-A
   "WorkflowCard.seam286.pin.test.tsx": 21, // 286-04 — menu roles, Schedules hands up the row id, arm-to-confirm grades, published-delete visibility
   // ADOPTED at 286-05: the two SEED-222 suites that guard a file in THIS phase's diff, which is the
   // re-open condition every earlier decline named. `toolReadOnlyMap.test.ts` — 286-02 retargeted
@@ -6257,6 +6262,8 @@ const TARGETS = [
   // characterization pin is an unguarded one: deleting a case would have read green.
   "src/pages/__tests__/WorkflowBuilderPage.seam286.pin.test.tsx",
   "src/pages/__tests__/WorkflowRunPage.seam286.pin.test.tsx",
+  // Phase 288-04 — FILE-LEVEL (no `src/pages` directory entry): the draft-settings page suite.
+  "src/pages/__tests__/WorkflowBuilderPage.draftSettings.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
