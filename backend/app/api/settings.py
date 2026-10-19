@@ -25,6 +25,7 @@ from app.models.user_settings import (
     save_app_settings,
     resolve_sub_agent_model,
 )
+from app.services.rerank_engines.registry import ACCEPTED_PROVIDER_IDS
 from app.services.retrieval_tuning import app_settings_has_hnsw_columns
 from app.services.audit_service import write_audit_entry
 from app.services.reembed_service import start_reembed
@@ -654,7 +655,17 @@ async def update_settings(
 
     if body.rerank_enabled is not None:
         updates["rerank_enabled"] = body.rerank_enabled
+    # Phase 294-04 (T-294-21): the engine id picks which vendor receives candidate passages, so
+    # an unknown id is refused before anything is written. The set is the registry's own tuple.
     if body.rerank_provider is not None:
+        if body.rerank_provider not in ACCEPTED_PROVIDER_IDS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Reranking engine must be one of: On this server (local), Jev via "
+                    "OpenRouter (jev), OpenAI Decisions (openai_decisions), Cohere (cohere)."
+                ),
+            )
         updates["rerank_provider"] = body.rerank_provider
     if body.rerank_api_key is not None:
         updates["rerank_api_key"] = body.rerank_api_key

@@ -11364,7 +11364,7 @@ cells rot within days.
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 91 / 66 / 978 (was `90 / 65 / 977`) | **FIRES** | **289-03**: ONE `include_router` + one import token (+2 −1). Honoured by construction. ⛔ scheduler_service untouched |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 43 / 17 / 2051 (was `42 / 17 / 2024`) | ⚠ **FIRES** | honoured by construction (**282-01** / **282-04**): ONE `_timeout_out_of_range_detail` helper serves the PATCH and Add model by ID; the add gains an optional bound timeout. ⛔ add still lands disabled |
-| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
+| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 44 / 23 / 1159 (was `41 / 21 / 1048`) | ⚠ **FIRES** | honoured by construction (**294-04**): ONE refusal arm, rerank_provider vs registry `ACCEPTED_PROVIDER_IDS` → 400. ⛔ never a retyped id list; GET never echoes a key |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 99 / 39 / 2698 (was `97 / 38 / 2653`) | ⚠ **FIRES** | Honoured by construction. **285-03** (D-12): both enqueue paths failed → the doc is marked `failed` (guard `status='pending'`) and 201 `failed` returned, like the storage-fail arm. Minter untouched |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 317 / 72 / 6568 (was `314 / 69 / 6539`) | ⚠ **FIRES** | last touch **289-REVIEW**: `ChatLayout.runDeepLink` adopted in both knobs; `PendingAskCard.paused` 4 → 6, `evidenceView` 29 → 31. ⚠ row was stale (`314 / 69 / 6539`) |
@@ -15354,6 +15354,16 @@ it and gating it is a self-inflicted end-user outage.
 ⚠ `/settings`' union reads **`load_all_model_overrides`**, not the enabled-only hot cache: a model
 the operator added and then **disabled** is still **registered**, and sourcing the union from the
 enabled-only cache would call it "unverified" the moment it was hidden.
+
+### `backend/app/api/settings.py` — Phase 294 (294-04), honoured by construction
+
+**`44 / 23 / 1159` (was `41 / 21 / 1048` in the scan list).** The scan-list triple was stale again: the planning measurement was already `43 / 22 / 1148` before 294-04's commit. **294-04** adds ONE closed-set refusal around the existing `rerank_provider` write (+11 L, the `hnsw_iterative_scan` arm's shape): an id outside `app.services.rerank_engines.registry.ACCEPTED_PROVIDER_IDS` (`api`, `cohere`, `local`, `jev`, `openai_decisions`) answers 400 with a plain-language list of the four engines and `save_app_settings` is never reached (T-294-21). No response field was added: `providers[*].has_key` and `rerank_has_api_key` already tell the engine cards which saved key exists. Pinned by `test_294_settings_engine_allowlist.py`, which also plants OpenRouter, OpenAI and Cohere key values and proves none reaches the GET body (SC#6, browser half).
+
+⛔ **Binding invariants:** the accepted set is IMPORTED from the registry, never retyped here (a new engine is one registry row); the legacy `"api"` id stays accepted (stored settings still carry it, and the Settings page must never normalise it on hydrate); the 500 arm for an unreachable DB is unchanged.
+
+Scan-list disposition cell before 294-04 (replaced):
+
+> honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged
 
 ### `frontend/src/lib/unverifiedModelCopy.ts` — `1 / 1 / 88`, row added AT CREATION
 
