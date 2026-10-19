@@ -740,6 +740,14 @@ The duplicate row's own cell is preserved verbatim rather than deleted (G-5 ⚠ 
 
 ⚠ row was STALE at `53/26/2937` and **256-05 does NOT modify it** — re-derived as an observation. extraction TAKEN (200-03). Its `:1586` recording is the shape 256-05 mirrored
 
+### `backend/app/services/harness/phase_types.py` — Phase 289 (289-02)
+
+**`57 / 29 / 3050` (was `56 / 28 / 3027`).** Honoured by construction, +23 lines (3027 → 3050): one import and one dict entry in each of the two KB-reading executors; all branching lives in `phase_confidence.py` (AST: `ast.If` 113 → 113, defs 55 → 55). This is the 286 forecast exactly ("one optional output field on the KB-reading types; no new phase type"). Live: every non-blocked roster provider wrote a level on the KB step and `null` on the no-tool step (289-05). The G-5 extraction obligation is unchanged.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 56 / 28 / 3027 (was `55 / 28 / 3014`) | **FIRES** | 286 forecast (289): ONE optional output field on the KB-reading types; no new phase type (closed core stays 7). ⚠ G-5 obligation stays OWED
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/services/harness/phase_types.py` | 56 / 28 / 3027 (was `55 / 28 / 3014`) | 286 forecast: 289 adds one optional output field, no new type · G-5 OWED |
+
 ## `frontend/src/pages/WorkflowsPage.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `34 commits / 12 phases / 1176 L` · **G-5 FIRES** (12 phases vs threshold 3) — satisfied (192 / 192.1).
@@ -980,6 +988,14 @@ carries the verdict — **honoured by construction (200 / 200.1) — at threshol
 
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `7 / 5 / 776` → `11 / 8 / 1003`.** 214-02 widened the read side with the failure reason; 214-16 with the launch inputs. Both are fields on models this file already serializes. Phase buckets gain `214`.
+
+### `backend/app/api/workflow_runs.py` — Phase 289 (289-02, 289-05)
+
+**`17 / 12 / 1295` (was `14 / 11 / 1240`).** Two touches, both recorded in the D-16 audited reading. 289-02: `WorkflowRunPhaseRead.confidence` declared, read by name off the existing single `obj` parse and passed through `confidence_for_wire` (+53 L; `ast.If` 30 → 31, the one lazy label resolve; defs 9 → 9). 289-05: `compose_waiting_on`'s paused sentence restored to "Still waiting on {who}; the run continues as soon as they answer." (+2 L) only after S5 drove a paused run to `completed` (`dd863ca5a`). ⚠ The 286 forecast expected the export to be "one projection of the run read" here; it went to a NEW module (`workflow_run_evidence.py`) because it is org-scoped and this read is owner-only, so this file did not grow a second concern.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 14 / 11 / 1240 (was `13 / 10 / 1108`) | **FIRES** | **288-03**: `waiting_on` declared, selected (`user_id`, `is_golden_run`) and produced in lockstep; ONE pure composer + ONE producer; built after the ownership select; failure degrades to None
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/api/workflow_runs.py` | 14 / 11 / 1240 (was `13 / 10 / 1108`) | 288-03: ONE field + composer + producer, in lockstep |
 
 ## `backend/app/models/thread.py`
 
@@ -1475,6 +1491,14 @@ carries the verdict — **honoured by construction (193.2 / 194 / 192.2 / **200.
 
 ⚠ row was STALE at `48/25/2585`. honoured by construction (**256-05**): **COMMENT-ONLY** — `persist_run_usage`'s body and `TOKEN_COVERAGE_LEGS` byte-unchanged; 3 stale pins corrected beside originals
 
+### `backend/app/db/workflows.py` — Phase 289 (289-01)
+
+**`54 / 28 / 2767` (was `53 / 27 / 2767`).** Honoured by construction. `ask_user_response_exists` and `get_ask_user_response` typed `$1` as text against a uuid column, so every paused-run answer raised `uuid = text` (captured live at base, 289-01 D-11). The fix is a 2-token cast in each statement (`git diff --numstat` `2 2`); the run scoping (`tool_calls->0->>'run_id'`, `wr.id = $1`) is otherwise byte-identical and is pinned against real Postgres by `tests/test_289_ask_user_sql.py`. Live proof: 289-05 S5 and eleven roster re-drives, 0 `re-drive failed`. No new function, no new concern; the extraction obligation is unchanged (still OWED).
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 53 / 27 / 2767 (was `52 / 26 / 2724`) | **FIRES** | **288-03**: ONE function, `get_unanswered_ask_user` (NOT EXISTS variant of the pending read, run-scoped); `get_pending_ask_user` byte-unchanged. No refactor. Extraction still OWED
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/db/workflows.py` | 53 / 27 / 2767 (was `52 / 26 / 2724`) | 288-03: ONE function (unanswered-prompt read), no refactor |
+
 ## `backend/app/services/harness/publish_service.py`
 
 #### Phase 288 (288-02) -- publish_service.py
@@ -1809,6 +1833,14 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 
 ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches
 
+### `backend/app/api/runs.py` — Phase 289 (289-01)
+
+**`43 / 20 / 1798` (was `41 / 19 / 1750`).** Honoured by construction, +43 lines (1755 → 1798): one helper and one guarded region around `_build_resume_context`. `_fail_redrive` checks `status = active` inline, fails the active phase with "Your answer was saved, but the run could not continue.", finishes the run `failed`, writes `run_failed`, and swallows its own failure (logs the run id only). The owner-scoped answer route (T-289-01) is unchanged; a same-org colleague's POST to it was refused 404 live (289-05 S4). The row was STALE before this phase (`41 / 19 / 1750`).
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 41 / 19 / 1750 | **FIRES** | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/api/runs.py` | 41 / 19 / 1750 | ⚠ STALE · last touch 268-REVIEW CR-01/WR-06 |
+
 ## `backend/app/services/harness_engine.py`
 
 ### ⚠ Re-derived 2026-09-19 (Phase 256 gap-closure round 1, plan `256-05`) — the row was STALE
@@ -1878,6 +1910,14 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 ### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
 
 ⚠ STALE (`58/21/3290`). **268-REVIEW WR-06**: the resume shell carries its run's org — the org read MOVED above the INSERT, one kwarg
+
+### `backend/app/services/harness_engine.py` — Phase 289 — NOT EDITED, and that is the record
+
+**`61 / 24 / 3387` (unchanged).** The Phase 286 forecast expected 289 to carry the chat confidence onto KB-derived phase outputs here, "one field where the output is recorded". Research F6 showed the output is recorded by the executors, so the field went into `phase_types.py` through `phase_confidence.py` (289-02), and this file has an empty `git diff --numstat dcf6ba649`. The forecast is discharged truthfully: the change it predicted happened, in a smaller place. ⚠ Still OWED here: F3, `_finalize_run_grounding` calls `_compute_confidence(final_avg)` without the owner's settings, so the run-level level uses the default buckets (a one-argument fix); and the resumed segment's model (`_build_resume_context` resolves the owner's default, not `workflow_runs.model`), measured on 9 providers' runs in 289-05 row (d) and planted as a seed.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 61 / 24 / 3387 (was `60 / 23 / 3297`) | **FIRES** | 286 forecast (289): the confidence chat already computes rides onto KB-derived phase outputs as ONE field where the output is recorded; no new loop branch, no model call (TRUST-01 SC#5)
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/services/harness_engine.py` | 61 / 24 / 3387 (was `60 / 23 / 3297`) | 286 forecast: 289 adds one confidence field on KB outputs (by construction) |
 
 ## `frontend/src/components/chat/ThinkingBlock.tsx`
 
@@ -2152,6 +2192,14 @@ carries the verdict — **honoured by construction (194.1)** — and this is the
 
 ⚠ row was STALE at `14/7/765`; G-5 FIRES at 8 phases. honoured by construction (**244-15**): ONE optional prop, ONE composed callback in the STACK, `useState` 9→9 — no new state on a 3-home shell
 
+### `frontend/src/components/panel/PendingAskCard.tsx` — Phase 289 (289-01)
+
+**`18 / 10 / 1042` (was `17 / 9 / 1013`).** Honoured by construction, +29 lines (1013 → 1042): one optional prop, one constant, one render arm, one dependency. `useState[(<]` 7 → 7, `useEffect(` 2 → 2. Default-prop callers are unchanged (pinned). Live: the run page card on a paused run showed the line and `Send Answer`, never "agent stopped" (289-05 S5, row P). ⚠ The chat panel's `PendingAskStack` cannot derive the paused status from data it holds (289-01 `## Named gap: PendingAskStack`), so it stays countdown-driven; planted as a seed with trigger: the next phase naming `StreamsProvider.tsx` or `streamsStore.ts`.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 17 / 9 / 1013 (was `15 / 8 / 836`) | **FIRES** | honoured by construction (**282-02**): draft moved to askDraftStore (useState 9 → 7); APG radio keys + mark; `home` prop; +`AskPointer` (+177 lines). ⚠ `SEED-219` still open
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `frontend/src/components/panel/PendingAskCard.tsx` | 17 / 9 / 1013 (was `15 / 8 / 836`) | G-5 FIRES · honoured by construction (282-02: draft moved out, +AskPointer) |
+
 ## `frontend/src/pages/WorkflowRunPage.tsx`
 
 ### Phase 288 (288-03) — frontend/src/pages/WorkflowRunPage.tsx
@@ -2220,6 +2268,14 @@ carries the verdict — **honoured by construction (200, 200.1, **200.2**)** —
 
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `25 / 8 / 1601` → `28 / 9 / 1670`.** T-214-11-04's rule at the render layer: one resolver, many renderers, so two surfaces cannot disagree about the same step at the same moment. Phase buckets gain `214`.
+
+### `frontend/src/pages/WorkflowRunPage.tsx` — Phase 289 (289-01, 289-04)
+
+**`33 / 13 / 1594` (was `31 / 12 / 1580`).** Honoured by construction, the D-16 audited reading (two touches recorded in STATE.md before any source edit). 289-01: ONE attribute `paused={runStatus === "paused"}` (1580 → 1581; `useState(` 1 → 1, `useState[(<]` 4 → 4, `useEffect(` 4 → 4). 289-04: one import and ONE early return after every hook, `loadPhase === "missing" || (ready && isTerminal)` → `<RunEvidenceReport>` (1581 → 1594; `useState(` 1 → 1, `useState<` 3 → 3, `useEffect(` 4 → 4); the missing/broken block now serves `broken` only and the retired 404 pair is tombstoned. The 286 seam's five snapshots: one changed by decision (the 404 screen, D-05/D-14a). ⚠ Consequence: `RunHero` and the deliverable-list wiring can no longer render from this page (F-D); removing them is the next touch's job, not a second concern here. Terminal-case migration: **87 source cases** (89 executions), not research's 45.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 31 / 12 / 1580 (was `30 / 11 / 1578`) | **FIRES** | **288-03**: ONE `<WaitingOnLine>` render beside `band.sentence`, no hook/state/effect; the five seam286 snapshots are unchanged. 289 also edits this page: leave it smaller. ⛔ invariants unchanged
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `frontend/src/pages/WorkflowRunPage.tsx` | 31 / 12 / 1580 (was `30 / 11 / 1578`) | 288-03: ONE WaitingOnLine render, no hook · seam286 snaps same · ⛔ |
 
 ## `frontend/src/components/chat/OutputFileCard.tsx`
 
@@ -2751,6 +2807,14 @@ carries the verdict — **honoured by construction (204)** — and this is the c
 #### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
 
 **275-03**: one flag-guarded RetentionSweepService start + stop, one `include_router(retention.router)`. ⛔ scheduler_service untouched
+
+### `backend/app/main.py` — Phase 289 (289-03)
+
+**`91 / 66 / 978` (was `90 / 65 / 977`).** Honoured by construction, 977 → 978. ⚠ Not this file's change but its lifespan: a `TestClient` test entering the real lifespan runs `resume_stranded_workflows` against the shared local DB and claimed live or stranded runs three times in this phase (289-01, 289-03, 289-05). Planted as a seed; the trigger is the next phase touching the lifespan or the resume sweep.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 90 / 65 / 977 (was `89 / 64 / 1002`) | ⚠ **FIRES** | Honoured by construction. **280-01** (D-30): the dead `_patch_postgrest_maybe_single` deleted (−25 L; it wrapped only the Single builder). ⛔ scheduler_service untouched
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/main.py` | 90 / 65 / 977 (was `89 / 64 / 1002`) | honoured by construction (280-01: dead postgrest patch deleted) · ⛔ |
 
 ### `backend/app/api/admin.py`
 
@@ -4755,6 +4819,14 @@ carries the verdict — **⚠ absent from BOTH at 21 phases (added 200)** — an
 
 ⚠ STALE (`58/29/1124`). **271-02**: `classification-rules` branch retired; `handleAskInChat` (new thread → prefill → navigate) on the ONE LibraryPage mount
 
+### `frontend/src/components/layout/ChatLayout.tsx` — Phase 289 (289-04)
+
+**`62 / 32 / 1140` (was `61 / 31 / 1137`).** Honoured by construction, 1137 → 1140: one import and the initializer with its comment. `useState(` 5 → 5, `useState<` 4 → 4, `useEffect(` 5 → 5. Live: `/app?run=<uuid>` opened the run for the owner, a colleague and an outsider (289-05 S1/S4).
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 61 / 31 / 1137 (was `60 / 30 / 1134`) | ⚠ **FIRES** | 286 forecast (287): the in-thread entry REUSES `ChatLaunchForm` and `doRun` (one caller today); ONE prop or ONE mount, never a second launch form
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 61 / 31 / 1137 (was `60 / 30 / 1134`) | 286 forecast: 287 reuses ChatLaunchForm + doRun; one prop or one mount |
+
 ## Phase 200.1 wave 2 (`200.1-02`, RUN-04) — the triples RE-DERIVED for every file the phase touched
 
 **Six non-test source files were touched by Phase 200.1 across its three plans.** All eight triples
@@ -6213,6 +6285,12 @@ carries the verdict — **young (200)** — and this is the cell it carried befo
 
 > young (200) — the past-tense spine, **not a third surface** (D-09). ⚠ **MOUNTED NOWHERE at its creating commit, load-bearing twice**: `WorkflowRunPage.tsx` is `200-07`'s file, and a receipt that cannot reach the builder cannot fabricate a run-tense claim on a draft — `199-02`'s refusal kept BY CONSTRUCTION. An `import.meta.glob` sweep asserts zero importers, with a positive control. ⚠ It spells NO user-visible string **including its `aria-label`**, and row order is the SERVER's
 
+### `frontend/src/components/workflows/RunReceipt.tsx` — Phase 289 — NOT EDITED, and that is the record
+
+**`3 / 1 / 241` (unchanged).** The Phase 286 forecast expected "one confidence chip" here. It went to the new leaf `StepEvidenceLine.tsx` (mounted in `RunSpine` and `RunEvidenceReport`), and the report is pinned never to import this file (its importer pin). Empty `git diff --numstat dcf6ba649`. The forecast is discharged truthfully.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 3 / 1 / 241 | no (1 phase) | young (200); does not fire (1 phase). 286 forecast (289): ONE confidence chip expected
+
 ### `frontend/src/components/workflows/doorVocabulary.ts`
 
 `4 / 3 / 341` · G-5 ⚠ **FIRES — EXACTLY AT THRESHOLD**
@@ -6403,6 +6481,14 @@ carries the verdict — **young (200, **200.2**)** — and this is the cell it c
 
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `3 / 2 / 372` → `5 / 3 / 426`.** ⚠ It crossed 3 phases in the commit that this row records — the same self-staling this ledger has documented repeatedly. Phase buckets gain `214`.
+
+### `frontend/src/components/workflows/RunSpine.tsx` — Phase 289 (289-02)
+
+**`6 / 4 / 433` (was `5 / 3 / 426`).** Honoured by construction, +7 lines (426 → 433): one import, the prop widening and one mount. The row was AT threshold (`5 / 3`) and now reads `6 / 4`. Live: the line rendered under the finished KB step only, on two paused runs (289-05 S1 / row P).
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 5 / 3 / 426 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (**214**) — it crossed the threshold IN THIS PHASE; renders the shared identity and resolves nothing
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `frontend/src/components/workflows/RunSpine.tsx` | 5 / 3 / 426 | honoured by construction (**214**) |
 
 ### `frontend/src/components/workflows/NodeIconWell.tsx`
 
@@ -7850,6 +7936,14 @@ ledger's own rule that a cell is measured and never copied.
 **No seam proposed.** A per-domain api module doing one thing many times is the right shape. The
 trigger to revisit is it beginning to **branch on source family** rather than merely list endpoints.
 ### `frontend/src/lib/api/workflows.ts`
+
+### `frontend/src/lib/api/workflows.ts` — Phase 289 (289-02)
+
+**`10 / 10 / 1129` (was `9 / 9 / 1111`).** Honoured by construction, +18 lines (1111 → 1129): one interface and one optional field, no logic.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 9 / 9 / 1111 (was `4 / 4 / 1081`) | ⚠ **FIRES** | **288-03**: `WorkflowRunRead.waiting_on?` + `WorkflowRunWaitingOn` interface (two declarations, no logic). The run read type lives here, not in `types/index.ts`
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `frontend/src/lib/api/workflows.ts` | 9 / 9 / 1111 (was `4 / 4 / 1081`) | 288-03: one optional run-read field + its type; no behaviour |
 
 ### Phase 288 (288-03) — frontend/src/lib/api/workflows.ts
 
@@ -9795,6 +9889,14 @@ that "three homes" names the WORKFLOW concern triad rather than a count of rail 
 
 ---
 
+### `frontend/src/App.tsx` — Phase 289 (289-04)
+
+**`37 / 28 / 422` (was `36 / 27 / 418`).** Honoured by construction, 418 → 422: one import and one seed line with a comment, inside the existing initializer, no `replaceState`. `useState(` 1 → 1, `useState<` 8 → 8, `useEffect(` 4 → 4.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 36 / 27 / 418 (was `35 / 26 / 412`) | ⚠ **FIRES** | **276-06**: boot splash spin ring → moving Iris (`thinking`) in a `role=status`; 1 import, hook call sites 9 → 9. Reachability fence green
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `frontend/src/App.tsx` | 36 / 27 / 418 (was `35 / 26 / 412`) | last touch 276-06 |
+
 ### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
 
 **276-06**: boot splash spin ring → moving Iris (`thinking`) in a `role=status`; no hook. Reachability fence green
@@ -11155,7 +11257,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | 286 forecast (290): the team picture is a SEPARATE read-only view (VIS-01: never a second canvas); at most ONE gated mount here. honoured by construction (199 / 200 / 214) |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 286 forecast (290): ONE prop; the chip words come from `libraryVocabulary`, never literals here. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
-| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 56 / 28 / 3027 (was `55 / 28 / 3014`) | **FIRES** | 286 forecast (289): ONE optional output field on the KB-reading types; no new phase type (closed core stays 7). ⚠ G-5 obligation stays OWED |
+| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 57 / 29 / 3050 (was `56 / 28 / 3027`) | **FIRES** | **289-02**: ONE `confidence` key on the llm_agent / batch outputs via phase_confidence (ifs 113→113, defs 55→55). The 286 forecast is honoured. ⚠ G-5 obligation stays OWED |
 | [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 45 / 18 / 1447 (was `43 / 17 / 1415`) | **FIRES** | 286 forecast (287): starters are DATA; fork reuses the existing fork hook; ONE prop. The 192 / 192.1 extraction stays TAKEN |
 | [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 22 / 8 / 1354 (was `19 / 6 / 1616`) | **FIRES** | **286-04** seam TAKEN (named 3×): ⋯ menu + armed draft delete → `WorkflowCardMenu.tsx`; card holds 0 `useState`, drawing only. ⚠ compiler lint now covers the whole card |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 11 / 5 / 766 (was `10 / 4 / 727`) | ⚠ **FIRES** | 286 forecast (290): chip labels are added as vocabulary ENTRIES (data), no logic. No seam proposed |
@@ -11164,14 +11266,14 @@ cells rot within days.
 | [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 18 / 12 / 1075 | **FIRES** | honoured by construction (193 / 193.1 / 199 / **214**) — 214-13 added the service picker and its refusal as CHILDREN |
 | [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 58 / 23 / 2803 (was `57 / 22 / 2993`) | **FIRES** | **286-02** seam TAKEN: id-to-name maps + mount read → `useBuilderNameMaps.ts`; 8 copy constants → `builderCopy.ts` (page re-exports). `FLAG_OFF_HEADER_MARKUP` stayed; 288 lands by useDraftPersistence |
 | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 45 / 23 / 1647 (was `43 / 23 / 2261`) | **FIRES** | **286-01** seam TAKEN: 20 wire models/helpers → `workflow_wire.py`; generate + template doors → `workflow_authoring_doors.py` (same router). D-05 1,200-1,400 MISSED (1,647); split OWED |
-| [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 14 / 11 / 1240 (was `13 / 10 / 1108`) | **FIRES** | **288-03**: `waiting_on` declared, selected (`user_id`, `is_golden_run`) and produced in lockstep; ONE pure composer + ONE producer; built after the ownership select; failure degrades to None |
-| [`backend/app/services/harness/phase_confidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_confidencepy) | 0 / 0 / 0 | no (young) | young (planned 289-02, row added at planning). Pure confidence helper + wire coercion + KB label read. ⛔ no provider import; chat's _compute_confidence only |
-| [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 0 / 0 / 0 | no (young) | young (planned 289-03, row added at planning). Pure composers for the four evidence sections. ⛔ no I/O; never ships passage/similarity |
-| [`backend/app/api/workflow_run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_run_evidencepy) | 0 / 0 / 0 | no (young) | young (planned 289-03, row added at planning). Org-scoped terminal-only evidence read. ⛔ ONE access query; 404 parity; require_canvas alone |
-| [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 8 / 5 / 391 | **FIRES** | ⚠ absent its ENTIRE LIFE (182/184/188/200.2/276) — row added at 289 planning. 289-03: ONE CANVAS_GATED_PATHS member |
+| [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 17 / 12 / 1295 (was `14 / 11 / 1240`) | **FIRES** | **289-02** `confidence` read field in lockstep (+1 lazy label read); **289-05** paused sentence restored after S5. The 286 export forecast went to a new module |
+| [`backend/app/services/harness/phase_confidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_confidencepy) | 1 / 1 / 153 (was `0 / 0 / 0`) | no (young) | young (created 289-02). Pure confidence helper + wire allow-list + KB label read (duck-typed, never raises). ⛔ no provider import; chat's _compute_confidence only |
+| [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 1 / 1 / 468 (was `0 / 0 / 0`) | no (young) | young (created 289-03). Pure composers for the four sections + definition_changed. ⛔ no I/O; never ships passage/similarity; non-owner masking fails closed |
+| [`backend/app/api/workflow_run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_run_evidencepy) | 1 / 1 / 358 (was `0 / 0 / 0`) | no (young) | young (created 289-03). Org-scoped terminal-only read; S4 driven live (byte-identical 404). ⛔ ONE access query; 404 parity; require_canvas alone |
+| [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 9 / 6 / 396 (was `8 / 5 / 391`) | **FIRES** | **289-03**: ONE CANVAS_GATED_PATHS member (`…/evidence`) + comment, same commit as its include_router. ⛔ test_182 never imports the set |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 22 / 15 / 537 (was `21 / 14 / 537`) | ⚠ **FIRES** | **279-01**: docstring repoints to the new expert_scope homes only (OpenAPI regen). ⛔ a body touching both pairs is a 422 |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 61 / 31 / 1137 (was `60 / 30 / 1134`) | ⚠ **FIRES** | 286 forecast (287): the in-thread entry REUSES `ChatLaunchForm` and `doRun` (one caller today); ONE prop or ONE mount, never a second launch form |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 62 / 32 / 1140 (was `61 / 31 / 1137`) | **FIRES** | **289-04**: ONE initializer `useState(() => readRunDeepLink())` (+3 L); hook counts unchanged (useState 5/4, useEffect 5) |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 5 / 4 / 262 (was `4 / 3 / 249`) | ⚠ **FIRES** | **284-03**: optional `totalState`: "Counting…" while loading, "Count not known yet" on failure, never "0 documents" before an answer; numbers grouped |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
@@ -11180,15 +11282,15 @@ cells rot within days.
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 5 / 3 / 65 (was `4 / 2 / 64`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/64`), now FIRES. **267-04**: `newThread` takes an optional Expert id, so an invite on a brand-new chat reaches the row (D-267-21; live G4-1). ⛔ `selectThread` stays a bare setState |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 22 / 9 / 1417 (was `21 / 8 / 1414`) | ⚠ **FIRES** | **273-03**: the grounding offer subtracts CHAT_ONLY_TOOLS (1 import, 1 set difference). ⚠ extraction still OWED |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 53 / 27 / 2767 (was `52 / 26 / 2724`) | **FIRES** | **288-03**: ONE function, `get_unanswered_ask_user` (NOT EXISTS variant of the pending read, run-scoped); `get_pending_ask_user` byte-unchanged. No refactor. Extraction still OWED |
+| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 54 / 28 / 2767 (was `53 / 27 / 2767`) | **FIRES** | **289-01**: the two ask_user statements cast `$1::uuid::text` (2 tokens, 2 lines); no new function, scoping byte-identical. Extraction still OWED |
 | [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 31 / 14 / 2001 (was `29 / 13 / 1942`) | **FIRES** | 288-02: pause timeout refusal inside `_interactive_phase_failures`; `auto_answered` from the golden run's outputs. No new stage, no check removed |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 17 / 11 / 1025 (was `16 / 10 / 1002`) | **FIRES** | 286 forecast (291): uploaded template / form / reference text = ONE more grounding input to the existing generate path; tools + phase types stay closed; asset text is untrusted |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | 286 forecast (288): draft config persistence rides `useDraftPersistence` (186-07); at most ONE store field. honoured by construction (193.2 / 197 / 214.1) |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 9 / 5 / 756 (was `8 / 4 / 748`) | **FIRES** | ⚠ STALE (`8/4/748`). **268-01**: `register_run_start` forwards `org_id`/`expert_id` (+8 lines). ⛔ NOT the shape to copy (C-5) |
-| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 41 / 19 / 1750 | **FIRES** | ⚠ STALE (`39/18/1736`). **268-REVIEW CR-01/WR-06**: Deep Continue carries the run's org; the Harness shell its workflow run's. 0 new branches |
-| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 61 / 24 / 3387 (was `60 / 23 / 3297`) | **FIRES** | 286 forecast (289): the confidence chat already computes rides onto KB-derived phase outputs as ONE field where the output is recorded; no new loop branch, no model call (TRUST-01 SC#5) |
+| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 43 / 20 / 1798 (was `41 / 19 / 1750`) | **FIRES** | **289-01**: ONE `_fail_redrive` helper + 2 call sites (a failed paused re-drive ends `failed` with words + a `run_failed` audit row); answer-route scoping untouched |
+| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 61 / 24 / 3387 | **FIRES** | **Phase 289 NOT EDITED**: the 286 forecast's confidence field landed in phase_types (289-02), so the engine needed no change. F3 (run-level buckets) still OWED here |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
 | [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |
@@ -11200,20 +11302,21 @@ cells rot within days.
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send |
-| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 17 / 9 / 1013 (was `15 / 8 / 836`) | **FIRES** | honoured by construction (**282-02**): draft moved to askDraftStore (useState 9 → 7); APG radio keys + mark; `home` prop; +`AskPointer` (+177 lines). ⚠ `SEED-219` still open |
-| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 31 / 12 / 1580 (was `30 / 11 / 1578`) | **FIRES** | **288-03**: ONE `<WaitingOnLine>` render beside `band.sentence`, no hook/state/effect; the five seam286 snapshots are unchanged. 289 also edits this page: leave it smaller. ⛔ invariants unchanged |
+| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 18 / 10 / 1042 (was `17 / 9 / 1013`) | **FIRES** | **289-01**: ONE `paused` prop + `PAUSED_WAITING_LINE`: the answer control stays after the window on a paused run. Hooks unchanged (useState 7, useEffect 2). Stack paused case → seed |
+| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 33 / 13 / 1594 (was `31 / 12 / 1580`) | **FIRES** | **289-01** one `paused` attribute; **289-04** ONE early return → RunEvidenceReport (+14 L). No new hook/state/effect. RunHero now dead here (F-D). ⛔ invariants unchanged |
 | [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
-| [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 0 / 0 / 0 | no (young) | young (planned 289-02, row added at planning). Leaf: the KB evidence line or nothing. ⛔ no hook, no @/lib/api, never ConfidenceChip tiers |
-| [`frontend/src/components/workflows/evidenceVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidencevocabularyts) | 0 / 0 / 0 | no (young) | young (planned 289-02 + 289-04, row added at planning). Every evidence-line and report word and glyph. ⛔ lookups through own() |
-| [`frontend/src/components/workflows/evidenceView.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidenceviewts) | 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). Pure payload to view-model; one source for DOM and export check. ⛔ no React |
-| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). The finished-run report (sketch 289 B). ⛔ no write control; never imports RunReceipt |
-| [`frontend/src/lib/api/runEvidence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirunevidencets) | 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). getRunEvidence client + types. ⛔ not re-exported through lib/api.ts |
-| [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). ?run=<uuid> read/write/clear. ⛔ strict UUID only |
+| [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 1 / 1 / 93 (was `0 / 0 / 0`) | no (young) | young (created 289-02). Leaf: the KB evidence line or nothing; mounted in RunSpine and RunEvidenceReport. ⛔ no hook, no @/lib/api, never ConfidenceChip tiers |
+| [`frontend/src/components/workflows/evidenceVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidencevocabularyts) | 2 / 1 / 233 (was `0 / 0 / 0`) | no (young) | young (289-02 created, 289-04 appended). Every evidence-line and report word and glyph; ○ ◉ ⤓ ⎙ flagged as icon proposals, ◆ clash. ⛔ lookups through own() |
+| [`frontend/src/components/workflows/evidenceView.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidenceviewts) | 1 / 1 / 353 (was `0 / 0 / 0`) | no (young) | young (created 289-04). Pure payload → view-model; the DOM and the export read the same object. ⛔ no React |
+| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 1 / 1 / 462 (was `0 / 0 / 0`) | no (young) | young (created 289-04). The finished-run report; S1-S4 driven live. ⛔ no write control; never imports RunReceipt. Follow-ups F-A..F-E open |
+| [`frontend/src/lib/api/runEvidence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirunevidencets) | 1 / 1 / 123 (was `0 / 0 / 0`) | no (young) | young (created 289-04). getRunEvidence + RunEvidence types; contract pinned both sides (289-05 I1). ⛔ not re-exported through lib/api.ts |
+| [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 1 / 1 / 63 (was `0 / 0 / 0`) | no (young) | young (created 289-04). ?run=<uuid> read/write/clear. ⛔ strict UUID only; the boot read never strips the param |
+| [`frontend/src/index.css`](docs/HOT-FILE-LEDGER.md#frontendsrcindexcss) | 34 / 18 / 1196 | **FIRES** | ⚠ absent its ENTIRE LIFE at 18 phases — row added 289-05. **289-04**: ONE `@media print` block keyed on `[data-print-root]` (+40 L) |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 210 / 125 / 530 (was `208 / 124 / 523`) | ⚠ **FIRES** | **284-01**: re-exports the paged clients. **284-05**: the five whole-list clients' barrel lines DELETED; `libraryListFence.test.ts` fails on any re-export of them |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 100 / 79 / 1656 (was `99 / 78 / 1546`) | ⚠ **FIRES** | **284-01**: the paged wire types (`DocumentListResponse`, `LibrarySummary`, page params, the four per-document pages); additive only. Seam OWED |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 90 / 65 / 977 (was `89 / 64 / 1002`) | ⚠ **FIRES** | Honoured by construction. **280-01** (D-30): the dead `_patch_postgrest_maybe_single` deleted (−25 L; it wrapped only the Single builder). ⛔ scheduler_service untouched |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 91 / 66 / 978 (was `90 / 65 / 977`) | **FIRES** | **289-03**: ONE `include_router` + one import token (+2 −1). Honoured by construction. ⛔ scheduler_service untouched |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 43 / 17 / 2051 (was `42 / 17 / 2024`) | ⚠ **FIRES** | honoured by construction (**282-01** / **282-04**): ONE `_timeout_out_of_range_detail` helper serves the PATCH and Add model by ID; the add gains an optional bound timeout. ⛔ add still lands disabled |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
@@ -11232,7 +11335,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/PhaseSpineGraph.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasespinegraphtsx) | 8 / 6 / 723 (was `5 / 5 / 473`) | ⚠ **FIRES** | 286 forecast (290): ONE optional prop for labelled chips. honoured by construction (200) |
 | [`frontend/src/components/workflows/phaseDuration.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasedurationts) | 5 / 1 / 525 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/receiptVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsreceiptvocabularyts) | 3 / 1 / 303 | no (1 phase) | young (200) |
-| [`frontend/src/components/workflows/RunReceipt.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunreceipttsx) | 3 / 1 / 241 | no (1 phase) | young (200); does not fire (1 phase). 286 forecast (289): ONE confidence chip expected |
+| [`frontend/src/components/workflows/RunReceipt.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunreceipttsx) | 3 / 1 / 241 | no (young) | young (200); does not fire (1 phase). **Phase 289 NOT EDITED**: the 286 forecast's chip went to StepEvidenceLine; the report never imports this file |
 | [`frontend/src/components/workflows/doorVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdoorvocabularyts) | 6 / 4 / 540 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape (214); ⚠ absent until 199, and it is no longer at threshold |
 | [`frontend/src/components/workflows/StepTypePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssteptypepickertsx) | 7 / 3 / 522 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (199) — ⚠ absent, on the boundary |
 | [`frontend/src/components/workflows/library/RunModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunmodaltsx) | 8 / 5 / 713 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ✅ **deferred extraction DISCHARGED (214-12)** — one declared-input renderer, shared with chat and the schedule door |
@@ -11259,7 +11362,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/toolNames.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstoolnamests) | 1 / 1 / 128 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/StepCardSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepcardsectiontsx--stepcardsectioncontextts) | 1 / 1 / 95 | no (1 phase) | young (200) |
 | [`frontend/src/providers/ThemeProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersthemeprovidertsx) | 1 / 1 / 149 | no (1 phase) | young (200) |
-| [`frontend/src/components/workflows/RunSpine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunspinetsx) | 5 / 3 / 426 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (**214**) — it crossed the threshold IN THIS PHASE; renders the shared identity and resolves nothing |
+| [`frontend/src/components/workflows/RunSpine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunspinetsx) | 6 / 4 / 433 (was `5 / 3 / 426`) | **FIRES** | **289-02**: ONE `<StepEvidenceLine>` mount before the spine-ask slot + `phases` prop widened by intersection (+7 L). Resolves nothing. ⛔ no --panel-* tokens |
 | [`frontend/src/components/workflows/NodeIconWell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsnodeiconwelltsx) | 4 / 2 / 190 | no (2 phases) | **DELETED AND RESTORED** |
 | [`frontend/src/components/workflows/RunTranscript.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsruntranscripttsx) | 7 / 3 / 652 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ **FIRES on a component with NO MOUNT in the product** — 214-11 measured it; 214 does not modify it |
 | [`frontend/src/components/workflows/RunHero.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunherotsx) | 1 / 1 / 242 | no (1 phase) | young (200.2) |
@@ -11342,7 +11445,7 @@ cells rot within days.
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 19 / 11 / 1967 (was `16 / 10 / 1935`) | ⚠ **FIRES** | **273-05**: `onArtifact` SSE branch + `artifacts` carried through the mapper (Array.isArray guard), additive |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 6 / 4 / 748 | ⚠ **FIRES** | ⛔ row was STALE at `4/2/715` reading `no (2 phases)` — re-derived 263 planning. Holds `FullAppSettings`, not only skills. D-263-03 reuses its `POST /skills` caller, adds no endpoint. |
-| [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 9 / 9 / 1111 (was `4 / 4 / 1081`) | ⚠ **FIRES** | **288-03**: `WorkflowRunRead.waiting_on?` + `WorkflowRunWaitingOn` interface (two declarations, no logic). The run read type lives here, not in `types/index.ts` |
+| [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 10 / 10 / 1129 (was `9 / 9 / 1111`) | **FIRES** | **289-02**: `RunPhaseConfidence` interface + optional `WorkflowRunPhase.confidence` (types only, +18 L). The run read type lives here |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 15 / 372 (was `31 / 16 / 372`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<td>` kept |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 63 / 20 / 1344 (was `57 / 19 / 1297`) | ⚠ **FIRES** | **284-01**: extraction TAKEN (`useLibraryDocuments.ts`); the page derives nothing from documents. **284-03**: states + exact pager. Lines ROSE 1302 → 1344: G-5 NOT discharged |
@@ -11391,7 +11494,7 @@ cells rot within days.
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 26 / 14 / 420 (was `25 / 14 / 416`) | ⚠ **FIRES** | **276-01** (D-14): Iris mark `<img>`; **276-06** (D-27): on the dark `#0A0E18` chip, classes only. 244-14's `overflow-x-hidden` stands |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 36 / 27 / 418 (was `35 / 26 / 412`) | ⚠ **FIRES** | **276-06**: boot splash spin ring → moving Iris (`thinking`) in a `role=status`; 1 import, hook call sites 9 → 9. Reachability fence green |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 37 / 28 / 422 (was `36 / 27 / 418`) | **FIRES** | **289-04**: `readRunDeepLink()` seed inside the existing `useState<ActiveView>` initializer (+4 L); hook counts unchanged. Reachability fence green |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 13 / 9 / 173 (was `12 / 8 / 153`) | ⚠ **FIRES** | **283-02** (FIX-01): the Settings entry UNGOVERNED (no `feature` key); per-tab gate in the page, per-route `require_visible` at the API. `visibleNavItems` unchanged |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
@@ -11450,7 +11553,7 @@ cells rot within days.
 | [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
 | [`.claude/settings.json`](docs/HOT-FILE-LEDGER.md#claudesettingsjson) | 9 / 4 / 202 | ⚠ **FIRES** | ⚠ **absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** `.claude/` is EXEMPT: no gate could ask. The ONE hook dispatch table; a too-narrow `matcher` fires NEVER, in silence |
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
-| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 24 / 13 / 991 (was `23 / 13 / 991`) | ⚠ **FIRES** | honoured by construction (**282-01** budget lookup; **282-04** `provider=_provider`, the provider the sub-agent already routes on) |
+| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 26 / 14 / 1018 (was `24 / 13 / 991`) | **FIRES** | **289-02**: `kb_search_calls` counter returned (+8 L), so 'never searched' is told apart from 'searched, nothing matched'. Honoured by construction |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 13 / 8 / 724 (was `12 / 8 / 724`) | ⚠ **FIRES** | honoured by construction (**282-01** budget per rung; **282-04** `provider=provider` on the one lookup). ⛔ accumulators init `None` never `0` |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 2 / 1 / 103 | no (new) | young (created 257-01). The single home of token-to-USD conversion (METER-02 / D-257-13). CostResult with Decimal arithmetic and None on unrated. |
@@ -16203,6 +16306,14 @@ accumulating `int | None` so that a stream which never surfaced usage yields `No
 ### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
 
 ⚠ the row was ACCURATE at 264 research (`19/10/958`) and **264-01 made it stale inside the same phase**. honoured by construction: ONE `sub_ctx` kwarg, read from `parent_ctx`, never re-derived
+
+### `backend/app/services/task_service.py` — Phase 289 (289-02)
+
+**`26 / 14 / 1018` (was `24 / 13 / 991`).** Honoured by construction, +8 lines (1010 → 1018; the row read `991`, stale). `run_task_sub_agent` counts its `search_documents` calls and returns the count. Scores alone cannot separate the two cases, because a zero-result search carries no score.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 24 / 13 / 991 (was `23 / 13 / 991`) | ⚠ **FIRES** | honoured by construction (**282-01** budget lookup; **282-04** `provider=_provider`, the provider the sub-agent already routes on)
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/services/task_service.py` | 24 / 13 / 991 (was `23 / 13 / 991`) | honoured by construction (282-04: provider kwarg) |
 
 ## `backend/app/services/run_reconciler.py` — row added 2026-09-18 (Phase 256, plan `256-02`)
 
@@ -22219,38 +22330,107 @@ CLAUDE.md FIRING row: young row added (cell cap 80).
 
 **`0 / 0 / 0` — planned (289-02); row and section added at planning so G-5 can see it from its first commit.** Carries chat's retrieval confidence onto KB-derived phase outputs (TRUST-01, D-07/D-08). `phase_confidence` and `confidence_for_wire` are pure; `resolve_kb_label` is the one read (folder name, R-05) and never raises. ⛔ **Binding invariants:** the level comes only from `agent_loop._compute_confidence` with the owner's settings (lazy import, never at module top); no provider or model import; a non-KB phase yields None and a failed search yields None. Plan 05 re-derives the triple.
 
+### `backend/app/services/harness/phase_confidence.py` — Phase 289 (289-02)
+
+**`1 / 1 / 153` (was `0 / 0 / 0`).** Created at 153 lines. The level comes only from `agent_loop._compute_confidence` with the owner's buckets (lazy import); a non-KB phase and a failed search both yield `None`. ⚠ F3: the run-level confidence on the final chat message still uses the default buckets (`harness_engine._finalize_run_grounding`), so the two can disagree for an owner with custom buckets; that fix is a one-argument change in `harness_engine.py`, not here.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-02, row added at planning). Pure confidence helper + wire coercion + KB label read. ⛔ no provider import; chat's _compute_confidence only
+
 ## `backend/app/services/run_evidence.py`
 
 **`0 / 0 / 0` — planned (289-03); row and section added at planning.** Pure composers for the evidence read's four sections (definition, phase log, verdicts, sources) plus definition_changed, deliverable and started_by (VIS-03, D-01/D-04, R-01..R-04). ⛔ **Binding invariants:** no I/O; jsonb only through `phase_output_object` / `_coerce_definition` (imported, never copied); never ships a citation passage or similarity; non-owner masking fails closed. Plan 05 re-derives the triple.
+
+### `backend/app/services/run_evidence.py` — Phase 289 (289-03)
+
+**`1 / 1 / 468` (was `0 / 0 / 0`).** Created at 468 lines. Live: the export equalled the page section by section (289-05 S3); a colleague got masked sources and R-04 words (S4).
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-03, row added at planning). Pure composers for the four evidence sections. ⛔ no I/O; never ships passage/similarity
 
 ## `backend/app/api/workflow_run_evidence.py`
 
 **`0 / 0 / 0` — planned (289-03); row and section added at planning.** `GET /workflow-runs/{id}/evidence`, the first org-shared read on the run tables (SECURITY-BEARING, beside the library feeds). ⛔ **Binding invariants:** ONE pool SELECT carries id + terminal status + owner-or-org-member before any other read; every refusal is the same 404 `Run not found`, never 403; `require_canvas()` alone; the path is in `CANVAS_GATED_PATHS`; email, thread_id and file_id only for the owner. RLS on the four run tables is NOT widened (no migration). Plan 05 re-derives the triple.
 
+### `backend/app/api/workflow_run_evidence.py` — Phase 289 (289-03)
+
+**`1 / 1 / 358` (was `0 / 0 / 0`).** Created at 358 lines. SECURITY-BEARING: the first org-shared read on the run tables. Live (289-05 S4): another org's user got `404 {"detail":"Run not found"}` byte-identical to a random uuid's; a same-org colleague got the minimised record, with the KB label resolved on the colleague's own RLS connection ("the knowledge base"). Observation: `run.org_name` carries the org's display name, which for an auto-created org embeds the founder's email; every member already receives it from `GET /org/me`.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-03, row added at planning). Org-scoped terminal-only evidence read. ⛔ ONE access query; 404 parity; require_canvas alone
+
 ## `backend/app/middleware/canvas_gate.py`
 
 **`8 / 5 / 391` — ⚠ ABSENT FROM THE LEDGER FOR ITS ENTIRE LIFE** (phases 182, 184, 188, 200.2, 276), found when 289's plans named it and the ledger gate fired. It already FIRES at 5 phases. Every touch so far has been one `CANVAS_GATED_PATHS` member plus its comment; **289-03 adds one more** (`/workflow-runs/{workflow_run_id}/evidence`), honoured by construction. ⛔ `tests/test_182_canvas_gate.py` must not import `CANVAS_GATED_PATHS`; a new gated route lands in the same commit as its `include_router`. Plan 05 re-derives the triple after 289-03.
+
+### `backend/app/middleware/canvas_gate.py` — Phase 289 (289-03)
+
+**`9 / 6 / 396` (was `8 / 5 / 391`).** Honoured by construction, +5 lines (391 → 396). `test_182`'s exact-set fence was red at base (two earlier members never joined its tuple); 289-03 repaired it in the same commit. Live: the canvas flag was proven ON (`audience: everyone`, `GET /workflow-runs` 200 for both test users) before any 404 was judged.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 8 / 5 / 391 | **FIRES** | ⚠ absent its ENTIRE LIFE (182/184/188/200.2/276) — row added at 289 planning. 289-03: ONE CANVAS_GATED_PATHS member
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `backend/app/middleware/canvas_gate.py` | 8 / 5 / 391 | ⚠ absent its ENTIRE LIFE — row added 289 planning · 289-03 adds one path |
 
 ## `frontend/src/components/workflows/StepEvidenceLine.tsx`
 
 **`0 / 0 / 0` — planned (289-02); row and section added at planning.** The sketch-289 B evidence line: "Answered from <KB> · N passages · ● Medium · 0.47", "Searched <KB> · nothing matched · ○ No match found", or nothing. Mounted once in `RunSpine.tsx` and once in `RunEvidenceReport.tsx` from the same wire object. ⛔ **Binding invariants:** LEAF (no hook, no `@/lib/api` import); renders nothing for a null confidence (D-09); never imports `ConfidenceChip`/`ConfidenceBadge` (metadata tiers). Plan 05 re-derives the triple.
 
+### `frontend/src/components/workflows/StepEvidenceLine.tsx` — Phase 289 (289-02)
+
+**`1 / 1 / 93` (was `0 / 0 / 0`).** Created at 93 lines. Uses the run surface's tones (`--success` / `--warning` / `hsl(0 80% 80%)`), not ConfidenceChip's `--panel-*` tokens, because RunSpine forbids them. ○ "No match found" is net-new against the icon convention (flagged as a proposal; ○ is also RunSpine's not-started face).
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-02, row added at planning). Leaf: the KB evidence line or nothing. ⛔ no hook, no @/lib/api, never ConfidenceChip tiers
+
 ## `frontend/src/components/workflows/evidenceVocabulary.ts`
 
 **`0 / 0 / 0` — planned (289-02 creates, 289-04 appends); row and section added at planning.** One home for every word and glyph of the evidence line and the finished-run report. The glyphs live HERE, not in `receiptVocabulary.ts` (whose rule 2 bans glyphs). ⛔ lookups by level go through `own()` (WR-04). Plan 05 re-derives the triple.
+
+### `frontend/src/components/workflows/evidenceVocabulary.ts` — Phase 289 (289-02, 289-04)
+
+**`2 / 1 / 233` (was `0 / 0 / 0`).** Created at 49 lines by 289-02; 289-04 appended every report word (49 → 233). Words and joins only. Glyph record: ○ (no match), ◉ (read-only), ⤓ (download), ⎙ (print) are net-new and flagged as icon-convention proposals; ◆ (deliverable) clashes with the publish gauntlet's ◆ stage (`PublishGauntlet.tsx:967`), a different surface; flagged for the convention owner.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-02 + 289-04, row added at planning). Every evidence-line and report word and glyph. ⛔ lookups through own()
 
 ## `frontend/src/components/workflows/evidenceView.ts`
 
 **`0 / 0 / 0` — planned (289-04); row and section added at planning.** Pure payload → view-model for the report; `sectionStrings` is what the D-03 content test compares the DOM against and `exportPayload` returns the fetched payload unchanged, which is why the JSON matches the page by construction. ⛔ no React import. Plan 05 re-derives the triple.
 
+### `frontend/src/components/workflows/evidenceView.ts` — Phase 289 (289-04)
+
+**`1 / 1 / 353` (was `0 / 0 / 0`).** Created at 353 lines. Privacy is applied a second time on `viewer_is_owner`.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). Pure payload to view-model; one source for DOM and export check. ⛔ no React
+
 ## `frontend/src/components/workflows/RunEvidenceReport.tsx`
 
 **`0 / 0 / 0` — planned (289-04); row and section added at planning.** The finished state of `WorkflowRunPage` (sketch 289 B): read-only mark, export buttons, facts strip, edited-since banner, four numbered sections, print via `[data-print-root]`. ⛔ **Binding invariants:** no write control for anyone; owner-only links only when `viewer_is_owner`; never imports `RunReceipt` (its importer pin); no `dangerouslySetInnerHTML`. Plan 05 re-derives the triple.
+
+### `frontend/src/components/workflows/RunEvidenceReport.tsx` — Phase 289 (289-04)
+
+**`1 / 1 / 462` (was `0 / 0 / 0`).** Created at 462 lines (`useState(` 2, `useState<` 1, `useEffect(` 2). Follow-ups recorded by 289-04 and still open: F-A no `role=alert` when a watched run fails; F-B step output renders markdown verbatim (seen live in S1); F-C no "why no download" sentence for an unlinked deliverable; F-D `RunHero` dead on WorkflowRunPage; F-E no deliverable size/path.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). The finished-run report (sketch 289 B). ⛔ no write control; never imports RunReceipt
 
 ## `frontend/src/lib/api/runEvidence.ts`
 
 **`0 / 0 / 0` — planned (289-04); row and section added at planning.** `getRunEvidence(runId, signal)` and the `RunEvidence` types (the plan 03 contract). ⛔ imported by its own specifier; NOT re-exported through `lib/api.ts`. Plan 05 re-derives the triple.
 
+### `frontend/src/lib/api/runEvidence.ts` — Phase 289 (289-04)
+
+**`1 / 1 / 123` (was `0 / 0 / 0`).** Created at 123 lines. 289-05 pinned its `RunEvidence` type against the shared contract fixture (`runEvidence.contract.test.ts`, `satisfies RunEvidence`), beside the backend pin.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). getRunEvidence client + types. ⛔ not re-exported through lib/api.ts
+
 ## `frontend/src/lib/runDeepLink.ts`
 
 **`0 / 0 / 0` — planned (289-04); row and section added at planning.** `readRunDeepLink` / `writeRunDeepLink` / `clearRunDeepLink` for `/app?run=<uuid>` (the app has no router). ⛔ strict UUID validation; the boot read never strips the param (a reload must keep the run). Plan 05 re-derives the triple.
+
+### `frontend/src/lib/runDeepLink.ts` — Phase 289 (289-04)
+
+**`1 / 1 / 63` (was `0 / 0 / 0`).** Created at 63 lines.
+
+Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). ?run=<uuid> read/write/clear. ⛔ strict UUID only
+
+
+## `frontend/src/index.css`
+
+### `frontend/src/index.css` — Phase 289 (289-04)
+
+**`34 / 18 / 1196`.** ⚠ **Absent from the ledger for its ENTIRE LIFE at 18 phases**: no scan-list row and no section until 289-05 measured it (289-04 flagged it). **289-04**: ONE `@media print` block (+40 L, 1156 → 1196): everything hidden except `[data-print-root]`, its ancestors unclipped through `*:has([data-print-root])`, theme tokens re-pointed to dark-on-white inside the root. Cosmetic only in print. ⛔ Any new global rule here is app-wide; a print rule must stay keyed on the print-root attribute.
