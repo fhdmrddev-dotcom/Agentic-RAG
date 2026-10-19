@@ -20,6 +20,9 @@ from app.services.rerank_engines.registry import ENGINES, LEGACY_ALIASES, Engine
 
 __all__ = [
     "CheckAvailability",
+    "DecisionMalformed",
+    "DecisionRefused",
+    "DecisionTimeout",
     "MissingEngineKey",
     "citation_check_availability",
     "get_engine",
@@ -30,6 +33,18 @@ __all__ = [
 
 class MissingEngineKey(RuntimeError):
     """A hosted engine is selected but no key is stored for it. The message is the engine id."""
+
+
+class DecisionMalformed(ValueError):
+    """A decision response is missing an answer or answers with the wrong type (never the body)."""
+
+
+class DecisionRefused(RuntimeError):
+    """An OpenAI Decisions answer was a refusal; a rerank then fails whole and falls back."""
+
+
+class DecisionTimeout(TimeoutError):
+    """The Jev fan-out did not finish inside its overall budget."""
 
 
 def get_engine(provider_id: str | None) -> EngineSpec | None:
