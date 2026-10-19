@@ -185,8 +185,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 289-01-PLAN.md - SEED-360: D-11 live capture at base, ask_user SQL cast fix (DB-backed RED), _fail_redrive, paused card prop
-- [ ] 289-02-PLAN.md - TRUST-01: per-phase confidence from chat's function, one wire field + KB label, evidence line on the run spine (SC#4, SC#5)
+- [x] 289-01-PLAN.md - SEED-360: D-11 live capture at base, ask_user SQL cast fix (DB-backed RED), _fail_redrive, paused card prop
+- [x] 289-02-PLAN.md - TRUST-01: per-phase confidence from chat's function, one wire field + KB label, evidence line on the run spine (SC#4, SC#5)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
