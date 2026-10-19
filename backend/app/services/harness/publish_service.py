@@ -1272,6 +1272,28 @@ def _interactive_phase_failures(definition) -> list:
     for phase in getattr(definition, "phases", []) or []:
         slug = getattr(phase, "slug", None)
         label = _clean_label(getattr(phase, "name", None))
+        # 288-02 (D-08 / A-03): a pause step's wait must be a real, bounded window. 0 or a
+        # negative is an instant timeout; above the ceiling the executor silently clamps.
+        # Added alongside, never in place of, the ask_user check below.
+        cfg = getattr(phase, "config", None)
+        if getattr(cfg, "phase_type", None) == "llm_human_input":
+            from app.config import settings  # function-local (module convention)
+
+            wait = getattr(cfg, "timeout_seconds", None)
+            ceiling = settings.ask_user_max_timeout_seconds
+            if not isinstance(wait, int) or wait <= 0 or wait > ceiling:
+                minutes = max(1, ceiling // 60)
+                who = f'the pause step "{label}"' if label else "one pause step"
+                failures.append(
+                    {
+                        "phase": slug,
+                        "message": (
+                            f"Publishing needs a clear time limit, and {who} waits outside "
+                            f"the allowed range. Set how long it waits to between 1 second "
+                            f"and {minutes} minute{'' if minutes == 1 else 's'} to publish."
+                        ),
+                    }
+                )
         for v in getattr(phase, "validators", []) or []:
             if getattr(v, "on_failure", None) == "ask_user":
                 failures.append(
