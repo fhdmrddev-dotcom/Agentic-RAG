@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 289 — Run Evidence Page</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+#vnav,#states{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.vtab,.stab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.stab.active{background:var(--color-accent);color:var(--color-text)}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft)}
+#note b{color:var(--color-text)}
+#frame{margin:16px;border:1px solid var(--color-border);border-radius:12px;overflow:hidden;min-height:640px;background:var(--color-bg)}
+
+/* shared atoms */
+.btn{background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-text);border-radius:var(--radius-sm);padding:7px 12px;font-size:var(--text-xs);cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn:hover{border-color:var(--color-primary)}
+.btn.primary{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.mono{font-family:var(--font-mono)}
+.dim{color:var(--color-text-dim)}
+.muted{color:var(--color-text-muted)}
+.ro{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);border:1px solid var(--color-border);border-radius:var(--radius-full);padding:2px 8px}
+.st{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:10px;border-radius:var(--radius-full);padding:2px 8px;border:1px solid}
+.st.done{color:var(--color-success);border-color:hsl(142 71% 45% / .4);background:var(--color-success-dim)}
+.st.pass{color:var(--color-success);border-color:hsl(142 71% 45% / .4)}
+.chip{display:inline-flex;align-items:center;gap:4px;font-family:var(--font-mono);font-size:10px;border-radius:var(--radius-full);padding:2px 8px;border:1px solid;white-space:nowrap}
+.chip.high{color:var(--color-success);border-color:hsl(142 71% 45% / .4);background:var(--color-success-dim)}
+.chip.medium{color:var(--color-warning);border-color:hsl(38 92% 60% / .4);background:var(--color-warning-dim)}
+.chip.low{color:hsl(0 80% 80%);border-color:hsl(0 72% 51% / .4);background:var(--color-danger-dim)}
+.changed{display:flex;gap:10px;align-items:flex-start;border:1px solid hsl(38 92% 60% / .4);background:var(--color-warning-dim);border-radius:var(--radius-md);padding:10px 12px;font-size:var(--text-sm)}
+.changed b{color:var(--color-warning)}
+.src{display:flex;gap:8px;align-items:baseline;font-size:var(--text-sm);padding:4px 0}
+.src .ic{font-size:12px}
+.src .where{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)}
+.src .by{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);white-space:nowrap}
+.qa{border-left:2px solid var(--color-border);padding-left:10px;font-size:var(--text-sm)}
+.qa .who{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)}
+
+/* B — report */
+.report{max-width:860px;margin:0 auto;padding:28px 32px 48px}
+.r-top{display:flex;align-items:flex-start;gap:16px}
+.r-title{font-family:var(--font-headline);font-size:var(--text-2xl);font-weight:600;margin:0}
+.r-sub{font-size:var(--text-sm);color:var(--color-text-muted);margin-top:6px;line-height:1.6}
+.r-actions{margin-left:auto;display:flex;gap:6px}
+.r-facts{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--color-border-soft);border:1px solid var(--color-border-soft);border-radius:var(--radius-md);overflow:hidden;margin:20px 0}
+.r-facts div{background:var(--color-bg-elev1);padding:10px 12px}
+.r-facts .k{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);text-transform:uppercase;letter-spacing:.06em}
+.r-facts .v{font-size:var(--text-sm);margin-top:3px}
+.r-sec{margin-top:28px}
+.r-sec h2{font-family:var(--font-headline);font-size:var(--text-md);font-weight:600;margin:0 0 4px;display:flex;align-items:baseline;gap:8px}
+.r-sec h2 .n{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim)}
+.r-sec .lede{font-size:var(--text-xs);color:var(--color-text-dim);margin-bottom:10px}
+table.log{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
+table.log th{text-align:left;font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--color-text-dim);text-transform:uppercase;letter-spacing:.05em;padding:6px 8px;border-bottom:1px solid var(--color-border)}
+table.log td{padding:9px 8px;border-bottom:1px solid var(--color-border-soft);vertical-align:top}
+table.log td .t{font-weight:600}
+table.log td .ty{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)}
+table.log td .out{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:3px}
+.verdict{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--color-border-soft);font-size:var(--text-sm)}
+.verdict .ic{color:var(--color-success);font-weight:700}
+.verdict .what{flex:1}
+.verdict .kind{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)}
+.defbox{border:1px solid var(--color-border-soft);border-radius:var(--radius-md);padding:10px 12px;font-size:var(--text-sm)}
+.defbox ol{margin:6px 0 0;padding-left:20px;color:var(--color-text-muted);font-size:var(--text-sm);line-height:1.7}
+details summary{cursor:pointer;font-size:var(--text-xs);color:var(--color-primary);margin-top:8px}
+pre{background:var(--color-bg-elev1);border:1px solid var(--color-border-soft);border-radius:var(--radius-sm);padding:10px;font-size:11px;overflow:auto;max-height:240px;color:var(--color-text-muted)}
+
+/* A — live page settled */
+.a-wrap{display:grid;grid-template-columns:1fr minmax(340px,38%);min-height:640px}
+.a-main{padding:18px 20px;border-right:1px solid var(--color-border)}
+.a-band{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-md);border:1px solid hsl(142 71% 45% / .4);border-left:3px solid var(--color-success);background:var(--color-surface);font-size:var(--text-sm)}
+.spine{list-style:none;margin:16px 0 0;padding:0;position:relative}
+.spine::before{content:"";position:absolute;left:11px;top:6px;bottom:6px;width:2px;background:hsl(142 71% 45% / .5)}
+.spine li{position:relative;padding:6px 0 6px 30px}
+.spine li .node{position:absolute;left:4px;top:10px;width:16px;height:16px;border-radius:50%;background:hsl(220 40% 8%);border:2px solid var(--color-success);display:grid;place-items:center;font-size:9px;color:var(--color-success)}
+.pcard{border:1px solid var(--color-border-soft);border-radius:var(--radius-md);padding:8px 10px}
+.pcard .l1{display:flex;align-items:center;gap:8px}
+.pcard .l1 .t{font-weight:600;font-size:var(--text-sm)}
+.pcard .l2{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);margin-top:3px}
+.a-panel{background:var(--color-bg-elev1);padding:14px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.a-tabs{display:flex;gap:4px;border-bottom:1px solid var(--color-border)}
+.a-tabs span{font-size:var(--text-xs);padding:6px 10px;color:var(--color-text-dim);border-bottom:2px solid transparent}
+.a-tabs span.on{color:var(--color-primary);border-color:var(--color-primary)}
+.psec{border:1px solid var(--color-border-soft);border-radius:var(--radius-md);padding:10px}
+.psec h3{margin:0 0 6px;font-size:var(--text-xs);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-dim);font-weight:500}
+
+/* C — split */
+.c-top{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.c-top .name{font-family:var(--font-headline);font-weight:600}
+.c-wrap{display:grid;grid-template-columns:300px 1fr;min-height:590px}
+.c-list{border-right:1px solid var(--color-border);background:var(--color-bg-elev1);padding:8px}
+.c-item{display:flex;gap:8px;align-items:flex-start;padding:8px;border-radius:var(--radius-sm);cursor:pointer;font-size:var(--text-sm);border:1px solid transparent}
+.c-item:hover{background:var(--color-surface)}
+.c-item.sel{background:var(--color-primary-dim);border-color:var(--color-primary)}
+.c-item .ok{color:var(--color-success)}
+.c-item .ty{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)}
+.c-detail{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+.c-detail h2{margin:0;font-family:var(--font-headline);font-size:var(--text-lg)}
+
+/* not available */
+.na{display:grid;place-items:center;min-height:640px;text-align:center}
+.na .box{max-width:420px}
+.na h2{font-family:var(--font-headline);margin:0 0 8px}
+
+/* json modal */
+#modal{position:fixed;inset:0;background:hsl(0 0% 0% / .6);display:none;place-items:center;z-index:20}
+#modal.on{display:grid}
+#modal .m{width:min(720px,92vw);background:var(--color-bg-elev1);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:16px}
+#modal pre{max-height:60vh}
+
+@media print{
+  #vnav,#states,#note,.r-actions,.noprint{display:none!important}
+  body{background:#fff;color:#111}
+  #frame{border:none;margin:0}
+  .report{max-width:none;padding:0}
+  .r-facts div,pre,.defbox{background:#fff}
+  table.log td,table.log th,.verdict{border-color:#ccc}
+}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="lbl">289 · evidence page</span>
+  <button class="vtab" data-v="A">A · The run page, settled</button>
+  <button class="vtab active" data-v="B">B · A report you can print ★ lean</button>
+  <button class="vtab" data-v="C">C · Step list + detail</button>
+</div>
+<div id="states"><span class="lbl">viewer</span>
+  <button class="stab active" data-w="owner">Owner (Dana)</button>
+  <button class="stab" data-w="colleague">Same-org colleague</button>
+  <button class="stab" data-w="outsider">Another org</button>
+  <span class="lbl" style="margin-left:14px">definition</span>
+  <button class="stab active" data-d="same">Unchanged since run</button>
+  <button class="stab" data-d="changed">Edited since run (v7 → v9)</button>
+</div>
+<div id="note"></div>
+<div id="frame"></div>
+<div id="modal"><div class="m"><div style="display:flex;align-items:center;margin-bottom:8px"><b style="font-size:var(--text-sm)">run-evidence-4f1c.json</b><span class="dim mono" style="font-size:10px;margin-left:8px">same payload the page renders</span><button class="btn" style="margin-left:auto" onclick="closeJson()">Close</button></div><pre id="jsonpre"></pre></div></div>
+
+<script>
+const RUN = {
+  id: "4f1c9a2e", workflow: "Vendor-risk portfolio review", version: 7, current_version: 9,
+  status: "completed", started: "19 Oct 2026 · 09:12", duration: "3 min 58 s",
+  owner: { name: "Dana Whitfield", email: "dana.whitfield@northwind.example" },
+  org: "Northwind Procurement", model: "gpt-5.6-sol",
+  deliverable: "committee_brief.docx"
+};
+const PHASES = [
+  { n:1, slug:"load_vendors", title:"Load the vendor list", type:"Read input", time:"0:04", kb:false,
+    out:"14 vendors read from vendor_list.xlsx" },
+  { n:2, slug:"research", title:"Research each vendor's breach history", type:"Search knowledge", time:"1:02", kb:true,
+    conf:{level:"medium", avg:0.47}, out:"Findings for 14 vendors · 9 passages used",
+    sources:[0,1,2] },
+  { n:3, slug:"score_vendors", title:"Score each vendor on risk", type:"Parallel agents", time:"1:31", kb:false,
+    out:"14 risk scores · 2 above the 90-day threshold" },
+  { n:4, slug:"draft_brief", title:"Draft the committee brief", type:"Write with sources", time:"0:52", kb:true,
+    conf:{level:"high", avg:0.71}, out:"6-page draft · 31 figures, each cited",
+    verdict:{kind:"Check", text:"Every figure has a source", detail:"31 of 31 cited"}, sources:[0,3,4] },
+  { n:5, slug:"confirm", title:"Confirm escalations", type:"Ask a person", time:"2:10 wait", kb:false,
+    qa:{q:"Helix Cloud and Orbit Data both breach the 90-day threshold. Escalate both?", a:"Escalate both"} },
+  { n:6, slug:"emit", title:"Save the brief", type:"Deliverable", time:"0:09", kb:false,
+    out:"committee_brief.docx saved to Files",
+    verdict:{kind:"Independent review", text:"The brief answers the request", detail:"judge model: gemini-3.5-flash"} }
+];
+const SOURCES = [
+  { name:"SOC-2 Report — Helix Cloud (2026).pdf", where:"p. 12, p. 14" },
+  { name:"Procurement Policy v4.docx", where:"§3.2 breach thresholds" },
+  { name:"Vendor Incident Log Q3.xlsx", where:"rows 41–47" },
+  { name:"Orbit Data — Security Questionnaire.pdf", where:"Q18" },
+  { name:"Risk Committee Template.docx", where:"structure" }
+];
+let V="B", W="owner", D="same";
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const confChip = c => !c ? "" :
+  `<span class="chip ${c.level}">${{high:"✓ High",medium:"● Medium",low:"⚠ Low"}[c.level]} · ${c.avg.toFixed(2)}</span>`;
+const startedBy = () => W==="owner" ? `${RUN.owner.name} (you) · <span class="mono dim" style="font-size:11px">${RUN.owner.email}</span>` : RUN.owner.name;
+const citedBy = i => PHASES.filter(p => (p.sources||[]).includes(i)).map(p => "step "+p.n).join(", ");
+const verdicts = () => PHASES.filter(p => p.verdict);
+const changedBanner = () => D==="changed" ? `<div class="changed"><span>⚠</span><div><b>This workflow has changed since this run.</b> The page shows <b>version 7</b>, exactly as it ran. The current version is 9. <span class="btn" style="margin-left:6px;padding:3px 8px">Compare with v9</span></div></div>` : "";
+
+function payload(){
+  return { run: { id:RUN.id, workflow:RUN.workflow, definition_version:RUN.version, status:RUN.status,
+      started_at:"2026-10-19T09:12:03Z", duration_s:238, started_by: W==="owner"? {name:RUN.owner.name,email:RUN.owner.email}:{name:RUN.owner.name} },
+    definition: { version:RUN.version, phases: PHASES.map(p=>({slug:p.slug,name:p.title,type:p.type})) },
+    phase_log: PHASES.map(p=>({n:p.n, slug:p.slug, name:p.title, status:"completed", duration:p.time, output:p.out||null,
+      confidence: p.conf? {level:p.conf.level, avg_similarity:p.conf.avg}: null, ...(p.qa?{question:p.qa.q, answer:p.qa.a, answered_by:RUN.owner.name}:{}) })),
+    verdicts: verdicts().map(p=>({phase:p.slug, kind:p.verdict.kind, result:"passed", text:p.verdict.text, detail:p.verdict.detail})),
+    sources: SOURCES.map((s,i)=>({document:s.name, location:s.where, cited_by:PHASES.filter(p=>(p.sources||[]).includes(i)).map(p=>p.slug)})) };
+}
+function showJson(){ document.getElementById("jsonpre").textContent = JSON.stringify(payload(),null,2); document.getElementById("modal").classList.add("on"); }
+function closeJson(){ document.getElementById("modal").classList.remove("on"); }
+
+function exportBtns(){ return `<button class="btn" onclick="showJson()">⤓ Download JSON</button><button class="btn" onclick="window.print()">⎙ Print / save as PDF</button>`; }
+
+function notAvailable(){
+  return `<div class="na"><div class="box"><h2>This run isn't available</h2>
+  <p class="muted" style="font-size:var(--text-sm);line-height:1.6">It may not exist, or it belongs to an organisation you're not in. Nothing about it is shown here.</p>
+  <button class="btn">Back to Workflows</button>
+  <p class="dim mono" style="font-size:10px;margin-top:18px">server: 404 for page and export alike — never 403, so a run's existence is not confirmed</p></div></div>`;
+}
+
+function renderB(){
+  const log = PHASES.map(p => `<tr>
+    <td class="mono dim">${p.n}</td>
+    <td><div class="t">${esc(p.title)}</div><div class="ty">${p.type} · ${p.slug}</div>
+      ${p.out?`<div class="out">${esc(p.out)}</div>`:""}
+      ${p.qa?`<div class="qa" style="margin-top:6px"><div>${esc(p.qa.q)}</div><div style="margin-top:3px"><b>“${esc(p.qa.a)}”</b> <span class="who">— ${esc(RUN.owner.name)}</span></div></div>`:""}</td>
+    <td><span class="st done">✓ Done</span></td>
+    <td class="mono dim" style="font-size:11px">${p.time}</td>
+    <td>${confChip(p.conf)}</td></tr>`).join("");
+  const v = verdicts().map(p => `<div class="verdict"><span class="ic">✓</span><div class="what">${esc(p.verdict.text)}<div class="kind">${p.verdict.kind} · step ${p.n} · ${esc(p.verdict.detail)}</div></div><span class="st pass">Passed</span></div>`).join("");
+  const s = SOURCES.map((x,i) => `<div class="src" style="border-bottom:1px solid var(--color-border-soft)"><span class="ic">📄</span><div>${esc(x.name)} <div class="where">${esc(x.where)}</div></div><span class="by">cited by ${citedBy(i)}</span></div>`).join("");
+  return `<div class="report">
+    <div class="r-top"><div><div class="ro">◉ Read-only record</div><h1 class="r-title" style="margin-top:8px">${RUN.workflow}</h1>
+      <div class="r-sub">Completed in ${RUN.duration} · started ${RUN.started} by ${startedBy()} · ${RUN.org}</div></div>
+      <div class="r-actions">${exportBtns()}</div></div>
+    <div class="r-facts"><div><div class="k">Result</div><div class="v" style="color:var(--color-success)">✓ Completed</div></div>
+      <div><div class="k">Version run</div><div class="v">v${RUN.version}</div></div>
+      <div><div class="k">Checks</div><div class="v">${verdicts().length} of ${verdicts().length} passed</div></div>
+      <div><div class="k">Deliverable</div><div class="v">◆ ${RUN.deliverable}</div></div></div>
+    ${changedBanner()}
+    <div class="r-sec"><h2><span class="n">1</span>What it ran</h2><div class="lede">The workflow definition as it was when this run started.</div>
+      <div class="defbox">Version ${RUN.version} · ${PHASES.length} steps<ol>${PHASES.map(p=>`<li>${esc(p.title)} <span class="dim mono" style="font-size:10px">${p.type}</span></li>`).join("")}</ol>
+      <details><summary>Show the full definition</summary><pre>${esc(JSON.stringify(payload().definition,null,2))}</pre></details></div></div>
+    <div class="r-sec"><h2><span class="n">2</span>What happened, step by step</h2><div class="lede">Confidence appears only on steps that answered from the knowledge base.</div>
+      <table class="log"><thead><tr><th>#</th><th>Step</th><th>Status</th><th>Time</th><th>Confidence</th></tr></thead><tbody>${log}</tbody></table></div>
+    <div class="r-sec"><h2><span class="n">3</span>Checks and verdicts</h2>${v}</div>
+    <div class="r-sec"><h2><span class="n">4</span>Sources it used</h2><div class="lede">Every document a step cited, with where in it.</div>${s}</div>
+  </div>`;
+}
+
+function renderA(){
+  const spine = PHASES.map(p => `<li><span class="node">✓</span><div class="pcard"><div class="l1"><span class="t">${esc(p.title)}</span><span class="st done" style="margin-left:auto">Done</span></div>
+    <div class="l2">Step ${p.n} of ${PHASES.length} · ${p.type} · ${p.time}</div></div></li>`).join("");
+  const v = verdicts().map(p => `<div class="verdict"><span class="ic">✓</span><div class="what">${esc(p.verdict.text)}<div class="kind">${p.verdict.kind} · step ${p.n}</div></div></div>`).join("");
+  const s = SOURCES.map((x,i) => `<div class="src"><span class="ic">📄</span><div>${esc(x.name)}<div class="where">${esc(x.where)} · ${citedBy(i)}</div></div></div>`).join("");
+  return `<div class="a-wrap"><div class="a-main">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><b style="font-family:var(--font-headline)">${RUN.workflow}</b><span class="ro">◉ Read-only</span><span style="margin-left:auto;display:flex;gap:6px" class="noprint">${exportBtns()}</span></div>
+    <div class="a-band">✓ <b>Completed</b> · ${RUN.duration} · v${RUN.version} · ${startedBy()}</div>
+    ${D==="changed"?`<div style="margin-top:10px">${changedBanner()}</div>`:""}
+    <ul class="spine">${spine}</ul></div>
+    <div class="a-panel"><div class="a-tabs"><span class="on">Evidence</span><span>Files</span><span>Definition</span></div>
+      <div class="psec"><h3>Checks</h3>${v}</div>
+      <div class="psec"><h3>Sources</h3>${s}</div>
+      <div class="psec"><h3>Answer given</h3><div class="qa">${esc(PHASES[4].qa.q)}<div style="margin-top:3px"><b>“${esc(PHASES[4].qa.a)}”</b> <span class="who">— ${esc(RUN.owner.name)}</span></div></div></div>
+      <div class="dim" style="font-size:11px">Version and confidence live in other tabs and on the steps — the four sections are not on one screen.</div>
+    </div></div>`;
+}
+
+let SEL = 3;
+function renderC(){
+  const list = PHASES.map((p,i) => `<div class="c-item ${i===SEL?"sel":""}" onclick="SEL=${i};render()"><span class="ok">✓</span><div><div>${esc(p.title)}</div><div class="ty">${p.n} · ${p.type}</div></div><span style="margin-left:auto">${p.conf?`<span class="chip ${p.conf.level}" style="padding:1px 5px">${{high:"✓",medium:"●",low:"⚠"}[p.conf.level]}</span>`:""}</span></div>`).join("");
+  const p = PHASES[SEL];
+  const srcs = (p.sources||[]).map(i => `<div class="src"><span class="ic">📄</span><div>${esc(SOURCES[i].name)}<div class="where">${esc(SOURCES[i].where)}</div></div></div>`).join("");
+  return `<div class="c-top"><span class="name">${RUN.workflow}</span><span class="ro">◉ Read-only</span><span class="st done">✓ Completed</span><span class="dim" style="font-size:var(--text-xs)">v${RUN.version} · ${RUN.duration} · ${startedBy()}</span><span style="margin-left:auto;display:flex;gap:6px">${exportBtns()}</span></div>
+    ${D==="changed"?`<div style="padding:10px 16px 0">${changedBanner()}</div>`:""}
+    <div class="c-wrap"><div class="c-list">${list}</div><div class="c-detail">
+      <div><div class="ty mono dim" style="font-size:10px">Step ${p.n} of ${PHASES.length} · ${p.type} · ${p.slug}</div><h2>${esc(p.title)}</h2></div>
+      ${p.conf?`<div>${confChip(p.conf)} <span class="dim" style="font-size:var(--text-xs)">how well the knowledge base matched</span></div>`:""}
+      ${p.out?`<div class="psec"><h3>Output</h3><div style="font-size:var(--text-sm)">${esc(p.out)}</div></div>`:""}
+      ${p.qa?`<div class="psec"><h3>Answer given</h3><div class="qa">${esc(p.qa.q)}<div style="margin-top:3px"><b>“${esc(p.qa.a)}”</b> <span class="who">— ${esc(RUN.owner.name)}</span></div></div></div>`:""}
+      ${p.verdict?`<div class="psec"><h3>Check</h3><div class="verdict" style="border:none"><span class="ic">✓</span><div class="what">${esc(p.verdict.text)}<div class="kind">${p.verdict.kind} · ${esc(p.verdict.detail)}</div></div></div></div>`:""}
+      ${srcs?`<div class="psec"><h3>Sources</h3>${srcs}</div>`:""}
+      ${!p.verdict && !srcs && !p.qa ? `<div class="dim" style="font-size:var(--text-xs)">No check or source on this step.</div>`:""}
+    </div></div>`;
+}
+
+const NOTES = {
+  A:"<b>A · The run page, settled.</b> The live page you already know, frozen and read-only: spine on the left, evidence in the panel. Familiar, but the four sections are split across tabs and steps, and it prints badly.",
+  B:"<b>B · A report you can print (lean).</b> One column, four numbered sections in the order a reviewer asks: what it ran → what happened → did checks pass → on what evidence. Print is the page itself, so export matches by construction. Try ⎙ and ⤓.",
+  C:"<b>C · Step list + detail.</b> Good for digging into one step; poor for answering “show me everything” — the reviewer has to click six times, and print shows one step."
+};
+function render(){
+  document.getElementById("note").innerHTML = W==="outsider" ? "<b>Another org:</b> the page and the export both answer 404 — same words for “doesn't exist” and “not yours”." : NOTES[V] + (W==="colleague" ? " <b>Colleague view:</b> owner's display name, no email, no write controls." : "");
+  document.getElementById("frame").innerHTML = W==="outsider" ? notAvailable() : ({A:renderA,B:renderB,C:renderC})[V]();
+}
+document.querySelectorAll(".vtab").forEach(b => b.onclick = () => { document.querySelectorAll(".vtab").forEach(x=>x.classList.remove("active")); b.classList.add("active"); V=b.dataset.v; render(); });
+document.querySelectorAll("[data-w]").forEach(b => b.onclick = () => { document.querySelectorAll("[data-w]").forEach(x=>x.classList.remove("active")); b.classList.add("active"); W=b.dataset.w; render(); });
+document.querySelectorAll("[data-d]").forEach(b => b.onclick = () => { document.querySelectorAll("[data-d]").forEach(x=>x.classList.remove("active")); b.classList.add("active"); D=b.dataset.d; render(); });
+document.getElementById("modal").onclick = e => { if (e.target.id==="modal") closeJson(); };
+render();
+</script>
+</body>
+</html>

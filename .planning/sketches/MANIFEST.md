@@ -2970,3 +2970,10 @@ reuses 267-B's event-card shape.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 282 | one-answer-input | Where the ONE ask_user input lives per panel state (open / rail / workflow pause), with one shared draft | ★ A input follows the open panel (autonomous pick 2026-10-15; operator confirmation owed at G-4) | phase-282, fix-07, ask_user, a11y |
+
+## Sketch 289 — The Run Page and Its Evidence (Phase 289, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 289 | run-evidence-page | How a finished run's read-only evidence page reads for a reviewer (settled run page / printable report / list+detail) | — (lean B) | phase-289, vis-03, export |
+| 289 | confidence-on-a-step | Where KB confidence sits on a step; what non-KB and no-match steps show | — (lean B) | phase-289, trust-01, confidence |
