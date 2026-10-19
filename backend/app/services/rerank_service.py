@@ -1,55 +1,70 @@
 """
-Reranking service — API (Cohere) and local (sentence-transformers CrossEncoder) providers.
+Reranking — a thin dispatcher over ``app.services.rerank_engines`` (Phase 294-01, DEC-01).
 
 Controlled by config or per-request UserEffectiveSettings:
   RERANK_ENABLED   - master switch (default: false)
-  RERANK_PROVIDER  - "api" or "local"
-  RERANK_API_KEY   - Cohere API key (required for "api" provider)
-  RERANK_MODEL     - model name for chosen provider
+  RERANK_PROVIDER  - "cohere" (legacy "api"), "local", "jev" or "openai_decisions"
+  RERANK_API_KEY   - Cohere API key (Jev uses the stored OpenRouter key, OpenAI Decisions the
+                     stored OpenAI key — D-02 / D-03, no new secret)
+  RERANK_MODEL     - model name; a name that belongs to another engine falls back to the
+                     selected engine's default (``rerank_engines.resolve_model``)
   RERANK_TOP_N     - number of results to return after reranking
+
+⛔ D-11 + D-12 — a failure EQUALS rerank-off. Any exception, an unknown provider, a missing key or
+a model that is still loading returns ``documents[:n]``, which is exactly what the caller gets with
+rerank off. (Before 294 a failure returned the WHOLE pool — more passages than off.) A failure is
+logged with the engine id and the exception TYPE only: never a traceback log, never the
+exception text (an httpx error can carry the request), never a key.
+
+⛔ SC#6 — the decorator's ``redact_inputs`` hook keeps ``user_settings`` (every provider key) out of the
+LangSmith run inputs.
 """
 
 from __future__ import annotations
 
+import importlib
 import logging
+import time
 from typing import TYPE_CHECKING
 
 import httpx
 from langsmith import traceable
 
 from app.config import settings
+from app.services.rerank_engines import MissingEngineKey, get_engine, resolve_credentials, resolve_model
+from app.services.rerank_engines.local import LocalModelWarming
+from app.services.rerank_engines.tracing import EngineCall, record_engine_call, redact_inputs
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
 
 logger = logging.getLogger(__name__)
 
-# Lazy-loaded local model (only initialised when first needed)
-_local_model = None
+
+def _reason(exc: BaseException) -> str:
+    """The exception TYPE (plus the HTTP status for a status error). Never ``str(exc)``."""
+    name = type(exc).__name__
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"{name}:{exc.response.status_code}"
+    return name
 
 
-def _get_local_model(model_name: str):
-    global _local_model
-    if _local_model is None:
-        from sentence_transformers import CrossEncoder  # type: ignore
-        logger.info("Loading local reranker model: %s", model_name)
-        _local_model = CrossEncoder(model_name)
-        logger.info("Local reranker model loaded.")
-    return _local_model
-
-
-@traceable(name="rerank-documents", run_type="retriever")
+@traceable(name="rerank-documents", run_type="retriever", process_inputs=redact_inputs)
 def rerank(
     query: str,
     documents: list[dict],
     top_n: int | None = None,
     user_settings: UserEffectiveSettings | None = None,
+    *,
+    instruction: str | None = None,
+    keep_documents: bool = False,
 ) -> list[dict]:
-    """Rerank documents by relevance to query. Returns top_n results (or all if top_n is None).
+    """Rerank documents by relevance to query. Returns at most top_n results.
 
-    Each document dict must have a "content" key.
-    Adds a "relevance_score" field to each returned document.
-    Falls back to original order on any error.
+    Each document dict must have a "content" key; every returned row is a COPY that keeps every
+    key and gains "relevance_score". ``instruction`` steers the decision engines only (D-09, data,
+    never instructions — D-10); ``keep_documents`` is the filtered path's D-27 coverage signal.
+    Falls back to ``documents[:n]`` (== rerank off) on any failure.
     """
     rerank_enabled = user_settings.rerank_enabled if user_settings is not None else settings.rerank_enabled
     if not rerank_enabled:
@@ -62,61 +77,37 @@ def rerank(
     n = top_n if top_n is not None else rerank_top_n
 
     rerank_provider = user_settings.rerank_provider if user_settings is not None else settings.rerank_provider
-    rerank_api_key = user_settings.rerank_api_key if user_settings is not None else settings.rerank_api_key
     rerank_model = user_settings.rerank_model if user_settings is not None else settings.rerank_model
 
+    spec = get_engine(rerank_provider)
+    if spec is None:
+        logger.warning("Unknown rerank_provider=%r — keeping the current order", rerank_provider)
+        return documents[:n]
+
+    model = resolve_model(spec, rerank_model)
+    started = time.perf_counter()
     try:
-        if rerank_provider in ("api", "cohere"):
-            return _rerank_api(query, documents, n, rerank_api_key, rerank_model)
-        elif rerank_provider == "local":
-            return _rerank_local(query, documents, n, rerank_model)
-        else:
-            logger.warning("Unknown RERANK_PROVIDER=%r — skipping rerank", rerank_provider)
-            return documents
-    except Exception:
-        logger.exception("Reranking failed — returning original order")
-        return documents
+        api_key = resolve_credentials(spec, user_settings)
+        if spec.hosted and api_key is None:
+            raise MissingEngineKey(spec.id)
+        adapter = importlib.import_module(f"app.services.rerank_engines.{spec.id}")
+        return adapter.rerank(
+            query, documents, n, api_key=api_key, model=model,
+            instruction=instruction, keep_documents=keep_documents,
+        )
+    except LocalModelWarming:
+        logger.info("local rerank model %s still loading — keeping the current order", model)
+        _record_fallback(spec.id, model, started, "warming")
+        return documents[:n]
+    except Exception as exc:  # noqa: BLE001 — D-11: any failure falls back to the off output
+        reason = _reason(exc)
+        logger.warning("rerank engine %s failed (%s) — keeping the current order", spec.id, reason)
+        _record_fallback(spec.id, model, started, reason)
+        return documents[:n]
 
 
-def _rerank_api(query: str, documents: list[dict], top_n: int, api_key: str, model: str) -> list[dict]:
-    """Rerank via Cohere Rerank API (v2)."""
-    response = httpx.post(
-        "https://api.cohere.com/v2/rerank",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": model,
-            "query": query,
-            "documents": [doc["content"] for doc in documents],
-            "top_n": top_n,
-        },
-        timeout=30.0,
-    )
-    response.raise_for_status()
-    data = response.json()
-
-    reranked = []
-    for result in data["results"]:
-        doc = dict(documents[result["index"]])
-        doc["relevance_score"] = result["relevance_score"]
-        reranked.append(doc)
-    return reranked
-
-
-def _rerank_local(query: str, documents: list[dict], top_n: int, model_name: str) -> list[dict]:
-    """Rerank via local sentence-transformers CrossEncoder."""
-    model = _get_local_model(model_name)
-    pairs = [(query, doc["content"]) for doc in documents]
-    scores = model.predict(pairs)
-
-    scored = [(float(score), doc) for score, doc in zip(scores, documents)]
-    scored.sort(key=lambda x: x[0], reverse=True)
-
-    reranked = []
-    for score, doc in scored[:top_n]:
-        d = dict(doc)
-        d["relevance_score"] = score
-        reranked.append(d)
-    return reranked
+def _record_fallback(engine: str, model: str, started: float, reason: str) -> None:
+    record_engine_call(EngineCall(
+        engine=engine, model=model, purpose="rerank", input_tokens=None, output_tokens=None,
+        cost_usd=None, latency_ms=(time.perf_counter() - started) * 1000, ok=False, reason=reason,
+    ))
