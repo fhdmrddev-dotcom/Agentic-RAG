@@ -13,8 +13,9 @@ function setUrl(path: string) {
 }
 
 afterEach(() => {
-  setUrl("/")
+  // Unstub FIRST: the no-window case replaces `window`, and resetting the address needs it.
   vi.unstubAllGlobals()
+  setUrl("/")
 })
 
 describe("readRunDeepLink", () => {
