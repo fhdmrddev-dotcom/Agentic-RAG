@@ -1728,7 +1728,7 @@ async def ask_user_response_exists(
              AND p.role = 'system'
              AND p.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
              AND p.tool_calls->0->>'tool_call_id' = $2
-             AND p.tool_calls->0->>'run_id' = $1::text
+             AND p.tool_calls->0->>'run_id' = $1::uuid::text
             WHERE wr.id = $1
               AND r.role = 'system'
               AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
@@ -2326,7 +2326,7 @@ async def get_ask_user_response(
          AND p.role = 'system'
          AND p.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
          AND p.tool_calls->0->>'tool_call_id' = $2
-         AND p.tool_calls->0->>'run_id' = $1::text
+         AND p.tool_calls->0->>'run_id' = $1::uuid::text
         WHERE wr.id = $1
           AND r.role = 'system'
           AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
