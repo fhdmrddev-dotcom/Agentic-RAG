@@ -468,6 +468,23 @@ describe("⚠ argumentVocabulary — THE ESCAPE HATCH IS ABSENT, AND THE ABSENCE
     expect("a plain js".concat("on box").toLowerCase().includes(needles[0])).toBe(true)
   })
 
+  it("289-05: the one export-format exemption is used ONLY by the evidence report's export button", () => {
+    const modules = import.meta.glob("/src/**/*.{ts,tsx}", {
+      query: "?raw",
+      eager: true,
+      import: "default",
+    }) as Record<string, string>
+    expect(Object.keys(modules).length).toBeGreaterThan(200)
+    const users = Object.entries(modules)
+      .filter(([path, src]) => !path.includes(".test.") && /\bDOWNLOAD_JSON\b/.test(src))
+      .map(([path]) => path)
+      .sort()
+    expect(users).toEqual([
+      "/src/components/workflows/RunEvidenceReport.tsx",
+      "/src/components/workflows/evidenceVocabulary.ts",
+    ])
+  })
+
   it("⚠ NO MODULE UNDER `workflows` EXPORTS ESCAPE-HATCH COPY — swept tree-wide", () => {
     const modules = import.meta.glob("/src/**/*.{ts,tsx}", {
       query: "?raw",
@@ -488,6 +505,18 @@ describe("⚠ argumentVocabulary — THE ESCAPE HATCH IS ABSENT, AND THE ABSENCE
     // fence is about what the product SAYS, so it reads exported literals only.
     const EXPORTED_COPY = /export\s+const\s+[A-Za-z0-9_]+\s*(?::[^=\n]*)?=\s*\n?\s*"([^"]*)"/g
 
+    // ⚠ Phase 289-05: ONE export-FORMAT label is not an escape hatch, and is matched EXACTLY.
+    // The finished-run evidence report's "Download JSON" button (D-14a, sketch 289 B) downloads
+    // the run's record as a file; it is not an argument-entry affordance, which is the only thing
+    // this fence is about. It is keyed on file + constant + exact value, so any OTHER literal
+    // carrying a needle — including a second one in the same file — still fails, and the case
+    // below proves the exemption is used only by the report's export button. The operator may
+    // reverse this by renaming the label instead (recorded in 289-05-SUMMARY.md).
+    const EXPORT_FORMAT_LABELS = new Set([
+      "/src/components/workflows/evidenceVocabulary.ts::DOWNLOAD_JSON::Download JSON",
+    ])
+    const EXPORTED_NAMED_COPY = /export\s+const\s+([A-Za-z0-9_]+)\s*(?::[^=\n]*)?=\s*\n?\s*"([^"]*)"/g
+
     const offenders: string[] = []
     for (const [path, source] of workflowModules) {
       if (path.includes(".test.")) continue
@@ -495,7 +524,11 @@ describe("⚠ argumentVocabulary — THE ESCAPE HATCH IS ABSENT, AND THE ABSENCE
       EXPORTED_COPY.lastIndex = 0
       while ((m = EXPORTED_COPY.exec(source)) !== null) {
         const value = m[1].toLowerCase()
-        if (needles.some((n) => value.includes(n))) offenders.push(path)
+        if (!needles.some((n) => value.includes(n))) continue
+        EXPORTED_NAMED_COPY.lastIndex = m.index
+        const named = EXPORTED_NAMED_COPY.exec(source)
+        const key = named ? `${path}::${named[1]}::${named[2]}` : ""
+        if (!EXPORT_FORMAT_LABELS.has(key)) offenders.push(path)
       }
     }
 
