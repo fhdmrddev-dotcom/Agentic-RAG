@@ -130,8 +130,16 @@ describe("RunEvidenceReport: the owner's report (D-14a)", () => {
     await ready()
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Vendor-risk portfolio review")
     expect(screen.getByText("Read-only record")).toBeTruthy()
+    // The full set by accessible name: the back navigation, the two exports, and the owner's
+    // two links. No answer, cancel, retry or edit control exists.
     expect(buttonNames()).toEqual(
-      ["Download JSON", "Download the deliverable", "Open the chat thread", "Print / save as PDF"].sort(),
+      [
+        "‹ Back to Workflows",
+        "Download JSON",
+        "Download the deliverable",
+        "Open the chat thread",
+        "Print / save as PDF",
+      ].sort(),
     )
     const sub = screen.getByTestId("evidence-sub").textContent ?? ""
     expect(sub).toContain("Completed in 3m 58s")
@@ -169,10 +177,12 @@ describe("RunEvidenceReport: the owner's report (D-14a)", () => {
 })
 
 describe("RunEvidenceReport: a colleague's report (D-05, R-01, R-02, R-04)", () => {
-  it("offers exactly the two export buttons and nothing writable", async () => {
-    renderReport(colleaguePayload())
+  it("offers exactly the two export buttons and the back navigation, nothing writable", async () => {
+    const { onBack } = renderReport(colleaguePayload())
     await ready()
-    expect(buttonNames()).toEqual(["Download JSON", "Print / save as PDF"])
+    expect(buttonNames()).toEqual(["Download JSON", "Print / save as PDF", "‹ Back to Workflows"].sort())
+    fireEvent.click(screen.getByRole("button", { name: "‹ Back to Workflows" }))
+    expect(onBack).toHaveBeenCalledTimes(1)
   })
 
   it("shows the owner's display name only, never (you) or an email", async () => {
