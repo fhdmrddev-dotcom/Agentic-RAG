@@ -313,6 +313,10 @@ class PublishVerdict(BaseModel):
     # judge block, a crash before any phase ran. A ``None`` renders as the surface that
     # shipped, so no stage gains an empty card it has nothing to put in.
     blocked_step: BlockedStep | None = None
+    # ── 288-02 (D-07 / A-04) — pauses the golden run answered FOR the author ─────────────
+    # Success-only; ``{phase, message}`` entries (same shape as ``named_failures``) whose
+    # words come from the server. Empty for every workflow without a pause.
+    auto_answered: list = Field(default_factory=list)
 
 
 def _coerce_user_id(current_user: dict) -> UUID:

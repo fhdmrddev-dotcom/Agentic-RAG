@@ -141,7 +141,7 @@ export const GAUNTLET_STAGES: readonly GauntletStageFact[] = Object.freeze([
   { label: "Valid", what: "Definition valid — re-validates as a WorkflowDefinition" },
   { label: "Goal", what: "business_requirement — exactly one must be declared" },
   { label: "Structure", what: "Structural lint — reachable · terminal · inputs satisfied · no orphans" },
-  { label: "Pause", what: "Interactive-phase check — human-pause phases can't validate synchronously" },
+  { label: "Pause", what: "Pause check — the pause step's shape and wait time are checked, and the practice run answers it automatically" },
   { label: "Grounding", what: "Grounding check — the folders, tools and skills this workflow points at must all resolve" },
   { label: "Golden run", what: "Golden run — a REAL harness run against the project KB" },
   { label: "Citations", what: "Structural gate — citations / integrity checked during the run" },

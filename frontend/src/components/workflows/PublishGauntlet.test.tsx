@@ -2063,3 +2063,38 @@ describe("PublishGauntlet 281-03 — the golden-run link opens the run, or is ab
     expect(cause.className.split(/\s+/)).toContain("whitespace-pre-line")
   })
 })
+
+describe("288-02 — the pause the practice run answered for the author", () => {
+  const NOTE =
+    'The pause step "Approve the draft" was answered automatically during validation and has not been exercised by a person.'
+
+  it("renders the server's words verbatim, once, on a success verdict", async () => {
+    mockedPublish.mockResolvedValue({
+      kind: "verdict",
+      verdict: {
+        published: true,
+        version: 2,
+        golden_run_id: "r1",
+        blocked_stage: null,
+        named_failures: [],
+        auto_answered: [{ phase: "approve", message: NOTE }],
+      },
+    } satisfies PublishOutcome)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    const block = await screen.findByTestId("auto-answered")
+    expect(block.textContent).toBe(NOTE)
+    expect(screen.getAllByTestId("auto-answered")).toHaveLength(1)
+  })
+
+  it("renders nothing when the field is empty", async () => {
+    mockedPublish.mockResolvedValue({
+      kind: "verdict",
+      verdict: { published: true, version: 2, golden_run_id: "r1", blocked_stage: null, named_failures: [], auto_answered: [] },
+    } satisfies PublishOutcome)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-success")).toBeInTheDocument())
+    expect(screen.queryByTestId("auto-answered")).not.toBeInTheDocument()
+  })
+})

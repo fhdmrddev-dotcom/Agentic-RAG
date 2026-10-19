@@ -209,7 +209,7 @@ const STAGES: { label: string; what: string; codes: string[]; Icon: StageIcon }[
   { label: "Valid", what: "Definition valid — re-validates as a WorkflowDefinition", codes: ["definition_invalid"], Icon: CheckMarkButton },
   { label: "Goal", what: "business_requirement — exactly one must be declared", codes: ["business_requirement"], Icon: Bullseye },
   { label: "Structure", what: "Structural lint — reachable · terminal · inputs satisfied · no orphans", codes: ["lint"], Icon: MagnifyingGlassTiltedLeft },
-  { label: "Pause", what: "Interactive-phase check — human-pause phases can't validate synchronously", codes: ["interactive_phase"], Icon: RaisedHand },
+  { label: "Pause", what: "Pause check — the pause step's shape and wait time are checked, and the practice run answers it automatically", codes: ["interactive_phase"], Icon: RaisedHand },
   { label: "Grounding", what: "Grounding check — the folders, tools and skills this workflow points at must all resolve", codes: ["grounding_fidelity"], Icon: Books },
   { label: "Golden run", what: "Golden run — a REAL harness run against the project KB", codes: ["golden_run_timeout", "golden_run_error"], Icon: Rocket },
   { label: "Citations", what: "Structural gate — citations / integrity checked during the run", codes: ["structural_gate"], Icon: Locked },
@@ -1158,6 +1158,19 @@ function GauntletContent({
                   className="mt-4 rounded border border-border bg-card px-3 py-2 text-[12px] leading-relaxed text-muted-foreground"
                 >
                   {GOLDEN_NO_SEND}
+                </div>
+              )}
+
+              {/* 288-02 (D-07): the pauses the practice run answered FOR the author, in the
+                  server's own words. Success only; nothing renders without server data. */}
+              {isSuccess && (verdict.auto_answered?.length ?? 0) > 0 && (
+                <div
+                  data-testid="auto-answered"
+                  className="mt-4 rounded border border-border bg-card px-3 py-2 text-[12px] leading-relaxed text-muted-foreground"
+                >
+                  {verdict.auto_answered?.map((n, i) => (
+                    <p key={i}>{n.message}</p>
+                  ))}
                 </div>
               )}
 
