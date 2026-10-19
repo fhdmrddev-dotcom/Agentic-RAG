@@ -205,7 +205,9 @@ def validate_migration(sql_path: Path) -> int:
 
     print(f"VALIDATE-MIGRATION OK: {len(defs)} starter defs valid, transformed, re-homed, strict-gated.")
     for d in defs:
-        print(f"  - {d['slug']} -> {d['assets'][0]['asset_id']}")
+        assets = d.get("assets") or []
+        # Template-less starters (mig 210) declare no assets: nothing to re-home, nothing to upload.
+        print(f"  - {d['slug']} -> {assets[0]['asset_id'] if assets else '(template-less: no asset)'}")
     return 0
 
 
