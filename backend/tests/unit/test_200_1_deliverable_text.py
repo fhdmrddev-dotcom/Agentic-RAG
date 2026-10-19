@@ -129,12 +129,16 @@ _EXPECTED_PHASE_KEYS = {
     "tool_name",
     "capability",
     "service_name",
+    # 289 (TRUST-01 / D-08) — chat's retrieval confidence on a KB step, plus the server-stamped
+    # KB label (R-05). Read BY NAME off the same single parse; `None` on every non-KB step.
+    "confidence",
 }
 
 # The keys the serializer reads BY NAME off the unwrapped `obj`. One until Phase 214, two now.
 # ⚠ `_failure_reason` is read off the SAME single parse — a third fact through the one door,
 # never a second door. The fence below is what keeps that true.
-_ALLOW_LISTED_OUTPUT_KEYS = {"text", "_failure_reason"}
+# ⚠ 289 ADDS A THIRD: `confidence`, coerced through `confidence_for_wire`'s own allow-list.
+_ALLOW_LISTED_OUTPUT_KEYS = {"text", "_failure_reason", "confidence"}
 
 _DEFINITION_JSON = {
     "slug": "quarterly-report",
@@ -684,6 +688,9 @@ def test_the_second_wire_model_was_not_widened():
     from app.models.thread import WorkflowPhaseState
 
     assert "deliverable_text" not in WorkflowPhaseState.model_fields
+    # 289 (D-289-02-A) — the chat panel model stays narrow for confidence too: chat already
+    # shows the run-level confidence on the final assistant message.
+    assert "confidence" not in WorkflowPhaseState.model_fields
     # positive control — the field name is spelled correctly and really is absent, not typo'd
     assert "step_count" in WorkflowPhaseState.model_fields
 
@@ -694,3 +701,112 @@ def test_the_run_page_model_does_not_declare_output():
 
     assert "output" not in WorkflowRunPhaseRead.model_fields
     assert set(WorkflowRunPhaseRead.model_fields) == _EXPECTED_PHASE_KEYS
+
+
+# ══ 10) BEHAVIOR — 289 (TRUST-01): confidence + its KB label reach the client ══════════════
+
+_FOLDER_ID = "5c0d1e2f-0000-4000-8000-000000289010"
+_STORED_CONFIDENCE = {
+    "level": "medium",
+    "avg_similarity": 0.47,
+    "disclaimer": None,
+    "passages": 6,
+}
+
+
+class _LabelPool:
+    """A pool stand-in with only ``fetchval``; counts calls so "once per read" is measured."""
+
+    def __init__(self, name="Procurement KB", exc=None):
+        self.name = name
+        self.exc = exc
+        self.calls = 0
+
+    async def fetchval(self, sql, *args):
+        self.calls += 1
+        if self.exc is not None:
+            raise self.exc
+        return self.name
+
+
+def _confidence_phases(client, monkeypatch, rows, *, pool=None, pool_exc=None, bound=True):
+    import app.dependencies as deps
+
+    store = _canvas_on(monkeypatch, rows)
+    if bound:
+        store.rows["workflow_runs"][0]["definition_snapshot"] = {
+            **_DEFINITION_JSON,
+            "project_folder_id": _FOLDER_ID,
+        }
+    pool_calls = {"n": 0}
+
+    async def _fake_pool():
+        pool_calls["n"] += 1
+        if pool_exc is not None:
+            raise pool_exc
+        return pool
+
+    monkeypatch.setattr(deps, "get_pg_pool", _fake_pool)
+    resp = client.get(f"/workflow-runs/{_RUN_ID}")
+    assert resp.status_code == 200, resp.text
+    return resp.json()["phases"], pool_calls["n"]
+
+
+def test_confidence_reaches_the_client_with_the_folder_label(client, monkeypatch):
+    """Dict row, string-scalar row and a no-KB row: label resolved ONCE for the whole read."""
+    pool = _LabelPool()
+    rows = [
+        _phase_row("gather", 0, {"text": "a", "confidence": _STORED_CONFIDENCE}),
+        _phase_row(
+            "draft",
+            1,
+            json.dumps({"text": "b", "confidence": {**_STORED_CONFIDENCE, "level": "low"}}),
+        ),
+        _phase_row("confirm", 2, {"text": "c"}),
+    ]
+    phases, pool_fetches = _confidence_phases(client, monkeypatch, rows, pool=pool)
+
+    assert phases[0]["confidence"] == {**_STORED_CONFIDENCE, "kb_label": "Procurement KB"}
+    assert phases[1]["confidence"]["level"] == "low"
+    assert phases[1]["confidence"]["kb_label"] == "Procurement KB"
+    assert phases[2]["confidence"] is None  # no KB use renders as absence (D-09)
+    assert pool.calls == 1, "the label must be resolved once per read, not per row"
+    assert pool_fetches == 1
+
+
+def test_unbound_definition_reads_the_default_label(client, monkeypatch):
+    pool = _LabelPool()
+    rows = [_phase_row("gather", 0, {"text": "a", "confidence": _STORED_CONFIDENCE})]
+    phases, _ = _confidence_phases(client, monkeypatch, rows, pool=pool, bound=False)
+    assert phases[0]["confidence"]["kb_label"] == "the knowledge base"
+    assert pool.calls == 0
+
+
+def test_no_confidence_anywhere_never_resolves_a_label(client, monkeypatch):
+    pool = _LabelPool()
+    rows = [_phase_row("gather", 0, {"text": "a"}), _phase_row("draft", 1, {"text": "b"})]
+    phases, pool_fetches = _confidence_phases(client, monkeypatch, rows, pool=pool)
+    assert [p["confidence"] for p in phases] == [None, None]
+    assert pool_fetches == 0 and pool.calls == 0
+
+
+def test_malformed_confidence_serializes_none(client, monkeypatch):
+    rows = [
+        _phase_row("gather", 0, {"text": "a", "confidence": {"level": "__proto__"}}),
+        _phase_row("draft", 1, {"text": "b", "confidence": "high"}),
+    ]
+    phases, _ = _confidence_phases(client, monkeypatch, rows, pool=_LabelPool())
+    assert [p["confidence"] for p in phases] == [None, None]
+
+
+def test_label_failure_degrades_to_default_and_never_fails_the_read(client, monkeypatch):
+    rows = [_phase_row("gather", 0, {"text": "a", "confidence": _STORED_CONFIDENCE})]
+    phases, _ = _confidence_phases(
+        client, monkeypatch, rows, pool=_LabelPool(exc=RuntimeError("down"))
+    )
+    assert phases[0]["confidence"]["kb_label"] == "the knowledge base"
+
+    phases, _ = _confidence_phases(
+        client, monkeypatch, rows, pool_exc=RuntimeError("no pool")
+    )
+    assert phases[0]["confidence"]["kb_label"] == "the knowledge base"
