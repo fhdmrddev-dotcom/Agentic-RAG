@@ -325,3 +325,83 @@ async def test_the_success_path_still_mints_exactly_one_shell_in_the_runs_org(mo
     assert inserted[0]["status"] == "streaming"
     assert inserted[0]["run_id"] == ctx.producer_run_id
     assert inserted[0]["org_id"] == str(org)
+
+
+# ── 289-REVIEW WR-02 — the terminal write IS the guard; the fail arm emits run_failed ──
+
+
+class _RecordingRedis(_NoopRedis):
+    def __init__(self):
+        self.events: list = []
+
+    async def xadd(self, key, fields, **kwargs):
+        self.events.append((key, json.loads(fields["data"])))
+        return "0-0"
+
+
+class _StopRacesPool(_RedriveFakePool):
+    """A Stop lands between `_fail_redrive`'s status read and its terminal write.
+
+    The status read answers `active`; by the time any write arrives the run is `cancelled`.
+    The terminal writes emulate `finish_run`'s guard (a different terminal value is refused).
+    """
+
+    async def fetchval(self, sql, *args):
+        out = await super().fetchval(sql, *args)
+        if "SELECT status FROM workflow_runs" in sql:
+            self.run_status = "cancelled"
+        return out
+
+    async def execute(self, sql, *args):
+        if "UPDATE workflow_runs SET status = $2" in sql:
+            self.calls.append((sql, args))
+            return "UPDATE 0" if self.run_status in ("completed", "failed", "cancelled") \
+                and self.run_status != args[1] else "UPDATE 1"
+        return await super().execute(sql, *args)
+
+
+@pytest.mark.asyncio
+async def test_a_stop_racing_the_fail_arm_leaves_no_failure_record(monkeypatch):
+    """WR-02: a run the person cancelled must not get a `run_failed` audit or a failed phase."""
+    row = _paused_row()
+    pool = _StopRacesPool(row)
+    ok = await _run_redrive(monkeypatch, pool=pool, resume_raises=True)
+
+    assert ok is True
+    assert _audit_writes(pool) == [], "no run_failed audit on a run that ended cancelled"
+    assert _phase_fail_writes(pool) == [], "no failed phase on a run that ended cancelled"
+
+
+@pytest.mark.asyncio
+async def test_the_fail_arm_emits_run_failed_like_the_engine(monkeypatch):
+    """WR-02: the engine's fail arm emits `run_failed`; the re-drive's fail arm must too."""
+    row = _paused_row()
+    pool = _RedriveFakePool(row)
+    redis = _RecordingRedis()
+    from app.api import runs as runs_api
+
+    async def _fake_get_pool():
+        return pool
+
+    async def _fake_load_def(_pool, _run_id):
+        return object()
+
+    async def _fake_build_ctx(_row, _redis, _pool):
+        return SimpleNamespace(producer_run_id=None)
+
+    async def _fake_resume(run_id, defn, ctx, *, pool, redis):
+        raise RuntimeError("planted _resume_run failure")
+
+    monkeypatch.setattr("app.dependencies.get_pg_pool", _fake_get_pool)
+    monkeypatch.setattr("app.services.harness_engine._load_run_definition", _fake_load_def)
+    monkeypatch.setattr("app.services.harness_engine._build_resume_context", _fake_build_ctx)
+    monkeypatch.setattr("app.services.harness_engine._resume_run", _fake_resume)
+
+    await runs_api._redrive_paused_workflow_run(row["run_id"], "tc-answered", redis)
+    for _ in range(10):
+        await asyncio.sleep(0)
+
+    failed = [(k, e) for k, e in redis.events if e.get("type") == "run_failed"]
+    assert len(failed) == 1
+    assert failed[0][0] == f"run:{row['run_id']}"
+    assert failed[0][1]["reason"] == REASON
