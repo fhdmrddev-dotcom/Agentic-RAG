@@ -105,11 +105,13 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **14 v4.7 requirements, 14 m
 **Plans**: 5 plans (4 parallel extractions in wave 1, gates + ledger in wave 2; the fifth is justified in 286-05: it owns the three files no wave-1 worktree can share)
 
 Plans:
+
 - [x] 286-01-PLAN.md — split `backend/app/api/workflows.py`: wire models + pure helpers + authoring doors to siblings on the same router (operator picks the move set at a blocking checkpoint, measured D-03/D-05 conflict)
 - [x] 286-02-PLAN.md — `WorkflowBuilderPage.tsx`: id-to-name maps into `useBuilderNameMaps`, copy constants into `builderCopy` (re-exported)
 - [x] 286-03-PLAN.md — `WorkflowRunPage.tsx`: run read + poll into `useWorkflowRun` at the original call positions
 - [x] 286-04-PLAN.md — `WorkflowCard.tsx`: overflow menu + armed delete into `WorkflowCardMenu`
 - [x] 286-05-PLAN.md — full gates against the base, count-gate adoption, ledger rows and SC#1 forecasts in one commit
+
 **Flags**: ⛔ G-5 extraction, behaviour-preserving, TDD pin-first. Measure first. Never `rm -rf` a worktree. Files in play (ledger triples as of roadmap time): `workflows.py` 43/23/2261, `WorkflowBuilderPage.tsx` 57/22/2993, `WorkflowRunPage.tsx` 28/9/1670, `WorkflowCard.tsx` 19/6/1616.
 
 #### Phase 287: Start From a Thread, Fork a Starter
@@ -129,11 +131,13 @@ Plans:
 **Plans**: 5 plans (waves 1/1/2/3/4)
 
 Plans:
+
 - [x] 287-01-PLAN.md - required launch inputs blocked at ChatLaunchForm + RunModal (SC#2)
 - [x] 287-02-PLAN.md - migration 210: 3 template-less starters (6 total) + static gauntlet test with counterfactuals (SC#3)
 - [x] 287-03-PLAN.md - in-thread "Run a workflow" action via StreamsProvider.sendMessage, one ChatArea mount (SC#1)
 - [x] 287-04-PLAN.md - fork isolation proof, full gates, ledger/seeds (SC#4)
 - [x] 287-05-PLAN.md - live proof: G-4 3/3 pass, 6 of 8 roster rows pass, 2 billing-blocked (SC#5)
+
 **UI hint**: yes
 **Flags**: **G-2 sketch** the in-thread entry and the starter picker before discuss. **G-4**: the operator names the "I'd recognize failure here" scenarios at scope time. `ChatLaunchForm` already exists (214-12) and `ChatLayout.doRun` has one caller; reuse it, do not build a second launch form. Starters are workflow definitions (data), no new phase type. Seeds `SEED-232`, `SEED-084`.
 
@@ -153,10 +157,12 @@ Plans:
 **Plans**: 4 plans (waves 1/1/1/2)
 
 Plans:
+
 - [x] 288-01-PLAN.md - draft settings row: one optional DraftArrivalCard prop, neutral words, TWO-children pin re-baselined, no-bleed regression (SC#1, SC#2)
 - [x] 288-02-PLAN.md - gauntlet: timeout lint in _interactive_phase_failures (RED on 0/-5/99999/1801), auto_answered verdict note, stale copy fixed (SC#3)
 - [x] 288-03-PLAN.md - run read waiting_on (server sentence, owner vs non-owner, active and paused) + one render in WorkflowRunPage (SC#4)
 - [x] 288-04-PLAN.md - live proof S1-S4 in Chrome, SC#10 roster in VALIDATION.md, full gates once, ledger/count-gate close-out
+
 **UI hint**: yes
 **Flags**: **G-2 sketch** the waiting-on moment. **G-4**. The publish gauntlet is security-adjacent: driven RED against a planted unbounded wait. Hot files: `WorkflowBuilderPage.tsx`, `builderStore.ts`, `PublishGauntlet.tsx`, `publish_service.py`, `WorkflowRunPage.tsx`; read their ledger sections. Seeds `SEED-183`, `SEED-164`. Uses the existing `llm_human_input` phase type; no new phase type.
 
@@ -177,11 +183,20 @@ Plans:
 **Plans**: 5 plans (waves 1/1/2/2/3; G-8: the backend evidence read and the frontend report with its 45-case test migration cannot share one context budget)
 
 Plans:
+**Wave 1**
+
 - [ ] 289-01-PLAN.md - SEED-360: D-11 live capture at base, ask_user SQL cast fix (DB-backed RED), _fail_redrive, paused card prop
 - [ ] 289-02-PLAN.md - TRUST-01: per-phase confidence from chat's function, one wire field + KB label, evidence line on the run spine (SC#4, SC#5)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 289-03-PLAN.md - VIS-03 server: org-scoped terminal-only evidence read, 404 parity, canvas-gated (SC#1, SC#3)
 - [ ] 289-04-PLAN.md - VIS-03 view: sketch-B report on the finished run page, JSON export + print by content, /app?run= deep link, terminal-case test migration (SC#1, SC#2, SC#4)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 289-05-PLAN.md - live proof S1-S5 as real users, four-axis roster, conditional 288 sentence restore, ledger + full gates once
+
 **UI hint**: yes
 **Flags**: **G-2 sketch** the page and the confidence chip. **G-4**. Migration only if the run model lacks a place for confidence (next free after 209). Hot files: `WorkflowRunPage.tsx`, `workflow_runs.py`, `harness_engine.py` (61/24/3387), `phase_types.py` (55/28/3014), `RunReceipt.tsx`. Seeds `SEED-348`, `SEED-152`.
 
