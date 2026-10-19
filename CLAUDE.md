@@ -425,7 +425,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | `frontend/src/components/workflows/library/libraryRow.ts` | 4 / 3 / 201 | ⚠ absent, on the boundary (added 192.2) |
 | `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 18 / 12 / 1075 | honoured by construction (193 / 193.1 / 199 / **214**) |
-| `frontend/src/pages/WorkflowBuilderPage.tsx` | 58 / 23 / 2803 (was `57 / 22 / 2993`) | seam TAKEN (286-02): name maps + copy → useBuilderNameMaps, builderCopy |
+| `frontend/src/pages/WorkflowBuilderPage.tsx` | 59 / 24 / 2808 (was `58 / 23 / 2803`) | 288-01: ONE prop at the existing card call · ⛔ |
+| `frontend/src/components/workflows/DraftArrivalCard.tsx` | 4 / 3 / 625 (was `1 / 1 / 338`) | 288-01: ONE prop, closed branch only · ⛔ |
+| `frontend/src/components/workflows/decisionsVocabulary.ts` | 4 / 3 / 327 (was `1 / 1 / 226`) | 288-01: 3 string consts, no logic · ⛔ |
 | `backend/app/api/workflows.py` | 45 / 23 / 1647 (was `43 / 23 / 2261`) | seam TAKEN (286-01): wire + authoring doors out; split OWED (>1,500 L) |
 | `backend/app/api/workflow_runs.py` | 13 / 10 / 1108 (was `11 / 8 / 1089`) | 286 forecast: 289 export = one projection of the run read (by construction) |
 | `backend/app/models/thread.py` | 22 / 15 / 537 (was `21 / 14 / 537`) | last touch 279-01 (docstring repoint only) |

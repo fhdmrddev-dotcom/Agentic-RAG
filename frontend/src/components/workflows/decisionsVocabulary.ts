@@ -300,6 +300,23 @@ export const APPLIED_HEADING = "What I applied"
  */
 export const DECISIONS_HEADING = "What I decided for you"
 
+// ── Phase 288-01 (AUTH-03, A-02) — the draft-lifetime settings row ────────────────────────
+//
+// A re-opened draft has no arrival card (`showReceipt` is arrival-only, D-01), so the decisions
+// rows and the working-name field were unreachable for the rest of the draft's life. The card's
+// closed branch now renders ONE collapsed row. These words are NEUTRAL and PRESENT TENSE on
+// purpose: `DECISIONS_HEADING` and `decisionsFoldSummary` narrate what the AI chose, which is
+// true on arrival and false on a draft the author has edited since.
+
+/** The collapsed row's heading. Names the surface, claims nothing about its history. */
+export const DRAFT_SETTINGS_HEADING = "Draft settings"
+
+/** The row's disclosure word while collapsed. */
+export const DRAFT_SETTINGS_OPEN_ACTION = "Show"
+
+/** The row's disclosure word while expanded. */
+export const DRAFT_SETTINGS_CLOSE_ACTION = "Hide"
+
 /** The model pair's label. Rendered only where every step agrees — see `DraftArrivalCard.tsx`. */
 export const APPLIED_MODEL_LABEL = "Model"
 

@@ -49,6 +49,10 @@ import {
   ARRIVAL_SOURCE_ACTION,
   ARRIVAL_SOURCE_LEAD,
   DECISIONS_FOLD_ACTION,
+  DECISIONS_HEADING,
+  DRAFT_SETTINGS_CLOSE_ACTION,
+  DRAFT_SETTINGS_HEADING,
+  DRAFT_SETTINGS_OPEN_ACTION,
   DECISION_CHANGE_ACTION,
   DECISION_EDIT_LIMIT_NOTE,
   DECISION_ROW_ORDER,
@@ -560,6 +564,9 @@ describe("DraftArrivalCard — the five charter clauses, each fenced", () => {
       "decisionsFoldSummary",
       "GROUNDING_FOLD_ACTION",
       "DECISIONS_FOLD_ACTION",
+      "DRAFT_SETTINGS_HEADING",
+      "DRAFT_SETTINGS_OPEN_ACTION",
+      "DRAFT_SETTINGS_CLOSE_ACTION",
     ]) {
       expect(draftArrivalCardSource).toContain(identifier)
     }
@@ -1241,6 +1248,64 @@ describe("DraftArrivalCard — sketch 200's card face, and what it REFUSES to in
     const plant = document.createElement("button")
     plant.textContent = `Proceed to ${GATE_WORD}`
     expect((plant.textContent ?? "").toLowerCase()).toContain(GATE_WORD)
+  })
+})
+
+describe("DraftArrivalCard — 288-01: the draft-lifetime settings row (AUTH-03, A-02)", () => {
+  it("prop OFF and closed: still renders NOTHING (existing behaviour)", () => {
+    const { container } = renderCard({ open: false })
+    expect(container.innerHTML).toBe("")
+    expect(screen.queryByTestId("draft-settings-row")).toBeNull()
+  })
+
+  it("prop ON and closed: ONE collapsed row, never the arrival card", () => {
+    const { container } = renderCard({ open: false, settingsRow: true })
+    expect(screen.getAllByTestId("draft-settings-row")).toHaveLength(1)
+    expect(screen.queryByTestId("draft-arrival-card")).toBeNull()
+    // The graph column's slot still holds exactly one element.
+    expect(container.childElementCount).toBe(1)
+    const toggle = screen.getByTestId("draft-settings-toggle")
+    expect(toggle).toHaveAttribute("aria-expanded", "false")
+    expect(toggle).toHaveTextContent(DRAFT_SETTINGS_HEADING)
+    expect(toggle).toHaveTextContent(DRAFT_SETTINGS_OPEN_ACTION)
+    // Collapsed: neither the list nor the name field is in the DOM.
+    expect(screen.queryByTestId("draft-settings-body")).toBeNull()
+    expect(screen.queryByTestId("decision-name-input")).toBeNull()
+  })
+
+  it("expanding reveals the decisions rows and the working-name input; collapsing hides them", async () => {
+    const user = userEvent.setup()
+    const { decisions } = renderCard({ open: false, settingsRow: true })
+    await user.click(screen.getByTestId("draft-settings-toggle"))
+    expect(screen.getByTestId("draft-settings-toggle")).toHaveAttribute("aria-expanded", "true")
+    expect(screen.getByTestId("draft-settings-toggle")).toHaveTextContent(DRAFT_SETTINGS_CLOSE_ACTION)
+    const body = screen.getByTestId("draft-settings-body")
+    expect(within(body).getByTestId("decisions-list")).toBeTruthy()
+    const input = screen.getByTestId("decision-name-input") as HTMLInputElement
+    expect(input.value).toBe(WORKFLOW_NAME)
+    expect(decisions.onChangeName).not.toHaveBeenCalled()
+    await user.type(input, "x")
+    expect(decisions.onChangeName).toHaveBeenCalled()
+    await user.click(screen.getByTestId("draft-settings-toggle"))
+    expect(screen.queryByTestId("draft-settings-body")).toBeNull()
+  })
+
+  it("the row's words are the vocabulary's and are NOT the arrival's past-tense narration", async () => {
+    const user = userEvent.setup()
+    renderCard({ open: false, settingsRow: true })
+    await user.click(screen.getByTestId("draft-settings-toggle"))
+    const read = atomsOf(screen.getByTestId("draft-settings-row")).join("   ")
+    expect(read).toContain(DRAFT_SETTINGS_HEADING)
+    expect(read).not.toContain(DECISIONS_HEADING)
+    expect(read).not.toContain(decisionsFoldSummary(DECISION_ROW_ORDER.length))
+    expect(read).not.toContain(SEED_RECEIPT_NOTHING_COMMITTED)
+  })
+
+  it("open TRUE with the prop ON renders the arrival card and NO settings row (receipt unchanged)", () => {
+    renderCard({ open: true, settingsRow: true })
+    expect(screen.getByTestId("draft-arrival-card")).toBeTruthy()
+    expect(screen.queryByTestId("draft-settings-row")).toBeNull()
+    expect(cardAtoms()).toContain(SEED_RECEIPT_NOTHING_COMMITTED)
   })
 })
 
