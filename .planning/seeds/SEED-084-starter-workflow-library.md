@@ -1,7 +1,7 @@
 ---
 seed_id: SEED-084
 title: Starter / seed workflow library (fork-a-starter)
-status: planted
+status: folded
 status_note: |
   Phase 251 frontmatter migration: this file had NO frontmatter block at all, so no status was
   ever recorded for it. `planted` here is a MIGRATION DEFAULT — it is a statement about the

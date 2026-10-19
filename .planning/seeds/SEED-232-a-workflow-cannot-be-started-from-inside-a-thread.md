@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-232
 title: A workflow cannot be started from inside a thread — the launch form was built for it and nothing calls it
-status: planted
+status: folded
+status_note: "Folded into Phase 287 (2026-10-19, autonomous discuss): START-01 / START-03."
 planted: 2026-08-29
 planted_by: Claude, measuring SC#2's third door while closing Phase 214.1's verification
 surface: Agentic-RAG
