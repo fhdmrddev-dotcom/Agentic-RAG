@@ -3919,18 +3919,23 @@ describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the tw
     expect(countChildren(three)).not.toBe(countChildren(host))
   })
 
-  it("dismissing takes the column down to TWO children, with the graph still last", async () => {
+  it("dismissing keeps the column at THREE children (the card slot now holds the settings row), graph still last", async () => {
+    // ⚠ RETIRED DELIBERATELY, 2026-10-19 (288-01, D-02 / A-02): this case was "dismissing takes
+    // the column down to TWO children". The card's closed branch now renders ONE collapsed
+    // "Draft settings" row (testid `draft-settings-row`, never `draft-arrival-card`) instead of
+    // null, so the draft-lifetime name/decisions surface stays reachable. The slot is
+    // occupied, the column stays at three, and the graph is still the last child. Not a
+    // re-baseline to turn a red green: the invariant (never a FOURTH child) is unchanged.
     const card = await draftAndArrive()
     expect(countChildren(graphColumn())).toBe(3)
 
     fireEvent.click(within(card).getByTestId("draft-arrival-dismiss"))
     await waitFor(() => expect(screen.queryByTestId("draft-arrival-card")).toBeNull())
 
-    // A dismissed card renders NO NODE — which is exactly why the graph is pinned to row 3
-    // by `*:last-child` rather than trusted to occupy a slot.
     const column = graphColumn()
-    expect(countChildren(column)).toBe(2)
+    expect(countChildren(column)).toBe(3)
     expect(column.children[0]).toHaveAttribute("data-testid", "builder-view-toggle")
+    expect(column.children[1]).toHaveAttribute("data-testid", "draft-settings-row")
     expect(column.lastElementChild?.getAttribute("aria-label")).toBe(SPINE_LABEL)
   })
 

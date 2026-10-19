@@ -2171,6 +2171,11 @@ export function WorkflowBuilderPage({
         open={showReceipt}
         onDismiss={() => setShowReceipt(false)}
         decisions={decisions}
+        // 288-01 (AUTH-03, D-04): the closed branch renders the collapsed "Draft settings" row
+        // for the draft's whole life. No published-gate code is needed: this Builder holds only
+        // draft rows, and `onGauntletPublished` returns to the library (WorkflowsPage), so a
+        // published workflow is never on this surface. `showReceipt` is untouched (D-01).
+        settingsRow
       />
       {graphChild}
     </div>
