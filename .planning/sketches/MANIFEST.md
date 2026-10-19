@@ -2975,5 +2975,5 @@ reuses 267-B's event-card shape.
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 289 | run-evidence-page | How a finished run's read-only evidence page reads for a reviewer (settled run page / printable report / list+detail) | — (lean B) | phase-289, vis-03, export |
-| 289 | confidence-on-a-step | Where KB confidence sits on a step; what non-KB and no-match steps show | — (lean B) | phase-289, trust-01, confidence |
+| 289 | run-evidence-page | How a finished run's read-only evidence page reads for a reviewer (settled run page / printable report / list+detail) | ★ B printable report, four numbered sections (operator, 2026-10-19) | phase-289, vis-03, export |
+| 289 | confidence-on-a-step | Where KB confidence sits on a step; what non-KB and no-match steps show | ★ B evidence line under the step (operator, 2026-10-19) | phase-289, trust-01, confidence |

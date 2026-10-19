@@ -2,7 +2,7 @@
 sketch: 289
 name: run-evidence-page
 question: "How should a finished run's read-only evidence page read, for someone reviewing whether it can be trusted?"
-winner: null
+winner: "B — a report you can print (operator, 2026-10-19). Confidence uses the 289-confidence-on-a-step B evidence line, synthesised into this sketch."
 tags: [phase-289, vis-03, run-surface, receipt, export, evidence]
 phase: 289
 requirements: [VIS-03]
@@ -31,4 +31,4 @@ Buttons: ⤓ Download JSON shows the export payload; ⎙ Print previews the PDF.
 - Edited-since-run: does the page make clear it shows v7, not the current v9?
 - Colleague view: owner's display name only, no email, no write controls.
 - Another org: one "isn't available" page, same words for "doesn't exist" and "not yours".
-- Confidence placement here is a placeholder column; sketch 289-confidence-on-a-step decides it.
+- Confidence: the step log now carries the winning evidence line from 289-confidence-on-a-step (no confidence column).

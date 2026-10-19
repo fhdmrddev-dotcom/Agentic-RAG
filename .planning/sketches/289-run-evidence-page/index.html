@@ -127,7 +127,7 @@ pre{background:var(--color-bg-elev1);border:1px solid var(--color-border-soft);b
 <body>
 <div id="vnav"><span class="lbl">289 · evidence page</span>
   <button class="vtab" data-v="A">A · The run page, settled</button>
-  <button class="vtab active" data-v="B">B · A report you can print ★ lean</button>
+  <button class="vtab active" data-v="B">★ B · A report you can print (winner)</button>
   <button class="vtab" data-v="C">C · Step list + detail</button>
 </div>
 <div id="states"><span class="lbl">viewer</span>
@@ -154,12 +154,12 @@ const PHASES = [
   { n:1, slug:"load_vendors", title:"Load the vendor list", type:"Read input", time:"0:04", kb:false,
     out:"14 vendors read from vendor_list.xlsx" },
   { n:2, slug:"research", title:"Research each vendor's breach history", type:"Search knowledge", time:"1:02", kb:true,
-    conf:{level:"medium", avg:0.47}, out:"Findings for 14 vendors · 9 passages used",
+    conf:{level:"medium", avg:0.47, n:9}, out:"Findings for 14 vendors · 9 passages used",
     sources:[0,1,2] },
   { n:3, slug:"score_vendors", title:"Score each vendor on risk", type:"Parallel agents", time:"1:31", kb:false,
     out:"14 risk scores · 2 above the 90-day threshold" },
   { n:4, slug:"draft_brief", title:"Draft the committee brief", type:"Write with sources", time:"0:52", kb:true,
-    conf:{level:"high", avg:0.71}, out:"6-page draft · 31 figures, each cited",
+    conf:{level:"high", avg:0.71, n:12}, out:"6-page draft · 31 figures, each cited",
     verdict:{kind:"Check", text:"Every figure has a source", detail:"31 of 31 cited"}, sources:[0,3,4] },
   { n:5, slug:"confirm", title:"Confirm escalations", type:"Ask a person", time:"2:10 wait", kb:false,
     qa:{q:"Helix Cloud and Orbit Data both breach the 90-day threshold. Escalate both?", a:"Escalate both"} },
@@ -210,10 +210,10 @@ function renderB(){
     <td class="mono dim">${p.n}</td>
     <td><div class="t">${esc(p.title)}</div><div class="ty">${p.type} · ${p.slug}</div>
       ${p.out?`<div class="out">${esc(p.out)}</div>`:""}
+      ${p.conf?`<div class="out" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">Answered from <b>Procurement KB</b> · ${p.conf.n} passages · ${confChip(p.conf)}</div>`:""}
       ${p.qa?`<div class="qa" style="margin-top:6px"><div>${esc(p.qa.q)}</div><div style="margin-top:3px"><b>“${esc(p.qa.a)}”</b> <span class="who">— ${esc(RUN.owner.name)}</span></div></div>`:""}</td>
     <td><span class="st done">✓ Done</span></td>
-    <td class="mono dim" style="font-size:11px">${p.time}</td>
-    <td>${confChip(p.conf)}</td></tr>`).join("");
+    <td class="mono dim" style="font-size:11px">${p.time}</td></tr>`).join("");
   const v = verdicts().map(p => `<div class="verdict"><span class="ic">✓</span><div class="what">${esc(p.verdict.text)}<div class="kind">${p.verdict.kind} · step ${p.n} · ${esc(p.verdict.detail)}</div></div><span class="st pass">Passed</span></div>`).join("");
   const s = SOURCES.map((x,i) => `<div class="src" style="border-bottom:1px solid var(--color-border-soft)"><span class="ic">📄</span><div>${esc(x.name)} <div class="where">${esc(x.where)}</div></div><span class="by">cited by ${citedBy(i)}</span></div>`).join("");
   return `<div class="report">
@@ -229,7 +229,7 @@ function renderB(){
       <div class="defbox">Version ${RUN.version} · ${PHASES.length} steps<ol>${PHASES.map(p=>`<li>${esc(p.title)} <span class="dim mono" style="font-size:10px">${p.type}</span></li>`).join("")}</ol>
       <details><summary>Show the full definition</summary><pre>${esc(JSON.stringify(payload().definition,null,2))}</pre></details></div></div>
     <div class="r-sec"><h2><span class="n">2</span>What happened, step by step</h2><div class="lede">Confidence appears only on steps that answered from the knowledge base.</div>
-      <table class="log"><thead><tr><th>#</th><th>Step</th><th>Status</th><th>Time</th><th>Confidence</th></tr></thead><tbody>${log}</tbody></table></div>
+      <table class="log"><thead><tr><th>#</th><th>Step</th><th>Status</th><th>Time</th></tr></thead><tbody>${log}</tbody></table></div>
     <div class="r-sec"><h2><span class="n">3</span>Checks and verdicts</h2>${v}</div>
     <div class="r-sec"><h2><span class="n">4</span>Sources it used</h2><div class="lede">Every document a step cited, with where in it.</div>${s}</div>
   </div>`;

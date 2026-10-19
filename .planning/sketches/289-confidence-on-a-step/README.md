@@ -2,7 +2,7 @@
 sketch: 289
 name: confidence-on-a-step
 question: "Where does knowledge-base confidence sit on a phase step, and what does a step without KB use show?"
-winner: null
+winner: "B — an evidence line under the step (operator, 2026-10-19)"
 tags: [phase-289, trust-01, confidence, run-surface, receipt]
 phase: 289
 requirements: [TRUST-01]

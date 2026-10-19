@@ -1,7 +1,7 @@
 # Phase 289: The Run Page and Its Evidence - Context
 
 **Gathered:** 2026-10-19
-**Status:** Ready for research. ⛔ G-2 sketch is OWED before planning (see D-14).
+**Status:** Ready for planning. ✅ G-2 satisfied 2026-10-19: operator picked **B + B** (see D-14a).
 **Mode:** autonomous on the recommended option, reason written beside each decision. The operator asked to fold SEED-360; every other call below can be overruled and none is a one-way door.
 
 <domain>
@@ -55,6 +55,21 @@ Requirements: VIS-03, TRUST-01. Seeds: SEED-348, SEED-152, SEED-360.
 ### Process and guardrails
 
 - **D-14 (G-2 is NOT skipped this time).** The operator is present, and the roadmap flags G-2 for the evidence page and the confidence chip. A `/gsd:sketch` of (a) the finished-run evidence view and (b) the confidence mark on a phase step runs BEFORE `/gsd:plan-phase 289`. The expired-card answer control reuses `PendingAskCard`'s existing live-answer layout, so it needs no sketch.
+- **D-14a (sketch winners, operator 2026-10-19; these are the acceptance bar).**
+  - `.planning/sketches/289-run-evidence-page/` **B, a report you can print**: one read-only column.
+    - The title block carries the "Read-only record" mark and the Download JSON and Print / save as PDF buttons.
+    - A facts strip shows result, version run, checks passed and deliverable.
+    - An "edited since this run" banner appears when the live definition is newer.
+    - Then four numbered sections: 1 What it ran (version, step list, expandable full definition), 2 What happened, step by step (a table), 3 Checks and verdicts, 4 Sources it used (each with its location and "cited by step N").
+    - Print is the page itself, through print CSS.
+    - Another org sees one "This run isn't available" page.
+  - `.planning/sketches/289-confidence-on-a-step/` **B, an evidence line under the step**: "Answered from <KB> · N passages · ● Medium · 0.47".
+    - It is the same line in the evidence page's step log and on the live panel spine card.
+    - The chip follows 028: glyph + word + raw score.
+    - Low adds chat's disclaimer sentence.
+    - "Searched, found nothing" reads "Searched <KB> · nothing matched · ○ No match found".
+    - A non-KB step has no line at all.
+  - ⚠ D-02 said "the run page in its finished state IS the page". The winner is a report layout, so the finished state of `WorkflowRunPage` renders the B report instead of the live spine. It is still one page and not a second route. Research confirms how this fits the 286 `useWorkflowRun` seam.
 - **D-15 (G-4 scenarios, defined now).**
   - S1: finish a run with a KB step and a non-KB step, open the evidence view; the four sections are present, the version is the snapshot, the KB step shows confidence and the other step shows none.
   - S2: edit the workflow after the run, reopen it; the page still shows the version the run used and says the definition has changed.
