@@ -2200,6 +2200,15 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 17 / 9 / 1
 
 CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `frontend/src/components/panel/PendingAskCard.tsx` | 17 / 9 / 1013 (was `15 / 8 / 836`) | G-5 FIRES · honoured by construction (282-02: draft moved out, +AskPointer) |
 
+
+### `frontend/src/components/panel/PendingAskCard.tsx` — 289-REVIEW CR-02
+
+**`19 / 10 / 1052` (was `18 / 10 / 1042`).** Honoured by construction, +10 lines (1042 → 1052): ONE `useEffect`, no new state (`useState` 7 → 7, `useEffect` 2 → 3). On the live path the client clock reaches 0 before the run page's 5 s poll reports `paused`; the card is keyed on `tool_call_id`, so it kept `expired`. Now a clock expiry (no `expiredMessage`) returns to the live-answer layout when `paused` arrives; a server-driven expiry (404 / 409) stays terminal. Pinned by `PendingAskCard.paused.test.tsx` (pending → expired → paused re-render, and the 404 arm). `WorkflowRunPage.tsx` untouched. ⚠ What was typed before the clock expiry is not restored (the clock arm still settles the draft).
+
+CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-REVIEW CR-02, moved verbatim): | `frontend/src/components/panel/PendingAskCard.tsx` | 18 / 10 / 1042 (was `17 / 9 / 1013`) | 289-01: ONE paused prop + one line; hooks unchanged · stack gap → seed |
+
+Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW CR-02, moved verbatim): 18 / 10 / 1042 (was `17 / 9 / 1013`) | **FIRES** | **289-01**: ONE `paused` prop + `PAUSED_WAITING_LINE`: the answer control stays after the window on a paused run. Hooks unchanged (useState 7, useEffect 2). Stack paused case → seed
+
 ## `frontend/src/pages/WorkflowRunPage.tsx`
 
 ### Phase 288 (288-03) — frontend/src/pages/WorkflowRunPage.tsx
@@ -11302,7 +11311,7 @@ cells rot within days.
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send |
-| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 18 / 10 / 1042 (was `17 / 9 / 1013`) | **FIRES** | **289-01**: ONE `paused` prop + `PAUSED_WAITING_LINE`: the answer control stays after the window on a paused run. Hooks unchanged (useState 7, useEffect 2). Stack paused case → seed |
+| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 19 / 10 / 1052 (was `18 / 10 / 1042`) | **FIRES** | **289-REVIEW CR-02**: ONE `useEffect` returns a CLOCK-expired card to pending when `paused` arrives; a 404/409 expiry stays terminal. useState 7, useEffect 2 → 3 |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 33 / 13 / 1594 (was `31 / 12 / 1580`) | **FIRES** | **289-01** one `paused` attribute; **289-04** ONE early return → RunEvidenceReport (+14 L). No new hook/state/effect. RunHero now dead here (F-D). ⛔ invariants unchanged |
 | [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
 | [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 1 / 1 / 93 (was `0 / 0 / 0`) | no (young) | young (created 289-02). Leaf: the KB evidence line or nothing; mounted in RunSpine and RunEvidenceReport. ⛔ no hook, no @/lib/api, never ConfidenceChip tiers |

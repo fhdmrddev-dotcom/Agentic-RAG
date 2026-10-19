@@ -381,6 +381,16 @@ export function PendingAskCard({
     return () => clearTimeout(t)
   }, [remaining, state, hasDeadline, paused, markSettled, tool_call_id])
 
+  // 289-REVIEW CR-02 (D-13 on the LIVE path): the client clock can reach 0 before the run page's
+  // 5 s poll reports `paused`, and the card is keyed on tool_call_id, so it keeps that `expired`.
+  // A CLOCK expiry (no `expiredMessage`) is not terminal for a paused run that is still waiting:
+  // when `paused` arrives, return to the live-answer layout. A server-driven expiry (404 / 409,
+  // which sets `expiredMessage`) stays terminal. What was typed before the clock expiry is gone
+  // (the clock arm settled the draft); the person can answer afresh.
+  useEffect(() => {
+    if (paused && state === "expired" && expiredMessage === null) setState("pending")
+  }, [paused, state, expiredMessage])
+
   // A2 / Pitfall 1: a pure-SSE prompt lacks run_id. Trigger ONE reconcile on
   // mount-if-missing so the GET-reconciled prompt (carrying run_id) replaces it
   // in the store. Submit stays gated until run_id lands.

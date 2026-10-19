@@ -248,8 +248,12 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * (default false, D-13), the `PAUSED_WAITING_LINE` constant and its render in place of the
      * clock, `|| paused` on the countdown's early return. `useState` 7 → 7, `useEffect` 2 → 2.
      * Retirement fences untouched and green.
+     *
+     * 2026-10-20 — 289-REVIEW CR-02 RE-BASELINED 1043 → 1053, not loosened: ONE `useEffect`
+     * that returns a CLOCK-expired card to pending when `paused` arrives (a server-driven expiry
+     * stays terminal). `useState` 7 → 7, `useEffect` 2 → 3. Retirement fences untouched and green.
      */
-    expect(src.split("\n").length).toBe(1043)
+    expect(src.split("\n").length).toBe(1053)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */
