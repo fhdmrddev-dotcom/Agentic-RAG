@@ -162,5 +162,20 @@ def main(argv: list[str] | None = None) -> int:
     return _EXIT_OK
 
 
+def _load_backend_env() -> None:
+    """``app.config`` reads ``.env`` relative to the CWD, and this CLI runs from the repo root.
+
+    Load ``backend/.env`` into the process environment (never overriding a variable already set)
+    so the real search path sees the same configuration the backend does. Only when run as a
+    script: importing this module in a test must not pull the operator's secrets into os.environ.
+    """
+    env_file = _BACKEND_ROOT / ".env"
+    if env_file.is_file():
+        from dotenv import load_dotenv
+
+        load_dotenv(env_file, override=False)
+
+
 if __name__ == "__main__":
+    _load_backend_env()
     sys.exit(main())
