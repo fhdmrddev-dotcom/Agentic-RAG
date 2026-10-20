@@ -4759,6 +4759,7 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
         toolName: row?.tool_name,
         capability: row?.capability,
         serviceName: row?.service_name,
+        unsourced: row?.unsourced,
       }
     })
   }
@@ -4809,6 +4810,7 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
       toolName: r.tool_name,
       capability: r.capability,
       serviceName: r.service_name,
+      unsourced: r.unsourced,
   }))
 }
 
