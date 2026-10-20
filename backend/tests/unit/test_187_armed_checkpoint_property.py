@@ -533,6 +533,7 @@ def _drive(case: dict):
     """
     from app.models.harness import PhaseSpec, ValidatorSpec
     from app.services import harness_engine
+    from app.services.harness import engine_ask
     from app.services.harness.grounding import _approval_sentence, effective_phase
 
     approve = _approve_label()
@@ -559,7 +560,9 @@ def _drive(case: dict):
 
     with patch.object(harness_engine, "_execute_phase", recorder.body), \
          patch.object(harness_engine, "write_audit", write_audit), \
+         patch.object(engine_ask, "write_audit", write_audit), \
          patch.object(harness_engine, "_emit", AsyncMock()), \
+         patch.object(engine_ask, "_emit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response",
                AsyncMock(side_effect=recorder.subscribe)):
         outcome = asyncio.run(

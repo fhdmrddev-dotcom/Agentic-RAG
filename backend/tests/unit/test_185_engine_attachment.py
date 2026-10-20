@@ -407,6 +407,7 @@ def test_armed_gate_subscribes_with_no_timeout_at_all():
     from uuid import uuid4
 
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     authored, eff = _armed_effective_phase()
     # D-187-01: the armed treatment is REQUESTED by the caller (is_action_risk=True),
@@ -414,7 +415,7 @@ def test_armed_gate_subscribes_with_no_timeout_at_all():
     finding = _armed_finding(authored)
     subscribe = AsyncMock(return_value={"kind": "response", "response_text": "Approve this step"})
 
-    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+    with patch.object(engine_ask, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -436,7 +437,7 @@ def test_armed_gate_subscribes_with_no_timeout_at_all():
         validators=[ValidatorSpec(kind="freshness", timing="pre", on_failure="ask_user")],
     )
     subscribe2 = AsyncMock(return_value={"kind": "response", "response_text": "Proceed anyway"})
-    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+    with patch.object(engine_ask, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe2):
         asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -459,12 +460,13 @@ def test_criterion_19_unanswered_armed_gate_does_not_advance_the_run():
     from uuid import uuid4
 
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     authored, eff = _armed_effective_phase()
     finding = _armed_finding(authored)
     write_audit = AsyncMock()
 
-    with patch.object(harness_engine, "write_audit", write_audit), \
+    with patch.object(engine_ask, "write_audit", write_audit), \
          patch("app.services.ask_user_service.subscribe_for_response",
                AsyncMock(return_value=None)):
         outcome = asyncio.run(
@@ -491,6 +493,7 @@ def test_armed_prompt_is_the_generated_sentence_character_identically():
     from uuid import uuid4
 
     from app.services import harness_engine
+    from app.services.harness import engine_ask
     from app.services.harness.grounding import _approval_sentence
 
     authored, eff = _armed_effective_phase(total_phases=4, index=1)
@@ -500,7 +503,7 @@ def test_armed_prompt_is_the_generated_sentence_character_identically():
     supabase = MagicMock()
     ctx = _armed_ctx(supabase=supabase, thread_id=uuid4())
 
-    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+    with patch.object(engine_ask, "write_audit", AsyncMock()), \
          patch("app.utils.db.aexec", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response",
                AsyncMock(return_value={"kind": "response", "response_text": "Do not run it"})):
@@ -538,13 +541,14 @@ def test_armed_prompt_and_row_carry_a_null_deadline_never_zero():
     from uuid import uuid4
 
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     authored, eff = _armed_effective_phase()
     finding = _armed_finding(authored)
     supabase = MagicMock()
     ctx = _armed_ctx(supabase=supabase, thread_id=uuid4())
 
-    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+    with patch.object(engine_ask, "write_audit", AsyncMock()), \
          patch("app.utils.db.aexec", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response",
                AsyncMock(return_value={"kind": "response", "response_text": "Do not run it"})):
@@ -579,11 +583,12 @@ def test_shutdown_mid_wait_leaves_an_armed_run_resumable():
     import pytest
 
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     authored, eff = _armed_effective_phase()
     finding = _armed_finding(authored)
 
-    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+    with patch.object(engine_ask, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response",
                AsyncMock(return_value={"kind": "shutdown"})):
         with pytest.raises(asyncio.CancelledError):
@@ -610,6 +615,7 @@ def test_shutdown_on_a_NON_armed_gate_still_fails_the_run():
 
     from app.models.harness import PhaseSpec, ValidatorSpec
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     fresh = PhaseSpec(
         slug="p", phase_index=0,
@@ -617,7 +623,7 @@ def test_shutdown_on_a_NON_armed_gate_still_fails_the_run():
         validators=[ValidatorSpec(kind="freshness", timing="pre", on_failure="ask_user")],
     )
 
-    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+    with patch.object(engine_ask, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response",
                AsyncMock(return_value={"kind": "shutdown"})):
         outcome = asyncio.run(

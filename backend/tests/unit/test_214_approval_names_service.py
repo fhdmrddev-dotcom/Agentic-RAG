@@ -41,6 +41,7 @@ import pytest
 
 from app.models.harness import PhaseSpec
 from app.services import connector_service, harness_engine
+from app.services.harness import engine_ask
 from app.services.connector_service import ConnectorDisabled
 
 # ══════════════════════════════════════════════════════════════════════════════════
@@ -206,7 +207,9 @@ def _drive(
 
     with patch.object(harness_engine, "_execute_phase", rec.body), \
          patch.object(harness_engine, "write_audit", rec.write_audit), \
+         patch.object(engine_ask, "write_audit", rec.write_audit), \
          patch.object(harness_engine, "_emit", AsyncMock()), \
+         patch.object(engine_ask, "_emit", AsyncMock()), \
          patch.object(connector_service, "_fetch_connection_row", _fetch), \
          patch.object(connector_service, "get_cipher", lambda: object()), \
          patch("app.services.ask_user_service.subscribe_for_response",

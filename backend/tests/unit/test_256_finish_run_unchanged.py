@@ -125,9 +125,15 @@ _EXPECTED_CALL_SITES = {
     #   identical; only positions shifted, by +75 then +90, when the emit-cause precedence
     #   block, `_attempt_identity` and the `reason_is_final` threading landed above them.
     #   harness_engine.py:2390 → 2465 · 2431 → 2506 · 2713 → 2803
-    "services/harness_engine.py:2465",
-    "services/harness_engine.py:2506",
-    "services/harness_engine.py:2803",
+    # ⚠ RE-DERIVED at Phase 295 Plan 01 (D-51): check (a), the per-file COUNTS, stayed
+    #   identical; only positions shifted, by -522, when the engine-ask disposition family
+    #   (`_OnFailure` … `_resolve_failure_with_ask_user`, 57 + 469 lines out, a 3-line
+    #   pointer comment + 1 blank left behind) moved VERBATIM above them into harness/engine_ask.py. The three calls
+    #   are byte-unchanged. Re-derived with the grep above.
+    #   harness_engine.py:2465 → 1943 · 2506 → 1984 · 2803 → 2281
+    "services/harness_engine.py:1943",
+    "services/harness_engine.py:1984",
+    "services/harness_engine.py:2281",
     # ⚠ RE-DERIVED at Phase 268 Plan 01: +8 line shift in services/run_lifecycle.py —
     #   register_run_start gained `org_id` / `expert_id` kwargs, their forward to insert_run and
     #   a 4-line docstring note, all ABOVE this call. Check (a), the per-file COUNTS, stayed

@@ -1342,6 +1342,7 @@ def _drive_armed_phase(*, is_golden_run: bool):
 
     from app.models.harness import PhaseSpec
     from app.services import harness_engine
+    from app.services.harness import engine_ask
     from app.services.harness.grounding import effective_phase
 
     recorder = _SubscribeRecorder()
@@ -1383,7 +1384,9 @@ def _drive_armed_phase(*, is_golden_run: bool):
     with (
         patch.object(harness_engine, "_execute_phase", _body_spy),
         patch.object(harness_engine, "write_audit", _audit_spy),
+        patch.object(engine_ask, "write_audit", _audit_spy),
         patch.object(harness_engine, "_emit", _emit_spy),
+        patch.object(engine_ask, "_emit", _emit_spy),
         patch("app.services.ask_user_service.subscribe_for_response", recorder),
     ):
         try:

@@ -119,7 +119,9 @@ class TestHarnessSitesTagHarness:
         assert "f'INSERT INTO messages" not in src
 
     def test_harness_engine_disposition_prompt_tags_harness(self):
-        src = self._read("app/services/harness_engine.py")
+        # Phase 295 (D-51): the disposition prompt insert moved VERBATIM with
+        # ``_resolve_failure_with_ask_user`` into harness/engine_ask.py.
+        src = self._read("app/services/harness/engine_ask.py")
         assert '"origin": "harness"' in src
 
     def test_phase_types_ask_user_prompt_tags_harness(self):

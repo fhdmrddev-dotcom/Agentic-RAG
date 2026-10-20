@@ -106,6 +106,7 @@ def test_ask_user_proceed_continues_with_receipt():
     audit receipt is written."""
     from app.db.workflows import _AUDIT_EVENT_TYPES
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     # The receipt kind exists (Plan 01/02 lockstep + live migration 070).
     assert "validator_ask_user_approved" in _AUDIT_EVENT_TYPES
@@ -115,7 +116,7 @@ def test_ask_user_proceed_continues_with_receipt():
     write_audit = AsyncMock()
     subscribe = AsyncMock(return_value={"kind": "response", "response_text": "Proceed anyway"})
 
-    with patch.object(harness_engine, "write_audit", write_audit), \
+    with patch.object(engine_ask, "write_audit", write_audit), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -139,11 +140,12 @@ def test_ask_user_proceed_post_gate_returns_completed_output():
     """A POST-gate Proceed returns ``completed`` carrying the already-produced output
     (the user approved delivering despite the finding)."""
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     produced = {"text": "the deliverable", "field_map": {}}
     subscribe = AsyncMock(return_value={"kind": "response", "choice_index": 0})
 
-    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+    with patch.object(engine_ask, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -161,11 +163,12 @@ def test_ask_user_abort_fails_run():
     """An "Abort" choice -> ``PhaseOutcome.kind == "fail_run"`` (honest fail); NO
     approval receipt is written."""
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     write_audit = AsyncMock()
     subscribe = AsyncMock(return_value={"kind": "response", "response_text": "Abort"})
 
-    with patch.object(harness_engine, "write_audit", write_audit), \
+    with patch.object(engine_ask, "write_audit", write_audit), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -186,11 +189,12 @@ def test_ask_user_unanswered_expiry_fails():
     """``subscribe_for_response`` returns None (timeout) -> honest fail, never hung —
     inheriting the existing Phase 085 ask_user expiry."""
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     write_audit = AsyncMock()
     subscribe = AsyncMock(return_value=None)  # the 085 expiry
 
-    with patch.object(harness_engine, "write_audit", write_audit), \
+    with patch.object(engine_ask, "write_audit", write_audit), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -236,13 +240,14 @@ def test_version_ambiguity_proceed_records_v1_cut_note():
     metadata note (the honest record that the user approved continuing with UNFILTERED
     retrieval); a staleness Proceed receipt does NOT carry the note."""
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     # ── version-ambiguity Proceed → the v1-cut note is on the receipt ──
     write_audit = AsyncMock()
     subscribe = AsyncMock(
         return_value={"kind": "response", "response_text": "Proceed despite version ambiguity"}
     )
-    with patch.object(harness_engine, "write_audit", write_audit), \
+    with patch.object(engine_ask, "write_audit", write_audit), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -265,7 +270,7 @@ def test_version_ambiguity_proceed_records_v1_cut_note():
     # ── a staleness Proceed receipt does NOT carry the note ──
     write_audit2 = AsyncMock()
     subscribe2 = AsyncMock(return_value={"kind": "response", "response_text": "Proceed anyway"})
-    with patch.object(harness_engine, "write_audit", write_audit2), \
+    with patch.object(engine_ask, "write_audit", write_audit2), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe2):
         asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -366,13 +371,14 @@ def test_armed_decline_fails_the_run_and_writes_no_approval():
     No ``validator_ask_user_approved`` receipt is written — declining is not approving,
     and the ledger must not record it as such."""
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     write_audit = AsyncMock()
     subscribe = AsyncMock(
         return_value={"kind": "response", "response_text": "Do not run it"}
     )
 
-    with patch.object(harness_engine, "write_audit", write_audit), \
+    with patch.object(engine_ask, "write_audit", write_audit), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -392,13 +398,14 @@ def test_armed_approval_runs_the_body_and_writes_the_receipt():
     ``None`` (the signal: run the body) and writes the governance receipt carrying the
     chosen text — so the ledger records WHO said yes to WHAT."""
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     write_audit = AsyncMock()
     subscribe = AsyncMock(
         return_value={"kind": "response", "response_text": "Approve this step"}
     )
 
-    with patch.object(harness_engine, "write_audit", write_audit), \
+    with patch.object(engine_ask, "write_audit", write_audit), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -437,13 +444,14 @@ def test_armed_empty_answer_fails_the_run():
     no resolvable ``choice_index`` classifies as abort-like → fail_run, so a silently
     empty POST can never advance an armed step."""
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     write_audit = AsyncMock()
     subscribe = AsyncMock(
         return_value={"kind": "response", "response_text": "", "choice_index": None}
     )
 
-    with patch.object(harness_engine, "write_audit", write_audit), \
+    with patch.object(engine_ask, "write_audit", write_audit), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -463,13 +471,14 @@ def test_armed_decline_by_choice_index_also_fails():
     resolves index 1 of the armed pair back to "Do not run it" and fails the run — the
     click path and the typed path must route identically."""
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     write_audit = AsyncMock()
     subscribe = AsyncMock(
         return_value={"kind": "response", "response_text": "", "choice_index": 1}
     )
 
-    with patch.object(harness_engine, "write_audit", write_audit), \
+    with patch.object(engine_ask, "write_audit", write_audit), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -523,11 +532,12 @@ def _drive(phase, finding, payload, *, is_pre=True, is_action_risk=False):
     while the non-armed path keeps the ``0`` it always passed.
     """
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     write_audit = AsyncMock()
     subscribe = AsyncMock(return_value=payload)
 
-    with patch.object(harness_engine, "write_audit", write_audit), \
+    with patch.object(engine_ask, "write_audit", write_audit), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -743,6 +753,7 @@ def test_armed_checkpoint_on_a_fail_run_phase_still_asks():
     vacuous (a helper that always subscribed would satisfy the positive half too).
     """
     from app.services import harness_engine
+    from app.services.harness import engine_ask
 
     author_fail_run = [{"kind": "freshness", "timing": "pre", "on_failure": "fail_run"}]
 
@@ -750,7 +761,7 @@ def test_armed_checkpoint_on_a_fail_run_phase_still_asks():
     subscribe = AsyncMock(
         return_value={"kind": "response", "response_text": "Approve this step"}
     )
-    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+    with patch.object(engine_ask, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
@@ -774,7 +785,7 @@ def test_armed_checkpoint_on_a_fail_run_phase_still_asks():
     # validator says fail_run, so the sync mapper handles it and nobody is asked. That is
     # correct AND it proves the assertion above measures something.
     subscribe2 = AsyncMock()
-    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+    with patch.object(engine_ask, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe2):
         plain = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
