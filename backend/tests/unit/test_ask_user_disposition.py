@@ -85,6 +85,71 @@ def _ctx():
     )
 
 
+# ── Phase 295 (D-18, plan 295-03) — THE ARMED ANSWER ARRIVES ON A RE-DRIVE ──────────────────
+# The armed checkpoint no longer blocks in-process on ``subscribe_for_response``. It pauses
+# the run DURABLY and the answer is consumed on the re-drive by
+# ``engine_ask.consume_engine_answer`` through the exact-label allow-list. So an armed drive
+# is now: pause (``_resolve_failure_with_ask_user`` → ``pause_run``) → the answer persisted
+# the way ``POST /ask_user_response`` persists it → consume → and, on an approval, the
+# re-driven checkpoint asking the helper again, which then returns ``None`` (run the body)
+# with the receipt. Every armed line below pins the property that shipped (a decline is never
+# a proceed, an approval writes exactly one receipt naming the choice); only the harness moved.
+def _receipts(write_audit) -> list:
+    """The ``validator_ask_user_approved`` awaits ONLY (the pause also writes a
+    ``policy_applied`` consequence row, which is never a receipt)."""
+    return [
+        c for c in write_audit.await_args_list
+        if c.kwargs.get("event_type") == "validator_ask_user_approved"
+    ]
+
+
+def _armed_redrive(phase, finding, payload):
+    """Pause, answer durably with ``payload``, re-drive. Returns
+    ``(outcome, write_audit, world, subscribe)``; ``outcome`` is what the re-driven
+    checkpoint hands the engine (``None`` = run the body)."""
+    from contextlib import ExitStack
+
+    from app.services import harness_engine
+    from app.services.harness import engine_ask
+    from tests.unit.engine_ask_fakes import FakePool, World
+
+    world = World(phase.slug)
+    ctx = world.ctx()
+    write_audit = AsyncMock()
+    subscribe = AsyncMock(return_value=payload)
+    run_id, user, pool = uuid4(), uuid4(), FakePool()
+
+    def _ask():
+        return asyncio.run(harness_engine._resolve_failure_with_ask_user(
+            phase, finding, 0, None,
+            run_id=run_id, pool=pool, redis=object(), ctx=ctx,
+            _audit_user_id=user, is_pre=True, is_action_risk=True,
+        ))
+
+    with ExitStack() as stack:
+        world.enter(stack, audit=False, subscribe=False)
+        stack.enter_context(patch.object(engine_ask, "write_audit", write_audit))
+        stack.enter_context(
+            patch("app.services.ask_user_service.subscribe_for_response", subscribe)
+        )
+        outcome = _ask()
+        if outcome is None or outcome.kind != "pause_run":
+            return outcome, write_audit, world, subscribe
+        if payload is not None and payload.get("kind") == "response":
+            ctx.resume_answered_tool_call_id = world.answer(
+                payload.get("response_text") or "", payload.get("choice_index"),
+            )
+        consumed = asyncio.run(engine_ask.consume_engine_answer(
+            phase, ctx, run_id=run_id, pool=pool, redis=object(),
+            _audit_user_id=user, stream_run_id=None,
+        ))
+        if consumed is not None:
+            return consumed, write_audit, world, subscribe
+        # The approval was consumed: the re-driven checkpoint asks the helper once more.
+        outcome = _ask()
+    return outcome, write_audit, world, subscribe
+
+
 def test_ask_user_parsed():
     """``_parse_on_failure("ask_user")`` returns the ask_user disposition (not the
     fail_run fallback); an unknown value still fails safe to fail_run."""
@@ -366,57 +431,34 @@ def test_every_presented_choice_pair_is_classified():
         assert not _is_abort_choice([c for c in pair if not _is_abort_choice(c)][0])
 
 
+@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_decline_fails_the_run_and_writes_no_approval():
     """L-4, the instance. Clicking "Do not run it" on an armed checkpoint FAILS the run.
     No ``validator_ask_user_approved`` receipt is written — declining is not approving,
-    and the ledger must not record it as such."""
-    from app.services import harness_engine
-    from app.services.harness import engine_ask
-
-    write_audit = AsyncMock()
-    subscribe = AsyncMock(
-        return_value={"kind": "response", "response_text": "Do not run it"}
+    and the ledger must not record it as such. (Phase 295: consumed on the re-drive.)"""
+    outcome, write_audit, _world, _sub = _armed_redrive(
+        _armed_phase(), _ARMED_FINDING,
+        {"kind": "response", "response_text": "Do not run it"},
     )
-
-    with patch.object(engine_ask, "write_audit", write_audit), \
-         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
-        outcome = asyncio.run(
-            harness_engine._resolve_failure_with_ask_user(
-                _armed_phase(), _ARMED_FINDING, 0, None,
-                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
-                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
-            )
-        )
 
     assert outcome is not None, "a decline returned None — the body would RUN"
     assert outcome.kind == "fail_run"
-    assert write_audit.await_count == 0
+    assert len(_receipts(write_audit)) == 0
 
 
+@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_approval_runs_the_body_and_writes_the_receipt():
     """The other half of the pair. "Approve this step" on a PRE gate returns
     ``None`` (the signal: run the body) and writes the governance receipt carrying the
-    chosen text — so the ledger records WHO said yes to WHAT."""
-    from app.services import harness_engine
-    from app.services.harness import engine_ask
-
-    write_audit = AsyncMock()
-    subscribe = AsyncMock(
-        return_value={"kind": "response", "response_text": "Approve this step"}
+    chosen text — so the ledger records WHO said yes to WHAT. (Phase 295: the approval is
+    consumed on the re-drive, and the re-driven checkpoint then returns ``None``.)"""
+    outcome, write_audit, _world, _sub = _armed_redrive(
+        _armed_phase(), _ARMED_FINDING,
+        {"kind": "response", "response_text": "Approve this step"},
     )
 
-    with patch.object(engine_ask, "write_audit", write_audit), \
-         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
-        outcome = asyncio.run(
-            harness_engine._resolve_failure_with_ask_user(
-                _armed_phase(), _ARMED_FINDING, 0, None,
-                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
-                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
-            )
-        )
-
     assert outcome is None  # pre-gate approval → run the body
-    assert write_audit.await_count == 1
+    assert len(_receipts(write_audit)) == 1
     _, kwargs = write_audit.await_args
     assert kwargs["event_type"] == "validator_ask_user_approved"
     assert kwargs["metadata"]["choice"] == "Approve this step"
@@ -439,58 +481,34 @@ def test_armed_approval_runs_the_body_and_writes_the_receipt():
     )
 
 
+@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_empty_answer_fails_the_run():
     """An empty answer is not consent. A ``{"kind": "response"}`` carrying no text and
     no resolvable ``choice_index`` classifies as abort-like → fail_run, so a silently
-    empty POST can never advance an armed step."""
-    from app.services import harness_engine
-    from app.services.harness import engine_ask
-
-    write_audit = AsyncMock()
-    subscribe = AsyncMock(
-        return_value={"kind": "response", "response_text": "", "choice_index": None}
+    empty POST can never advance an armed step. (Phase 295: consumed on the re-drive.)"""
+    outcome, write_audit, _world, _sub = _armed_redrive(
+        _armed_phase(), _ARMED_FINDING,
+        {"kind": "response", "response_text": "", "choice_index": None},
     )
-
-    with patch.object(engine_ask, "write_audit", write_audit), \
-         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
-        outcome = asyncio.run(
-            harness_engine._resolve_failure_with_ask_user(
-                _armed_phase(), _ARMED_FINDING, 0, None,
-                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
-                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
-            )
-        )
 
     assert outcome is not None
     assert outcome.kind == "fail_run"
-    assert write_audit.await_count == 0
+    assert len(_receipts(write_audit)) == 0
 
 
+@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_decline_by_choice_index_also_fails():
     """A choice CLICK arrives as ``{response_text: "", choice_index: 1}``. The engine
     resolves index 1 of the armed pair back to "Do not run it" and fails the run — the
-    click path and the typed path must route identically."""
-    from app.services import harness_engine
-    from app.services.harness import engine_ask
-
-    write_audit = AsyncMock()
-    subscribe = AsyncMock(
-        return_value={"kind": "response", "response_text": "", "choice_index": 1}
+    click path and the typed path must route identically. (Phase 295: on the re-drive.)"""
+    outcome, write_audit, _world, _sub = _armed_redrive(
+        _armed_phase(), _ARMED_FINDING,
+        {"kind": "response", "response_text": "", "choice_index": 1},
     )
-
-    with patch.object(engine_ask, "write_audit", write_audit), \
-         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
-        outcome = asyncio.run(
-            harness_engine._resolve_failure_with_ask_user(
-                _armed_phase(), _ARMED_FINDING, 0, None,
-                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
-                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
-            )
-        )
 
     assert outcome is not None
     assert outcome.kind == "fail_run"
-    assert write_audit.await_count == 0
+    assert len(_receipts(write_audit)) == 0
 
 
 # ══ T-185-04-01 (quick-260731-3y4) — the FREE-TEXT box below those buttons ═════════
@@ -530,9 +548,16 @@ def _drive(phase, finding, payload, *, is_pre=True, is_action_risk=False):
     shipped. ``failed_idx`` follows it: an armed checkpoint has NO index into
     ``phase.validators`` (that is the whole point of the hoist), so it passes ``None``,
     while the non-armed path keeps the ``0`` it always passed.
+
+    Phase 295 (D-18): an ARMED drive goes through ``_armed_redrive`` (pause → durable answer
+    → consume → re-asked checkpoint); the non-armed path below is byte-identical.
     """
     from app.services import harness_engine
     from app.services.harness import engine_ask
+
+    if is_action_risk:
+        outcome, write_audit, _world, _sub = _armed_redrive(phase, finding, payload)
+        return outcome, write_audit
 
     write_audit = AsyncMock()
     subscribe = AsyncMock(return_value=payload)
@@ -583,6 +608,7 @@ _ARMED_NON_APPROVALS = (
 )
 
 
+@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_typed_refusal_is_never_approval():
     """T-185-04-01. On an ARMED action-risk checkpoint, EVERY answer that is not the
     exact presented approve label routes to ``fail_run`` and writes ZERO
@@ -608,8 +634,8 @@ def test_armed_typed_refusal_is_never_approval():
             f"answer {answer!r} routed to {outcome.kind!r}, not fail_run — an answer "
             f"the engine cannot read as the approval option is not consent"
         )
-        assert write_audit.await_count == 0, (
-            f"answer {answer!r} wrote {write_audit.await_count} audit row(s) — a "
+        assert len(_receipts(write_audit)) == 0, (
+            f"answer {answer!r} wrote {len(_receipts(write_audit))} approval row(s) — a "
             f"validator_ask_user_approved receipt on a refusal names the person who "
             f"said no as the one who authorised it (T-3y4-01)"
         )
@@ -621,12 +647,13 @@ def test_armed_typed_refusal_is_never_approval():
         is_action_risk=True,
     )
     assert outcome is None, "the exact presented label must proceed (pre-gate → None)"
-    assert write_audit.await_count == 1
+    assert len(_receipts(write_audit)) == 1
     _, kwargs = write_audit.await_args
     assert kwargs["event_type"] == "validator_ask_user_approved"
     assert kwargs["metadata"]["choice"] == "Approve this step"
 
 
+@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_approval_by_choice_index_still_proceeds():
     """The CLICK path control. A button click arrives as ``{response_text: "",
     choice_index: 0}``; the engine resolves index 0 of the armed pair back to the exact
@@ -639,7 +666,7 @@ def test_armed_approval_by_choice_index_still_proceeds():
     )
 
     assert outcome is None, "clicking Approve must run the body (pre-gate → None)"
-    assert write_audit.await_count == 1
+    assert len(_receipts(write_audit)) == 1
     _, kwargs = write_audit.await_args
     assert kwargs["event_type"] == "validator_ask_user_approved"
     assert kwargs["metadata"]["choice"] == "Approve this step"
@@ -737,6 +764,7 @@ def test_approve_label_has_exactly_one_home():
 # the HELPER, one layer down, so the guarantee does not depend on a single observer.
 
 
+@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_checkpoint_on_a_fail_run_phase_still_asks():
     """T-187-11-04. An armed checkpoint on a phase whose AUTHOR declared
     ``on_failure: "fail_run"`` still PAUSES for a person.
@@ -751,6 +779,9 @@ def test_armed_checkpoint_on_a_fail_run_phase_still_asks():
     WITHOUT the parameter delegates to ``_route_on_failure`` and never subscribes — which
     is both the correct non-armed behaviour and the proof that this assertion is not
     vacuous (a helper that always subscribed would satisfy the positive half too).
+
+    Phase 295 (D-18): the rendezvous is now the DURABLE prompt row (an engine ask never
+    waits in-process), and the approval is consumed on the re-drive.
     """
     from app.services import harness_engine
     from app.services.harness import engine_ask
@@ -758,26 +789,17 @@ def test_armed_checkpoint_on_a_fail_run_phase_still_asks():
     author_fail_run = [{"kind": "freshness", "timing": "pre", "on_failure": "fail_run"}]
 
     # ── the ARMED call: the author's fail_run must not speak for the checkpoint ──
-    subscribe = AsyncMock(
-        return_value={"kind": "response", "response_text": "Approve this step"}
+    outcome, _wa, world, subscribe = _armed_redrive(
+        _armed_phase(author_validators=author_fail_run), _ARMED_FINDING,
+        {"kind": "response", "response_text": "Approve this step"},
     )
-    with patch.object(engine_ask, "write_audit", AsyncMock()), \
-         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
-        outcome = asyncio.run(
-            harness_engine._resolve_failure_with_ask_user(
-                _armed_phase(author_validators=author_fail_run),
-                _ARMED_FINDING, 0, None,
-                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
-                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
-            )
-        )
 
-    subscribe.assert_awaited(), (
+    assert world.count("prompt_row") == 1, (
         "the armed checkpoint never reached the rendezvous — the author's "
         "validators[0].on_failure='fail_run' routed it away and NOBODY WAS ASKED "
         "(RESEARCH Pitfall 4)"
     )
-    assert subscribe.await_count == 1
+    assert subscribe.await_count == 0
     assert outcome is None, "an approval on a PRE gate must return None (run the body)"
 
     # ── the NEGATIVE CONTROL, same phase, same finding, no parameter ──

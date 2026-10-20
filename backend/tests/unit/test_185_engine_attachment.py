@@ -396,12 +396,64 @@ def _armed_ctx(*, supabase=None, thread_id=None):
     )
 
 
-def test_armed_gate_subscribes_with_no_timeout_at_all():
-    """SPEC Req 9, the indefinite-wait proof. ``subscribe_for_response`` is awaited with
-    ``None`` as its fourth argument for an armed checkpoint — not a big float, not 0 —
-    which is what makes "no answer" mean "the run never proceeds" rather than "the run
-    advances in N seconds". The freshness gate in the same file still gets a ``float``,
-    which is what proves the change did not widen past armed checkpoints."""
+# ── Phase 295 (D-18 / D-37, plan 295-03) — the armed ask is a DURABLE pause now ────────────
+# The armed checkpoint no longer blocks in-process on ``subscribe_for_response``: it writes
+# ``pause_run``, a durable prompt row and the ``ask_user_prompt`` emit, then returns
+# ``pause_run`` with the body un-run; the answer is consumed on a re-drive. The tests in this
+# block pin the SAME properties (no deadline, the verbatim prompt, never advancing without
+# consent, surviving a restart) against that shape, driven over ``engine_ask_fakes.World``.
+# The retired in-process observables are named in ``test_295_engine_ask_seam.py``.
+def _pause_armed(eff, finding):
+    """Drive the armed disposition over the durable world. Returns
+    ``(outcome, world, ctx, subscribe_mock, write_audit_mock)``.
+
+    ``subscribe_for_response`` is replaced by a mock that would hand back the graceful-drain
+    SHUTDOWN sentinel, so an engine that still waited in-process would raise out of here."""
+    import asyncio
+    from contextlib import ExitStack
+    from unittest.mock import AsyncMock, patch
+    from uuid import uuid4
+
+    from app.services import harness_engine
+    from app.services.harness import engine_ask
+    from tests.unit.engine_ask_fakes import FakePool, World
+
+    world = World(eff.slug)
+    ctx = world.ctx()
+    subscribe = AsyncMock(return_value={"kind": "shutdown"})
+    write_audit = AsyncMock()
+    with ExitStack() as stack:
+        world.enter(stack, audit=False, subscribe=False)
+        stack.enter_context(patch.object(engine_ask, "write_audit", write_audit))
+        stack.enter_context(
+            patch("app.services.ask_user_service.subscribe_for_response", subscribe)
+        )
+        outcome = asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                eff, finding, 0, None,
+                run_id=uuid4(), pool=FakePool(), redis=object(), ctx=ctx,
+                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
+            )
+        )
+    return outcome, world, ctx, subscribe, write_audit
+
+
+def _approval_receipts(write_audit) -> list:
+    return [
+        c for c in write_audit.await_args_list
+        if c.kwargs.get("event_type") == "validator_ask_user_approved"
+    ]
+
+
+def test_armed_gate_pauses_with_no_timeout_at_all():
+    """SPEC Req 9, the indefinite-wait proof — RE-EXPRESSED at Phase 295 (D-18 / D-37).
+
+    Was ``test_armed_gate_subscribes_with_no_timeout_at_all``: ``subscribe_for_response``
+    awaited with ``None``. An engine ask no longer waits in-process at all, so the same
+    property now reads off the durable prompt row: it carries ``timeout_seconds = None`` —
+    not a big float, not 0 — and nothing subscribed. "No answer" still means "the run never
+    proceeds", never "the run advances in N seconds". The freshness gate in the same file
+    still gets a ``float``, which is what proves the change did not widen past engine asks."""
     import asyncio
     from unittest.mock import AsyncMock, patch
     from uuid import uuid4
@@ -413,20 +465,10 @@ def test_armed_gate_subscribes_with_no_timeout_at_all():
     # D-187-01: the armed treatment is REQUESTED by the caller (is_action_risk=True),
     # never sniffed out of the finding, and the checkpoint has no validator index.
     finding = _armed_finding(authored)
-    subscribe = AsyncMock(return_value={"kind": "response", "response_text": "Approve this step"})
+    _outcome, world, _ctx, subscribe, _wa = _pause_armed(eff, finding)
 
-    with patch.object(engine_ask, "write_audit", AsyncMock()), \
-         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
-        asyncio.run(
-            harness_engine._resolve_failure_with_ask_user(
-                eff, finding, 0, None,
-                run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
-                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
-            )
-        )
-
-    args, _kwargs = subscribe.await_args
-    assert args[3] is None, f"armed gate subscribed with {args[3]!r}, not an indefinite wait"
+    row_timeout = world.latest_tool_call()["timeout_seconds"]
+    assert row_timeout is None and subscribe.await_count == 0, f"armed gate paused with {row_timeout!r}, not an indefinite wait"
 
     # ── the NON-ARMED control, same file, same mock: still a float ──
     from app.models.harness import PhaseSpec, ValidatorSpec
@@ -451,35 +493,20 @@ def test_armed_gate_subscribes_with_no_timeout_at_all():
 
 
 def test_criterion_19_unanswered_armed_gate_does_not_advance_the_run():
-    """CRITERION 19. With the checkpoint SET and ``subscribe_for_response`` returning
-    ``None``, the helper returns a ``fail_run`` outcome — crucially NOT ``None``, which
-    on a pre-gate is the signal "run the body". The body never runs, so the run does not
-    advance to the next phase; in the canonical example the email is not sent."""
-    import asyncio
-    from unittest.mock import AsyncMock, patch
-    from uuid import uuid4
-
-    from app.services import harness_engine
-    from app.services.harness import engine_ask
-
+    """CRITERION 19 — RE-EXPRESSED at Phase 295 (D-01 / D-18). With the checkpoint SET and
+    nobody having answered, the helper returns a ``pause_run`` outcome — crucially NOT
+    ``None``, which on a pre-gate is the signal "run the body". It used to be ``fail_run``
+    after an in-process wait that could only end unanswered; an unanswered engine ask now
+    never fails the run, it PAUSES it. The body never runs, so the run does not advance to the
+    next phase; in the canonical example the email is not sent, and no approval receipt is
+    written (the pause's own ``policy_applied`` row is a consequence, not a receipt)."""
     authored, eff = _armed_effective_phase()
     finding = _armed_finding(authored)
-    write_audit = AsyncMock()
-
-    with patch.object(engine_ask, "write_audit", write_audit), \
-         patch("app.services.ask_user_service.subscribe_for_response",
-               AsyncMock(return_value=None)):
-        outcome = asyncio.run(
-            harness_engine._resolve_failure_with_ask_user(
-                eff, finding, 0, None,
-                run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
-                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
-            )
-        )
+    outcome, _world, _ctx, _subscribe, write_audit = _pause_armed(eff, finding)
 
     assert outcome is not None, "the pre-gate caller would have RUN THE BODY"
-    assert outcome.kind == "fail_run"
-    assert write_audit.await_count == 0  # nothing was approved
+    assert outcome.kind == "pause_run"
+    assert _approval_receipts(write_audit) == []  # nothing was approved
 
 
 def test_armed_prompt_is_the_generated_sentence_character_identically():
@@ -487,39 +514,23 @@ def test_armed_prompt_is_the_generated_sentence_character_identically():
     ``grounding._approval_sentence`` composed — VERBATIM. Not wrapped in "A validation
     check on phase 'X' flagged: …", not prefixed, not truncated. The expected string is
     built by CALLING the composer, so this assertion cannot drift from the composer and
-    plan 185-05 can assert against the same value."""
-    import asyncio
-    from unittest.mock import AsyncMock, MagicMock, patch
-    from uuid import uuid4
+    plan 185-05 can assert against the same value.
 
-    from app.services import harness_engine
-    from app.services.harness import engine_ask
+    Phase 295 (D-18): driven over the durable pause; the emit and the row are the same two
+    observables, now read off the durable world."""
     from app.services.harness.grounding import _approval_sentence
 
     authored, eff = _armed_effective_phase(total_phases=4, index=1)
     expected = _approval_sentence(authored, 4)
     finding = _armed_finding(authored)
 
-    supabase = MagicMock()
-    ctx = _armed_ctx(supabase=supabase, thread_id=uuid4())
-
-    with patch.object(engine_ask, "write_audit", AsyncMock()), \
-         patch("app.utils.db.aexec", AsyncMock()), \
-         patch("app.services.ask_user_service.subscribe_for_response",
-               AsyncMock(return_value={"kind": "response", "response_text": "Do not run it"})):
-        asyncio.run(
-            harness_engine._resolve_failure_with_ask_user(
-                eff, finding, 0, None,
-                run_id=uuid4(), pool=object(), redis=object(), ctx=ctx,
-                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
-            )
-        )
+    _outcome, world, _ctx, _subscribe, _wa = _pause_armed(eff, finding)
 
     # The SSE the frontend renders.
-    emitted = ctx.emit.await_args.kwargs
+    emitted = world.emits("ask_user_prompt")[0]
     assert emitted["prompt"] == expected
     # And the durable row /pending replays.
-    row = supabase.table.return_value.insert.call_args[0][0]
+    row = world.prompt_rows()[0][1]
     assert row["content"] == expected
     assert row["tool_calls"][0]["prompt"] == expected
 
@@ -535,36 +546,16 @@ def test_armed_prompt_and_row_carry_a_null_deadline_never_zero():
     response within 0:00 — agent stopped", so every armed prompt would appear dead the
     instant it appeared — G-4 scenario 3's named failure, shipped by the fix meant to
     prevent it. Plan 185-05 teaches the card to read ``None`` as "no deadline"; sending
-    ``None`` is this plan's half."""
-    import asyncio
-    from unittest.mock import AsyncMock, MagicMock, patch
-    from uuid import uuid4
-
-    from app.services import harness_engine
-    from app.services.harness import engine_ask
-
+    ``None`` is this plan's half. (Phase 295: read off the durable pause's world.)"""
     authored, eff = _armed_effective_phase()
     finding = _armed_finding(authored)
-    supabase = MagicMock()
-    ctx = _armed_ctx(supabase=supabase, thread_id=uuid4())
+    _outcome, world, _ctx, _subscribe, _wa = _pause_armed(eff, finding)
 
-    with patch.object(engine_ask, "write_audit", AsyncMock()), \
-         patch("app.utils.db.aexec", AsyncMock()), \
-         patch("app.services.ask_user_service.subscribe_for_response",
-               AsyncMock(return_value={"kind": "response", "response_text": "Do not run it"})):
-        asyncio.run(
-            harness_engine._resolve_failure_with_ask_user(
-                eff, finding, 0, None,
-                run_id=uuid4(), pool=object(), redis=object(), ctx=ctx,
-                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
-            )
-        )
-
-    emitted = ctx.emit.await_args.kwargs
+    emitted = world.emits("ask_user_prompt")[0]
     assert emitted["timeout_seconds"] is None
     assert emitted["timeout_seconds"] != 0  # explicit: the value that renders EXPIRED
 
-    tool_call = supabase.table.return_value.insert.call_args[0][0]["tool_calls"][0]
+    tool_call = world.prompt_rows()[0][1]["tool_calls"][0]
     assert tool_call["timeout_seconds"] is None
     assert tool_call["options"] == ["Approve this step", "Do not run it"]
 
@@ -575,30 +566,23 @@ def test_shutdown_mid_wait_leaves_an_armed_run_resumable():
     ``choice = ""`` → ``_is_abort_choice("")`` → the run is FAILED by a routine deploy.
     The armed gate now escapes via ``asyncio.CancelledError`` (the shipped 096-09
     precedent), which leaves the phase ``active`` and the durable prompt row alive for
-    the boot-time resume sweep — a deploy no longer destroys a run parked on a person."""
-    import asyncio
-    from unittest.mock import AsyncMock, patch
-    from uuid import uuid4
+    the boot-time resume sweep — a deploy no longer destroys a run parked on a person.
 
+    Phase 295 (D-18 / D-50): STRONGER NOW, BY CONSTRUCTION. Nothing waits in-process, so the
+    shutdown sentinel has nothing to interrupt: the run is ALREADY durably paused with its
+    prompt row written before any deploy can land, and the boot sweep leaves an unanswered
+    engine ask paused (295-03 Task 3). The subscribe mock below would hand back the shutdown
+    sentinel; the drive never reaches it."""
     import pytest
-
-    from app.services import harness_engine
-    from app.services.harness import engine_ask
 
     authored, eff = _armed_effective_phase()
     finding = _armed_finding(authored)
 
-    with patch.object(engine_ask, "write_audit", AsyncMock()), \
-         patch("app.services.ask_user_service.subscribe_for_response",
-               AsyncMock(return_value={"kind": "shutdown"})):
-        with pytest.raises(asyncio.CancelledError):
-            asyncio.run(
-                harness_engine._resolve_failure_with_ask_user(
-                    eff, finding, 0, None,
-                    run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
-                    _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
-                )
-            )
+    outcome, world, _ctx, subscribe, _wa = _pause_armed(eff, finding)
+    if outcome is None or outcome.kind != "pause_run":
+        pytest.fail(f"the armed ask did not leave the run paused: {outcome!r}")
+    if subscribe.await_count or world.count("prompt_row") != 1:
+        pytest.fail("the armed ask waited in-process, or left no durable prompt row to resume")
 
 
 def test_shutdown_on_a_NON_armed_gate_still_fails_the_run():

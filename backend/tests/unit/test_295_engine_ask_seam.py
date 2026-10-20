@@ -81,7 +81,82 @@ STAYS: tuple[str, ...] = (
 _FROM_ENGINE = frozenset({"PhaseOutcome", "_emit"})
 
 # name → the reason it is no longer compared. EMPTY in 295-01 — a pure move changes nothing.
-RETIRED: dict[str, str] = {}
+RETIRED: dict[str, str] = {
+    "_resolve_failure_with_ask_user": (
+        "295-03 Task 1 (D-01 / D-18 / D-37 / D-51): the body changed DELIBERATELY. The engine "
+        "citations gate (grounding.is_engine_citation_gate, not an outage) and a live armed "
+        "approval now return engine_ask.engine_pause(...) — a durable pause — instead of "
+        "blocking in-process on subscribe_for_response. Author ask_user gates and every other "
+        "disposition are unchanged."
+    ),
+}
+
+# 295-03 (D-18): the in-process ARMED observables retired when engine asks stopped waiting
+# in-process. ``RETIRED`` above is keyed by MOVED names (its own invariant), so these live in a
+# sibling dict. Key: ``<suite>::<test as it is named now>``; value: the old observable and the
+# reason. Every entry is checked to still exist below — a retirement that names a test which is
+# gone is a deletion wearing a record.
+_D18 = "D-18: engine asks no longer wait in-process; the answer is consumed on a re-drive"
+RETIRED_ARMED_ASSERTIONS: dict[str, str] = {
+    "test_185_engine_attachment.py::test_armed_gate_pauses_with_no_timeout_at_all": (
+        "was test_armed_gate_subscribes_with_no_timeout_at_all: `subscribe.await_args[3] is "
+        f"None` → the durable prompt row's timeout_seconds is None and nothing subscribed. {_D18}"
+    ),
+    "test_185_engine_attachment.py::test_criterion_19_unanswered_armed_gate_does_not_advance_the_run": (
+        "`outcome.kind == 'fail_run'` after an unanswered in-process wait and "
+        "`write_audit.await_count == 0` → `pause_run` (D-01: an unanswered engine ask never "
+        f"fails the run) and zero APPROVAL receipts (the pause writes policy_applied). {_D18}"
+    ),
+    "test_185_engine_attachment.py::test_armed_prompt_is_the_generated_sentence_character_identically": (
+        "read `ctx.emit.await_args` and a MagicMock insert after a scripted in-process answer → "
+        f"the same emit and row, read off the durable world. {_D18}"
+    ),
+    "test_185_engine_attachment.py::test_armed_prompt_and_row_carry_a_null_deadline_never_zero": (
+        f"same observables as above, read off the durable world. {_D18}"
+    ),
+    "test_185_engine_attachment.py::test_shutdown_mid_wait_leaves_an_armed_run_resumable": (
+        "`pytest.raises(CancelledError)` on a shutdown payload mid-wait → there is no wait to "
+        "interrupt: the run is already paused with its prompt row and nothing subscribed. "
+        f"{_D18}"
+    ),
+    "test_ask_user_disposition.py::test_armed_decline_fails_the_run_and_writes_no_approval": (
+        f"subscribe returned the decline in-process; `write_audit.await_count` → approval "
+        f"receipts only (the pause writes policy_applied). {_D18}"
+    ),
+    "test_ask_user_disposition.py::test_armed_approval_runs_the_body_and_writes_the_receipt": (
+        f"approval handed back in-process → consumed on the re-drive; receipts counted by kind. {_D18}"
+    ),
+    "test_ask_user_disposition.py::test_armed_empty_answer_fails_the_run": (
+        f"empty in-process payload → empty durable answer consumed on the re-drive. {_D18}"
+    ),
+    "test_ask_user_disposition.py::test_armed_decline_by_choice_index_also_fails": (
+        f"choice_index decline in-process → on the re-drive. {_D18}"
+    ),
+    "test_ask_user_disposition.py::test_armed_typed_refusal_is_never_approval": (
+        f"typed refusals in-process → durable answers consumed on the re-drive. {_D18}"
+    ),
+    "test_ask_user_disposition.py::test_armed_approval_by_choice_index_still_proceeds": (
+        f"choice_index approval in-process → on the re-drive. {_D18}"
+    ),
+    "test_ask_user_disposition.py::test_armed_checkpoint_on_a_fail_run_phase_still_asks": (
+        "`subscribe.assert_awaited()` / `await_count == 1` (the rendezvous) → the durable "
+        f"prompt row count is 1 and subscribe is awaited 0 times. {_D18}"
+    ),
+    "test_187_armed_checkpoint_property.py::test_p1_body_implies_the_armed_prompt_was_awaited_first": (
+        "`ask_orders_for` joined subscribe awaits to emits → durable armed prompt rows (author "
+        f"gates still in-process); two drives over one world. {_D18}"
+    ),
+    "test_187_armed_checkpoint_property.py::test_p2_reaching_the_body_implies_exactly_one_armed_prompt": (
+        f"exactly one armed ask across the pause AND its re-drive. {_D18}"
+    ),
+    "test_187_armed_checkpoint_property.py::test_p3_a_typed_refusal_runs_nothing_and_writes_zero_approval_receipts": (
+        f"the typed refusal is a durable answer consumed on the re-drive. {_D18}"
+    ),
+    "test_214_approval_names_service.py::test_MEASURED_the_approval_receipt_ALREADY_copies_the_whole_sentence_into_the_ledger": (
+        "`_drive` approved in-process → `_drive(approve=True)` answers the durable card and "
+        f"re-drives; the receipt is written on the re-drive. {_D18}"
+    ),
+}
 
 
 def _blob_at_base(rel_path: str, sha: str = PHASE_BASE_SHA) -> str:
@@ -333,3 +408,22 @@ def test_every_global_a_body_reads_is_bound(rel):
         f"{rel}: names read as globals but bound nowhere in the module (a dropped import — this "
         f"only fails at CALL time): {unresolved}"
     )
+
+
+# ── 6. 295-03: every retired ARMED observable names a test that still exists ───────────────
+
+
+def test_every_retired_armed_assertion_names_a_living_test():
+    """A retirement is a record, never a deletion: each entry's suite still defines the test
+    it names, and its reason cites D-18."""
+    tests_dir = BACKEND_DIR / "tests" / "unit"
+    assert RETIRED_ARMED_ASSERTIONS, "the 295-03 retirement record is empty"
+    missing = []
+    for key, reason in RETIRED_ARMED_ASSERTIONS.items():
+        suite, name = key.split("::", 1)
+        tree = ast.parse((tests_dir / suite).read_text(encoding="utf-8"))
+        defined = {n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+        if name not in defined:
+            missing.append(key)
+        assert "D-18" in reason, f"{key}: the reason must cite D-18"
+    assert missing == [], f"retired entries name tests that no longer exist: {missing}"
