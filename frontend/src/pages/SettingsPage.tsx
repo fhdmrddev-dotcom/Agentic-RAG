@@ -33,6 +33,7 @@ import {
   SETTINGS_TAB_STORAGE_KEY,
 } from "@/components/settings/settingsTabs"
 import { ModelPillRow } from "@/components/settings/ModelPillRow"
+import { RerankEngineBlock } from "@/components/settings/RerankEngineBlock"
 import { unverifiedDescription } from "@/lib/unverifiedModelCopy"
 import {
   ProviderPicker,
@@ -1347,36 +1348,34 @@ export function SettingsPage() {
                 </div>
               </SectionCard>
 
-              {/* Reranking SectionCard */}
-              <SectionCard title="Reranking" description="Re-score retrieved chunks with a cross-encoder for higher precision.">
+              {/* Reranking SectionCard — Phase 294-04 (DEC-01, sketch 294 B). The Enabled switch
+                  stays here (D-01: the single on/off); the body is ONE RerankEngineBlock mount fed
+                  by state this page already owns. "Keep at most" is retrievalTopK (OQ1, the same
+                  state as the Retrieval card's Top-K), the pool is rerankTopN. The key booleans
+                  come from the hydrated settings; no key value ever reaches the browser. */}
+              <SectionCard title="Reranking" description="Re-score search candidates so the model gets fewer, more relevant passages.">
                 <FieldRow label="Enabled">
                   <Toggle checked={rerankEnabled} onChange={setRerankEnabled} label={rerankEnabled ? "On" : "Off"} />
                 </FieldRow>
-                {rerankEnabled && (
-                  <>
-                    <FieldRow label="Provider">
-                      <select
-                        value={rerankProvider}
-                        onChange={(e) => setRerankProvider(e.target.value)}
-                        className="h-8 w-full text-sm rounded-md bg-muted/30 ghost-border px-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      >
-                        <option value="api">API (Cohere)</option>
-                        <option value="local">Local (sentence-transformers)</option>
-                      </select>
-                    </FieldRow>
-                    <FieldRow label="Model">
-                      <TextInput value={rerankModel} onChange={setRerankModel} placeholder="rerank-v3.5" />
-                    </FieldRow>
-                    <FieldRow label="Top-N results">
-                      <NumberInput value={rerankTopN} onChange={setRerankTopN} min={1} max={50} />
-                    </FieldRow>
-                    {rerankProvider === "api" && (
-                      <FieldRow label="API Key">
-                        <ApiKeyInput value={rerankApiKey} onChange={setRerankApiKey} />
-                      </FieldRow>
-                    )}
-                  </>
-                )}
+                <RerankEngineBlock
+                  enabled={rerankEnabled}
+                  provider={rerankProvider}
+                  onProviderChange={setRerankProvider}
+                  model={rerankModel}
+                  onModelChange={setRerankModel}
+                  poolSize={rerankTopN}
+                  onPoolSizeChange={setRerankTopN}
+                  keepAtMost={retrievalTopK}
+                  onKeepAtMostChange={setRetrievalTopK}
+                  hybridEnabled={hybridEnabled}
+                  hasKey={{
+                    openrouter: s?.providers.find((p) => p.id === "openrouter")?.has_key === true,
+                    openai: s?.providers.find((p) => p.id === "openai")?.has_key === true,
+                    cohere: rerankApiKey !== "",
+                  }}
+                  cohereKeySlot={<ApiKeyInput value={rerankApiKey} onChange={setRerankApiKey} />}
+                  saved={savedSearch}
+                />
               </SectionCard>
 
               {/* Images SectionCard — SEED-227. The description carries the CONSEQUENCE,

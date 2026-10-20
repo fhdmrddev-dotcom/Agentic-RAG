@@ -11432,7 +11432,7 @@ cells rot within days.
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
-| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 53 / 27 / 1658 (was `47 / 24 / 1773`) | ⚠ **FIRES** | ⚠ STALE a FOURTH close. **283**: tab-registration seam TAKEN (283-01, `settingsTabs.ts`); Audit Log + Preferences extracted. Per-tab state / hydrate / save split OWED (D-15) |
+| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 57 / 28 / 1662 (was `53 / 27 / 1658`) | ⚠ **FIRES** | honoured by construction (**294-04**): Reranking body → ONE `RerankEngineBlock` mount, 0 new state, hydrate/save untouched. ⛔ per-tab state / hydrate / save split still OWED (D-15) |
 | [`frontend/src/pages/settingsSearchPayload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingssearchpayloadts) | 2 / 2 / 116 | no (2 phases) | Created by 242. Row added AT CREATION rather than at the third phase — an absent row makes G-5 absent forever, silently, at any count |
 | [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
 | [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
@@ -21451,6 +21451,16 @@ Scan-list disposition cell before 283-02 (replaced):
 CLAUDE.md verdict cell as of 2026-10-15 (replaced by 283-02):
 
 > ⚠ row STALE · honoured by construction (mig 180) · tab seam still OWED
+
+### `frontend/src/pages/SettingsPage.tsx` — Phase 294 (294-04), honoured by construction
+
+**`57 / 28 / 1662` (was `53 / 27 / 1658` in the scan list).** Stale for a FIFTH close running: the planning measurement was already `56 / 27 / 1663`. **294-04** replaced the Reranking card's `{rerankEnabled && (<>…</>)}` body (Provider select · Model · Top-N · API Key) with ONE `<RerankEngineBlock …/>` mount (sketch 294 B), kept the `SectionCard` and the Enabled `FieldRow` (D-01: one on/off), and reworded the card description. The mount is fed only by state the page already owns: `rerankProvider` / `rerankModel` / `rerankTopN` (the candidate pool) / `retrievalTopK` ("Keep at most", OQ1: the same state as the Retrieval card's Top-K, so they cannot drift) / `hybridEnabled` / `savedSearch`, plus key booleans computed inline from the hydrated `s.providers[*].has_key` (OpenRouter, OpenAI) and `rerankApiKey !== ""` (Cohere). The page's own `ApiKeyInput` rides in through `cohereKeySlot`. `+26 / −27`.
+
+⛔ **Binding invariants:** zero new `useState` / `useEffect`; `hydrate`, `searchPayloadFrom` and the save payload are byte-unchanged, and the block never calls a setter on render, so a stored legacy `"api"` stays `"api"` and `SettingsPage.changedFields` stays green (no hydrate diff); `ProviderPicker.tsx`, `config.py` and `user_settings.py` untouched. The per-tab state / hydrate / save split is still **OWED** (283 D-15) and remains the seam the next phase on this file should take first.
+
+Scan-list disposition cell before 294-04 (replaced):
+
+> ⚠ STALE a FOURTH close. **283**: tab-registration seam TAKEN (283-01, `settingsTabs.ts`); Audit Log + Preferences extracted. Per-tab state / hydrate / save split OWED (D-15)
 
 ### `frontend/src/lib/nav-items.ts` — Phase 283 close
 
