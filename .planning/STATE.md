@@ -73,7 +73,7 @@ Live at `4e767a3a2` (2026-10-16): phases 280-285, migrations 207-209 in cloud. B
 - Open bugs not named in v4.6 requirements: see `.planning/reported-bugs/` (`status: open`).
 - 295 decisions, answered by the operator 2026-10-20 ("proceed with what you recommend"):
   1. No author lock on detected KB steps in 295; sketch 142 stands. "Locked" = the stored `grounding_escalated` bit (D-36). Held in `SEED-366`.
-  2. Yes, delete the 15 leaked `test_214` fixture rows locally. ⚠ **The auto-mode classifier blocked Claude from running the delete.** The operator runs it from `backend/`: `venv/Scripts/python.exe -I <scratchpad>/del_fixtures.py`. It is guarded: it aborts unless exactly 15 rows match. Until then, plan 02's base measure includes them; record which state it saw.
+  2. Yes, delete the 15 leaked `test_214` fixture rows locally. **DONE 2026-10-20 by the operator** (the auto-mode classifier blocked Claude from running it): `runs: DELETE 15`, `threads: DELETE 15`. Failed runs without `run_failed` now **5** (the June producer escapes, D-43). Plan 02's base measure runs after this delete. Research's 285-run SC#5 denominator included these 15 rows and is superseded by plan 02's re-measure.
 
 ## Guardrail overrides
 
