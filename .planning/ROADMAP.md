@@ -320,7 +320,7 @@ Plans:
 | 291. Describe It From Your Own Files | 0/TBD | Not started | - |
 | 292. More Ways to Show It | 0/TBD | Not started | - |
 | 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
-| 294. Decision Engine: Rerank and Citation Check | 5/5 | Executed (human_needed) | - |
+| 294. Decision Engine: Rerank and Citation Check | 5/5 | human_needed (2026-10-20) | 6/6 SC met in code; live: Jev rerank + citation check end to end; owed: G-4 sign-off, planted C1/S1, fault phase, LangSmith + OpenAI gpt-6-luna 403s, roster (294-HUMAN-UAT.md) |
 
 ---
 
