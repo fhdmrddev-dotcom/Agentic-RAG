@@ -42,7 +42,7 @@ result: passed (2026-10-20). C7 OpenAI half: `citation-order-probe.py --message-
 
 ### 8. Cross-provider roster and UAT axes (R1-R8, A1-A3)
 expected: One reranked `search_documents` call per provider (OpenAI gpt-5.6-terra, Anthropic claude-sonnet-5, Google gemini-3.5-flash, DeepSeek deepseek-v4-pro, Zhipu glm-5.2, MiniMax MiniMax-M3, Moonshot kimi-k2.6, OpenRouter deepseek/deepseek-v4-pro), plus the multi-tool, parallel-thread and long-message rows. Anthropic is likely still blocked by billing.
-result: [partial 2026-10-20 — 6 of 8 roster rows pass, R2 blocked, R5 passes on glm-5.2 only; A1 and A2 pass; A3 pending]. Same question on every row, Jev reranking on: "Search my documents: what did Northwind's CC6.1 deprovisioning test find? Cite the passages." Read from `messages` (markers / bracketed filenames) and LangSmith `rerank-documents` spans.
+result: passed with recorded blocks (2026-10-20) — 7 of 8 roster rows pass (R5 on glm-5.2), R2 ⛔ Anthropic billing, R5 on glm-5.3 ⛔ BUG-261020-06; A1, A2 and A3 pass. Same question on every row, Jev reranking on: "Search my documents: what did Northwind's CC6.1 deprovisioning test find? Cite the passages." Read from `messages` (markers / bracketed filenames) and LangSmith `rerank-documents` spans.
 - R1 OpenAI gpt-5.6-terra: ✅ 4 markers, 3 sources, 0 filenames (3756691f).
 - R2 Anthropic claude-sonnet-5-5: ⛔ blocked: "Billing error: your account has insufficient credits" (9eb6db2b). Not a 294 defect.
 - R3 Google gemini-3.5-flash: ✅ 11 markers, 3 sources (1a1d2fc8).
@@ -54,7 +54,7 @@ result: [partial 2026-10-20 — 6 of 8 roster rows pass, R2 blocked, R5 passes o
 - Every answer with sources carried `[n]` markers and none wrote a bracketed filename (7 of 7), the first cross-provider evidence for the BUG-261020-05 fix.
 - A1 multi-tool (DeepSeek flash): ✅ one prompt ran `search_documents` and code execution ("Computing CC6.1 exception rate from sample counts"); answer cites [n].
 - A2 parallel-thread: ✅ thread A (summarise every control) streaming while thread B (management response) was sent; the sidebar read "2 running"; both finished with markers.
-- A3 long-message (≥ 5 KB prompt): pending. Typing a 5.6 KB prompt one key at a time through the browser driver froze the tab (CDP `Input.dispatchKeyEvent` timed out); a driver limit, not yet an app finding.
+- A3 long-message: ✅ a 5,603-byte prompt (ten background notes plus the CC6.1 question) answered correctly with [n] markers and 3 sources (thread "Logistics clients SOC 2 access testing"). Typing it one key at a time through the browser driver froze the tab for about two minutes before it caught up; that is the driver, and the composer accepted the full text.
 
 ### 9. Remaining halves (C3 second profile, C5 Local and Off arms)
 expected: A second browser profile shows the saved verdicts with no POST; with Local or Off selected the ⓘ line reads the matching sentence.
@@ -63,9 +63,9 @@ result: [partial 2026-10-20 — C5 passed; C3 second profile pending]. C5: with 
 ## Summary
 
 total: 9
-passed: 5
+passed: 6
 issues: 0
-pending: 4
+pending: 3
 skipped: 0
 blocked: 0
 
