@@ -22056,6 +22056,8 @@ CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 317
 
 **294-REVIEW CR-01 (`6598` lines).** Three pins RAISED 10 → 11 (`citationVerdicts.parity`, `citationCheckStore`, `CitationCheckAction`), one new case each; no suite adopted, none lowered.
 
+**294-REVIEW CR-02 (`6600` lines).** `citationOrdinals.parity.test.tsx` RAISED 49 → 70: 3 cases per fixture case, 7 fixture cases added.
+
 ## Phase 285 close (2026-10-16, 285-03)
 
 All triples below were re-derived on the merged tree at `cca4e5a90` (285-01..03 code merged) with the CLAUDE.md recipe; six-digit quick-task buckets are subtracted and named per file. The set is every non-test source file the phase changed since PHASE_BASE `c8c764e90` (`git diff --name-only c8c764e90 HEAD -- backend/app frontend/src`, tests excluded): **7 files**. Migration 209, `scripts/apply_migration_209.py` and `supabase/full-schema.sql` are gate-exempt. Each subsection quotes the scan-list cell it replaced and, where the file had one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. **Newly FIRING or absent from CLAUDE.md, row ADDED:** `watch_service.py` (6), `db/watches.py` (4), `RunHistoryList.tsx` (3). `ingest_splice.py` and `db/ingestion_jobs.py` were NOT touched (D-12).
@@ -22774,6 +22776,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 **`1 / 1 / 279` (was `0 / 0 / 0`).** Created at 279 lines. 294-05 made the frontend half of the ordinal pin stricter: `citationOrdinals.parity.test.tsx` now also asserts `(data-citation-ordinal, n)` equals the backend's `(ordinal, n)` for all 16 fixture cases.
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). PURE claim extraction + marker ordinals + dedup_paragraphs port. ⛔ ordinals pinned to CitedMarkdown by a shared fixture
+
+**294-REVIEW CR-02 (`501` lines, was `279`).** `_block_regions` (indented code, unclosed fences, link reference definitions, list-relative indent) and `_reference_links` (marked's reflink / nolink order) blank what marked renders as code or a link. Measured against real marked 17 on 54 probe inputs, 0 diffs; 7 of them added to the shared fixture (5 RED at base). Still pure: imports only `re` and `citation_markers`. ⛔ A new markdown construct is a fixture case FIRST, measured against marked, never assumed.
 
 ## `backend/app/services/citation_check_service.py`
 

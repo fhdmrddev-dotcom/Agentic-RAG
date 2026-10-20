@@ -57,6 +57,15 @@ def test_fixture_covers_the_required_case_kinds():
         "table_rows",
         "list_items",
         "heading_with_marker",
+        # 294-REVIEW CR-02: what marked renders as code or a link that a regex over the raw text
+        # did not see — the review's exact link-reference example, indented and unclosed code.
+        "link_reference_definition",
+        "indented_code_marker_skipped",
+        "unclosed_fence_marker_skipped",
+        "reference_links_full_and_failed",
+        "definition_without_blank_line_is_text",
+        "indented_line_in_list_is_text",
+        "indented_code_in_list_item",
     ):
         assert needed in ids, needed
 

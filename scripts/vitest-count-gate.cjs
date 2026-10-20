@@ -174,7 +174,9 @@ const BASELINE = {
   // fixture case (16 cases in citation_ordinals_v1.json). Measured green on a run of the suite alone.
   // Phase 294-05 Task 2 raised it 33 -> 49: + 1 case per fixture case (16), the
   // (data-citation-ordinal, n) pairs assertion plan 05 decorates by. Measured on the suite alone.
-  "citationOrdinals.parity.test.tsx": 49,
+  // 294-REVIEW CR-02 raised it 49 -> 70: + 3 cases per fixture case for the 7 cases it added
+  // (link reference definitions, indented / unclosed code, two look-alikes that stay text).
+  "citationOrdinals.parity.test.tsx": 70,
   // Phase 294-05 (DEC-03) — the citation-check client, vocabulary, store, action, marker and peek
   // suites, measured green on a run of these suites alone (2026-10-20).
   "citationChecks.contract.test.ts": 8,

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "_doc": "Phase 294-03 (DEC-03, Pitfall 7). For each case: render CitedMarkdown with content = dedupParagraphs(content) and n_sources citations; the n of every upgraded marker, in DOM order, equals `expected`. citation_claims.extract_claims must give the same n list in ordinal order. `expected_sentences` (backend only) is the claim text per ordinal. Read by backend/tests/unit/test_294_citation_claims.py and frontend/src/components/chat/__tests__/citationOrdinals.parity.test.tsx. `deduped` (when present; else content unchanged) is dedupParagraphs(content), asserted from both stacks.",
+  "_doc": "Phase 294-03 (DEC-03, Pitfall 7). For each case: render CitedMarkdown with content = dedupParagraphs(content) and n_sources citations; the n of every upgraded marker, in DOM order, equals `expected`. citation_claims.extract_claims must give the same n list in ordinal order. `expected_sentences` (backend only) is the claim text per ordinal. Read by backend/tests/unit/test_294_citation_claims.py and frontend/src/components/chat/__tests__/citationOrdinals.parity.test.tsx. `deduped` (when present; else content unchanged) is dedupParagraphs(content), asserted from both stacks. 294-REVIEW CR-02 added the block constructs marked renders as code or drops: a link reference definition (and every [n] it turns into a link), an indented code block (inside a list only past the item's content column), an unclosed fence; plus two look-alikes that stay text. Their `expected` lists were measured against the real marked 17 before the backend fix, which they turned RED.",
   "cases": [
     {
       "id": "plain_sentences",
@@ -202,6 +202,95 @@
       ],
       "expected_sentences": [
         "Revenue rose to five million dollars in 2024"
+      ]
+    },
+    {
+      "id": "link_reference_definition",
+      "content": "Revenue grew to 40 million in 2025 [1]. Margins improved to 12 percent [2]. Headcount was cut by half [2].\n\n[1]: annual-report.pdf\n",
+      "n_sources": 2,
+      "expected": [
+        2,
+        2
+      ],
+      "expected_sentences": [
+        "Margins improved to 12 percent",
+        "Headcount was cut by half"
+      ]
+    },
+    {
+      "id": "indented_code_marker_skipped",
+      "content": "Example:\n\n    rows[1] = 5\n    print(rows[2])\n\nThe loader caches results per session [1].",
+      "n_sources": 2,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "The loader caches results per session"
+      ]
+    },
+    {
+      "id": "unclosed_fence_marker_skipped",
+      "content": "The loader caches results per session [1].\n\n```python\nrows[2] = 5\nprint(rows[1])",
+      "n_sources": 2,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "The loader caches results per session"
+      ]
+    },
+    {
+      "id": "reference_links_full_and_failed",
+      "content": "Revenue grew to 40 million in 2025 [2][1]. Margins improved to 12 percent [2]. Headcount was cut by half [1][2].\n\n[1]: annual-report.pdf \"Annual report\"",
+      "n_sources": 2,
+      "expected": [
+        2,
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Margins improved to 12 percent",
+        "Headcount was cut by half",
+        "Headcount was cut by half"
+      ]
+    },
+    {
+      "id": "definition_without_blank_line_is_text",
+      "content": "Revenue grew to 40 million in 2025 [1]. Margins improved to 12 percent [2].\n[1]: annual-report.pdf",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2,
+        1
+      ],
+      "expected_sentences": [
+        "Revenue grew to 40 million in 2025",
+        "Margins improved to 12 percent",
+        "Margins improved to 12 percent ."
+      ]
+    },
+    {
+      "id": "indented_line_in_list_is_text",
+      "content": "- Headcount grew to 240 people [1]\n\n    The Berlin office opened in March [2]",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Headcount grew to 240 people",
+        "The Berlin office opened in March"
+      ]
+    },
+    {
+      "id": "indented_code_in_list_item",
+      "content": "- Headcount grew to 240 people [1]\n\n      rows[2] = 5",
+      "n_sources": 2,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "Headcount grew to 240 people"
       ]
     }
   ]

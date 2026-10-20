@@ -12,7 +12,13 @@ What the chat renders, and so what this module mirrors:
     including JS ``trim`` / ``\\s`` whitespace and UTF-16 ``length``;
   * markers inside code (fenced blocks, inline spans) are never upgraded — the SAME ``_CODE_RE``
     the backend's marker normaliser uses, imported, never re-typed;
-  * markers inside markdown link text (rendered inside ``<a>``) are never upgraded.
+  * markers inside markdown link text (rendered inside ``<a>``) are never upgraded;
+  * 294-REVIEW CR-02 — block constructs a regex over the raw text missed, MEASURED against marked:
+    an indented (4-column) code block and an unclosed fence render as code; a link reference
+    definition (``[1]: annual-report.pdf``) is dropped, and every ``[1]`` naming it becomes a
+    link. ``_block_regions`` / ``_reference_links`` blank those. Before the fix the review's
+    example gave backend ordinals ``n = 1, 2, 2, 1`` against the chat's ``2, 2``, so the
+    Headcount marker showed the Margins sentence's verdict (same ``n``, wrong sentence).
 
 Units (what a claim's sentence is cut from): each list item line, each table row and each
 heading line is one unit; a plain paragraph is split on ``(?<=[.!?])\\s+(?=[A-Z0-9"(\\[])``, and a
@@ -56,6 +62,28 @@ _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"(\[])")
 _LEADING_CLUSTER = re.compile(r"(?:\[\d+\])+")
 #: A markdown link or image: ``[text](dest "title")``; text may hold one level of brackets.
 _LINK = re.compile(r"!?\[((?:[^\[\]\n]|\[[^\[\]\n]*\])*)\]\([^\s)]*(?:\s+\"[^\"]*\")?\)")
+
+# ── block constructs marked renders as code or drops (294-REVIEW CR-02) ──────────────────────────
+# Mirrors marked 17 (gfm, breaks), MEASURED against it, not CommonMark from memory: the drive set
+# is in fixtures/citation_ordinals_v1.json (rendered through the real CitedMarkdown by
+# citationOrdinals.parity.test.tsx).
+#: A fence opener after at most 3 columns of (relative) indent. A backtick fence's info string
+#: may not contain a backtick (then the line is a paragraph).
+_FENCE_OPEN = re.compile(r"(`{3,}|~{3,})(.*)")
+#: A link reference definition (marked's ``def`` rule): ``[label]: dest "title"``. The label has
+#: a non-space character and no unescaped bracket; only spaces may follow the colon (a tab makes
+#: it a paragraph); a destination with trailing text that is not a quoted title is no definition.
+_DEF_LABEL = r"\[(?P<label>(?!\s*\])(?:\\.|[^\[\]\\\n])+)\]:"
+_DEF_DEST = r"(?P<dest><[^<>\n]*>|[^<\s]\S*)"
+_DEF_TITLE = r"(?P<title>\"(?:\\\"?|[^\"\\\n])*\"|'[^'\n]*'|\([^()\n]*\))"
+_REF_DEF = re.compile(_DEF_LABEL + r" *" + _DEF_DEST + r"(?: +" + _DEF_TITLE + r")? *$")
+#: ``[label]:`` alone; the destination may then sit on the next line.
+_REF_DEF_OPEN = re.compile(_DEF_LABEL + r" *$")
+_REF_DEF_DEST_LINE = re.compile(r"[ \t]*" + _DEF_DEST + r"(?: +" + _DEF_TITLE + r")? *$")
+_REF_DEF_TITLE_LINE = re.compile(r"[ \t]*" + _DEF_TITLE + r" *$")
+_QUOTE_PREFIX = re.compile(r"(?: {0,3}> ?)+")
+#: One bracket group (one level of nesting), the unit marked's reflink / nolink rules work on.
+_BRACKET = re.compile(r"!?\[((?:[^\[\]\n\\]|\\.|\[[^\[\]\n]*\])*)\]")
 
 # ── cleaning ────────────────────────────────────────────────────────────────────────────────────
 _STRONG = re.compile(r"\*\*|__|~~")
@@ -196,6 +224,195 @@ def _split_paragraph(layout: str, start: int, end: int) -> list[tuple[int, int]]
     return out
 
 
+def _indent(line: str) -> tuple[int, int]:
+    """``(columns, chars)`` of leading whitespace; a tab advances to the next multiple of 4."""
+    col = 0
+    for i, ch in enumerate(line):
+        if ch == " ":
+            col += 1
+        elif ch == "\t":
+            col += 4 - col % 4
+        else:
+            return col, i
+    return col, len(line)
+
+
+def _norm_label(label: str) -> str:
+    """marked's label key: whitespace runs collapsed to one space, lowercased (no trim)."""
+    return re.sub(r"\s+", " ", label).lower()
+
+
+def _block_regions(text: str) -> tuple[list[tuple[int, int]], set[str]]:
+    """Spans marked renders as ``<pre><code>`` or drops, and the link-reference labels it defines.
+
+    294-REVIEW CR-02: ``_CODE_RE`` (shared with the marker normaliser) sees only CLOSED fences
+    and inline spans. marked also renders an indented (4-column) code block and an UNCLOSED fence
+    as code, and drops a link reference definition (``[1]: annual-report.pdf``) while turning
+    every ``[1]`` that names it into a link. None of those markers is upgraded in the chat, so
+    none may get an ordinal here.
+
+    Line-based, like marked's block lexer: a fence may interrupt a paragraph; an indented code
+    block and a definition may not (they need a blank line, the start, or a heading / fence /
+    definition before them). Inside a list item, indent counts from the item's content column,
+    so a 4-space line under ``- item`` is a paragraph and a 6-space one is code. A blockquote
+    prefix is stripped before classifying.
+    """
+    lines = text.split("\n")
+    starts: list[int] = []
+    pos = 0
+    for line in lines:
+        starts.append(pos)
+        pos += len(line) + 1
+
+    regions: list[tuple[int, int]] = []
+    labels: set[str] = set()
+    list_col: int | None = None   # content column of the open list item, None outside a list
+    prev = "blank"                # blank | para | list | heading | table | fence | code | def
+
+    def content_of(j: int) -> tuple[str, int]:
+        line = lines[j]
+        q = _QUOTE_PREFIX.match(line)
+        return (line[q.end():], q.end()) if q else (line, 0)
+
+    def rel_indent(j: int) -> tuple[int | None, str]:
+        """(columns past the list content column, rest of the line) or (None, rest) when the
+        line is outside the open list."""
+        body, _ = content_of(j)
+        col, n = _indent(body)
+        base = list_col or 0
+        if list_col is not None and col < list_col:
+            return None, body[n:]
+        return col - base, body[n:]
+
+    def try_def(j: int, rest: str) -> int | None:
+        """Last line index of a definition starting at line ``j`` (``rest`` = its text), or None."""
+        m = _REF_DEF.match(rest)
+        end = j
+        if m is None:
+            if not _REF_DEF_OPEN.match(rest) or j + 1 >= len(lines):
+                return None
+            m2 = _REF_DEF_DEST_LINE.match(content_of(j + 1)[0])
+            if m2 is None:
+                return None
+            label = _REF_DEF_OPEN.match(rest).group("label")
+            end, has_title = j + 1, m2.group("title") is not None
+        else:
+            label, has_title = m.group("label"), m.group("title") is not None
+        if not has_title and end + 1 < len(lines) and _REF_DEF_TITLE_LINE.match(content_of(end + 1)[0]):
+            end += 1
+        labels.add(_norm_label(label))
+        return end
+
+    i = 0
+    while i < len(lines):
+        body, _ = content_of(i)
+        if not body.strip():
+            prev = "blank"
+            i += 1
+            continue
+        col, n = _indent(body)
+        rest = body[n:]
+        if list_col is not None and col < list_col and prev == "blank" and not _LIST_ITEM.match(body):
+            list_col = None           # a blank line, then a line left of the item: the list ended
+        rel = col - (list_col or 0) if (list_col is None or col >= list_col) else 0
+
+        # indented code: 4+ columns past the content column, never interrupting a paragraph
+        if rel >= 4 and prev in ("blank", "heading", "fence", "def", "code"):
+            j, last = i, i
+            while j < len(lines):
+                b, _ = content_of(j)
+                if not b.strip():
+                    j += 1
+                    continue
+                r, _rest = rel_indent(j)
+                if r is None or r < 4:
+                    break
+                last = j
+                j += 1
+            regions.append((starts[i], starts[last] + len(lines[last])))
+            prev, i = "code", last + 1
+            continue
+
+        fence = _FENCE_OPEN.match(rest) if rel <= 3 else None
+        if fence and not (fence.group(1)[0] == "`" and "`" in fence.group(2)):
+            ch, width = fence.group(1)[0], len(fence.group(1))
+            close = re.compile(r"[ \t]{0,3}" + re.escape(ch) + "{" + str(width) + r",}[ \t]*$")
+            j = i + 1
+            while j < len(lines):
+                r, rest_j = rel_indent(j)
+                if r is not None and r <= 3 and close.match(rest_j):
+                    break
+                j += 1
+            last = min(j, len(lines) - 1)   # unclosed: the fence runs to the end, as in marked
+            regions.append((starts[i], starts[last] + len(lines[last])))
+            prev, i = "fence", last + 1
+            continue
+
+        item = _LIST_ITEM.match(body)
+        if item and rel <= 3:
+            list_col = item.end()
+            end = try_def(i, body[item.end():]) if body[item.end():].strip() else None
+            if end is not None:   # "- [1]: a.pdf" — marked takes it as a definition, the item empty
+                regions.append((starts[i] + item.end(), starts[end] + len(lines[end])))
+                prev, i = "def", end + 1
+                continue
+            prev, i = "list", i + 1
+            continue
+
+        if rel <= 3 and prev in ("blank", "heading", "fence", "def", "code"):
+            end = try_def(i, rest)
+            if end is not None:
+                regions.append((starts[i], starts[end] + len(lines[end])))
+                prev, i = "def", end + 1
+                continue
+
+        if _HEADING.match(body):
+            prev = "heading"
+        elif _TABLE_ROW.match(body):
+            prev = "table"
+        else:
+            prev = "para"
+        i += 1
+    return regions, labels
+
+
+def _reference_links(masked: str, labels: set[str], inline: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Spans marked renders as reference links (``<a>``), given the defined ``labels``.
+
+    marked, left to right: ``[text][ref]`` (no space between) is a full reference — a link when
+    ``ref`` is defined; when it is not, the ``[`` is literal and scanning resumes one character
+    on, so ``[text]`` is NOT then tried as a shortcut. Otherwise ``[ref]`` / ``[ref][]`` is a
+    shortcut link when ``ref`` is defined. An inline link ``[text](url)`` wins over both.
+    """
+    if not labels:
+        return []
+    out: list[tuple[int, int]] = []
+    pos = 0
+    while True:
+        m = _BRACKET.search(masked, pos)
+        if m is None:
+            return out
+        inside = next((b for a, b in inline if a <= m.start() < b), None)
+        if inside is not None:
+            pos = inside
+            continue
+        nxt = _BRACKET.match(masked, m.end())
+        if nxt is not None and nxt.group(1).strip():
+            if _norm_label(nxt.group(1)) in labels:
+                out.append((m.start(), nxt.end()))
+                pos = nxt.end()
+            else:
+                pos = m.start() + 1
+            continue
+        text = m.group(1)
+        end = nxt.end() if nxt is not None and nxt.group(1) == "" else m.end()
+        if text.strip() and "[" not in text and "]" not in text and _norm_label(text) in labels:
+            out.append((m.start(), end))
+            pos = end
+        else:
+            pos = m.start() + 1
+
+
 def _passage(ref: object) -> str | None:
     if not isinstance(ref, dict):
         return None
@@ -213,8 +430,12 @@ def extract_claims(content: str, source_refs: list) -> list[Claim]:
         return []
 
     masked = list(text)  # every code region blanked: markers inside code vanish
-    layout = list(text)  # only fenced blocks blanked: units never span code blocks
-    for m in _CODE_RE.finditer(text):
+    layout = list(text)  # only block code (and definitions) blanked: units never span code blocks
+    blocks, labels = _block_regions(text)   # CR-02: indented / unclosed code, link definitions
+    for a, b in blocks:
+        _blank(masked, a, b)
+        _blank(layout, a, b)
+    for m in _CODE_RE.finditer("".join(masked)):
         _blank(masked, m.start(), m.end())
         if m.group(0).startswith(("```", "~~~")):
             _blank(layout, m.start(), m.end())
@@ -222,6 +443,7 @@ def extract_claims(content: str, source_refs: list) -> list[Claim]:
     layout_s = "".join(layout)
 
     links = [(m.start(), m.end()) for m in _LINK.finditer(masked_s)]
+    links += _reference_links(masked_s, labels, links)
 
     def in_link(i: int) -> bool:
         return any(a <= i < b for a, b in links)
