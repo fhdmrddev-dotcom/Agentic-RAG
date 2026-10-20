@@ -325,7 +325,29 @@ Plans:
   5. Re-measured with the 2026-10-20 queries over the phase's UAT runs, the share of runs ending in a `citations_required` failure falls, and the before/after is recorded in VERIFICATION, measured rather than asserted (RUN-01).
 
 **How we'd know this failed**: "continue without sources" becomes a silent pass, so an unsourced output looks sourced anywhere; a locked must-prove-it workflow can skip its evidence; the pause has no timeout or loses the person's choice (the BUG-261020-01 family); the template check fires only at publish while drafts still fail at run time; the judge is loosened for every workflow instead of told what a recorded-not-sent step produces; stuck runs are hidden in the UI instead of finalised; the failure share is quoted without the query that produced it.
-**Plans**: TBD (target 3-5)
+**Plans**: 7 plans in 4 waves (CONTEXT D-34 suggested 5; plan 01 is the pure-move seam D-51 requires on its own, and the frontend is split so the 1,052-line PendingAskCard does not share a worktree with the 33-file read change)
+
+Plans:
+
+**Wave 1**
+
+- [ ] 295-01-PLAN.md — take the G-5 seam: move the engine-ask disposition verbatim into `harness/engine_ask.py`, re-exported, proven pure (D-51) — wave 1
+- [ ] 295-02-PLAN.md — base captures (SC#5 baseline, DMT before); `no_template_bound` refused at publish and run start, named at save; the judge told what a recorded-not-sent step produces (RUN-02, RUN-03) — wave 1
+- [ ] 295-05-PLAN.md — the read side: `unsourced` and `end_reason` on every run read, the deadline-true window, the mark in four places, the end-reason line (RUN-01, RUN-04) — wave 1
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 295-03-PLAN.md — engine asks pause durably with server-built choices, the bounded folder re-run, the locked refusal, consume on re-drive, the sweep never re-asks (RUN-01, RUN-04) — wave 2
+- [ ] 295-06-PLAN.md — the pause card: one helper, one folder leaf, no false clock, Stop recorded as a stop — wave 2
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 295-04-PLAN.md — truthful ends: the answer reaches the next step, one failure one message, cancel reads cancelled, resume/golden/F2/reconciler finalise with reasons (RUN-04, BUG-261020-01, BUG-261015-01) — wave 3
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 295-07-PLAN.md — live proof S1-S7, SC#3 and SC#5 measured with their queries, the D-47 re-drive, the four-axis roster, the ledger and every gate once — wave 4
+
 **UI hint**: yes
 **Flags**: **Evidence**: `BUG-261020-07`..`12` (folded here) and memory `project_workflow_blocking_measured_20261020`. **Route at discuss**: `BUG-261020-01` (a human step's answer never reaches the next step) belongs to the same "doesn't run as intended" family and is the first candidate to fold. **Not in scope**: branching or loops (`SEED-295` stays parked; the 2026-10-20 measure found no failure caused by a route the engine cannot express). `ValidatorSpec.on_failure` already accepts `ask_user` (D-11), so RUN-01 may be mostly a default and a worded pause; verify before adding engine code. **G-2 sketch** for the found-nothing pause. **G-4**. Hot files: `harness_engine.py`, `phase_types.py`, `validator_kinds.py`, `publish_service.py`, `run_reconciler.py`, `PendingAskCard.tsx`; read their ledger sections.
 
