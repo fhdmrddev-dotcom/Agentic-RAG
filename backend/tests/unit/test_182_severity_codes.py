@@ -225,10 +225,16 @@ def test_every_known_code_classifies_exactly_as_the_pinned_table():
         # ... and an empty draft does not soften them either: with no phases there is no step
         # to accuse, so the code cannot be emitted — but the classifier must still be total.
         ("no_source", True, "error"),
+        # Phase 295 (D-45, overriding UI-SPEC decided item 8) — a fill step with no template
+        # is a DESIGNED shape: the Run modal uploads one at launch. So /validate says "still
+        # building" and does not reject the save; publish and run start still refuse it.
+        # Lint-minted, like input_unsatisfied, so it is NOT a route-assigned code.
+        ("no_template_bound", False, "incomplete"),
     ]
-    assert len(table) == 19, (
+    assert len(table) == 20, (
         "11 codes + the second no_terminal and unbound_retrieval conditions, + Phase 214's "
-        "five argument-gap codes and the second no_source condition"
+        "five argument-gap codes and the second no_source condition, + Phase 295's "
+        "no_template_bound"
     )
 
     for code, phases_empty, expected in table:
