@@ -4,9 +4,9 @@ title: A validated emit failure writes N+1 chat messages that disagree on the at
 reported: 2026-10-15
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [backend/harness, chat]
-folded_into: null
+folded_into: "295"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "The next phase whose files_modified names backend/app/services/harness/phase_types.py or backend/app/services/harness_engine.py, OR any report of a workflow run's chat thread showing the same failure more than once."

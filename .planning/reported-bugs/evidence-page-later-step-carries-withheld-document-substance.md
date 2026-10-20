@@ -9,7 +9,7 @@ affected_areas: [backend/run-evidence, privacy]
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-364]
-re_open_trigger: null
+re_open_trigger: "A phase that touches the run-evidence read (backend/app/api/workflow_runs.py evidence assembly) or ratifies sharing derived content of owner-private documents. Reviewed at 295 discuss (2026-10-20) and left: privacy/evidence-page, not run dead-ends."
 reproduces_on:
   branch: develop
   commit: 4b37c72aa

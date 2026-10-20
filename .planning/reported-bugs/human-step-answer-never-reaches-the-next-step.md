@@ -4,9 +4,9 @@ title: A person's answer to a human-input step never reaches the next step
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/harness, workflows/human-input]
-folded_into: null
+folded_into: "295"
 verified_closed_by: null
 related_seeds: [SEED-360]
 re_open_trigger: null
