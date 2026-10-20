@@ -74,6 +74,8 @@ from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
 # cannot close the harness_engine -> harness -> phase_types cycle. It owns every branch (D-16).
 from app.services.harness.phase_confidence import phase_confidence
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
+# 295-03 (D-03): a pure leaf with no app imports, so it cannot close any cycle.
+from app.services.harness.run_handoff import phase_scope_ids
 
 # 214.1-03 (BUG-260828-03) — ONE scrubber, TWO callers. ``_clean_label`` is the shipped
 # Unicode-category scrub + 72-char clamp for author- and model-authored strings, and the
@@ -633,7 +635,7 @@ def _build_phase_tool_context(phase, ctx, *, model: str | None = None) -> ToolCo
     # never silently "fixes" an invalid scope — it only restricts to the declared subset.
     # Keep the channel a list (Pitfall 1: a set would raise in supabase-py json.dumps on
     # the RPC p_folder_ids param). None project subtree (unbound / Deep) → None (no narrowing).
-    _proj = getattr(ctx, "folder_subtree_ids", None)            # the resolved project subtree (or None)
+    _proj = phase_scope_ids(ctx, phase)  # the resolved project subtree, or a 295 folder re-run's override (or None)
     _phase_scope = getattr(phase.config, "folder_scope", None)  # PROJ-02 resolved id list (or None on non-retrieval phases)
     _effective = (
         [f for f in _proj if f in set(map(str, _phase_scope))]  # narrow-only ∩ — keep a list (Pitfall 1)

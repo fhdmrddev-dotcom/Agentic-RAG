@@ -559,6 +559,41 @@ class AskUserResponseBody(BaseModel):
     tool_call_id: str
     response_text: str
     choice_index: "int | None" = None
+    # Phase 295 (D-03): the folder an engine ask's "Search another folder" answer chose. Only
+    # ever one of the ids the prompt row's ``engine_pause.folders`` offered (allow-listed below).
+    folder_id: "str | None" = None
+
+
+async def _engine_answer_refusal(run_id: UUID, thread_id, body: "AskUserResponseBody") -> "str | None":
+    """Phase 295 (T-295-03-01 / -02): refuse an answer an ENGINE ask never offered.
+
+    Loads this run's prompt row for ``body.tool_call_id`` (run-scoped: the prompt carries the
+    workflow run id) and hands it to ``engine_ask.engine_answer_refusal`` — the one allow-list,
+    shared with the consume step. A prompt without ``engine_pause`` returns None (unaffected).
+    """
+    from app.dependencies import get_pg_pool  # noqa: PLC0415
+    from app.services.harness.engine_ask import engine_answer_refusal  # noqa: PLC0415
+
+    pool = await get_pg_pool()
+    prompt = await pool.fetchrow(
+        """
+        SELECT tool_calls FROM messages
+        WHERE thread_id = $1::uuid AND role = 'system'
+          AND tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+          AND tool_calls->0->>'tool_call_id' = $2
+          AND tool_calls->0->>'run_id' = $3
+        ORDER BY created_at DESC LIMIT 1
+        """,
+        str(thread_id), body.tool_call_id, str(run_id),
+    )
+    tcs = prompt["tool_calls"] if prompt is not None else None
+    if isinstance(tcs, str):
+        tcs = json.loads(tcs)
+    tool_call = tcs[0] if isinstance(tcs, list) and tcs else None
+    return engine_answer_refusal(
+        tool_call, response_text=body.response_text,
+        choice_index=body.choice_index, folder_id=body.folder_id,
+    )
 
 
 _REDRIVE_FAILED_REASON = "Your answer was saved, but the run could not continue."
@@ -941,6 +976,18 @@ async def submit_ask_user_response(
             detail=f"This run has already {_TERMINAL_RUN_WORDS.get(_run_status, 'ended')}.",
         )
 
+    # ── Step 1c (Phase 295, T-295-03-01 / -02): an ENGINE ask's answer is allow-listed ──
+    # BEFORE it is persisted: an unoffered label or index, a folder outside the server-built
+    # list, or "Continue without sources" on a locked step is refused with plain words, so the
+    # card stays answerable and nothing is re-driven. Harness answers only; a prompt without
+    # ``engine_pause`` is unaffected.
+    _refusal = (
+        await _engine_answer_refusal(run_id, row["thread_id"], body)
+        if _origin == "harness" else None
+    )
+    if _refusal:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=_refusal)
+
     # ── Step 2: persist messages row FIRST (durability — RESEARCH §A.7) ──
     # If this fails, return 500 — the agent loop has no live SUBSCRIBE we
     # could wake instead, and we don't want to silently drop the response.
@@ -958,6 +1005,7 @@ async def submit_ask_user_response(
                     "tool_call_id": body.tool_call_id,
                     "response_text": body.response_text,
                     "choice_index": body.choice_index,
+                    "folder_id": body.folder_id,  # Phase 295 (D-03), additive
                 }],
             })
         )

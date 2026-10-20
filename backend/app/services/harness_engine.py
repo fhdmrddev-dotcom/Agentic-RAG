@@ -666,6 +666,17 @@ async def _run_phase_with_gates(
     # (back-compat for direct unit callers).
     stream_run_id = stream_run_id or run_id
 
+    # Phase 295 (D-01 / D-18): a re-drive of an answered ENGINE ask resolves it here, before
+    # anything runs. ``None`` = nothing to consume, or the step must run (a folder re-run, a
+    # consumed approval); any other outcome is returned as is. The disposition lives in
+    # ``engine_ask.consume_engine_answer``; this is its one call site.
+    _answered = await consume_engine_answer(
+        phase, ctx, run_id=run_id, pool=pool, redis=redis,
+        _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+    )
+    if _answered is not None:
+        return _answered
+
     # Lazy import (breaks the harness-package import cycle — see module note).
     from app.services.harness.validators import run_gates
 
@@ -2894,4 +2905,5 @@ from app.services.harness.engine_ask import (  # noqa: E402,F401
     _parse_on_failure,
     _resolve_failure_with_ask_user,
     _route_on_failure,
+    consume_engine_answer,  # Phase 295 (295-03): the ONE call at the top of _run_phase_with_gates
 )

@@ -681,7 +681,6 @@ def _armed_two_drives(answer: dict | None):
     return first, second, world, body["n"]
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_approve_runs_body_exactly_once():
     """The exact approve label, consumed on the re-drive: the body runs exactly once, the
     armed ask is skipped once (no second prompt row), and ONE approval receipt is written."""
@@ -699,7 +698,6 @@ def test_armed_approve_runs_body_exactly_once():
     assert receipts[0]["metadata"]["choice"] == _ACTION_RISK_APPROVE_CHOICE
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_a_decline_consumed_on_the_redrive_fails_naming_the_person_and_the_step():
     first, second, world, body_calls = _armed_two_drives(
         {"response_text": "Do not run it", "choice_index": 1}
@@ -712,7 +710,6 @@ def test_a_decline_consumed_on_the_redrive_fails_naming_the_person_and_the_step(
     assert world.audits("validator_ask_user_approved") == []
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_a_redrive_with_no_durable_answer_stays_paused_and_runs_nothing():
     first, second, world, body_calls = _armed_two_drives(None)
     assert first.kind == "pause_run"

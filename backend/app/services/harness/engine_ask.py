@@ -46,6 +46,7 @@ repointed to ``engine_ask`` in the move commit (295-01 SUMMARY lists every site)
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections import namedtuple
 from uuid import UUID
@@ -83,7 +84,10 @@ __all__ = [
     "ENGINE_CHOICE_STOP",
     "classify_engine_choice",
     "compose_engine_choices",
+    "consume_engine_answer",
+    "engine_answer_refusal",
     "engine_pause",
+    "resolve_engine_label",
     "finding_from_output",
     "is_locked",
     "permitted_folder_options",
@@ -373,6 +377,17 @@ async def _resolve_failure_with_ask_user(
         # A live armed checkpoint no longer waits in-process (a golden run auto-continues
         # upstream, 189 D-19). Everything below this ``if`` is therefore reached by an
         # AUTHOR's ``ask_user`` gate only; its armed-only deltas are now unreachable.
+        if _take_engine_approval(ctx, phase):
+            # The approval was consumed on THIS re-drive (``consume_engine_answer``): run the
+            # body once, asking nothing, and write the governance receipt here — where the
+            # approval is USED, after the pre-gates passed again (consequence ≠ receipt).
+            await _write_receipt(pool, run_id, _audit_user_id, {
+                "phase": phase.slug,
+                "validator": failed_idx,
+                "choice": _ACTION_RISK_APPROVE_CHOICE,
+                "finding": error_message,
+            })
+            return None
         return await engine_pause(
             phase, kind="action_risk", error_message=error_message, produced_output=None,
             failed_idx=failed_idx, run_id=run_id, pool=pool, redis=redis, ctx=ctx,
@@ -1021,3 +1036,251 @@ async def engine_pause(
         logger.exception("engine ask: ask_user_prompt emit failed run=%s", run_id)
     # 6. The shipped pause arm does the rest.
     return PhaseOutcome("pause_run", None, None, f"Waiting for your answer on “{step_label}”.")
+
+
+# ── Phase 295: consuming the answer on the re-drive (RESEARCH Pattern 5) ─────────────────────
+#
+# The single-use key is ``ctx.resume_answered_tool_call_id``, set ONLY by the answer route's
+# re-drive (``api/runs.py``) and by the boot sweep for an answered engine ask. It is consumed
+# here ONLY when the active phase row's ``_awaiting_answer.tool_call_id`` equals it; otherwise
+# it is left untouched for the human-step executor (``human_input.py``), which reads the same
+# flag. Answers resolve through an EXACT-label allow-list over the options the prompt row
+# stored — never ``_is_abort_choice``'s deny-list — so an answer the engine cannot read as one
+# of its own labels never proceeds.
+
+_UNOFFERED_CHOICE = "That choice is not one this question offers."
+_UNOFFERED_FOLDER = "That folder is not one this question offers."
+
+
+def resolve_engine_label(options, response_text, choice_index) -> str | None:
+    """The presented label an answer names, or None. A click sends the label AND its index;
+    a forged pair (label ≠ options[index]) is unmatched, and so is any text not offered."""
+    opts = [str(o) for o in (options or [])]
+    text = (response_text or "").strip()
+    if choice_index is not None:
+        try:
+            ci = int(choice_index)
+        except (TypeError, ValueError):
+            return None
+        if not 0 <= ci < len(opts):
+            return None
+        return opts[ci] if (not text or text == opts[ci]) else None
+    return text if text in opts else None
+
+
+def engine_answer_refusal(prompt_tool_call, *, response_text, choice_index, folder_id) -> str | None:
+    """The answer route's allow-list (T-295-03-01 / -02): plain words to refuse with, or None.
+
+    A prompt without ``engine_pause`` is not an engine ask and is never refused here.
+    """
+    pause = (prompt_tool_call or {}).get("engine_pause")
+    if not isinstance(pause, dict):
+        return None
+    label = resolve_engine_label(prompt_tool_call.get("options"), response_text, choice_index)
+    wants_continue = label == ENGINE_CHOICE_CONTINUE or (
+        (response_text or "").strip() == ENGINE_CHOICE_CONTINUE
+    )
+    if pause.get("locked") and wants_continue:
+        return _LOCKED_ADDENDUM
+    if label is None:
+        return _UNOFFERED_CHOICE
+    offered = {str(f.get("id")) for f in (pause.get("folders") or []) if isinstance(f, dict)}
+    if label == ENGINE_CHOICE_SEARCH:
+        return None if folder_id is not None and str(folder_id) in offered else _UNOFFERED_FOLDER
+    return None if folder_id is None else _UNOFFERED_FOLDER
+
+
+def _locked_now(ctx, phase) -> bool:
+    """D-05: re-check the lock against the RUN's definition at consume time."""
+    definition = getattr(ctx, "definition", None)
+    for spec in getattr(definition, "phases", None) or []:
+        if getattr(spec, "slug", None) == getattr(phase, "slug", None):
+            return is_locked(spec)
+    return is_locked(phase)
+
+
+async def _person_words(pool, ctx) -> str:
+    """Who answered, for a STORED reason: the shared name chain, called without the email
+    (a reason is read by colleagues too) — display name, else "the person who started this
+    run". Lazy import of the one chain (``api/workflow_runs.waiting_who``)."""
+    from app.api.workflow_runs import waiting_who  # noqa: PLC0415
+
+    user_id = (getattr(ctx, "current_user", None) or {}).get("id")
+    display = None
+    if pool is not None and user_id:
+        try:
+            display = await pool.fetchval(
+                "SELECT display_name FROM profiles WHERE id = $1",
+                user_id if isinstance(user_id, UUID) else UUID(str(user_id)),
+            )
+        except Exception:  # noqa: BLE001 — a name is words, never a reason to fail
+            display = None
+    return waiting_who(is_owner=False, display_name=display, viewer_email=None)
+
+
+async def _write_receipt(pool, run_id, _audit_user_id, metadata: dict) -> None:
+    try:
+        await write_audit(
+            pool, run_id, user_id=_audit_user_id,
+            event_type="validator_ask_user_approved",
+            metadata=metadata,
+        )
+    except Exception:  # noqa: BLE001 — a receipt write must never strand the answered run
+        logger.warning("engine ask: validator_ask_user_approved receipt write failed run=%s", run_id)
+
+
+def _grant_engine_approval(ctx, slug, tool_call_id) -> None:
+    approvals = dict(getattr(ctx, "engine_ask_approved", None) or {})
+    approvals[slug] = str(tool_call_id)
+    try:
+        ctx.engine_ask_approved = approvals
+    except Exception:  # noqa: BLE001
+        logger.debug("engine ask: could not record the consumed approval", exc_info=True)
+
+
+def _take_engine_approval(ctx, phase) -> bool:
+    """Single-use: an approval consumed on THIS re-drive lets the armed checkpoint run the
+    body ONCE without asking again (no second prompt row)."""
+    approvals = dict(getattr(ctx, "engine_ask_approved", None) or {})
+    slug = getattr(phase, "slug", None)
+    if slug not in approvals:
+        return False
+    approvals.pop(slug, None)
+    try:
+        ctx.engine_ask_approved = approvals
+    except Exception:  # noqa: BLE001
+        pass
+    return True
+
+
+def _set_scope_override(ctx, slug, subtree: list, name: str) -> None:
+    overrides = dict(getattr(ctx, "phase_scope_override", None) or {})
+    labels = dict(getattr(ctx, "phase_scope_label", None) or {})
+    overrides[slug] = list(subtree)
+    labels[slug] = name
+    ctx.phase_scope_override = overrides
+    ctx.phase_scope_label = labels
+
+
+async def consume_engine_answer(
+    phase,
+    ctx,
+    *,
+    run_id: UUID,
+    pool,
+    redis,
+    _audit_user_id: UUID | None,
+    stream_run_id: UUID | None = None,
+) -> PhaseOutcome | None:
+    """Resolve an answered engine ask at the top of ``_run_phase_with_gates`` (re-drive only).
+
+    Returns ``None`` when there is nothing to consume (no flag, or the flag is another
+    question's — left untouched), and also when the step must RUN: a folder answer (the body
+    re-runs once over that folder) or an armed approval (the checkpoint then runs the body once
+    without asking). Otherwise a terminal-or-waiting outcome:
+
+      * Continue without sources (offered, and still unlocked) → ``completed`` with the stashed
+        output UNCHANGED plus ONE field ``unsourced = {continued_by, at}`` (D-04);
+      * Stop the run → ``fail_run`` naming the finding and the person (D-02);
+      * the armed decline (or an answer that is not the approval) → ``fail_run`` naming the
+        person and the step, without the armed prompt sentence (D-42);
+      * no durable answer, or an answer the allow-list cannot match → ``pause_run``: the run
+        stays paused and nothing proceeds.
+    """
+    tcid = getattr(ctx, "resume_answered_tool_call_id", None)
+    if not tcid or pool is None or run_id is None:
+        return None
+    active = await get_active_phase(pool, run_id) or {}
+    output = active.get("output")
+    if isinstance(output, str):
+        try:
+            output = json.loads(output)
+        except ValueError:
+            output = None
+    awaiting = output.get("_awaiting_answer") if isinstance(output, dict) else None
+    slug = getattr(phase, "slug", None)
+    if (
+        not isinstance(awaiting, dict)
+        or str(awaiting.get("tool_call_id")) != str(tcid)
+        or active.get("slug") != slug
+    ):
+        return None  # not this step's engine ask: the human executor keeps the flag
+    try:
+        ctx.resume_answered_tool_call_id = None
+    except Exception:  # noqa: BLE001 — a frozen ctx must not sink the phase
+        logger.debug("engine ask: could not clear the resume flag", exc_info=True)
+
+    step_label = _step_label(phase)
+    waiting = PhaseOutcome("pause_run", None, None, f"Waiting for your answer on “{step_label}”.")
+    answer = await get_ask_user_response(pool, run_id, str(tcid))
+    if answer is None:
+        return waiting
+    label = resolve_engine_label(
+        awaiting.get("options"), answer.get("response_text"), answer.get("choice_index"),
+    )
+    meaning = classify_engine_choice(label)
+    kind = awaiting.get("kind")
+
+    if kind == "action_risk":
+        if meaning == "approve":
+            _grant_engine_approval(ctx, slug, tcid)
+            return None
+        if meaning == "decline":
+            person = await _person_words(pool, ctx)
+            return PhaseOutcome(
+                "fail_run", None, None,
+                f"{person} chose not to run “{step_label}”, so the run stopped.",
+            )
+        return PhaseOutcome(
+            "fail_run", None, None,
+            f"“{step_label}” was not run: the answer did not match the approval option, so "
+            "the run stopped.",
+        )
+
+    receipt = {
+        "phase": slug,
+        "validator": awaiting.get("failed_idx"),
+        "choice": label,
+        "finding": kind,
+    }
+    if meaning == "stop":
+        person = await _person_words(pool, ctx)
+        lead = awaiting.get("stop_reason") or f"“{step_label}” found nothing to cite."
+        return PhaseOutcome("fail_run", None, None, f"{lead} Stopped by {person}.")
+    if meaning == "continue" and awaiting.get("continue_allowed"):
+        if _locked_now(ctx, phase):
+            logger.info("engine ask: continue refused at consume, %s is locked now", slug)
+            return PhaseOutcome(
+                "fail_run", None, None,
+                f"“{step_label}” is set to Must prove it, so it can't continue without "
+                "sources. The run stopped.",
+            )
+        from datetime import datetime, timezone  # noqa: PLC0415
+
+        user_id = (getattr(ctx, "current_user", None) or {}).get("id") or _audit_user_id
+        produced = dict(awaiting.get("produced_output") or {})
+        produced["unsourced"] = {
+            "continued_by": str(user_id),
+            "at": datetime.now(timezone.utc).isoformat(),
+        }
+        await _write_receipt(pool, run_id, _audit_user_id, {**receipt, "unsourced": True})
+        return PhaseOutcome("completed", produced, None, None)
+    if meaning == "search":
+        folder_id = answer.get("folder_id")
+        offered = [str(f) for f in (awaiting.get("folder_option_ids") or [])]
+        if folder_id is not None and str(folder_id) in offered:
+            from app.services.harness import scope as _scope  # noqa: PLC0415
+
+            user_id = (getattr(ctx, "current_user", None) or {}).get("id") or _audit_user_id
+            subtree = await _scope.resolve_project_subtree(
+                str(folder_id), supabase=getattr(ctx, "supabase", None), user_id=str(user_id),
+            ) or [str(folder_id)]
+            name = (awaiting.get("folder_names") or {}).get(str(folder_id)) or "the chosen folder"
+            _set_scope_override(ctx, slug, [str(x) for x in subtree], name)
+            await _write_receipt(pool, run_id, _audit_user_id, {**receipt, "folder_id": str(folder_id)})
+            return None
+    logger.warning(
+        "engine ask: an answer the allow-list cannot match on %s (run %s) — left paused",
+        slug, run_id,
+    )
+    return waiting

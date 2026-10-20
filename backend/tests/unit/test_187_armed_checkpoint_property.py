@@ -717,7 +717,6 @@ _REACHING_CASES: tuple[dict, ...] = tuple(
 _REACHING_IDS: tuple[str, ...] = tuple(c["id"] for c in _REACHING_CASES)
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 @pytest.mark.parametrize("case", _REACHING_CASES, ids=_REACHING_IDS)
 def test_p2_reaching_the_body_implies_exactly_one_armed_prompt(case):
     """On every author set that reaches the body, the armed prompt is awaited EXACTLY once.
@@ -763,7 +762,6 @@ def _approval_receipts(write_audit) -> list:
     ]
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_p3_a_typed_refusal_runs_nothing_and_writes_zero_approval_receipts():
     """T-187-01-02 / the Phase-185 BLOCKER shape, as a property-space row.
 

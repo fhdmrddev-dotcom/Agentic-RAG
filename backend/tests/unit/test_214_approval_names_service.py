@@ -638,7 +638,6 @@ def _ledger_drive() -> tuple[_Drive, str]:
     return rec, asked
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_the_action_risk_pending_row_carries_no_argument_value():
     """WAITING IS NOT FAILING, and it is also not a record of the payload.
 
@@ -655,7 +654,6 @@ def test_the_action_risk_pending_row_carries_no_argument_value():
             assert value not in blob, f"an argument value reached the ledger: {call!r}"
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_MEASURED_the_approval_receipt_ALREADY_copies_the_whole_sentence_into_the_ledger():
     """⚠ **A MEASURED LEAK, PINNED RATHER THAN ASSUMED AWAY — and it is NOT this plan's.**
 
@@ -702,7 +700,6 @@ def test_MEASURED_the_approval_receipt_ALREADY_copies_the_whole_sentence_into_th
     )
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_the_leak_is_confined_to_that_one_receipt_and_no_other_row():
     """The BOUND on the finding above. Every OTHER audit row this path writes is clean —
     so a future edit that spreads argument values to a second event type goes red here."""

@@ -461,7 +461,6 @@ def test_every_engine_choice_is_classified_by_the_engine_allow_list():
         assert classify_engine_choice(stranger) is None, f"{stranger!r} was read as a choice"
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_decline_fails_the_run_and_writes_no_approval():
     """L-4, the instance. Clicking "Do not run it" on an armed checkpoint FAILS the run.
     No ``validator_ask_user_approved`` receipt is written — declining is not approving,
@@ -476,7 +475,6 @@ def test_armed_decline_fails_the_run_and_writes_no_approval():
     assert len(_receipts(write_audit)) == 0
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_approval_runs_the_body_and_writes_the_receipt():
     """The other half of the pair. "Approve this step" on a PRE gate returns
     ``None`` (the signal: run the body) and writes the governance receipt carrying the
@@ -511,7 +509,6 @@ def test_armed_approval_runs_the_body_and_writes_the_receipt():
     )
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_empty_answer_fails_the_run():
     """An empty answer is not consent. A ``{"kind": "response"}`` carrying no text and
     no resolvable ``choice_index`` classifies as abort-like → fail_run, so a silently
@@ -526,7 +523,6 @@ def test_armed_empty_answer_fails_the_run():
     assert len(_receipts(write_audit)) == 0
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_decline_by_choice_index_also_fails():
     """A choice CLICK arrives as ``{response_text: "", choice_index: 1}``. The engine
     resolves index 1 of the armed pair back to "Do not run it" and fails the run — the
@@ -638,7 +634,6 @@ _ARMED_NON_APPROVALS = (
 )
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_typed_refusal_is_never_approval():
     """T-185-04-01. On an ARMED action-risk checkpoint, EVERY answer that is not the
     exact presented approve label routes to ``fail_run`` and writes ZERO
@@ -683,7 +678,6 @@ def test_armed_typed_refusal_is_never_approval():
     assert kwargs["metadata"]["choice"] == "Approve this step"
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_approval_by_choice_index_still_proceeds():
     """The CLICK path control. A button click arrives as ``{response_text: "",
     choice_index: 0}``; the engine resolves index 0 of the armed pair back to the exact
@@ -794,7 +788,6 @@ def test_approve_label_has_exactly_one_home():
 # the HELPER, one layer down, so the guarantee does not depend on a single observer.
 
 
-@pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_checkpoint_on_a_fail_run_phase_still_asks():
     """T-187-11-04. An armed checkpoint on a phase whose AUTHOR declared
     ``on_failure: "fail_run"`` still PAUSES for a person.

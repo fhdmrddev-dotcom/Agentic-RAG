@@ -2377,6 +2377,9 @@ async def get_ask_user_response(
     return {
         "response_text": payload.get("response_text"),
         "choice_index": payload.get("choice_index"),
+        # Phase 295 (D-03): the folder an engine ask's "Search another folder" answer chose.
+        # Additive — None on every older row.
+        "folder_id": payload.get("folder_id"),
     }
 
 
