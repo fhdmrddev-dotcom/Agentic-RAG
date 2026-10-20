@@ -363,20 +363,25 @@ async def _finalize_producer_run(
                     active_workflow_run_id,
                 )
 
-            await _finish_wf(
-                await get_pg_pool(),
-                active_workflow_run_id,
-                # v2.8-audit cancel-honesty fix: a user Stop sets
-                # terminal_status='cancelled' and the workflow_runs CHECK + every
-                # terminal-status consumer already handle 'cancelled' — record the
-                # true intent. Every OTHER non-completed escape (timed_out is NOT in
-                # the workflow_runs CHECK, failed, crash) keeps writing 'failed'.
-                # 204: ...UNLESS the cancel registry says this run was cancelled, in
-                # which case the far worker's intent wins over the local guess.
+            # v2.8-audit cancel-honesty fix: a user Stop sets
+            # terminal_status='cancelled' and the workflow_runs CHECK + every
+            # terminal-status consumer already handle 'cancelled' — record the
+            # true intent. Every OTHER non-completed escape (timed_out is NOT in
+            # the workflow_runs CHECK, failed, crash) keeps writing 'failed'.
+            # 204: ...UNLESS the cancel registry says this run was cancelled, in
+            # which case the far worker's intent wins over the local guess.
+            _f2_status = (
                 "cancelled"
                 if (terminal_status == "cancelled" or _cancel_known)
-                else "failed",
+                else "failed"
             )
+            # Phase 295 (D-20, BUG-11): a ``failed`` end this call WINS also gets ONE worded
+            # run_failed audit (it had none — 5 June runs read "no reason"). Never raises, so
+            # the unconditional finish below (and its anchor clear) is byte-for-byte the same.
+            from app.services.harness.run_handoff import record_failed_end  # noqa: PLC0415
+
+            await record_failed_end(await get_pg_pool(), active_workflow_run_id, _f2_status)
+            await _finish_wf(await get_pg_pool(), active_workflow_run_id, _f2_status)
         except BaseException:
             logger.exception(
                 "F2 harness-failure terminalize failed for run %s",

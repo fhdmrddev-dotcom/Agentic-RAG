@@ -90,7 +90,10 @@ RETIRED: dict[str, str] = {
         "disposition are unchanged. Task 2 (D-18): a live armed call first takes an approval "
         "consumed on this re-drive (receipt + run the body once). Task 3 (D-48): an author's "
         "post-gate Proceed now runs the engine citations gate on the produced output before "
-        "returning completed."
+        "returning completed. 295-04 Task 2 (D-49): a {kind: cancel} payload reaching the "
+        "in-process wait now raises asyncio.CancelledError like the shutdown sentinel, so a "
+        "Stop ends the run cancelled instead of fail_run 'aborted by user'; the `if payload is "
+        "None` branch is unchanged."
     ),
 }
 

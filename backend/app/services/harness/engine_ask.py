@@ -537,6 +537,12 @@ async def _resolve_failure_with_ask_user(
             "action-risk checkpoint interrupted by server shutdown — phase left active "
             "for the boot-time resume sweep (096-09 precedent)"
         )
+    # Phase 295 (D-49): a ``{"kind": "cancel"}`` payload is a STOP, never a decision. It used to
+    # resolve ``choice = ""`` → ``_is_abort_choice`` → ``fail_run`` "aborted by user", so a
+    # stopped run read failed. It now escapes like the shutdown sentinel, for every disposition
+    # that waits here; the run ends ``cancelled``. ``if payload is None`` below is untouched.
+    if payload and payload.get("kind") == "cancel":
+        raise asyncio.CancelledError("ask_user wait stopped by a cancel (295 D-49)")
 
     reason_base = error_message if reason_is_final else (
         f"Phase {phase.phase_index + 1} ({phase.slug}) validation flagged: {error_message}"

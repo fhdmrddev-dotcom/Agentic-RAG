@@ -1791,6 +1791,13 @@ async def _drive_golden_run(
             logger.warning(
                 "publish: producer-shell finalize failed for %s", _producer_id, exc_info=True
             )
+        # Phase 295 (D-20): the golden run's OWN row. ``find_resumable_runs`` excludes golden
+        # runs, so a golden run that raised or hit the publish budget used to stay ``active``
+        # forever. The helper ends it ``failed`` with words only if nothing else already ended
+        # it, and never raises (shell cleanup never masks the run's own outcome).
+        from app.services.harness.run_handoff import finish_golden_run  # noqa: PLC0415
+
+        await finish_golden_run(pool, run_id, user_id=user_id)
 
 
 async def _judge_golden_output(

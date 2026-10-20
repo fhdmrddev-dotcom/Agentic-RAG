@@ -776,9 +776,17 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
 
     async def _wake():
         _failed = False
+        _escape = None
         try:
             await _resume_run(run_id, definition, ctx, pool=pool, redis=redis)
-        except Exception:
+        except asyncio.CancelledError as _cancel:
+            # Phase 295 (D-41): a cancelled re-drive's shell reads cancelled, never completed
+            # (``except Exception`` below never saw a CancelledError). The run row itself was
+            # finalised by ``_resume_run`` (run_handoff.resume_with_terminalize).
+            _escape = _cancel
+            raise
+        except Exception as _exc:
+            _escape = _exc
             _failed = True
             logger.exception("ask_user_response: re-drive failed for run %s", run_id)
             await _fail_redrive(
@@ -790,6 +798,9 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
             if _pid is not None:
                 try:
                     from app.db.runs import finalize_run  # noqa: PLC0415
+                    from app.services.harness.run_handoff import (  # noqa: PLC0415
+                        resume_shell_status,
+                    )
                     from datetime import datetime as _dt, timezone as _tz  # noqa: PLC0415
 
                     # METER-05 site 1 (Phase 256 / D-256-08). This shell hardcoded a NULL
@@ -818,7 +829,7 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
                     await finalize_run(
                         pool,
                         run_id=_pid,
-                        status="failed" if _failed else "completed",
+                        status=resume_shell_status(_escape),
                         error="ask_user re-drive failed" if _failed else None,
                         completed_at=_dt.now(_tz.utc),
                         message_id=None,
@@ -1834,7 +1845,8 @@ async def cancel_run(
                             run_id,
                         )
                     _wrote = await cancel_workflow_run_internals(
-                        pool=pool, workflow_run_id=run_id
+                        # Phase 295 (D-19): this Stop's reason names the person who pressed it.
+                        pool=pool, workflow_run_id=run_id, stopped_by=current_user["id"],
                     )
                     # ⚠ CR-03 (194 code review) — THIS ARM MAY NOT REPORT A WRITE IT
                     # CANNOT KNOW HAPPENED. The comment here used to read "Postgres is
@@ -1886,6 +1898,8 @@ async def cancel_run(
         # Phase 163 (D-05): shared run-lifecycle writer — service-role (matches the
         # operator Kill path); the owner gate above already enforced RLS ownership.
         supabase=service_supabase,
+        # Phase 295 (D-19): the owner's Stop is recorded with their name (Kill passes none).
+        stopped_by=current_user["id"],
     )
 
     # Always 204 — every sub-path (terminal-noop / task-cancelled / zombie-healed)

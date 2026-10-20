@@ -668,6 +668,10 @@ async def _run_phase_with_gates(
     # (back-compat for direct unit callers).
     stream_run_id = stream_run_id or run_id
 
+    # Phase 295 (D-23, BUG-261015-01): does the engine own this phase's failure words? (A
+    # phase with validators retries or routes, and each failure-terminal arm surfaces once.)
+    claim_failure_message(ctx, phase)
+
     # Phase 295 (D-01 / D-18): a re-drive of an answered ENGINE ask resolves it here, before
     # anything runs. ``None`` = nothing to consume, or the step must run (a folder re-run, a
     # consumed approval); any other outcome is returned as is. The disposition lives in
@@ -1146,7 +1150,9 @@ async def _run_phase_with_gates(
         await write_audit(
             pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
             metadata={"phase": phase.slug, "attempt": attempt, "error": cause,
-                      "validator_error": gate.error_message},
+                      # Phase 295 (D-14 / D-44): a diagnosed failure records the executor's
+                      # cause, never the validator's reading of the failure output's shape.
+                      "validator_error": cause if diagnosed else gate.error_message},
         )
         await _emit(redis, stream_run_id, "gate_failed",
             phase=phase.slug, attempt=attempt, error=cause,
@@ -2016,6 +2022,8 @@ async def run_workflow(
                         "site for run %s", run_id,
                     )
                 return
+            # Phase 295 (D-23): the executor was silenced for this phase, so say it once here.
+            await surface_if_engine_owned(ctx, run_id, outcome.reason, pool, _surface_failure_message)
             i = target_i
             continue
 
@@ -2095,6 +2103,10 @@ async def run_workflow(
                 ) or str(_emit_failure),
                 output=durable_output,
             )
+            # Phase 295 (D-23): the same composed cause, said once when the engine owned it.
+            await surface_if_engine_owned(ctx, run_id, compose_emit_failure(
+                output.get("attempt_causes") or [], step_name=_clean_label(getattr(phase, "name", None)),
+            ) or str(_emit_failure), pool, _surface_failure_message)
         elif _recorded_intent:
             await record_phase_not_sent(pool, phase_id, durable_output)
         else:
@@ -2636,8 +2648,12 @@ async def _resume_run(run_id: UUID, definition: WorkflowDefinition, ctx, *, pool
     (an llm_agent re-run forks a fresh sub_run_id; the old partial is orphaned
     harmlessly — Pitfall 5). The completion/failure path inside run_workflow already
     mirrors ``_shielded_finalize`` (durable terminal status BEFORE the terminal emit).
+    Phase 295 (D-41): an ESCAPE is finalised by ``run_handoff.resume_with_terminalize``.
     """
-    await run_workflow(run_id, definition, ctx, pool=pool, redis=redis)
+    await resume_with_terminalize(
+        run_workflow(run_id, definition, ctx, pool=pool, redis=redis),
+        run_id=run_id, pool=pool, user_id=(getattr(ctx, "current_user", None) or {}).get("id"),
+    )
 
 
 async def resume_stranded_workflows(*, pool, redis) -> int:
@@ -2720,10 +2736,12 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
             # run until the next restart. Skip THIS run only (honoring the
             # _load_run_definition docstring promise); it re-becomes claimable
             # after harness_resume_lease_seconds expires.
+            # ~~it re-becomes claimable after harness_resume_lease_seconds expires~~ Phase 295
+            # (D-20): re-claiming re-reads the same dead definition, forever. It ends failed.
             logger.warning(
-                "resume sweep: run %s has no loadable definition — skipping "
-                "(re-claimable after lease expiry)", run_id,
+                "resume sweep: run %s has no loadable definition — ended failed", run_id,
             )
+            await fail_unloadable_definition(pool, run_id, user_id=run.get("user_id"))
             continue
 
         # 2b. Phase 185 (GOVERN-03 / RESEARCH L-7) — the ARMED action-risk branch.
@@ -2775,11 +2793,13 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
         # reconcile F2 self-heal (ORDER BY started_at DESC LIMIT 1) reads
         # 'streaming' → lock_is_stale=False → re-wedges the thread (the exact class
         # F2 closed). The point is TERMINAL (not the exact status).
-        _redrive_failed = False
+        # Phase 295 (D-41): the escape itself is kept, so a CANCELLED re-drive's shell reads
+        # cancelled rather than completed (``except Exception`` never saw a CancelledError).
+        _redrive_exc = None
         try:
             await _resume_run(run_id, definition, ctx, pool=pool, redis=redis)
-        except Exception:
-            _redrive_failed = True
+        except BaseException as _escape:
+            _redrive_exc = _escape
             raise
         finally:
             _pid = getattr(ctx, "producer_run_id", None)
@@ -2811,8 +2831,9 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
                     await finalize_run(
                         pool,
                         run_id=_pid,
-                        status="failed" if _redrive_failed else "completed",
-                        error="resume re-drive failed" if _redrive_failed else None,
+                        status=resume_shell_status(_redrive_exc),
+                        error="resume re-drive failed"
+                        if resume_shell_status(_redrive_exc) == "failed" else None,
                         completed_at=datetime.now(timezone.utc),
                         message_id=None,
                         input_tokens=_in_tok,
@@ -2829,10 +2850,12 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
             # here. Failed redrive: the old prompt's subscription is dead; the
             # next sweep's re-run re-asks with a fresh prompt row, so expiring
             # the stale one keeps /pending honest in the interim.
+            # Phase 295 (295-03 deferred (a)): never the NEW prompt of a re-drive that paused
+            # again — that is the question the person answers next.
             try:
-                await _expire_pending_ask_user(
+                await expire_unless_paused(
                     pool, run.get("thread_id"), run_id,
-                    org_id=getattr(ctx, "org_id", None),
+                    org_id=getattr(ctx, "org_id", None), expire=_expire_pending_ask_user,
                 )
             except Exception:  # noqa: BLE001
                 logger.exception(
@@ -2911,6 +2934,14 @@ __all__ = [
 # ``phase_types.register_all()`` → ``from app.services.harness_engine import
 # PHASE_TYPE_REGISTRY``: placed in the top import block it fails on a cold
 # ``import app.services.harness_engine`` (measured, 295-01 SUMMARY ## Cycle probe).
+from app.services.harness.run_handoff import (  # noqa: E402,F401 — Phase 295 (295-04): leaf helpers
+    claim_failure_message,
+    expire_unless_paused,
+    fail_unloadable_definition,
+    resume_shell_status,
+    resume_with_terminalize,
+    surface_if_engine_owned,
+)
 from app.services.harness.engine_ask import (  # noqa: E402,F401
     _ABORT_LIKE_CHOICES,
     _ACTION_RISK_APPROVE_CHOICE,

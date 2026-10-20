@@ -75,7 +75,7 @@ from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
 from app.services.harness.phase_confidence import phase_confidence
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
 # 295-03 (D-03): a pure leaf with no app imports, so it cannot close any cycle.
-from app.services.harness.run_handoff import phase_scope_ids
+from app.services.harness.run_handoff import handoff_text, phase_scope_ids, surface_unless_engine_owns  # noqa: E501
 
 # 214.1-03 (BUG-260828-03) — ONE scrubber, TWO callers. ``_clean_label`` is the shipped
 # Unicode-category scrub + 72-char clamp for author- and model-authored strings, and the
@@ -182,10 +182,9 @@ def _prior_output_text(accumulated_outputs: dict) -> str:
     if not accumulated_outputs:
         return ""
     # dicts preserve insertion order; the engine inserts in phase_index order.
-    texts = [
-        (v.get("text") if isinstance(v, dict) else None)
-        for v in accumulated_outputs.values()
-    ]
+    # Phase 295 (D-10 / D-11 / D-46): a human step hands over its question AND answer, an
+    # unsourced output its note — the reading lives in ``run_handoff.handoff_text``.
+    texts = [handoff_text(v) for v in accumulated_outputs.values()]
     texts = [t for t in texts if t]
     if not texts:
         return ""
@@ -383,7 +382,9 @@ async def _surface_failure_message(ctx, run_id, reason, pool):
     """
     from app.services.harness_engine import _surface_failure_message as _engine_surface
 
-    return await _engine_surface(ctx, run_id, reason, pool)
+    # Phase 295 (D-23, BUG-261015-01): silenced while the engine owns the failure's words
+    # (the phase has validators, so it will retry or route and surface the cause ONCE).
+    return await surface_unless_engine_owns(ctx, run_id, reason, pool, _engine_surface)
 
 
 def _retry_suffix(ctx) -> str:
