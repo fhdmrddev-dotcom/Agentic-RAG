@@ -3,7 +3,7 @@ phase: 294-decision-engine-rerank-and-citation-check
 plan: 05
 subsystem: citations
 tags: [citations, chat, ui, sketch-294-A, uat, g-4]
-status: checkpoint-open  # Tasks 1-3 complete; Task 4 pass 1 recorded every row as blocked; the plan is NOT complete
+status: complete-human-needed  # Tasks 1-3 complete; Task 4 driven in pass 2 (partial live); remaining rows owed to the operator (see "Task 4: live drive, pass 2")
 requires:
   - phase: 294-02
     provides: measurement harness + 294-MEASUREMENT.md (openai_decisions UNMEASURED)
@@ -144,6 +144,16 @@ completed: null
 ### Settings: read, never written
 
 `app_settings` (`id='global'`), read once at about 05:43 local and never written by this agent: `hybrid_search_enabled=true`, `hybrid_candidate_count=20`, `rerank_enabled=false`, `rerank_provider='cohere'`, `rerank_model='rerank-v3.5'`, `rerank_top_n=5`, `retrieval_top_k=5`, `updated_at=2026-10-18 17:35:04.782645+00`. Precondition 6 was not applied, so there was nothing to restore. No key was read or printed.
+
+## Task 4: live drive, pass 2 (2026-10-20, orchestrator)
+
+Driven with claude-in-chrome on the operator's logged-in local app after the review fixes merged (`84dbfc755`); full rows in `294-VALIDATION.md` under "Drive pass 2".
+
+- **Proven live:** Jev reranked both `search_documents` calls (E2, engine half); Check citations · Jev stored `3 supported · 3 partly · 1 not supported` with markers and the pinned peek per D-14; a reload re-renders them with one batched GET and no POST (C3 reload half); Cohere shows the ⓘ reason line with stored verdicts kept (C5 Cohere arm); the option-order probe passed for Jev (C7 Jev half, exit 0).
+- **Settings restored exactly** (read back from `GET /settings`): reranking off, cohere, rerank-v3.5, top-N 5, top-K 5, hybrid on / 20.
+- **Finding:** BUG-261020-04 (deferred): the action appears only after the thread is re-opened, because a fresh answer keeps its `temp-` id.
+- **Still owed to the operator:** G4-1..G4-3 sign-off (evidence in `evidence/`), the planted-contradiction rows (C1 planted, C2, C6), C4, F1-F5 fault phase, E1/E3/E4/E5, R1-R8, A1-A3, S1, M1 (OpenAI `gpt-6-luna` access, LangSmith key, fault-path restart).
+- **Final gates on the merged tree:** backend 70 failed, failing set identical to base (0 new, 0 fixed); vitest count gate OK, 10908 tests, 0 failed.
 
 ## Owed to operator
 

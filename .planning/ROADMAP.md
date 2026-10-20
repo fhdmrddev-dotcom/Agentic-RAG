@@ -303,7 +303,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 294-05-PLAN.md — verdicts on the citation markers (sketch 294 A), ledger re-derive, live evidence checkpoint per 294-VALIDATION.md (wave 3, not autonomous)
+- [x] 294-05-PLAN.md — verdicts on the citation markers (sketch 294 A), ledger re-derive, live evidence checkpoint per 294-VALIDATION.md (wave 3, not autonomous)
 
 **UI hint**: yes
 **Flags**: **Provider-docs-first**: Jev (`/api/alpha/decisions` on OpenRouter; TypeSafe direct; about 30 documents per call, about 32k tokens per call) and OpenAI Decisions (`POST /v1/decisions`, `gpt-6-luna`, 1-200 questions, refusal answers; SDK 2.28.0 may lack `client.decisions`, so raw `httpx` is acceptable). Local: Qwen3-Reranker (takes an instruction) or bge-reranker-v2-m3; check licences. **Extends the existing seam** `rerank_service.py` (Cohere / local today, off by default) instead of adding a second one. The steering instruction is an optional argument on the existing search tool, and the citation check is an API route, so the tool count stays 30. Migration only if settings need new columns (next free after 210; re-run `ls`). **G-2 sketch** for the Settings block and the citation-check view. **G-4**. Hot files: `retrieval_service.py`, `config.py`, `user_settings.py`, `api/settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`; read their ledger sections. Deferred to future requirements: model routing, chunk tagging at ingestion. Intake research and sources: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`; re-verify at discuss.
@@ -320,7 +320,7 @@ Plans:
 | 291. Describe It From Your Own Files | 0/TBD | Not started | - |
 | 292. More Ways to Show It | 0/TBD | Not started | - |
 | 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
-| 294. Decision Engine: Rerank and Citation Check | 4/5 | In Progress | - |
+| 294. Decision Engine: Rerank and Citation Check | 5/5 | Executed (human_needed) | - |
 
 ---
 

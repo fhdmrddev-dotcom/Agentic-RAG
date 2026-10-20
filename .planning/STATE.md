@@ -42,7 +42,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Phase: 294 (decision-engine-rerank-and-citation-check) — EXECUTING
-Plan: 5 of 5 (wave 3; 294-01..04 complete). 294-05 Tasks 1-3 committed (2026-10-20); Task 4, the live drive of every 294-VALIDATION.md row, is at its checkpoint and waits on the operator (start backend + frontend, OpenRouter key, fault-phase .env lines). Plan 05 stays unchecked until Task 4 is done. Task 4 pass 1 (2026-10-20) drove NOTHING: 33/33 rows recorded ⛔ (0 PASS, 0 FAIL) because the agent had no browser tools and the permission classifier denied a dev-user session + credential-bearing runs; the fault path is inactive (ENVIRONMENT=''). Re-drive owed (see 294-05-SUMMARY.md "Owed to operator").
+Plan: 5 of 5 — all plans executed (2026-10-20). 294-05 Task 4 driven in pass 2 (partial live: Jev rerank, citation check end to end, reload, Cohere reason line, order probe); G4 sign-off and the operator-gated rows remain owed (294-VALIDATION.md "Drive pass 2"). Next: verifier, then phase close as human_needed.
 
 ### Roadmap Evolution
 
