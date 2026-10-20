@@ -4,12 +4,12 @@ title: Some answers cite sources by filename in brackets instead of [n], so no c
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [backend/agent-loop, citations, cross-provider]
-folded_into: null
-verified_closed_by: null
+folded_into: "294"
+verified_closed_by: "live drive 2026-10-20 14:1x: same question that gave 0 markers twice (04:20, 14:03) gave 10 [n] markers, 0 bracketed filenames; check rendered 7 supported · 2 partly · 1 not supported (message db9860d4). ONE sample, DeepSeek only"
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Any answer with sources that writes a filename inside brackets, on any provider; or a change to CITATION_INSTRUCTION / CITATION_REMINDER"
 reproduces_on:
   branch: develop
   commit: 5b7951ed6
@@ -41,3 +41,16 @@ Model adherence, not rendering. `CITATION_INSTRUCTION` (`backend/app/services/ci
 ## Fix direction
 
 Measure first, across the full native roster (CLAUDE.md UAT recipe): marker rate per provider on a fixed question set. Then options, cheapest first: tighten the instruction with a one-line wrong/right example (`[FMrad.docx]` ✗ → `[3]` ✓); or map a bracketed filename that exactly matches one manifest row to that row's number at the settle point, next to `normalize_citation_markers` (only when exactly one row carries that filename, otherwise leave it).
+
+## Fix (2026-10-20, operator: "in the real chat I don't see references anymore")
+
+Re-measured first: the three newest DeepSeek answers with sources (04:16, 04:20, 14:03) had **0** `[n]` markers between them; two wrote bracketed filenames such as `[Fahed_Mrad_1-3_FM_17032026.docx]`, one named sources in prose. Both bracketed ones answered a prompt ending "Cite the passages."
+
+Instruction-only fix in `backend/app/services/citation_markers.py` (no settle-time remapping, because several chunks share one filename and guessing the chunk would be a fabricated attribution, D-02):
+
+1. `CITATION_INSTRUCTION` now says a marker is the number only, with a wrong/right example (`[Report.docx]` ✗, `[3]` ✓), and that a user asking to "cite" or "name sources" still gets `[n]`.
+2. New `CITATION_REMINDER` is appended **after** the manifest, since the manifest lines `[n] {filename} · chunk k` are what the model copied from.
+
+- RED → GREEN: `tests/unit/test_153_citation_instruction.py::TestNumberNotFilename` (2 cases) failed at collection before the change. Neighbouring suites (`test_153_citation_markers`, `test_294_citation_claims`, `test_retrieval_failure_honesty`): 103 passed.
+- Live: the same question in a new chat → 10 markers, 0 bracketed filenames; Check citations · Jev rendered the verdict pills.
+- ⚠ Evidence is **one** DeepSeek answer. The full-roster marker-rate measurement in "Fix direction" above is still unrun.
