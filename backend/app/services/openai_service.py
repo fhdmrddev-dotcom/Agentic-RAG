@@ -41,6 +41,21 @@ SEARCH_DOCUMENTS_TOOL = {
                     "type": "string",
                     "description": "The semantic search query to find relevant document chunks.",
                 },
+                # Phase 294 (D-09): optional steering for the decision engines. A plain string,
+                # not required, no maxLength (the server clamps it); untrusted, so it only ever
+                # travels to an engine as data (D-10). 294-REVIEW WR-01: the decision engines fold
+                # it into the relevance score that prune() cuts on, so the text says it CAN drop a
+                # passage (never below MIN_KEEP, never to none) instead of "never filters".
+                "instruction": {
+                    "type": "string",
+                    "description": (
+                        "Optional. What makes a passage useful for THIS question when it is not "
+                        "obvious from the query, e.g. 'prefer 2025 figures' or 'the signed "
+                        "version, not drafts'. It steers the relevance scores, and a conservative "
+                        "cut drops passages scored as very unlikely to help (at least 3 are always "
+                        "kept, never none), so state a preference, not a filter."
+                    ),
+                },
                 # Phase 272 (FIND-07, D-03): Find's condition list as a tool ARGUMENT. The
                 # `op` enum EQUALS ViewCondition.op (pinned by test_272_tool_schema.py), and
                 # the subtree is provider-safe by construction: no anyOf/oneOf/allOf/

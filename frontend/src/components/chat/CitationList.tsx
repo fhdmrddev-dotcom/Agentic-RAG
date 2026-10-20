@@ -3,6 +3,7 @@ import { CitationCard } from "./CitationCard"
 import type { Citation } from "@/types"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { FoldTrigger } from "./FoldTrigger"
+import { CitationCheckAction } from "./CitationCheckAction"
 
 interface Props {
   citations: Citation[]
@@ -27,13 +28,27 @@ interface Props {
    * document scope inside `flashCitationMarker`.
    */
   flashContainer?: ParentNode | null
+  /**
+   * Phase 294-05 (DEC-03, D-13): the settled assistant message this footer belongs to. When set,
+   * the header carries ONE `CitationCheckAction` beside the fold trigger (a sibling, never inside
+   * it, so there is no nested button and it stays visible while folded). Absent → the footer
+   * renders exactly as before.
+   */
+  checkMessageId?: string
 }
 
-export function CitationList({ citations, defaultOpen = false, flashContainer }: Props) {
+export function CitationList({ citations, defaultOpen = false, flashContainer, checkMessageId }: Props) {
   const [open, setOpen] = useState(defaultOpen)
   if (!citations.length) return null
 
   const count = citations.length
+  const trigger = (
+    <CollapsibleTrigger asChild>
+      <button aria-expanded={open}>
+        <FoldTrigger open={open} label={`References · ${count} source${count !== 1 ? "s" : ""}`} />
+      </button>
+    </CollapsibleTrigger>
+  )
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="mt-3">
@@ -49,11 +64,14 @@ export function CitationList({ citations, defaultOpen = false, flashContainer }:
           plain language for a chip is scope this bug never asked for. The full sentence
           rides in as the label, so the count stays visible while CLOSED — hiding how many
           sources there are would be a worse bug than the one being fixed. */}
-      <CollapsibleTrigger asChild>
-        <button aria-expanded={open}>
-          <FoldTrigger open={open} label={`References · ${count} source${count !== 1 ? "s" : ""}`} />
-        </button>
-      </CollapsibleTrigger>
+      {checkMessageId ? (
+        <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
+          {trigger}
+          <CitationCheckAction messageId={checkMessageId} citationCount={count} />
+        </div>
+      ) : (
+        trigger
+      )}
       <CollapsibleContent
         className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-top-1 data-[state=closed]:slide-out-to-top-1 duration-200 ease-in-out"
       >

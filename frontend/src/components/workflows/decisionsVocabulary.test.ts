@@ -221,6 +221,32 @@ describe("the four absence values state an absence, and each states its own", ()
   })
 })
 
+// ── 4b. 288-01 — the draft-lifetime settings row's words (A-02) ──────────────────────────
+
+describe("288-01 — the settings row speaks present tense, not the arrival's narration", () => {
+  const ROW_WORDS = [
+    decisionsVocabulary.DRAFT_SETTINGS_HEADING,
+    decisionsVocabulary.DRAFT_SETTINGS_OPEN_ACTION,
+    decisionsVocabulary.DRAFT_SETTINGS_CLOSE_ACTION,
+  ]
+
+  it("all three exist, are non-empty and trimmed", () => {
+    for (const w of ROW_WORDS) {
+      expect(typeof w).toBe("string")
+      expect(w).not.toBe("")
+      expect(w).toBe(w.trim())
+    }
+  })
+
+  it("none narrates the AI's past choices (the arrival's register)", () => {
+    for (const w of ROW_WORDS) {
+      expect(w.toLowerCase()).not.toMatch(/decided|made for you|i applied/)
+    }
+    // Distinct from the arrival heading it must not echo.
+    expect(decisionsVocabulary.DRAFT_SETTINGS_HEADING).not.toBe(decisionsVocabulary.DECISIONS_HEADING)
+  })
+})
+
 // ── 5. D-20 — no value claims what the gate does (T-197-09) ──────────────────────────────
 
 describe("D-20 — nothing this module says makes a claim about the gate", () => {

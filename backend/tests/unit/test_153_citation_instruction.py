@@ -13,6 +13,7 @@ import copy
 
 from app.services.citation_markers import (
     CITATION_INSTRUCTION,
+    CITATION_REMINDER,
     apply_citation_instruction,
     format_citation_manifest,
     _deduplicate_citations,
@@ -86,6 +87,25 @@ class TestDualChannelInject:
         assert expected in out_sys
         # Dedup collapses the two identical (document_id, chunk_index) hits -> 2 rows.
         assert expected.count("\n") == 1
+
+
+class TestNumberNotFilename:
+    """BUG-261020-05: answers cited ``[Report.docx]`` instead of ``[n]``, so no marker
+    rendered. The note must forbid a bracketed filename, say so even when the user asks
+    to "cite", and repeat the rule AFTER the manifest (the lines the model copies from)."""
+
+    def test_instruction_forbids_bracketed_filename(self):
+        assert "never" in CITATION_INSTRUCTION.lower()
+        assert "filename" in CITATION_INSTRUCTION.lower()
+        assert "cite" in CITATION_INSTRUCTION.lower() and "asks" in CITATION_INSTRUCTION.lower()
+
+    def test_reminder_follows_manifest(self):
+        cits = [_chunk("a", filename="Report.docx")]
+        out_sys = apply_citation_instruction(BASE_SYS, _base_messages(), cits)
+        manifest = format_citation_manifest(_deduplicate_citations(cits))
+        tail = out_sys[out_sys.index(manifest) + len(manifest):]
+        assert CITATION_REMINDER in tail
+        assert "[1]" in CITATION_REMINDER and "filename" in CITATION_REMINDER.lower()
 
 
 class TestIdempotency:

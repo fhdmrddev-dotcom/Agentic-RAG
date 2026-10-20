@@ -57,7 +57,13 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { Upload, Check, X, ChevronDown, Info } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { launchInputFields, templateAdmission, type DefShape } from "@/components/workflows/soulData"
+import {
+  launchInputFields,
+  missingRequiredFields,
+  requiredFieldsMessage,
+  templateAdmission,
+  type DefShape,
+} from "@/components/workflows/soulData"
 // 214-12 (STEP-02): the ONE declared-input field renderer, shared with the chat launch form.
 // The two-arm label rule and the launchInputFields-not-entryInputFields warning live with it.
 import { LaunchInputFields } from "@/components/workflows/LaunchInputFields"
@@ -117,8 +123,11 @@ export function RunModal({
   const launchFields = launchInputFields(def)
   // The collected values, keyed by the DECLARED key. Never seeded from anything: a field a
   // person did not fill is an empty string, and an empty string is a real answer here (the
-  // executor's own schema validation is the arbiter — this launcher validates nothing).
+  // executor's own schema validation is the arbiter; 287-01 only refuses an EMPTY REQUIRED field at confirm).
   const [inputValues, setInputValues] = useState<Record<string, string>>({})
+  // 287-01: refusal sentence for an empty required field. Distinct from `launchError`
+  // (the server's verbatim 422 path) so the two stay distinguishable.
+  const [requiredRefusal, setRequiredRefusal] = useState<string | null>(null)
   // ── Phase 193-07 (AUTH-03 / D-17 / D-20): does this workflow get the template control? ──
   //
   // HIDE ONLY ON A POSITIVE NO. `templateAdmission` is THREE-state and this comparison is
@@ -246,6 +255,12 @@ export function RunModal({
     // keys and nothing else. Built from `launchFields` rather than handed `inputValues`
     // straight, so a key that stopped being declared between two renders cannot ride along,
     // and so the dict is `{}` — never `undefined` — when the definition declares none.
+    const missing = missingRequiredFields(launchFields, inputValues)
+    if (missing.length > 0) {
+      setRequiredRefusal(requiredFieldsMessage(missing))
+      return
+    }
+    setRequiredRefusal(null)
     const inputs: Record<string, string> = {}
     for (const f of launchFields) inputs[f.key] = inputValues[f.key] ?? ""
     try {
@@ -453,7 +468,7 @@ export function RunModal({
               substring match, so prose that merely SPELLS the sentence trips it; this paragraph
               deliberately does not (the same discipline `librarySubtree.fences.test.ts`'s
               T-192-04 note keeps about the prop IT forbids). Please do not tidy the indentation. */}
-          {(showTemplate || launchError) && (
+          {(showTemplate || launchError || requiredRefusal) && (
           <div className="flex flex-col gap-1.5">
             {showTemplate && (
             <>
@@ -514,6 +529,11 @@ export function RunModal({
               </button>
             )}
             </>
+            )}
+            {requiredRefusal && (
+              <p data-testid="run-required-refusal" role="alert" className="px-0.5 text-[11px] text-destructive">
+                {requiredRefusal}
+              </p>
             )}
             {launchError && (
               <p data-testid="run-upload-error" role="alert" className="px-0.5 text-[11px] text-destructive">
@@ -622,10 +642,9 @@ export function RunModal({
               warning all travelled WITH the code, because a rule separated from what it
               governs is a rule nobody applies. Read them there, not here.
 
-              ⚠ NO REQUIRED-NESS IS VALIDATED HERE, deliberately. The publish gate (`214-05`)
-              already refuses a workflow whose `ask` key is undeclared; a launcher that
-              blocked on an empty optional field would refuse a run the system can perform.
-              An empty field sends an empty string and the executor's schema is the arbiter.
+              ⚠ THE LEAF STAYS NON-BLOCKING; THE BLOCK IS `handleRun`'s (287-01). An empty
+              required field is refused there, by name, before `onRun` is called; an empty
+              `required: false` field still sends an empty string with its key present.
 
               ⚠ IT SITS WITH THE FIELDS, NOT IN THE INFO GROUP BELOW. That group is what the
               dialog SAYS about the run; this is what it ASKS. Putting a text box among the

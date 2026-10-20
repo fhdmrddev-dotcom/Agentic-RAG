@@ -3082,6 +3082,82 @@ COMMENT ON COLUMN public.message_artifacts.created_at IS 'Emission time. Orders 
 
 
 --
+-- Name: message_citation_checks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.message_citation_checks (
+    message_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    org_id uuid NOT NULL,
+    engine text NOT NULL,
+    model text NOT NULL,
+    result jsonb NOT NULL,
+    input_tokens integer,
+    cost_usd numeric,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT message_citation_checks_engine_check CHECK ((engine = ANY (ARRAY['jev'::text, 'openai_decisions'::text])))
+);
+
+
+--
+-- Name: TABLE message_citation_checks; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.message_citation_checks IS 'Stored citation-check result per assistant message (Phase 294, DEC-03). One row per message; a re-check replaces it. Visibility mirrors public.messages; written only by the backend pool.';
+
+
+--
+-- Name: COLUMN message_citation_checks.message_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_citation_checks.message_id IS 'The assistant message that was checked. ON DELETE CASCADE.';
+
+
+--
+-- Name: COLUMN message_citation_checks.user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_citation_checks.user_id IS 'The message owner. Part of the RLS predicate (auth.uid() = user_id), as on messages.';
+
+
+--
+-- Name: COLUMN message_citation_checks.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_citation_checks.org_id IS 'The tenancy boundary, bound from the message row; the autofill trigger stamps it when absent, exactly as messages.';
+
+
+--
+-- Name: COLUMN message_citation_checks.engine; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_citation_checks.engine IS 'The decision engine that ran the check. Must equal CheckEngineId in backend/app/models/citation_check.py.';
+
+
+--
+-- Name: COLUMN message_citation_checks.result; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_citation_checks.result IS 'CitationCheckResult version 1: claims (ordinal, n, sentence, verdict, confidence), counts, usage. Never model-written prose.';
+
+
+--
+-- Name: COLUMN message_citation_checks.input_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_citation_checks.input_tokens IS 'Engine input tokens summed over the check''s calls; NULL when unknown (never 0 for unknown).';
+
+
+--
+-- Name: COLUMN message_citation_checks.cost_usd; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_citation_checks.cost_usd IS 'Engine cost in USD for the check, unquantised; NULL when unknown.';
+
+
+--
 -- Name: message_feedback; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4790,6 +4866,14 @@ ALTER TABLE ONLY public.message_artifacts
 
 
 --
+-- Name: message_citation_checks message_citation_checks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_citation_checks
+    ADD CONSTRAINT message_citation_checks_pkey PRIMARY KEY (message_id);
+
+
+--
 -- Name: message_feedback message_feedback_message_user_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5882,6 +5966,13 @@ CREATE INDEX idx_message_artifacts_thread ON public.message_artifacts USING btre
 
 
 --
+-- Name: idx_message_citation_checks_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_citation_checks_user ON public.message_citation_checks USING btree (user_id);
+
+
+--
 -- Name: idx_message_feedback_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6740,6 +6831,20 @@ CREATE TRIGGER message_artifacts_autofill_org_id BEFORE INSERT ON public.message
 --
 
 CREATE TRIGGER message_artifacts_immutable BEFORE UPDATE ON public.message_artifacts FOR EACH ROW EXECUTE FUNCTION public.message_artifacts_immutable();
+
+
+--
+-- Name: message_citation_checks message_citation_checks_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_citation_checks_autofill_org_id BEFORE INSERT ON public.message_citation_checks FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: message_citation_checks message_citation_checks_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_citation_checks_set_updated_at BEFORE UPDATE ON public.message_citation_checks FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
@@ -7625,6 +7730,30 @@ ALTER TABLE ONLY public.message_artifacts
 
 ALTER TABLE ONLY public.message_artifacts
     ADD CONSTRAINT message_artifacts_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_citation_checks message_citation_checks_message_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_citation_checks
+    ADD CONSTRAINT message_citation_checks_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.messages(id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_citation_checks message_citation_checks_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_citation_checks
+    ADD CONSTRAINT message_citation_checks_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: message_citation_checks message_citation_checks_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_citation_checks
+    ADD CONSTRAINT message_citation_checks_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -8736,6 +8865,13 @@ CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SE
 
 
 --
+-- Name: message_citation_checks Users can view their own citation checks; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view their own citation checks" ON public.message_citation_checks FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
 -- Name: message_artifacts Users can view their own message artifacts; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -9291,6 +9427,12 @@ CREATE POLICY legal_holds_update ON public.legal_holds FOR UPDATE TO authenticat
 --
 
 ALTER TABLE public.message_artifacts ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: message_citation_checks; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.message_citation_checks ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: message_feedback; Type: ROW SECURITY; Schema: public; Owner: -
@@ -10838,3 +10980,12 @@ REVOKE ALL ON TABLE public.library_documents FROM authenticated;
 REVOKE ALL ON TABLE public.library_documents FROM service_role;
 GRANT SELECT ON TABLE public.library_documents TO authenticated;
 GRANT SELECT ON TABLE public.library_documents TO service_role;
+
+-- migration 211 — message_citation_checks: owners READ (the messages predicate); only the backend writes.
+-- service_role holds UPDATE: a re-check replaces the stored row (ON CONFLICT (message_id) DO UPDATE).
+REVOKE ALL ON TABLE public.message_citation_checks FROM PUBLIC;
+REVOKE ALL ON TABLE public.message_citation_checks FROM anon;
+REVOKE ALL ON TABLE public.message_citation_checks FROM authenticated;
+REVOKE ALL ON TABLE public.message_citation_checks FROM service_role;
+GRANT SELECT ON TABLE public.message_citation_checks TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.message_citation_checks TO service_role;

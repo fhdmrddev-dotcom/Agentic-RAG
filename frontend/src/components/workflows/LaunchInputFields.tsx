@@ -52,10 +52,9 @@ import { ARG_OPTIONAL_MARK, ARG_REQUIRED_MARK } from "@/components/workflows/arg
  * `react-refresh/only-export-components` lint ERROR on this directory (measured in
  * `ExternalActionSection.tsx`). Constants belong in a vocabulary module, not here.
  *
- * ⚠ NO REQUIRED-NESS IS VALIDATED, deliberately, on any launcher. The publish gate (`214-05`)
- * already refuses a workflow whose `ask` key is undeclared; a launcher that blocked on an empty
- * optional field would refuse a run the system can perform. An empty field sends an empty string
- * and the executor's schema is the arbiter.
+ * ⚠ THIS LEAF NEVER BLOCKS. Required-ness is enforced by the two launch CONFIRM controls
+ * (`ChatLaunchForm`, `RunModal`) through `soulData.missingRequiredFields` (287-01); an empty field
+ * here still just holds an empty string and `input.required` stays false.
  *
  * ── 214.1-01 (STEP-02) — REQUIREDNESS IS NOW SHOWN, AND STILL NOT ENFORCED ────────────
  *
@@ -65,20 +64,14 @@ import { ARG_OPTIONAL_MARK, ARG_REQUIRED_MARK } from "@/components/workflows/arg
  * component renders it as a MARK, from `argumentVocabulary`'s SHIPPED `ARG_REQUIRED_MARK` /
  * `ARG_OPTIONAL_MARK` rather than a third copy of the words the argument form already says.
  *
- * ⛔ AND THE CONFIRM CONTROL IS STILL NOT BLOCKED — the paragraph above stands, and this one
- * says WHY it stands rather than leaving the omission to look like an oversight:
+ * ✅ 287-01 TOOK THE RE-OPEN TRIGGER BELOW: the confirm controls of the library Run modal and the
+ * chat launch form now refuse an empty required field and name it (`missingRequiredFields` /
+ * `requiredFieldsMessage` in `soulData.ts`). This leaf is deliberately unchanged and non-blocking.
+ * The client block is UX, not the trust boundary: no server predicate for required launch inputs
+ * exists (hardening deferred), and the schedule form is NOT yet blocked (deferred to 293).
  *
- *   1. Blocking would change the contract of THREE shipped launch doors from Phase 214 (the
- *      library Run modal, the chat launch form, the schedule form) in a plan that ships a mark.
- *   2. Nothing silently succeeds today. The SMTP adapter and the publish gate BOTH fail closed
- *      on an empty required argument, so an empty box produces a refusal that names itself —
- *      not a run that quietly does the wrong thing.
- *   3. A client-side block would be a second copy of a server predicate (D-182-06), and the
- *      weaker copy: this component cannot see the action's schema.
- *
- * ⚠ RE-OPEN TRIGGER, recorded here rather than in a plan file: **the next phase that touches a
- * launcher's confirm control takes the block.** At that point the change is one place and the
- * mark is already rendered; today it would be three doors and a new refusal vocabulary.
+ * Original re-open trigger, kept for the record: **the next phase that touches a launcher's
+ * confirm control takes the block.**
  *
  * ⚠ THE MARK IS AN ADDITION, NOT A THIRD ARM. The label/key rule above is untouched and the
  * label reading is still the FIRST span inside the `<label>`; the mark follows it.

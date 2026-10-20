@@ -203,7 +203,7 @@ SQL editor, in order:
    **"Run without RLS"** — the file enables RLS itself). One shot: tables + RLS + the 4
    storage buckets + the `on_auth_user_created` trigger + realtime + pgvector.
 
-2. **Apply the 14 seed migrations** the schema-only dump skips, from `supabase/migrations/`,
+2. **Apply the 16 seed migrations** the schema-only dump skips, from `supabase/migrations/`,
    by exact filename:
 
    | Order | File | Carries |
@@ -222,10 +222,12 @@ SQL editor, in order:
    | 12 | `187_expert_bundles.sql` | the Financial Analyzer system Expert row — **apply FIRST of the Expert trio** |
    | 13 | `189_expert_presentation_and_grants.sql` | presentation columns + `experts:manage` role permissions; UPDATEs 187's row — **apply SECOND** |
    | 14 | `198_starter_expert_library.sql` | the starter Expert library (Contract Reviewer, HR Policy Advisor, Security & Compliance, Operations Analyst) + the Financial Analyzer copy fix; UPDATEs 187's row — **apply THIRD** |
+   | 15 | `094_starter_workflows.sql` | the 3 template-backed Starter workflows (risk-register, weekly-status-report, compliance-gap-report). Their `.docx` templates are Storage objects a SQL file cannot place: after applying, run `python scripts/seed-starters.py --upload` against the target Supabase |
+   | 16 | `210_starter_workflows_v2.sql` | the 3 template-less Starter workflows (meeting-notes-to-actions, policy-change-impact, stakeholder-update); no Storage asset needed. Published rows are immutable, and `UNIQUE(slug, version)` is global: check the three slugs are free first |
 
    **Order matters within the trio `087 → 088 → 089`** (088 and 089 both UPDATE the row
    087 creates) **and within the Expert trio `187 → 189 → 198`** (189 and 198 both UPDATE the
-   Financial Analyzer row 187 creates). All fourteen are idempotent **when re-run in the order listed** — ⚠ re-running 187 or 189 ALONE after 198 restores the Financial Analyzer's superseded copy (24.3% / $412M), so if you re-run any of the Expert trio, re-run `187 → 189 → 198` together.
+   Financial Analyzer row 187 creates). All sixteen are idempotent **when re-run in the order listed** — ⚠ re-running 187 or 189 ALONE after 198 restores the Financial Analyzer's superseded copy (24.3% / $412M), so if you re-run any of the Expert trio, re-run `187 → 189 → 198` together.
 
    ⚠ **What this list deliberately does NOT carry, for the Expert catalog** (Phase 269): the
    retired hardcoded-org knowledge seed and the two later migrations that re-point and then delete

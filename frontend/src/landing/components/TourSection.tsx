@@ -320,7 +320,7 @@ export function TourSection() {
               </div>
               <div className="tourright">
                 <div className="feat"><b>AI Model</b>Default provider and model, per-role overrides (title generation, judge, embeddings), and the tool-calling mode: Quality, Native, or XML / structured.</div>
-                <div className="feat"><b>Retrieval</b>Hybrid search weights, reranking on/off with API (Cohere) or local (sentence-transformers), embedding model with the weight-not-friction re-embed confirm.</div>
+                <div className="feat"><b>Retrieval</b>Hybrid search weights, reranking off or one of four engines (on this server, Jev via OpenRouter, OpenAI Decisions, Cohere) with a plain notice when passages leave the server, an on-demand citation check on cited answers, and the embedding model with the weight-not-friction re-embed confirm.</div>
                 <div className="feat"><b>Integrations</b>The connections list, per-application availability lines, grants, and the custom MCP door.</div>
                 <div className="feat"><b>Memory</b>What the agent has remembered about you and your org; edit or forget any of it.</div>
                 <div className="feat"><b>Audit Log</b>Your own actions and the agent’s writes on your behalf, filterable, exportable.</div>

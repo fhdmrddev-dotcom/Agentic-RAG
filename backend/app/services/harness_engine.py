@@ -2899,18 +2899,9 @@ async def _build_resume_context(run, redis, pool):
                 "resume: org_id read failed for run %s", run.get("run_id"), exc_info=True
             )
             _org_id = None
-    await insert_run(
-        pool,
-        run_id=_producer_id,
-        thread_id=_thread_id if isinstance(_thread_id, UUID) else UUID(str(_thread_id)),
-        user_id=_user_id if isinstance(_user_id, UUID) else UUID(str(_user_id)),
-        status="streaming",
-        # model/provider are NOT NULL (db/runs.py); the shell is never used for an
-        # LLM call so the placeholder cannot misroute any provider's sub-agent.
-        model="unknown", provider="unknown",
-        parent_run_id=None,
-        org_id=str(_org_id) if _org_id else None,
-    )
+    # 289-REVIEW WR-01: the shell INSERT moved to the END of this function (below). It used to
+    # sit here, and `get_service_role_supabase` (which refuses a falsy org) could then raise
+    # with no `ctx` returned, so no caller could finalize the `streaming` shell.
 
     # F5 (092-07): the startup sweep has NO request, so there is no request-scoped
     # supabase to thread. Source the SERVICE-ROLE client for the resumed run. Without
@@ -3073,7 +3064,7 @@ async def _build_resume_context(run, redis, pool):
             _owner_settings = None
     _ctx_model = resolve_workflow_ctx_model(_owner_settings)
 
-    return SimpleNamespace(
+    _resume_ctx = SimpleNamespace(
         run_id=run["run_id"],
         producer_run_id=_producer_id,
         thread_id=str(run["thread_id"]),
@@ -3115,6 +3106,24 @@ async def _build_resume_context(run, redis, pool):
         spawn=_resume_spawn,
         per_run_task_semaphore=asyncio.Semaphore(settings.task_per_run_concurrency),
     )
+    # 289-REVIEW WR-01 — THE SHELL IS MINTED LAST. Every fallible step above (the org-requiring
+    # service-role client, scope resolution, settings, the ctx model) runs BEFORE this INSERT,
+    # and nothing after it can raise, so a raise here never leaves a `streaming` shell that no
+    # caller can finalize (it would become the thread's latest runs row and defeat the F2
+    # self-heal). Org still resolved before the INSERT (268-REVIEW WR-06).
+    await insert_run(
+        pool,
+        run_id=_producer_id,
+        thread_id=_thread_id if isinstance(_thread_id, UUID) else UUID(str(_thread_id)),
+        user_id=_user_id if isinstance(_user_id, UUID) else UUID(str(_user_id)),
+        status="streaming",
+        # model/provider are NOT NULL (db/runs.py); the shell is never used for an
+        # LLM call so the placeholder cannot misroute any provider's sub-agent.
+        model="unknown", provider="unknown",
+        parent_run_id=None,
+        org_id=str(_org_id) if _org_id else None,
+    )
+    return _resume_ctx
 
 
 def _resume_spawn(coro) -> asyncio.Task:

@@ -1,0 +1,721 @@
+{
+  "router": [
+    {
+      "path": "/workflows/published",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_published_workflows",
+      "endpoint": "get_published_workflows",
+      "response_model": "list[PublishedWorkflow]",
+      "status_code": null,
+      "route_dependencies": [],
+      "query_params": [
+        "project_folder_id",
+        "scope"
+      ],
+      "path_params": [],
+      "header_params": [],
+      "body_params": [],
+      "sub_dependencies": [
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/starters",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_starter_workflows",
+      "endpoint": "get_starter_workflows",
+      "response_model": "list[PublishedWorkflow]",
+      "status_code": null,
+      "route_dependencies": [],
+      "query_params": [],
+      "path_params": [],
+      "header_params": [],
+      "body_params": [],
+      "sub_dependencies": [
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/validate",
+      "methods": [
+        "POST"
+      ],
+      "name": "validate_workflow",
+      "endpoint": "validate_workflow",
+      "response_model": "ValidateResponse",
+      "status_code": null,
+      "route_dependencies": [
+        {
+          "qualname": "require_canvas.<locals>._dep",
+          "closure_strings": []
+        }
+      ],
+      "query_params": [],
+      "path_params": [],
+      "header_params": [],
+      "body_params": [
+        "body"
+      ],
+      "sub_dependencies": [
+        {
+          "qualname": "require_canvas.<locals>._dep",
+          "closure_strings": []
+        },
+        {
+          "qualname": "canvas_caller",
+          "closure_strings": []
+        },
+        {
+          "qualname": "get_supabase",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/grounding-bundle",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_grounding_bundle",
+      "endpoint": "get_grounding_bundle",
+      "response_model": "GroundingBundleResponse",
+      "status_code": null,
+      "route_dependencies": [
+        {
+          "qualname": "require_canvas.<locals>._dep",
+          "closure_strings": []
+        }
+      ],
+      "query_params": [
+        "template_asset_id"
+      ],
+      "path_params": [],
+      "header_params": [],
+      "body_params": [],
+      "sub_dependencies": [
+        {
+          "qualname": "require_canvas.<locals>._dep",
+          "closure_strings": []
+        },
+        {
+          "qualname": "canvas_caller",
+          "closure_strings": []
+        },
+        {
+          "qualname": "get_supabase",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/publish",
+      "methods": [
+        "POST"
+      ],
+      "name": "publish_workflow",
+      "endpoint": "publish_workflow",
+      "response_model": "PublishVerdict",
+      "status_code": null,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [
+        "definition_id"
+      ],
+      "header_params": [],
+      "body_params": [
+        "body"
+      ],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        },
+        {
+          "qualname": "get_redis",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows",
+      "methods": [
+        "POST"
+      ],
+      "name": "create_draft",
+      "endpoint": "create_draft",
+      "response_model": "DraftCreateResponse",
+      "status_code": 201,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [],
+      "header_params": [],
+      "body_params": [
+        "body"
+      ],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/drafts",
+      "methods": [
+        "GET"
+      ],
+      "name": "list_drafts",
+      "endpoint": "list_drafts",
+      "response_model": "list[DraftRow]",
+      "status_code": null,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [],
+      "header_params": [],
+      "body_params": [],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}",
+      "methods": [
+        "PATCH"
+      ],
+      "name": "update_draft",
+      "endpoint": "update_draft",
+      "response_model": "DraftCreateResponse",
+      "status_code": null,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [
+        "definition_id"
+      ],
+      "header_params": [
+        "if_match"
+      ],
+      "body_params": [
+        "body"
+      ],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "name": "delete_draft",
+      "endpoint": "delete_draft",
+      "response_model": null,
+      "status_code": 204,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [
+        "definition_id"
+      ],
+      "header_params": [],
+      "body_params": [],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/delete-preview",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_delete_preview",
+      "endpoint": "get_delete_preview",
+      "response_model": "DeletePreview",
+      "status_code": null,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [
+        "definition_id"
+      ],
+      "header_params": [],
+      "body_params": [],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/cascade",
+      "methods": [
+        "DELETE"
+      ],
+      "name": "delete_workflow_cascade",
+      "endpoint": "delete_workflow_cascade",
+      "response_model": null,
+      "status_code": 204,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [
+        "definition_id"
+      ],
+      "header_params": [],
+      "body_params": [],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        },
+        {
+          "qualname": "get_supabase",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/generate",
+      "methods": [
+        "POST"
+      ],
+      "name": "generate_workflow",
+      "endpoint": "generate_workflow",
+      "response_model": null,
+      "status_code": null,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [],
+      "header_params": [],
+      "body_params": [
+        "body"
+      ],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        },
+        {
+          "qualname": "get_supabase",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/template/placeholders",
+      "methods": [
+        "POST"
+      ],
+      "name": "read_template_placeholders",
+      "endpoint": "read_template_placeholders",
+      "response_model": "TemplatePlaceholdersResponse",
+      "status_code": null,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [],
+      "header_params": [],
+      "body_params": [
+        "file"
+      ],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/template",
+      "methods": [
+        "POST"
+      ],
+      "name": "upload_workflow_template",
+      "endpoint": "upload_workflow_template",
+      "response_model": "TemplateAssetRef",
+      "status_code": 201,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [
+        "definition_id"
+      ],
+      "header_params": [],
+      "body_params": [
+        "file"
+      ],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        },
+        {
+          "qualname": "get_user_supabase_client",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/template/placeholders",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_workflow_template_placeholders",
+      "endpoint": "get_workflow_template_placeholders",
+      "response_model": "TemplatePlaceholdersResponse",
+      "status_code": null,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        }
+      ],
+      "query_params": [
+        "asset_id"
+      ],
+      "path_params": [
+        "definition_id"
+      ],
+      "header_params": [],
+      "body_params": [],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        },
+        {
+          "qualname": "get_user_supabase_client",
+          "closure_strings": []
+        }
+      ]
+    }
+  ],
+  "app": [
+    {
+      "path": "/workflows/published",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/workflows/starters",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/workflows/validate",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/workflows/grounding-bundle",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/publish",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/workflows",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/workflows/drafts",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/delete-preview",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/cascade",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "path": "/workflows/generate",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/workflows/template/placeholders",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/template",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/template/placeholders",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/workflows/{workflow_id}/schedules",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/workflows/{workflow_id}/schedules",
+      "methods": [
+        "GET"
+      ]
+    }
+  ]
+}

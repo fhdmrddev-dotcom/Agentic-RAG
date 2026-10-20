@@ -29,404 +29,312 @@
 - ✅ **v4.3 What You Can Actually Sell** — Phases **255-264** (shipped 2026-09-23, git tag `v4.3`). 10 phases (255-260 scoped; 261-264 added in-milestone), **39 plans**, migrations **182-192**, 6 days. **31/32 requirements delivered · PACK-05 carried to SEED-304 by decision.** Extension contract, token metering + USD, enforceable tiers, Experts as data.
 - ✅ **v4.4 Experts That Actually Work** — Phases **265-269** (shipped 2026-09-29, git tag `v4.4`). 5 phases, **24 plans**, migrations **194-198**, 7 days. **17/17 requirements satisfied** (audit `tech_debt`, no blockers). A client installs an Expert and gets grounded answers from its own knowledge in their own org — proven by live drives as a real user, never by a mocked test. ✅ **DEPLOYED 2026-09-29** — production `82babd8d0`; migrations 195-198 applied to production (194 already was). Operator smoke test owed.
 - ✅ **v4.5 Find It, Show It** — Phases **270-276** (shipped 2026-10-12, git tag `v4.5`). 7 phases, **38 plans**, migrations **199-206**, 14 days. **25/25 requirements satisfied** (audit `tech_debt`, no blockers). Find a document by what it IS and get the file back out, an agent that answers with interactive artifacts from a closed registry, thread-scoped attachments, retention with legal hold, and public docs. ✅ 270-274 + 276 **LIVE 2026-10-05** (prod `bd9e126c3`); ✅ **275 deployed 2026-10-12** (prod `784647e2d`, migrations 204-206).
-- 🚧 **v4.6 Pay It Down** — Phases 277-285 (started 2026-10-12; 284 added 2026-10-14; 285 added 2026-10-16). Repair only: 14 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extractions, 2 register-hygiene items (24 requirements).
+- ✅ **v4.6 Pay It Down** — Phases **277-285** (shipped 2026-10-16, git tag `v4.6`). 9 phases, **34 plans**, migrations **207-209**, 5 days. **24/24 requirements satisfied** (audit `tech_debt`, no blockers). Repair only: 14 major-bug fixes, 5 v4.5 debt items, 3 G-5 extractions, 2 register-hygiene items. ✅ **DEPLOYED 2026-10-16** (prod `4e767a3a2`).
+- 🚧 **v4.7 Workflows You Can See and Start Anywhere** — Phases **286-293** (started 2026-10-18). 8 phases, 14 requirements. Workflows become easier to start (from a thread, from a starter, from outside), easier to finish authoring, and show at a glance what a run did and on what evidence.
 
 ---
 
-## v4.6 Pay It Down — 🚧 IN PROGRESS
+## v4.7 Workflows You Can See and Start Anywhere — 🚧 IN PROGRESS
 
-**Started:** 2026-10-12. **Roadmap created:** 2026-10-12.
-Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **24 v4.6 requirements, 24 mapped, 0 orphans** (was 20 at roadmap creation; FIX-11 added 2026-10-14 with 284; FIX-12..14 added 2026-10-16 with 285 at the milestone audit).
-⚠ The intake summary said *"19"*; the categories add to **20** (10 FIX + 5 DEBT + 3 SEAM + 2 REG), counted from `REQUIREMENTS.md`.
+**Started:** 2026-10-18. **Roadmap created:** 2026-10-18.
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 mapped, 0 orphans** (4 START · 3 AUTH · 4 VIS · 1 TRUST · 2 REG · 3 DEC). DEC-01..03 (Phase 294) were added 2026-10-20 by the operator, outside the workflow theme.
 
-**Goal:** Every open **major** bug fixed and the v4.5 tech debt cleared. **Repair only — no new user capability.**
+**Goal:** Workflows become easier to start, finish authoring and understand at a glance, with visuals that show what a run did.
 
-**Milestone rule (every phase):** a fix is proven by **driving the defect it closes**, RED first, on the
-path the bug report names, with the evidence recorded (DB row, request/response, screenshot, transcript).
-A mocked or fixture test alone does not close a bug. ⛔ *Presence assertions cannot see content drift*:
-where the words are the deliverable (a refusal, a cause, a path), assert the rendered **content**.
-⛔ **Measure before fixing.** Four requirements arrive with a record saying the work is already partly
-or fully done (FIX-03/04/05 fixed in code 2026-09-10; FIX-10 narrowed to one item 2026-08-29; SEAM-02
-recorded as discharged by 272-01). Each is re-measured against the tree at discuss. A record is a
-claim, and this project has found three wrong register entries in one sitting before.
+**Milestone rule (every phase):** a capability is proven by **driving it as a user** on the path the requirement names (DB row, request/response, screenshot, transcript). A mocked test alone does not close a requirement. ⛔ Presence assertions cannot see content drift: where the words are the deliverable (a receipt line, a trigger label, a refusal), assert the rendered **content**.
+⛔ **Measure before building.** Each seed behind a requirement is a claim about the tree at planting time. Re-measure the files, line counts and ledger triples at discuss.
 
-**Red line (every phase — the Extension Contract, `docs/EXTENSION-CONTRACT.md`):** the closed core
-(**7 phase types / 1 emitter / 30 tools** at v4.5 close) is re-counted against each phase's base commit.
-Count it; do not substring-match it. **No phase adds a tool, a phase type, an emitter or a validator
-kind.** A repair milestone that grows the core has stopped being a repair milestone.
+**Red line (every phase, the Extension Contract):** the closed core (**7 phase types / 1 emitter / 30 tools**) is re-counted against each phase's base commit with `test_259_closed_core_inventory.py`, never substring-matched. **No phase adds a tool, a phase type, an emitter or a validator kind** unless the phase flags it and the operator approves it explicitly. A new artifact component (VIS-02) is a registry entry, not a tool. An inbound trigger (START-02) is an API route, not a tool.
 
-**Baseline gates (every phase):** backend `pytest tests/unit -q --continue-on-collection-errors` at
-**≤ 71 failed, 0 collection errors** (zero headroom); frontend `GSD_VITEST_MAX_WORKERS=2 node
-scripts/vitest-count-gate.cjs` with no per-file decrease and 0 failing; the frontend typecheck as
-`npx tsc -p tsconfig.app.json --noEmit` measured as a **set diff** against base (plain `tsc --noEmit`
-checks zero files); `node scripts/check-claude-md-size.cjs` with **no warning** once Phase 277 lands.
+**Baseline gates (every phase):** backend `pytest tests/unit -q --continue-on-collection-errors` at **<= 71 failed, 0 collection errors** (zero headroom); frontend `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` with no per-file decrease and 0 failing; frontend typecheck as `npx tsc -p tsconfig.app.json --noEmit` as a **set diff** against base; `node scripts/check-claude-md-size.cjs` with no warning.
 
-**Numbering:** Phases **277-283**. **Migrations resume at `207`**, measured at roadmap creation (`ls
-supabase/migrations | tail` ends at `206_retention_hold_hardening.sql`). No phase is pre-assigned a
-migration. Only Phase 280 is likely to need one (FIX-02's atomicity, or DEBT-08's decision); whichever
-phase needs one takes the **next free** number at its own discuss, after running `ls` again.
+**Numbering:** Phases **286-294** (294 added 2026-10-20). **Migrations resume at `210`**, measured at roadmap creation (`ls supabase/migrations | tail` ends at `209_watch_item_retry_and_purge_scope.sql`). No phase is pre-assigned a migration; likely candidates are 293 (START-02 inbound credentials) and 289 (TRUST-01 confidence column if the run model lacks one). Whichever phase needs one takes the next free number after re-running `ls`.
 
-**Solo running:** Claude builds and reviews. Phases close `verification_mode: self-verified`, and the
-review runs as a fresh-context `/gsd:code-review`.
+**Solo running:** Claude builds and reviews. Phases close `verification_mode: self-verified`; review runs as a fresh-context `/gsd:code-review`.
 
-**Out of scope (operator, at intake):** any new user-facing capability · `SEED-354` (hold private
-documents) · `SEED-334` (272 SC#4 remaining providers) · Open Platform (`SEED-013`) · the owed v4.5
-operator UAT/sign-offs (they stay in `STATE.md` "Owed") · medium/minor bugs not named in
-`REQUIREMENTS.md`. ⛔ A fix that needs a missing capability to be complete is **recorded and
-deferred**, never built inside this milestone (G-7's "a closure round may never introduce a new
-capability", applied milestone-wide).
+**Out of scope:** `SEED-347` canvas scale hardening · `SEED-013` Open Platform (v4.8) · new tools, phase types or emitters · the owed v4.6 operator verification (stays in `STATE.md` "Owed").
 
 ### Phase Table
 
 | Phase | Name | Goal | Requirements | SC# | Flags |
 |-------|------|------|--------------|-----|-------|
-| 277 | Registers Back Inside the Band | The always-loaded project instructions sit below the warn band with nothing deleted, and the v4.5 records say what shipped | REG-04, REG-05 | 4 | docs-only · no source touched · split by FUNCTION, same-commit sync rule · ledger table stays complete |
-| 278 | One Home for Tools and Filters | The agent's tool dispatcher splits into registry and handlers, and the document-filter vocabulary has one home, with behaviour unchanged | SEAM-02, SEAM-03, DEBT-09 | 5 | ⛔ **G-5 extraction** (`tool_dispatcher.py` OV-273-02; `retrieval_service.py` SEED-224, **measure first**) · behaviour-preserving · registry pinned 30/30 · TDD pin-first |
-| 279 | The Expert Scope Seam | `expert_scope.py` is split along its named seam and every deferred Phase 267 review item is fixed or carries a written reason | SEAM-01 | 4 | ⛔ **G-5 extraction** (`expert_scope.py`) · `SEED-328` folded · G-5 (`threads.py`, `run_producer.py`, `ChatArea.tsx`, `StreamsProvider.tsx`) honoured by construction |
-| 280 | In Once, Out Clean | A document that comes in arrives exactly once and completely, and one that goes out leaves nothing behind | FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11 | 5 | **measure first** (FIX-03/04/05 fixed in code 2026-09-10) · migration **207** only if needed · security_enforcement · hold guard order · live OneDrive row (⛔ if no credential) · G-5 (`documents.py`, `ingest_splice.py`, `sources.py`) |
-| 281 | A Refusal Names Its Cause | When a workflow step or a publish is refused, the author reads the check that actually failed, in plain words, and the freshness check ignores archived documents | FIX-09, FIX-10, DEBT-07 | 5 | closed core recount · **G-4** · G-2 skip recorded (copy on shipped layouts) · `SEED-221` folded · G-5 (`phase_types.py`, `validator_kinds.py`, `PublishGauntlet.tsx`, `doorVocabulary.ts`, `WorkflowBuilderPage.tsx`) · UI hint |
-| 282 | The Slow Run and the Paused Run | A slow model gets the timeout the operator set, and a paused run asks its question in one place with one draft | FIX-06, FIX-07 | 5 | **G-2 sketch** (FIX-07) · **G-4** · **SC#10 four-axis UAT, full 8-row roster** · G-5 (`openai_service.py`, `MessageList.tsx`, `PendingAskCard.tsx`, `WorkspacePanel.tsx`, `streamsStore.ts`) · UI hint |
-| 283 | Every Member Reaches Their Own Settings | An ordinary member reaches their own settings, and a large document's detail panel stays navigable | FIX-01, FIX-08 | 4 | ⛔ **G-5: `SettingsPage.tsx` tab seam OWED — taken first** · **G-4** · security_enforcement (two-role fence) · G-2 skip recorded unless discuss opens a new door · UI hint |
-| 284 | Library at Scale | The Library, Find and every picker stay correct and fast at tens of thousands of documents: server pages, server counts, no growing id lists | FIX-11 | 7 | ⛔ **G-5: `LibraryPage.tsx` extraction OWED — taken first** · **measure first** (10k/50k seeded) · migration **207** only if needed · security_enforcement (INVOKER, revoke PUBLIC) · **G-4** · G-5 (`documents.py`, `document_search_service.py`, `DocumentList.tsx`) · UI hint |
-| 285 | Watch and Re-upload Close Out | A watched file that fails once is fetched again, purging a watch removes only what it brought in, and a document whose ingest never started can be uploaded again | FIX-12, FIX-13, FIX-14 | 5 | added 2026-10-16 at the v4.6 audit (operator option B) · **security_enforcement** (purge is destructive: data loss of a hand upload) · G-5 FIRES (`ingest_splice.py`, `documents.py`, `sources.py`) — read their ledger sections first · migration only if needed (next free after **208**) · live OneDrive re-drive (⛔ if no credential) · no UI hint |
+| 286 | Seams Before Features | The workflow files this milestone edits are split along their named seams first, with behaviour unchanged | REG-07 | 4 | ⛔ **G-5 extraction** · measure first (which rows truly fire) · behaviour-preserving, pin-first · no UI hint |
+| 287 | Start From a Thread, Fork a Starter | A user starts a workflow from inside a thread and from a curated starter without opening the builder | START-01, START-03 | 5 | **G-2 sketch** (thread entry, starter picker) · **G-4** · SC#10 axes · starters must pass the gauntlet · G-5 (`ChatLayout.tsx`, `WorkflowsPage.tsx`, `ChatArea.tsx`) · UI hint |
+| 288 | Drafts That Survive, Pauses That Publish | A draft keeps its configuration across navigation, and a workflow that pauses for a person can be published and shows who it waits on | AUTH-03, AUTH-01 | 4 | **G-2 sketch** (waiting-on moment) · **G-4** · publish-gauntlet semantics change (security-adjacent) · G-5 (`WorkflowBuilderPage.tsx`, `builderStore.ts`, `PublishGauntlet.tsx`, `publish_service.py`, `WorkflowRunPage.tsx`) · UI hint |
+| 289 | The Run Page and Its Evidence | A finished run has one read-only page with export, and each knowledge-base-derived phase output carries a confidence level | VIS-03, TRUST-01 | 5 | **G-2 sketch** · **G-4** · migration only if needed (next free after 209) · no new model call · G-5 (`WorkflowRunPage.tsx`, `workflow_runs.py`, `harness_engine.py`, `phase_types.py`) · UI hint |
+| 290 | The Card and the Team Picture | The library card matches its approved sketch, and a multi-agent workflow can be viewed as a truthful orchestrator / workers / judge picture | VIS-04, VIS-01 | 4 | **G-2 sketch FIRST for both** · **G-4** · no edges the schema lacks · G-5 (`WorkflowCard.tsx`, `PhaseSpineGraph.tsx`, `WorkflowCanvas.tsx`, `PhaseNodeCard.tsx`) · UI hint |
+| 291 | Describe It From Your Own Files | Describe-it authoring takes uploaded assets and derives inputs, phases and tools from the closed set | AUTH-02 | 4 | **provider-docs-first** (structured output, 8-row roster) · SC#10 four-axis · security_enforcement (untrusted asset content) · closed core recount · G-5 (`workflow_authoring.py`, `workflows.py`, `useTemplateFirstDraft.ts`) · UI hint |
+| 292 | More Ways to Show It | The agent can show artifact types beyond chart, table and metric, from a closed registry | VIS-02 | 4 | **G-2 sketch** (choose the set at sketch time) · closed registry only, no new tool · migration only if the message_artifacts constraint needs it · G-4 · UI hint |
+| 293 | Start From Outside, and Close Out | An external system starts a run and reads the result; every run shows how it began; seed statuses match reality | START-02, START-04, REG-06 | 6 | ⛔ **security_enforcement** (opens an external door) · anti-injection + egress · org-scoped, rate-limited, audited · migration likely (next free) · **G-4** · depends on 287 and 289 · UI hint |
+| 294 | Decision Engine: Rerank and Citation Check | Knowledge-base search can rerank and prune its candidates with a fast decision model, and a user can check whether citations are supported; all behind a Settings switch | DEC-01, DEC-02, DEC-03 | 6 | **provider-docs-first** (Jev, OpenAI Decisions) · **G-2 sketch** (settings block, citation check) · **G-4** · measure before/after · migration likely (next free) · keys encrypted · no new tool · G-5 (`retrieval_service.py`, `config.py`, `user_settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`) · UI hint |
 
-**Dependency order:** 277 → 278 → 279 → 280 → 281 → 282 → 283. The real constraints are narrower,
-and are stated so a phase can run early when its files are free:
+**Dependency order:** 286 → 287 → 288 → 289 → 290 → 291 → 292 → 293. The real constraints are narrower:
 
-- **277 comes first.** It is docs-only and touches no source, so it cannot collide with a G-5 file.
-  CLAUDE.md measures **121,650 chars** (81.1% of the 150k hard limit) and every later phase edits
-  hot-file ledger rows in it. Splitting first gives six phases of headroom, instead of splitting under
-  pressure at close. The ledger table is the one thing every later phase writes to, so it must be in
-  its final shape before they start.
-
-- **278 and 279 (the extractions) come before every fix phase.** G-5: a refactor goes before the next
-  feature or fix on a hot file.
-
-  - `tool_dispatcher.py` (98 commits / 43 phases / 5,068 lines) has had its split deferred twice
-    (OV-273-02, and 272 before it). DEBT-09's vocabulary is read by the search handlers, so the split
-    lands **before** the vocabulary move, inside 278.
-
-  - DEBT-09 is itself an extraction (three restated copies → one home), so it rides the same
-    behaviour-preserving phase as SEAM-02 rather than a fix phase.
-
-  - `expert_scope.py` crossed G-5 at 275-01, and its own ledger section says *"the next phase that
-    touches this file proposes an extraction FIRST"*.
-
-  - 279 runs after 278 only because both close with a full backend gate. Their files are disjoint, so
-    they may run in parallel worktrees if neither mutates the local DB (worktree rule 4).
-
-- **279 comes before 282.** `SEED-328` touches `threads.py`, `run_producer.py`, `ChatArea.tsx` and
-  `StreamsProvider.tsx`, and FIX-06/FIX-07 touch the same send path and chat surfaces. Two phases must
-  not edit `StreamsProvider.tsx` concurrently.
-
-- **280 and 281 have no dependency on each other.** 280 is ingestion, storage and watch; 281 is the
-  harness and the Workflow Studio. They are sequenced only for G-8 cadence and can swap or run in
-  parallel.
-
-- **282 comes before 283.** FIX-06 edits the Model Registry (`admin.py`, `ModelRegistryTab.tsx`,
-  `config.py`) and FIX-01 edits settings gating (`settings.py`, `dependencies.py`, `SettingsPage.tsx`).
-  Serialising them keeps one settings/registry change in flight at a time.
+- **286 comes first** (REG-07). G-5: refactors go before the feature phases that edit the same files. `workflows.py` extraction is recorded OWED, and `WorkflowBuilderPage.tsx` (2,993 lines), `WorkflowRunPage.tsx` (1,670) and `WorkflowCard.tsx` (1,616) are the largest workflow files later phases edit.
+- **288 before 289.** Both edit `WorkflowRunPage.tsx`; AUTH-01 adds the "waiting on" line, then 289 builds the page around it. Two phases must not edit it concurrently.
+- **289 before 293.** START-02 returns a result the caller reads back and START-04 labels how a run began; both are shown on the run page 289 builds.
+- **287 before 293.** START-04's last/next-run vocabulary sits beside the start entry points 287 adds.
+- **290 and 292** are independent of each other and of 291; they can swap order.
+- **291 after 288.** Both author through the builder / describe door; `useTemplateFirstDraft.ts` and the builder store settle in 288 first.
+- **294 is independent of 290-293.** It touches retrieval, Settings and the chat message, not workflow files. It can run any time after 289; if it runs before 293, they must not take the same migration number.
 
 ### Phase Checklist
 
-- [x] **Phase 277: Registers Back Inside the Band** (completed 2026-10-12): split CLAUDE.md by function into `docs/` below 120k with nothing deleted; repair the v4.5 bookkeeping drift (REG-04, REG-05)
-- [x] **Phase 278: One Home for Tools and Filters**: `tool_dispatcher.py` registry/handler split pinned at 30 tools; `retrieval_service.py` seam measured and closed; one home for the filter vocabulary (SEAM-02, SEAM-03, DEBT-09)
-- [x] **Phase 279: The Expert Scope Seam**: `expert_scope.py` extracted along its named seam; every `SEED-328` item fixed or recorded with a reason (SEAM-01)
-- [x] **Phase 280: In Once, Out Clean**: same-bytes upload never retires the in-flight copy; Graph adapter pages, encodes and decodes honestly; purge and delete remove bytes and answer 404; a recorded decision for artifact rows on disposal (FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11)
-- [x] **Phase 281: A Refusal Names Its Cause**: emit failure names the check that failed; publish and describe-door refusals in plain words; freshness ignores archived documents (FIX-09, FIX-10, DEBT-07)
-- [x] **Phase 282: The Slow Run and the Paused Run**: per-model timeout reaches the provider call with deliberate retries; one `ask_user` input with one draft (FIX-06, FIX-07)
-- [x] **Phase 283: Every Member Reaches Their Own Settings**: Settings reachable by members with operator tabs hidden and refused; bounded Chunks section (FIX-01, FIX-08) — completed 2026-10-16
-- [x] **Phase 284: Library at Scale**: the Library, Find and every picker page and count on the server (envelope `GET /documents`, `GET /library/summary`, Find in SQL, pickers on `POST /document-search`), migrations 207 (visible-set view) + 208 (page index), guards driven RED, G-4 A-F at 10k/50k (FIX-11) — completed 2026-10-16
-- [x] **Phase 285: Watch and Re-upload Close Out**: a failed watch download is retried and stays visible until it lands; a purge deletes only documents the watch minted; a stuck `pending` row never absorbs same-bytes re-uploads (FIX-12, FIX-13, FIX-14) (completed 2026-10-16)
+- [x] **Phase 286: Seams Before Features**: take the named G-5 seams on the workflow files this milestone edits, behaviour unchanged (REG-07)
+- [x] **Phase 287: Start From a Thread, Fork a Starter** (closed 2026-10-19, `human_needed`: SC#4 one-click ruling, Anthropic/OpenRouter rows after credit, cloud mig 210 paste): launch a workflow from a thread with its form and run attached; fork one of 5+ curated, gauntlet-passing starters in one click (START-01, START-03)
+- [ ] **Phase 288: Drafts That Survive, Pauses That Publish**: draft configuration persists across navigation; a human-pause workflow publishes and the run shows who it waits on (AUTH-03, AUTH-01)
+- [x] **Phase 289: The Run Page and Its Evidence** (closed 2026-10-20, operator-approved; Anthropic row blocked on billing; BUG-261020-01/02 filed): one read-only finished-run page with export; confidence on KB-derived phase outputs (VIS-03, TRUST-01)
+- [ ] **Phase 290: The Card and the Team Picture**: card matches its approved sketch; truthful orchestrator / workers / judge view (VIS-04, VIS-01)
+- [ ] **Phase 291: Describe It From Your Own Files**: describe-it authoring from uploaded template, form and reference documents (AUTH-02)
+- [ ] **Phase 292: More Ways to Show It**: new artifact types from a closed registry, set chosen at sketch time (VIS-02)
+- [ ] **Phase 293: Start From Outside, and Close Out**: authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
+- [ ] **Phase 294: Decision Engine: Rerank and Citation Check**: a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
 
 ### Phase Details
 
-#### Phase 277: Registers Back Inside the Band
+#### Phase 286: Seams Before Features
 
-**Goal**: The instructions every session and subagent loads sit back **below the 120,000-char warn band**, split by function into `docs/` with **nothing deleted**, and the v4.5 records say what actually shipped.
-**Depends on**: Nothing (first phase of v4.6).
-**Requirements**: REG-04, REG-05
+**Goal**: The workflow files this milestone is about to edit are split along the seams their ledger sections name, so later phases add to small files instead of 1,600 to 3,000-line ones. Behaviour is unchanged.
+**Depends on**: Nothing (first phase of v4.7).
+**Requirements**: REG-07
 **Success Criteria** (what must be TRUE):
 
-  1. `node scripts/check-claude-md-size.cjs` exits 0 with **no warning**. CLAUDE.md is below 120,000 chars, and each moved section lives in a named `docs/<TOPIC>.md` with a pointer left at its old place, all in **one commit** (REG-04).
-  2. Nothing is lost. Every line removed from CLAUDE.md in that commit is present in a `docs/` file the same commit adds or extends, checked mechanically (removed-lines set minus added-lines set = empty) rather than by reading. The G-5-firing hot-file table stays in CLAUDE.md, complete (REG-04).
-  3. The guards still fire after the split. `check-claude-md-size.cjs` (`[disposition-too-long]`, `[duplicate-row]`, `[malformed-row]`) and `check-hot-file-ledger.cjs` are each driven RED against a planted defect, and the file is restored md5-identical (REG-04).
-  4. The archived v4.5 records match the phase directories, re-derived from those directories and never from a summary line: FIND-01/02/03/06 carry their real status in `milestones/v4.5-REQUIREMENTS.md`, the 270/271 progress rows match their VERIFICATION frontmatter, and every v4.5 SUMMARY carries its `requirements` field (REG-05).
+  1. Before any extraction, `node scripts/check-hot-file-ledger.cjs` is run over the `files_modified` of phases 287-293 as sketched at roadmap time, and the list of files that actually fire G-5 is recorded in CONTEXT (re-derived with the ledger recipe, not copied from a row). Each firing file is either extracted in this phase or carries a written reason it can be honoured by construction.
+  2. `backend/app/api/workflows.py` (recorded "extraction still OWED") and the frontend files the measurement shows firing on 287-290 (candidates: `WorkflowBuilderPage.tsx`, `WorkflowRunPage.tsx`, `WorkflowCard.tsx`) are split along their ledger-named seams. Moved functions are AST-identical to the phase base, and no route path, response shape or rendered DOM changes.
+  3. The closed core counts 7 / 1 / 30 before and after, the backend unit gate stays <= 71 failed with 0 collection errors, the frontend count gate shows no per-file decrease, and the typecheck set diff is empty.
+  4. The ledger rows and their `docs/HOT-FILE-LEDGER.md` sections are updated in the same commit, and `check-claude-md-size.cjs` and `check-hot-file-ledger.cjs` pass.
 
-**How we'd know this failed**: the size drops because prose was deleted, not moved; a hot-file row leaves the scan table, so its guardrail can never fire again; the split lands at 119,9xx and Phase 278's first ledger edit puts it back over; a pointer names a `docs/` file that does not exist; an archived artifact's body text changes beyond the named fields; REG-05 ticks a requirement because a summary says so.
-**Plans**: 2 plans (wave 1, both inline under `inline_plan_threshold`)
+**How we'd know this failed**: a "pure move" changes a route or an import-time side effect and a test edited in the same commit hides it; the extraction is chosen from the roadmap's candidate list instead of the measurement; a later phase still has to edit a 2,900-line file because the seam taken was the easy one; a ledger row is updated without its section, or the reverse.
+**Plans**: 5 plans (4 parallel extractions in wave 1, gates + ledger in wave 2; the fifth is justified in 286-05: it owns the three files no wave-1 worktree can share)
 
 Plans:
 
-- [x] 277-01-PLAN.md — split CLAUDE.md by function to <= 90k (verdict cells <= 80 + vitest history to docs/VITEST-COUNT-GATE.md + D-03 moves only if needed), bind the cell cap to the FIRING table at 80, no-loss proof, guards driven RED (REG-04)
-- [x] 277-02-PLAN.md — repair the v4.5 archive in place: REQUIREMENTS line 9 + 19 SUMMARY requirements fields from their PLANs, re-verify 270/271 rows (REG-05)
+- [x] 286-01-PLAN.md — split `backend/app/api/workflows.py`: wire models + pure helpers + authoring doors to siblings on the same router (operator picks the move set at a blocking checkpoint, measured D-03/D-05 conflict)
+- [x] 286-02-PLAN.md — `WorkflowBuilderPage.tsx`: id-to-name maps into `useBuilderNameMaps`, copy constants into `builderCopy` (re-exported)
+- [x] 286-03-PLAN.md — `WorkflowRunPage.tsx`: run read + poll into `useWorkflowRun` at the original call positions
+- [x] 286-04-PLAN.md — `WorkflowCard.tsx`: overflow menu + armed delete into `WorkflowCardMenu`
+- [x] 286-05-PLAN.md — full gates against the base, count-gate adoption, ledger rows and SC#1 forecasts in one commit
 
-**Flags**: Docs-only; no source file is touched, so G-5 cannot fire. Split by **function** (the precedents are `docs/HOT-FILE-LEDGER.md` and `docs/SANDBOX-PACKAGES.md`). The gate names the biggest sections: Workflow guardrails 55,145 and Parallel execution 24,125, of which the vitest-gate correction history is narrative. The verdicts, index and scan list stay in CLAUDE.md. ⚠ The vendored GSD framework wiring table (G-7, REG-02) stays in CLAUDE.md, because it is the list used to re-apply the guardrails after a framework update. **REG-05 must not use `milestone.complete` or `state.*` SDK verbs** (STATE.md records eight false-record occurrences); hand-edit only. Re-measure the gate at **every later phase close**, so the band holds through the milestone and not just at 277.
+**Flags**: ⛔ G-5 extraction, behaviour-preserving, TDD pin-first. Measure first. Never `rm -rf` a worktree. Files in play (ledger triples as of roadmap time): `workflows.py` 43/23/2261, `WorkflowBuilderPage.tsx` 57/22/2993, `WorkflowRunPage.tsx` 28/9/1670, `WorkflowCard.tsx` 19/6/1616.
 
-#### Phase 278: One Home for Tools and Filters
+#### Phase 287: Start From a Thread, Fork a Starter
 
-**Goal**: The agent's tool dispatcher is split into a **registry and handlers**, the retrieval orchestrator's seam is closed, and the document-filter vocabulary has **one home**. Every tool, search and filter behaves exactly as before.
-**Depends on**: Phase 277 (the hot-file ledger is in its final shape before this phase edits its rows).
-**Requirements**: SEAM-02, SEAM-03, DEBT-09
+**Goal**: A user can start a workflow without leaving the conversation, and can begin from a ready-made starter instead of a blank page.
+**Depends on**: Phase 286.
+**Requirements**: START-01, START-03
 **Success Criteria** (what must be TRUE):
 
-  1. `tool_dispatcher.py` is split into a registry module and handler modules. The closed core counts **30 tools** before and after, counted by `test_259_closed_core_inventory.py` and not substring-matched. A registry pin taken at the phase base (tool names, order, full schema text) compares **identical** after the split (SEAM-03).
-  2. The seam state of `retrieval_service.py` is **measured** at discuss. Its ledger section records the extraction as discharged by 272-01 (a pure move into `retrieval_rpc/rank/documents/scope.py`; the file is 174 lines and is the orchestrator only), while the CLAUDE.md row still reads *"extraction still OWED"*. Either the remaining seam is taken, or the discharge is confirmed by its AST pin (`test_272_pure_move.py`). In both cases the stale CLAUDE.md row and `SEED-224`'s extraction half are corrected **beside** their originals (SEAM-02).
-  3. The date-word → column map and the topics-is-a-list rule are each defined **once** and imported by `retrieval_scope.py`, `document_search_service.py` and `view_filter_compiler.py`. A test fails when a divergent copy is planted, driven RED and then restored (DEBT-09).
-  4. Behaviour is unchanged. The backend unit gate is ≤ 71 failed with 0 collection errors; the frontend count gate shows no per-file decrease; the 272 retrieval pins (`test_unfiltered_rpc_calls_are_pinned`) and the 275 retrievable-predicate pins stay green (SEAM-02, SEAM-03, DEBT-09).
-  5. A live chat turn that uses two tools (`search_documents` + `execute_code`) completes on one native provider after the split, with the same audit rows (`search.query` carrying `run_id`) as before (SEAM-03).
+  1. From inside an open thread, the user can pick a workflow, fill the launch form that workflow declares, and start it; the run appears attached to that same thread, not a new one (START-01).
+  2. A required launch input left empty is refused with a plain message naming the field, and nothing is started (START-01).
+  3. At least 5 curated starter workflows are listed, each passes the publish gauntlet when the gauntlet is run against it (shown by running it, not asserted) (START-03).
+  4. One click on a starter creates the user's own draft copy, opened in the builder, and editing the draft never changes the starter or another user's copy (START-03).
+  5. The thread start path is driven on one native provider and OpenRouter with a two-tool prompt and a parallel-thread row (SC#10 axes; full roster run or recorded owed).
 
-**How we'd know this failed**: the registry gains or loses a tool, or a schema string changes by a byte; a moved handler changes behaviour and a test edited in the same commit hides it; the "one home" is a fourth copy, with the old three left in place; the divergence test passes against a planted divergence; SEAM-02 is ticked by re-reading the 272 record instead of measuring the file; the split is done but the registry is still built by mutation at import time, so its order depends on import order.
-**Plans**: 4 plans in 3 waves
+**How we'd know this failed**: the form appears but the run starts in a new thread; the entry point is still reachable only from the Workflows page; a starter fails the gauntlet and the list still counts it; "fork" shares the row with the starter so an edit leaks; the starters are fixtures with no real content.
+**Plans**: 5 plans (waves 1/1/2/3/4)
 
 Plans:
 
-- [x] 278-01-PLAN.md — wave 1: pins first — base failing set, registry pin (names/order/bindings/static literal/schema sha256), AST pure-move pin (xfail strict), D-07 retarget-only checker, ten fences anchored/tupled (SEAM-03)
-- [x] 278-02-PLAN.md — wave 1 (TDD): one home for the filter vocabulary (`document_vocabulary.py`), three import swaps with base-pinned values, divergence fence driven RED (DEBT-09)
-- [x] 278-03-PLAN.md — wave 2: the split — `tool_dispatcher.py` → registry + `services/tools/` families in ONE retarget-only commit, extension-contract guards extended, full unit gate set-diffed (SEAM-03)
-- [x] 278-04-PLAN.md — wave 3 (operator checkpoint): SEAM-02 measured + stale records corrected beside originals, merged-tree gates, Anthropic two-tool live smoke, ledger cells written last, SEED-224 → partially-answered (SEAM-02, SEAM-03, DEBT-09)
+- [x] 287-01-PLAN.md - required launch inputs blocked at ChatLaunchForm + RunModal (SC#2)
+- [x] 287-02-PLAN.md - migration 210: 3 template-less starters (6 total) + static gauntlet test with counterfactuals (SC#3)
+- [x] 287-03-PLAN.md - in-thread "Run a workflow" action via StreamsProvider.sendMessage, one ChatArea mount (SC#1)
+- [x] 287-04-PLAN.md - fork isolation proof, full gates, ledger/seeds (SC#4)
+- [x] 287-05-PLAN.md - live proof: G-4 3/3 pass, 6 of 8 roster rows pass, 2 billing-blocked (SC#5)
 
-**Flags**: ⛔ **G-5 extraction phase, behaviour-preserving** — pure moves verified AST-identical against PHASE_BASE where possible, with **TDD pin-first** (pins land RED-proof before the move). `tool_dispatcher.py` FIRES (98/43/5068), with the split deferred twice (OV-273-02). The Extension Contract applies: the registry stays closed and statically declared, **never dynamically registered**. `search_documents_tool.py` (1,163 lines) sits beside the split and must not gain logic. SC#10: a pure move whose registry pin is identical does not change provider behaviour, so one live multi-tool row is the proportionate check; discuss records that decision. Seeds: `SEED-224` (extraction half only; the five-tab redesign stays out of scope).
-
-#### Phase 279: The Expert Scope Seam
-
-**Goal**: `expert_scope.py` is split along its named seam. The **pure** scope composition stays apart from the async statement and transcript-event wording, and every item the Phase 267 independent review deferred is **fixed or carries a written reason**.
-**Depends on**: Phase 277. No file overlap with 278, so it may run in parallel with it (worktree rule 4 applies if either mutates the local DB).
-**Requirements**: SEAM-01
-**Success Criteria** (what must be TRUE):
-
-  1. `expert_scope.py` (632 lines, 3 phases, crossed G-5 at 275-01) is extracted along the seam its `docs/HOT-FILE-LEDGER.md` section names. `compose_expert_scope` stays pure (no I/O, not async; the AST fence stays green), the moved functions are AST-identical to the phase base, and the 267/268 fixtures (`test_267_expert_scope.py`'s 11 cases, the 268 Dropped-line fixtures) stay byte-equal (SEAM-01).
-  2. Every `SEED-328` item (CR-03(b), WR-01..WR-08, IN-01..IN-05 and the CR-02/03 live-drive observations) has a row in the phase record reading **fixed**, with the test or drive that proves it, or **not fixed**, with the reason. `SEED-328`'s frontmatter `status` changes to match, so the register scan no longer reports it as `planted` (SEAM-01).
-  3. If CR-03(b) is fixed, it is fixed as **one** shared org-equality helper used by PATCH, handoff and preview (which also closes IN-01). A two-org user sending on an Expert thread with the wrong org active is refused before any run row is written, and this is driven live as that user, not only unit-tested (SEAM-01).
-  4. The backend unit gate is ≤ 71 failed with 0 collection errors, and the frontend count gate shows no per-file decrease (SEAM-01).
-
-**How we'd know this failed**: a fixture's output changes by a character after the move; a SEED-328 item disappears from the record because it was hard; CR-03(b) arrives as a second inline org check on the send path (268's "0 new send-path branches" broken) instead of one helper; WR-05's untrusted handoff summary still becomes a user message and the record says "fixed"; the seed still reads `planted` at close.
-**Plans**: 4 plans in 3 waves (target was 3; the drives + close are split from the frontend work because a checkpoint plan must not carry implementation, and the regrouping lets 279-02 and 279-03 run in parallel with no shared file)
-
-Plans:
-**Wave 1**
-
-- [x] 279-01-PLAN.md — wave 1: pins first (test_279_pure_move strict-xfail, send If-count + org-helper Wave-0 pins, base failing set), parameterised retarget checker (278 defaults proven), then ONE pure-move commit: expert_scope.py → pure / expert_scope_statement.py / expert_scope_events.py, all importers + 12 test patches repointed (SEAM-01)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 279-02-PLAN.md — wave 2 (TDD, backend): `_require_thread_org` at PATCH/handoff/preview/send (CR-03(b), IN-01, D-18), WR-01, WR-02, IN-05, WR-05 quoted background, IN-03, GET /experts manager view, D-07 restricted→restricted fix, WR-08 multi-folder note (SEAM-01)
-- [x] 279-03-PLAN.md — wave 2 (TDD, frontend, parallel with 02): "Won't search" reword + card prefix (WR-04, D-16), WR-03, IN-01 dialog field, D-15 send-409 narrowing, WR-06 chip, WR-01 client, WR-07 Start Chat reason (SEAM-01)
-
-**Wave 3** *(blocked on Wave 2 completion)*
-
-- [x] 279-04-PLAN.md — wave 3 (operator checkpoints): 4 G-4 Chrome drives (D-12) + WR-05 DB proof, two-org CR-03(b) live drive (D-13), then gates, the SEED-328 record (one row per item), seed → answered, ledger + CLAUDE.md rows, VALIDATION, STATE (SEAM-01)
-
-**Flags**: ⛔ **G-5 extraction phase.** `SEED-328` (folded at intake) fires on `run_producer.py`, `threads.py` (90 phases), `experts.py`, `ChatArea.tsx` (42 phases), `StreamsProvider.tsx` (38 phases) and the Expert catalog, all G-5-firing. Each item is either **honoured by construction** (one helper, one call, no new branch) or recorded as an override under `STATE.md → Guardrail overrides`. If an item changes rendered chat copy (WR-03/04/07/08), **G-4** applies to that item: the operator names the scenario at scope time and it is driven in Chrome. `run_producer.py`'s runs table is SELECT-only under the user JWT (268 finding), so a user-JWT UPDATE there silently no-ops. Measure writes, never assume them.
-
-#### Phase 280: In Once, Out Clean
-
-**Goal**: A document that comes in **arrives exactly once and completely**, whether uploaded twice in a hurry or listed from a large OneDrive folder, and one that goes out **leaves nothing behind**: no orphaned bytes, no 500, no unanswered question about the artifacts that cited it.
-**Depends on**: Phase 277. No file overlap with 278/279; independent of 281.
-**Requirements**: FIX-02, FIX-03, FIX-04, FIX-05, DEBT-08, DEBT-10, DEBT-11
-**Success Criteria** (what must be TRUE):
-
-  1. Uploading the same bytes twice while the first copy is still `pending`/`processing` (two concurrent requests, driven against the live local stack) leaves **exactly one** copy visible in `GET /documents` and in search, returns no 409, and never sets `is_latest = false` on the in-flight row. A RED-first test proves it, and every other minter caller (watch import, promote) goes through the same fixed path (FIX-02).
-  2. The Graph adapter's three defects are **measured first** (all three were recorded fixed in code on 2026-09-10, `45b4fb9dc` / `db7a083a2`) and each is pinned by a driven test: an unrecognised pagination cursor **raises** and never restarts at page 1; a search term containing `?` `#` `&` `/` `(` `'` cannot change the request path; folder paths come back decoded, or `None` for a drive-internal id. A **live re-drive** of a real OneDrive folder whose name contains a space and which holds more than one page imports every page and stores `/Team Docs/…`, which a `path contains '/Team Docs/'` rule matches. If no Microsoft credential is available, that row is recorded ⛔ with the reason and is never omitted (FIX-03, FIX-04, FIX-05).
-  3. Both watch purge doors (`DELETE /watches/{id}?purge_documents=true` and `POST /watches/{id}/purge`) remove the stored file bytes **after** the row delete succeeds, as the Library delete does, and a storage listing shows no object left for a purged document. A held document still refuses, and its bytes stay (DEBT-10).
-  4. `DELETE /documents/{id}` for a row the caller does not own, or one that does not exist, answers **404** `Document not found` with CORS headers. One grep finds every other handler with the same `maybe_single()` → `.data` shape, and each is fixed or listed with a reason (DEBT-11).
-  5. A **recorded decision** (CONTEXT `<decisions>` and `docs/`) states what happens to `message_artifacts` rows when retention disposes their source document. If the decision requires enforcement, disposition enforces it, with a test that drives RED first and a dry-run that names the affected artifact count (DEBT-08).
-
-**How we'd know this failed**: the dedup fix swallows the second upload's error but still retires the first; the minter is made atomic for the upload door only and the watch path still races; the OneDrive row reads "pass" on doubles alone; bytes are removed **before** the row delete, so a hold refusal leaves a row with no file; a purge of a held document removes bytes; the 404 distinguishes "exists in another org" from "does not exist" (an existence oracle); DEBT-08's decision says "delete" and no code does it, or says "keep" and the artifact then renders a broken reference with no explanation.
-**Plans**: 4 plans in 3 waves (D-23 target kept; the OneDrive live re-drive moved from the Graph plan into the close plan because it needs the fixed minter and an operator checkpoint, and a checkpoint plan must not carry implementation)
-
-Plans:
-**Wave 1**
-
-- [x] 280-01-PLAN.md — wave 1 (TDD): phase base failing set; `sources.py` purge extraction FIRST into `document_purge.py` (G-5, D-12), then bytes after the row delete (DEBT-10, D-11/D-31); `maybe_row` + AST fence + 22-site 404 sweep (DEBT-11, D-08/D-09/D-29); dead `main.py` patch deleted (D-30)
-- [x] 280-02-PLAN.md — wave 1 (TDD, stubbed, parallel with 01): 238 pins re-driven RED/GREEN (measure first); `_item_segment` so client ids cannot shape the Graph path (FIX-04, D-28); stale comment (D-17); `Team Docs` 105-file folder generated outside the repo (D-27)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 280-03-PLAN.md — wave 2 (TDD, live DB, lock): live RED drives; same-bytes minter — in-flight leg, insert-then-retire, 23505→winner, `already_in_library` (FIX-02, D-01..D-04, D-24/D-25); CR-01 filed first if it reproduces, then fixed without an oracle (D-05/D-26)
-
-**Wave 3** *(blocked on Wave 2 completion)*
-
-- [x] 280-04-PLAN.md — wave 3 (operator checkpoint at the end): live per-path purge + delete 404 evidence (SC#3/SC#4); DEBT-08 KEEP record in two homes + caption test (D-06/D-07); ledger + CLAUDE.md rows, seeds, full gates; then the OneDrive re-drive (SC#2) — pass, or OWED/⛔ with reason
-
-**Flags**: **Measure first** for FIX-03/04/05: the work left may be only the live re-drive the report names (`238-VERIFICATION.md` M-9). **Migration `207`** only if FIX-02's atomicity needs a database function (a unique-index-aware upsert or one-statement retire+insert) or DEBT-08's decision needs a constraint. Apply it via the SQL editor, regenerate `full-schema.sql` (no reset), mirror any REVOKE in `scripts/full-schema-supplement.sql`, and run `get_advisors(security)`. **security_enforcement**: purge and delete are data-protection actions; the 275 hold guard runs before any delete, and its order (guard → rows → bytes, D-38) is binding. ⚠ The unmeasured CR-01 note in `BUG-261005-01` (the minter's folder check compares `user_id`, never the folder's org) is **driven once here**. If it reproduces, file it as a new bug and do not fold it silently. **G-5 audit at discuss**: `backend/app/api/documents.py` (FIRES, 36 phases), `backend/app/services/ingest_splice.py` (FIRES), `backend/app/api/sources.py` (FIRES), `backend/app/services/sources/adapters/microsoft_graph.py`, `backend/app/services/retention/disposition.py`. Each change is honoured by construction or recorded. **Deploy parity**: migration before backend; `WATCH_PROCESS_ENABLED` and `RETENTION_SWEEP_ENABLED` stay as they are in production.
-
-#### Phase 281: A Refusal Names Its Cause
-
-**Goal**: When a workflow step fails or a publish is refused, the author reads **the check that actually failed**, in plain words and by the step's canvas name, never a machine code or a wrong subsystem. The freshness check stops counting archived documents.
-**Depends on**: Phase 277. Independent of 280 (disjoint files); may run before or alongside it.
-**Requirements**: FIX-09, FIX-10, DEBT-07
-**Success Criteria** (what must be TRUE):
-
-  1. An emit step whose field map has 100% citation coverage but misses template placeholder keys (`covers_template: false`, the `Compliance Gap Report` shape, reproduced as a fixture and once live) reports the **key-coverage** failure and names the missing keys. Attempts that failed differently (narrated vs incomplete keys) are reported as different causes. "citations_required" never appears unless the citation check failed (FIX-09).
-  2. A publish refusal shows the precise `harness_audit` reason for the failing step under its canvas label, and the text *"(view coming soon)"* is gone. The golden-run link opens `WorkflowRunPage` when the canvas flag is on, or the phrase is removed with no new schedule promise in its place (FIX-10, closing `BUG-260815-06` item #4).
-  3. A describe-door refusal such as `connection_not_allowed` renders as a plain sentence from **one** translation table beside `doorVocabulary.ts`. `test_214_argument_seams.py` asserts the rendered screen shows the sentence and **not** the raw code, and an unknown code falls back to a sentence, never to the code (FIX-10, `SEED-221`).
-  4. A freshness-validated step over a folder that contains archived (`retrievable = false`) documents counts only retrievable ones, by importing `RETRIEVABLE_COLUMN` rather than restating the predicate, proven RED-first (DEBT-07).
-  5. **G-4**: the operator defines the lived-experience scenarios at scope time ("I'd recognise failure if…"), and Chrome MCP drives each refusal to the screen. The assertions read the rendered **words**, not the presence of a block.
-
-**How we'd know this failed**: a new validator kind or phase type appears (closed core broken); the client invents its own cause table and starts overclaiming, trading the honesty 192/193.2 fought for against legibility; the translation table covers `connection_not_allowed` and nothing else; "coming soon" is replaced by "later" or another unowned promise; the freshness fix is a fourth copy of the retrievable predicate; the emit cause is right in `harness_audit` but the gauntlet still renders the last validator's message ("the least informative error wins by being last").
-**Plans**: 4 plans in 3 waves (D-23 target kept; freshness rides the emit plan; the gauntlet render waits on the emit contract and a second test-running agent slot)
-
-Plans:
-**Wave 1**
-
-- [x] 281-01-PLAN.md — wave 1 (TDD, backend): phase base failing set; new pure leaf `harness/emit_cause.py` (one composer, per-shot records, `template_fields_missing` split); engine precedence + `reason_is_final` + identity projection + true retry feedback (FIX-09, D-01..D-06, D-25, D-26, D-30); `freshness.py` imports `RETRIEVABLE_COLUMN`, RED-first (DEBT-07, D-16)
-- [x] 281-02-PLAN.md — wave 1 (TDD, parallel with 01): additive `reason_code` on the 3 `connection_not_allowed` arms; new leaf `describeRefusalVocabulary.ts` (4 codes + subs + fallback, `SERVICES_LABEL` imported); describe door renders sentence + next step, code only on reveal; S-7 inverted (FIX-10 / SEED-221, D-11..D-15, D-24)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 281-03-PLAN.md — wave 2 (TDD, frontend): golden-run link by `onOpenRun` presence + leave guard, no "coming soon" (D-07/D-08/D-28/D-29); gated next line; pre-line cause; `template_fields_missing` copy on PhaseCard / runVocabulary; SEED-218 connect control → Connections (D-27)
-
-**Wave 3** *(blocked on Wave 2 completion)*
-
-- [x] 281-04-PLAN.md — wave 3 (operator checkpoints): merged-tree gates + closed-core recount + ledger/CLAUDE.md rows + seeds sweep; G-4 Chrome drives A-D (D-17..D-20) matched to the DB; evidence-gated bug/seed closes; STATE
-
-**Flags**: **Closed-core recount** (7 / 1 / 30) against the phase base. A cause-precedence change is data inside the existing executor, never a new one. **G-2**: the refusals sit on shipped layouts (the gauntlet's worded verdict, the describe door), so no layout decision is open. The skip is **recorded as a decision** at discuss (OV-266-01 is what an unrecorded skip cost). **G-4** fires. **G-5 audit at discuss**: `backend/app/services/harness/phase_types.py` (FIRES), `backend/app/services/harness/validator_kinds.py` (FIRES), `backend/app/services/template_render_service.py`, `backend/app/services/workflow_authoring.py` (FIRES), `frontend/src/components/workflows/PublishGauntlet.tsx` (FIRES), `doorVocabulary.ts` (FIRES), `WorkflowBuilderPage.tsx` (FIRES ×6), `backend/app/services/harness/freshness.py`. Seeds: `SEED-221` (folded). Read the sketch-findings skill for the gauntlet's worded-verdict vocabulary before writing copy.
 **UI hint**: yes
+**Flags**: **G-2 sketch** the in-thread entry and the starter picker before discuss. **G-4**: the operator names the "I'd recognize failure here" scenarios at scope time. `ChatLaunchForm` already exists (214-12) and `ChatLayout.doRun` has one caller; reuse it, do not build a second launch form. Starters are workflow definitions (data), no new phase type. Seeds `SEED-232`, `SEED-084`.
 
-#### Phase 282: The Slow Run and the Paused Run
+#### Phase 288: Drafts That Survive, Pauses That Publish
 
-**Goal**: A slow model gets **the timeout the operator set**, with retries chosen deliberately, and a paused run asks its question in **one place with one draft** that every rendering agrees on.
-**Depends on**: Phase 279 (it edits `threads.py`, `ChatArea.tsx` and `StreamsProvider.tsx`; this phase edits the same send path and chat surfaces).
-**Requirements**: FIX-06, FIX-07
+**Goal**: An author's work in progress does not disappear, and a workflow that legitimately waits for a person is a normal publishable workflow.
+**Depends on**: Phase 286.
+**Requirements**: AUTH-03, AUTH-01
 **Success Criteria** (what must be TRUE):
 
-  1. A per-model `llm_call_timeout_seconds` of N (up to the maximum the Model Registry accepts) is the timeout the provider call actually gets, on **every** provider client, not only the OpenAI-compatible one. It is read back from the built client in a test, and a stub endpoint that answers at 700 s completes under a 900 s setting. A value above a real ceiling is **refused in the Model Registry with the reason on screen**, never stored and silently capped (FIX-06).
-  2. `max_retries` is set explicitly per client, with the reason recorded in CONTEXT `<decisions>`, and a timed-out call does not multiply the wait past the operator's budget unannounced (FIX-06).
-  3. One `ask_user` pause shows **exactly one** answer input, in the layout the operator approves in the sketch. A selection made in any rendering of the question shows identically wherever the question appears. Options expose their selected state to assistive technology (e.g. `aria-pressed`), not by colour alone. No control without a handler remains: `Answer in panel →` either works or is gone. A workflow pause with the panel **closed** still has a reachable input, the `BUG-260828-07` case (FIX-07).
-  4. **SC#10 four-axis UAT.** The full native roster plus OpenRouter (**8 rows**, derived from `MODEL_CAPABILITIES` by provider, newest registry-backed model each) run a turn under the new client settings and raise and answer an `ask_user` pause. A blocked row is recorded ⛔ with its reason and issue id, never omitted. There is at least one multi-tool row, one parallel-thread row (Thread A paused while Thread B streams) and one long-message row (FIX-06, FIX-07).
-  5. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. panel open, panel closed, two threads paused at once, a slow local model on GPU), and Chrome MCP drives each one. The draft-agreement check reads both renderings' DOM state, not a screenshot (FIX-07).
+  1. An author configures a draft (including the name and node configuration the describe door produced), navigates to another page and back, and every setting is still there. Driven in a browser as the user (AUTH-03).
+  2. Closing a draft, opening a different one, and returning never shows the first draft's configuration inside the second (AUTH-03).
+  3. A workflow containing a human-input pause passes the publish gauntlet and can be published, where it was refused before; the gauntlet still refuses a planted unbounded wait (AUTH-01).
+  4. When a run of that workflow pauses, the run surface shows who the run is waiting on, in words, and the same line is present after reload (AUTH-01).
 
-**How we'd know this failed**: the timeout reaches `get_llm_client` but the Anthropic, Google or Responses-surface client still binds the SDK default; the UI accepts 3600 while the httpx pool or read timeout still binds at 600; retries stay at the SDK default "by omission"; `PendingAskStack`'s mount condition is narrowed and a workflow pause becomes unreachable with the panel closed (the SHELL-03 failure, a third time); the draft is "shared" by copying state between two cards so they can still diverge; the board lists only the rows that passed.
-**Plans**: 4 plans in 3 waves (282-04 added at sign-off, D-27..D-30; D-18 / G-8; 01 and 02 share no files and run in parallel worktrees; the a11y + dead-control work rides plan 02)
+**How we'd know this failed**: the draft persists only until a hard reload; two drafts overwrite each other; the gauntlet is loosened by removing a check rather than teaching it the pause; "waiting on" shows an id or nothing; a published pause workflow makes a run that never resumes and nothing says so.
+**Plans**: 4 plans (waves 1/1/1/2)
 
 Plans:
-**Wave 1**
 
-- [x] 282-01-PLAN.md — wave 1 (TDD, backend + Registry): ceiling 1800 + boot check + DB-tier clamp, explicit timeout/max_retries on all four client families via `GatewayRequest.timeout_s`, off-loop OpenAI-family open under one shared deadline (BUG-261015-02), the 422 watchdog sentence + help line, the `did not answer within N s` run-failure text, SCALED 2 s < 3 s stub proof (FIX-06; D-01..D-09, D-19..D-23)
-- [x] 282-02-PLAN.md — wave 1 (TDD, frontend): new `stores/askDraftStore.ts` (one draft per `tool_call_id`, GC on the ask slice, panel-home refcount), card reads it, radio keyboard + non-colour mark, `PendingAskStack home` prop + chat pointer (sketch 282 variant A), `home="panel"` on the panel mount, D-15 fences, global test reset (FIX-07; D-10..D-15, D-24)
+- [x] 288-01-PLAN.md - draft settings row: one optional DraftArrivalCard prop, neutral words, TWO-children pin re-baselined, no-bleed regression (SC#1, SC#2)
+- [x] 288-02-PLAN.md - gauntlet: timeout lint in _interactive_phase_failures (RED on 0/-5/99999/1801), auto_answered verdict note, stale copy fixed (SC#3)
+- [x] 288-03-PLAN.md - run read waiting_on (server sentence, owner vs non-owner, active and paused) + one render in WorkflowRunPage (SC#4)
+- [x] 288-04-PLAN.md - live proof S1-S4 in Chrome, SC#10 roster in VALIDATION.md, full gates once, ledger/count-gate close-out
 
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 282-03-PLAN.md — wave 2 (operator checkpoints): merged-tree gates + ledger/CLAUDE.md rows; SC#10 8-row board (3 axes); G-4 rows 1-4 in Chrome on DOM state + Registry refusal on screen; operator confirms sketch A; evidence-gated bug/seed flips + STATE (FIX-06, FIX-07; D-16, D-17, D-25, D-26)
-
-**Wave 3** *(operator-approved at the G-4 sign-off, 2026-10-15)*
-
-- [x] 282-04-PLAN.md — wave 3 (TDD, backend + Registry): self-hosted models default to 900 s when no timeout is set (resolver takes the provider), Timeout field on "Add model by ID" bound 1..1800 with the shared refusal sentence (FIX-06 follow-up; D-27..D-30)
-
-**Flags**: ⛔ **G-2 FIRES for FIX-07, and a sketch is genuinely needed.** Sketch 006 option C (calm panel card plus chat **pointer**) conflicts with 244-12's chat-column mount, which exists for reachability when the panel is closed. Where the single input lives in each panel state is an **open layout decision**, and the operator-approved mockup is the acceptance bar. Run `/gsd:sketch` before plan and read the sketch-findings skill (`references/pending-question.md`). **Provider-docs-first** for FIX-06: read each provider SDK's own timeout and retry documentation (OpenAI, Anthropic native, Google), and keep provider-specific handling at the service boundary. **G-5 audit at discuss**: `backend/app/services/openai_service.py` (FIRES, 36 phases), `backend/app/services/anthropic_service.py` (FIRES), `backend/app/config.py` (FIRES; `MODEL_CAPABILITIES` seam owed), `backend/app/api/admin.py`, `frontend/src/components/admin/ModelRegistryTab.tsx` (FIRES), `MessageList.tsx`, `MessageItem.tsx`, `PendingAskCard.tsx` (FIRES), `WorkspacePanel.tsx` (FIRES), `streamsStore.ts` (FIRES), `PausedRunCue.tsx`. ⛔ The FIX-06 change stays a constructor argument at the client boundary, and the agent loop's `per_call_budget` call sites do not move (`agent_loop.py` prompt-assembly seam OV-273-03 is owed and not taken here). Seeds: `SEED-289` / `SEED-172` (sibling local-model findings; the 13 rowless local models on the 300 s inferred default are **noted, not fixed**, unless discuss shows they are the same defect).
 **UI hint**: yes
+**Flags**: **G-2 sketch** the waiting-on moment. **G-4**. The publish gauntlet is security-adjacent: driven RED against a planted unbounded wait. Hot files: `WorkflowBuilderPage.tsx`, `builderStore.ts`, `PublishGauntlet.tsx`, `publish_service.py`, `WorkflowRunPage.tsx`; read their ledger sections. Seeds `SEED-183`, `SEED-164`. Uses the existing `llm_human_input` phase type; no new phase type.
 
-#### Phase 283: Every Member Reaches Their Own Settings
+#### Phase 289: The Run Page and Its Evidence
 
-**Goal**: An ordinary org member can **reach and use their own settings** (Memory, Audit Log, "Show technical names") while operator-only tabs stay hidden **and refused**, and a large document's detail panel stays navigable when its Chunks section is open.
-**Depends on**: Phase 282 (it edits the Model Registry and `config.py`; this phase edits settings gating, so the two stay serial).
-**Requirements**: FIX-01, FIX-08
+**Goal**: Anyone with access can open one read-only page for a finished run that shows what it did and on what evidence, and can see how sure each knowledge-based answer was.
+**Depends on**: Phase 288 (both edit `WorkflowRunPage.tsx`).
+**Requirements**: VIS-03, TRUST-01
 **Success Criteria** (what must be TRUE):
 
-  1. Signed in as an ordinary member (not an operator) in a real org, a user finds a Settings door, opens Memory, Audit Log and "Show technical names", and saves a change that persists across reload. Operator-only tabs (models, providers and the rest of `model_management`) do not render for them (FIX-01).
-  2. The UI gate and the API gate agree, checked by a two-role fence on the real auth path: a member's own-settings write is accepted, and a member calling an operator-only settings endpoint directly is refused 403. Nothing becomes reachable by widening `model_management`'s audience (FIX-01).
-  3. With the Chunks section expanded on a document with about 1,000 chunks, every section below it is reachable without scrolling past the chunks. The list is bounded and scrolls inside itself, with the chunk count shown. This is measured by the next section's bounding rect in Chrome, not by `scrollTop` (FIX-08).
-  4. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. a member's first visit, an operator's view unchanged, a 1,000-chunk document), and Chrome MCP drives each one as the real role (FIX-01, FIX-08).
+  1. A finished run opens a single read-only page listing the workflow definition version it ran, the phase log, each verdict, and the cited sources (VIS-03).
+  2. The page can be exported, and the export contains the same four sections, matching what the page shows (VIS-03).
+  3. A user without access to the run's organisation cannot open the page or export, driven as a second user (VIS-03).
+  4. Each phase output that came from the knowledge base carries a confidence level, shown on the run surface and in the receipt; a phase that did not use the knowledge base shows none (TRUST-01).
+  5. The confidence value is the one already computed for chat, carried onto the run; no new model call is added (TRUST-01).
 
-**How we'd know this failed**: the fix widens `model_management` (the documented workaround) so members also see model management; a member sees an operator tab that 403s on first click; the Settings door appears but the page renders empty for a member; the client hides a tab whose API still accepts a member's write; Chunks gets a "Show first 20 / Show all" button (which the report rules out as a fix); the bounded list traps keyboard focus or wheel scroll; a filter box for finding a chunk arrives (a capability, out of scope).
-**Plans**: 3 plans in 2 waves (D-23 / G-8; 01 and 03 share no files and run in parallel worktrees; the G-4 drive, the D-13 live two-role check and the close are orchestrator-owned, recorded in `283-LIVE-EVIDENCE.md`)
+**How we'd know this failed**: the page shows the current workflow definition instead of the version the run used; export omits the cited sources; a phase with no KB use shows "high"; confidence is recomputed with a model call; the page is writable; a member of another org reads it.
+**Plans**: 5 plans (waves 1/1/2/2/3; G-8: the backend evidence read and the frontend report with its 45-case test migration cannot share one context budget)
 
 Plans:
 **Wave 1**
 
-- [x] 283-01-PLAN.md — wave 1 (TDD, frontend): `settingsTabs.ts` tab-registration seam reproducing today's rule exactly + source-order fence, SettingsPage asks the registry with literal JSX triggers, `AuditLogSection.tsx` extracted; existing SettingsPage suites unedited (FIX-01; D-03, D-14, D-15)
-- [x] 283-03-PLAN.md — wave 1 (TDD, frontend): the Chunks list bounded at `max-h-96` inside a labelled `role=region` with one Tab stop and no overscroll containment, fences driven RED by plants (FIX-08; D-16..D-20)
+- [x] 289-01-PLAN.md - SEED-360: D-11 live capture at base, ask_user SQL cast fix (DB-backed RED), _fail_redrive, paused card prop
+- [x] 289-02-PLAN.md - TRUST-01: per-phase confidence from chat's function, one wire field + KB label, evidence line on the run spine (SC#4, SC#5)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [x] 283-02-PLAN.md — wave 2 (TDD, backend fences + frontend): D-10 two-role fence on the real gate + D-11 route inventory (driven RED), Preferences tab `"6"` with the toggle + default model moved verbatim, derived first-visible fallback, Reset and operator panels gated, zero gated calls, Settings rail door un-gated, docs/landing facts in the same commit, phase ledger close on the merged tree (FIX-01; D-01..D-13, D-15, D-21..D-23)
-
-**Flags**: ⛔ **G-5: `frontend/src/pages/SettingsPage.tsx` FIRES (24 phases) and its tab seam is OWED**. FIX-01 is a per-tab gating change, which is exactly that seam, so wave 1 takes it behaviour-preserving before any gate moves. Also FIRING: `frontend/src/lib/nav-items.ts`, `backend/app/api/settings.py`, `backend/app/dependencies.py` (access-gate module seam named: `app/security/access.py`), `DocumentDetailPanel.tsx`. **security_enforcement**: the change is a permission boundary, so the API gate is the authority and the UI only reflects it. **G-2**: FIX-08's layout is settled by its own report (bound the list using the per-chunk `max-h` pattern already in the file), and FIX-01 reuses the existing rail entry or profile menu. The sketch skip is **recorded as a decision** unless discuss decides a new door is needed, in which case `/gsd:sketch` runs first. The dev account is in two orgs, so prove the active org before every drive. Read the sketch-findings skill for the Settings and document-detail-panel contracts.
-**UI hint**: yes
-
-#### Phase 284: Library at Scale
-
-**Goal**: The Library, Find and every document picker stay correct and fast for an account with **tens of thousands of documents**: the server returns one page at a time, the server does the counting, and no request ever carries an ever-growing list of ids.
-**Depends on**: Phase 280 (it edited `documents.py`); after Phase 283 in sequence. Added 2026-10-14 from `BUG-261014-06` (Library read 0 documents at 286, `414 URI too long`) and `BUG-261014-07` (every list silently cut at 1,000 rows).
-**Requirements**: FIX-11
-**Success Criteria** (what must be TRUE):
-
-  1. With **10,000** and **50,000** documents seeded locally for one account, the Library opens Root and a folder showing the **correct total** and the first page; the page's response size and load time are **measured and recorded** for both sizes, and neither grows with the library (FIX-11).
-  2. **Nothing is silently missing:** an account with more than 1,000 documents reaches every one by paging, and the total shown equals `count(*)` in the database. No list request depends on the API's 1,000-row cap (FIX-11).
-  3. Folder counts, the CHUNKS / VECTORS tiles and each row's table / image counts come from **server-side aggregates** and equal the database counts at 10,000 documents. No request carries an id list that grows with the library; the `BUG-261014-06` batching stopgap is removed (FIX-11).
-  4. **Find pages in the database** (limit / offset in SQL), not by loading every match and slicing (`document_search_service.py:573` today) (FIX-11).
-  5. Every screen that loads the whole document list just to pick one (`CreateLinkDialog`, `TakeoffSection`, `LegalHoldDialog` and the rest of the `listDocuments()` callers) **searches on the server** instead (FIX-11).
-  6. A guard test fails if any list endpoint returns an unbounded result or any query is built from an unbounded id list, and it is **driven RED** against a planted regression (FIX-11).
-  7. **G-4**: the operator defines the lived-experience scenarios at scope time (e.g. opening a 10,000-document folder, paging to the end, picking a document in the link dialog), and Chrome MCP drives each one (FIX-11).
-
-**How we'd know this failed**: the list pages, but folder totals or the tiles are still counted from the page in the browser (so they read 50, not 10,000); the 1,000-row cap is "fixed" by raising `max_rows`; the batching stays and simply runs 100+ round-trips; Find still loads every match before slicing; a picker still downloads the whole library; the RLS boundary loosens because a new aggregate function runs as `SECURITY DEFINER` (or keeps the default `PUBLIC` EXECUTE grant).
-**Plans**: 6 plans in 4 waves (5 planned in 3 waves per D-25 / G-8; 06 added 2026-10-16 at the operator's request for SEED-357; 01 is frontend-only and 02 holds the local-DB lock, so they run in parallel worktrees; in wave 2 only 04 holds the lock; 03 and 04 share no file — 01 owns every wire type and client; the after-measurement, the production `max_rows` read, the G-4 drive and the close are orchestrator-owned, recorded in `284-MEASUREMENTS.md` / `284-LIVE-EVIDENCE.md`)
-
-Plans:
-**Wave 1**
-
-- [x] 284-01-PLAN.md — wave 1 (TDD, frontend, no DB): the paged wire contract (`listDocumentsPage` / `getDocument` / `getLibrarySummary` / per-document pages / paged resolves, legacy-shape tolerant), the `useLibraryDocuments` extraction over `useDocuments` with the screen byte-identical (G-5 seam TAKEN), stat tiles / folder band / Find editors take numbers, R-11 `.folder_id` re-pin (FIX-11; D-01, D-02, D-07, D-11, D-12, D-16, D-17, D-24, R-03..R-06, R-08, R-11)
-- [x] 284-02-PLAN.md — wave 1 (TDD, backend, DB lock): synthetic 10k / 50k account + BEFORE figures at base, migration **207** `library_documents` security_invoker view (SELECT-only, closed to anon / service role, supplement mirror, applied by script, regen) proven by leak / fail-closed / parity / drift live tests, `GET /library/summary` (one GROUPING SETS read), `GET /documents` envelope + `GET /documents/{id}` + bounded per-document lists, `BUG-261014-06` stopgap removed, public OpenAPI + pagination.md (FIX-11; D-01..D-07, D-11, D-13, D-17..D-21, R-01..R-08, R-11)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 284-03-PLAN.md — wave 2 (TDD, frontend, no DB): hook body on the server, Realtime INSERT / DELETE → debounced refetch, single-document read, `fakeLibraryApi` keeps the nine suites' cases, loading / failed / warm states (SEED-248 Library half), exact pager with the ROW_CAP arm deleted, IngestionTab on the summary + paged lists, Chunks scroll-sentinel paging, Tables / Images / Versions "N of M" (FIX-11; D-07..D-13, D-17, D-24, R-04, R-08, R-11)
-- [x] 284-04-PLAN.md — wave 2 (TDD, backend + frontend, DB lock): Find paged in SQL over the view (lineage batching gone), saved views / filters paged with the agent tool on its two-leg path (byte-identical output), D-23 layer 1 route inventory driven RED + SEED-355 / SEED-356 planted, CreateLinkDialog / RelationshipEditor / LegalHoldDialog typeahead on `POST /document-search`, Takeoff one bounded spreadsheet page (FIX-11; D-10, D-14, D-15, D-16, D-18, D-23, R-02, R-05, R-10..R-12)
+- [x] 289-03-PLAN.md - VIS-03 server: org-scoped terminal-only evidence read, 404 parity, canvas-gated (SC#1, SC#3)
+- [x] 289-04-PLAN.md - VIS-03 view: sketch-B report on the finished run page, JSON export + print by content, /app?run= deep link, terminal-case test migration (SC#1, SC#2, SC#4)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [x] 284-05-PLAN.md — wave 3 (TDD guards + orchestrator checkpoint, DB lock): D-23 layer 2 request recorder (unit + live) and the D-16 whole-list fence, each driven RED, legacy array clients deleted; merged-tree gates, count-gate pins, ledger + CLAUDE.md close; AFTER measurement at 10k / 50k, production `max_rows` read (read-only), G-4 A-E, evidence-gated bug / seed / requirement flips (FIX-11; D-16, D-18, D-21..D-23, D-25..D-27, R-09)
-- [x] 284-06-PLAN.md — wave 4 (TDD, DB lock; added 2026-10-16 at the operator's request, SEED-357): locate where the 50k first-page time goes, migration **208** (the Library page index; the view rewritten as UNION ALL only if EXPLAIN demands it), applied by script, AFTER at 10k / 50k so Root and Find page 1 stay within 1.5x (FIX-11; SC#1, D-22)
+- [x] 289-05-PLAN.md - live proof S1-S5 as real users, four-axis roster, conditional 288 sentence restore, ledger + full gates once
 
-**Flags**: ⛔ **G-5: `frontend/src/pages/LibraryPage.tsx` FIRES and its extraction is OWED — taken first.** Also FIRING: `backend/app/api/documents.py`, `backend/app/services/document_search_service.py`, `frontend/src/components/ingestion/DocumentList.tsx`, `frontend/src/lib/api/documents.ts`, `frontend/src/types/index.ts`; `frontend/src/hooks/useDocuments.ts` and `DocumentsPager.tsx` read their ledger sections first. **security_enforcement**: any new SQL function is `SECURITY INVOKER`, revoked from `PUBLIC`, and proven as `authenticated`, never through the service role. **measure first**: record today's figures at 10k/50k before changing anything. Supabase Realtime stays a hint: a document-change event refetches the current page, never patches a full in-memory list. **G-2**: the pager exists (`DocumentsPager`), so the sketch skip is recorded unless discuss changes the Library layout. Cross-check `BUG-261014-06` / `-07` at discuss.
 **UI hint**: yes
+**Flags**: **G-2 sketch** the page and the confidence chip. **G-4**. Migration only if the run model lacks a place for confidence (next free after 209). Hot files: `WorkflowRunPage.tsx`, `workflow_runs.py`, `harness_engine.py` (61/24/3387), `phase_types.py` (55/28/3014), `RunReceipt.tsx`. Seeds `SEED-348`, `SEED-152`.
 
-#### Phase 285: Watch and Re-upload Close Out
+#### Phase 290: The Card and the Team Picture
 
-**Goal**: The three major bugs found during Phase 280 are closed: a watched file whose download fails once is fetched again on a later sync, purging a watch's documents removes only what that watch brought in, and a document whose ingest never started does not swallow every later upload of the same bytes.
-**Depends on**: Phase 284 (it last edited `documents.py`). Added 2026-10-16 at the v4.6 milestone audit (operator chose option B: close the open majors before closing the milestone). Source: `BUG-261014-02` (280 live re-drive, 104/105), `BUG-261014-03` (280 review WR-03), `BUG-261014-04` (280 review WR-04).
-**Requirements**: FIX-12, FIX-13, FIX-14
+**Goal**: The workflow library card looks like the design the operator approved, and a multi-agent workflow can be seen as the team it is.
+**Depends on**: Phase 286.
+**Requirements**: VIS-04, VIS-01
 **Success Criteria** (what must be TRUE):
 
-  1. A watch item left `failed` by a transient download error is read again on the next sync and imported. Until it lands, the run row shows the failure with the exception type and the file name, never `count_errors = 0` with `last_error = NULL` (FIX-12).
-  2. Both purge doors (`DELETE /sources/watches/{id}?purge_documents=true` and `POST /sources/watches/{id}/purge`) delete only documents the watch minted. A hand upload the watch only dedup-linked to survives the purge with its row AND its stored bytes. This is driven RED first against today's code (FIX-13).
-  3. When both enqueue paths fail, the upload does not leave a `pending` row with no ingestion job that the minter then treats as in flight. A later upload of the same bytes, in any folder, gets ingested. This is driven RED first against today's code (FIX-14).
-  4. The Phase 280 guarantees still hold: a same-bytes upload while the first copy is genuinely in flight still yields exactly one copy and no 409 (FIX-02), and purge still removes bytes (DEBT-10). The 280 suites stay green on the merged tree.
-  5. A live re-drive of the OneDrive watch reaches **105/105** after one forced transient failure, or is recorded ⛔ with the reason if no credential is available (FIX-12).
+  1. The library card shows labelled phase chips and the description no longer dominates, matching the approved sketch; checked by screenshot against the sketch and by asserting the rendered chip text (VIS-04).
+  2. A multi-agent workflow can be opened as a picture of its orchestrator, workers and judge, built from the workflow definition (VIS-01).
+  3. The picture contains no edge the schema lacks: for a planted workflow with no worker-to-worker link, none is drawn (VIS-01).
+  4. A single-agent workflow shows no team picture, or an honest single-node one, and never an invented worker (VIS-01).
 
-**How we'd know this failed**: the retry runs forever on a file that will never download, and every sync re-reads it with no cap and no visible state; a purge still deletes a hand upload because the "minted by this watch" test reads `source_connection_id` but a dedup link copied it; the stuck-row fix marks a row `failed` that a live worker was about to process (a race with the enqueue); the in-flight leg is loosened so far that FIX-02's same-bytes guarantee comes back broken; or the fix lands with only a mocked test and no driven defect.
-**Plans**: 3 plans (waves 1 → 2 → 3, serialized: every plan mutates the local DB)
+**How we'd know this failed**: the card still leads with a paragraph; chips show type ids instead of words; the team picture draws arrows that look right but are not in the definition; it looks good on the sketch's example and breaks on a real 7-phase workflow; the new view becomes a second runtime or second canvas.
+**Plans**: TBD (target 3-5)
+**UI hint**: yes
+**Flags**: **G-2 sketch FIRST for both** (the card has an approved sketch; VIS-01 needs a new one). **G-4**. Hot files: `WorkflowCard.tsx`, `PhaseSpineGraph.tsx`, `WorkflowCanvas.tsx`, `PhaseNodeCard.tsx`, `libraryVocabulary.ts`; read the card's ledger section. Canvas glyph vocabulary: `references/icon-convention.md` section 4. Seeds `SEED-155`, `SEED-086`.
+
+#### Phase 291: Describe It From Your Own Files
+
+**Goal**: An author can hand the describe door a template, a form or reference documents and get a draft whose inputs, phases and tools come from them.
+**Depends on**: Phase 288.
+**Requirements**: AUTH-02
+**Success Criteria** (what must be TRUE):
+
+  1. The describe door accepts an uploaded template, form and reference documents, and returns a draft whose declared inputs match the fields found in the uploaded form or template (AUTH-02).
+  2. Every tool and phase type in the draft comes from the existing closed set; a draft the model proposes with an unknown tool is refused, not saved (AUTH-02).
+  3. Instructions hidden inside an uploaded asset do not change the draft's tools or grants; driven with a planted injection in a reference document (AUTH-02).
+  4. The path is driven on the full native provider roster plus OpenRouter, with blocked rows recorded, never omitted (AUTH-02).
+
+**How we'd know this failed**: inputs are guessed from the prompt and ignore the form; the draft names a tool that does not exist; an uploaded document gains the power to grant a tool; only one provider was driven; the asset text is lost on reload.
+**Plans**: TBD (target 3-5)
+**UI hint**: yes
+**Flags**: **Provider-docs-first** (structured output per provider). **SC#10 four-axis UAT, full roster**. security_enforcement: asset content is untrusted. Closed core recount. Hot files: `workflow_authoring.py` (17/11/1025), `workflows.py`, `useTemplateFirstDraft.ts`. Seed `SEED-051`.
+
+#### Phase 292: More Ways to Show It
+
+**Goal**: The agent can answer with more kinds of interactive artifact than chart, table and metric, each from a closed, reviewed registry.
+**Depends on**: Phase 286 (no file overlap with 287-291; may run earlier).
+**Requirements**: VIS-02
+**Success Criteria** (what must be TRUE):
+
+  1. The new artifact set is chosen at sketch time, recorded in CONTEXT with the reason each type earns a place, and is a closed list (VIS-02).
+  2. In a real chat turn the agent shows each new type and it renders; a type name outside the registry is refused and shown as text, not rendered (VIS-02).
+  3. Reloading the thread shows the same artifacts, checked on at least two native providers (VIS-02).
+  4. The tool count stays 30; `show_artifact` is extended by registry entries only (VIS-02).
+
+**How we'd know this failed**: a component is added without a schema guard so model-supplied props render raw; the set grows because it was easy rather than chosen at sketch; artifacts vanish on reload; the tool count moves; sandboxed HTML (direction B in the seed) creeps in without its own operator decision.
+**Plans**: TBD (target 3-4)
+**UI hint**: yes
+**Flags**: **G-2 sketch**. Closed registry only; sandboxed HTML needs its own operator decision and is out of this phase. Files: `frontend/src/components/chat/artifacts/**`, `backend/app/models/artifact.py`, `backend/app/services/show_artifact_tool.py`. Migration only if the `message_artifacts` constraint needs a new literal. Seed `SEED-337`.
+
+#### Phase 293: Start From Outside, and Close Out
+
+**Goal**: An external system can start a workflow and read its result, every run shows how it was started, and the seed register matches what shipped.
+**Depends on**: Phase 287 (start entry points), Phase 289 (run page that shows provenance and result).
+**Requirements**: START-02, START-04, REG-06
+**Success Criteria** (what must be TRUE):
+
+  1. An authenticated inbound call starts a published workflow's run and returns an identifier; a second call with that identifier reads the status and result (START-02).
+  2. An unauthenticated call, a call with a credential from another organisation, and a call to an unpublished workflow are each refused, driven live (START-02).
+  3. Calls above the rate limit are refused with a clear response, and every call writes an audit row naming the credential and the run (START-02).
+  4. Inbound input is treated as untrusted data: a payload containing instructions cannot change the workflow's tools or grants (START-02).
+  5. A run started by a schedule or an inbound call says so on the run surface, and the workflow shows its last run and next run (START-04).
+  6. `SEED-163` reads delivered, every seed folded at intake carries its real status and where it went, and `node scripts/check-seeds-register.cjs` reports no folded seed still `planted` (REG-06).
+
+**How we'd know this failed**: the endpoint trusts a guessable id; a credential works across organisations; no rate limit; inbound payload text reaches a prompt as instructions; the run page says "manual" for an inbound run; next-run is blank for a scheduled workflow; a seed that shipped still reads `planted`.
+**Plans**: TBD (target 4-5)
+**UI hint**: yes
+**Flags**: ⛔ **security_enforcement**, opens an external door; read `docs/CONNECTOR-ARCHITECTURE.md` (MCP-first verdict; this is the inbound half, not Open Platform `SEED-013`), `app.security.egress`, and the TRUST-03 anti-injection discipline. Org-scoped, rate-limited, audited. Credentials stored hashed or encrypted per `secret_cipher.py`. Migration likely (next free after 209); apply by SQL editor, regenerate `full-schema.sql`, run `get_advisors(security)`; revoke from `PUBLIC` on any new function. **G-4**. SC#10 axes for the run-start path. Hot files: `workflow_runs.py`, `workflow_kickoff.py`, `scheduler_service.py`, `WorkflowRunPage.tsx`, `main.py`. Seeds `SEED-195`, `SEED-014`; REG-06 is the close-out step, by hand-editing seed frontmatter.
+
+#### Phase 294: Decision Engine: Rerank and Citation Check
+
+**Goal**: Knowledge-base search sends the main model fewer, more relevant chunks by reranking with a fast decision model, and a user can check whether an answer's citations are supported. Everything sits behind a Settings switch that is off by default.
+**Depends on**: Phase 289 (no file overlap with 290-293).
+**Requirements**: DEC-01, DEC-02, DEC-03
+**Success Criteria** (what must be TRUE):
+
+  1. With the switch off, search returns exactly what it returns today (pinned by a test) and no decision call is made (DEC-01).
+  2. Each engine (Jev, OpenAI Decisions, local) reranks a real knowledge-base search in a live chat, and each call's tokens, cost and latency are recorded in LangSmith (DEC-01, DEC-02).
+  3. On a held-out set of real questions, reranking sends fewer chunks to the main model while recall of the right passage stays within a margin stated in CONTEXT. This is measured, not asserted (DEC-02).
+  4. A forced engine failure (bad key, timeout, refusal) keeps the existing order and the chat answer still arrives (DEC-02).
+  5. The citation check labels each cited sentence with a verdict and a confidence, and a planted contradicting citation comes back as contradicted (DEC-03).
+  6. Engine keys are stored encrypted and never returned to the browser, and the Settings copy says that candidate text leaves the server for hosted engines (DEC-01).
+
+**How we'd know this failed**: pruning silently drops the passage that held the answer; "off" still makes calls or changes the order; cost per chat goes up instead of down; Jev's listwise scores (ranks) are used as if they were absolute relevance; OpenAI's choice option-order bias is ignored; text in the cited answer steers the checker; the local model reloads on every request; only one engine was driven.
+**Plans:** 5 plans (3 waves)
 
 Plans:
 **Wave 1**
 
-- [x] 285-01-PLAN.md — migration 209 (attempts + minted marker, tightened backfill, stuck-pending heal) + FIX-12 retry, typed failures on the run row, minted marker writes
+- [x] 294-01-PLAN.md — rerank_engines package: Jev / OpenAI Decisions / Local / Cohere behind rerank(), D-07 prune, failure == off, local cache fix, trace redaction, steering instruction (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [x] 285-02-PLAN.md — FIX-13 purge scope (minted and unshared only, honest receipt) + BUG-261014-05 bytes receipt
+- [x] 294-02-PLAN.md — frozen 50+ question held-out set, decision_eval harness + CLI, measurement report, SEED-020 routed (wave 2)
+- [x] 294-03-PLAN.md — migration 211 message_citation_checks, claim extraction with shared ordinals, citation-check service + routes (wave 2, the only DB-mutating plan)
+- [x] 294-04-PLAN.md — Settings engine cards (sketch 294 B) + server-side engine allowlist (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [x] 285-03-PLAN.md — FIX-14 enqueue-failure refusal in /upload, heal verified live, 280 guarantees re-pinned, SC#5 OneDrive re-drive (operator OK), bug closes + ledger
+- [x] 294-05-PLAN.md — verdicts on the citation markers (sketch 294 A), ledger re-derive, live evidence checkpoint per 294-VALIDATION.md (wave 3, not autonomous)
 
-**Flags**: added at the milestone audit · **security_enforcement** (destructive purge path) · ⛔ G-5: `backend/app/services/ingest_splice.py`, `backend/app/api/documents.py` and `backend/app/api/sources.py` FIRE, so read their ledger sections before planning; `watch_service.py` and `db/ingestion_jobs.py` need a ledger presence check · **measure first**: re-read each bug's cited lines against HEAD before fixing · migration only if needed (next free after **208**, run `ls` first) · repair only: no new user capability, and no retry *policy UI* · cross-check `BUG-261014-05` (minor, `remove_document_bytes` counts) at discuss as a fold candidate.
-**UI hint**: no
+**UI hint**: yes
+**Flags**: **Provider-docs-first**: Jev (`/api/alpha/decisions` on OpenRouter; TypeSafe direct; about 30 documents per call, about 32k tokens per call) and OpenAI Decisions (`POST /v1/decisions`, `gpt-6-luna`, 1-200 questions, refusal answers; SDK 2.28.0 may lack `client.decisions`, so raw `httpx` is acceptable). Local: Qwen3-Reranker (takes an instruction) or bge-reranker-v2-m3; check licences. **Extends the existing seam** `rerank_service.py` (Cohere / local today, off by default) instead of adding a second one. The steering instruction is an optional argument on the existing search tool, and the citation check is an API route, so the tool count stays 30. Migration only if settings need new columns (next free after 210; re-run `ls`). **G-2 sketch** for the Settings block and the citation-check view. **G-4**. Hot files: `retrieval_service.py`, `config.py`, `user_settings.py`, `api/settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`; read their ledger sections. Deferred to future requirements: model routing, chunk tagging at ingestion. Intake research and sources: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`; re-verify at discuss.
 
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 277. Registers Back Inside the Band | 2/2 | Complete | 2026-10-12 |
-| 278. One Home for Tools and Filters | 4/4 | Complete | 2026-10-13 |
-| 279. The Expert Scope Seam | 4/4 | Complete (verified 4/4; owed: D-18 cloud read, 4-axis rows, review leftovers) | 2026-10-14 |
-| 280. In Once, Out Clean | 4/4 | Complete | 2026-10-14 |
-| 281. A Refusal Names Its Cause | 4/4 | Complete (owed by operator decision: G-4 rows A, C, D; WR-02 kept by design) | 2026-10-15 |
-| 282. The Slow Run and the Paused Run | 4/4 | Complete (verified 5/5, self-verified; review CR-01 + WR-02..05 fixed, WR-01 partial; owed by decision: G4-4 max 356 s, G4-6, A1, Add-form click-through, SC#10 rows 2/8 on credit) | 2026-10-15 |
-| 283. Every Member Reaches Their Own Settings | 3/3 | Complete (verified 4/4 SCs; review CR-01 + WR-01/02 + 4 info fixed, IN-04/IN-06 skipped by decision; G-4 driven live, Tab row confirmed by operator) | 2026-10-16 |
-| 284. Library at Scale | 6/6 | Complete (verified 7/7 SCs, self-verified; review R1 CR-01 + WR-01/02/04 + IN-05/07 and R2 WR-R2-01..05 fixed test-first, WR-03 accepted; G-4 A-F driven live, A/B re-driven on 208; migrations 207 + 208 LOCAL only — production apply owed) | 2026-10-16 |
-| 285. Watch and Re-upload Close Out | 3/3 | Complete (verified 5/5, self-verified; review CR-01 + CR-02 + WR-01 marker fixed test-first, rest accepted/deferred; SC#5 OneDrive 105/105 live; migration 209 LOCAL only, production paste owed BEFORE backend deploy) | 2026-10-16 |
+| 286. Seams Before Features | 0/TBD | Not started | - |
+| 287. Start From a Thread, Fork a Starter | 0/TBD | Not started | - |
+| 288. Drafts That Survive, Pauses That Publish | 4/4 | human_needed (2026-10-19) | S1 generate arm and Anthropic row blocked on billing; late-answer resume and Expired card defects open (288-UAT.md) |
+| 289. The Run Page and Its Evidence | 5/5 | Complete (2026-10-20) | Operator approved G-4; Anthropic row blocked on billing; BUG-261020-01 (human answer not passed on) and BUG-261020-02 (CR-01 residual) open |
+| 290. The Card and the Team Picture | 0/TBD | Not started | - |
+| 291. Describe It From Your Own Files | 0/TBD | Not started | - |
+| 292. More Ways to Show It | 0/TBD | Not started | - |
+| 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
+| 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
+
+---
+
+## v4.6 Pay It Down — SHIPPED 2026-10-16
+
+**9 phases** (277-285), **34 plans**, migrations **207-209**, 5 days, git tag `v4.6`.
+**24 / 24 requirements satisfied** (14 FIX · 5 DEBT · 3 SEAM · 2 REG). Audit `tech_debt`, no blockers; integration **9/9**. Repair only: closed core stays **7 phase types / 1 emitter / 30 tools**.
+Full detail: [`milestones/v4.6-ROADMAP.md`](milestones/v4.6-ROADMAP.md) ·
+requirements: [`milestones/v4.6-REQUIREMENTS.md`](milestones/v4.6-REQUIREMENTS.md) ·
+audit: [`milestones/v4.6-MILESTONE-AUDIT.md`](milestones/v4.6-MILESTONE-AUDIT.md) ·
+state at close: [`milestones/v4.6-STATE-at-close.md`](milestones/v4.6-STATE-at-close.md)
+
+CLAUDE.md back under the warn band (277) · one home for tool handlers and filter vocabulary (278) · the expert-scope seam (279) · same-bytes upload and Graph adapter fixed, purge removes bytes (280) · a refusal names its cause (281) · per-model timeout reaches the provider and one `ask_user` input (282) · members reach their own Settings (283) · Library, Find and pickers page and count on the server, migrations 207 + 208 (284) · failed watch downloads retried, purge deletes only what the watch minted, stuck-pending uploads recover, migration 209 (285).
+✅ **280-285 LIVE 2026-10-16** (prod `4e767a3a2`). Owed: Coolify rebuild confirmation + logged-in smoke; 282 G4-4/G4-6/A1; 281 G-4 rows A, C, D.
 
 ---
 

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "engine": "jev",
+  "model": "typesafe/jev-1.14",
+  "checked_at": "2026-10-20T12:00:00Z",
+  "claims": [
+    {"ordinal": 0, "n": 1, "sentence": "Revenue rose to $5M in 2024", "verdict": "supported", "confidence": 0.94},
+    {"ordinal": 1, "n": 2, "sentence": "Costs fell by 12 percent over the year", "verdict": "contradicted", "confidence": 0.83},
+    {"ordinal": 2, "n": 1, "sentence": "Margins improved in every quarter", "verdict": "partly_supported", "confidence": 0.61},
+    {"ordinal": 3, "n": 2, "sentence": "The Berlin office opened in March", "verdict": "not_supported", "confidence": 0.72},
+    {"ordinal": 4, "n": 3, "sentence": "Headcount grew to 240 people", "verdict": "couldnt_check", "confidence": null}
+  ],
+  "counts": {"supported": 1, "partly_supported": 1, "not_supported": 1, "contradicted": 1, "couldnt_check": 1},
+  "usage": {"input_tokens": 1234, "cost_usd": 0.0000518}
+}

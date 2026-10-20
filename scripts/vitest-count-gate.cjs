@@ -170,6 +170,27 @@ const BASELINE = {
   // rather than omitted, so a reader can tell "measured, unmoved" from "not looked at".
   "WorkspacePanel.derived.test.tsx": 4,
   "CitationList.test.tsx": 15,
+  // Phase 294-03 (DEC-03, Pitfall 7) — the claim-ordinal parity fence: 1 non-vacuity case + 2 per
+  // fixture case (16 cases in citation_ordinals_v1.json). Measured green on a run of the suite alone.
+  // Phase 294-05 Task 2 raised it 33 -> 49: + 1 case per fixture case (16), the
+  // (data-citation-ordinal, n) pairs assertion plan 05 decorates by. Measured on the suite alone.
+  // 294-REVIEW CR-02 raised it 49 -> 70: + 3 cases per fixture case for the 7 cases it added
+  // (link reference definitions, indented / unclosed code, two look-alikes that stay text).
+  "citationOrdinals.parity.test.tsx": 70,
+  // Phase 294-05 (DEC-03) — the citation-check client, vocabulary, store, action, marker and peek
+  // suites, measured green on a run of these suites alone (2026-10-20).
+  "citationChecks.contract.test.ts": 8,
+  // 294-REVIEW CR-01 raised each of these three 10 -> 11: the 503 engine_failed line (route source
+  // + fixed sentence), the store keeping the saved result, and the action keeping the saved pills.
+  "citationVerdicts.parity.test.ts": 11,
+  "citationCheckStore.test.ts": 11,
+  "CitationCheckAction.test.tsx": 11,
+  "CitedMarkdown.verdict.test.tsx": 17,
+  "CitationPeek.verdict.test.tsx": 5,
+  // Phase 294-04 (DEC-01) — the engine cards and the engine-id parity fence. 294-04 left them
+  // un-adopted (handover); adopted here, measured green on a run of the two suites alone.
+  "RerankEngineBlock.test.tsx": 25,  // 294-REVIEW WR-04: +1, a cleared Keep at most never reports 0
+  "rerankEngines.parity.test.ts": 7,
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
   "ChatArea.approval.test.tsx": 3,
@@ -200,6 +221,16 @@ const BASELINE = {
   "ScopeChip.test.tsx": 7,
   "ScopePicker.test.tsx": 15,
   "ChatArea.scopeChange.test.tsx": 15, // +3 268-REVIEW WR-01 (thread-switch gating) · +3 iter-2 WR-01 (409 reconcile)
+  // ── Phase 287-04 (START-01/03) — adopted suites, both knobs, same commit. Counts are the
+  //    printed `actual` of the suites run together, never hand-counted. soulData.requiredFields,
+  //    starterFork.287 live under the `src/components/workflows` directory TARGETS entry;
+  //    the chat + providers ones are named FILE-LEVEL below (no bare directory entry exists).
+  "ThreadWorkflowPicker.test.tsx": 9,
+  "useStartWorkflowInThread.test.tsx": 7,
+  "ChatArea.threadWorkflowPicker.test.tsx": 5,
+  "StreamsProvider.inputs.test.tsx": 3,
+  "soulData.requiredFields.test.ts": 7,
+  "starterFork.287.test.tsx": 3,
   "HandoffCard.test.tsx": 3,
   "MessageItem.transcriptEvent.test.tsx": 8,
   "InviteExpertDialog.test.tsx": 23, // 267-REVIEW WR-06 +1, IN-02 +1; 267-UI-REVIEW #3 +1
@@ -428,7 +459,7 @@ const BASELINE = {
   "ChatArea.model.test.tsx": 2,
   // Phase 226 — src/landing (pinned at the merge commit; pre-flight F-6 kept the phase off this file while 224-05 edited it)
   "landingBundleFence.test.ts": 2,
-  "facts.test.ts": 5,
+  "facts.test.ts": 6, // 288-04: 5 -> 6 (the corrected pause-stage copy; gate actual)
   "cssClasses.test.ts": 1,
   "scenes.test.tsx": 9,
   "LandingPage.test.tsx": 7,
@@ -635,8 +666,8 @@ const BASELINE = {
   // began (the file ran 78 at wave 1's start), so it was leaving 37 cases deletable in
   // silence on the gauntlet — the publish surface. Reasons + the full six-pin table live in
   // the 214.1-02 block beside `declaredInputs.test.ts`.
-  "PublishGauntlet.test.tsx": 83,
-  "WorkflowBuilderPage.canvas.test.tsx": 128,
+  "PublishGauntlet.test.tsx": 91, // 288-04: 83 -> 91 (288-02 auto_answered block + pause stage copy; read from the gate's own actual column)
+  "WorkflowBuilderPage.canvas.test.tsx": 154, // 288-04: 128 -> 154 (the retired TWO-children pin rewritten to THREE; gate actual)
   // ⚠ 193.1-08 (D-24): 19 → 30 (+11). Read from THIS SCRIPT'S OWN `actual` column
   // (`WorkflowBuilderPage.describe.test.tsx 19 30 +11`), never counted by hand.
   //
@@ -1514,7 +1545,7 @@ const BASELINE = {
   // ⚠ AND THE SUITE ITSELF IS BYTE-UNCHANGED BY THE PASS THAT RAISES THE PIN — checked with
   //    `git diff --numstat` before the number was touched, because a pin raised in the same
   //    breath as an edit to its subject proves nothing about either.
-  "WorkflowRunPage.test.tsx": 148,
+  "WorkflowRunPage.test.tsx": 184, // 289-05: 177 -> 184 (289-01 paused cases +2, 289-04 report cases +5; gate actual). 288-04: 148 -> 177
   // ── Added in 195-02 task 3, in the SAME COMMIT as their TARGETS entries. Every ───────
   // ── number below is this script's own printed `actual` column across TWO agreeing ────
   // ── runs (`total 4044 · failed 0 · count gate OK` both times) — never hand-counted ───
@@ -1721,7 +1752,7 @@ const BASELINE = {
   // reported the kill switch as "deleted, or belongs to another account". Four of the five
   // cases were observed RED; the fifth is the flag-ON positive control. This also
   // discharges the render-guard assertion `revertByteIdentical.test.tsx` deferred in 181.
-  "ChatLayout.launch.test.tsx": 17,
+  "ChatLayout.launch.test.tsx": 38, // 287-04: raised 17 -> 38, the gate's own printed `actual` (287-01/02 rewrote it)
   // ⚠ ADOPTED 2026-09-01, pinned at the gate's OWN printed `new` column (13), never counted
   // by hand — `221-CARRY-FORWARD.md` §E2 records the session where a hand-split pin was
   // caught doing exactly that. TARGETS was added in the same commit; a suite in one knob
@@ -2276,7 +2307,7 @@ const BASELINE = {
   // description; unpinned, the whole guard sat in eight cases of slack.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`RunModal.test.tsx 32 40 +8`).
-  "RunModal.test.tsx": 40,
+  "RunModal.test.tsx": 55, // 287-04: raised 40 -> 55, the gate's own printed `actual` (287-01/02 rewrote it)
   // 193-07 (AUTH-03 / D-18), pinned by 193-10's sweep: 16 → 20. An EXTENSION, never a lowering.
   // The +4 guard that D-18's `Template to fill` is a TEXT NODE and not a `<label htmlFor>` bound
   // to a hidden input — the a11y half of naming the control — plus the D-19 provenance sentence
@@ -2463,7 +2494,13 @@ const BASELINE = {
   // argued. E-1's plant widened the real memo to `[rows, query]`: 1 failed / 117 passed.
   // ⚠ Both restores md5-CHECKED per the note above: fences `c1f2c17f53fe2fd8a75f07fed0c6d8f1`,
   // and `WorkflowsPage.tsx` left absent from `git status --porcelain`.
-  "librarySubtree.fences.test.ts": 118,
+  // ⚠ RAISED 118 → 133 at 286-05 (2026-10-18), read from this script's own `actual` column.
+  //   +5 is 286-04's: `./WorkflowCardMenu.tsx` joined `LIBRARY_SUBTREE_PATHS` (14 → 15) in the
+  //   commit that created it, and each path runs five `it.each` sweeps. The other +10 PREDATE
+  //   Phase 286 — the suite measured 128 at the phase base `d45bef9e2` (run on the base tree,
+  //   286-05-GATES.md), so the pin had been 10 behind its own suite before this phase began.
+  //   Folded in here because raising a pin only tightens it; the split is stated, not smoothed.
+  "librarySubtree.fences.test.ts": 133,
   // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
   // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
   // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).
@@ -2757,9 +2794,9 @@ const BASELINE = {
   //     in the suite sweeps the targeted handles in the source and asserts the set is exactly
   //     those four. ⚠ G-4 row **U1 is still owed** on the appearance half: jsdom applies no
   //     CSS, so the one-card composition is proved here by SOURCE assertion only.
-  "decisionsVocabulary.test.ts": 22,
+  "decisionsVocabulary.test.ts": 24, // 288-04: 22 -> 24 (draft-settings words; gate actual)
   "DecisionsList.test.tsx": 54,
-  "DraftArrivalCard.test.tsx": 35,
+  "DraftArrivalCard.test.tsx": 61, // 288-04: 35 -> 61 (288-01 settingsRow cases plus earlier unpinned growth; gate actual)
   // ── Added in 192.2-10 (WR-02), in the SAME COMMIT that creates the file ──────────────
   //
   // ⚠ THE TWO-KNOB TRAP, AND `src/lib/` IS WHERE THIS SCRIPT ALREADY RECORDS IT FOUR TIMES.
@@ -2943,7 +2980,7 @@ const BASELINE = {
   // ticks and the tick DISCLOSES it is unfinished; that a STALE slice cannot pulse a finished
   // step, because liveness needs BOTH sources; and that the caller's ask renders inside the
   // row it was given for and nowhere else — which is the placement the whole re-port turns on.
-  "RunSpine.test.tsx": 11,
+  "RunSpine.test.tsx": 15, // 289-05: 11 -> 15 (289-02 evidence-line mount cases; gate actual)
   // ── SEED-190's run log, pinned in the commit that creates all three files ───────────────
   //
   // ⚠ THREE SUITES, THREE DIFFERENT THINGS, and none of them is coverage for its own sake:
@@ -3496,7 +3533,7 @@ const BASELINE = {
   "StepIdentity.coverage.test.tsx": 23,
   "WorkflowScheduleModal.test.tsx": 9,
   "argumentModel.test.ts": 26,
-  "argumentVocabulary.test.ts": 44,
+  "argumentVocabulary.test.ts": 45, // 289-05: 44 -> 45 (the export-format exemption's own scope case)
   "describeServiceMatch.test.ts": 15,
   "publishRefusalVocabulary.test.ts": 41,
   "stepIdentityVocabulary.test.ts": 34,
@@ -4252,6 +4289,40 @@ const BASELINE = {
   // 284-REVIEW CR-01 / IN-07 — the review-fix suites. BOTH KNOBS, SAME COMMIT.
   "LibraryPage.review284.test.tsx": 5, // 284-REVIEW CR-01 + IN-07 — never a page past the end; the pager describes the rows shown
   "pageClamp.test.ts": 3, // 284-REVIEW CR-01 — the ONE clamp for every paged list
+  // ── Phase 286-05 (2026-10-18, REG-07) — the three characterization pins wave 1 wrote BEFORE
+  // each move, pinned at the gate's own printed actuals (`count gate OK`, failed 0). The two
+  // src/pages pins are also named in TARGETS (same commit); the card pin rides the
+  // `src/components/workflows` directory entry. Deleting a pin case now reds the gate.
+  "WorkflowBuilderPage.seam286.pin.test.tsx": 11, // 286-02 — export set, one call per name read, names never ids, both read-only arms, header DOM
+  "WorkflowRunPage.seam286.pin.test.tsx": 10, // 286-03 — load screens, 5 s cadence, terminal edge, stale guard, retry, refresh blip
+  // Phase 288-04 — ADOPTED: the two suites 288 created. `WaitingOnLine.test.tsx` rides the
+  // `src/components/workflows` directory entry (BASELINE pin only); `WorkflowBuilderPage.draftSettings.test.tsx`
+  // is in `src/pages/__tests__`, reached by named files only, so it is ALSO named in TARGETS below.
+  "WaitingOnLine.test.tsx": 4, // 288-03 — sentence is a text child, absent field renders nothing, no id/email leak
+  "WorkflowBuilderPage.draftSettings.test.tsx": 6, // 288-01 — re-open shows the row not the card, rename reaches the PATCH, flag off, three children, A-B-A
+  "WorkflowCard.seam286.pin.test.tsx": 21, // 286-04 — menu roles, Schedules hands up the row id, arm-to-confirm grades, published-delete visibility
+  // ADOPTED at 286-05: the two SEED-222 suites that guard a file in THIS phase's diff, which is the
+  // re-open condition every earlier decline named. `toolReadOnlyMap.test.ts` — 286-02 retargeted
+  // its "THE JOIN" case onto `useBuilderNameMaps.ts` (the read-only banner's join, T-286-09); 7 at
+  // the phase base and 7 now (286-02 added an assertion inside an existing case, not a case).
+  // `automationFacts.test.ts` — reads `./WorkflowCard?raw` (row-answer-dot < row-automation <
+  // row-identity order), and 286-04 moved 307 lines out of that file. The other three SEED-222
+  // suites (`PromptVariableChips`, `RunHero`, `nodeEffectBanner`) read no 286 file: still unpinned.
+  "toolReadOnlyMap.test.ts": 7,
+  "automationFacts.test.ts": 11,
+  // ── Phase 289-05 (2026-10-19) — the suites plans 289-01..05 created, adopted in BOTH knobs ──
+  // in one commit. Counts are the per-file actuals from a focused `--reporter=json` run at
+  // `GSD_VITEST_MAX_WORKERS=2`, never hand-counted. The three `src/components/workflows` suites
+  // are inside that DIRECTORY entry and need a pin only; the other four are FILE-LEVEL below.
+  "PendingAskCard.paused.test.tsx": 6, // 289-REVIEW CR-02: 4 -> 6 (pending -> expired -> paused re-render, 404 stays terminal). 289-01 — the paused card keeps its answer control
+  "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
+  "evidenceView.test.ts": 31, // 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
+  "RunEvidenceReport.test.tsx": 26, // 289-04 — the report by content, button sets, 404 screen
+  "runDeepLink.test.ts": 12, // 289-04 — strict-UUID ?run= read/write/clear
+  "runEvidence.test.ts": 3, // 289-04 — the client: encodeURIComponent, ApiError(status)
+  "runEvidence.contract.test.ts": 3, // 289-05 I1 — RunEvidence vs the shared contract fixture
+  // 289-REVIEW WR-05 (2026-10-20) — created by the review fix, adopted in BOTH knobs in one commit.
+  "ChatLayout.runDeepLink.test.tsx": 2, // ?run= is cleared when a LIVE run page is left
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4693,6 +4764,17 @@ const TARGETS = [
   // worth guarding rather than leaving declined.
   "src/components/panel/__tests__/WorkspacePanel.derived.test.tsx",
   "src/components/chat/__tests__/CitationList.test.tsx",
+  // Phase 294-03 — BOTH KNOBS, SAME COMMIT: without this entry the parity fence runs in no gate.
+  "src/components/chat/__tests__/citationOrdinals.parity.test.tsx",
+  // Phase 294-05 — BOTH KNOBS, SAME COMMIT (the 294-03 rule): each entry pairs a BASELINE pin.
+  "src/components/chat/__tests__/citationChecks.contract.test.ts",
+  "src/components/chat/__tests__/citationVerdicts.parity.test.ts",
+  "src/components/chat/__tests__/citationCheckStore.test.ts",
+  "src/components/chat/__tests__/CitationCheckAction.test.tsx",
+  "src/components/chat/__tests__/CitedMarkdown.verdict.test.tsx",
+  "src/components/chat/__tests__/CitationPeek.verdict.test.tsx",
+  "src/components/settings/__tests__/RerankEngineBlock.test.tsx",
+  "src/components/settings/__tests__/rerankEngines.parity.test.ts",
   "src/components/chat/RunCard.test.tsx",
   "src/components/chat/RunCard.timer.test.tsx",
   "src/components/chat/__tests__/ChatArea.approval.test.tsx",
@@ -4719,6 +4801,11 @@ const TARGETS = [
   "src/components/chat/__tests__/IrisAvatar.test.tsx",
   "src/components/chat/__tests__/irisMotion.test.ts",
   "src/components/chat/__tests__/ChatArea.scopeChange.test.tsx",
+  // Phase 287-04 — FILE-LEVEL (no bare chat/providers directory entry); pinned in BASELINE, same commit.
+  "src/components/chat/__tests__/ThreadWorkflowPicker.test.tsx",
+  "src/components/chat/__tests__/useStartWorkflowInThread.test.tsx",
+  "src/components/chat/__tests__/ChatArea.threadWorkflowPicker.test.tsx",
+  "src/providers/__tests__/StreamsProvider.inputs.test.tsx",
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,
   // matching how its two siblings below are already reached. Both knobs, same commit.
@@ -6213,6 +6300,24 @@ const TARGETS = [
   // 284-REVIEW CR-01 / IN-07 — FILE-LEVEL (no `src/pages` / `src/lib` directory entry).
   "src/pages/__tests__/LibraryPage.review284.test.tsx",
   "src/lib/__tests__/pageClamp.test.ts",
+  // Phase 286-05 (2026-10-18, REG-07) — the two characterization pins 286-02 and 286-03 wrote
+  // BEFORE their moves. FILE-LEVEL: `src/pages` is reached by named files only. The third pin,
+  // `library/__tests__/WorkflowCard.seam286.pin.test.tsx` (286-04), is already inside the
+  // `src/components/workflows` DIRECTORY entry, so it needs a BASELINE pin only. An unpinned
+  // characterization pin is an unguarded one: deleting a case would have read green.
+  "src/pages/__tests__/WorkflowBuilderPage.seam286.pin.test.tsx",
+  "src/pages/__tests__/WorkflowRunPage.seam286.pin.test.tsx",
+  // Phase 288-04 — FILE-LEVEL (no `src/pages` directory entry): the draft-settings page suite.
+  "src/pages/__tests__/WorkflowBuilderPage.draftSettings.test.tsx",
+  // Phase 289-05 — FILE-LEVEL (no `src/lib` or `src/components/panel` directory entry), in the
+  // SAME commit as their BASELINE pins.
+  "src/components/panel/__tests__/PendingAskCard.paused.test.tsx",
+  "src/lib/runDeepLink.test.ts",
+  "src/lib/api/runEvidence.test.ts",
+  "src/lib/api/__tests__/runEvidence.contract.test.ts",
+  // 289-REVIEW WR-05 — FILE-LEVEL (no `src/components/layout` directory entry), in the SAME
+  // commit as its BASELINE pin.
+  "src/components/layout/__tests__/ChatLayout.runDeepLink.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

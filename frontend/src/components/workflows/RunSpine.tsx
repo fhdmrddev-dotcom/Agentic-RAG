@@ -76,6 +76,9 @@ import { timeRunning } from "@/components/workflows/receiptVocabulary"
 // ── Phase 214-11 Task 2b (STEP-04 / D-214-16) — the ONE step-identity element, `size="spine"`.
 // It takes props; this component resolves nothing and reaches for no map.
 import { StepIdentity, type StepIdentityProps } from "@/components/workflows/StepIdentity"
+// ── Phase 289 (TRUST-01 / D-10) — the evidence line under a KB step. A leaf; it imports
+// nothing from `@/lib/api`, so this component still has no runtime edge there (196-08).
+import { StepEvidenceLine, type EvidenceLineConfidence } from "@/components/workflows/StepEvidenceLine"
 
 /**
  * The page's live reading for one step, structurally declared.
@@ -181,8 +184,10 @@ const FALLBACK_FACE: Face = {
 }
 
 export interface RunSpineProps {
-  /** The run's durable phase rows, IN THE ORDER THE SERVER GAVE THEM. */
-  phases: readonly PhaseTimingRow[]
+  /** The run's durable phase rows, IN THE ORDER THE SERVER GAVE THEM.
+   *  Phase 289: widened by intersection with the wire's optional `confidence` — a read shape,
+   *  so `phaseDuration.ts` is untouched and every existing caller still type-checks. */
+  phases: readonly (PhaseTimingRow & { confidence?: EvidenceLineConfidence | null })[]
   /** The step's human name — the page's, never re-derived here. */
   titleOf: (slug: string) => string
   /**
@@ -407,6 +412,8 @@ export function RunSpine({
                         </span>
                       )}
                     </span>
+                    {/* Phase 289 (D-09 / D-10) — renders nothing for a non-KB step. */}
+                    <StepEvidenceLine confidence={row.confidence} />
                     {ask ? (
                       <span data-testid="spine-ask" className="mt-1 block">
                         {ask}

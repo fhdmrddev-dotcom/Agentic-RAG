@@ -39,7 +39,11 @@ export async function updateSettings(body: SettingsUpdate): Promise<FullAppSetti
     }
     throw new Error("Failed to save settings")
   }
-  return res.json() as Promise<FullAppSettings>
+  const saved = (await res.json()) as FullAppSettings
+  // 294 UAT C5: a save can switch or switch off the rerank engine; the chat's citation-check
+  // line listens for this and asks the server again (stores/citationCheckStore.ts).
+  window.dispatchEvent(new Event("agentic:settings-saved"))
+  return saved
 }
 
 // Phase 137.1 (EVAL-05 / D-11, D-12) — independent judge-model get/set. THIN wrappers

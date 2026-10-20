@@ -311,7 +311,9 @@ def test_the_route_forwards_the_field_without_collapsing_it():
     above, which only ever calls the service directly."""
     from pathlib import Path
 
-    import app.api.workflows as wf
+    # Phase 286 (286-01): handler moved to workflow_authoring_doors.py; the sweep reads the file
+    # that now holds both GenerateRequest and generate_workflow
+    import app.api.workflow_authoring_doors as wf
 
     source = Path(wf.__file__).read_text(encoding="utf-8")
     assert "allowed_connection_ids=body.allowed_connection_ids," in source

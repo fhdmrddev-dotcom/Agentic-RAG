@@ -1,0 +1,2887 @@
+{
+  "paths": {
+    "/workflows/published": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Published Workflows",
+        "description": "List the published workflow definitions the user may start (D-01 picker feed).\n\nOwner-scoped via the RLS-mirroring predicate in ``list_published_workflows``.\nPure read — prefers the asyncpg pool for the scoped query.\n\nPROJECT BINDING (Phase 098 / PROJ-01, D-03): the optional ``project_folder_id``\nquery param makes the library queryable per project — when present, only\npublished definitions bound to that folder are returned. FastAPI coerces the\nraw query string to ``UUID`` before it reaches the DB layer (rejecting a\nmalformed value with 422), and the db helper binds it as a positional\nparameter — never string-interpolated (T-098-10). Owner-scoping is preserved\n(it lives in the db-layer WHERE); the project filter can only narrow, never\nwiden, the result (T-098-09). Omitting it returns the full published list\nunchanged (backward compatible).\n\nSCOPED SHELF (Phase 143 / WF-01, D-143-2a): the optional ``scope`` query param\nthreads ``owned_only=(scope == \"mine\")`` into the db helper. The Workflows-page\nPublished shelf passes ``?scope=mine`` to see ONLY the caller's own published\nrows (the curated globals now live in the Starters shelf — no double-render);\nANY other value (including omitting it — the composer picker / run-soul default)\nkeeps ``owned_only=False`` so the global rows still appear. The comparison is a\npure-Python ``== \"mine\"`` — ``scope`` is NEVER interpolated into SQL (V5).",
+        "operationId": "get_published_workflows_workflows_published_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_folder_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Folder Id"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublishedWorkflow"
+                  },
+                  "title": "Response Get Published Workflows Workflows Published Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/starters": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Starter Workflows",
+        "description": "List the curated global starters — the Starters shelf feed (Phase 143 / WF-01).\n\nDelegates to ``list_starter_workflows`` (``status='published' AND is_system_global=true\nAND definition->>'category'='starter'``) and maps each row through the existing\n``PublishedWorkflow`` + ``_coerce_definition`` shape the Published shelf uses. The\nrows are UNSCOPED curated globals — ``is_system_global`` published rows are world-readable\n(T-143-01, mig-056 SELECT policy), so no per-user filter is needed; ``category=\n'starter'`` narrows to curated (the 5 mig-061 dev scaffolds lack the marker and are\nexcluded — D-143-2a).\n\nDeclared as an explicit STATIC ``/starters`` segment BEFORE any ``/{definition_id}``\nroute (the ``/drafts`` precedent) so a future path param can never shadow it.",
+        "operationId": "get_starter_workflows_workflows_starters_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublishedWorkflow"
+                  },
+                  "type": "array",
+                  "title": "Response Get Starter Workflows Workflows Starters Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/workflows/validate": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Validate Workflow",
+        "description": "Validate a raw ``WorkflowDefinition`` — the SINGLE SOURCE OF VALIDATION TRUTH (VALID-01).\n\nAggregates the FULL STATIC publish gauntlet (D-182-02) so the canvas previews every\npre-run blocker live, reusing each check VERBATIM:\n\n  1. ``lint_workflow``                          — structural (bad_index / unsatisfiable_skip /\n                                                  orphan_phase / no_terminal / input_unsatisfied)\n  2. ``grounding.grounding_verdicts``           — fidelity (folder_scope ⊆ project subtree,\n                                                  available_tools ∈ registry, skill_ref ∈ enabled)\n  3. ``grounding.business_requirement_missing`` — the D-13 publish invariant (shared with publish stage 1)\n  4. ``publish_service._interactive_phase_failures`` — the WR-04 interactive-phase pre-run block\n  5. ``grounding.grounding_cause`` × ``project_folder_id`` — the D-187-11 unbound-retrieval\n                                                  check, the ONE rule on this route that\n                                                  publish does NOT also run (see\n                                                  ``_ROUTE_ASSIGNED_CODES``)\n\nThe golden run + judge (publish stages 3-4) are LIVE-only and deliberately NOT here —\n``/validate`` is a static, no-provider, read-only surface called on every canvas edit.\n\nALWAYS HTTP 200 with the machine-renderable envelope: a dirty definition is not an HTTP\nerror, it is advice. A malformed/injected body key is a 422 for free (``WorkflowDefinition``\nis ``extra='forbid'``) — the SHAPE tier, never relaxed to a lenient dict (V5). A phase\ndeclaring ``folder_scope`` on an unbound workflow also 422s at the shape tier (the\n``@model_validator``), so it never reaches this handler; an empty ``phases: []`` IS\nshape-valid and lands here as an ``incomplete`` ``no_terminal``.\n\nTHAT PROMISE IS NOW ENFORCED FOR THE TWO GROUNDING I/O STAGES (round-2 gap closure —\nWR-02). Until this plan nothing enforced it: a real ``postgrest`` ``APIError`` from either\nthe palette read or the ⊆ walk escaped as an HTTP 500 (``APIError`` is not a\n``ValueError``, so the ⊆ rule's catch never saw it) — while the SAME collector on the\npublish side returned a structured block. Both stages are wrapped now and degrade to the\nhonest ``grounding_unavailable`` verdict at severity ``error``: ``ok`` is never ``True``\nwhen a check did not run, and a degraded read is never dressed up as a rule finding.\n\nTHE SEAL IS SCOPED, AND ITS BOUNDARY IS RECORDED. What remains is SEED-131 / SEED-132 and\nstays DEFERRED to Phase 184: the envelope-level design question (a top-level ``degraded``\nmarker or a third severity, instead of a verdict code), the ``@model_validator`` 422s that\nbypass this envelope before the handler is even entered, and a contract test enforcing\nalways-200 across the WHOLE handler rather than across the grounding stages only.",
+        "operationId": "validate_workflow_workflows_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowDefinition"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/workflows/grounding-bundle": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Grounding Bundle",
+        "description": "The cacheable server-sourced palette the canvas binds to (D-182-01).\n\nA pure READ — no writes, no provider call. Delegates to the ONE shared\n``grounding.assemble_grounding_bundle`` (the SAME computation the ``/validate`` fidelity\nrules and NL generation consume) and serializes its structured fields. The palette is\nworkflow-agnostic, so ``project_folder_id`` is not taken: a bound project narrows only the\nper-phase ``folder_scope`` ⊆ check, never the set of valid building blocks.\n\n``template_placeholders`` is populated ONLY when the optional ``?template_asset_id=`` query\nparam is supplied (placeholders are per-template); the base palette returns ``[]``. A\nmalformed id is a 422 for free (``UUID`` coercion, V5); the pg pool is resolved lazily\nbecause it is needed ONLY to resolve a template's bytes.\n\nReads stay OWNER-scoped by ``user_id`` (V4 / T-182-03) — the palette must never widen to\nanother user's folders or skills.\n\nThe response is an EXPLICIT projection (``PaletteFolder`` / ``PaletteSkill``), never the raw\nDB rows (CR-02): ``org_id`` and the seeding owner's ``user_id`` never reach the wire.",
+        "operationId": "get_grounding_bundle_workflows_grounding_bundle_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_asset_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Template Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroundingBundleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{definition_id}/publish": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Publish Workflow",
+        "description": "Publish a draft (D-07) — the QUAL-01 hard gate.\n\nEnforces, IN ORDER (the same order as ``publish_service.publish_workflow``'s stage list —\nthe two docstrings must never disagree): business_requirement present -> structural lint\n-> the interactive-phase pre-run block (WR-04) -> grounding fidelity (Phase 182 stage 2.6,\nthe SAME shared collector ``POST /workflows/validate`` previews) -> a REAL golden run on\nthe project KB -> the judge verdict -> the draft->published flip. A lint-clean workflow\nwhose judge fails CANNOT publish.\n\nThe orchestration lives in ``publish_service.publish`` (owner-scoped via\n``get_definition``). HTTP mapping:\n  - ``not_found`` (not owned / does not exist) -> 404 (no existence leak, V4)\n  - ``already_published`` -> 409\n  - ``business_requirement`` (D-13) -> 400 with the structured verdict\n  - any other block -> 200 ``{published: False, blocked_stage, named_failures, golden_run_id}``\n  - success -> 200 ``{published: True, version, golden_run_id}``\n\n``grounding_fidelity`` and ``draft_changed`` (like ``lint`` and ``interactive_phase``)\nare UNRECOGNISED ``blocked_stage`` values for the branches above, so they fall through\nto the 200 + structured verdict — a new stage needs NO route branch here, only this\ndocstring. The newest of them (Phase 186 / D-186-10) means the draft was edited while\nthe gauntlet was running, so the token captured at stage 0 no longer matched and the\nflip was refused. It is deliberately NOT folded into the ``already_published`` 409:\nthat would tell the author somebody else published their workflow, which is false, and\nwould hide the one fact that tells them what to do next — their own newer edit. 200 +\n``{published: False, blocked_stage, golden_run_id}`` is the honest answer, and the\ngolden run stays browsable.\n\n``definition_id`` is a path ``UUID`` -> FastAPI 422 on a malformed id (V5).",
+        "operationId": "publish_workflow_workflows__definition_id__publish_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishVerdict"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Create Draft",
+        "description": "Persist a NEW draft (REQ-1 create) — returns ``{id, version}``.\n\nServer-forced invariants (T-103-01-03): ``status='draft'`` is forced on the body\nserver-side (never trusted from the client); the DB fn binds ``is_system_global=false`` +\n``created_by=user_id`` literally/by the trusted owner. A hallucinated/extra key in\nthe body is already a 422 (``WorkflowDefinition`` is ``extra='forbid'``).",
+        "operationId": "create_draft_workflows_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowDefinition"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/workflows/drafts": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "List Drafts",
+        "description": "List the caller's OWN drafts (the drafts shelf — D-103-4).\n\nOwner-scoped in the DB layer (``status='draft' AND created_by=$1``); a second\nuser's draft is absent (T-103-01-01). Declared as an explicit static segment\nso it is never shadowed by a ``/{definition_id}`` path.",
+        "operationId": "list_drafts_workflows_drafts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DraftRow"
+                  },
+                  "type": "array",
+                  "title": "Response List Drafts Workflows Drafts Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/workflows/{definition_id}": {
+      "patch": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Update Draft",
+        "description": "Update a DRAFT (REQ-1 PATCH) — returns ``{id, version, token}``.\n\nTHE CONCURRENCY TOKEN RIDES IN ``If-Match``, NOT IN THE BODY (Phase 186 / D-186-07).\n``WorkflowDefinition`` is ``extra='forbid'`` and the token is TRANSPORT METADATA, not\npart of the definition (D-14 — no second source of truth): a token key in the body\nwould 422 today and would be persisted into the ``definition`` JSONB if it did not.\nA wrapper body model was the alternative and was rejected — it is a breaking shape\nchange to every caller and every test that PATCHes a bare definition.\n\n``If-Match`` IS OPTIONAL FOR ONE RELEASE, DELIBERATELY. An absent header means exactly\ntoday's unguarded behaviour. Requiring it would break every browser tab that was open\nacross the deploy on its very next save. The client always sends one, so the unguarded\npath is reachable only by a pre-deploy tab or a non-browser caller. THIS IS A DATED\nCONCESSION, NOT THE END STATE — the header is expected to become required once no\npre-186 client can still be running.\n\nThree named refusals (D-186-09), and the 404 is deliberately the dullest of them:\n  - ``not_found`` (missing OR not-owned) -> **404** with the UNCHANGED string detail\n    ``draft not found``. It gets NO machine code: a coded 404 would let a caller\n    tell \"no such workflow\" from \"someone else's workflow\", i.e. an existence oracle\n    (T-186-01-03). Not-found and not-owned must stay byte-identical.\n  - ``already_published`` -> **409**, today's sentence, now object-shaped so the\n    client can stop string-matching prose. NOTE this is a deliberate STATUS change\n    from the pre-186 404: the 0-row write is now disambiguated by an owner-scoped\n    probe instead of collapsing to \"not found\" (test_103_published_409.py pins it).\n  - ``stale_token`` -> **409** with the CURRENT token attached, so D-186-08's\n    \"overwrite with what's on screen\" is ONE more PATCH rather than a re-read plus a\n    PATCH. Disclosing it leaks nothing: the disambiguating probe is owner-scoped, so\n    the caller already owns the row (T-186-01-04, accepted).\n\nA published-row PATCH also hits the immutability trigger (Postgres ``23514``) when the\n``status='draft'`` conjunct loses a race with a concurrent publish; we still catch\n``asyncpg.exceptions.CheckViolationError`` -> HTTP 409, never a silent overwrite or a\n500 (T-103-01-02 / T-186-01-06). ``definition_id`` is a path ``UUID`` -> FastAPI 422 on\na malformed id.",
+        "operationId": "update_draft_workflows__definition_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowDefinition"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Delete Draft",
+        "description": "Delete a DRAFT (REQ-1 DELETE) -> 204.\n\nA published-row DELETE hits the immutability trigger (``23514``); we catch\n``CheckViolationError`` -> HTTP 409 (no silent removal, no 500; T-103-01-02). A\nnot-owned / non-draft / missing id returns ``False`` -> 404 (no existence leak).\n\nNo return-type annotation (the delete_folder 204 precedent): a ``-> None`` makes\nFastAPI build a response body field, which the 204 status forbids.\n\nTHIS 409's DETAIL STAYS A BARE STRING, ON PURPOSE (Phase 186). A delete is not on the\nautosave path, so it has no concurrency token and no stale-vs-published ambiguity to\nresolve — object-shaping it would be churn for a distinction that does not exist here.\nThe client's defensive default covers the asymmetry: a 409 whose body has no ``code``\nfalls back to today's ``WorkflowConflictError``. Read as a DECISION, not an oversight.",
+        "operationId": "delete_draft_workflows__definition_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{definition_id}/delete-preview": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Delete Preview",
+        "description": "Exact Removed/Kept counts for the victim-naming sheet BEFORE commit (D-LOCK-03).\n\nOwner-gated + 404-collapse (same boundary as the cascade DELETE). The counts are\nserver-sourced — the sheet never guesses. A distinct STATIC-suffix route so it never\nshadows (or is shadowed by) the draft ``/{definition_id}`` paths.",
+        "operationId": "get_delete_preview_workflows__definition_id__delete_preview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletePreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{definition_id}/cascade": {
+      "delete": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Delete Workflow Cascade",
+        "description": "Hard-delete a workflow (definition + ALL versions + ALL runs) safely -> 204.\n\nOrder (D-LOCK-04/05):\n  1. Owner-gate the target id → its slug (non-owner / unknown → 404, no leak).\n  2. CANCEL-FIRST every in-flight run (status ``active``/``paused``/``cap_paused``) for\n     that slug's versions — BEFORE the DB delete, never deleting a live run out from\n     under the engine (D-LOCK-05). Cancel through the PRODUCER ``runs.run_id`` (the\n     RUN_TASKS key, resolved by the LEFT JOIN — NOT the ``workflow_runs.id``, which the\n     registry never keys), publish the ask_user cancel sentinel on the workflow-run\n     channel, and durably ``finish_run`` the workflow_runs row (covers the paused +\n     cross-worker ``WORKER_COUNT=2`` cases).\n  3. FK-safe cascade (``delete_published_workflow_cascade``): runs FIRST (RESTRICT\n     blocker) → phases auto-cascade → thread anchors auto-SET-NULL (threads KEPT as\n     normal chats) → all versions. ``harness_audit`` receipts linger (A3).\n  4. Best-effort audit receipt (never raises) — the victim-naming \"recorded with your\n     name\" (D-LOCK-03).\n\nNo return-type annotation (the ``delete_draft`` 204 precedent): a ``-> None`` makes\nFastAPI build a response body field, which 204 forbids.",
+        "operationId": "delete_workflow_cascade_workflows__definition_id__cascade_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/generate": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Generate Workflow",
+        "description": "Generate a grounded ``WorkflowDefinition`` DRAFT from an NL description (REQ-2).\n\nDelegates to ``workflow_authoring.generate_workflow_definition`` (the orchestration\nstays OUT of the route body). Returns the service result dict directly:\n  - ``{ok: True, definition}`` -> a draft object the Builder loads (NOT persisted);\n  - ``{ok: False, error, detail}`` -> an HONEST \"could not generate\" (the UI\n    distinguishes on ``ok``). A service ``ok=False`` is returned as 200 with the\n    structured error body — it is not an HTTP error, it is an honest failure surface.\n\n``project_folder_id`` / ``template_asset_id`` are path/body ``UUID``s -> FastAPI 422\non a malformed value (V5).",
+        "operationId": "generate_workflow_workflows_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/workflows/template/placeholders": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Read Template Placeholders",
+        "description": "Read a template's fill-in fields from the BYTES, persisting nothing (D-05).\n\nWHY THIS ROUTE EXISTS. The sibling upload door needs a saved workflow\n(``POST /{definition_id}/template``), and at describe time there is no workflow yet\n— so an author who wants the draft built to fit their template has a chicken-and-egg\nproblem. This door takes the bytes straight off their disk and answers with the field\nnames. **No row, no Storage object, no draft.** Rejected alternatives, recorded so the\nshape reads as a decision: minting an empty draft up front (library rows the user\nnever asked for, and a second writer against Phase 186's concurrency token), and\nstashing to a scratch Storage path (an orphan-cleanup problem nobody owns, on bytes\nthat are RLS-sensitive).\n\n⚠ **IT INJECTS NO SUPABASE CLIENT AND NO POOL, AND THAT IS A CLASS ELIMINATION\nRATHER THAN A STYLE CHOICE.** Quick task ``260814-q5r`` had to write an owner-prefix\ncheck AND a ``..`` traversal check on its read door, because that route resolves a\ncaller-supplied Storage PATH through a client sitting on a service-role pool which\nbypasses RLS — a hand-written guard in front of a service-role read is the exact\nshape of a prior credential-exposure defect in this codebase. This route accepts no\npath and owns no row, so there is nothing for that class to attach to. Adding\n``supabase=Depends(get_supabase)`` \"for symmetry\" would REINTRODUCE it; the fence in\n``tests/unit/test_193_1_stateless_placeholders.py`` sweeps the body as well as the\nsignature so that edit reds.\n\nTHE GATES, in the sibling's exact order — each one load-bearing:\n\n  1. **The DECLARED part size, before the body is materialised** (the WR-04 fix) —\n     uvicorn/FastAPI impose no body cap, so ``.read()`` of a multi-GB part would\n     buffer it all in RAM.\n  2. **The extension**, before the body is read at all — a ``.png`` costs nothing.\n  3. **Empty / oversized actual body** — a lying or absent declared size stops here.\n  4. **The magic bytes** via the shipped ``validate_upload`` — ZIP EOCD +\n     ``[Content_Types].xml`` + a per-extension part marker, so a renamed binary\n     wearing a ``.docx`` name never reaches the parser.\n  5. **The uncompressed-total cap** — see ``_TEMPLATE_MAX_UNCOMPRESSED_BYTES``.\n     ⚠ This one is NOT inherited: gates 1-4 come from the shipped doors and do NOT\n     cover a zip bomb, so they must not be presented as though they did. Capping it\n     here does NOT close it on ``POST /{id}/template`` or on the q5r read door — the\n     exposure is inherited, flagged, and deliberately not widened. It caps the\n     DECLARED uncompressed total; a central directory that UNDER-declares its sizes\n     would still get past it, and closing that needs a bounded read inside the\n     shipped parser, which is out of this door's scope.\n\nWHY THE ORDER IS THE HONESTY MECHANISM. ``parse_docx_template_variables`` returns\n``None`` for TWO different facts — *not a zip / corrupt / not a docx* (:390-391) and\n*a real docx carrying no tokens* (:407-408). Here the bytes come straight off a\nuser's disk, so the ambiguity is live. With gate 4 ahead of the parse, a document\nthat never opened is a **422 refusal**, and ``read=\"ok\"`` with ``[]`` can only ever\nmean *we opened it and it carries no fill-in fields*. Those two facts may never merge\n(``TemplateAttachSection.tsx:130-143`` carries the same warning on the client).\n\n⚠ ``read=\"unreadable\"`` is UNREACHABLE on this route — the same idiom\n``TemplatePlaceholdersResponse`` already uses for ``\"not_requested\"``. A document that\ncannot be opened is a refusal, not a degraded read. The field is kept for shape parity\nwith the bound-template door so the client derives its arms from ONE wire shape.\n\nThe response echoes NOTHING from the upload — no filename, no extension, no size —\nwhich is why the sibling's WR-05 ``safe_name`` sanitisation is not carried across.",
+        "operationId": "read_template_placeholders_workflows_template_placeholders_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_read_template_placeholders_workflows_template_placeholders_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplatePlaceholdersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/workflows/{definition_id}/template": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Upload Workflow Template",
+        "description": "Upload a template and store it durably against a workflow the caller OWNS.\n\nThe order of the gates is load-bearing and each one is a decision:\n\n  1. **Owner-gate first** — ``_owned_slug_or_404`` is the SAME owner-scoped\n     ``created_by`` WHERE the delete/preview routes use, and its 404 is deliberately\n     indistinguishable from not-found: a 403 would confirm that a workflow exists\n     (no existence oracle). The workflow cluster reads through a service-role pool\n     which bypasses RLS, so this WHERE is the route's authorization boundary.\n  2. **The DECLARED part size, before the body is materialised** (workspace.py:250,\n     the WR-04 fix) — uvicorn/FastAPI impose no body cap, so ``.read()`` of a\n     multi-GB part would buffer it all in RAM.\n  3. **The extension**, before the body is read at all — a ``.png`` costs nothing.\n  4. **The magic bytes** via the shipped ``validate_upload`` — a renamed binary\n     wearing a ``.docx`` name never reaches Storage.\n\nNothing is persisted on any refusal: the single write is the LAST statement before\nthe return. The blocking supabase-py upload is ``run_in_threadpool``-wrapped\n(CLAUDE.md / D-v2.5-01).",
+        "operationId": "upload_workflow_template_workflows__definition_id__template_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_workflow_template_workflows__definition_id__template_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateAssetRef"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{definition_id}/template/placeholders": {
+      "get": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Get Workflow Template Placeholders",
+        "description": "Read the fill-in fields of a template the caller OWNS (quick task 260814-q5r).\n\nWHY THIS ROUTE EXISTS AT ALL, rather than a widened ``?template_asset_id=`` on\n``GET /workflows/grounding-bundle``. That parameter is typed ``UUID | None``, while\nthis feature's asset ids are Storage PATHS (``{user_id}/_library/{definition_id}/…``)\n— so passing a real one is a **422 before the handler runs**, measured. The seam is\nnot merely unwired, it is unwirable as typed. And widening it would be worse than\nuseless: ``resolve_template_source`` Branch 1 does not scope by ``user_id`` at all,\nand that route injects the **service-role** client, so the ``UUID`` coercion is\ntoday's ONLY thing standing between a caller and any object in the bucket. Relaxing\nan accidental guard into a hand-written one on a service-role Storage read is the\nexact shape of a prior credential-exposure defect in this codebase. Two further\nreasons: the palette route is ``require_canvas()``-gated, so placeholders would be\ninvisible on the Spine view (the surface most authors are on), and it would refetch\nthe whole palette — folder tree, skill registry, tool list — to read one document.\n\n⚠ **The asset is NOT required to be bound in the persisted definition, and that is a\ndecision, not an oversight.** The Builder writes a freshly-uploaded descriptor into\nits store one statement before ``saveNow()``; requiring the binding would make this\nfetch race that round trip and answer about the OLD template, or about none.\nOwnership is proved by the gates below, never by the binding.\n\nTHE GATES, in order, each one load-bearing:\n\n  1. **Owner-gate on the definition** — ``_owned_slug_or_404``, the SAME owner-scoped\n     ``created_by`` WHERE the upload/delete/preview routes use. Its 404 is deliberately\n     indistinguishable from not-found: a 403 would confirm a workflow exists.\n  2. **Owner-prefix on the asset id** — it must start with ``{user_id}/``. The pool is\n     service-role and bypasses RLS, and gate 1 proves nothing about an asset id that\n     arrived in the query string, so without this a caller could pass their OWN\n     definition id and SOMEONE ELSE'S asset path.\n  3. **No ``..`` segment.** This is NOT belt-and-braces. ``workspace_storage_select_own``\n     (``supabase/migrations/054_workspace_files.sql:83-89``) keys on\n     ``(storage.foldername(name))[1]`` — the FIRST path segment — so\n     ``{uid}/../someone-else/x.docx`` satisfies gate 2 AND passes the database policy.\n     The traversal check is the only thing that stops it.\n\nBoth refusals raise the SAME 404 wording as a missing workflow — no existence oracle\nfor objects either.\n\nThe Storage read goes through the user-JWT client so ``workspace_storage_select_own``\nis a second, database-enforced boundary underneath gate 2, exactly as the sibling\nupload door documents for its write. A service-role client would silently remove it.",
+        "operationId": "get_workflow_template_placeholders_workflows__definition_id__template_placeholders_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          },
+          {
+            "name": "asset_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 512,
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplatePlaceholdersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{workflow_id}/schedules": {
+      "post": {
+        "tags": [
+          "schedules"
+        ],
+        "summary": "Create Workflow Schedule",
+        "description": "Schedule a published workflow. 404 if the caller cannot load it, 400 if it is a draft.\n\nThe cron string has ALREADY been parsed by ``croniter`` and the timezone resolved by\n``zoneinfo`` before this body runs — see the module docblock. Nothing malformed reaches\nthe INSERT.",
+        "operationId": "create_workflow_schedule_workflows__workflow_id__schedules_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowScheduleCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowScheduleRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "schedules"
+        ],
+        "summary": "List Workflow Schedules",
+        "description": "Every schedule the caller owns on one workflow.\n\n⚠ No existence check on the workflow, deliberately: the read is owner-scoped on the\nSCHEDULE, so a foreign or absent workflow id simply returns ``[]``. Adding a 404 here would\nturn this route into an existence oracle for workflow ids.",
+        "operationId": "list_workflow_schedules_workflows__workflow_id__schedules_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorkflowScheduleRead"
+                  },
+                  "title": "Response List Workflow Schedules Workflows  Workflow Id  Schedules Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ArgumentSourceSpec": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "fixed",
+              "ask",
+              "upstream"
+            ],
+            "title": "Source"
+          },
+          "ask_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask Key"
+          },
+          "upstream_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Slug"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "title": "ArgumentSourceSpec",
+        "description": "Phase 214 (STEP-01 / D-214-01 / D-214-03) — where ONE argument's value comes from.\n\nA stored, VALIDATED enum with three arms, never an inferred one:\n\n  * ``fixed``    — the author typed the value; it lives at ``tool_args[<property>]``.\n  * ``ask``      — the value arrives with the run, under ``ask_key`` (defaulting to the\n    property's own name). The workflow's ``inputs`` must DECLARE that key or the publish\n    gate refuses with ``ask_undeclared`` — nothing would ever populate it.\n  * ``upstream`` — the value is the output of the phase named by ``upstream_slug``. This\n    is D-214-03: the body-class auto-fill that used to be an invisible rule inside the\n    executor's projection becomes an EXPLICIT, author-visible source.\n\nOne of these per argument; the map is ``ExternalActionPhaseConfig.arg_sources`` below,\nKEYED BY THE SCHEMA PROPERTY NAME — the vendor's own declared argument — so an entry\ncannot describe a field the tool does not have. A leftover entry naming an undeclared\nproperty is surfaced to the author (D-214-08) and is never a publish gap.\n\n── ⚠ WHAT THIS FIELD MAY NOT CARRY, IN THE D-13 REGISTER ─────────────────────────────\nIt is not a secret, not a token, not a password, not a host, not a base_url, not a\nchannel and not an email address. It is a NAME — of a run input, or of a phase in this\nsame workflow. A workflow definition is copyable, exportable, hand-editable JSONB that\nreaches the client verbatim, and ``_pre_credential_destination`` reads ``config.base_url``\nprecisely so that \"the day a destination DOES land on the step the guard is already ahead\nof the resolver\". A free-text key here would be that day arriving through a field the\negress guard does not read.\n\n**So it is ENFORCED rather than asked for.** The validator below refuses anything outside\n``^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$``, which structurally excludes a URL, a scheme, an\n``@``, a ``/`` and whitespace — the same posture the shipped patch-sweep fence in\n``ConnectionPicker.tsx`` takes one layer up, and fail-CLOSED in the only direction that\nmatters: the field can only ever hold a plain name."
+      },
+      "AssetRef": {
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "title": "Asset Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "template",
+              "reference"
+            ],
+            "title": "Kind"
+          },
+          "mime": {
+            "type": "string",
+            "title": "Mime"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "asset_id",
+          "filename",
+          "kind",
+          "mime"
+        ],
+        "title": "AssetRef"
+      },
+      "BlockedStep": {
+        "properties": {
+          "step_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Slug"
+          },
+          "step_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Index"
+          },
+          "step_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Name"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "cause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cause"
+          }
+        },
+        "type": "object",
+        "title": "BlockedStep",
+        "description": "WHICH step of the AUTHOR'S OWN workflow stopped a publish, and why (BUG-260828-09).\n\n── WHY THIS IS A FIELD OF ITS OWN AND NOT ANOTHER ``named_failures`` ENTRY ────────────\n``named_failures`` is POLYMORPHIC across the gauntlet's stages and its consumers are\nrequired to detect shape PER ENTRY, never to switch on ``blocked_stage``\n(``PublishGauntlet.tsx`` docblock rule 4). Adding a sixth shape to that array would make\nevery consumer's detection set grow, and a refusal that leads the surface is exactly the\nthing that must not be reachable only by a successful shape guess. So the array is\nUNTOUCHED — every existing entry renders byte-for-byte as it did — and the step identity\nrides its own optional field.\n\n⚠ **``step_name`` IS ``None`` WHEN THE AUTHOR NAMED NOTHING, AND IS NEVER THE SLUG.**\nThat is property (1) of the report — *by the author's step name, never a slug or a stage\nindex* — enforced at the producer rather than trusted at the consumer. The client resolves\nthe visible face through ``phaseVocabulary.nodeTitle``, the shipped four-tier ladder whose\nstated floor is that the slug never appears in its output. ``step_slug`` and ``step_index``\nare carried for correlation (a run link, a canvas focus), NOT for display.\n\n⚠ **``cause`` LEADS AND ``reason`` IS DEMOTED — BOTH ARE SENT.** ``reason`` is the engine's\nverbatim sentence including its ``Phase {n} ({slug}) …:`` prefix; ``cause`` is that sentence\nwith the prefix removed. When the prefix does not match, ``cause`` IS ``reason``, so a\nsurface leading with ``cause`` can never render empty."
+      },
+      "Body_read_template_placeholders_workflows_template_placeholders_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_read_template_placeholders_workflows_template_placeholders_post"
+      },
+      "Body_upload_workflow_template_workflows__definition_id__template_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_workflow_template_workflows__definition_id__template_post"
+      },
+      "DeletePreview": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "versions": {
+            "type": "integer",
+            "title": "Versions"
+          },
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "threads": {
+            "type": "integer",
+            "title": "Threads"
+          },
+          "in_flight": {
+            "type": "integer",
+            "title": "In Flight",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "versions",
+          "runs",
+          "threads"
+        ],
+        "title": "DeletePreview",
+        "description": "The victim-naming sheet's exact Removed/Kept counts (D-LOCK-03). ``versions`` +\n``runs`` are Removed; ``threads`` are Kept (they become normal chats); ``in_flight``\nis the count of runs STILL LIVE — the honest signal the sheet's amber cancel-first\nbanner gates on (D-LOCK-05). Defaults to 0 so an older client that ignores it is\nunaffected (additive field)."
+      },
+      "DraftCreateResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "token"
+        ],
+        "title": "DraftCreateResponse",
+        "description": "The create/PATCH return — the new (or updated) draft id + its version.\n\nPhase 186 (CONCUR-02 / D-186-07): ``token`` is the ADDITIVE opaque optimistic\nconcurrency token of the row AS OF THIS RESPONSE. On a PATCH it is the POST-write\nvalue, so the client chains its next autosave with no extra read. Old callers that\nignore the field stay valid — nothing about ``id``/``version`` changed.\n\nTYPED ``str``, NEVER ``datetime``, AND THAT IS BINDING. A ``datetime``-typed field\nre-serializes through Pydantic, which DROPS the fractional part when microseconds are\n0 — the token width would then vary with the clock and a save could compare unequal to\nitself. The client echoes this string VERBATIM and must never parse it (a JS ``Date``\ntruncates to milliseconds; probed, it matches 0 rows)."
+      },
+      "DraftRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_run_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Status"
+          },
+          "has_any_run": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has Any Run"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "version",
+          "token"
+        ],
+        "title": "DraftRow",
+        "description": "A drafts-shelf row (the caller's own drafts — D-103-4).\n\nPhase 103-06 (REQ-7 D9/D10): ``definition`` is ADDITIVE so the drafts-shelf\ncard can derive the tier badge + phase chain client-side; optional to keep the\npre-103 id/slug/version/name shelf shape valid.\n\nPhase 186 (D-186-07): ``token`` is ADDITIVE too — the Open-a-draft path needs a\nconcurrency token in hand before its first autosave, or that save would have to write\nunguarded. Same binding typing rule as ``DraftCreateResponse.token``: ``str``, never\n``datetime``, never parsed.\n\nPhase 192.1 (LIB-05 / D-15): ``updated_at`` is ADDITIVE and DEFAULTED — the recency half\nof the library identity line. Typed ``str`` for the same Pydantic-drops-the-fraction\nreason recorded on ``DraftCreateResponse.token`` (:184-188), serialized via\n``.isoformat()`` in the builder.\n\n⚠ D-16 — THERE ARE TWO FIELDS HERE OFF ONE SOURCE COLUMN, AND THAT IS DELIBERATE.\n``token`` is ``to_char(updated_at …)`` in disguise (``db/workflows.py:93-95``), so a\nreader will reasonably ask why ``updated_at`` is not simply parsed out of it. Because\n``token`` is OPAQUE BY CONTRACT and parsing it is forbidden: Postgres keeps microseconds,\na JS ``Date`` keeps milliseconds, and a parsed-and-re-rendered token matches ZERO rows —\nevery later save then refuses as stale (probed live 2026-08-01). One field the server\ncompares byte-for-byte; one the client may format. Never collapse them.\n\nPhase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` are ADDITIVE and\nDEFAULTED, mirroring ``PublishedWorkflow`` field-for-field so the library speaks ONE\nlanguage across its three shelves. See that model's docblock for the binding typing rules\n(``str`` never ``datetime``; a plain nullable ``str`` never an enum) and for D-08's three\narms — they apply here verbatim.\n\n⚠ THERE ARE NOW **THREE** TIME-SHAPED FIELDS ON THIS ROW AND THEY ARE THREE DIFFERENT\nFACTS. ``token`` is ``to_char(updated_at …)`` — opaque, never parsed. ``updated_at`` is\nwhen the DRAFT was last edited. ``last_run_at`` is when it was last RUN, from\n``workflow_runs``, and a draft genuinely can have runs — the publish gauntlet's golden run\nis one. Collapsing any pair of these is a lie in a different direction each time.\n\n── Phase 192.2 gap round 1 (CR-01 / DEC-08-A) — ``has_any_run`` ──────────────────────\n\n**What it is:** whether ANY run of this definition exists, by ANYBODY. A ROW-LEVEL fact,\nmirroring ``PublishedWorkflow`` field-for-field so the library speaks ONE language across\nits three shelves.\n\n⚠ **What it is NOT:** it is not ``last_run_at`` / ``last_run_status``, which are\nOWNER-SCOPED and answer *did MY last run of this work?*. ``has_any_run=true`` with\n``last_run_at=null`` means *somebody ran it, and it was not you*.\n\n⚠ **On THIS shelf the two agree today, and that is precisely why the field is still\nprojected here rather than \"only where it can differ\".** A draft is owner-scoped, so the\ncaller IS the only person with runs of it — but \"the two agree\" is an UNSTATED invariant\nthat nothing enforces, and a shelf that omitted the key would be claiming the opposite of\nwhat ``PublishedWorkflow`` says about the same concept. See that model's docblock for the\ntyping rule (``bool | None``, defaulting to ``None``, never coerced) and\n``_HAS_ANY_RUN_SQL`` in ``app/db/workflows.py`` for the disclosure budget; neither is\nrestated here.\n\n⚠ **The ``response_model`` trap applies verbatim** — ``response_model=list[DraftRow]``\ndrops undeclared keys silently, so this model and the builder move together."
+      },
+      "ExternalActionPhaseConfig": {
+        "properties": {
+          "phase_type": {
+            "type": "string",
+            "const": "external_action",
+            "title": "Phase Type"
+          },
+          "capability": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "send_email",
+                  "create_ticket",
+                  "post_message"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capability"
+          },
+          "available_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Tools"
+          },
+          "connection_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Id"
+          },
+          "tool_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Name"
+          },
+          "tool_args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Tool Args"
+          },
+          "arg_sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ArgumentSourceSpec"
+            },
+            "type": "object",
+            "title": "Arg Sources"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase_type"
+        ],
+        "title": "ExternalActionPhaseConfig",
+        "description": "Phase 189 (CONN-01 / D-01) — the 7th phase type: a GOVERNED EXTERNAL ACTION.\n\nThe step that reaches OUTSIDE this app — and, in 189, sends NOTHING. The author picks\none named ``capability`` from a CLOSED SET of three (D-15, ratified 2026-08-07); the\nexecutor RECORDS the action it would have taken and the phase lands\n``recorded_not_sent`` (D-05). Phase 190 swaps the no-op for a real call behind an\nunchanged seam. Nothing here opens a socket, and nothing here is meant to.\n\nAdditive-optional / ZERO-MIGRATION: appended to the ``PhaseConfig`` union as the 7th\ndiscriminated member — the standard extension, which is the phrase\n``LlmEmitPhaseConfig`` above uses for the 6th and which this module's docblock records\nas the way all of them arrived. ``_StrictBase`` rejects unknown keys (D-07); old JSONB\nphase rows without ``external_action`` still ``model_validate()``, because an old row\nnever names the new member. The discriminator, ``extra='forbid'`` and the union\nstructure are UNTOUCHED — the module docblock calls that mechanism LOCKED, and a 7th\nmember is additive INSIDE it, never a change to it.\n\n── D-22 · THE CAPABILITY IS A STEP THE EXECUTOR PERFORMS, NOT A TOOL THE LLM CALLS ──\nThe shipped precedent is ``render_template``: a name honoured by the per-phase\nwhitelist while being INVISIBLE to the model — registered for dispatch, never\nadvertised in ``openai_service.get_tools()``, and executed by the phase itself\n(``phase_types.py``'s 101-06 WR-01 correction states the two layers). The name that\n``available_tools`` carries below is therefore a GOVERNANCE DECLARATION, not a\ndispatchable schema. Phase 189 adds NO ``_TOOL_REGISTRY`` entry and NO ``get_tools()``\nschema for these three names; both belong to Phase 190. The tool reading would require\nan agent loop, i.e. an LLM deciding WHETHER and HOW to send — which contradicts D-05\noutright and would ship most of the plumbing for live egress that SC#4 forbids.\n\n── D-03 · ``available_tools`` IS DERIVED FROM ``capability``, NEVER AUTHORED ──\nThe capability IS an entry in ``available_tools``, so it flows through the SAME\nper-phase whitelist every other tool does — ``phase_types._build_phase_tool_context``\nbuilds ``ToolContext.phase_whitelist`` from this list and ``tool_dispatcher.dispatch_tool``\nis where it is ENFORCED (``api/runs.py:resolve_phase_available_tools`` is the *Continue*\nre-read of the same list, not the main run's builder). SC#1's claim that this rides the\nguard that already exists is then literally true rather than aspirational.\n\nThe validator below DERIVES the list rather than trusting it, and the derivation is\ntotal replacement — after validation ``available_tools == [capability]``, whatever was\nsubmitted. One fact, one derivation, no drift. Two consequences, both deliberate:\n  * an author-supplied list is DISCARDED rather than merged. Merging would let an\n    author park ``search_documents`` on this step, and grounding detection is\n    ``available_tools ∩ KB_TOOLS`` — the step would silently arm the *must prove it*\n    dial while reading no knowledge base. Replacement makes that unrepresentable\n    rather than documented, and it is fail-CLOSED in the only direction that matters:\n    the whitelist can only ever get NARROWER than what was asked for.\n  * the derived value IS persisted (the draft path saves ``model_dump(mode=\"json\")``).\n    That is the requirement here, not a hazard: D-03 needs the name in the STORED row\n    so the run-time re-read finds it. Contrast ``PhaseSpec``'s grounding block below,\n    where baking a derived value is forbidden precisely because that one must be able\n    to change when the row changes. This one cannot: it is a function of ``capability``\n    alone, and ``capability`` cannot change without rewriting this config.\n\n── D-03 · DISJOINT FROM ``KB_TOOLS`` BY CONSTRUCTION ──\nNone of the three names is a KB tool (``grounding.KB_TOOLS``), so ``grounding_cause``\nreturns ``None`` for this step and it is *free to think* — it carries NO ⛨ governance\nseal. That is CORRECT, not a missing feature: an external-action step reads no\nknowledge base. The membership is fenced two ways: a module-level assertion beside\n``EXTERNAL_ACTION_CAPABILITIES`` in ``grounding.py``, and\n``tests/unit/test_189_external_action_model.py``, which asserts the SET of this\n``Literal``'s own members equals that frozenset and is disjoint from ``KB_TOOLS``.\nTwo spellings of one closed set are unavoidable (Pydantic needs a literal; the\nfrozenset is the runtime home and this module must not import a service), so the\nagreement is MECHANICAL rather than remembered.\n\n⚠ THE ARMING IS NOT HERE. ``action_risk_armed`` lives on ``PhaseSpec``, shared by all\nseven types, and D-04's pin is the ``model_validator`` on THAT class. Do not add a\nsecond home for it here — see that validator's docblock for why."
+      },
+      "GenerateRequest": {
+        "properties": {
+          "describe": {
+            "type": "string",
+            "title": "Describe"
+          },
+          "project_folder_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Folder Id"
+          },
+          "template_asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Asset Id"
+          },
+          "template_placeholders": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Placeholders"
+          },
+          "allowed_connection_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Connection Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "describe"
+        ],
+        "title": "GenerateRequest",
+        "description": "The NL-authoring body (D-103-CONF-2). ``describe`` is the plain-language task;\ntemplate grounding is OPTIONAL — a library ``template_asset_id`` OR a direct\n``template_placeholders`` list (never both required)."
+      },
+      "GroundingBundleResponse": {
+        "properties": {
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools"
+          },
+          "kb_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kb Tools"
+          },
+          "folders": {
+            "items": {
+              "$ref": "#/components/schemas/PaletteFolder"
+            },
+            "type": "array",
+            "title": "Folders"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/PaletteSkill"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "template_placeholders": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Template Placeholders"
+          },
+          "degraded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Degraded"
+          }
+        },
+        "type": "object",
+        "title": "GroundingBundleResponse",
+        "description": "The server-sourced PALETTE of valid building blocks (D-182-01).\n\nThis is what Phase 184's node-config dropdowns bind to — the tool names eligible for an\n``available_tools`` whitelist, the KB folder tree (name + id), the enabled owner/org-shared\nskills eligible for ``skill_ref``, and (only when a ``template_asset_id`` is supplied) that\ntemplate's placeholder fields. **It is NEVER a frontend constant** (Pitfall 1 / SC#2): KB\ncontent can never whitelist itself, so the valid sets are computed server-side by the ONE\nshared ``grounding.assemble_grounding_bundle``.\n\nKept a SEPARATE cacheable ``GET`` rather than embedded in the ``/validate`` response\n(D-182-01): ``/validate`` fires on every canvas edit; the palette is near-static."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InputFieldSpec": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "date",
+              "enum",
+              "file",
+              "kb_auto"
+            ],
+            "title": "Type"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "user",
+              "kb_auto",
+              "template_derived"
+            ],
+            "title": "Source",
+            "default": "user"
+          },
+          "enum_options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enum Options",
+            "default": []
+          },
+          "folder_scope": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Scope"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "type"
+        ],
+        "title": "InputFieldSpec"
+      },
+      "LlmAgentPhaseConfig": {
+        "properties": {
+          "phase_type": {
+            "type": "string",
+            "const": "llm_agent",
+            "title": "Phase Type"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "available_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Tools"
+          },
+          "max_steps": {
+            "type": "integer",
+            "title": "Max Steps",
+            "default": 12
+          },
+          "wall_clock_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Clock Seconds"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "folder_scope": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Scope"
+          },
+          "skill_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Ref"
+          },
+          "skill_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase_type",
+          "prompt",
+          "available_tools"
+        ],
+        "title": "LlmAgentPhaseConfig"
+      },
+      "LlmBatchAgentsPhaseConfig": {
+        "properties": {
+          "phase_type": {
+            "type": "string",
+            "const": "llm_batch_agents",
+            "title": "Phase Type"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "available_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Tools"
+          },
+          "max_steps": {
+            "type": "integer",
+            "title": "Max Steps",
+            "default": 12
+          },
+          "max_parallel_agents": {
+            "type": "integer",
+            "title": "Max Parallel Agents",
+            "default": 5
+          },
+          "merge_strategy": {
+            "type": "string",
+            "enum": [
+              "concat",
+              "concat_numbered"
+            ],
+            "title": "Merge Strategy",
+            "default": "concat"
+          },
+          "wall_clock_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Clock Seconds"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "folder_scope": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Scope"
+          },
+          "skill_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Ref"
+          },
+          "skill_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase_type",
+          "prompt",
+          "available_tools"
+        ],
+        "title": "LlmBatchAgentsPhaseConfig"
+      },
+      "LlmEmitPhaseConfig": {
+        "properties": {
+          "phase_type": {
+            "type": "string",
+            "const": "llm_emit",
+            "title": "Phase Type"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "emitter": {
+            "type": "string",
+            "title": "Emitter",
+            "default": "render_template"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "folder_scope": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Scope"
+          },
+          "skill_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Ref"
+          },
+          "skill_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "citation_policy": {
+            "type": "string",
+            "enum": [
+              "strict",
+              "flag",
+              "partial",
+              "draft"
+            ],
+            "title": "Citation Policy",
+            "default": "strict"
+          },
+          "integrity_policy": {
+            "type": "string",
+            "enum": [
+              "strict",
+              "documented_limit"
+            ],
+            "title": "Integrity Policy",
+            "default": "strict"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase_type",
+          "prompt"
+        ],
+        "title": "LlmEmitPhaseConfig",
+        "description": "Phase 101.1 (D-04) — the 6th phase type: a SEALED FORCED EMIT.\n\nThe ONLY path that produces a typed deliverable. The model is FORCED (never an\nopen auto-tool-choice loop — D-01, the GAP-A root cause) to emit cited DATA against\nthe ``emitter``'s strict schema; a PINNED deterministic driver renders it (D-02 — no\nmodel-written code touches the deliverable). Adding a future deliverable = register\nONE entry in ``EMITTER_REGISTRY`` (schema + driver), never new engine code.\n\nAdditive-optional / ZERO-migration: appended to the ``PhaseConfig`` union as the\n6th discriminated member (the standard extension — the 5 existing members were added\nthis way). ``_StrictBase`` rejects unknown keys (T-101.1-01-01); old JSONB phase rows\nwithout ``llm_emit`` still ``model_validate()``. The optional shape-symmetry fields\nmirror the other LLM members so the family stays uniform."
+      },
+      "LlmHumanInputPhaseConfig": {
+        "properties": {
+          "phase_type": {
+            "type": "string",
+            "const": "llm_human_input",
+            "title": "Phase Type"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "title": "Timeout Seconds",
+            "default": 300
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase_type",
+          "prompt"
+        ],
+        "title": "LlmHumanInputPhaseConfig"
+      },
+      "LlmSinglePhaseConfig": {
+        "properties": {
+          "phase_type": {
+            "type": "string",
+            "const": "llm_single",
+            "title": "Phase Type"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "folder_scope": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Scope"
+          },
+          "skill_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Ref"
+          },
+          "skill_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase_type",
+          "prompt"
+        ],
+        "title": "LlmSinglePhaseConfig"
+      },
+      "PaletteFolder": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "PaletteFolder",
+        "description": "One KB folder the canvas may bind a ``project_folder_id`` / ``folder_scope`` to.\n\nAn EXPLICIT projection (CR-02). ``bundle.folders`` are raw\n``fetch_all_folders(supabase, fields=\"*\")`` rows — i.e. EVERY column of ``public.folders``\n(``id, user_id, name, parent_id, is_org_shared, created_at, updated_at, org_id``). Raw DB\nrows must NEVER reach the wire on this surface:\n\n  * ``org_id`` is deliberately absent — ``FolderResponse`` does not expose it either, and a\n    tenant identifier is not a palette field.\n  * the owner ``user_id`` is deliberately absent — SEED-091 / D-164-05 (TEN-06): a\n    non-owner reader of an org-shared folder must not learn who seeded it. Omitting the\n    column outright is strictly stronger than nulling it.\n  * ``created_at`` / ``updated_at`` are noise the palette never renders.\n\n``id`` / ``name`` / ``parent_id`` is not a guess at what the canvas needs — it is exactly\nwhat ``grounding._render_folder_tree`` consumes to build the tree, so the picker can render\nthe full hierarchy from this and nothing more."
+      },
+      "PaletteSkill": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "PaletteSkill",
+        "description": "One enabled skill eligible for a phase ``skill_ref`` — id + display name ONLY (CR-02).\n\n``bundle.skills`` rows carry the owner ``user_id`` (and, post-CR-01, ``org_id`` /\n``is_system`` / ``is_enabled``, which the org-gated visibility post-filter needs). None of\nthat is palette data. ``skill_ref`` binds to the ``id``; the name is the label\n``render_grounding_prompt`` also shows. ``name`` is Optional purely so a degenerate row can\nnever 500 a read-only palette."
+      },
+      "PhaseSpec": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "phase_index": {
+            "type": "integer",
+            "title": "Phase Index"
+          },
+          "config": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProgrammaticPhaseConfig"
+              },
+              {
+                "$ref": "#/components/schemas/LlmSinglePhaseConfig"
+              },
+              {
+                "$ref": "#/components/schemas/LlmAgentPhaseConfig"
+              },
+              {
+                "$ref": "#/components/schemas/LlmBatchAgentsPhaseConfig"
+              },
+              {
+                "$ref": "#/components/schemas/LlmHumanInputPhaseConfig"
+              },
+              {
+                "$ref": "#/components/schemas/LlmEmitPhaseConfig"
+              },
+              {
+                "$ref": "#/components/schemas/ExternalActionPhaseConfig"
+              }
+            ],
+            "title": "Config",
+            "discriminator": {
+              "propertyName": "phase_type",
+              "mapping": {
+                "external_action": "#/components/schemas/ExternalActionPhaseConfig",
+                "llm_agent": "#/components/schemas/LlmAgentPhaseConfig",
+                "llm_batch_agents": "#/components/schemas/LlmBatchAgentsPhaseConfig",
+                "llm_emit": "#/components/schemas/LlmEmitPhaseConfig",
+                "llm_human_input": "#/components/schemas/LlmHumanInputPhaseConfig",
+                "llm_single": "#/components/schemas/LlmSinglePhaseConfig",
+                "programmatic": "#/components/schemas/ProgrammaticPhaseConfig"
+              }
+            }
+          },
+          "validators": {
+            "items": {
+              "$ref": "#/components/schemas/ValidatorSpec"
+            },
+            "type": "array",
+            "title": "Validators"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "grounding_escalated": {
+            "type": "boolean",
+            "title": "Grounding Escalated",
+            "default": false
+          },
+          "action_risk_armed": {
+            "type": "boolean",
+            "title": "Action Risk Armed",
+            "default": false
+          },
+          "name_seeded_by_ai": {
+            "type": "boolean",
+            "title": "Name Seeded By Ai",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug",
+          "phase_index",
+          "config"
+        ],
+        "title": "PhaseSpec"
+      },
+      "ProgrammaticPhaseConfig": {
+        "properties": {
+          "phase_type": {
+            "type": "string",
+            "const": "programmatic",
+            "title": "Phase Type"
+          },
+          "fn": {
+            "type": "string",
+            "title": "Fn"
+          },
+          "input_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Keys"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase_type",
+          "fn"
+        ],
+        "title": "ProgrammaticPhaseConfig"
+      },
+      "PublishRequest": {
+        "properties": {
+          "golden_input": {
+            "type": "string",
+            "title": "Golden Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "golden_input"
+        ],
+        "title": "PublishRequest",
+        "description": "The publish body — the author-supplied representative kickoff prompt (D-05)\nthe golden run executes against the project KB."
+      },
+      "PublishVerdict": {
+        "properties": {
+          "published": {
+            "type": "boolean",
+            "title": "Published"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "golden_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Golden Run Id"
+          },
+          "blocked_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Stage"
+          },
+          "named_failures": {
+            "items": {},
+            "type": "array",
+            "title": "Named Failures"
+          },
+          "blocked_step": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BlockedStep"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "auto_answered": {
+            "items": {},
+            "type": "array",
+            "title": "Auto Answered"
+          }
+        },
+        "type": "object",
+        "required": [
+          "published"
+        ],
+        "title": "PublishVerdict",
+        "description": "The D-08 structured verdict. A block names the stage + the failures + the\ngolden run id (a real, browsable run); a success carries the published version.\nMachine-renderable for 103 (nothing prose-only)."
+      },
+      "PublishedWorkflow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition"
+          },
+          "is_mine": {
+            "type": "boolean",
+            "title": "Is Mine",
+            "default": false
+          },
+          "is_system_global": {
+            "type": "boolean",
+            "title": "Is System Global",
+            "default": false
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_run_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Status"
+          },
+          "has_any_run": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has Any Run"
+          },
+          "next_schedule_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Schedule At"
+          },
+          "next_schedule_cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Schedule Cron"
+          },
+          "next_schedule_interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Schedule Interval Seconds"
+          },
+          "next_schedule_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Schedule Timezone"
+          },
+          "next_schedule_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Schedule Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name"
+        ],
+        "title": "PublishedWorkflow",
+        "description": "A picker row — the minimum the Deep/Harness toggle needs to list and start\na workflow (id to kick off via MessageCreate.workflow_definition_id; name +\nslug for display).\n\nPhase 103-06 (REQ-7 D9/D10): ``definition`` is ADDITIVE — the Workflows page\ncard derives its client-side strictness tier + phase chain from the real\ndefinition JSONB. It is optional so the pre-103 picker callers (the composer\nHarness dropdown) keep validating against the id/slug/name shape unchanged.\n\nPhase 192 (LIB-01 / D-04): ``is_mine`` + ``is_system_global`` are ADDITIVE and\nDEFAULTED, following the ``definition`` precedent — the 22 frontend references and\nthe three production consumers (``WorkflowsPage.tsx``, ``panel/WorkspacePanel.tsx``,\n``workflows/StarterTemplatePicker.tsx``) keep validating unchanged, and a frontend\ndeployed AHEAD of this backend degrades to \"nothing is mine\" rather than crashing.\nThey exist so the Workflows-page *Yours* and *Starters* chips filter client-side with\nhonest SIMULTANEOUS counts instead of a ``?scope=mine`` server round-trip.\n\nBINDING RULE — ``is_mine`` IS COMPUTED SERVER-SIDE FROM THE AUTHENTICATED CALLER, AND\nA RAW ``created_by`` IS DELIBERATELY NOT PROJECTED ONTO THIS MODEL. ``list_published_\nworkflows`` runs on a service-role asyncpg pool that BYPASSES RLS, so the predicate\n``(is_system_global = true OR created_by = $1)`` is the ONLY boundary — whatever this\nmodel carries, the caller receives. A raw ``created_by`` is safe under TODAY's predicate\n(the sole non-caller rows are migration-seeded globals) and starts emitting other users'\nidentifiers the moment a later phase widens it — and v3.4's co-tenant ``org_id`` /\n``is_org_shared`` model is exactly that widening, with no code change here and no review.\nThat is the mig-116 / CR-01 shape, applied prospectively. ``is_mine`` CANNOT widen: it\ndiscloses one bit about the caller themselves. ``is_system_global`` describes the ROW,\nnever a person.\n\nPhase 192.1 (LIB-05 / D-15): ``updated_at`` is ADDITIVE and DEFAULTED on the same\n``definition`` / ``is_mine`` precedent — a frontend deployed AHEAD of this backend reads\n``undefined`` and renders no *changed* segment, which degrades rather than crashing. It\nfeeds the library identity line's recency half (\"changed 2 months ago\").\n\nIT PASSES THE BINDING RULE ABOVE, FOR THE RULE'S OWN STATED REASON — it \"describes the\nROW, never a person\", exactly as ``is_system_global`` does. It discloses WHEN a row the\ncaller can ALREADY see last changed, and it can never begin emitting a second user's\nidentifier however the predicate later widens. Recorded here so a reviewer meeting a new\nfield on this model does not have to re-litigate it as the mig-116 / CR-01 shape.\n\nTYPED ``str``, NEVER ``datetime``, AND THE REASON IS THE ONE ``DraftCreateResponse.token``\nALREADY BANKED (:184-188): a ``datetime``-typed field re-serializes through Pydantic and\nDROPS the fractional part when microseconds are 0, so the wire string's width would vary\nwith the clock. Typing it ``str`` and calling ``.isoformat()`` in the builder makes the\nwire value exactly what the database returned.\n\n⚠ D-17 — ON A PUBLISHED ROW THIS IS THE PUBLISH TIME, AND THAT IS HONEST, NOT A BUG.\n``workflow_definitions_block_published`` (``full-schema.sql:3764``) makes a published row\nimmutable, so its ``updated_at`` is frozen at the publish flip — which IS the last time\nit changed. Do NOT add a second field to \"fix\" this.\n\nPhase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` are ADDITIVE and\nDEFAULTED on that same precedent — a frontend deployed AHEAD of this backend reads\n``undefined`` and renders *unknown*, which degrades rather than crashing or, worse,\nfabricating. They answer LIB-06's question — *does this one work* — from ``workflow_runs``\nrows that already exist (228 of them; **no migration, no new column, no new write**).\n\n⚠ THESE ARE **NOT** ``updated_at``, AND THE PARAGRAPH DIRECTLY ABOVE IS WHY THAT MATTERS.\nOn a published row ``updated_at`` is the PUBLISH time, deliberately. ``last_run_at`` is a\nRUN's own ``created_at``, from a different table. A surface that showed one as the other\nwould be lying about the exact fact this field exists to tell the truth about. D-08's\nthree arms follow from the pair being independent: a real time + a real status is *it\nworked / it failed*; BOTH ``null`` is *never run*; the keys ABSENT is *this backend cannot\nsay*. None of the three may render blank, a fabricated time, or a green tick.\n\n⚠ ``last_run_status`` IS A PLAIN NULLABLE ``str``, NEVER AN ENUM, AND THAT IS BINDING.\n``workflow_runs.status`` is written by the run lifecycle (six values today under the\ntable's CHECK); a seventh terminal state added by a later phase must flow through\nverbatim, because a validation error here would 500 the LIBRARY — a read path the Phase\n148 RUN CARVE-OUT deliberately leaves ungated for every user.\n\n⚠ ``last_run_at`` IS TYPED ``str`` FOR THE REASON ``updated_at`` IS, four paragraphs up:\na ``datetime``-typed field re-serializes through Pydantic and DROPS the fractional part\nwhen microseconds are 0, so the wire string's width would vary with the clock. The plan\nfor this phase wrote ``datetime | None`` in one sentence and *\"matching the ``updated_at``\nprecedent exactly\"* in the next; the precedent wins, because it is the one backed by a\nmeasurement.\n\nTHEY PASS THIS MODEL'S BINDING RULE FOR THE RULE'S OWN STATED REASON — they \"describe the\nROW, never a person\". ⚠ And the join behind them is OWNER-SCOPED (``r.user_id = $1``), so\non a world-readable ``is_system_global`` row a caller sees THEIR run of it and never\nanother tenant's; the raw ``user_id`` is never projected onto this model at all.\n\n── Phase 192.2 gap round 1 (CR-01 / DEC-08-A) — ``has_any_run`` ──────────────────────\n\n**What it is:** whether ANY run of this definition exists, by ANYBODY. A ROW-LEVEL fact.\n\n⚠ **What it is NOT, and the pair is the whole point of the field.** It is not\n``last_run_at`` / ``last_run_status``, which are OWNER-SCOPED and answer *did MY last run\nof this work?*. The two DISAGREE on exactly the rows CR-01 named, and that disagreement is\nthe message rather than an inconsistency: **``has_any_run=true`` with ``last_run_at=null``\nmeans *somebody ran it, and it was not you*.** Before this field existed the surface had\nonly the second half and rendered it as the first — printing an explicit \"Never run\" about\nfive ``is_system_global`` rows carrying 20 / 15 / 11 / 7 / 1 real runs, to every caller but\nthe one user who ran them. A caller-scoped fact rendered as a row-level one is FALSE, not\nmerely unhelpful.\n\n⚠ **The disclosure budget is EXISTENCE ONLY** — no count, no timestamp, no user id, no org\nid, no status. The argument is recorded ONCE, on ``_HAS_ANY_RUN_SQL``'s docblock in\n``app/db/workflows.py``; it is not restated here, because a rule written twice drifts.\n\n⚠ **It is ``bool | None`` and it DEFAULTS TO ``None``, never to ``False`` (DEC-08-C).** A\nSQL ``EXISTS`` is never null, so live the value is always ``True``/``False``; ``None``\nexists for exactly one case — a read path that omits the column. Coercing that absence to\n``False`` would manufacture the affirmative claim *\"nobody has run this\"* out of nothing,\nwhich is the shape of this very bug one layer down. The serializers use\n``r.get(\"has_any_run\")``, never ``bool(...)``.\n\n⚠ **THE ``response_model`` TRAP, verbatim from ``192.2-03``'s finding:** these routes\ndeclare ``response_model``, which DROPS UNDECLARED KEYS SILENTLY — a green backend test\nbeside an unchanged UI. The model and the builders move together or the column never\nreaches the client."
+      },
+      "SkillSnapshot": {
+        "properties": {
+          "skill_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Skill Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "storage_prefix": {
+            "type": "string",
+            "title": "Storage Prefix"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "skill_id",
+          "name",
+          "instructions",
+          "storage_prefix"
+        ],
+        "title": "SkillSnapshot",
+        "description": "099 WFSKILL-01 — the materialized, immutable copy of a referenced skill.\n\nLives inside the locked WorkflowDefinition JSONB so a later live-skill edit/delete\ncannot change a published run (D-01). Materialized at first kickoff (D-03a) by the\nPlan 03 ``skill_snapshot.py`` service. Inner fields may be required: this object only\nexists when a skill is present. Defined ABOVE the phase configs so the\n``skill_snapshot: SkillSnapshot | None`` annotations resolve at class build."
+      },
+      "TemplateAssetRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "template",
+            "title": "Kind",
+            "default": "template"
+          },
+          "asset_id": {
+            "type": "string",
+            "title": "Asset Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime": {
+            "type": "string",
+            "title": "Mime"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset_id",
+          "filename",
+          "mime"
+        ],
+        "title": "TemplateAssetRef",
+        "description": "The four keys ``resolve_template_source`` Branch 1 reads off an ``AssetRef``.\n\nField-for-field identical to ``app.models.harness.AssetRef`` (models/harness.py:512)\nso the Builder can drop this object straight into ``definition.assets[]`` and the\n``extra='forbid'`` WorkflowDefinition will accept it unchanged. ``kind`` is a\nsingle-value Literal — this door mints templates, never ``reference`` assets."
+      },
+      "TemplatePlaceholdersResponse": {
+        "properties": {
+          "read": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unreadable"
+            ],
+            "title": "Read"
+          },
+          "placeholders": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Placeholders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "read"
+        ],
+        "title": "TemplatePlaceholdersResponse",
+        "description": "What a bound template asks the step to fill in — and whether we could read it.\n\n``read`` is the whole point of the model. An empty ``placeholders`` list is\nambiguous on its own: it could mean *we opened the document and it carries no\nfill-in fields*, or *we never opened it at all*. Collapsing those two into one\nwire shape lets an author conclude their template is field-less when the read\nsimply failed — and they then ship a workflow that fills nothing. The two\nstates are therefore carried separately and rendered as different sentences on\ndifferent nodes by the client.\n\n``\"not_requested\"`` is deliberately NOT in this Literal: the route always\nsupplies an ``asset_id``, so that arm of the resolver is unreachable here."
+      },
+      "ValidateResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/Verdict"
+            },
+            "type": "array",
+            "title": "Verdicts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "title": "ValidateResponse",
+        "description": "The ``{ok, verdicts}`` envelope — vocabulary aligned with the existing\n``{ok, error, detail}`` grounding shape + the D-08 publish verdict (no new vocabulary).\n\n``ok == (verdicts == [])``: the FULL static gauntlet is clean, i.e. \"this can pass the\nstatic half of publish now\". An ``incomplete``-only verdict set still sets ``ok False``\n(an unfinished draft cannot publish either)."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ValidatorSpec": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "json_schema",
+              "regex_match",
+              "workspace_file_exists",
+              "programmatic",
+              "citations_required",
+              "freshness",
+              "structure_check",
+              "output_file_valid",
+              "llm_judge_rubric",
+              "action_risk_approval"
+            ],
+            "title": "Kind"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          },
+          "on_failure": {
+            "type": "string",
+            "title": "On Failure",
+            "default": "fail_run"
+          },
+          "max_retries": {
+            "type": "integer",
+            "title": "Max Retries",
+            "default": 2
+          },
+          "timing": {
+            "type": "string",
+            "enum": [
+              "pre",
+              "post"
+            ],
+            "title": "Timing",
+            "default": "post"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "ValidatorSpec",
+        "description": "HARNESS-04 gate kinds (091 owns execution; this is the shape).\n\nPhase 102 (GATE-01): + 5 library kinds (D-12) + timing (D-10) + ask_user\non_failure value (D-11, on_failure stays a str — skip_to_phase:<slug> already\nparses, so ask_user is just one more recognized value, not a new type).\n\nPhase 185 (GOVERN-03 / D-185-12): + ``action_risk_approval``, the armed\naction-risk checkpoint's ``timing=\"pre\"`` kind. Additive in the same sense as\n102's five: no stored row names it, so every pre-185 row still validates. It is\nregistered here because ``ValidatorSpec`` is a ``_StrictBase`` and construction\nvalidates — a synthesized spec of an unlisted kind could not be built at all."
+      },
+      "Verdict": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "error",
+              "incomplete"
+            ],
+            "title": "Severity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "severity"
+        ],
+        "title": "Verdict",
+        "description": "One static-gauntlet finding, per-node (SC#4).\n\n``code`` is the machine literal, and every one of them is OWNED by the module that emits\nit (WR-05): the 5 ``reachability.LINT_CODES`` values, the 3\n``grounding.GROUNDING_VERDICT_CODES`` values (``folder_scope`` / ``unregistered_tool`` /\n``unregistered_skill``), and the 3 ``_ROUTE_ASSIGNED_CODES`` this route mints itself\n(``business_requirement`` / ``interactive_phase`` / ``unbound_retrieval``). ``phase`` is\nthe phase ``slug`` — the\nnode identity the canvas paints on (the 181/183 ``node id == phase.slug`` contract) — or\n``None`` for a workflow-global finding. ``severity`` is the ONLY net-new field (D-182-03):\nan ORTHOGONAL UI hint (``error`` = broken/red, ``incomplete`` = still-building/grey), NOT\na pass/fail axis — both severities block a publish."
+      },
+      "WorkflowDefinition": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "title": "Status",
+            "default": "draft"
+          },
+          "phases": {
+            "items": {
+              "$ref": "#/components/schemas/PhaseSpec"
+            },
+            "type": "array",
+            "title": "Phases"
+          },
+          "project_folder_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Folder Id"
+          },
+          "output_target_folder": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Target Folder"
+          },
+          "reingest_output": {
+            "type": "boolean",
+            "title": "Reingest Output",
+            "default": false
+          },
+          "version_policy": {
+            "type": "string",
+            "enum": [
+              "supersede-by-filename",
+              "keep-all"
+            ],
+            "title": "Version Policy",
+            "default": "supersede-by-filename"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "source",
+              "derived"
+            ],
+            "title": "Provenance",
+            "default": "source"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/InputFieldSpec"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs"
+          },
+          "assets": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AssetRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assets"
+          },
+          "business_requirement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Requirement"
+          },
+          "is_stateful": {
+            "type": "boolean",
+            "title": "Is Stateful",
+            "default": false
+          },
+          "business_requirement_seeded_by_ai": {
+            "type": "boolean",
+            "title": "Business Requirement Seeded By Ai",
+            "default": false
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug",
+          "version",
+          "name",
+          "phases"
+        ],
+        "title": "WorkflowDefinition"
+      },
+      "WorkflowScheduleCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "cron_expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron Expression"
+          },
+          "interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 60.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Seconds"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "UTC"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "max_tokens_per_run": {
+            "type": "integer",
+            "maximum": 2000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max Tokens Per Run",
+            "default": 500000
+          },
+          "max_duration_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max Duration Seconds",
+            "default": 1800
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "WorkflowScheduleCreate",
+        "description": "``POST /workflows/{workflow_id}/schedules`` body."
+      },
+      "WorkflowScheduleRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "workflow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workflow Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "cron_expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron Expression"
+          },
+          "interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Seconds"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "UTC"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "max_tokens_per_run": {
+            "type": "integer",
+            "title": "Max Tokens Per Run"
+          },
+          "max_duration_seconds": {
+            "type": "integer",
+            "title": "Max Duration Seconds"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inputs"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "workflow_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "workflow_id",
+          "name",
+          "max_tokens_per_run",
+          "max_duration_seconds"
+        ],
+        "title": "WorkflowScheduleRead",
+        "description": "One ``workflow_schedules`` row as the client renders it.\n\n⚠ EXPLICIT FIELD LIST. See the module docblock: the three-place lockstep is\n``.select()`` string + this model + the serializer."
+      }
+    }
+  }
+}

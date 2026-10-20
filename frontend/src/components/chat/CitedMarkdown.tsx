@@ -28,7 +28,10 @@ import { marked } from "marked"
 import DOMPurify from "dompurify"
 import { cn } from "@/lib/utils"
 import type { Citation } from "@/types"
+import type { CitationCheckResult, CitationClaimResult } from "@/lib/api/citationChecks"
+import { useCitationCheck } from "@/stores/citationCheckStore"
 import { CitationPeek, type CitationAnchorRect } from "./CitationPeek"
+import { verdictMeta, verdictSpoken } from "./citationVerdicts"
 import {
   CITATION_MARKER_ATTR,
   CITATION_ACTIVE_CLASS,
@@ -43,14 +46,27 @@ const MARKER_RE = /\[(\d+)\]/g
 /** markerPop stagger (UI-SPEC §Streaming→Settle: `animationDelay = index * 60ms`). */
 const STAGGER_MS = 60
 
+/** Phase 294-05: the 0-based DOM index of an upgraded marker — the backend claim's `ordinal`. */
+const ORDINAL_ATTR = "data-citation-ordinal"
+/** Prefix of the verdict marker classes (`citationVerdicts.VERDICT_META[*].markerClass`). */
+const VERDICT_CLASS_PREFIX = "citation-marker--v-"
+const VERDICT_GLYPH_CLASS = "citation-marker__verdict"
+
 interface Props {
   content: string
   citations: Citation[]
   className?: string
+  /**
+   * Phase 294-05 (DEC-03): the settled assistant message whose stored citation check decorates
+   * these markers. Absent (streaming, a temp- id, or any other caller) → markers render as today.
+   */
+  checkMessageId?: string
 }
 
 interface PeekState {
   n: number
+  /** The marker's ordinal, so the peek shows that claim's verdict (null on an old marker). */
+  ordinal: number | null
   anchorRect: CitationAnchorRect
 }
 
@@ -70,15 +86,71 @@ function createMarker(n: number, citation: Citation, staggerIndex: number): HTML
   const sup = document.createElement("sup")
   sup.className = "citation-marker citation-marker--attach"
   sup.setAttribute(CITATION_MARKER_ATTR, String(n))
+  // Phase 294-05: the k-th upgraded marker IS claim k (citation_claims.py numbers the same walk;
+  // citationOrdinals.parity.test.tsx pins both stacks against one fixture).
+  sup.setAttribute(ORDINAL_ATTR, String(staggerIndex))
   sup.setAttribute("role", "button")
   sup.setAttribute("tabindex", "0")
-  sup.setAttribute("aria-label", `Citation ${n}: ${citation.filename}`)
+  sup.setAttribute("aria-label", markerLabel(n, citation))
   sup.textContent = String(n)
   sup.style.animationDelay = `${staggerIndex * STAGGER_MS}ms`
   return sup
 }
 
-export function CitedMarkdown({ content, citations, className }: Props) {
+function markerLabel(n: number, citation: Citation): string {
+  return `Citation ${n}: ${citation.filename}`
+}
+
+/** The claim for an ordinal, ONLY when it names the same source `n` as the marker (Pitfall 7). */
+function claimFor(
+  result: CitationCheckResult | null,
+  ordinal: number | null,
+  n: number,
+): CitationClaimResult | null {
+  if (!result || ordinal === null) return null
+  const claim = result.claims.find((c) => c.ordinal === ordinal)
+  return claim && claim.n === n ? claim : null
+}
+
+/**
+ * Phase 294-05 (DEC-03, D-14, D-17, sketch 294 A) — put each claim's verdict on its marker.
+ *
+ * Pure DOM over the markers THIS component owns: it first clears any earlier decoration (a
+ * re-check replaces), then, for a marker whose ordinal has a claim with the SAME `n`, adds the
+ * verdict class, an aria-hidden glyph and the spoken verdict on the aria-label. A mismatched or
+ * missing claim leaves the marker exactly as `createMarker` built it, so absence stays absence.
+ * Everything written comes from the closed `VERDICT_META` table via `classList` / `textContent`,
+ * never `innerHTML` with server text (T-294-25); an unknown verdict reads as couldn't check.
+ */
+function decorateMarkers(
+  container: HTMLElement,
+  result: CitationCheckResult | null,
+  citations: Citation[],
+): void {
+  const els = container.querySelectorAll<HTMLElement>(`[${CITATION_MARKER_ATTR}][${ORDINAL_ATTR}]`)
+  for (const el of Array.from(els)) {
+    const n = parseInt(el.getAttribute(CITATION_MARKER_ATTR) ?? "", 10)
+    const ordinal = parseInt(el.getAttribute(ORDINAL_ATTR) ?? "", 10)
+    const citation = citations[n - 1]
+    for (const cls of Array.from(el.classList)) {
+      if (cls.startsWith(VERDICT_CLASS_PREFIX)) el.classList.remove(cls)
+    }
+    el.querySelectorAll(`.${VERDICT_GLYPH_CLASS}`).forEach((g) => g.remove())
+    if (citation) el.setAttribute("aria-label", markerLabel(n, citation))
+    const claim = claimFor(result, Number.isInteger(ordinal) ? ordinal : null, n)
+    if (!claim || !citation) continue
+    const meta = verdictMeta(claim.verdict)
+    el.classList.add(meta.markerClass)
+    const glyph = document.createElement("span")
+    glyph.className = VERDICT_GLYPH_CLASS
+    glyph.setAttribute("aria-hidden", "true")
+    glyph.textContent = meta.glyph
+    el.appendChild(glyph)
+    el.setAttribute("aria-label", `${markerLabel(n, citation)} — ${verdictSpoken(claim.verdict, claim.confidence)}`)
+  }
+}
+
+export function CitedMarkdown({ content, citations, className, checkMessageId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [peek, setPeek] = useState<PeekState | null>(null)
   const [pinned, setPinned] = useState(false)
@@ -88,6 +160,11 @@ export function CitedMarkdown({ content, citations, className }: Props) {
   pinnedRef.current = pinned
   const citationsRef = useRef(citations)
   citationsRef.current = citations
+  // Phase 294-05: the stored check, read through a ref by the rebuild effect below (the
+  // citationsRef idiom), so a verdict arriving never re-runs that effect and its listeners.
+  const checkResult = useCitationCheck(checkMessageId)
+  const checkResultRef = useRef(checkResult)
+  checkResultRef.current = checkResult
   const activeMarkerRef = useRef<HTMLElement | null>(null)
 
   const html = useMemo(
@@ -162,6 +239,8 @@ export function CitedMarkdown({ content, citations, className }: Props) {
           node.parentNode?.replaceChild(frag, node)
         }
       }
+      // The innerHTML reset above dropped any decoration; put the stored verdicts back.
+      decorateMarkers(container, checkResultRef.current, citations)
     }
 
     // ── Delegated interaction (listeners attached programmatically — Pitfall 3) ──
@@ -176,15 +255,19 @@ export function CitedMarkdown({ content, citations, className }: Props) {
       const r = el.getBoundingClientRect()
       return { bottom: r.bottom, left: r.left }
     }
+    const ordinalOf = (el: HTMLElement): number | null => {
+      const o = parseInt(el.getAttribute(ORDINAL_ATTR) ?? "", 10)
+      return Number.isInteger(o) ? o : null
+    }
     const openPreview = (el: HTMLElement) => {
       const n = nOf(el)
       if (n == null) return
-      setPeek({ n, anchorRect: rectOf(el) })
+      setPeek({ n, ordinal: ordinalOf(el), anchorRect: rectOf(el) })
     }
     const pinMarker = (el: HTMLElement) => {
       const n = nOf(el)
       if (n == null) return
-      setPeek({ n, anchorRect: rectOf(el) })
+      setPeek({ n, ordinal: ordinalOf(el), anchorRect: rectOf(el) })
       setPinned(true)
       applyActiveMarker(el)
       // Scope the row flash to this message (falls back to document in isolation).
@@ -240,6 +323,14 @@ export function CitedMarkdown({ content, citations, className }: Props) {
     }
   }, [html, citations, applyActiveMarker])
 
+  // Phase 294-05: a check that arrives (or is replaced) after mount decorates the EXISTING
+  // markers in place — no rebuild, so the delegated listeners above stay attached.
+  useLayoutEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    decorateMarkers(container, checkResult, citationsRef.current)
+  }, [checkResult])
+
   // Outside-click dismissal for a pinned peek (the peek portals to body, so this
   // is a document-level listener that ignores clicks on the peek or a marker).
   useEffect(() => {
@@ -256,6 +347,7 @@ export function CitedMarkdown({ content, citations, className }: Props) {
   }, [pinned, closePeek])
 
   const peekCitation = peek ? citations[peek.n - 1] : null
+  const peekClaim = peek ? claimFor(checkResult, peek.ordinal, peek.n) : null
 
   return (
     <>
@@ -275,6 +367,7 @@ export function CitedMarkdown({ content, citations, className }: Props) {
           n={peek.n}
           anchorRect={peek.anchorRect}
           pinned={pinned}
+          verdict={peekClaim ? { verdict: peekClaim.verdict, confidence: peekClaim.confidence } : undefined}
           onPin={() => {
             if (pinned) {
               closePeek()

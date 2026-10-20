@@ -2970,3 +2970,17 @@ reuses 267-B's event-card shape.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 282 | one-answer-input | Where the ONE ask_user input lives per panel state (open / rail / workflow pause), with one shared draft | ★ A input follows the open panel (autonomous pick 2026-10-15; operator confirmation owed at G-4) | phase-282, fix-07, ask_user, a11y |
+
+## Sketch 289 — The Run Page and Its Evidence (Phase 289, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 289 | run-evidence-page | How a finished run's read-only evidence page reads for a reviewer (settled run page / printable report / list+detail) | ★ B printable report, four numbered sections (operator, 2026-10-19) | phase-289, vis-03, export |
+| 289 | confidence-on-a-step | Where KB confidence sits on a step; what non-KB and no-match steps show | ★ B evidence line under the step (operator, 2026-10-19) | phase-289, trust-01, confidence |
+
+## Sketch 294 — Decision Engine: Rerank and Citation Check (Phase 294, G-2 gate, D-20)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 294 | rerank-engine-block | How the Reranking card shows the engine, its key, and that text leaves the server (select+footer / engine cards / off-local-hosted) | ★ B engine cards (operator, 2026-10-20) | phase-294, dec-01, settings, egress |
+| 294 | citation-check | Where the citation-check verdict sits on each cited sentence (marker carries verdict / sentence underline / margin gutter) | ★ A marker carries the verdict (operator, 2026-10-20) | phase-294, dec-03, citations |

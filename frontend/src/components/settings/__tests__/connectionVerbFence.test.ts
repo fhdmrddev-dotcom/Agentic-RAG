@@ -582,7 +582,11 @@ describe("211-05 · SC#3 — no verb CATEGORY is offered anywhere (CONN-04 / CON
     const carriers = Object.entries(SURFACE).filter(([, source]) =>
       /\brole=["'](?:radio|tab|option)["']/.test(source),
     )
-    expect(carriers.map(([path]) => path)).toEqual([])
+    // ⚠ REVIEWED 2026-10-20 (Phase 294-04): the Reranking engine picker is a radiogroup of
+    // ENGINES (Local / Jev / OpenAI Decisions / Cohere), not a verb category. Exempted by
+    // path, and the exemption must still be a carrier, so a removal is read, not absorbed.
+    const REVIEWED_RADIOGROUPS = ["/src/components/settings/RerankEngineBlock.tsx"]
+    expect(carriers.map(([path]) => path)).toEqual(REVIEWED_RADIOGROUPS)
     // POSITIVE CONTROL — the pattern really matches.
     expect(/\brole=["'](?:radio|tab|option)["']/.test('<div role="radio">x</div>')).toBe(true)
   })

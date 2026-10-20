@@ -9,6 +9,9 @@
 import { describe, it, expect } from "vitest"
 
 import pageSource from "@/pages/WorkflowBuilderPage?raw"
+// 286-02 (2026-10-18, D-10a / D-13): the import and the call moved, verbatim, out of the page
+// into this hook. The JOIN below follows them there rather than being relaxed or deleted.
+import nameMapsSource from "./useBuilderNameMaps?raw"
 import { buildToolReadOnlyMap } from "./toolReadOnlyMap"
 import type { ConnectorConnection } from "@/lib/api"
 
@@ -94,8 +97,18 @@ describe("buildToolReadOnlyMap", () => {
     // mounting the whole page behind a 30-symbol api factory. What this pins is precisely the
     // seam that failed twice in this phase: a resolver that works and a caller that never
     // feeds it. If the page stops importing, calling, or threading it, this goes red.
-    expect(pageSource).toMatch(/import \{ buildToolReadOnlyMap \}/)
-    expect(pageSource).toMatch(/setToolReadOnly\(buildToolReadOnlyMap\(connections\)\)/)
+    //
+    // 286-02 (2026-10-18, D-13) — RETARGETED, SAME STRENGTH, ONE HOP LONGER. The import and the
+    // call moved verbatim into `useBuilderNameMaps` (D-10a), so the first two needles are now
+    // asserted against THAT source. Non-vacuity first: a `?raw` of a moved or renamed module
+    // can read as the empty string, and then every needle below would be a free pass. The
+    // identity guard proves the loaded text really is the hook.
+    expect(nameMapsSource.length).toBeGreaterThan(1000)
+    expect(nameMapsSource).toContain("useBuilderNameMaps")
+    expect(nameMapsSource).toMatch(/import \{ buildToolReadOnlyMap \}/)
+    expect(nameMapsSource).toMatch(/setToolReadOnly\(buildToolReadOnlyMap\(connections\)\)/)
+    // The hop the move added: the page must still CALL the hook, or the join is dead again.
+    expect(pageSource).toMatch(/useBuilderNameMaps\(\)/)
     // …and that the state actually reaches the context the canvas reads.
     expect(pageSource).toMatch(/^\s+toolReadOnly,$/m)
   })

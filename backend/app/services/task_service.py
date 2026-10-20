@@ -737,6 +737,10 @@ async def run_task_sub_agent(
     sub_citations: list[dict] = []
     sub_similarity_scores: list[float] = []
     sub_retrieval_error: dict | None = None
+    # 289 (TRUST-01 / D-09): how many `search_documents` calls this sub-agent made. Scores
+    # alone cannot tell "never searched" from "searched and matched nothing" (a zero-result
+    # search carries no score), and those are two different sentences on the run surface.
+    sub_kb_search_calls = 0
 
     step = 0  # WR-02: bound before the loop so the timed-out arm can always name it
     try:
@@ -786,6 +790,13 @@ async def run_task_sub_agent(
                     parsed_args = tc.get("args") or {}
 
                 tr = await dispatch_tool(tc.get("name") or "", parsed_args, sub_ctx)
+                if tc.get("name") == "search_documents":
+                    # 289-REVIEW WR-04: a refused search (invalid filter / refused retry) ran no
+                    # retrieval, so it is not a search that "matched nothing".
+                    from app.services.search_documents_tool import ran_retrieval  # noqa: PLC0415
+
+                    if ran_retrieval(tr):
+                        sub_kb_search_calls += 1
                 tool_results_to_append.append({
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),
@@ -1007,4 +1018,6 @@ async def run_task_sub_agent(
         "input_tokens": _sub_in,
         "output_tokens": _sub_out,
         "retrieval_error": sub_retrieval_error,
+        # 289 (TRUST-01): additive, same argument as F7 above — existing callers ignore it.
+        "kb_search_calls": sub_kb_search_calls,
     }

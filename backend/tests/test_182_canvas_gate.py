@@ -47,7 +47,22 @@ _BUNDLE_PATH = "/workflows/grounding-bundle"
 # test_revert_byte_identical.py), which is why the path probes below stay on the two
 # ``/workflows`` members.
 _RUN_READ_PATH = "/workflow-runs/{workflow_run_id}"
-_CANVAS_PATHS = (_VALIDATE_PATH, _BUNDLE_PATH, _RUN_READ_PATH)
+# Phase 289 (VIS-03) — the org-scoped evidence read; a template member like the run read above.
+_RUN_EVIDENCE_PATH = "/workflow-runs/{workflow_run_id}/evidence"
+# ⚠ INHERITED, found at 289-03: SEED-190 (the run log) and 200.2 (the citations read) joined
+# the gated set without joining THIS tuple, so the exact-set fence in
+# `test_openapi_tracks_the_flag_in_both_directions_in_one_process` was red before 289 touched
+# it (on − off carried these two paths and their models). Listed here so the fence is exact again.
+_RUN_LOG_PATH = "/workflow-runs"
+_RUN_CITATIONS_PATH = "/workflow-runs/{workflow_run_id}/phases/{phase_slug}/citations"
+_CANVAS_PATHS = (
+    _VALIDATE_PATH,
+    _BUNDLE_PATH,
+    _RUN_READ_PATH,
+    _RUN_LOG_PATH,
+    _RUN_CITATIONS_PATH,
+    _RUN_EVIDENCE_PATH,
+)
 
 # The two literal-path canvas routes — the subset that the REQUEST-path probes (malformed
 # body / wrong method / trailing slash) can meaningfully target. A templated path cannot be
@@ -79,6 +94,25 @@ _CANVAS_SCHEMAS = (
     "PaletteSkill",
     "WorkflowRunRead",
     "WorkflowRunPhaseRead",
+    # ⚠ INHERITED (see `_RUN_LOG_PATH` above) — measured at 289-03 off the real filter:
+    "WorkflowRunListItem",
+    "WorkflowRunListRead",
+    "WorkflowRunCitationRead",
+    "WorkflowRunWaitingOn",
+    # Phase 289 (VIS-03) — measured at 289-03: the evidence read's models leave the published
+    # schema with its route.
+    "RunEvidenceRead",
+    "RunEvidenceRun",
+    "RunEvidenceStartedBy",
+    "RunEvidenceDefinition",
+    "RunEvidenceDefinitionPhase",
+    "RunEvidenceDefinitionChanged",
+    "RunEvidenceDeliverable",
+    "RunEvidenceLogEntry",
+    "RunEvidenceConfidence",
+    "RunEvidenceHumanInput",
+    "RunEvidenceVerdict",
+    "RunEvidenceSource",
 )
 
 # CONTROLS — a schema and a path from NON-canvas routes on the same router. These are what
