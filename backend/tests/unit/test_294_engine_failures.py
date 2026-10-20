@@ -285,3 +285,43 @@ def test_post_decisions_is_exported_by_both_adapters():
     for engine in ENGINE_MODULES:
         mod = _module(engine)
         assert callable(mod.post_decisions) and callable(mod.rerank)
+
+
+# ── 294-REVIEW IN-04: a probability is a number, never a boolean or a numeric string ──────────
+
+_ANSWER_CASES = [
+    ("jev", "_NoulAnswer", {"type": "noul"}, "noul"),
+    ("jev", "_ChoiceAnswer", {"type": "choice", "choice": "supported"}, "confidence"),
+    ("openai_decisions", "_Predicate", {"type": "predicate", "name": "q"}, "probability"),
+    ("openai_decisions", "_Choice", {"type": "choice", "name": "q", "choice": "supported"}, "confidence"),
+    ("openai_decisions", "_ChoiceProbability", {"value": "supported"}, "probability"),
+]
+_ANSWER_IDS = [f"{e}-{m}" for e, m, _, _ in _ANSWER_CASES]
+
+
+@pytest.mark.parametrize("engine,model,base,field", _ANSWER_CASES, ids=_ANSWER_IDS)
+@pytest.mark.parametrize("bad", [True, False, "0.7"], ids=["true", "false", "numeric-string"])
+def test_answer_models_reject_a_boolean_or_string_probability(engine, model, base, field, bad):
+    """Lax mode turned ``true`` into 1.0, which defeated map_answer's explicit bool rejection."""
+    from pydantic import ValidationError
+
+    cls = getattr(_module(engine), model)
+    with pytest.raises(ValidationError):
+        cls.model_validate({**base, field: bad})
+
+
+@pytest.mark.parametrize("engine,model,base,field", _ANSWER_CASES, ids=_ANSWER_IDS)
+def test_answer_models_still_accept_json_numbers(engine, model, base, field):
+    cls = getattr(_module(engine), model)
+    for good in (0, 1, 0.42):
+        assert getattr(cls.model_validate({**base, field: good}), field) == float(good)
+
+
+def test_jev_choice_probabilities_reject_booleans():
+    from pydantic import ValidationError
+
+    from app.services.rerank_engines.jev import _ChoiceAnswer
+
+    with pytest.raises(ValidationError):
+        _ChoiceAnswer.model_validate({"type": "choice", "choice": "supported", "confidence": 0.9,
+                                      "probabilities": {"supported": True}})

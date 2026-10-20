@@ -67,12 +67,18 @@ class _Response(_Lenient):
     usage: _Usage | None = None
 
 
-class _NoulAnswer(_Lenient):
+# 294-REVIEW IN-04: the ANSWER models validate strictly — lax mode turned `true` into 1.0 and
+# "0.7" into 0.7, which defeated map_answer's bool rejection. Strict still accepts a JSON int.
+class _StrictAnswer(_Lenient):
+    model_config = ConfigDict(extra="ignore", strict=True)
+
+
+class _NoulAnswer(_StrictAnswer):
     type: Literal["noul"]
     noul: float = Field(ge=0.0, le=1.0)
 
 
-class _ChoiceAnswer(_Lenient):
+class _ChoiceAnswer(_StrictAnswer):
     type: Literal["choice"]
     choice: str
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)

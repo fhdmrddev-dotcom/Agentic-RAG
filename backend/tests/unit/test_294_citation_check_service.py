@@ -331,6 +331,26 @@ def test_a_source_that_answered_badly_still_counts_as_answered(monkeypatch):
     assert all(c.confidence is None for c in result.claims)
 
 
+def test_a_boolean_confidence_never_becomes_a_verdict(monkeypatch):
+    """294-REVIEW IN-04: ``"confidence": true`` was coerced to 1.0 by the adapter's lax model, so
+    map_answer's bool rejection never saw it and the claim read as supported at 1.00."""
+    rec = Recorder()
+
+    def handle(request):
+        body = rec.enter(request)
+        try:
+            conf = True if body["state"]["source_passage"] == "Passage one." else 0.8
+            return httpx.Response(200, json={"answers": {
+                n: {"type": "choice", "choice": "supported", "confidence": conf} for n in body["questions"]}})
+        finally:
+            rec.leave()
+
+    install(monkeypatch, jev, handle)
+    result = svc.run_citation_check(_row(THREE_CLAIMS, ["Passage one.", "Passage two."]), _settings("jev"))
+    assert [(c.verdict, c.confidence) for c in result.claims] == [
+        ("couldnt_check", None), ("couldnt_check", None), ("supported", 0.8)]
+
+
 def test_a_claim_without_a_passage_makes_no_engine_call(monkeypatch):
     rec = Recorder()
     install(monkeypatch, jev, _jev_choice_handler(rec, lambda cid: _choice("supported")))

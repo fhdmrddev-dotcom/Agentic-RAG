@@ -22739,6 +22739,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). OpenRouter /api/alpha/decisions: noul rerank (≤30 / ≤28 KB per call, ≤4 in flight) + post_decisions. ⛔ untrusted text only in state
 
+**294-REVIEW IN-04 (`216` lines).** The answer models (`_NoulAnswer`, `_ChoiceAnswer`) validate strictly via `_StrictAnswer`: `true` / `"0.7"` are rejected (the call fails, so the rerank falls back and a check's source is couldn't check); a JSON int still validates. `_Usage` / `_Response` stay lax.
+
 ## `backend/app/services/rerank_engines/openai_decisions.py`
 
 **`0 / 0 / 0` — planned (294-01; `post_decisions` reused by 294-03); row and section added at planning.** One request per pool (≤ 200 questions), per-passage `predicate` (D-06), `httpx.Timeout(8.0, connect=2.0)`, no retries. Cost is computed through `pricing_service` (the AST single-home fence). ⛔ **Binding invariants:** untrusted text only inside `input` as JSON; constant question instructions (D-10); a `refusal` answer or any malformed body raises in rerank (fallback, D-11) and maps to `couldnt_check` in the citation check (D-17). Plan 05 re-derives the triple.
@@ -22748,6 +22750,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 **`2 / 1 / 195` (was `0 / 0 / 0`).** Created at 195 lines. Live: HTTP 403 "The project does not have access to this model." at 294-02 (owed at Task 4).
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). POST /v1/decisions gpt-6-luna: predicate rerank + post_decisions; raw httpx (SDK lacks decisions). ⛔ refusal → fallback
+
+**294-REVIEW IN-04 (`201` lines).** `_Predicate`, `_ChoiceProbability` and `_Choice` validate strictly via `_StrictAnswer` (no bool or numeric string as a probability; a JSON int still validates). `_Usage` / `_Response` / `_Refusal` unchanged.
 
 ## `backend/app/services/rerank_engines/tracing.py`
 
