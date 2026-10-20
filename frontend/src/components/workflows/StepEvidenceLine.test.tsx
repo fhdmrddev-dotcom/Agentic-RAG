@@ -120,3 +120,73 @@ describe("StepEvidenceLine — the sketch-B words, exactly", () => {
     expect(screen.getByTestId("step-evidence-line").textContent).toContain(hostile)
   })
 })
+
+// ── Phase 295-05 (RUN-01 / D-04 / UI-SPEC B.1) — the unsourced arm, asserted by its WORDS ──
+
+const NOTE = "This output was kept without sources — it does not cite your documents."
+const mark = (continued_by = "Fahad Murad (you)") => ({ continued_by, at: "2026-10-20T12:30:00Z" })
+
+describe("StepEvidenceLine — the unsourced mark (295-05, D-04)", () => {
+  it("alone: the chip word, who continued, and the note sentence", () => {
+    const { container } = render(<StepEvidenceLine unsourced={mark()} />)
+    expect(container.textContent).toBe(
+      `◌ Unsourced · continued by Fahad Murad (you)${NOTE}`,
+    )
+    expect(screen.getByText(/Unsourced/)).toBeTruthy()
+    expect(screen.getByText(/continued by/)).toBeTruthy()
+    expect(screen.getByText(NOTE)).toBeTruthy()
+    expect(screen.queryByTestId("step-evidence-sentence")).toBeNull()
+  })
+
+  it("the ◌ glyph is decorative and differs from the no-match ○", () => {
+    render(<StepEvidenceLine unsourced={mark()} />)
+    const glyph = screen.getByText("◌")
+    expect(glyph.getAttribute("aria-hidden")).toBe("true")
+    expect("◌").not.toBe("○")
+  })
+
+  it("the chip is the bordered amber warning tone, never muted and never red", () => {
+    render(<StepEvidenceLine unsourced={mark()} />)
+    const chip = screen.getByText("◌").parentElement as HTMLElement
+    expect(chip.textContent).toBe("◌ Unsourced")
+    expect(chip.className).toContain("bg-[hsl(var(--warning)/0.12)]")
+    expect(chip.className).toContain("text-[hsl(var(--warning))]")
+    expect(chip.className).toContain("border-[hsl(var(--warning)/0.4)]")
+    expect(chip.className).not.toContain("destructive")
+    expect(screen.getByText(NOTE).className).toContain("italic")
+  })
+
+  it("with a confidence object the confidence sentence comes FIRST and the mark below it", () => {
+    const { container } = render(
+      <StepEvidenceLine confidence={conf({ level: "none", avg_similarity: null, passages: 0 })}
+        unsourced={mark("the person who started this run")} />,
+    )
+    const text = container.textContent ?? ""
+    const at = text.indexOf("Searched Procurement KB · nothing matched · ○ No match found")
+    const markAt = text.indexOf("◌ Unsourced · continued by the person who started this run")
+    expect(at).toBe(0)
+    expect(markAt).toBeGreaterThan(at)
+    expect(text.indexOf(NOTE)).toBeGreaterThan(markAt)
+  })
+
+  it("the confidence arm is byte-unchanged when there is no mark", () => {
+    const { container: a } = render(<StepEvidenceLine confidence={conf()} />)
+    const before = a.innerHTML
+    cleanup()
+    const { container: b } = render(<StepEvidenceLine confidence={conf()} unsourced={null} />)
+    expect(b.innerHTML).toBe(before)
+    expect(b.textContent).not.toContain("Unsourced")
+  })
+
+  it("neither present renders nothing", () => {
+    const { container } = render(<StepEvidenceLine confidence={null} unsourced={null} />)
+    expect(container.innerHTML).toBe("")
+  })
+
+  it("a hostile name renders as text, never as markup", () => {
+    const hostile = "<img src=x onerror=alert(1)>"
+    const { container } = render(<StepEvidenceLine unsourced={mark(hostile)} />)
+    expect(container.querySelector("img")).toBeNull()
+    expect(container.textContent).toContain(`continued by ${hostile}`)
+  })
+})

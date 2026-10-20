@@ -196,6 +196,28 @@ describe("toEvidenceView: section 2, step by step", () => {
     expect(toEvidenceView(p).steps[2].humanInput).toEqual(["Waited for an answer · not answered"])
   })
 
+  it("295-05: carries the unsourced mark onto the step row, and null where there is none", () => {
+    const p = ownerPayload()
+    const mark = { continued_by: "Dana Whitfield (you)", at: "2026-10-19T09:14:00Z" }
+    p.phase_log[1] = { ...p.phase_log[1], unsourced: mark }
+    const v = toEvidenceView(p)
+    expect(v.steps[1].unsourced).toEqual(mark)
+    expect(v.steps[0].unsourced).toBeNull()
+    // and the page's section-2 strings carry who continued, so the DOM test measures it too
+    expect(sectionStrings(v)[2]).toContain("Dana Whitfield (you)")
+  })
+
+  it("295-05: the view carries the run's end reason with its status", () => {
+    const failed = failedPayload()
+    failed.run.end_reason = "The knowledge base did not answer in time."
+    expect(toEvidenceView(failed).endReason).toEqual({
+      status: "failed", reason: "The knowledge base did not answer in time.",
+    })
+    const silent = failedPayload()
+    expect(toEvidenceView(silent).endReason).toEqual({ status: "failed", reason: null })
+    expect(toEvidenceView(ownerPayload()).endReason).toEqual({ status: "completed", reason: null })
+  })
+
   it("words a failed step's reason and the steps the run never reached", () => {
     const v = toEvidenceView(failedPayload())
     expect(v.steps[1].statusWord).toBe("✕ Failed")

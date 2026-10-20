@@ -29,6 +29,15 @@ export interface RunEvidenceRun {
   model: string | null
   viewer_is_owner: boolean
   thread_id: string | null
+  /** 295-05 (D-22): why a failed or cancelled run stopped, as recorded; null when nothing was. */
+  end_reason?: string | null
+}
+
+/** 295-05 (D-04): the mark on a step kept without sources. `continued_by` is WORDS resolved
+ *  server-side for the viewer, never an id; `at` is the ISO-8601 time of the choice. */
+export interface RunEvidenceUnsourced {
+  continued_by: string
+  at: string
 }
 
 export interface RunEvidenceDefinitionPhase {
@@ -77,6 +86,8 @@ export interface RunEvidencePhase {
   failure_reason: string | null
   confidence: RunPhaseConfidence | null
   human_input: RunEvidenceHumanInput | null
+  /** 295-05 (D-04): null when the step was not kept without sources. */
+  unsourced?: RunEvidenceUnsourced | null
 }
 
 export interface RunEvidenceVerdict {

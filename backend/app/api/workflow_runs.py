@@ -52,7 +52,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -96,6 +96,14 @@ from app.services.harness.phase_confidence import (
     KB_LABEL_DEFAULT,
     confidence_for_wire,
     resolve_kb_label,
+)
+# 295 (D-04 / D-22 / D-37) — the pure leaf every run read shares for these facts.
+from app.services.harness.run_read_wire import (
+    END_REASON_AUDIT_KINDS,
+    UnsourcedMark,
+    deadline_passed,
+    resolve_end_reason,
+    unsourced_for_wire,
 )
 
 logger = logging.getLogger(__name__)
@@ -282,6 +290,24 @@ class WorkflowRunPhaseRead(BaseModel):
         ),
     )
 
+    # ── 295 (RUN-01 / D-04 / D-40) — the mark on a step kept without sources ───────────────
+    # ⚠ JOINS THE LOCKSTEP (declared here, read BY NAME off the same single parse, populated
+    # in the same construction, fenced by `test_200_1`'s set equality) AND the two-wire-model
+    # rule: `WorkflowPhaseState` carries the same field, because the chat panel's PhaseCard
+    # renders it — D-289-02-A's re-open trigger ("a chat-panel phase card that needs per-step
+    # evidence") is exactly this. The stored `continued_by` is a user uuid; the wire carries
+    # viewer-aware WORDS instead (`run_read_wire.unsourced_for_wire`), so no id ships.
+    unsourced: UnsourcedMark | None = Field(
+        default=None,
+        description=(
+            "Present when the person chose to keep this step's output without sources: "
+            "`{continued_by, at}`. `continued_by` is WORDS resolved for the viewer (the owner "
+            "reads `<name> (you)`; anyone else reads `the person who started this run`), never "
+            "an id. `at` is the ISO-8601 time of the choice. `null` means no such choice was "
+            "made — render nothing."
+        ),
+    )
+
 
 # ─── D-200.1-02-A — THE SECOND WIRE MODEL IS DELIBERATELY NOT WIDENED ────────────────────
 #
@@ -406,6 +432,17 @@ class WorkflowRunRead(BaseModel):
     # Phase 288 (AUTH-01) - DECLARED here, SELECTED via `user_id` + `is_golden_run` in the
     # ownership select, PRODUCED by `_read_waiting_on`: the same lockstep as the fields above.
     waiting_on: WorkflowRunWaitingOn | None = None
+    # 295 (RUN-04 / D-22) — DECLARED here, PRODUCED by `resolve_end_reason` off the phase rows
+    # this read already holds plus ONE audit read (only when no step recorded a reason).
+    end_reason: str | None = Field(
+        default=None,
+        description=(
+            "Why a failed or cancelled run stopped, as RECORDED: the failed step's reason, "
+            "else the run's `run_failed` audit reason, else a cancelled run's cancel reason. "
+            "`null` means nothing was recorded (or the run did not fail or stop) — the client "
+            "says so; a reason is never composed here."
+        ),
+    )
     phases: list[WorkflowRunPhaseRead] = Field(default_factory=list)
 
 
@@ -788,6 +825,34 @@ def _first_line(raw: object) -> str | None:
     return None
 
 
+def waiting_who(*, is_owner: bool, display_name: object, viewer_email: object) -> str:
+    """The name chain, in its ONE home (295-05 factored it out of ``compose_waiting_on``).
+
+    Scrubbed ``display_name``; else the viewer's email ONLY for the owner; else the words "the
+    person who started this run". "(you)" only for the owner, and never on the fallback words.
+    """
+    from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
+
+    name = _clean_label(display_name)
+    if name is None and is_owner:
+        name = _clean_label(viewer_email)
+    if name is None:
+        name = _WAITING_FALLBACK_NAME
+    return f"{name} (you)" if is_owner and name != _WAITING_FALLBACK_NAME else name
+
+
+def unsourced_who(*, is_owner: bool, display_name: object, viewer_email: object) -> str:
+    """295-05 (D-04, UI-SPEC B.1): who kept an unsourced output, in the viewer's words.
+
+    The owner reads ``<name> (you)`` through the same chain as the waiting-on line. Anyone else
+    reads "the person who started this run": the chain is called with the name withheld, so a
+    colleague learns that the choice was made, never by whom beyond the run's starter.
+    """
+    if not is_owner:
+        return waiting_who(is_owner=False, display_name=None, viewer_email=None)
+    return waiting_who(is_owner=True, display_name=display_name, viewer_email=viewer_email)
+
+
 def compose_waiting_on(
     *,
     owner_id: object,
@@ -808,12 +873,7 @@ def compose_waiting_on(
     from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
 
     is_owner = str(owner_id) == str(viewer_id)
-    name = _clean_label(display_name)
-    if name is None and is_owner:
-        name = _clean_label(viewer_email)
-    if name is None:
-        name = _WAITING_FALLBACK_NAME
-    who = f"{name} (you)" if is_owner and name != _WAITING_FALLBACK_NAME else name
+    who = waiting_who(is_owner=is_owner, display_name=display_name, viewer_email=viewer_email)
     prompt_line = _first_line(prompt_text) if is_owner else None
     if window_passed:
         # 289-05 (D-13): restored only after S5 drove a paused run that was answered from
@@ -850,7 +910,11 @@ async def _read_waiting_on(
         prompt = await workflows_db.get_unanswered_ask_user(pool, run["id"])
         if not prompt:
             return None
-        active_slug = next(
+        # 295-05 (D-37): an ENGINE pause names the KB phase it paused; that phase is not a
+        # human-input step, so the active-human-input rule below would find no name for it.
+        engine_pause = prompt.get("engine_pause")
+        paused_phase = engine_pause.get("phase") if isinstance(engine_pause, dict) else None
+        active_slug = paused_phase if isinstance(paused_phase, str) and paused_phase else next(
             (
                 r.get("slug")
                 for r in phase_rows
@@ -878,7 +942,12 @@ async def _read_waiting_on(
                 display_name=display_name,
                 step_name=step_name,
                 prompt_text=prompt.get("prompt"),
-                window_passed=run.get("status") == "paused",
+                # 295-05 (D-37 / UI-SPEC A.4): a fact about TIME, the prompt's own deadline —
+                # never `status == paused`, which an engine ask reads at second 0.
+                window_passed=deadline_passed(
+                    prompt.get("timeout_seconds"), prompt.get("created_at"),
+                    datetime.now(timezone.utc),
+                ),
             )
         )
     except Exception:  # noqa: BLE001 - degrade to None, never 500 a pure read.
@@ -886,6 +955,78 @@ async def _read_waiting_on(
             "workflow_run waiting_on lookup failed for run %s", run.get("id"), exc_info=True
         )
         return None
+
+
+async def _unsourced_words_for(supabase: Client, run: dict[str, Any], current_user: dict) -> str:
+    """295-05 (D-04): the viewer's words for the unsourced mark on THIS run.
+
+    The run row came from the id+user_id ownership select, so the profile read is the owner's
+    own row on the user-JWT client (its own-profile RLS). A failed read degrades to the chain's
+    next link (the owner's email, else the fallback words) — never a 500.
+    """
+    is_owner = str(run.get("user_id")) == str(current_user.get("id"))
+    display_name = None
+    if is_owner:
+        try:
+            resp = await aexec(
+                supabase.table("profiles")
+                .select("display_name")
+                .eq("id", str(run["user_id"]))
+                .maybe_single()
+            )
+            prof = resp.data if resp is not None else None
+            display_name = prof.get("display_name") if isinstance(prof, dict) else None
+        except Exception:  # noqa: BLE001 — a name is an affordance on a pure read.
+            logger.warning("unsourced name lookup failed for run %s", run.get("id"), exc_info=True)
+    return unsourced_who(
+        is_owner=is_owner, display_name=display_name, viewer_email=current_user.get("email")
+    )
+
+
+async def panel_unsourced_who(fetchrow: Any, current_user: dict) -> str:
+    """295-05 (D-04): the chat panel's words for the mark. The panel route is owner-scoped (the
+    thread's own owner reads it), so the viewer IS the owner; ``fetchrow`` is that route's
+    RLS-bound reader (own-profile policy). A failed read degrades down the chain, never a 500.
+    """
+    display_name = None
+    try:
+        prof = await fetchrow(
+            "SELECT display_name FROM profiles WHERE id = $1", UUID(str(current_user["id"]))
+        )
+        display_name = prof["display_name"] if prof is not None else None
+    except Exception:  # noqa: BLE001 — a name is an affordance on a pure read.
+        logger.warning("panel unsourced name lookup failed", exc_info=True)
+    return unsourced_who(
+        is_owner=True, display_name=display_name, viewer_email=current_user.get("email")
+    )
+
+
+async def _read_end_reason(
+    supabase: Client, run: dict[str, Any], failed_reasons: list[str | None]
+) -> str | None:
+    """295-05 (RUN-04 / D-22): the recorded reason a failed or cancelled run stopped.
+
+    The audit is read ONLY when the run ended that way and no failed step recorded a reason,
+    through the same user-JWT client (harness_audit's owner SELECT policy). Any failure reads
+    ``None``: the client then says no reason was recorded, which is true of what it could read.
+    """
+    status_ = run.get("status")
+    reason = resolve_end_reason(status_, failed_reasons, [])
+    if reason is not None or status_ not in ("failed", "cancelled"):
+        return reason
+    try:
+        resp = await aexec(
+            supabase.table("harness_audit")
+            .select("event_type, metadata, created_at")
+            .eq("run_id", str(run["id"]))
+            .in_("event_type", list(END_REASON_AUDIT_KINDS))
+            .order("created_at")
+        )
+        rows = (resp.data if resp is not None else None) or []
+    except Exception:  # noqa: BLE001 — degrade, never 500 a pure read.
+        logger.warning("end reason audit read failed for run %s", run.get("id"), exc_info=True)
+        rows = []
+    return resolve_end_reason(status_, failed_reasons, rows)
 
 
 @router.get(
@@ -1067,6 +1208,12 @@ async def read_workflow_run(
     # row actually carries a confidence key (resolved lazily inside the loop, so the one parse
     # per row stays one). A failure degrades to the default words and never fails the read.
     kb_label: str | None = None
+    # ── 295 (D-04) — the viewer's words for the unsourced mark, resolved AT MOST ONCE PER READ
+    # and only when a row carries the mark (this read is polled while live). A failed lookup
+    # degrades to the chain's next link, never to a 500.
+    unsourced_words: str | None = None
+    # ── 295 (D-22) — the failed steps' recorded reasons, in phase_index order, for end_reason.
+    failed_reasons: list[str | None] = []
     phases = []
     for row in phase_rows:
         # ── 200.1 (RUN-04) — ONE parse per row, feeding BOTH reads ──
@@ -1094,6 +1241,13 @@ async def read_workflow_run(
         failure_reason = (
             raw_reason if isinstance(raw_reason, str) and raw_reason.strip() else None
         )
+        if row.get("status") == "failed":
+            failed_reasons.append(failure_reason)
+        # ── 295 (D-04) — THE FIFTH FACT OFF THE SAME SINGLE PARSE, by name. Only the top-level
+        # key is read; an active row's `_awaiting_answer` stash (D-40) is never looked into.
+        raw_unsourced = obj.get("unsourced") if isinstance(obj, dict) else None
+        if isinstance(raw_unsourced, dict) and unsourced_words is None:
+            unsourced_words = await _unsourced_words_for(supabase, run, current_user)
         # ── 214 (D-214-16) — the step's identity, off the shared derivation + the run's map.
         # ⚠ A non-`external_action` phase is absent from the mapping and resolves three
         # `None`s; an unresolvable connection resolves `service_name = None`. Both are FACTS,
@@ -1135,8 +1289,13 @@ async def read_workflow_run(
                 service_name=service_name,
                 # 289 — POPULATED, not merely declared (the 214 rule above, one field over).
                 confidence=confidence_for_wire(raw_confidence, kb_label or KB_LABEL_DEFAULT),
+                # 295 — POPULATED, and the stored uuid is replaced, never copied.
+                unsourced=unsourced_for_wire(
+                    raw_unsourced, who=unsourced_words or _WAITING_FALLBACK_NAME
+                ),
             )
         )
+    end_reason = await _read_end_reason(supabase, run, failed_reasons)
 
     # ── Phase 257.1 — the THIRD place of the lockstep (ROADMAP SC#4). ────────────────────
     #
@@ -1211,6 +1370,7 @@ async def read_workflow_run(
         is_rated=run_is_rated,
         token_coverage=list(_coverage) if isinstance(_coverage, list) else None,
         waiting_on=waiting_on,
+        end_reason=end_reason,
         phases=phases,
     )
 

@@ -249,6 +249,42 @@ def test_an_unanswered_human_step_says_so():
     assert log[1]["human_input"]["answered_by"] is None
 
 
+# ── 295-05 (RUN-01 / D-04): the unsourced mark on the phase log ────────────────────────────
+
+_STORED_BY = "aaaaaaaa-0000-4000-8000-0000000002a5"
+
+
+def _unsourced_rows() -> list[dict]:
+    return [
+        {"slug": "gather", "phase_index": 0, "status": "completed", "output": json.dumps(
+            {"text": "Kept as produced.",
+             "unsourced": {"continued_by": _STORED_BY, "at": "2026-10-20T12:30:00+00:00"}})},
+        {"slug": "write", "phase_index": 2, "status": "completed",
+         "output": {"text": "Memo written."}},
+    ]
+
+
+def test_the_owner_reads_the_mark_with_their_own_name():
+    log = ev.compose_phase_log(_unsourced_rows(), _definition(), True, "Dana", "kb")
+    assert log[0]["unsourced"] == {"continued_by": "Dana (you)",
+                                   "at": "2026-10-20T12:30:00+00:00"}
+    assert log[1]["unsourced"] is None
+    assert _STORED_BY not in json.dumps(log)
+
+
+def test_a_colleague_reads_the_mark_without_a_name():
+    log = ev.compose_phase_log(_unsourced_rows(), _definition(), False, "Dana", "kb")
+    assert log[0]["unsourced"]["continued_by"] == "the person who started this run"
+    assert "Dana" not in json.dumps(log[0]["unsourced"])
+    assert _STORED_BY not in json.dumps(log)
+
+
+def test_an_owner_with_no_name_reads_the_fallback_words_without_you():
+    log = ev.compose_phase_log(_unsourced_rows(), _definition(), True,
+                               "the person who started this run", "kb")
+    assert log[0]["unsourced"]["continued_by"] == "the person who started this run"
+
+
 # ── compose_verdicts (R-03) ─────────────────────────────────────────────────────────────
 
 

@@ -1100,6 +1100,8 @@ export async function subscribeToRun(
             // D-12 (Phase 093): additive — the prior-phase draft the user confirms.
             // Optional; absent on older streams → undefined (harmless).
             draft: parsed.draft as string | undefined,
+            // Phase 295 (D-02 / D-37): the engine's pause facts; absent on every other prompt.
+            engine_pause: parsed.engine_pause as PendingAsk["engine_pause"],
           })
         else if (t === "ask_user_response" && callbacks.onAskUserResponse)
           callbacks.onAskUserResponse(parsed.tool_call_id as string)
@@ -1486,7 +1488,10 @@ export async function getWorkspaceFileDiff(
  *  `ask_user_response` SSE removes the prompt from the store, reactively clearing
  *  the card and un-pausing the run (Pattern 3). `runId` comes from
  *  `PendingAsk.run_id` (GET-only — Pitfall 1 / A2); the submit caller (Plan 05)
- *  gates on its presence. Throws on non-OK. */
+ *  gates on its presence. Throws on non-OK.
+ *
+ *  Phase 295 (D-03): an engine pause's "Search another folder" answer carries
+ *  `body.folder_id`, which the server allow-lists against the folders it offered. */
 export async function answerAskUser(
   runId: string,
   body: AskUserAnswerBody,
@@ -1692,6 +1697,9 @@ export interface WorkflowPhaseState {
   tool_name?: string | null
   capability?: string | null
   service_name?: string | null
+  /** Phase 295-05 (RUN-01 / D-04) — the mirror of the backend field: the owner's words and the
+   *  time of the choice; absent when the step was not kept without sources. */
+  unsourced?: { continued_by: string; at: string } | null
 }
 
 /** A picker row from GET /workflows/published (backend/app/api/workflows.py

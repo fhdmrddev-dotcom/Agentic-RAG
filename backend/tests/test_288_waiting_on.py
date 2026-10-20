@@ -125,10 +125,13 @@ def test_db_read_is_not_exists_and_run_scoped():
                          "timeout_seconds": 300}]}
     )
     out = asyncio.run(wdb.get_unanswered_ask_user(pool, _RUN))
+    # 295-05 (D-37): the prompt row's own ``created_at`` and the engine's ``engine_pause`` ride
+    # the read, so "the window passed" is computed from the deadline, never from run status.
     assert out == {"tool_call_id": "tc2", "prompt": "Second?", "options": None,
-                   "timeout_seconds": 300}
+                   "timeout_seconds": 300, "created_at": None, "engine_pause": None}
     sql = " ".join(pool.sql.split())
     assert "NOT EXISTS" in sql
+    assert "m.created_at" in sql
     assert "ask_user_prompt" in sql and "ask_user_response" in sql
     assert "tool_calls->0->>'run_id' = $1::text" in sql
     assert "tool_calls->0->>'tool_call_id'" in sql
@@ -176,7 +179,8 @@ def _active_review(store, status="active", run_status="active", golden=None):
                     ph["name"] = "Manager sign-off"
 
 
-def _wire(monkeypatch, *, name="Dana Whitfield", prompt="Approve the Q3 numbers?", raises=False):
+def _wire(monkeypatch, *, name="Dana Whitfield", prompt="Approve the Q3 numbers?", raises=False,
+          timeout_seconds=None, created_at=None, engine_pause=None):
     import app.dependencies as deps
     from app.api import workflow_runs as wr
 
@@ -186,7 +190,10 @@ def _wire(monkeypatch, *, name="Dana Whitfield", prompt="Approve the Q3 numbers?
     async def _unanswered(pool, run_id):
         if raises:
             raise RuntimeError("pool down")
-        return None if prompt is None else {"tool_call_id": "t", "prompt": prompt}
+        if prompt is None:
+            return None
+        return {"tool_call_id": "t", "prompt": prompt, "timeout_seconds": timeout_seconds,
+                "created_at": created_at, "engine_pause": engine_pause}
 
     monkeypatch.setattr(deps, "get_pg_pool", _pool)
     monkeypatch.setattr(wr.workflows_db, "get_unanswered_ask_user", _unanswered)
@@ -204,13 +211,61 @@ def test_active_run_gets_a_worded_waiting_on(client, monkeypatch):
     assert t188._OWNER_ID not in w["sentence"]
 
 
+def _long_ago():
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+
+
 def test_paused_run_keeps_the_line_with_window_passed(client, monkeypatch):
+    # 295-05 (D-37): the window passed because the prompt's OWN deadline passed (a 5-minute
+    # human-input window asked 30 minutes ago), not because the run reads ``paused``.
     store = t188._canvas_on(monkeypatch)
     _active_review(store, run_status="paused")
-    _wire(monkeypatch)
+    _wire(monkeypatch, timeout_seconds=300, created_at=_long_ago())
     w = client.get(f"/workflow-runs/{t188._OWNED_RUN_ID}").json()["waiting_on"]
     assert w["window_passed"] is True
     assert "expire" not in w["sentence"].lower()
+
+
+def test_an_engine_pause_with_no_deadline_never_reads_as_a_passed_window(client, monkeypatch):
+    """295-05 (D-37 / UI-SPEC A.4): an engine ask pauses the run at second 0 with
+    ``timeout_seconds`` null. ``status == "paused"`` alone must not say the window passed."""
+    store = t188._canvas_on(monkeypatch)
+    _active_review(store, status="completed", run_status="paused")
+    _wire(monkeypatch, prompt="Searched Q3 and found nothing for Gather.\nHow should it continue?",
+          timeout_seconds=None, created_at=_long_ago())
+    w = client.get(f"/workflow-runs/{t188._OWNED_RUN_ID}").json()["waiting_on"]
+    assert w["window_passed"] is False
+    assert w["sentence"] == (
+        'Waiting on Dana Whitfield (you) to answer "Searched Q3 and found nothing for Gather.".'
+    )
+    assert "Still waiting" not in w["sentence"]
+
+
+def test_a_deadline_not_yet_reached_is_not_passed_even_when_paused(client, monkeypatch):
+    from datetime import datetime, timezone
+
+    store = t188._canvas_on(monkeypatch)
+    _active_review(store, run_status="paused")
+    _wire(monkeypatch, timeout_seconds=300, created_at=datetime.now(timezone.utc).isoformat())
+    w = client.get(f"/workflow-runs/{t188._OWNED_RUN_ID}").json()["waiting_on"]
+    assert w["window_passed"] is False
+
+
+def test_the_paused_step_name_is_the_phase_the_engine_paused(client, monkeypatch):
+    """295-05: an engine pause names its KB phase; the active-human-input rule finds none."""
+    store = t188._canvas_on(monkeypatch)
+    _active_review(store, status="completed", run_status="paused")
+    for d in store.rows["workflow_definitions"]:
+        if d["id"] == t188._OLD_DEF_ID:
+            for ph in d["definition"]["phases"]:
+                if ph["slug"] == "gather":
+                    ph["name"] = "Find the evidence"
+    _wire(monkeypatch, engine_pause={"kind": "no_sources", "phase": "gather",
+                                     "continue_allowed": True, "locked": False, "folders": []})
+    w = client.get(f"/workflow-runs/{t188._OWNED_RUN_ID}").json()["waiting_on"]
+    assert w["step_name"] == "Find the evidence"
 
 
 def test_same_read_twice_is_identical_reload(client, monkeypatch):

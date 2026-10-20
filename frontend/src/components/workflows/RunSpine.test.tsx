@@ -232,3 +232,42 @@ describe("RunSpine — Phase 289 (TRUST-01 / D-10): the evidence line sits under
     expect(line.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
+
+describe("RunSpine — Phase 295-05 (RUN-01 / D-04): the unsourced mark, by its words", () => {
+  const NOTE = "This output was kept without sources — it does not cite your documents."
+  const MARKED = [
+    {
+      slug: "gather",
+      status: "completed",
+      started_at: s(0),
+      completed_at: s(12),
+      confidence: {
+        level: "none" as const,
+        avg_similarity: null,
+        disclaimer: null,
+        passages: 0,
+        kb_label: "Procurement KB",
+      },
+      unsourced: { continued_by: "Fahad Murad (you)", at: s(13) },
+    },
+    { slug: "draft", status: "completed", started_at: s(14), completed_at: s(70), unsourced: null },
+  ]
+
+  it("an unsourced step reads Unsourced, who continued, and the note, inside its own row", () => {
+    render(<RunSpine phases={MARKED} titleOf={titleOf} now={T0} />)
+    const text = row("gather").textContent ?? ""
+    expect(text).toContain("Unsourced")
+    expect(text).toContain("continued by Fahad Murad (you)")
+    expect(text).toContain(NOTE)
+    // below the confidence sentence, never instead of it
+    expect(text.indexOf("Searched Procurement KB")).toBeLessThan(text.indexOf("Unsourced"))
+  })
+
+  it("a sourced step reads none of it", () => {
+    render(<RunSpine phases={MARKED} titleOf={titleOf} now={T0} />)
+    const text = row("draft").textContent ?? ""
+    expect(text).not.toContain("Unsourced")
+    expect(text).not.toContain("continued by")
+    expect(text).not.toContain(NOTE)
+  })
+})

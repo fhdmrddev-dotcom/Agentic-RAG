@@ -36,6 +36,7 @@ import { getRunEvidence, type RunEvidence } from "@/lib/api/runEvidence"
 import { downloadWorkspaceFile } from "@/lib/api/documents"
 import { clearRunDeepLink, writeRunDeepLink } from "@/lib/runDeepLink"
 import { StepEvidenceLine } from "@/components/workflows/StepEvidenceLine"
+import { RunEndReasonLine } from "@/components/workflows/RunEndReasonLine"
 import { exportPayload, toEvidenceView, type EvidenceView, type FactTone } from "@/components/workflows/evidenceView"
 import {
   CHANGED_GLYPH,
@@ -187,6 +188,8 @@ function Report({
             ) : null}
             {view.org !== null ? ` · ${view.org}` : null}
           </p>
+          {/* 295-05 (D-22 / UI-SPEC C.2): why it stopped, directly under the outcome. */}
+          <RunEndReasonLine status={view.endReason.status} endReason={view.endReason.reason} />
         </div>
         <div className="flex flex-wrap items-center gap-1.5 print:hidden">
           <Button
@@ -311,7 +314,7 @@ function Report({
                     <div className="mt-0.5 whitespace-pre-wrap break-words text-xs text-muted-foreground">{r.output}</div>
                   ) : null}
                   {r.count !== null ? <div className="mt-0.5 text-xs text-muted-foreground">{r.count}</div> : null}
-                  <StepEvidenceLine confidence={r.confidence} />
+                  <StepEvidenceLine confidence={r.confidence} unsourced={r.unsourced} />
                   {r.humanInput !== null ? (
                     <div className="mt-1.5 border-l-2 border-border pl-2.5 text-sm">
                       {r.humanInput.map((line, i) => (

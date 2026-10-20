@@ -966,6 +966,56 @@ describe("Phase 214 — reconcilePhases carries the step identity onto Phase, in
   })
 })
 
+// ── Phase 295-05 (RUN-01 / D-04) — the unsourced mark survives BOTH mapper literals ────────
+
+describe("Phase 295 — reconcilePhases carries the unsourced mark onto Phase, in BOTH branches", () => {
+  beforeEach(() => {
+    resetPhases()
+  })
+
+  const MARK = { continued_by: "Fahad Murad (you)", at: "2026-10-20T12:30:00+00:00" }
+
+  it("HISTORICAL branch — a terminal run's marked row carries the mark", async () => {
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: true,
+      definition_name: "Vendor review",
+      run_status: "completed",
+      current_phase_index: 0,
+      total_phases: 1,
+      phases: [
+        { slug: "research", phase_index: 0, status: "completed", phase_type: "llm_agent",
+          unsourced: MARK },
+      ],
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_214))
+    await waitFor(() => expect(result.current.data).toHaveLength(1))
+    expect(result.current.data[0].unsourced).toEqual(MARK)
+  })
+
+  it("LIVE branch — the mark is overlaid, and an unmarked row reads absence", async () => {
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: false,
+      definition_name: "Vendor review",
+      run_status: "running",
+      current_phase_index: 1,
+      total_phases: 2,
+      phases: [
+        { slug: "research", phase_index: 0, status: "completed", phase_type: "llm_agent",
+          unsourced: MARK },
+        { slug: "write", phase_index: 1, status: "active", phase_type: "llm_single" },
+      ],
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_214))
+    await waitFor(() => expect(result.current.data).toHaveLength(2))
+    expect(result.current.data[0].unsourced).toEqual(MARK)
+    expect(result.current.data[1].unsourced ?? null).toBeNull()
+  })
+})
+
 // ── THE STRUCTURAL FENCE — the guard that survives the NEXT widening ───────────────────────
 
 describe("Phase 214 — the two Phase-RETURNING literals in reconcilePhases declare the same keys", () => {

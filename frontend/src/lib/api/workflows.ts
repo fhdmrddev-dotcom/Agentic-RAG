@@ -662,6 +662,15 @@ export interface WorkflowRunPhase {
    *  or the run predates the field). Render NOTHING for it — never a low chip, never "n/a"
    *  (D-09). A step that searched and matched nothing carries `level: "none"` instead. */
   confidence?: RunPhaseConfidence | null
+  /** Phase 295-05 (RUN-01 / D-04) — present when the person kept this step's output without
+   *  sources. `continued_by` is WORDS resolved server-side for the viewer, never an id. */
+  unsourced?: RunPhaseUnsourced | null
+}
+
+/** Phase 295-05 — the wire twin of `run_read_wire.UnsourcedMark`. */
+export interface RunPhaseUnsourced {
+  continued_by: string
+  at: string
 }
 
 /** Phase 289 (TRUST-01) — the wire twin of the backend's `confidence_for_wire` output.
@@ -754,6 +763,9 @@ export interface WorkflowRunRead {
   model?: string | null
   /** Phase 288 (AUTH-01): present only while the run waits on a human-input step. */
   waiting_on?: WorkflowRunWaitingOn | null
+  /** Phase 295-05 (RUN-04 / D-22): why a failed or cancelled run stopped, as recorded;
+   *  null when nothing was (the page then says so for a failed run). */
+  end_reason?: string | null
 }
 
 /**
