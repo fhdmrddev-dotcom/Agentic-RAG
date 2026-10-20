@@ -1189,6 +1189,26 @@ def grounding_cause(phase) -> str | None:
     return None
 
 
+def is_engine_citation_gate(phase, failed_idx: int | None) -> bool:
+    """True iff the failing validator is THE citations gate ``effective_phase`` appended.
+
+    Phase 295 (D-51, RESEARCH Pattern 2). PURE, ZERO I/O, getattr-total — the
+    ``grounding_cause`` idiom. ``effective_phase`` appends exactly ONE spec, at the END, and
+    only when the cause is ``detected``; an author's own ``citations_required`` therefore sits
+    at a LOWER index (D-185-05) and is never this gate. The engine gate keeps
+    its ``fail_run`` disposition (``test_185_engine_attachment.py`` pins it); the durable pause is
+    chosen by THIS predicate inside ``engine_ask``, never by a new author-writable disposition.
+    """
+    vs = list(getattr(phase, "validators", None) or [])
+    return (
+        failed_idx is not None
+        and failed_idx == len(vs) - 1
+        and grounding_cause(phase) == "detected"
+        and getattr(vs[failed_idx], "kind", None) == "citations_required"
+        and (getattr(vs[failed_idx], "config", None) or {}).get("mode") == "retrieved_and_cited"
+    )
+
+
 # ── Phase 185 (GOVERN-01 / GOVERN-03) — the ONE synthesis home ────────────────
 #
 # What the ENGINE runs is not always what the author wrote. ONE gate is attached at run
