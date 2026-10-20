@@ -297,9 +297,9 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 294-02-PLAN.md — frozen 50+ question held-out set, decision_eval harness + CLI, measurement report, SEED-020 routed (wave 2)
-- [ ] 294-03-PLAN.md — migration 211 message_citation_checks, claim extraction with shared ordinals, citation-check service + routes (wave 2, the only DB-mutating plan)
-- [ ] 294-04-PLAN.md — Settings engine cards (sketch 294 B) + server-side engine allowlist (wave 2)
+- [x] 294-02-PLAN.md — frozen 50+ question held-out set, decision_eval harness + CLI, measurement report, SEED-020 routed (wave 2)
+- [x] 294-03-PLAN.md — migration 211 message_citation_checks, claim extraction with shared ordinals, citation-check service + routes (wave 2, the only DB-mutating plan)
+- [x] 294-04-PLAN.md — Settings engine cards (sketch 294 B) + server-side engine allowlist (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -320,7 +320,7 @@ Plans:
 | 291. Describe It From Your Own Files | 0/TBD | Not started | - |
 | 292. More Ways to Show It | 0/TBD | Not started | - |
 | 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
-| 294. Decision Engine: Rerank and Citation Check | 0/5 | Planned | - |
+| 294. Decision Engine: Rerank and Citation Check | 4/5 | In Progress | - |
 
 ---
 

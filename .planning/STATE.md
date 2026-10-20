@@ -42,7 +42,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Phase: 294 (decision-engine-rerank-and-citation-check) — EXECUTING
-Plan: 2 of 5
+Plan: 5 of 5 (wave 3; 294-01..04 complete)
 
 ### Roadmap Evolution
 
