@@ -107,7 +107,11 @@ _EXPECTED_CALL_SITES = {
     #   above it moved to workflow_wire.py; delete_workflow_cascade and the call are unchanged.
     #   Re-derived with `grep -n "await finish_run(" backend/app/api/workflows.py`.
     #   api/workflows.py:1812 → 1550
-    "api/workflows.py:1550",
+    # ⚠ RE-DERIVED at Phase 295 Plan 02: (a) the COUNTS stayed identical ("api/workflows.py": 1).
+    #   Only the position shifted (+6), when `_INCOMPLETE_CODES` gained `no_template_bound` and
+    #   its D-45 comment above the call; delete_workflow_cascade and the call are unchanged.
+    #   api/workflows.py:1550 → 1556
+    "api/workflows.py:1556",
     # ⚠ RE-DERIVED at Phase 256 round 1 (plan 256-05), and the originals are recorded
     # beside the new values rather than over them, because this fence's own docstring
     # asks for exactly that: check (a) — the per-file COUNTS — stayed identical, so no
