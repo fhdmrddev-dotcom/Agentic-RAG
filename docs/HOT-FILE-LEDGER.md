@@ -11219,6 +11219,7 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
+| [`backend/app/api/panel.py`](docs/HOT-FILE-LEDGER.md#backendappapipanelpy) | 6 / 5 / 285 (was `5 / 4 / 282`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 4 phases — row added 295-03. 295-03: ONE additive `engine_pause` key on /pending beside `draft`. Honoured by construction |
 | [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 81 / 41 / 2623 (was `79 / 40 / 2602`) | ⚠ **FIRES** | 294-01: ONE optional `instruction` string on SEARCH_DOCUMENTS_TOOL (+12; provider-safe: no anyOf, no type array). Honoured by construction |
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
@@ -22946,3 +22947,11 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 2 / 1 / 10
 **`5 / 4 / 267`.** ⚠ **Absent from the ledger for its entire life at 4 phases.** 294-01 added the dev-only `DECISION_ENGINE_FAULT_BASE_URL` to the script's intentionally-omitted list (+2), so the deploy-artifact drift check knows it is not a onebox variable.
 
 No scan-list row existed before 294-05 (2026-10-20).
+
+## `backend/app/api/panel.py`
+
+**Re-derived at 295-03's base `ea1347c4d` with the `CLAUDE.md` recipe, BEFORE the edit: `5 commits / 4 phases / 282 L`.** Phase buckets, verbatim: `085` · `093` · `096` · `163`; no six-digit quick-task bucket to drop. ⚠ **G-5 FIRES at 4 phases against a threshold of 3, and the file had NO ROW in either document for its entire life** (`grep -c "api/panel.py" CLAUDE.md` returned `0`): the same invisibility the `api/runs.py` and `models/thread.py` rows recorded, found the same way, by re-deriving the triple of a file a plan was about to edit. History (`git log -- backend/app/api/panel.py`): `32242511a`/`e54851682` (085-04, the panel router + `/ask_user/pending` + `/tasks`), `02c71c54a` (093-05, the prior-phase `draft` on the prompt), `3632515c0` (096-03, the dead-run liveness filter, dual id namespace), `a8e53b46b` (163-06, the user-JWT RLS connection).
+
+### `backend/app/api/panel.py` — Phase 295 (295-03)
+
+**`6 / 5 / 285` after this commit (was `5 / 4 / 282`).** +3: ONE additive key in the `/pending` projection, `"engine_pause": payload.get("engine_pause")`, beside `draft` — the wire half of an engine ask (kind, lock, the server-bounded folder list), `None` on every other prompt row. Branch counts `If 6 → 6`, `IfExp 6 → 6`, defs `5 → 5`. **Honoured by construction** (one projection line, no logic). ⛔ The projection stays a pass-through of the stored prompt row: no server re-derivation here, so `/pending` and the `ask_user_prompt` SSE can never disagree. ⛔ The liveness filter (`_prompt_run_is_live`) and the RLS connection are untouched. Named seam if a next phase needs more than a key here: the projection dict becomes a small pure `_pending_row(payload, row)` helper beside the route.

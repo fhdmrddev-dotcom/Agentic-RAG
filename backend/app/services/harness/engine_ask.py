@@ -46,12 +46,20 @@ repointed to ``engine_ask`` in the move commit (295-01 SUMMARY lists every site)
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections import namedtuple
 from uuid import UUID
 
 from app.config import settings
-from app.db.workflows import write_audit
+from app.db.workflows import (
+    get_active_phase,
+    get_ask_user_response,
+    pause_run,
+    stash_awaiting_answer,
+    write_audit,
+)
+from app.services.harness.phase_confidence import resolve_kb_label
 # Bound from the engine (see "THE HONEST LEAF INVARIANT" above). Safe ONLY because the
 # engine imports this module at its END, after both names are bound.
 from app.services.harness_engine import PhaseOutcome, _emit
@@ -69,6 +77,20 @@ __all__ = [
     "_parse_on_failure",
     "_resolve_failure_with_ask_user",
     "_route_on_failure",
+    # Phase 295 (295-03): the durable engine ask.
+    "ENGINE_ASK_POLICY",
+    "ENGINE_CHOICE_CONTINUE",
+    "ENGINE_CHOICE_SEARCH",
+    "ENGINE_CHOICE_STOP",
+    "classify_engine_choice",
+    "compose_engine_choices",
+    "consume_engine_answer",
+    "engine_answer_refusal",
+    "engine_pause",
+    "resolve_engine_label",
+    "finding_from_output",
+    "is_locked",
+    "permitted_folder_options",
 ]
 
 
@@ -333,10 +355,44 @@ async def _resolve_failure_with_ask_user(
     if not is_action_risk:
         disp = _parse_on_failure(_failing_on_failure(phase, failed_idx))
         if disp.kind != "ask_user":
+            # ── Phase 295 (D-01 / D-51) — THE ENGINE CITATIONS GATE PAUSES DURABLY ──────
+            # Identified by the pure predicate, never by its disposition (it keeps
+            # ``fail_run`` in grounding.py). An outage keeps the shipped route (D-06).
+            from app.services.harness.grounding import is_engine_citation_gate  # noqa: PLC0415
+
+            _finding = finding_from_output(produced_output)
+            if not is_pre and is_engine_citation_gate(phase, failed_idx) and _finding != "outage":
+                return await engine_pause(
+                    phase, kind=_finding, error_message=error_message,
+                    produced_output=produced_output, failed_idx=failed_idx, run_id=run_id,
+                    pool=pool, redis=redis, ctx=ctx, _audit_user_id=_audit_user_id,
+                    stream_run_id=stream_run_id,
+                )
             # fail_run / skip_to_phase — the sync mapper handles it byte-identical.
             return _route_on_failure(
                 phase, error_message, attempt, failed_idx, reason_is_final=reason_is_final
             )
+    else:
+        # ── Phase 295 (D-18) — THE ARMED APPROVAL IS THE SAME DURABLE PAUSE ─────────────
+        # A live armed checkpoint no longer waits in-process (a golden run auto-continues
+        # upstream, 189 D-19). Everything below this ``if`` is therefore reached by an
+        # AUTHOR's ``ask_user`` gate only; its armed-only deltas are now unreachable.
+        if _take_engine_approval(ctx, phase):
+            # The approval was consumed on THIS re-drive (``consume_engine_answer``): run the
+            # body once, asking nothing, and write the governance receipt here — where the
+            # approval is USED, after the pre-gates passed again (consequence ≠ receipt).
+            await _write_receipt(pool, run_id, _audit_user_id, {
+                "phase": phase.slug,
+                "validator": failed_idx,
+                "choice": _ACTION_RISK_APPROVE_CHOICE,
+                "finding": error_message,
+            })
+            return None
+        return await engine_pause(
+            phase, kind="action_risk", error_message=error_message, produced_output=None,
+            failed_idx=failed_idx, run_id=run_id, pool=pool, redis=redis, ctx=ctx,
+            _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+        )
 
     # ── ask_user pause (copy _exec_llm_human_input ordering VERBATIM) ──
     # The pause needs a live redis transport + a run_id channel; without them the
@@ -596,4 +652,687 @@ async def _resolve_failure_with_ask_user(
 
     if is_pre:
         return None  # signal: run the body (the user approved running despite the finding)
+    # ── Phase 295 (D-48) — AN AUTHOR'S PROCEED IS NOT THE ENGINE'S PROOF ────────────────────
+    # ``run_gates`` is first-failure-wins, so an author's failing post gate HID the engine
+    # citations gate behind it: a Proceed here used to complete an output the engine gate never
+    # saw. That gate now runs on the produced output first; on failure it pauses (or, for an
+    # outage, fails) exactly as it would have on its own.
+    _engine_outcome = await _engine_gate_after_proceed(
+        phase, failed_idx, produced_output, run_id=run_id, pool=pool, redis=redis, ctx=ctx,
+        _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+    )
+    if _engine_outcome is not None:
+        return _engine_outcome
     return PhaseOutcome("completed", produced_output, None, None)
+
+
+# ── Phase 295: the durable engine ask ────────────────────────────────────────────────────────
+#
+# D-01 / D-18 / D-37. The two asks the ENGINE owns — the citations gate it appends to a detected
+# KB step (``grounding.effective_phase``) and the armed action-risk approval — no longer block
+# in-process on the 085 ask channel. They pause the run DURABLY, the human-step way:
+# ``pause_run`` → the produced output stashed on the active phase row → the prompt row →
+# ``policy_applied`` → the ``ask_user_prompt`` emit → ``PhaseOutcome("pause_run")``. The shipped
+# pause arm in ``harness_engine.run_workflow`` does the rest, and the answer comes back on a
+# re-drive (``ctx.resume_answered_tool_call_id``) that ``consume_engine_answer`` reads.
+#
+# ⚠ WHY THE ORDER IS LOAD-BEARING (RESEARCH Pattern 4).
+#   * ``pause_run`` FIRST: ``_redrive_paused_workflow_run`` requires ``status='paused'``, so an
+#     answer arriving between the emit and a later status write would be durable with nobody
+#     re-driving it. ``pause_run`` also releases the claim lease (D-50 / Pitfall 1).
+#   * the STASH before the prompt row: the moment a card exists it can be answered, and the
+#     re-drive needs the stash to resolve the answer.
+#   * the prompt row is FAIL-CLOSED (D-50 / Pitfall 4): it is the only way back in, so a paused
+#     run without it is a dead end. An insert failure ends the step with words instead.
+#   * ``timeout_seconds`` is ``None`` on the row AND the emit (D-37): no deadline, no countdown,
+#     so "the answer window has passed" can never be said at second 0 (Pitfall 5).
+#
+# ⚠ NO NEW AUDIT KIND (test_audit_event_registration.py). The pause writes the existing
+# ``policy_applied`` with ``policy: "engine_ask_pause"`` and the finding, beside the arm's own
+# ``human_gate_pause`` row.
+#
+# ⚠ THE WORDS ARE SERVER-BUILT (D-02, UI-SPEC A.2). The card renders them and composes nothing;
+# no prompt, option or reason here may carry a validator code (the never-say list).
+
+ENGINE_CHOICE_SEARCH = "Search another folder"
+ENGINE_CHOICE_CONTINUE = "Continue without sources"
+ENGINE_CHOICE_STOP = "Stop the run"
+ENGINE_ASK_POLICY = "engine_ask_pause"
+
+#: The decline label the armed pair presents (``_ask_user_choices_from_finding``'s second item).
+_ACTION_RISK_DECLINE_CHOICE = "Do not run it"
+
+_HOW_SHOULD_IT_CONTINUE = "How should the run continue?"
+_LOCKED_ADDENDUM = "This step is set to Must prove it, so it can't continue without sources."
+_ONLY_STOP_LEFT = (
+    "No other folder is available to search, and this step is set to Must prove it, so the "
+    "run stopped."
+)
+_CANNOT_ASK = "The run could not keep this question for you, so it stopped here."
+
+#: A bound on how many folders one pause offers (each candidate is checked by the shipped
+#: acceptance rule, which reads the folder tree).
+_FOLDER_OPTION_CAP = 50
+
+
+def classify_engine_choice(label) -> str | None:
+    """The engine-ask allow-list: an EXACT presented label → its meaning, anything else → None.
+
+    Exact equality, never casefold or prefix (the T-185-04-01 ruling): an answer the engine
+    cannot read as one of its own labels is not that choice.
+    """
+    return {
+        ENGINE_CHOICE_SEARCH: "search",
+        ENGINE_CHOICE_CONTINUE: "continue",
+        ENGINE_CHOICE_STOP: "stop",
+        _ACTION_RISK_APPROVE_CHOICE: "approve",
+        _ACTION_RISK_DECLINE_CHOICE: "decline",
+    }.get(label)
+
+
+def is_locked(phase) -> bool:
+    """D-36: the author's stored ``grounding_escalated`` bit, read DIRECTLY.
+
+    Never through ``grounding_cause``: on a KB step that always reads ``detected`` (detection
+    wins), so it cannot say whether the author asked this step to prove itself.
+    """
+    return bool(getattr(phase, "grounding_escalated", False))
+
+
+def finding_from_output(output) -> str:
+    """The citations finding from the keys the validator reads (RESEARCH Pattern 3).
+
+    ``retrieval_error`` → ``"outage"``; no ``citations`` → ``"no_sources"``; else
+    ``"no_markers"``. The validator's messages are never sniffed.
+    """
+    out = output if isinstance(output, dict) else {}
+    if out.get("retrieval_error"):
+        return "outage"
+    if not out.get("citations"):
+        return "no_sources"
+    return "no_markers"
+
+
+def _finding_sentence(finding: str, *, step_label: str, folder_label: str) -> str:
+    """The first sentence of the prompt (UI-SPEC A.2)."""
+    if finding == "no_sources":
+        return f"Searched {folder_label} and found nothing for “{step_label}”."
+    return f"“{step_label}” answered without citing its sources in {folder_label}."
+
+
+def compose_engine_choices(
+    finding: str, *, step_label: str, folder_label: str, locked: bool, folders: list
+) -> tuple[str, list[str]]:
+    """The server-built prompt and the options, in the fixed order (UI-SPEC A.2).
+
+    ``Search another folder`` only for 0 sources with at least one permitted folder (D-38);
+    ``Continue without sources`` only when the step is not locked (D-36); ``Stop the run``
+    always. An absent option is removed, never blanked.
+    """
+    parts = [_finding_sentence(finding, step_label=step_label, folder_label=folder_label)]
+    if locked:
+        parts.append(_LOCKED_ADDENDUM)
+    parts.append(_HOW_SHOULD_IT_CONTINUE)
+    options: list[str] = []
+    if finding == "no_sources" and folders:
+        options.append(ENGINE_CHOICE_SEARCH)
+    if not locked:
+        options.append(ENGINE_CHOICE_CONTINUE)
+    options.append(ENGINE_CHOICE_STOP)
+    return " ".join(parts), options
+
+
+def _golden_reason(finding: str, *, step_label: str, folder_label: str) -> str:
+    """D-07: a trial run never pauses and never auto-continues; it stops with the finding."""
+    if finding == "no_sources":
+        return (
+            f"Searched {folder_label} and found nothing for “{step_label}” during the trial "
+            "run, so it was stopped. Add documents to that folder, or point the step at a "
+            "folder that has them."
+        )
+    return (
+        f"“{step_label}” answered without citing its sources in {folder_label} during the "
+        "trial run, so it was stopped."
+    )
+
+
+def _step_label(phase) -> str:
+    """``{step}``: the step's human title, else its slug (UI-SPEC A.2)."""
+    from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
+
+    return _clean_label(getattr(phase, "name", None)) or str(getattr(phase, "slug", "") or "")
+
+
+def _folder_depth(folder_id: str, by_id: dict) -> int:
+    """Depth from the parent chain over the visible folders (cycle-guarded)."""
+    depth, seen, cur = 0, {folder_id}, by_id.get(folder_id)
+    while cur is not None:
+        parent = cur.get("parent_id")
+        parent = str(parent) if parent is not None else None
+        if parent is None or parent in seen or parent not in by_id:
+            break
+        seen.add(parent)
+        depth += 1
+        cur = by_id.get(parent)
+    return depth
+
+
+async def permitted_folder_options(
+    definition, *, phase, searched_ids, supabase, user_id
+) -> list[dict]:
+    """The folders "Search another folder" may offer — D-03 / D-39, never a second rule.
+
+    A candidate ``F`` is offered iff:
+      * ``scope.resolve_run_scope_root(definition, run_inputs={"folder_id": F}, ...)`` returns
+        ``F`` — the SAME acceptance rule a per-run override already obeys (the owner gate, and
+        for a scoped definition the author-subtree containment + per-phase intersection);
+      * it is not already searched, and its effective search for THIS step (its subtree,
+        narrowed by the step's own ``folder_scope``) is not a subset of what was searched;
+      * it has a name (a nameless row is dropped, never rendered blank).
+
+    An unbound definition (``project_folder_id`` None) searches the whole knowledge base, so
+    another folder cannot widen anything and none is offered. Returns ``[{id, name, depth}]``.
+    """
+    if definition is None or getattr(definition, "project_folder_id", None) is None:
+        return []
+    if supabase is None or not user_id:
+        return []
+    from app.services.harness import scope as _scope  # noqa: PLC0415
+    from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
+    from app.utils.folder_utils import fetch_visible_folders  # noqa: PLC0415
+
+    visible = await fetch_visible_folders(supabase, str(user_id))
+    by_id = {str(f.get("id")): f for f in visible if f.get("id") is not None}
+    searched = {str(x) for x in (searched_ids or [])}
+    step_scope = {str(x) for x in (getattr(getattr(phase, "config", None), "folder_scope", None) or [])}
+
+    out: list[dict] = []
+    for fid, row in by_id.items():
+        if len(out) >= _FOLDER_OPTION_CAP:
+            break
+        name = _clean_label(row.get("name"))
+        if not name or fid in searched:
+            continue
+        accepted = await _scope.resolve_run_scope_root(
+            definition, run_inputs={"folder_id": fid}, thread_folder_id=None,
+            supabase=supabase, user_id=str(user_id),
+        )
+        if accepted is None or str(accepted) != fid:
+            continue
+        subtree = await _scope.resolve_project_subtree(
+            fid, supabase=supabase, user_id=str(user_id)
+        ) or [fid]
+        effective = {str(x) for x in subtree}
+        if step_scope:
+            effective &= step_scope
+        if not effective or effective <= searched:
+            continue
+        out.append({"id": fid, "name": name, "depth": _folder_depth(fid, by_id)})
+    return out
+
+
+def _searched_ids(ctx, phase) -> list[str] | None:
+    """What this step searched: the run's resolved subtree, narrowed by the step's scope."""
+    proj = getattr(ctx, "folder_subtree_ids", None)
+    step_scope = getattr(getattr(phase, "config", None), "folder_scope", None)
+    if proj is None:
+        return None
+    if step_scope:
+        keep = {str(x) for x in step_scope}
+        return [str(f) for f in proj if str(f) in keep]
+    return [str(f) for f in proj]
+
+
+def _searched_label(ctx, phase, default: str) -> str:
+    """The folder words: a folder chosen on an earlier answer, else the bound folder's name."""
+    labels = getattr(ctx, "phase_scope_label", None) or {}
+    return labels.get(getattr(phase, "slug", None)) or default
+
+
+async def engine_pause(
+    phase,
+    *,
+    kind: str,
+    error_message: str,
+    produced_output: dict | None,
+    failed_idx: int | None,
+    run_id: UUID,
+    pool,
+    redis,
+    ctx,
+    _audit_user_id: UUID | None,
+    stream_run_id: UUID | None = None,
+) -> PhaseOutcome:
+    """Pause the run durably on an engine-owned ask (RESEARCH Pattern 4). See the banner above.
+
+    ``kind`` is ``"no_sources"`` / ``"no_markers"`` (the citations gate) or ``"action_risk"``
+    (the armed approval, whose prompt is the sentence after ``_ACTION_RISK_FINDING_PREFIX``).
+    """
+    from uuid import uuid4
+
+    step_label = _step_label(phase)
+    slug = getattr(phase, "slug", None)
+    definition = getattr(ctx, "definition", None)
+    draft = None
+    if kind == "action_risk":
+        prompt = (error_message or "").split("|", 1)[-1]
+        options = _ask_user_choices_from_finding(error_message)
+        locked, continue_allowed, folders = False, False, []
+        stop_reason = None
+    else:
+        folder_label = _searched_label(ctx, phase, await resolve_kb_label(pool, definition))
+        if getattr(ctx, "is_golden_run", False):
+            return PhaseOutcome("fail_run", None, None, _golden_reason(
+                kind, step_label=step_label, folder_label=folder_label,
+            ))
+        locked = is_locked(phase)
+        folders = []
+        if kind == "no_sources":
+            folders = await permitted_folder_options(
+                definition, phase=phase, searched_ids=_searched_ids(ctx, phase),
+                supabase=getattr(ctx, "supabase", None),
+                user_id=(getattr(ctx, "current_user", None) or {}).get("id"),
+            )
+        prompt, options = compose_engine_choices(
+            kind, step_label=step_label, folder_label=folder_label, locked=locked,
+            folders=folders,
+        )
+        finding_words = _finding_sentence(kind, step_label=step_label, folder_label=folder_label)
+        if options == [ENGINE_CHOICE_STOP]:
+            # UI-SPEC "decided 1": a question with one answer is a dead end with a click.
+            return PhaseOutcome("fail_run", None, None, f"{finding_words} {_ONLY_STOP_LEFT}")
+        continue_allowed = ENGINE_CHOICE_CONTINUE in options
+        if kind == "no_sources":
+            stop_reason = finding_words
+        else:
+            stop_reason = f"“{step_label}” answered without citing its sources."
+        if isinstance(produced_output, dict) and isinstance(produced_output.get("text"), str):
+            draft = produced_output.get("text") or None
+
+    supabase = getattr(ctx, "supabase", None)
+    thread_id = getattr(ctx, "thread_id", None)
+    cannot_ask = PhaseOutcome("fail_run", None, None, f"“{step_label}” needed your answer. {_CANNOT_ASK}")
+    if redis is None or run_id is None or pool is None or supabase is None or not thread_id:
+        return cannot_ask
+    active = await get_active_phase(pool, run_id)
+    if not active or active.get("slug") != slug:
+        return cannot_ask
+
+    tool_call_id = uuid4().hex
+    engine_payload = {
+        "kind": kind,
+        "phase": slug,
+        "continue_allowed": continue_allowed,
+        "locked": locked,
+        "folders": folders,
+    }
+    awaiting = {
+        "tool_call_id": tool_call_id,
+        "kind": kind,
+        "phase": slug,
+        "options": options,
+        "continue_allowed": continue_allowed,
+        "locked": locked,
+        "folder_option_ids": [f["id"] for f in folders],
+        "folder_names": {f["id"]: f["name"] for f in folders},
+        "produced_output": produced_output if kind != "action_risk" else None,
+        "finding": error_message,
+        "failed_idx": failed_idx,
+        "stop_reason": stop_reason,
+    }
+
+    # 1. WRITE the pause first (and release the lease) — see the banner.
+    await pause_run(pool, run_id)
+    # 2. The stash the re-drive resolves the answer against (D-40).
+    try:
+        await stash_awaiting_answer(pool, active["id"], awaiting)
+    except Exception:  # noqa: BLE001 — fail closed: a pause nobody can consume is a dead end
+        logger.exception("engine ask: stash failed run=%s phase=%s", run_id, slug)
+        return cannot_ask
+    # 3. The durable prompt row — FAIL-CLOSED (D-50).
+    tool_call = {
+        "kind": "ask_user_prompt",
+        "tool_call_id": tool_call_id,
+        "prompt": prompt,
+        "options": options,
+        "timeout_seconds": None,
+        "run_id": str(run_id),
+        "engine_pause": engine_payload,
+    }
+    if draft:
+        tool_call["draft"] = draft
+    current_user = getattr(ctx, "current_user", None) or {}
+    try:
+        from app.utils.db import aexec  # noqa: PLC0415
+
+        await aexec(
+            supabase.table("messages").insert(
+                {
+                    "thread_id": thread_id,
+                    "user_id": current_user.get("id"),
+                    "role": "system",
+                    "content": prompt,
+                    # CTX-01 (T-120-04): an engine ask is a workflow row.
+                    "origin": "harness",
+                    "tool_calls": [tool_call],
+                }
+            )
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("engine ask: prompt row insert failed run=%s tcid=%s", run_id, tool_call_id)
+        return cannot_ask
+    # 4. The ledger: the existing kind, the policy named (no new audit kind).
+    try:
+        await write_audit(
+            pool, run_id, user_id=_audit_user_id,
+            event_type="policy_applied",
+            metadata={"policy": ENGINE_ASK_POLICY, "phase": slug, "finding": kind},
+        )
+    except Exception:  # noqa: BLE001 — the pause is already durable
+        logger.warning("engine ask: policy_applied write failed run=%s", run_id)
+    # 5. The live card (best-effort: /pending replays the row on any reconnect).
+    _stream_id = getattr(ctx, "producer_run_id", None) or stream_run_id or run_id
+    emit = getattr(ctx, "emit", None) or _emit
+    try:
+        await emit(
+            redis, _stream_id, "ask_user_prompt",
+            tool_call_id=tool_call_id,
+            prompt=prompt,
+            options=options,
+            timeout_seconds=None,
+            engine_pause=engine_payload,
+            draft=draft,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("engine ask: ask_user_prompt emit failed run=%s", run_id)
+    # 6. The shipped pause arm does the rest.
+    return PhaseOutcome("pause_run", None, None, f"Waiting for your answer on “{step_label}”.")
+
+
+# ── Phase 295: consuming the answer on the re-drive (RESEARCH Pattern 5) ─────────────────────
+#
+# The single-use key is ``ctx.resume_answered_tool_call_id``, set ONLY by the answer route's
+# re-drive (``api/runs.py``) and by the boot sweep for an answered engine ask. It is consumed
+# here ONLY when the active phase row's ``_awaiting_answer.tool_call_id`` equals it; otherwise
+# it is left untouched for the human-step executor (``human_input.py``), which reads the same
+# flag. Answers resolve through an EXACT-label allow-list over the options the prompt row
+# stored — never ``_is_abort_choice``'s deny-list — so an answer the engine cannot read as one
+# of its own labels never proceeds.
+
+_UNOFFERED_CHOICE = "That choice is not one this question offers."
+_UNOFFERED_FOLDER = "That folder is not one this question offers."
+
+
+def resolve_engine_label(options, response_text, choice_index) -> str | None:
+    """The presented label an answer names, or None. A click sends the label AND its index;
+    a forged pair (label ≠ options[index]) is unmatched, and so is any text not offered."""
+    opts = [str(o) for o in (options or [])]
+    text = (response_text or "").strip()
+    if choice_index is not None:
+        try:
+            ci = int(choice_index)
+        except (TypeError, ValueError):
+            return None
+        if not 0 <= ci < len(opts):
+            return None
+        return opts[ci] if (not text or text == opts[ci]) else None
+    return text if text in opts else None
+
+
+def engine_answer_refusal(prompt_tool_call, *, response_text, choice_index, folder_id) -> str | None:
+    """The answer route's allow-list (T-295-03-01 / -02): plain words to refuse with, or None.
+
+    A prompt without ``engine_pause`` is not an engine ask and is never refused here.
+    """
+    pause = (prompt_tool_call or {}).get("engine_pause")
+    if not isinstance(pause, dict):
+        return None
+    label = resolve_engine_label(prompt_tool_call.get("options"), response_text, choice_index)
+    wants_continue = label == ENGINE_CHOICE_CONTINUE or (
+        (response_text or "").strip() == ENGINE_CHOICE_CONTINUE
+    )
+    if pause.get("locked") and wants_continue:
+        return _LOCKED_ADDENDUM
+    if label is None:
+        return _UNOFFERED_CHOICE
+    offered = {str(f.get("id")) for f in (pause.get("folders") or []) if isinstance(f, dict)}
+    if label == ENGINE_CHOICE_SEARCH:
+        return None if folder_id is not None and str(folder_id) in offered else _UNOFFERED_FOLDER
+    return None if folder_id is None else _UNOFFERED_FOLDER
+
+
+def _locked_now(ctx, phase) -> bool:
+    """D-05: re-check the lock against the RUN's definition at consume time."""
+    definition = getattr(ctx, "definition", None)
+    for spec in getattr(definition, "phases", None) or []:
+        if getattr(spec, "slug", None) == getattr(phase, "slug", None):
+            return is_locked(spec)
+    return is_locked(phase)
+
+
+async def _person_words(pool, ctx) -> str:
+    """Who answered, for a STORED reason: the shared name chain, called without the email
+    (a reason is read by colleagues too) — display name, else "the person who started this
+    run". Lazy import of the one chain (``api/workflow_runs.waiting_who``)."""
+    from app.api.workflow_runs import waiting_who  # noqa: PLC0415
+
+    user_id = (getattr(ctx, "current_user", None) or {}).get("id")
+    display = None
+    if pool is not None and user_id:
+        try:
+            display = await pool.fetchval(
+                "SELECT display_name FROM profiles WHERE id = $1",
+                user_id if isinstance(user_id, UUID) else UUID(str(user_id)),
+            )
+        except Exception:  # noqa: BLE001 — a name is words, never a reason to fail
+            display = None
+    return waiting_who(is_owner=False, display_name=display, viewer_email=None)
+
+
+async def _write_receipt(pool, run_id, _audit_user_id, metadata: dict) -> None:
+    try:
+        await write_audit(
+            pool, run_id, user_id=_audit_user_id,
+            event_type="validator_ask_user_approved",
+            metadata=metadata,
+        )
+    except Exception:  # noqa: BLE001 — a receipt write must never strand the answered run
+        logger.warning("engine ask: validator_ask_user_approved receipt write failed run=%s", run_id)
+
+
+def _grant_engine_approval(ctx, slug, tool_call_id) -> None:
+    approvals = dict(getattr(ctx, "engine_ask_approved", None) or {})
+    approvals[slug] = str(tool_call_id)
+    try:
+        ctx.engine_ask_approved = approvals
+    except Exception:  # noqa: BLE001
+        logger.debug("engine ask: could not record the consumed approval", exc_info=True)
+
+
+def _take_engine_approval(ctx, phase) -> bool:
+    """Single-use: an approval consumed on THIS re-drive lets the armed checkpoint run the
+    body ONCE without asking again (no second prompt row)."""
+    approvals = dict(getattr(ctx, "engine_ask_approved", None) or {})
+    slug = getattr(phase, "slug", None)
+    if slug not in approvals:
+        return False
+    approvals.pop(slug, None)
+    try:
+        ctx.engine_ask_approved = approvals
+    except Exception:  # noqa: BLE001
+        pass
+    return True
+
+
+def _set_scope_override(ctx, slug, subtree: list, name: str) -> None:
+    overrides = dict(getattr(ctx, "phase_scope_override", None) or {})
+    labels = dict(getattr(ctx, "phase_scope_label", None) or {})
+    overrides[slug] = list(subtree)
+    labels[slug] = name
+    ctx.phase_scope_override = overrides
+    ctx.phase_scope_label = labels
+
+
+async def consume_engine_answer(
+    phase,
+    ctx,
+    *,
+    run_id: UUID,
+    pool,
+    redis,
+    _audit_user_id: UUID | None,
+    stream_run_id: UUID | None = None,
+) -> PhaseOutcome | None:
+    """Resolve an answered engine ask at the top of ``_run_phase_with_gates`` (re-drive only).
+
+    Returns ``None`` when there is nothing to consume (no flag, or the flag is another
+    question's — left untouched), and also when the step must RUN: a folder answer (the body
+    re-runs once over that folder) or an armed approval (the checkpoint then runs the body once
+    without asking). Otherwise a terminal-or-waiting outcome:
+
+      * Continue without sources (offered, and still unlocked) → ``completed`` with the stashed
+        output UNCHANGED plus ONE field ``unsourced = {continued_by, at}`` (D-04);
+      * Stop the run → ``fail_run`` naming the finding and the person (D-02);
+      * the armed decline (or an answer that is not the approval) → ``fail_run`` naming the
+        person and the step, without the armed prompt sentence (D-42);
+      * no durable answer, or an answer the allow-list cannot match → ``pause_run``: the run
+        stays paused and nothing proceeds.
+    """
+    tcid = getattr(ctx, "resume_answered_tool_call_id", None)
+    if not tcid or pool is None or run_id is None:
+        return None
+    active = await get_active_phase(pool, run_id) or {}
+    output = active.get("output")
+    if isinstance(output, str):
+        try:
+            output = json.loads(output)
+        except ValueError:
+            output = None
+    awaiting = output.get("_awaiting_answer") if isinstance(output, dict) else None
+    slug = getattr(phase, "slug", None)
+    if (
+        not isinstance(awaiting, dict)
+        or str(awaiting.get("tool_call_id")) != str(tcid)
+        or active.get("slug") != slug
+    ):
+        return None  # not this step's engine ask: the human executor keeps the flag
+    try:
+        ctx.resume_answered_tool_call_id = None
+    except Exception:  # noqa: BLE001 — a frozen ctx must not sink the phase
+        logger.debug("engine ask: could not clear the resume flag", exc_info=True)
+
+    step_label = _step_label(phase)
+    waiting = PhaseOutcome("pause_run", None, None, f"Waiting for your answer on “{step_label}”.")
+    answer = await get_ask_user_response(pool, run_id, str(tcid))
+    if answer is None:
+        return waiting
+    label = resolve_engine_label(
+        awaiting.get("options"), answer.get("response_text"), answer.get("choice_index"),
+    )
+    meaning = classify_engine_choice(label)
+    kind = awaiting.get("kind")
+
+    if kind == "action_risk":
+        if meaning == "approve":
+            _grant_engine_approval(ctx, slug, tcid)
+            return None
+        if meaning == "decline":
+            person = await _person_words(pool, ctx)
+            return PhaseOutcome(
+                "fail_run", None, None,
+                f"{person} chose not to run “{step_label}”, so the run stopped.",
+            )
+        return PhaseOutcome(
+            "fail_run", None, None,
+            f"“{step_label}” was not run: the answer did not match the approval option, so "
+            "the run stopped.",
+        )
+
+    receipt = {
+        "phase": slug,
+        "validator": awaiting.get("failed_idx"),
+        "choice": label,
+        "finding": kind,
+    }
+    if meaning == "stop":
+        person = await _person_words(pool, ctx)
+        lead = awaiting.get("stop_reason") or f"“{step_label}” found nothing to cite."
+        return PhaseOutcome("fail_run", None, None, f"{lead} Stopped by {person}.")
+    if meaning == "continue" and awaiting.get("continue_allowed"):
+        if _locked_now(ctx, phase):
+            logger.info("engine ask: continue refused at consume, %s is locked now", slug)
+            return PhaseOutcome(
+                "fail_run", None, None,
+                f"“{step_label}” is set to Must prove it, so it can't continue without "
+                "sources. The run stopped.",
+            )
+        from datetime import datetime, timezone  # noqa: PLC0415
+
+        user_id = (getattr(ctx, "current_user", None) or {}).get("id") or _audit_user_id
+        produced = dict(awaiting.get("produced_output") or {})
+        produced["unsourced"] = {
+            "continued_by": str(user_id),
+            "at": datetime.now(timezone.utc).isoformat(),
+        }
+        await _write_receipt(pool, run_id, _audit_user_id, {**receipt, "unsourced": True})
+        return PhaseOutcome("completed", produced, None, None)
+    if meaning == "search":
+        folder_id = answer.get("folder_id")
+        offered = [str(f) for f in (awaiting.get("folder_option_ids") or [])]
+        if folder_id is not None and str(folder_id) in offered:
+            from app.services.harness import scope as _scope  # noqa: PLC0415
+
+            user_id = (getattr(ctx, "current_user", None) or {}).get("id") or _audit_user_id
+            subtree = await _scope.resolve_project_subtree(
+                str(folder_id), supabase=getattr(ctx, "supabase", None), user_id=str(user_id),
+            ) or [str(folder_id)]
+            name = (awaiting.get("folder_names") or {}).get(str(folder_id)) or "the chosen folder"
+            _set_scope_override(ctx, slug, [str(x) for x in subtree], name)
+            await _write_receipt(pool, run_id, _audit_user_id, {**receipt, "folder_id": str(folder_id)})
+            return None
+    logger.warning(
+        "engine ask: an answer the allow-list cannot match on %s (run %s) — left paused",
+        slug, run_id,
+    )
+    return waiting
+
+
+async def _engine_gate_after_proceed(
+    phase,
+    failed_idx: int | None,
+    produced_output,
+    *,
+    run_id: UUID,
+    pool,
+    redis,
+    ctx,
+    _audit_user_id: UUID | None,
+    stream_run_id: UUID | None = None,
+) -> PhaseOutcome | None:
+    """D-48: after an author's post ``ask_user`` Proceed, evaluate the ENGINE citations gate
+    (the single spec ``effective_phase`` appended) on the produced output.
+
+    ``None`` = no engine gate on this step, the gate was the one that failed (it is never asked
+    twice), or it passes. Otherwise the gate's own disposition: an outage fails with the shipped
+    route (D-06); 0 sources / 0 markers pause durably through ``engine_pause``.
+    """
+    from app.services.harness.grounding import is_engine_citation_gate  # noqa: PLC0415
+    from app.services.harness.validators import VALIDATOR_REGISTRY  # noqa: PLC0415
+
+    validators = list(getattr(phase, "validators", None) or [])
+    gate_idx = len(validators) - 1
+    if gate_idx < 0 or gate_idx == failed_idx or not is_engine_citation_gate(phase, gate_idx):
+        return None
+    validator = VALIDATOR_REGISTRY.get(validators[gate_idx].kind)
+    output = produced_output if isinstance(produced_output, dict) else {}
+    result = await validator(output, validators[gate_idx].config, ctx)
+    if result.passed:
+        return None
+    finding = finding_from_output(output)
+    if finding == "outage":
+        return _route_on_failure(phase, result.error_message, 0, gate_idx)
+    return await engine_pause(
+        phase, kind=finding, error_message=result.error_message, produced_output=output,
+        failed_idx=gate_idx, run_id=run_id, pool=pool, redis=redis, ctx=ctx,
+        _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+    )

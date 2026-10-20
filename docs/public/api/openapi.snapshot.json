@@ -16089,6 +16089,17 @@
        }
       ],
       "title": "Choice Index"
+     },
+     "folder_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Folder Id"
      }
     },
     "type": "object",

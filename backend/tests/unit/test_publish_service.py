@@ -1370,30 +1370,36 @@ def _drive_armed_phase(*, is_golden_run: bool):
     # production seam rather than beside it.
     eff = effective_phase(raw, total_phases=_ARMED_TOTAL_PHASES)
 
-    ctx = SimpleNamespace(
-        supabase=None,
-        thread_id=None,
-        current_user={"id": uuid4()},
-        producer_run_id=uuid4(),
-        emit=AsyncMock(),
-        retry_feedback=None,
-        is_golden_run=is_golden_run,  # ← D-19's threading target
-    )
+    # Phase 295 (D-18, plan 295-03): a LIVE armed ask no longer waits in-process — it pauses
+    # DURABLY over a prompt row. The drive runs over the in-memory durable world, and the two
+    # recorded facts keep their meaning at their new home: ``timeouts`` is the deadline of
+    # every place the person was asked (an in-process subscribe OR a durable prompt row), and
+    # ``wedged`` is "the drive reached the ask" (subscribed, or paused on a durable prompt).
+    from contextlib import ExitStack
+
+    from tests.unit.engine_ask_fakes import FakePool, World
+
+    world = World(_ARMED_SLUG)
+    ctx = world.ctx(emit=AsyncMock(), is_golden_run=is_golden_run)  # ← D-19's threading target
 
     wedged = False
-    with (
-        patch.object(harness_engine, "_execute_phase", _body_spy),
-        patch.object(harness_engine, "write_audit", _audit_spy),
-        patch.object(engine_ask, "write_audit", _audit_spy),
-        patch.object(harness_engine, "_emit", _emit_spy),
-        patch.object(engine_ask, "_emit", _emit_spy),
-        patch("app.services.ask_user_service.subscribe_for_response", recorder),
-    ):
+    outcome = None
+    with ExitStack() as stack:
+        world.enter(stack, emit=False, audit=False, subscribe=False)
+        for p in (
+            patch.object(harness_engine, "_execute_phase", _body_spy),
+            patch.object(harness_engine, "write_audit", _audit_spy),
+            patch.object(engine_ask, "write_audit", _audit_spy),
+            patch.object(harness_engine, "_emit", _emit_spy),
+            patch.object(engine_ask, "_emit", _emit_spy),
+            patch("app.services.ask_user_service.subscribe_for_response", recorder),
+        ):
+            stack.enter_context(p)
         try:
-            asyncio.run(
+            outcome = asyncio.run(
                 harness_engine._run_phase_with_gates(
                     eff, {}, ctx,
-                    run_id=uuid4(), pool=object(), redis=object(),
+                    run_id=uuid4(), pool=FakePool(), redis=object(),
                     wall_clock=30, _audit_user_id=uuid4(),
                     total_phases=_ARMED_TOTAL_PHASES,
                 )
@@ -1401,8 +1407,11 @@ def _drive_armed_phase(*, is_golden_run: bool):
         except _AskChannelSubscribed:
             wedged = True
 
+    durable = [tc.get("timeout_seconds") for tc in world.prompt_tool_calls()]
+    if outcome is not None and outcome.kind == "pause_run" and durable:
+        wedged = True
     return SimpleNamespace(
-        timeouts=recorder.timeouts, body_invoked=body.invoked, wedged=wedged,
+        timeouts=recorder.timeouts + durable, body_invoked=body.invoked, wedged=wedged,
         audit_events=audit_events, emits=emits,
     )
 
@@ -2291,7 +2300,18 @@ def test_live_mcp_run_still_stops_at_approval_checkpoint(mock_asyncpg_pool):
         [{"id": uuid4(), "slug": _MCP_V20_SLUG, "phase_index": 0, "status": "pending", "output": {}}]
     )
 
-    with patch("app.services.ask_user_service.subscribe_for_response", recorder):
+    # Phase 295 (D-18): a live armed ask pauses DURABLY instead of subscribing, so the drive
+    # runs over the in-memory durable world and "the run stopped at the checkpoint" is read off
+    # both homes of an ask — an in-process subscribe OR a durable prompt row (same recorder).
+    from contextlib import ExitStack
+
+    from tests.unit.engine_ask_fakes import FakeSupabase, World
+
+    world = World(_MCP_V20_SLUG)
+    ctx.supabase = FakeSupabase()
+    with ExitStack() as stack:
+        world.enter(stack, emit=False, audit=False, subscribe=False)
+        stack.enter_context(patch("app.services.ask_user_service.subscribe_for_response", recorder))
         try:
             asyncio.run(
                 harness_engine.run_workflow(
@@ -2300,6 +2320,7 @@ def test_live_mcp_run_still_stops_at_approval_checkpoint(mock_asyncpg_pool):
             )
         except Exception:
             pass  # The recorder raises TimeoutError intentionally
+    recorder.timeouts.extend(tc.get("timeout_seconds") for tc in world.prompt_tool_calls())
 
     assert len(recorder.timeouts) == 1, (
         f"Live MCP run did not subscribe to the ask channel for approval! timeouts={recorder.timeouts!r}"

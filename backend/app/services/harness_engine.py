@@ -58,12 +58,14 @@ from app.db.workflows import (
     find_resumable_runs,
     finish_run,
     get_active_phase,
+    get_ask_user_response,
     get_latest_completed_workflow_run,
     get_pending_ask_user,
     load_run_phases,
     mark_phase_active,
     pause_run,
     record_phase_not_sent,
+    resume_run,
     skip_phase,
     write_audit,
 )
@@ -665,6 +667,17 @@ async def _run_phase_with_gates(
     # clean). Default to the workflow run_id when called without the kwarg
     # (back-compat for direct unit callers).
     stream_run_id = stream_run_id or run_id
+
+    # Phase 295 (D-01 / D-18): a re-drive of an answered ENGINE ask resolves it here, before
+    # anything runs. ``None`` = nothing to consume, or the step must run (a folder re-run, a
+    # consumed approval); any other outcome is returned as is. The disposition lives in
+    # ``engine_ask.consume_engine_answer``; this is its one call site.
+    _answered = await consume_engine_answer(
+        phase, ctx, run_id=run_id, pool=pool, redis=redis,
+        _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+    )
+    if _answered is not None:
+        return _answered
 
     # Lazy import (breaks the harness-package import cycle — see module note).
     from app.services.harness.validators import run_gates
@@ -2668,6 +2681,18 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
 
         # 2. ask_user resume branch: answered → proceed; pending → re-emit + block.
         active = await get_active_phase(pool, run_id)
+        # 2a. Phase 295 (D-50 / RESEARCH Pitfall 2) — a PAUSED ENGINE ASK. Its question and the
+        #     produced output live durably on the active row (``_awaiting_answer``), so a
+        #     restart must never re-run the step or ask again. Unanswered → leave it paused
+        #     (``pause_run`` also releases the claim just taken, so an answer re-drives at
+        #     once); answered → re-drive with the answered id, which ``consume_engine_answer``
+        #     resolves. The human branch below is untouched.
+        _engine_ask = ((active or {}).get("output") or {}) if isinstance(
+            (active or {}).get("output"), dict) else {}
+        _engine_tcid = (_engine_ask.get("_awaiting_answer") or {}).get("tool_call_id")
+        if _engine_tcid and await get_ask_user_response(pool, run_id, str(_engine_tcid)) is None:
+            await pause_run(pool, run_id)
+            continue
         if active is not None and _is_llm_human_input(active):
             tool_call_id = _active_tool_call_id(active)
             if tool_call_id is not None:
@@ -2739,6 +2764,9 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
             # way the run does not advance without an answer.
 
         ctx = await _build_resume_context(run, redis, pool)
+        if _engine_tcid:  # 2a, answered: consume on the re-drive; the run stops reading paused
+            ctx.resume_answered_tool_call_id = str(_engine_tcid)
+            await resume_run(pool, run_id)
         # Facet C (092-07): MANDATORY resume finalizer — terminalize the
         # producer-shell minted in _build_resume_context on EVERY exit path
         # (success/exception/cancel), mirroring the F2 terminalize at
@@ -2894,4 +2922,5 @@ from app.services.harness.engine_ask import (  # noqa: E402,F401
     _parse_on_failure,
     _resolve_failure_with_ask_user,
     _route_on_failure,
+    consume_engine_answer,  # Phase 295 (295-03): the ONE call at the top of _run_phase_with_gates
 )

@@ -2261,10 +2261,36 @@ async def pause_run(pool: asyncpg.Pool, workflow_run_id: UUID) -> None:
     CALLER (the engine reached this run through an owner-scoped kickoff or an
     owner-scoped, anchor-confirmed answer), the same division ``cancel_active_phases``
     keeps.
+
+    ⚠ PHASE 295 (D-50 / RESEARCH Pitfall 1): THE SAME UPDATE RELEASES THE CLAIM LEASE
+    (``claimed_at = NULL``). ``claim_run`` matches only an unset or expired lease, and nothing
+    else ever cleared it, so a SECOND pause answered within ``harness_resume_lease_seconds`` of a
+    re-drive failed its claim and nothing re-drove the durable answer until the next boot. A
+    paused run has no producer, so it holds no lease.
     """
     await pool.execute(
-        "UPDATE workflow_runs SET status = 'paused' WHERE id = $1 AND status NOT IN ('completed', 'failed', 'cancelled')",
+        "UPDATE workflow_runs SET status = 'paused', claimed_at = NULL WHERE id = $1 AND status NOT IN ('completed', 'failed', 'cancelled')",
         workflow_run_id,
+    )
+
+
+async def stash_awaiting_answer(pool: asyncpg.Pool, phase_id: UUID, awaiting: dict) -> None:
+    """Stash an engine ask's re-drive state on the ACTIVE phase row (Phase 295 / D-40).
+
+    Written under ONE nested key, ``output._awaiting_answer``, and nowhere else: the top-level
+    keys of the active row's output are left as they are, so no reader of ``output["text"]``
+    sees the produced-but-unaccepted output, and ``_is_llm_human_input`` (which keys on a
+    top-level ``tool_call_id``) stays False. A non-object output is replaced by ``{}`` first,
+    because ``jsonb_set`` cannot set a path inside a scalar.
+
+    ``WHERE id = $1 AND status = 'active'``: a step that already ended (a Stop on another
+    worker) is never written. PHASE-KEYED write. Pass the plain dict, never ``json.dumps`` (the
+    ``record_phase_not_sent`` / 200.1 binding).
+    """
+    await pool.execute(
+        "UPDATE workflow_phases SET output = jsonb_set(CASE WHEN jsonb_typeof(output) = 'object' THEN output ELSE '{}'::jsonb END, '{_awaiting_answer}', $2::jsonb), updated_at = now() WHERE id = $1 AND status = 'active'",
+        phase_id,
+        awaiting,
     )
 
 
@@ -2351,6 +2377,9 @@ async def get_ask_user_response(
     return {
         "response_text": payload.get("response_text"),
         "choice_index": payload.get("choice_index"),
+        # Phase 295 (D-03): the folder an engine ask's "Search another folder" answer chose.
+        # Additive — None on every older row.
+        "folder_id": payload.get("folder_id"),
     }
 
 

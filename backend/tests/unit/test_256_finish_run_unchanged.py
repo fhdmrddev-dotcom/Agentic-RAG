@@ -99,7 +99,12 @@ _EXPECTED_CALL_SITES = {
     # ⚠ RE-DERIVED at 289-REVIEW WR-06: (a) the COUNTS stayed identical again; +13 when
     #   `_fail_redrive` gained `from_statuses` / `reason` and the second reason constant.
     #   api/runs.py:605 → 618
-    "api/runs.py:618",
+    # ⚠ RE-DERIVED at Phase 295 Plan 03: (a) the COUNTS stayed identical ("api/runs.py": 1);
+    #   +35 when `AskUserResponseBody.folder_id` and `_engine_answer_refusal` (the engine-ask
+    #   allow-list loader) landed above `_fail_redrive`. Re-derived with
+    #   `grep -n "await finish_run(" backend/app/api/runs.py`.
+    #   api/runs.py:618 → 653
+    "api/runs.py:653",
     # ⚠ RE-DERIVED at Phase 258 Plan 03: +7 line shift in api/workflows.py (import + decorators)
     #   api/workflows.py:1802 → 1809 → 1812 (v4.3 audit: +3 lines, require_capability on authoring writes; the call itself unchanged)
     # ⚠ RE-DERIVED at Phase 286 Plan 01: check (a), the per-file COUNTS, stayed identical
@@ -131,9 +136,15 @@ _EXPECTED_CALL_SITES = {
     #   pointer comment + 1 blank left behind) moved VERBATIM above them into harness/engine_ask.py. The three calls
     #   are byte-unchanged. Re-derived with the grep above.
     #   harness_engine.py:2465 → 1943 · 2506 → 1984 · 2803 → 2281
-    "services/harness_engine.py:1943",
-    "services/harness_engine.py:1984",
-    "services/harness_engine.py:2281",
+    # ⚠ RE-DERIVED at Phase 295 Plan 03: (a) the COUNTS stayed identical; +11 when the ONE
+    #   `consume_engine_answer(...)` call (and its comment) landed at the top of
+    #   `_run_phase_with_gates`, above all three. The calls are byte-unchanged.
+    #   harness_engine.py:1943 → 1954 · 1984 → 1995 · 2281 → 2292
+    #   then +2 in 295-03 Task 3 (`get_ask_user_response` / `resume_run` joined the db import
+    #   block for the sweep's engine-ask arm): 1954 → 1956 · 1995 → 1997 · 2292 → 2294
+    "services/harness_engine.py:1956",
+    "services/harness_engine.py:1997",
+    "services/harness_engine.py:2294",
     # ⚠ RE-DERIVED at Phase 268 Plan 01: +8 line shift in services/run_lifecycle.py —
     #   register_run_start gained `org_id` / `expert_id` kwargs, their forward to insert_run and
     #   a 4-line docstring note, all ABOVE this call. Check (a), the per-file COUNTS, stayed
