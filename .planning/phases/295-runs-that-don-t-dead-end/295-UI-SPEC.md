@@ -414,4 +414,4 @@ New leaves (not hot): `AskFolderChoice.tsx`, `RunEndReasonLine.tsx`, the pause h
 - [x] Dimension 5 Spacing: PASS
 - [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-10-20 (gsd-ui-checker, 6/6 PASS after 1 revision; autonomous run, operator sign-off at G-4)
