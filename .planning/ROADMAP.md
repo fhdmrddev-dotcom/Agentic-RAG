@@ -37,7 +37,7 @@
 ## v4.7 Workflows You Can See and Start Anywhere — 🚧 IN PROGRESS
 
 **Started:** 2026-10-18. **Roadmap created:** 2026-10-18.
-Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 mapped, 0 orphans** (4 START · 3 AUTH · 4 VIS · 1 TRUST · 2 REG · 3 DEC). DEC-01..03 (Phase 294) were added 2026-10-20 by the operator, outside the workflow theme.
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **21 v4.7 requirements, 21 mapped, 0 orphans** (4 START · 3 AUTH · 4 VIS · 1 TRUST · 2 REG · 3 DEC · 4 RUN). DEC-01..03 (Phase 294) were added 2026-10-20 by the operator, outside the workflow theme. RUN-01..04 (Phase 295) were added 2026-10-20 by the operator, from measured run failures.
 
 **Goal:** Workflows become easier to start, finish authoring and understand at a glance, with visuals that show what a run did.
 
@@ -67,6 +67,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 m
 | 292 | More Ways to Show It | The agent can show artifact types beyond chart, table and metric, from a closed registry | VIS-02 | 4 | **G-2 sketch** (choose the set at sketch time) · closed registry only, no new tool · migration only if the message_artifacts constraint needs it · G-4 · UI hint |
 | 293 | Start From Outside, and Close Out | An external system starts a run and reads the result; every run shows how it began; seed statuses match reality | START-02, START-04, REG-06 | 6 | ⛔ **security_enforcement** (opens an external door) · anti-injection + egress · org-scoped, rate-limited, audited · migration likely (next free) · **G-4** · depends on 287 and 289 · UI hint |
 | 294 | Decision Engine: Rerank and Citation Check | Knowledge-base search can rerank and prune its candidates with a fast decision model, and a user can check whether citations are supported; all behind a Settings switch | DEC-01, DEC-02, DEC-03 | 6 | **provider-docs-first** (Jev, OpenAI Decisions) · **G-2 sketch** (settings block, citation check) · **G-4** · measure before/after · migration likely (next free) · keys encrypted · no new tool · G-5 (`retrieval_service.py`, `config.py`, `user_settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`) · UI hint |
+| 295 | Runs That Don't Dead-End | A workflow run never dead-ends: an empty or uncited knowledge-base step pauses and asks the person, misconfigurations are refused before a run, and every run ends in a truthful state with its reason | RUN-01, RUN-02, RUN-03, RUN-04 | 5 | **measured first** (BUG-261020-07..12) · **G-2 sketch** (the found-nothing pause) · **G-4** · governance-sensitive ("must prove it" stays strict) · G-5 (`harness_engine.py`, `phase_types.py`, `validator_kinds.py`, `publish_service.py`, `run_reconciler.py`) · UI hint |
 
 **Dependency order:** 286 → 287 → 288 → 289 → 290 → 291 → 292 → 293. The real constraints are narrower:
 
@@ -77,6 +78,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 m
 - **290 and 292** are independent of each other and of 291; they can swap order.
 - **291 after 288.** Both author through the builder / describe door; `useTemplateFirstDraft.ts` and the builder store settle in 288 first.
 - **294 is independent of 290-293.** It touches retrieval, Settings and the chat message, not workflow files. It can run any time after 289; if it runs before 293, they must not take the same migration number.
+- **295 after 288 and 289.** It reuses 288's pause and 289's run page and confidence. It shares `harness_engine.py` / `phase_types.py` with 291, so the two must not run concurrently. It may run before 290 if the operator wants reliability first.
 
 ### Phase Checklist
 
@@ -89,6 +91,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 m
 - [ ] **Phase 292: More Ways to Show It**: new artifact types from a closed registry, set chosen at sketch time (VIS-02)
 - [ ] **Phase 293: Start From Outside, and Close Out**: authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
 - [ ] **Phase 294: Decision Engine: Rerank and Citation Check**: a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
+- [ ] **Phase 295: Runs That Don't Dead-End**: an empty or uncited KB step pauses and asks instead of failing; misconfigurations refused before a run; the judge stops failing recorded-not-sent actions; every run ends truthfully with a reason (RUN-01..04)
 
 ### Phase Details
 
@@ -308,6 +311,24 @@ Plans:
 **UI hint**: yes
 **Flags**: **Provider-docs-first**: Jev (`/api/alpha/decisions` on OpenRouter; TypeSafe direct; about 30 documents per call, about 32k tokens per call) and OpenAI Decisions (`POST /v1/decisions`, `gpt-6-luna`, 1-200 questions, refusal answers; SDK 2.28.0 may lack `client.decisions`, so raw `httpx` is acceptable). Local: Qwen3-Reranker (takes an instruction) or bge-reranker-v2-m3; check licences. **Extends the existing seam** `rerank_service.py` (Cohere / local today, off by default) instead of adding a second one. The steering instruction is an optional argument on the existing search tool, and the citation check is an API route, so the tool count stays 30. Migration only if settings need new columns (next free after 210; re-run `ls`). **G-2 sketch** for the Settings block and the citation-check view. **G-4**. Hot files: `retrieval_service.py`, `config.py`, `user_settings.py`, `api/settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`; read their ledger sections. Deferred to future requirements: model routing, chunk tagging at ingestion. Intake research and sources: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`; re-verify at discuss.
 
+#### Phase 295: Runs That Don't Dead-End
+
+**Goal**: A workflow run does not dead-end. When a knowledge-base step finds nothing or forgets its citations, the run pauses and asks the person what to do instead of failing. Misconfigurations are refused before a run starts, and every run ends in a state that is true and says why.
+**Depends on**: Phase 288 (the pause), Phase 289 (the run page and confidence).
+**Requirements**: RUN-01, RUN-02, RUN-03, RUN-04
+**Success Criteria** (what must be TRUE):
+
+  1. A KB step that retrieves 0 sources, or answers with 0 citation markers, pauses the run with a worded choice: search another folder, continue without sources (the output is marked unsourced on the step, the run page and the receipt), or stop. It no longer fails the run. A workflow whose author locked grounding ("must prove it") offers no continue-without-sources (RUN-01).
+  2. A report step with no template bound is refused when the workflow is saved or published, and the message names the missing template, never a citation error (RUN-02).
+  3. A workflow whose external action is recorded-not-sent can pass the publish judge. Driven with the 2026-08-26 *DMT Project Status Summary & Email* shape, which was blocked 4 times (RUN-03).
+  4. No run reads `active` once all its phases are terminal; no failed run lacks a recorded reason; a run waiting for an approval reads waiting, not failed. The two stuck runs and the 20 reasonless runs found on 2026-10-20 are reconciled or explained (RUN-04).
+  5. Re-measured with the 2026-10-20 queries over the phase's UAT runs, the share of runs ending in a `citations_required` failure falls, and the before/after is recorded in VERIFICATION, measured rather than asserted (RUN-01).
+
+**How we'd know this failed**: "continue without sources" becomes a silent pass, so an unsourced output looks sourced anywhere; a locked must-prove-it workflow can skip its evidence; the pause has no timeout or loses the person's choice (the BUG-261020-01 family); the template check fires only at publish while drafts still fail at run time; the judge is loosened for every workflow instead of told what a recorded-not-sent step produces; stuck runs are hidden in the UI instead of finalised; the failure share is quoted without the query that produced it.
+**Plans**: TBD (target 3-5)
+**UI hint**: yes
+**Flags**: **Evidence**: `BUG-261020-07`..`12` (folded here) and memory `project_workflow_blocking_measured_20261020`. **Route at discuss**: `BUG-261020-01` (a human step's answer never reaches the next step) belongs to the same "doesn't run as intended" family and is the first candidate to fold. **Not in scope**: branching or loops (`SEED-295` stays parked; the 2026-10-20 measure found no failure caused by a route the engine cannot express). `ValidatorSpec.on_failure` already accepts `ask_user` (D-11), so RUN-01 may be mostly a default and a worded pause; verify before adding engine code. **G-2 sketch** for the found-nothing pause. **G-4**. Hot files: `harness_engine.py`, `phase_types.py`, `validator_kinds.py`, `publish_service.py`, `run_reconciler.py`, `PendingAskCard.tsx`; read their ledger sections.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -321,6 +342,7 @@ Plans:
 | 292. More Ways to Show It | 0/TBD | Not started | - |
 | 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
+| 295. Runs That Don't Dead-End | 0/TBD | Not started | - |
 
 ---
 

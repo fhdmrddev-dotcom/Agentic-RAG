@@ -43,6 +43,13 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 - [ ] **DEC-02**: When on, knowledge-base search reranks its candidates with the chosen engine, accepts an optional steering instruction from the agent, and drops only candidates below a conservative threshold. Any engine failure falls back to the current order.
 - [ ] **DEC-03**: A user can check an answer's citations and see, for each cited sentence, whether its source supports it fully, partly, not at all, or contradicts it, with a confidence.
 
+### Runs (RUN) — added 2026-10-20 by the operator, from measured run failures
+
+- [ ] **RUN-01**: A knowledge-base step that finds nothing, or answers without citations, pauses the run and asks the person (search elsewhere / continue unsourced, visibly marked / stop) instead of failing it; a locked must-prove-it workflow never offers continue-unsourced. — `BUG-261020-07`
+- [ ] **RUN-02**: A report step with no template is refused when the workflow is saved or published, with a message that names the missing template. — `BUG-261020-08`
+- [ ] **RUN-03**: The publish judge does not fail a workflow because a recorded-not-sent action did not send. — `BUG-261020-09`
+- [ ] **RUN-04**: Every run ends in a true state with a reason: none stays active after its phases end, none fails without a recorded reason, and a run waiting for approval reads waiting. — `BUG-261020-10`, `-11`, `-12`
+
 ## Future Requirements (deferred)
 
 - Decision-engine model routing (simple turns to a cheaper model) — after DEC-02 is measured; needs the full provider roster.
@@ -81,8 +88,12 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 | DEC-01 | Phase 294 | Pending |
 | DEC-02 | Phase 294 | Pending |
 | DEC-03 | Phase 294 | Pending |
+| RUN-01 | Phase 295 | Pending |
+| RUN-02 | Phase 295 | Pending |
+| RUN-03 | Phase 295 | Pending |
+| RUN-04 | Phase 295 | Pending |
 
-Mapped: 14/14, no orphans, no duplicates.
+Mapped: 21/21, no orphans, no duplicates.
 
 ---
 *Requirements defined: 2026-10-18*
