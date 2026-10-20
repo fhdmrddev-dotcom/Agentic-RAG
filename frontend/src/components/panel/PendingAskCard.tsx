@@ -56,6 +56,9 @@ import { useStreamsStore } from "@/stores/streamsStore"
 import { useAskDraft, useAskDraftStore, useAskSettled, usePanelHomeMounted } from "@/stores/askDraftStore"
 import { answerAskUser, ApiError } from "@/lib/api"
 import type { PendingAsk } from "@/types"
+// Phase 295-06 (D-32) — the found-nothing pause: ONE pure reading of `ask.engine_pause`, ONE leaf.
+import { answeredHeader, answeredReceipt, needsFolder, readEnginePause } from "./enginePause"
+import { AskFolderChoice } from "./AskFolderChoice"
 import {
   Dialog,
   DialogContent,
@@ -325,9 +328,15 @@ export function PendingAskCard({
   // It used to be two `useState`s here, so the chat card and the panel card for ONE pause held
   // two drafts that disagreed (BUG-260918-01 B). Now every rendering reads the one draft keyed by
   // `tool_call_id`; the two setters keep their old names so every downstream read is unchanged.
-  const { choiceIndex, freeText } = useAskDraft(tool_call_id)
+  const { choiceIndex, freeText, folderId } = useAskDraft(tool_call_id)
   const setChoice = useAskDraftStore((s) => s.setChoice)
   const setFreeTextAction = useAskDraftStore((s) => s.setFreeText)
+  const setFolder = useAskDraftStore((s) => s.setFolder)
+  // Phase 295-06 (D-02 / D-03 / D-32) — the ONE read of the new field. The server built the prompt
+  // and the choices; the card only learns whether the folder chooser is needed. No deadline logic
+  // here: an engine pause has `timeout_seconds: null`, which the shipped no-deadline arm handles.
+  const enginePause = readEnginePause(ask)
+  const wantsFolder = needsFolder(ask, choiceIndex)
   const markSettled = useAskDraftStore((s) => s.markSettled)
   const setChoiceIndex = (i: number | null) => setChoice(tool_call_id, i)
   const setFreeText = (t: string) => setFreeTextAction(tool_call_id, t)
@@ -406,7 +415,8 @@ export function PendingAskCard({
   const hasText = freeText.trim().length > 0
   const hasAnswer = hasChoice || hasText
   const runReady = run_id != null
-  const canSubmit = hasAnswer && runReady && !submitting && state === "pending"
+  // 295-06 (D-03): while "Search another folder" is selected, the answer needs a folder.
+  const canSubmit = hasAnswer && runReady && !submitting && state === "pending" && (!wantsFolder || !!folderId)
 
   const selectedValue = useMemo(() => {
     if (hasChoice && choiceIndex !== null) return options[choiceIndex]
@@ -417,7 +427,10 @@ export function PendingAskCard({
     if (!canSubmit || run_id == null) return
     setSubmitting(true)
     setSubmitError(null)
-    const valueForDisplay = selectedValue
+    // 295-06: a folder answer's receipt names the folder; resolved now, because a successful
+    // answer settles the draft and the chosen folder goes with it.
+    const valueForDisplay =
+      answeredReceipt(ask, selectedValue, wantsFolder ? folderId : undefined) ?? selectedValue
     try {
       await answerAskUser(run_id, {
         tool_call_id,
@@ -427,6 +440,8 @@ export function PendingAskCard({
         // this file). Sending "" for choices fed the model an empty answer.
         response_text: selectedValue,
         choice_index: hasChoice ? choiceIndex : null,
+        // 295-06 (D-03): only for the search choice; the server allow-lists it (295-03).
+        ...(wantsFolder && folderId ? { folder_id: folderId } : {}),
       })
       // Optimistic green answered state (D4). The ask_user_response SSE then
       // removes the prompt from the store, reactively unmounting this card.
@@ -619,7 +634,9 @@ export function PendingAskCard({
       <div className="flex flex-col gap-2 rounded-md border border-[hsl(var(--success))] bg-[hsl(var(--success)/0.12)] p-3">
         <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--success))]">
           <span className="h-[7px] w-[7px] flex-none rounded-full bg-[hsl(var(--success))]" aria-hidden="true" />
-          Answered · agent resumed
+          {/* 295-06: the shipped header for every answer except an engine-pause Stop, which says
+              the run stopped. Both words live in enginePause.ts. */}
+          {answeredHeader(ask, answeredValue)}
         </div>
         <p className="text-sm leading-relaxed text-foreground" id={labelId}>
           {prompt}
@@ -760,6 +777,17 @@ export function PendingAskCard({
             )
           })}
         </div>
+      )}
+
+      {/* 295-06 (D-03 / UI-SPEC A.3): the server-bounded folder chooser, only while the search
+          choice is selected. Its selection lives in the one draft (askDraftStore). */}
+      {wantsFolder && enginePause && (
+        <AskFolderChoice
+          id={`ask-${tool_call_id}-folder`}
+          folders={enginePause.folders}
+          value={folderId}
+          onChange={(id) => setFolder(tool_call_id, id)}
+        />
       )}
 
       {/* "or" divider — only meaningful when both surfaces are present. */}
