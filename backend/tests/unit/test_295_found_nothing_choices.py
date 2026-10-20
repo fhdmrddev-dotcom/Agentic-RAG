@@ -367,3 +367,112 @@ def test_the_tool_context_searches_the_override_folder():
     assert _build_phase_tool_context(phase, ctx).folder_subtree_ids == [OTHER]
     ctx.phase_scope_override = {}
     assert _build_phase_tool_context(phase, ctx).folder_subtree_ids == [P, CHILD]
+
+
+# ══ Task 3 — precedence (D-08 / SEED-137) and the post-Proceed gate (D-48) ═════════════════
+class _EngineDrive:
+    """``_run_phase_with_gates`` over the durable world, with a scripted body and an
+    in-process answer for any AUTHOR ask (which still waits in-process)."""
+
+    def __init__(self, raw, *, outputs, author_answer="Proceed anyway"):
+        from app.services.harness.grounding import effective_phase
+        from tests.unit.engine_ask_fakes import FakePool, World
+
+        self.phase = effective_phase(raw, total_phases=1)
+        self.world = World(raw.slug, kb_label=FOLDER)
+        self.ctx = self.world.ctx(definition=None)
+        self.outputs = list(outputs)
+        self.author_answer = author_answer
+        self.run_id, self.user, self.pool = uuid4(), uuid4(), FakePool()
+
+    async def body(self, phase, accumulated, ctx):
+        self.world.events.append(("body", self.world.tick()))
+        return dict(self.outputs[0])
+
+    async def author(self, redis, run_id, tool_call_id, timeout):
+        self.world.events.append(("author_ask", self.world.tick()))
+        return {"kind": "response", "response_text": self.author_answer}
+
+    def once(self):
+        from contextlib import ExitStack
+
+        from app.services import harness_engine
+
+        with ExitStack() as stack:
+            self.world.enter(stack, subscribe=False)
+            for p in (
+                patch.object(harness_engine, "_execute_phase", self.body),
+                patch.object(harness_engine, "write_audit", self.world.write_audit),
+                patch.object(harness_engine, "_emit", self.world.emit),
+                patch("app.services.ask_user_service.subscribe_for_response", self.author),
+            ):
+                stack.enter_context(p)
+            return asyncio.run(harness_engine._run_phase_with_gates(
+                self.phase, {}, self.ctx, run_id=self.run_id, pool=self.pool, redis=object(),
+                wall_clock=30, _audit_user_id=self.user, total_phases=1,
+            ))
+
+
+def _kb(*, armed=False, validators=None):
+    from app.models.harness import PhaseSpec
+
+    return PhaseSpec(
+        slug=SLUG, phase_index=0, name=STEP, action_risk_armed=armed,
+        config={"phase_type": "llm_agent", "prompt": "Find the terms and cite them.",
+                "available_tools": ["search_documents"]},
+        validators=list(validators or []),
+    )
+
+
+_NOTHING = {"text": "Nothing found.", "sub_run_id": "s", "citations": []}
+_CITED = {"text": "The term renews yearly [1].", "sub_run_id": "s", "citations": [{"doc": "d"}]}
+
+
+def test_d08_an_armed_kb_step_asks_the_approval_before_the_body_and_only_then_can_its_gate_pause():
+    """SEED-137 / D-08, the precedence record. The armed checkpoint is a PRE-body ask and the
+    engine citations gate is a POST gate, so an armed KB step asks the approval FIRST; only
+    after the approval is consumed does the body run, and only then can the citations gate
+    pause on a found-nothing output. The call order is the observable."""
+    from app.services.harness.engine_ask import _ACTION_RISK_APPROVE_CHOICE
+
+    d = _EngineDrive(_kb(armed=True), outputs=[_NOTHING])
+    first = d.once()
+    assert first.kind == "pause_run"
+    armed_tc = d.world.latest_tool_call()
+    assert armed_tc["engine_pause"]["kind"] == "action_risk"
+    assert d.world.count("body") == 0, "the body ran before the approval was answered"
+
+    d.ctx.resume_answered_tool_call_id = d.world.answer(_ACTION_RISK_APPROVE_CHOICE, 0)
+    second = d.once()
+    assert second.kind == "pause_run"
+    kinds = [row["tool_calls"][0]["engine_pause"]["kind"] for _o, row in d.world.prompt_rows()]
+    assert kinds == ["action_risk", "no_sources"]
+    armed_at = d.world.prompt_rows()[0][0]
+    first_body = next(e[1] for e in d.world.events if e[0] == "body")
+    citations_at = d.world.prompt_rows()[1][0]
+    assert armed_at < first_body < citations_at
+
+
+def test_d48_after_an_author_proceed_an_unsourced_output_still_pauses():
+    """D-48: an author's post ``ask_user`` gate fails first (first-failure-wins hides the
+    engine gate behind it); the person says Proceed; the engine citations gate is THEN run on
+    the produced output, so 0 sources pauses instead of completing unmarked."""
+    author = {"kind": "structure_check", "timing": "post", "on_failure": "ask_user",
+              "config": {"mode": "loose", "sections": ["__NEVER__"]}}
+    d = _EngineDrive(_kb(validators=[author]), outputs=[_NOTHING])
+    outcome = d.once()
+    assert d.world.count("author_ask") == 1, "the author's gate asked in-process"
+    assert outcome.kind != "completed", "an unsourced output passed unmarked after Proceed"
+    assert outcome.kind == "pause_run"
+    assert d.world.latest_tool_call()["engine_pause"]["kind"] == "no_sources"
+
+
+def test_d48_after_an_author_proceed_a_cited_output_completes():
+    author = {"kind": "structure_check", "timing": "post", "on_failure": "ask_user",
+              "config": {"mode": "loose", "sections": ["__NEVER__"]}}
+    d = _EngineDrive(_kb(validators=[author]), outputs=[_CITED])
+    outcome = d.once()
+    assert outcome.kind == "completed"
+    assert outcome.output["text"] == _CITED["text"]
+    # the author's own ask wrote its (in-process) prompt row; no ENGINE ask was raised
+    assert [tc for tc in d.world.prompt_tool_calls() if tc.get("engine_pause")] == []

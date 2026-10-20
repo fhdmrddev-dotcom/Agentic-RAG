@@ -317,6 +317,66 @@ def test_a_locked_step_is_never_completed_at_consume():
     assert d.world.audits("validator_ask_user_approved") == []
 
 
+# ── Task 3: the boot sweep (D-50 / RESEARCH Pitfall 2) ──────────────────────────────────
+def _sweep(answer):
+    """Run ``resume_stranded_workflows`` over ONE paused run whose active phase carries an
+    engine-ask stash. Every db read, the re-subscribe, the ctx build and the re-drive are
+    mocked (the test_185 ``_drive_resume_sweep`` posture)."""
+    from app.services import harness_engine
+
+    run_id = uuid4()
+    active = {"id": uuid4(), "slug": SLUG, "phase_index": 0, "status": "active",
+              "config": {"phase_type": "llm_agent"},
+              "output": {"_awaiting_answer": {"tool_call_id": "tc-e", "kind": "no_sources"}}}
+    built = SimpleNamespace(producer_run_id=None, org_id=None, resume_answered_tool_call_id=None)
+    seen: dict = {}
+
+    async def _resume(rid, definition, ctx, *, pool, redis):
+        seen["flag"] = ctx.resume_answered_tool_call_id
+
+    resume = AsyncMock(side_effect=_resume)
+    mocks = {
+        "find_resumable_runs": AsyncMock(return_value=[{"run_id": run_id, "thread_id": uuid4()}]),
+        "claim_run": AsyncMock(return_value=True),
+        "get_active_phase": AsyncMock(return_value=active),
+        "_load_run_definition": AsyncMock(return_value=SimpleNamespace(phases=[])),
+        "get_pending_ask_user": AsyncMock(return_value={"tool_call_id": "tc-e", "prompt": "p",
+                                                        "options": [], "timeout_seconds": None}),
+        "ask_user_response_exists": AsyncMock(return_value=answer is not None),
+        "get_ask_user_response": AsyncMock(return_value=answer),
+        "resume_pending_prompt": AsyncMock(),
+        "_build_resume_context": AsyncMock(return_value=built),
+        "_resume_run": resume,
+        "_expire_pending_ask_user": AsyncMock(),
+        "pause_run": AsyncMock(),
+        "resume_run": AsyncMock(),
+    }
+    with ExitStack() as stack:
+        for name, mock in mocks.items():
+            stack.enter_context(patch.object(harness_engine, name, mock))
+        resumed = asyncio.run(harness_engine.resume_stranded_workflows(pool=object(), redis=object()))
+    return resumed, mocks, seen
+
+
+def test_the_sweep_leaves_an_unanswered_engine_ask_paused_and_asks_nothing():
+    resumed, m, _seen = _sweep(None)
+    assert resumed == 0
+    m["_resume_run"].assert_not_awaited()
+    m["resume_pending_prompt"].assert_not_awaited()
+    m["_expire_pending_ask_user"].assert_not_awaited()
+    m["pause_run"].assert_awaited_once()  # the claim the sweep just took is released (D-50)
+
+
+def test_the_sweep_redrives_an_answered_engine_ask_with_its_tool_call_id():
+    resumed, m, seen = _sweep({"response_text": "Stop the run", "choice_index": 1,
+                               "folder_id": None})
+    assert resumed == 1
+    m["_resume_run"].assert_awaited_once()
+    assert seen["flag"] == "tc-e"
+    m["resume_pending_prompt"].assert_not_awaited()
+    m["resume_run"].assert_awaited_once()  # the run stops reading paused while it is driven
+
+
 def test_pause_run_releases_the_lease_so_a_second_pause_can_be_redriven():
     """D-50 / Pitfall 1 — the second pause's ``pause_run`` releases the claim; the SQL is
     pinned in tests/unit/test_295_engine_ask_pause.py. Here: a re-drive that pauses again
