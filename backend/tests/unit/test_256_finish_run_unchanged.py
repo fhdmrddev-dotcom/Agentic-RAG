@@ -171,8 +171,10 @@ _EXPECTED_CALL_SITES = {
     #   its lazy import) just above this call. The call itself is byte-unchanged.
     #   run_lifecycle.py:529 → 544
     "services/run_lifecycle.py:544",
-    # Phase 295 Plan 04: the new caller's one site (see the COUNTS note above).
-    "services/harness/run_handoff.py:186",
+    # Phase 295 Plan 04: the new caller's one site (see the COUNTS note above). Re-derived at
+    #   Task 3 (+15: the F2 / reconciler reason constants and `_claim_terminal` above it):
+    #   run_handoff.py:186 → 201
+    "services/harness/run_handoff.py:201",
 }
 
 _CALL_RE = re.compile(r"await\s+finish_run\s*\(")

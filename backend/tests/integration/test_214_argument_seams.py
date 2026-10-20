@@ -186,6 +186,67 @@ async def raw_pool():
         await pool.close()
 
 
+async def _seed_teardown(pool, ids) -> None:
+    """FK-ordered, best-effort removal of everything ``_seed_rows`` may have inserted.
+
+    Phase 295 (D-43): called from BOTH exits — after the fixture's ``yield`` AND from a failed
+    seed, before it raises. The 2026-08-28 leak was the second exit: a seed that failed after
+    its ``workflow_runs`` INSERT left before the ``yield``, so this never ran, 15 times.
+    """
+    for sql in (
+        ("UPDATE threads SET active_workflow_run_id = NULL WHERE id = $1", ids.thread_id),
+        ("DELETE FROM workflow_phases WHERE workflow_run_id = $1", ids.run_id),
+        ("DELETE FROM workflow_runs WHERE id = $1", ids.run_id),
+        ("DELETE FROM workflow_runs WHERE thread_id = $1", ids.thread_id),
+        ("DELETE FROM threads WHERE id = $1", ids.thread_id),
+        ("DELETE FROM auth.users WHERE id = $1", ids.user_id),
+    ):
+        try:
+            await pool.execute(*sql)
+        except Exception:  # noqa: BLE001 — teardown is best-effort, FK-ordered
+            pass
+
+
+async def _seed_rows(pool, ids, def_id, org_id) -> None:
+    """INSERT the user / thread / workflow_run / phase under ``ids``; on ANY failure, remove what
+    was written and raise — a seed failure is a failure (never a skip) AND never litter."""
+    user_id, thread_id, run_id, phase_id = ids.user_id, ids.thread_id, ids.run_id, ids.phase_id
+    try:
+        await pool.execute(
+            "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
+            user_id, f"phase-214-14-{user_id}@test.local",
+        )
+        await pool.execute(
+            "INSERT INTO threads (id, user_id, title) VALUES ($1, $2, $3)",
+            thread_id, user_id, "phase 214-14 seam thread",
+        )
+        await pool.execute(
+            "INSERT INTO workflow_runs (id, thread_id, definition_id, status, org_id, "
+            "user_id, inputs) VALUES ($1, $2, $3, 'failed', $4, $5, '{}'::jsonb)",
+            run_id, thread_id, def_id, org_id, user_id,
+        )
+        await pool.execute(
+            "INSERT INTO workflow_phases (id, workflow_run_id, phase_index, slug, status, "
+            "output, org_id) VALUES ($1, $2, 0, 'send-the-mail', 'active', '{}'::jsonb, $3)",
+            phase_id, run_id, org_id,
+        )
+        await pool.execute(
+            "UPDATE threads SET active_workflow_run_id = $1 WHERE id = $2", run_id, thread_id
+        )
+    except Exception as exc:  # noqa: BLE001
+        # Phase 295 (D-43): clean up FIRST — raising from here leaves before any ``yield``.
+        await _seed_teardown(getattr(pool, "_pool", pool), ids)
+        # ⚠ A SEED FAILURE IS A FAILURE, NEVER A SKIP. The first run of this suite seeded
+        # `status='running'` — not a legal `workflow_phases` status — and a `pytest.skip`
+        # here turned five unproven seams into a green line. That is the vacuous-pass shape
+        # this whole file exists to refuse. A skip belongs to an ABSENT DATABASE (handled at
+        # module scope) and to a missing FK target, never to a broken INSERT.
+        raise AssertionError(
+            f"seam-suite seed failed — the seams below are UNPROVEN, not skipped: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+
+
 @pytest_asyncio.fixture
 async def seeded(raw_pool):
     """A throwaway user + thread + workflow_run + one phase, under generated ids.
@@ -201,56 +262,15 @@ async def seeded(raw_pool):
         pytest.skip("no published workflow_definitions row with an org_id to use as FK target")
     def_id, org_id = row["id"], row["org_id"]
 
-    user_id, thread_id, run_id, phase_id = uuid4(), uuid4(), uuid4(), uuid4()
-    try:
-        await raw_pool.execute(
-            "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
-            user_id, f"phase-214-14-{user_id}@test.local",
-        )
-        await raw_pool.execute(
-            "INSERT INTO threads (id, user_id, title) VALUES ($1, $2, $3)",
-            thread_id, user_id, "phase 214-14 seam thread",
-        )
-        await raw_pool.execute(
-            "INSERT INTO workflow_runs (id, thread_id, definition_id, status, org_id, "
-            "user_id, inputs) VALUES ($1, $2, $3, 'failed', $4, $5, '{}'::jsonb)",
-            run_id, thread_id, def_id, org_id, user_id,
-        )
-        await raw_pool.execute(
-            "INSERT INTO workflow_phases (id, workflow_run_id, phase_index, slug, status, "
-            "output, org_id) VALUES ($1, $2, 0, 'send-the-mail', 'active', '{}'::jsonb, $3)",
-            phase_id, run_id, org_id,
-        )
-        await raw_pool.execute(
-            "UPDATE threads SET active_workflow_run_id = $1 WHERE id = $2", run_id, thread_id
-        )
-    except Exception as exc:  # noqa: BLE001
-        # ⚠ A SEED FAILURE IS A FAILURE, NEVER A SKIP. The first run of this suite seeded
-        # `status='running'` — not a legal `workflow_phases` status — and a `pytest.skip`
-        # here turned five unproven seams into a green line. That is the vacuous-pass shape
-        # this whole file exists to refuse. A skip belongs to an ABSENT DATABASE (handled at
-        # module scope) and to a missing FK target, never to a broken INSERT.
-        raise AssertionError(
-            f"seam-suite seed failed — the seams below are UNPROVEN, not skipped: "
-            f"{type(exc).__name__}: {exc}"
-        ) from exc
+    ids = SimpleNamespace(user_id=uuid4(), thread_id=uuid4(), run_id=uuid4(), phase_id=uuid4())
+    await _seed_rows(raw_pool, ids, def_id, org_id)
 
     yield SimpleNamespace(
-        user_id=user_id, thread_id=thread_id, run_id=run_id,
-        phase_id=phase_id, definition_id=def_id, org_id=org_id,
+        user_id=ids.user_id, thread_id=ids.thread_id, run_id=ids.run_id,
+        phase_id=ids.phase_id, definition_id=def_id, org_id=org_id,
     )
 
-    for sql in (
-        ("UPDATE threads SET active_workflow_run_id = NULL WHERE id = $1", thread_id),
-        ("DELETE FROM workflow_phases WHERE workflow_run_id = $1", run_id),
-        ("DELETE FROM workflow_runs WHERE id = $1", run_id),
-        ("DELETE FROM threads WHERE id = $1", thread_id),
-        ("DELETE FROM auth.users WHERE id = $1", user_id),
-    ):
-        try:
-            await raw_pool.execute(*sql)
-        except Exception:  # noqa: BLE001 — teardown is best-effort, FK-ordered
-            pass
+    await _seed_teardown(raw_pool, ids)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

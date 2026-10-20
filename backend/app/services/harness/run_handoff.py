@@ -29,6 +29,9 @@ __all__ = [
     "resume_shell_status",
     "expire_unless_paused",
     "record_stop",
+    "record_failed_end",
+    "finish_golden_run",
+    "golden_end_reason",
 ]
 
 
@@ -146,10 +149,22 @@ SWEEP_NO_DEFINITION_REASON = (
     "This run could not continue after a restart: its workflow could not be loaded."
 )
 
+#: D-20 — run_producer's F2: a producer escape the engine never terminalized.
+F2_FAILED_REASON = (
+    "This run stopped unexpectedly before its steps finished, so it was marked failed."
+)
+#: D-21 — the boot reconciler's sweep (SEED-297 shape: no total is ever written or NULLed).
+RECONCILED_REASON = "Finalised by the reconciler: its steps had ended."
+
 _GUARDED_TERMINAL_SQL = (
     "UPDATE workflow_runs SET status = $2 "
-    "WHERE id = $1 AND status = ANY($3::text[]) RETURNING id"
+    "WHERE id = $1 AND status = ANY($3::text[]) RETURNING id, user_id"
 )
+
+
+async def _claim_terminal(pool, run_id, status: str, from_statuses):
+    """The winner check: the row (``id``, ``user_id``) iff THIS call moved the run, else None."""
+    return await pool.fetchrow(_GUARDED_TERMINAL_SQL, run_id, status, list(from_statuses))
 
 
 def _as_uuid(value):
@@ -176,7 +191,7 @@ async def end_run(pool, run_id, status: str, *, from_statuses=_LIVE_STATUSES, us
         write_audit,
     )
 
-    won = await pool.fetchval(_GUARDED_TERMINAL_SQL, run_id, status, list(from_statuses))
+    won = await _claim_terminal(pool, run_id, status, from_statuses)
     if won is None:
         return False
     if status == "failed" and reason and fail_active_phase:
@@ -186,10 +201,62 @@ async def end_run(pool, run_id, status: str, *, from_statuses=_LIVE_STATUSES, us
     await finish_run(pool, run_id, status)
     if status == "failed" and reason:
         await write_audit(
-            pool, run_id, user_id=_as_uuid(user_id), event_type="run_failed",
+            pool, run_id, user_id=_as_uuid(user_id or won["user_id"]), event_type="run_failed",
             metadata={"reason": reason},
         )
     return True
+
+
+async def record_failed_end(pool, run_id, status: str, *, reason: str = F2_FAILED_REASON) -> bool:
+    """D-20 (run_producer F2): BEFORE the caller's own unconditional ``finish_run``, claim the
+    ``failed`` end and, only when THIS call won it, write ONE ``run_failed`` with words. A
+    ``cancelled`` end writes nothing; a run another writer already ended gets nothing. Never
+    raises, so the caller's ``finish_run`` (and its anchor clear) always still runs."""
+    if status != "failed":
+        return False
+    try:
+        from app.db.workflows import write_audit  # noqa: PLC0415
+
+        won = await _claim_terminal(pool, run_id, "failed", _STOPPABLE_STATUSES)
+        if won is None:
+            return False
+        await write_audit(
+            pool, run_id, user_id=_as_uuid(won["user_id"]), event_type="run_failed",
+            metadata={"reason": reason},
+        )
+        return True
+    except Exception:  # noqa: BLE001
+        logger.exception("F2: the failure reason could not be recorded for workflow run %s", run_id)
+        return False
+
+
+def golden_end_reason(escape) -> str:
+    """D-20: the words for a golden (publish trial) run that did not finish. Composed from the
+    shape of the escape only — never its message (T-295-04-07)."""
+    if isinstance(escape, (asyncio.CancelledError, asyncio.TimeoutError)):
+        return "The trial run did not finish within its time limit, so it was stopped."
+    if escape is not None:
+        return f"The trial run stopped because of an error ({type(escape).__name__})."
+    return "The trial run ended before its steps finished."
+
+
+async def finish_golden_run(pool, run_id, *, user_id=None) -> bool:
+    """D-20: called from ``_drive_golden_run``'s ``finally`` AFTER the shell finalise. A golden
+    run's ``workflow_runs`` row still ``active`` / ``paused`` here is ended ``failed`` with
+    :func:`golden_end_reason` and ONE ``run_failed``; a row the run itself already ended is never
+    rewritten. The in-flight escape is read with ``sys.exc_info()`` (this runs inside the
+    caller's ``finally``). Never raises: shell cleanup never masks the run's own outcome."""
+    import sys  # noqa: PLC0415
+
+    escape = sys.exc_info()[1]
+    try:
+        return await asyncio.shield(end_run(
+            pool, run_id, "failed", user_id=user_id, reason=golden_end_reason(escape),
+            fail_active_phase=True,
+        ))
+    except Exception:  # noqa: BLE001
+        logger.warning("publish: golden run %s could not be finalised", run_id, exc_info=True)
+        return False
 
 
 def resume_shell_status(exc) -> str:
@@ -276,9 +343,7 @@ async def record_stop(pool, run_id, stopped_by, *, policy: str) -> bool:
     try:
         from app.db.workflows import write_audit  # noqa: PLC0415
 
-        won = await pool.fetchval(
-            _GUARDED_TERMINAL_SQL, run_id, "cancelled", list(_STOPPABLE_STATUSES)
-        )
+        won = await _claim_terminal(pool, run_id, "cancelled", _STOPPABLE_STATUSES)
         if won is None:
             return False
         name = await _stopper_words(pool, stopped_by)
