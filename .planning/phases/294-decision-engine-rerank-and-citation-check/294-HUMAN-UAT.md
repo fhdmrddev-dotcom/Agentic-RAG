@@ -26,7 +26,13 @@ result: passed (2026-10-20). Uploaded `Northwind_Office_Facilities_Notes.md` car
 
 ### 4. Fault phase (F1-F5)
 expected: Start `python scripts/decision-fault-server.py --port 8765 --slow-seconds 12`; add `ENVIRONMENT=local` and `DECISION_ENGINE_FAULT_BASE_URL=http://127.0.0.1:8765` to `backend/.env`; restart the backend once and confirm one "is ACTIVE" warning. Drive each mode with `curl -X POST http://127.0.0.1:8765/_mode/<mode>`: every answer still arrives in today's order, and the log names the engine and error type only. Remove both lines and restart once more.
-result: [pending]
+result: passed (2026-10-20). Fault server on 127.0.0.1:8765 (`--slow-seconds 12`); the operator added `ENVIRONMENT=local` + `DECISION_ENGINE_FAULT_BASE_URL` and restarted at 19:56. backend.41032.log: ONE "DECISION_ENGINE_FAULT_BASE_URL is ACTIVE … (dev-only)" warning at the first engine call (19:58:23), then one fallback line per failed search, each "rerank engine <engine> failed (<type>) — keeping the current order", engine and error type only, no key or body:
+- Jev: 401 → HTTPStatusError:401 · slow → DecisionTimeout · missing → DecisionMalformed · 429 → HTTPStatusError:429 · 500 → HTTPStatusError:500 · malformed → JSONDecodeError · ok → no failure line.
+- OpenAI Decisions: 401 → HTTPStatusError:401 · slow → ReadTimeout (the answer's run took 10.3 s, under the 12 s fault delay) · refusal → DecisionRefused · 429 → HTTPStatusError:429 (two searches, two lines 4 s apart) · 500 → HTTPStatusError:500 · malformed → JSONDecodeError · ok → no failure line.
+- Fault-server access log: exactly one request per search batch, no retries. In slow mode the server logged `ConnectionAbortedError` when it wrote after the backend had already timed out, which is the timeout working.
+- Every answer arrived with [n] markers.
+- F4 citation check, still in refusal: "? 8 couldn't check" on every marker, never ✓, "checked by OpenAI Decisions".
+- Settings restored to Jev afterwards (verified in app_settings). Owed: remove the two .env lines and restart once.
 
 ### 5. Local and Off engines live (E1, E4)
 expected: E1: select "On this server", save; the first searches keep today's order while each worker loads (INFO "still loading", then "loaded in Xs" with the pid); later searches are reordered. E4: reranking OFF; no decision or rerank span under search-documents.
@@ -63,9 +69,9 @@ result: [partial 2026-10-20 — C5 passed; C3 second profile pending]. C5: with 
 ## Summary
 
 total: 9
-passed: 7
+passed: 8
 issues: 0
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 
