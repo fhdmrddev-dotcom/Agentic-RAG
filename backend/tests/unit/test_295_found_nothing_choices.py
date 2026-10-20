@@ -180,3 +180,190 @@ def test_the_acceptance_rule_is_resolve_run_scope_root_itself():
             supabase=object(), user_id="u",
         ))
     assert out == []
+
+
+# ══ Task 2 — consuming the answer on the re-drive (D-02 / D-03 / D-04 / D-05 / D-36) ══════
+SLUG = "summarise"
+OTHER = str(uuid4())
+OTHER_SUB = str(uuid4())
+
+
+def _raw_kb_phase(*, escalated: bool):
+    from app.models.harness import PhaseSpec
+
+    return PhaseSpec(
+        slug=SLUG, phase_index=0, name=STEP,
+        config={"phase_type": "llm_agent", "prompt": "Find the terms and cite them.",
+                "available_tools": ["search_documents"]},
+        grounding_escalated=escalated,
+    )
+
+
+def _run_definition(*, escalated: bool):
+    from app.models.harness import WorkflowDefinition
+
+    return WorkflowDefinition(
+        slug="w", name="W", version=1, project_folder_id=P,
+        phases=[_raw_kb_phase(escalated=escalated).model_dump()],
+    )
+
+
+def _pause_then_consume(answer, *, finding="no_sources", locked=False, locked_now=None,
+                        folders=None, flag=True, stale_tcid=False, subtree=None):
+    """Pause the engine citations gate for real, persist ``answer`` as the answer route
+    does, then run ``consume_engine_answer`` the way the top of ``_run_phase_with_gates``
+    does on the re-drive. Returns ``(result, world, ctx)``."""
+    from contextlib import ExitStack
+
+    from app.services import harness_engine
+    from app.services.harness import engine_ask
+    from app.services.harness.grounding import effective_phase
+    from tests.unit.engine_ask_fakes import FakePool, World
+
+    world = World(SLUG, kb_label=FOLDER, folders=list(folders or []))
+    phase = effective_phase(_raw_kb_phase(escalated=locked), total_phases=1)
+    now = locked if locked_now is None else locked_now
+    ctx = world.ctx(definition=_run_definition(escalated=now))
+    output = {"text": "The term renews yearly.", "sub_run_id": "s",
+              "citations": [] if finding == "no_sources" else [{"doc": "d"}]}
+    run_id, user, pool = uuid4(), uuid4(), FakePool()
+
+    async def _subtree(root, *, supabase, user_id, **_kw):
+        return list(subtree or [root])
+
+    with ExitStack() as stack:
+        world.enter(stack)
+        stack.enter_context(patch("app.services.harness.scope.resolve_project_subtree", _subtree))
+        paused = asyncio.run(harness_engine._resolve_failure_with_ask_user(
+            phase, "citations_required: planted", 2, len(phase.validators) - 1,
+            run_id=run_id, pool=pool, redis=object(), ctx=ctx, _audit_user_id=user,
+            produced_output=output, is_pre=False,
+        ))
+        assert paused.kind == "pause_run", paused
+        tcid = world.latest_tool_call()["tool_call_id"]
+        if answer is not None:
+            world.answer(**answer)
+        if flag:
+            ctx.resume_answered_tool_call_id = "someone-else" if stale_tcid else tcid
+        result = asyncio.run(engine_ask.consume_engine_answer(
+            phase, ctx, run_id=run_id, pool=pool, redis=object(),
+            _audit_user_id=user, stream_run_id=None,
+        ))
+    return result, world, ctx
+
+
+def test_no_flag_or_another_questions_flag_is_left_for_the_human_step():
+    result, _w, ctx = _pause_then_consume({"response_text": "Stop the run"}, flag=False)
+    assert result is None and ctx.resume_answered_tool_call_id is None
+    result, _w, ctx = _pause_then_consume({"response_text": "Stop the run"}, stale_tcid=True)
+    assert result is None
+    assert ctx.resume_answered_tool_call_id == "someone-else", "the human executor's flag was eaten"
+
+
+def test_continue_keeps_the_output_and_marks_it_unsourced():
+    from datetime import datetime
+
+    result, world, ctx = _pause_then_consume(
+        {"response_text": "Continue without sources", "choice_index": 1},
+        folders=[{"id": OTHER, "name": "Archive", "depth": 0}],
+    )
+    assert result.kind == "completed"
+    out = result.output
+    assert out["text"] == "The term renews yearly."
+    assert out["citations"] == []
+    assert out["unsourced"]["continued_by"] == str(ctx.current_user["id"])
+    datetime.fromisoformat(out["unsourced"]["at"])
+    assert set(out) - {"text", "sub_run_id", "citations"} == {"unsourced"}, "ONE field added"
+    receipt = world.audits("validator_ask_user_approved")[-1]["metadata"]
+    assert receipt["phase"] == SLUG and receipt["choice"] == "Continue without sources"
+    assert receipt["finding"] == "no_sources" and receipt["unsourced"] is True
+    assert ctx.resume_answered_tool_call_id is None, "the single-use flag was not cleared"
+
+
+def test_continue_on_a_step_locked_since_the_pause_never_completes():
+    result, world, _ctx = _pause_then_consume(
+        {"response_text": "Continue without sources"}, locked=False, locked_now=True,
+    )
+    assert result.kind != "completed"
+    assert result.kind == "fail_run"
+    assert "Must prove it" in result.reason and STEP in result.reason
+    assert world.audits("validator_ask_user_approved") == []
+
+
+def test_stop_fails_with_the_finding_and_the_person():
+    result, _w, _ctx = _pause_then_consume({"response_text": "Stop the run", "choice_index": 1})
+    assert result.kind == "fail_run"
+    assert result.reason == (
+        f"Searched {FOLDER} and found nothing for “{STEP}”. Stopped by Fahad Murad."
+    )
+
+
+def test_stop_after_an_uncited_answer_uses_the_markers_sentence():
+    result, _w, _ctx = _pause_then_consume(
+        {"response_text": "Stop the run"}, finding="no_markers",
+    )
+    assert result.reason == f"“{STEP}” answered without citing its sources. Stopped by Fahad Murad."
+
+
+def test_a_folder_answer_reruns_the_step_with_that_folder_only():
+    result, world, ctx = _pause_then_consume(
+        {"response_text": "Search another folder", "choice_index": 0, "folder_id": OTHER},
+        folders=[{"id": OTHER, "name": "Archive", "depth": 0}], subtree=[OTHER, OTHER_SUB],
+    )
+    assert result is None, "a folder answer re-runs the body (None)"
+    assert ctx.phase_scope_override == {SLUG: [OTHER, OTHER_SUB]}
+    assert isinstance(ctx.phase_scope_override[SLUG], list)
+    assert ctx.phase_scope_label == {SLUG: "Archive"}
+    receipt = world.audits("validator_ask_user_approved")[-1]["metadata"]
+    assert receipt["folder_id"] == OTHER and receipt["choice"] == "Search another folder"
+    assert ctx.definition.project_folder_id is not None  # the definition is never rewritten
+    assert str(ctx.definition.project_folder_id) == P
+
+
+def test_unmatched_answers_never_proceed_and_leave_the_run_paused():
+    folders = [{"id": OTHER, "name": "Archive", "depth": 0}]
+    for answer in (
+        {"response_text": "Proceed anyway"},
+        {"response_text": "", "choice_index": 7},
+        {"response_text": "Search another folder", "folder_id": str(uuid4())},
+        {"response_text": "Search another folder"},
+        {"response_text": "continue without sources"},
+    ):
+        result, world, _ctx = _pause_then_consume(answer, folders=folders)
+        assert result is not None and result.kind == "pause_run", (answer, result)
+        assert world.audits("validator_ask_user_approved") == [], answer
+        assert world.count("prompt_row") == 1, "an unmatched answer must not mint a new prompt"
+
+
+def test_a_locked_prompt_refuses_continue_even_when_forged_at_consume():
+    result, _w, _ctx = _pause_then_consume(
+        {"response_text": "Continue without sources"}, locked=True,
+        folders=[{"id": OTHER, "name": "Archive", "depth": 0}],
+    )
+    assert result.kind == "pause_run", "a label the prompt never offered is unmatched"
+
+
+def test_phase_scope_ids_prefers_the_override_and_is_a_pure_leaf():
+    from types import SimpleNamespace
+
+    from app.services.harness.run_handoff import phase_scope_ids
+
+    phase = SimpleNamespace(slug="a")
+    assert phase_scope_ids(SimpleNamespace(folder_subtree_ids=["r"]), phase) == ["r"]
+    assert phase_scope_ids(SimpleNamespace(), phase) is None
+    ctx = SimpleNamespace(folder_subtree_ids=["r"], phase_scope_override={"a": ["f", "g"]})
+    assert phase_scope_ids(ctx, phase) == ["f", "g"]
+    assert phase_scope_ids(ctx, SimpleNamespace(slug="b")) == ["r"]
+
+
+def test_the_tool_context_searches_the_override_folder():
+    from types import SimpleNamespace
+
+    from app.services.harness.phase_types import _build_phase_tool_context
+
+    phase = _raw_kb_phase(escalated=False)
+    ctx = SimpleNamespace(producer_run_id=uuid4(), folder_subtree_ids=[P, CHILD],
+                          phase_scope_override={SLUG: [OTHER]}, current_user={})
+    assert _build_phase_tool_context(phase, ctx).folder_subtree_ids == [OTHER]
+    ctx.phase_scope_override = {}
+    assert _build_phase_tool_context(phase, ctx).folder_subtree_ids == [P, CHILD]

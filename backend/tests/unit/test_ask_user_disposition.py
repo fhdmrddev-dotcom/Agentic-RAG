@@ -431,6 +431,36 @@ def test_every_presented_choice_pair_is_classified():
         assert not _is_abort_choice([c for c in pair if not _is_abort_choice(c)][0])
 
 
+def test_every_engine_choice_is_classified_by_the_engine_allow_list():
+    """THE INVARIANT, extended to Phase 295's engine asks. Every label an engine pause can
+    present — each found-nothing composition, and the armed pair — is classified by
+    ``engine_ask.classify_engine_choice`` (an EXACT-label allow-list, never
+    ``_is_abort_choice``'s catch-all), and nothing else is."""
+    from app.services.harness.engine_ask import (
+        _ACTION_RISK_FINDING_PREFIX,
+        classify_engine_choice,
+        compose_engine_choices,
+    )
+    from app.services.harness_engine import _ask_user_choices_from_finding
+
+    presented = set(_ask_user_choices_from_finding(_ACTION_RISK_FINDING_PREFIX + "x"))
+    for finding in ("no_sources", "no_markers"):
+        for locked in (False, True):
+            for folders in ([], [{"id": "f", "name": "Archive", "depth": 0}]):
+                _prompt, options = compose_engine_choices(
+                    finding, step_label="S", folder_label="K", locked=locked, folders=folders,
+                )
+                presented |= set(options)
+    assert presented == {
+        "Search another folder", "Continue without sources", "Stop the run",
+        "Approve this step", "Do not run it",
+    }
+    for label in presented:
+        assert classify_engine_choice(label) is not None, f"{label!r} is unclassified"
+    for stranger in ("Proceed anyway", "Abort", "stop", "continue without sources", "", None):
+        assert classify_engine_choice(stranger) is None, f"{stranger!r} was read as a choice"
+
+
 @pytest.mark.xfail(strict=True, reason="consume lands in 295-03 Task 2")
 def test_armed_decline_fails_the_run_and_writes_no_approval():
     """L-4, the instance. Clicking "Do not run it" on an armed checkpoint FAILS the run.
