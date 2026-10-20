@@ -1173,6 +1173,53 @@ def test_S7_the_refusal_reaches_a_rendered_screen_as_a_SENTENCE_never_the_code()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Phase 295 (D-43) — a FAILED seed gives the database back too
+#
+# The 15 reasonless `failed` workflow runs measured locally on 2026-10-20 (thread title
+# "phase 214-14 seam thread", no phases, no audit, no `runs` rows, all 2026-08-28 11:10-11:12)
+# were THIS fixture's: the first run of the suite seeded an illegal phase status, the phase
+# INSERT raised AFTER the workflow_runs INSERT, and the fixture left before its `yield` — so the
+# teardown after the `yield` never ran. A seed failure still leaves the same way today (it raises
+# an AssertionError rather than skipping), so the leak was never closed, only made loud.
+# ⛔ The historical rows are NOT deleted here (a destructive local write, the operator's call).
+# ══════════════════════════════════════════════════════════════════════════════
+
+class _FailingPhaseInsert:
+    """A pool proxy whose ``workflow_phases`` INSERT raises — the 2026-08-28 seed failure."""
+
+    def __init__(self, pool):
+        self._pool = pool
+
+    async def execute(self, sql, *args):
+        if "INSERT INTO workflow_phases" in sql:
+            raise RuntimeError("planted seed failure (the 2026-08-28 illegal phase status)")
+        return await self._pool.execute(sql, *args)
+
+    async def fetchrow(self, sql, *args):
+        return await self._pool.fetchrow(sql, *args)
+
+
+@pytest.mark.asyncio
+async def test_D43_a_failed_seed_leaves_no_workflow_run_behind(raw_pool):
+    row = await raw_pool.fetchrow(
+        "SELECT id, org_id FROM workflow_definitions WHERE status = 'published' "
+        "AND org_id IS NOT NULL LIMIT 1"
+    )
+    if row is None:
+        pytest.skip("no published workflow_definitions row with an org_id to use as FK target")
+    ids = SimpleNamespace(user_id=uuid4(), thread_id=uuid4(), run_id=uuid4(), phase_id=uuid4())
+    with pytest.raises(AssertionError, match="seam-suite seed failed"):
+        await _seed_rows(_FailingPhaseInsert(raw_pool), ids, row["id"], row["org_id"])
+    left = await raw_pool.fetchval(
+        "SELECT count(*) FROM workflow_runs WHERE thread_id = $1", ids.thread_id
+    )
+    threads = await raw_pool.fetchval("SELECT count(*) FROM threads WHERE id = $1", ids.thread_id)
+    assert (left, threads) == (0, 0), (
+        f"a failed seed leaked {left} workflow_runs row(s) and {threads} thread(s) — D-43"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # T-214-14-05 — the suite gives the operator's database back
 # ══════════════════════════════════════════════════════════════════════════════
 

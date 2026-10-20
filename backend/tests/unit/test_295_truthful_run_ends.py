@@ -292,13 +292,19 @@ class _EndPool:
         self.phase_id = uuid.uuid4()
         self.active_phase = active_phase
 
+    owner = uuid.UUID(int=7)
+
+    def _guarded(self, args):
+        if self.status in args[2]:
+            self.status = args[1]
+            return {"id": args[0], "user_id": self.owner}
+        return None
+
     async def fetchval(self, sql, *args):
         self.calls.append((sql, args))
         if sql.lstrip().startswith("UPDATE workflow_runs SET status"):
-            if self.status in args[2]:
-                self.status = args[1]
-                return args[0]
-            return None
+            won = self._guarded(args)
+            return None if won is None else won["id"]
         if "FROM profiles" in sql:
             return self.display_name
         if "SELECT status FROM workflow_runs" in sql:
@@ -307,6 +313,8 @@ class _EndPool:
 
     async def fetchrow(self, sql, *args):
         self.calls.append((sql, args))
+        if sql.lstrip().startswith("UPDATE workflow_runs SET status"):
+            return self._guarded(args)
         if "FROM workflow_phases" in sql and self.active_phase:
             return {"id": self.phase_id, "slug": "p0", "phase_index": 0, "status": "active",
                     "output": {}, "started_at": None, "completed_at": None}
@@ -514,14 +522,11 @@ class _TwoRunPool(_EndPool):
         super().__init__(**kw)
         self.ended: set = set()
 
-    async def fetchval(self, sql, *args):
-        if sql.lstrip().startswith("UPDATE workflow_runs SET status"):
-            self.calls.append((sql, args))
-            if args[0] in self.ended:
-                return None
-            self.ended.add(args[0])
-            return args[0]
-        return await super().fetchval(sql, *args)
+    def _guarded(self, args):
+        if args[0] in self.ended:
+            return None
+        self.ended.add(args[0])
+        return {"id": args[0], "user_id": self.owner}
 
 
 def test_the_sweep_finalises_a_run_whose_definition_will_not_load_and_moves_on():
@@ -654,3 +659,251 @@ def test_both_stop_routes_pass_the_person_who_pressed_stop():
     assert runs_src.count('stopped_by=current_user["id"]') == 2
     assert life_src.count("stopped_by=stopped_by") == 1
     assert life_src.count('"run_cancelled"') == 1
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+#  Section 3 (D-20 / D-21 / D-22): the golden run's finally, run_producer's F2, the reconciler.
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+
+
+# ── the golden run's finally ────────────────────────────────────────────────────────────────
+
+
+def _golden(pool, *, run_workflow, won=True, guard_raises=False, max_seconds=None):
+    """Drive the REAL publish → ``_drive_golden_run`` (test_publish_service's MCP v20 harness),
+    with the guarded terminal write answered by ``won`` and ``write_audit`` recorded."""
+    from tests.unit.test_publish_service import _drive_mcp_v20_publish
+
+    audit = AsyncMock()
+    guarded: list = []
+    orig = pool.fetchrow
+
+    async def _fetchrow(sql, *args):
+        if "RETURNING id, user_id" in sql:
+            guarded.append(args)
+            if guard_raises:
+                raise RuntimeError("planted finalise failure")
+            return {"id": args[0], "user_id": uuid.uuid4()} if won else None
+        return await orig(sql, *args)
+
+    pool.fetchrow = _fetchrow
+    extra = [patch("app.services.harness_engine.run_workflow", run_workflow),
+             patch("app.db.workflows.write_audit", audit)]
+    if max_seconds is not None:
+        from app.config import settings
+
+        extra.append(patch.object(settings, "harness_publish_max_seconds", max_seconds))
+    run = _drive_mcp_v20_publish(pool, extra_patches=extra)
+    failed = [c.kwargs["metadata"]["reason"] for c in audit.await_args_list
+              if c.kwargs.get("event_type") == "run_failed"]
+    return run, guarded, failed
+
+
+def test_a_golden_run_that_raises_ends_failed_with_one_worded_reason(mock_asyncpg_pool):
+    run, guarded, failed = _golden(
+        mock_asyncpg_pool, run_workflow=AsyncMock(side_effect=RuntimeError("Late crash secret")),
+    )
+    assert run.result["blocked_stage"] == "golden_run_error"
+    assert [g[:2] for g in guarded] == [(run.run_id, "failed")]
+    assert failed == ["The trial run stopped because of an error (RuntimeError)."]
+
+
+def test_a_golden_run_that_times_out_ends_failed_naming_the_time_limit(mock_asyncpg_pool):
+    async def _hang(*a, **k):
+        await asyncio.sleep(30)
+
+    run, guarded, failed = _golden(mock_asyncpg_pool, run_workflow=_hang, max_seconds=0.2)
+    assert run.result["blocked_stage"] == "golden_run_timeout"
+    assert [g[1] for g in guarded] == ["failed"]
+    assert failed == ["The trial run did not finish within its time limit, so it was stopped."]
+
+
+def test_a_golden_run_already_terminal_is_not_rewritten(mock_asyncpg_pool):
+    run, guarded, failed = _golden(
+        mock_asyncpg_pool, run_workflow=AsyncMock(side_effect=RuntimeError("x")), won=False,
+    )
+    assert len(guarded) == 1 and failed == []
+
+
+def test_a_golden_finalise_error_never_masks_the_publish_outcome(mock_asyncpg_pool):
+    run, _, failed = _golden(
+        mock_asyncpg_pool, run_workflow=AsyncMock(side_effect=RuntimeError("x")), guard_raises=True,
+    )
+    assert run.result["blocked_stage"] == "golden_run_error"
+    assert failed == []
+
+
+# ── run_producer's F2 ───────────────────────────────────────────────────────────────────────
+
+
+def _f2(pool, terminal_status, *, cancel_known=False):
+    from app.services import run_producer
+    from app.services.run_lifecycle import broadcast_run_cancellation
+
+    redis = _FakeRedis()
+    wf_id = uuid.uuid4()
+
+    async def _get_pool():
+        return pool
+
+    async def _go():
+        if cancel_known:
+            await broadcast_run_cancellation(redis, wf_id)
+        await run_producer._finalize_producer_run(
+            run_id=uuid.uuid4(), thread_id=uuid.uuid4(), redis=redis, result_sink={},
+            terminal_status=terminal_status, terminal_error="boom",
+            active_workflow_run_id=wf_id, resolved_provider="openai", resolved_model="gpt-4o",
+        )
+
+    with patch("app.api.threads.get_pg_pool", new=_get_pool), \
+         patch("app.dependencies.get_pg_pool", new=_get_pool):
+        asyncio.run(_go())
+
+
+def test_an_f2_failed_escape_writes_one_worded_run_failed():
+    pool = _EndPool(status="active")
+    _f2(pool, "failed")
+    rows = pool.audits("run_failed")
+    assert len(rows) == 1
+    assert rows[0][1]["reason"] == (
+        "This run stopped unexpectedly before its steps finished, so it was marked failed."
+    )
+    assert "failed" in pool.finish_runs(), "F2's own finish_run still runs (anchor clear)"
+
+
+def test_an_f2_cancelled_escape_writes_no_run_failed():
+    pool = _EndPool(status="active")
+    _f2(pool, "cancelled")
+    assert pool.audits("run_failed") == []
+
+
+def test_an_f2_on_a_run_another_writer_ended_writes_nothing():
+    pool = _EndPool(status="cancelled")
+    _f2(pool, "failed", cancel_known=False)
+    assert pool.audits("run_failed") == []
+
+
+def test_run_producer_spends_one_line_on_the_f2_reason():
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[2] / "app/services/run_producer.py").read_text(
+        encoding="utf-8"
+    )
+    assert src.count("record_failed_end(") == 1
+
+
+# ── the boot reconciler (D-21, SEED-297) ────────────────────────────────────────────────────
+
+
+class _ReconcilePool(_EndPool):
+    """``fetch`` answers the ended-steps query with ``candidates``; everything else as _EndPool."""
+
+    def __init__(self, candidates, **kw):
+        super().__init__(**kw)
+        self.candidates = candidates
+        self.ended: dict = {}
+
+    async def fetch(self, sql, *args):
+        self.calls.append((sql, args))
+        if "FROM workflow_runs wr" in sql:
+            return list(self.candidates)
+        return []
+
+    def _guarded(self, args):
+        if args[0] in self.ended or "active" not in args[2]:
+            return None
+        self.ended[args[0]] = args[1]
+        return {"id": args[0], "user_id": self.owner}
+
+
+def _candidate(last="completed"):
+    return {"id": uuid.uuid4(), "thread_id": uuid.uuid4(), "user_id": uuid.uuid4(),
+            "org_id": None, "last_phase_status": last}
+
+
+def _reconcile(pool):
+    from app.services import harness_engine, run_reconciler
+
+    expire = AsyncMock()
+    with patch.object(harness_engine, "_expire_pending_ask_user", expire):
+        n = asyncio.run(run_reconciler._reconcile_workflow_runs(pool))
+    return n, expire
+
+
+def test_an_active_run_whose_steps_ended_is_finalised_failed_with_the_reconciler_words():
+    c = _candidate("completed")
+    pool = _ReconcilePool([c])
+    n, expire = _reconcile(pool)
+    assert n == 1
+    assert pool.ended == {c["id"]: "failed"}
+    assert [r[1] for r in pool.audits("run_failed")] == [
+        {"reason": "Finalised by the reconciler: its steps had ended."}
+    ]
+    assert expire.await_count == 1
+
+
+def test_a_run_whose_last_step_was_cancelled_is_finalised_cancelled_without_run_failed():
+    c = _candidate("cancelled")
+    pool = _ReconcilePool([c])
+    n, _ = _reconcile(pool)
+    assert n == 1 and pool.ended == {c["id"]: "cancelled"}
+    assert pool.audits("run_failed") == []
+
+
+def test_a_run_another_writer_ended_first_is_not_counted():
+    c = _candidate()
+    pool = _ReconcilePool([c])
+    pool.ended[c["id"]] = "completed"
+    n, expire = _reconcile(pool)
+    assert n == 0 and expire.await_count == 0 and pool.audits() == []
+
+
+def test_the_reconcile_query_guards_in_flight_young_and_paused_runs():
+    from app.config import settings
+
+    pool = _ReconcilePool([])
+    _reconcile(pool)
+    sql, args = next((s, a) for s, a in pool.calls if "FROM workflow_runs wr" in s)
+    assert args[0] == ["active"], "paused and cap_paused runs are never candidates"
+    assert args[1] == float(settings.harness_resume_lease_seconds), "the age guard is the lease"
+    assert "NOT EXISTS" in sql and "workflow_phases" in sql
+    assert set(args[2]) == {"completed", "failed", "skipped", "cancelled", "recorded_not_sent"}
+    assert "updated_at <" in sql
+
+
+def test_the_reconciler_never_writes_or_nulls_a_total_column():
+    """SEED-297: every SQL the new sweep sends names no usage / total column."""
+    c = _candidate()
+    pool = _ReconcilePool([c])
+    _reconcile(pool)
+    for sql, _ in pool.calls:
+        low = sql.lower()
+        for col in ("input_tokens", "output_tokens", "total", "usage"):
+            assert col not in low, (col, sql)
+
+
+def test_reconcile_orphaned_runs_calls_the_new_sweep_under_the_same_lock():
+    from app.services import run_reconciler
+
+    sweep = AsyncMock(return_value=2)
+
+    class _R:
+        async def set(self, *a, **k):
+            return True
+
+    with patch.object(run_reconciler, "_reconcile_workflow_runs", sweep), \
+         patch.object(run_reconciler, "_reconcile_eval_runs", AsyncMock(return_value=0)), \
+         patch.object(run_reconciler, "_reconcile_chat_runs", AsyncMock(return_value=0)):
+        n = asyncio.run(run_reconciler.reconcile_orphaned_runs(pool=object(), redis=_R(),
+                                                               supabase=object()))
+    assert n == 2 and sweep.await_count == 1
+
+    class _Held:
+        async def set(self, *a, **k):
+            return None
+
+    sweep.reset_mock()
+    with patch.object(run_reconciler, "_reconcile_workflow_runs", sweep):
+        assert asyncio.run(run_reconciler.reconcile_orphaned_runs(
+            pool=object(), redis=_Held(), supabase=object())) == 0
+    assert sweep.await_count == 0, "the sweep runs only under the reconcile lock"
