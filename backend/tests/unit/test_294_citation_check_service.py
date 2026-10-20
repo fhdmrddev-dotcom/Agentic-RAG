@@ -515,8 +515,17 @@ def test_probe_interleaves_the_orders():
     assert p.ask_schedule(3) == ["canonical", "reversed"] * 3
 
 
+def _venv_python() -> str:
+    # Under the junctioned worktree venv, sys.executable can resolve to the BASE interpreter,
+    # which has none of the backend's packages; the venv's own launcher lives under sys.prefix.
+    for cand in (Path(sys.prefix) / "Scripts" / "python.exe", Path(sys.prefix) / "bin" / "python"):
+        if cand.exists():
+            return str(cand)
+    return sys.executable
+
+
 def test_probe_help_lists_repeats_and_refuses_fewer_than_two():
-    py = sys.executable
+    py = _venv_python()
     out = subprocess.run([py, str(PROBE), "--help"], capture_output=True, text=True, timeout=60)
     assert out.returncode == 0, out.stderr
     assert "--repeats" in out.stdout and "default 2" in out.stdout.lower()

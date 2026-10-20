@@ -8310,6 +8310,102 @@
     }
    }
   },
+  "/citation-checks": {
+   "get": {
+    "tags": [
+     "citation-checks"
+    ],
+    "summary": "Get Citation Checks",
+    "operationId": "get_citation_checks_citation_checks_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "message_ids",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "description": "Comma-separated assistant message ids (at most 100)",
+       "title": "Message Ids"
+      },
+      "description": "Comma-separated assistant message ids (at most 100)"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CitationChecksResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/citation-checks/{message_id}": {
+   "post": {
+    "tags": [
+     "citation-checks"
+    ],
+    "summary": "Post Citation Check",
+    "operationId": "post_citation_check_citation_checks__message_id__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "message_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Message Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CitationCheckResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/metadata-fields": {
    "get": {
     "tags": [
@@ -16553,6 +16649,239 @@
     },
     "type": "object",
     "title": "CheckedQueryUpdate"
+   },
+   "CitationCheckAvailabilityOut": {
+    "properties": {
+     "available": {
+      "type": "boolean",
+      "title": "Available"
+     },
+     "engine": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "jev",
+         "openai_decisions"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Engine"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "off",
+         "engine_reorders_only",
+         "key_missing"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "available",
+     "engine",
+     "reason"
+    ],
+    "title": "CitationCheckAvailabilityOut"
+   },
+   "CitationCheckCounts": {
+    "properties": {
+     "supported": {
+      "type": "integer",
+      "title": "Supported"
+     },
+     "partly_supported": {
+      "type": "integer",
+      "title": "Partly Supported"
+     },
+     "not_supported": {
+      "type": "integer",
+      "title": "Not Supported"
+     },
+     "contradicted": {
+      "type": "integer",
+      "title": "Contradicted"
+     },
+     "couldnt_check": {
+      "type": "integer",
+      "title": "Couldnt Check"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "supported",
+     "partly_supported",
+     "not_supported",
+     "contradicted",
+     "couldnt_check"
+    ],
+    "title": "CitationCheckCounts"
+   },
+   "CitationCheckResult": {
+    "properties": {
+     "version": {
+      "type": "integer",
+      "const": 1,
+      "title": "Version"
+     },
+     "engine": {
+      "type": "string",
+      "enum": [
+       "jev",
+       "openai_decisions"
+      ],
+      "title": "Engine"
+     },
+     "model": {
+      "type": "string",
+      "title": "Model"
+     },
+     "checked_at": {
+      "type": "string",
+      "title": "Checked At"
+     },
+     "claims": {
+      "items": {
+       "$ref": "#/components/schemas/CitationClaimResult"
+      },
+      "type": "array",
+      "title": "Claims"
+     },
+     "counts": {
+      "$ref": "#/components/schemas/CitationCheckCounts"
+     },
+     "usage": {
+      "$ref": "#/components/schemas/CitationCheckUsage"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "version",
+     "engine",
+     "model",
+     "checked_at",
+     "claims",
+     "counts",
+     "usage"
+    ],
+    "title": "CitationCheckResult"
+   },
+   "CitationCheckUsage": {
+    "properties": {
+     "input_tokens": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Input Tokens"
+     },
+     "cost_usd": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cost Usd"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "input_tokens",
+     "cost_usd"
+    ],
+    "title": "CitationCheckUsage"
+   },
+   "CitationChecksResponse": {
+    "properties": {
+     "availability": {
+      "$ref": "#/components/schemas/CitationCheckAvailabilityOut"
+     },
+     "checks": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/CitationCheckResult"
+      },
+      "type": "object",
+      "title": "Checks"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "availability",
+     "checks"
+    ],
+    "title": "CitationChecksResponse"
+   },
+   "CitationClaimResult": {
+    "properties": {
+     "ordinal": {
+      "type": "integer",
+      "title": "Ordinal"
+     },
+     "n": {
+      "type": "integer",
+      "title": "N"
+     },
+     "sentence": {
+      "type": "string",
+      "title": "Sentence"
+     },
+     "verdict": {
+      "type": "string",
+      "enum": [
+       "supported",
+       "partly_supported",
+       "not_supported",
+       "contradicted",
+       "couldnt_check"
+      ],
+      "title": "Verdict"
+     },
+     "confidence": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Confidence"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "ordinal",
+     "n",
+     "sentence",
+     "verdict",
+     "confidence"
+    ],
+    "title": "CitationClaimResult"
    },
    "ConfirmBatch": {
     "properties": {
