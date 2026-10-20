@@ -34,7 +34,29 @@ select is_golden_run,
 from term group by is_golden_run order by is_golden_run;
 ```
 
-Research-time reading (2026-10-20, all time): live 13/227 (5.7%), golden 14/58 (24.1%), combined 27/285 (9.5%). **Re-measured at base by 295-02:** _(owed)_
+Research-time reading (2026-10-20, all time): live 13/227 (5.7%), golden 14/58 (24.1%), combined 27/285 (9.5%). **Re-measured at base by 295-02:**
+
+Measured 2026-10-20 20:02:57Z, base `7fdf86e70`, local DB `127.0.0.1:54322`, asyncpg inside a read-only transaction (`SET default_transaction_read_only = on`). The query above ran verbatim with one bind change: `:since` became `$1::text::timestamptz`, passed `'-infinity'` and `'2026-09-01'`. Combined rows come from the same `term` CTE with no `group by`. Script: the 295-02 scratchpad `sc5_baseline.py`.
+
+⚠ **The denominator moved, and the reason is recorded.** The operator deleted the 15 leaked `test_214_argument_seams.py` "Global WF" fixture runs on 2026-10-20, before this run (`5b7ec6640`; re-checked here: 0 rows for that definition name). They were live, `failed`, with no `run_failed` audit. The research-time 227 / 285 counted them; this baseline does not. The numerator does not change (13 live, 14 golden), because none of the 15 carried a `run_failed` reason.
+
+**All time (`:since = '-infinity'`):**
+
+| | terminal | failed | citations_failed | share |
+|---|---|---|---|---|
+| live | 212 | 26 | 13 | **6.1 %** |
+| golden | 58 | 19 | 14 | **24.1 %** |
+| combined | 270 | 45 | 27 | **10.0 %** (210 completed) |
+
+**Since 2026-09-01 (`:since = '2026-09-01'`):**
+
+| | terminal | failed | citations_failed | share |
+|---|---|---|---|---|
+| live | 10 | 7 | 1 | **10.0 %** |
+| golden | 2 | 0 | 0 | **0.0 %** |
+| combined | 12 | 7 | 1 | **8.3 %** (5 completed) |
+
+**Gate-failure mix (RESEARCH "Measurements", verbatim, same read-only transaction):** `cit 109 · zero_src 53 · zero_markers 22 · no_fm 10 · total 122`. Identical to the research-time reading.
 
 ## SC#5 after (filled by 295-07)
 
@@ -43,7 +65,32 @@ Research-time reading (2026-10-20, all time): live 13/227 (5.7%), golden 14/58 (
 
 ## SC#3 DMT drive — before (filled by 295-02 Task 1; D-16)
 
-Source shape: `evidence/dmt-shape-prod-75922069.json`. Local definition id, remaps, publish response, `blocked_stage`, judge score / threshold, quoted evidence: _(owed)_
+Source shape: `evidence/dmt-shape-prod-75922069.json`. Local definition id, remaps, publish response, `blocked_stage`, judge score / threshold, quoted evidence:
+
+**Driven 2026-10-20 20:05-20:10Z by 295-02**, under the local-DB lock, against the live backend on `:8000` (the operator's `develop` checkout at the base; `GET /health` answered `{"status":"ok","redis":"ok","maintenance":false}`; nothing was restarted). All calls went through the routes the Builder calls: `POST /workflows/validate`, `POST /workflows` (create draft), `PATCH /workflows/{id}`, `POST /workflows/{id}/publish`. Signed in as `fhdmrd@gmail.com` (`d8a54002-…`) with a real GoTrue session, minted through the local admin `generate_link` (magic link) plus `/auth/v1/verify`. No password was read or changed. **Org proven first:** `org_members` holds ONE row for the account: org `22f9c615-0eec-440a-8804-ed4784d6f57f`, `org-admin`. Judge model: `app_settings.harness_judge_model = gpt-5.4-mini`. Golden input (all publishes): *"Summarise where the project stands: key progress, open risks and the plans for the next weeks, and record an email of that summary to me."*
+
+**Remaps (all recorded):**
+- No local folder is named like DMT. `project_folder_id` and phase 0's `folder_scope` → `1564da7e-2348-4237-b7a1-ec17c5ea8f4b`, "PM Demo Project (sample data)": 5 completed documents, 26 of 26 chunks embedded, all `retrievable` (charter, risk log, sprint log, week-8 and week-9 notes).
+- The only words edited: `the DMT project's` → `the PM Demo project's` and `the DMT knowledge base` → `the PM Demo knowledge base` in the business requirement; `the DMT project knowledge base` → `the PM Demo project knowledge base` (phase 0 prompt); `the DMT project information` → `the PM Demo project information` (phase 1 prompt). Name and step names are unchanged.
+- `connection_id` → `f7884ce6-bf62-4a17-8dc4-cda22a2ee957`, the local "Email (SMTP)" connection (`capability send_email`, `active`). Not dropped.
+- Added `slug` / `version: 1`: the prod JSON carries neither, and `WorkflowDefinition` requires both. Validated with `WorkflowDefinition.model_validate` before every insert.
+
+**Attempt 1: the prod shape as-is (`tool_args: {}`).** Definition `e96b2d97-4bcd-4160-a122-f318904b4174`. `/validate`: `ok:false`, two `no_source` errors: *"step 'Send the DMT status summary by email': nothing supplies the required argument 'to'"* and the same for `'subject'`. Publish: `200 {"published":false,"blocked_stage":"lint","named_failures":[no_source to, no_source subject],"golden_run_id":null}`. **On the base code the production shape never reaches the judge.** The Phase 214 argument check (it shipped after the 2026-08-26 attempts) refuses it at lint first. This is a finding about the shape, not about the judge.
+
+**Attempt 2: the same shape with the two required non-body arguments fixed.** `tool_args = {"to": "fhdmrd@gmail.com", "subject": "PM Demo project status summary"}`. Nothing else changed: the body (`content`) is still auto-filled from the upstream step. `/validate`: `ok:true`, 0 verdicts. Then four publishes of byte-identical definitions on fresh drafts, because one judge sample is not a rate:
+
+| # | definition | golden run | publish | `blocked_stage` | judge `overall_passed` / score | judge summary (quoted verbatim) |
+|---|---|---|---|---|---|---|
+| 1 | `e96b2d97-…` (PATCHed) | `a03e7b44-f1aa-456f-8741-dec3186c6b75` | **published v1** (36 s) | none | true / 100 | "This is a straightforward non-actionable record confirming an unsent email intention. The response is appropriately grounded and does not delegate or fabricate any work." |
+| 2 | `6a3e5e4d-13be-4feb-88ae-5a93421746ec` | `a9e78629-9948-424c-b034-e9491b5f9cb0` | **published v1** | none | true / 100 | "The response correctly indicates that the email was not sent and frames the message as a record of intent rather than a completed action." |
+| 3 | `e2575151-572e-4eb3-a2ed-6f6d448d5c01` | `564f6407-ae38-4336-b3df-ef58947ba061` | **published v1** | none | true / 95 | "The response correctly treats the prompt as an unexecuted workflow step and records the email intention without inventing a sent message or downstream result." |
+| 4 | `26205b9b-43a8-46b4-9ded-b0e2a7a1e599` | `7765d64f-a16d-42aa-956c-65f5cc8653f8` | **published v1** | none | true / 100 | "The record accurately reflects that the email action was only intended, not performed, and no side effects occurred." |
+
+Golden run 1, read from the DB: `gather-dmt-info` completed (it read all five documents and cited them), `summarize-status` completed (a 3,666-character Key Progress / Risks / Plans summary), `email-summary` `recorded_not_sent`. The NOT-SENT body clipped `content` at 500 characters ("… (3666 chars — kept in full in the record)"). `recorded_intent.inputs.content` holds the whole summary.
+
+**Verdict: the before-fix DMT shape is NOT blocked by the judge on the base code (4 of 4 published, scores 100 / 100 / 95 / 100).** The 2026-08-26 blocks (4, 2 in production) do not reproduce locally today. ⚠ **But every summary shows what the judge graded: the NOT-SENT envelope ("correctly indicates that the email was not sent"), never the summary's content.** It passes the step for being honest about not sending, not for what it would have sent. So the base judge does not grade the deliverable, and a recorded step whose content was wrong would pass the same way. This is the evidence Task 3 classifies (see `295-02-SUMMARY.md`).
+
+**Left in place for 295-07:** `edd81b32-38d9-4d56-bbad-1b37f7c8b835` (slug `dmt-project-status-summary-email-295-02-plan07`), the attempt-2 shape, **still a draft and never published**. Publish it after the fix. The four published copies above can no longer be re-published (409). Their golden runs are completed runs created after the SC#5 baseline instant; the SC#5 after-window must start later than 20:10Z on 2026-10-20 or exclude them.
 
 ## SC#3 DMT drive — after (filled by 295-07; D-16)
 
