@@ -173,8 +173,9 @@ _EXPECTED_CALL_SITES = {
     "services/run_lifecycle.py:544",
     # Phase 295 Plan 04: the new caller's one site (see the COUNTS note above). Re-derived at
     #   Task 3 (+15: the F2 / reconciler reason constants and `_claim_terminal` above it):
-    #   run_handoff.py:186 → 201
-    "services/harness/run_handoff.py:201",
+    #   run_handoff.py:186 → 201, then -2 when the reconciler's sentence moved home to
+    #   run_reconciler.py: 201 → 199
+    "services/harness/run_handoff.py:199",
 }
 
 _CALL_RE = re.compile(r"await\s+finish_run\s*\(")

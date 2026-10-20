@@ -153,8 +153,6 @@ SWEEP_NO_DEFINITION_REASON = (
 F2_FAILED_REASON = (
     "This run stopped unexpectedly before its steps finished, so it was marked failed."
 )
-#: D-21 — the boot reconciler's sweep (SEED-297 shape: no total is ever written or NULLed).
-RECONCILED_REASON = "Finalised by the reconciler: its steps had ended."
 
 _GUARDED_TERMINAL_SQL = (
     "UPDATE workflow_runs SET status = $2 "

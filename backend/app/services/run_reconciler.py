@@ -275,20 +275,21 @@ async def _reconcile_chat_runs(pool, redis, *, stale_timeout_ms, grace_ms, inclu
 # D-22: no reason is invented for a historical run beyond this sentence, which is TRUE of every
 # row it finalises; no audit is back-dated.
 _TERMINAL_PHASE_STATUSES = ["completed", "failed", "skipped", "cancelled", "recorded_not_sent"]
+#: The one sentence this sweep stores (the ``run_failed`` audit + the run's end reason).
+_REASON_WORKFLOW = "Finalised by the reconciler: its steps had ended."
 
 
-async def _reconcile_workflow_runs(pool) -> int:
+async def _reconcile_workflow_runs(db) -> int:
     """Finalise ``active`` workflow runs whose every step has ended (D-21). Returns the count.
 
     Its last step (by end time, then position) ``cancelled`` → the run ends ``cancelled`` (no
-    ``run_failed``); else ``failed`` with "Finalised by the reconciler: its steps had ended."
-    and ONE ``run_failed``. Each finalised run's pending prompts are expired. Per-row
+    ``run_failed``); else ``failed`` with :data:`_REASON_WORKFLOW` and ONE ``run_failed``. Each finalised run's pending prompts are expired. Per-row
     try/except: one bad row never aborts the sweep (the ``_reconcile_chat_runs`` idiom).
     """
-    from app.services.harness.run_handoff import RECONCILED_REASON, end_run  # noqa: PLC0415
+    from app.services.harness.run_handoff import end_run  # noqa: PLC0415
 
     try:
-        rows = await pool.fetch(
+        rows = await db.fetch(
             """
             SELECT wr.id, wr.thread_id, wr.user_id, wr.org_id,
                    (SELECT wp.status FROM workflow_phases wp
@@ -318,13 +319,13 @@ async def _reconcile_workflow_runs(pool) -> int:
         run_id = row["id"]
         try:
             status = "cancelled" if row["last_phase_status"] == "cancelled" else "failed"
-            if not await end_run(pool, run_id, status, from_statuses=("active",),
-                                 user_id=row["user_id"], reason=RECONCILED_REASON):
+            if not await end_run(db, run_id, status, from_statuses=("active",),
+                                 user_id=row["user_id"], reason=_REASON_WORKFLOW):
                 continue  # somebody else ended it first (first-terminal-wins)
             from app.services.harness_engine import _expire_pending_ask_user  # noqa: PLC0415
 
             await _expire_pending_ask_user(
-                pool, row["thread_id"], run_id, org_id=row["org_id"],
+                db, row["thread_id"], run_id, org_id=row["org_id"],
             )
             flipped += 1
         except Exception:
