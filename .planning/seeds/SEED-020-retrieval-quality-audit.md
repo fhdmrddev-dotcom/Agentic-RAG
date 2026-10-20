@@ -1,7 +1,11 @@
 ---
 seed_id: SEED-020
 title: Retrieval Quality Audit — embedding model + re-ranker + hybrid retrieval
-status: planted
+status: partially-answered
+partial: true
+folded_into: "294"
+status_note: |
+  294-02 benched the rerank stage on a frozen 50+ question held-out set (294-MEASUREMENT.md); the embedding-model and query-type-sliced audit arms remain open
 planted: 2026-05-16
 phase_origin: 071.3-docling-demotion-table-engine-full-rip
 related_seeds: [SEED-006, SEED-019, SEED-021, SEED-027, SEED-059, SEED-060]
