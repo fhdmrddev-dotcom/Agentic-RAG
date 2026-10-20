@@ -69,8 +69,20 @@ def test_fixture_names_every_object_path_of_the_contract():
     assert set(_paths()) == {
         "$", "run", "run.started_by", "definition", "definition.phases[]", "definition_changed",
         "deliverable", "phase_log[]", "phase_log[].confidence", "phase_log[].human_input",
+        # 295-05 (RUN-01 / D-04): the unsourced mark, {continued_by: <words>, at: <ISO>}.
+        "phase_log[].unsourced",
         "verdicts[]", "sources[]",
     }
+
+
+def test_295_the_run_carries_end_reason_and_the_log_carries_unsourced():
+    """295-05 (D-22 / D-04): both fields are declared on the wire models, not merely fixtured."""
+    from app.api.workflow_run_evidence import RunEvidenceLogEntry, RunEvidenceRun
+
+    assert "end_reason" in RunEvidenceRun.model_fields
+    assert RunEvidenceRun.model_fields["end_reason"].default is None
+    assert "unsourced" in RunEvidenceLogEntry.model_fields
+    assert RunEvidenceLogEntry.model_fields["unsourced"].default is None
 
 
 def test_run_evidence_read_matches_the_contract_fixture_path_by_path():
