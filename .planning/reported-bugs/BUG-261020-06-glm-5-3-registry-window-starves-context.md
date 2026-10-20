@@ -4,12 +4,12 @@ title: glm-5.3's registry row (window 30,000 < max output 32,768) leaves a 1,981
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [model-registry, backend/context-window, cross-provider]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "live 2026-10-20 ~20:45: same question on glm-5.3 answered after 2 searches with [n] markers and 4 sources (was 13 searches, no answer)"
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Any registry row whose max_output_tokens exceeds context_window_tokens, or a context_budget_clamped log line below the system-prompt size; the code guard in Fix direction 2 is still unbuilt"
 reproduces_on:
   branch: develop
   commit: 762e74a54
@@ -44,3 +44,9 @@ Local `model_capabilities_overrides` row: `glm-5.3 · zhipu · context_window_to
 
 1. Data (operator): correct `glm-5.3`'s Context window in Settings → Model Registry to the vendor's figure (check docs.z.ai). This is the operator's registry value, so it was not edited here.
 2. Code (small, worth a test): treat a registry row whose `max_output_tokens` exceeds `context_window_tokens`, or whose clamped budget is smaller than the system prompt, as inconsistent: log it and fall back to the chain budget, as the existing guard already does for `reserve >= window`. Optionally flag `max_output > window` in the Model Registry form.
+
+## Fix (2026-10-20, operator: "fix the glm-5.3 context window for me")
+
+Data only. docs.z.ai/guides/llm/glm-5.3 states *"a 1M-token context window and a maximum output length of 128K tokens"*. Set glm-5.3's Context to **1,000,000** in Control Room → Model Registry (verified in `model_capabilities_overrides`: `context_window_tokens 1000000`, `max_output_tokens 32768` left as the request ceiling). With the window corrected, the budget falls back to the zhipu chain value (100,000) instead of being clamped to 1,981. Re-driven live on the same question: 2 searches, then an answer with [n] markers and 4 sources.
+
+⚠ **Local DB only.** If the cloud registry carries the same row, it needs the same edit after deploy. Fix direction 2, the code guard, is not built; the re_open_trigger names what would bring this back.
