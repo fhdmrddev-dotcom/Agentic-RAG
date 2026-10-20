@@ -71,6 +71,9 @@ Live at `4e767a3a2` (2026-10-16): phases 280-285, migrations 207-209 in cloud. B
 - Pre-close artifact audit: 39 open entries, almost all pre-v4.6 (`gsd-sdk query audit-open`).
 - v4.6 public changelog line for the `GET /documents` envelope breaking change (R-06).
 - Open bugs not named in v4.6 requirements: see `.planning/reported-bugs/` (`status: open`).
+- 295 (decisions owed, 2026-10-20):
+  1. Should authors be able to lock a detected KB step ("never continue without sources")? It would reverse sketch 142's "no switch on a detected step". Until then, "locked" means the stored `grounding_escalated` bit (295-CONTEXT D-36).
+  2. May the 15 leaked `test_214` fixture rows be deleted from the local DB (D-43)?
 
 ## Guardrail overrides
 

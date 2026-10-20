@@ -160,6 +160,64 @@ Decisions:
   - A plan whose tests mutate the local DB is serialised (worktree rule 4).
 - **D-35 (closed core).** No new phase type, emitter or tool. The new things are one validator disposition and one optional output field.
 
+### Post-research amendments (2026-10-20, auto): these SUPERSEDE the decisions they name
+
+`295-RESEARCH.md` §"Refuted / adjusted" (R1-R13) measured where the decisions above were wrong. Each amendment is the research's recommendation, adopted in `--auto` mode. Where an original decision conflicts with an amendment, the amendment wins.
+
+- **D-36 (R1, supersedes D-05's predicate).** "Locked" means `bool(phase.grounding_escalated)`: the author's stored bit, read directly and **not** through `grounding_cause`, which always reads `detected` on a KB step.
+  - A locked step's pause has no continue choice, and a forged continue is refused (allow-list).
+  - S3 plants the bit by direct DB write.
+  - ⚠ **Operator decision owed (not made autonomously):** the UI cannot set this bit on a detected step. Sketch 142 (operator) says "NO switch exists" on a detected step. So, today, an author can lock a KB step only by escalating before adding a KB tool.
+    - Adding a lock control on detected steps would reverse an operator design decision. It stays out of scope, recorded in `<deferred>` and in STATE.md's owed list.
+    - Also owed: whether every KB step's canvas label "⛨ Must prove it" still reads true when the pause offers continue. The output is then marked unsourced in three places, never silently passed.
+- **D-37 (R7, supersedes D-01's window bullet).** Engine asks pause **immediately** and durably with `timeout_seconds=None`: no deadline and no countdown, as the armed ask already behaves.
+  - The run reads paused / "Waiting on <name>" from the first second.
+  - `compose_waiting_on` and `PendingAskCard` must not say "the answer window has passed" for a prompt with no deadline. That sentence keys on a passed deadline, never on `paused` alone (UI-SPEC pitfall 1).
+  - The roadmap's "the pause has no timeout" failure is read as "a wait with no surface or no way out". The wait is visible, Stop is always offered, and nothing is lost. This interpretation is recorded for the verifier.
+- **D-38 (R13, refines D-02).**
+  - 0 sources → search another folder (only when permitted, per D-39) + continue (unless locked) + stop.
+  - 0 citation markers → continue (unless locked) + stop. Sources were found, so another folder is a dead option.
+  - Outage → unchanged `fail_run` (D-06).
+  - When the only remaining choice is stop, the step fails with its worded reason instead of pausing. A one-choice pause is a dead end with an extra click (UI-SPEC).
+- **D-39 (R8, refines D-03).** The folders offered use **the same acceptance rule as `scope.resolve_run_scope_root`**:
+  - A definition that declares a per-phase `folder_scope` → author-subtree members.
+  - A definition without one → owner-visible folders.
+  - An unbound definition (whole KB) → the option is not offered.
+  - The list is built server-side; the client is fed only that list.
+- **D-40 (open question 1, D-04 stash).** The produced-but-gate-failed output and the ask metadata are stashed on the active `workflow_phases.output` under `_awaiting_answer`. It survives a restart and the sweep can read it.
+  - One new writer in `db/workflows.py` (G-5: one helper).
+  - The 289 evidence and run-page readers are checked to ignore that key on an active row.
+  - The `unsourced` field carries `continued_by` and `at`, per the UI-SPEC.
+- **D-41 (R3, extends D-20).** The stuck runs came from `_resume_run` / the boot sweep, not the golden run. `_resume_run` must terminalize `workflow_runs` on escape (it covers both the boot sweep and `_wake`), and the resume shell must not be written `completed` when the run did not complete. The golden-run `finally` is still fixed (latent).
+- **D-42 (R4, refines D-18 / BUG-12).** No historical "waiting" failure was an unanswered wait: all 7 were answered declines. What stays true and gets fixed:
+  1. A waiting run reads paused (D-37).
+  2. A decline's reason names the person and the step and **drops** the armed prompt sentence ("The run is waiting here…").
+  - A decline ends `failed` (open question 3), with words. Stop on the found-nothing pause also ends `failed`, "stopped by <person>".
+- **D-43 (R5, refines D-22).** The 20 reasonless runs: 15 are `test_214_argument_seams.py:212-215` fixtures that its teardown leaked; 5 are June producer escapes (F2).
+  - The test's teardown is fixed in this phase, so it stops leaking.
+  - Deleting the 15 local fixture rows is **not** done by the phase: it is a destructive local write, proposed to the operator.
+  - Production was read on 2026-10-20 (MCP, read-only): **0 `active` runs and 0 failed runs without `run_failed`** (17 completed / 2 failed / 1 cancelled). D-22's defects are local-only.
+- **D-44 (R6, shrinks D-14).** Since 281 the message is already the composed cause. D-14 is one expression (`validator_error` at `harness_engine.py:1189`) plus re-pinning `test_281_engine_cause_precedence.py:137` with a reason.
+- **D-45 (R2, refines D-13).** A template-less `llm_emit` step is a designed shape: the Run modal uploads a template at launch.
+  - Publish still refuses it (the golden run has no upload).
+  - Run start refuses only when neither a definition asset nor a staged thread `template_input` exists (the Branch-2 predicate in `template_asset_service.py:209-226`).
+  - `/validate` reports the code as **incomplete** (`_INCOMPLETE_CODES`), not as an error.
+- **D-46 (R9, refines D-10).**
+  - `_prior_output_text` gives the next step the question AND the answer, labelled.
+  - `_latest_phase_text` **skips** human-step outputs (those carrying `answer`), so an external action's content and a later human step's draft come from the latest produced text, not the approval question.
+  - The `unsourced` note goes into the prior-output text only, **never** into an external action's body (Pitfall 10; open question 4).
+- **D-47 (R10, orders D-17).** D-10 lands first. Then re-drive 4 publishes of the 288 pause plant. Add a `_golden_run_mock` judge note only if the judge still cites the auto-answer; record the counts either way.
+  - D-15 also renders `recorded_intent.inputs` in full for the judge. The NOT-SENT body truncates each value at 500 characters.
+- **D-48 (R11, extends D-04's "never a silent pass").** After an author-declared post `ask_user` validator's Proceed, the engine citations gate still evaluates the produced output, so an unsourced output cannot pass unmarked. Drafts only today (publish refuses author `ask_user`). D-08's ordering gets its one pinning test.
+- **D-49 (R12, refines D-19).** Engine asks no longer wait in-process, so a Stop on a paused run already ends `cancelled`. The remaining in-process waiters (author `ask_user` validators, and the `llm_human_input` window, where a cancel today completes the step with an empty answer) raise `CancelledError` on `kind == "cancel"`, following the shutdown precedent.
+- **D-50 (research pitfalls, binding).**
+  - Release the claim lease on pause, so an answer within 300 s re-drives.
+  - The boot sweep must not re-run a paused run and ask again.
+  - The prompt-row insert stops being best-effort for engine asks: a durable pause without its prompt row is a dead end.
+  - D-23's suppression must never drop the only message.
+- **D-51 (D-32 resolved).** The seam is taken first. The engine-ask disposition (`_resolve_failure_with_ask_user` and its helpers) moves **verbatim** into `backend/app/services/harness/engine_ask.py`, with the names re-exported from `harness_engine.py` so patch targets survive (Pitfall 8). The engine gate keeps `on_failure="fail_run"` in `grounding.py`, and a pure predicate identifies it (`test_185:77` stays green; no new author-writable disposition literal).
+- **SC#5 baseline (D-09, from RESEARCH §G):** runs ending in a `citations_required` failure: live **13/227 (5.7%)**, golden **14/58 (24.1%)**, combined **27/285 (9.5%)**. Query in RESEARCH §G. Backend unit baseline at research: **70 failed / 8421 passed**. Re-derive it at execute; never quote it.
+
 ### Claude's Discretion
 - Exact wording of the pause prompt and choices, within D-02's plain-language rule and the copy/vocabulary files the ledger names.
 - Whether the per-run folder override lives on the phase row or in run inputs (D-03), provided it is recorded and never written to the definition.
@@ -249,6 +307,9 @@ Decisions:
 - **A hard save refusal for a missing template**: rejected for now (D-13) because it would break draft autosave. Re-open if the operator wants it.
 - **A new `waiting` run status**: not needed (D-18); `paused` plus the waiting tone carries it.
 - **Backfilling reasons for historical failed runs**: rejected (D-22); no invented reasons.
+- **An author lock control on detected KB steps (D-36)**: an operator decision. It would reverse sketch 142's "no switch on a detected step". Until then, "locked" means the stored `grounding_escalated` bit.
+- **Deleting the 15 leaked `test_214` fixture rows from the local DB (D-43)**: a destructive local write, proposed to the operator and not done by the phase.
+- **Stating "unsourced" to an external action's recipient**: no (D-46). The mark lives on the step, the evidence page and the receipt.
 
 ### Reviewed bugs (not folded)
 - `BUG-261020-02` (evidence page shows a later step restating a withheld document): privacy / run-evidence, not dead-ends. A `re_open_trigger` was written.
