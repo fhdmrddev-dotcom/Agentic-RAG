@@ -80,6 +80,16 @@ Live at `4e767a3a2` (2026-10-16): phases 280-285, migrations 207-209 in cloud. B
 ## Guardrail overrides
 
 - **Phase 295 — G-2 (sketch before plan for UX), 2026-10-20:** not run. The operator asked for autonomous end-to-end completion. The found-nothing pause reuses `PendingAskCard`'s live-answer layout, and the unsourced mark reuses the 289 evidence-line vocabulary (295-CONTEXT D-30). The G-4 browser drive is the check. The operator may ask for a sketch of the pause card.
+- **Phase 295 — plan 05 G-5 over budget, recorded, not hidden (2026-10-21):** the work stayed one-touch in shape but exceeded the count:
+  - `api/workflow_runs.py`: +5 functions. 3 do I/O, so they cannot live in the new pure `run_read_wire.py`.
+  - `api/threads.py`: one field plus one one-time name lookup.
+  - `types/index.ts`: 3 fields, not 2, because `AskUserAnswerBody.folder_id` lives there.
+  - `db/workflows.py`: edited outside the plan's file list. `get_unanswered_ask_user` returns `created_at` and `engine_pause`.
+  - `WorkflowRunPage.tsx`: deliberately untouched. A finished run renders the evidence report (since 289-04), so a band mount could never render; the reason line lives in the report instead.
+  - Detail: `295-05-SUMMARY.md`.
+- **Phase 295 — SC#3 reading, measured 2026-10-20 (295-02):** at base, the production DMT shape is refused at **lint** (Phase 214: the email step has no `to` / `subject`), not by the judge. With those two set, it published **4 of 4** (judge 100 / 100 / 95 / 100, `gpt-5.4-mini`), and the judge graded the honesty of the NOT-SENT envelope rather than the content.
+  - The August blocks came from an older judge.
+  - After 295-02 the judge sees the full recorded content, so plan 07's after-publish of draft `edd81b32` is the real SC#3 test.
 - **Phase 295 — G-8 plan count 7, 2026-10-20:** 7 plans in 4 waves, against the 3-5 target. Plan 01 is a pure-move seam that must stand alone (D-51). The frontend splits between `PendingAskCard.tsx` (plan 06) and the read-side change (plan 05), which cannot share one context budget (295-CONTEXT D-52). Verifier, TDD RED, security review and migration discipline not cut.
 - **Phase 295 — ledger rows deferred to plan 07, 2026-10-20:** 8 files with no ledger row (`engine_ask.py`, `run_handoff.py`, `run_read_wire.py`, `api/panel.py`, `harness/human_input.py`, `RunEndReasonLine.tsx`, `enginePause.ts`, `AskFolderChoice.tsx`) get their rows and sections in one plan-07 commit (289 precedent), so parallel worktrees never collide on `docs/HOT-FILE-LEDGER.md`.
 - **Phase 295 — UI-SPEC interprets CONTEXT D-30, 2026-10-20:** two deliberate departures from D-30's examples. (1) The unsourced glyph is `◌`, not `○`, because `○` already means "searched, nothing matched" on the same 289 evidence line. (2) The folder choice is a new small `Select` fed by a list the server has already bounded, following `MoveToFolderDialog`'s pattern. It does not reuse a shipped picker, because every shipped picker loads the user's whole folder list, which would break D-03 (never widen access). The operator may reverse either.
