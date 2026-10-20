@@ -170,6 +170,9 @@ const BASELINE = {
   // rather than omitted, so a reader can tell "measured, unmoved" from "not looked at".
   "WorkspacePanel.derived.test.tsx": 4,
   "CitationList.test.tsx": 15,
+  // Phase 294-03 (DEC-03, Pitfall 7) — the claim-ordinal parity fence: 1 non-vacuity case + 2 per
+  // fixture case (16 cases in citation_ordinals_v1.json). Measured green on a run of the suite alone.
+  "citationOrdinals.parity.test.tsx": 33,
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
   "ChatArea.approval.test.tsx": 3,
@@ -4743,6 +4746,8 @@ const TARGETS = [
   // worth guarding rather than leaving declined.
   "src/components/panel/__tests__/WorkspacePanel.derived.test.tsx",
   "src/components/chat/__tests__/CitationList.test.tsx",
+  // Phase 294-03 — BOTH KNOBS, SAME COMMIT: without this entry the parity fence runs in no gate.
+  "src/components/chat/__tests__/citationOrdinals.parity.test.tsx",
   "src/components/chat/RunCard.test.tsx",
   "src/components/chat/RunCard.timer.test.tsx",
   "src/components/chat/__tests__/ChatArea.approval.test.tsx",
