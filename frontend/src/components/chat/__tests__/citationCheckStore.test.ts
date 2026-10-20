@@ -5,7 +5,7 @@
  * server's 100-id cap), and an id already loaded or queued never asks again. `run(id)` is the only
  * POST, and it never hides a stored result when it fails.
  */
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { renderHook } from "@testing-library/react"
 
 const api = vi.hoisted(() => ({ getCitationChecks: vi.fn(), runCitationCheck: vi.fn() }))
@@ -29,8 +29,15 @@ const RESULT: CitationCheckResult = {
 }
 const AVAILABLE = { available: true, engine: "jev", reason: null } as const
 
-/** Let the queued microtask flush and the mocked request settle. */
-const settle = () => new Promise((r) => setTimeout(r, 0))
+/** Let the queued microtask flush and the mocked request settle (a few macrotasks: the store
+ *  loads its client with a dynamic import, which beforeAll pre-warms). */
+const settle = async () => {
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+}
+
+beforeAll(async () => {
+  await import("@/lib/api/citationChecks")
+})
 
 afterEach(() => {
   api.getCitationChecks.mockReset()

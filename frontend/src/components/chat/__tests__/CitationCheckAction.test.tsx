@@ -5,7 +5,7 @@
  * citations…" · per-verdict count pills + Re-check + "checked by …" · the ⓘ reason line. A failed
  * POST shows one fixed line and never hides a stored result.
  */
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 const api = vi.hoisted(() => ({ getCitationChecks: vi.fn(), runCitationCheck: vi.fn() }))
@@ -32,6 +32,11 @@ function serve(availability: CitationCheckAvailability, checks: Record<string, C
   api.getCitationChecks.mockResolvedValue({ availability, checks })
 }
 
+beforeAll(async () => {
+  // the store loads its client lazily; pre-warm the (mocked) module so timing is not the test
+  await import("@/lib/api/citationChecks")
+})
+
 afterEach(() => {
   cleanup()
   api.getCitationChecks.mockReset()
@@ -43,7 +48,7 @@ describe("CitationCheckAction", () => {
     api.getCitationChecks.mockReturnValue(new Promise(() => {}))
     const { container } = render(<CitationCheckAction messageId="m1" citationCount={3} />)
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 0))
+      for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
     })
     expect(container.innerHTML).toBe("")
     expect(api.getCitationChecks).toHaveBeenCalledTimes(1)
