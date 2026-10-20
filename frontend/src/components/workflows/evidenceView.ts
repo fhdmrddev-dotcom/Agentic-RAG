@@ -20,6 +20,7 @@ import type {
   RunEvidence,
   RunEvidencePhase,
   RunEvidenceSource,
+  RunEvidenceUnsourced,
   RunEvidenceVerdict,
 } from "@/lib/api/runEvidence"
 import type { RunPhaseConfidence } from "@/lib/api/workflows"
@@ -91,6 +92,8 @@ export interface EvidenceStepRow {
   count: string | null
   /** The SAME wire object the live spine renders — passed through untouched (D-10). */
   confidence: RunPhaseConfidence | null
+  /** 295-05 (D-04): the unsourced mark, passed through untouched like `confidence`. */
+  unsourced: RunEvidenceUnsourced | null
   /** Owner: question, quoted answer, "— who". Colleague: one "Waited for an answer" line. */
   humanInput: string[] | null
   failure: string | null
@@ -118,6 +121,8 @@ export interface EvidenceView {
   runId: string
   title: string
   outcome: string
+  /** 295-05 (D-22 / UI-SPEC C.2): what `RunEndReasonLine` reads under the outcome. */
+  endReason: { status: string; reason: string | null }
   startedBy: string
   /** Owner only. */
   email: string | null
@@ -255,6 +260,7 @@ function stepRow(row: RunEvidencePhase, runStatus: string, isOwner: boolean): Ev
     output: humanInput !== null ? null : row.output_text,
     count: count === null ? null : countDeclared(count.count, count.noun),
     confidence: row.confidence,
+    unsourced: row.unsourced ?? null,
     humanInput,
     failure: row.failure_reason ? whyItStopped(row.failure_reason) : null,
     status: row.status,
@@ -295,6 +301,7 @@ export function toEvidenceView(p: RunEvidence): EvidenceView {
     runId: p.run.id,
     title: p.run.workflow_name || UNTITLED_WORKFLOW,
     outcome: outcomeIn(p.run.status, runSpanText(p.run.started_at, p.run.completed_at)),
+    endReason: { status: p.run.status, reason: p.run.end_reason ?? null },
     startedBy: startedByLine(
       formatWhen(p.run.started_at),
       p.run.started_by.name,
@@ -357,6 +364,7 @@ export function sectionStrings(v: EvidenceView): Record<1 | 2 | 3 | 4, string[]>
         r.statusWord,
         r.time,
         r.confidence?.kb_label,
+        r.unsourced?.continued_by,
       ]),
     ),
     3: v.noVerdicts !== null ? [v.noVerdicts] : nonEmpty(v.verdicts.flatMap((r) => [r.sentence, r.meta, r.resultWord])),

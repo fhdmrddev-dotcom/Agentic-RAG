@@ -62,6 +62,8 @@ import { StepIdentity } from "@/components/workflows/StepIdentity"
 import { stepActionWords, stepMarkShape } from "@/components/workflows/stepActionWords"
 // The failure block's label. `214-03`'s vocabulary is the ONE home for these words.
 import { FAILED_REASON_LABEL } from "@/components/workflows/stepIdentityVocabulary"
+// 295-05 (D-04): the SAME leaf the run spine and the evidence report mount, off the same field.
+import { StepEvidenceLine } from "@/components/workflows/StepEvidenceLine"
 
 // ── PHASE_TYPE_LABEL (DATA-CONTRACT §5.1) — the 5 LOCKED literals → label + glyph
 //    + one-liner. UNKNOWN (forward-compat) falls back to the generic "Step" row;
@@ -609,6 +611,12 @@ export function PhaseCard({ phase, position, timing, runLive }: PhaseCardProps) 
               </span>
             )}
             <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{phase.slug}</span>
+            {/* 295-05 (RUN-01 / D-04 / UI-SPEC B.2) — the unsourced mark, beneath the step's
+                essence line and above its timing row. Sited in the always-visible identity
+                column, not the accordion region, so a FOLDED done card still reads it: a step
+                kept without sources must never look like a quiet completed step. Renders
+                nothing when the mark is absent. */}
+            <StepEvidenceLine unsourced={phase.unsourced} />
 
             {/* ── Phase 200-07 · RS-MR-02 (the per-step reading) + RS-MR-01 (the declared
                    count) ────────────────────────────────────────────────────────────────
