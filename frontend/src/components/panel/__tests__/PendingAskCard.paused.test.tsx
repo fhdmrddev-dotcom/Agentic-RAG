@@ -39,7 +39,7 @@ vi.mock("@/lib/api", async () => {
   }
 })
 import { answerAskUser, ApiError } from "@/lib/api"
-import { PAUSED_WAITING_LINE, PendingAskCard } from "../PendingAskCard"
+import { NO_DEADLINE_WAITING_LINE, PAUSED_WAITING_LINE, PendingAskCard } from "../PendingAskCard"
 
 afterEach(() => {
   cleanup()
@@ -143,5 +143,82 @@ describe("PendingAskCard paused (289-01 / D-13)", () => {
 
     expect(screen.getByText(/no response within 0:30 — agent stopped/i)).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /send answer/i })).toBeNull()
+  })
+})
+
+// ── Phase 295-06 (D-37 / D-18 / UI-SPEC A.4) — an engine pause has NO deadline ──────────────────
+//
+// Engine asks pause immediately and durably with `timeout_seconds: null` (D-37). So in BOTH homes —
+// the run page (which passes `paused`) and the panel stack (which does not) — the card draws no
+// clock, shows the shipped no-deadline line, and never says the window passed or the agent
+// stopped, however long the person takes. An armed approval reads the same (D-18).
+//
+// ⚠ These pass against the card before 295-06's edit, because the shipped `!hasDeadline` arm
+// already covers a null deadline. They stand as FENCES on the reading, not as drivers.
+describe("PendingAskCard (295-06 / D-37) — an engine pause shows no clock and keeps waiting", () => {
+  const ENGINE_WAIT: PendingAsk = {
+    tool_call_id: "tc-engine-wait",
+    prompt: "“Draft the summary” answered without citing its sources in Policies. How should the run continue?",
+    options: ["Continue without sources", "Stop the run"],
+    timeout_seconds: null,
+    run_id: "wr-engine-wait",
+    created_at: new Date(Date.now() - 600_000).toISOString(),
+    engine_pause: { kind: "no_markers", phase: "draft_summary", continue_allowed: true, locked: false, folders: [] },
+  }
+
+  const assertStillWaiting = () => {
+    expect(screen.getByText(NO_DEADLINE_WAITING_LINE)).toBeInTheDocument()
+    expect(screen.queryByText(PAUSED_WAITING_LINE)).toBeNull()
+    expect(document.body.textContent).not.toContain("The answer window has passed")
+    expect(document.body.textContent).not.toContain("agent stopped")
+    expect(screen.queryByText(/^\d+:\d{2}$/)).toBeNull()
+    expect(screen.queryByText("Expired")).toBeNull()
+    expect(screen.queryByText("Retired")).toBeNull()
+    expect(screen.getByText("Needs you")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /send answer/i })).toBeInTheDocument()
+  }
+
+  for (const paused of [true, false]) {
+    it(`${paused ? "run-page home (paused)" : "panel home (no paused prop)"}: still waiting after 10 minutes`, () => {
+      vi.useFakeTimers()
+      try {
+        render(<PendingAskCard ask={ENGINE_WAIT} reconcile={noopReconcile} paused={paused} />)
+        expect(screen.getByText(ENGINE_WAIT.prompt)).toBeInTheDocument()
+        assertStillWaiting()
+        for (let i = 0; i < 10; i++) {
+          act(() => {
+            vi.advanceTimersByTime(60_000)
+          })
+        }
+        assertStillWaiting()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  }
+
+  it("an armed approval (no deadline) reads the same, with its two shipped choices", () => {
+    vi.useFakeTimers()
+    try {
+      const armed: PendingAsk = {
+        tool_call_id: "tc-armed-wait",
+        prompt: "This step sends an email to the client. Approve it?",
+        options: ["Approve this step", "Do not run it"],
+        timeout_seconds: null,
+        run_id: "wr-armed-wait",
+        engine_pause: { kind: "action_risk", phase: "send_email", continue_allowed: false, locked: false, folders: [] },
+      }
+      render(<PendingAskCard ask={armed} reconcile={noopReconcile} paused />)
+      expect(screen.getAllByRole("radio").map((r) => r.textContent)).toEqual(["Approve this step", "Do not run it"])
+      act(() => {
+        vi.advanceTimersByTime(600_000)
+      })
+      expect(screen.getByText(NO_DEADLINE_WAITING_LINE)).toBeInTheDocument()
+      expect(document.body.textContent).not.toContain("The answer window has passed")
+      expect(document.body.textContent).not.toContain("agent stopped")
+      expect(screen.queryByText(/^\d+:\d{2}$/)).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
