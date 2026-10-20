@@ -13,7 +13,7 @@
  * Mocks copied from `PendingAskCard.test.tsx` (allow-list StreamsProvider factory), with the
  * viewing thread made mutable for the two-thread case.
  */
-import { describe, it, expect, vi, afterEach } from "vitest"
+import { describe, it, expect, vi, afterEach, beforeAll } from "vitest"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { mockPendingAskWithRunId } from "./fixtures"
@@ -68,7 +68,7 @@ vi.mock("@/providers/StreamsProvider", () => ({
   }),
 }))
 
-import { PendingAskCard, PendingAskStack } from "../PendingAskCard"
+import { NO_DEADLINE_WAITING_LINE, PendingAskCard, PendingAskStack } from "../PendingAskCard"
 import { useAskDraftStore } from "@/stores/askDraftStore"
 
 afterEach(() => {
@@ -276,5 +276,77 @@ describe("PendingAskStack (282-02) — one input per pause, wherever the panel i
     await user.click(within(panel).getAllByRole("radio")[2])
     expect(within(direct).getAllByRole("radio")[2]).toHaveAttribute("aria-checked", "true")
     expect(within(direct).getAllByRole("radio")[1]).toHaveAttribute("aria-checked", "false")
+  })
+})
+
+// ── Phase 295-06 (D-03 / D-37 / UI-SPEC A.3-A.4) — the found-nothing pause in the panel stack ────
+//
+// The panel stack passes no `paused` (289-01's named gap). An engine pause needs none: it carries
+// `timeout_seconds: null`, so the panel card reads "waiting" with no clock. The chosen folder lives
+// in the ONE draft (282-02), so the panel card, the chat pointer and the chat card agree about it,
+// and one pause still shows ONE folder chooser.
+describe("PendingAskStack (295-06) — the found-nothing pause, one chooser, no clock", () => {
+  beforeAll(() => {
+    Element.prototype.scrollIntoView = vi.fn()
+    if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
+    if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
+    if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {}
+  })
+
+  const engineAsk: PendingAsk = {
+    tool_call_id: "tc-stack-engine",
+    prompt: "Searched Policies and found nothing for “Find the clauses”. How should the run continue?",
+    options: ["Search another folder", "Continue without sources", "Stop the run"],
+    timeout_seconds: null,
+    run_id: "wr-stack-engine",
+    created_at: new Date(Date.now() - 600_000).toISOString(),
+    engine_pause: {
+      kind: "no_sources",
+      phase: "find_clauses",
+      continue_allowed: true,
+      locked: false,
+      folders: [
+        { id: "f-contracts", name: "Contracts", depth: 0 },
+        { id: "f-leases", name: "Leases", depth: 1 },
+      ],
+    },
+  }
+
+  it("the panel card reads waiting with no clock, and still does 10 minutes later", () => {
+    vi.useFakeTimers()
+    hookState.asks = [engineAsk]
+    render(<Homes panel />)
+    const card = panelCard(engineAsk.tool_call_id)!
+    expect(within(card).getByText(NO_DEADLINE_WAITING_LINE)).toBeInTheDocument()
+    for (let i = 0; i < 10; i++) {
+      act(() => {
+        vi.advanceTimersByTime(60_000)
+      })
+    }
+    expect(within(panelCard(engineAsk.tool_call_id)!).getByText(NO_DEADLINE_WAITING_LINE)).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain("agent stopped")
+    expect(document.body.textContent).not.toContain("The answer window has passed")
+    expect(screen.queryByText(/^\d+:\d{2}$/)).toBeNull()
+    expect(screen.getAllByRole("button", { name: "Send Answer" })).toHaveLength(1)
+  })
+
+  it("one chooser for one pause, and the chosen folder follows the panel to the chat card", async () => {
+    const user = userEvent.setup()
+    hookState.asks = [engineAsk]
+    const { rerender } = render(<Homes panel />)
+    const card = panelCard(engineAsk.tool_call_id)!
+    await user.click(within(card).getByRole("radio", { name: "Search another folder" }))
+    expect(screen.getAllByText("Folder to search")).toHaveLength(1)
+    expect(screen.getByTestId("ask-pointer-draft").textContent).toBe("Draft: Search another folder")
+
+    await user.click(within(card).getByLabelText("Folder to search"))
+    await user.click(await screen.findByRole("option", { name: "Contracts" }))
+
+    rerender(<Homes panel={false} />)
+    const chat = screen.getByTestId("chat-column")
+    expect(within(chat).getByRole("radio", { name: "Search another folder" })).toHaveAttribute("aria-checked", "true")
+    expect(within(chat).getByLabelText("Folder to search")).toHaveTextContent("Contracts")
+    expect(screen.getAllByText("Folder to search")).toHaveLength(1)
+    expect(within(chat).getByRole("button", { name: "Send Answer" })).toBeEnabled()
   })
 })
