@@ -333,8 +333,15 @@ def _latest_phase_text(accumulated_outputs: dict) -> str:
     reverse scan: every phase executor returns ``{"text": <answer>}``, so the
     latest non-empty ``text`` is the prior phase's output (the doc_qa_human flow's
     ``draft`` phase produces ``{"text": <answer>}`` — that is the thing being
-    confirmed). Returns ``""`` when there is no upstream text (harmless)."""
+    confirmed). Returns ``""`` when there is no upstream text (harmless).
+
+    Phase 295 (D-46, BUG-261020-01): a human step's output (it carries ``answer``) is SKIPPED.
+    Its ``text`` is the approval QUESTION, so an external action after KB → summary → approve
+    used to send the question as its content, and a later human step's draft was a question.
+    The raw ``text`` is read here, so D-11's unsourced note (``run_handoff.handoff_text``,
+    next-model only) never reaches an external action's body (Pitfall 10)."""
     for out in reversed(list(accumulated_outputs.values())):
-        if isinstance(out, dict) and isinstance(out.get("text"), str) and out["text"].strip():
+        if isinstance(out, dict) and "answer" not in out \
+                and isinstance(out.get("text"), str) and out["text"].strip():
             return out["text"]
     return ""

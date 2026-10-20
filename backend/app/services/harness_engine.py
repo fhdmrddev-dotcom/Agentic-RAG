@@ -668,6 +668,10 @@ async def _run_phase_with_gates(
     # (back-compat for direct unit callers).
     stream_run_id = stream_run_id or run_id
 
+    # Phase 295 (D-23, BUG-261015-01): does the engine own this phase's failure words? (A
+    # phase with validators retries or routes, and each failure-terminal arm surfaces once.)
+    claim_failure_message(ctx, phase)
+
     # Phase 295 (D-01 / D-18): a re-drive of an answered ENGINE ask resolves it here, before
     # anything runs. ``None`` = nothing to consume, or the step must run (a folder re-run, a
     # consumed approval); any other outcome is returned as is. The disposition lives in
@@ -1146,7 +1150,9 @@ async def _run_phase_with_gates(
         await write_audit(
             pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
             metadata={"phase": phase.slug, "attempt": attempt, "error": cause,
-                      "validator_error": gate.error_message},
+                      # Phase 295 (D-14 / D-44): a diagnosed failure records the executor's
+                      # cause, never the validator's reading of the failure output's shape.
+                      "validator_error": cause if diagnosed else gate.error_message},
         )
         await _emit(redis, stream_run_id, "gate_failed",
             phase=phase.slug, attempt=attempt, error=cause,
@@ -2016,6 +2022,8 @@ async def run_workflow(
                         "site for run %s", run_id,
                     )
                 return
+            # Phase 295 (D-23): the executor was silenced for this phase, so say it once here.
+            await surface_if_engine_owned(ctx, run_id, outcome.reason, pool, _surface_failure_message)
             i = target_i
             continue
 
@@ -2095,6 +2103,10 @@ async def run_workflow(
                 ) or str(_emit_failure),
                 output=durable_output,
             )
+            # Phase 295 (D-23): the same composed cause, said once when the engine owned it.
+            await surface_if_engine_owned(ctx, run_id, compose_emit_failure(
+                output.get("attempt_causes") or [], step_name=_clean_label(getattr(phase, "name", None)),
+            ) or str(_emit_failure), pool, _surface_failure_message)
         elif _recorded_intent:
             await record_phase_not_sent(pool, phase_id, durable_output)
         else:
@@ -2911,6 +2923,10 @@ __all__ = [
 # ``phase_types.register_all()`` → ``from app.services.harness_engine import
 # PHASE_TYPE_REGISTRY``: placed in the top import block it fails on a cold
 # ``import app.services.harness_engine`` (measured, 295-01 SUMMARY ## Cycle probe).
+from app.services.harness.run_handoff import (  # noqa: E402,F401 — Phase 295 (295-04): leaf helpers
+    claim_failure_message,
+    surface_if_engine_owned,
+)
 from app.services.harness.engine_ask import (  # noqa: E402,F401
     _ABORT_LIKE_CHOICES,
     _ACTION_RISK_APPROVE_CHOICE,

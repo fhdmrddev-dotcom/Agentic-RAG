@@ -142,9 +142,14 @@ _EXPECTED_CALL_SITES = {
     #   harness_engine.py:1943 → 1954 · 1984 → 1995 · 2281 → 2292
     #   then +2 in 295-03 Task 3 (`get_ask_user_response` / `resume_run` joined the db import
     #   block for the sweep's engine-ask arm): 1954 → 1956 · 1995 → 1997 · 2292 → 2294
-    "services/harness_engine.py:1956",
-    "services/harness_engine.py:1997",
-    "services/harness_engine.py:2294",
+    # ⚠ RE-DERIVED at Phase 295 Plan 04 Task 1: (a) the COUNTS stayed identical; +6 when the ONE
+    #   `claim_failure_message(ctx, phase)` call and the D-14 `validator_error` comment landed in
+    #   `_run_phase_with_gates` above all three, then +6 more above the third when the valid
+    #   skip_to and completed-with-failure arms gained their one `surface_if_engine_owned` line.
+    #   The calls are byte-unchanged. 1956 → 1962 · 1997 → 2003 · 2294 → 2306
+    "services/harness_engine.py:1962",
+    "services/harness_engine.py:2003",
+    "services/harness_engine.py:2306",
     # ⚠ RE-DERIVED at Phase 268 Plan 01: +8 line shift in services/run_lifecycle.py —
     #   register_run_start gained `org_id` / `expert_id` kwargs, their forward to insert_run and
     #   a 4-line docstring note, all ABOVE this call. Check (a), the per-file COUNTS, stayed
