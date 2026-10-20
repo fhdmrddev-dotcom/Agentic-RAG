@@ -837,3 +837,12 @@ REVOKE ALL ON TABLE public.library_documents FROM authenticated;
 REVOKE ALL ON TABLE public.library_documents FROM service_role;
 GRANT SELECT ON TABLE public.library_documents TO authenticated;
 GRANT SELECT ON TABLE public.library_documents TO service_role;
+
+-- migration 211 — message_citation_checks: owners READ (the messages predicate); only the backend writes.
+-- service_role holds UPDATE: a re-check replaces the stored row (ON CONFLICT (message_id) DO UPDATE).
+REVOKE ALL ON TABLE public.message_citation_checks FROM PUBLIC;
+REVOKE ALL ON TABLE public.message_citation_checks FROM anon;
+REVOKE ALL ON TABLE public.message_citation_checks FROM authenticated;
+REVOKE ALL ON TABLE public.message_citation_checks FROM service_role;
+GRANT SELECT ON TABLE public.message_citation_checks TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.message_citation_checks TO service_role;
