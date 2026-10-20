@@ -42,15 +42,17 @@ function citations(k: number): Citation[] {
   }))
 }
 
-function renderedMarkerNs(content: string, k: number): number[] {
+function renderedMarkers(content: string, k: number): HTMLElement[] {
   const { container } = render(
     <CitationNavProvider>
       <CitedMarkdown content={dedupParagraphs(content)} citations={citations(k)} />
     </CitationNavProvider>,
   )
-  return Array.from(container.querySelectorAll<HTMLElement>(`[${CITATION_MARKER_ATTR}]`)).map((el) =>
-    parseInt(el.getAttribute(CITATION_MARKER_ATTR) ?? "", 10),
-  )
+  return Array.from(container.querySelectorAll<HTMLElement>(`[${CITATION_MARKER_ATTR}]`))
+}
+
+function renderedMarkerNs(content: string, k: number): number[] {
+  return renderedMarkers(content, k).map((el) => parseInt(el.getAttribute(CITATION_MARKER_ATTR) ?? "", 10))
 }
 
 describe("citation ordinals — the shared fixture", () => {
@@ -67,6 +69,17 @@ describe("citation ordinals — the shared fixture", () => {
 
     it(`${c.id}: upgraded markers in DOM order == expected ordinals`, () => {
       expect(renderedMarkerNs(c.content, c.n_sources)).toEqual(c.expected)
+    })
+
+    // Phase 294-05 (Task 2): plan 05 decorates claim k onto the marker whose
+    // data-citation-ordinal is k, so the attribute must be the 0-based DOM index and the
+    // (ordinal, n) pairs must be the backend's (ordinal, expected[ordinal]).
+    it(`${c.id}: data-citation-ordinal is the DOM index and (ordinal, n) == the backend pairs`, () => {
+      const pairs = renderedMarkers(c.content, c.n_sources).map((el) => [
+        parseInt(el.getAttribute("data-citation-ordinal") ?? "", 10),
+        parseInt(el.getAttribute(CITATION_MARKER_ATTR) ?? "", 10),
+      ])
+      expect(pairs).toEqual(c.expected.map((n, ordinal) => [ordinal, n]))
     })
   }
 })
