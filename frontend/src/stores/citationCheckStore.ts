@@ -142,3 +142,11 @@ export function resetCitationChecks(): void {
   flushScheduled = false
   useCitationCheckStore.setState({ byMessage: {}, availability: null, inFlight: {}, errors: {} })
 }
+
+// 294 UAT C5: `availability` is fetched once per message id, so switching the engine (or turning
+// reranking off) in Settings left the chat offering the old engine until a reload. A successful
+// save (`lib/api/settings.ts` updateSettings) forgets everything; the chat is unmounted while
+// Settings is open, so the next thread view asks again and stored verdicts come back with it.
+if (typeof window !== "undefined") {
+  window.addEventListener("agentic:settings-saved", () => resetCitationChecks())
+}

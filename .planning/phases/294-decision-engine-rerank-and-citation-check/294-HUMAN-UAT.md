@@ -30,7 +30,7 @@ result: [pending]
 
 ### 5. Local and Off engines live (E1, E4)
 expected: E1: select "On this server", save; the first searches keep today's order while each worker loads (INFO "still loading", then "loaded in Xs" with the pid); later searches are reordered. E4: reranking OFF; no decision or rerank span under search-documents.
-result: [pending]
+result: passed (2026-10-20). E1: selected "On this server" and saved. First search: backend.45132.log 18:31:59 "local rerank model BAAI/bge-reranker-v2-m3 still loading — keeping the current order" (LangSmith rerank-documents 581adaed: output order = input order), then "loaded in 95.2s (pid 45132)" at 18:33:34. A later search (rerank-documents 3fad3b81) was reordered with cross-encoder scores 0.89 / 0.62 / 0.49 / 0.03 / 0.001, 13.4 s on this CPU, cost $0. Only that worker's load was seen; the second worker loads on its own first search. E4: reranking OFF and saved; the next search produced a `search-documents` span with no `rerank-documents` or `decision.*` span. Settings restored to Jev afterwards (verified in app_settings). Found and fixed on the way: after a Settings save the chat kept showing the old engine's action until a page reload (the citation store fetches availability once per message id); fixed so a successful save resets the store, and re-driven live without a reload (Cohere → ⓘ line; Jev → Check citations).
 
 ### 6. Span evidence (E2, E5)
 expected: Fix the LangSmith key (uploads returned 403 on 2026-10-20). Then the Jev `rerank-documents` / `search-documents` runs show tokens, cost_usd and latency_ms, and inputs read `<redacted>` with no key prefix.
@@ -46,14 +46,14 @@ result: [pending]
 
 ### 9. Remaining halves (C3 second profile, C5 Local and Off arms)
 expected: A second browser profile shows the saved verdicts with no POST; with Local or Off selected the ⓘ line reads the matching sentence.
-result: [pending]
+result: [partial 2026-10-20 — C5 passed; C3 second profile pending]. C5: with "On this server" and with Cohere saved, an unchecked answer reads "ⓘ Citation check needs Jev or OpenAI Decisions (Settings → Reranking)."; with reranking OFF the checked answer keeps its stored pills (✓ 7 supported · ✕ 1 contradicted, checked by Jev) and reads "ⓘ Citation check is off while reranking is off." in place of Re-check. C3 needs a second browser profile signed in as the same user.
 
 ## Summary
 
 total: 9
-passed: 4
+passed: 5
 issues: 0
-pending: 5
+pending: 4
 skipped: 0
 blocked: 0
 

@@ -175,4 +175,19 @@ describe("useCitationCheck and reset", () => {
     await settle()
     expect(api.getCitationChecks).toHaveBeenCalledTimes(2)
   })
+
+  it("a saved Settings change forgets the old availability, so the next view asks again", async () => {
+    const OFF = { available: false, engine: null, reason: "rerank_off" } as const
+    api.getCitationChecks.mockResolvedValueOnce({ availability: AVAILABLE, checks: { a: RESULT } })
+    api.getCitationChecks.mockResolvedValueOnce({ availability: OFF, checks: { a: RESULT } })
+    useCitationCheckStore.getState().ensure("a")
+    await settle()
+    window.dispatchEvent(new Event("agentic:settings-saved"))
+    expect(useCitationCheckStore.getState().availability).toBeNull()
+    useCitationCheckStore.getState().ensure("a")
+    await settle()
+    expect(api.getCitationChecks).toHaveBeenCalledTimes(2)
+    expect(useCitationCheckStore.getState().availability).toEqual(OFF)
+    expect(useCitationCheckStore.getState().byMessage.a).toEqual(RESULT)
+  })
 })
