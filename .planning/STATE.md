@@ -42,7 +42,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Phase: 294 (decision-engine-rerank-and-citation-check) — EXECUTING
-Plan: 5 of 5 (wave 3; 294-01..04 complete)
+Plan: 5 of 5 (wave 3; 294-01..04 complete). 294-05 Tasks 1-3 committed (2026-10-20); Task 4, the live drive of every 294-VALIDATION.md row, is at its checkpoint and waits on the operator (start backend + frontend, OpenRouter key, fault-phase .env lines). Plan 05 stays unchecked until Task 4 is done.
 
 ### Roadmap Evolution
 
