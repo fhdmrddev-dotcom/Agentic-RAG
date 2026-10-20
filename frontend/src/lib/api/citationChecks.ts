@@ -65,7 +65,8 @@ export interface CitationChecksResponse {
 
 /**
  * A refused check. `reason` is the server's 409 `{"detail": {"reason": …}}` word (`off`,
- * `engine_reorders_only`, `key_missing`, `in_flight`), or null when the detail is a plain string
+ * `engine_reorders_only`, `key_missing`, `in_flight`) or its 503 `engine_failed` (no engine call
+ * answered, nothing stored — 294-REVIEW CR-01), or null when the detail is a plain string
  * (422) or unreadable. The UI words every case from its own fixed vocabulary; `detail` is kept for
  * diagnosis only and is never rendered.
  */

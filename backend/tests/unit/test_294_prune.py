@@ -89,3 +89,15 @@ def test_never_empty_for_non_empty_input():
 
     for n in range(1, 6):
         assert prune(_scored([0.0] * n), 5)
+
+
+def test_a_non_positive_top_n_keeps_the_floor_never_empty():
+    """294-REVIEW WR-04: a cleared "Keep at most" field saved 0, and ``kept[:0]`` was ``[]`` (a
+    negative value sliced from the end). top_n <= 0 now keeps the floor, min(3, len)."""
+    from app.services.rerank_engines.prune import prune
+
+    for top_n in (0, -1, -7):
+        out = prune(_scored([0.9, 0.8, 0.7, 0.6, 0.5]), top_n)
+        assert [r["id"] for r in out] == ["c0", "c1", "c2"], top_n
+        assert [r["id"] for r in prune(_scored([0.9, 0.05]), top_n)] == ["c0", "c1"], top_n
+        assert len(prune(_scored([0.4]), top_n)) == 1, top_n

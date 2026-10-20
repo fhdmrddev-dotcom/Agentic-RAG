@@ -123,6 +123,16 @@ describe("run — the one POST", () => {
     expect(s.byMessage.m).toEqual(RESULT)
   })
 
+  it("294-REVIEW CR-01 — a 503 engine_failed records that code and keeps the stored result", async () => {
+    useCitationCheckStore.setState({ byMessage: { m: RESULT } })
+    api.runCitationCheck.mockRejectedValue(Object.assign(new Error("503"), { status: 503, reason: "engine_failed" }))
+    await useCitationCheckStore.getState().run("m")
+    const s = useCitationCheckStore.getState()
+    expect(s.errors.m).toBe("engine_failed")
+    expect(s.inFlight.m).toBeUndefined()
+    expect(s.byMessage.m).toBe(RESULT)
+  })
+
   it("error codes: 404 → not_found, 422 → rejected, anything else → failed", async () => {
     api.runCitationCheck.mockRejectedValueOnce(Object.assign(new Error("x"), { status: 404, reason: null }))
     await useCitationCheckStore.getState().run("a")

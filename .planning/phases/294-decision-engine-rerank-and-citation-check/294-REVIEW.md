@@ -239,6 +239,22 @@ A greenfield environment built from the current artifact has no table. Its `GET 
 **Issue:** `citationCount` is `citations.length`. One source cited by five sentences reads "Checking 1 citation…".
 **Fix:** Pass the marker count, or reword it to "Checking N sources…".
 
+## Fix status
+
+Applied 2026-10-20 by gsd-code-fixer on base `e8e7e58e7`, one commit per finding, each RED before GREEN.
+
+| Finding | Status | Commit | What changed |
+|---|---|---|---|
+| CR-01 | fixed | `623bfbe01` | `run_citation_check` raises `CitationCheckFailed` when no source answered; the route answers 503 `{"reason": "engine_failed"}` and never calls `upsert_check`. A partial failure still stores. The chat words `engine_failed` with a fixed line and keeps the saved pills. |
+| CR-02 | fixed: requires human verification | `2d49d2111` | `citation_claims` now blanks what marked renders as code or a link: link reference definitions and every `[n]` they link, indented code (list-relative), unclosed fences. 54 probe inputs matched the real marked 17 with 0 diffs. 7 joined `citation_ordinals_v1.json`, including the review's exact example; 5 were RED at base. No frontend change. |
+| WR-01 | fixed | `d413c5ae7` | The `instruction` description says it steers the relevance scores the conservative cut uses (at least 3 kept, never none). `test_278_registry_pin` digests re-captured. The old text restored in memory reproduces the 294-01 digests, which are kept in a comment. |
+| WR-04 | fixed | `6f89369b0` | `prune()` treats `top_n <= 0` as the floor, `min(3, len)`. "Keep at most" ignores an empty entry and clamps the rest to 1-50. |
+| IN-04 | fixed | `7093755c7` | The decision-engine answer models validate strictly: a boolean or a numeric string is rejected, and a JSON int is still accepted. |
+
+CR-02 is marked for human verification because it is a logic fix: it mirrors marked's block rules, and it is proven only on the cases that were measured. A markdown construct outside that set, such as an HTML block or a setext heading, is not covered. Add it as a fixture case, measured against marked, before trusting it.
+
+**Deferred (out of scope for this fix pass; routed elsewhere):** WR-02 (per-user rate limit / concurrency cap / spend ledger), WR-03 (`full-schema.sql` regeneration, operator-owed), IN-01, IN-02, IN-03, IN-05, IN-06, IN-07, IN-08.
+
 ---
 
 _Reviewed: 2026-10-20T01:46:11Z_

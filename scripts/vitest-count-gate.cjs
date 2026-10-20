@@ -174,18 +174,22 @@ const BASELINE = {
   // fixture case (16 cases in citation_ordinals_v1.json). Measured green on a run of the suite alone.
   // Phase 294-05 Task 2 raised it 33 -> 49: + 1 case per fixture case (16), the
   // (data-citation-ordinal, n) pairs assertion plan 05 decorates by. Measured on the suite alone.
-  "citationOrdinals.parity.test.tsx": 49,
+  // 294-REVIEW CR-02 raised it 49 -> 70: + 3 cases per fixture case for the 7 cases it added
+  // (link reference definitions, indented / unclosed code, two look-alikes that stay text).
+  "citationOrdinals.parity.test.tsx": 70,
   // Phase 294-05 (DEC-03) — the citation-check client, vocabulary, store, action, marker and peek
   // suites, measured green on a run of these suites alone (2026-10-20).
   "citationChecks.contract.test.ts": 8,
-  "citationVerdicts.parity.test.ts": 10,
-  "citationCheckStore.test.ts": 10,
-  "CitationCheckAction.test.tsx": 10,
+  // 294-REVIEW CR-01 raised each of these three 10 -> 11: the 503 engine_failed line (route source
+  // + fixed sentence), the store keeping the saved result, and the action keeping the saved pills.
+  "citationVerdicts.parity.test.ts": 11,
+  "citationCheckStore.test.ts": 11,
+  "CitationCheckAction.test.tsx": 11,
   "CitedMarkdown.verdict.test.tsx": 17,
   "CitationPeek.verdict.test.tsx": 5,
   // Phase 294-04 (DEC-01) — the engine cards and the engine-id parity fence. 294-04 left them
   // un-adopted (handover); adopted here, measured green on a run of the two suites alone.
-  "RerankEngineBlock.test.tsx": 24,
+  "RerankEngineBlock.test.tsx": 25,  // 294-REVIEW WR-04: +1, a cleared Keep at most never reports 0
   "rerankEngines.parity.test.ts": 7,
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,

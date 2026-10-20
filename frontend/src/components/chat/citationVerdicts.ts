@@ -136,6 +136,10 @@ export function checkErrorLine(code: string, a: CitationCheckAvailability | null
       return "This answer isn't available to check."
     case "rejected":
       return "This answer has no cited passages to check."
+    case "engine_failed":
+      // 294-REVIEW CR-01: the server's 503 — no engine call answered, so NOTHING was stored and
+      // any saved verdicts are unchanged (the store keeps them; this line sits under them).
+      return "The engine didn't answer, so nothing was saved. Try again in a moment."
     default:
       return "The check didn't finish. Try again."
   }

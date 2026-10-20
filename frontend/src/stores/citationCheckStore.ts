@@ -35,7 +35,8 @@ interface CitationCheckState {
   byMessage: Record<string, CitationCheckResult>
   availability: CitationCheckAvailability | null
   inFlight: Record<string, true>
-  /** A fixed error CODE per message (`in_flight`, `off`, `not_found`, `rejected`, `failed` …),
+  /** A fixed error CODE per message (`in_flight`, `off`, `not_found`, `rejected`, `engine_failed`
+   *  — the 503 a total engine outage answers, which stored nothing (294-REVIEW CR-01) — `failed` …),
    *  worded by `citationVerdicts.checkErrorLine`; server text is never stored or rendered. */
   errors: Record<string, string>
   ensure: (id: string) => void

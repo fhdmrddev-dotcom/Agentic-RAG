@@ -21183,6 +21183,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 79 / 40 / 
 
 CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 79 / 40 / 2602 (was `72 / 36 / 2268`) | ⛔ FIRES at 40 phases · honoured by construction (282-01: client kwargs)
 
+**294-REVIEW WR-01 (`2626` lines, +3).** One description string and its comment: `instruction` no longer claims it "never filters"; it says it steers the relevance scores that a conservative cut uses (at least 3 kept, never none). Honoured by construction (no logic). `test_278_registry_pin.py` re-captured, proven the only byte change (old text restored in memory hashes to the 294-01 digests, kept in a comment).
+
 ### `backend/app/services/provider_gateway/anthropic.py` — Phase 282 close
 
 **`5 / 5 / 125` (was `4 / 4 / 124`).** **282-01** (`46b95d72c`, +1 / -0): exactly the one forwarded kwarg planned. It FIRES (5 phases) and had no CLAUDE.md FIRING row; one is added in this commit.
@@ -22054,6 +22056,12 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 317 / 72 /
 
 CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 317 / 72 / 6568 (was `314 / 69 / 6539`) | 289-REVIEW: 1 suite adopted, 2 pins raised (row was stale)
 
+**294-REVIEW CR-01 (`6598` lines).** Three pins RAISED 10 → 11 (`citationVerdicts.parity`, `citationCheckStore`, `CitationCheckAction`), one new case each; no suite adopted, none lowered.
+
+**294-REVIEW CR-02 (`6600` lines).** `citationOrdinals.parity.test.tsx` RAISED 49 → 70: 3 cases per fixture case, 7 fixture cases added.
+
+**294-REVIEW WR-04 (`6600` lines).** `RerankEngineBlock.test.tsx` RAISED 24 → 25 (one case).
+
 ## Phase 285 close (2026-10-16, 285-03)
 
 All triples below were re-derived on the merged tree at `cca4e5a90` (285-01..03 code merged) with the CLAUDE.md recipe; six-digit quick-task buckets are subtracted and named per file. The set is every non-test source file the phase changed since PHASE_BASE `c8c764e90` (`git diff --name-only c8c764e90 HEAD -- backend/app frontend/src`, tests excluded): **7 files**. Migration 209, `scripts/apply_migration_209.py` and `supabase/full-schema.sql` are gate-exempt. Each subsection quotes the scan-list cell it replaced and, where the file had one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. **Newly FIRING or absent from CLAUDE.md, row ADDED:** `watch_service.py` (6), `db/watches.py` (4), `RunHistoryList.tsx` (3). `ingest_splice.py` and `db/ingestion_jobs.py` were NOT touched (D-12).
@@ -22699,6 +22707,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). PURE D-07 prune: floor 0.1, keep ≥3, ≤top_n, never empty, keep_documents coverage. ⛔ probabilistic engines only
 
+**294-REVIEW WR-04 (`40` lines, was `36`).** `top_n <= 0` (a cleared field saved 0; `retrieval_top_k` is not bounded server-side, SEED-271) now keeps the floor, `min(3, len)`, instead of `kept[:0] == []` or a negative slice from the end. Still pure.
+
 ## `backend/app/services/rerank_engines/cohere.py`
 
 **`0 / 0 / 0` — planned (294-01); row and section added at planning.** `_rerank_api` moved out of `rerank_service.py` with behaviour unchanged (30 s timeout, `rerank-v3.5`), now behind a `_http_client()` factory so the off-path test can assert it is never constructed. ⛔ Reorder plus `[:top_n]` only: Cohere documents `relevance_score` as a ranking score, not a probability (D-08). Plan 05 re-derives the triple.
@@ -22729,6 +22739,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). OpenRouter /api/alpha/decisions: noul rerank (≤30 / ≤28 KB per call, ≤4 in flight) + post_decisions. ⛔ untrusted text only in state
 
+**294-REVIEW IN-04 (`216` lines).** The answer models (`_NoulAnswer`, `_ChoiceAnswer`) validate strictly via `_StrictAnswer`: `true` / `"0.7"` are rejected (the call fails, so the rerank falls back and a check's source is couldn't check); a JSON int still validates. `_Usage` / `_Response` stay lax.
+
 ## `backend/app/services/rerank_engines/openai_decisions.py`
 
 **`0 / 0 / 0` — planned (294-01; `post_decisions` reused by 294-03); row and section added at planning.** One request per pool (≤ 200 questions), per-passage `predicate` (D-06), `httpx.Timeout(8.0, connect=2.0)`, no retries. Cost is computed through `pricing_service` (the AST single-home fence). ⛔ **Binding invariants:** untrusted text only inside `input` as JSON; constant question instructions (D-10); a `refusal` answer or any malformed body raises in rerank (fallback, D-11) and maps to `couldnt_check` in the citation check (D-17). Plan 05 re-derives the triple.
@@ -22738,6 +22750,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 **`2 / 1 / 195` (was `0 / 0 / 0`).** Created at 195 lines. Live: HTTP 403 "The project does not have access to this model." at 294-02 (owed at Task 4).
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). POST /v1/decisions gpt-6-luna: predicate rerank + post_decisions; raw httpx (SDK lacks decisions). ⛔ refusal → fallback
+
+**294-REVIEW IN-04 (`201` lines).** `_Predicate`, `_ChoiceProbability` and `_Choice` validate strictly via `_StrictAnswer` (no bool or numeric string as a probability; a JSON int still validates). `_Usage` / `_Response` / `_Refusal` unchanged.
 
 ## `backend/app/services/rerank_engines/tracing.py`
 
@@ -22773,6 +22787,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). PURE claim extraction + marker ordinals + dedup_paragraphs port. ⛔ ordinals pinned to CitedMarkdown by a shared fixture
 
+**294-REVIEW CR-02 (`501` lines, was `279`).** `_block_regions` (indented code, unclosed fences, link reference definitions, list-relative indent) and `_reference_links` (marked's reflink / nolink order) blank what marked renders as code or a link. Measured against real marked 17 on 54 probe inputs, 0 diffs; 7 of them added to the shared fixture (5 RED at base). Still pure: imports only `re` and `citation_markers`. ⛔ A new markdown construct is a fixture case FIRST, measured against marked, never assumed.
+
 ## `backend/app/services/citation_check_service.py`
 
 **`0 / 0 / 0` — planned (294-03); row and section added at planning.** Groups claims by source, asks one `choice` question per claim through `jev.post_decisions` / `openai_decisions.post_decisions` with the canonical label order, validates labels against the closed set, and upserts `message_citation_checks` through the pool. ⛔ **Binding invariants:** every SQL value is a `$N` placeholder; `user_id` / `org_id` / `thread_id` come from the message row, never the request; one source's failure marks only its claims `couldnt_check`; nothing ever defaults to `supported` (D-17). Plan 05 re-derives the triple.
@@ -22782,6 +22798,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 **`1 / 1 / 330` (was `0 / 0 / 0`).** Created at 330 lines. Invariants held: `$N` placeholders only; ids from the message row; one source's failure marks only its claims `couldnt_check`.
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). Runs the check (choice per claim, grouped by source) + the pool upsert. ⛔ ids bound from the message row; refusal → couldnt_check
+
+**294-REVIEW CR-01 (`354` lines).** A check where NO source answered (every call failed or ran out of budget) now raises `CitationCheckFailed(engine)` and returns nothing, so an outage is never stored as a verdict and never replaces a stored check. A partial failure still returns a result, the failed sources' claims as `couldnt_check`. The exception carries the engine id only, never a vendor body.
 
 ## `backend/app/models/citation_check.py`
 
@@ -22803,6 +22821,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). GET availability+checks, POST run (404 same body, 422, 409 in flight). ⛔ a route, NOT a tool (30 stays); never returns a key
 
+**294-REVIEW CR-01 (`181` lines).** `CitationCheckFailed` maps to **503 `{"reason": "engine_failed"}`** and `upsert_check` is never reached, so a failed Re-check leaves the stored row byte-unchanged. The OpenAPI surface is unchanged (no `responses=` declared, like the 409s).
+
 ## `frontend/src/components/settings/rerankEngines.ts`
 
 **`0 / 0 / 0` — planned (294-04); row and section added at planning.** One exported table of engine-card facts (name, where it runs, vendor, model id, key source, price string, cuts / reorders, steering, citation check), the 024 rule: preset data never hardcoded in component logic. `engineFor(id)` resolves the legacy `"api"` and any unknown id to a declared row. ⛔ Engine ids pinned to `backend/app/services/rerank_engines/registry.py` through a `?raw` parity fence. Plan 05 re-derives the triple.
@@ -22823,6 +22843,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-04, row added at planning). Sketch 294 B engine cards + keep-at-most + missing-key + egress lines. ⛔ props in, callbacks out; no fetch, no useState
 
+**294-REVIEW WR-04 (`302` lines, was `283`).** "Keep at most" goes through the pure `keepAtMostFrom`: an empty or non-numeric entry reports nothing (the field keeps its value), anything else clamps to the input's own 1-50. Still owns no fetch and no state. Suite 24 → 25.
+
 ## `frontend/src/lib/api/citationChecks.ts`
 
 **`0 / 0 / 0` — planned (294-05); row and section added at planning.** The two clients and the wire types copied verbatim from `backend/app/models/citation_check.py`, pinned by `backend/tests/unit/fixtures/citation_check_result_v1.json` (`satisfies`). ⛔ Imported by its own specifier, never through the `lib/api.ts` barrel (the hottest file). Plan 05 re-derives the triple.
@@ -22832,6 +22854,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 **`1 / 1 / 117` (was `0 / 0 / 0`).** Created at 117 lines. `CitationCheckApiError` extends `ApiError` with `reason` and `detail`.
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). getCitationChecks / runCitationCheck + wire types. ⛔ own specifier; NOT re-exported through lib/api.ts
+
+**294-REVIEW CR-01 (`118` lines).** Doc comment only: `CitationCheckApiError.reason` can now also be the 503's `engine_failed`.
 
 ## `frontend/src/stores/citationCheckStore.ts`
 
@@ -22843,6 +22867,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). byMessage + availability; microtask-batched ensure() → one GET. ⛔ never a slice of streamsStore.ts; reset in setupTests
 
+**294-REVIEW CR-01 (`144` lines).** Doc comment only: `engine_failed` is listed among the error codes. The store already passed the server's reason through and kept `byMessage` on a failed POST; a new case pins both for the 503.
+
 ## `frontend/src/components/chat/citationVerdicts.ts`
 
 **`0 / 0 / 0` — planned (294-05); row and section added at planning.** Five rows (✓ supported · ◐ partly supported · ○ not supported · ✕ contradicted · ? couldn't check), each with a fixed one-line reason (decision engines return no text), the ⓘ availability reasons, and an own-property-guarded accessor. ⛔ Labels pinned to `Verdict` in `backend/app/models/citation_check.py` through `?raw`; glyph plus word plus raw confidence, never colour alone. Plan 05 re-derives the triple.
@@ -22852,6 +22878,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 **`2 / 1 / 142` (was `0 / 0 / 0`).** Created at 124 lines, +18 in Task 2 (`claimConfidence`, `verdictSpoken`). Every word the chat shows for a check is here; no server text is rendered.
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). THE verdict vocabulary: glyph, word, class, fixed reason line. ⛔ labels pinned to models/citation_check.py; unknown → couldn't check
+
+**294-REVIEW CR-01 (`146` lines).** `checkErrorLine("engine_failed")` has its own fixed line ("The engine didn't answer, so nothing was saved. Try again in a moment."); the parity suite reads the 503 detail from `api/citation_checks.py` via `?raw`.
 
 ## `frontend/src/components/chat/CitationCheckAction.tsx`
 

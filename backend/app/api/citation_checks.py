@@ -15,6 +15,8 @@ the tool registry is unchanged.
   one is in flight (409), and is released in ``finally`` only while still owned (T-294-19).
 * With the engine off, Cohere / Local, or no key, GET reports ``available: false`` with the
   reason and POST answers 409 with it. There is no chat-model fallback (D-16).
+* When no engine call answered at all (an outage), POST answers 503 ``{"reason": "engine_failed"}``
+  and stores NOTHING, so a stored check survives a failed Re-check (294-REVIEW CR-01).
 * Responses are the declared Pydantic models: no key and no base URL can appear (T-294-20).
 * Blocking supabase-py calls go through ``aexec`` (D-v2.5-01); the engine run (sync, threaded)
   goes through ``run_in_threadpool``.
@@ -39,6 +41,7 @@ from app.models.citation_check import (
 )
 from app.models.user_settings import load_app_settings_async
 from app.services.citation_check_service import (
+    CitationCheckFailed,
     CitationCheckUnavailable,
     load_checks,
     run_citation_check,
@@ -165,6 +168,9 @@ async def post_citation_check(
             result = await run_in_threadpool(run_citation_check, row, user_settings)
         except CitationCheckUnavailable as exc:   # settings changed between the check and the run
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"reason": exc.reason}) from None
+        except CitationCheckFailed:   # CR-01: no source answered; store NOTHING, keep any stored row
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                                detail={"reason": "engine_failed"}) from None
         stored = await upsert_check(pool, row, result)
         return CitationCheckResult.model_validate(stored["result"])
     finally:

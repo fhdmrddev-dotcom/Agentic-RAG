@@ -95,6 +95,22 @@ function WhereTag({ facts }: { facts: RerankEngineFacts }) {
   )
 }
 
+/** The input's bounds (its own `min` / `max`). */
+const KEEP_MIN = 1
+const KEEP_MAX = 50
+
+/**
+ * 294-REVIEW WR-04: a cleared field is `Number("") === 0`, which was saved and made the prune keep
+ * nothing. An empty or non-numeric entry reports nothing (the field keeps the previous value);
+ * anything else is clamped to the input's own 1-50 range.
+ */
+function keepAtMostFrom(raw: string): number | null {
+  if (raw.trim() === "") return null
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return null
+  return Math.min(KEEP_MAX, Math.max(KEEP_MIN, Math.trunc(n)))
+}
+
 function capabilities(facts: RerankEngineFacts): string {
   return `${facts.cuts ? "cuts below 0.1" : "reorders only"} · steering ${facts.steering ? "✓" : "—"} · citation check ${facts.citationCheck ? "✓" : "—"}`
 }
@@ -197,9 +213,12 @@ export function RerankEngineBlock({
             <Input
               type="number"
               value={keepAtMost}
-              onChange={(e) => onKeepAtMostChange(Number(e.target.value))}
-              min={1}
-              max={50}
+              onChange={(e) => {
+                const n = keepAtMostFrom(e.target.value)
+                if (n !== null) onKeepAtMostChange(n)
+              }}
+              min={KEEP_MIN}
+              max={KEEP_MAX}
               aria-label="Keep at most (passages per search)"
               className="h-8 w-20 bg-muted/30 font-mono text-sm ghost-border"
             />

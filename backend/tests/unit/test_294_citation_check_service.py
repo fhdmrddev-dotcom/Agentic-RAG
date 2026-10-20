@@ -223,7 +223,11 @@ def test_the_real_path_never_passes_choice_order():
 
 
 def test_every_answer_missing_refused_or_malformed_is_couldnt_check(monkeypatch):
+    # 294-REVIEW CR-01: the six bad answers share source [1], whose call therefore fails whole; a
+    # seventh claim on source [2] answers, so the check is not a total failure and IS returned.
+    # (A check where NO source answers raises instead: test_every_source_failing_raises_….)
     content = " ".join(f"Claim number {i} is long enough to be a sentence [1]." for i in range(6))
+    content += " A seventh claim is long enough to be a sentence [2]."
     bad = {
         "C000": {"type": "refusal"},
         "C001": None,                                           # missing
@@ -231,6 +235,7 @@ def test_every_answer_missing_refused_or_malformed_is_couldnt_check(monkeypatch)
         "C003": {"type": "choice", "choice": "supported", "confidence": None},         # no confidence
         "C004": {"type": "choice", "choice": "supported", "confidence": 1.7},           # out of range
         "C005": {"type": "predicate", "probability": 0.9},     # wrong type
+        "C006": {"type": "choice", "choice": "supported", "confidence": 0.9},          # source [2]: fine
     }
     rec = Recorder()
 
@@ -243,11 +248,13 @@ def test_every_answer_missing_refused_or_malformed_is_couldnt_check(monkeypatch)
             rec.leave()
 
     install(monkeypatch, openai_decisions, handle)
-    result = svc.run_citation_check(_row(content, ["P"]), _settings("openai_decisions"))
-    assert len(result.claims) == 6
-    assert result.counts.supported == 0
-    assert result.counts.couldnt_check == len(result.claims)
-    assert all(c.confidence is None for c in result.claims)
+    result = svc.run_citation_check(_row(content, ["P", "P2"]), _settings("openai_decisions"))
+    assert len(result.claims) == 7
+    bad_claims = [c for c in result.claims if c.n == 1]
+    assert len(bad_claims) == 6
+    assert all(c.verdict == "couldnt_check" and c.confidence is None for c in bad_claims)
+    assert result.counts.supported == 1 and result.counts.couldnt_check == 6
+    assert result.claims[6].verdict == "supported"
 
 
 def test_jev_missing_or_malformed_is_couldnt_check(monkeypatch):
@@ -275,6 +282,73 @@ def test_a_per_source_failure_marks_only_that_source(monkeypatch):
     result = svc.run_citation_check(_row(THREE_CLAIMS, ["Passage one.", "Passage two."]), _settings("jev"))
     by_n = {c.ordinal: (c.n, c.verdict) for c in result.claims}
     assert by_n == {0: (1, "couldnt_check"), 1: (1, "couldnt_check"), 2: (2, "supported")}
+
+
+def test_every_source_failing_raises_and_returns_no_result(monkeypatch):
+    """294-REVIEW CR-01: an outage is not a verdict. When NO engine call succeeded the check raises
+    ``CitationCheckFailed`` instead of returning an all-couldn't-check result that would be stored."""
+    rec = Recorder()
+
+    def handle(request):
+        rec.enter(request)
+        try:
+            return httpx.Response(429, json={"error": {"message": "rate limited"}})
+        finally:
+            rec.leave()
+
+    install(monkeypatch, jev, handle)
+    with pytest.raises(svc.CitationCheckFailed) as e:
+        svc.run_citation_check(_row(THREE_CLAIMS, ["Passage one.", "Passage two."]), _settings("jev"))
+    assert len(rec.bodies) == 2          # both sources were asked; neither answered
+    assert e.value.engine == "jev"
+    assert "429" not in str(e.value) and "rate limited" not in str(e.value)
+
+
+def test_the_budget_running_out_on_every_source_raises(monkeypatch):
+    """CR-01: a timeout on every source is the same outage — nothing answered, nothing to store."""
+    release = threading.Event()
+
+    def fake(api_key, model, *, state_or_input, questions, purpose, timeout):
+        release.wait(5)
+        return {name: _choice("supported") for name in questions}
+
+    monkeypatch.setattr(jev, "post_decisions", fake)
+    monkeypatch.setattr(svc, "OVERALL_BUDGET_S", 0.2)
+    try:
+        with pytest.raises(svc.CitationCheckFailed):
+            svc.run_citation_check(_row(THREE_CLAIMS, ["SLOW", "SLOWER"]), _settings("jev"))
+    finally:
+        release.set()
+
+
+def test_a_source_that_answered_badly_still_counts_as_answered(monkeypatch):
+    """CR-01 boundary: an engine that ANSWERED (even with no usable verdict) is not an outage."""
+    rec = Recorder()
+    install(monkeypatch, jev, _jev_choice_handler(
+        rec, lambda cid: {"type": "choice", "choice": "made_up", "confidence": 0.5}))
+    result = svc.run_citation_check(_row(THREE_CLAIMS, ["Passage one.", "Passage two."]), _settings("jev"))
+    assert result.counts.couldnt_check == 3
+    assert all(c.confidence is None for c in result.claims)
+
+
+def test_a_boolean_confidence_never_becomes_a_verdict(monkeypatch):
+    """294-REVIEW IN-04: ``"confidence": true`` was coerced to 1.0 by the adapter's lax model, so
+    map_answer's bool rejection never saw it and the claim read as supported at 1.00."""
+    rec = Recorder()
+
+    def handle(request):
+        body = rec.enter(request)
+        try:
+            conf = True if body["state"]["source_passage"] == "Passage one." else 0.8
+            return httpx.Response(200, json={"answers": {
+                n: {"type": "choice", "choice": "supported", "confidence": conf} for n in body["questions"]}})
+        finally:
+            rec.leave()
+
+    install(monkeypatch, jev, handle)
+    result = svc.run_citation_check(_row(THREE_CLAIMS, ["Passage one.", "Passage two."]), _settings("jev"))
+    assert [(c.verdict, c.confidence) for c in result.claims] == [
+        ("couldnt_check", None), ("couldnt_check", None), ("supported", 0.8)]
 
 
 def test_a_claim_without_a_passage_makes_no_engine_call(monkeypatch):

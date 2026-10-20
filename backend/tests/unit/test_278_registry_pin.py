@@ -202,15 +202,27 @@ def test_nothing_mutates_the_registry():
 #   (False, True, False): "9f734c1c0b2abcfe9fbf9de6ffb10087662e904906e726394c839998f1e675a1",
 #   (False, False, True): "d7ac152b38d4050751747370dc7a8c0a7a5856bc63d977e1bf14a2993ed795e6",
 #   (False, False, False): "39555dbd1ae1e6b339669182a50408cd7c462692d554949a21a649756fe6dd50",
+# ⚠ RE-CAPTURED 2026-10-20 (294-REVIEW WR-01), outside 278, deliberately: the `instruction` description no
+# longer says it "never filters" (the decision engines fold it into the score prune() cuts on). Proven the
+# ONLY byte change: with the old description restored in memory, all 8 combos hashed to the 294-01 digests
+# below. RENDER_TEMPLATE_TOOL is unchanged. The 294-01 digests, kept for the record:
+#   (True, True, True): "0b18ce999b476843e00bb974b7d8b03b72a4422e429d9d35210bef8511538e70",
+#   (True, True, False): "407b8187e2c8cfcc82ea25df3fcc1efed1353bd6fccbde4663a21a2deac1d3ad",
+#   (True, False, True): "0524aceb6f74af270eb3874624b6372a9546f980c12906f98440fdc35a4703ec",
+#   (True, False, False): "e14d0c8797620845660c00125c311f345a2a76f39f357b5dac81fcfcc2ce29df",
+#   (False, True, True): "49abde1228de3f08c2a288e9fae58d4bdccdb20ee67958bdff97404e157fa958",
+#   (False, True, False): "84e000e8319a8b2048cb989ba4a91f085b9dcabc7e481e8ab679eb360670d7b4",
+#   (False, False, True): "d158c6eb0b2b0ae2dac8faa773ed9fdbe0c858ba46341957187c03e04d641bc6",
+#   (False, False, False): "e8ffec20254a3a21addd97a77d673ee86d0b0726551a589fd76c6a1c4cf493ef",
 SCHEMA_SHA256: dict = {
-    (True, True, True): "0b18ce999b476843e00bb974b7d8b03b72a4422e429d9d35210bef8511538e70",
-    (True, True, False): "407b8187e2c8cfcc82ea25df3fcc1efed1353bd6fccbde4663a21a2deac1d3ad",
-    (True, False, True): "0524aceb6f74af270eb3874624b6372a9546f980c12906f98440fdc35a4703ec",
-    (True, False, False): "e14d0c8797620845660c00125c311f345a2a76f39f357b5dac81fcfcc2ce29df",
-    (False, True, True): "49abde1228de3f08c2a288e9fae58d4bdccdb20ee67958bdff97404e157fa958",
-    (False, True, False): "84e000e8319a8b2048cb989ba4a91f085b9dcabc7e481e8ab679eb360670d7b4",
-    (False, False, True): "d158c6eb0b2b0ae2dac8faa773ed9fdbe0c858ba46341957187c03e04d641bc6",
-    (False, False, False): "e8ffec20254a3a21addd97a77d673ee86d0b0726551a589fd76c6a1c4cf493ef",
+    (True, True, True): "78609984e3fb0cb9d6a86a55463a2ab8b18262639ac3f8bd4e541c6e5b189e28",
+    (True, True, False): "e75061f8d2d08e76778543aff77e7d6195b4c76b604796eb67ec51ff14f9a835",
+    (True, False, True): "8856dd73851edbb8ac9fe457489db779a429a3aa1e404de2ef89d84cd0da485d",
+    (True, False, False): "0a1ad3a456e05ee84fb7dd0f9bfcab261ae01887b26d758638bcc12cdc42a4db",
+    (False, True, True): "2a639a105cd8d1542b03b5d8bf28cdf5d94c747ae17777e2f103eb7c1023a747",
+    (False, True, False): "902f6fc516476bb5793f78f2281deb1eb3cbd61794b221ad389ccf90fe5aea62",
+    (False, False, True): "f5d6a04cb15e8efb2934401eeecb614ec4c594d9f9310523e2d3f2c061e08d1a",
+    (False, False, False): "0c3cfde3c637e4a345192cf76ad0ec20acec3e522e29347c65404ccbf5d73623",
     "RENDER_TEMPLATE_TOOL": "aa76bc5f0db6a685ab22e9b1bbfa1d2c628f14e9a2ccee08cfb474f048e13b0f",
 }
 

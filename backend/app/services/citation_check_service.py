@@ -14,6 +14,9 @@ or OpenAI Decisions — never a chat model, D-16), and returns a ``CitationCheck
 * D-17: a refusal, a missing / malformed / unknown answer, a non-numeric confidence, a missing
   passage, a claim over the cap, a per-source failure or the budget running out is
   ``couldnt_check`` with ``confidence`` null. Nothing ever defaults to ``supported``.
+  ⚠ But when NO source answered at all (every call failed or ran out of budget), the check
+  raises ``CitationCheckFailed`` and returns nothing, so an outage is never stored as a verdict
+  and never replaces a stored check (294-REVIEW CR-01).
 * A2 (option-order bias): every call offers the four labels in the canonical ``CHOICE_LABELS``
   order. ``build_check_request``'s ``choice_order`` exists ONLY for
   ``scripts/citation-order-probe.py``; this module never passes it. The verdict is the engine's
@@ -88,6 +91,20 @@ class CitationCheckUnavailable(RuntimeError):
     def __init__(self, reason: str):
         super().__init__(reason)
         self.reason = reason
+
+
+class CitationCheckFailed(RuntimeError):
+    """Every engine call failed (or ran out of budget): nothing answered, so NOTHING is stored.
+
+    294-REVIEW CR-01 / D-17: an outage is not a verdict. Returning an all-``couldnt_check`` result
+    here would be upserted and would REPLACE a stored check the user paid for. A partial failure
+    (at least one source answered) is not this error: it still returns a result, with the failed
+    sources' claims as ``couldnt_check``. The message is the engine id only, never a vendor body.
+    """
+
+    def __init__(self, engine: str):
+        super().__init__(engine)
+        self.engine = engine
 
 
 def _reason(exc: BaseException) -> str:
@@ -208,6 +225,7 @@ def run_citation_check(message_row: dict, user_settings: Any) -> CitationCheckRe
             groups[claim.n].append(claim)
 
     message_id = message_row.get("id")
+    answered = 0   # sources whose engine call returned (CR-01: zero of them is an outage)
     with capture_engine_calls() as calls:
         if groups:
             executor = ThreadPoolExecutor(max_workers=min(MAX_SOURCES_IN_FLIGHT, len(groups)),
@@ -225,6 +243,7 @@ def run_citation_check(message_row: dict, user_settings: Any) -> CitationCheckRe
                     if future in done:
                         try:
                             mapped = future.result()
+                            answered += 1
                         except Exception as exc:  # noqa: BLE001 — D-17: this source only
                             logger.warning("citation check source [%s] failed for message %s (%s)",
                                            n, message_id, _reason(exc))
@@ -235,6 +254,11 @@ def run_citation_check(message_row: dict, user_settings: Any) -> CitationCheckRe
             finally:
                 executor.shutdown(wait=False, cancel_futures=True)
         engine_calls = [c for c in calls if c.purpose == PURPOSE]
+
+    if groups and answered == 0:
+        # CR-01: at least one source was sent and none answered. Raise so nothing is stored.
+        logger.warning("citation check for message %s: no source answered; nothing stored", message_id)
+        raise CitationCheckFailed(spec.id)
 
     out_claims = []
     for claim in claims:

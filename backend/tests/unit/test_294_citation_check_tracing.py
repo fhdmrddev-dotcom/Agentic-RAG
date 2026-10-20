@@ -124,8 +124,11 @@ def test_a_failing_source_logs_no_key_and_no_body(monkeypatch, caplog):
 
     install(monkeypatch, jev, handle)
     caplog.set_level(logging.DEBUG)
-    result = svc.run_citation_check(_row(), user_settings(rerank_provider="jev", rerank_model=""))
-    assert result.counts.couldnt_check == 2
+    # 294-REVIEW CR-01: every source failing is an outage, so the check raises (nothing stored);
+    # the exception carries the engine id only, never the vendor body or a key.
+    with pytest.raises(svc.CitationCheckFailed) as e:
+        svc.run_citation_check(_row(), user_settings(rerank_provider="jev", rerank_model=""))
+    assert "BODY-MARKER-294" not in str(e.value) and "BODY-MARKER-294" not in repr(e.value)
     assert "BODY-MARKER-294" not in caplog.text
     for key in PLANTED_KEYS:
         assert key not in caplog.text
