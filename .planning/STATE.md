@@ -41,7 +41,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 294 (decision-engine-rerank-and-citation-check) — EXECUTED, human_needed (2026-10-20)
+Phase: 295 (runs-that-don-t-dead-end) — EXECUTING (started 2026-10-20, `--auto`). 7 plans / 4 waves; base `0d7e77d90`.
+Previous: Phase: 294 (decision-engine-rerank-and-citation-check) — EXECUTED, human_needed (2026-10-20)
 Plan: 5 of 5 — all plans executed (2026-10-20). 294-05 Task 4 driven in pass 2 (partial live: Jev rerank, citation check end to end, reload, Cohere reason line, order probe); G4 sign-off and the operator-gated rows remain owed (294-VALIDATION.md "Drive pass 2"). Verifier: human_needed, 6/6 success criteria met in code (294-VERIFICATION.md). Closed as a DECISION with owed live rows (294-HUMAN-UAT.md); run test 1 (G-4 sign-off) first. Not pushed; migration 211 is applied LOCALLY only (cloud paste + get_advisors owed before any deploy).
 
 ### Roadmap Evolution
