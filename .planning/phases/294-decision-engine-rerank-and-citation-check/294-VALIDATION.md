@@ -66,6 +66,28 @@ never deleted or silently skipped.
 
 **To finish the drive:** a session that has the claude-in-chrome tools AND permission to call the API with the local dev user's session, or the operator driving the browser rows, plus the operator steps for the fault phase. The order and the steps in each row are unchanged.
 
+## Drive pass 2 (2026-10-20, orchestrator, claude-in-chrome on the operator's logged-in local app): PARTIAL live drive
+
+Driven after the review fixes merged (`84dbfc755`), against the operator-started backend (:8000, auto-reloaded, serves `/citation-checks`) and frontend (:5173). No restart, no `.env` edit, no session minted, no credential-bearing script beyond the C7 probe. Settings were recorded first and **restored exactly** at the end (read back from `GET /settings`): `rerank_enabled=false`, `rerank_provider=cohere`, `rerank_model=rerank-v3.5`, `rerank_top_n=5`, `retrieval_top_k=5`, `hybrid_search_enabled=true`, `hybrid_candidate_count=20`. During the drive: reranking ON, Jev, Score the best 20, Keep at most 5 (saved via the UI; the server read back `jev` / `typesafe/jev-1.14` / 20 / 5).
+
+Thread "Statistical test and RPA survey items"; question from the frozen held-out set (statistical test + RPA survey items); main model deepseek-v4-flash; assistant message `df506422-9bed-457a-aeef-50a73d2bc187`.
+
+| ID | Pass 2 result | Evidence |
+|---|---|---|
+| E2 | ◐ PARTIAL: Jev reranked both live `search_documents` calls (2 × `POST https://openrouter.ai/api/alpha/decisions` 200, 06:21:26 and 06:21:28); answer arrived with 10 sources. Span half ⛔ LangSmith 403 (unchanged). The question carried no steering preference, so `instruction` was not exercised here | `backend/logs/backend.12728.log` lines 107, 112 |
+| C1 (Jev, natural answer, not the planted CC6.1 doc) | ◐ PARTIAL: "Check citations · Jev" → "Checking 10 citations…" → `✓ 3 supported · ◐ 3 partly supported · ○ 1 not supported` + Re-check + "checked by Jev · saved with this answer · just now". The planted-contradiction case (✕ contradicted) is NOT driven: it needs the planted document uploaded | `evidence/C-verdict-pills-and-markers-jev.jpg`; log lines 196-201 (6 parallel Jev calls, all 200) |
+| D-14 markers + peek | ✅ every marker kept its numeral and gained its glyph and class (`2✓ 1◐ 2◐ 3○ 5✓ 6✓ 7◐`, ordinals 0-6 = 7 claims = 3+3+1); the pinned peek shows verdict word, `confidence 0.75` (2 decimals), `[3]` file · chunk 277, the quoted passage and the fixed reason "The source passage does not say this." | `evidence/C-peek-not-supported.jpg`; DOM read (aria-labels "Citation 3: … — Not supported, confidence 0.75") |
+| C3 (reload half) | ✅ after a full reload the verdicts render with ONE batched `GET /citation-checks?message_ids=df506422-…` (200) and no POST. Second-profile half not driven | network log of tab; backend log lines 186, 251 |
+| C5 (Cohere arm) | ✅ engine switched to Cohere (saved): the button is replaced by "ⓘ Citation check needs Jev or OpenAI Decisions (Settings → Reranking)."; stored pills and all 7 marker verdicts still render. Local and Off arms not captured | `evidence/C5-cohere-reason-line.jpg` |
+| C7 (Jev half) | ✅ `citation-order-probe.py --message-id df506422-… --repeats 2` exit 0: "PASS — no consistent flip: 0 flip · 0 unstable · 2 stable" (C000 supported 0.48/0.41 vs 0.52/0.51; C002 partly 0.77/0.77 vs 0.72/0.75). OpenAI half ⛔ 403 (unchanged). Run on the natural answer, not the C1 planted one | probe stdout, recorded here |
+| G4-1 | evidence captured for the KEY-PRESENT state only: four engine cards per sketch 294 B, Jev reads "✓ uses your saved OpenRouter key" (the DB column is empty; the key resolves from `backend/.env` through the settings loader's env fallback), egress notice names OpenRouter (TypeSafe) and the cited sentences. The NO-key scenario cannot be shown without removing the env key → awaiting operator | `evidence/G4-1-engine-cards-unsaved.jpg` |
+| G4-2 | evidence captured on the natural answer (not C1): markers, pills and peek as above → **awaiting operator sign-off** against sketch 294 A | `evidence/C-verdict-pills-and-markers-jev.jpg`, `evidence/C-peek-not-supported.jpg` |
+| G4-3 | evidence captured (C5) → **awaiting operator sign-off** against sketch 294 A | `evidence/C5-cohere-reason-line.jpg` |
+
+**Finding LIVE-01 (lived experience, D-13): "Check citations" does not appear on a freshly finished answer until the thread is reloaded or re-opened.** Measured: right after the answer settled, the References header held only the fold trigger and no `GET /citation-checks` was sent; after re-opening the thread the action rendered. Cause (read from code): a finished live answer keeps its `temp-…` id until the persisted twin replaces it (`frontend/src/lib/dedupMessages.ts`, `StreamsProvider.tsx:390`), and `MessageItem.tsx:742/778` deliberately withholds `checkMessageId` from `temp-` ids; the stream's completion carries no persisted message id to swap in. Not fixed in 294: the fix lives in the streaming path (`StreamsProvider.tsx`, a G-5 FIRING hot file) and is filed as `BUG-261020-04`.
+
+Rows still ⛔ after pass 2, with the same reasons as pass 1: E1, E3, E4, E5, F1-F5, R1-R8, A1-A3, C1 planted / C2 / C4 / C6, S1, M1, plus the second-profile half of C3 and the Local / Off arms of C5.
+
 ## Live UAT rows
 
 ### Engines (SC#2, D-22) — each engine reranks a real knowledge-base search in a live chat
