@@ -22054,6 +22054,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 317 / 72 /
 
 CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 317 / 72 / 6568 (was `314 / 69 / 6539`) | 289-REVIEW: 1 suite adopted, 2 pins raised (row was stale)
 
+**294-REVIEW CR-01 (`6598` lines).** Three pins RAISED 10 → 11 (`citationVerdicts.parity`, `citationCheckStore`, `CitationCheckAction`), one new case each; no suite adopted, none lowered.
+
 ## Phase 285 close (2026-10-16, 285-03)
 
 All triples below were re-derived on the merged tree at `cca4e5a90` (285-01..03 code merged) with the CLAUDE.md recipe; six-digit quick-task buckets are subtracted and named per file. The set is every non-test source file the phase changed since PHASE_BASE `c8c764e90` (`git diff --name-only c8c764e90 HEAD -- backend/app frontend/src`, tests excluded): **7 files**. Migration 209, `scripts/apply_migration_209.py` and `supabase/full-schema.sql` are gate-exempt. Each subsection quotes the scan-list cell it replaced and, where the file had one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. **Newly FIRING or absent from CLAUDE.md, row ADDED:** `watch_service.py` (6), `db/watches.py` (4), `RunHistoryList.tsx` (3). `ingest_splice.py` and `db/ingestion_jobs.py` were NOT touched (D-12).
@@ -22783,6 +22785,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). Runs the check (choice per claim, grouped by source) + the pool upsert. ⛔ ids bound from the message row; refusal → couldnt_check
 
+**294-REVIEW CR-01 (`354` lines).** A check where NO source answered (every call failed or ran out of budget) now raises `CitationCheckFailed(engine)` and returns nothing, so an outage is never stored as a verdict and never replaces a stored check. A partial failure still returns a result, the failed sources' claims as `couldnt_check`. The exception carries the engine id only, never a vendor body.
+
 ## `backend/app/models/citation_check.py`
 
 **`0 / 0 / 0` — planned (294-03); row and section added at planning.** The wire contract: `Verdict` (`supported`, `partly_supported`, `not_supported`, `contradicted`, `couldnt_check`), `CheckEngineId`, `CitationClaimResult`, `CitationCheckResult` (version 1), `CitationCheckAvailability`. Module-level `Literal`s so `frontend/src/components/chat/citationVerdicts.ts` can pin them through `?raw`. Plan 05 re-derives the triple.
@@ -22802,6 +22806,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 **`1 / 1 / 175` (was `0 / 0 / 0`).** Created at 175 lines. 409 bodies are `{"reason": off | engine_reorders_only | key_missing | in_flight}`; 422 for a non-assistant message, no passages, or no cited claim; GET takes at most 100 uuid ids. The binding invariants recorded at planning held: user-JWT reads through `aexec`/`maybe_row`, pool write with ids from the message row, Redis `SET NX EX 60` released by compare-and-delete, no key or base URL in any response.
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). GET availability+checks, POST run (404 same body, 422, 409 in flight). ⛔ a route, NOT a tool (30 stays); never returns a key
+
+**294-REVIEW CR-01 (`181` lines).** `CitationCheckFailed` maps to **503 `{"reason": "engine_failed"}`** and `upsert_check` is never reached, so a failed Re-check leaves the stored row byte-unchanged. The OpenAPI surface is unchanged (no `responses=` declared, like the 409s).
 
 ## `frontend/src/components/settings/rerankEngines.ts`
 
@@ -22833,6 +22839,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). getCitationChecks / runCitationCheck + wire types. ⛔ own specifier; NOT re-exported through lib/api.ts
 
+**294-REVIEW CR-01 (`118` lines).** Doc comment only: `CitationCheckApiError.reason` can now also be the 503's `engine_failed`.
+
 ## `frontend/src/stores/citationCheckStore.ts`
 
 **`0 / 0 / 0` — planned (294-05); row and section added at planning.** A small zustand store (the `askDraftStore.ts` precedent): `byMessage`, `availability`, `inFlight`, `ensure(id)` batched per microtask into one `GET /citation-checks?message_ids=`, and `run(id)`. ⛔ **Binding invariants:** its own module, never a slice of `streamsStore.ts` (G-5 FIRES there); stable empty references (zustand v5); `resetCitationChecks()` registered in `setupTests.ts`. Plan 05 re-derives the triple.
@@ -22843,6 +22851,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). byMessage + availability; microtask-batched ensure() → one GET. ⛔ never a slice of streamsStore.ts; reset in setupTests
 
+**294-REVIEW CR-01 (`144` lines).** Doc comment only: `engine_failed` is listed among the error codes. The store already passed the server's reason through and kept `byMessage` on a failed POST; a new case pins both for the 503.
+
 ## `frontend/src/components/chat/citationVerdicts.ts`
 
 **`0 / 0 / 0` — planned (294-05); row and section added at planning.** Five rows (✓ supported · ◐ partly supported · ○ not supported · ✕ contradicted · ? couldn't check), each with a fixed one-line reason (decision engines return no text), the ⓘ availability reasons, and an own-property-guarded accessor. ⛔ Labels pinned to `Verdict` in `backend/app/models/citation_check.py` through `?raw`; glyph plus word plus raw confidence, never colour alone. Plan 05 re-derives the triple.
@@ -22852,6 +22862,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 **`2 / 1 / 142` (was `0 / 0 / 0`).** Created at 124 lines, +18 in Task 2 (`claimConfidence`, `verdictSpoken`). Every word the chat shows for a check is here; no server text is rendered.
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). THE verdict vocabulary: glyph, word, class, fixed reason line. ⛔ labels pinned to models/citation_check.py; unknown → couldn't check
+
+**294-REVIEW CR-01 (`146` lines).** `checkErrorLine("engine_failed")` has its own fixed line ("The engine didn't answer, so nothing was saved. Try again in a moment."); the parity suite reads the 503 detail from `api/citation_checks.py` via `?raw`.
 
 ## `frontend/src/components/chat/CitationCheckAction.tsx`
 

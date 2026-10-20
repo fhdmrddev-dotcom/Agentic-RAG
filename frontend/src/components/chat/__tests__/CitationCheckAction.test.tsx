@@ -132,4 +132,20 @@ describe("CitationCheckAction", () => {
     expect(await screen.findByText("A check is already running for this answer.")).toBeInTheDocument()
     expect(screen.getAllByTestId("citation-verdict-pill")).toHaveLength(3)
   })
+
+  it("294-REVIEW CR-01 — a 503 engine_failed Re-check shows the fixed line and keeps the saved verdicts", async () => {
+    serve({ available: true, engine: "jev", reason: null }, { m1: RESULT })
+    api.runCitationCheck.mockRejectedValue(
+      Object.assign(new Error("503"), { status: 503, reason: "engine_failed" }),
+    )
+    render(<CitationCheckAction messageId="m1" citationCount={3} />)
+    fireEvent.click(await screen.findByRole("button", { name: "Re-check" }))
+    expect(
+      await screen.findByText("The engine didn't answer, so nothing was saved. Try again in a moment."),
+    ).toBeInTheDocument()
+    const pills = screen.getAllByTestId("citation-verdict-pill").map((p) => p.textContent)
+    expect(pills).toEqual(["✓ 1 supported", "✕ 1 contradicted", "? 1 couldn't check"])
+    expect(screen.getByText(/checked by Jev · saved with this answer/)).toBeInTheDocument()
+    expect(screen.queryByText("The check didn't finish. Try again.")).toBeNull()
+  })
 })

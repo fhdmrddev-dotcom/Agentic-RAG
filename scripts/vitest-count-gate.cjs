@@ -178,9 +178,11 @@ const BASELINE = {
   // Phase 294-05 (DEC-03) — the citation-check client, vocabulary, store, action, marker and peek
   // suites, measured green on a run of these suites alone (2026-10-20).
   "citationChecks.contract.test.ts": 8,
-  "citationVerdicts.parity.test.ts": 10,
-  "citationCheckStore.test.ts": 10,
-  "CitationCheckAction.test.tsx": 10,
+  // 294-REVIEW CR-01 raised each of these three 10 -> 11: the 503 engine_failed line (route source
+  // + fixed sentence), the store keeping the saved result, and the action keeping the saved pills.
+  "citationVerdicts.parity.test.ts": 11,
+  "citationCheckStore.test.ts": 11,
+  "CitationCheckAction.test.tsx": 11,
   "CitedMarkdown.verdict.test.tsx": 17,
   "CitationPeek.verdict.test.tsx": 5,
   // Phase 294-04 (DEC-01) — the engine cards and the engine-id parity fence. 294-04 left them

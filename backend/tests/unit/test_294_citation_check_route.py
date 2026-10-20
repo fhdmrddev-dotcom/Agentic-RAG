@@ -333,6 +333,67 @@ def test_a_second_post_replaces_the_stored_row(env, monkeypatch):
     assert env.pool.store[MSG_ID]["result"]["counts"]["not_supported"] == 2
 
 
+def _engine_down(monkeypatch, status_code=429):
+    rec = Recorder()
+
+    def handle(request):
+        rec.enter(request)
+        try:
+            return httpx.Response(status_code, json={"error": {"message": "upstream says no sk-or-PLANTED-294"}})
+        finally:
+            rec.leave()
+
+    install(monkeypatch, jev, handle)
+    return rec
+
+
+def test_a_total_engine_failure_is_503_and_stores_nothing(env, monkeypatch):
+    """294-REVIEW CR-01: every engine call failed -> 503 with a fixed detail, nothing stored."""
+    rec = _engine_down(monkeypatch)
+    r = env.client.post(f"/citation-checks/{MSG_ID}")
+    assert r.status_code == 503, r.text
+    assert r.json() == {"detail": {"reason": "engine_failed"}}
+    assert len(rec.bodies) == 2
+    assert env.pool.store == {} and env.pool.calls == []
+    assert env.redis.kv == {}
+    _no_secrets(r.text)
+
+
+def test_a_total_engine_failure_never_overwrites_the_stored_check(env, monkeypatch):
+    """CR-01 scenario: yesterday's verdicts survive a Re-check made during an outage."""
+    _engine_ok(monkeypatch, "supported")
+    first = env.client.post(f"/citation-checks/{MSG_ID}")
+    assert first.status_code == 200
+    before = dict(env.pool.store[MSG_ID])
+    _engine_down(monkeypatch, 500)
+    again = env.client.post(f"/citation-checks/{MSG_ID}")
+    assert again.status_code == 503
+    assert env.pool.store[MSG_ID] == before
+    assert len(env.pool.calls) == 1
+    assert env.pool.store[MSG_ID]["result"]["counts"]["supported"] == 2
+
+
+def test_a_partial_engine_failure_still_stores(env, monkeypatch):
+    """CR-01 boundary: one source answered, so the check is stored, the failed source couldn't check."""
+    rec = Recorder()
+
+    def handle(request):
+        body = rec.enter(request)
+        try:
+            if body["state"]["source_passage"].startswith("Revenue"):
+                return httpx.Response(500, json={"error": {"message": "boom"}})
+            return httpx.Response(200, json={"answers": {
+                n: {"type": "choice", "choice": "contradicted", "confidence": 0.8} for n in body["questions"]}})
+        finally:
+            rec.leave()
+
+    install(monkeypatch, jev, handle)
+    r = env.client.post(f"/citation-checks/{MSG_ID}")
+    assert r.status_code == 200, r.text
+    assert [c["verdict"] for c in r.json()["claims"]] == ["couldnt_check", "contradicted"]
+    assert MSG_ID in env.pool.store
+
+
 def test_the_in_flight_key_is_released_on_error(env, monkeypatch):
     def boom(_row, _settings):
         raise RuntimeError("engine exploded sk-or-PLANTED-294")

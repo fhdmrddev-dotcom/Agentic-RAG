@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest"
 import modelSource from "../../../../../backend/app/models/citation_check.py?raw"
+import routeSource from "../../../../../backend/app/api/citation_checks.py?raw"
 import { VERDICT_META, verdictMeta, availabilityReason, checkErrorLine } from "../citationVerdicts"
 
 function literalValues(source: string, name: string): string[] {
@@ -89,6 +90,14 @@ describe("checkErrorLine — one fixed line per failure, never server text", () 
     expect(checkErrorLine("rejected", null)).toBe("This answer has no cited passages to check.")
     expect(checkErrorLine("failed", null)).toBe("The check didn't finish. Try again.")
     expect(checkErrorLine("anything-else", null)).toBe("The check didn't finish. Try again.")
+  })
+
+  it("294-REVIEW CR-01 — the route's 503 engine_failed reason has its own fixed line", () => {
+    // read from the route SOURCE, so a rename there fails here instead of falling to the generic line
+    expect(routeSource).toMatch(/status_code=status\.HTTP_503_SERVICE_UNAVAILABLE,\s*detail=\{"reason": "engine_failed"\}/)
+    expect(checkErrorLine("engine_failed", null)).toBe(
+      "The engine didn't answer, so nothing was saved. Try again in a moment.",
+    )
   })
 
   it("an availability refusal reuses the ⓘ sentence", () => {
