@@ -422,14 +422,59 @@ describe("RunModal 214-09 — declared inputs become real fields (STEP-02 / D-21
     expect(kickoff).toBe("go")
   })
 
-  it("an untouched field sends an EMPTY STRING, not an absent key — no required-ness is validated here", async () => {
+  // 287-01 REWRITE IN PLACE (reason: the old case asserted an untouched REQUIRED field sends
+  // `""` and Run stays enabled. START-01 / D-06 reverses that: Run stays clickable but the
+  // press is refused by name and `onRun` is never called. The old property survives below
+  // for an explicit `required: false` field.)
+  it("an untouched REQUIRED field is REFUSED by name — onLaunch is never called", async () => {
     mockListPublished.mockResolvedValue([declaredInputsPublished])
     const { modal, onLaunch } = await openModal(folders)
     fireEvent.change(within(modal).getByTestId("run-input-to"), { target: { value: "a@b.c" } })
-    // `subject_line` is left untouched, and Run stays ENABLED — the publish gate (214-05)
-    // already refuses an undeclared `ask` key, and a launcher that blocked on an empty
-    // optional field would refuse a run the system can perform.
-    expect(within(modal).getByTestId("run-confirm")).not.toBeDisabled()
+    // `subject_line` is left untouched (absent reads required).
+    fireEvent.click(within(modal).getByTestId("run-confirm"))
+    const refusal = await within(modal).findByTestId("run-required-refusal")
+    expect(refusal.textContent).toBe("subject_line is required")
+    expect(onLaunch).not.toHaveBeenCalled()
+    // Distinct from the server-422 verbatim path.
+    expect(within(modal).queryByTestId("run-upload-error")).toBeNull()
+  })
+
+  // 287-05 REGRESSION (found in the live G-4 drive): a workflow that does NOT admit a template
+  // (no llm_emit phase) hid the whole block the refusal sits in, so an empty required field was
+  // refused SILENTLY. The refusal must render regardless of template admission.
+  it("an empty REQUIRED field is refused by name on a template-less workflow too", async () => {
+    mockListPublished.mockResolvedValue([
+      {
+        ...declaredInputsPublished,
+        definition: {
+          ...declaredInputsPublished.definition,
+          phases: [{ slug: "w", phase_index: 0, config: { phase_type: "llm_single" } }],
+        },
+      },
+    ])
+    const { modal, onLaunch } = await openModal(folders)
+    fireEvent.click(within(modal).getByTestId("run-confirm"))
+    const refusal = await within(modal).findByTestId("run-required-refusal")
+    expect(refusal.textContent).toBe("Recipient email and subject_line are required")
+    expect(onLaunch).not.toHaveBeenCalled()
+  })
+
+  it("a `required: false` field left empty is sent as an EMPTY STRING, key present", async () => {
+    mockListPublished.mockResolvedValue([
+      {
+        ...declaredInputsPublished,
+        definition: {
+          ...declaredInputsPublished.definition,
+          inputs: [
+            { key: "to", label: "Recipient email" },
+            { key: "subject_line", required: false },
+            { key: "kickoff_prompt" },
+          ],
+        },
+      },
+    ])
+    const { modal, onLaunch } = await openModal(folders)
+    fireEvent.change(within(modal).getByTestId("run-input-to"), { target: { value: "a@b.c" } })
     fireEvent.click(within(modal).getByTestId("run-confirm"))
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
     const [, , extras] = onLaunch.mock.calls[0]

@@ -1,0 +1,41 @@
+---
+id: BUG-261020-01
+title: A person's answer to a human-input step never reaches the next step
+reported: 2026-10-20
+surface: Agentic-RAG
+severity: major
+status: open
+affected_areas: [backend/harness, workflows/human-input]
+folded_into: null
+verified_closed_by: null
+related_seeds: [SEED-360]
+re_open_trigger: null
+reproduces_on:
+  branch: develop
+  commit: 4b37c72aa
+  date: 2026-10-20
+---
+
+# BUG-261020-01: A person's answer to a human-input step never reaches the next step
+
+## What we observed
+
+Found during the Phase 289 live re-drive (2026-10-20, `289-VALIDATION.md` "Post-review live re-drive").
+
+- Run A was a planted pause workflow with the steps KB, then approval (human input), then wrap. The person answered "Yes", and the last step then wrote: "I can't confirm the note was approved because no approval decision was provided."
+- Run E had the same shape and its wrap said "Approved". That answer came from the model guessing, not from the stored answer.
+- So Phase 289 plan 05's S5 wording ("the run completed and acted on the answer") proved completion only, never that the answer was used.
+
+## Why it matters
+
+A workflow that pauses to ask a person "approve?" and then ignores the reply is wrong in the way that matters most. The run looks correct (`completed`), while the decision it was waiting for had no effect.
+
+## Where (from the live drive; not yet driven by a test)
+
+- `backend/app/services/harness/phase_types.py:173`: `_prior_output_text` hands the next step only each prior step's `text`.
+- `backend/app/services/harness/human_input.py:142`, `:188`, `:327`: `llm_human_input` returns `text = <the question>` on all three paths. The answer sits in a separate field that `_prior_output_text` never reads.
+- Inherited: `_prior_output_text` dates from Phase 091-03 / 092-07 (2026-05-31). Phase 289 did not change it.
+
+## Fix direction (not a decision)
+
+Carry the answer into what the next step sees. Either the human step's `text` includes the answer once it is answered, or `_prior_output_text` reads the answer field. Pin it with a test where the wrap step's input contains the stored answer.

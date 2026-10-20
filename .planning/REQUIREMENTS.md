@@ -1,95 +1,88 @@
-# Requirements: Milestone v4.6 Pay It Down
+# Requirements: Milestone v4.7 Workflows You Can See and Start Anywhere
 
-**Defined:** 2026-10-12 (operator intake; research skipped — every bug report carries a measured root cause)
+**Defined:** 2026-10-18 (operator intake; research skipped — every item has a planted seed with context)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviours (skills) that persist and can be shared.
-**Milestone goal:** Every open **major** bug fixed and the v4.5 tech debt cleared. Repair only — no new user capability.
+**Milestone goal:** Workflows become easier to start, finish authoring and understand at a glance, with visuals that show what a run did.
 
-Seeds folded at intake: **SEED-221** (into FIX-10), **SEED-328** (into SEAM-01), **SEED-224** extraction half (into SEAM-02).
+Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-051, SEED-183, SEED-086, SEED-337, SEED-348, SEED-155, SEED-152. SEED-163 is already delivered (Phase 193.2) and is only flipped (REG-06).
 
-## v4.6 Requirements
+## v4.7 Requirements
 
-### Major bugs (FIX)
+### Start (START)
 
-- [x] **FIX-01**: An ordinary org member can open Settings and use Memory, Audit Log and "Show technical names"; operator-only tabs stay hidden from them. — `BUG-261004-02`
-- [x] **FIX-02**: Uploading the same bytes while the first copy is still indexing never retires that copy and never 409s; exactly one copy stays visible in the Library and in search. — `BUG-261005-01`
-- [x] **FIX-03**: A watched OneDrive/SharePoint folder larger than one page imports every page, or fails loudly — it never silently restarts the listing at page 1. — `onedrive-adapter-…` WR-02
-- [x] **FIX-04**: A OneDrive search query cannot alter the Microsoft Graph request path. — `onedrive-adapter-…` WR-01
-- [x] **FIX-05**: Folder paths minted by the OneDrive adapter use one encoding, so a filing rule written against the displayed path matches. — `onedrive-adapter-…` WR-03
-- [x] **FIX-06**: A per-model timeout is the timeout the provider call actually gets, up to the maximum the UI accepts; a value above a real ceiling is refused with the reason; `max_retries` is chosen deliberately, not inherited from the SDK default. — `BUG-260916-01`
-- [x] **FIX-07**: One `ask_user` pause shows one answer input; the draft is the same wherever it appears; option selection is not conveyed by colour alone; no dead button remains. — `BUG-260918-01`
-- [x] **FIX-08**: Expanding the Chunks section on a 1,000-chunk document leaves every section below it reachable. — `BUG-260908-01`
-- [x] **FIX-09**: When an emit step fails, the reported cause is the check that actually failed — never "citations" when citation coverage was 100%. — `BUG-260730-02`
-- [x] **FIX-10**: A publish-gauntlet refusal shows the author the precise reason recorded in `harness_audit`, in plain words, never a machine code. — `BUG-260815-06` + `SEED-221`
-- [x] **FIX-11**: The Library, Find and every document picker stay correct and fast for an account with tens of thousands of documents — the server pages and counts, no request carries a growing id list, and no list is silently cut at the API's 1,000-row cap. — `BUG-261014-06` + `BUG-261014-07` (added 2026-10-14)
-- [x] **FIX-12**: A watched file whose download fails once is fetched again on a later sync, and until it lands the failure stays visible with its cause; a later sync never reports a clean success over a skipped file. — `BUG-261014-02` (added 2026-10-16)
-- [x] **FIX-13**: Purging a watch's documents deletes only the documents that watch minted; a hand-uploaded document the watch only dedup-linked to keeps its row and its stored bytes. — `BUG-261014-03` (added 2026-10-16)
-- [x] **FIX-14**: A document whose ingest never started (no ingestion job) does not absorb later uploads of the same bytes; a re-upload gets the file ingested. — `BUG-261014-04` (added 2026-10-16)
+- [x] **START-01**: From inside a thread, a user can start a workflow, fill its launch form, and see the run attached to that thread. — `SEED-232`
+- [ ] **START-02**: An external system can start a workflow run through an authenticated inbound call and read the result back. Org-scoped, rate-limited, audited. — `SEED-195`
+- [x] **START-03**: A user can fork a starter workflow into their own draft in one click; at least 5 curated starters ship, each passing the publish gauntlet. — `SEED-084` (287: fork is menu + name dialog, not literal one click; operator to rule)
+- [ ] **START-04**: A run started by a schedule or an inbound call shows how it was started, and its last and next run are visible. — `SEED-014`
 
-### v4.5 audit debt (DEBT)
+### Author (AUTH)
 
-- [x] **DEBT-07**: The harness freshness validator (`harness/freshness.py`) excludes archived (`retrievable=false`) documents. — W-1
-- [x] **DEBT-08**: A recorded decision states what happens to `message_artifacts` rows when their source document is disposed by retention, and the code enforces it if the decision requires. — W-2
-- [x] **DEBT-09**: The date-word→column map and the topics-is-a-list rule each have one home, imported by `retrieval_scope.py`, `document_search_service.py` and `view_filter_compiler.py`; a test fails if they diverge. — W-3
-- [x] **DEBT-10**: Both watch purge paths remove the stored file bytes as well as the document rows. — W-5 / `BUG-261012-01`
-- [x] **DEBT-11**: `DELETE /documents/{id}` answers 404, not 500, when the caller owns no such row. — W-5 / `BUG-261012-02`
+- [ ] **AUTH-01**: A workflow that pauses for a person can be published, and the run surface shows who it is waiting on. — `SEED-164`
+- [ ] **AUTH-02**: Describe-it authoring can take uploaded assets (template, form, reference docs) and derive the inputs, phases and tools from them. — `SEED-051`
+- [ ] **AUTH-03**: A draft's configuration does not vanish when the author navigates away. — `SEED-183`
 
-### Owed G-5 extractions (SEAM)
+### See (VIS)
 
-Behaviour-preserving: the backend unit baseline ceiling (71 failed) is not exceeded and the frontend count gate shows no per-file decrease.
+- [ ] **VIS-01**: A multi-agent workflow can be viewed as a truthful picture of orchestrator, workers and judge, with no edges the schema does not have. Sketch first (G-2). — `SEED-086`
+- [ ] **VIS-02**: The agent can show more artifact types beyond chart, table and metric; the new set is chosen at sketch time from a closed registry only. — `SEED-337`
+- [x] **VIS-03**: A finished run has one read-only page, with export, showing what it did and on what evidence (definition version, phase log, verdicts, cited sources). — `SEED-348`
+- [ ] **VIS-04**: The workflow library card matches its approved sketch: labelled phase chips, and the description no longer dominates. — `SEED-155`
 
-- [x] **SEAM-01**: `backend/app/services/expert_scope.py` is extracted along its named seam (`docs/HOT-FILE-LEDGER.md`); every `SEED-328` item is fixed or recorded with a reason.
-- [x] **SEAM-02**: `backend/app/services/retrieval_service.py` is extracted along its named seam (`SEED-224`, owed since Phase 231).
-- [x] **SEAM-03**: `backend/app/services/tool_dispatcher.py` is split into registry and handlers (`OV-273-02`); the closed core stays at 30 tools and the registry is pinned identical before and after.
+### Trust (TRUST)
+
+- [x] **TRUST-01**: Each workflow phase output that came from the knowledge base carries a confidence level, shown on the run surface and in the receipt. — `SEED-152`
 
 ### Register hygiene (REG)
 
-- [x] **REG-04**: `CLAUDE.md` measures below the 120,000-char warn band (`node scripts/check-claude-md-size.cjs` exit 0 with no warning), split by function into `docs/` under the same-commit sync rule — nothing deleted.
-- [x] **REG-05**: The v4.5 bookkeeping drift is repaired — archived REQUIREMENTS FIND-01/02/03/06 status, ROADMAP 270/271 progress rows, and the missing SUMMARY requirement fields.
+- [ ] **REG-06**: Seed statuses match reality: SEED-163 flipped, and each seed this milestone folds is updated.
+- [x] **REG-07**: Hot-file refactors that guardrail G-5 requires are done before the feature phases that touch those files.
+
+### Decision engine (DEC) — added 2026-10-20 by the operator, outside the milestone's workflow theme
+
+- [ ] **DEC-01**: A Settings switch turns the decision engine on or off and picks the engine: Jev (TypeSafe, ~~direct or~~ via OpenRouter), OpenAI Decisions (`gpt-6-luna`), or a local model. Off is the default and leaves retrieval exactly as it is today. *Amended 2026-10-20 (294-CONTEXT D-03, operator): Jev ships via OpenRouter only; TypeSafe direct is deferred.*
+- [ ] **DEC-02**: When on, knowledge-base search reranks its candidates with the chosen engine, accepts an optional steering instruction from the agent, and drops only candidates below a conservative threshold. Any engine failure falls back to the current order.
+- [ ] **DEC-03**: A user can check an answer's citations and see, for each cited sentence, whether its source supports it fully, partly, not at all, or contradicts it, with a confidence.
 
 ## Future Requirements (deferred)
 
-- Owed operator verification carried from v4.5: 275 UAT (18 rows), 273 structured-path drive + WR-04/05, 271 G-4 sign-off + P-01/P-03, 272 re-drive, logged-in production smoke test — operator-driven, tracked in `STATE.md` "Owed".
-- Medium/minor open bugs not named above (e.g. `BUG-260828-05`, `BUG-260828-06`, `BUG-260923-01`).
+- Decision-engine model routing (simple turns to a cheaper model) — after DEC-02 is measured; needs the full provider roster.
+- Decision-engine chunk tagging at ingestion (table of contents, footer, signature, personal data) — through the classification splice (`ingest_splice.py`).
+
+- `SEED-347` canvas scale hardening — conditional on a real large workflow.
+- `SEED-013` Open Platform (public API, MCP server) — planned as v4.8.
+- Owed operator verification from v4.6: Coolify rebuild confirmation, logged-in production smoke, 282 G4-4/G4-6/A1, 281 G-4 rows A/C/D.
 
 ## Out of Scope
 
 | Item | Reason |
 |------|--------|
-| Any new user-facing capability | Repair-only milestone by operator decision; a capability is a phase in a feature milestone |
-| SEED-354 (hold private documents) | Extends retention — a feature, not debt |
-| SEED-334 (272 SC#4 remaining providers) | Provider-quality work; carried |
-| Open Platform (SEED-013) | Next feature slot, sequenced after this milestone |
+| New tools, phase types or emitters beyond the closed core (7 / 1 / 30) | Extension Contract; needs explicit approval per requirement |
+| Open Platform / public API / MCP server | Next milestone (v4.8) |
+| Medium/minor open bugs not named above | Carried in `.planning/reported-bugs/` |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 283 | Complete |
-| FIX-02 | Phase 280 | Complete |
-| FIX-03 | Phase 280 | Complete |
-| FIX-04 | Phase 280 | Complete |
-| FIX-05 | Phase 280 | Complete |
-| FIX-06 | Phase 282 | Complete |
-| FIX-07 | Phase 282 | Complete |
-| FIX-08 | Phase 283 | Complete |
-| FIX-09 | Phase 281 | Complete |
-| FIX-10 | Phase 281 | Complete |
-| FIX-11 | Phase 284 | Complete |
-| FIX-12 | Phase 285 | Complete |
-| FIX-13 | Phase 285 | Complete |
-| FIX-14 | Phase 285 | Complete |
-| DEBT-07 | Phase 281 | Complete |
-| DEBT-08 | Phase 280 | Complete |
-| DEBT-09 | Phase 278 | Complete |
-| DEBT-10 | Phase 280 | Complete |
-| DEBT-11 | Phase 280 | Complete |
-| SEAM-01 | Phase 279 | Complete |
-| SEAM-02 | Phase 278 | Complete |
-| SEAM-03 | Phase 278 | Complete |
-| REG-04 | Phase 277 | Complete |
-| REG-05 | Phase 277 | Complete |
+| REG-07 | Phase 286 | Complete |
+| START-01 | Phase 287 | Complete |
+| START-03 | Phase 287 | Complete |
+| AUTH-03 | Phase 288 | Pending |
+| AUTH-01 | Phase 288 | Pending |
+| VIS-03 | Phase 289 | Complete |
+| TRUST-01 | Phase 289 | Complete |
+| VIS-04 | Phase 290 | Pending |
+| VIS-01 | Phase 290 | Pending |
+| AUTH-02 | Phase 291 | Pending |
+| VIS-02 | Phase 292 | Pending |
+| START-02 | Phase 293 | Pending |
+| START-04 | Phase 293 | Pending |
+| REG-06 | Phase 293 | Pending |
+| DEC-01 | Phase 294 | Pending |
+| DEC-02 | Phase 294 | Pending |
+| DEC-03 | Phase 294 | Pending |
 
-**Coverage:** 21 v4.6 requirements · 21 mapped · 0 orphans · 0 duplicates (roadmap created 2026-10-12; FIX-11 / Phase 284 added 2026-10-14).
+Mapped: 14/14, no orphans, no duplicates.
 
 ---
-*Requirements defined: 2026-10-12*
+*Requirements defined: 2026-10-18*

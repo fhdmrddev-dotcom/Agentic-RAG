@@ -123,7 +123,8 @@ def _call(asset_id: str, *, resolver: _RecordingResolver, owner_row=..., user_id
     pool = _FakePool({"slug": "some-workflow"} if owner_row is ... else owner_row)
 
     async def _go():
-        with patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=pool)), patch(
+        # Phase 286 (286-01): handler moved to workflow_authoring_doors.py; patch target follows the name lookup
+        with patch("app.api.workflow_authoring_doors.get_pg_pool", AsyncMock(return_value=pool)), patch(
             "app.services.template_asset_service.resolve_template_source", resolver
         ):
             return await wf_api.get_workflow_template_placeholders(

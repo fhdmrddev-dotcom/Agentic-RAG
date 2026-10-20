@@ -655,6 +655,24 @@ export interface WorkflowRunPhase {
    *  it. **Never substitute**: not "Unknown service", not the capability id, not the connection
    *  id — never draw a name the system cannot know. */
   service_name?: string | null
+  /** Phase 289 (TRUST-01 / D-08 / R-05) — this step's retrieval confidence, computed ONCE at
+   *  write time by chat's own function over this step's own knowledge-base searches.
+   *
+   *  ⚠ **`null` / absent MEANS THE STEP MADE NO KNOWLEDGE-BASE SEARCH** (or its search failed,
+   *  or the run predates the field). Render NOTHING for it — never a low chip, never "n/a"
+   *  (D-09). A step that searched and matched nothing carries `level: "none"` instead. */
+  confidence?: RunPhaseConfidence | null
+}
+
+/** Phase 289 (TRUST-01) — the wire twin of the backend's `confidence_for_wire` output.
+ *  `kb_label` is stamped server-side (the bound project folder's name, else "the knowledge
+ *  base") so the live spine and the evidence report render the same line. */
+export interface RunPhaseConfidence {
+  level: "high" | "medium" | "low" | "none"
+  avg_similarity: number | null
+  disclaimer: string | null
+  passages: number
+  kb_label: string
 }
 
 /**
@@ -698,6 +716,15 @@ export interface WorkflowRunPhase {
  * `definition: null` rather than 404ing. Treat an empty `workflow_name` as "definition
  * unavailable", never render the empty string.
  */
+/** Phase 288 (D-09): who a run waiting on a person is waiting on. The SERVER composes
+ *  `sentence`; render it verbatim and never build one from an id. */
+export interface WorkflowRunWaitingOn {
+  sentence: string
+  step_name?: string | null
+  prompt_line?: string | null
+  window_passed: boolean
+}
+
 export interface WorkflowRunRead {
   /** `workflow_runs.id` — NOT `PostMessageResponse.run_id`. See the docblock. */
   id: string
@@ -725,6 +752,8 @@ export interface WorkflowRunRead {
   is_rated?: boolean
   token_coverage?: string[] | null
   model?: string | null
+  /** Phase 288 (AUTH-01): present only while the run waits on a human-input step. */
+  waiting_on?: WorkflowRunWaitingOn | null
 }
 
 /**

@@ -79,8 +79,8 @@ export function SettingsScene() {
           </span>
         </div>
         <div className="font-mono t-toglabel" style={{ fontSize: 11, color: "hsl(220 16% 65%)" }}>
-          <span className="t-la">API (Cohere)</span>
-          <span className="t-lb">Local (sentence-transformers)</span>
+          <span className="t-la">Hosted (Jev · OpenAI · Cohere)</span>
+          <span className="t-lb">On this server (local)</span>
         </div>
         <div style={{ height: 1, background: "hsl(220 20% 16%)" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

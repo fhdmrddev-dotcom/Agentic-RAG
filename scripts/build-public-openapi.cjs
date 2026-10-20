@@ -96,7 +96,7 @@ const V45_OPERATIONS = []
 const SYSTEM_TAG = "system"
 
 const TAG_GROUPS = [
-  { name: "Chat & runs", tags: ["threads", "runs", "panel", "workspace", "sandbox-outputs"] },
+  { name: "Chat & runs", tags: ["threads", "runs", "panel", "workspace", "sandbox-outputs", "citation-checks"] },
   {
     name: "Documents",
     tags: [

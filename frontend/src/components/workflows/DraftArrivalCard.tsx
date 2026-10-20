@@ -97,6 +97,9 @@ import {
   DECISIONS_FOLD_ACTION,
   DECISIONS_HEADING,
   DECISION_ROW_ORDER,
+  DRAFT_SETTINGS_CLOSE_ACTION,
+  DRAFT_SETTINGS_HEADING,
+  DRAFT_SETTINGS_OPEN_ACTION,
   GROUNDING_FOLD_ACTION,
   decisionsFoldSummary,
   groundingFoldSummary,
@@ -135,6 +138,13 @@ export interface DraftArrivalCardProps {
   /** ── The decisions half, as ONE object so the page's wiring is explicit at the call
    *  site rather than spread across eleven sibling props. ── */
   decisions: DecisionsListProps
+
+  /** Phase 288-01 (AUTH-03, A-02) — when true and `open` is false, the closed branch renders ONE
+   *  collapsed "Draft settings" row (testid `draft-settings-row`, never the arrival card's)
+   *  instead of null, so the decisions rows and the working-name field stay reachable for the
+   *  draft's whole life. The receipt stays arrival-only: `open` is unchanged and the row
+   *  authors no past-tense narration. Default false keeps the closed branch null. */
+  settingsRow?: boolean
 }
 
 /**
@@ -231,6 +241,7 @@ export function DraftArrivalCard({
   open,
   onDismiss,
   decisions,
+  settingsRow = false,
 }: DraftArrivalCardProps) {
   /**
    * ⚠ READ OFF `decisions`, NEVER MIRRORED INTO STATE. These three are LIVE off the definition
@@ -254,6 +265,9 @@ export function DraftArrivalCard({
    * disclosure state is the correct shape, and no PROP is cached by it.
    */
   const [sourceOpen, setSourceOpen] = useState(false)
+  /** 288-01 — the closed branch's own disclosure, collapsed on mount, local like its siblings. */
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsBodyId = useId()
 
   // DERIVED from the ONE home (187-24), never re-implemented and never read back out of
   // the DOM. A second consumer of one predicate is not a second predicate.
@@ -293,7 +307,43 @@ export function DraftArrivalCard({
   const groundingSummary = groundingFoldSummary(groundedCount)
   const decisionsSummary = decisionsFoldSummary(DECISION_ROW_ORDER.length)
 
-  if (!open) return null
+  if (!open) {
+    if (!settingsRow) return null
+    // 288-01 — the draft-lifetime surface. ONE element in the graph column's slot, so the
+    // three-row grid keeps its three children. Present-tense words, all imported.
+    return (
+      <section
+        data-testid="draft-settings-row"
+        className="w-full max-w-[720px] rounded border border-border bg-card"
+      >
+        <button
+          type="button"
+          data-testid="draft-settings-toggle"
+          aria-expanded={settingsOpen}
+          aria-controls={settingsBodyId}
+          onClick={() => setSettingsOpen((wasOpen) => !wasOpen)}
+          className={cn(FOLD_LINE_CLASS, "mt-0 px-3 py-2")}
+        >
+          <span aria-hidden="true" className="shrink-0">
+            {FOLD_GLYPH}
+          </span>
+          <span className="min-w-0 flex-1 truncate">{DRAFT_SETTINGS_HEADING}</span>
+          <span className={FOLD_ACTION_CLASS}>
+            {settingsOpen ? DRAFT_SETTINGS_CLOSE_ACTION : DRAFT_SETTINGS_OPEN_ACTION}
+          </span>
+        </button>
+        {settingsOpen ? (
+          <div
+            id={settingsBodyId}
+            data-testid="draft-settings-body"
+            className="border-t border-border p-2"
+          >
+            <DecisionsList {...decisions} />
+          </div>
+        ) : null}
+      </section>
+    )
+  }
 
   return (
     /* ── SKETCH 200 (`draft-arrival.html`) — THE CARD'S FRAME ──────────────────────────

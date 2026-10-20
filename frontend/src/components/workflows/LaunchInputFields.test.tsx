@@ -257,9 +257,8 @@ describe("LaunchInputFields — source fence: it is a leaf", () => {
   })
 
   it("214.1 — does NOT block anything: no field is disabled and no control is required", () => {
-    // ⛔ D-214-04's rejected arm, kept rejected. Blocking a launcher's confirm would change
-    // the contract of three shipped doors, and the SMTP adapter plus the publish gate already
-    // fail CLOSED on an empty required argument — so nothing silently succeeds today.
+    // 287-01: the LEAF stays non-blocking. The block now lives in the two launch CONFIRM
+    // controls (ChatLaunchForm, RunModal) via `missingRequiredFields`; this leaf only marks.
     render(
       <LaunchInputFields fields={[{ key: "to", required: true }]} values={{}} onChange={noop} />,
     )

@@ -1,11 +1,8 @@
 ---
 seed_id: SEED-084
 title: Starter / seed workflow library (fork-a-starter)
-status: planted
-status_note: |
-  Phase 251 frontmatter migration: this file had NO frontmatter block at all, so no status was
-  ever recorded for it. `planted` here is a MIGRATION DEFAULT — it is a statement about the
-  absence, never a claim about the seed. Read the body and set it deliberately.
+status: shipped
+status_note: "Shipped by Phase 287 (2026-10-19): START-03 fork isolation proven (test_287_fork_isolation.py). SC#4 one-click DEVIATED (menu + ForkNameDialog kept, A-04), operator to rule. Original body Status: dormant is superseded."
 surface: Agentic-RAG
 trigger_when: unset
 ---

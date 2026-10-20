@@ -118,6 +118,8 @@ const LIBRARY_SUBTREE_PATHS = [
   // measured reason: an unlisted module is swept by NOTHING while all six fences stay green.
   // Its plan's `files_modified` did not name this file either.
   "./runFacts.ts",
+  // ── 286-04 (2026-10-18, REG-07 / D-08): the card's `⋯` menu + armed delete, moved out ──
+  "./WorkflowCardMenu.tsx",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -166,7 +168,7 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     // FIVE held for the SECOND consecutive addition — the suite printed `1 failed | 127 passed
     // (128)` against 123 at the previous commit. The module is `./runFacts.ts`, the run truth's
     // wire→words resolver.
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(14)
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(15)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",

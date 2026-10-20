@@ -1,0 +1,621 @@
+{
+  "created_at": "2026-10-19T23:57:04+00:00",
+  "items": [
+    {
+      "id": "c01",
+      "kind": "chunk",
+      "query": "How do I set up a work email account in the email app on an Android phone?",
+      "target": {
+        "chunk_index": 58,
+        "chunk_sha256": "3d3fe83dcd08528a7d08e30d02791ac4e5c7b863a9a72188c9299fc31883342b",
+        "document_id": "2efcd588-76a9-4bdd-b594-7a5cdaa32c3c",
+        "filename": "rag_sample_qas_from_kis.csv"
+      }
+    },
+    {
+      "id": "c02",
+      "kind": "chunk",
+      "query": "Which statistical test was used for the hypothesis on technical integration challenges, and how many survey items measure RPA implementation success?",
+      "target": {
+        "chunk_index": 31,
+        "chunk_sha256": "c144f6138668612aeb7028f006b72e7b81925e4a6e5202c06cee9735b56c777a",
+        "document_id": "d4a5be3d-d1ec-4618-aa47-c189cbd9514f",
+        "filename": "Defence_Guide_Chapter3.docx"
+      }
+    },
+    {
+      "id": "c03",
+      "kind": "chunk",
+      "query": "What are the kitchen and bathroom dimensions in the Giraffe360 residential demo drawing, and why were lengths not converted?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "3fdcb66e4459644b4f2c9098624f5223ccf7b389e73e2c33f885319e0a8c36a8",
+        "document_id": "4458b153-4875-4755-a805-29b7f0c3302b",
+        "filename": "giraffe360_demo_residential.dxf"
+      }
+    },
+    {
+      "id": "c04",
+      "kind": "chunk",
+      "query": "What is the postal address of the Project Management Institute given in the membership feedback email?",
+      "target": {
+        "chunk_index": 1,
+        "chunk_sha256": "e2d1110cace70e1b24752cae1ef2f60966a31e9659c0931c9c239457ab910ddf",
+        "document_id": "8bbe82b9-9ed4-4c9a-b104-98230c60c65d",
+        "filename": "Help us improve PMI membership.eml"
+      }
+    },
+    {
+      "id": "c05",
+      "kind": "chunk",
+      "query": "Which vendor's API contract was still unsigned in week 9, and what risk did that create for integration testing?",
+      "target": {
+        "chunk_index": 1,
+        "chunk_sha256": "374f8ac89590168cdd143835aaef71c41ca091f6ad3219dcc30b1b518aad5740",
+        "document_id": "cd5f1cb5-699d-4f50-83dc-89697b5eeb47",
+        "filename": "weekly-meeting-notes-week9.md"
+      }
+    },
+    {
+      "id": "c06",
+      "kind": "chunk",
+      "query": "Did Siemens say that the rejection affects my other job applications with them?",
+      "target": {
+        "chunk_index": 1,
+        "chunk_sha256": "bfdbe4b0be4c01d7513f51e18c0db0befe1b2771c2a8cbacfe38933556db33bf",
+        "document_id": "6dd95d4f-9eb9-4f57-a779-a03282626800",
+        "filename": "An update on your recent Siemens application.msg"
+      }
+    },
+    {
+      "id": "c07",
+      "kind": "chunk",
+      "query": "What were the overall objective and expected outputs of the Area-Based Return Support workshop?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "bafb7133b8fc735e4afd7dc6db7f260b6af771582e04b6e36c0f809734063cbe",
+        "document_id": "1ce073b8-93d1-4650-bd0c-0862c94c0c97",
+        "filename": "AGENDA Workshop on ABRS Approach & Programming (PDF).pdf"
+      }
+    },
+    {
+      "id": "c08",
+      "kind": "chunk",
+      "query": "Which interests were ticked on the SE Ranking onboarding survey after registration?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "81c3d9188f9d688d05424718746da857fa444ae2ae5b9061d24a3c637198c894",
+        "document_id": "22b7c916-ef07-4ede-a8f7-bfa17a04755b",
+        "filename": "screencapture-online-seranking-admin-poll-after-registration-start-html-2025-05-04-21_54_33.png"
+      }
+    },
+    {
+      "id": "c09",
+      "kind": "chunk",
+      "query": "According to the defence slides, what share of RPA initiatives fail to deliver, and which four concepts framed the literature review?",
+      "target": {
+        "chunk_index": 3,
+        "chunk_sha256": "c2e7b1f61fdf3caadffd013ef4c31943222ce4d5a697ab13cab0969a7d6ba370",
+        "document_id": "9a56ec80-0f0a-42e0-bf0c-07e0caeb9349",
+        "filename": "Fahed_Mrad_Defense_Presentation_Draft_11062026.pptx"
+      }
+    },
+    {
+      "id": "c10",
+      "kind": "chunk",
+      "query": "What unique identifier does team note 42 carry, and which phase generated it?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "a8486040f135b39557b29af2f41bfbd9cc203d6e2894a1d2862f321c0003b9db",
+        "document_id": "a5137f17-fabc-4207-9862-23fbe89af955",
+        "filename": "team-note-042.txt"
+      }
+    },
+    {
+      "id": "c11",
+      "kind": "chunk",
+      "query": "In which countries are Joe Bloggs or John Smith used as placeholder names instead of John Doe?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "658be2cbe49b4f66ddc4ca399f5ff9d700ef4e39981bfa8531faef51f44b67c7",
+        "document_id": "ed06c254-66e3-4bf8-ac39-1bcc3f8bfefc",
+        "filename": "example.webp"
+      }
+    },
+    {
+      "id": "c12",
+      "kind": "chunk",
+      "query": "What is the forecast revenue for the Federal National Council GSign renewal in the 2026 DT revenue forecast?",
+      "target": {
+        "chunk_index": 24,
+        "chunk_sha256": "758a61e007c71f1ea9f13667688dd4a44620d764ff596ba03524acffa297fec1",
+        "document_id": "6435ef1e-03f4-4dfb-9639-6376a5860d7a",
+        "filename": "Pipeline-Awarded Projects- Budget 2026 (clean) (1).xlsx"
+      }
+    },
+    {
+      "id": "c13",
+      "kind": "chunk",
+      "query": "What was East region revenue in Q4 according to the board revenue table?",
+      "target": {
+        "chunk_index": 1,
+        "chunk_sha256": "e099d0c0e3806a064f9fa0d3ca1847f96b62bbc83be17ce499f4ad3da8fcbd87",
+        "document_id": "66a12211-fbf4-43d8-a98d-35c97c271ebb",
+        "filename": "273-board-revenue.csv"
+      }
+    },
+    {
+      "id": "c14",
+      "kind": "chunk",
+      "query": "How many Swedish public sector employees took the survey on critical success factors for RPA, and what did it find about external factors?",
+      "target": {
+        "chunk_index": 55,
+        "chunk_sha256": "a4006e3e1c047693f9b700a49352bd2dbb6b8777b140901166a54cf115f7e3f9",
+        "document_id": "0eb09224-2ae8-4483-b60b-cff638aa9632",
+        "filename": "Fahed Mrad Chapters 2 & 3.docx"
+      }
+    },
+    {
+      "id": "c15",
+      "kind": "chunk",
+      "query": "How many W250x33 blocks are counted in the structural drawing, and what roof membrane is specified?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "31380cd6bbb939cea34e52c044941218c3bc586fa6b87fe1891b2be0b3f308b3",
+        "document_id": "8ee3952b-b40c-426e-a02c-deb032fcbf9b",
+        "filename": "sample_structural_drawing.dxf"
+      }
+    },
+    {
+      "id": "c16",
+      "kind": "chunk",
+      "query": "Which address should I add to my contacts so Mashreq statements do not land in junk?",
+      "target": {
+        "chunk_index": 2,
+        "chunk_sha256": "9870ee596a63f798a43b6751ec42f826eb7a1b0522159895903595b651a1c60b",
+        "document_id": "05848af9-e158-49a9-a0ae-94eb867af795",
+        "filename": "VAT Statement.eml"
+      }
+    },
+    {
+      "id": "c17",
+      "kind": "chunk",
+      "query": "What was total cloud spend in Q3 2025 for Platform Engineering and what drove the increase?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "fda0c5e6bbee55cfa63e26a98e33547a9ddee2adaee0a265f2f8452596e9f2f9",
+        "document_id": "b1db27ac-35c2-4f4e-833c-f4727ed828fb",
+        "filename": "uat111_axisa_anthropic.md"
+      }
+    },
+    {
+      "id": "c18",
+      "kind": "chunk",
+      "query": "How much royalty income from Amazon.com Services was reported on the 2025 Form 1042-S, and how much federal tax was withheld?",
+      "target": {
+        "chunk_index": 11,
+        "chunk_sha256": "18071d0e8d9fcbf17ecc7fd20a20fc6faa1e31c6d97e83a09dbcbdca64bbe8b3",
+        "document_id": "dd5610f4-9652-4f40-b870-0378efb763a6",
+        "filename": "2025-1042S.pdf"
+      }
+    },
+    {
+      "id": "c19",
+      "kind": "chunk",
+      "query": "What did the K2 Horizon 7B model score on Terminal-Bench 2.1 compared with the dense 32B?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "3ebe7c0ca5e89eb73e238b09036563e3da743dbe202724a7ca6514ff2284d8f1",
+        "document_id": "bf3039db-c594-4372-89a7-8519d6c1572e",
+        "filename": "k2_horizon_benchmarks.png"
+      }
+    },
+    {
+      "id": "c20",
+      "kind": "chunk",
+      "query": "Within what time must the reconciliation team validate discrepancies in monthly payments?",
+      "target": {
+        "chunk_index": 21,
+        "chunk_sha256": "65e1531a6ce241b4c70d626d535d8f14d1e7a316e87eda0e60e63f23e3b2da05",
+        "document_id": "ac8e1abd-082d-4ea7-9cb1-991752b746ef",
+        "filename": "CS SOPs final_29 Oct 2025_Billing Team Comments.pptx"
+      }
+    },
+    {
+      "id": "c21",
+      "kind": "chunk",
+      "query": "What is the unique id recorded in team note 24?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "3455f7c2fc1e7def638247e5f09d0718379580aac20c88c3b47ffd265b8e70ba",
+        "document_id": "6b846ca6-1ddc-474f-8612-ac1097633932",
+        "filename": "team-note-024.txt"
+      }
+    },
+    {
+      "id": "c22",
+      "kind": "chunk",
+      "query": "Which embedding model and index are listed for document DOC0111, the experimental study on datasets in production systems?",
+      "target": {
+        "chunk_index": 37,
+        "chunk_sha256": "d076e0bd028d12b77a40256eb62f633bca8ec9599f0cc5c3571f78cc6c7fdb12",
+        "document_id": "0d6827af-8d6e-4b19-b5ec-3c281b4d7dfc",
+        "filename": "rag_corpus_documents.csv"
+      }
+    },
+    {
+      "id": "c23",
+      "kind": "chunk",
+      "query": "What rules does the facilitator guide give speakers about handovers and reading slides?",
+      "target": {
+        "chunk_index": 11,
+        "chunk_sha256": "e69b45ff541b7beabb232accb8999f6b20e0eb477d30e7b2608ce7c44bc0368a",
+        "document_id": "1041dae5-a723-4d85-9e0b-7181b66b53ab",
+        "filename": "facilitator-guide.docx"
+      }
+    },
+    {
+      "id": "c24",
+      "kind": "chunk",
+      "query": "What railing and post sections are called out in the architectural annotation and multileader drawing?",
+      "target": {
+        "chunk_index": 1,
+        "chunk_sha256": "b67ee35aa0522fb126e60ccd6086e9024387444c3082421a845c16e6a0728b53",
+        "document_id": "15ed1dde-f774-4a48-b5ce-9bcd8a4a6ae4",
+        "filename": "architectural_-_annotation_scaling_and_multileaders.dxf"
+      }
+    },
+    {
+      "id": "c25",
+      "kind": "chunk",
+      "query": "Who sent the invitation to the IBIS 2023 conference, and is it free for SSBM students?",
+      "target": {
+        "chunk_index": 1,
+        "chunk_sha256": "3f9add4c22a85f67b468afcfc7b8fc39463e376c37d357e9278808d9650f91b0",
+        "document_id": "9aebc85b-7c3e-40e9-878f-69400157475b",
+        "filename": "Invitation to IBIS 2023: \"AI for Sustainable Society\" Conference.eml"
+      }
+    },
+    {
+      "id": "c26",
+      "kind": "chunk",
+      "query": "What does Acme's Q3 2026 supplier scorecard name as its main supply priority over the coming half year, and when will Binh Minh's lead time improve?",
+      "target": {
+        "chunk_index": 3,
+        "chunk_sha256": "5fd59cf95a2875b768fe79952e4d86e96bf3769d6b5d4a890e3c134cc45bdc71",
+        "document_id": "3e4e9f43-d8b4-4133-81b7-f42800e58488",
+        "filename": "acme_supplier_scorecard_q3_2026.md"
+      }
+    },
+    {
+      "id": "c27",
+      "kind": "chunk",
+      "query": "How does the Eisenhower Matrix sort a leader's tasks into four quadrants?",
+      "target": {
+        "chunk_index": 273,
+        "chunk_sha256": "3af2be01dee6fec24e23281e2b705d59bb60d10605e0b62c82e90217ba81ba8b",
+        "document_id": "7b4eefae-f136-42e8-bf3b-85af917a8c1f",
+        "filename": "KDP_PRINT_BOOK_PUBLISHER_INTERIOR.pdf"
+      }
+    },
+    {
+      "id": "c28",
+      "kind": "chunk",
+      "query": "What were the research questions about implementation strategies in the defence presentation, and what did the literature say about underperforming initiatives?",
+      "target": {
+        "chunk_index": 2,
+        "chunk_sha256": "291e4fee9bf13ada7dca6e09eac261dababdafd5f32b6fdfa57de43b762cb07e",
+        "document_id": "a0c76123-eecd-432d-b260-3d10492568f8",
+        "filename": "Fahed_Mrad_Defense_Presentation (7).pptx"
+      }
+    },
+    {
+      "id": "c29",
+      "kind": "chunk",
+      "query": "Team note 64: what is its unique identifier?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "755afcf73a4350cfbe164f17e9de2fd97d7c85bc0ad6ad8e3dfb29c278cda208",
+        "document_id": "47ad08ef-a2a9-41eb-85be-397ad1b49388",
+        "filename": "team-note-064.txt"
+      }
+    },
+    {
+      "id": "c30",
+      "kind": "chunk",
+      "query": "Who owns the data quality risk on Project Meridian and what duplicate-rate threshold blocks the migration?",
+      "target": {
+        "chunk_index": 2,
+        "chunk_sha256": "689be8d2f922164393f8e6cf525b1b5f72ccd7146585cc72e4f925d3b0b1b751",
+        "document_id": "b5ae9906-1f74-432a-9da9-8a9fd6954438",
+        "filename": "Project-Meridian-Status-Report-Week09.docx"
+      }
+    },
+    {
+      "id": "c31",
+      "kind": "chunk",
+      "query": "What warning about recruitment fraud is in the Emirates Group email about the Agile Delivery Manager application?",
+      "target": {
+        "chunk_index": 2,
+        "chunk_sha256": "09a638590bdc5bf6f681c6533c30880b059361b8e0146117d33d42cd5826c428",
+        "document_id": "e841bb34-a21a-4e50-bb92-30fd0200e86a",
+        "filename": "Thank you for your application for Agile Delivery Manager.eml"
+      }
+    },
+    {
+      "id": "c32",
+      "kind": "chunk",
+      "query": "What size should the job aid slide be printed at, and what goes on the back of the card?",
+      "target": {
+        "chunk_index": 16,
+        "chunk_sha256": "e5bb52482399ea6727faf741ca87c181d61e6c14efa9d8af2d305f205536dc17",
+        "document_id": "d5a748e8-06a8-4afb-b5ee-4278fdf34577",
+        "filename": "facilitator-guide.md"
+      }
+    },
+    {
+      "id": "c33",
+      "kind": "chunk",
+      "query": "Which migration number range is reserved for version 2.6 in the backend README?",
+      "target": {
+        "chunk_index": 4,
+        "chunk_sha256": "b341d2f810e76a2128354a1682ed54de05e8ffb189f61cef80f38307c64a8dcc",
+        "document_id": "cc82a40e-e2fc-4132-b090-b627913399ae",
+        "filename": "BAckend - Unicorn commands README.pdf"
+      }
+    },
+    {
+      "id": "c34",
+      "kind": "chunk",
+      "query": "In the performance conversation slides, how should a manager open the talk about late client reports instead of criticising attitude?",
+      "target": {
+        "chunk_index": 2,
+        "chunk_sha256": "9db70111fd86c7f7c2732569ebb5b389f4935bc2bd6fa3dda78d2da22f11a5b5",
+        "document_id": "70b64757-63b2-475e-bea5-7810e86d5df4",
+        "filename": "performance-conversation.pptx"
+      }
+    },
+    {
+      "id": "c35",
+      "kind": "chunk",
+      "query": "Give the unique id from team note 52.",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "a3625510d3c1bda427cdd8b742295fbe2d030de1cc36d5b6c98b2fa8ede2e0e6",
+        "document_id": "3b6d2a9c-aa14-40da-9a91-19d572a07437",
+        "filename": "team-note-052.txt"
+      }
+    },
+    {
+      "id": "c36",
+      "kind": "chunk",
+      "query": "What does the study conclude mainly determines successful RPA integration in BPM, and what role does change management play?",
+      "target": {
+        "chunk_index": 70,
+        "chunk_sha256": "35c532358355436a6e76b62e19910b3ecbd46a81706530881a30477400f80ad0",
+        "document_id": "58015db8-0553-474a-9d1f-f4f0ee58b77d",
+        "filename": "Chapter_5_Full_Draft (4).docx"
+      }
+    },
+    {
+      "id": "c37",
+      "kind": "chunk",
+      "query": "Will I still get security alerts if I unsubscribe from Google Account change emails?",
+      "target": {
+        "chunk_index": 5,
+        "chunk_sha256": "594bef030489eb341cfdca89b289c9ec3213c4ff21fc9d2b5b2e809b2d194960",
+        "document_id": "daeb2f3c-d501-4b51-8c99-e6cd18df273d",
+        "filename": "You shared some Google Account data with takafo.ai.eml"
+      }
+    },
+    {
+      "id": "c38",
+      "kind": "chunk",
+      "query": "Who wrote the 2024 annual report on sustainability and operations, and what date does it carry?",
+      "target": {
+        "chunk_index": 9,
+        "chunk_sha256": "dc0872e2ec0116a3f183babdacf25d273437f7f79a33a907ac1eddc4eefc960b",
+        "document_id": "db1c8175-fb6f-4c43-bdcf-b74850d20781",
+        "filename": "uat111_axisc_anthropic_v2.md"
+      }
+    },
+    {
+      "id": "c39",
+      "kind": "chunk",
+      "query": "How much did I send to Express PRO on 14 November 2025, and which bank holds the receiving account?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "d259908654c69d44ed5e0f4f377491a512d47bdf304c75f881505e754160ad65",
+        "document_id": "892aad87-78c8-40ea-a8d8-9a17f35ecd7f",
+        "filename": "TRANSACTION_RECEIPT_202511140006B98111618519800.pdf"
+      }
+    },
+    {
+      "id": "c40",
+      "kind": "chunk",
+      "query": "What actions does the ABRS presentation list for addressing housing, land and property concerns?",
+      "target": {
+        "chunk_index": 10,
+        "chunk_sha256": "1848711c528413501a5fd3ff14088a879f204dae3c5e2914c147fafc8abf7752",
+        "document_id": "645567ec-e004-4ed8-a805-9dbe614fb5aa",
+        "filename": "HLP presentation_ABRS_8 Dec 22.pptx"
+      }
+    },
+    {
+      "id": "c41",
+      "kind": "chunk",
+      "query": "What unique identifier is listed in team note 72?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "d18bcebc489a3d9fb283c6e828da0765626c5122e1a3ffcd56c37439eed11cd0",
+        "document_id": "245f9725-83ea-4700-8564-98d3145deace",
+        "filename": "team-note-072.txt"
+      }
+    },
+    {
+      "id": "c42",
+      "kind": "chunk",
+      "query": "Which AI and automation skills are listed on Fahed Mrad's June 2026 CV?",
+      "target": {
+        "chunk_index": 7,
+        "chunk_sha256": "5419ecb16bdbf570db330aa11afb2500013510faa55f69b2cf4719c32bca9f6c",
+        "document_id": "ef0fcd5f-e943-494e-8015-e376fc2f2df0",
+        "filename": "Fahed_Mrad_CV_Jun2026_NoAI.docx"
+      }
+    },
+    {
+      "id": "c43",
+      "kind": "chunk",
+      "query": "What search keywords were used in the LinkedIn job alert for the education sector PMO project manager role?",
+      "target": {
+        "chunk_index": 11,
+        "chunk_sha256": "d6b6644c857c0b0849f11be636846bbd6389d945a58d57b3664cc86ef7336f5d",
+        "document_id": "13948e2c-1d4f-4d0f-9d9a-6d67eb8a430f",
+        "filename": "Project Manager – PMO (Immediate Start, Education Sector Experience) at Faithful Executive - Leader in Interim Managemen.eml"
+      }
+    },
+    {
+      "id": "c44",
+      "kind": "chunk",
+      "query": "How many customer records and policies were profiled this sprint, and when does user acceptance testing begin?",
+      "target": {
+        "chunk_index": 1,
+        "chunk_sha256": "52524185bcfbb81b5dbccffe39f2b076f49b17ffde513f1d494c86a4c089c0da",
+        "document_id": "9360660f-4af7-4be2-9591-afe1567e159c",
+        "filename": "sprint-task-log.md"
+      }
+    },
+    {
+      "id": "c45",
+      "kind": "chunk",
+      "query": "What Year 1 budget must senior leadership approve for the PMO, and what is the estimated yearly cost of doing nothing?",
+      "target": {
+        "chunk_index": 3,
+        "chunk_sha256": "002ed2d13aa0c55aecd7361564fbaac3f7d652d7c07e30544015f58c044d37fa",
+        "document_id": "df79db27-a6e1-4366-92a0-b88e6d66052f",
+        "filename": "Executive_Summary_1Page.md.pdf"
+      }
+    },
+    {
+      "id": "c46",
+      "kind": "chunk",
+      "query": "What is the unique code in team note 29?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "b4fb3819bc75c0d63602b71d52b97efffec77a53a0ddae1ee628a1286026ff76",
+        "document_id": "7673d639-abb0-4b03-9945-59ce12f35e39",
+        "filename": "team-note-029.txt"
+      }
+    },
+    {
+      "id": "c47",
+      "kind": "chunk",
+      "query": "Why do workers need new skills under digital transformation and Industry 4.0, according to chapter 1?",
+      "target": {
+        "chunk_index": 27,
+        "chunk_sha256": "9073c2cb861007554fd5eefd7824895b4d24e05eb3c7a0f52a95d98ff41150ac",
+        "document_id": "d9ef8a68-fc3a-45cc-b90d-04282da3af53",
+        "filename": "FMrad_Chapter_1_Approved.docx"
+      }
+    },
+    {
+      "id": "c48",
+      "kind": "chunk",
+      "query": "Who from GCG Enterprise Solutions sent a LinkedIn connection invitation?",
+      "target": {
+        "chunk_index": 0,
+        "chunk_sha256": "e989b3322af71cb5eae2d2b6be9a523f6dc6891df6754db659e53d79660b0b67",
+        "document_id": "61f804e5-6617-4215-a926-3554e2732ac4",
+        "filename": "I want to connect.eml"
+      }
+    },
+    {
+      "id": "p01",
+      "kind": "probe",
+      "query": "Northwind quarterly business review September 2026",
+      "target": {
+        "document_id": "650e0845-aab2-4c91-9fab-05bcbccee1c9",
+        "filename": "northwind-qbr-notes-sept-2026.md"
+      }
+    },
+    {
+      "id": "p02",
+      "kind": "probe",
+      "query": "commercial contract renewal Northwind pricing terms",
+      "target": {
+        "document_id": "1ef08790-c1bb-44c1-b5ad-1e3156c21926",
+        "filename": "northwind-commercials-renewal.md"
+      }
+    },
+    {
+      "id": "p03",
+      "kind": "probe",
+      "query": "UAE Credit Reports BNPL buy now pay later and micro loan",
+      "target": {
+        "document_id": "e9a7c4fd-757d-4421-b4ed-d1d768506dbf",
+        "filename": "Update UAE Credit Reports now include BNPL and micro-loan information.eml"
+      }
+    },
+    {
+      "id": "p04",
+      "kind": "probe",
+      "query": "Project risks, mitigations and probability impact log",
+      "target": {
+        "document_id": "2d289b08-3e1a-47cf-8d21-1ffee2b41e7b",
+        "filename": "risk-log.md"
+      }
+    },
+    {
+      "id": "p05",
+      "kind": "probe",
+      "query": "Triangulation research methodology with visuals",
+      "target": {
+        "document_id": "976111f2-a96c-4093-804c-418a26f8eefb",
+        "filename": "Triangulation_Research_Complete_with_Visuals.docx"
+      }
+    },
+    {
+      "id": "p06",
+      "kind": "probe",
+      "query": "metrics decisions knowledge base document 3",
+      "target": {
+        "document_id": "c3ce390e-4e77-4228-80f3-3dc4445b3819",
+        "filename": "kb_doc3_metrics_decisions.md"
+      }
+    },
+    {
+      "id": "p07",
+      "kind": "probe",
+      "query": "uat111 axisa minimax integration testing",
+      "target": {
+        "document_id": "cc4a732d-bbf1-4bf5-919b-92437b072833",
+        "filename": "uat111_axisa_minimax.md"
+      }
+    },
+    {
+      "id": "p08",
+      "kind": "probe",
+      "query": "uat111 axisa zhipu provider evaluation",
+      "target": {
+        "document_id": "00dc2c25-1ee6-4b1f-8505-c719c483ff87",
+        "filename": "uat111_axisa_zhipu.md"
+      }
+    },
+    {
+      "id": "p09",
+      "kind": "probe",
+      "query": "supplier rate card and master rate sheet takeoff",
+      "target": {
+        "document_id": "168f6d22-8ab0-4139-ad12-ef2e08014cf9",
+        "filename": "sample_master_rate_sheet.xlsx"
+      }
+    }
+  ],
+  "seed": 294,
+  "selection": "Dev user d8a54002-6a29-4b88-b918-cff2aa4a06d5. Eligible documents: is_latest, status 'completed', retrievable, not archived, not an EVAL_PROBES target. Eligible chunks: an embedding under text-embedding-3-small and at least 300 characters of content. Documents are grouped by file extension; each group is ordered by document id and shuffled with random.Random(294); groups are drawn round-robin in extension order until 48 documents are chosen; one chunk per document is drawn with the same generator from its eligible chunks in chunk_index order. One question per chunk, written from the chunk text only and paraphrased (no run of 6 or more consecutive words shared with the chunk). Probe items are the 10 EVAL_PROBES queries verbatim, each targeting its resolved document (exact filename, then stem). A chunk target is (document_id, chunk_index, chunk_sha256): the content hash is part of the identity because (document_id, chunk_index) is not unique in this corpus.",
+  "unresolved_probes": [
+    "2026 Q3 board pack.pdf"
+  ],
+  "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+  "version": 1
+}

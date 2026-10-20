@@ -1,0 +1,163 @@
+{
+  "label": "after",
+  "size": 50000,
+  "base_url": "http://127.0.0.1:8000",
+  "measured_at": "2026-10-16T04:03:59.443306+00:00",
+  "provenance": {
+    "plan_base": null
+  },
+  "ground_truth": {
+    "owner": "10f191c6-fa85-416c-8bf4-a0b3c88a9ac5",
+    "big_folder_id": "ea595fbd-6880-5816-a543-c6eab092279c",
+    "owner_latest_all": 50021,
+    "root_latest_all": 30001,
+    "root_latest_unarchived": 29809,
+    "big_latest_all": 10000,
+    "big_latest_unarchived": 9948,
+    "owner_latest_unarchived": 49721,
+    "legacy_visible_latest": 50021
+  },
+  "surfaces": [
+    {
+      "surface": "GET /documents Root page 1 (limit 25)",
+      "method": "GET",
+      "url": "/documents?folder_id=root&limit=25",
+      "status": 200,
+      "bytes": 26948,
+      "median_ms": 679.9,
+      "max_ms": 741.6,
+      "rows": 25,
+      "reported_total": 29809,
+      "db_count": 29809,
+      "equal": true,
+      "samples_ms": [
+        679.9,
+        741.6,
+        690.1,
+        664.0,
+        673.7
+      ]
+    },
+    {
+      "surface": "GET /documents Big page 1 (limit 25)",
+      "method": "GET",
+      "url": "/documents?folder_id=ea595fbd-6880-5816-a543-c6eab092279c&limit=25",
+      "status": 200,
+      "bytes": 27208,
+      "median_ms": 276.4,
+      "max_ms": 290.1,
+      "rows": 25,
+      "reported_total": 9948,
+      "db_count": 9948,
+      "equal": true,
+      "samples_ms": [
+        290.1,
+        276.4,
+        269.7,
+        282.3,
+        267.6
+      ]
+    },
+    {
+      "surface": "GET /documents Big LAST page (limit 25)",
+      "method": "GET",
+      "url": "/documents?folder_id=ea595fbd-6880-5816-a543-c6eab092279c&limit=25&offset=9925",
+      "status": 200,
+      "bytes": 24886,
+      "median_ms": 292.7,
+      "max_ms": 357.4,
+      "rows": 23,
+      "reported_total": 9948,
+      "db_count": 9948,
+      "equal": true,
+      "samples_ms": [
+        278.2,
+        314.1,
+        357.4,
+        292.7,
+        268.0
+      ]
+    },
+    {
+      "surface": "POST /document-search page 1 (limit 25)",
+      "method": "POST",
+      "url": "/document-search",
+      "status": 200,
+      "bytes": 27441,
+      "median_ms": 660.2,
+      "max_ms": 695.3,
+      "rows": 25,
+      "reported_total": 49721,
+      "db_count": 49721,
+      "equal": true,
+      "samples_ms": [
+        669.5,
+        695.3,
+        654.8,
+        660.2,
+        649.6
+      ]
+    },
+    {
+      "surface": "Picker read (POST /document-search limit 20)",
+      "method": "POST",
+      "url": "/document-search",
+      "status": 200,
+      "bytes": 22011,
+      "median_ms": 687.3,
+      "max_ms": 718.0,
+      "rows": 20,
+      "reported_total": 49721,
+      "db_count": 49721,
+      "equal": true,
+      "samples_ms": [
+        684.8,
+        698.0,
+        687.3,
+        651.1,
+        718.0
+      ]
+    },
+    {
+      "surface": "GET /library/summary",
+      "method": "GET",
+      "url": "/library/summary",
+      "status": 200,
+      "bytes": 2590,
+      "median_ms": 150.2,
+      "max_ms": 151.9,
+      "rows": null,
+      "reported_total": 50021,
+      "db_count": 50021,
+      "equal": true,
+      "samples_ms": [
+        151.9,
+        149.6,
+        147.0,
+        150.2,
+        151.9
+      ]
+    },
+    {
+      "surface": "Library open request set (Root page + summary + folders, parallel)",
+      "method": "SET",
+      "url": "GET /documents?folder_id=root&limit=25 + GET /library/summary + GET /folders",
+      "status": "200/200/200",
+      "bytes": 34771,
+      "median_ms": 679.4,
+      "max_ms": 757.0,
+      "rows": null,
+      "reported_total": null,
+      "db_count": null,
+      "equal": null,
+      "samples_ms": [
+        692.8,
+        629.9,
+        757.0,
+        679.4,
+        625.2
+      ],
+      "note": ""
+    }
+  ]
+}

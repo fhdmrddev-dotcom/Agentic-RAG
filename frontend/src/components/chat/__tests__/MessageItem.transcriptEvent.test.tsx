@@ -134,9 +134,11 @@ describe("MessageItem.tsx source fence (G-5, comments stripped)", () => {
     expect([...src.matchAll(/<HandoffCard\b/g)]).toHaveLength(1)
     expect([...src.matchAll(/transcriptEventOf\(/g)].length).toBeGreaterThanOrEqual(1)
     // base (de74d1470): useState 3 · useEffect 0 · every hook call 7
+    // BUG-261020-04: +1 deliberate hook, `usePersistedMessageId` (the stored id for the citation
+    // check). It holds its own state and effect, so useState / useEffect here stay at the base.
     expect([...src.matchAll(/\buseState\s*[<(]/g)]).toHaveLength(3)
     expect([...src.matchAll(/\buseEffect\s*\(/g)]).toHaveLength(0)
-    expect([...src.matchAll(/\buse[A-Z]\w*\s*[<(]/g)]).toHaveLength(7)
+    expect([...src.matchAll(/\buse[A-Z]\w*\s*[<(]/g)]).toHaveLength(8)
   })
 })
 

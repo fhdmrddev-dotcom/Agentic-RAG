@@ -52,8 +52,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from supabase import Client
 
-from app.config import settings
 from app.dependencies import get_current_user, get_supabase
+from app.utils.environment import current_environment
 
 _OPENAPI_URL = "/openapi.json"
 _OAUTH2_REDIRECT_URL = "/docs/oauth2-redirect"
@@ -74,8 +74,9 @@ _QUIET_OPEN_ENVIRONMENTS = frozenset({"", "local"})
 
 
 def _environment() -> str:
-    """``settings.environment`` normalised — the ONE reader of ENVIRONMENT (A-IN-11)."""
-    return (settings.environment or "").strip().lower()
+    """``settings.environment`` normalised — the ONE reader of ENVIRONMENT (A-IN-11), which lives
+    in ``app.utils.environment`` since 294 so the decision-engine fault guard shares it."""
+    return current_environment()
 
 
 def is_production_environment() -> bool:

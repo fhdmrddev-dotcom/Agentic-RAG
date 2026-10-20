@@ -1,0 +1,297 @@
+{
+  "version": 1,
+  "_doc": "Phase 294-03 (DEC-03, Pitfall 7). For each case: render CitedMarkdown with content = dedupParagraphs(content) and n_sources citations; the n of every upgraded marker, in DOM order, equals `expected`. citation_claims.extract_claims must give the same n list in ordinal order. `expected_sentences` (backend only) is the claim text per ordinal. Read by backend/tests/unit/test_294_citation_claims.py and frontend/src/components/chat/__tests__/citationOrdinals.parity.test.tsx. `deduped` (when present; else content unchanged) is dedupParagraphs(content), asserted from both stacks. 294-REVIEW CR-02 added the block constructs marked renders as code or drops: a link reference definition (and every [n] it turns into a link), an indented code block (inside a list only past the item's content column), an unclosed fence; plus two look-alikes that stay text. Their `expected` lists were measured against the real marked 17 before the backend fix, which they turned RED.",
+  "cases": [
+    {
+      "id": "plain_sentences",
+      "content": "Revenue rose to $5M in 2024 [1]. Costs fell by 12 percent over the year [2]. Margins improved.",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Revenue rose to $5M in 2024",
+        "Costs fell by 12 percent over the year"
+      ]
+    },
+    {
+      "id": "list_items",
+      "content": "Key facts:\n\n- Headcount grew to 240 people [1]\n- The Berlin office opened in March [2]\n- Churn stayed flat [1]",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2,
+        1
+      ],
+      "expected_sentences": [
+        "Headcount grew to 240 people",
+        "The Berlin office opened in March",
+        "Churn stayed flat"
+      ]
+    },
+    {
+      "id": "table_rows",
+      "content": "| Metric | Value |\n|---|---|\n| Revenue | $5M [1] |\n| Headcount | 240 [2] |",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Revenue | $5M",
+        "Headcount | 240"
+      ]
+    },
+    {
+      "id": "stacked_markers",
+      "content": "The merger closed in Q3 after regulatory approval [1][2]. Integration is ongoing.",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "The merger closed in Q3 after regulatory approval",
+        "The merger closed in Q3 after regulatory approval"
+      ]
+    },
+    {
+      "id": "inline_code_marker_skipped",
+      "content": "Call `get_rows()[1]` to read the second row of the sheet [2]. The API returns JSON for every request [1].",
+      "n_sources": 2,
+      "expected": [
+        2,
+        1
+      ],
+      "expected_sentences": [
+        "Call `get_rows()[1]` to read the second row of the sheet",
+        "The API returns JSON for every request"
+      ]
+    },
+    {
+      "id": "fenced_code_marker_skipped",
+      "content": "Example:\n\n```python\nrows[1] = 5\nprint(rows[2])\n```\n\nThe loader caches results per session [1].",
+      "n_sources": 2,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "The loader caches results per session"
+      ]
+    },
+    {
+      "id": "link_text_marker_skipped",
+      "content": "See [the 2024 report [2]](https://example.com/report) for details. Revenue doubled year over year [1].",
+      "n_sources": 2,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "Revenue doubled year over year"
+      ]
+    },
+    {
+      "id": "marker_shaped_link_skipped",
+      "content": "Read the [1](https://example.com/one) summary first. Profit rose sharply in the final quarter [1].",
+      "n_sources": 1,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "Profit rose sharply in the final quarter"
+      ]
+    },
+    {
+      "id": "duplicated_paragraph",
+      "content": "Revenue rose to five million dollars [1].\n\nRevenue rose to five million dollars [1].\n\nCosts fell sharply in the second half [2].",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Revenue rose to five million dollars",
+        "Costs fell sharply in the second half"
+      ],
+      "deduped": "Revenue rose to five million dollars [1].\n\nCosts fell sharply in the second half [2]."
+    },
+    {
+      "id": "duplicated_sentence_run_on",
+      "content": "The board approved the new budget in March [1]. The board approved the new budget in March [1]. Hiring resumes next quarter [2].",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "The board approved the new budget in March",
+        "Hiring resumes next quarter"
+      ],
+      "deduped": "The board approved the new budget in March [1]. Hiring resumes next quarter [2]."
+    },
+    {
+      "id": "out_of_range_and_zero",
+      "content": "Sales grew in every region last year [3]. Prices held steady through the winter [1]. Nothing here [0].",
+      "n_sources": 2,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "Prices held steady through the winter"
+      ]
+    },
+    {
+      "id": "heading_with_marker",
+      "content": "## Revenue grew strongly this year [1]\n\nDetails follow in the next section of the report [2].",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Revenue grew strongly this year",
+        "Details follow in the next section of the report"
+      ]
+    },
+    {
+      "id": "two_markers_one_sentence",
+      "content": "Revenue grew by ten percent across all regions [1], while operating costs fell by five percent [2].",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Revenue grew by ten percent across all regions",
+        "while operating costs fell by five percent"
+      ]
+    },
+    {
+      "id": "short_spans_use_the_whole_unit",
+      "content": "Revenue grew 10% [1] while costs fell 5% [2] in the same period.",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Revenue grew 10% while costs fell 5% in the same period.",
+        "Revenue grew 10% while costs fell 5% in the same period."
+      ]
+    },
+    {
+      "id": "trailing_cluster_after_period",
+      "content": "Revenue rose to five million dollars. [1] Costs fell in the second half of the year [2].",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Revenue rose to five million dollars.",
+        "Costs fell in the second half of the year"
+      ]
+    },
+    {
+      "id": "emphasis_stripped",
+      "content": "**Revenue** rose to *five* million dollars in __2024__ [1].",
+      "n_sources": 1,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "Revenue rose to five million dollars in 2024"
+      ]
+    },
+    {
+      "id": "link_reference_definition",
+      "content": "Revenue grew to 40 million in 2025 [1]. Margins improved to 12 percent [2]. Headcount was cut by half [2].\n\n[1]: annual-report.pdf\n",
+      "n_sources": 2,
+      "expected": [
+        2,
+        2
+      ],
+      "expected_sentences": [
+        "Margins improved to 12 percent",
+        "Headcount was cut by half"
+      ]
+    },
+    {
+      "id": "indented_code_marker_skipped",
+      "content": "Example:\n\n    rows[1] = 5\n    print(rows[2])\n\nThe loader caches results per session [1].",
+      "n_sources": 2,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "The loader caches results per session"
+      ]
+    },
+    {
+      "id": "unclosed_fence_marker_skipped",
+      "content": "The loader caches results per session [1].\n\n```python\nrows[2] = 5\nprint(rows[1])",
+      "n_sources": 2,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "The loader caches results per session"
+      ]
+    },
+    {
+      "id": "reference_links_full_and_failed",
+      "content": "Revenue grew to 40 million in 2025 [2][1]. Margins improved to 12 percent [2]. Headcount was cut by half [1][2].\n\n[1]: annual-report.pdf \"Annual report\"",
+      "n_sources": 2,
+      "expected": [
+        2,
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Margins improved to 12 percent",
+        "Headcount was cut by half",
+        "Headcount was cut by half"
+      ]
+    },
+    {
+      "id": "definition_without_blank_line_is_text",
+      "content": "Revenue grew to 40 million in 2025 [1]. Margins improved to 12 percent [2].\n[1]: annual-report.pdf",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2,
+        1
+      ],
+      "expected_sentences": [
+        "Revenue grew to 40 million in 2025",
+        "Margins improved to 12 percent",
+        "Margins improved to 12 percent ."
+      ]
+    },
+    {
+      "id": "indented_line_in_list_is_text",
+      "content": "- Headcount grew to 240 people [1]\n\n    The Berlin office opened in March [2]",
+      "n_sources": 2,
+      "expected": [
+        1,
+        2
+      ],
+      "expected_sentences": [
+        "Headcount grew to 240 people",
+        "The Berlin office opened in March"
+      ]
+    },
+    {
+      "id": "indented_code_in_list_item",
+      "content": "- Headcount grew to 240 people [1]\n\n      rows[2] = 5",
+      "n_sources": 2,
+      "expected": [
+        1
+      ],
+      "expected_sentences": [
+        "Headcount grew to 240 people"
+      ]
+    }
+  ]
+}

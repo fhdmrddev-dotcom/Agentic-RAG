@@ -24,6 +24,7 @@ from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 from app.config import settings
+from app.services.rerank_engines.tracing import redact_inputs
 from app.services.rerank_service import rerank
 from app.services.retrieval_documents import _enrich_with_filenames
 from app.services.retrieval_rank import (
@@ -60,7 +61,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@traceable(name="search-documents", run_type="retriever")
+@traceable(name="search-documents", run_type="retriever", process_inputs=redact_inputs)
 async def search_documents(
     query: str,
     user_id: str,
@@ -69,6 +70,7 @@ async def search_documents(
     user_settings: UserEffectiveSettings | None = None,
     folder_ids: list[str] | None = None,
     document_ids: Sequence[str] | None = None,
+    *, instruction: str | None = None,  # 294 D-09: steering, forwarded to rerank only when set
 ) -> tuple[list[dict], float]:
     """Phase 272 (D-14 / D-18 / D-19 / D-10) — ``document_ids`` is the filtered-retrieval input.
 
@@ -165,6 +167,9 @@ async def search_documents(
         candidates = await run_in_threadpool(
             rerank, query, candidates, top_n=len(candidates) if filtered else top_k,
             user_settings=user_settings,
+            # 294: conditional so fixed-signature fakes keep working (RESEARCH Pitfall 4)
+            **({"instruction": instruction} if instruction else {}),
+            **({"keep_documents": True} if filtered else {}),
         )
         if filtered:
             candidates = _cover_matched_documents(candidates, top_k)

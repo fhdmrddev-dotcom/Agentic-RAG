@@ -1,5 +1,25 @@
 # Milestones
 
+## v4.6 Pay It Down (Shipped: 2026-10-16)
+
+**Phases:** 9 (277-285) · **Plans:** 34 · **Migrations:** 207-209 · **Timeline:** 2026-10-12 → 2026-10-16 (5 days)
+**Audit:** [`v4.6-MILESTONE-AUDIT.md`](milestones/v4.6-MILESTONE-AUDIT.md) — `tech_debt`, no blockers ·
+**24 / 24** satisfied · integration **9/9**. Deployed to production 2026-10-16 (`4e767a3a2`).
+
+Repair only: every open major bug fixed and the v4.5 debt cleared, with no new user capability.
+
+**Key accomplishments:**
+
+- **Registers back inside the band, one home for shared logic** (277-279). CLAUDE.md split 121,650 → 89,171 chars; `tool_dispatcher` split into registry + handlers; filter vocabulary and expert scope each have one home.
+- **In once, out clean** (280, 285). Same-bytes upload never retires an in-flight copy; Graph adapter pages, encodes and decodes honestly; purge removes bytes and only what the watch minted; failed watch downloads are retried and stay visible.
+- **A refusal names its cause** (281). Emit and publish-gauntlet refusals show the check that failed, in plain words.
+- **The slow run and the paused run** (282). A per-model timeout reaches the provider call; one `ask_user` input with one draft.
+- **Every member reaches their own Settings** (283), and **the Library at scale** (284): server-side paging and counts, Find in SQL, migrations 207 + 208, verified at 10k / 50k documents.
+
+Known deferred items at close: 39 open quick-task/todo/seed/UAT entries from the artifact audit, almost all pre-v4.6 (not written to STATE.md individually; re-run `gsd-sdk query audit-open`).
+
+---
+
 ## v4.5 Find It, Show It (Shipped: 2026-10-12)
 
 **Phases:** 7 (270-276) · **Plans:** 38 · **Commits:** 553 since `v4.4` · **Files:** 1,530

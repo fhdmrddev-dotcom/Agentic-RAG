@@ -913,6 +913,22 @@ def _refused_retry(
     )
 
 
+# 289-REVIEW WR-04 — the two arms above REFUSE a search without running any retrieval, and set
+# no `retrieval_error`. A caller counting "did this step search the KB" (task_service's
+# `kb_search_calls`, which feeds TRUST-01's "searched, nothing matched" line) must not count them.
+# Pinned against the REAL arms by `test_289_phase_confidence.py`, so a renamed token goes red.
+REFUSED_SEARCH_ERRORS = frozenset({"invalid_filter", "refused_retry"})
+
+
+def ran_retrieval(tool_result: Any) -> bool:
+    """False only for a result from ``_invalid_filter`` / ``_refused_retry``; True otherwise."""
+    try:
+        body = json.loads(getattr(tool_result, "result", None) or "")
+    except (ValueError, TypeError):
+        return True
+    return not (isinstance(body, dict) and body.get("error") in REFUSED_SEARCH_ERRORS)
+
+
 def _no_documents(
     ctx: Any,
     query: str,
@@ -1131,11 +1147,30 @@ def _audit_ids_and_sims(results: list) -> tuple[list[str], dict[str, float]]:
     return _audit_doc_ids, _sims
 
 
-async def _search_unfiltered(args: dict, ctx: Any, ToolResult: Any):
+_INSTRUCTION_MAX_CHARS = 300
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+
+def _clamp_instruction(value: Any) -> str | None:
+    """Phase 294 (D-09 / D-10) — the agent's optional steering text, made safe to forward as DATA.
+
+    A non-string is ignored (never refused); control characters are stripped; whitespace runs
+    collapse to one space; the result is capped at 300 characters; empty → None. The value is
+    still untrusted (the agent may have read a hostile document): it only ever reaches an engine
+    as ``searcher_preference`` data, never as instruction text.
+    """
+    if not isinstance(value, str):
+        return None
+    cleaned = " ".join(_CONTROL_CHARS.sub(" ", value).split())[:_INSTRUCTION_MAX_CHARS].strip()
+    return cleaned or None
+
+
+async def _search_unfiltered(args: dict, ctx: Any, ToolResult: Any, *, instruction: str | None = None):
     """The pre-272 path, byte-for-byte in what it calls and returns.
 
     ⛔ It passes NO ``document_ids`` kwarg (never ``document_ids=None``): test_260's fixed-signature
-    retrieval fakes would TypeError, and "no filter" must stay the call it always was.
+    retrieval fakes would TypeError, and "no filter" must stay the call it always was. The same
+    rule holds for ``instruction`` (294): it is passed only when the clamped value is non-empty.
     """
     try:
         results, avg_sim = await search_documents(
@@ -1143,6 +1178,7 @@ async def _search_unfiltered(args: dict, ctx: Any, ToolResult: Any):
             metadata_filter=None,
             user_settings=ctx.user_settings,
             folder_ids=ctx.folder_subtree_ids,
+            **({"instruction": instruction} if instruction else {}),
         )
     except Exception as exc:  # noqa: BLE001 — honest tool-result error, never raise into the loop
         return _provider_error(ctx, args["query"], exc, [], ToolResult)
@@ -1193,6 +1229,7 @@ async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
     from app.services.tool_dispatcher import ToolResult
 
     query = args["query"]
+    instruction = _clamp_instruction(args.get("instruction"))   # 294 D-09: once per handler
     parsed = parse_filter_args(args)
     if isinstance(parsed, FilterRefusal):
         return _invalid_filter(ctx, query, parsed, [], ToolResult)
@@ -1219,7 +1256,7 @@ async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
         )
 
     if not requires_resolved_scope(parsed):
-        return await _search_unfiltered(args, ctx, ToolResult)
+        return await _search_unfiltered(args, ctx, ToolResult, instruction=instruction)
 
     uid = ctx.current_user["id"]
     try:
@@ -1292,6 +1329,7 @@ async def handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
             user_settings=ctx.user_settings,
             folder_ids=folder_ids,
             document_ids=scope.document_ids,
+            **({"instruction": instruction} if instruction else {}),
         )
     except Exception as exc:  # noqa: BLE001 — honest tool-result error, never raise into the loop
         return _provider_error(ctx, query, exc, applied, ToolResult)

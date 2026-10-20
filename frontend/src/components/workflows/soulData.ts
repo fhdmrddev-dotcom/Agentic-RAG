@@ -192,10 +192,34 @@ export interface EntryInputField {
    * ⚠ ABSENT ON THE WIRE READS `true`, because `InputFieldSpec.required` is `bool = True`
    * server-side. Defaulting the other way here would be a client that disagreed with the
    * model about what a definition says — a second copy of a server predicate, and a wrong one.
-   * ⛔ It is a MARK, never a block: see `LaunchInputFields.tsx`'s docblock for why, and for
-   * the re-open trigger that would change it.
+   * The LEAF (`LaunchInputFields.tsx`) only MARKS it and stays non-blocking. The BLOCK lives
+   * in the two launch confirm controls (`ChatLaunchForm`, `RunModal`) via
+   * `missingRequiredFields` below — Phase 287-01 took the 214.1-01 re-open trigger.
    */
   required?: boolean
+}
+
+/**
+ * Phase 287-01 (START-01 / D-06 / A-08) — the declared fields a launch confirm control must
+ * REFUSE to proceed past: required (absent reads `true`, as server-side) and empty after
+ * trimming. A key missing from `values` counts as empty. `required: false` is never missing.
+ */
+export function missingRequiredFields(
+  fields: EntryInputField[],
+  values: Record<string, string>,
+): EntryInputField[] {
+  return fields.filter((f) => f.required !== false && (values[f.key] ?? "").trim() === "")
+}
+
+/**
+ * The single plain sentence naming the missing fields. Uses the author's label when present,
+ * else the bare key — never a fabricated friendly name. Empty string when nothing is missing.
+ */
+export function requiredFieldsMessage(missing: EntryInputField[]): string {
+  const names = missing.map((f) => f.label ?? f.key)
+  if (names.length === 0) return ""
+  if (names.length === 1) return `${names[0]} is required`
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]} are required`
 }
 
 /**

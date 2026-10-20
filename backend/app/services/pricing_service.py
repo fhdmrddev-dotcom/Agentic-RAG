@@ -129,3 +129,28 @@ def compute_token_cost_usd(
         input_cost_usd=in_cost,
         output_cost_usd=out_cost,
     )
+
+
+def compute_token_cost_usd_unquantized(
+    input_tokens: Optional[int],
+    output_tokens: Optional[int],
+    rate: Optional[ModelRate],
+    model_id: Optional[str] = None,
+) -> CostResult:
+    """``compute_token_cost_usd`` without the 4-decimal quantize (Phase 294-01, Pitfall 8).
+
+    A decision-engine call costs about $0.0001 or less; quantised it reads ``0.0000`` — "free",
+    which is false. Same None rules as the quantised function (no rate → ``cost_usd=None``,
+    unrated, NEVER $0; no tokens recorded → ``cost_usd=None``, rated). It lives HERE because the
+    AST fence (``test_257_single_token_conversion_home.py``) allows token × rate nowhere else.
+    """
+    if rate is None:
+        return CostResult(cost_usd=None, is_rated=False, unrated_model=model_id,
+                          input_cost_usd=None, output_cost_usd=None)
+    if input_tokens is None and output_tokens is None:
+        return CostResult(cost_usd=None, is_rated=True, unrated_model=None,
+                          input_cost_usd=None, output_cost_usd=None)
+    in_cost = (Decimal(input_tokens or 0) * rate.input_cost_per_million) / ONE_MILLION
+    out_cost = (Decimal(output_tokens or 0) * rate.output_cost_per_million) / ONE_MILLION
+    return CostResult(cost_usd=in_cost + out_cost, is_rated=True, unrated_model=None,
+                      input_cost_usd=in_cost, output_cost_usd=out_cost)

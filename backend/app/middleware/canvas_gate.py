@@ -105,6 +105,11 @@ CANVAS_GATED_PATHS: frozenset[str] = frozenset(
         # comes from require_canvas. The existing /workflow-runs/{workflow_run_id} template is
         # segment-anchored and does NOT match this deeper path, so the new member is required.
         "/workflow-runs/{workflow_run_id}/phases/{phase_slug}/citations",
+        # Phase 289 (VIS-03 / D-05) — a finished run's evidence, org-scoped.
+        # TEMPLATE form: OpenAPI-half only (see the asymmetry note above); its request-path 404
+        # comes from require_canvas. The /workflow-runs/{workflow_run_id} template is
+        # segment-anchored and does NOT match this deeper path, so the new member is required.
+        "/workflow-runs/{workflow_run_id}/evidence",
     }
 )
 

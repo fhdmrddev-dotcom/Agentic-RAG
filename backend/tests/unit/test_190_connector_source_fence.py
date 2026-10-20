@@ -597,7 +597,14 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
     # module-scope registry importer and closes no cycle. Proven by a real fresh import
     # before the line was written. The fence fired on the line move; the number is
     # re-derived, the property is not.
-    assert module_scope_importers == ["app/services/harness/phase_types.py:114"], (
+    # ⚠ AND AGAIN, 114 -> 119, at Phase 289-02 (TRUST-01): `phase_types` gained a module-top
+    #   `from app.services.harness.phase_confidence import phase_confidence`, plus the comment
+    #   lines beside it, ABOVE the registry import. `phase_confidence` imports nothing from the
+    #   connector layer (its only app import, `agent_loop`, is FUNCTION-LOCAL), so it adds no
+    #   module-scope registry importer and closes no cycle: the list below still has ONE member
+    #   and the subprocess import above still exits 0. Re-pinned at 289-05, where the phase-base
+    #   set diff (`dcf6ba649` green, HEAD red) showed this was the phase's own line move.
+    assert module_scope_importers == ["app/services/harness/phase_types.py:119"], (
         f"the connector registry now has these MODULE-SCOPE importers: "
         f"{module_scope_importers!r}. It had exactly one, and that is the ONLY reason the "
         "measured import cycle (registry -> harness.grounding -> harness/__init__ -> "

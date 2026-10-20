@@ -601,6 +601,12 @@ export interface PublishVerdict {
     reason?: string | null
     cause?: string | null
   } | null
+  /**
+   *  288-02 (D-07 / A-04) — success only: one `{phase, message}` per pause step the golden
+   *  run answered automatically. The words are the SERVER's; render them verbatim. Absent
+   *  from a pre-288 server and `[]` for every workflow without a pause.
+   */
+  auto_answered?: { phase?: string | null; message: string }[]
 }
 
 /** Phase 214 (STEP-03) — the OPTIONAL keys a publish-refusal entry may carry, so a refusal can

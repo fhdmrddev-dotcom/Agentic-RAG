@@ -13,6 +13,7 @@ import type { StudioTab } from "./pages/SkillStudioPage"
 import type { LibraryTab } from "./pages/librarySelection"
 // Phase 235 plan 15 (gap-closure round 1): the hand-off's LIFETIME rule, as a strict leaf.
 import { libraryTabAfterNavigate } from "@/lib/libraryTabHandoff"
+import { readRunDeepLink } from "@/lib/runDeepLink"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
 // Phase 166 (D-166-07): the org-context spine mounts OUTSIDE StreamsProvider so an
@@ -157,6 +158,9 @@ function App() {
     if (typeof window !== "undefined" && (window.location.pathname === "/admin/spend" || window.location.pathname.startsWith("/admin/spend"))) {
       return "admin-spend"
     }
+    // Phase 289-04 (SC#3): `/app?run=<uuid>` opens that run's page on boot. The query is KEPT
+    // (no replaceState) so a reload stays on the run; the reader accepts a strict UUID only.
+    if (readRunDeepLink()) return "workflow-run"
     // BUG-260903-01 / SEED-185: both OAuth callbacks land on `/app?connections=1&…`, and until
     // 2026-09-03 nothing read it — the person arrived on Chat with their result in the URL.
     // Read once, land on Connections, and drop the query so a reload does not re-route.

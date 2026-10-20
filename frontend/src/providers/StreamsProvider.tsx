@@ -2752,6 +2752,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               agentMode: opts?.agentMode,
               // Phase 092 (D-02): kickoff field — only present on a Harness send.
               workflowDefinitionId: opts?.workflowDefinitionId,
+              inputs: opts?.inputs, // Phase 287 (A-01): one passthrough, no branch
               // Phase 216 (CHAT-05 / CHAT-06): active connector IDs for this turn.
               activeConnectorIds: opts?.activeConnectorIds,
             })

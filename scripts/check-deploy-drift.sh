@@ -107,6 +107,8 @@ OMITTED_FROM_ONEBOX=(
   # Supabase Management API access token (Phase 248 / CRED-04) — used by scripts/check-security-advisors.sh
   # for cloud advisory checks; not a one-box knob
   SUPABASE_ACCESS_TOKEN
+  # dev-only fault injection (Phase 294) — never a production knob
+  DECISION_ENGINE_FAULT_BASE_URL
 )
 
 FAILURES=()

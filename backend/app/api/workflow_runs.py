@@ -88,7 +88,15 @@ from app.utils.db import aexec
 # time, when it is still None — the reason is written out at `api/admin.py:243`.
 from app import dependencies as deps
 from app.db import rates
+from app.db import workflows as workflows_db
 from app.services.pricing_service import compute_token_cost_usd
+# 289 (TRUST-01) — the read side of the per-step confidence: one allow-list, one label home.
+# Safe at module top: the helper lazy-imports `agent_loop` inside its bodies.
+from app.services.harness.phase_confidence import (
+    KB_LABEL_DEFAULT,
+    confidence_for_wire,
+    resolve_kb_label,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -256,6 +264,24 @@ class WorkflowRunPhaseRead(BaseModel):
         ),
     )
 
+    # ── 289 (TRUST-01 / D-08 / R-05) — chat's retrieval confidence on a KB step ─────────────
+    # ⚠ JOINS THE LOCKSTEP: declared here, read BY NAME off the same single parse in the
+    # serializer, populated in the same construction, fenced by `test_200_1`'s set equality.
+    # Does NOT join the two-wire-model rule — see D-289-02-A below the class.
+    confidence: dict | None = Field(
+        default=None,
+        description=(
+            "This step's retrieval confidence, computed ONCE at write time by chat's own "
+            "`_compute_confidence` over the similarity of this step's own `search_documents` "
+            "calls: `{level, avg_similarity, disclaimer, passages, kb_label}`. `level` is "
+            "high | medium | low | none, where `none` means the step searched and matched "
+            "nothing. ⚠ `null` MEANS THE STEP MADE NO KNOWLEDGE-BASE SEARCH (or its search "
+            "failed, or the run predates this field) — render nothing, never a low chip. "
+            "`kb_label` is the bound project folder's name, else `the knowledge base`, "
+            "resolved server-side once per read."
+        ),
+    )
+
 
 # ─── D-200.1-02-A — THE SECOND WIRE MODEL IS DELIBERATELY NOT WIDENED ────────────────────
 #
@@ -278,6 +304,18 @@ class WorkflowRunPhaseRead(BaseModel):
 # ⚠ RE-OPEN TRIGGER, NAMED SO IT IS NOT A SILENCE: a chat-surface affordance that needs the
 # deliverable INDEPENDENTLY of the message stream.
 #
+# ─── D-289-02-A — `confidence` IS NOT ADDED TO THE SECOND WIRE MODEL EITHER ──────────────
+#
+# Same shape as D-200.1-02-A, and recorded HERE rather than in `models/thread.py` because that
+# file is not this phase's to edit. The chat surface already shows the RUN-LEVEL confidence on
+# the final assistant message (`harness_engine._finalize_run_grounding`), so a per-step chip on
+# the chat panel would be a second confidence claim on the same screen. Widening
+# `WorkflowPhaseState` would also widen `GET /threads/{id}/workflow`, which lives in
+# `api/threads.py` — the hottest backend route in the ledger — for no surface that reads it.
+# The per-step line lives on the run spine and the evidence report, both behind this route.
+#
+# ⚠ RE-OPEN TRIGGER: a chat-panel phase card that needs per-step evidence.
+#
 # ─── D-200.1-02-B — THE TEXT SHIPS WHOLE, ON EVERY ROW THAT HAS ONE, UNCLAMPED ───────────
 #
 # Measured over the same census: max 38,935 characters on one row, mean 3,871, p95 15,431 —
@@ -295,6 +333,18 @@ class WorkflowRunPhaseRead(BaseModel):
 # ⚠ RE-OPEN TRIGGER: the first surface that reads this field for a LIST of runs rather than
 # for one run (T-200.1-13 is ACCEPTED on exactly that condition).
 # ─────────────────────────────────────────────────────────────────────────────────────────
+
+
+class WorkflowRunWaitingOn(BaseModel):
+    """Phase 288 (D-09): who a paused-on-a-person run is waiting on, composed SERVER-side.
+
+    The client renders ``sentence`` verbatim and never builds it from an id.
+    """
+
+    sentence: str
+    step_name: str | None = None
+    prompt_line: str | None = None
+    window_passed: bool = False
 
 
 class WorkflowRunRead(BaseModel):
@@ -353,6 +403,9 @@ class WorkflowRunRead(BaseModel):
         ),
     )
     token_coverage: list[str] | None = None
+    # Phase 288 (AUTH-01) - DECLARED here, SELECTED via `user_id` + `is_golden_run` in the
+    # ownership select, PRODUCED by `_read_waiting_on`: the same lockstep as the fields above.
+    waiting_on: WorkflowRunWaitingOn | None = None
     phases: list[WorkflowRunPhaseRead] = Field(default_factory=list)
 
 
@@ -719,6 +772,122 @@ async def list_workflow_runs(
     )
 
 
+_WAITING_FALLBACK_NAME = "the person who started this run"
+
+
+def _first_line(raw: object) -> str | None:
+    """The first non-blank line of a prompt, scrubbed and clamped (V5), or None."""
+    from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
+
+    if not isinstance(raw, str):
+        return None
+    for line in raw.splitlines():
+        cleaned = _clean_label(line)
+        if cleaned:
+            return cleaned
+    return None
+
+
+def compose_waiting_on(
+    *,
+    owner_id: object,
+    viewer_id: object,
+    viewer_email: object,
+    display_name: object,
+    step_name: object,
+    prompt_text: object,
+    window_passed: bool,
+) -> dict[str, Any]:
+    """Phase 288 (D-09/D-10/D-11, A-06): the waiting-on sentence, as a pure function.
+
+    Name chain: scrubbed ``display_name``; else the viewer's email ONLY when the viewer is the
+    owner; else the words "the person who started this run". "(you)" only for the owner. A
+    non-owner gets no email and no prompt line (A-06). The paused wording says the run is
+    still waiting and continues when answered; it never says "expired".
+    """
+    from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
+
+    is_owner = str(owner_id) == str(viewer_id)
+    name = _clean_label(display_name)
+    if name is None and is_owner:
+        name = _clean_label(viewer_email)
+    if name is None:
+        name = _WAITING_FALLBACK_NAME
+    who = f"{name} (you)" if is_owner and name != _WAITING_FALLBACK_NAME else name
+    prompt_line = _first_line(prompt_text) if is_owner else None
+    if window_passed:
+        # 289-05 (D-13): restored only after S5 drove a paused run that was answered from
+        # the run page card and reached `completed` (289-VALIDATION.md S5, run 229f45ae).
+        sentence = f"Still waiting on {who}; the run continues as soon as they answer."
+    elif prompt_line:
+        sentence = f'Waiting on {who} to answer "{prompt_line}".'
+    else:
+        sentence = f"Waiting on {who} to answer."
+    return {
+        "sentence": sentence,
+        "step_name": _clean_label(step_name),
+        "prompt_line": prompt_line,
+        "window_passed": window_passed,
+    }
+
+
+async def _read_waiting_on(
+    run: dict[str, Any],
+    phase_rows: list[dict[str, Any]],
+    definition: dict[str, Any] | None,
+    slug_to_type: dict[str, str],
+    current_user: dict,
+) -> WorkflowRunWaitingOn | None:
+    """Phase 288 (A-05/A-07): built AFTER the id+user_id ownership select, keyed by that row.
+
+    ``None`` for a terminal run, a golden run, no unanswered prompt, or ANY failure: a pure
+    read never 500s over an additional affordance (the cost lookup's rule).
+    """
+    if run.get("status") not in ("active", "paused") or run.get("is_golden_run"):
+        return None
+    try:
+        pool = await deps.get_pg_pool()
+        prompt = await workflows_db.get_unanswered_ask_user(pool, run["id"])
+        if not prompt:
+            return None
+        active_slug = next(
+            (
+                r.get("slug")
+                for r in phase_rows
+                if r.get("status") == "active"
+                and slug_to_type.get(r.get("slug")) == "llm_human_input"
+            ),
+            None,
+        )
+        step_name = next(
+            (
+                p.get("name")
+                for p in ((definition or {}).get("phases") or [])
+                if isinstance(p, dict) and p.get("slug") == active_slug
+            ),
+            None,
+        )
+        display_name = await pool.fetchval(
+            "SELECT display_name FROM profiles WHERE id = $1", run["user_id"]
+        )
+        return WorkflowRunWaitingOn(
+            **compose_waiting_on(
+                owner_id=run["user_id"],
+                viewer_id=current_user["id"],
+                viewer_email=current_user.get("email"),
+                display_name=display_name,
+                step_name=step_name,
+                prompt_text=prompt.get("prompt"),
+                window_passed=run.get("status") == "paused",
+            )
+        )
+    except Exception:  # noqa: BLE001 - degrade to None, never 500 a pure read.
+        logger.warning(
+            "workflow_run waiting_on lookup failed for run %s", run.get("id"), exc_info=True
+        )
+        return None
+
+
 @router.get(
     "/{workflow_run_id}",
     response_model=WorkflowRunRead,
@@ -768,7 +937,7 @@ async def read_workflow_run(
             # fence red. ⭐ A fence that counts occurrences is a fence a COMMENT can break,
             # which is the mirror image of this repo's other standing lesson that a text
             # fence cannot tell code from a comment. Say "star read" in prose; never type it.
-            "model, input_tokens, output_tokens, token_coverage"
+            "model, input_tokens, output_tokens, token_coverage, user_id, is_golden_run"
         )
         .eq("id", str(workflow_run_id))
         .eq("user_id", current_user["id"])
@@ -894,6 +1063,10 @@ async def read_workflow_run(
             conn_name = conn_row.get("name")
             if isinstance(conn_name, str) and conn_name.strip():
                 conn_names[str(conn_row.get("id"))] = conn_name
+    # ── 289 (R-05 / T-289-10) — the KB label, resolved AT MOST ONCE PER READ and only when a
+    # row actually carries a confidence key (resolved lazily inside the loop, so the one parse
+    # per row stays one). A failure degrades to the default words and never fails the read.
+    kb_label: str | None = None
     phases = []
     for row in phase_rows:
         # ── 200.1 (RUN-04) — ONE parse per row, feeding BOTH reads ──
@@ -929,6 +1102,16 @@ async def read_workflow_run(
             row["slug"], (None, None, None)
         )
         service_name = conn_names.get(connection_id) if connection_id else None
+        # ── 289 (TRUST-01 / D-08) — THE FOURTH FACT OFF THE SAME SINGLE PARSE, by name. The
+        # stored dict is coerced through `confidence_for_wire`'s allow-list (T-289-07); a row
+        # with no key is a step with no KB use and ships `None` (D-09).
+        raw_confidence = obj.get("confidence") if isinstance(obj, dict) else None
+        if raw_confidence is not None and kb_label is None:
+            try:
+                kb_label = await resolve_kb_label(await deps.get_pg_pool(), definition)
+            except Exception:  # noqa: BLE001 — the pool itself failed; degrade, never 500.
+                logger.warning("kb label pool unavailable for run %s", run["id"], exc_info=True)
+                kb_label = KB_LABEL_DEFAULT
         phases.append(
             WorkflowRunPhaseRead(
                 slug=row["slug"],
@@ -950,6 +1133,8 @@ async def read_workflow_run(
                 tool_name=tool_name,
                 capability=capability,
                 service_name=service_name,
+                # 289 — POPULATED, not merely declared (the 214 rule above, one field over).
+                confidence=confidence_for_wire(raw_confidence, kb_label or KB_LABEL_DEFAULT),
             )
         )
 
@@ -1002,6 +1187,7 @@ async def read_workflow_run(
             run_cost_usd = None
 
     _coverage = run.get("token_coverage")
+    waiting_on = await _read_waiting_on(run, phase_rows, definition, slug_to_type, current_user)
 
     return WorkflowRunRead(
         id=run["id"],
@@ -1024,6 +1210,7 @@ async def read_workflow_run(
         cost_usd=run_cost_usd,
         is_rated=run_is_rated,
         token_coverage=list(_coverage) if isinstance(_coverage, list) else None,
+        waiting_on=waiting_on,
         phases=phases,
     )
 

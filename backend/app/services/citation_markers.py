@@ -32,8 +32,16 @@ CITATION_INSTRUCTION = (
     "marker per claim is enough; never stack markers or add a marker to a sentence that "
     "is not grounded in a listed source. If a sentence draws on your general knowledge "
     "rather than a retrieved source, leave it unmarked — an unmarked sentence tells the "
-    "reader it is general knowledge.\n\nSources retrieved this turn:"
+    "reader it is general knowledge. A marker is the number only: never put a filename, "
+    "document title or section name inside brackets (wrong: [Report.docx]; right: [3]). "
+    "When the user asks you to cite or name your sources, still use [n] markers — the app "
+    "shows the filename beside each number.\n\nSources retrieved this turn:"
 )
+
+# BUG-261020-05: repeated AFTER the manifest, because the manifest lines read
+# ``[n] {filename} · chunk k`` and a model that copies the filename half of a line
+# writes ``[Report.docx]``, which renders as plain text and leaves nothing to check.
+CITATION_REMINDER = "Cite with the number only, for example [1] — never a filename in brackets."
 
 # Delimiters wrapping the injected note so it can be stripped and refreshed cleanly on
 # each retrieval turn (the manifest may grow as more sources are retrieved) without
@@ -164,7 +172,7 @@ def apply_citation_instruction(
         return active_system_prompt
 
     manifest = format_citation_manifest(_deduplicate_citations(retrieved_citations))
-    note = _NOTE_START + CITATION_INSTRUCTION + "\n" + manifest + _NOTE_END
+    note = _NOTE_START + CITATION_INSTRUCTION + "\n" + manifest + "\n" + CITATION_REMINDER + _NOTE_END
 
     new_system_prompt = _strip_citation_note(active_system_prompt) + note
     for i, m in enumerate(messages):

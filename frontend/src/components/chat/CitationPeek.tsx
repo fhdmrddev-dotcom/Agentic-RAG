@@ -32,6 +32,7 @@ import { ArrowUpRight, Pin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Citation } from "@/types"
 import { useCitationNav } from "@/lib/citationNav"
+import { claimConfidence, verdictMeta } from "./citationVerdicts"
 
 /** Peek width (UI-SPEC: 320px). */
 const PEEK_WIDTH = 320
@@ -58,6 +59,11 @@ export interface CitationPeekProps {
   onPin: () => void
   /** Close/unpin the peek (Esc / the parent marker restores focus in 153-05). */
   onClose: () => void
+  /**
+   * Phase 294-05 (DEC-03, D-14): this marker's citation-check verdict, when it has one. Adds ONE
+   * section between the passage and the footer; absent → the peek renders exactly as before.
+   */
+  verdict?: { verdict: string; confidence: number | null }
 }
 
 export function CitationPeek({
@@ -67,6 +73,7 @@ export function CitationPeek({
   pinned,
   onPin,
   onClose,
+  verdict,
 }: CitationPeekProps) {
   const nav = useCitationNav()
   const headId = useId()
@@ -166,6 +173,12 @@ export function CitationPeek({
         </p>
       ) : null}
 
+      {/* Phase 294-05 (sketch 294 A): the verdict — glyph (aria-hidden) + WORD + the raw
+          confidence to 2 decimals, then the verdict's FIXED one-line reason. Every word comes
+          from the closed citationVerdicts table; an unknown verdict reads as couldn't check and
+          shows no number (D-17). */}
+      {verdict && <PeekVerdict verdict={verdict.verdict} confidence={verdict.confidence} />}
+
       {/* Footer: divider + {loc} left + ↗ Open document right. A full-doc peek or
           a calm-degraded chunk peek shows Open document only (empty loc). */}
       <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2 text-xs">
@@ -186,4 +199,29 @@ export function CitationPeek({
 
   if (typeof document === "undefined") return card
   return createPortal(card, document.body)
+}
+
+function PeekVerdict({ verdict, confidence }: { verdict: string; confidence: number | null }) {
+  const meta = verdictMeta(verdict)
+  const shown = claimConfidence(verdict, confidence)
+  return (
+    <div data-testid="citation-peek-verdict" className="mt-1.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-1.5">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "inline-flex h-4 min-w-4 items-center justify-center rounded px-1 font-mono text-[10px]",
+            meta.pillClass,
+          )}
+        >
+          {meta.glyph}
+        </span>
+        <span className="font-semibold text-foreground">{meta.word}</span>
+        <span className="ml-auto font-mono text-[11px] tabular-nums">
+          {shown !== null ? `confidence ${shown.toFixed(2)}` : "no verdict"}
+        </span>
+      </div>
+      <p className="mt-1 leading-relaxed">{meta.reason}</p>
+    </div>
+  )
 }

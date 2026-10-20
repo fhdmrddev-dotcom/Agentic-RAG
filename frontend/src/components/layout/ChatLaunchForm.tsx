@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react"
 import { X } from "lucide-react"
 import { LaunchInputFields } from "@/components/workflows/LaunchInputFields"
-import type { EntryInputField } from "@/components/workflows/soulData"
+import {
+  missingRequiredFields,
+  requiredFieldsMessage,
+  type EntryInputField,
+} from "@/components/workflows/soulData"
 
 /**
  * Phase 214-12 (STEP-02 / D-214-04) — THE CHAT SURFACE'S LAUNCH MOMENT.
@@ -69,6 +73,7 @@ export function ChatLaunchForm({
    * An empty box is an honest empty box. See the ⛔ block above.
    */
   const [values, setValues] = useState<Record<string, string>>({})
+  const [refusal, setRefusal] = useState<string | null>(null)
 
   // Escape dismisses, exactly as the library modal's does — the two doors behave the same way.
   useEffect(() => {
@@ -85,11 +90,16 @@ export function ChatLaunchForm({
   /**
    * ⚠ PROJECTED ONTO THE DECLARED KEYS, never handed over raw. A key that stopped being declared
    * between two renders cannot ride along, and every declared key is PRESENT — an untouched
-   * field sends `""`, which is a real answer here. No required-ness is validated: the publish
-   * gate already refuses a workflow whose `ask` key is undeclared, and blocking on an empty
-   * optional field would refuse a run the system can perform.
+   * field sends `""`, which is a real answer here. An empty REQUIRED field is refused before
+   * `onConfirm` is called (287-01), by name; an empty `required: false` field still sends `""`.
    */
   const submit = () => {
+    const missing = missingRequiredFields(fields, values)
+    if (missing.length > 0) {
+      setRefusal(requiredFieldsMessage(missing))
+      return
+    }
+    setRefusal(null)
     const collected: Record<string, string> = {}
     for (const f of fields) collected[f.key] = values[f.key] ?? ""
     onConfirm(collected)
@@ -131,6 +141,11 @@ export function ChatLaunchForm({
             values={values}
             onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
           />
+          {refusal && (
+            <p data-testid="chat-launch-required-refusal" role="alert" className="text-[12px] text-destructive">
+              {refusal}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
