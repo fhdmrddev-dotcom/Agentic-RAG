@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 294-decision-engine-rerank-and-citation-check
 source: [294-VERIFICATION.md, 294-VALIDATION.md]
 started: 2026-10-20T00:00:00Z
@@ -8,7 +8,7 @@ updated: 2026-10-20T00:00:00Z
 
 ## Current Test
 
-[awaiting human testing: start with test 1]
+[testing complete]
 
 ## Tests
 
@@ -64,14 +64,14 @@ result: passed with recorded blocks (2026-10-20) — 7 of 8 roster rows pass (R5
 
 ### 9. Remaining halves (C3 second profile, C5 Local and Off arms)
 expected: A second browser profile shows the saved verdicts with no POST; with Local or Off selected the ⓘ line reads the matching sentence.
-result: [partial 2026-10-20 — C5 passed; C3 second profile pending]. C5: with "On this server" and with Cohere saved, an unchecked answer reads "ⓘ Citation check needs Jev or OpenAI Decisions (Settings → Reranking)."; with reranking OFF the checked answer keeps its stored pills (✓ 7 supported · ✕ 1 contradicted, checked by Jev) and reads "ⓘ Citation check is off while reranking is off." in place of Re-check. C3 needs a second browser profile signed in as the same user.
+result: passed (2026-10-20). C3: the operator opened "Northwind FY2026 SOC 2 CC6 testing results" in a Chrome Incognito window (no app state, fresh login) and the stored verdicts rendered with no click (✓ 7 supported · ✕ 1 contradicted, checked by Jev · saved with this answer). On the first try they opened a never-checked chat, which correctly offered "Check citations · Jev"; that click stored a check for message 78638e15. C5: with "On this server" and with Cohere saved, an unchecked answer reads "ⓘ Citation check needs Jev or OpenAI Decisions (Settings → Reranking)."; with reranking OFF the checked answer keeps its stored pills (✓ 7 supported · ✕ 1 contradicted, checked by Jev) and reads "ⓘ Citation check is off while reranking is off." in place of Re-check. C3 needs a second browser profile signed in as the same user.
 
 ## Summary
 
 total: 9
-passed: 8
+passed: 9
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
