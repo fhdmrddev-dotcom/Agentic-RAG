@@ -332,8 +332,9 @@ class _EndPool:
         return out
 
     def terminal_writes(self):
+        """The GUARDED terminal writes (the winner check), not ``finish_run``'s own UPDATE."""
         return [args[1] for sql, args in self.calls
-                if sql.lstrip().startswith("UPDATE workflow_runs SET status")]
+                if sql.lstrip().startswith("UPDATE workflow_runs SET status") and "ANY(" in sql]
 
     def finish_runs(self):
         return [args[1] for sql, args in self.calls if "UPDATE workflow_runs SET status = $2 " in sql

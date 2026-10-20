@@ -285,6 +285,13 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
             "llm_human_input interrupted by server shutdown — phase left active "
             "for the boot-time resume sweep (096-09)"
         )
+    # Phase 295 (D-49): a ``{"kind": "cancel"}`` payload is a STOP. It used to fall through and
+    # COMPLETE this step with ``answer: ""``; it now escapes like the shutdown sentinel, and the
+    # engine's escape handler cancels the step. The ``None`` (timeout) branch below is untouched.
+    if payload and payload.get("kind") == "cancel":
+        raise asyncio.CancelledError(
+            "llm_human_input wait stopped by a cancel — the step is not completed (295 D-49)"
+        )
 
     # ── 200 (D-10 / BUG-260816-06) — THE GATE FAILS **CLOSED** ───────────────────
     #
@@ -300,9 +307,10 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
     # re-presentation can excuse.** Nobody answered, so nothing was approved.
     #
     # ⚠ GATED STRICTLY ON ``payload is None``, never on falsiness. A ``cancel`` payload
-    # is a DIFFERENT disposition that already falls through to the shipped block below,
-    # and widening this to ``if not payload`` would quietly convert a cancellation into a
-    # pause — the same class of substitution this fix removes.
+    # is a DIFFERENT disposition (~~that already falls through to the shipped block below~~
+    # — since 295 / D-49 it escapes above as a cancel), and widening this to
+    # ``if not payload`` would quietly convert a cancellation into a pause — the same class
+    # of substitution this fix removes.
     if payload is None:
         raise HumanInputTimeout(
             tool_call_id=tool_call_id, timeout_seconds=timeout_seconds

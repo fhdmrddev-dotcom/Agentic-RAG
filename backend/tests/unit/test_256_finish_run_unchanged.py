@@ -65,6 +65,15 @@ _EXPECTED_CALL_COUNTS = {
     "api/workflows.py": 1,
     "services/harness_engine.py": 3,
     "services/run_lifecycle.py": 1,
+    # ⚠ A NEW CALLER, ADDED DELIBERATELY at Phase 295 Plan 04 (D-19 / D-20 / D-21 / D-41). This
+    #   IS a contract change, recorded as one: `run_handoff.end_run` is the ONE home for every
+    #   new truthful run end (a resumed run that escaped, the sweep's unloadable definition, the
+    #   golden run's finally, run_producer's F2, the boot reconciler). It calls finish_run ONLY
+    #   after its own guarded `UPDATE ... WHERE status = ANY(...) RETURNING id` won, for the
+    #   thread-anchor clear in the same transaction finish_run owns — so the value-identity
+    #   contract holds (both writes carry the same status) and no usage column is ever named
+    #   (SEED-297). finish_run's body is byte-unchanged (the digest above).
+    "services/harness/run_handoff.py": 1,
 }
 
 # The POSITIONS, pinned as well because the plan asks for the file:line set.
@@ -156,7 +165,14 @@ _EXPECTED_CALL_SITES = {
     #   identical (no caller appeared or vanished); the call itself is byte-unchanged.
     #   Re-derived with `grep -n "await finish_run(" backend/app/services/run_lifecycle.py`.
     #   run_lifecycle.py:521 → 529
-    "services/run_lifecycle.py:529",
+    # ⚠ RE-DERIVED at Phase 295 Plan 04 Task 2: (a) the COUNTS stayed identical
+    #   ("services/run_lifecycle.py": 1); +15 when `cancel_workflow_run_internals` gained the
+    #   `stopped_by` kwarg, its D-19 docstring paragraph and the ONE `record_stop(...)` call (with
+    #   its lazy import) just above this call. The call itself is byte-unchanged.
+    #   run_lifecycle.py:529 → 544
+    "services/run_lifecycle.py:544",
+    # Phase 295 Plan 04: the new caller's one site (see the COUNTS note above).
+    "services/harness/run_handoff.py:186",
 }
 
 _CALL_RE = re.compile(r"await\s+finish_run\s*\(")
