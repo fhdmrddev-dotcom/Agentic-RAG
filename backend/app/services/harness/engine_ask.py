@@ -652,6 +652,17 @@ async def _resolve_failure_with_ask_user(
 
     if is_pre:
         return None  # signal: run the body (the user approved running despite the finding)
+    # ── Phase 295 (D-48) — AN AUTHOR'S PROCEED IS NOT THE ENGINE'S PROOF ────────────────────
+    # ``run_gates`` is first-failure-wins, so an author's failing post gate HID the engine
+    # citations gate behind it: a Proceed here used to complete an output the engine gate never
+    # saw. That gate now runs on the produced output first; on failure it pauses (or, for an
+    # outage, fails) exactly as it would have on its own.
+    _engine_outcome = await _engine_gate_after_proceed(
+        phase, failed_idx, produced_output, run_id=run_id, pool=pool, redis=redis, ctx=ctx,
+        _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+    )
+    if _engine_outcome is not None:
+        return _engine_outcome
     return PhaseOutcome("completed", produced_output, None, None)
 
 
@@ -1284,3 +1295,44 @@ async def consume_engine_answer(
         slug, run_id,
     )
     return waiting
+
+
+async def _engine_gate_after_proceed(
+    phase,
+    failed_idx: int | None,
+    produced_output,
+    *,
+    run_id: UUID,
+    pool,
+    redis,
+    ctx,
+    _audit_user_id: UUID | None,
+    stream_run_id: UUID | None = None,
+) -> PhaseOutcome | None:
+    """D-48: after an author's post ``ask_user`` Proceed, evaluate the ENGINE citations gate
+    (the single spec ``effective_phase`` appended) on the produced output.
+
+    ``None`` = no engine gate on this step, the gate was the one that failed (it is never asked
+    twice), or it passes. Otherwise the gate's own disposition: an outage fails with the shipped
+    route (D-06); 0 sources / 0 markers pause durably through ``engine_pause``.
+    """
+    from app.services.harness.grounding import is_engine_citation_gate  # noqa: PLC0415
+    from app.services.harness.validators import VALIDATOR_REGISTRY  # noqa: PLC0415
+
+    validators = list(getattr(phase, "validators", None) or [])
+    gate_idx = len(validators) - 1
+    if gate_idx < 0 or gate_idx == failed_idx or not is_engine_citation_gate(phase, gate_idx):
+        return None
+    validator = VALIDATOR_REGISTRY.get(validators[gate_idx].kind)
+    output = produced_output if isinstance(produced_output, dict) else {}
+    result = await validator(output, validators[gate_idx].config, ctx)
+    if result.passed:
+        return None
+    finding = finding_from_output(output)
+    if finding == "outage":
+        return _route_on_failure(phase, result.error_message, 0, gate_idx)
+    return await engine_pause(
+        phase, kind=finding, error_message=result.error_message, produced_output=output,
+        failed_idx=gate_idx, run_id=run_id, pool=pool, redis=redis, ctx=ctx,
+        _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+    )

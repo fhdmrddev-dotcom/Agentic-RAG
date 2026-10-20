@@ -87,7 +87,10 @@ RETIRED: dict[str, str] = {
         "citations gate (grounding.is_engine_citation_gate, not an outage) and a live armed "
         "approval now return engine_ask.engine_pause(...) — a durable pause — instead of "
         "blocking in-process on subscribe_for_response. Author ask_user gates and every other "
-        "disposition are unchanged."
+        "disposition are unchanged. Task 2 (D-18): a live armed call first takes an approval "
+        "consumed on this re-drive (receipt + run the body once). Task 3 (D-48): an author's "
+        "post-gate Proceed now runs the engine citations gate on the produced output before "
+        "returning completed."
     ),
 }
 

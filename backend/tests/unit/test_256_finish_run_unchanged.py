@@ -140,9 +140,11 @@ _EXPECTED_CALL_SITES = {
     #   `consume_engine_answer(...)` call (and its comment) landed at the top of
     #   `_run_phase_with_gates`, above all three. The calls are byte-unchanged.
     #   harness_engine.py:1943 → 1954 · 1984 → 1995 · 2281 → 2292
-    "services/harness_engine.py:1954",
-    "services/harness_engine.py:1995",
-    "services/harness_engine.py:2292",
+    #   then +2 in 295-03 Task 3 (`get_ask_user_response` / `resume_run` joined the db import
+    #   block for the sweep's engine-ask arm): 1954 → 1956 · 1995 → 1997 · 2292 → 2294
+    "services/harness_engine.py:1956",
+    "services/harness_engine.py:1997",
+    "services/harness_engine.py:2294",
     # ⚠ RE-DERIVED at Phase 268 Plan 01: +8 line shift in services/run_lifecycle.py —
     #   register_run_start gained `org_id` / `expert_id` kwargs, their forward to insert_run and
     #   a 4-line docstring note, all ABOVE this call. Check (a), the per-file COUNTS, stayed
