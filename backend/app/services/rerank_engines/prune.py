@@ -19,6 +19,10 @@ def prune(scored: list[tuple[float, dict]], top_n: int, *, keep_documents: bool 
     probability order (ties keep the pre-rerank order), each with ``relevance_score`` added."""
     ranked = [s for _, s in sorted(enumerate(scored), key=lambda t: (-t[1][0], t[0]))]
     floor_keep = min(MIN_KEEP, len(ranked))
+    if top_n <= 0:
+        # 294-REVIEW WR-04: an unbounded setting (a cleared field saved 0) must not empty the
+        # result — kept[:0] is [] and a negative slice cuts from the end. Keep the floor instead.
+        top_n = floor_keep
     kept = [s for s in ranked if s[0] >= PRUNE_FLOOR]
     if len(kept) < floor_keep:
         kept = ranked[:floor_keep]                     # never empty

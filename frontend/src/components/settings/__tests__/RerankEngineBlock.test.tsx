@@ -192,6 +192,18 @@ describe("numbers", () => {
     expect(screen.getByText(/passages per search/)).toBeInTheDocument()
   })
 
+  it("294-REVIEW WR-04 — a cleared Keep at most never reports 0; out-of-range values clamp to 1-50", () => {
+    const { props } = setup({ keepAtMost: 5 })
+    const input = screen.getByRole("spinbutton", { name: "Keep at most (passages per search)" })
+    fireEvent.change(input, { target: { value: "" } })
+    expect(props.onKeepAtMostChange).not.toHaveBeenCalled()
+    expect(input).toHaveValue(5)
+    fireEvent.change(input, { target: { value: "0" } })
+    fireEvent.change(input, { target: { value: "-3" } })
+    fireEvent.change(input, { target: { value: "80" } })
+    expect(vi.mocked(props.onKeepAtMostChange).mock.calls).toEqual([[1], [1], [50]])
+  })
+
   it("Score the best M candidates first shows poolSize and reports a change", () => {
     const { props } = setup({ poolSize: 20 })
     const input = screen.getByRole("spinbutton", { name: "Score the best (candidates first)" })

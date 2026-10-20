@@ -22060,6 +22060,8 @@ CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 317
 
 **294-REVIEW CR-02 (`6600` lines).** `citationOrdinals.parity.test.tsx` RAISED 49 → 70: 3 cases per fixture case, 7 fixture cases added.
 
+**294-REVIEW WR-04 (`6600` lines).** `RerankEngineBlock.test.tsx` RAISED 24 → 25 (one case).
+
 ## Phase 285 close (2026-10-16, 285-03)
 
 All triples below were re-derived on the merged tree at `cca4e5a90` (285-01..03 code merged) with the CLAUDE.md recipe; six-digit quick-task buckets are subtracted and named per file. The set is every non-test source file the phase changed since PHASE_BASE `c8c764e90` (`git diff --name-only c8c764e90 HEAD -- backend/app frontend/src`, tests excluded): **7 files**. Migration 209, `scripts/apply_migration_209.py` and `supabase/full-schema.sql` are gate-exempt. Each subsection quotes the scan-list cell it replaced and, where the file had one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. **Newly FIRING or absent from CLAUDE.md, row ADDED:** `watch_service.py` (6), `db/watches.py` (4), `RunHistoryList.tsx` (3). `ingest_splice.py` and `db/ingestion_jobs.py` were NOT touched (D-12).
@@ -22705,6 +22707,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). PURE D-07 prune: floor 0.1, keep ≥3, ≤top_n, never empty, keep_documents coverage. ⛔ probabilistic engines only
 
+**294-REVIEW WR-04 (`40` lines, was `36`).** `top_n <= 0` (a cleared field saved 0; `retrieval_top_k` is not bounded server-side, SEED-271) now keeps the floor, `min(3, len)`, instead of `kept[:0] == []` or a negative slice from the end. Still pure.
+
 ## `backend/app/services/rerank_engines/cohere.py`
 
 **`0 / 0 / 0` — planned (294-01); row and section added at planning.** `_rerank_api` moved out of `rerank_service.py` with behaviour unchanged (30 s timeout, `rerank-v3.5`), now behind a `_http_client()` factory so the off-path test can assert it is never constructed. ⛔ Reorder plus `[:top_n]` only: Cohere documents `relevance_score` as a ranking score, not a probability (D-08). Plan 05 re-derives the triple.
@@ -22834,6 +22838,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 **`1 / 1 / 283` (was `0 / 0 / 0`).** Created at 283 lines. Its suite (24) was adopted into the count gate by 294-05.
 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-04, row added at planning). Sketch 294 B engine cards + keep-at-most + missing-key + egress lines. ⛔ props in, callbacks out; no fetch, no useState
+
+**294-REVIEW WR-04 (`302` lines, was `283`).** "Keep at most" goes through the pure `keepAtMostFrom`: an empty or non-numeric entry reports nothing (the field keeps its value), anything else clamps to the input's own 1-50. Still owns no fetch and no state. Suite 24 → 25.
 
 ## `frontend/src/lib/api/citationChecks.ts`
 

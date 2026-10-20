@@ -189,7 +189,7 @@ const BASELINE = {
   "CitationPeek.verdict.test.tsx": 5,
   // Phase 294-04 (DEC-01) — the engine cards and the engine-id parity fence. 294-04 left them
   // un-adopted (handover); adopted here, measured green on a run of the two suites alone.
-  "RerankEngineBlock.test.tsx": 24,
+  "RerankEngineBlock.test.tsx": 25,  // 294-REVIEW WR-04: +1, a cleared Keep at most never reports 0
   "rerankEngines.parity.test.ts": 7,
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
