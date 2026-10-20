@@ -23323,6 +23323,16 @@
                 "type": "null"
               }
             ]
+          },
+          "unsourced": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnsourcedMark"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -23469,6 +23479,18 @@
             ],
             "title": "Thread Id",
             "description": "The owner's thread; null for anyone else."
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason",
+            "description": "Why a failed or cancelled run stopped, as recorded; null when nothing was."
           }
         },
         "type": "object",
@@ -26543,6 +26565,25 @@
         ],
         "title": "UnarchiveOut"
       },
+      "UnsourcedMark": {
+        "properties": {
+          "continued_by": {
+            "type": "string",
+            "title": "Continued By"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "continued_by",
+          "at"
+        ],
+        "title": "UnsourcedMark",
+        "description": "The wire shape of the mark: words and a timestamp, never an id."
+      },
       "ValidateResponse": {
         "properties": {
           "ok": {
@@ -27976,6 +28017,20 @@
               }
             ],
             "title": "Service Name"
+          },
+          "unsourced": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unsourced"
           }
         },
         "type": "object",
@@ -28301,6 +28356,17 @@
             ],
             "title": "Confidence",
             "description": "This step's retrieval confidence, computed ONCE at write time by chat's own `_compute_confidence` over the similarity of this step's own `search_documents` calls: `{level, avg_similarity, disclaimer, passages, kb_label}`. `level` is high | medium | low | none, where `none` means the step searched and matched nothing. ⚠ `null` MEANS THE STEP MADE NO KNOWLEDGE-BASE SEARCH (or its search failed, or the run predates this field) — render nothing, never a low chip. `kb_label` is the bound project folder's name, else `the knowledge base`, resolved server-side once per read."
+          },
+          "unsourced": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnsourcedMark"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present when the person chose to keep this step's output without sources: `{continued_by, at}`. `continued_by` is WORDS resolved for the viewer (the owner reads `<name> (you)`; anyone else reads `the person who started this run`), never an id. `at` is the ISO-8601 time of the choice. `null` means no such choice was made — render nothing."
           }
         },
         "type": "object",
@@ -28464,6 +28530,18 @@
                 "type": "null"
               }
             ]
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason",
+            "description": "Why a failed or cancelled run stopped, as RECORDED: the failed step's reason, else the run's `run_failed` audit reason, else a cancelled run's cancel reason. `null` means nothing was recorded (or the run did not fail or stop) — the client says so; a reason is never composed here."
           },
           "phases": {
             "items": {

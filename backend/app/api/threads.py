@@ -145,6 +145,9 @@ from app.models.thread import (
     phase_output_object,
     step_identity,
 )
+# 295 (D-04): the unsourced mark — the pure leaf + the one name chain the run page also reads.
+from app.services.harness.run_read_wire import unsourced_for_wire
+from app.api.workflow_runs import panel_unsourced_who
 from app.models.user_settings import (
     load_all_model_overrides,
     load_user_settings,
@@ -2335,6 +2338,7 @@ async def get_thread_workflow(
                     if isinstance(_name, str) and _name.strip():
                         conn_names[str(cr["id"])] = _name
             phases_list = []
+            _uns_who: str | None = None  # 295 (D-04): resolved once, only for a marked row
             for r in phase_rows:
                 # 200.1 / 214 — ONE parse per row, feeding BOTH reads. `declared_phase_measure`
                 # calls the same helper on a dict, so handing it `_obj` changes no behaviour
@@ -2350,6 +2354,9 @@ async def get_thread_workflow(
                     _raw_reason if isinstance(_raw_reason, str) and _raw_reason.strip() else None
                 )
                 _tool, _cap, _cid = identity_by_slug.get(r["slug"], (None, None, None))
+                _uns = _obj.get("unsourced") if isinstance(_obj, dict) else None
+                if isinstance(_uns, dict) and _uns_who is None:
+                    _uns_who = await panel_unsourced_who(_rls_fetchrow, current_user)
                 phases_list.append(
                     WorkflowPhaseState(
                         slug=r["slug"],
@@ -2368,6 +2375,9 @@ async def get_thread_workflow(
                         # never the connection id — `grounding.py`'s shipped rule: never draw
                         # a name the system cannot know.
                         service_name=conn_names.get(_cid) if _cid else None,
+                        # 295 (RUN-01 / D-04): the same mark the run page carries; the stored
+                        # uuid is replaced by the owner's words, never copied.
+                        unsourced=unsourced_for_wire(_uns, who=_uns_who or ""),
                     )
                 )
 

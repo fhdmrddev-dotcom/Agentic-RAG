@@ -1791,10 +1791,14 @@ async def get_unanswered_ask_user(pool: asyncpg.Pool, run_id: UUID) -> dict | No
     ``tool_calls->0->>'run_id'`` and the response row carries the matching ``tool_call_id``,
     so the scope is the WHERE clause (pool reads bypass RLS): the caller has already passed
     the id+user_id ownership select for this run.
+
+    295-05 (D-37): ``created_at`` (the prompt row's own time) and the payload's
+    ``engine_pause`` ride the result, so the caller computes "the window passed" from the
+    prompt's deadline and names an engine pause's phase, never inferring either from status.
     """
     row = await pool.fetchrow(
         """
-        SELECT m.tool_calls
+        SELECT m.tool_calls, m.created_at
         FROM messages m
         JOIN workflow_runs wr ON wr.thread_id = m.thread_id
         WHERE wr.id = $1
@@ -1822,6 +1826,8 @@ async def get_unanswered_ask_user(pool: asyncpg.Pool, run_id: UUID) -> dict | No
         "prompt": payload.get("prompt"),
         "options": payload.get("options"),
         "timeout_seconds": payload.get("timeout_seconds"),
+        "created_at": row.get("created_at"),
+        "engine_pause": payload.get("engine_pause"),
     }
 
 

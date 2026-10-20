@@ -418,6 +418,12 @@ class WorkflowPhaseState(BaseModel):
     tool_name: str | None = None
     capability: str | None = None
     service_name: str | None = None
+    # ── 295 (RUN-01 / D-04) — the unsourced mark, widened in the SAME commit as
+    # `WorkflowRunPhaseRead.unsourced` (the rule above, at full strength: the panel's PhaseCard
+    # renders it). Semantics are stated once, there. `api/threads.py` populates it.
+    # ⚠ A plain `dict[str, str]`, not `run_read_wire.UnsourcedMark`: importing the harness
+    # package from the models layer would run its executor registration (an import cycle).
+    unsourced: dict[str, str] | None = None
 
 
 class ThreadWorkflowState(BaseModel):
