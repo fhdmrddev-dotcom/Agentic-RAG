@@ -87,6 +87,24 @@ export function verdictMeta(v: string): VerdictMeta {
   return VERDICT_META[v as Verdict]
 }
 
+/**
+ * The confidence to SHOW for a claim, or null. Only a known, decided verdict carries one: a
+ * `couldnt_check` (or an unknown string, which reads as couldn't check) shows no number, because a
+ * number beside "couldn't check" would read as a measurement nobody made (D-17). Raw, never
+ * rounded here; callers format with `toFixed(2)` for display only.
+ */
+export function claimConfidence(verdict: string, confidence: number | null | undefined): number | null {
+  if (!Object.prototype.hasOwnProperty.call(VERDICT_META, verdict) || verdict === "couldnt_check") return null
+  return typeof confidence === "number" && Number.isFinite(confidence) ? confidence : null
+}
+
+/** "Contradicted, confidence 0.87" / "Couldn't check" — the marker's aria-label suffix. */
+export function verdictSpoken(verdict: string, confidence: number | null | undefined): string {
+  const word = verdictMeta(verdict).word
+  const c = claimConfidence(verdict, confidence)
+  return c === null ? word : `${word}, confidence ${c.toFixed(2)}`
+}
+
 const OFF_LINE = "Citation check is off while reranking is off."
 const REORDERS_ONLY_LINE = "Citation check needs Jev or OpenAI Decisions (Settings → Reranking)."
 

@@ -15,7 +15,6 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 const api = vi.hoisted(() => ({ getCitationChecks: vi.fn(), runCitationCheck: vi.fn() }))
 vi.mock("@/lib/api/citationChecks", () => api)
 
-import cssSource from "../../../index.css?raw"
 import messageItemSource from "../MessageItem.tsx?raw"
 import { CitedMarkdown } from "../CitedMarkdown"
 import { CitationList } from "../CitationList"
@@ -23,6 +22,21 @@ import { CITATION_MARKER_ATTR, CitationNavProvider } from "@/lib/citationNav"
 import { useCitationCheckStore } from "@/stores/citationCheckStore"
 import type { CitationCheckResult, CitationClaimResult } from "@/lib/api/citationChecks"
 import type { Citation } from "@/types"
+
+/**
+ * ⚠ `index.css` IS READ THROUGH node:fs, NOT `?raw` — measured on this suite's first GREEN run:
+ * under vitest `test.css` is false, so `index.css?raw` resolves to "" and the CSS case failed
+ * with `expected '' to contain …`. Same remedy as `ui/__tests__/tabsContrast.test.ts:50-80`.
+ */
+const nodeFs = await vi.importActual<{ readFileSync(path: string, encoding: string): string }>("node:fs")
+const SRC_ROOT = (() => {
+  const here = decodeURIComponent(import.meta.url).replace(/^file:\/\/\/?/, "")
+  const marker = "/src/components/chat/__tests__/"
+  const at = here.indexOf(marker)
+  if (at === -1) throw new Error(`fence cannot locate its own subtree in: ${here}`)
+  return `${here.slice(0, at)}/src/`
+})()
+const cssSource = nodeFs.readFileSync(`${SRC_ROOT}index.css`, "utf8")
 
 beforeAll(async () => {
   await import("@/lib/api/citationChecks")
@@ -186,6 +200,10 @@ describe("decoration (sketch 294 A)", () => {
 })
 
 describe("index.css — one block keyed only on the verdict classes", () => {
+  it("NON-VACUITY — the real stylesheet was read", () => {
+    expect(cssSource.length).toBeGreaterThan(8000)
+  })
+
   it("every verdict class and the glyph class has a rule", () => {
     for (const v of ["supported", "partly_supported", "not_supported", "contradicted", "couldnt_check"]) {
       expect(cssSource).toContain(`.citation-marker--v-${v}`)

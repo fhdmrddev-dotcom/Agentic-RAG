@@ -739,7 +739,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
               // answer routes to CitedMarkdown, which upgrades validated [n] to
               // interactive markers over the SAME dedupParagraphs output. This is
               // the ONLY new branch; the else path stays byte-identical (D-12/D-14).
-              <CitedMarkdown content={dedupParagraphs(message.content)} citations={message.citations} />
+              <CitedMarkdown content={dedupParagraphs(message.content)} citations={message.citations} checkMessageId={!isStreaming && !message.id.startsWith("temp-") ? message.id : undefined} />
             ) : (
               <MarkdownRenderer content={message.role === "assistant" ? dedupParagraphs(message.content) : message.content} />
             )}
@@ -775,6 +775,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 defaultOpen={false}
                 // Scope the row→marker flash to this message's marker host.
                 flashContainer={messageBody}
+                checkMessageId={!isStreaming && !message.id.startsWith("temp-") ? message.id : undefined}
               />
             )}
             {!isStreaming && message.suggestions && message.suggestions.length > 0 && onSendMessage && (

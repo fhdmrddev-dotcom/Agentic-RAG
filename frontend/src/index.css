@@ -892,6 +892,49 @@
   animation: markerPop 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+/* Phase 294-05 (DEC-03, sketch 294 A) — the verdict ON the marker. After a citation check the
+   chip keeps its numeral and gains a glyph (.citation-marker__verdict, aria-hidden — the WORD is
+   on the aria-label and in the peek, never colour alone) and the verdict's colour. Keyed ONLY on
+   these classes, which CitedMarkdown adds; an unchecked marker matches none of them. The doubled
+   `.citation-marker.` prefix out-ranks the hover rule above so a checked chip keeps its verdict
+   colour under the pointer (sketch: brightness lift, not a hue swap). */
+.citation-marker.citation-marker--v-supported {
+  color: hsl(var(--panel-status-done));
+  background: hsl(var(--panel-status-done) / 0.15);
+}
+.citation-marker.citation-marker--v-partly_supported {
+  color: hsl(var(--panel-status-active));
+  background: hsl(var(--panel-status-active) / 0.15);
+}
+.citation-marker.citation-marker--v-not_supported {
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
+}
+.citation-marker.citation-marker--v-contradicted {
+  color: hsl(0 85% 75%);
+  background: hsl(0 72% 51% / 0.18);
+  box-shadow: 0 0 0 1px hsl(0 72% 51% / 0.5);
+}
+.citation-marker.citation-marker--v-couldnt_check {
+  color: hsl(var(--muted-foreground));
+  background: transparent;
+  /* a border, not an outline, so the shared :focus-visible ring still shows; the padding
+     gives back the border's 1px so the chip keeps its size */
+  border: 1px dashed hsl(var(--border));
+  padding: 0 3px;
+  opacity: 0.85;
+}
+.citation-marker.citation-marker--v-supported:hover,
+.citation-marker.citation-marker--v-partly_supported:hover,
+.citation-marker.citation-marker--v-not_supported:hover,
+.citation-marker.citation-marker--v-contradicted:hover,
+.citation-marker.citation-marker--v-couldnt_check:hover {
+  filter: brightness(1.2);
+}
+.citation-marker .citation-marker__verdict {
+  margin-left: 2px;
+}
+
 /* References footer row (075-A References Footer Contract). Resting styling is
    owned by the footer components; this contract adds the shared scroll anchor +
    the flash bloom so a marker click can scroll-and-bloom the matching row. */
