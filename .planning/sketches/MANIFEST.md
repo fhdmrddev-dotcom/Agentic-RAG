@@ -2984,3 +2984,9 @@ reuses 267-B's event-card shape.
 |---|------|----------------|--------|------|
 | 294 | rerank-engine-block | How the Reranking card shows the engine, its key, and that text leaves the server (select+footer / engine cards / off-local-hosted) | ★ B engine cards (operator, 2026-10-20) | phase-294, dec-01, settings, egress |
 | 294 | citation-check | Where the citation-check verdict sits on each cited sentence (marker carries verdict / sentence underline / margin gutter) | ★ A marker carries the verdict (operator, 2026-10-20) | phase-294, dec-03, citations |
+
+## Sketch 290 — The Team Picture (Phase 290, G-2 gate, VIS-01)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 290 | team-picture | How a multi-agent workflow reads as a truthful team (org chart / office floor / layers), with no edge the definition lacks | ★ A org chart (operator, 2026-10-20) | phase-290, vis-01, seed-086, schema-truth |
