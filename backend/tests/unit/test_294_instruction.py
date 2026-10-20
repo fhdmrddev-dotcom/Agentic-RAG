@@ -40,6 +40,18 @@ def test_instruction_is_one_optional_plain_string():
     assert not (_FORBIDDEN & set(prop))
 
 
+def test_instruction_description_is_truthful_about_the_prune():
+    """294-REVIEW WR-01: the instruction is folded into the relevance question, and that score is
+    what prune() compares against PRUNE_FLOOR, so it CAN drop a passage. The model must not be told
+    it never filters."""
+    from app.services.rerank_engines.prune import MIN_KEEP
+
+    d = _prop()["description"]
+    assert "never filters" not in d and "only to reorder" not in d.lower()
+    assert "steers the relevance scores" in d
+    assert f"at least {MIN_KEEP}" in d and "never none" in d
+
+
 def test_anthropic_conversion_keeps_a_plain_string():
     from app.services.anthropic_service import _convert_tools_to_anthropic
     from app.services.openai_service import SEARCH_DOCUMENTS_TOOL

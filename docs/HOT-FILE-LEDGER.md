@@ -21183,6 +21183,8 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 79 / 40 / 
 
 CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 79 / 40 / 2602 (was `72 / 36 / 2268`) | ⛔ FIRES at 40 phases · honoured by construction (282-01: client kwargs)
 
+**294-REVIEW WR-01 (`2626` lines, +3).** One description string and its comment: `instruction` no longer claims it "never filters"; it says it steers the relevance scores that a conservative cut uses (at least 3 kept, never none). Honoured by construction (no logic). `test_278_registry_pin.py` re-captured, proven the only byte change (old text restored in memory hashes to the 294-01 digests, kept in a comment).
+
 ### `backend/app/services/provider_gateway/anthropic.py` — Phase 282 close
 
 **`5 / 5 / 125` (was `4 / 4 / 124`).** **282-01** (`46b95d72c`, +1 / -0): exactly the one forwarded kwarg planned. It FIRES (5 phases) and had no CLAUDE.md FIRING row; one is added in this commit.
