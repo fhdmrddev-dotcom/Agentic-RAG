@@ -57,14 +57,15 @@ describe("AskFolderChoice (295-06 / D-03)", () => {
     }
   })
 
+  // The item's own 32px (`pl-8`, room for the check mark) plus 16px per depth level.
   it("indents each folder 16px per depth level", async () => {
     const user = userEvent.setup()
     render(<AskFolderChoice id="ask-tc-3-folder" folders={FOLDERS} value={undefined} onChange={() => {}} />)
     await user.click(screen.getByLabelText("Folder to search"))
     const byName = (n: string) => screen.getAllByRole("option").find((o) => o.textContent === n)!
-    expect(byName("Contracts").style.paddingLeft).toBe("calc(2rem + 0px)")
-    expect(byName("Leases").style.paddingLeft).toBe("calc(2rem + 16px)")
-    expect(byName("HR").style.paddingLeft).toBe("calc(2rem + 32px)")
+    expect(byName("Contracts").style.paddingLeft).toBe("32px")
+    expect(byName("Leases").style.paddingLeft).toBe("48px")
+    expect(byName("HR").style.paddingLeft).toBe("64px")
   })
 
   it("reports the chosen folder's id, and shows the chosen folder's name once chosen", async () => {
